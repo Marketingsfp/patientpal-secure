@@ -6994,11 +6994,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
             setPagInitialForma("");
             return;
           }
+          // Mensalidade paga em mais de uma forma: a divisão que o operador
+          // digitou cobre só a mensalidade, e a taxa de adesão herdava "misto"
+          // sem composição — ia para "Outros" no Movimento de Caixa em vez da
+          // gaveta (18/09/2026, contrato #20262739, R$ 30,00). Nesse caso a
+          // taxa não é gravada aqui: fica em aberto na linha "Taxa de adesão"
+          // do contrato, para ser registrada com a forma certa.
+          const pagoEmMaisDeUmaForma = !dados.forma_pagamento || dados.forma_pagamento === "misto";
           try {
             // Se a parcela carrega a taxa de adesão (apenas a 1ª parcela),
             // gera um lançamento financeiro separado e imprime UMA GR única
             // combinando mensalidade + taxa (em vez de dois pop-ups).
-            if (taxaAdesao > 0) {
+            if (taxaAdesao > 0 && !pagoEmMaisDeUmaForma) {
               try {
                 // 1) Busca categoria "TAXA DE ADESAO CARTAO" (seed feito na migration).
                 const { data: catRow } = await supabase
@@ -7118,6 +7125,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   ? "Pagamento registrado e GR enviado para impressão."
                   : "Pagamento registrado. Nenhuma GR foi impressa.",
               );
+              if (taxaAdesao > 0) {
+                toast.warning(
+                  `A taxa de adesão (${BRL(taxaAdesao)}) NÃO foi registrada: a mensalidade foi paga em mais de uma forma. ` +
+                    'Registre agora na linha "Taxa de adesão" do contrato, escolhendo como o paciente pagou.',
+                  { duration: 15000 },
+                );
+              }
             }
           } catch (err) {
             mostrarErro(err);

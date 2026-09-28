@@ -331,6 +331,13 @@ export interface RateioGrupo {
   qtd: number;
   receita: number;
   repasse: number;
+  /**
+   * Parte do médico terceiro (dono do equipamento). Coluna própria desde
+   * 28/09/2026: o líquido já vinha descontado dela, mas nenhuma coluna a
+   * mostrava, e Repasse + Líquido ficava abaixo da Receita todos os dias
+   * (em 01/09/2026, R$ 439,20). Agora Receita = Repasse + Terceiro + Líquido.
+   */
+  terceiro: number;
   liquido: number;
   /** Percentual da receita que ficou com a clínica. */
   margem: number;
@@ -340,6 +347,8 @@ export interface RateioTotais {
   qtd: number;
   receita: number;
   repasse: number;
+  /** Ver `RateioGrupo.terceiro`. */
+  terceiro: number;
   liquido: number;
   margem: number;
 }
@@ -1371,6 +1380,7 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
       qtd: 0,
       receita: 0,
       repasse: 0,
+      terceiro: 0,
       liquido: 0,
       margem: 0,
     };
@@ -1381,6 +1391,7 @@ export function agruparRateio(linhas: RateioLinha[], agruparPor: RateioAgruparPo
     if (!l.laudo) atual.qtd += 1;
     atual.receita = round2(atual.receita + l.receita);
     atual.repasse = round2(atual.repasse + l.repasse);
+    atual.terceiro = round2(atual.terceiro + l.terceiro);
     // O líquido já vem descontado da parte do terceiro, quando existe.
     atual.liquido = round2(atual.liquido + l.liquido);
     acc.set(chave, atual);
@@ -1456,6 +1467,7 @@ export function compararRateio(
       qtd: 0,
       receita: 0,
       repasse: 0,
+      terceiro: 0,
       liquido: 0,
       margem: 0,
       receitaAnterior: g.receita,
@@ -1475,16 +1487,19 @@ export function compararRateio(
 export function totaisRateio(linhas: RateioLinha[]): RateioTotais {
   let receita = 0;
   let repasse = 0;
+  let terceiro = 0;
   let liquido = 0;
   let qtd = 0;
   for (const l of linhas) {
     if (!l.laudo) qtd++;
     receita += l.receita;
     repasse += l.repasse;
+    terceiro += l.terceiro;
     liquido += l.liquido;
   }
   receita = round2(receita);
   repasse = round2(repasse);
+  terceiro = round2(terceiro);
   liquido = round2(liquido);
-  return { qtd, receita, repasse, liquido, margem: margemClinica(receita, liquido) };
+  return { qtd, receita, repasse, terceiro, liquido, margem: margemClinica(receita, liquido) };
 }

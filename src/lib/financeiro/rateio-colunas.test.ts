@@ -95,6 +95,7 @@ describe("colunas do sintetico", () => {
       "Qtd. atend.",
       "Receita bruta",
       "Repasse prestador",
+      "Terceiro (aparelho)",
       "Líquido clínica",
       "% clínica",
     ]);

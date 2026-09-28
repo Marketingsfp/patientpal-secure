@@ -46,9 +46,18 @@ import { classificarForma } from "@/lib/financeiro/formas-pagamento";
  * Todo texto de cartão por bandeira vem da importação (o sistema atual grava
  * `cartao_debito`/`cartao_credito`), por isso a forma sozinha já identifica a
  * linha — é o balde "Parcelas do sistema antigo" de `classificarForma`.
+ *
+ * Desde 28/09/2026 entra aqui também o atendimento "Pago no sistema anterior"
+ * (`pago_sistema_anterior`): o paciente pagou na Clínica Total e só agora fez
+ * o exame. Ele não gera movimento de caixa e não está no cupom, mas entrava na
+ * Receita bruta do dia — em 10/09/2026 eram três Holter, R$ 534,00 a mais no
+ * Dashboard, no Movimento e no Rateio do que o cupom daquele dia. O repasse do
+ * médico continua devido: isto só tira o valor da conta do caixa.
  */
 export function ehParcelaImportada(l: { tipo?: string | null; forma_pagamento?: string | null }) {
-  return l.tipo === "receita" && classificarForma(l.forma_pagamento) === "legado_cartao";
+  if (l.tipo !== "receita") return false;
+  const balde = classificarForma(l.forma_pagamento);
+  return balde === "legado_cartao" || balde === "pago_sistema_anterior";
 }
 
 /**
@@ -319,13 +328,14 @@ export function avisoParcelasImportadas(
     // susto. Quem bate o olho tem que sair tranquilo na primeira linha.
     titulo:
       `Nada a fazer — ` +
-      `${plural(t.quantidade, "parcela de cartão importada", "parcelas de cartão importadas")} ` +
-      `do sistema antigo ${escondendo ? "fora" : "dentro"} do caixa deste período — ` +
+      `${plural(t.quantidade, "lançamento do sistema antigo", "lançamentos do sistema antigo")} ` +
+      `${escondendo ? "fora" : "dentro"} do caixa deste período — ` +
       `${fmt(t.receitas)}.`,
     detalhe:
-      "São parcelas de vendas antigas, trazidas da Clínica Total com a data em que cada " +
-      "parcela cai. Não passaram no balcão nesses dias, não estão no cupom impresso e o " +
-      "relatório diário do sistema antigo também não as conta. " +
+      "São parcelas de cartão de vendas antigas, trazidas da Clínica Total com a data em que " +
+      "cada parcela cai, e atendimentos que o paciente já tinha pago na Clínica Total. Esse " +
+      "dinheiro não passou no balcão nesses dias e não está no cupom impresso. O repasse do " +
+      "médico continua valendo normalmente. " +
       (escondendo
         ? "Continuam no Rateio da Receita e no Painel Executivo, pela competência. " +
           "No Dashboard, só entram com o botão de retroativos ligado."

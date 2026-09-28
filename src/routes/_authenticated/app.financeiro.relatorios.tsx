@@ -1374,6 +1374,7 @@ function Page() {
       if (c.chave === "variacaoPercentual")
         return v.percentual === null ? "—" : comSinal(v.percentual, pct(v.percentual));
       if (c.chave === "repasse") return brl(t.repasse);
+      if (c.chave === "terceiro") return brl(t.terceiro);
       if (c.chave === "liquido") return brl(t.liquido);
       if (c.chave === "margem") return pct(t.margem);
       if (i === 0) return "TOTAL GERAL";
@@ -1535,6 +1536,7 @@ function Page() {
       variacaoValor: v.valor,
       variacaoPercentual: v.percentual,
       repasse: t.repasse,
+      terceiro: t.terceiro,
       liquido: t.liquido,
       margem: t.margem,
     };
@@ -1568,6 +1570,7 @@ function Page() {
     { rotulo: "Atendimentos", valor: t.qtd.toLocaleString("pt-BR") },
     { rotulo: "Receita bruta", valor: brl(t.receita) },
     { rotulo: "Repasse ao prestador", valor: brl(t.repasse) },
+    { rotulo: "Terceiro (aparelho)", valor: brl(t.terceiro) },
     { rotulo: "Líquido da clínica", valor: `${brl(t.liquido)} (${pct(t.margem)})` },
   ];
 
@@ -2791,7 +2794,10 @@ function Page() {
               comparacaoVisivel
                 ? `${brl(totaisComp.repasse)} antes`
                 : repassePagoRateio !== null
-                  ? `Pago no caixa: repasse ${brl(repassePagoRateio.repasse)} + complemento médico ${brl(repassePagoRateio.complemento)} · devido pelos atendimentos: ${brl(totaisR.repasse)}`
+                  ? `Pago no caixa: repasse ${brl(repassePagoRateio.repasse)} + complemento médico ${brl(repassePagoRateio.complemento)} · devido pelos atendimentos: ${brl(totaisR.repasse + totaisR.terceiro)}` +
+                    (totaisR.terceiro > 0
+                      ? ` (repasse ${brl(totaisR.repasse)} + terceiro do aparelho ${brl(totaisR.terceiro)})`
+                      : "")
                   : "Devido pelos atendimentos"
             }
             delta={deltaDe(totaisR.repasse, totaisComp.repasse)}
@@ -2804,7 +2810,16 @@ function Page() {
           <CardResumo
             titulo="Líquido da clínica"
             valor={brl(totaisR.liquido)}
-            detalhe={`Margem de ${pct(totaisR.margem)} · receita menos repasse dos atendimentos`}
+            detalhe={
+              `Margem de ${pct(totaisR.margem)} · receita menos repasse e terceiro dos atendimentos` +
+              // O complemento médico é pago à parte e não entra nesta conta.
+              // Se ele deve ou não ser descontado aqui ainda não foi decidido
+              // pela gestão (28/09/2026); até lá, fica visível para ninguém
+              // tomar este líquido pelo que realmente sobrou.
+              (repassePagoRateio && repassePagoRateio.complemento > 0
+                ? ` · não desconta o complemento médico pago no período (${brl(repassePagoRateio.complemento)})`
+                : "")
+            }
             delta={deltaDe(totaisR.liquido, totaisComp.liquido)}
           />
         </div>

@@ -70,6 +70,9 @@ export function colunasRateio(
     { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
     ...comparacao,
     { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
+    // Parte do dono do equipamento: o líquido já vem descontado dela, então
+    // sem esta coluna Repasse + Líquido não fechava com a Receita.
+    { chave: "terceiro", rotulo: "Terceiro (aparelho)", formato: "moeda", somar: true },
     { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
     { chave: "margem", rotulo: "% clínica", formato: "percentual" },
   ];
@@ -120,6 +123,9 @@ export function colunasRateio(
     { chave: "forma_pagamento", rotulo: "Forma de pagamento", formato: "texto" },
     { chave: "receita", rotulo: "Receita bruta", formato: "moeda", somar: true },
     { chave: "repasse", rotulo: "Repasse prestador", formato: "moeda", somar: true },
+    // Parte do dono do equipamento: o líquido já vem descontado dela, então
+    // sem esta coluna Repasse + Líquido não fechava com a Receita.
+    { chave: "terceiro", rotulo: "Terceiro (aparelho)", formato: "moeda", somar: true },
     { chave: "liquido", rotulo: "Líquido clínica", formato: "moeda", somar: true },
     { chave: "margem", rotulo: "% clínica", formato: "percentual" },
   ];

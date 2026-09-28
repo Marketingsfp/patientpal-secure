@@ -127,7 +127,8 @@ describe("totaisRateio", () => {
       linha({ id: "1", receita: 100, repasse: 40, terceiro: 30, liquido: 30 }),
       linha({ id: "2", receita: 100, repasse: 50, terceiro: 0, liquido: 50 }),
     ]);
-    expect(t).toEqual({ qtd: 2, receita: 200, repasse: 90, liquido: 80, margem: 40 });
+    // Receita = repasse + terceiro + líquido: 200 = 90 + 30 + 80.
+    expect(t).toEqual({ qtd: 2, receita: 200, repasse: 90, terceiro: 30, liquido: 80, margem: 40 });
   });
 });
 
@@ -267,6 +268,7 @@ describe("compararRateio", () => {
     qtd: 1,
     receita: 100,
     repasse: 60,
+    terceiro: 0,
     liquido: 40,
     margem: 40,
     ...over,

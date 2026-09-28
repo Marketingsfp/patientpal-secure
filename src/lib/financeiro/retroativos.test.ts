@@ -275,6 +275,12 @@ describe("parcelas de cartão importadas do sistema antigo", () => {
     expect(ehParcelaImportada({ tipo: "despesa", forma_pagamento: "MASTER" })).toBe(false);
   });
 
+  it("pago no sistema anterior também fica fora do caixa (10/09/2026: 3 Holter, R$ 534,00)", () => {
+    expect(ehParcelaImportada({ tipo: "receita", forma_pagamento: "pago_sistema_anterior" })).toBe(
+      true,
+    );
+  });
+
   it("avisa quanto ficou fora do caixa (01/09/2026: R$ 80,00)", () => {
     const t = totaisRetroativos([{ tipo: "receita", valor: 80, data: "2026-09-01" }]);
     const aviso = avisoParcelasImportadas(t, (n) => `R$ ${n.toFixed(2)}`, true);
@@ -282,7 +288,7 @@ describe("parcelas de cartão importadas do sistema antigo", () => {
     // A primeira linha tem que tranquilizar: a equipe lia este aviso como
     // problema e perguntava à gerência se havia erro no caixa (24/09/2026).
     expect(aviso?.titulo.startsWith("Nada a fazer")).toBe(true);
-    expect(aviso?.titulo).toContain("1 parcela de cartão importada");
+    expect(aviso?.titulo).toContain("1 lançamento do sistema antigo");
     expect(aviso?.titulo).toContain("fora");
     expect(aviso?.titulo).toContain("R$ 80.00");
     expect(avisoParcelasImportadas(totaisRetroativos([]), String, true)).toBeNull();

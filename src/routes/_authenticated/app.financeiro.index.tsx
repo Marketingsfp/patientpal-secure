@@ -395,8 +395,9 @@ function FinDashboard() {
                     ` (${brl(dados.foraDoCaixa.retroativos.receitas)} em receitas e` +
                     ` ${brl(dados.foraDoCaixa.retroativos.despesas)} em despesas, digitados depois do dia)`,
                 dados.foraDoCaixa.importadas.quantidade > 0 &&
-                  `${dados.foraDoCaixa.importadas.quantidade} parcela(s) de cartão importada(s) do` +
-                    ` sistema antigo (${brl(dados.foraDoCaixa.importadas.receitas)})`,
+                  `${dados.foraDoCaixa.importadas.quantidade} lançamento(s) do sistema antigo` +
+                    ` — parcelas de cartão importadas ou atendimentos pagos na Clínica Total` +
+                    ` (${brl(dados.foraDoCaixa.importadas.receitas)})`,
               ]
                 .filter(Boolean)
                 .join("; ")}
