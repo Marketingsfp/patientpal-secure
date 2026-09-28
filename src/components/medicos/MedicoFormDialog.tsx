@@ -86,8 +86,6 @@ interface ConvenioRow {
   /** REPASSE TRIPLO — valor fixo em R$ por atendimento pago ao terceiro */
   valor_terceiro: string;
   ativo: boolean;
-  /** Só site/integrações; não afeta a agenda interna. */
-  visivel_agendamento_online: boolean;
 }
 
 /** Médico da clínica que pode ser escolhido como terceiro (dono do equipamento). */
