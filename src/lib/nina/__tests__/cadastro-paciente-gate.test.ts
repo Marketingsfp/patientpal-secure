@@ -114,6 +114,39 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: escolher vaga → coletar dados → confirmar → agendar", () => {
+  test.each(["Prefiro 14:00", "Prefiro 14:00 da lista anterior."])(
+    "preserva preferência validada no começo da frase: %s", async mensagem => {
+      const t = preparar();
+      const vaga = t.estado.appointment.confirmation!.vaga;
+      t.estado.appointment.confirmation = null;
+      registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+      const r = await t.turno(mensagem);
+      expect(r?.camposPendentes).toEqual(["nome", "data_nascimento"]);
+      expect(confirmacaoDaEscolha(t.estado)?.vaga).toEqual(vaga);
+      await t.turno("Ana da Silva, 02/01/1990");
+      expect((await t.turno("Isso, pode confirmar."))?.acoesConcluidas[0]?.confirmada).toBe(true);
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    },
+  );
+  test("recusa sem outra vaga validada limpa a escolha e não agenda", async () => {
+    const t = preparar();
+    expect(await t.turno("Prefiro não agendar agora")).toBeNull();
+    expect(confirmacaoDaEscolha(t.estado)).toBeNull();
+    expect(t.chamadas).toHaveLength(0);
+  });
+  test("aproveita nome e nascimento declarados junto da preferência sem reservar antes do aceite", async () => {
+    const t = preparar();
+    const vaga = t.estado.appointment.confirmation!.vaga;
+    t.estado.appointment.confirmation = null;
+    registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+    const r = await t.turno("Prefiro 14:00 da lista anterior. Meu nome é Lucas Simulação Teste Um, nasci em 21/10/1990.");
+    expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Lucas Simulação Teste Um", data_nascimento: "1990-10-21",
+    });
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect((await t.turno("Isso, pode confirmar."))?.acoesConcluidas[0]?.confirmada).toBe(true);
+  });
   test("escolha pede dados antes da confirmação, sem interpretar o horário como nome", async () => {
     const t = preparar();
     const vaga = t.estado.appointment.confirmation!.vaga;

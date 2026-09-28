@@ -311,7 +311,9 @@ export async function aplicarGateIdentificacao(params: {
       return encaminharFalha("selecionar_horario", r.erro);
     }
   }
-  if (ehNegacao(mensagem)) {
+  // "Prefiro 08:10" é uma escolha já validada, não uma recusa que a apaga.
+  // Negativas sem seleção válida continuam suspendendo o fluxo.
+  if (!selecionouAgora && ehNegacao(mensagem)) {
     limparEscolhaAgendamento(estado);
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "CHOOSING_SLOT";
@@ -329,7 +331,11 @@ export async function aplicarGateIdentificacao(params: {
   const ultimaMensagem = ctx.consultaAgenda?.historico.at(-1);
   const coletandoDados = ["AWAITING_PATIENT_DATA", "COLLECTING_PATIENT_DATA", "IDENTIFYING_PATIENT"].includes(estado.flow.stage) ||
     (ultimaMensagem?.role === "assistant" && /nome completo|data de nascimento|telefone com DDD/i.test(ultimaMensagem.content ?? ""));
-  const novo = aceiteDaVaga || selecionouAgora || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
+  const declaracaoNaEscolha = selecionouAgora
+    ? mensagem.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0]
+    : null;
+  const novo = declaracaoNaEscolha ? extrairDadosIdentificacao(declaracaoNaEscolha)
+    : aceiteDaVaga || selecionouAgora || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
   if (
     !selecionouAgora && !aceiteDaVaga &&
     pareceAssuntoParalelo(mensagem) &&
