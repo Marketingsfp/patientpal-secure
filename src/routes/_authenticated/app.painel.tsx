@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
+import { BannerBoasVindas } from "@/components/painel/banner-boas-vindas";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -339,6 +340,8 @@ function DashboardOperacional() {
       />
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6">
+        <BannerBoasVindas />
+
         {/* Atalhos rápidos */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
