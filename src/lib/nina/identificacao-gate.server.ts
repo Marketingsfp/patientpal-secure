@@ -53,7 +53,10 @@ export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 const NEGACAO =
   /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)(?=\s|$|[,.!?])/i;
 export function ehNegacao(texto: string): boolean {
-  return ehRespostaNegativaCurta(texto) || NEGACAO.test((texto ?? "").trim());
+  const t = (texto ?? "").trim();
+  const recusaExplicita = !t.includes("?") &&
+    /(?:^|[.!;]\s*)(?:na\s+verdade\s+n[ãa]o(?=\s*[,.;!]|$)|n[ãa]o\s+(?:confirma|confirme|confirmo|agende|agenda|marque|marca)(?=\s|$|[,.!]))/i.test(t);
+  return ehRespostaNegativaCurta(t) || NEGACAO.test(t) || recusaExplicita;
 }
 
 /**
@@ -107,8 +110,39 @@ function declaracaoDePaciente(texto: string): string | null {
   if (paciente) return paciente;
   const propria = texto.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0];
   if (propria) return propria;
+  const nomeDependente = texto.match(/\b(?:(?:o\s+)?nome(?:\s+completo)?\s+(?:dele|dela|do\s+paciente|da\s+paciente)\s+(?:é|eh|e)|(?:ele|ela)\s+se\s+chama)\s+.+/i)?.[0];
+  if (nomeDependente) return nomeDependente;
+  // Apresentação na mesma mensagem da escolha: "14:30. Sou Ana Silva...".
+  // O extrator continua rejeitando idade, médico e relação familiar como nome.
+  const apresentacao = texto.match(/(?:^|[.!?]\s*)(sou\s+.+)/i)?.[1];
+  if (apresentacao) return apresentacao;
   const dependente = texto.match(/(?:^|[.!?]\s*)(?:(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])|(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(?:é|eh|e|se\s+chama))\s+(.+)/i)?.[1];
   return dependente ?? null;
+}
+
+/** Remove só a referência familiar já vinculada ao cadastro desta sessão.
+ * "Confirmo para minha mãe" não pode aceitar a vaga de outro paciente. */
+function aceiteParaPacienteIdentificado(mensagem: string, ctx: CtxNinaPaciente): string {
+  const p = ctx.estado?.patient;
+  if (!p?.identified || !p.validated || !p.id || !ctx.pacienteNome) return mensagem;
+  const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const sufixo = mensagem.match(/\s+(?:para|pra|pro)\s+(?:(?:a|o)\s+)?(?:minha|meu)\s+(mãe|mae|pai|filha|filho|esposa|esposo)[.!\s]*$/i);
+  if (!sufixo) return mensagem;
+  const historico = ctx.consultaAgenda?.historico ?? [];
+  for (let i = historico.length - 1; i >= 0; i--) {
+    const item = historico[i]!;
+    if (item.role !== "user" || !item.content) continue;
+    const declaracao = declaracaoDePaciente(item.content);
+    if (!declaracao) continue;
+    const nome = extrairDadosIdentificacao(declaracao).nome;
+    if (!nome) continue;
+    const parentesco = item.content.match(/(?:^|[.!?]\s*)(?:meu|minha)\s+(mãe|mae|pai|filha|filho|esposa|esposo)\s+(?:é|eh|e|se\s+chama)\s+/i)?.[1];
+    // A declaração mais recente prevalece: não reutilize um parente anterior.
+    if (!parentesco || normalizar(nome) !== normalizar(ctx.pacienteNome) ||
+        normalizar(parentesco) !== normalizar(sufixo[1]!)) return mensagem;
+    return mensagem.slice(0, sufixo.index).trim();
+  }
+  return mensagem;
 }
 
 /**
@@ -225,10 +259,11 @@ export async function aplicarGateIdentificacao(params: {
   const textos = params.textos ?? null;
   const a = estado.appointment;
   const p = estado.patient;
+  const mensagemAceite = aceiteParaPacienteIdentificado(mensagem, ctx);
   if (estado.flow.stage === "HANDOFF") return null;
   if (a.appointment_id) {
     if (reservaDaSessaoAtual(estado) &&
-      ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga)) {
+      ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga)) {
       return criarResultado({ origem: "gate",
         texto: "Seu agendamento já foi realizado. Não é necessário confirmar novamente.",
         fatosConfirmados: ["agendamento_ja_existente"],
@@ -277,7 +312,7 @@ export async function aplicarGateIdentificacao(params: {
   };
   let selecionouAgora = params.aposSelecao === true;
   const cadastroProntoNoInicio = Boolean(p.identified && p.validated && p.id);
-  const aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagem, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
+  const aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
   const escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
   const opcoes = vagasDaSessao(estado, ctx.clinicaId);
   // Uma correção/recusa após o aceite suspende a gravação. A Nina não troca

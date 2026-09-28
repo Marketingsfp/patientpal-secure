@@ -124,6 +124,32 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: escolher vaga → coletar dados → confirmar → agendar", () => {
+  test.each(["Sim, confirmo para minha mãe.", "Isso aí, pode marcar pra minha mãe!"])(
+    "aceita referência à mesma paciente identificada: %s", async frase => {
+      const t = preparar();
+      await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+      expect((await t.turno(frase))?.acoesConcluidas[0]?.confirmada).toBe(true);
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+      expect((await t.turno(frase))?.fatosConfirmados).toContain("agendamento_ja_existente");
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    });
+  test.each(["Sim, confirmo para meu pai.", "Não confirmo para minha mãe.", "Sim, mas outro horário para minha mãe.", "Confirmo às 15:00 para minha mãe."])(
+    "parentesco, recusa ou escolha divergentes não autorizam reserva: %s", async frase => {
+      const t = preparar();
+      await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
+      await t.turno(frase);
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    });
+  test("não inventa vínculo familiar nem aceita declaração antiga para outro cadastro", async () => {
+    for (const declarado of ["Ana da Silva, 02/01/1990", "Minha mãe se chama Maria de Souza, 02/01/1990"]) {
+      const t = preparar();
+      await t.turno(declarado);
+      // O executor da fixture identifica sempre Ana da Silva.
+      await t.turno("Sim, confirmo para minha mãe.");
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    }
+  });
   test.each(["Prefiro 14:00", "Prefiro 14:00 da lista anterior."])(
     "preserva preferência validada no começo da frase: %s", async mensagem => {
       const t = preparar();
@@ -207,15 +233,38 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(extrairDadosIdentificacao("Quero o doutor Sergio Palermo. Minha filha é Helena Teste Quarenta Dois, 03/07/2024.").nome).toBe("Helena Teste Quarenta Dois");
     expect(extrairDadosIdentificacao("Minha filha é menor de idade. Ela pode ir com a avó?").nome).toBeNull();
   });
-  test("recusa com vírgula interrompe a confirmação sem reservar", async () => {
+  test.each([
+    "14:00. Sou Fabio Segunda Rodada Oito, nasci em 17/08/1980.",
+    "14:00, por favor. O nome dele é Fabio Segunda Rodada Oito, nasceu em 17/08/1980.",
+    "14:00. Ele se chama Fabio Segunda Rodada Oito, 17/08/1980.",
+  ])("apresentação com nome e nascimento na escolha identifica antes de pedir aceite: %s", async (frase) => {
     const t = preparar();
-    expect(await t.turno("Não, deixa pra lá. Não quero marcar agora.")).toBeNull();
+    const vaga = t.estado.appointment.confirmation!.vaga;
+    t.estado.appointment.confirmation = null;
+    registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+    const r = await t.turno(frase);
+    expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Fabio Segunda Rodada Oito", data_nascimento: "1980-08-17",
+    });
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(extrairDadosIdentificacao("Sou a mãe do paciente, ele tem oito anos.").nome).toBeNull();
+    expect(extrairDadosIdentificacao("Sou atendido pelo doutor Carlos Eduardo.").nome).toBeNull();
+  });
+  test.each([
+    "Não, deixa pra lá. Não quero marcar agora.",
+    "Na verdade não, preciso falar com meu trabalho antes. Não confirma por enquanto.",
+    "Não confirme por enquanto.", "Não agende agora.", "Não marque ainda.",
+  ])("recusa explícita interrompe a confirmação sem reservar: %s", async (frase) => {
+    const t = preparar();
+    expect(await t.turno(frase)).toBeNull();
     expect(t.estado.appointment.confirmation).toBeNull();
     expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
   });
   for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
     "isso mesmo, pode confirmar", "sim, tudo certo por aqui", "confirmo sim, obrigado!",
     "tá tudo certo, pode confirmar", "Isso, esse mesmo.",
+    "Isso aí, pode marcar.",
     "já é", "formou", "demorou", "blz, pode confirmar", "ss, pode agendar pfv",
     "Confirmo a consulta de ortopedia com Jorge Ribeiro em 21/01/2030 às 14:00."]) {
     test(`confirmação natural não retorna à escolha: ${frase}`, async () => {

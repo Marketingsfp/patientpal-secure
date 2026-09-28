@@ -38,7 +38,7 @@ export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento
     .replace(/\s+(?:por favor|por gentileza|pfv|pfvr|obrigad[oa])$/, "")
     .replace(/\s+por aqui$/, "")
     .trim();
-  t = t.replace(/^(?:ja e|formou|demorou|fechou|combinado|blz|beleza|bora|ss|s)(?=\s+(?:pode|confirmo|eu confirmo)\b)/, "sim");
+  t = t.replace(/^(?:isso (?:ai|ae)|ja e|formou|demorou|fechou|combinado|blz|beleza|bora|ss|s)(?=\s+(?:pode|confirmo|eu confirmo)\b)/, "sim");
   if (CURTA.test(t.replace(/[,.!]/g, " ").replace(/\s+/g, " ").trim())) return true;
   if (
     !/^(?:(?:sim|isso(?: mesmo)?|esse(?: mesmo)?|essa(?: mesma)?|claro|ok)[,.!\s]+)?(?:eu\s+)?(?:confirmo|aceito|autorizo|pode\s+(?:sim\s+)?(?:marcar|agendar|confirmar|finalizar|concluir)|(?:(?:esta|estao|ta)\s+(?:tudo\s+)?|tudo\s+)(?:certo|correto|certinho))\b/.test(

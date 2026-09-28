@@ -171,7 +171,14 @@ export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: s
   });
   const modos = vinculados.flatMap(p => {
     const itens = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome);
-    const selecionados = escopo && itens.length ? selecionarAtendimentosConsulta(itens, escopo) : undefined;
+    let selecionados = escopo && itens.length ? selecionarAtendimentosConsulta(itens, escopo) : undefined;
+    if (selecionados && !selecionados.length && escopo?.referencias?.length) {
+      // "pré-natal" ou o nome do médico podem ser o termo da pesquisa,
+      // enquanto a referência identifica Consulta Obstétrica. Revalide apenas
+      // referências do mesmo registro; nunca presuma a modalidade do médico.
+      selecionados = [...new Set(escopo.referencias.filter(r => r.registro === p.id && r.procedimento)
+        .flatMap(r => selecionarAtendimentosConsulta(itens, { atendimento: r.procedimento!, preferencia: escopo.preferencia })))];
+    }
     if (selecionados && !selecionados.length) return [];
     return [modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento, selecionados)];
   });

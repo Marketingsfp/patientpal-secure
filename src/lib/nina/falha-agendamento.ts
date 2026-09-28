@@ -5,6 +5,8 @@ import { FERRAMENTAS_DE_VAGAS } from "./consulta-agenda";
 export function encaminhamentoFalhaAgendamento(r: ResultadoBroker) {
   if (r.success || !r.erro) return null;
   const d = r.dados as Record<string, unknown> | null;
+  if (r.ferramenta === "selecionar_horario" && r.erro === "ACTION_NOT_AUTHORIZED" &&
+      d?.codigo === "ESCOLHA_HORARIO_PENDENTE" && d?.aguardando_paciente === true) return null;
   const acao = ["selecionar_horario", "identificar_paciente", "agendar"].includes(r.ferramenta);
   const tecnica = [
     "INTERNAL_ERROR",

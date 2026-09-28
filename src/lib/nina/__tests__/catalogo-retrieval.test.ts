@@ -182,6 +182,18 @@ describe("uma leitura do catálogo por resposta", () => {
   });
   const leituras = () => chamadas.filter(c => c.tabela.startsWith("nina_cat_"));
 
+  it("modalidade revalida referências somente do mesmo registro e atendimento", async () => {
+    banco.nina_cat_profissionais[0]!.observacao_publica = 'CONSULTA CARDIOLÓGICA\nEspecialidade: CARDIOLOGIA\nObservação: Hora marcada';
+    const escopo = { atendimento: 'consulta do coração' };
+    expect(await modalidadePublicadaDoMedico(CLINICA, medicoId, escopo)).toBe('nao_definida');
+    expect(await modalidadePublicadaDoMedico(CLINICA, medicoId, { ...escopo,
+      referencias: [{ registro: profissionalId, procedimento: 'Consulta — CARDIOLOGIA' }] })).toBe('hora_marcada');
+    expect(await modalidadePublicadaDoMedico(CLINICA, medicoId, { ...escopo,
+      referencias: [{ registro: 'outro-registro', procedimento: 'Consulta — CARDIOLOGIA' }] })).toBe('nao_definida');
+    expect(await modalidadePublicadaDoMedico(CLINICA, medicoId, { ...escopo,
+      referencias: [{ registro: profissionalId, procedimento: 'Consulta — GINECOLOGIA' }] })).toBe('nao_definida');
+  });
+
   it("conta sem copiar o catálogo e clona só os campos e registros selecionados", async () => {
     banco.nina_cat_servicos[0]!.estrutura = { aliases: ["mamo"], texto: "x".repeat(100_000) };
     await comCatalogoDoTurno(CLINICA, async () => {

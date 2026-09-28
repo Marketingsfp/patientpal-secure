@@ -22,6 +22,7 @@ describe("aceite natural vinculado ao resumo", () => {
     "blz, pode confirmar", "ss, pode agendar pfv", "fechou, confirmo às 08:30",
     "Sim, confirmo.",
     "Isso, esse mesmo.", "Isso, é esse mesmo", "isso mesmo, essa mesma",
+    "Isso aí, pode marcar.", "Isso aê, pode agendar", "isso aí, confirmo",
     "Isso esse msm", "isso, ele mesmo", "isso, essa mesma, obrigada!",
     "isso mesmo, pode confirmar",
     "Esse mesmo, pode marcar.", "essa mesma, pode agendar", "esse, confirmo",
@@ -39,6 +40,9 @@ describe("aceite natural vinculado ao resumo", () => {
   test.each([
     "Sim, mas qual o valor?",
     "Isso, esse mesmo, mas amanhã", "isso, esse mesmo não", "isso, esse mesmo?",
+    "Isso aí, pode marcar não", "Isso aí, pode marcar se tiver desconto",
+    "Isso aí, pode marcar amanhã", "Isso aí, pode marcar com outro médico",
+    "Isso aí, pode marcar?", "Isso aí não, pode marcar",
     "isso, esse mesmo se tiver desconto", "isso, esse mesmo às 10:00",
     "isso, esse mesmo, quero outro médico",
     "Esse mesmo, pode marcar às 10:00", "essa mesma, pode agendar se tiver desconto",

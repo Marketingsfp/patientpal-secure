@@ -79,7 +79,7 @@ const normalizar = (v: string) =>
 
 /** Partes da mensagem que falam só de dados pessoais ou de pagamento. */
 const PARTE_PARALELA =
-  /\b(valor|valores|preco|precos|custa|custo|quanto|pagar|pagando|pagamento|dinheiro|pix|cartao|cpf|nasci|nascida|nascido|nascimento|telefone|celular|meu nome|me chamo)\b/;
+  /\b(valor|valores|preco|precos|custa|custo|quanto|pagar|pagando|pagamento|dinheiro|pix|cartao|cpf|nasci|nasceu|nascida|nascido|nascimento|telefone|celular|meu nome|me chamo|sou|nome (?:completo )?(?:dele|dela|do paciente|da paciente)|(?:ele|ela) se chama)\b/;
 
 /**
  * Não confunde pergunta de preço, recusa, dois horários ou outro médico com escolha.

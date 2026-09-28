@@ -1,5 +1,38 @@
 import { describe, expect, it } from "bun:test";
-import { enviarComRetomadaRecuperavel, temRespostaAoEnvio } from "../homologacao-retomada";
+import { enviarComRetomadaRecuperavel, recuperarHistoricoPendente, temRespostaAoEnvio } from "../homologacao-retomada";
+
+describe("recuperação do chat sem evento Realtime", () => {
+  it("recupera resposta tardia e para assim que ela aparece", async () => {
+    let leituras = 0, esperas = 0;
+    expect(await recuperarHistoricoPendente(async () => ++leituras === 9,
+      () => true, async () => { esperas++; })).toBe(true);
+    expect(leituras).toBe(9);
+    expect(esperas).toBe(9);
+  });
+  it("não aplica leitura depois de reset ou troca de lead durante a espera", async () => {
+    let atual = true, leituras = 0;
+    expect(await recuperarHistoricoPendente(async () => { leituras++; return true; },
+      () => atual, async () => { atual = false; })).toBe(false);
+    expect(leituras).toBe(0);
+  });
+  it("falhas de leitura não reenviam a mensagem e a recuperação é limitada", async () => {
+    let leituras = 0;
+    expect(await recuperarHistoricoPendente(async () => { leituras++; throw new Error('rede'); },
+      () => true, async () => {})).toBe(false);
+    expect(leituras).toBe(24);
+  });
+  it("não sobrepõe leituras lentas e ignora sucesso de seleção antiga", async () => {
+    let atual = true, concluir!: (v: boolean) => void, leituras = 0;
+    const p = recuperarHistoricoPendente(() => { leituras++; return new Promise(r => { concluir = r; }); },
+      () => atual, async () => {});
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(leituras).toBe(1);
+    atual = false;
+    concluir(true);
+    expect(await p).toBe(false);
+  });
+});
 
 describe("retomada idempotente da homologação", () => {
   it("reutiliza o mesmo envio somente após erro recuperável persistido", async () => {

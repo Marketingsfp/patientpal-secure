@@ -108,7 +108,7 @@ import {
   type MensagemResumoRow,
 } from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
-import { enviarComRetomadaRecuperavel, temRespostaAoEnvio } from "@/lib/nina/homologacao-retomada";
+import { enviarComRetomadaRecuperavel, recuperarHistoricoPendente, temRespostaAoEnvio } from "@/lib/nina/homologacao-retomada";
 import {
   aceitaMensagemRealtime,
   mesclarMensagemTimeline,
@@ -800,6 +800,14 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     // sessão não tiver sido reiniciada manualmente no meio do caminho.
     const meuLead = () =>
       leadSelecionadoRef.current === leadOrigem && geracaoRef.current === geracao;
+
+    // O retorno HTTP e o Realtime não são garantias de atualização visual.
+    // Recupere a resposta correlacionada sem reenviar a entrada do paciente.
+    void recuperarHistoricoPendente(
+      async () => temRespostaAoEnvio(msgsRef.current, waIdDoEnvio(leadOrigem, chave)) ||
+        await carregarHistorico(leadOrigem, waIdDoEnvio(leadOrigem, chave)),
+      meuLead,
+    );
 
     setEmProcessamento((n) => n + 1);
     try {
