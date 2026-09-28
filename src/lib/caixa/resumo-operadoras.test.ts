@@ -79,6 +79,28 @@ describe("resumoOperadoras", () => {
     expect(total.diferenca).toBe(-10);
   });
 
+  it("abre o recebido por forma e dia a dia, líquido de estorno", () => {
+    const s = [
+      sessao({ id: "d2", user_id: "u6", dia: "2026-09-02", diferenca: -5 }),
+      sessao({ id: "d1", user_id: "u6", dia: "2026-09-01" }),
+    ];
+    const m = [
+      mov("d1", "recebimento", 300, "dinheiro"),
+      mov("d1", "recebimento", 200, "pix"),
+      mov("d1", "sangria", 250),
+      mov("d2", "recebimento", 150, "cartao_credito"),
+      mov("d2", "recebimento", 80, "cartao_debito"),
+      mov("d2", "estorno", 50, "cartao_credito"),
+      mov("d2", "recebimento", 30, "misto"),
+      mov("d2", "recebimento", 0, "sem_cobranca"),
+    ];
+    const l = resumoOperadoras(s, m).linhas[0];
+    expect(l.porForma).toEqual({ dinheiro: 300, pix: 200, credito: 100, debito: 80, outros: 30 });
+    expect(l.detalhe.map((d) => d.dia)).toEqual(["2026-09-01", "2026-09-02"]);
+    expect(l.detalhe[0]).toMatchObject({ sangrias: 250, gaveta: 50, calculado: 250 });
+    expect(l.detalhe[1].diferenca).toBe(-5);
+  });
+
   it("troco de abertura entra na gaveta mas não no calculado", () => {
     const s = [sessao({ id: "t", user_id: "u5", status: "aberto", valor_abertura: 110 })];
     const m = [mov("t", "abertura", 110), mov("t", "recebimento", 90, "dinheiro")];

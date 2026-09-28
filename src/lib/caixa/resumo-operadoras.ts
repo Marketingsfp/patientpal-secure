@@ -24,6 +24,8 @@ export interface SessaoOperadora {
   user_id: string;
   user_nome: string | null;
   status: string;
+  /** Dia da clínica (AAAA-MM-DD) em que a sessão abriu — só para o detalhe. */
+  dia?: string;
   valor_abertura: number | string | null;
   valor_fechamento_calculado: number | string | null;
   diferenca: number | string | null;
@@ -34,6 +36,31 @@ export interface MovOperadora {
   tipo: string;
   valor: number | string | null;
   forma_pagamento: string | null;
+}
+
+/**
+ * Recebido por forma, líquido de estorno na mesma forma. "outros" junta o que
+ * não é dinheiro, PIX ou cartão (misto, boleto…); sem cobrança e gratuidade
+ * valem R$ 0,00 e não mudam nada.
+ */
+export interface PorForma {
+  dinheiro: number;
+  pix: number;
+  credito: number;
+  debito: number;
+  outros: number;
+}
+
+/** Uma sessão de caixa, para a janela de detalhe da operadora. */
+export interface DetalheSessaoOperadora {
+  sessaoId: string;
+  dia: string;
+  fechada: boolean;
+  porForma: PorForma;
+  sangrias: number;
+  gaveta: number;
+  calculado: number;
+  diferenca: number | null;
 }
 
 export interface LinhaOperadora {
@@ -48,11 +75,14 @@ export interface LinhaOperadora {
   calculado: number;
   /** Soma das diferenças dos fechamentos; null se nenhuma sessão foi fechada. */
   diferenca: number | null;
+  porForma: PorForma;
+  /** Sessões do período, em ordem de dia. */
+  detalhe: DetalheSessaoOperadora[];
 }
 
 export interface ResumoOperadoras {
   linhas: LinhaOperadora[];
-  total: Omit<LinhaOperadora, "userId" | "nome">;
+  total: Omit<LinhaOperadora, "userId" | "nome" | "detalhe">;
 }
 
 const num = (v: number | string | null | undefined) => Number(v) || 0;
@@ -65,6 +95,27 @@ const ehDinheiro = (forma: string | null) => (forma ?? "").trim().toLowerCase() 
  * mesma regra de `bucketDeMov` na tela do Caixa.
  */
 const saiDaGaveta = (forma: string | null) => !(forma ?? "").trim() || ehDinheiro(forma);
+
+const zeroFormas = (): PorForma => ({ dinheiro: 0, pix: 0, credito: 0, debito: 0, outros: 0 });
+
+function chaveForma(forma: string | null): keyof PorForma {
+  const f = (forma ?? "").trim().toLowerCase();
+  if (f === "dinheiro") return "dinheiro";
+  if (f === "pix") return "pix";
+  if (f === "cartao_credito" || f === "credito") return "credito";
+  if (f === "cartao_debito" || f === "debito") return "debito";
+  return "outros";
+}
+
+function somaFormas(a: PorForma, b: PorForma): PorForma {
+  return {
+    dinheiro: r2(a.dinheiro + b.dinheiro),
+    pix: r2(a.pix + b.pix),
+    credito: r2(a.credito + b.credito),
+    debito: r2(a.debito + b.debito),
+    outros: r2(a.outros + b.outros),
+  };
+}
 
 export function resumoOperadoras(
   sessoes: SessaoOperadora[],
@@ -84,8 +135,11 @@ export function resumoOperadoras(
     let sangrias = 0;
     let suprimentos = 0;
     let despesas = 0;
+    const porForma = zeroFormas();
     for (const m of ms) {
       const v = num(m.valor);
+      if (m.tipo === "recebimento") porForma[chaveForma(m.forma_pagamento)] += v;
+      else if (m.tipo === "estorno") porForma[chaveForma(m.forma_pagamento)] -= v;
       if (m.tipo === "recebimento" && ehDinheiro(m.forma_pagamento)) recebidoDinheiro += v;
       else if (m.tipo === "estorno" && ehDinheiro(m.forma_pagamento)) recebidoDinheiro -= v;
       else if (m.tipo === "sangria") sangrias += v;
@@ -117,6 +171,8 @@ export function resumoOperadoras(
       gaveta: 0,
       calculado: 0,
       diferenca: null,
+      porForma: zeroFormas(),
+      detalhe: [],
     };
     linha.sessoes += 1;
     linha.emAberto ||= !fechada;
@@ -125,12 +181,25 @@ export function resumoOperadoras(
     linha.gaveta = r2(linha.gaveta + gaveta);
     linha.calculado = r2(linha.calculado + calculado);
     if (fechada) linha.diferenca = r2((linha.diferenca ?? 0) + num(s.diferenca));
+    const formasSessao = somaFormas(porForma, zeroFormas());
+    linha.porForma = somaFormas(linha.porForma, formasSessao);
+    linha.detalhe.push({
+      sessaoId: s.id,
+      dia: s.dia ?? "",
+      fechada,
+      porForma: formasSessao,
+      sangrias: r2(sangrias),
+      gaveta: r2(gaveta),
+      calculado: r2(calculado),
+      diferenca: fechada ? r2(num(s.diferenca)) : null,
+    });
     porUsuario.set(s.user_id, linha);
   }
 
   const linhas = Array.from(porUsuario.values()).sort((a, b) =>
     a.nome.localeCompare(b.nome, "pt-BR"),
   );
+  for (const l of linhas) l.detalhe.sort((a, b) => a.dia.localeCompare(b.dia));
   const total = linhas.reduce<ResumoOperadoras["total"]>(
     (acc, l) => ({
       sessoes: acc.sessoes + l.sessoes,
@@ -140,6 +209,7 @@ export function resumoOperadoras(
       gaveta: r2(acc.gaveta + l.gaveta),
       calculado: r2(acc.calculado + l.calculado),
       diferenca: l.diferenca == null ? acc.diferenca : r2((acc.diferenca ?? 0) + l.diferenca),
+      porForma: somaFormas(acc.porForma, l.porForma),
     }),
     {
       sessoes: 0,
@@ -149,6 +219,7 @@ export function resumoOperadoras(
       gaveta: 0,
       calculado: 0,
       diferenca: null,
+      porForma: zeroFormas(),
     },
   );
   return { linhas, total };

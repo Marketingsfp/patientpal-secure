@@ -21,14 +21,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { brl } from "@/lib/financeiro/format";
-import { dataClinicaDe } from "@/lib/date-utils";
+import { dataClinicaDe, formatDatePura } from "@/lib/date-utils";
 import {
   resumoOperadoras,
+  type LinhaOperadora,
   type MovOperadora,
+  type PorForma,
   type ResumoOperadoras,
   type SessaoOperadora,
 } from "@/lib/caixa/resumo-operadoras";
+
+const FORMAS: Array<{ chave: keyof PorForma; rotulo: string }> = [
+  { chave: "dinheiro", rotulo: "Dinheiro" },
+  { chave: "pix", rotulo: "PIX" },
+  { chave: "credito", rotulo: "Cartão de crédito" },
+  { chave: "debito", rotulo: "Cartão de débito" },
+  { chave: "outros", rotulo: "Outros" },
+];
 
 /** Um dia a mais de cada lado: `aberto_em` é UTC e o dia certo sai de `dataClinicaDe`. */
 function diaDeslocado(iso: string, dias: number): string {
@@ -55,10 +72,9 @@ async function carregar(
   if (usuario !== "todos" && usuario !== "sem") q = q.eq("user_id", usuario);
   const { data: ss, error } = await q;
   if (error) throw error;
-  const sessoes = ((ss ?? []) as Array<SessaoOperadora & { aberto_em: string }>).filter((s) => {
-    const dia = dataClinicaDe(s.aberto_em);
-    return !!dia && dia >= de && dia <= ate;
-  });
+  const sessoes = ((ss ?? []) as Array<SessaoOperadora & { aberto_em: string }>)
+    .map((s) => ({ ...s, dia: dataClinicaDe(s.aberto_em) ?? "" }))
+    .filter((s) => !!s.dia && s.dia >= de && s.dia <= ate);
 
   const movs: MovOperadora[] = [];
   const LOTE_IDS = 50;
@@ -87,6 +103,112 @@ function corDiferenca(v: number | null) {
   return v < 0 ? "text-rose-600" : "text-amber-600";
 }
 
+/** Janela ao clicar na operadora: recebido por forma e o caixa dia a dia. */
+function DetalheOperadora({
+  linha,
+  onClose,
+}: {
+  linha: LinhaOperadora | null;
+  onClose: () => void;
+}) {
+  const totalFormas = linha ? FORMAS.reduce((acc, f) => acc + linha.porForma[f.chave], 0) : 0;
+  return (
+    <Dialog open={!!linha} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        {linha && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{linha.nome}</DialogTitle>
+              <DialogDescription>
+                Caixa no período · {linha.sessoes} sess{linha.sessoes === 1 ? "ão" : "ões"}. Valores
+                recebidos já descontados os estornos.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {FORMAS.map((f) => (
+                <div key={f.chave} className="rounded-lg border bg-card p-2.5 min-w-0">
+                  <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
+                    {f.rotulo}
+                  </p>
+                  <p className="font-semibold tabular-nums">{brl(linha.porForma[f.chave])}</p>
+                </div>
+              ))}
+              <div className="rounded-lg border bg-muted/50 p-2.5 min-w-0">
+                <p className="text-[12px] uppercase tracking-wide text-muted-foreground">
+                  Total recebido
+                </p>
+                <p className="font-bold tabular-nums">{brl(totalFormas)}</p>
+              </div>
+            </div>
+
+            <Table containerClassName="rounded-lg border">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Dia</TableHead>
+                  {FORMAS.map((f) => (
+                    <TableHead key={f.chave} className="text-right">
+                      {f.rotulo}
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right">Sangrias entregues</TableHead>
+                  <TableHead className="text-right">Sobra entregue no fechamento</TableHead>
+                  <TableHead className="text-right">Calculado</TableHead>
+                  <TableHead className="text-right">Diferença</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {linha.detalhe.map((d) => (
+                  <TableRow key={d.sessaoId}>
+                    <TableCell className="whitespace-nowrap">
+                      {formatDatePura(d.dia)}
+                      {!d.fechada && (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 border-emerald-300 text-emerald-700"
+                        >
+                          Aberto
+                        </Badge>
+                      )}
+                    </TableCell>
+                    {FORMAS.map((f) => (
+                      <TableCell key={f.chave} className="text-right tabular-nums">
+                        {brl(d.porForma[f.chave])}
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-right tabular-nums">{brl(d.sangrias)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{brl(d.gaveta)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{brl(d.calculado)}</TableCell>
+                    <TableCell className={`text-right tabular-nums ${corDiferenca(d.diferenca)}`}>
+                      {d.diferenca == null ? "—" : brl(d.diferenca)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow className="font-semibold">
+                  <TableCell>Total</TableCell>
+                  {FORMAS.map((f) => (
+                    <TableCell key={f.chave} className="text-right tabular-nums">
+                      {brl(linha.porForma[f.chave])}
+                    </TableCell>
+                  ))}
+                  <TableCell className="text-right tabular-nums">{brl(linha.sangrias)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{brl(linha.gaveta)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{brl(linha.calculado)}</TableCell>
+                  <TableCell className={`text-right tabular-nums ${corDiferenca(linha.diferenca)}`}>
+                    {linha.diferenca == null ? "—" : brl(linha.diferenca)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function CaixasOperadoras({
   clinicaId,
   de,
@@ -102,6 +224,7 @@ export function CaixasOperadoras({
   const [resumo, setResumo] = useState<ResumoOperadoras | null>(null);
   const [erro, setErro] = useState(false);
   const [aberto, setAberto] = useState(true);
+  const [detalhe, setDetalhe] = useState<LinhaOperadora | null>(null);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -209,9 +332,14 @@ export function CaixasOperadoras({
             </TableHeader>
             <TableBody>
               {resumo.linhas.map((l) => (
-                <TableRow key={l.userId}>
+                <TableRow
+                  key={l.userId}
+                  className="cursor-pointer"
+                  title="Clique para ver o caixa dia a dia, por forma de pagamento"
+                  onClick={() => setDetalhe(l)}
+                >
                   <TableCell className="whitespace-nowrap">
-                    {l.nome}
+                    <span className="underline decoration-dotted underline-offset-4">{l.nome}</span>
                     {l.sessoes > 1 && (
                       <span className="text-xs text-muted-foreground"> · {l.sessoes} sessões</span>
                     )}
@@ -251,6 +379,7 @@ export function CaixasOperadoras({
             </TableFooter>
           </Table>
         )}
+        <DetalheOperadora linha={detalhe} onClose={() => setDetalhe(null)} />
       </CardContent>
     </Card>
   );
