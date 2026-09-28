@@ -1302,7 +1302,9 @@ async function executarFerramentaInterna(
         } else if (!ctx.opcoesAgendamentoInicioTurno ||
           /^(?:sim(?:,?\s*por\s*favor)?|ok|isso(?:\s*mesmo)?|pode\s*(?:ser|marcar|agendar)|oi|ol[aá])[!.\s]*$/i.test(mensagem.trim()) ||
           /\b(?:quais|disponibilidade|valor|preço|preco)\b/i.test(mensagem)) {
-          return falha("ACTION_NOT_AUTHORIZED", "Consultar opções ou dizer sim sem resumo não seleciona uma vaga. Aguarde a escolha do paciente.");
+          return falha("ACTION_NOT_AUTHORIZED", "Consultar opções ou dizer sim sem resumo não seleciona uma vaga. Mostre os horários disponíveis no período solicitado e aguarde a escolha do paciente; não encaminhe por esta pendência.", {
+            codigo: "ESCOLHA_HORARIO_PENDENTE", aguardando_paciente: true,
+          });
         }
         const vagasAtuais = await enriquecerModalidades(ctx.clinicaId, await disponibilidadeDoPedido(ctx, {
           clinicaId: ctx.clinicaId, medicoId: vaga.medico_id, data: vaga.data, dias: 90,

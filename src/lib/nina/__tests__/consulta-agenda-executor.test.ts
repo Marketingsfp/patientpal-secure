@@ -1012,6 +1012,18 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
 });
 
 describe("executor real das ferramentas com banco simulado", () => {
+  test("período escolhido sem oferta anterior pede horário sem reservar nem gerar falha técnica", async () => {
+    const ctx = { ...contexto("Tem vaga à tarde com Alex Louza?"), opcoesAgendamentoInicioTurno: false };
+    referenciaConsulta(ctx);
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO, periodo: "tarde" })).ok).toBe(true);
+    ctx.consultaAgenda = { mensagemAtual: "À tarde, o primeiro que tiver.", historico: [] };
+    const r = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: inicio.toISOString(), fim: fim.toISOString() });
+    expect(r.ok).toBe(false);
+    expect(r.codigo).toBe("ESCOLHA_HORARIO_PENDENTE");
+    expect(r.aguardando_paciente).toBe(true);
+    expect(ctx.estado.appointment.confirmation).toBeFalsy();
+    expect(gravacoes).toHaveLength(0);
+  });
   test("sem data, disponibilidade encontra vaga após duas semanas como proxima_vaga", async () => {
     const distante = new Date(inicio.getTime() + 21 * 86_400_000);
     banco.agendamentos![0]!.inicio = distante.toISOString();

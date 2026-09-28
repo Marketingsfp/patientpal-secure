@@ -124,6 +124,32 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: escolher vaga → coletar dados → confirmar → agendar", () => {
+  test.each(["Sim, confirmo para minha mãe.", "Isso aí, pode marcar pra minha mãe!"])(
+    "aceita referência à mesma paciente identificada: %s", async frase => {
+      const t = preparar();
+      await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+      expect((await t.turno(frase))?.acoesConcluidas[0]?.confirmada).toBe(true);
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+      expect((await t.turno(frase))?.fatosConfirmados).toContain("agendamento_ja_existente");
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    });
+  test.each(["Sim, confirmo para meu pai.", "Não confirmo para minha mãe.", "Sim, mas outro horário para minha mãe.", "Confirmo às 15:00 para minha mãe."])(
+    "parentesco, recusa ou escolha divergentes não autorizam reserva: %s", async frase => {
+      const t = preparar();
+      await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
+      await t.turno(frase);
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    });
+  test("não inventa vínculo familiar nem aceita declaração antiga para outro cadastro", async () => {
+    for (const declarado of ["Ana da Silva, 02/01/1990", "Minha mãe se chama Maria de Souza, 02/01/1990"]) {
+      const t = preparar();
+      await t.turno(declarado);
+      // O executor da fixture identifica sempre Ana da Silva.
+      await t.turno("Sim, confirmo para minha mãe.");
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    }
+  });
   test.each(["Prefiro 14:00", "Prefiro 14:00 da lista anterior."])(
     "preserva preferência validada no começo da frase: %s", async mensagem => {
       const t = preparar();
