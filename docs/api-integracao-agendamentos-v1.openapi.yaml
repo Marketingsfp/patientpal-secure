@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Health Hub Pro — API de Agendamentos v1
-  version: "1.4.0"
+  version: "1.6.0"
   description: |
     API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
     A v1.1 é compatível com a v1: mesma base, nada removido nem alterado.
@@ -668,6 +668,7 @@ components:
                 - patient_not_found
                 - business_rule_violation
                 - procedure_not_resolved
+                - doctor_not_bookable_online
                 - appointment_rejected
                 - rate_limit_exceeded
                 - auth_lookup_failed
@@ -695,7 +696,7 @@ components:
       description: "409 — `idempotency_key_reuse`, `request_in_progress`"
       content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
     Unprocessable:
-      description: "422 — `invalid_body`, `invalid_query`, `invalid_period`, `patient_not_found`, `business_rule_violation`, `procedure_not_resolved`, `appointment_rejected`"
+      description: "422 — `invalid_body`, `invalid_query`, `invalid_period`, `patient_not_found`, `business_rule_violation`, `procedure_not_resolved`, `doctor_not_bookable_online` (v1.6: médico com `visivel_agendamento_online=false`; a lista pública de médicos/especialidades e `/availability` também respeitam o campo), `appointment_rejected`"
       content: { application/json: { schema: { $ref: "#/components/schemas/Erro" } } }
     RateLimited:
       description: "429 — `rate_limit_exceeded`"
