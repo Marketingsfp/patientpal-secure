@@ -11,6 +11,8 @@ export type PreferenciaAtendimentoConsulta = {
 
 export type EscopoAtendimentoConsulta = {
   atendimento: string;
+  /** Referências da pesquisa já identificada, revalidadas na publicação atual. */
+  referencias?: Array<{ registro: string; procedimento: string | null }>;
   /** Quando presente, a modalidade pertence ao serviço, nunca à consulta do médico. */
   procedimentoId?: string;
   preferencia?: PreferenciaAtendimentoConsulta | null;

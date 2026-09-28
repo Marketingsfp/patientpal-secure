@@ -1,5 +1,24 @@
 import type { MensagemTimeline } from "./homologacao-realtime";
 
+/** Rede de segurança somente de leitura, independente do retorno do envio.
+ * Realtime pode perder um evento mesmo com o canal conectado. Não reenvia
+ * mensagem e não prolonga o processamento da Nina. Leituras nunca se sobrepõem. */
+export async function recuperarHistoricoPendente(
+  buscar: () => Promise<boolean>, atual: () => boolean,
+  esperar = () => new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+): Promise<boolean> {
+  for (let tentativa = 0; tentativa < 24 && atual(); tentativa++) {
+    await esperar();
+    if (!atual()) break;
+    try {
+      if (await buscar()) return atual();
+    } catch {
+      // Uma falha transitória de leitura não é uma nova falha no envio.
+    }
+  }
+  return false;
+}
+
 /** Só retoma uma entrada já persistida e explicitamente liberada pelo servidor. */
 export async function enviarComRetomadaRecuperavel<T extends {
   recuperavel?: boolean; mensagemPersistida?: boolean;

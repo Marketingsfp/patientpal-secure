@@ -313,6 +313,7 @@ function escopoModalidade(ctx: CtxNinaPaciente, procedimento?: string | null): E
   const preferencia = ctx.consultaAgenda?.selecaoRevalidada ?? normalizarSelecaoContextual(conhecimento.selecao);
   const selecao = preferencia?.clinicaId === ctx.clinicaId && preferencia.sessaoId === ctx.estado?.session_id ? preferencia : null;
   return { atendimento: procedimento ?? selecao?.modalidade?.nome ?? conhecimento.consulta.termo,
+    ...(!procedimento && !selecao?.modalidade ? { referencias: conhecimento.referencias } : {}),
     preferencia: conhecimento.atendimentoConsulta };
 }
 

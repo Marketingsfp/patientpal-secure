@@ -53,7 +53,10 @@ export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 const NEGACAO =
   /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)(?=\s|$|[,.!?])/i;
 export function ehNegacao(texto: string): boolean {
-  return ehRespostaNegativaCurta(texto) || NEGACAO.test((texto ?? "").trim());
+  const t = (texto ?? "").trim();
+  const recusaExplicita = !t.includes("?") &&
+    /(?:^|[.!;]\s*)(?:na\s+verdade\s+n[ãa]o(?=\s*[,.;!]|$)|n[ãa]o\s+(?:confirma|confirme|confirmo|agende|agenda|marque|marca)(?=\s|$|[,.!]))/i.test(t);
+  return ehRespostaNegativaCurta(t) || NEGACAO.test(t) || recusaExplicita;
 }
 
 /**
@@ -107,6 +110,12 @@ function declaracaoDePaciente(texto: string): string | null {
   if (paciente) return paciente;
   const propria = texto.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0];
   if (propria) return propria;
+  const nomeDependente = texto.match(/\b(?:(?:o\s+)?nome(?:\s+completo)?\s+(?:dele|dela|do\s+paciente|da\s+paciente)\s+(?:é|eh|e)|(?:ele|ela)\s+se\s+chama)\s+.+/i)?.[0];
+  if (nomeDependente) return nomeDependente;
+  // Apresentação na mesma mensagem da escolha: "14:30. Sou Ana Silva...".
+  // O extrator continua rejeitando idade, médico e relação familiar como nome.
+  const apresentacao = texto.match(/(?:^|[.!?]\s*)(sou\s+.+)/i)?.[1];
+  if (apresentacao) return apresentacao;
   const dependente = texto.match(/(?:^|[.!?]\s*)(?:(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])|(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(?:é|eh|e|se\s+chama))\s+(.+)/i)?.[1];
   return dependente ?? null;
 }

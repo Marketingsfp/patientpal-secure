@@ -1087,6 +1087,9 @@ describe("executor real das ferramentas com banco simulado", () => {
   });
   for (const origem of ["homologacao", "whatsapp"] as const) {
     for (const caso of [
+      { especialidade: "OBSTETRICIA", nome: "Sérgio Satoshi", agenda: "SERGIO SATOSHI OKUDA", termo: "pré-natal",
+        referencias: ["Consulta — OBSTETRICIA", "Consulta Obstétrica", null, "consulta obstetrica", "Consulta OBSTETRICIA"],
+        modalidade: "Hora marcada", codigoModalidade: "hora_marcada", estruturado: true },
       { especialidade: "OBSTETRICIA", nome: "Sérgio Satoshi", agenda: "SERGIO SATOSHI OKUDA", termo: "Sérgio Satoshi",
         referencias: ["Consulta — OBSTETRICIA", "Consulta Obstétrica", null, "consulta obstetrica", "Consulta OBSTETRICIA"],
         modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
@@ -1097,10 +1100,13 @@ describe("executor real das ferramentas com banco simulado", () => {
         referencias: ["Consulta — ODONTOLOGIA", "Avaliação odontológica", null],
         modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
     ]) {
-      test(`${origem}: ${caso.especialidade} mantém o vínculo com referências equivalentes até concluir`, async () => {
+      test(`${origem}: ${caso.especialidade} (${caso.termo}) mantém o vínculo com referências equivalentes até concluir`, async () => {
         Object.assign(banco.nina_cat_profissionais![0]!, { nome: caso.nome,
           especialidades: [{ nome: caso.especialidade }], tipo_atendimento: caso.modalidade });
         banco.medicos![0]!.nome = caso.agenda;
+        if ('estruturado' in caso && caso.estruturado) {
+          banco.nina_cat_profissionais![0]!.observacao_publica = 'CONSULTA OBSTÉTRICA\nEspecialidade: OBSTETRICIA\nProfissional: Sérgio Satoshi\nObservação: Hora marcada';
+        }
         const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data"), origem,
           teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
         ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
@@ -1108,7 +1114,8 @@ describe("executor real das ferramentas com banco simulado", () => {
           referencias: caso.referencias.map(procedimento => ({ registro: CATALOGO, versao: null, procedimento, medicoNome: caso.nome })) };
         const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
         expect(r.ok).toBe(true);
-        const procedimento = `Consulta — ${caso.especialidade}`;
+        const procedimento = 'estruturado' in caso && caso.estruturado
+          ? 'CONSULTA OBSTÉTRICA — OBSTETRICIA' : `Consulta — ${caso.especialidade}`;
         expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ medico_id: MEDICO, procedimento,
           modalidade: caso.codigoModalidade });
         expect(gravacoes).toHaveLength(0);
