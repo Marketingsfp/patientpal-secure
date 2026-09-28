@@ -2937,6 +2937,7 @@ export type Database = {
           fidelidade_meses: number
           id: string
           informativo_html: string | null
+          informativo_pdf_path: string | null
           max_dependentes: number
           modalidade: string | null
           modelo_contrato: string | null
@@ -2963,6 +2964,7 @@ export type Database = {
           fidelidade_meses?: number
           id?: string
           informativo_html?: string | null
+          informativo_pdf_path?: string | null
           max_dependentes?: number
           modalidade?: string | null
           modelo_contrato?: string | null
@@ -2989,6 +2991,7 @@ export type Database = {
           fidelidade_meses?: number
           id?: string
           informativo_html?: string | null
+          informativo_pdf_path?: string | null
           max_dependentes?: number
           modalidade?: string | null
           modelo_contrato?: string | null
