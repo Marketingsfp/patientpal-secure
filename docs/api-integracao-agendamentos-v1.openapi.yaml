@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Health Hub Pro — API de Agendamentos v1
-  version: "1.3.0"
+  version: "1.4.0"
   description: |
     API REST genérica de agenda do Health Hub Pro, autenticada por chave de API.
     A v1.1 é compatível com a v1: mesma base, nada removido nem alterado.
@@ -10,9 +10,12 @@ info:
     (resolve por CPF ou cadastra, com escopo `patients:write`) e existem os
     catálogos `GET /specialties` e `GET /doctors`.
 
-    Não existe — e não existirá — endpoint de busca de paciente: uma rota
-    pública que responde "esse CPF existe?" seria um oráculo de enumeração
-    sobre a base real de pacientes.
+    v1.4 (mudança de política consciente): existe `POST /patients/lookup`,
+    que reconhece paciente já cadastrado por CPF + data de nascimento (os dois
+    precisam bater) e devolve só dados mascarados. Escopo próprio
+    `patients:lookup`, limite de 10/min e 100/dia por chave. Ver seção 9.1 da
+    documentação em Markdown. No objeto `paciente`, `nome` e `telefone` passam
+    a ser opcionais: só são exigidos para criar cadastro.
 
     Toda escrita passa pelos mesmos núcleos de regra de negócio usados pela tela
     da Agenda. A API nunca grava direto em `agendamentos` (exceto anexar o motivo
@@ -330,6 +333,54 @@ paths:
         "422": { $ref: "#/components/responses/Unprocessable" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /patients/lookup:
+    post:
+      tags: [Verificação de paciente]
+      summary: "v1.4 — reconhece paciente já cadastrado por CPF + nascimento"
+      description: |
+        Escopo exigido: `patients:lookup` (nenhuma chave antiga o recebe
+        automaticamente). Limite próprio: 10 por minuto e 100 por dia por
+        chave; estouro → 429 com `details.limite = "lookup"`.
+
+        Responde 200 nos dois casos, com a mesma forma. CPF inexistente e CPF
+        existente com nascimento diferente são indistinguíveis (corpo e tempo).
+        Só considera cadastro ativo da clínica da chave. Nunca devolve
+        `paciente_id`, e-mail, endereço, nome completo ou a data enviada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cpf, data_nascimento]
+              properties:
+                cpf: { type: string, minLength: 11, maxLength: 20 }
+                data_nascimento: { type: string, format: date }
+      responses:
+        "200":
+          description: Resultado (encontrado ou não)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [encontrado, nome_exibicao, telefone_mascarado]
+                    properties:
+                      encontrado: { type: boolean }
+                      nome_exibicao: { type: [string, "null"], examples: ["MARIA S."] }
+                      telefone_mascarado: { type: [string, "null"], examples: ["(21) ****-8970"] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { description: "`invalid_cpf` ou `invalid_body`" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    options:
+      summary: Pré-voo CORS
+      security: []
+      responses:
+        "204": { description: Sem conteúdo }
+
   /patients/verify/start:
     post:
       tags: [Verificação de paciente]
@@ -531,7 +582,11 @@ components:
 
     PacienteEntrada:
       type: object
-      required: [cpf, nome, data_nascimento, telefone]
+      required: [cpf, data_nascimento]
+      description: |
+        v1.4: `nome` e `telefone` só são obrigatórios para CRIAR cadastro.
+        Sem eles, a API só usa cadastro existente (CPF + nascimento); se não
+        houver, responde 422 `patient_details_required`.
       description: |
         Alternativa a `paciente_id` (v1.1). Exige o escopo `patients:write` e
         o cabeçalho `Idempotency-Key`. A API nunca responde se o CPF já existia.

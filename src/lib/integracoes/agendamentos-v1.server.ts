@@ -22,6 +22,7 @@ import {
   autenticarApiKey,
   concluirIdempotencia,
   consumirRateLimit,
+  consumirRateLimitCustom,
   erroResponse,
   exigirEscopo,
   iniciarIdempotencia,
@@ -31,7 +32,12 @@ import {
   registrarRequisicao,
   type ApiKeyContexto,
 } from "./api.server";
-import { pacienteSchema, resolverPaciente } from "./pacientes-v1.server";
+import {
+  consultarPaciente,
+  lookupSchema,
+  pacienteSchema,
+  resolverPaciente,
+} from "./pacientes-v1.server";
 
 const CAMPOS_AGENDAMENTO =
   "id,clinica_id,paciente_id,paciente_nome,medico_id,especialidade_id,inicio,fim,procedimento,status,observacoes,tipo_atendimento,data_pagamento,origem_integracao,id_externo,created_at,updated_at";
@@ -303,6 +309,33 @@ async function buscarAgendamento(db: SupabaseClient<Database>, ctx: ApiKeyContex
     });
   }
   return r.data;
+}
+
+/** v1.4 — POST /patients/lookup. Ver seção 9.1 da documentação. */
+async function handleLookupPaciente(
+  db: SupabaseClient<Database>,
+  ctx: ApiKeyContexto,
+  bodyTexto: string,
+): Promise<{ status: number; body: unknown }> {
+  exigirEscopo(ctx, "patients:lookup");
+  // Torneira própria e apertada, separada das demais.
+  await consumirRateLimitCustom(db, ctx, "lookup", 10, 100, { limite: "lookup" });
+  let bruto: unknown;
+  try {
+    bruto = JSON.parse(bodyTexto || "{}");
+  } catch {
+    throw new ApiError({ status: 400, code: "invalid_json", message: "Corpo JSON inválido." });
+  }
+  const parsed = lookupSchema.safeParse(bruto);
+  if (!parsed.success) {
+    throw new ApiError({
+      status: 422,
+      code: "invalid_body",
+      message: "Corpo da requisição inválido.",
+      details: parsed.error.flatten().fieldErrors,
+    });
+  }
+  return ok(200, await consultarPaciente(db, ctx, parsed.data));
 }
 
 async function handleCriar(
@@ -928,6 +961,13 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
       partes[2] === "reschedule"
     ) {
       resultado = await handleReagendar(db, ctx, ator, decodeURIComponent(partes[1]!), bodyTexto);
+    } else if (
+      request.method === "POST" &&
+      partes[0] === "patients" &&
+      partes[1] === "lookup" &&
+      partes.length === 2
+    ) {
+      resultado = await handleLookupPaciente(db, ctx, bodyTexto);
     } else {
       // Verificação do paciente por WhatsApp (v1.2).
       const verificacao = await rotearVerificacaoV1(

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { pacienteSchema, resolverPaciente } from "./pacientes-v1.server";
+import {
+  consultarPaciente,
+  nomeExibicao,
+  pacienteSchema,
+  resolverPaciente,
+  telefoneMascarado,
+} from "./pacientes-v1.server";
 import { ApiError, type ApiKeyContexto } from "./api.server";
 
 const CLINICA = "1d3c4f34-2a0f-40fa-b39a-3609677a11a5";
@@ -125,9 +131,11 @@ describe("resolverPaciente — resolução", () => {
 });
 
 describe("pacienteSchema", () => {
-  it("exige cpf, nome, nascimento e telefone", () => {
-    const r = pacienteSchema.safeParse({ cpf: "52998224725" });
-    expect(r.success).toBe(false);
+  it("exige cpf e nascimento; nome e telefone são opcionais (v1.4)", () => {
+    expect(pacienteSchema.safeParse({ cpf: "52998224725" }).success).toBe(false);
+    expect(
+      pacienteSchema.safeParse({ cpf: "52998224725", data_nascimento: "1985-03-12" }).success,
+    ).toBe(true);
   });
 
   it("aceita e-mail e sexo como opcionais", () => {
@@ -141,5 +149,67 @@ describe("pacienteSchema", () => {
     expect(pacienteSchema.safeParse({ ...entrada, data_nascimento: "12/03/1985" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("resolverPaciente — v1.4 sem nome/telefone", () => {
+  it("pede só cadastro existente quando falta nome ou telefone", async () => {
+    let visto: Record<string, unknown> = {};
+    const db = fakeDb({ rpc: { paciente_id: PAC, criado: false, mismatch: false }, onRpc: (a) => (visto = a) });
+    const r = await resolverPaciente(db, ctx, { cpf: entrada.cpf, data_nascimento: entrada.data_nascimento });
+    expect(visto["_somente_existente"]).toBe(true);
+    expect(r.paciente_id).toBe(PAC);
+    expect(r.telefone_divergente).toBeNull();
+  });
+
+  it("com nome e telefone mantém o comportamento de sempre", async () => {
+    let visto: Record<string, unknown> = {};
+    const db = fakeDb({ rpc: { paciente_id: PAC, criado: true, mismatch: false }, onRpc: (a) => (visto = a) });
+    await resolverPaciente(db, ctx, entrada);
+    expect(visto["_somente_existente"]).toBe(false);
+  });
+
+  it("CPF não encontrado sem nome/telefone → patient_details_required", async () => {
+    const db = fakeDb({ rpc: { nao_encontrado: true } });
+    await expect(
+      resolverPaciente(db, ctx, { cpf: entrada.cpf, data_nascimento: entrada.data_nascimento }),
+    ).rejects.toMatchObject({ code: "patient_details_required", status: 422 });
+  });
+
+  it("nascimento divergente continua patient_data_mismatch", async () => {
+    const db = fakeDb({ rpc: { mismatch: true } });
+    await expect(
+      resolverPaciente(db, ctx, { cpf: entrada.cpf, data_nascimento: "1990-01-01" }),
+    ).rejects.toMatchObject({ code: "patient_data_mismatch" });
+  });
+});
+
+describe("consultarPaciente — v1.4 lookup", () => {
+  const achado = { encontrado: true, nome: "MARIA DA SILVA SANTOS", telefone: "21999998970" };
+  const nada = { encontrado: false, nome: null, telefone: null };
+  const e = { cpf: entrada.cpf, data_nascimento: entrada.data_nascimento };
+
+  it("achado devolve só nome de exibição e telefone mascarado", async () => {
+    const r = await consultarPaciente(fakeDb({ rpc: achado }), ctx, e);
+    expect(r).toEqual({ encontrado: true, nome_exibicao: "MARIA S.", telefone_mascarado: "(21) ****-8970" });
+    expect(Object.keys(r).sort()).toEqual(["encontrado", "nome_exibicao", "telefone_mascarado"]);
+  });
+
+  it("não achado e nascimento divergente têm a mesma resposta", async () => {
+    const r = await consultarPaciente(fakeDb({ rpc: nada }), ctx, e);
+    expect(r).toEqual({ encontrado: false, nome_exibicao: null, telefone_mascarado: null });
+  });
+
+  it("CPF inválido → invalid_cpf", async () => {
+    await expect(consultarPaciente(fakeDb({ rpc: nada }), ctx, { ...e, cpf: "12345678901" })).rejects.toMatchObject({
+      code: "invalid_cpf",
+      status: 422,
+    });
+  });
+
+  it("máscaras", () => {
+    expect(nomeExibicao("JOAO")).toBe("JOAO");
+    expect(nomeExibicao("ana de souza")).toBe("ANA S.");
+    expect(telefoneMascarado("5521988887777")).toBe("(21) ****-7777");
   });
 });
