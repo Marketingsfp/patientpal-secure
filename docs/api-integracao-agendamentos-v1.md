@@ -1,4 +1,4 @@
-# API de Agendamentos — Health Hub Pro (v1.3)
+# API de Agendamentos — Health Hub Pro (v1.4)
 
 API REST genérica de agenda, autenticada por **chave de API**. Não é uma
 integração com nenhum sistema específico: é a agenda do Health Hub Pro exposta
@@ -49,6 +49,10 @@ operação, mesmo com acesso privilegiado ao banco.
 | `appointments:read` | listar e consultar agendamentos |
 | `appointments:write` | criar, cancelar e reagendar |
 | `appointments:write:all` | alterar também agendamentos criados fora da API (concedido caso a caso) |
+
+Escopos de paciente: `patients:write` (v1.1, cadastrar), `patients:verify`
+(v1.2, WhatsApp) e `patients:lookup` (v1.4, reconhecer por CPF + nascimento —
+ver 9.1 e seção 12).
 
 Sem `appointments:write:all`, a chave só altera o que **ela mesma** criou.
 
@@ -372,15 +376,41 @@ Motivação: o site público da Policlínica São Francisco de Paula precisa fec
 agendamento sozinho, inclusive para quem nunca foi na clínica. A v1 travava
 porque exigia `paciente_id` já existente.
 
-### 9.1 Por que NÃO existe busca de paciente
+### 9.1 Busca de paciente: decisão da v1.1 e mudança consciente na v1.4
 
-A solução óbvia seria um `GET /patients?cpf=...`. Ela é a errada: qualquer rota
-pública que confirme se um CPF existe transforma a API num **oráculo de
+**Decisão original (v1.1).** Não havia busca de paciente de propósito. Uma rota
+pública que confirma "esse CPF existe?" transforma a API num **oráculo de
 enumeração de CPF** sobre a base real de pacientes — problema de LGPD, não de
-conveniência. Por isso a resolução do paciente acontece **dentro** do
-`POST /appointments` e nenhuma resposta da API revela se o cadastro já existia
-(nem por campo, nem por mensagem de erro, nem por código HTTP). Essa informação
-fica só no log interno (`integracao_requisicoes`).
+conveniência. Por isso a resolução acontecia só dentro do `POST /appointments`,
+sem revelar se o cadastro já existia.
+
+**Mudança de política (v1.4, setembro/2026) — escolha consciente do cliente,
+não descuido.** O site deixou de usar o reconhecimento por WhatsApp (seção 10).
+Sem ele, quem já era paciente precisava redigitar nome, CPF, nascimento e
+telefone a cada agendamento, e o cadastro antigo era usado por baixo sem que a
+pessoa soubesse. O cliente conhece o risco de enumeração e decidiu assumi-lo
+para resolver isso, criando `POST /patients/lookup` com estas mitigações:
+
+- **Dois dados, os dois têm que bater:** CPF **e** data de nascimento. Só CPF
+  não basta — adivinhar o par é muito mais difícil do que testar CPFs.
+- **CPF existente com nascimento errado responde igual a CPF inexistente**
+  (`encontrado: false`, mesmo corpo, mesmo status 200, mesmo trabalho no
+  servidor e no banco — o tempo de resposta também não separa os casos).
+- **Só dado mascarado sai:** primeiro nome + inicial do primeiro sobrenome
+  (`MARIA S.`) e telefone com só DDD e 4 últimos dígitos (`(21) ****-8970`).
+  Nunca `paciente_id`, e-mail, endereço, nome completo, nem eco da data.
+- **Escopo próprio `patients:lookup`**, separado de `patients:write`. Nenhuma
+  chave existente o recebeu automaticamente; é concedido chave a chave.
+- **Limite próprio e apertado:** 10 consultas por minuto e 100 por dia por
+  chave, em janelas próprias (`lookup_minuto`/`lookup_dia`) em
+  `integracao_rate_limit`. Estouro → 429 com `details.limite: "lookup"`.
+- **Só cadastro ativo da clínica da chave.**
+- CPF com dígito verificador inválido → 422 `invalid_cpf` (isso não revela
+  nada sobre a base).
+- O corpo da consulta não é gravado no log; `integracao_requisicoes` guarda só
+  rota, status e duração.
+
+Detalhes da rota na seção 12.
 
 ### 9.2 `POST /appointments` aceita `paciente`
 
@@ -484,7 +514,8 @@ atendimento como "Realizado"; a escrita continua passando pelos núcleos
 - **v1.1 (2026-09):** objeto `paciente` no `POST /appointments`; escopo
   `patients:write`; `GET /specialties` e `GET /doctors`; limite próprio de
   cadastro de paciente; `Idempotency-Key` obrigatório no cadastro.
-  **Deliberadamente ausente:** endpoint de busca/consulta de paciente (ver 9.1).
+  **Deliberadamente ausente na v1.1:** endpoint de busca/consulta de paciente
+  (a v1.4 mudou essa decisão de forma consciente — ver 9.1).
 - **v1 (2026-08):** versão inicial, congelada e ainda válida.
 
 ---
@@ -650,3 +681,55 @@ aceitável; oferecer um que seria recusado, não. `vagas` vale sempre 1.
   `procedimento_id`/`procedimento_nome`/`procedimento_tipo` nos slots;
   `com_horario` em `/specialties` e `/doctors`; `/availability` montado a
   partir das fichas `DISPONIVEL` (contrato de coerência com o `POST`).
+
+---
+
+## 12. v1.4 — reconhecer o paciente que já tem cadastro
+
+Motivação e mitigações: seção 9.1.
+
+### 12.1 `POST /patients/lookup`
+
+Escopo `patients:lookup`. Corpo:
+
+```json
+{ "cpf": "529.982.247-25", "data_nascimento": "1985-03-12" }
+```
+
+Resposta **200 nos dois casos**, dentro do envelope `data` usado por toda a API:
+
+```json
+{ "data": { "encontrado": true,  "nome_exibicao": "MARIA S.", "telefone_mascarado": "(21) ****-8970" } }
+{ "data": { "encontrado": false, "nome_exibicao": null,        "telefone_mascarado": null } }
+```
+
+Erros: 403 `insufficient_scope`; 422 `invalid_cpf`; 422 `invalid_body`;
+429 `rate_limit_exceeded` com `details.limite: "lookup"`.
+
+### 12.2 `nome` e `telefone` opcionais no objeto `paciente`
+
+No `POST /appointments`, o objeto `paciente` passa a exigir só `cpf` e
+`data_nascimento`:
+
+- com `nome` e `telefone`: comportamento da v1.1, inalterado (usa cadastro
+  existente ou cria);
+- sem algum dos dois: só usa cadastro existente. CPF encontrado e nascimento
+  batendo → agenda nesse cadastro. CPF não encontrado → 422
+  `patient_details_required` ("informe também nome e telefone para criar o
+  cadastro"). Nascimento diferente → 422 `patient_data_mismatch`, com a mesma
+  mensagem genérica de sempre.
+
+A função de banco `integracao_resolver_paciente` ganhou o parâmetro
+`_somente_existente` (padrão `false`); a consulta usa
+`integracao_lookup_paciente`. Ambas só executáveis pelo servidor.
+
+### 12.3 O que NÃO mudou
+
+`/availability`, `com_horario`, núcleos da Agenda, pagamento/financeiro e a
+verificação por WhatsApp (`/patients/verify/*`, que continua funcionando).
+
+### 12.4 Changelog
+
+- **v1.4 (2026-09):** `POST /patients/lookup` (escopo `patients:lookup`,
+  10/min e 100/dia); `nome`/`telefone` opcionais no objeto `paciente`;
+  erro `patient_details_required`; seção 9.1 reescrita.
