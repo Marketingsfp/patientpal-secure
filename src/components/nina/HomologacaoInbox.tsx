@@ -108,6 +108,7 @@ import {
   type MensagemResumoRow,
 } from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
+import { enviarComRetomadaRecuperavel, temRespostaAoEnvio } from "@/lib/nina/homologacao-retomada";
 import {
   aceitaMensagemRealtime,
   mesclarMensagemTimeline,
@@ -543,7 +544,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   }, []);
 
   const carregarHistorico = useCallback(
-    async (id: string) => {
+    async (id: string, waId?: string) => {
       if (!clinicaId || leadSelecionadoRef.current !== id) return false;
       controleHistoricoRef.current.selecionar(`${clinicaId}:${id}:${geracaoRef.current}`);
       const solicitacao = controleHistoricoRef.current.iniciar();
@@ -581,7 +582,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           setFerramentas([]);
           setDebugEstado(null);
         }
-        return r.mensagens.at(-1)?.direction === "out";
+        return waId ? temRespostaAoEnvio(r.mensagens, waId) : r.mensagens.at(-1)?.direction === "out";
       } catch (e: any) {
         if (atual()) mostrarErro(e);
         return false;
@@ -630,12 +631,12 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
    * até a resposta aparecer — assim nenhuma mensagem "some" da tela.
    */
   const aguardarResposta = useCallback(
-    async (id: string, tentativas = 8) => {
+    async (id: string, tentativas = 8, waId?: string) => {
       if (!clinicaId) return false;
       const geracao = geracaoRef.current;
       for (let i = 0; i < tentativas; i++) {
         if (leadSelecionadoRef.current !== id || geracaoRef.current !== geracao) return false;
-        if (await carregarHistorico(id)) return true;
+        if (await carregarHistorico(id, waId)) return true;
         await new Promise((res) => setTimeout(res, 2500));
       }
       return false;
@@ -802,9 +803,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
 
     setEmProcessamento((n) => n + 1);
     try {
-      const r = (await enviar({
-        data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave },
-      })) as {
+      type ResultadoEnvio = {
         duplicada: boolean;
         reply: string | null;
         erro: string | null;
@@ -816,7 +815,14 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         avisoMensagemId?: string | null;
         avisoEstado?: "confirmado" | "envio_pendente" | null;
         mensagemPersistida?: boolean;
+        recuperavel?: boolean;
       };
+      const entrada = { data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave } };
+      const r = await enviarComRetomadaRecuperavel(
+        async () => (await enviar(entrada)) as ResultadoEnvio, meuLead,
+      );
+      const duplicadaRespondida = r.duplicada && !r.reply && !r.erro && meuLead()
+        ? await aguardarResposta(leadOrigem, 8, waIdDoEnvio(leadOrigem, chave)) : false;
       if (r.mensagemPersistida === false) {
         falharOtimista(chave);
         if (meuLead()) {
@@ -848,7 +854,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           setEncerrado(null);
         } else if (r.transferida) {
           setEncerrado(AVISO_TESTE_ENCERRADO);
-        } else if (!r.reply && !agrupada && !r.semNovaMensagem) {
+        } else if (!r.reply && !agrupada && !r.semNovaMensagem && !duplicadaRespondida) {
           setErro("A Nina não respondeu nesta execução.");
           setEncerrado(null);
         }
@@ -856,12 +862,12 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
 
 
       return {
-        ok: agrupada ? true : !r.erro && (!!r.reply || r.semNovaMensagem === true),
+        ok: agrupada ? true : !r.erro && (!!r.reply || r.semNovaMensagem === true || duplicadaRespondida),
         transferida: !!r.transferida,
         erro: r.erro ?? null,
       };
     } catch (e: any) {
-      const chegou = meuLead() ? await aguardarResposta(leadOrigem) : false;
+      const chegou = meuLead() ? await aguardarResposta(leadOrigem, 8, waIdDoEnvio(leadOrigem, chave)) : false;
       if (chegou) concluirOtimista(chave);
       else falharOtimista(chave);
       void carregarLeads();
