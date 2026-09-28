@@ -103,6 +103,8 @@ const CONECTIVO = /^(?:da|de|do|das|dos|e|o|a)$/i;
 
 /** Só recorta uma declaração explícita, sem confundir o médico com o paciente. */
 function declaracaoDePaciente(texto: string): string | null {
+  const paciente = texto.match(/(?:^|[.!?]\s*)(?:o|a)\s+paciente\s+(?:é|eh|e|se\s+chama)\s+(.+)/i)?.[1];
+  if (paciente) return paciente;
   const propria = texto.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0];
   if (propria) return propria;
   const dependente = texto.match(/(?:^|[.!?]\s*)(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(.+)/i)?.[1];

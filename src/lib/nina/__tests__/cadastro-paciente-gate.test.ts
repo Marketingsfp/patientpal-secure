@@ -7,6 +7,16 @@ import { resumoEntregueFixture } from "./agendamento-fixture";
 import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO } from "../agendamento-escolha";
 import { derivarEtapa } from "../atendimento-fase6";
 
+test.each(["O paciente é", "A paciente se chama", "O paciente eh"])("declaração explícita de paciente: %s", prefixo => {
+  expect(extrairDadosIdentificacao(`${prefixo} Miguel Simulação Teste, nascido em 18/05/2022.`)).toMatchObject({
+    nome: "Miguel Simulação Teste", data_nascimento: "2022-05-18",
+  });
+});
+
+test("a pergunta sobre quem é o paciente não vira um nome", () => {
+  expect(extrairDadosIdentificacao("O paciente é meu filho, posso agendar?").nome).toBeNull();
+});
+
 function preparar(faltantes = ["nome", "data_nascimento"]) {
   const estado = estadoVazio();
   Object.assign(estado.appointment, {
