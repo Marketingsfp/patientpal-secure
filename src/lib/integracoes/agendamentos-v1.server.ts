@@ -31,7 +31,12 @@ import {
   registrarRequisicao,
   type ApiKeyContexto,
 } from "./api.server";
-import { pacienteSchema, resolverPaciente } from "./pacientes-v1.server";
+import {
+  consultarPaciente,
+  lookupSchema,
+  pacienteSchema,
+  resolverPaciente,
+} from "./pacientes-v1.server";
 
 const CAMPOS_AGENDAMENTO =
   "id,clinica_id,paciente_id,paciente_nome,medico_id,especialidade_id,inicio,fim,procedimento,status,observacoes,tipo_atendimento,data_pagamento,origem_integracao,id_externo,created_at,updated_at";
@@ -928,6 +933,13 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
       partes[2] === "reschedule"
     ) {
       resultado = await handleReagendar(db, ctx, ator, decodeURIComponent(partes[1]!), bodyTexto);
+    } else if (
+      request.method === "POST" &&
+      partes[0] === "patients" &&
+      partes[1] === "lookup" &&
+      partes.length === 2
+    ) {
+      resultado = await handleLookupPaciente(db, ctx, bodyTexto);
     } else {
       // Verificação do paciente por WhatsApp (v1.2).
       const verificacao = await rotearVerificacaoV1(

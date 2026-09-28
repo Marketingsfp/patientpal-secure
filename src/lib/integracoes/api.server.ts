@@ -315,6 +315,7 @@ export async function consumirRateLimitCustom(
   prefixo: string,
   limiteMinuto: number,
   limiteDia: number,
+  details?: Record<string, unknown>,
 ): Promise<void> {
   const agora = new Date();
   const minuto = new Date(
@@ -348,6 +349,7 @@ export async function consumirRateLimitCustom(
         status: 429,
         code: "rate_limit_exceeded",
         message: "Limite de requisições atingido para esta chave.",
+        ...(details ? { details } : {}),
       });
     }
   }
