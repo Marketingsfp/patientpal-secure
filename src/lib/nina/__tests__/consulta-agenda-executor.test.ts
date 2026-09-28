@@ -975,6 +975,24 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
 });
 
 describe("executor real das ferramentas com banco simulado", () => {
+  test("sem data, disponibilidade encontra vaga após duas semanas como proxima_vaga", async () => {
+    const distante = new Date(inicio.getTime() + 21 * 86_400_000);
+    banco.agendamentos![0]!.inicio = distante.toISOString();
+    banco.agendamentos![0]!.fim = new Date(distante.getTime() + 30 * 60_000).toISOString();
+    for (const ferramenta of ["consultar_disponibilidade", "proxima_vaga"]) {
+      const ctx = contexto("Tem vaga à tarde com Alex Louza?");
+      referenciaConsulta(ctx);
+      const r = await executarFerramentaPaciente(ctx, ferramenta, { medico_id: MEDICO, periodo: "tarde" });
+      expect(r.ok).toBe(true);
+      expect(ctx.estado.appointment.slot_options?.vagas[0]?.inicio).toBe(distante.toISOString());
+      expect(gravacoes).toHaveLength(0);
+    }
+    const ctx = contexto("Só posso nos próximos sete dias à tarde");
+    referenciaConsulta(ctx);
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, periodo: "tarde", dias: 7 });
+    expect(r.reason).toBe("NO_AVAILABILITY");
+    expect(ctx.estado.appointment.slot_options?.vagas ?? []).toHaveLength(0);
+  });
   function referenciaConsulta(ctx: CtxNinaPaciente, termo = "cardiologia") {
     banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Cardiologia Infantil" }];
     ctx.estado!.knowledge_context = {

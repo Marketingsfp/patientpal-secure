@@ -1632,9 +1632,10 @@ async function executarFerramentaInterna(
             if (dia === "modalidade_pendente") return modalidadePendente();
             slots = dia;
           } else {
-            // Sem dia: o primeiro dia com vaga (no período pedido), depois lido inteiro.
+            // Sem dia: mesma janela de proxima_vaga. O limite antigo de 14 dias
+            // encaminhava pacientes mesmo havendo vagas posteriores (ex.: Mastologia).
             const janela = await enriquecerModalidades(ctx.clinicaId, await disponibilidadeDoPedido(ctx, {
-              clinicaId: ctx.clinicaId, ...base, dias: p.dias ?? 14, periodo: periodoBusca,
+              clinicaId: ctx.clinicaId, ...base, dias: p.dias ?? 60, periodo: periodoBusca,
             }), escopoModalidade(ctx));
             if (janela.some(s => !permiteReserva(s.modalidade))) return modalidadePendente();
             const primeiro = horariosDistintos(janela)[0];
