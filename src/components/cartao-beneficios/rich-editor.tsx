@@ -472,9 +472,12 @@ interface Props {
   onChange: (html: string) => void;
   clinicaId: string;
   variables?: { label: string; token: string }[];
+  /** Quando informado, a janela do PDF importado oferece "Salvar só o PDF":
+   * o arquivo é entregue a quem usa o editor em vez de virar texto. */
+  onSalvarSoPdf?: (file: File) => Promise<boolean>;
 }
 
-export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
+export function RichEditor({ value, onChange, clinicaId, variables, onSalvarSoPdf }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
@@ -1340,8 +1343,10 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
           <DialogHeader>
             <DialogTitle>Documento PDF</DialogTitle>
             <DialogDescription>
-              {pdfFile?.name} — visualize o PDF original abaixo. Você pode mantê-lo somente para
-              leitura ou importar o texto para edição no editor.
+              {pdfFile?.name} — visualize o PDF original abaixo.{" "}
+              {onSalvarSoPdf
+                ? "Você pode salvar só o PDF (a tela passa a exibi-lo como está) ou importar o texto para edição no editor."
+                : "Você pode mantê-lo somente para leitura ou importar o texto para edição no editor."}
             </DialogDescription>
           </DialogHeader>
           {pdfUrl && (
@@ -1361,6 +1366,28 @@ export function RichEditor({ value, onChange, clinicaId, variables }: Props) {
             >
               Abrir em nova aba
             </Button>
+            {onSalvarSoPdf && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={importando}
+                onClick={async () => {
+                  if (!pdfFile) return;
+                  setImportando(true);
+                  try {
+                    const ok = await onSalvarSoPdf(pdfFile);
+                    if (!ok) return;
+                    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+                    setPdfUrl("");
+                    setPdfFile(null);
+                  } finally {
+                    setImportando(false);
+                  }
+                }}
+              >
+                Salvar só o PDF
+              </Button>
+            )}
             <Button
               type="button"
               disabled={importando}

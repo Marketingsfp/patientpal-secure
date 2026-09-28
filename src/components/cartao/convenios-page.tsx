@@ -65,6 +65,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RichEditor } from "@/components/cartao-beneficios/rich-editor";
+import {
+  InformativoPdfViewer,
+  abrirPdfInformativo,
+  enviarPdfInformativo,
+} from "@/components/cartao-beneficios/informativo-pdf-viewer";
 import { INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML } from "@/components/cartao-beneficios/informativo-seed";
 import { RegrasConvenioTab } from "@/components/cartao-beneficios/regras-tab";
 import { z } from "zod";
@@ -180,6 +185,9 @@ type Convenio = {
   beneficios: string | null;
   modelo_contrato: string | null;
   informativo_html: string | null;
+  // PDF salvo como está no storage (bucket cb-informativos). Quando preenchido,
+  // a aba Informativo exibe o PDF em vez do texto do editor.
+  informativo_pdf_path?: string | null;
   termo_inclusao_html: string | null;
 };
 
@@ -213,6 +221,8 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
   const [beneficiosTxt, setBeneficiosTxt] = useState("");
   const [modeloContrato, setModeloContrato] = useState("");
   const [informativoHtml, setInformativoHtml] = useState("");
+  const [informativoPdfPath, setInformativoPdfPath] = useState<string | null>(null);
+  const [informativoModo, setInformativoModo] = useState<"pdf" | "texto">("texto");
   const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([
     { vidas_de: 1, vidas_ate: null, valor_mensal: 0 },
@@ -287,6 +297,8 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
     setBeneficiosTxt("");
     setModeloContrato("");
     setInformativoHtml("");
+    setInformativoPdfPath(null);
+    setInformativoModo("texto");
     setTermoInclusaoHtml("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setView("form");
@@ -324,6 +336,8 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
     } else {
       setInformativoHtml("");
     }
+    setInformativoPdfPath(c.informativo_pdf_path ?? null);
+    setInformativoModo(c.informativo_pdf_path ? "pdf" : "texto");
     setTermoInclusaoHtml(c.termo_inclusao_html ?? "");
     const { data: fs } = await supabase
       .from("cb_convenio_faixas")
@@ -428,6 +442,12 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
       modelo_contrato: modeloContrato.trim() || null,
       informativo_html: informativoHtml.trim() || null,
       termo_inclusao_html: termoInclusaoHtml.trim() || null,
+      // "Editar como texto" desvincula o PDF ao salvar; o arquivo fica no storage.
+      // Só envia o campo quando ele existe no banco ou há PDF a gravar, para o
+      // salvamento não quebrar se a coluna ainda não tiver sido criada.
+      ...(informativoPdfPath || (editing && "informativo_pdf_path" in editing)
+        ? { informativo_pdf_path: informativoModo === "pdf" ? informativoPdfPath : null }
+        : {}),
     };
     let convenioId = editing?.id;
     if (editing) {
@@ -900,17 +920,58 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
                     <div className="flex items-center gap-2 font-medium">
                       <Info className="h-4 w-4" /> Informativo do Convênio
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => window.print()}>
-                      <Printer className="h-4 w-4 mr-1" /> Imprimir
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {informativoPdfPath && informativoModo === "texto" && (
+                        <Button variant="ghost" size="sm" onClick={() => setInformativoModo("pdf")}>
+                          <FileText className="h-4 w-4 mr-1" /> Voltar para o PDF
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          informativoPdfPath && informativoModo === "pdf"
+                            ? abrirPdfInformativo(informativoPdfPath)
+                            : window.print()
+                        }
+                      >
+                        <Printer className="h-4 w-4 mr-1" /> Imprimir
+                      </Button>
+                    </div>
                   </div>
-                  <div id="convenio-informativo-print">
-                    <RichEditor
-                      value={informativoHtml}
-                      onChange={setInformativoHtml}
+                  {informativoPdfPath && informativoModo === "pdf" ? (
+                    <InformativoPdfViewer
+                      path={informativoPdfPath}
                       clinicaId={clinicaAtual.clinica_id}
+                      onSubstituir={setInformativoPdfPath}
+                      onEditarComoTexto={() => setInformativoModo("texto")}
                     />
-                  </div>
+                  ) : (
+                    <>
+                      {informativoPdfPath && (
+                        <p className="text-xs text-muted-foreground">
+                          Ao salvar o convênio neste modo, o informativo passa a ser o texto abaixo
+                          e o PDF deixa de ser exibido. Para manter o PDF, clique em "Voltar para o
+                          PDF".
+                        </p>
+                      )}
+                      <div id="convenio-informativo-print">
+                        <RichEditor
+                          value={informativoHtml}
+                          onChange={setInformativoHtml}
+                          clinicaId={clinicaAtual.clinica_id}
+                          onSalvarSoPdf={async (file) => {
+                            const path = await enviarPdfInformativo(clinicaAtual.clinica_id, file);
+                            if (!path) return false;
+                            setInformativoPdfPath(path);
+                            setInformativoModo("pdf");
+                            toast.success("PDF anexado. Clique em Salvar convênio para gravar.");
+                            return true;
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                   <style>{`
                   @media print {
                     @page { size: A4; margin: 0; }
