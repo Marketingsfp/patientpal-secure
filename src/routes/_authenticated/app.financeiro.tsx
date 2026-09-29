@@ -1,4 +1,5 @@
-import { Suspense, useState } from "react";
+import { Suspense, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   createFileRoute,
   Link,
@@ -94,12 +95,34 @@ function FinLayout() {
       i.to !== "/app/financeiro" &&
       (location.pathname === i.to || location.pathname.startsWith(i.to + "/")),
   );
-  const sobreposta = temDashboard && !naDashboard && !!abaAtual;
+  // O atalho "Dashboard" da tela cheia mostra o Dashboard DENTRO da camada,
+  // sem fechá-la (pedido do dono em 29/09/2026). Só Fechar/Esc saem dela.
+  const [dashboardNaCamadaPedido, setDashboardNaCamadaPedido] = useState(false);
+  const dashboardNaCamada = temDashboard && naDashboard && dashboardNaCamadaPedido;
+  const camadaAberta = temDashboard && ((!naDashboard && !!abaAtual) || dashboardNaCamada);
+  /** Uma aba (não o próprio Dashboard) está cobrindo o Dashboard. */
+  const sobreposta = camadaAberta && !dashboardNaCamada;
   // O Dashboard só é montado depois de visitado: quem entra direto numa aba
   // (pelo menu ou F5) não paga a leitura pesada dele sem precisar.
   const [dashboardVisto, setDashboardVisto] = useState(naDashboard);
   if (naDashboard && !dashboardVisto) setDashboardVisto(true);
   const dashboardMontado = temDashboard && (naDashboard || dashboardVisto);
+
+  // O Dashboard é UM só componente, desenhado num contêiner próprio que muda
+  // de lugar: no fundo da página ou dentro da tela cheia. Mover o contêiner
+  // não desmonta o React, então período, botão de retroativos e detalhamento
+  // aberto continuam como estavam, sem nova leitura do banco.
+  const [dashboardHost] = useState(() => document.createElement("div"));
+  const slotFundo = useRef<HTMLDivElement>(null);
+  const [slotCamada, setSlotCamada] = useState<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const alvo = dashboardNaCamada ? slotCamada : slotFundo.current;
+    if (alvo && dashboardHost.parentElement !== alvo) alvo.appendChild(dashboardHost);
+  });
+  const fecharCamada = () => {
+    setDashboardNaCamadaPedido(false);
+    navigate({ to: "/app/financeiro" });
+  };
 
   // Se o usuário não tem acesso ao módulo "financeiro" em si (apenas a
   // submódulos), redireciona a entrada raiz /app/financeiro para a
@@ -145,24 +168,29 @@ function FinLayout() {
         </nav>
       </div>
       <div className="min-w-0 flex-1 overflow-auto p-3">
-        {dashboardMontado ? (
-          <FinanceiroCobertoProvider value={sobreposta}>
-            <Suspense fallback={null}>
-              <FinDashboard />
-            </Suspense>
-          </FinanceiroCobertoProvider>
-        ) : null}
-        {sobreposta && abaAtual ? (
+        {temDashboard ? <div ref={slotFundo} /> : null}
+        {dashboardMontado
+          ? createPortal(
+              <FinanceiroCobertoProvider value={sobreposta}>
+                <Suspense fallback={null}>
+                  <FinDashboard />
+                </Suspense>
+              </FinanceiroCobertoProvider>,
+              dashboardHost,
+            )
+          : null}
+        {camadaAberta ? (
           <VisaoSobreposta
-            titulo={abaAtual.label}
-            icone={abaAtual.icon}
+            titulo={dashboardNaCamada || !abaAtual ? "Dashboard" : abaAtual.label}
+            icone={dashboardNaCamada || !abaAtual ? LayoutDashboard : abaAtual.icon}
             atalhos={visibleSubnav.filter((i) =>
               (ATALHOS_TELA_CHEIA as readonly string[]).includes(i.to),
             )}
-            ativo={abaAtual.to}
-            onFechar={() => navigate({ to: "/app/financeiro" })}
+            ativo={dashboardNaCamada || !abaAtual ? "/app/financeiro" : abaAtual.to}
+            onEscolher={(to) => setDashboardNaCamadaPedido(to === "/app/financeiro")}
+            onFechar={fecharCamada}
           >
-            <Outlet />
+            {dashboardNaCamada ? <div ref={setSlotCamada} /> : <Outlet />}
           </VisaoSobreposta>
         ) : naDashboard && dashboardMontado ? null : (
           <Outlet />

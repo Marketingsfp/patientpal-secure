@@ -51,9 +51,9 @@ function escPertenceAOutroElemento(e: KeyboardEvent): boolean {
 export type AtalhoFinanceiro = { to: string; label: string; icon: LucideIcon };
 
 /**
- * Atalhos do topo da tela cheia (pedido do dono em 29/09/2026). "Dashboard"
- * fecha a camada e mostra o Dashboard que já está montado no fundo, intacto;
- * os demais trocam o conteúdo sem fechar a tela cheia.
+ * Atalhos do topo da tela cheia (pedido do dono em 29/09/2026). Todos trocam
+ * o conteúdo sem fechar a camada — inclusive "Dashboard", que mostra ali
+ * dentro o mesmo Dashboard do fundo, intacto. Só Fechar/Esc saem dela.
  */
 export const ATALHOS_TELA_CHEIA = [
   "/app/financeiro",
@@ -67,6 +67,7 @@ export function VisaoSobreposta({
   icone: Icone,
   atalhos,
   ativo,
+  onEscolher,
   onFechar,
   children,
 }: {
@@ -76,6 +77,8 @@ export function VisaoSobreposta({
   atalhos: readonly AtalhoFinanceiro[];
   /** `to` da aba aberta, para destacar o atalho correspondente. */
   ativo: string;
+  /** Avisado antes da navegação do atalho clicado. */
+  onEscolher?: (to: string) => void;
   onFechar: () => void;
   children: ReactNode;
 }) {
@@ -112,6 +115,7 @@ export function VisaoSobreposta({
               <Link
                 key={a.to}
                 to={a.to}
+                onClick={() => onEscolher?.(a.to)}
                 className={cn(
                   "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[14px] font-medium transition-colors duration-200",
                   selecionado
