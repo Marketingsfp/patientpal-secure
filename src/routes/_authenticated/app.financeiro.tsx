@@ -1,4 +1,12 @@
-import { createFileRoute, Link, Outlet, useLocation, Navigate } from "@tanstack/react-router";
+import { Suspense, useState } from "react";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  Navigate,
+} from "@tanstack/react-router";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -21,6 +29,14 @@ import {
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota, moduloPermitido } from "@/lib/permissoes-rotas";
 import { cn } from "@/lib/utils";
+import {
+  FinanceiroCobertoProvider,
+  VisaoSobreposta,
+} from "@/components/financeiro/visao-sobreposta";
+import { Route as DashboardRoute } from "./app.financeiro.index";
+
+/** Componente do Dashboard, para mantê-lo montado atrás das abas. */
+const FinDashboard = DashboardRoute.options.component!;
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
@@ -49,6 +65,7 @@ const subnav = [
 
 function FinLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { allowed, configured } = usePermissoes();
   // Filtra as abas do submenu com base nas permissões do perfil.
   // - Admin (allowed === null) vê tudo.
@@ -64,6 +81,24 @@ function FinLayout() {
   const visibleSubnav = subnav.filter((item) =>
     moduloPermitido(moduloDaRota(item.to), allowed, configured, { abrirCascaDeAbas: false }),
   );
+
+  // Abas por cima do Dashboard (ver visao-sobreposta.tsx). Só vale para quem
+  // enxerga o Dashboard — sem ele não há "fundo" para onde voltar, e a aba
+  // abre como página normal. As telas de detalhe abertas em nova guia do
+  // navegador (detalhe, movimento-detalhe) também seguem como página normal.
+  const naDashboard = location.pathname.replace(/\/+$/, "") === "/app/financeiro";
+  const temDashboard = visibleSubnav.some((i) => i.to === "/app/financeiro");
+  const abaAtual = visibleSubnav.find(
+    (i) =>
+      i.to !== "/app/financeiro" &&
+      (location.pathname === i.to || location.pathname.startsWith(i.to + "/")),
+  );
+  const sobreposta = temDashboard && !naDashboard && !!abaAtual;
+  // O Dashboard só é montado depois de visitado: quem entra direto numa aba
+  // (pelo menu ou F5) não paga a leitura pesada dele sem precisar.
+  const [dashboardVisto, setDashboardVisto] = useState(naDashboard);
+  if (naDashboard && !dashboardVisto) setDashboardVisto(true);
+  const dashboardMontado = temDashboard && (naDashboard || dashboardVisto);
 
   // Se o usuário não tem acesso ao módulo "financeiro" em si (apenas a
   // submódulos), redireciona a entrada raiz /app/financeiro para a
@@ -109,7 +144,24 @@ function FinLayout() {
         </nav>
       </div>
       <div className="min-w-0 flex-1 overflow-auto p-3">
-        <Outlet />
+        {dashboardMontado ? (
+          <FinanceiroCobertoProvider value={sobreposta}>
+            <Suspense fallback={null}>
+              <FinDashboard />
+            </Suspense>
+          </FinanceiroCobertoProvider>
+        ) : null}
+        {sobreposta && abaAtual ? (
+          <VisaoSobreposta
+            titulo={abaAtual.label}
+            icone={abaAtual.icon}
+            onFechar={() => navigate({ to: "/app/financeiro" })}
+          >
+            <Outlet />
+          </VisaoSobreposta>
+        ) : naDashboard && dashboardMontado ? null : (
+          <Outlet />
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useFinanceiroCoberto } from "@/components/financeiro/visao-sobreposta";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Handshake,
@@ -143,6 +144,7 @@ interface DetalheAberto {
  */
 function FinDashboard() {
   const { clinicaAtual } = useClinica();
+  const coberto = useFinanceiroCoberto();
   const podeEscrever = usePodeEscrever("financeiro");
   /**
    * O Dashboard abre em "Hoje".
@@ -265,8 +267,11 @@ function FinDashboard() {
   // Atualização automática, na hora que o relógio da tela marca. O `reload`
   // refaz a leitura; como a data de hoje é recalculada a cada render, a tela
   // aberta de um dia para o outro também passa sozinha para o dia novo.
+  // Coberto por uma aba (Mov. Caixa, Relatórios…) ninguém está vendo os
+  // números: sem relógio nem leitura. Ao fechar a aba o efeito volta a rodar
+  // e, se o horário marcado já passou, atualiza na hora.
   useEffect(() => {
-    if (proximaEm === null) return;
+    if (proximaEm === null || coberto) return;
     const atualizar = () => {
       if (document.visibilityState === "visible") setReload((r) => r + 1);
     };
@@ -280,7 +285,7 @@ function FinDashboard() {
       window.clearTimeout(id);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
-  }, [proximaEm]);
+  }, [proximaEm, coberto]);
 
   const resumo = useMemo(() => (dados ? resumoPainel(dados) : null), [dados]);
   const v = (n: (r: ResumoPainel) => number, formato: (x: number) => string = brl) =>
