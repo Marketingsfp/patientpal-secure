@@ -200,7 +200,11 @@ export function MedicosDoDiaTv({
               Agora
             </div>
             <div className="text-4xl font-bold tabular-nums leading-none text-slate-900">
-              {agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              {agora.toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
             </div>
           </div>
           <div className="text-center">
