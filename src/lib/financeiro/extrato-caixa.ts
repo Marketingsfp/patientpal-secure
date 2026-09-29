@@ -492,8 +492,8 @@ export function totaisExtrato(movs: MovimentacaoExtrato[]): TotaisExtrato {
     const valor = Number(m.valor) || 0;
     if (ehTransferenciaInterna(m)) {
       transferQtd += 1;
-      if (ehSaida(m)) transferSaida += valor;
       if (m.transferOrigem === "fechamento") transferFechamento += valor;
+      if (ehSaida(m)) transferSaida += valor;
       else transferEntrada += valor;
     } else if (ehSaida(m)) despesas += valor;
     else receitas += valor;

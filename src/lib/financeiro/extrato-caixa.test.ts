@@ -417,6 +417,7 @@ describe("totaisExtrato", () => {
       despesas: 0,
       transferEntrada: 0,
       transferSaida: 0,
+      transferFechamento: 0,
       transferQtd: 0,
       resultado: 0,
     });
