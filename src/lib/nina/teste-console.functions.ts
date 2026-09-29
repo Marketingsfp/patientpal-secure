@@ -213,10 +213,14 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(LIMITE_MENSAGENS_LEAD);
     let { data: msgsDesc, error } = await buscarMsgs();
-    if (error && /fetch failed/i.test(error.message)) {
-      await new Promise((r) => setTimeout(r, 500));
+    // Até 3 novas tentativas (0,5 s, 1,5 s, 3 s) para oscilações de rede.
+    for (const espera of [500, 1500, 3000]) {
+      if (!error || !/fetch failed/i.test(error.message)) break;
+      await new Promise((r) => setTimeout(r, espera));
       ({ data: msgsDesc, error } = await buscarMsgs());
     }
+    if (error && /fetch failed/i.test(error.message))
+      throw new Error("Conexão com o banco instável. Tente novamente em alguns segundos.");
     if (error) throw new Error(error.message);
     const msgs = ((msgsDesc ?? []) as any[]).slice().reverse();
 
