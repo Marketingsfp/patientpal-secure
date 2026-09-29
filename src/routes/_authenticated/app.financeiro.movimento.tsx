@@ -26,7 +26,7 @@ import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
-import { hojeBR } from "@/lib/date-utils";
+import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 import { contaPadrao, dedupContas } from "@/lib/financeiro/contas";
 import { printReciboLancamento } from "@/lib/print-recibo-lancamento";
 import { blocoAssinaturasRelatorio, CSS_RELATORIO_A4 } from "@/lib/print-relatorio-base";
@@ -198,6 +198,10 @@ interface Lanc {
    *  parcela cai: não passou no balcão. Sai do caixa junto com os retroativos.
    *  Ver `ehParcelaImportada`. */
   _parcelaImportada?: boolean;
+  /** Novo dia (YYYY-MM-DD) da consulta, quando ela foi reagendada para um dia
+   *  diferente do lançamento. O pagamento NÃO muda de data: o dinheiro entrou
+   *  na gaveta (e no cupom) do dia em que foi pago. Só vira um aviso na linha. */
+  _reagendadoPara?: string | null;
   /** Nome do procedimento do atendimento vinculado, como está gravado em
    *  `agendamentos.procedimento` (com a especialidade colada no fim). Separa
    *  Consultas de Exames/Procedimentos na composição da receita. */
@@ -214,6 +218,21 @@ interface Lanc {
   paciente_id?: string | null;
   convenio_modalidade?: string | null;
   empresa_id?: string | null;
+}
+/** Aviso da linha cuja consulta foi reagendada depois do pagamento. */
+function AvisoReagendado({ data, para }: { data: string; para: string }) {
+  const diaMes = `${para.slice(8, 10)}/${para.slice(5, 7)}`;
+  return (
+    <Badge
+      variant="outline"
+      className="ml-2 text-[10px] px-1.5 py-0 border-sky-400 bg-sky-50 text-sky-800 align-middle whitespace-nowrap"
+      title="O pagamento continua no dia em que o dinheiro entrou no caixa. Só a consulta mudou de data."
+    >
+      {para > data
+        ? `Consulta reagendada para ${diaMes} — pago adiantado`
+        : `Consulta reagendada para ${diaMes}`}
+    </Badge>
+  );
 }
 /** Rótulos amigáveis das formas de pagamento (usados no recibo impresso). */
 const FORMA_LABEL: Record<string, string> = {
@@ -707,10 +726,14 @@ function Page() {
         medico_id: string | null;
         paciente_id: string | null;
         agenda_id: string | null;
+        inicio: string | null;
+        reagendamento_em: string | null;
       }>(agIds, (lote) =>
         supabase
           .from("agendamentos")
-          .select("id, ficha_numero, procedimento, medico_id, paciente_id, agenda_id")
+          .select(
+            "id, ficha_numero, procedimento, medico_id, paciente_id, agenda_id, inicio, reagendamento_em",
+          )
           .in("id", lote),
       );
       const agMap = new Map(ags.map((a) => [a.id, a]));
@@ -749,6 +772,11 @@ function Page() {
         };
         const ag = raw.agendamento_id ? agMap.get(raw.agendamento_id) : undefined;
         const medicoId = raw.medico_id ?? ag?.medico_id ?? null;
+        // Consulta reagendada depois do pagamento: o lançamento fica no dia em
+        // que o dinheiro entrou (caixa fechado não se reescreve) e a linha só
+        // avisa para onde a consulta foi. Ex.: pago em 16/09, consulta em 23/09.
+        const diaConsulta = ag?.reagendamento_em ? dataClinicaDe(ag.inicio) : null;
+        const reagendadoPara = diaConsulta && diaConsulta !== l.data ? diaConsulta : null;
         return {
           ...l,
           medico_nome: medicoId ? (medMap.get(medicoId) ?? null) : null,
@@ -757,6 +785,7 @@ function Page() {
           ficha_numero: ag?.ficha_numero ?? null,
           procedimento: ag?.procedimento ?? null,
           paciente_id: raw.paciente_id ?? ag?.paciente_id ?? null,
+          _reagendadoPara: reagendadoPara,
         };
       });
       // 1c) Mensalidades do Cartão Benefícios quitadas neste período
@@ -3192,6 +3221,9 @@ function Page() {
                                     Retroativo
                                   </Badge>
                                 )}
+                                {l._reagendadoPara && l.data && (
+                                  <AvisoReagendado data={l.data} para={l._reagendadoPara} />
+                                )}
                               </p>
                               <span
                                 className={`text-sm font-medium whitespace-nowrap shrink-0 ${
@@ -3367,6 +3399,9 @@ function Page() {
                                 >
                                   Retroativo
                                 </Badge>
+                              )}
+                              {l._reagendadoPara && l.data && (
+                                <AvisoReagendado data={l.data} para={l._reagendadoPara} />
                               )}
                             </TableCell>
                             <TableCell className="text-sm">
