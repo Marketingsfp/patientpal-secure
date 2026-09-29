@@ -2139,7 +2139,10 @@ function Page() {
         </div>
         {/* Atalhos de período no cabeçalho: é a troca mais frequente do dia,
             então fica à vista sem precisar rolar até a barra de filtros. */}
-        <div className="min-w-0 flex-1">
+        {/* `min-w-fit`: sem espaço, o botão "Novo lançamento" desce de linha
+            em vez de ficar por cima das pílulas (meia tela no Comparar,
+            notebook estreito). */}
+        <div className="min-w-fit flex-1">
           {/* Em "Período" os dois calendários aparecem aqui em cima: sem eles
               a pílula só mostrava o intervalo e não deixava escolher a data.
               Os campos De/Até da barra de filtros continuam válidos e ficam

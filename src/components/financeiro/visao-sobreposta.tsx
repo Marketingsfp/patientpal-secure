@@ -235,7 +235,11 @@ export function VisaoSobreposta({
           {/* A chave troca a cada aba: o conteúdo novo entra com um fade curto. */}
           <div
             key={ativo}
-            className="min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
+            className={cn(
+              "min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200",
+              // Cards cabem pela largura do painel (ver styles.css).
+              ladoALado && "painel-comparado",
+            )}
           >
             {children}
           </div>
@@ -256,7 +260,7 @@ export function VisaoSobreposta({
             </BarraDoPainel>
             <div
               key={direita.ativo}
-              className="min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
+              className="painel-comparado min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
             >
               {direita.conteudo}
             </div>
