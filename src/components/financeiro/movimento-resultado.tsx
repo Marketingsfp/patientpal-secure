@@ -248,8 +248,11 @@ function QuadroProfissionais({
     <Card>
       <CardContent className="p-4 space-y-2">
         <div>
-          <p className="text-sm font-medium">Por profissional</p>
-          <p className="text-[11px] text-muted-foreground">
+          {/* Textos em tom forte e tamanho de leitura (pedido de 29/09/2026):
+              o cinza claro em 10–11px sumia na tela da recepção. Cores pelos
+              tokens do tema, para valer no modo escuro e na cor da clínica. */}
+          <p className="text-sm font-semibold">Por profissional</p>
+          <p className="text-xs text-foreground/80">
             Consultas × Exames pelo tipo do serviço cadastrado — clique para filtrar a lista
           </p>
         </div>
@@ -263,7 +266,7 @@ function QuadroProfissionais({
             <div className="space-y-1">
               <label
                 htmlFor="busca-profissional"
-                className="text-[11px] uppercase tracking-wide text-muted-foreground"
+                className="text-xs font-semibold uppercase tracking-wide text-foreground/80"
               >
                 Buscar profissional
               </label>
@@ -273,11 +276,11 @@ function QuadroProfissionais({
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Nome do profissional..."
-                className="h-9 text-xs"
+                className="h-10 px-3 py-2 text-sm text-foreground placeholder:text-foreground/60 border-foreground/30 hover:border-foreground/50 focus-visible:border-primary"
               />
             </div>
             {termo && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-foreground/80">
                 {visiveis.length} de {dados.length} profissionais
               </p>
             )}
@@ -287,7 +290,7 @@ function QuadroProfissionais({
                 Limpar filtro
               </Button>
             )}
-            <p className="text-[11px] leading-snug text-muted-foreground">
+            <p className="text-xs leading-snug text-foreground/80">
               O período é o mesmo escolhido no topo da tela, em De / Até.
             </p>
           </aside>
@@ -302,11 +305,11 @@ function QuadroProfissionais({
             <div className="max-h-[460px] overflow-auto">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--border)]">
-                  <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <th className="py-1 pr-4 text-left font-medium">Profissional</th>
-                    <th className="w-32 py-1 px-2 text-right font-medium">Consultas</th>
-                    <th className="w-32 py-1 px-2 text-right font-medium">Exames</th>
-                    <th className="w-32 py-1 px-2 text-right font-medium">Total</th>
+                  <tr className="text-[11px] uppercase tracking-wide text-foreground">
+                    <th className="py-1.5 pr-4 text-left font-bold">Profissional</th>
+                    <th className="w-32 py-1.5 px-2 text-right font-bold">Consultas</th>
+                    <th className="w-32 py-1.5 px-2 text-right font-bold">Exames</th>
+                    <th className="w-32 py-1.5 px-2 text-right font-bold">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -376,7 +379,7 @@ function QuadroProfissionais({
                 fixo e o valor mudava sozinho pela busca, o que fazia um total
                 já filtrado parecer o da clínica inteira. */}
             <div className="rounded-lg border border-border p-3">
-              <p className="text-[11px] uppercase tracking-wide leading-snug text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-wide leading-snug text-foreground/80">
                 {tituloCard("Faturamento", "Faturamento geral do período")}
               </p>
               <p className="text-xl font-bold tabular-nums">{brl(totalCards.total)}</p>
@@ -385,7 +388,7 @@ function QuadroProfissionais({
               </p>
             </div>
             <div className="rounded-lg border border-border p-3">
-              <p className="text-[11px] uppercase tracking-wide leading-snug text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-wide leading-snug text-foreground/80">
                 {tituloCard("Atendimentos", "Atendimentos de todos os profissionais")}
               </p>
               <p className="text-xl font-bold tabular-nums">{int(totalCards.totalQtd)}</p>
@@ -395,7 +398,7 @@ function QuadroProfissionais({
             </div>
             {(selecionado ?? destaque) && (
               <div className="rounded-lg border border-border p-3">
-                <p className="text-[11px] uppercase tracking-wide leading-snug text-muted-foreground">
+                <p className="text-xs font-semibold uppercase tracking-wide leading-snug text-foreground/80">
                   {selecionado
                     ? "Profissional selecionado"
                     : "Destaque do período · maior faturamento"}
