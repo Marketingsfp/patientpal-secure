@@ -1482,6 +1482,22 @@ function AtendimentosPage() {
     // Filtro "Médico" = CARTÃO TERAPÊUTICO: não é um cadastro, é recorte por
     // serviço. Vale para qualquer profissional que atenda o produto.
     const filtroCartaoTerapeutico = fMedico === FILTRO_MEDICO_CARTAO_TERAPEUTICO;
+    // Profissional escolhido que também é TERCEIRO (ex.: DU PREVENTIVO, que
+    // recebe parte do PREVENTIVO de outros médicos): os atendimentos dele
+    // estão no nome do executante. Trazemos também os executantes cujo
+    // convênio aponta para ele e filtramos depois por executante OU terceiro.
+    const executantesDoTerceiro =
+      fMedico !== "todos" && !filtroCartaoTerapeutico
+        ? Array.from(
+            new Set(
+              convenios
+                .filter((c) => c.terceiro_id === fMedico && c.medico_id)
+                .map((c) => c.medico_id as string),
+            ),
+          )
+        : [];
+    const ehDoFiltro = (x: { medico_id: string | null; terceiro_medico_id?: string | null }) =>
+      x.medico_id === fMedico || x.terceiro_medico_id === fMedico;
     const buildManual = () => {
       let q = supabase
         .from("fin_atendimentos")
@@ -1499,7 +1515,10 @@ function AtendimentosPage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data", fIni)
         .lte("data", fFim);
-      if (fMedico !== "todos" && !filtroCartaoTerapeutico) q = q.eq("medico_id", fMedico);
+      if (fMedico !== "todos" && !filtroCartaoTerapeutico)
+        q = executantesDoTerceiro.length
+          ? q.in("medico_id", [fMedico, ...executantesDoTerceiro])
+          : q.eq("medico_id", fMedico);
       return q;
     };
     const buildAgenda = () =>
@@ -1930,11 +1949,13 @@ function AtendimentosPage() {
       ? agendSoAtendimentos.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
       : fMedico === "todos"
         ? agendSoAtendimentos
-        : agendSoAtendimentos.filter((x) => x.medico_id === fMedico);
+        : agendSoAtendimentos.filter(ehDoFiltro);
     // Os manuais deixaram de ser filtrados no banco neste recorte: filtra aqui.
     const manuaisVis = filtroCartaoTerapeutico
       ? manuais.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
-      : manuais;
+      : executantesDoTerceiro.length
+        ? manuais.filter(ehDoFiltro)
+        : manuais;
     let unif = [...manuaisVis, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
