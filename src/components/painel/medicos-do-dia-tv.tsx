@@ -36,11 +36,41 @@ function melhorColunas(n: number, largura: number, altura: number) {
   return melhor;
 }
 
+/** Opções do seletor de atualização automática; 0 = desligada. */
+const INTERVALOS = [
+  { ms: 30_000, rotulo: "30s" },
+  { ms: 60_000, rotulo: "1m" },
+  { ms: 300_000, rotulo: "5m" },
+  { ms: 0, rotulo: "Desligado" },
+];
+const CHAVE_INTERVALO = "painel-modo-tv-intervalo";
+
+/** Intervalo lembrado neste navegador (a TV costuma ficar sempre na mesma escolha). */
+function lerIntervaloSalvo() {
+  try {
+    const salvo = Number(localStorage.getItem(CHAVE_INTERVALO));
+    if (INTERVALOS.some((op) => op.ms === salvo) && localStorage.getItem(CHAVE_INTERVALO) !== null)
+      return salvo;
+  } catch {
+    // Armazenamento bloqueado: usa o padrão.
+  }
+  return 30_000;
+}
+
+/** "28s" ou "4m 05s". */
+function formatarRestante(ms: number) {
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+}
+
 /**
  * Modo TV do quadro "Médicos do dia": ocupa a tela inteira por cima do menu
  * lateral e da barra superior, pede tela cheia ao navegador e distribui os
  * cards para caberem sem rolagem. Sair da tela cheia (Esc) fecha o modo.
- * A atualização automática vem da consulta do Dashboard (30 s + tempo real).
+ * Enquanto aberto, a atualização periódica é comandada daqui, no intervalo
+ * escolhido no seletor (a consulta do Dashboard desliga o próprio timer); o
+ * tempo real continua valendo e reinicia a contagem.
  */
 export function MedicosDoDiaTv({
   medicos,
@@ -58,6 +88,28 @@ export function MedicosDoDiaTv({
   const areaRef = useRef<HTMLDivElement>(null);
   const [area, setArea] = useState({ w: 0, h: 0 });
   const [agora, setAgora] = useState(() => new Date());
+  const [intervalo, setIntervalo] = useState(lerIntervaloSalvo);
+  const ultimoDisparo = useRef(0);
+
+  const escolherIntervalo = (ms: number) => {
+    setIntervalo(ms);
+    try {
+      localStorage.setItem(CHAVE_INTERVALO, String(ms));
+    } catch {
+      // Sem armazenamento: vale só até fechar o modo TV.
+    }
+  };
+
+  // A contagem parte da última atualização recebida (automática, manual ou
+  // tempo real) ou do último disparo, para não repetir o pedido se ele falhar.
+  const base = Math.max(atualizadoEm || 0, ultimoDisparo.current);
+  const restanteMs = intervalo > 0 ? Math.max(0, base + intervalo - agora.getTime()) : 0;
+
+  useEffect(() => {
+    if (intervalo <= 0 || atualizando || restanteMs > 0) return;
+    ultimoDisparo.current = Date.now();
+    onAtualizar();
+  }, [intervalo, atualizando, restanteMs, onAtualizar]);
 
   // Tela cheia do navegador; quando o usuário sai dela (Esc), fecha o modo TV.
   useEffect(() => {
@@ -92,7 +144,7 @@ export function MedicosDoDiaTv({
   }, [onSair]);
 
   useEffect(() => {
-    const t = window.setInterval(() => setAgora(new Date()), 15_000);
+    const t = window.setInterval(() => setAgora(new Date()), 1_000);
     return () => window.clearInterval(t);
   }, []);
 
@@ -118,6 +170,15 @@ export function MedicosDoDiaTv({
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 dark:bg-background">
+      {/* Barra do tempo restante até a próxima atualização. */}
+      <div className="h-1 w-full bg-slate-200 dark:bg-slate-800">
+        {intervalo > 0 && (
+          <div
+            className="h-full bg-primary"
+            style={{ width: `${Math.min(100, (restanteMs / intervalo) * 100)}%` }}
+          />
+        )}
+      </div>
       <header className="flex items-center justify-between gap-3 px-4 py-2 border-b border-slate-200 bg-card">
         <div className="min-w-0">
           <h1 className="text-base font-semibold text-slate-800 truncate">
@@ -131,10 +192,38 @@ export function MedicosDoDiaTv({
               hour: "2-digit",
               minute: "2-digit",
               second: "2-digit",
-            })}
+            })}{" "}
+            ·{" "}
+            {intervalo <= 0
+              ? "atualização automática desligada"
+              : atualizando || restanteMs === 0
+                ? "atualizando…"
+                : `próxima atualização em ${formatarRestante(restanteMs)}`}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <div
+            className="inline-flex rounded-md border border-slate-200 bg-card p-0.5"
+            role="group"
+            aria-label="Intervalo da atualização automática"
+          >
+            {INTERVALOS.map((op) => (
+              <button
+                key={op.ms}
+                type="button"
+                onClick={() => escolherIntervalo(op.ms)}
+                aria-pressed={intervalo === op.ms}
+                className={cn(
+                  "rounded px-2 py-1 text-xs font-medium",
+                  intervalo === op.ms
+                    ? "bg-primary text-primary-foreground"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                )}
+              >
+                {op.rotulo}
+              </button>
+            ))}
+          </div>
           <Button variant="outline" size="sm" onClick={onAtualizar} disabled={atualizando}>
             <RefreshCw className={cn("h-4 w-4 mr-1.5", atualizando && "animate-spin")} />
             Atualizar

@@ -158,10 +158,13 @@ function DashboardOperacional() {
   const ids = clinicaIds;
   const enabled = ids.length > 0;
 
+  // No Modo TV quem comanda a atualização periódica é o seletor da própria tela.
+  const [modoTv, setModoTv] = useState(false);
+
   const q = useQuery({
     queryKey: ["dashboard-operacional", ids.join("|"), dia],
     enabled,
-    refetchInterval: 30_000,
+    refetchInterval: modoTv ? false : 30_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const de = `${dia}T00:00:00`;
@@ -322,7 +325,6 @@ function DashboardOperacional() {
   }, [d]);
 
   const carregando = loading || q.isLoading;
-  const [modoTv, setModoTv] = useState(false);
   const sairModoTv = useCallback(() => setModoTv(false), []);
 
   return (
