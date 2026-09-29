@@ -180,6 +180,13 @@ interface Atend {
   terceiro_forma_pagamento?: string | null;
   terceiro_conta_id?: string | null;
   /**
+   * REPASSE TRIPLO — linha vista pelo DONO DO EQUIPAMENTO (filtro "Médico" =
+   * terceiro). `valor_medico` e as marcas `repasse_*` passam a ser as dele
+   * (cópia dos campos `terceiro_*`); `medico_id` continua sendo o executante.
+   * Pagar esta linha paga só a parte do terceiro — nunca a do executante.
+   */
+  visao_terceiro?: boolean;
+  /**
    * Mensalidade do plano mensal do Cartão Terapêutico. Não é atendimento (não
    * tem agendamento nem profissional), mas gera repasse de 50% e por isso
    * aparece nesta tela para o financeiro dar baixa.
@@ -830,7 +837,10 @@ function AtendimentosPage() {
       conta_id: a.repasse_conta_id ?? "",
       reimpressao: true,
     };
-    const c = buildComprovante([a], { ...meta, pago_at: a.repasse_pago_at ?? null });
+    // Linha vista pelo dono do equipamento: o recibo é só o dele.
+    const c = a.visao_terceiro
+      ? null
+      : buildComprovante([a], { ...meta, pago_at: a.repasse_pago_at ?? null });
     // REPASSE TRIPLO — o terceiro recebeu num lançamento próprio, então ganha
     // um recibo próprio logo depois do recibo do executante.
     const blocos = [...(c ? [c] : []), ...buildComprovantesTerceiro([a], meta)];
@@ -843,6 +853,8 @@ function AtendimentosPage() {
     if (!itens.length) return;
     const byMed = new Map<string, Atend[]>();
     for (const a of itens) {
+      // Linha vista pelo dono do equipamento: só o recibo dele, abaixo.
+      if (a.visao_terceiro) continue;
       // Chave composta: o Cartão Terapêutico sai em recibo próprio, separado do
       // atendimento normal da MESMA profissional.
       const k = `${a.medico_id ?? "sem"}|${ehServicoCartaoTerapeutico(a.procedimento) ? "ct" : "-"}`;
@@ -1482,10 +1494,10 @@ function AtendimentosPage() {
     // Filtro "Médico" = CARTÃO TERAPÊUTICO: não é um cadastro, é recorte por
     // serviço. Vale para qualquer profissional que atenda o produto.
     const filtroCartaoTerapeutico = fMedico === FILTRO_MEDICO_CARTAO_TERAPEUTICO;
-    // Profissional escolhido que também é TERCEIRO (ex.: DU PREVENTIVO, que
-    // recebe parte do PREVENTIVO de outros médicos): os atendimentos dele
-    // estão no nome do executante. Trazemos também os executantes cujo
-    // convênio aponta para ele e filtramos depois por executante OU terceiro.
+    // REPASSE TRIPLO — o profissional filtrado é dono de equipamento em alguma
+    // regra (ex.: DU PREVENTIVO no PREVENTIVO da ginecologia). A parte dele fica
+    // na linha do EXECUTANTE, então os manuais vêm também dos executantes cuja
+    // regra aponta para ele; o recorte fino é feito depois do cálculo.
     const executantesDoTerceiro =
       fMedico !== "todos" && !filtroCartaoTerapeutico
         ? Array.from(
@@ -1496,8 +1508,6 @@ function AtendimentosPage() {
             ),
           )
         : [];
-    const ehDoFiltro = (x: { medico_id: string | null; terceiro_medico_id?: string | null }) =>
-      x.medico_id === fMedico || x.terceiro_medico_id === fMedico;
     const buildManual = () => {
       let q = supabase
         .from("fin_atendimentos")
@@ -1943,19 +1953,41 @@ function AtendimentosPage() {
       !x.agendamento_id && !x.medico_id && !x.mensalidade_ct;
     const naoAtendimentos = agend.filter(ehRecebimentoSemAtendimento).length;
     const agendSoAtendimentos = agend.filter((x) => !ehRecebimentoSemAtendimento(x));
+    // REPASSE TRIPLO — filtrando pelo dono do equipamento, a linha do
+    // executante entra com a parte DELE: valor e situação (a receber/pago) são
+    // os do terceiro. Sem isso a lista dele vinha vazia (29/09/2026: DU
+    // PREVENTIVO recebe R$ 26,00 por PREVENTIVO e não aparecia no filtro).
+    const comoTerceiro = (x: Atend): Atend => ({
+      ...x,
+      visao_terceiro: true,
+      valor_medico: Number(x.terceiro_valor) || 0,
+      repasse_pago: !!x.terceiro_pago,
+      repasse_pago_em: x.terceiro_pago_em ?? null,
+      repasse_pago_at: x.terceiro_pago_at ?? null,
+      repasse_forma_pagamento: x.terceiro_forma_pagamento ?? null,
+      repasse_conta_id: x.terceiro_conta_id ?? null,
+    });
+    const doMedicoFiltrado = (lista: Atend[]): Atend[] =>
+      lista.flatMap((x) =>
+        x.medico_id === fMedico
+          ? [x]
+          : x.terceiro_medico_id === fMedico && (Number(x.terceiro_valor) || 0) > 0
+            ? [comoTerceiro(x)]
+            : [],
+      );
     // Filtro client-side por médico para os registros da agenda (cobre os
     // lançamentos cujo medico_id está nulo e vem do agendamento).
     const agendFiltered = filtroCartaoTerapeutico
       ? agendSoAtendimentos.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
       : fMedico === "todos"
         ? agendSoAtendimentos
-        : agendSoAtendimentos.filter(ehDoFiltro);
+        : doMedicoFiltrado(agendSoAtendimentos);
     // Os manuais deixaram de ser filtrados no banco neste recorte: filtra aqui.
     const manuaisVis = filtroCartaoTerapeutico
       ? manuais.filter((x) => ehServicoCartaoTerapeutico(x.procedimento))
-      : executantesDoTerceiro.length
-        ? manuais.filter(ehDoFiltro)
-        : manuais;
+      : fMedico === "todos"
+        ? manuais
+        : doMedicoFiltrado(manuais);
     let unif = [...manuaisVis, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
@@ -2685,7 +2717,8 @@ function AtendimentosPage() {
           else acc.aReceber += Number(a.valor_medico) || 0;
           // REPASSE TRIPLO — a parte do dono do equipamento é somada à parte,
           // porque ela sai num lançamento separado do repasse do executante.
-          const vt = a.terceiro_medico_id ? Number(a.terceiro_valor) || 0 : 0;
+          // Na linha vista pelo próprio terceiro essa parte já é o `valor_medico`.
+          const vt = a.terceiro_medico_id && !a.visao_terceiro ? Number(a.terceiro_valor) || 0 : 0;
           if (vt > 0) {
             if (a.terceiro_pago) acc.terceiroPago += vt;
             else acc.terceiroAPagar += vt;
@@ -2743,6 +2776,7 @@ function AtendimentosPage() {
     selectedItems,
     selectedTotal,
     selectedPagos,
+    selectedPagosEstornaveis,
     selectedNaoPagos,
     selectedNaoBaixados,
     selectedBaixados,
@@ -2754,10 +2788,18 @@ function AtendimentosPage() {
     const selectedItems = filteredItems.filter((a) => sel.has(`${a.origem}:${a.id}`));
     const selectedTotal = selectedItems.reduce((s, a) => s + (Number(a.valor_medico) || 0), 0);
     const selectedPagos = selectedItems.filter((a) => a.repasse_pago);
+    // Estorno, baixa e laudo mexem no atendimento de quem executou: a linha
+    // vista pelo dono do equipamento só entra no pagamento e na 2ª via.
+    const selectedPagosEstornaveis = selectedPagos.filter((a) => !a.visao_terceiro);
     const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
-    const selectedNaoBaixados = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
-    const selectedBaixados = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
+    const selectedNaoBaixados = selectedItems.filter(
+      (a) => !a.visao_terceiro && !a.repasse_pago && !isAtendido(a),
+    );
+    const selectedBaixados = selectedItems.filter(
+      (a) => !a.visao_terceiro && !a.repasse_pago && isAtendido(a),
+    );
     const selectedLaudoElegiveis = selectedItems.filter((a) => {
+      if (a.visao_terceiro) return false;
       const procKey = a.procedimento ? norm(a.procedimento) : "";
       const exige = procKey && procLaudo.get(procKey);
       return exige && a.laudo_status !== "emitido";
@@ -2768,6 +2810,7 @@ function AtendimentosPage() {
       selectedItems,
       selectedTotal,
       selectedPagos,
+      selectedPagosEstornaveis,
       selectedNaoPagos,
       selectedNaoBaixados,
       selectedBaixados,
@@ -2791,6 +2834,7 @@ function AtendimentosPage() {
   const terceirosSelecionados = useMemo(() => {
     const m = new Map<string, { nome: string; total: number; qtd: number }>();
     for (const a of selectedItems) {
+      if (a.visao_terceiro) continue;
       if (!a.terceiro_medico_id || a.terceiro_pago) continue;
       const valor = Number(a.terceiro_valor) || 0;
       if (valor <= 0) continue;
@@ -2913,7 +2957,11 @@ function AtendimentosPage() {
       // despesa e um recibo para ele e outro para o atendimento normal da
       // mesma profissional. O `medico_id` gravado continua sendo o real.
       const byMed = new Map<string, Atend[]>();
+      // REPASSE TRIPLO — linhas vistas pelo dono do equipamento pagam só a
+      // parte dele, mais abaixo; o repasse do executante não é tocado.
+      const soTerceiro = selectedItems.filter((a) => a.visao_terceiro);
       for (const a of selectedItems) {
+        if (a.visao_terceiro) continue;
         const k = `${a.medico_id ?? "sem"}|${ehServicoCartaoTerapeutico(a.procedimento) ? "ct" : "-"}`;
         if (!byMed.has(k)) byMed.set(k, []);
         byMed.get(k)!.push(a);
@@ -2923,6 +2971,11 @@ function AtendimentosPage() {
       // ignoramos o override para não desbalancear repasses de outros.
       const valorManualNum = Number((payForm.valor_manual ?? "").toString().replace(",", "."));
       const usarValorManual = valorManualNum > 0 && byMed.size === 1;
+      if (valorManualNum > 0 && soTerceiro.length > 0) {
+        toast.warning(
+          "Valor manual não vale para a parte do dono do equipamento: ele recebe o valor cadastrado na regra do serviço.",
+        );
+      }
       if (valorManualNum > 0 && byMed.size > 1) {
         toast.warning(
           "Valor manual ignorado: selecione atendimentos de apenas um médico para editar o valor do repasse.",
@@ -3085,16 +3138,65 @@ function AtendimentosPage() {
           }
         }
       }
+      // REPASSE TRIPLO — pagamento só da parte do dono do equipamento, num
+      // lançamento de despesa próprio (RPC pagar_repasse_terceiro). Mesmas
+      // travas de data/cancelamento do executante, e o banco recusa pagar o
+      // mesmo terceiro duas vezes pelo mesmo atendimento.
+      const porTerceiro = new Map<string, Atend[]>();
+      for (const a of soTerceiro) {
+        if (!a.terceiro_medico_id || a.terceiro_pago) continue;
+        if ((Number(a.terceiro_valor) || 0) <= 0) continue;
+        const lista = porTerceiro.get(a.terceiro_medico_id) ?? [];
+        lista.push(a);
+        porTerceiro.set(a.terceiro_medico_id, lista);
+      }
+      for (const [terceiroId, list] of porTerceiro) {
+        const nome = medMap.get(terceiroId) ?? "Terceiro";
+        const itensRpc = list.map((x) => ({
+          origem: x.origem ?? "manual",
+          id: x.id,
+          valor: +(Number(x.terceiro_valor) || 0).toFixed(2),
+          percentual: x.terceiro_percentual ?? null,
+          data: x.data,
+        }));
+        const total = +itensRpc.reduce((s, x) => s + x.valor, 0).toFixed(2);
+        const { data: userData } = await supabase.auth.getUser();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: eRpc } = await (supabase.rpc as any)("pagar_repasse_terceiro", {
+          _clinica_id: clinicaAtual.clinica_id,
+          _terceiro_id: terceiroId,
+          _terceiro_nome: nome,
+          _itens: itensRpc,
+          _total: total,
+          _data: payForm.data,
+          _forma_pagamento: payForm.forma_pagamento || null,
+          _conta_id: payForm.conta_id || null,
+          _criado_por: userData?.user?.id ?? null,
+        });
+        if (eRpc) {
+          toast.error(
+            (eRpc as { code?: string }).code === "23505"
+              ? `Alguns atendimentos de ${nome} já haviam sido pagos. Nenhum novo pagamento foi gerado — recarregando.`
+              : `Falha ao pagar repasse de ${nome}: ${(eRpc as { message?: string }).message ?? "erro desconhecido"}`,
+          );
+          continue;
+        }
+        terceirosGerados += 1;
+        itensPagosOk.push(...list);
+      }
       toast.success(
         terceirosGerados > 0
           ? `Repasses pagos com sucesso. Foram gerados ${terceirosGerados} lançamento(s) separado(s) de repasse de terceiro (dono do equipamento).`
           : "Repasses pagos com sucesso",
       );
-      const c = buildComprovante(selectedItems, {
-        ...payForm,
-        pago_at: new Date().toISOString(),
-        reimpressao: false,
-      });
+      const c = buildComprovante(
+        selectedItems.filter((a) => !a.visao_terceiro),
+        {
+          ...payForm,
+          pago_at: new Date().toISOString(),
+          reimpressao: false,
+        },
+      );
       // REPASSE TRIPLO — cada dono de equipamento pago neste lote sai com o
       // recibo dele, numa página própria, logo depois do recibo do executante.
       const blocos = [
@@ -3157,10 +3259,15 @@ function AtendimentosPage() {
                   exportToExcel(
                     filteredItems.map((a) => ({
                       data: new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR"),
-                      medico: nomeRepasseExibido(
-                        a.procedimento,
-                        a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
-                      ),
+                      medico:
+                        a.visao_terceiro && a.terceiro_medico_id
+                          ? `${medMap.get(a.terceiro_medico_id) ?? ""} (equipamento — atendido por ${
+                              a.medico_id ? (medMap.get(a.medico_id) ?? "") : ""
+                            })`
+                          : nomeRepasseExibido(
+                              a.procedimento,
+                              a.medico_id ? (medMap.get(a.medico_id) ?? "") : "",
+                            ),
                       paciente: nomePaciente(a),
                       procedimento: a.procedimento ?? "",
                       valor_total: Number(a.valor_total).toFixed(2),
@@ -3260,15 +3367,18 @@ function AtendimentosPage() {
                       {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      disabled={selectedPagos.length === 0 || !podeEstornarRepasse}
+                      disabled={selectedPagosEstornaveis.length === 0 || !podeEstornarRepasse}
                       onSelect={(e) => {
                         e.preventDefault();
-                        if (selectedPagos.length > 0) abrirEstornoRepasse(selectedPagos);
+                        if (selectedPagosEstornaveis.length > 0)
+                          abrirEstornoRepasse(selectedPagosEstornaveis);
                       }}
                     >
                       <RotateCcw className="h-4 w-4 mr-2 text-rose-600" />
                       Estornar repasse (volta para A receber)
-                      {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+                      {selectedPagosEstornaveis.length
+                        ? ` (${selectedPagosEstornaveis.length})`
+                        : ""}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -3710,10 +3820,15 @@ function AtendimentosPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map((a, idx) => {
-                      const medicoNome = nomeRepasseExibido(
+                      const executanteNome = nomeRepasseExibido(
                         a.procedimento,
                         a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
                       );
+                      // Linha vista pelo dono do equipamento: o nome é o dele.
+                      const medicoNome =
+                        a.visao_terceiro && a.terceiro_medico_id
+                          ? (medMap.get(a.terceiro_medico_id) ?? "—")
+                          : executanteNome;
                       const pacienteNome =
                         (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
                         a.paciente_nome_extra ??
@@ -3793,9 +3908,18 @@ function AtendimentosPage() {
                           {/* Larguras baseadas em % e truncate para textos longos não quebrarem o layout */}
                           <TableCell
                             className="text-xs max-w-[90px] truncate px-2"
-                            title={medicoNome}
+                            title={
+                              a.visao_terceiro
+                                ? `${medicoNome} — parte do equipamento. Atendido por ${executanteNome}.`
+                                : medicoNome
+                            }
                           >
                             {medicoNome}
+                            {a.visao_terceiro && (
+                              <div className="text-[10px] text-muted-foreground truncate">
+                                Atendido por {executanteNome}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell
                             className="text-xs font-medium max-w-[190px] truncate px-2"
@@ -3836,27 +3960,37 @@ function AtendimentosPage() {
                             {/* REPASSE TRIPLO — a parte do dono do equipamento
                                 aparece logo abaixo do repasse do executante,
                                 para o operador ver a divisão antes de pagar. */}
-                            {a.terceiro_medico_id && (Number(a.terceiro_valor) || 0) > 0 && (
+                            {a.visao_terceiro && (
                               <div
                                 className="mt-0.5 font-normal text-[11px] text-amber-700 dark:text-amber-500"
-                                title={`Repasse de terceiro (dono do equipamento): ${
-                                  medMap.get(a.terceiro_medico_id) ?? "—"
-                                } — ${
-                                  a.terceiro_percentual != null
-                                    ? `${a.terceiro_percentual}% do valor do atendimento`
-                                    : "valor fixo por atendimento"
-                                }`}
+                                title="Parte do dono do equipamento neste atendimento. Sai num pagamento próprio, separado do repasse de quem atendeu."
                               >
-                                + {fmt(Number(a.terceiro_valor))}{" "}
-                                <span className="text-muted-foreground">
-                                  {medMap.get(a.terceiro_medico_id) ?? "terceiro"}
-                                  {a.terceiro_percentual != null
-                                    ? ` (${a.terceiro_percentual}%)`
-                                    : " (R$ fixo)"}
-                                  {a.terceiro_pago ? " • pago" : ""}
-                                </span>
+                                parte do equipamento
                               </div>
                             )}
+                            {!a.visao_terceiro &&
+                              a.terceiro_medico_id &&
+                              (Number(a.terceiro_valor) || 0) > 0 && (
+                                <div
+                                  className="mt-0.5 font-normal text-[11px] text-amber-700 dark:text-amber-500"
+                                  title={`Repasse de terceiro (dono do equipamento): ${
+                                    medMap.get(a.terceiro_medico_id) ?? "—"
+                                  } — ${
+                                    a.terceiro_percentual != null
+                                      ? `${a.terceiro_percentual}% do valor do atendimento`
+                                      : "valor fixo por atendimento"
+                                  }`}
+                                >
+                                  + {fmt(Number(a.terceiro_valor))}{" "}
+                                  <span className="text-muted-foreground">
+                                    {medMap.get(a.terceiro_medico_id) ?? "terceiro"}
+                                    {a.terceiro_percentual != null
+                                      ? ` (${a.terceiro_percentual}%)`
+                                      : " (R$ fixo)"}
+                                    {a.terceiro_pago ? " • pago" : ""}
+                                  </span>
+                                </div>
+                              )}
                           </TableCell>
                           {!isMedicoOnly && (
                             <TableCell className="text-xs text-right text-muted-foreground whitespace-nowrap px-2">
@@ -3888,6 +4022,9 @@ function AtendimentosPage() {
                           </TableCell>
                           <TableCell className="text-center px-2">
                             {(() => {
+                              // O laudo é do atendimento de quem executou.
+                              if (a.visao_terceiro)
+                                return <span className="text-muted-foreground text-[11px]">—</span>;
                               const procKey = a.procedimento ? norm(a.procedimento) : "";
                               const exigeLaudo = procKey && procLaudo.get(procKey);
                               const laudadorNome = a.medico_laudador_id
@@ -3963,7 +4100,27 @@ function AtendimentosPage() {
                                 rowBg, // Usa a mesma cor zebrada da linha para o fundo do bloco fixo
                               )}
                             >
-                              {a.origem === "agenda" ? (
+                              {a.visao_terceiro ? (
+                                // Linha do dono do equipamento: baixa, edição,
+                                // exclusão e estorno são do atendimento de quem
+                                // executou — ficam na lista desse profissional.
+                                <div className="flex items-center justify-end gap-0.5">
+                                  <span className="text-[10px] text-muted-foreground uppercase mr-1">
+                                    Equipamento
+                                  </span>
+                                  {a.repasse_pago && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="Imprimir comprovante de repasse"
+                                      onClick={() => abrirComprovanteDoItem(a)}
+                                    >
+                                      <Printer className="h-3.5 w-3.5 text-primary" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ) : a.origem === "agenda" ? (
                                 <div className="flex items-center justify-end gap-0.5">
                                   <span className="text-[10px] text-muted-foreground uppercase mr-1">
                                     Agenda
@@ -4291,15 +4448,18 @@ function AtendimentosPage() {
                       {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      disabled={selectedPagos.length === 0 || !podeEstornarRepasse}
+                      disabled={selectedPagosEstornaveis.length === 0 || !podeEstornarRepasse}
                       onSelect={(e) => {
                         e.preventDefault();
-                        if (selectedPagos.length > 0) abrirEstornoRepasse(selectedPagos);
+                        if (selectedPagosEstornaveis.length > 0)
+                          abrirEstornoRepasse(selectedPagosEstornaveis);
                       }}
                     >
                       <RotateCcw className="h-4 w-4 mr-2 text-rose-600" />
                       Estornar repasse (volta para A receber)
-                      {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+                      {selectedPagosEstornaveis.length
+                        ? ` (${selectedPagosEstornaveis.length})`
+                        : ""}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
