@@ -454,6 +454,14 @@ function Page() {
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const [recarga, setRecarga] = useState(0);
+  /**
+   * Atualização automática escolhida ao lado do botão "atualizar", em ms
+   * (0 = manual). Não fica gravada: toda abertura da tela volta ao manual,
+   * para nenhum computador esquecido ficar relendo o caixa sem ninguém olhar.
+   */
+  const [autoIntervalo, setAutoIntervalo] = useState(0);
+  const [agoraAuto, setAgoraAuto] = useState(() => Date.now());
+  const ultimoDisparoAuto = useRef(0);
   /** nome do procedimento (maiúsculo) → tipo cadastrado (consulta/exame/…). */
   const [procTipos, setProcTipos] = useState<Map<string, string>>(() => new Map());
   /**
@@ -1489,6 +1497,27 @@ function Page() {
     }
   };
 
+  // Atualização automática: a contagem parte da última leitura (automática,
+  // manual ou troca de filtro) ou do último disparo, para não repetir o pedido
+  // em sequência se a leitura falhar. Com a aba escondida o disparo espera e
+  // acontece assim que ela volta a ficar visível.
+  const atualizarAgoraRef = useRef(atualizarAgora);
+  atualizarAgoraRef.current = atualizarAgora;
+  const baseAuto = Math.max(atualizadoEm?.getTime() ?? 0, ultimoDisparoAuto.current);
+  const restanteAutoMs = autoIntervalo > 0 ? Math.max(0, baseAuto + autoIntervalo - agoraAuto) : 0;
+  useEffect(() => {
+    if (autoIntervalo <= 0) return;
+    setAgoraAuto(Date.now());
+    const t = window.setInterval(() => setAgoraAuto(Date.now()), 1_000);
+    return () => window.clearInterval(t);
+  }, [autoIntervalo]);
+  useEffect(() => {
+    if (autoIntervalo <= 0 || atualizando || loading || restanteAutoMs > 0) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    ultimoDisparoAuto.current = Date.now();
+    void atualizarAgoraRef.current();
+  }, [autoIntervalo, atualizando, loading, restanteAutoMs, agoraAuto]);
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     // O diálogo tem uma única ação de confirmação ("Salvar e imprimir"), então
@@ -2210,6 +2239,37 @@ function Page() {
               {atualizando || loading ? "atualizando…" : "atualizar"}
             </span>
           </button>
+          <Select
+            value={String(autoIntervalo)}
+            onValueChange={(v) => {
+              // A contagem começa na hora da escolha, sem releitura imediata.
+              ultimoDisparoAuto.current = Date.now();
+              setAgoraAuto(Date.now());
+              setAutoIntervalo(Number(v));
+            }}
+          >
+            <SelectTrigger
+              className="h-6.5 w-auto gap-1 px-2 text-xs text-muted-foreground"
+              title="Atualizar a tela sozinha a cada intervalo"
+              aria-label="Atualização automática"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Manual</SelectItem>
+              <SelectItem value="60000">A cada 1 min</SelectItem>
+              <SelectItem value="180000">A cada 3 min</SelectItem>
+              <SelectItem value="300000">A cada 5 min</SelectItem>
+              <SelectItem value="600000">A cada 10 min</SelectItem>
+            </SelectContent>
+          </Select>
+          {autoIntervalo > 0 && (
+            <span className="text-xs tabular-nums text-muted-foreground" aria-live="off">
+              {atualizando || loading
+                ? "atualizando…"
+                : `próxima em ${String(Math.floor(Math.ceil(restanteAutoMs / 1000) / 60)).padStart(2, "0")}:${String(Math.ceil(restanteAutoMs / 1000) % 60).padStart(2, "0")}`}
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <Dialog open={open} onOpenChange={setOpen}>
