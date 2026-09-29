@@ -71,6 +71,7 @@ export const ATALHOS_TELA_CHEIA = [
   "/app/financeiro/movimento",
   "/app/financeiro/atendimentos",
   "/app/financeiro/relatorios",
+  "/app/financeiro/estorno",
 ] as const;
 
 const PILULA =

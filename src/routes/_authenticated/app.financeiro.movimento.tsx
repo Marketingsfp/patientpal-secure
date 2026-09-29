@@ -2956,9 +2956,23 @@ function Page() {
         </CardContent>
       </Card>
 
-      <Card>
+      {/* Ao recarregar (troca de data, filtro, atualização automática) a lista
+          anterior fica no lugar, esmaecida, até a nova chegar. Trocá-la pela
+          caixinha "Carregando..." encurtava a página e o navegador rolava a
+          tela para cima (pedido do dono em 29/09/2026). */}
+      <Card
+        aria-busy={loading}
+        className={
+          loading && displayItems.length > 0 ? "relative pointer-events-none opacity-60" : "relative"
+        }
+      >
+        {loading && displayItems.length > 0 ? (
+          <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm">
+            Atualizando…
+          </div>
+        ) : null}
         <CardContent className="p-0">
-          {loading ? (
+          {loading && displayItems.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">Carregando...</div>
           ) : displayItems.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">

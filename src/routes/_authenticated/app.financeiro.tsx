@@ -39,6 +39,7 @@ import { Route as DashboardRoute } from "./app.financeiro.index";
 import { Route as MovimentoRoute } from "./app.financeiro.movimento";
 import { Route as AtendimentosRoute } from "./app.financeiro.atendimentos";
 import { Route as RelatoriosRoute } from "./app.financeiro.relatorios";
+import { Route as EstornoRoute } from "./app.financeiro.estorno";
 
 /** Componente do Dashboard, para mantê-lo montado atrás das abas. */
 const FinDashboard = DashboardRoute.options.component!;
@@ -52,6 +53,7 @@ const TELAS_DO_PAINEL_DIREITO: Record<string, ComponentType> = {
   "/app/financeiro/movimento": MovimentoRoute.options.component!,
   "/app/financeiro/atendimentos": AtendimentosRoute.options.component!,
   "/app/financeiro/relatorios": RelatoriosRoute.options.component!,
+  "/app/financeiro/estorno": EstornoRoute.options.component!,
 };
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
