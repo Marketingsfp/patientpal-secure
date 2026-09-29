@@ -14,6 +14,7 @@ import {
   Info,
   Search,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -444,6 +445,15 @@ function Page() {
   // "Incluir lançamentos retroativos" naquela hora. Não fica gravado no
   // navegador: toda abertura da tela volta ao padrão.
   const [ocultarRetroativos, setOcultarRetroativos] = useState(false);
+  /**
+   * Botão "atualizar" ao lado dos filtros de período, igual ao do Dashboard
+   * do Financeiro: relê lista, cards, resumo por forma e a conferência com o
+   * Rateio sem recarregar a página. `recarga` só existe para refazer a
+   * conferência, que roda num efeito próprio.
+   */
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
+  const [recarga, setRecarga] = useState(0);
   /** nome do procedimento (maiúsculo) → tipo cadastrado (consulta/exame/…). */
   const [procTipos, setProcTipos] = useState<Map<string, string>>(() => new Map());
   /**
@@ -538,7 +548,7 @@ function Page() {
     return () => {
       cancelado = true;
     };
-  }, [clinicaAtual?.clinica_id, fromDate, toDate, ocultarRetroativos]);
+  }, [clinicaAtual?.clinica_id, fromDate, toDate, ocultarRetroativos, recarga]);
 
   /**
    * true → a busca por texto vale para o histórico inteiro da clínica, sem a
@@ -1012,6 +1022,7 @@ function Page() {
       }
       setResumo({ r, d, saldo: r - d, totalRows: merged.length });
     }
+    setAtualizadoEm(new Date());
     setLoading(false);
   };
   const loadResumo = async () => {
@@ -1459,6 +1470,23 @@ function Page() {
     limparCacheFinanceiro();
     await load();
     await loadResumo();
+  };
+
+  /**
+   * Releitura pedida no botão "atualizar". Esquece o cache curto do período
+   * (senão o Rateio e os retroativos voltariam iguais por até um minuto) e
+   * refaz tudo o que a tela mostra, sem trocar filtro nem página.
+   */
+  const atualizarAgora = async () => {
+    if (atualizando) return;
+    setAtualizando(true);
+    limparCacheFinanceiro();
+    setRecarga((r) => r + 1);
+    try {
+      await Promise.all([load(), loadResumo()]);
+    } finally {
+      setAtualizando(false);
+    }
   };
 
   const submit = (e: FormEvent) => {
@@ -2142,7 +2170,7 @@ function Page() {
         {/* `min-w-fit`: sem espaço, o botão "Novo lançamento" desce de linha
             em vez de ficar por cima das pílulas (meia tela no Comparar,
             notebook estreito). */}
-        <div className="min-w-fit flex-1">
+        <div className="min-w-fit flex-1 flex flex-wrap items-center gap-2">
           {/* Em "Período" os dois calendários aparecem aqui em cima: sem eles
               a pílula só mostrava o intervalo e não deixava escolher a data.
               Os campos De/Até da barra de filtros continuam válidos e ficam
@@ -2160,6 +2188,28 @@ function Page() {
               setToDate(r.to);
             }}
           />
+          <button
+            type="button"
+            onClick={() => void atualizarAgora()}
+            disabled={atualizando || loading}
+            title="Atualizar agora"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground hover:bg-muted/50 disabled:cursor-default"
+          >
+            <RefreshCw
+              aria-hidden
+              className={`h-3.5 w-3.5${atualizando || loading ? " animate-spin" : ""}`}
+            />
+            {atualizadoEm && (
+              <span>
+                Atualizado às{" "}
+                {atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <span aria-hidden>·</span>
+            <span className="font-medium text-foreground">
+              {atualizando || loading ? "atualizando…" : "atualizar"}
+            </span>
+          </button>
         </div>
         <div className="flex gap-2">
           <Dialog open={open} onOpenChange={setOpen}>
