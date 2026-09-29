@@ -57,11 +57,10 @@ function lerIntervaloSalvo() {
   return 30_000;
 }
 
-/** "28s" ou "4m 05s". */
+/** "0:28" ou "4:05" — minutos e segundos, legível de longe na TV. */
 function formatarRestante(ms: number) {
   const s = Math.ceil(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 /**
@@ -186,20 +185,36 @@ export function MedicosDoDiaTv({
           </h1>
           <p className="text-[12px] text-slate-600 dark:text-slate-400">
             {agora.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}{" "}
-            · {agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} ·
-            atualizado às{" "}
+            · atualizado às{" "}
             {new Date(atualizadoEm || Date.now()).toLocaleTimeString("pt-BR", {
               hour: "2-digit",
               minute: "2-digit",
               second: "2-digit",
-            })}{" "}
-            ·{" "}
-            {intervalo <= 0
-              ? "atualização automática desligada"
-              : atualizando || restanteMs === 0
-                ? "atualizando…"
-                : `próxima atualização em ${formatarRestante(restanteMs)}`}
+            })}
           </p>
+        </div>
+        {/* Hora atual e contagem em tamanho grande, para leitura de longe. */}
+        <div className="flex items-end gap-6 shrink-0">
+          <div className="text-center">
+            <div className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
+              Agora
+            </div>
+            <div className="text-4xl font-bold tabular-nums leading-none text-slate-900">
+              {agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
+              Próxima atualização
+            </div>
+            <div className="text-4xl font-bold tabular-nums leading-none text-primary">
+              {intervalo <= 0
+                ? "—"
+                : atualizando || restanteMs === 0
+                  ? "…"
+                  : formatarRestante(restanteMs)}
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div
