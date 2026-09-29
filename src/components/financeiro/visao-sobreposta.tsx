@@ -12,8 +12,10 @@
  */
 import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "@tanstack/react-router";
 import { X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
  * `true` enquanto uma aba cobre o Dashboard. O Dashboard usa para pausar a
@@ -46,14 +48,34 @@ function escPertenceAOutroElemento(e: KeyboardEvent): boolean {
   );
 }
 
+export type AtalhoFinanceiro = { to: string; label: string; icon: LucideIcon };
+
+/**
+ * Atalhos do topo da tela cheia (pedido do dono em 29/09/2026). "Dashboard"
+ * fecha a camada e mostra o Dashboard que já está montado no fundo, intacto;
+ * os demais trocam o conteúdo sem fechar a tela cheia.
+ */
+export const ATALHOS_TELA_CHEIA = [
+  "/app/financeiro",
+  "/app/financeiro/movimento",
+  "/app/financeiro/atendimentos",
+  "/app/financeiro/relatorios",
+] as const;
+
 export function VisaoSobreposta({
   titulo,
   icone: Icone,
+  atalhos,
+  ativo,
   onFechar,
   children,
 }: {
   titulo: string;
   icone?: LucideIcon;
+  /** Atalhos que o perfil pode ver, na ordem do cabeçalho. */
+  atalhos: readonly AtalhoFinanceiro[];
+  /** `to` da aba aberta, para destacar o atalho correspondente. */
+  ativo: string;
   onFechar: () => void;
   children: ReactNode;
 }) {
@@ -78,16 +100,51 @@ export function VisaoSobreposta({
       aria-label={titulo}
       className="fixed inset-0 z-50 flex flex-col bg-background animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
     >
-      <header className="flex shrink-0 items-center gap-3 border-b border-border/70 bg-card px-4 py-2.5 shadow-sm">
-        {Icone && <Icone className="h-5 w-5 shrink-0 text-primary" />}
-        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{titulo}</h1>
-        <span className="hidden text-xs text-muted-foreground sm:inline">Esc para fechar</span>
-        <Button variant="default" size="sm" onClick={onFechar} className="gap-1.5">
-          <X className="h-4 w-4" />
-          Fechar
-        </Button>
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/70 bg-card px-4 py-2.5 shadow-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          {Icone && <Icone className="h-5 w-5 shrink-0 text-primary" />}
+          <h1 className="truncate text-lg font-semibold">{titulo}</h1>
+        </div>
+        <nav className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
+          {atalhos.map((a) => {
+            const selecionado = a.to === ativo;
+            return (
+              <Link
+                key={a.to}
+                to={a.to}
+                className={cn(
+                  "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[14px] font-medium transition-colors duration-200",
+                  selecionado
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/60 bg-muted/40 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground",
+                )}
+              >
+                <a.icon
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    selecionado ? "" : "text-muted-foreground/70 group-hover:text-primary",
+                  )}
+                />
+                {a.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="hidden text-xs text-muted-foreground lg:inline">Esc para fechar</span>
+          <Button variant="default" size="sm" onClick={onFechar} className="gap-1.5">
+            <X className="h-4 w-4" />
+            Fechar
+          </Button>
+        </div>
       </header>
-      <div className="min-w-0 flex-1 overflow-auto p-3">{children}</div>
+      {/* A chave troca a cada aba: o conteúdo novo entra com um fade curto. */}
+      <div
+        key={ativo}
+        className="min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
+      >
+        {children}
+      </div>
     </div>,
     document.body,
   );

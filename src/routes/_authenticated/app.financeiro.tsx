@@ -30,6 +30,7 @@ import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota, moduloPermitido } from "@/lib/permissoes-rotas";
 import { cn } from "@/lib/utils";
 import {
+  ATALHOS_TELA_CHEIA,
   FinanceiroCobertoProvider,
   VisaoSobreposta,
 } from "@/components/financeiro/visao-sobreposta";
@@ -155,6 +156,10 @@ function FinLayout() {
           <VisaoSobreposta
             titulo={abaAtual.label}
             icone={abaAtual.icon}
+            atalhos={visibleSubnav.filter((i) =>
+              (ATALHOS_TELA_CHEIA as readonly string[]).includes(i.to),
+            )}
+            ativo={abaAtual.to}
             onFechar={() => navigate({ to: "/app/financeiro" })}
           >
             <Outlet />
