@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarPlus,
@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Wallet,
   ListChecks,
+  Tv,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -30,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
 import { BannerBoasVindas } from "@/components/painel/banner-boas-vindas";
+import { MedicosDoDiaTv } from "@/components/painel/medicos-do-dia-tv";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -320,6 +322,8 @@ function DashboardOperacional() {
   }, [d]);
 
   const carregando = loading || q.isLoading;
+  const [modoTv, setModoTv] = useState(false);
+  const sairModoTv = useCallback(() => setModoTv(false), []);
 
   return (
     <div className="flex flex-col w-full bg-slate-50/60">
@@ -335,9 +339,27 @@ function DashboardOperacional() {
               <RefreshCw className={cn("h-4 w-4 mr-1.5", q.isFetching && "animate-spin")} />{" "}
               Atualizar
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setModoTv(true)}
+              title="Mostrar só os médicos do dia em tela cheia, para TV ou monitor grande"
+            >
+              <Tv className="h-4 w-4 mr-1.5" /> Modo TV
+            </Button>
           </>
         }
       />
+
+      {modoTv && (
+        <MedicosDoDiaTv
+          medicos={medicosDoDia}
+          atualizando={q.isFetching}
+          atualizadoEm={q.dataUpdatedAt}
+          onAtualizar={refresh}
+          onSair={sairModoTv}
+        />
+      )}
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-6">
         <BannerBoasVindas />

@@ -1,0 +1,209 @@
+import { useEffect, useRef, useState } from "react";
+import { Minimize2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+export type MedicoDoDia = {
+  id: string;
+  nome: string;
+  especialidade: string | null;
+  total: number;
+  pagos: number;
+  novos: number;
+};
+
+/** Proporção de referência de um card compacto (largura x altura, em px). */
+const CARD_W = 240;
+const CARD_H = 140;
+
+/**
+ * Escolhe quantas colunas usar para que todos os cards caibam na área sem
+ * rolagem: testa de 1 a 10 colunas e fica com a que deixa o card maior,
+ * respeitando a proporção de referência.
+ */
+function melhorColunas(n: number, largura: number, altura: number) {
+  if (n <= 0 || largura <= 0 || altura <= 0) return 1;
+  let melhor = 1;
+  let melhorEscala = 0;
+  for (let cols = 1; cols <= Math.min(10, n); cols++) {
+    const linhas = Math.ceil(n / cols);
+    const escala = Math.min(largura / cols / CARD_W, altura / linhas / CARD_H);
+    if (escala > melhorEscala) {
+      melhorEscala = escala;
+      melhor = cols;
+    }
+  }
+  return melhor;
+}
+
+/**
+ * Modo TV do quadro "Médicos do dia": ocupa a tela inteira por cima do menu
+ * lateral e da barra superior, pede tela cheia ao navegador e distribui os
+ * cards para caberem sem rolagem. Sair da tela cheia (Esc) fecha o modo.
+ * A atualização automática vem da consulta do Dashboard (30 s + tempo real).
+ */
+export function MedicosDoDiaTv({
+  medicos,
+  atualizando,
+  atualizadoEm,
+  onAtualizar,
+  onSair,
+}: {
+  medicos: MedicoDoDia[];
+  atualizando: boolean;
+  atualizadoEm: number;
+  onAtualizar: () => void;
+  onSair: () => void;
+}) {
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState({ w: 0, h: 0 });
+  const [agora, setAgora] = useState(() => new Date());
+
+  // Tela cheia do navegador; quando o usuário sai dela (Esc), fecha o modo TV.
+  useEffect(() => {
+    const el = document.documentElement;
+    let pediu = false;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen()
+        .then(() => {
+          pediu = true;
+        })
+        .catch(() => {
+          // Navegador recusou: o modo TV segue ocupando a janela inteira.
+        });
+    }
+    const aoMudar = () => {
+      if (!document.fullscreenElement) onSair();
+    };
+    document.addEventListener("fullscreenchange", aoMudar);
+    return () => {
+      document.removeEventListener("fullscreenchange", aoMudar);
+      if (pediu && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    };
+  }, [onSair]);
+
+  // Esc também fecha quando o navegador não entrou em tela cheia.
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.fullscreenElement) onSair();
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [onSair]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setAgora(new Date()), 15_000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const medir = () => setArea({ w: el.clientWidth, h: el.clientHeight });
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const GAP = 10;
+  const cols = melhorColunas(medicos.length, area.w, area.h);
+  const linhas = Math.max(1, Math.ceil(medicos.length / cols));
+  const cardW = (area.w - GAP * (cols - 1)) / cols;
+  const cardH = (area.h - GAP * (linhas - 1)) / linhas;
+  // Fonte do número principal acompanha o tamanho do card.
+  const escala = Math.max(0.7, Math.min(2.2, Math.min(cardW / CARD_W, cardH / CARD_H)));
+
+  const totalAtend = medicos.reduce((s, m) => s + m.total, 0);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 dark:bg-background">
+      <header className="flex items-center justify-between gap-3 px-4 py-2 border-b border-slate-200 bg-card">
+        <div className="min-w-0">
+          <h1 className="text-base font-semibold text-slate-800 truncate">
+            Médicos do dia — {medicos.length} profissional(is) · {totalAtend} atendimento(s)
+          </h1>
+          <p className="text-[12px] text-slate-600 dark:text-slate-400">
+            {agora.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}{" "}
+            · {agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} ·
+            atualizado às{" "}
+            {new Date(atualizadoEm || Date.now()).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={onAtualizar} disabled={atualizando}>
+            <RefreshCw className={cn("h-4 w-4 mr-1.5", atualizando && "animate-spin")} />
+            Atualizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={onSair}>
+            <Minimize2 className="h-4 w-4 mr-1.5" />
+            Sair do modo TV
+          </Button>
+        </div>
+      </header>
+
+      <div ref={areaRef} className="flex-1 min-h-0 p-2.5 overflow-hidden">
+        {medicos.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-slate-500 text-lg">
+            Nenhum médico com atendimentos hoje
+          </div>
+        ) : (
+          <div
+            className="grid h-full"
+            style={{
+              gap: GAP,
+              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${linhas}, minmax(0, 1fr))`,
+            }}
+          >
+            {medicos.map((m) => {
+              const pct = m.total > 0 ? Math.round((m.pagos / m.total) * 100) : 0;
+              return (
+                <div
+                  key={m.id}
+                  className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-card p-2.5 flex flex-col"
+                >
+                  <div
+                    className="font-semibold text-slate-800 truncate leading-tight"
+                    style={{ fontSize: `${Math.round(13 * escala)}px` }}
+                    title={m.nome}
+                  >
+                    {m.nome}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {m.especialidade ?? "Sem especialidade"}
+                  </div>
+                  <div className="flex-1 min-h-0 flex items-center gap-2">
+                    <span
+                      className="font-bold tabular-nums text-slate-900 leading-none"
+                      style={{ fontSize: `${Math.round(30 * escala)}px` }}
+                    >
+                      {m.total}
+                    </span>
+                    <span className="text-xs uppercase tracking-wider font-semibold text-slate-500">
+                      Atend.
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div className="rounded-md bg-emerald-50 px-1.5 py-1 text-xs">
+                      <span className="font-semibold text-emerald-700">Pagos </span>
+                      <span className="font-bold tabular-nums text-emerald-800">{pct}%</span>
+                    </div>
+                    <div className="rounded-md bg-sky-50 px-1.5 py-1 text-xs">
+                      <span className="font-semibold text-sky-700">Novos </span>
+                      <span className="font-bold tabular-nums text-sky-800">{m.novos}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
