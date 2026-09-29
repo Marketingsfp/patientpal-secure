@@ -202,13 +202,21 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     // Busca as mensagens MAIS RECENTES (desc) e reordena para exibição: com
     // muitas sessões o lead passa do limite, e ordenar asc esconderia justo as
     // mensagens novas enviadas depois do reset.
-    const { data: msgsDesc, error } = await supabaseAdmin
-      .from("whatsapp_mensagens")
-      .select("id, conversa_id, direction, body, tipo, transcricao, status, enviada_por, created_at, execucao_id, wa_message_id")
-      .eq("clinica_id", data.clinicaId)
-      .in("conversa_id", ids)
-      .order("created_at", { ascending: false })
-      .limit(LIMITE_MENSAGENS_LEAD);
+    // Falha de rede momentânea ("fetch failed") ganha uma segunda tentativa
+    // antes de virar erro, para não derrubar a tela do console.
+    const buscarMsgs = () =>
+      supabaseAdmin
+        .from("whatsapp_mensagens")
+        .select("id, conversa_id, direction, body, tipo, transcricao, status, enviada_por, created_at, execucao_id, wa_message_id")
+        .eq("clinica_id", data.clinicaId)
+        .in("conversa_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(LIMITE_MENSAGENS_LEAD);
+    let { data: msgsDesc, error } = await buscarMsgs();
+    if (error && /fetch failed/i.test(error.message)) {
+      await new Promise((r) => setTimeout(r, 500));
+      ({ data: msgsDesc, error } = await buscarMsgs());
+    }
     if (error) throw new Error(error.message);
     const msgs = ((msgsDesc ?? []) as any[]).slice().reverse();
 
