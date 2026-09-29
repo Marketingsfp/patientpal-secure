@@ -32,6 +32,11 @@ import type { ColunaRateio } from "./rateio-colunas";
 import { LABEL_FORMA, type FormaCanonica, type ParteMisto } from "./formas-pagamento";
 import { receitaPorForma, type FatiaDaReceita } from "./receita-por-forma";
 import { SEM_CATEGORIA } from "./filtro-categoria";
+import {
+  resumoOperadoras,
+  type MovOperadora,
+  type SessaoOperadora,
+} from "@/lib/caixa/resumo-operadoras";
 
 /**
  * Rótulo usado quando a linha não tem categoria e nem dá para deduzi-la.
@@ -652,7 +657,7 @@ export function linhasDeFechamento(
     const dt = new Date(f.created_at);
     saida.push({
       data: dt.toLocaleDateString("en-CA"),
-      hora: dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      hora: `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`,
       tipo: "transferencia",
       transferSentido: "saida",
       transferOrigem: "fechamento",
