@@ -225,7 +225,7 @@ function AvisoReagendado({ data, para }: { data: string; para: string }) {
   return (
     <Badge
       variant="outline"
-      className="ml-2 text-[10px] px-1.5 py-0 border-sky-400 bg-sky-50 text-sky-800 align-middle whitespace-nowrap"
+      className="mt-1 flex w-fit text-xs font-semibold px-2 py-0.5 border-sky-500 bg-sky-100 text-sky-900 whitespace-nowrap"
       title="O pagamento continua no dia em que o dinheiro entrou no caixa. Só a consulta mudou de data."
     >
       {para > data
