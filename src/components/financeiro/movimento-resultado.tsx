@@ -180,6 +180,8 @@ function QuadroProfissionais({
 }) {
   /** Busca por nome, só deste quadro — não mexe na lista de lançamentos. */
   const [busca, setBusca] = useState("");
+  /** Lista inteira aberta pelo botão "Ver todos" — por padrão só os primeiros. */
+  const [verTodos, setVerTodos] = useState(false);
   const dados = resumoPorProfissional(linhas);
   // O hook acima fica ANTES desta saída: hook depois de `return` quebra a
   // regra do React e derruba a tela quando o período não tem atendimento.
@@ -187,6 +189,13 @@ function QuadroProfissionais({
   const chave = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   const termo = chave(busca.trim());
   const visiveis = termo ? dados.filter((d) => chave(d.profissional).includes(termo)) : dados;
+  // A tabela abre só com os de maior faturamento (a lista já vem nessa ordem)
+  // e o resto fica a um clique (pedido de 29/09/2026). Com a busca preenchida
+  // mostra tudo o que casou: quem digitou um nome quer ver todos os resultados.
+  // Só corta a exibição — totais e cards continuam somando `visiveis` inteira.
+  const LIMITE_INICIAL = 12;
+  const cortada = !termo && !verTodos && visiveis.length > LIMITE_INICIAL;
+  const exibidos = cortada ? visiveis.slice(0, LIMITE_INICIAL) : visiveis;
   // Os totais seguem o que está NA TELA: quem digita um nome espera a soma
   // daquele nome, não a do período inteiro. O rótulo muda junto, para ninguém
   // confundir um total filtrado com o total do dia.
@@ -283,64 +292,84 @@ function QuadroProfissionais({
             </p>
           </aside>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <th className="py-1 pr-4 text-left font-medium">Profissional</th>
-                  <th className="w-32 py-1 px-2 text-right font-medium">Consultas</th>
-                  <th className="w-32 py-1 px-2 text-right font-medium">Exames</th>
-                  <th className="w-32 py-1 px-2 text-right font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visiveis.map((d) => {
-                  const f: FiltroCard = { profissional: d.profissional };
-                  const ativo = mesmoFiltro(filtro, f);
-                  return (
-                    <tr
-                      key={d.profissional}
-                      className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
-                        ativo ? "bg-primary/5" : ""
-                      }`}
-                      aria-selected={ativo}
-                      onClick={() => alternar(f)}
-                    >
-                      <td className="py-1 pr-4 leading-tight">{d.profissional}</td>
-                      <td className="py-1 px-2 text-right">{celula(d.consulta)}</td>
-                      <td className="py-1 px-2 text-right">{celula(d.exame)}</td>
-                      <td className="py-1 px-2 text-right font-medium">{celula(d.total)}</td>
+          {/* Altura limitada com rolagem só dentro da tabela (pedido de
+              29/09/2026): antes a lista crescia com o período e empurrava o
+              fim da tabela e os cards da direita para fora da tela. O
+              cabeçalho e o Total geral ficam presos em cima e embaixo. As
+              linhas divisórias deles são sombra, e não borda, porque borda de
+              célula presa some ao rolar numa tabela de bordas unidas. */}
+          <div className="space-y-1.5">
+            <div className="max-h-[460px] overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--border)]">
+                  <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="py-1 pr-4 text-left font-medium">Profissional</th>
+                    <th className="w-32 py-1 px-2 text-right font-medium">Consultas</th>
+                    <th className="w-32 py-1 px-2 text-right font-medium">Exames</th>
+                    <th className="w-32 py-1 px-2 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exibidos.map((d) => {
+                    const f: FiltroCard = { profissional: d.profissional };
+                    const ativo = mesmoFiltro(filtro, f);
+                    return (
+                      <tr
+                        key={d.profissional}
+                        className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
+                          ativo ? "bg-primary/5" : ""
+                        }`}
+                        aria-selected={ativo}
+                        onClick={() => alternar(f)}
+                      >
+                        <td className="py-1 pr-4 leading-tight">{d.profissional}</td>
+                        <td className="py-1 px-2 text-right">{celula(d.consulta)}</td>
+                        <td className="py-1 px-2 text-right">{celula(d.exame)}</td>
+                        <td className="py-1 px-2 text-right font-medium">{celula(d.total)}</td>
+                      </tr>
+                    );
+                  })}
+                  {visiveis.length === 0 && (
+                    <tr className="border-t border-border/60">
+                      <td colSpan={4} className="py-3 text-center text-muted-foreground">
+                        Nenhum profissional com esse nome no período.
+                      </td>
                     </tr>
-                  );
-                })}
-                {visiveis.length === 0 && (
-                  <tr className="border-t border-border/60">
-                    <td colSpan={4} className="py-3 text-center text-muted-foreground">
-                      Nenhum profissional com esse nome no período.
+                  )}
+                </tbody>
+                <tfoot className="sticky bottom-0 z-10 bg-muted shadow-[inset_0_2px_0_var(--border)]">
+                  <tr className="font-semibold">
+                    <td className="py-1 pr-4 whitespace-nowrap">
+                      {termo ? "Total filtrado" : "Total geral"}
+                    </td>
+                    <td className="py-1 px-2 text-right">
+                      {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
+                    </td>
+                    <td className="py-1 px-2 text-right">
+                      {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
+                    </td>
+                    <td className="py-1 px-2 text-right">
+                      {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                     </td>
                   </tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-border bg-muted/40 font-semibold">
-                  <td className="py-1 pr-4 whitespace-nowrap">
-                    {termo ? "Total filtrado" : "Total geral"}
-                  </td>
-                  <td className="py-1 px-2 text-right">
-                    {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
-                  </td>
-                  <td className="py-1 px-2 text-right">
-                    {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
-                  </td>
-                  <td className="py-1 px-2 text-right">
-                    {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
+            {!termo && visiveis.length > LIMITE_INICIAL && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-full text-xs"
+                onClick={() => setVerTodos((v) => !v)}
+              >
+                {cortada
+                  ? `Ver todos os ${visiveis.length} profissionais`
+                  : `Mostrar só os ${LIMITE_INICIAL} de maior faturamento`}
+              </Button>
+            )}
           </div>
 
-          <aside className="space-y-2">
+          <aside className="space-y-2 xl:sticky xl:top-2 xl:self-start">
             {/* Os três cards dizem de quem é o número no próprio título: com
                 uma linha da tabela selecionada, eles passam a mostrar só
                 aquele profissional (pedido de 24/09/2026). Antes o título era
