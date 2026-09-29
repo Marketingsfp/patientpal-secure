@@ -519,3 +519,61 @@ describe("resumoPorForma", () => {
     expect(soma("Pago")).toBe(t.pago);
   });
 });
+
+describe("linhasDeFechamento", () => {
+  const { linhasDeFechamento, totaisExtrato, categoriaDaLinha, favorecidoDaLinha } =
+    require("./extrato-caixa") as typeof import("./extrato-caixa");
+  const sess = (id: string, abertura = 0) => ({
+    id,
+    user_id: "u",
+    user_nome: null,
+    status: "fechado",
+    valor_abertura: abertura,
+    valor_fechamento_calculado: null,
+    diferenca: 0,
+  });
+  const f = (sessao_id: string) => ({
+    sessao_id,
+    descricao: "FECHAMENTO DO DIA 28/09 CALCULADO 2189,19 | INFORMADO 2189,19 | DIFERENÇA 0,00",
+    created_at: "2026-09-28T20:00:00Z",
+    usuarioNome: "NICOLE",
+  });
+
+  it("sessão com sobra gera linha só com o dinheiro da gaveta", () => {
+    const movs = [
+      { sessao_id: "a", tipo: "recebimento", valor: 500, forma_pagamento: "dinheiro" },
+      { sessao_id: "a", tipo: "recebimento", valor: 800.2, forma_pagamento: "cartao_credito" },
+      { sessao_id: "a", tipo: "recebimento", valor: 279.99, forma_pagamento: "pix" },
+      { sessao_id: "a", tipo: "estorno", valor: 19, forma_pagamento: "dinheiro" },
+      { sessao_id: "a", tipo: "sangria", valor: 400, forma_pagamento: null },
+      { sessao_id: "a", tipo: "suprimento", valor: 50, forma_pagamento: null },
+    ];
+    const linhas = linhasDeFechamento([f("a")], [sess("a", 50)], movs);
+    expect(linhas).toHaveLength(1);
+    const l = linhas[0];
+    expect(l.valor).toBe(181); // 50 + 500 − 19 − 400 + 50
+    expect(l.tipo).toBe("transferencia");
+    expect(l.transferSentido).toBe("saida");
+    expect(l.formaPagamento).toBe("Dinheiro");
+    expect(l.usuarioNome).toBe("NICOLE");
+    expect(l.observacoes).toContain("FECHAMENTO DO DIA");
+    expect(categoriaDaLinha(l)).toBe("TRANSFERENCIA ENTRE CAIXAS");
+    expect(favorecidoDaLinha(l)).toBe("Fechamento de caixa");
+    const t = totaisExtrato([
+      { tipo: "receita", valor: 100, data: "2026-09-28", descricao: "x" },
+      ...linhas,
+    ]);
+    expect(t.transferFechamento).toBe(181);
+    expect(t.transferSaida).toBe(181);
+    expect(t.resultado).toBe(100);
+  });
+
+  it("sessão sem sobra não gera linha", () => {
+    const movs = [
+      { sessao_id: "b", tipo: "recebimento", valor: 300, forma_pagamento: "dinheiro" },
+      { sessao_id: "b", tipo: "recebimento", valor: 1109, forma_pagamento: "cartao_debito" },
+      { sessao_id: "b", tipo: "sangria", valor: 300, forma_pagamento: null },
+    ];
+    expect(linhasDeFechamento([f("b")], [sess("b")], movs)).toEqual([]);
+  });
+});

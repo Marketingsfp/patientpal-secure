@@ -2725,27 +2725,27 @@ function Page() {
             <p className="text-xs text-muted-foreground">
               Tudo que entrou e saiu do caixa geral no período: recebimentos de pacientes,
               mensalidades e adesões do cartão, despesas, repasse médico, boletos e as sangrias,
-              suprimentos e fechamentos de caixa entre caixas (do fechamento entra só o dinheiro
-              que sobrou na gaveta; cartão e PIX já estão nas receitas). Lançamento cancelado fica de fora. Como no Movimento de
-              Caixa, os lançamentos digitados depois do dia e as parcelas de cartão do sistema
-              antigo só entram com o botão abaixo ligado — e aí vêm marcados na coluna Situação,
-              porque não estavam no cupom impresso daquele dia.{" "}
+              suprimentos e fechamentos de caixa entre caixas (do fechamento entra só o dinheiro que
+              sobrou na gaveta; cartão e PIX já estão nas receitas). Lançamento cancelado fica de
+              fora. Como no Movimento de Caixa, os lançamentos digitados depois do dia e as parcelas
+              de cartão do sistema antigo só entram com o botão abaixo ligado — e aí vêm marcados na
+              coluna Situação, porque não estavam no cupom impresso daquele dia.{" "}
               {/* A diferença entre as duas visões precisa estar escrita na tela: quem imprime
                   o sintético e o analítico lado a lado vê dois TOTAL GERAL diferentes quando
                   houve sangria, e essa frase é a explicação. */}
               {rTipo === "sintetico" ? (
                 <>
-                  No <strong>sintético</strong>, a transferência entre caixas (sangria, fechamento de caixa e
-                  suprimento){" "}
-                  <strong>não entra em Valor Pago nem no saldo</strong>: é o mesmo dinheiro mudando
-                  de mão dentro da clínica, e aparece só no quadro &quot;Movimentações
-                  internas&quot;.
+                  No <strong>sintético</strong>, a transferência entre caixas (sangria, fechamento
+                  de caixa e suprimento) <strong>não entra em Valor Pago nem no saldo</strong>: é o
+                  mesmo dinheiro mudando de mão dentro da clínica, e aparece só no quadro
+                  &quot;Movimentações internas&quot;.
                 </>
               ) : (
                 <>
-                  No <strong>analítico</strong> a sangria e o fechamento de caixa aparecem linha a linha e entram no TOTAL
-                  GERAL, porque aqui se confere dinheiro físico e extrato de banco — o resultado do
-                  período, sem eles, está no card &quot;Saldo do período&quot;.
+                  No <strong>analítico</strong> a sangria e o fechamento de caixa aparecem linha a
+                  linha e entram no TOTAL GERAL, porque aqui se confere dinheiro físico e extrato de
+                  banco — o resultado do período, sem eles, está no card &quot;Saldo do
+                  período&quot;.
                 </>
               )}
             </p>
