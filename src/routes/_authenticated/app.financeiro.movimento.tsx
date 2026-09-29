@@ -456,10 +456,11 @@ function Page() {
   const [recarga, setRecarga] = useState(0);
   /**
    * Atualização automática escolhida ao lado do botão "atualizar", em ms
-   * (0 = manual). Não fica gravada: toda abertura da tela volta ao manual,
-   * para nenhum computador esquecido ficar relendo o caixa sem ninguém olhar.
+   * (0 = manual). Abre LIGADA em 3 min por decisão do dono (29/09/2026): a
+   * equipe não sabe ligar sozinha. 3 min e não 1 para não reler o caixa a
+   * cada minuto em todo computador aberto; com a aba escondida nada dispara.
    */
-  const [autoIntervalo, setAutoIntervalo] = useState(0);
+  const [autoIntervalo, setAutoIntervalo] = useState(180_000);
   const [agoraAuto, setAgoraAuto] = useState(() => Date.now());
   const ultimoDisparoAuto = useRef(0);
   /** nome do procedimento (maiúsculo) → tipo cadastrado (consulta/exame/…). */
