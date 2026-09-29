@@ -11,9 +11,12 @@
  *
  *   - `fin_lancamentos` — receitas (paciente pagando) e despesas (fornecedor,
  *     repasse médico, boleto, compra).
- *   - `caixa_movimentos` — sangrias e suprimentos, o dinheiro físico saindo da
- *     gaveta da recepção para o financeiro e voltando. Não são receita nem
- *     despesa, mas passam pelo caixa e aparecem no extrato como transferência.
+ *   - `caixa_movimentos` — sangrias, suprimentos e fechamentos de caixa, o
+ *     dinheiro físico saindo da gaveta da recepção para o financeiro e
+ *     voltando. Não são receita nem despesa, mas passam pelo caixa e aparecem
+ *     no extrato como transferência. Do fechamento entra SÓ a sobra em
+ *     dinheiro da sessão (ver `linhasDeFechamento`): o `valor` gravado nele
+ *     inclui cartão e PIX, que já vêm como receita do `fin_lancamentos`.
  *
  * Lançamento cancelado fica fora: ele não é dinheiro, e somá-lo faria o total
  * do relatório não bater com o extrato do banco.
@@ -29,7 +32,7 @@ import {
   mapaDaGaveta,
   TIPOS_QUE_PESAM_NA_GAVETA,
 } from "./retroativos";
-import type { MovimentacaoExtrato } from "./extrato-caixa";
+import { linhasDeFechamento, type MovimentacaoExtrato } from "./extrato-caixa";
 
 /** Linhas por página nas consultas paginadas (limite do PostgREST). */
 const PAGINA = 1000;
@@ -138,7 +141,8 @@ type LancamentoBruto = {
 
 type MovimentoBruto = {
   id: string;
-  tipo: "sangria" | "suprimento";
+  tipo: "sangria" | "suprimento" | "fechamento";
+  sessao_id: string | null;
   valor: number | string;
   descricao: string | null;
   forma_pagamento: string | null;
@@ -158,7 +162,7 @@ export async function carregarMovimentacao(params: {
 }): Promise<MovimentacaoExtrato[]> {
   const { clinicaId, de, ate } = params;
 
-  const [lancamentos, sangrias, categorias, contas] = await Promise.all([
+  const [lancamentos, movsCaixa, categorias, contas] = await Promise.all([
     buscarTudo<LancamentoBruto>(() =>
       supabase
         .from("fin_lancamentos")
@@ -177,9 +181,11 @@ export async function carregarMovimentacao(params: {
     buscarTudo<MovimentoBruto>(() =>
       supabase
         .from("caixa_movimentos")
-        .select("id, tipo, valor, descricao, forma_pagamento, user_id, created_at, destino_nome")
+        .select(
+          "id, tipo, sessao_id, valor, descricao, forma_pagamento, user_id, created_at, destino_nome",
+        )
         .eq("clinica_id", clinicaId)
-        .in("tipo", ["sangria", "suprimento"])
+        .in("tipo", ["sangria", "suprimento", "fechamento"])
         .gte("created_at", `${de}T00:00:00`)
         .lte("created_at", `${ate}T23:59:59`)
         .order("created_at"),
@@ -191,6 +197,8 @@ export async function carregarMovimentacao(params: {
   ]);
 
   if (contas.error) throw contas.error;
+  const sangrias = movsCaixa.filter((m) => m.tipo !== "fechamento");
+  const fechamentos = movsCaixa.filter((m) => m.tipo === "fechamento" && !!m.sessao_id);
 
   const catMap = mapaDeCategorias(categorias);
   const contaMap = new Map(
@@ -239,7 +247,7 @@ export async function carregarMovimentacao(params: {
     ),
     nomesPorId("profiles", [
       ...lancamentos.map((l) => l.criado_por).filter((x): x is string => !!x),
-      ...sangrias.map((s) => s.user_id).filter((x): x is string => !!x),
+      ...movsCaixa.map((s) => s.user_id).filter((x): x is string => !!x),
     ]),
   ]);
 
@@ -324,6 +332,56 @@ export async function carregarMovimentacao(params: {
       usuarioNome: m.user_id ? (userMap.get(m.user_id) ?? null) : null,
       status: "confirmado",
     });
+  }
+
+  // Fechamento de caixa: só a sobra em dinheiro da sessão, pela mesma conta
+  // de gaveta do Movimento de Caixa.
+  if (fechamentos.length) {
+    const sessaoIds = Array.from(new Set(fechamentos.map((f) => f.sessao_id as string)));
+    const [sessoesFech, movsSessao] = await Promise.all([
+      buscarPorLotes(sessaoIds, LOTE_IDS, async (ids) => {
+        const { data, error } = await supabase
+          .from("caixa_sessoes")
+          .select("id, user_id, status, valor_abertura, valor_fechamento_calculado, diferenca")
+          .in("id", ids);
+        if (error) throw error;
+        return (data ?? []) as Array<{
+          id: string;
+          user_id: string;
+          status: string;
+          valor_abertura: number | null;
+          valor_fechamento_calculado: number | null;
+          diferenca: number | null;
+        }>;
+      }),
+      buscarPorLotes(sessaoIds, LOTE_IDS, (ids) =>
+        buscarTudo<{
+          sessao_id: string;
+          tipo: string;
+          valor: number | null;
+          forma_pagamento: string | null;
+        }>(() =>
+          supabase
+            .from("caixa_movimentos")
+            .select("id, sessao_id, tipo, valor, forma_pagamento")
+            .in("sessao_id", ids)
+            .in("tipo", ["recebimento", "estorno", "sangria", "suprimento", "despesa"])
+            .order("id"),
+        ),
+      ),
+    ]);
+    saida.push(
+      ...linhasDeFechamento(
+        fechamentos.map((f) => ({
+          sessao_id: f.sessao_id as string,
+          descricao: f.descricao,
+          created_at: f.created_at,
+          usuarioNome: f.user_id ? (userMap.get(f.user_id) ?? null) : null,
+        })),
+        sessoesFech.map((s) => ({ ...s, user_nome: null })),
+        movsSessao,
+      ),
+    );
   }
 
   return saida;

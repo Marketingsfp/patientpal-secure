@@ -32,6 +32,11 @@ import type { ColunaRateio } from "./rateio-colunas";
 import { LABEL_FORMA, type FormaCanonica, type ParteMisto } from "./formas-pagamento";
 import { receitaPorForma, type FatiaDaReceita } from "./receita-por-forma";
 import { SEM_CATEGORIA } from "./filtro-categoria";
+import {
+  resumoOperadoras,
+  type MovOperadora,
+  type SessaoOperadora,
+} from "@/lib/caixa/resumo-operadoras";
 
 /**
  * Rótulo usado quando a linha não tem categoria e nem dá para deduzi-la.
@@ -63,6 +68,13 @@ export type MovimentacaoExtrato = {
   tipo: "receita" | "despesa" | "transferencia";
   /** Só para `transferencia`: suprimento entra, sangria sai. */
   transferSentido?: "entrada" | "saida" | null;
+  /**
+   * Só para `transferencia`: de onde veio a linha. O fechamento de caixa é o
+   * dinheiro que sobrou na gaveta e foi recolhido ao fechar a sessão — sai da
+   * gaveta como a sangria, mas o card "Movimentações internas" o mostra à parte.
+   * Ausente = sangria (saída) ou suprimento (entrada), como sempre foi.
+   */
+  transferOrigem?: "sangria" | "suprimento" | "fechamento" | null;
   descricao: string;
   valor: number;
   /** Nome da categoria já resolvido; `null` quando o lançamento não tem uma. */
@@ -438,7 +450,9 @@ export type TotaisExtrato = {
   despesas: number;
   /** Sangria: dinheiro que saiu da gaveta para o financeiro. */
   transferSaida: number;
-  /** Quantas linhas do período são troca de custódia (sangria + suprimento). */
+  /** Parte de `transferSaida` que veio de fechamento de caixa (sobra em dinheiro). */
+  transferFechamento: number;
+  /** Quantas linhas do período são troca de custódia (sangria, fechamento, suprimento). */
   transferQtd: number;
   /** Suprimento: dinheiro que voltou do financeiro para a gaveta. */
   transferEntrada: number;
@@ -473,10 +487,12 @@ export function totaisExtrato(movs: MovimentacaoExtrato[]): TotaisExtrato {
   let transferEntrada = 0;
   let transferSaida = 0;
   let transferQtd = 0;
+  let transferFechamento = 0;
   for (const m of movs) {
     const valor = Number(m.valor) || 0;
     if (ehTransferenciaInterna(m)) {
       transferQtd += 1;
+      if (m.transferOrigem === "fechamento") transferFechamento += valor;
       if (ehSaida(m)) transferSaida += valor;
       else transferEntrada += valor;
     } else if (ehSaida(m)) despesas += valor;
@@ -497,6 +513,7 @@ export function totaisExtrato(movs: MovimentacaoExtrato[]): TotaisExtrato {
     despesas,
     transferEntrada,
     transferSaida,
+    transferFechamento: +transferFechamento.toFixed(2),
     transferQtd,
     resultado: +(receitas - despesas).toFixed(2),
   };
@@ -603,4 +620,56 @@ export function resumoPorForma(movs: MovimentacaoExtrato[]): ItemResumoExtrato[]
     if (v.pago) itens.push({ rotulo: `Pago em ${forma}`, valor: +v.pago.toFixed(2) });
   }
   return itens;
+}
+
+/** Movimento de fechamento de sessão (`caixa_movimentos.tipo = 'fechamento'`). */
+export type FechamentoBruto = {
+  sessao_id: string;
+  descricao: string | null;
+  created_at: string;
+  usuarioNome: string | null;
+};
+
+/**
+ * Linhas de "Fechamento de caixa" para o extrato: SÓ o dinheiro físico que
+ * sobrou na gaveta, nunca o `valor` gravado no fechamento.
+ *
+ * O `valor` do fechamento é cartão + PIX + sobra em dinheiro da sessão, e
+ * cartão e PIX já entram como receita pelo `fin_lancamentos` — somá-lo
+ * inteiro duplicaria. A sobra sai da mesma conta de gaveta do Movimento de
+ * Caixa (`resumoOperadoras` → `saldoEsperadoGaveta`): abertura + dinheiro
+ * recebido − estorno em dinheiro − sangrias + suprimentos − despesas em
+ * espécie. Sobra zero (ou negativa) não gera linha.
+ */
+export function linhasDeFechamento(
+  fechamentos: FechamentoBruto[],
+  sessoes: SessaoOperadora[],
+  movs: MovOperadora[],
+): MovimentacaoExtrato[] {
+  const sobra = new Map<string, number>();
+  for (const l of resumoOperadoras(sessoes, movs).linhas) {
+    for (const d of l.detalhe) sobra.set(d.sessaoId, d.gaveta);
+  }
+  const saida: MovimentacaoExtrato[] = [];
+  for (const f of fechamentos) {
+    const valor = +(sobra.get(f.sessao_id) ?? 0).toFixed(2);
+    if (!(valor > 0)) continue;
+    const dt = new Date(f.created_at);
+    saida.push({
+      data: dt.toLocaleDateString("en-CA"),
+      hora: `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`,
+      tipo: "transferencia",
+      transferSentido: "saida",
+      transferOrigem: "fechamento",
+      descricao: "Fechamento de caixa",
+      valor,
+      categoriaNome: CATEGORIA_TRANSFERENCIA,
+      formaPagamento: LABEL_FORMA.dinheiro,
+      formaCanonica: "dinheiro",
+      observacoes: f.descricao?.trim() || null,
+      usuarioNome: f.usuarioNome,
+      status: "confirmado",
+    });
+  }
+  return saida;
 }
