@@ -10,7 +10,7 @@
  * O endereço continua mudando por baixo (/app/financeiro/movimento etc.):
  * assim o voltar do navegador, o F5 e a permissão por aba seguem valendo.
  */
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
 import { Columns2, Square, X, type LucideIcon } from "lucide-react";
@@ -27,6 +27,17 @@ export const FinanceiroCobertoProvider = FinanceiroCobertoContext.Provider;
 
 export function useFinanceiroCoberto() {
   return useContext(FinanceiroCobertoContext);
+}
+
+/**
+ * Espaço na barra de cima (ou na barra do painel, no Comparar) onde a tela
+ * aberta pode pôr os próprios controles — ex.: as abas de tipo do Relatórios.
+ * `null` fora da tela cheia: aí a tela mostra o controle no lugar de sempre.
+ */
+const SlotDoCabecalhoContext = createContext<HTMLElement | null>(null);
+
+export function useSlotDoCabecalho() {
+  return useContext(SlotDoCabecalhoContext);
 }
 
 /**
@@ -157,6 +168,8 @@ export function VisaoSobreposta({
   children: ReactNode;
 }) {
   const ladoALado = comparar && !!direita;
+  const [slotEsquerda, setSlotEsquerda] = useState<HTMLDivElement | null>(null);
+  const [slotDireita, setSlotDireita] = useState<HTMLDivElement | null>(null);
   const fecharRef = useRef(onFechar);
   fecharRef.current = onFechar;
 
@@ -193,6 +206,7 @@ export function VisaoSobreposta({
           {ladoALado ? null : (
             <AtalhosDeRota atalhos={atalhos} ativo={ativo} onEscolher={onEscolher} />
           )}
+          {ladoALado ? null : <div ref={setSlotEsquerda} className="ml-2 empty:hidden" />}
         </nav>
         <div className="ml-auto flex items-center gap-3">
           {onAlternarComparar && (
@@ -230,6 +244,7 @@ export function VisaoSobreposta({
           {ladoALado ? (
             <BarraDoPainel rotulo="Esquerda">
               <AtalhosDeRota atalhos={atalhos} ativo={ativo} onEscolher={onEscolher} />
+              <div ref={setSlotEsquerda} className="ml-2 empty:hidden" />
             </BarraDoPainel>
           ) : null}
           {/* A chave troca a cada aba: o conteúdo novo entra com um fade curto. */}
@@ -241,7 +256,9 @@ export function VisaoSobreposta({
               ladoALado && "painel-comparado",
             )}
           >
-            {children}
+            <SlotDoCabecalhoContext.Provider value={slotEsquerda}>
+              {children}
+            </SlotDoCabecalhoContext.Provider>
           </div>
         </section>
         {ladoALado && direita ? (
@@ -257,12 +274,15 @@ export function VisaoSobreposta({
                   <ConteudoPilula a={a} selecionado={a.to === direita.ativo} />
                 </button>
               ))}
+              <div ref={setSlotDireita} className="ml-2 empty:hidden" />
             </BarraDoPainel>
             <div
               key={direita.ativo}
               className="painel-comparado min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
             >
-              {direita.conteudo}
+              <SlotDoCabecalhoContext.Provider value={slotDireita}>
+                {direita.conteudo}
+              </SlotDoCabecalhoContext.Provider>
             </div>
           </section>
         ) : null}

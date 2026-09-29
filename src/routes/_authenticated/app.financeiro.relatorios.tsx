@@ -20,6 +20,8 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useSlotDoCabecalho } from "@/components/financeiro/visao-sobreposta";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -234,6 +236,53 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios"
 });
 
 type Tipo = "lancamentos" | "atendimentos" | "notas" | "rateio" | "movimentacao" | "sessoes";
+
+const OPCOES_TIPO: { valor: Tipo; rotulo: string }[] = [
+  { valor: "lancamentos", rotulo: "Lançamentos" },
+  { valor: "atendimentos", rotulo: "Atendimentos" },
+  { valor: "notas", rotulo: "Notas" },
+  { valor: "rateio", rotulo: "Rateio da Receita" },
+  { valor: "movimentacao", rotulo: "Movimentação Financeira" },
+  { valor: "sessoes", rotulo: "Sessões e Manutenções" },
+];
+
+/**
+ * Tipo de relatório como abas na barra de cima da tela cheia (pedido do dono
+ * em 29/09/2026). Fora da tela cheia a tela usa o campo de seleção antigo.
+ */
+function AbasTipoRelatorio({ valor, onChange }: { valor: Tipo; onChange: (t: Tipo) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Tipo de relatório"
+      className="flex flex-wrap items-center gap-1 rounded-full border border-border/60 bg-muted/40 p-1"
+    >
+      <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Relatório
+      </span>
+      {OPCOES_TIPO.map((o) => {
+        const ativo = o.valor === valor;
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            role="tab"
+            aria-selected={ativo}
+            onClick={() => onChange(o.valor)}
+            className={cn(
+              "whitespace-nowrap rounded-full px-3 py-1 text-[13px] font-medium transition-colors duration-200",
+              ativo
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
+            )}
+          >
+            {o.rotulo}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 type Linha = Record<string, unknown>;
 
@@ -739,6 +788,7 @@ const LARGURA_COMPACTA: Record<string, string> = {
 function Page() {
   const { clinicaAtual } = useClinica();
   const [tipo, setTipo] = useState<Tipo>("lancamentos");
+  const slotCabecalho = useSlotDoCabecalho();
   // A tela abre no mês corrente, que é a aba "Mês" do seletor. O intervalo e a
   // aba precisam nascer combinando: um intervalo solto deixaria uma aba acesa
   // mostrando outras datas.
@@ -2220,22 +2270,27 @@ function Page() {
               data só aparecem em "Período". */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="space-y-1.5 sm:w-72">
-                <Label className={ROTULO}>Tipo de relatório</Label>
-                <Select value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
-                  <SelectTrigger className={CAMPO}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lancamentos">Lançamentos</SelectItem>
-                    <SelectItem value="atendimentos">Atendimentos</SelectItem>
-                    <SelectItem value="notas">Notas</SelectItem>
-                    <SelectItem value="rateio">Rateio da Receita</SelectItem>
-                    <SelectItem value="movimentacao">Movimentação Financeira</SelectItem>
-                    <SelectItem value="sessoes">Sessões e Manutenções</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Na tela cheia o tipo vira abas na barra de cima (portal no
+                  espaço que ela oferece); aqui só aparece fora dela. */}
+              {slotCabecalho ? (
+                createPortal(<AbasTipoRelatorio valor={tipo} onChange={setTipo} />, slotCabecalho)
+              ) : (
+                <div className="space-y-1.5 sm:w-72">
+                  <Label className={ROTULO}>Tipo de relatório</Label>
+                  <Select value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
+                    <SelectTrigger className={CAMPO}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OPCOES_TIPO.map((o) => (
+                        <SelectItem key={o.valor} value={o.valor}>
+                          {o.rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {/* Categoria fica ao lado do tipo de relatório, e não dentro do
                   bloco de opções de cada um, porque ela é a pergunta que o
                   financeiro faz PRIMEIRO ("quero auditar o repasse médico") —
