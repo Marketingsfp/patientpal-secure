@@ -103,6 +103,21 @@ const ABERTURA_NOME =
 const NAO_E_NOME =
   /\b(consulta|agendamento|agendar|marcar|quero|queria|preciso|gostaria|pode|filh[oa]s?|m[aã]e|pai|espos[oa]|marido|irm[aã]o?|av[oóô]|net[oa]|sobrinh[oa]|crian[cç]a|beb[eê]|paciente|dele|dela|ele|ela|meu|minha|nascid[oa]|nasceu|nasci|nascimento|data|cpf|telefone|celular|whatsapp|hor[aá]rios?|hora|dia|doutor[a]?|dr[a]?|para|pra|com|em|anos?|idade|prefiro|pode|ser|sim|ok|obrigad[oa]|valor|pre[cç]o|quanto|custa|dinheiro|pix|cart[aã]o|pagar|pagamento|confirmo|tanto|faz|manh[aã]|tarde|noite)\b/i;
 const CONECTIVO = /^(?:da|de|do|das|dos|e|o|a)$/i;
+/** Parentesco que também é sobrenome ("José Carlos Silva Filho", "Bruno Almeida Neto"). */
+const SOBRENOME_FAMILIA = /^(?:filh[oa]|net[oa]|sobrinh[oa])$/i;
+/** "minha filha Sofia Lopes" → "Sofia Lopes": o parentesco antecede o nome. */
+const PARENTESCO_ANTES =
+  /^(?:(?:é|eh|e)\s+)?(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|m[aã]e|pai|espos[oa]|marido|irm[aã]o?|av[oóô]|net[oa]|sobrinh[oa]|entead[oa])\s+(?:(?:é|eh|e|se\s+chama|chamad[oa])\s+)?/i;
+
+/** Rejeita palavras que não são nome; parentesco só vale no fim, como sobrenome. */
+function pareceNome(palavras: string[]): boolean {
+  const semConectivo = (w: string[]) => w.filter((p) => !CONECTIVO.test(p)).length;
+  if (semConectivo(palavras) < 2) return false;
+  const ultima = palavras.at(-1) ?? "";
+  const antes = palavras.slice(0, -1);
+  if (SOBRENOME_FAMILIA.test(ultima) && semConectivo(antes) >= 2) return !NAO_E_NOME.test(antes.join(" "));
+  return !NAO_E_NOME.test(palavras.join(" "));
+}
 
 /** Só recorta uma declaração explícita, sem confundir o médico com o paciente. */
 function declaracaoDePaciente(texto: string): string | null {
@@ -114,10 +129,21 @@ function declaracaoDePaciente(texto: string): string | null {
   if (nomeDependente) return nomeDependente;
   // Apresentação na mesma mensagem da escolha: "14:30. Sou Ana Silva...".
   // O extrator continua rejeitando idade, médico e relação familiar como nome.
-  const apresentacao = texto.match(/(?:^|[.!?]\s*)(sou\s+.+)/i)?.[1];
+  const apresentacao = texto.match(/(?:^|[.,;!?]\s*)(sou\s+.+)/i)?.[1];
   if (apresentacao) return apresentacao;
   const dependente = texto.match(/(?:^|[.!?]\s*)(?:(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])|(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(?:é|eh|e|se\s+chama))\s+(.+)/i)?.[1];
   return dependente ?? null;
+}
+
+/**
+ * "sim 9:15. Renata Duarte 09/09/1990": dados sem "meu nome é" junto da
+ * escolha do horário. Só vale com nome E nascimento passado — a data da
+ * consulta é futura e o nome do médico é barrado pelo extrator.
+ */
+function dadosJuntoDaEscolha(texto: string): DadosIdentificacao | null {
+  const dados = extrairDadosIdentificacao(texto);
+  if (!dados.nome || !dados.data_nascimento) return null;
+  return Date.parse(`${dados.data_nascimento}T00:00:00Z`) < Date.now() - 86_400_000 ? dados : null;
 }
 
 /** Remove só a referência familiar já vinculada ao cadastro desta sessão.
@@ -159,9 +185,9 @@ function extrairNome(semData: string): string | null {
     .replace(/\d/g, " ")
     .split(/[,;:|.!?\n]+|\s+e\s+(?=(?:nasci|nascid[oa]|que\s+nasceu|data)\b)|\b(?:nascid[oa]|nasci|que\s+nasceu)\s+(?:em|no\s+dia)?\b/i);
   const candidatos = partes
-    .map((p) => p.replace(/\s+/g, " ").trim().replace(ABERTURA_NOME, "").trim())
+    .map((p) => p.replace(/\s+/g, " ").trim().replace(ABERTURA_NOME, "").trim().replace(PARENTESCO_ANTES, "").trim())
     .map((p) => p.split(" ").filter((w) => /^[A-Za-zÀ-ÿ'´`^~-]{2,}$/.test(w)))
-    .filter((w) => w.filter((p) => !CONECTIVO.test(p)).length >= 2 && !NAO_E_NOME.test(w.join(" ")));
+    .filter(pareceNome);
   const melhor = candidatos.sort((a, b) => b.length - a.length)[0];
   return melhor ? melhor.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ") : null;
 }
@@ -380,7 +406,8 @@ export async function aplicarGateIdentificacao(params: {
     ? declaracaoDePaciente(mensagem)
     : null;
   const novo = declaracaoNaEscolha ? extrairDadosIdentificacao(declaracaoNaEscolha)
-    : aceiteDaVaga || selecionouAgora || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
+    : selecionouAgora ? dadosJuntoDaEscolha(mensagem)
+    : aceiteDaVaga || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
   if (
     !aceiteDaVaga &&
     pareceAssuntoParalelo(mensagem) &&

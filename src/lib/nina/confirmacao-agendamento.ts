@@ -14,7 +14,8 @@ const VOCABULARIO = new Set(
     "sim isso mesmo mesma claro ok eu confirmo confirmar confirmado confirmada aceito autorizo pode ser marcar agendar finalizar concluir prosseguir continuar " +
     "o a os as um uma de da do das dos em no na nos nas com para pra por favor gentileza e esse essa esses essas este esta estes estas " +
     "todos todas dados informacoes atendimento consulta exame procedimento agendamento pre horario data dia profissional medico medica dr dra doutor doutora " +
-    "meu minha esta estao ta correto correta corretos corretas certo certa certinho combinado fechado tudo pode nesse nessa neste nesta"
+    "meu minha esta estao ta correto correta corretos corretas certo certa certinho combinado fechado tudo pode nesse nessa neste nesta " +
+    "perfeito beleza otimo"
   ).split(/\s+/),
 );
 
@@ -35,13 +36,17 @@ export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento
   // Complementos de cortesia/localização não mudam o aceite. Remova apenas
   // sufixos conhecidos; uma ressalva ou outro atendimento continua inválido.
   t = t.replace(/[,.!;]+/g, " ").replace(/\s+/g, " ").trim()
+    .replace(/(?:\s+(?:muito\s+)?(?:obrigad[oa]|valeu|grat[oa]))?(?:\s+nina)?$/, "")
     .replace(/\s+(?:por favor|por gentileza|pfv|pfvr|obrigad[oa])$/, "")
     .replace(/\s+por aqui$/, "")
+    // "sim, já falei que confirmo": a insistência não muda o aceite.
+    .replace(/\b(?:ja\s+)?(?:falei|disse)\s+(?:que\s+)?(?=(?:eu\s+)?confirmo\b)/, "")
+    .replace(/\s+/g, " ")
     .trim();
   t = t.replace(/^(?:isso (?:ai|ae)|ja e|formou|demorou|fechou|combinado|blz|beleza|bora|ss|s)(?=\s+(?:pode|confirmo|eu confirmo)\b)/, "sim");
   if (CURTA.test(t.replace(/[,.!]/g, " ").replace(/\s+/g, " ").trim())) return true;
   if (
-    !/^(?:(?:sim|isso(?: mesmo)?|esse(?: mesmo)?|essa(?: mesma)?|claro|ok)[,.!\s]+)?(?:eu\s+)?(?:confirmo|aceito|autorizo|pode\s+(?:sim\s+)?(?:marcar|agendar|confirmar|finalizar|concluir)|(?:(?:esta|estao|ta)\s+(?:tudo\s+)?|tudo\s+)(?:certo|correto|certinho))\b/.test(
+    !/^(?:(?:sim|isso(?: mesmo)?|esse(?: mesmo)?|essa(?: mesma)?|claro|ok|certo|certinho|perfeito|combinado|beleza|otimo)[,.!\s]+)?(?:eu\s+)?(?:confirmo|aceito|autorizo|pode\s+(?:sim\s+)?(?:marcar|agendar|confirmar|finalizar|concluir)|(?:(?:esta|estao|ta)\s+(?:tudo\s+)?|tudo\s+)(?:certo|correto|certinho))\b/.test(
       t,
     )
   )

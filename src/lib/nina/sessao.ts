@@ -133,6 +133,29 @@ export function novaSessao(anterior: EstadoFluxoNina, agoraISO?: string): Estado
   };
 }
 
+/**
+ * Recua o início da sessão aberta neste turno até a mensagem mais antiga do
+ * próprio turno. A mensagem é gravada antes do processamento; com o início no
+ * "agora", ela ficava fora do histórico e o nome/nascimento dela se perdia.
+ */
+export function inicioSessaoComEntradas(
+  estado: EstadoFluxoNina,
+  mensagens: ReadonlyArray<{ id?: string | null; created_at?: string | null }>,
+  idsDoTurno: ReadonlyArray<string>,
+): EstadoFluxoNina {
+  const inicio = Date.parse(estado.session_started_at ?? "");
+  if (!Number.isFinite(inicio) || !idsDoTurno.length) return estado;
+  const ids = new Set(idsDoTurno);
+  const maisAntiga = Math.min(
+    ...mensagens
+      .filter((m) => m.id && ids.has(m.id))
+      .map((m) => Date.parse(m.created_at ?? ""))
+      .filter(Number.isFinite),
+  );
+  if (!Number.isFinite(maisAntiga) || maisAntiga >= inicio) return estado;
+  return { ...estado, session_started_at: new Date(maisAntiga).toISOString() };
+}
+
 /** Gera um identificador de sessão operacional novo. */
 export function novoSessionId(): string {
   const g = globalThis as { crypto?: { randomUUID?: () => string } };

@@ -1071,6 +1071,12 @@ async function gerarRespostaNinaInterno(
   }
   const sessaoSaudacao = garantirSessaoAtiva(sessaoNina.estado);
   sessaoNina.estado = sessaoSaudacao.estado;
+  if (sessaoSaudacao.novaSessao || sessaoNina.expirou) {
+    // A sessão aberta neste turno começa na 1ª mensagem recebida, não no
+    // processamento: senão os dados dessa mensagem somem do histórico.
+    const { inicioSessaoComEntradas } = await import("@/lib/nina/sessao");
+    sessaoNina.estado = inicioSessaoComEntradas(sessaoNina.estado, msgsMemoria, opcoes?.mensagensEntrada ?? []);
+  }
   const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
   const jaSeApresentou = !saudacaoObrigatoria;
   console.info("[NINA_SESSION]", {
