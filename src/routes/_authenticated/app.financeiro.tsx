@@ -1,4 +1,4 @@
-import { Suspense, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useLayoutEffect, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 import {
   createFileRoute,
@@ -36,9 +36,23 @@ import {
   VisaoSobreposta,
 } from "@/components/financeiro/visao-sobreposta";
 import { Route as DashboardRoute } from "./app.financeiro.index";
+import { Route as MovimentoRoute } from "./app.financeiro.movimento";
+import { Route as AtendimentosRoute } from "./app.financeiro.atendimentos";
+import { Route as RelatoriosRoute } from "./app.financeiro.relatorios";
 
 /** Componente do Dashboard, para mantê-lo montado atrás das abas. */
 const FinDashboard = DashboardRoute.options.component!;
+
+/**
+ * Telas que o painel direito do modo Comparar desenha por conta própria,
+ * fora do endereço. Cada uma é uma instância independente (filtros próprios).
+ */
+const TELAS_DO_PAINEL_DIREITO: Record<string, ComponentType> = {
+  "/app/financeiro": FinDashboard,
+  "/app/financeiro/movimento": MovimentoRoute.options.component!,
+  "/app/financeiro/atendimentos": AtendimentosRoute.options.component!,
+  "/app/financeiro/relatorios": RelatoriosRoute.options.component!,
+};
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
@@ -119,8 +133,13 @@ function FinLayout() {
     const alvo = dashboardNaCamada ? slotCamada : slotFundo.current;
     if (alvo && dashboardHost.parentElement !== alvo) alvo.appendChild(dashboardHost);
   });
+  // Modo Comparar: painel esquerdo segue o endereço, o direito é escolhido
+  // por estado. Fechar a tela cheia desliga o modo.
+  const [comparar, setComparar] = useState(false);
+  const [abaDireita, setAbaDireita] = useState<string | null>(null);
   const fecharCamada = () => {
     setDashboardNaCamadaPedido(false);
+    setComparar(false);
     navigate({ to: "/app/financeiro" });
   };
 
@@ -134,6 +153,18 @@ function FinLayout() {
   if (semFinanceiroPai && primeiraAbaSub) {
     return <Navigate to={primeiraAbaSub.to} replace />;
   }
+
+  const atalhosTelaCheia = visibleSubnav.filter((i) =>
+    (ATALHOS_TELA_CHEIA as readonly string[]).includes(i.to),
+  );
+  const ativoEsquerda = dashboardNaCamada || !abaAtual ? "/app/financeiro" : abaAtual.to;
+  // Sem escolha ainda, o painel direito abre na primeira tela diferente da
+  // esquerda (ex.: Dashboard à esquerda → Mov. Caixa à direita).
+  const abaDireitaEfetiva =
+    (abaDireita && atalhosTelaCheia.some((a) => a.to === abaDireita) ? abaDireita : null) ??
+    atalhosTelaCheia.find((a) => a.to !== ativoEsquerda)?.to ??
+    atalhosTelaCheia[0]?.to ??
+    null;
   return (
     <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col">
       <div className="shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
@@ -183,12 +214,23 @@ function FinLayout() {
           <VisaoSobreposta
             titulo={dashboardNaCamada || !abaAtual ? "Dashboard" : abaAtual.label}
             icone={dashboardNaCamada || !abaAtual ? LayoutDashboard : abaAtual.icon}
-            atalhos={visibleSubnav.filter((i) =>
-              (ATALHOS_TELA_CHEIA as readonly string[]).includes(i.to),
-            )}
-            ativo={dashboardNaCamada || !abaAtual ? "/app/financeiro" : abaAtual.to}
+            atalhos={atalhosTelaCheia}
+            ativo={ativoEsquerda}
             onEscolher={(to) => setDashboardNaCamadaPedido(to === "/app/financeiro")}
             onFechar={fecharCamada}
+            comparar={comparar && !!abaDireitaEfetiva}
+            onAlternarComparar={
+              atalhosTelaCheia.length > 0 ? () => setComparar((c) => !c) : undefined
+            }
+            direita={
+              abaDireitaEfetiva
+                ? {
+                    ativo: abaDireitaEfetiva,
+                    onEscolher: setAbaDireita,
+                    conteudo: <TelaDoPainelDireito to={abaDireitaEfetiva} />,
+                  }
+                : undefined
+            }
           >
             {dashboardNaCamada ? <div ref={setSlotCamada} /> : <Outlet />}
           </VisaoSobreposta>
@@ -197,5 +239,21 @@ function FinLayout() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Tela do painel direito do modo Comparar. O Dashboard daqui é uma segunda
+ * instância, independente da esquerda (período próprio); nunca está coberto.
+ */
+function TelaDoPainelDireito({ to }: { to: string }) {
+  const Tela = TELAS_DO_PAINEL_DIREITO[to];
+  if (!Tela) return null;
+  return (
+    <FinanceiroCobertoProvider value={false}>
+      <Suspense fallback={null}>
+        <Tela />
+      </Suspense>
+    </FinanceiroCobertoProvider>
   );
 }

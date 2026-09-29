@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useMatch } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -331,7 +331,9 @@ function AtendimentosPage() {
   const [form, setForm] = useState(EMPTY);
   // Filtros do relatório
   const hoje = new Date().toISOString().slice(0, 10);
-  const buscaUrl = Route.useSearch();
+  // Sem `throw`: no painel direito do modo Comparar a tela é desenhada fora
+  // do próprio endereço, e aí não há `?de=&ate=` — abre em hoje.
+  const buscaUrl = useMatch({ from: Route.id, shouldThrow: false })?.search ?? {};
   const [fMedico, setFMedico] = useState<string>("todos");
   // "todos" | "nome:<chave>" — recorte por agenda do profissional escolhido.
   const [fAgenda, setFAgenda] = useState<string>("todos");

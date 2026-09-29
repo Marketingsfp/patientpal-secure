@@ -13,7 +13,7 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
-import { X, type LucideIcon } from "lucide-react";
+import { Columns2, Square, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +62,73 @@ export const ATALHOS_TELA_CHEIA = [
   "/app/financeiro/relatorios",
 ] as const;
 
+const PILULA =
+  "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[14px] font-medium transition-colors duration-200";
+const PILULA_ATIVA = "border-primary bg-primary text-primary-foreground shadow-sm";
+const PILULA_INATIVA =
+  "border-border/60 bg-muted/40 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground";
+
+function ConteudoPilula({ a, selecionado }: { a: AtalhoFinanceiro; selecionado: boolean }) {
+  return (
+    <>
+      <a.icon
+        className={cn(
+          "h-4 w-4 shrink-0",
+          selecionado ? "" : "text-muted-foreground/70 group-hover:text-primary",
+        )}
+      />
+      {a.label}
+    </>
+  );
+}
+
+/** Atalhos que trocam de aba pelo endereço (tela única e painel esquerdo). */
+function AtalhosDeRota({
+  atalhos,
+  ativo,
+  onEscolher,
+}: {
+  atalhos: readonly AtalhoFinanceiro[];
+  ativo: string;
+  onEscolher?: (to: string) => void;
+}) {
+  return (
+    <>
+      {atalhos.map((a) => (
+        <Link
+          key={a.to}
+          to={a.to}
+          onClick={() => onEscolher?.(a.to)}
+          className={cn(PILULA, a.to === ativo ? PILULA_ATIVA : PILULA_INATIVA)}
+        >
+          <ConteudoPilula a={a} selecionado={a.to === ativo} />
+        </Link>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Painel direito do modo Comparar (pedido do dono em 29/09/2026): escolhe a
+ * tela por estado, sem mexer no endereço — o esquerdo segue o endereço.
+ */
+export type PainelDireito = {
+  ativo: string;
+  onEscolher: (to: string) => void;
+  conteudo: ReactNode;
+};
+
+function BarraDoPainel({ rotulo, children }: { rotulo: string; children: ReactNode }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/70 bg-muted/30 px-3 py-2">
+      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {rotulo}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 export function VisaoSobreposta({
   titulo,
   icone: Icone,
@@ -69,6 +136,9 @@ export function VisaoSobreposta({
   ativo,
   onEscolher,
   onFechar,
+  comparar = false,
+  onAlternarComparar,
+  direita,
   children,
 }: {
   titulo: string;
@@ -80,8 +150,13 @@ export function VisaoSobreposta({
   /** Avisado antes da navegação do atalho clicado. */
   onEscolher?: (to: string) => void;
   onFechar: () => void;
+  /** Modo lado a lado ligado. */
+  comparar?: boolean;
+  onAlternarComparar?: () => void;
+  direita?: PainelDireito;
   children: ReactNode;
 }) {
+  const ladoALado = comparar && !!direita;
   const fecharRef = useRef(onFechar);
   fecharRef.current = onFechar;
 
@@ -105,36 +180,32 @@ export function VisaoSobreposta({
     >
       <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/70 bg-card px-4 py-2.5 shadow-sm">
         <div className="flex min-w-0 items-center gap-2">
-          {Icone && <Icone className="h-5 w-5 shrink-0 text-primary" />}
-          <h1 className="truncate text-lg font-semibold">{titulo}</h1>
+          {ladoALado ? (
+            <Columns2 className="h-5 w-5 shrink-0 text-primary" />
+          ) : (
+            Icone && <Icone className="h-5 w-5 shrink-0 text-primary" />
+          )}
+          <h1 className="truncate text-lg font-semibold">
+            {ladoALado ? "Comparar lado a lado" : titulo}
+          </h1>
         </div>
         <nav className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
-          {atalhos.map((a) => {
-            const selecionado = a.to === ativo;
-            return (
-              <Link
-                key={a.to}
-                to={a.to}
-                onClick={() => onEscolher?.(a.to)}
-                className={cn(
-                  "group flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[14px] font-medium transition-colors duration-200",
-                  selecionado
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                    : "border-border/60 bg-muted/40 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground",
-                )}
-              >
-                <a.icon
-                  className={cn(
-                    "h-4 w-4 shrink-0",
-                    selecionado ? "" : "text-muted-foreground/70 group-hover:text-primary",
-                  )}
-                />
-                {a.label}
-              </Link>
-            );
-          })}
+          {ladoALado ? null : (
+            <AtalhosDeRota atalhos={atalhos} ativo={ativo} onEscolher={onEscolher} />
+          )}
         </nav>
         <div className="ml-auto flex items-center gap-3">
+          {onAlternarComparar && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAlternarComparar}
+              className={cn("gap-1.5", ladoALado && "border-primary text-primary")}
+            >
+              {ladoALado ? <Square className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
+              {ladoALado ? "Visão única" : "Comparar"}
+            </Button>
+          )}
           <span className="hidden text-xs text-muted-foreground lg:inline">Esc para fechar</span>
           <Button variant="default" size="sm" onClick={onFechar} className="gap-1.5">
             <X className="h-4 w-4" />
@@ -142,12 +213,55 @@ export function VisaoSobreposta({
           </Button>
         </div>
       </header>
-      {/* A chave troca a cada aba: o conteúdo novo entra com um fade curto. */}
+      {/*
+        A estrutura do painel esquerdo é a mesma com ou sem Comparar: ligar e
+        desligar o modo não desmonta a tela aberta nem perde os filtros dela.
+        Estreito, os painéis ficam um sobre o outro; cada um rola sozinho.
+      */}
       <div
-        key={ativo}
-        className="min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
+        className={cn(
+          "min-h-0 flex-1",
+          ladoALado
+            ? "grid grid-cols-1 grid-rows-2 divide-y divide-border/70 lg:grid-cols-2 lg:grid-rows-1 lg:divide-x lg:divide-y-0"
+            : "flex flex-col",
+        )}
       >
-        {children}
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {ladoALado ? (
+            <BarraDoPainel rotulo="Esquerda">
+              <AtalhosDeRota atalhos={atalhos} ativo={ativo} onEscolher={onEscolher} />
+            </BarraDoPainel>
+          ) : null}
+          {/* A chave troca a cada aba: o conteúdo novo entra com um fade curto. */}
+          <div
+            key={ativo}
+            className="min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
+          >
+            {children}
+          </div>
+        </section>
+        {ladoALado && direita ? (
+          <section className="flex min-h-0 min-w-0 flex-col">
+            <BarraDoPainel rotulo="Direita">
+              {atalhos.map((a) => (
+                <button
+                  key={a.to}
+                  type="button"
+                  onClick={() => direita.onEscolher(a.to)}
+                  className={cn(PILULA, a.to === direita.ativo ? PILULA_ATIVA : PILULA_INATIVA)}
+                >
+                  <ConteudoPilula a={a} selecionado={a.to === direita.ativo} />
+                </button>
+              ))}
+            </BarraDoPainel>
+            <div
+              key={direita.ativo}
+              className="min-h-0 min-w-0 flex-1 overflow-auto p-3 animate-in fade-in-0 slide-in-from-bottom-1 duration-200"
+            >
+              {direita.conteudo}
+            </div>
+          </section>
+        ) : null}
       </div>
     </div>,
     document.body,
