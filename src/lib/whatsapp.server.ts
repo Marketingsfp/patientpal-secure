@@ -1559,9 +1559,11 @@ async function gerarRespostaNinaInterno(
     // Consulta de agenda vale para TODAS as clínicas (não cria nada, não
     // expõe paciente). Só as ferramentas que gravam dependem da flag.
     const mod = await import("@/lib/nina/paciente-tools.server");
+    // Flag desligada = a Nina só informa e encaminha à recepção: sem vaga livre.
+    const { semFerramentasDeVaga } = await import("@/lib/nina/consulta-agenda");
     ferramentas = podeAgendar
       ? [...mod.FERRAMENTAS_NINA_PACIENTE]
-      : [...mod.FERRAMENTAS_NINA_CONSULTA];
+      : semFerramentasDeVaga([...mod.FERRAMENTAS_NINA_CONSULTA]);
     // As leituras ficam acessíveis em todos os turnos. A escolha de consultar
     // vem da interpretação do modelo; expressões literais não removem tools.
     executar = async (...args) => {

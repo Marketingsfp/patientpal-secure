@@ -40,6 +40,18 @@ export const FERRAMENTAS_DE_VAGAS = new Set([
   "consultar_primeiro_disponivel",
 ]);
 
+/**
+ * Modo "somente informa" (flag nina_agenda_ativa = false): a Nina responde com
+ * os horários habituais do catálogo e encaminha para a recepção. Nenhuma
+ * ferramenta que consulta vaga livre é exposta ao modelo.
+ */
+export function semFerramentasDeVaga<T>(ferramentas: readonly T[]): T[] {
+  return ferramentas.filter((f) => {
+    const nome = (f as { function?: { name?: string }; name?: string })?.function?.name ?? (f as { name?: string })?.name;
+    return !(typeof nome === "string" && FERRAMENTAS_DE_VAGAS.has(nome));
+  });
+}
+
 const normalizar = (t: string) =>
   t
     .toLowerCase()

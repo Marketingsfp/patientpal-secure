@@ -229,8 +229,11 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       "./paciente-tools.server"
     );
     const { FERRAMENTA_HANDOFF } = await import("./handoff-tool.server");
+    const { semFerramentasDeVaga } = await import("./consulta-agenda");
     const lista: any[] = [
-      ...(FERRAMENTAS_NINA_CONSULTA as readonly any[]),
+      ...(podeAgendar
+        ? (FERRAMENTAS_NINA_CONSULTA as readonly any[])
+        : semFerramentasDeVaga(FERRAMENTAS_NINA_CONSULTA as readonly any[])),
       ...(podeAgendar ? (FERRAMENTAS_NINA_AGENDAMENTO as readonly any[]) : []),
       FERRAMENTA_HANDOFF as any,
     ];

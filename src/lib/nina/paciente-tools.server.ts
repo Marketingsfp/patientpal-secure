@@ -1143,6 +1143,10 @@ async function executarFerramentaInterna(
   const SOMENTE_COM_FLAG = new Set(["selecionar_horario", "consultar_cadastro_paciente", "identificar_paciente", "meus_agendamentos", "agendar"]);
   if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
+  // Modo "somente informa": vaga livre também não é consultada. O modelo informa
+  // os dias e horários habituais do catálogo e encaminha o paciente à recepção.
+  if (FERRAMENTAS_DE_VAGAS.has(nome) && ctx.podeAgendar === false)
+    return falha("PERMISSION_DENIED", "Nesta unidade a assistente não consulta vagas nem agenda. Informe os dias e horários habituais do catálogo e encaminhe o paciente à recepção com solicitar_atendente_humano (setor Recepção), sem prometer horário.");
 
   if (ctx.esclarecimentoCatalogo && (FERRAMENTAS_DE_VAGAS.has(nome) || ["selecionar_horario", "agendar"].includes(nome)))
     return { ok: true, consulta_realizada: false, precisa_esclarecer: true,
