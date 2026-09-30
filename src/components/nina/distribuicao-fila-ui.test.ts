@@ -4,7 +4,6 @@ import {
   avisoPresencaConfirmada,
   mensagemDistribuicaoFila,
   textoCargaAtendente,
-  validarLimiteAtendente,
 } from "./distribuicao-fila-ui";
 
 const resultado = (extra: Partial<ResultadoDistribuicaoFila> = {}): ResultadoDistribuicaoFila => ({
@@ -16,29 +15,25 @@ const resultado = (extra: Partial<ResultadoDistribuicaoFila> = {}): ResultadoDis
 });
 
 describe("resultado da distribuição no controle de presença", () => {
-  test("separa a carga ativa do limite de reservas em Pausa", () => {
-    expect(textoCargaAtendente(22, 10, 10)).toBe("12 conversa(s) ativa(s), sem limite. 10/10 em Não atribuídas.");
-    expect(textoCargaAtendente(22, null, 10)).toBe("12 conversa(s) ativa(s), sem limite. 10 em Não atribuídas.");
+  test("Online não tem limite: a carga é só informativa", () => {
+    expect(textoCargaAtendente(22)).toBe("22 conversa(s) ativa(s), sem limite.");
   });
-  test("Online com capacidade atingida informa carga, limite e fila pendente", () => {
+  test("Pausa para saída aparece com o próprio nome e sem receber conversas", () => {
     const aviso = avisoPresencaConfirmada(
-      "ONLINE",
+      "PAUSA_SAIDA",
       resultado({
-        status: "bloqueada",
         pendentes: 2,
-        motivo: "capacidade_lotada",
-        meu: { carga_atual: 5, capacidade: 5, elegivel: false, motivo: "capacidade_lotada" },
+        status: "bloqueada",
+        motivo: "sem_atendentes_elegiveis",
+        meu: { carga_atual: 3, capacidade: null, elegivel: false, motivo: "escolha_manual_pausa_saida" },
       }),
     );
-    expect(aviso.tom).toBe("aviso");
-    expect(aviso.texto).toContain("Online. 5/5 conversas ativas.");
-    expect(aviso.texto).toContain("Capacidade atingida.");
-    expect(aviso.texto).toContain("2 conversa(s) aguardando distribuição.");
-    expect(aviso.texto.match(/Capacidade atingida/g)).toHaveLength(1);
+    expect(aviso.texto).toContain("Em pausa para saída.");
+    expect(aviso.texto).toContain("Você está em pausa para saída e não recebe novas conversas.");
   });
 
   test("sem limite não inventa capacidade cinco nem impede carga maior", () => {
-    expect(textoCargaAtendente(12, null)).toBe("12 conversa(s) ativa(s), sem limite.");
+    expect(textoCargaAtendente(12)).toBe("12 conversa(s) ativa(s), sem limite.");
     const aviso = mensagemDistribuicaoFila(
       resultado({
         distribuidas: 2,
@@ -81,18 +76,4 @@ describe("resultado da distribuição no controle de presença", () => {
     const aviso = mensagemDistribuicaoFila(resultado({ meu: null }));
     expect(aviso.texto).toBe("Nenhuma conversa aguardando distribuição.");
   });
-});
-
-describe("limite configurável de conversas", () => {
-  test("sem limite envia null mesmo com número antigo no campo", () => {
-    expect(validarLimiteAtendente("sem_limite", "5")).toEqual({ ok: true, capacidade: null });
-  });
-  test("limites positivos até 1000 são aceitos", () => {
-    expect(validarLimiteAtendente("limitado", " 1 ")).toEqual({ ok: true, capacidade: 1 });
-    expect(validarLimiteAtendente("limitado", "1000")).toEqual({ ok: true, capacidade: 1000 });
-  });
-  test.each(["", "0", "-1", "1.5", "1e2", "Infinity", "1001", "cinco"])(
-    "limite inválido %s não é enviado",
-    (valor) => expect(validarLimiteAtendente("limitado", valor).ok).toBe(false),
-  );
 });

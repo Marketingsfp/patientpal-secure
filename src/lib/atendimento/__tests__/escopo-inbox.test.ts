@@ -16,7 +16,6 @@ const conversas = [
   { id: "m1", atribuida_user_id: maria, owner_type: "HUMAN" },
   { id: "r1", atribuida_user_id: rodrigo, owner_type: "HUMAN" },
   { id: "nina1", atribuida_user_id: null, owner_type: "AI" },
-  { id: "sem1", atribuida_user_id: jean, owner_type: "HUMAN", fila_pendente: true },
   { id: "global", atribuida_user_id: null, owner_type: "NONE" },
 ];
 
@@ -48,7 +47,7 @@ describe("escopo da Inbox", () => {
   });
 
   it("conversa não atribuída não aparece em Minhas conversas", () => {
-    expect(visiveis(jean)).not.toContain("sem1");
+    expect(visiveis(jean)).not.toContain("global");
   });
 
   it("contador corresponde apenas às conversas do usuário", () => {
@@ -63,8 +62,14 @@ describe("escopo da Inbox", () => {
     );
   });
 
-  it("filtro Não atribuídas mostra só quem espera humano, sem as da Nina", () => {
-    expect(visiveis(jean, "nao_atribuidas")).toEqual(["sem1"]);
+  it("Não atribuídas (fila global) é só da gestão: mostra quem espera humano, sem as da Nina", () => {
+    expect(visiveis(jean, "nao_atribuidas", true)).toEqual(["global"]);
+  });
+
+  it("atendente comum nunca vê a fila global: o filtro cai para Minhas conversas", () => {
+    expect(escopoEfetivo("nao_atribuidas", false)).toBe("minhas");
+    expect(visiveis(jean, "nao_atribuidas", false)).toEqual(["j1", "j2"]);
+    expect(visiveis(jean, "nao_atribuidas", false)).not.toContain("global");
   });
 
   it("filtro Nina mostra só as conversas da Nina", () => {
@@ -85,8 +90,13 @@ describe("escopo da Inbox", () => {
       tipo: "atribuida",
       userId: jean,
     });
+    expect(filtroEscopoInbox({ escopo: "nao_atribuidas", userId: jean, gestor: true })).toEqual({
+      tipo: "sem_responsavel",
+    });
+    // Sem permissão de gestão, o pedido pela fila global vira Minhas conversas.
     expect(filtroEscopoInbox({ escopo: "nao_atribuidas", userId: jean, gestor: false })).toEqual({
-      tipo: "fila_individual", userId: jean,
+      tipo: "atribuida",
+      userId: jean,
     });
     expect(filtroEscopoInbox({ escopo: "nina", userId: jean, gestor: false })).toEqual({
       tipo: "nina",
@@ -115,7 +125,7 @@ const fase2 = [
     status: "bot_attending",
     nome: "Maria Silva",
   },
-  { id: "sem", atribuida_user_id: jean, fila_pendente: true, owner_type: "HUMAN", status: "waiting", nome: "Bruno" },
+  { id: "sem", atribuida_user_id: null, owner_type: "NONE", status: "waiting", nome: "Bruno" },
   { id: "j-fechada", atribuida_user_id: jean, owner_type: "HUMAN", status: "closed", nome: "Ana" },
   {
     id: "m-fechada",
@@ -144,12 +154,20 @@ describe("filtros operacionais da Inbox", () => {
     expect(lista("minhas")).toEqual(["j-aberta", "j-maria"]);
   });
 
+  it("uma conversa da pessoa continua em Minhas (Ativas) esteja ou não aguardando resposta", () => {
+    // Pendentes é a visualização de espera sobre Minhas: não tira a conversa de Ativas.
+    const aguardando = { id: "p", atribuida_user_id: jean, owner_type: "HUMAN", status: "waiting" };
+    expect(conversaVisivelNoEscopo(aguardando, { escopo: "minhas", userId: jean, gestor: false })).toBe(true);
+    expect(conversaVisivelNoEscopo({ ...aguardando, status: "active" }, { escopo: "minhas", userId: jean, gestor: false })).toBe(true);
+  });
+
   it("Nina mostra somente conversas sob a IA", () => {
     expect(lista("nina")).toEqual(["nina-maria"]);
   });
 
-  it("Não atribuídas mostra somente reservas individuais", () => {
-    expect(lista("nao_atribuidas")).toEqual(["sem"]);
+  it("Não atribuídas (gestão) mostra a fila global; para atendente comum não mostra nada dela", () => {
+    expect(lista("nao_atribuidas", jean, true)).toEqual(["sem"]);
+    expect(lista("nao_atribuidas", jean, false)).not.toContain("sem");
   });
 
   it("Fechadas mostra as encerradas do próprio atendente", () => {
@@ -178,7 +196,7 @@ describe("filtros operacionais da Inbox", () => {
     expect({
       minhas: lista("minhas").length,
       nina: lista("nina").length,
-      nao_atribuidas: lista("nao_atribuidas").length,
+      nao_atribuidas: lista("nao_atribuidas", jean, true).length,
       fechadas: lista("fechadas").length,
     }).toEqual({ minhas: 2, nina: 1, nao_atribuidas: 1, fechadas: 1 });
   });

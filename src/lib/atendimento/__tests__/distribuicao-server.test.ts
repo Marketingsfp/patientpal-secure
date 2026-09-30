@@ -5,7 +5,6 @@ import {
   salvarPresencaComDistribuicao,
 } from "../distribuicao.server";
 import {
-  capacidadeAtendenteSchema,
   type ResultadoDistribuicaoFila,
 } from "../distribuicao-contrato";
 
@@ -135,13 +134,5 @@ describe("contrato de presença e distribuição do Zap OS", () => {
     });
     expect((await executarDistribuicaoFila(db, "c")).status).toBe("pendente");
     expect(db.chamadas[0].nome).toBe("atend_distribuir_fila_status");
-  });
-
-  it("configuração permite sem limite e recusa zero, negativos e valores fracionários", () => {
-    expect(capacidadeAtendenteSchema.parse(null)).toBeNull();
-    expect(capacidadeAtendenteSchema.parse(5)).toBe(5);
-    for (const invalido of [0, -1, 1.5, 1001, "5", undefined]) {
-      expect(capacidadeAtendenteSchema.safeParse(invalido).success).toBe(false);
-    }
   });
 });

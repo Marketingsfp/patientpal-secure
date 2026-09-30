@@ -27,7 +27,6 @@ export const STATUS_FECHADOS = ["closed", "finished"] as const;
 export const ESCOPO_INBOX_PADRAO: EscopoInbox = "minhas";
 
 export interface ConversaEscopo {
-  fila_pendente?: boolean;
   atribuida_user_id?: string | null;
   last_assigned_user_id?: string | null;
   resolved_by?: string | null;
@@ -39,7 +38,6 @@ export type FiltroEscopo =
   | { tipo: "equipe" }
   | { tipo: "atribuida"; userId: string }
   | { tipo: "sem_responsavel" }
-  | { tipo: "fila_individual"; userId: string }
   | { tipo: "nina" }
   | { tipo: "fechadas"; userId: string | null };
 
@@ -51,6 +49,8 @@ export function escopoEfetivo(escopo: EscopoInbox, gestor: boolean): EscopoInbox
   // "Equipe" é visão de supervisão: sem permissão de gestão, o usuário volta
   // para a própria Inbox. A checagem vale no backend, não só na tela.
   if (escopo === "equipe" && !gestor) return "minhas";
+  // A fila global sem responsável é só da gestão: atendente comum nunca a enxerga.
+  if (escopo === "nao_atribuidas" && !gestor) return "minhas";
   return escopo;
 }
 
@@ -65,7 +65,7 @@ export function filtroEscopoInbox(args: {
     case "equipe":
       return { tipo: "equipe" };
     case "nao_atribuidas":
-      return args.gestor ? { tipo: "sem_responsavel" } : { tipo: "fila_individual", userId: args.userId };
+      return { tipo: "sem_responsavel" };
     case "nina":
       return { tipo: "nina" };
     case "fechadas":
@@ -116,8 +116,6 @@ export function conversaVisivelNoEscopo(
   switch (filtro.tipo) {
     case "equipe":
       return true;
-    case "fila_individual":
-      return conversa.fila_pendente === true && conversa.atribuida_user_id === filtro.userId && conversa.owner_type !== "AI";
     case "sem_responsavel":
       return !conversa.atribuida_user_id && conversa.owner_type !== "AI";
     case "nina":
@@ -128,7 +126,7 @@ export function conversaVisivelNoEscopo(
         (filtro.userId === null || conversaResolvidaDoAtendente(conversa, filtro.userId))
       );
     default:
-      return conversa.atribuida_user_id === filtro.userId && conversa.fila_pendente !== true;
+      return conversa.atribuida_user_id === filtro.userId;
   }
 }
 
@@ -137,8 +135,8 @@ export function conversaVisivelNoEscopo(
  *
  * Gestor/supervisor vê qualquer conversa da clínica. Atendente comum vê
  * apenas o que algum filtro dele mostraria: as suas conversas (abertas ou
- * fechadas), as da Nina e as não atribuídas. Conversa ativa de outro
- * atendente fica bloqueada.
+ * fechadas) e as da Nina. Conversa ativa de outro atendente e conversa sem
+ * responsável (fila global) ficam bloqueadas.
  */
 export function usuarioPodeVerConversa(
   conversa: ConversaEscopo,

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { estadoFiltroAtendente, filtroAtendenteAtual, type FiltroAtendente } from "../filtros-atendente";
+import {
+  OPCOES_FILTRO_ATENDENTE,
+  estadoFiltroAtendente,
+  filtroAtendenteAtual,
+  type FiltroAtendente,
+} from "../filtros-atendente";
 import { atendenteConsulta, escopoConsulta } from "../filtros-inbox";
 import { filtrarPorEscopo } from "../inbox-cache";
 import { usuarioPodeVerConversa, type ConversaEscopo } from "../escopo-inbox";
@@ -13,9 +18,9 @@ const outra = "atendente-b";
 const linhas = [
   { id: "ativa", status: "active", owner_type: "HUMAN", atribuida_user_id: eu },
   { id: "outra-ativa", status: "active", owner_type: "HUMAN", atribuida_user_id: outra },
-  { id: "fila", status: "waiting", owner_type: "HUMAN", atribuida_user_id: eu, fila_pendente: true },
+  { id: "aguardando", status: "waiting", owner_type: "HUMAN", atribuida_user_id: eu },
   { id: "global", status: "waiting", owner_type: "NONE", atribuida_user_id: null },
-  { id: "outra-fila", status: "waiting", owner_type: "HUMAN", atribuida_user_id: outra, fila_pendente: true },
+  { id: "outra-aguardando", status: "waiting", owner_type: "HUMAN", atribuida_user_id: outra },
   { id: "nina", status: "bot_attending", owner_type: "AI", atribuida_user_id: null },
   { id: "fechada", status: "closed", owner_type: "NONE", atribuida_user_id: null, last_assigned_user_id: eu, resolved_by: eu },
   { id: "finalizada", status: "finished", owner_type: "NONE", atribuida_user_id: null, resolved_by: eu },
@@ -29,39 +34,55 @@ const contexto = (filtro: FiltroAtendente) => {
   };
 };
 
-describe("três filtros operacionais das atendentes", () => {
-  test("cada opção traz somente seu conjunto, sem conversas de outra atendente", () => {
-    expect(filtrarPorEscopo(linhas, contexto("ativas")).map(c => c.id)).toEqual(["ativa"]);
-    expect(filtrarPorEscopo(linhas, contexto("nao_atribuidas")).map(c => c.id)).toEqual(["fila"]);
+describe("três filtros operacionais das atendentes: Ativas, Pendentes e Fechadas", () => {
+  test("as opções são Ativas, Pendentes e Fechadas — sem Não atribuídas", () => {
+    expect(OPCOES_FILTRO_ATENDENTE.map(o => o.rotulo)).toEqual(["Ativas", "Pendentes", "Fechadas"]);
+  });
+
+  test("Ativas e Pendentes partem das conversas da própria atendente; nunca de outra nem da fila global", () => {
+    // Pendentes é "Minhas" com a ordem/recorte de espera: o corte fino vem da métrica canônica.
+    const minhas = ["ativa", "aguardando"];
+    expect(filtrarPorEscopo(linhas, contexto("ativas")).map(c => c.id)).toEqual(minhas);
+    expect(filtrarPorEscopo(linhas, contexto("pendentes")).map(c => c.id)).toEqual(minhas);
     expect(filtrarPorEscopo(linhas, contexto("fechadas")).map(c => c.id)).toEqual(["fechada", "finalizada"]);
+    for (const filtro of ["ativas", "pendentes", "fechadas"] as const)
+      expect(filtrarPorEscopo(linhas, contexto(filtro)).map(c => c.id)).not.toContain("global");
   });
 
-  test("entrar na fila depois de Fechadas não deixa o estado fechado oculto", () => {
-    const escolhido = filtroAtendenteAtual({ visualizacao: "resolvidas", naoAtribuidas: true });
-    expect(estadoFiltroAtendente(escolhido).visualizacao).toBe("recentes");
-    expect(filtrarPorEscopo(linhas, contexto(escolhido)).map(c => c.id)).toEqual(["fila"]);
-  });
-
-  test("preferências antigas da Nina ou de maior espera não restringem Ativas", () => {
-    const antigo = { base: "nina" as const, visualizacao: "espera" as const, naoAtribuidas: false };
-    expect(estadoFiltroAtendente(filtroAtendenteAtual(antigo))).toEqual({
-      base: "minhas", atendenteId: null, visualizacao: "recentes", naoAtribuidas: false,
+  test("Pendentes usa a visualização de maior espera; Ativas e Fechadas não", () => {
+    expect(estadoFiltroAtendente("pendentes")).toEqual({
+      base: "minhas", atendenteId: null, visualizacao: "espera", naoAtribuidas: false,
     });
+    expect(estadoFiltroAtendente("ativas").visualizacao).toBe("recentes");
+    expect(estadoFiltroAtendente("fechadas").visualizacao).toBe("resolvidas");
+    for (const filtro of ["ativas", "pendentes", "fechadas"] as const)
+      expect(estadoFiltroAtendente(filtro).naoAtribuidas).toBe(false);
   });
 
-  test("lembra Não atribuídas e isola a escolha por clínica", () => {
+  test("o filtro aparece selecionado conforme a visualização guardada", () => {
+    expect(filtroAtendenteAtual({ visualizacao: "espera" })).toBe("pendentes");
+    expect(filtroAtendenteAtual({ visualizacao: "resolvidas" })).toBe("fechadas");
+    expect(filtroAtendenteAtual({ visualizacao: "recentes" })).toBe("ativas");
+  });
+
+  test("trocar de Fechadas para Pendentes não deixa o estado fechado oculto", () => {
+    const escolhido = filtroAtendenteAtual({ visualizacao: "espera" });
+    expect(estadoFiltroAtendente(escolhido).visualizacao).toBe("espera");
+    expect(filtrarPorEscopo(linhas, contexto(escolhido)).map(c => c.id)).toEqual(["ativa", "aguardando"]);
+  });
+
+  test("lembra Pendentes e isola a escolha por clínica", () => {
     const valores = new Map<string, string>();
     const storage = { getItem: (k: string) => valores.get(k) ?? null, setItem: (k: string, v: string) => valores.set(k, v) };
-    salvarFiltrosInbox(storage, "clinica-a", estadoFiltroAtendente("nao_atribuidas"));
-    const salvo = lerFiltrosInbox(storage, "clinica-a", { gestor: false });
-    expect(salvo.naoAtribuidas).toBe(true);
-    expect(lerFiltrosInbox(storage, "clinica-b", { gestor: false }).naoAtribuidas).not.toBe(true);
+    salvarFiltrosInbox(storage, "clinica-a", estadoFiltroAtendente("pendentes"));
+    expect(lerFiltrosInbox(storage, "clinica-a", { gestor: false }).visualizacao).toBe("espera");
+    expect(lerFiltrosInbox(storage, "clinica-b", { gestor: false }).visualizacao).not.toBe("espera");
   });
 
-  test("primeira resposta tira da fila e coloca em Ativas; encerramento move para Fechadas", () => {
-    const fila = { id: "movimento", status: "waiting", owner_type: "HUMAN", atribuida_user_id: eu, fila_pendente: true };
-    const assumida = { ...fila, fila_pendente: false, status: "active", owner_type: "HUMAN", atribuida_user_id: eu };
-    expect(patchListaPorConversa([fila], assumida, contexto("nao_atribuidas")).lista).toHaveLength(0);
+  test("responder não tira a conversa de Ativas; encerramento move para Fechadas", () => {
+    const aguardando = { id: "movimento", status: "waiting", owner_type: "HUMAN", atribuida_user_id: eu };
+    const assumida = { ...aguardando, status: "active", owner_type: "HUMAN", atribuida_user_id: eu };
+    expect(patchListaPorConversa([aguardando], assumida, contexto("ativas")).lista).toHaveLength(1);
     expect(patchListaPorConversa([], assumida, contexto("ativas")).lista).toHaveLength(1);
     const fechada = { ...assumida, status: "closed", atribuida_user_id: null, last_assigned_user_id: eu, resolved_by: eu };
     expect(patchListaPorConversa([assumida], fechada, contexto("ativas")).lista).toHaveLength(0);

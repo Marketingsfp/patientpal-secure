@@ -1,7 +1,8 @@
 /**
- * Etapa 1 (30/09/2026) — "Em pausa para saída" e recebimento só para quem está Online.
- * PostgreSQL temporário em memória (PGlite) com as migrations reais de distribuição
- * (20260914211605, 20260917144041) e a nova (20260930130000). Nunca aponta para produção.
+ * Etapas 1 e 2 (30/09/2026) — "Em pausa para saída", recebimento só para quem está Online e
+ * fim da fila individual (reserva de 10). PostgreSQL temporário em memória (PGlite) com as
+ * migrations reais de distribuição (20260914211605, 20260917144041) e as novas (20260930130000 e
+ * 20260930140000). Nunca aponta para produção.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
@@ -12,6 +13,9 @@ const MIGRATIONS = [
   "20260917144041_b618961f-ac79-4d95-977a-1eac1d3541fa.sql",
   "20260930130000_atend_pausa_para_saida.sql",
 ];
+const ETAPA2 = "20260930140000_atend_remove_fila_individual.sql";
+const lerMigration = async (nome: string) =>
+  readFile(new URL(`../../../../supabase/migrations/${nome}`, import.meta.url), "utf8");
 const clinica = "11111111-1111-4111-8111-111111111111";
 const ana = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const bia = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -48,9 +52,7 @@ const novaConversaNaFila = async () => {
 const donoDe = async (id: string) =>
   (await q("SELECT atribuida_user_id, status, fila_pendente FROM atend_conversas WHERE id=$1", [id]))[0];
 
-beforeAll(async () => {
-  db = new PGlite();
-  await db.exec(`
+const ESQUEMA = `
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE SCHEMA auth;
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.uid', true), '')::uuid $$;
@@ -87,17 +89,19 @@ beforeAll(async () => {
       created_at timestamptz NOT NULL DEFAULT clock_timestamp());
     CREATE TABLE public.whatsapp_mensagens(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), clinica_id uuid,
       conversa_id uuid, direction text, enviada_por text, status text, recebida_em timestamptz);
-  `);
-  for (const nome of MIGRATIONS)
-    await db.exec(
-      await readFile(new URL(`../../../../supabase/migrations/${nome}`, import.meta.url), "utf8"),
-    );
-  await db.exec(`
+  `;
+const SEMENTE = `
     INSERT INTO clinicas VALUES ('${clinica}');
     INSERT INTO auth.users VALUES ('${ana}'), ('${bia}');
     INSERT INTO clinica_memberships(user_id, clinica_id, role) VALUES ('${ana}','${clinica}','telefonia'), ('${bia}','${clinica}','telefonia');
     INSERT INTO atend_pause_reasons VALUES ('${motivo}', '${clinica}');
-  `);
+  `;
+
+beforeAll(async () => {
+  db = new PGlite();
+  await db.exec(ESQUEMA);
+  for (const nome of MIGRATIONS) await db.exec(await lerMigration(nome));
+  await db.exec(SEMENTE);
 }, 60_000);
 
 afterAll(async () => {
@@ -181,5 +185,63 @@ describe("Etapa 1 — pausa para saída (migration)", () => {
     await expect(
       q("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, $2)", [clinica, motivo]),
     ).rejects.toThrow();
+  });
+});
+
+describe("Etapa 2 — fim da fila individual (migration)", () => {
+  let d2: PGlite;
+  const q2 = async <T = Record<string, any>>(sql: string, p: unknown[] = []) =>
+    (await d2.query<T>(sql, p)).rows;
+  const reservada = crypto.randomUUID();
+  const normal = crypto.randomUUID();
+  const semDono = crypto.randomUUID();
+
+  beforeAll(async () => {
+    d2 = new PGlite();
+    await d2.exec(ESQUEMA);
+    // Estado do banco ANTES da Etapa 2: as duas primeiras migrations de distribuição.
+    for (const nome of MIGRATIONS.slice(0, 2)) await d2.exec(await lerMigration(nome));
+    await d2.exec(SEMENTE);
+    await d2.exec(`
+      INSERT INTO atend_agente_presenca(clinica_id,user_id,status,aceita_novas,estado_manual,estado_manual_versao)
+      VALUES ('${clinica}','${ana}','BUSY',false,'PAUSA',1);
+      INSERT INTO atend_conversas(id,clinica_id,atribuida_user_id,status,owner_type,ai_enabled,is_teste,fila_pendente,assigned_at)
+      VALUES ('${reservada}','${clinica}','${ana}','waiting','HUMAN',false,false,true,now()),
+             ('${normal}','${clinica}','${ana}','active','HUMAN',false,false,false,now());
+      INSERT INTO atend_conversas(id,clinica_id,status,owner_type,ai_enabled,is_teste)
+      VALUES ('${semDono}','${clinica}','waiting','NONE',false,false);
+    `);
+    await d2.exec(await lerMigration(MIGRATIONS[2]!));
+    await d2.exec(await lerMigration(ETAPA2));
+  }, 60_000);
+
+  afterAll(async () => {
+    await d2?.close();
+  });
+
+  test("reservas existentes viram conversas normais da mesma pessoa, sem redistribuir", async () => {
+    const r = await q2("SELECT id, atribuida_user_id, status, fila_pendente FROM atend_conversas ORDER BY id");
+    const por = Object.fromEntries(r.map((x) => [x.id, x]));
+    expect(por[reservada]).toMatchObject({ atribuida_user_id: ana, status: "active", fila_pendente: false });
+    expect(por[normal]).toMatchObject({ atribuida_user_id: ana, status: "active", fila_pendente: false });
+    expect(por[semDono]).toMatchObject({ atribuida_user_id: null, status: "waiting" });
+  });
+
+  test("gatilhos, política, índice e função de limite da reserva foram removidos", async () => {
+    const nomes = async (sql: string) => (await q2(sql)).map((x) => x.n);
+    expect(await nomes("SELECT tgname AS n FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE '%fila_individual%'")).toEqual([]);
+    expect(await nomes("SELECT policyname AS n FROM pg_policies WHERE policyname = 'atend_fila_individual_privada'")).toEqual([]);
+    expect(await nomes("SELECT proname AS n FROM pg_proc WHERE proname IN ('atend_configurar_capacidade','atend_normalizar_fila_individual','atend_resposta_inicia_fila_individual')")).toEqual([]);
+    expect(await nomes("SELECT indexname AS n FROM pg_indexes WHERE indexname = 'atend_fila_individual_idx'")).toEqual([]);
+  });
+
+  test("a conversa sem dono só é distribuída a quem fica Online, direto em Ativas", async () => {
+    await q2("SELECT set_config('test.uid', $1, false)", [bia]);
+    await q2("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, NULL)", [clinica]);
+    await q2("SELECT public.atend_distribuir_fila_seguro($1, 200, 'teste', NULL)", [clinica]);
+    expect((await q2("SELECT atribuida_user_id FROM atend_conversas WHERE id=$1", [semDono]))[0]!.atribuida_user_id).toBeNull();
+    await q2("SELECT public.atend_definir_presenca_manual($1, 'ONLINE', NULL, NULL)", [clinica]);
+    const [c] = await q2("SELECT atribuida_user_id, status, fila_pendente FROM atend_conversas WHERE id=$1", [semDono]);
+    expect(c).toMatchObject({ atribuida_user_id: bia, status: "active", fila_pendente: false });
   });
 });

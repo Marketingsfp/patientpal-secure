@@ -500,9 +500,7 @@ export async function encaminharParaHumano(args: {
     departamento: depto?.nome ?? null,
     atribuida_para: atribuida?.nome ?? null,
     mensagem: atribuida
-      ? atribuida.filaPendente
-        ? `Conversa reservada na fila individual de ${atribuida.nome}. A IA parou de responder.`
-        : `Conversa encaminhada e atribuída a ${atribuida.nome}. A IA parou de responder.`
+      ? `Conversa encaminhada e atribuída a ${atribuida.nome}. A IA parou de responder.`
       : "Conversa encaminhada para a equipe. A IA parou de responder.",
     // RESULTADO ESTRUTURADO — quem chamou não precisa inventar comunicação:
     // aqui está o protocolo, o estado do aviso e a mensagem já entregue.
@@ -512,8 +510,8 @@ export async function encaminharParaHumano(args: {
 }
 
 /**
- * Distribui entre Online e Pausa, escolhendo quem tem MENOS
- * conversas abertas (empate: quem recebeu há mais tempo). Sem candidato
+ * Distribui entre quem está Online (Pausa, Pausa para saída e Offline não
+ * recebem), escolhendo quem tem MENOS conversas abertas (empate: quem recebeu há mais tempo). Sem candidato
  * elegível, retorna null e a conversa fica na fila "Não atribuídas".
  *
  * A decisão inteira acontece no banco (`atend_auto_assign_conversa`), dentro de
@@ -528,7 +526,7 @@ export async function atribuirAtendenteOnline(args: {
   origem?: "auto_assignment" | "queue_distribution";
   /** Não grava o banner de sistema (quem chama já registra o próprio evento). */
   semMarcador?: boolean;
-}): Promise<{ userId: string; nome: string; filaPendente: boolean } | null> {
+}): Promise<{ userId: string; nome: string } | null> {
   const { data: escolhido, error } = await supabaseAdmin.rpc("atend_auto_assign_conversa", {
     _conversa_id: args.conversaId,
     _clinica_id: args.clinicaId,
@@ -549,15 +547,11 @@ export async function atribuirAtendenteOnline(args: {
     .maybeSingle();
   const nome = ((prof as { nome?: string | null } | null)?.nome ?? "Atendente").trim();
 
-  const { data: destino } = await supabaseAdmin.from("atend_conversas")
-    .select("fila_pendente").eq("id", args.conversaId).eq("clinica_id", args.clinicaId).maybeSingle();
   if (!args.semMarcador)
     await registrarMarcadorSistema({
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
-      texto: destino?.fila_pendente
-        ? `Conversa reservada na fila individual de ${nome}.`
-        : `👤 Atribuída automaticamente a ${nome}.`,
+      texto: `👤 Atribuída automaticamente a ${nome}.`,
     });
 
   // Transferência da Nina EFETIVADA: só aqui o protocolo é gerado e informado
@@ -573,7 +567,7 @@ export async function atribuirAtendenteOnline(args: {
     console.error("[handoff] falha no protocolo de atendimento", e);
   }
 
-  return { userId, nome, filaPendente: destino?.fila_pendente === true };
+  return { userId, nome };
 }
 
 /** Devolve a conversa para a Nina (reativa a IA). */

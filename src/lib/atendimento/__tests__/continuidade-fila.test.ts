@@ -11,29 +11,29 @@ import { patchListaPorConversa } from "../patch-inbox";
 import { estadoFiltroAtendente, type FiltroAtendente } from "../filtros-atendente";
 import { escopoConsulta } from "../filtros-inbox";
 
-const ctx: ContextoEscopo = { clinicaId: "clinica-a", userId: "ana", gestor: false, escopo: "nao_atribuidas" };
+const ctx: ContextoEscopo = { clinicaId: "clinica-a", userId: "ana", gestor: false, escopo: "minhas" };
+// Conversa da própria atendente que aguarda resposta (aparece em Ativas e em Pendentes).
 const fila = {
   id: "conversa-a", clinica_id: "clinica-a", is_teste: false,
-  atribuida_user_id: "ana", owner_type: "HUMAN", status: "waiting", fila_pendente: true,
+  atribuida_user_id: "ana", owner_type: "HUMAN", status: "waiting",
 };
-const ativa = { ...fila, status: "active", fila_pendente: false };
+const ativa = { ...fila, status: "active" };
 const fechada = {
   ...ativa, status: "closed", owner_type: "NONE", atribuida_user_id: null,
   last_assigned_user_id: "ana", resolved_by: "ana",
 };
-const filtros: FiltroAtendente[] = ["ativas", "nao_atribuidas", "fechadas"];
+const filtros: FiltroAtendente[] = ["ativas", "pendentes", "fechadas"];
 const contextoFiltro = (filtro: FiltroAtendente): ContextoEscopo => ({
   ...ctx,
   escopo: escopoConsulta({ ...estadoFiltroAtendente(filtro), gestor: false, meuId: ctx.userId }),
 });
 
-describe("continuidade da própria conversa após responder na fila individual", () => {
-  it("o card passa para Ativas, mas a seleção pode continuar no filtro Não atribuídas", () => {
-    const pendentes = patchListaPorConversa([fila], ativa, { ...ctx, userId: "ana" }).lista;
-    expect(pendentes).toEqual([]);
+describe("continuidade da própria conversa após responder", () => {
+  it("ao responder, o card continua em Ativas e a seleção segue aberta em Pendentes", () => {
+    const lista = patchListaPorConversa([fila], ativa, { ...ctx, userId: "ana" }).lista;
+    expect(lista).toEqual([ativa]);
     expect(filtrarPorEscopo([ativa], { ...ctx, escopo: "minhas" })).toEqual([ativa]);
-    expect(selecaoDeveSair({ selecionada: fila, linhas: pendentes, buscando: false, ctx, confirmadaForaLista: ativa })).toBe(false);
-    expect(ctx.escopo).toBe("nao_atribuidas");
+    expect(selecaoDeveSair({ selecionada: fila, linhas: lista, buscando: false, ctx, confirmadaForaLista: ativa })).toBe(false);
   });
 
   it("continua aberta nas reconciliações seguintes, mesmo sem card na lista atual", () => {
@@ -44,7 +44,6 @@ describe("continuidade da própria conversa após responder na fila individual",
   it("conversa ainda pendente permanece aberta mesmo ausente da lista filtrada", () => {
     expect(selecaoDeveSair({ selecionada: fila, linhas: [fila], buscando: false, ctx })).toBe(false);
     expect(filtrarPorEscopo([fila], ctx)).toEqual([fila]);
-    expect(filtrarPorEscopo([fila], { ...ctx, escopo: "minhas" })).toEqual([]);
     expect(chatContinuaEntreFiltros({ selecionada: fila, confirmada: fila, ctx })).toBe(true);
     expect(selecaoDeveSair({ selecionada: fila, linhas: [], buscando: false, ctx })).toBe(false);
   });
@@ -93,7 +92,8 @@ describe("continuidade do chat nas três abas das atendentes", () => {
       { ...ativa, id: "ativa" }, { ...fila, id: "fila" }, { ...fechada, id: "fechada" },
     ];
     const linhas = filtrarPorEscopo(conversas, contexto);
-    expect(linhas).toEqual([conversas[filtro === "ativas" ? 0 : filtro === "nao_atribuidas" ? 1 : 2]]);
+    // Ativas e Pendentes partem de "Minhas" (as duas conversas abertas dela); Fechadas traz só a encerrada.
+    expect(linhas).toEqual(filtro === "fechadas" ? [conversas[2]] : [conversas[0], conversas[1]]);
     for (const selecionada of conversas) {
       expect(selecaoDeveSair({
         selecionada, linhas, buscando: false, ctx: contexto, confirmadaForaLista: selecionada,

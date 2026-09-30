@@ -35,11 +35,9 @@ import {
   precisaEscolherPresenca,
   type EstadoManualPresenca,
 } from "@/lib/atendimento/presenca-manual";
-import { capacidadeAtendenteSchema } from "@/lib/atendimento/distribuicao-contrato";
 import {
   consultarEstadoDistribuicao,
   executarDistribuicaoFila,
-  lerResultadoDistribuicao,
   salvarPresencaComDistribuicao,
 } from "@/lib/atendimento/distribuicao.server";
 
@@ -92,6 +90,60 @@ async function assertDestinoNaoEstaEmPausa(
   if (error) throw new Error(error.message);
   if (estadoBloqueiaTransferencia((data as { estado_manual?: string | null } | null)?.estado_manual))
     throw new Error(MSG_DESTINO_EM_PAUSA);
+}
+/**
+ * Pendentes de um atendente: conversas abertas que estão com ele agora E em que o
+ * paciente aguarda resposta (transferência da Nina, tempo limite da Nina ou paciente
+ * que falou por último). Usa a métrica canônica `atend_espera_por_conversa`, que
+ * zera quando o atendente responde e recomeça a cada nova mensagem do paciente.
+ */
+async function idsPendentesDoAtendente(
+  supabase: SupabaseClient<Database>,
+  clinicaId: string,
+  userId: string,
+  espera: Record<string, string>,
+): Promise<string[]> {
+  if (!Object.keys(espera).length) return [];
+  const minhas = new Set<string>();
+  const PAGINA = 1000;
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from("atend_conversas")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .eq("is_teste", false)
+      .eq("atribuida_user_id", userId)
+      .neq("owner_type", "AI")
+      .not("status", "in", `(${STATUS_FECHADOS.join(",")})`)
+      .order("id", { ascending: true })
+      .range(de, de + PAGINA - 1);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) minhas.add(r.id);
+    if ((data?.length ?? 0) < PAGINA) break;
+  }
+  return Object.keys(espera).filter((id) => minhas.has(id));
+}
+
+async function contarPendentesDoAtendente(
+  supabase: SupabaseClient<Database>,
+  clinicaId: string,
+  userId: string,
+): Promise<number> {
+  try {
+    const { data: esperas, error } = await supabase.rpc("atend_espera_por_conversa", {
+      _clinica_id: clinicaId,
+      _is_teste: false,
+    });
+    if (error) throw new Error(error.message);
+    const mapa: Record<string, string> = {};
+    for (const e of (esperas ?? []) as { conversa_id?: string; aguardando_desde?: string }[]) {
+      if (e.conversa_id && e.aguardando_desde) mapa[e.conversa_id] = e.aguardando_desde;
+    }
+    return (await idsPendentesDoAtendente(supabase, clinicaId, userId, mapa)).length;
+  } catch {
+    // Contador é informativo: falha não derruba a tela.
+    return 0;
+  }
 }
 async function assertManager(
   supabase: SupabaseClient<Database>,
@@ -229,9 +281,21 @@ export const listarConversas = createServerFn({ method: "POST" })
       for (const e of (esperas ?? []) as any[]) {
         if (e?.conversa_id && e?.aguardando_desde) mapaEspera[e.conversa_id] = e.aguardando_desde;
       }
+      // Pendentes de uma pessoa: só as conversas que estão com ela agora. O recorte
+      // precisa vir ANTES do teto da lista, senão as dela poderiam ficar de fora.
+      const responsavelEspera =
+        atendenteFiltro ?? (filtroEscopo.tipo === "atribuida" ? filtroEscopo.userId : null);
+      let esperaConsiderada = mapaEspera;
+      if (responsavelEspera && !plano.somenteResolvidas) {
+        const doResponsavel = await idsPendentesDoAtendente(
+          context.supabase, data.clinicaId, responsavelEspera, mapaEspera,
+        );
+        esperaConsiderada = Object.fromEntries(doResponsavel.map((id) => [id, mapaEspera[id]!]));
+        for (const id of Object.keys(mapaEspera)) if (!(id in esperaConsiderada)) delete mapaEspera[id];
+      }
       // Recorte pela métrica canônica ANTES do LIMIT: se houver mais conversas
       // aguardando do que o teto da lista, ficam as de maior espera.
-      idsEspera = idsPorEsperaCrescente(mapaEspera).slice(0, data.limit);
+      idsEspera = idsPorEsperaCrescente(esperaConsiderada).slice(0, data.limit);
       if (idsEspera.length === 0) {
         marcar("consulta");
         return [];
@@ -261,10 +325,7 @@ export const listarConversas = createServerFn({ method: "POST" })
     if (atendenteFiltro) q = porResponsavel(q, atendenteFiltro, plano.somenteResolvidas);
     if (filtroEscopo.tipo === "atribuida") {
       q = porResponsavel(q, filtroEscopo.userId, plano.somenteResolvidas);
-      if (!plano.somenteResolvidas) q = q.eq("fila_pendente", false);
-    } else if (filtroEscopo.tipo === "fila_individual")
-      q = q.eq("atribuida_user_id", filtroEscopo.userId).eq("fila_pendente", true).neq("owner_type", "AI");
-    else if (filtroEscopo.tipo === "sem_responsavel")
+    } else if (filtroEscopo.tipo === "sem_responsavel")
       q = q.is("atribuida_user_id", null).neq("owner_type", "AI");
     else if (filtroEscopo.tipo === "nina") q = q.eq("owner_type", "AI");
     else if (filtroEscopo.tipo === "fechadas") {
@@ -453,16 +514,18 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
     let minhasFechadas = base().in("status", [...STATUS_FECHADOS]);
     if (filtroFechadas.tipo === "ou") minhasFechadas = minhasFechadas.or(filtroFechadas.expr);
 
-    const [minhas, nina, naoAtribuidas, fechadas, todas] = await Promise.all([
-      abertas().eq("atribuida_user_id", context.userId).eq("fila_pendente", false),
+    const [minhas, nina, naoAtribuidas, fechadas, todas, pendentes] = await Promise.all([
+      abertas().eq("atribuida_user_id", context.userId),
       abertas().eq("owner_type", "AI"),
+      // A fila global sem responsável é só da gestão.
       gestor
         ? abertas().is("atribuida_user_id", null).neq("owner_type", "AI")
-        : abertas().eq("atribuida_user_id", context.userId).eq("fila_pendente", true).neq("owner_type", "AI"),
+        : Promise.resolve({ count: 0 } as { count: number | null }),
       gestor
         ? base().in("status", [...STATUS_FECHADOS])
         : minhasFechadas,
       gestor ? abertas() : Promise.resolve({ count: null } as { count: number | null }),
+      contarPendentesDoAtendente(context.supabase, data.clinicaId, context.userId),
     ]);
 
     return {
@@ -470,6 +533,7 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
       minhas: minhas.count ?? 0,
       nina: nina.count ?? 0,
       nao_atribuidas: naoAtribuidas.count ?? 0,
+      pendentes,
       fechadas: fechadas.count ?? 0,
       equipe: todas.count ?? 0,
     };
@@ -2620,15 +2684,15 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
         "id, contato_nome, whatsapp_profile_name, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
       )
       .eq("clinica_id", data.clinicaId)
-      // Mesma fila da Inbox: global para supervisão, reservas próprias para atendentes.
+      // Mesma fila da Inbox: a fila global sem responsável é só da gestão.
       .in("status", ["waiting", "active", "in_progress"])
       .neq("owner_type", "AI")
       .eq("is_teste", false)
       .order("prioridade", { ascending: false })
       .order("aguardando_desde", { ascending: true })
       .limit(data.limit);
-    q = gestor ? q.is("atribuida_user_id", null)
-      : q.eq("atribuida_user_id", context.userId).eq("fila_pendente", true);
+    if (!gestor) return [];
+    q = q.is("atribuida_user_id", null);
     if (data.departamentoId) q = q.eq("departamento_id", data.departamentoId);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
@@ -3016,90 +3080,6 @@ export const consultarDistribuicaoFila = createServerFn({ method: "POST" })
     await assertMember(context.supabase, context.userId, data.clinicaId);
     return consultarEstadoDistribuicao(context.supabase, data.clinicaId);
   });
-
-export const listarCapacidadesAtendentes = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => clinIdSchema.parse(i))
-  .handler(async ({ data, context }) => {
-    await assertMember(context.supabase, context.userId, data.clinicaId);
-    const [gestao, pool, membros] = await Promise.all([
-      context.supabase.rpc("can_manage_clinica", {
-        _user_id: context.userId,
-        _clinica_id: data.clinicaId,
-      }),
-      context.supabase.rpc("atend_diagnostico_distribuicao", {
-        _clinica_id: data.clinicaId,
-      }),
-      context.supabase
-        .from("clinica_memberships")
-        .select("user_id")
-        .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true)
-        .eq("role", "telefonia"),
-    ]);
-    if (gestao.error) throw new Error(gestao.error.message);
-    if (pool.error) throw new Error(pool.error.message);
-    if (membros.error) throw new Error(membros.error.message);
-    const ids = [...new Set((membros.data ?? []).map((m) => m.user_id))];
-    const perfis = ids.length
-      ? await context.supabase.from("profiles").select("id, nome").in("id", ids)
-      : { data: [], error: null };
-    if (perfis.error) throw new Error(perfis.error.message);
-    const nomes = new Map((perfis.data ?? []).map((p) => [p.id, p.nome]));
-    const linhas = z.array(z.object({
-      user_id: z.string(),
-      estado_manual: z.string().nullable(),
-      load_at_selection: z.number().int().nonnegative(),
-      capacidade: z.number().int().positive().nullable(),
-      motivo_exclusao: z.string().nullable(),
-    })).parse(z.object({ candidatos: z.unknown() }).parse(pool.data).candidatos);
-    const porId = new Map(linhas.map((l) => [l.user_id, l]));
-    return {
-      podeConfigurar: gestao.data === true,
-      atendentes: ids.map((userId) => {
-        const linha = porId.get(userId);
-        if (!linha) throw new Error("Não foi possível consultar a capacidade de toda a equipe.");
-        return {
-          userId,
-          nome: nomes.get(userId) || "Atendente",
-          estado: linha.estado_manual,
-          cargaAtual: linha.load_at_selection,
-          capacidade: linha.capacidade,
-          motivo: linha.motivo_exclusao,
-        };
-      }).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
-    };
-  });
-
-/** Só gestores alteram limites; o banco valida a clínica e registra antes/depois. */
-export const configurarCapacidadeAtendente = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({
-    clinicaId: z.string().uuid(),
-    userId: z.string().uuid(),
-    capacidade: capacidadeAtendenteSchema,
-  }).parse(i))
-  .handler(async ({ data, context }) => {
-    await assertManager(context.supabase, context.userId, data.clinicaId);
-    // O SQL aceita NULL em _max_simultaneas (remove o limite); os tipos gerados
-    // declaram apenas integer, então o argumento é montado e convertido aqui.
-    const argumentosCapacidade = {
-      _clinica_id: data.clinicaId,
-      _user_id: data.userId,
-      _max_simultaneas: data.capacidade,
-    } satisfies Omit<
-      Database["public"]["Functions"]["atend_configurar_capacidade"]["Args"],
-      "_max_simultaneas"
-    > & { _max_simultaneas: number | null };
-    const { data: resposta, error } = await context.supabase.rpc(
-      "atend_configurar_capacidade",
-      argumentosCapacidade as Database["public"]["Functions"]["atend_configurar_capacidade"]["Args"],
-    );
-    if (error) throw new Error(error.message);
-    const resultado = z.object({ ok: z.literal(true), distribuicao: z.unknown() }).parse(resposta);
-    return lerResultadoDistribuicao(resultado.distribuicao);
-  });
-
 
 /**
  * Diagnóstico (somente leitura) do pool de distribuição automática.

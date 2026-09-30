@@ -1,5 +1,5 @@
 import type { ResultadoDistribuicaoFila } from "@/lib/atendimento/distribuicao-contrato";
-import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
+import { ROTULO_ESTADO_MANUAL, type EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 
 export type AvisoDistribuicao = {
   texto: string;
@@ -7,12 +7,12 @@ export type AvisoDistribuicao = {
 };
 
 const MOTIVOS: Record<string, string> = {
-  capacidade_lotada: "Capacidade atingida.",
   sem_perfil_telefonia: "Seu perfil não recebe a distribuição automática da Telefonia.",
   admin_excluido: "Administradores não recebem a distribuição automática.",
   sem_escolha_manual: "Escolha sua disponibilidade para receber conversas.",
   escolha_manual_offline: "Você está offline para novas conversas.",
   escolha_manual_pausa: "Você está em pausa para novas conversas.",
+  escolha_manual_pausa_saida: "Você está em pausa para saída e não recebe novas conversas.",
   em_pausa: "Você está em pausa para novas conversas.",
   setor_incompativel: "Não há compatibilidade com o setor desta fila.",
   sem_atendentes_elegiveis: "Nenhum atendente pode receber novas conversas agora.",
@@ -25,19 +25,15 @@ export function textoMotivoDistribuicao(motivo: string | null): string | null {
   return motivo ? (MOTIVOS[motivo] ?? "O recebimento de novas conversas está indisponível.") : null;
 }
 
-export function textoCargaAtendente(carga: number, capacidade: number | null, reservadas?: number): string {
-  if (reservadas !== undefined) {
-    return `${Math.max(0, carga - reservadas)} conversa(s) ativa(s), sem limite. ${reservadas}${capacidade === 10 ? "/10" : ""} em Não atribuídas.`;
-  }
-  return capacidade === null
-    ? `${carga} conversa(s) ativa(s), sem limite.`
-    : `${carga}/${capacidade} conversas ativas.`;
+/** Online não tem limite de conversas. */
+export function textoCargaAtendente(carga: number): string {
+  return `${carga} conversa(s) ativa(s), sem limite.`;
 }
 
 export function mensagemDistribuicaoFila(r: ResultadoDistribuicaoFila): AvisoDistribuicao {
   const partes: string[] = [];
   if (r.meu) {
-    partes.push(textoCargaAtendente(r.meu.carga_atual, r.meu.capacidade, r.meu.reservadas));
+    partes.push(textoCargaAtendente(r.meu.carga_atual));
     const motivo = textoMotivoDistribuicao(r.meu.motivo);
     if (motivo) partes.push(motivo);
   }
@@ -75,7 +71,7 @@ export function avisoPresencaConfirmada(
   estado: EstadoManualPresenca,
   distribuicao: ResultadoDistribuicaoFila,
 ): AvisoDistribuicao {
-  const rotulo = estado === "ONLINE" ? "Online" : estado === "OFFLINE" ? "Offline" : "Em pausa";
+  const rotulo = ROTULO_ESTADO_MANUAL[estado];
   const aviso = mensagemDistribuicaoFila(distribuicao);
   return {
     ...aviso,
@@ -84,17 +80,4 @@ export function avisoPresencaConfirmada(
         ? `Presença salva: ${rotulo.toLowerCase()}. ${aviso.texto}`
         : `${rotulo}. ${aviso.texto}`,
   };
-}
-
-export function validarLimiteAtendente(
-  modo: "sem_limite" | "limitado",
-  valor: string,
-): { ok: true; capacidade: number | null } | { ok: false; erro: string } {
-  if (modo === "sem_limite") return { ok: true, capacidade: null };
-  const texto = valor.trim();
-  const numero = Number(texto);
-  if (!/^\d+$/.test(texto) || !Number.isInteger(numero) || numero < 1 || numero > 1000) {
-    return { ok: false, erro: "Informe um limite inteiro de 1 a 1000 conversas." };
-  }
-  return { ok: true, capacidade: numero };
 }

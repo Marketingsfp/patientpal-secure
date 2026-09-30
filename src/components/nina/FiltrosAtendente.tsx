@@ -14,11 +14,11 @@ export function FiltrosAtendente({
     <div
       role="group"
       aria-label="Filtrar conversas"
-      className="grid grid-cols-[1fr_1.5fr_1fr] gap-1 pt-1.5"
+      className="grid grid-cols-3 gap-1 pt-1.5"
     >
       {OPCOES_FILTRO_ATENDENTE.map((opcao) => {
         const quantidade = contagens[opcao.valor];
-        const descricao = `${opcao.rotulo}: ${quantidade} ${quantidade === 1 ? "conversa" : "conversas"}${opcao.valor === "nao_atribuidas" ? ", limite de 10" : ""}`;
+        const descricao = `${opcao.rotulo}: ${quantidade} ${quantidade === 1 ? "conversa" : "conversas"}`;
         return (
           <Button
             key={opcao.valor}

@@ -32,7 +32,7 @@ describe("FASE 3 — acesso direto por URL", () => {
     ).toBe(true);
   });
 
-  it("conversa da Nina e reserva própria ficam visíveis para o atendente", () => {
+  it("conversa da Nina e conversa própria aguardando resposta ficam visíveis; a fila global não", () => {
     expect(
       usuarioPodeVerConversa(
         { atribuida_user_id: null, owner_type: "AI", status: "open" },
@@ -41,10 +41,14 @@ describe("FASE 3 — acesso direto por URL", () => {
     ).toBe(true);
     expect(
       usuarioPodeVerConversa(
-        { atribuida_user_id: JEAN, fila_pendente: true, owner_type: "HUMAN", status: "waiting" },
+        { atribuida_user_id: JEAN, owner_type: "HUMAN", status: "waiting" },
         { userId: JEAN, gestor: false },
       ),
     ).toBe(true);
+    // Sem responsável (fila global): só gestão/admin.
+    const global = { atribuida_user_id: null, owner_type: "NONE", status: "waiting" };
+    expect(usuarioPodeVerConversa(global, { userId: JEAN, gestor: false })).toBe(false);
+    expect(usuarioPodeVerConversa(global, { userId: JEAN, gestor: true })).toBe(true);
   });
 
   it("conversa fechada de outro atendente permanece bloqueada", () => {

@@ -2,8 +2,8 @@ import { nomeContato } from "./rotulo-conversa";
 /**
  * Central de Atenção — regras puras.
  *
- * Combina as filas global e individuais pelo estado real das conversas com
- * o mapa de espera da Inbox. Não altera atribuição, presença ou capacidade.
+ * Combina a fila global (sem responsável) com o mapa de espera da Inbox.
+ * Não altera atribuição nem presença.
  */
 import { faixaEsperaDesde, minutosDesde } from "./espera";
 
@@ -44,11 +44,10 @@ export function pedirAbrirConversa(pedido: { conversaId: string; mensagemId?: st
 export type CategoriaAtencao =
   | "nao_atribuida"
   | "nao_atribuida_global"
-  | "nao_atribuida_individual"
   | "critica"
   | "aguardando";
 
-/** Estado da conversa usado para distinguir fila individual e global. */
+/** Estado da conversa usado para reconhecer a fila global (sem responsável). */
 export interface LinhaFila {
   id: string;
   contato_nome?: string | null;
@@ -58,15 +57,13 @@ export interface LinhaFila {
   handoff_resumo?: string | null;
   atribuida_user_id?: string | null;
   atendente_nome?: string | null;
-  fila_pendente?: boolean;
   owner_type?: string | null;
   status?: string | null;
 }
 
-export function tipoFilaAtencao(c: LinhaFila): "individual" | "global" | null {
+export function tipoFilaAtencao(c: LinhaFila): "global" | null {
   if (c.status === "closed" || c.status === "finished" || c.owner_type === "AI") return null;
-  if (!c.atribuida_user_id) return "global";
-  return c.fila_pendente === true ? "individual" : null;
+  return c.atribuida_user_id ? null : "global";
 }
 
 export interface ItemAtencao {
@@ -84,12 +81,6 @@ export interface ItemAtencao {
   atendenteNome?: string | null;
 }
 
-export interface FilaIndividualAtencao {
-  atendenteId: string;
-  nome: string;
-  total: number;
-}
-
 export interface PausaAtencao {
   atendenteId: string;
   nome: string;
@@ -103,7 +94,6 @@ export interface ResumoAtencao {
   total: number;
   naoAtribuidas: number;
   naoAtribuidasGlobal: number;
-  filasIndividuais: FilaIndividualAtencao[];
   criticas: number;
   /** Pacientes aguardando resposta por até 10 minutos, excluindo os críticos. */
   aguardando: number;
@@ -119,7 +109,7 @@ export function nivelAtencao(total: number): 0 | 1 | 2 | 3 {
 }
 
 export function calcularAtencao(args: {
-  /** Filas visíveis ao perfil: global sem responsável e individuais pendentes. */
+  /** Fila global sem responsável (só a gestão recebe os detalhes). */
   naoAtribuidas: LinhaFila[];
   /** Para atendentes: só o total global, sem expor detalhes de conversas alheias. */
   globalSemDetalhes?: number;
@@ -138,22 +128,9 @@ export function calcularAtencao(args: {
     ).values(),
   ];
   const porConversa = new Map(fila.map((c) => [c.id, c]));
-  const individuais = new Map<string, FilaIndividualAtencao>();
   const globalSemDetalhes = Math.max(0, args.globalSemDetalhes ?? 0);
   let naoAtribuidasGlobal = globalSemDetalhes;
-  for (const c of fila) {
-    if (tipoFilaAtencao(c) === "global") {
-      naoAtribuidasGlobal += 1;
-    } else if (c.atribuida_user_id) {
-      const grupo = individuais.get(c.atribuida_user_id) ?? {
-        atendenteId: c.atribuida_user_id,
-        nome: c.atendente_nome?.trim() || "Atendente sem nome",
-        total: 0,
-      };
-      grupo.total += 1;
-      individuais.set(c.atribuida_user_id, grupo);
-    }
-  }
+  naoAtribuidasGlobal += fila.length;
   // Identidade do contato WhatsApp — nunca o cadastro de paciente.
   for (const c of fila) {
     const n = nomeContato(c);
@@ -199,7 +176,6 @@ export function calcularAtencao(args: {
   const peso: Record<CategoriaAtencao, number> = {
     nao_atribuida: 1,
     nao_atribuida_global: 1,
-    nao_atribuida_individual: 1,
     critica: 0,
     aguardando: 2,
   };
@@ -209,9 +185,6 @@ export function calcularAtencao(args: {
     total: idsCriticas.size,
     naoAtribuidas: idsNaoAtribuidas.size + globalSemDetalhes,
     naoAtribuidasGlobal,
-    filasIndividuais: [...individuais.values()].sort(
-      (a, b) => a.nome.localeCompare(b.nome, "pt-BR") || a.atendenteId.localeCompare(b.atendenteId),
-    ),
     criticas: idsCriticas.size,
     aguardando: idsAguardando.size,
     itens: itens.slice(0, args.limiteItens ?? 8),
@@ -223,17 +196,11 @@ export function calcularAtencao(args: {
  * Lista de uma categoria dentro da própria Central (não filtra a Inbox).
  * Sem categoria selecionada, mostra apenas as prioridades (esperas críticas).
  */
-export function itensDaCategoria(
-  itens: ItemAtencao[],
-  categoria: CategoriaAtencao | null,
-  atendenteId?: string | null,
-) {
+export function itensDaCategoria(itens: ItemAtencao[], categoria: CategoriaAtencao | null) {
   if (!categoria) return itens.filter((i) => i.critica);
   if (categoria === "nao_atribuida") return itens.filter((i) => i.naoAtribuida);
   if (categoria === "nao_atribuida_global")
     return itens.filter((i) => i.naoAtribuida && !i.atendenteId);
-  if (categoria === "nao_atribuida_individual")
-    return itens.filter((i) => i.naoAtribuida && i.atendenteId === atendenteId);
   if (categoria === "critica") return itens.filter((i) => i.critica);
   return itens.filter((i) => i.aguardandoResposta && !i.critica);
 }

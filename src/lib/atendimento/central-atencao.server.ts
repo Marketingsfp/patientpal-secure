@@ -27,15 +27,15 @@ export async function carregarDadosCentralAtencao(
       let query = supabase
         .from("atend_conversas")
         .select(
-          "id, contato_nome, whatsapp_profile_name, contato_telefone, atribuida_user_id, fila_pendente, owner_type, status",
+          "id, contato_nome, whatsapp_profile_name, contato_telefone, atribuida_user_id, owner_type, status",
         )
         .eq("clinica_id", clinicaId)
         .eq("is_teste", false)
         .not("status", "in", "(closed,finished)")
         .order("id", { ascending: true })
         .limit(TAMANHO_PAGINA);
-      // Mantém a privacidade da fila individual: atendentes veem só a própria
-      // e as conversas da Nina que já podem acompanhar na Inbox.
+      // Atendentes veem só as próprias conversas e as da Nina que já podem acompanhar
+      // na Inbox; a fila global sem responsável é só da gestão.
       if (!gestor) query = query.or(`atribuida_user_id.eq.${userId},owner_type.eq.AI`);
       if (depoisDe) query = query.gt("id", depoisDe);
       const { data, error } = await query;

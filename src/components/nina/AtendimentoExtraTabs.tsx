@@ -400,10 +400,10 @@ export function AtendInbox() {
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
   const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(null);
-  const filtroAtendente = filtroAtendenteAtual({
-    visualizacao: visualizacaoEscolhida,
-    naoAtribuidas: naoAtribuidasFiltro,
-  });
+  // A fila global sem responsável só existe para a gestão; para atendente comum o
+  // filtro é sempre ignorado (mesmo que tenha ficado guardado no navegador).
+  const naoAtribuidasAtivo = souGestor && naoAtribuidasFiltro;
+  const filtroAtendente = filtroAtendenteAtual({ visualizacao: visualizacaoEscolhida });
   const filtrosAtendente = estadoFiltroAtendente(filtroAtendente);
   const visualizacao = souGestor ? visualizacaoEscolhida : filtrosAtendente.visualizacao;
   // Contagem própria de cada filtro (nunca reaproveita o número de outro).
@@ -414,6 +414,8 @@ export function AtendInbox() {
     fechadas: 0,
     equipe: 0,
   });
+  // Pendentes: minhas conversas em que o paciente aguarda resposta.
+  const [pendentes, setPendentes] = useState(0);
   // FASE 3 — reset seguro: trocando de clínica, perdendo a permissão de
   // supervisão ou saindo o atendente da equipe, o filtro volta para "todos".
   // Nunca fica um user_id de outra clínica preso na tela.
@@ -471,7 +473,7 @@ export function AtendInbox() {
     base: escopoBase,
     atendenteId: atendenteEscolhidoId,
     visualizacao,
-    naoAtribuidas: naoAtribuidasFiltro,
+    naoAtribuidas: naoAtribuidasAtivo,
     ...(!souGestor ? filtrosAtendente : {}),
     gestor: souGestor,
     meuId,
@@ -481,7 +483,7 @@ export function AtendInbox() {
   const filtroStatus = statusConsulta(visualizacao);
   const ordem = ordemVisualizacao(visualizacao);
 
-  const soNaoAtribuidas = naoAtribuidasFiltro;
+  const soNaoAtribuidas = naoAtribuidasAtivo;
   const setSoNaoAtribuidas = (v: boolean) => {
     setNaoAtribuidasFiltro(v);
     if (v) {
@@ -963,6 +965,7 @@ export function AtendInbox() {
         fechadas: r?.fechadas ?? 0,
         equipe: r?.equipe ?? 0,
       });
+      setPendentes(r?.pendentes ?? 0);
     } catch {
       /* contadores são informativos; falha não bloqueia a lista */
     }
@@ -1727,7 +1730,6 @@ export function AtendInbox() {
     if (!atual) return;
     if (
       atual.atribuida_user_id !== sel.atribuida_user_id ||
-      atual.fila_pendente !== sel.fila_pendente ||
       atual.status !== sel.status ||
       atual.owner_type !== sel.owner_type ||
       // FASE 5 — o nome do perfil no WhatsApp pode mudar a qualquer momento e o
@@ -1742,7 +1744,6 @@ export function AtendInbox() {
     convs,
     sel?.id,
     sel?.atribuida_user_id,
-    sel?.fila_pendente,
     sel?.status,
     sel?.owner_type,
     sel?.whatsapp_profile_name,
@@ -2658,13 +2659,6 @@ export function AtendInbox() {
             quando: oficial?.recebida_em ?? new Date().toISOString(),
           }) as any[],
         );
-        if (selIdRef.current === origem && selRef.current?.fila_pendente === true &&
-            ["sent", "delivered", "read"].includes(oficial?.status)) {
-          // Primeiro envio confirmado: confere a mudança de fila mesmo se o
-          // Realtime atrasar. A recarga preserva o chat pela leitura autorizada.
-          agrupadores.current?.lista.agendar();
-          agrupadores.current?.contadores.agendar();
-        }
         registrarDiagnostico("atendimento-inbox", { sync_reason: "envio", full_reload: false });
         // Etapa final do envio: fecha o trace e alimenta p50/p95/p99.
         marcarEtapa(clientMessageId, "SEND_T12_CANONICAL_RECONCILED", "send");
@@ -3036,7 +3030,7 @@ export function AtendInbox() {
                 valor={filtroAtendente}
                 contagens={{
                   ativas: contadores.minhas,
-                  nao_atribuidas: contadores.nao_atribuidas,
+                  pendentes,
                   fechadas: contadores.fechadas,
                 }}
                 onChange={(valor) => {

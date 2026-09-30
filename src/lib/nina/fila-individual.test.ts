@@ -43,25 +43,26 @@ describe("distribuição só para Online e fila global sem dono", () => {
   });
 });
 
-describe("visibilidade da fila individual", () => {
-  const own = { id: "c", atribuida_user_id: "a", fila_pendente: true, status: "waiting", owner_type: "HUMAN" };
-  test("reserva fica privada no acesso, no link e nos filtros", () => {
-    expect(usuarioPodeVerConversa(own, { userId: "a", gestor: false })).toBe(true);
-    expect(usuarioPodeVerConversa(own, { userId: "b", gestor: false })).toBe(false);
-    expect(usuarioPodeVerConversa(own, { userId: "b", gestor: true })).toBe(true);
-    expect(escopoParaConversa(own, { userId: "a", gestor: false, escopoAtual: "minhas" })).toBe("nao_atribuidas");
-    expect(conversaVisivelNoEscopo(own, { userId: "a", gestor: false, escopo: "minhas" })).toBe(false);
+describe("visibilidade da fila global (sem responsável)", () => {
+  const dela = { id: "c", atribuida_user_id: "a", status: "waiting", owner_type: "HUMAN" };
+  const global = { id: "g", atribuida_user_id: null, status: "waiting", owner_type: "NONE" };
+  test("conversa com dono é só da pessoa (e da gestão) no acesso, no link e nos filtros", () => {
+    expect(usuarioPodeVerConversa(dela, { userId: "a", gestor: false })).toBe(true);
+    expect(usuarioPodeVerConversa(dela, { userId: "b", gestor: false })).toBe(false);
+    expect(usuarioPodeVerConversa(dela, { userId: "b", gestor: true })).toBe(true);
+    expect(escopoParaConversa(dela, { userId: "a", gestor: false, escopoAtual: "minhas" })).toBe("minhas");
+    expect(conversaVisivelNoEscopo(dela, { userId: "a", gestor: false, escopo: "minhas" })).toBe(true);
   });
-  test("supervisão vê o excedente global; atendente vê apenas suas reservas", () => {
-    const global = { ...own, atribuida_user_id: null, fila_pendente: false };
+  test("a fila global sem responsável é só da gestão", () => {
     expect(conversaVisivelNoEscopo(global, { userId: "a", gestor: true, escopo: "nao_atribuidas" })).toBe(true);
     expect(conversaVisivelNoEscopo(global, { userId: "a", gestor: false, escopo: "nao_atribuidas" })).toBe(false);
+    expect(usuarioPodeVerConversa(global, { userId: "a", gestor: false })).toBe(false);
+    expect(escopoParaConversa(global, { userId: "a", gestor: false, escopoAtual: "minhas" })).toBeNull();
   });
-  test("primeira resposta remove da fila e entra em Ativas mesmo se status já era active", () => {
-    const before = { ...own, status: "active" };
-    const after = { ...before, fila_pendente: false };
+  test("ao ser distribuída a alguém Online, a conversa sai da global e entra direto em Ativas", () => {
+    const distribuida = { ...global, atribuida_user_id: "a", status: "active", owner_type: "HUMAN" };
     const ctx = { userId: "a", gestor: false, buscando: false };
-    expect(patchListaPorConversa([before], after, { ...ctx, escopo: "nao_atribuidas" }).lista).toHaveLength(0);
-    expect(patchListaPorConversa([], after, { ...ctx, escopo: "minhas" }).lista).toHaveLength(1);
+    expect(patchListaPorConversa([global], distribuida, { ...ctx, gestor: true, escopo: "nao_atribuidas", userId: "gestor" }).lista).toHaveLength(0);
+    expect(patchListaPorConversa([], distribuida, { ...ctx, escopo: "minhas" }).lista).toHaveLength(1);
   });
 });

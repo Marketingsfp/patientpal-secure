@@ -55,7 +55,10 @@ describe("FASE 5 — RBAC e cenário completo da Inbox individual", () => {
   it("Nina e Não atribuídas ficam em visões separadas", () => {
     const l = cenario();
     expect(conta(l, "nina", JEAN)).toBe(10);
-    expect(conta(l, "nao_atribuidas", JEAN)).toBe(0);
+    // A fila global sem responsável é só da gestão: atendente comum cai em Minhas e não vê nenhuma dela.
+    const idsGlobais = new Set(l.filter((c) => c.id.startsWith("f")).map((c) => c.id));
+    expect(l.filter((c) => conversaVisivelNoEscopo(c, { escopo: "nao_atribuidas", userId: JEAN, gestor: false }))
+      .some((c) => idsGlobais.has(c.id))).toBe(false);
     expect(conta(l, "nao_atribuidas", JEAN, true)).toBe(3);
     // Nenhuma conversa da Nina aparece na Inbox pessoal.
     expect(conta(l, "minhas", JEAN)).toBe(5);
