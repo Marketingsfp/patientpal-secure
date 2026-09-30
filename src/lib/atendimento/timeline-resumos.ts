@@ -44,3 +44,33 @@ export function inserirResumosNaTimeline<T extends { at: number }>(
   }
   return saida;
 }
+
+/**
+ * Casa cada resumo com o aviso de encaminhamento da mesma transferencia, para os dois serem UM so
+ * cartao. Um aviso recebe no maximo um resumo; o que nao encontra aviso proximo volta em `soltos`
+ * (por exemplo, conclusao por agendamento) e entra na conversa como cartao proprio.
+ */
+export function casarResumosComAvisos<T extends { at: number }>(
+  itens: readonly T[],
+  resumos: readonly ResumoNaConversa[],
+  ehAvisoDeEncaminhamento: (item: T) => boolean,
+): { anexos: Map<T, ResumoNaConversa>; soltos: ResumoNaConversa[] } {
+  const anexos = new Map<T, ResumoNaConversa>();
+  const soltos: ResumoNaConversa[] = [];
+  for (const resumo of resumos) {
+    const em = Date.parse(resumo.handoff_em);
+    let melhor: T | null = null;
+    let distancia = Infinity;
+    for (const item of itens) {
+      if (anexos.has(item) || !ehAvisoDeEncaminhamento(item)) continue;
+      const d = Math.abs(item.at - em);
+      if (d <= JANELA_AVISO_RESUMO_MS && d < distancia) {
+        melhor = item;
+        distancia = d;
+      }
+    }
+    if (melhor) anexos.set(melhor, resumo);
+    else soltos.push(resumo);
+  }
+  return { anexos, soltos };
+}

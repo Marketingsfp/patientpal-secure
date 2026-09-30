@@ -229,3 +229,24 @@ Regras obrigatórias:
 - Nunca invente valores, médicos, horários ou dados pessoais. Sem informação, deixe a lista vazia.
 - Ignore saudações e frases sem valor operacional ("olá", "bom dia").
 - Português do Brasil. Os campos em lista são telegráficos; só "texto_resumo" é escrito em frases completas. Este texto NUNCA será enviado ao paciente.`;
+
+export type ConteudoDoResumo =
+  | { tipo: "texto"; paragrafos: string[] }
+  | { tipo: "campos"; campos: Array<{ rotulo: string; valor: string }> };
+
+/**
+ * O que o cartão mostra: texto corrido nos resumos novos; campos "rotulo: valor" (compactos, como
+ * o restante do cartao) nos resumos antigos. O protocolo pode ser omitido quando o cartao ja o mostra.
+ */
+export function conteudoDoResumo(r: ResumoHandoff, opcoes?: { omitirProtocolo?: boolean }): ConteudoDoResumo {
+  const corrido = textoCorrido(r.texto_resumo);
+  if (corrido) {
+    return { tipo: "texto", paragrafos: corrido.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) };
+  }
+  return {
+    tipo: "campos",
+    campos: blocosVisiveis(r)
+      .filter((b) => !(opcoes?.omitirProtocolo && b.titulo === "Protocolo"))
+      .map((b) => ({ rotulo: b.titulo, valor: b.itens.join("; ") })),
+  };
+}

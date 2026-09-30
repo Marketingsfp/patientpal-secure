@@ -6,7 +6,11 @@
  * ou clique. Só apresentação: nenhum dado é criado, alterado ou apagado aqui.
  */
 
+import type { ReactNode } from "react";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
+import { conteudoDoResumo } from "@/lib/atendimento/handoff-resumo";
+import { rotuloDesfecho } from "@/lib/atendimento/resumo-desfecho";
+import type { ResumoNaConversa } from "@/lib/atendimento/resumo-retencao";
 import type { GrupoAtribuicao, GrupoHandoff } from "@/lib/atendimento/timeline-grupos";
 import {
   motivoParaAtendimento,
@@ -17,10 +21,13 @@ function Card({
   titulo,
   hora,
   linhas,
+  children,
 }: {
   titulo: string;
   hora: string | null;
   linhas: Array<Array<{ rotulo?: string; valor: string }>>;
+  /** Conteúdo extra no mesmo cartão (o resumo da Nina). */
+  children?: ReactNode;
 }) {
   return (
     <div className="my-1.5 flex justify-center px-2">
@@ -44,8 +51,69 @@ function Card({
               </div>
             ))}
         </div>
+        {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Resumo interno da Nina, como segunda parte do cartão (mesmo estilo, sem cor própria): cada
+ * conclusão da Nina tem o seu e ele não muda depois. Resumos novos vêm em texto corrido; os antigos,
+ * em campos "rótulo: valor".
+ */
+function ResumoDaNina({ resumo, omitirProtocolo }: { resumo: ResumoNaConversa; omitirProtocolo: boolean }) {
+  const r = resumo.payload;
+  const conteudo = conteudoDoResumo(r, { omitirProtocolo });
+  const agendamento = r.agendamento_confirmado;
+  const desfecho = omitirProtocolo ? null : rotuloDesfecho(resumo.desfecho as never);
+  return (
+    <section
+      aria-label="Resumo da Nina"
+      data-testid="resumo-na-conversa"
+      data-resumo-id={resumo.id}
+      className="mt-1.5 border-t border-border/50 pt-1.5"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+        <span className="font-medium text-foreground">
+          Resumo da Nina{desfecho ? <span className="font-normal opacity-70"> · {desfecho}</span> : null}
+        </span>
+        <span className="whitespace-nowrap opacity-60" title="Resumo interno, guardado por sete dias">
+          uso interno
+        </span>
+      </div>
+      <div className="mt-1 space-y-0.5">
+        {conteudo.tipo === "texto"
+          ? conteudo.paragrafos.map((p, i) => (
+              <p key={i} className="whitespace-pre-wrap font-medium text-foreground/90">
+                {p}
+              </p>
+            ))
+          : conteudo.campos.map((c, i) => (
+              <div key={i}>
+                <span className="opacity-70">{c.rotulo}: </span>
+                <span className="font-medium text-foreground/90">{c.valor}</span>
+              </div>
+            ))}
+        {agendamento && (
+          <div>
+            <span className="opacity-70">Agendamento confirmado: </span>
+            <span className="font-medium text-foreground/90">
+              {[agendamento.servico, agendamento.medico, agendamento.data, agendamento.hora].filter(Boolean).join(" · ")}
+            </span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Resumo sem aviso de encaminhamento próximo (por exemplo, conclusão por agendamento): cartão próprio. */
+export function ResumoAvulsoCard({ resumo }: { resumo: ResumoNaConversa }) {
+  return (
+    <Card titulo="Conclusão da Nina" hora={formatarDataHoraMensagem(resumo.handoff_em)} linhas={[]}>
+      <ResumoDaNina resumo={resumo} omitirProtocolo={false} />
+    </Card>
   );
 }
 
@@ -62,7 +130,7 @@ const STATUS_HANDOFF: Record<GrupoHandoff["status"], string> = {
   PROTOCOLO_INFORMADO: "Protocolo informado ao paciente",
 };
 
-export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
+export function HandoffGroupCard({ grupo, resumo }: { grupo: GrupoHandoff; resumo?: ResumoNaConversa }) {
   const motivo = motivoParaAtendimento(grupo.motivo);
 
   const linha2: Array<{ rotulo?: string; valor: string }> = [];
@@ -84,8 +152,15 @@ export function HandoffGroupCard({ grupo }: { grupo: GrupoHandoff }) {
     <Card
       titulo="Encaminhamento para atendimento humano"
       hora={formatarDataHoraMensagem(grupo.criadoEm)}
-      linhas={[motivo ? [{ rotulo: "Motivo", valor: motivo }] : [], linha2, linha3, linha4]}
-    />
+      // Com o resumo no mesmo cartão, origem, status e atribuição ficam numa linha só (mais compacto).
+      linhas={
+        resumo
+          ? [motivo ? [{ rotulo: "Motivo", valor: motivo }] : [], linha2, [...linha3, ...linha4]]
+          : [motivo ? [{ rotulo: "Motivo", valor: motivo }] : [], linha2, linha3, linha4]
+      }
+    >
+      {resumo ? <ResumoDaNina resumo={resumo} omitirProtocolo={Boolean(grupo.protocolo)} /> : null}
+    </Card>
   );
 }
 

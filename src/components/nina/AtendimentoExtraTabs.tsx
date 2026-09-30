@@ -109,7 +109,12 @@ import {
   handoffsAguardandoAtendente,
   type ItemTimelineAgrupado,
 } from "@/lib/atendimento/timeline-grupos";
-import { AtribuicaoGroupCard, EsperaAtendenteCard, HandoffGroupCard } from "@/components/nina/ConversationEventGroup";
+import {
+  AtribuicaoGroupCard,
+  EsperaAtendenteCard,
+  HandoffGroupCard,
+  ResumoAvulsoCard,
+} from "@/components/nina/ConversationEventGroup";
 import {
   listarConversas,
   obterConversa,
@@ -166,9 +171,9 @@ import {
   preservarOtimistas,
 } from "@/lib/atendimento/envio-otimista";
 import { criarFilaEnvio } from "@/lib/atendimento/fila-envio";
-import { ResumoNaConversa } from "@/components/nina/ResumoNaConversa";
 import { useResumosDaConversa } from "@/components/nina/use-resumos-conversa";
-import { inserirResumosNaTimeline } from "@/lib/atendimento/timeline-resumos";
+import { casarResumosComAvisos, inserirResumosNaTimeline } from "@/lib/atendimento/timeline-resumos";
+import type { ResumoNaConversa as ResumoDaConversa } from "@/lib/atendimento/resumo-retencao";
 
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
@@ -2262,10 +2267,14 @@ export function AtendInbox() {
 
   // Resumos da Nina (um por conclusão dela), colocados dentro da conversa.
   const resumosDaConversa = useResumosDaConversa(clinicaId, sel?.id);
-  const timelineComResumos = useMemo(
-    () => inserirResumosNaTimeline(timeline, resumosDaConversa, (i) => i.kind === "grupo" && i.item.tipo === "HANDOFF"),
-    [timeline, resumosDaConversa],
-  );
+  // O resumo e o aviso de encaminhamento da mesma transferência formam UM cartão; o que não tem aviso
+  // próximo (conclusão por agendamento) entra como cartão próprio, pela hora da conclusão.
+  const timelineComResumos = useMemo(() => {
+    const ehAviso = (i: (typeof timeline)[number]) => i.kind === "grupo" && i.item.tipo === "HANDOFF";
+    const { anexos, soltos } = casarResumosComAvisos(timeline, resumosDaConversa, ehAviso);
+    const base = timeline.map((i) => (anexos.has(i) ? { ...i, resumo: anexos.get(i) } : i));
+    return inserirResumosNaTimeline(base, soltos, () => false);
+  }, [timeline, resumosDaConversa]);
 
   // FASE 1 — mensagem recebida já desenhada na conversa: fecha o trace RECV.
   useEffect(() => {
@@ -3238,7 +3247,6 @@ export function AtendInbox() {
                         size="sm"
                         variant="outline"
                         disabled={(!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa}
-
                         className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                         onClick={() => setTransferOpen(true)}
                       >
@@ -3322,7 +3330,7 @@ export function AtendInbox() {
                       if (item.kind === "resumo") {
                         return (
                           <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
-                            <ResumoNaConversa resumo={item.resumo} />
+                            <ResumoAvulsoCard resumo={item.resumo} />
                           </div>
                         );
                       }
@@ -3331,7 +3339,7 @@ export function AtendInbox() {
                         if (g.tipo === "HANDOFF") {
                           return (
                             <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                              <HandoffGroupCard grupo={g} />
+                              <HandoffGroupCard grupo={g} resumo={(item as { resumo?: ResumoDaConversa }).resumo} />
                               {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
                             </div>
                           );
