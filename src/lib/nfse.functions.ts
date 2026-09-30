@@ -223,6 +223,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
         : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
+    // Formato do portal: "CONSULTA (PEDIATRIA)", só quando o agendamento
+    // informa a especialidade. Não sabendo, a descrição fica como veio.
+    {
+      const { descricaoComEspecialidade } = await import("@/lib/nfse-descricao.server");
+      data.descricaoServicos = await descricaoComEspecialidade(
+        supabaseAdmin,
+        data.descricaoServicos,
+        [data.agendamentoId, ...(data.agendamentoIds ?? [])],
+      );
+    }
     const aliquota = data.aliquotaIssOverride ?? Number(emitente.aliquota_iss ?? 0.02);
     const valorIss = +(data.valorServicos * aliquota).toFixed(2);
     const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
@@ -361,7 +371,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // Expected is one of (CAEPF, IM, xNome)".
       razao_social_tomador: data.tomador.nome,
       ...enderecoTomadorNacional,
-      codigo_municipio_prestacao: Number(tomadorCodMun),
+      // Local da prestação = município da clínica (emitente), nunca o do
+      // paciente: é ele que define onde o ISS é devido. Não há no sistema
+      // atendimento fora da clínica, então não existe sobreposição.
+      codigo_municipio_prestacao: Number(emitente.codigo_municipio),
       codigo_tributacao_nacional_iss: itemListaServico,
       ...(codigoTributarioMunicipio
         ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
@@ -505,6 +518,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // tentar de novo os mesmos números na próxima emissão). Só adianta, nunca
     // volta atrás — ver `avancarContadorDps`.
     if (isNacional) await avancarContadorDps(supabaseAdmin, emitente.id, bumpedTo + 1);
+    // Renumeração por E0014 deixa de ser silenciosa: fica na nota e no log.
+    const numeroEnviado = (payloadNacional as { numero_dps?: number }).numero_dps;
+    const notaRenumerada =
+      isNacional && attempts > 1
+        ? `DPS renumerada: a prefeitura recusou por número repetido (E0014); ${attempts} tentativas, última enviada nº ${numeroEnviado}.`
+        : null;
+    if (notaRenumerada) console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
+    const observacoesComRenumeracao = notaRenumerada
+      ? [nota.observacoes, notaRenumerada].filter(Boolean).join(" ")
+      : nota.observacoes;
 
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
@@ -515,6 +538,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
+          observacoes: observacoesComRenumeracao,
           erro_mensagem: e0014Final
             ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
@@ -538,6 +562,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       .update({
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        observacoes: observacoesComRenumeracao,
         payload_envio: payload,
         payload_resposta: body,
       })
@@ -962,7 +987,10 @@ export const reenviarNfse = createServerFn({ method: "POST" })
             uf_tomador: String(enderecoTomadorAtual.uf || emitente.uf),
           }
         : {}),
-      codigo_municipio_prestacao: Number(tomadorCodMun),
+      // Local da prestação = município da clínica (emitente), nunca o do
+      // paciente: é ele que define onde o ISS é devido. Não há no sistema
+      // atendimento fora da clínica, então não existe sobreposição.
+      codigo_municipio_prestacao: Number(emitente.codigo_municipio),
       codigo_tributacao_nacional_iss: itemListaServico,
       ...(codigoTributarioMunicipio
         ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
@@ -1060,6 +1088,16 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     }
 
     if (isNacional) await avancarContadorDps(supabaseAdmin, emitente.id, bumpedTo + 1);
+    // Renumeração por E0014 deixa de ser silenciosa: fica na nota e no log.
+    const numeroEnviado = (payloadNacional as { numero_dps?: number }).numero_dps;
+    const notaRenumerada =
+      isNacional && attempts > 1
+        ? `DPS renumerada: a prefeitura recusou por número repetido (E0014); ${attempts} tentativas, última enviada nº ${numeroEnviado}.`
+        : null;
+    if (notaRenumerada) console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
+    const observacoesComRenumeracao = notaRenumerada
+      ? [nota.observacoes, notaRenumerada].filter(Boolean).join(" ")
+      : nota.observacoes;
 
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
@@ -1070,6 +1108,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
+          observacoes: observacoesComRenumeracao,
           erro_mensagem: e0014Final
             ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
@@ -1091,6 +1130,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       .update({
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        observacoes: observacoesComRenumeracao,
         payload_resposta: body,
       })
       .eq("id", nota.id);
