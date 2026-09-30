@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import {
   ListaRespostasRapidas,
@@ -2480,6 +2480,31 @@ export function AtendInbox() {
   const respostasRapidas = useRespostasRapidas(clinicaId);
   const registrarUsoFn = useServerFn(registrarUsoResposta);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const colunaChatRef = useRef<HTMLDivElement | null>(null);
+  // Campo de escrever: cresce e diminui com o texto, sem limite de linhas. Sempre sobra um espaço
+  // mínimo para a conversa (cabeçalho + mensagens); só então o campo passa a rolar por dentro.
+  const ESPACO_MIN_CONVERSA_PX = 280;
+  const ajustarAlturaCampo = useCallback(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const caixa = chat.containerRef.current;
+    const noFim = !!caixa && caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 48;
+    el.style.height = "auto";
+    const coluna = colunaChatRef.current?.clientHeight ?? window.innerHeight;
+    const maximo = Math.max(44, coluna - ESPACO_MIN_CONVERSA_PX);
+    const alvo = el.scrollHeight;
+    el.style.height = `${Math.min(alvo, maximo)}px`;
+    el.style.overflowY = alvo > maximo ? "auto" : "hidden";
+    // Quem estava no fim da conversa continua vendo as últimas mensagens.
+    if (noFim && caixa) caixa.scrollTop = caixa.scrollHeight;
+  }, [chat.containerRef]);
+  useLayoutEffect(() => {
+    ajustarAlturaCampo();
+  }, [ajustarAlturaCampo, draft, sel?.id]);
+  useEffect(() => {
+    window.addEventListener("resize", ajustarAlturaCampo);
+    return () => window.removeEventListener("resize", ajustarAlturaCampo);
+  }, [ajustarAlturaCampo]);
   const [slash, setSlash] = useState<ComandoDigitado | null>(null);
   const [slashIdx, setSlashIdx] = useState(0);
   // Prioriza (sem esconder) respostas ligadas ao que já está no atendimento.
@@ -3210,7 +3235,7 @@ export function AtendInbox() {
                 onMouseLeave={() => cancelarPrefetch(c.id)}
                 onFocus={() => agendarPrefetch(c.id)}
                 onBlur={() => cancelarPrefetch(c.id)}
-                className={`relative w-full border-b border-atd-border p-3 pl-4 text-left transition-colors hover:bg-atd-blue-hover ${
+                className={`relative w-full border-b border-atd-border py-2 pl-4 pr-3 text-left transition-colors hover:bg-atd-blue-hover ${
                   sel?.id === c.id
                     ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
                     : "bg-atd-surface"
@@ -3231,10 +3256,11 @@ export function AtendInbox() {
                     </Badge>
                   )}
                 </div>
-                <div className="flex min-h-[24px] flex-wrap items-center gap-1.5 mt-1">
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
                   {/* Lista canônica e já deduplicada por chave semântica. */}
                   {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
-                    if (tipo === "status") return <Fragment key={tipo}>{statusBadge(c.status)}</Fragment>;
+                    // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
+                    if (tipo === "status" || tipo === "timeout-nina") return null;
                     if (tipo === "sem-responsavel")
                       return (
                         <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
@@ -3250,16 +3276,6 @@ export function AtendInbox() {
                           ✦ Nina
                         </Badge>
                       );
-                    if (tipo === "timeout-nina")
-                      return (
-                        <Badge
-                          key={tipo}
-                          title="Transferida automaticamente: o paciente não respondeu no prazo"
-                          className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn"
-                        >
-                          🟡 Timeout da Nina — sem resposta por 30 min
-                        </Badge>
-                      );
                     return (
                       <Badge
                         key={tipo}
@@ -3269,11 +3285,6 @@ export function AtendInbox() {
                       </Badge>
                     );
                   })}
-                  {formatarNumeroConversa(c.numero_conversa) && (
-                    <code className="text-[11px] text-muted-foreground">
-                      Conversa {formatarNumeroConversa(c.numero_conversa)}
-                    </code>
-                  )}
                   {c.is_teste && (
                     <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
                       Teste
@@ -3281,10 +3292,7 @@ export function AtendInbox() {
                   )}
                   <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                 </div>
-                <div className="mt-1 min-h-[16px] truncate text-xs text-muted-foreground">
-                  {c.ultima_msg_preview || "—"}
-                </div>
-                <div className="mt-0.5 min-h-[14px] text-[11px] text-muted-foreground">
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
                   {fmtData(c.ultima_msg_em)}
                 </div>
               </button>
@@ -3296,6 +3304,7 @@ export function AtendInbox() {
         {/* COLUNA 2 — CHAT */}
         <Card
           data-a11y-principal="true"
+          ref={colunaChatRef}
           className="flex min-w-0 flex-1 flex-col overflow-hidden"
         >
           {!sel ? (
@@ -3433,30 +3442,6 @@ export function AtendInbox() {
                   </div>
                 </div>
               </CardHeader>
-              <div
-                aria-live="polite"
-                className={`flex items-center gap-2 border-b px-3 py-1.5 text-xs ${
-                  souResponsavel
-                    ? "border-atd-go/30 bg-atd-go/10 text-atd-ink"
-                    : responsavelId
-                      ? "border-atd-warn bg-atd-warn-bg text-atd-warn-ink"
-                      : "border-atd-border bg-atd-idle-bg text-atd-ink-soft"
-                }`}
-              >
-                <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                {sel.handoff_motivo === "patient_response_timeout" && (
-                  <span className="rounded-full border border-atd-warn bg-atd-warn-bg px-2 py-0.5 text-[11px] text-atd-warn-ink">
-                    🟡 Timeout da Nina — sem resposta por 30 min
-                  </span>
-                )}
-                <span className="truncate">
-                  {souResponsavel
-                    ? "Você é o responsável por esta conversa."
-                    : responsavelId
-                      ? `Em atendimento por ${nomeUsuario(responsavelId)} — modo somente leitura.`
-                      : "Sem responsável. Assuma para responder."}
-                </span>
-              </div>
               <div className="relative flex-1 min-h-0">
               <div
                 ref={chat.containerRef}
@@ -3644,20 +3629,6 @@ export function AtendInbox() {
               </div>
 
               <div className="border-t p-3 space-y-2">
-                {motivoBloqueio && (
-                  <div className="flex items-start gap-1.5 rounded-md border border-atd-warn bg-atd-warn-bg px-2 py-1.5 text-xs text-atd-warn-ink">
-                    <span aria-hidden="true">⚠️</span>
-                    <span>{motivoBloqueio}</span>
-                  </div>
-                )}
-                {respondendoComoSupervisao && !motivoBloqueio && meuPerfilSupervisao && (
-                  <div className="rounded-md border border-atd-border bg-atd-bg px-2 py-1.5 text-xs text-atd-ink-soft">
-                    Você está respondendo como {ROTULO_PERFIL_SUPERVISAO[meuPerfilSupervisao]}.{" "}
-                    {responsavelId
-                      ? `A conversa continua com ${nomeUsuario(responsavelId)}.`
-                      : "A conversa continua sem responsável até alguém clicar em Assumir conversa."}
-                  </div>
-                )}
                 <div className="relative flex gap-2">
                   {slash && (
                     <ListaRespostasRapidas
