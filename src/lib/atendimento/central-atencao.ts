@@ -94,6 +94,8 @@ export interface PausaAtencao {
   atendenteId: string;
   nome: string;
   inicio: string | null;
+  /** Pausa comum ou pausa para saída — contadas e listadas separadamente. */
+  tipo: "PAUSA" | "PAUSA_SAIDA";
 }
 
 export interface ResumoAtencao {

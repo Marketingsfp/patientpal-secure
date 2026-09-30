@@ -18,24 +18,30 @@
  * ser testado e reaproveitado pelo servidor e pela tela.
  */
 
-export const ESTADOS_MANUAIS = ["ONLINE", "OFFLINE", "PAUSA"] as const;
+export const ESTADOS_MANUAIS = ["ONLINE", "OFFLINE", "PAUSA", "PAUSA_SAIDA"] as const;
 export type EstadoManualPresenca = (typeof ESTADOS_MANUAIS)[number];
 
 export const ROTULO_ESTADO_MANUAL: Record<EstadoManualPresenca, string> = {
   ONLINE: "Online",
   OFFLINE: "Offline",
   PAUSA: "Em pausa",
+  PAUSA_SAIDA: "Em pausa para saída",
 };
 
-/** Só aceita os três estados permitidos — qualquer outra coisa é recusada. */
+/** Só aceita os estados permitidos — qualquer outra coisa é recusada. */
 export function ehEstadoManual(v: unknown): v is EstadoManualPresenca {
   return typeof v === "string" && (ESTADOS_MANUAIS as readonly string[]).includes(v);
 }
 
+/** Pausa comum e pausa para saída: não recebem conversas novas, mas podem enviar mensagens. */
+export function ehEstadoPausa(v: unknown): v is "PAUSA" | "PAUSA_SAIDA" {
+  return v === "PAUSA" || v === "PAUSA_SAIDA";
+}
+
 /**
- * Tradução para os campos legados de presença. A distribuição consulta
- * `estado_manual`: Online recebe ativas, Pausa recebe reservas até 10.
- * `aceita_novas` não decide elegibilidade e permanece compatível com o legado.
+ * Tradução para os campos legados de presença. Só Online recebe conversas novas;
+ * as duas pausas e o Offline não recebem. `aceita_novas` não decide elegibilidade
+ * e permanece compatível com o legado.
  */
 export function tecnicoDoEstadoManual(estado: EstadoManualPresenca): {
   status: "ONLINE" | "BUSY" | "OFFLINE";
@@ -45,6 +51,7 @@ export function tecnicoDoEstadoManual(estado: EstadoManualPresenca): {
     case "ONLINE":
       return { status: "ONLINE", aceitaNovas: true };
     case "PAUSA":
+    case "PAUSA_SAIDA":
       return { status: "BUSY", aceitaNovas: false };
     default:
       return { status: "OFFLINE", aceitaNovas: false };

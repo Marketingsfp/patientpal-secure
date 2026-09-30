@@ -16,7 +16,7 @@ import {
   type RespostaRapida,
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
-import type { EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
+import { ehEstadoPausa, type EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
 import type {
   ResultadoPresencaDistribuicao,
 } from "@/lib/atendimento/distribuicao-contrato";
@@ -89,6 +89,7 @@ import {
   MessageSquare,
   Circle,
   Coffee,
+  DoorOpen,
   PowerOff,
   CalendarPlus,
   Pin,
@@ -253,7 +254,9 @@ import { CronometroPausa } from "@/components/nina/CronometroPausa";
 import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
 import {
   MSG_ADMIN_NAO_ATENDE,
+  MSG_DESTINO_EM_PAUSA,
   ROTULO_PRESENCA,
+  estadoBloqueiaTransferencia,
   type PresencaAtendente,
 } from "@/lib/atendimento/perfil-atendimento";
 
@@ -757,7 +760,8 @@ export function AtendInbox() {
       setEstadoManual(estado);
       setVersaoPresenca(versao);
       setPausaAtiva(p);
-      const confirmado = p ? ("PAUSA" as EstadoManualPresenca) : estado;
+      // A pausa para saída é um estado próprio: um registro de pausa aberto não a converte em Pausa.
+      const confirmado = p && estado !== "PAUSA_SAIDA" ? ("PAUSA" as EstadoManualPresenca) : estado;
       setControle((c) => presAoCarregar(c, confirmado));
     } catch {
       // Estado auxiliar da fila: se falhar, a aba segue com os valores atuais.
@@ -793,7 +797,7 @@ export function AtendInbox() {
   // FASE 3 — o visual segue o estado confirmado pelo servidor.
   const [controle, setControle] = useState(CONTROLE_INICIAL);
   const online = estadoManual === "ONLINE" && !pausaAtiva;
-  const emPausa = estadoManual === "PAUSA" || !!pausaAtiva;
+  const emPausa = ehEstadoPausa(estadoManual) || !!pausaAtiva;
   const manualOffline = estadoManual === "OFFLINE";
 
   // Sinal de vida (apenas informação técnica de conexão). Este caminho NUNCA
@@ -897,11 +901,17 @@ export function AtendInbox() {
     return aplicarPresencaConfirmada(r);
   };
 
-  const definirStatus = async (status: "online" | "pausa" | "offline") => {
+  const definirStatus = async (status: "online" | "pausa" | "pausa_saida" | "offline") => {
     if (!clinicaId) return;
     if (controle.salvando) return; // evita clique duplicado
     const alvo: EstadoManualPresenca =
-      status === "online" ? "ONLINE" : status === "offline" ? "OFFLINE" : "PAUSA";
+      status === "online"
+        ? "ONLINE"
+        : status === "offline"
+          ? "OFFLINE"
+          : status === "pausa_saida"
+            ? "PAUSA_SAIDA"
+            : "PAUSA";
     setControle((c) => presAoIniciar(c, alvo));
     try {
       const r = await gravarPresencaManual(alvo);
@@ -2559,9 +2569,8 @@ export function AtendInbox() {
         ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
         : !podeAtender
           ? "Você tem acesso somente de leitura no atendimento."
-          : emPausa
-      ? "Você está em pausa. Encerre a pausa para enviar mensagens."
-      : !filaAberta
+          : !filaAberta && !emPausa
+        // Só o Offline (ou a falta de escolha) bloqueia o envio; as duas pausas podem responder.
         ? "Você está offline. Fique online para enviar mensagens."
         : janela24hExpirada
           ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
@@ -2911,7 +2920,7 @@ export function AtendInbox() {
             <div
               role="radiogroup"
               aria-label="Minha disponibilidade"
-              className="grid grid-cols-3 gap-1"
+              className="grid grid-cols-2 gap-1"
             >
               <Button
                 size="sm"
@@ -2957,6 +2966,28 @@ export function AtendInbox() {
                 Pausa
                 {presSelecionada(controle, "PAUSA") && <span className="sr-only"> (selecionado)</span>}
               </Button>
+              <Button
+                size="sm"
+                role="radio"
+                aria-checked={presSelecionada(controle, "PAUSA_SAIDA")}
+                aria-label="Em pausa para saída"
+                disabled={presDesabilitada(controle)}
+                variant={presSelecionada(controle, "PAUSA_SAIDA") ? "default" : "outline"}
+                className={`h-7 px-1 text-[11px] ${
+                  presSelecionada(controle, "PAUSA_SAIDA")
+                    ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink ring-2 ring-offset-1 ring-atd-warn"
+                    : "text-atd-warn-ink border-atd-warn/40"
+                }`}
+                onClick={() => definirStatus("pausa_saida")}
+              >
+                {controle.salvando === "PAUSA_SAIDA" ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <DoorOpen className="h-3 w-3 mr-1" />
+                )}
+                Em pausa para saída
+                {presSelecionada(controle, "PAUSA_SAIDA") && <span className="sr-only"> (selecionado)</span>}
+              </Button>
 
               <Button
                 size="sm"
@@ -2981,10 +3012,10 @@ export function AtendInbox() {
                 {presSelecionada(controle, "OFFLINE") && <span className="sr-only"> (selecionado)</span>}
               </Button>
             </div>
-            {estadoManual === "PAUSA" && inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
+            {ehEstadoPausa(estadoManual) && inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
-                Escolha Online, Em pausa ou Offline para definir se você recebe novas conversas.
+                Escolha Online, Em pausa, Em pausa para saída ou Offline. Só quem está Online recebe novas conversas.
               </p>
             )}
             {controle.erro && !controle.salvando && (
@@ -3989,11 +4020,18 @@ export function AtendInbox() {
                         const cor =
                           st === "ONLINE"
                             ? "bg-emerald-500"
-                            : st === "PAUSA"
+                            : st === "PAUSA" || st === "PAUSA_SAIDA"
                               ? "bg-amber-500"
                               : "bg-muted-foreground";
+                        // Quem está em pausa não recebe transferência manual (o servidor também recusa).
+                        const emPausaDestino = estadoBloqueiaTransferencia(st);
                         return (
-                          <SelectItem key={u.user_id} value={u.user_id}>
+                          <SelectItem
+                            key={u.user_id}
+                            value={u.user_id}
+                            disabled={emPausaDestino}
+                            title={emPausaDestino ? MSG_DESTINO_EM_PAUSA : undefined}
+                          >
                             <span className="flex items-center gap-2">
                               <span
                                 aria-hidden="true"

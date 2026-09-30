@@ -71,25 +71,26 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
     expect(r.restantes).toHaveLength(0);
   });
 
-  it("limite de 10 reservas em Pausa é respeitado e uma vaga permite nova reserva", () => {
+  it("quem está em Pausa ou Pausa para saída não recebe; a fila espera alguém ficar Online", () => {
     const lote = fila(2);
-    const cheio = simularRedistribuicao(
-      [atendente("a", { status: "PAUSA", cargaNaoAtribuida: 10 })],
+    const parados = simularRedistribuicao(
+      [atendente("a", { status: "PAUSA" }), atendente("b", { status: "PAUSA_SAIDA" })],
       lote,
     );
-    expect(cheio.atribuicoes).toHaveLength(0);
-    const comVaga = simularRedistribuicao(
-      [atendente("a", { status: "PAUSA", cargaNaoAtribuida: 9 })],
-      cheio.restantes,
+    expect(parados.atribuicoes).toHaveLength(0);
+    expect(parados.restantes).toHaveLength(2);
+    const alguemOnline = simularRedistribuicao(
+      [atendente("a", { status: "PAUSA" }), atendente("c", { cargaAtiva: 40 })],
+      parados.restantes,
     );
-    expect(comVaga.atribuicoes).toEqual([{ conversationId: "c01", userId: "a" }]);
-    expect(comVaga.restantes).toHaveLength(1);
+    expect(alguemOnline.atribuicoes.map((x) => x.userId)).toEqual(["c", "c"]);
+    expect(alguemOnline.restantes).toHaveLength(0);
   });
 
   it("setor lotado não exclui atendente disponível do conjunto geral", () => {
     const r = simularRedistribuicao(
       [
-        atendente("a", { departamentos: ["exames"], status: "PAUSA", cargaNaoAtribuida: 10 }),
+        atendente("a", { departamentos: ["exames"], status: "PAUSA" }),
         atendente("b", { departamentos: ["consultas"], capacidadeMaxima: null }),
       ],
       fila(2, { departamentoId: "exames" }),

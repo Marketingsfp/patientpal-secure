@@ -23,7 +23,9 @@ import {
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
+  MSG_DESTINO_EM_PAUSA,
   apenasDestinatariosValidos,
+  estadoBloqueiaTransferencia,
   statusPresenca,
 
 } from "@/lib/atendimento/perfil-atendimento";
@@ -71,6 +73,25 @@ async function ehAdminClinica(
   });
   if (error) throw new Error(error.message);
   return !!data;
+}
+/**
+ * Transferência/atribuição manual não vai para quem está em Pausa ou Pausa para saída.
+ * (Offline não entra nesta barreira: a regra pedida vale só para as duas pausas.)
+ */
+async function assertDestinoNaoEstaEmPausa(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  clinicaId: string,
+) {
+  const { data, error } = await supabase
+    .from("atend_agente_presenca")
+    .select("estado_manual")
+    .eq("clinica_id", clinicaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (estadoBloqueiaTransferencia((data as { estado_manual?: string | null } | null)?.estado_manual))
+    throw new Error(MSG_DESTINO_EM_PAUSA);
 }
 async function assertManager(
   supabase: SupabaseClient<Database>,
@@ -521,6 +542,9 @@ export const atribuirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    // Assumir a própria conversa é permitido em qualquer estado; entregar a outra pessoa não.
+    if (data.userId && data.userId !== context.userId)
+      await assertDestinoNaoEstaEmPausa(context.supabase, data.userId, data.clinicaId);
     // Responsável antes da ação: define se o registro é "atribuiu" ou
     // "transferiu de X para Y" e evita evento quando nada muda.
     const { data: antes } = await context.supabase
@@ -590,6 +614,7 @@ export const transferirConversa = createServerFn({ method: "POST" })
     await assertMember(context.supabase, context.userId, data.clinicaId);
     if (data.paraUserId && (await ehAdminClinica(context.supabase, data.paraUserId, data.clinicaId)))
       throw new Error(MSG_ADMIN_NAO_ATENDE);
+    if (data.paraUserId) await assertDestinoNaoEstaEmPausa(context.supabase, data.paraUserId, data.clinicaId);
     const { data: conv, error: e1 } = await context.supabase
       .from("atend_conversas")
       .select("atribuida_user_id, departamento_id")

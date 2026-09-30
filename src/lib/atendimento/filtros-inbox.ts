@@ -24,7 +24,7 @@ export const VISUALIZACAO_PADRAO: VisualizacaoInbox = "recentes";
 
 const PREFIXO_AGENTE = "agente:";
 
-/** No menu, Online e Pausa têm a mesma prioridade; nomes seguem a ordem pt-BR. */
+/** No menu, Online e as duas pausas têm a mesma prioridade; nomes seguem a ordem pt-BR. */
 export function ordenarAtendentesNoFiltro<
   T extends {
     user_id: string;
@@ -32,7 +32,7 @@ export function ordenarAtendentesNoFiltro<
     presenca?: string | null;
   },
 >(atendentes: readonly T[]): T[] {
-  const prioridade = (p: T) => (p.presenca === "ONLINE" || p.presenca === "PAUSA" ? 0 : 1);
+  const prioridade = (p: T) => (p.presenca === "ONLINE" || p.presenca === "PAUSA" || p.presenca === "PAUSA_SAIDA" ? 0 : 1);
   return [...atendentes].sort(
     (a, b) =>
       prioridade(a) - prioridade(b) ||

@@ -18,7 +18,7 @@ export function TempoPausa({
       role="timer"
       aria-label={atendente ? `Tempo de pausa de ${atendente}` : "Tempo desde o início da pausa"}
       aria-live="off"
-      title={disponivel ? "A contagem termina ao clicar em Online ou Offline" : "Tempo de pausa indisponível"}
+      title={disponivel ? "A contagem zera a cada mudança de status" : "Tempo de pausa indisponível"}
       className={cn(
         "inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-atd-warn/40 bg-background px-1 text-[11px] font-medium tabular-nums text-atd-warn-ink",
         className,
@@ -31,8 +31,8 @@ export function TempoPausa({
 
 export function CronometroPausa({ inicio }: { inicio: string }) {
   return (
-    <div className="grid grid-cols-3 gap-1">
-      <TempoPausa inicio={inicio} className="col-start-2" />
+    <div className="flex justify-center">
+      <TempoPausa inicio={inicio} />
     </div>
   );
 }

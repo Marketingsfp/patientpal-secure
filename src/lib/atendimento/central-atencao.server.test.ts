@@ -59,6 +59,10 @@ function bancoTeste(gestor: boolean) {
           filtro.push((r) => r[campo] === valor);
           return query;
         },
+        neq(campo: string, valor: unknown) {
+          filtro.push((r) => r[campo] !== valor);
+          return query;
+        },
         is(campo: string, _valor: null) {
           filtro.push((r) => r[campo] == null);
           return query;
@@ -289,9 +293,21 @@ describe("consulta da Central de Atenção", () => {
     db.presenca("ana", "PAUSA");
     db.presenca("bia", "PAUSA");
     const dados = await db.carregar();
-    expect(dados.pausas).toEqual([{ atendenteId: "ana", nome: "Ana", inicio: null }]);
+    expect(dados.pausas).toEqual([{ atendenteId: "ana", nome: "Ana", inicio: null, tipo: "PAUSA" }]);
     expect(dados.filas).toEqual([]);
     expect(db.leiturasGestao).toEqual([]);
+  });
+
+  it("Em pausa e Em pausa para saída aparecem separadas, cada uma com o próprio tipo", async () => {
+    const db = bancoTeste(true);
+    db.presenca("ana", "PAUSA");
+    db.presenca("bia", "PAUSA_SAIDA");
+    db.presenca("online", "ONLINE");
+    const dados = await db.carregar();
+    expect(dados.pausas.map((p) => [p.nome, p.tipo])).toEqual([
+      ["Ana", "PAUSA"],
+      ["Bia", "PAUSA_SAIDA"],
+    ]);
   });
 
   it("não consulta histórico privilegiado quando a verificação de gestão falha", async () => {

@@ -5,31 +5,29 @@ import { conversaVisivelNoEscopo, usuarioPodeVerConversa } from "../atendimento/
 import { patchListaPorConversa } from "../atendimento/patch-inbox";
 import { escopoParaConversa } from "../atendimento/deep-link";
 
-const agent = (id: string, status: "ONLINE" | "PAUSA" | "OFFLINE", extra: Partial<CandidatoDistribuicao> = {}): CandidatoDistribuicao => ({
+const agent = (id: string, status: "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE", extra: Partial<CandidatoDistribuicao> = {}): CandidatoDistribuicao => ({
   userId: id, status, temTelefonia: true, ...extra,
 });
 
-describe("distribuição Online/Pausa e fila global", () => {
-  test("não prioriza Online; desempate usa carga, última atribuição e id", () => {
-    expect(poolElegivel([agent("online", "ONLINE", { cargaAtiva: 5 }), agent("pausa", "PAUSA", { cargaNaoAtribuida: 2 })])[0].userId).toBe("pausa");
-    expect(poolElegivel([agent("online", "ONLINE", { cargaAtiva: 4 }), agent("pausa", "PAUSA", { cargaAtiva: 3, cargaNaoAtribuida: 2 })])[0].userId).toBe("online");
-    expect(poolElegivel([agent("a", "ONLINE", { ultimaAtribuicaoEm: "2026-09-17T12:00:00Z" }), agent("b", "PAUSA", { ultimaAtribuicaoEm: "2026-09-17T11:00:00Z" })])[0].userId).toBe("b");
+describe("distribuição só para Online e fila global sem dono", () => {
+  test("pausas e offline nunca entram no pool; desempate usa carga, última atribuição e id", () => {
+    expect(poolElegivel([agent("online", "ONLINE", { cargaAtiva: 5 }), agent("pausa", "PAUSA"), agent("saida", "PAUSA_SAIDA")]).map(c => c.userId)).toEqual(["online"]);
+    expect(poolElegivel([agent("a", "ONLINE", { cargaAtiva: 4 }), agent("b", "ONLINE", { cargaAtiva: 3 })])[0].userId).toBe("b");
+    expect(poolElegivel([agent("a", "ONLINE", { ultimaAtribuicaoEm: "2026-09-17T12:00:00Z" }), agent("b", "ONLINE", { ultimaAtribuicaoEm: "2026-09-17T11:00:00Z" })])[0].userId).toBe("b");
   });
-  test("duas pausas recebem 10 cada; sobra fica global e Offline não participa", () => {
-    const r = simularFila([agent("a", "PAUSA"), agent("b", "PAUSA"), agent("c", "OFFLINE")], 25);
-    expect(r.atribuicoes.filter(x => x === "a")).toHaveLength(10);
-    expect(r.atribuicoes.filter(x => x === "b")).toHaveLength(10);
-    expect(r.atribuicoes).not.toContain("c");
-    expect(r.naoAtribuidas).toBe(5);
+  test("duas pausas não recebem nada; tudo fica na fila global até alguém ficar Online", () => {
+    const r = simularFila([agent("a", "PAUSA"), agent("b", "PAUSA_SAIDA"), agent("c", "OFFLINE")], 25);
+    expect(r.atribuicoes.every(x => x === null)).toBe(true);
+    expect(r.naoAtribuidas).toBe(25);
   });
-  test("Online recebe sem limite; teto da Pausa usa apenas as reservas", () => {
+  test("Online recebe sem limite, sem teto de reservas", () => {
     expect(simularFila([agent("a", "ONLINE", { cargaAtiva: 100, capacidadeMaxima: 1 })], 35).naoAtribuidas).toBe(0);
-    expect(verificarElegibilidade(agent("b", "PAUSA", { cargaAtiva: 100, cargaNaoAtribuida: 9 })).eligible_for_nina_handoff).toBe(true);
-    expect(verificarElegibilidade(agent("b", "PAUSA", { cargaNaoAtribuida: 10 })).eligible_for_nina_handoff).toBe(false);
+    expect(verificarElegibilidade(agent("b", "PAUSA", { cargaAtiva: 0 })).eligible_for_nina_handoff).toBe(false);
   });
-  test("revalidação muda o destino ao entrar em Pausa e recusa Offline", () => {
-    expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", "PAUSA") }).destino).toBe("fila_individual");
-    expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", "OFFLINE") }).destino).toBe("nao_atribuidas");
+  test("revalidação: quem entra em Pausa, Pausa para saída ou Offline antes de gravar é descartado", () => {
+    for (const novo of ["PAUSA", "PAUSA_SAIDA", "OFFLINE"] as const)
+      expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", novo) }).destino).toBe("nao_atribuidas");
+    expect(simularAtribuicao([agent("a", "ONLINE")]).destino).toBe("atribuida");
   });
   test("auditoria aceita reserva em Pausa sem afirmar que estava Online", () => {
     const audit = {

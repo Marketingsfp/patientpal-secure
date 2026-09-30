@@ -1,23 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import type { EstadoManualPresenca } from "./presenca-manual";
+import { ehEstadoPausa, type EstadoManualPresenca } from "./presenca-manual";
 
-/** Online e Offline encerram a pausa; cliques repetidos em Pausa preservam o início. */
+/**
+ * Qualquer mudança de estado zera o cronômetro; cliques repetidos no mesmo estado de pausa
+ * (Pausa ou Pausa para saída) preservam o início.
+ */
 export async function consultarInicioCronometroPausa(
   db: SupabaseClient<Database>,
   args: { clinicaId: string; userId: string; estado: EstadoManualPresenca | null; versao: number },
 ): Promise<string | null> {
-  if (args.estado !== "PAUSA") return null;
+  if (!ehEstadoPausa(args.estado)) return null;
   const base = () => db.from("atend_presenca_manual_log")
     .select("estado, versao, created_at")
     .eq("clinica_id", args.clinicaId)
     .eq("user_id", args.userId)
     // Reconstrói a mesma versão da presença, mesmo se outra aba gravar durante a leitura.
     .lte("versao", args.versao);
-  const { data: encerramento, error: erroEncerramento } = await base().in("estado", ["ONLINE", "OFFLINE"])
+  const { data: encerramento, error: erroEncerramento } = await base().neq("estado", args.estado as string)
     .order("versao", { ascending: false }).limit(1).maybeSingle();
   if (erroEncerramento) throw erroEncerramento;
-  const { data: pausa, error: erroPausa } = await base().eq("estado", "PAUSA")
+  const { data: pausa, error: erroPausa } = await base().eq("estado", args.estado as string)
     .gt("versao", encerramento?.versao ?? -1)
     .order("versao", { ascending: true }).limit(1).maybeSingle();
   if (erroPausa) throw erroPausa;

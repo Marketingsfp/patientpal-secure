@@ -17,6 +17,15 @@ export const PERFIL_ADMIN = "admin";
 export const MSG_ADMIN_NAO_ATENDE =
   "Administrador acompanha as conversas, mas não pode assumir nem responder ao paciente.";
 
+/** Mensagem única mostrada quando alguém tenta transferir para quem está em pausa. */
+export const MSG_DESTINO_EM_PAUSA =
+  "Esta pessoa está em pausa e não pode receber conversas. Escolha alguém que esteja Online.";
+
+/** Quem está em Pausa ou em Pausa para saída não recebe transferência manual. */
+export function estadoBloqueiaTransferencia(estadoManual: string | null | undefined): boolean {
+  return estadoManual === "PAUSA" || estadoManual === "PAUSA_SAIDA";
+}
+
 /** É perfil de administrador? */
 export function ehPerfilAdmin(role: string | null | undefined): boolean {
   return (role ?? "").trim().toLowerCase() === PERFIL_ADMIN;
@@ -42,7 +51,7 @@ export function apenasDestinatariosValidos<T extends { role?: string | null }>(
  * Fonte já existente: `atend_agente_presenca` + `atend_pausas_log`.
  * ------------------------------------------------------------- */
 
-export type PresencaAtendente = "ONLINE" | "PAUSA" | "OFFLINE";
+export type PresencaAtendente = "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE";
 
 /**
  * FASE 2 — a presença é MANUAL. `visto_em` (heartbeat) é apenas sinal técnico
@@ -55,6 +64,8 @@ export function statusPresenca(p: {
   vistoEm?: string | null | undefined;
   emPausa: boolean;
 }): PresencaAtendente {
+  // A pausa para saída é um estado próprio; não se confunde com a pausa comum.
+  if ((p.status ?? "").toUpperCase() === "PAUSA_SAIDA") return "PAUSA_SAIDA";
   // Pausa livre não cria o registro legado com motivo; a escolha manual basta.
   if (p.emPausa || (p.status ?? "").toUpperCase() === "PAUSA") return "PAUSA";
   if ((p.status ?? "").toUpperCase() === "ONLINE") return "ONLINE";
@@ -65,5 +76,6 @@ export function statusPresenca(p: {
 export const ROTULO_PRESENCA: Record<PresencaAtendente, string> = {
   ONLINE: "Online",
   PAUSA: "Em pausa",
+  PAUSA_SAIDA: "Em pausa para saída",
   OFFLINE: "Offline",
 };
