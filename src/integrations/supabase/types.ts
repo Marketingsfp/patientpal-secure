@@ -15299,6 +15299,14 @@ export type Database = {
         Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
         Returns: boolean
       }
+      atend_configurar_capacidade: {
+        Args: {
+          _clinica_id: string
+          _max_simultaneas: number
+          _user_id: string
+        }
+        Returns: Json
+      }
       atend_conversa_de_handoff: {
         Args: {
           _atribuida_user_id: string
