@@ -1,4 +1,4 @@
-import { LIMITE_SEM_SENTIDO, SEM_SENTIDO, resultadoBackfill, type FalhaBackfill } from "./nfse-backfill";
+import { LIMITE_SEM_SENTIDO, ORIGEM_BACKFILL, SEM_SENTIDO, resultadoBackfill, type FalhaBackfill } from "./nfse-backfill";
 
 type Linha = {
   id: string;
@@ -22,15 +22,23 @@ async function baixar(url: string, token: string | undefined): Promise<string | 
   }
 }
 
-export async function executarLoteBackfill(admin: any, clinicaId: string, limite: number) {
-  const { data: notas, error } = await admin
+export async function executarLoteBackfill(
+  admin: any,
+  clinicaId: string,
+  limite: number,
+  opts: { emitenteId: string; reprocessarFalhas?: boolean },
+) {
+  let q = admin
     .from("nfse")
     .select("id, numero, emitente_id, aliquota_iss, valor_iss, valor_servicos, url_xml, payload_resposta")
     .eq("clinica_id", clinicaId)
-    .eq("status", "emitida")
-    .is("retorno_conferencia", null)
-    .order("created_at")
-    .limit(limite);
+    .eq("emitente_id", opts.emitenteId)
+    .eq("status", "emitida");
+  // Tentar de novo: só as que a própria rotina marcou como falha.
+  q = opts.reprocessarFalhas
+    ? q.eq("retorno_conferencia->>origem", ORIGEM_BACKFILL).not("retorno_conferencia->>falha", "is", null)
+    : q.is("retorno_conferencia", null);
+  const { data: notas, error } = await q.order("created_at").limit(limite);
   if (error) throw new Error("Falha ao ler notas: " + error.message);
   const lista = (notas ?? []) as Linha[];
 
@@ -73,12 +81,11 @@ export async function executarLoteBackfill(admin: any, clinicaId: string, limite
       ? { aliquota_iss: r.aliquota_iss, valor_iss: r.valor_iss, retorno_conferencia: r.conferencia }
       : { retorno_conferencia: r.conferencia };
     if (!parado) {
-      const { error: eu } = await admin
-        .from("nfse")
-        .update(upd)
-        .eq("id", n.id)
-        .eq("status", "emitida")
-        .is("retorno_conferencia", null);
+      let u = admin.from("nfse").update(upd).eq("id", n.id).eq("status", "emitida");
+      u = opts.reprocessarFalhas
+        ? u.not("retorno_conferencia->>falha", "is", null)
+        : u.is("retorno_conferencia", null);
+      const { error: eu } = await u;
       if (eu) {
         falhas.erro_gravacao = (falhas.erro_gravacao ?? 0) + 1;
         continue;
