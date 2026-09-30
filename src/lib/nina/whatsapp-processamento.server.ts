@@ -588,6 +588,13 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         }
       }
 
+      // Conclusão da Nina: se esta resposta encerrou com uma transferência, o resumo interno é escrito
+      // agora, DEPOIS de o paciente já ter recebido a mensagem (nunca atrasa o atendimento).
+      if (convId) {
+        const { gerarResumoDaConclusaoDaNina } = await import("@/lib/atendimento/handoff-resumo.server");
+        await gerarResumoDaConclusaoDaNina(params.clinicaId, convId);
+      }
+
       if (webhookPhoneNumberId && webhookPhoneNumberId !== cfg.phone_number_id) {
         await supabaseAdmin
           .from("whatsapp_configs")

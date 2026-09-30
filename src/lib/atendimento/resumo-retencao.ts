@@ -1,5 +1,5 @@
 import { normalizarResumo, type ResumoHandoff } from "./handoff-resumo";
-import { ajustarResumoPorDesfecho, type DesfechoConversa } from "./resumo-desfecho";
+import { ajustarResumoPorDesfecho, ehConclusaoDaNina, type DesfechoConversa } from "./resumo-desfecho";
 import { acaoConcluida, acoesSolicitadas } from "./resumo-atividades";
 
 export const RETENCAO_RESUMO_MS = 7 * 24 * 60 * 60 * 1000;
@@ -125,4 +125,47 @@ export function limiteTranscricaoResumo(inicioAtendimento: string, agora = Date.
   return new Date(
     Math.max(Date.parse(inicioAtendimento), agora - RETENCAO_RESUMO_MS),
   ).toISOString();
+}
+
+/** Resumo que aparece DENTRO da conversa, no ponto em que a Nina concluiu o atendimento. */
+export interface ResumoNaConversa {
+  id: string;
+  versao: number;
+  /** Momento da conclusão da Nina (posição do resumo no chat). */
+  handoff_em: string;
+  desfecho: string | null;
+  /** Fim da retenção de sete dias. */
+  expira_em: string;
+  payload: ResumoHandoff;
+}
+
+/**
+ * Um resumo por conclusão da Nina: só desfechos da Nina, já gerados, dentro do prazo e, quando há
+ * mais de uma versão para o mesmo momento, a mais recente. Ordem cronológica (a do chat).
+ */
+export function selecionarResumosDaConversa(linhas: ResumoRetido[], agora = Date.now()): ResumoNaConversa[] {
+  const porMomento = new Map<number, ResumoRetido>();
+  for (const r of linhas) {
+    if (r.status !== "ok" || !r.payload || !ehConclusaoDaNina(r.desfecho) || !resumoNoPrazo(r.handoff_em, agora))
+      continue;
+    const chave = Date.parse(r.handoff_em);
+    const atual = porMomento.get(chave);
+    if (!atual || r.versao > atual.versao) porMomento.set(chave, r);
+  }
+  return [...porMomento.values()]
+    .sort((a, b) => Date.parse(a.handoff_em) - Date.parse(b.handoff_em) || a.versao - b.versao)
+    .map((r) => ({
+      id: r.id,
+      versao: r.versao,
+      handoff_em: r.handoff_em,
+      desfecho: r.desfecho,
+      expira_em: new Date(Date.parse(r.handoff_em) + RETENCAO_RESUMO_MS).toISOString(),
+      payload: normalizarResumo(r.payload, {
+        protocolo: r.payload!.protocolo,
+        agendamentoReal: r.payload!.agendamento_confirmado,
+        motivoHandoff: r.payload!.motivo_handoff,
+        ultimaPergunta: r.payload!.ultima_pergunta,
+        etapaInterrompida: r.payload!.etapa_interrompida,
+      }),
+    }));
 }

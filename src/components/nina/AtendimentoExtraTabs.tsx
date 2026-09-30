@@ -223,7 +223,9 @@ import {
   preservarOtimistas,
 } from "@/lib/atendimento/envio-otimista";
 import { criarFilaEnvio } from "@/lib/atendimento/fila-envio";
-import { ResumoHandoffCard } from "@/components/nina/ResumoHandoffCard";
+import { ResumoNaConversa } from "@/components/nina/ResumoNaConversa";
+import { useResumosDaConversa } from "@/components/nina/use-resumos-conversa";
+import { inserirResumosNaTimeline } from "@/lib/atendimento/timeline-resumos";
 
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
 import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
@@ -2304,6 +2306,12 @@ export function AtendInbox() {
     }));
   }, [msgs, eventos]);
 
+  // Resumos da Nina (um por conclusão dela), colocados dentro da conversa.
+  const resumosDaConversa = useResumosDaConversa(clinicaId, sel?.id);
+  const timelineComResumos = useMemo(
+    () => inserirResumosNaTimeline(timeline, resumosDaConversa, (i) => i.kind === "grupo" && i.item.tipo === "HANDOFF"),
+    [timeline, resumosDaConversa],
+  );
 
   // FASE 1 — mensagem recebida já desenhada na conversa: fecha o trace RECV.
   useEffect(() => {
@@ -3486,9 +3494,7 @@ export function AtendInbox() {
                     )}
                   </div>
                 )}
-                {clinicaId && conteudoDaConversa && (
-                  <ResumoHandoffCard key={sel.id} clinicaId={clinicaId} conversaId={sel.id} />
-                )}
+
                 {!conteudoDaConversa && !erroMsgs && <ConversaSkeleton />}
                 {erroMsgs && (
                   <div className="text-center text-sm text-muted-foreground">
@@ -3502,7 +3508,15 @@ export function AtendInbox() {
                   <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                 )}
 
-                {(conteudoDaConversa ? timeline : []).map((item) => {
+                {(conteudoDaConversa ? timelineComResumos : []).map((item) => {
+                  // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
+                  if (item.kind === "resumo") {
+                    return (
+                      <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
+                        <ResumoNaConversa resumo={item.resumo} />
+                      </div>
+                    );
+                  }
                   if (item.kind === "grupo") {
                     const g = item.item;
                     if (g.tipo === "HANDOFF") {

@@ -49,6 +49,23 @@ export const DESFECHOS_COM_NOVO_RESUMO: DesfechoConversa[] = [
   "remarcacao",
 ];
 
+/**
+ * Desfechos que são CONCLUSÃO DA NINA (o que o chat mostra como resumo). Resolução, reabertura e
+ * atualizações feitas por uma pessoa não criam um resumo novo dentro da conversa.
+ */
+export const DESFECHOS_CONCLUSAO_NINA: DesfechoConversa[] = [
+  "agendamento_concluido",
+  "agendamento_falhou",
+  "handoff_humano",
+  "timeout_sem_resposta",
+  "cancelamento",
+  "remarcacao",
+];
+
+export function ehConclusaoDaNina(d: string | null | undefined): boolean {
+  return DESFECHOS_CONCLUSAO_NINA.includes((d ?? "handoff_humano") as DesfechoConversa);
+}
+
 export function exigeNovoResumo(d: DesfechoConversa): boolean {
   return DESFECHOS_COM_NOVO_RESUMO.includes(d);
 }

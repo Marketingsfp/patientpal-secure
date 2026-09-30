@@ -28,6 +28,8 @@ import { registrarEvento } from "./handoff.server";
 import {
   limiteTranscricaoResumo,
   montarPainelResumo,
+  selecionarResumosDaConversa,
+  type ResumoNaConversa,
   resumoNoPrazo,
   RETENCAO_RESUMO_MS,
   type PainelResumo,
@@ -470,4 +472,54 @@ export async function obterPainelResumo(args: {
     ["closed", "finished"].includes(conversa.status),
   );
   return painel.atual || painel.anteriores.length ? painel : null;
+}
+
+/**
+ * Resumos que aparecem dentro da conversa (um por conclusão da Nina). Gera o que ainda não foi
+ * escrito (conversas anteriores à geração automática ou uma falha passada) antes de listar.
+ */
+export async function listarResumosDaConversa(args: {
+  clinicaId: string;
+  conversaId: string;
+}): Promise<ResumoNaConversa[]> {
+  const { data: conversa, error: erroConversa } = await supabaseAdmin
+    .from("atend_conversas")
+    .select("handoff_em")
+    .eq("clinica_id", args.clinicaId)
+    .eq("id", args.conversaId)
+    .maybeSingle();
+  if (erroConversa) throw new Error(erroConversa.message);
+  if (!conversa) return [];
+  await garantirResumoHandoff({ ...args, ignorarHandoff: !conversa.handoff_em });
+  const { data, error } = await supabaseAdmin
+    .from(TABELA)
+    .select("*")
+    .eq("clinica_id", args.clinicaId)
+    .eq("conversa_id", args.conversaId)
+    .gt("handoff_em", new Date(Date.now() - RETENCAO_RESUMO_MS).toISOString())
+    .order("handoff_em", { ascending: true });
+  if (error) throw new Error(error.message);
+  return selecionarResumosDaConversa(data as LinhaResumo[]);
+}
+
+/**
+ * Conclusão da Nina: escreve o resumo da transferência que acabou de acontecer. Chamado DEPOIS de
+ * o paciente receber a resposta, então nunca atrasa o atendimento. Idempotente (um resumo pronto
+ * não é gerado de novo) e nunca lança.
+ */
+export async function gerarResumoDaConclusaoDaNina(clinicaId: string, conversaId: string): Promise<void> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("atend_conversas")
+      .select("handoff_em")
+      .eq("clinica_id", clinicaId)
+      .eq("id", conversaId)
+      .maybeSingle();
+    const em = data?.handoff_em ? Date.parse(data.handoff_em) : NaN;
+    // Só a transferência que acabou de acontecer; o resto segue a geração sob demanda.
+    if (!Number.isFinite(em) || Date.now() - em > 15 * 60_000) return;
+    await garantirResumoHandoff({ clinicaId, conversaId });
+  } catch (e) {
+    console.error("[handoff-resumo] falha ao gerar o resumo da conclusão da Nina", conversaId, e);
+  }
 }

@@ -81,6 +81,8 @@ export interface ResumoHandoff {
   ultima_pergunta?: string | null;
   /** Etapa do fluxo em que o atendimento parou (rótulo em português). */
   etapa_interrompida?: string | null;
+  /** Resumo completo e elaborado, em parágrafos (é o que aparece dentro do chat). */
+  texto_resumo?: string | null;
 }
 
 function listaBruta(v: unknown): unknown[] {
@@ -108,6 +110,32 @@ function lista(v: unknown, maxItens = 6): string[] {
     if (itens.length >= maxItens) break;
   }
   return itens;
+}
+
+/**
+ * Texto corrido do resumo: preserva os parágrafos e NÃO corta frases. Só descarta o que claramente
+ * não é texto (JSON) e remove identificadores internos.
+ */
+export function textoCorrido(v: unknown, max = 6000): string | null {
+  if (typeof v !== "string") return null;
+  const t = v
+    .replace(/\r/g, "")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (!t || /^[{\[]/.test(t)) return null;
+  return t.length > max ? `${t.slice(0, max).replace(/\s+\S*$/, "")}…` : t;
+}
+
+/**
+ * Parágrafos exibidos no chat. Resumos novos trazem o texto corrido; os anteriores a esta mudança
+ * (retenção de sete dias) caem nos blocos de sempre, escritos como frases.
+ */
+export function paragrafosDoResumo(r: ResumoHandoff): string[] {
+  const corrido = textoCorrido(r.texto_resumo);
+  if (corrido) return corrido.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  return blocosVisiveis(r).map((b) => `${b.titulo}: ${b.itens.join("; ")}`);
 }
 
 /**
@@ -154,6 +182,7 @@ export function normalizarResumo(
     situacao: texto(o.situacao, 300),
     motivo_handoff: texto(extras?.motivoHandoff ?? o.motivo_handoff, 240),
     agendamento_confirmado: real && (real.medico || real.servico || real.data) ? real : null,
+    texto_resumo: textoCorrido(o.texto_resumo),
   };
 }
 
@@ -182,7 +211,7 @@ export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens:
 export const PROMPT_RESUMO_HANDOFF = `Você resume, para a equipe INTERNA de uma clínica, uma conversa de WhatsApp que a assistente virtual Nina acabou de transferir para atendimento humano.
 
 Responda APENAS um JSON com as chaves:
-{"intencao","motivo_contato","atividades_paciente","informacoes","ja_informado","pendencias","proxima_acao","situacao"}
+{"intencao","motivo_contato","atividades_paciente","informacoes","ja_informado","pendencias","proxima_acao","situacao","texto_resumo"}
 
 Regras obrigatórias:
 - "intencao" deve ser um destes valores: ${Object.keys(ROTULO_INTENCAO).join(", ")}.
@@ -195,7 +224,8 @@ Regras obrigatórias:
 - Se o atendimento foi resolvido, "pendencias" deve ser [] e "proxima_acao" deve ser vazia.
 - "proxima_acao": UMA frase com a próxima ação operacional sugerida ao atendente.
 - "situacao": use apenas quando a Nina NÃO conseguiu resolver (ex.: "A Nina não encontrou informação suficiente na base"). Caso contrário, string vazia.
+- "texto_resumo": o resumo COMPLETO e elaborado da conversa, em frases completas, de 2 a 5 parágrafos separados por uma linha em branco (sem telegrafar e sem cortar ideias). Conte: quem é o paciente (o nome só se ele o informou), o que pediu, o que a Nina informou (cite valores, médicos, dias e horários exatamente como foram ditos), o que ficou pendente, até onde o atendimento chegou e por que foi transferido. Sem listas, sem títulos e sem termos técnicos do sistema (não cite ferramentas, códigos nem identificadores). As regras abaixo de não afirmar ação concluída e de não inventar dados valem também para este texto.
 - NUNCA afirme que algo foi agendado, confirmado, cancelado ou pago. Intenção não é ação concluída: escreva "deseja agendar", nunca "foi agendado".
 - Nunca invente valores, médicos, horários ou dados pessoais. Sem informação, deixe a lista vazia.
 - Ignore saudações e frases sem valor operacional ("olá", "bom dia").
-- Português do Brasil, telegráfico, sem enrolação. Este texto NUNCA será enviado ao paciente.`;
+- Português do Brasil. Os campos em lista são telegráficos; só "texto_resumo" é escrito em frases completas. Este texto NUNCA será enviado ao paciente.`;
