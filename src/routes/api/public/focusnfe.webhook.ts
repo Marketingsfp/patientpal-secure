@@ -86,8 +86,32 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
         };
         if (body.status === "autorizado") {
           updates.status = "emitida";
-          updates.numero = body.numero ?? null;
-          updates.serie = body.serie ?? null;
+          // Grava o que a prefeitura autorizou (JSON + XML oficial), não o calculado.
+          const { data: notaRef } = await supabaseAdmin
+            .from("nfse")
+            .select("emitente_id")
+            .eq("focus_ref", body.ref)
+            .maybeSingle();
+          const { data: emit } = notaRef?.emitente_id
+            ? await supabaseAdmin
+                .from("nfse_emitentes")
+                .select("focus_ambiente, aliquota_iss")
+                .eq("id", notaRef.emitente_id)
+                .maybeSingle()
+            : { data: null };
+          const tokenFocus =
+            emit?.focus_ambiente === "producao"
+              ? process.env.FOCUS_NFE_TOKEN_PROD
+              : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
+          const { camposDoRetornoAutorizado } = await import("@/lib/nfse-retorno.server");
+          Object.assign(
+            updates,
+            await camposDoRetornoAutorizado(body, {
+              token: tokenFocus,
+              aliquotaCadastro: emit?.aliquota_iss ?? null,
+              nfseRef: body.ref,
+            }),
+          );
           updates.codigo_verificacao = body.codigo_verificacao ?? null;
           if (body.caminho_danfse)
             updates.url_pdf = `https://api.focusnfe.com.br${body.caminho_danfse}`;
