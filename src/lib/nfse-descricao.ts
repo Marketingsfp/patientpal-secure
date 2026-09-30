@@ -61,12 +61,38 @@ export function especialidadeDoProcedimento(
  * " — " ou quebra de linha). Se a descrição já cita a especialidade, ou se ela
  * não é conhecida, devolve a descrição sem mudança.
  */
-export function acrescentarEspecialidade(descricao: string, especialidade: string | null): string {
+export function acrescentarEspecialidade(
+  descricao: string,
+  especialidade: string | null,
+  procedimentos: (string | null | undefined)[] = [],
+): string {
   if (!especialidade) return descricao;
+  // Só mexe quando a descrição COMEÇA com o nome do procedimento do
+  // agendamento (sem o sufixo "(ESPECIALIDADE)"). Descrição escrita à mão,
+  // ex. "Serviços laboratoriais", fica como está.
+  if (!procedimentos.some((p) => descricaoComecaComProcedimento(descricao, p))) return descricao;
   if (normEsp(descricao).includes(`(${normEsp(especialidade)})`)) return descricao;
   const corte = descricao.search(/\n| — /);
   const primeiro = corte === -1 ? descricao : descricao.slice(0, corte);
   const resto = corte === -1 ? "" : descricao.slice(corte);
   if (!primeiro.trim()) return descricao;
   return `${primeiro.trimEnd()} (${especialidade})${resto}`;
+}
+
+/** Nome do procedimento sem o sufixo final entre parênteses: "CONSULTA (ORTOPEDIA)" → "CONSULTA". */
+export function procedimentoSemSufixo(procedimento: string | null | undefined): string {
+  return (procedimento ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+}
+
+/** Ignora maiúsculas, acentos e espaço extra; exige fim de palavra após o nome. */
+export function descricaoComecaComProcedimento(
+  descricao: string,
+  procedimento: string | null | undefined,
+): boolean {
+  const base = normEsp(procedimentoSemSufixo(procedimento));
+  if (!base) return false;
+  const d = normEsp(descricao);
+  if (!d.startsWith(base)) return false;
+  const prox = d.charAt(base.length);
+  return prox === "" || !/[A-Z0-9]/.test(prox);
 }

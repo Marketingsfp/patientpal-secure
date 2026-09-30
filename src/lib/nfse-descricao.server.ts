@@ -30,7 +30,8 @@ export async function descricaoComEspecialidade(
       ),
     );
     if (achadas.size !== 1) return descricao;
-    return acrescentarEspecialidade(descricao, [...achadas][0] ?? null);
+    const procs = ((ags ?? []) as { procedimento: string | null }[]).map((a) => a.procedimento);
+    return acrescentarEspecialidade(descricao, [...achadas][0] ?? null, procs);
   } catch {
     return descricao;
   }
