@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
-  MSG_ADMIN_SO_COM_ATENDENTE,
+  MSG_ADMIN_NAO_RESPONDE_AQUI,
+  adminPodeResponder,
+  conversaSemResponsavel,
   ROTULO_PERFIL_SUPERVISAO,
   conversaComAtendente,
   perfilSupervisao,
@@ -31,7 +33,22 @@ describe("supervisão (admin e gestor) respondendo no chat da atendente", () => 
     expect(conversaComAtendente({ ...base, owner_type: "AI" })).toBe(false); // com a Nina
     expect(conversaComAtendente({ ...base, status: "closed" })).toBe(false);
     expect(conversaComAtendente({ ...base, status: "finished" })).toBe(false);
-    expect(MSG_ADMIN_SO_COM_ATENDENTE).toContain("atendente");
+    expect(MSG_ADMIN_NAO_RESPONDE_AQUI).toContain("sem responsável");
+  });
+
+  it("conversa sem responsável (fila global): supervisão responde sem ser atribuída; Nina e fechadas ficam de fora", () => {
+    const livre = { atribuida_user_id: null, owner_type: "NONE", status: "waiting" };
+    expect(conversaSemResponsavel(livre)).toBe(true);
+    expect(conversaSemResponsavel({ ...livre, owner_type: "AI" })).toBe(false);
+    expect(conversaSemResponsavel({ ...livre, status: "closed" })).toBe(false);
+    expect(conversaSemResponsavel({ ...livre, atribuida_user_id: "ana" })).toBe(false);
+  });
+
+  it("o admin responde conversas com atendente ou sem responsável, e só elas", () => {
+    expect(adminPodeResponder({ atribuida_user_id: "ana", owner_type: "HUMAN", status: "active" })).toBe(true);
+    expect(adminPodeResponder({ atribuida_user_id: null, owner_type: "NONE", status: "waiting" })).toBe(true);
+    expect(adminPodeResponder({ atribuida_user_id: null, owner_type: "AI", status: "active" })).toBe(false);
+    expect(adminPodeResponder({ atribuida_user_id: "ana", owner_type: "HUMAN", status: "closed" })).toBe(false);
   });
 
   it("a bolha otimista já carrega quem enviou e o perfil, sem esperar o servidor", () => {

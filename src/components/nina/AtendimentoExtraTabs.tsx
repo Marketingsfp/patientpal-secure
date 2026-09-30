@@ -253,11 +253,12 @@ import { AgendamentosContato } from "@/components/nina/AgendamentosContato";
 import { CronometroPausa } from "@/components/nina/CronometroPausa";
 import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
 import {
-  MSG_ADMIN_SO_COM_ATENDENTE,
+  MSG_ADMIN_NAO_RESPONDE_AQUI,
   MSG_DESTINO_EM_PAUSA,
   ROTULO_PERFIL_SUPERVISAO,
   ROTULO_PRESENCA,
-  conversaComAtendente,
+  adminPodeResponder,
+  conversaSemResponsavel,
   estadoBloqueiaTransferencia,
   perfilSupervisao,
   rotuloAutorSupervisao,
@@ -2562,19 +2563,26 @@ export function AtendInbox() {
 
 
 
-  // Supervisão (admin e gestor) responde no chat da atendente sem assumir a conversa; a mensagem
-  // fica gravada com o perfil exato. O admin só responde conversas que estão com uma atendente.
+  // Supervisão (admin e gestor) responde no chat da atendente e nas conversas sem responsável,
+  // sem assumir: a mensagem fica gravada com o perfil exato e a conversa segue com quem estava
+  // (ou sem responsável até alguém clicar em "Assumir conversa"). O admin não responde as da
+  // Nina nem as fechadas.
   const meuPerfilSupervisao = perfilSupervisao({ admin: souAdmin, gestor: souGestor });
+  const conversaLivre = !!sel && conversaSemResponsavel({
+    atribuida_user_id: sel.atribuida_user_id,
+    owner_type: sel.owner_type,
+    status: sel.status,
+  });
   const respondendoComoSupervisao =
-    !!meuPerfilSupervisao && !!sel && !!responsavelId && !souResponsavel && !conversaEncerrada;
+    !!meuPerfilSupervisao && !!sel && !souResponsavel && !conversaEncerrada && (!!responsavelId || conversaLivre);
   const motivoBloqueio = !sel
     ? null
-    : souAdmin && !carregandoConversa && !conversaComAtendente({
+    : souAdmin && !carregandoConversa && !adminPodeResponder({
           atribuida_user_id: sel.atribuida_user_id,
           owner_type: sel.owner_type,
           status: sel.status,
         })
-      ? MSG_ADMIN_SO_COM_ATENDENTE
+      ? MSG_ADMIN_NAO_RESPONDE_AQUI
     : carregandoConversa
       ? "Carregando conversa…"
     : conversaEncerrada
@@ -3365,7 +3373,7 @@ export function AtendInbox() {
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    {!conversaEncerrada && !souResponsavel && podeAtender && !souAdmin && (
+                    {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (
                       <Button
                         size="sm"
                         variant="default"
@@ -3644,8 +3652,10 @@ export function AtendInbox() {
                 )}
                 {respondendoComoSupervisao && !motivoBloqueio && meuPerfilSupervisao && (
                   <div className="rounded-md border border-atd-border bg-atd-bg px-2 py-1.5 text-xs text-atd-ink-soft">
-                    Você está respondendo como {ROTULO_PERFIL_SUPERVISAO[meuPerfilSupervisao]}. A conversa
-                    continua com {nomeUsuario(responsavelId)}.
+                    Você está respondendo como {ROTULO_PERFIL_SUPERVISAO[meuPerfilSupervisao]}.{" "}
+                    {responsavelId
+                      ? `A conversa continua com ${nomeUsuario(responsavelId)}.`
+                      : "A conversa continua sem responsável até alguém clicar em Assumir conversa."}
                   </div>
                 )}
                 <div className="relative flex gap-2">

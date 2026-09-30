@@ -23,10 +23,11 @@ import {
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
-  MSG_ADMIN_SO_COM_ATENDENTE,
+  MSG_ADMIN_NAO_RESPONDE_AQUI,
   MSG_DESTINO_EM_PAUSA,
+  adminPodeResponder,
   apenasDestinatariosValidos,
-  conversaComAtendente,
+  conversaSemResponsavel,
   estadoBloqueiaTransferencia,
   perfilSupervisao,
   statusPresenca,
@@ -2068,12 +2069,15 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
       throw new Error("Conversa encerrada. Reabra o atendimento para responder.");
-    if (ehAdmin && !conversaComAtendente(conv)) throw new Error(MSG_ADMIN_SO_COM_ATENDENTE);
+    if (ehAdmin && !adminPodeResponder(conv)) throw new Error(MSG_ADMIN_NAO_RESPONDE_AQUI);
+    // Supervisão responde conversa sem responsável (fila global) SEM virar responsável:
+    // só assume se clicar em "Assumir conversa". A da Nina segue a regra de antes.
+    const respondeSemAssumir = !!perfilSup && conversaSemResponsavel(conv);
     if (conv.atribuida_user_id && conv.atribuida_user_id !== context.userId && !perfilSup)
       throw new Error(
         "Esta conversa está sendo atendida por outra pessoa. Use “Assumir conversa” para responder.",
       );
-    if (!conv.atribuida_user_id) {
+    if (!conv.atribuida_user_id && !respondeSemAssumir) {
       // Conversa livre: quem responde primeiro vira responsável, de forma atômica.
       const { data: claim, error: claimErr } = await context.supabase
         .from("atend_conversas")
@@ -2154,10 +2158,13 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     trace.marcar("SEND_T8_DB_INSERT_DONE");
 
     // SLA primeira resposta
-    const patch: any = {
-      atribuida_user_id: conv.atribuida_user_id ?? context.userId,
-      status: "active",
-    };
+    // Resposta da supervisão numa conversa sem responsável não atribui nem muda o andamento dela.
+    const patch: any = respondeSemAssumir
+      ? {}
+      : {
+          atribuida_user_id: conv.atribuida_user_id ?? context.userId,
+          status: "active",
+        };
     if (!conv.primeiro_resp_em) {
       const ref = conv.aguardando_desde ?? conv.primeiro_resp_em;
       patch.primeiro_resp_em = new Date().toISOString();
@@ -2741,18 +2748,21 @@ export const assumirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
-      return { ok: false as const, motivo: "ADMIN_NAO_ATENDE" as const };
+    const ehAdminAssumindo = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
     await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
     const { data: conv, error: eConv } = await context.supabase
       .from("atend_conversas")
-      .select("id, atribuida_user_id, status, departamento_id")
+      .select("id, atribuida_user_id, status, departamento_id, owner_type")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (eConv) throw new Error(eConv.message);
     if (!conv) return { ok: false as const, motivo: "NAO_ENCONTRADA" as const };
     if (conv.status === "closed") return { ok: false as const, motivo: "ENCERRADA" as const };
+    // O admin assume só conversa sem responsável (fila global), por clique; nunca toma a de uma
+    // atendente nem a da Nina.
+    if (ehAdminAssumindo && !conversaSemResponsavel(conv))
+      return { ok: false as const, motivo: "ADMIN_NAO_ATENDE" as const };
     // Idempotente: repetir o clique (ou outra aba) não muda nada.
     if (conv.atribuida_user_id === context.userId)
       return { ok: true as const, motivo: null, atribuidaUserId: context.userId, jaEra: true };
