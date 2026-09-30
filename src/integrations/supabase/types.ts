@@ -8384,6 +8384,7 @@ export type Database = {
           aliquota_iss: number | null
           cancelada_em: string | null
           cancelada_motivo: string | null
+          chave_acesso: string | null
           clinica_id: string
           codigo_verificacao: string | null
           created_at: string
@@ -8404,6 +8405,7 @@ export type Database = {
           pagamento_ids: string[]
           payload_envio: Json | null
           payload_resposta: Json | null
+          retorno_conferencia: Json | null
           rps_numero: number | null
           rps_serie: string | null
           serie: string | null
@@ -8424,6 +8426,7 @@ export type Database = {
           aliquota_iss?: number | null
           cancelada_em?: string | null
           cancelada_motivo?: string | null
+          chave_acesso?: string | null
           clinica_id: string
           codigo_verificacao?: string | null
           created_at?: string
@@ -8444,6 +8447,7 @@ export type Database = {
           pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
+          retorno_conferencia?: Json | null
           rps_numero?: number | null
           rps_serie?: string | null
           serie?: string | null
@@ -8464,6 +8468,7 @@ export type Database = {
           aliquota_iss?: number | null
           cancelada_em?: string | null
           cancelada_motivo?: string | null
+          chave_acesso?: string | null
           clinica_id?: string
           codigo_verificacao?: string | null
           created_at?: string
@@ -8484,6 +8489,7 @@ export type Database = {
           pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
+          retorno_conferencia?: Json | null
           rps_numero?: number | null
           rps_serie?: string | null
           serie?: string | null
