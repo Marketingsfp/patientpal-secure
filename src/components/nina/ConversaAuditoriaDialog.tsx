@@ -240,14 +240,9 @@ export function ConversaAuditoriaDialog({
                         {autor}
                       </div>
                       {m.media_url && (
-                        <a
-                          href={m.media_url}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="block underline"
-                        >
-                          Anexo {m.media_mime ? `(${m.media_mime})` : ""}
-                        </a>
+                        <span className="block text-xs opacity-80">
+                          Anexo {m.media_mime ? `(${m.media_mime})` : ""} — abra a conversa para ver
+                        </span>
                       )}
                       <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
                       <div

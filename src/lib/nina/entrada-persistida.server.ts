@@ -66,7 +66,7 @@ export async function persistirEntradaNina(
     const midiaSemLote =
       Boolean(m.nina_status) &&
       m.tipo !== "text" &&
-      (m.tipo !== "audio" || !String(m.transcricao ?? "").trim());
+      ((m.tipo !== "audio" && m.tipo !== "image") || !String(m.transcricao ?? "").trim());
     // A execução já começou: nunca repetir efeitos em busca de uma resposta ausente.
     return {
       mensagem: m,

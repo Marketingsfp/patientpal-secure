@@ -143,6 +143,7 @@ import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimen
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { AvatarContato } from "@/components/nina/AvatarContato";
+import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import { conversasDesatualizadas, criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
 import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
@@ -3347,7 +3348,8 @@ export function AtendInbox() {
                                 : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
                             }`}
                           >
-                            <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
+                            {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
+                            {textoDaBolha(m) && <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>}
                             {ehOtimista(m) && m.status === "failed" && (
                               <div className="mt-1 flex items-center gap-2 text-[11px]">
                                 <span className="whitespace-nowrap">⚠ Falha ao enviar</span>

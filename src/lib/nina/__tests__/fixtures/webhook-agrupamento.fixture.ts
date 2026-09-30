@@ -184,6 +184,15 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
 mock.module("@/lib/nina-desligada.server", () => ({ ninaDesativadaNaClinica: async () => false }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
   transcreverAudioWhatsapp: async () => ({ texto: "Bom dia", mime: "audio/ogg" }),
+  receberMidiaWhatsapp: async () => ({
+    base64: "AAAA",
+    mime: "audio/ogg",
+    caminho: "clinica/2026-09/wamid_teste.ogg",
+    erro: null,
+  }),
+  transcreverAudioBase64: async () => ({ texto: "Bom dia", erro: null }),
+  lerPedidoNaImagem: async () => ({ tipo: "outro" }),
+  limparMidiasExpiradasSeChegouAHora: async () => {},
   RESPOSTA_AUDIO_FALHOU: "Áudio indisponível",
   respostaMidiaNaoSuportada: () => "Mídia indisponível",
 }));

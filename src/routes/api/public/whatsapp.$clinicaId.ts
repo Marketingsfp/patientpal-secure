@@ -192,20 +192,76 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 const tipoBruto = String(msg.type ?? "text");
                 const tipo = tipoBruto === "voice" ? "audio" : tipoBruto;
                 const ehAudio = tipo === "audio";
+                const ehImagem = tipo === "image";
 
                 // Texto do paciente que a Nina vai processar (áudio vira transcrição).
                 let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
                 let transcricao: string | null = null;
                 let audioFalhou = false;
                 let mediaMime: string | null = null;
+                // Caminho do arquivo no bucket privado (imagem e áudio recebidos).
+                let caminhoMidia: string | null = null;
+                const legendaImagem = ehImagem ? String(msg.image?.caption ?? "").trim() : "";
+
+                if (ehAudio || ehImagem) {
+                  // Mantém o armazenamento em dia: apaga mídias com mais de 30 dias (no máx. a cada 10 min).
+                  const { limparMidiasExpiradasSeChegouAHora } =
+                    await import("@/lib/whatsapp-midia.server");
+                  await limparMidiasExpiradasSeChegouAHora(params.clinicaId);
+                }
+
+                if (ehImagem && cfg.access_token) {
+                  const mediaId = String(msg.image?.id ?? "");
+                  if (mediaId) {
+                    const { receberMidiaWhatsapp, lerPedidoNaImagem } =
+                      await import("@/lib/whatsapp-midia.server");
+                    const recebida = await receberMidiaWhatsapp({
+                      clinicaId: params.clinicaId,
+                      waMessageId: wa_message_id,
+                      tipo: "image",
+                      mediaId,
+                      accessToken: cfg.access_token,
+                    });
+                    mediaMime = recebida.mime;
+                    caminhoMidia = recebida.caminho;
+                    if (recebida.erro) console.error("recebimento de imagem falhou", recebida.erro);
+                    // A IA só lê a imagem quando a Nina vai mesmo responder (conversa de gente
+                    // ou Nina desligada: a imagem não sai do sistema).
+                    if (recebida.base64 && recebida.mime?.startsWith("image/")) {
+                      const { estadoConversaPorTelefone: estadoAntes, ninaPodeResponder: podeAntes } =
+                        await import("@/lib/atendimento/handoff.server");
+                      const { ninaDesativadaNaClinica: desligadaAntes } =
+                        await import("@/lib/nina-desligada.server");
+                      const estado = from ? await estadoAntes(params.clinicaId, from) : null;
+                      if (podeAntes(estado) && !(await desligadaAntes(params.clinicaId))) {
+                        const leitura = await lerPedidoNaImagem(recebida.base64, recebida.mime);
+                        if (leitura.tipo === "pedido_medico") {
+                          const { textoDoPedidoLido } = await import("@/lib/nina/leitura-imagem");
+                          textoPaciente = textoDoPedidoLido(leitura.itens, legendaImagem);
+                          transcricao = textoPaciente;
+                        }
+                      }
+                    }
+                  }
+                }
 
                 if (ehAudio && cfg.access_token) {
                   const mediaId = String(msg.audio?.id ?? msg.voice?.id ?? "");
                   if (mediaId) {
-                    const { transcreverAudioWhatsapp } =
+                    const { receberMidiaWhatsapp, transcreverAudioBase64 } =
                       await import("@/lib/whatsapp-midia.server");
-                    const r = await transcreverAudioWhatsapp(mediaId, cfg.access_token);
-                    mediaMime = r.mime;
+                    const recebido = await receberMidiaWhatsapp({
+                      clinicaId: params.clinicaId,
+                      waMessageId: wa_message_id,
+                      tipo: "audio",
+                      mediaId,
+                      accessToken: cfg.access_token,
+                    });
+                    caminhoMidia = recebido.caminho;
+                    const r = recebido.base64
+                      ? await transcreverAudioBase64(recebido.base64, recebido.mime)
+                      : { texto: "", erro: recebido.erro };
+                    mediaMime = recebido.mime;
                     if (r.texto) {
                       transcricao = r.texto;
                       textoPaciente = r.texto;
@@ -224,7 +280,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     : "🎤 [áudio não transcrito]"
                   : tipo === "text"
                     ? String(msg.text?.body ?? "")
-                    : `[${tipo}]`;
+                    : ehImagem
+                      ? legendaImagem
+                        ? `📷 ${legendaImagem}`
+                        : "📷 Imagem"
+                      : `[${tipo}]`;
 
                 // Idempotência: `wa_message_id` é único. Se a Meta reenviar o
                 // mesmo evento (retry/duplicidade), o insert falha aqui e a
@@ -243,6 +303,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   tipo,
                   transcricao,
                   media_mime: mediaMime,
+                  media_url: caminhoMidia,
                   status: "received",
                   enviada_por: "paciente",
                   raw: msg,
@@ -257,7 +318,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 if (entradaPersistida.repetida) {
                   // Retry reutiliza o conteúdo imutável da entrada, não o payload reenviado.
                   textoPaciente =
-                    msgInserida.tipo === "audio"
+                    msgInserida.tipo === "audio" || msgInserida.tipo === "image"
                       ? (msgInserida.transcricao ?? "")
                       : msgInserida.tipo === "text"
                         ? (msgInserida.body ?? "")
