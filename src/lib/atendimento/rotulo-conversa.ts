@@ -155,3 +155,19 @@ export function nomeConversa(c: ConversaComNome | null | undefined): string | nu
 export function tituloConversa(c: ConversaComNome | null | undefined): string {
   return nomeConversa(c) ?? SEM_NOME;
 }
+
+/**
+ * Iniciais para o avatar do contato: primeira letra do primeiro e do último nome
+ * ("Quédima Silva" → "QS"; nome único → 1 letra). Sem nome de verdade, devolve null
+ * e a tela mostra um ícone genérico. Só apresentação.
+ */
+export function iniciaisDoNome(nome: string | null | undefined): string | null {
+  const partes = String(nome ?? "")
+    .split(/\s+/)
+    .map((p) => p.replace(/^[^\p{L}\p{N}]+/u, ""))
+    .filter((p) => /^[\p{L}\p{N}]/u.test(p));
+  if (!partes.length) return null;
+  const primeira = partes[0];
+  const ultima = partes.length > 1 ? partes[partes.length - 1] : "";
+  return (Array.from(primeira)[0] + (ultima ? Array.from(ultima)[0] : "")).toLocaleUpperCase("pt-BR");
+}

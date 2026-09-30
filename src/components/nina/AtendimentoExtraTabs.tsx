@@ -59,7 +59,6 @@ import {
   UserCheck,
   ArrowRightLeft,
   CheckCircle2,
-  Plus,
   Users,
   Phone,
   MessageSquare,
@@ -125,8 +124,6 @@ import {
   obterDadosContato,
   transferirConversa,
   fecharConversa,
-  listarNotas,
-  criarNota,
   listarDepartamentos,
   listarUsuariosClinica,
   travarMinhaFila,
@@ -145,6 +142,7 @@ import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
+import { AvatarContato } from "@/components/nina/AvatarContato";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import { conversasDesatualizadas, criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
 import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
@@ -224,9 +222,7 @@ import {
   nomeContato,
   nomeConversa,
   tituloConversa,
-  divergenciaIdentidade,
 } from "@/lib/atendimento/rotulo-conversa";
-import { RevisarVinculoDialog } from "@/components/nina/RevisarVinculoDialog";
 import { InspecaoMensagemNina } from "./InspecaoMensagemNina";
 import { useSaidasDasMensagens } from "./SaidaMensagem";
 import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens } from "@/lib/nina/inspecao-mensagem";
@@ -284,8 +280,6 @@ export function AtendInbox() {
   const obterContato = useServerFn(obterDadosContato);
   const transferirFn = useServerFn(transferirConversa);
   const fecharFn = useServerFn(fecharConversa);
-  const listarNotasFn = useServerFn(listarNotas);
-  const criarNotaFn = useServerFn(criarNota);
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
   const travarFilaFn = useServerFn(travarMinhaFila);
@@ -306,7 +300,6 @@ export function AtendInbox() {
   const [msgs, setMsgs] = useState<any[]>([]);
   const [eventos, setEventos] = useState<ConversaEvento[]>([]);
   const [contato, setContato] = useState<any>(null);
-  const [notas, setNotas] = useState<any[]>([]);
   // Id da conversa a que o conteúdo carregado pertence. A tela central só
   // renderiza mensagens/contato/notas/eventos quando este id é exatamente o
   // da conversa selecionada.
@@ -338,7 +331,6 @@ export function AtendInbox() {
   // dependentes do conversation_id ficam bloqueadas.
   const carregandoConversa = !!sel?.id && !conteudoDaConversa;
   // FASE 5 — revisão manual (e confirmada) do cadastro vinculado à conversa.
-  const [revisarVinculoAberto, setRevisarVinculoAberto] = useState(false);
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   // Supervisão mantém os dois eixos; atendentes usam três filtros operacionais.
@@ -520,7 +512,6 @@ export function AtendInbox() {
   // FASE 3 — coordenação entre abertura, sincronização e tempo real.
   const aberturaEmAndamentoRef = useRef<{ conversaId: string; pedido: number } | null>(null);
   const syncPendenteRef = useRef(false);
-  const apoioPendenteRef = useRef(false);
   const syncEmVooRef = useRef<{ conversaId: string; promise: Promise<void> } | null>(null);
 
   // Mensagem específica a localizar ao abrir (vem da Revisão de aprendizados).
@@ -605,7 +596,6 @@ export function AtendInbox() {
   const limparRascunhoDe = useCallback((id: string) => {
     setRascunhos((prev) => limparRascunho(prev, id));
   }, []);
-  const [novaNota, setNovaNota] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
@@ -1041,7 +1031,6 @@ export function AtendInbox() {
         setSecundariosCarregadosId(null);
         setMsgs([]);
         setContato(null);
-        setNotas([]);
         setEventos([]);
         // Sem aviso: a conversa apenas sai da tela e volta a "Selecione uma
         // conversa". O motivo continua visível na lista e nos eventos.
@@ -1118,7 +1107,6 @@ export function AtendInbox() {
         setSecundariosCarregadosId(null);
         setMsgs([]);
         setContato(null);
-        setNotas([]);
         setEventos([]);
       }
       return;
@@ -1330,9 +1318,6 @@ export function AtendInbox() {
     const podeGravarCache = () =>
       prefetchMsgs.current.resultadoValido(alvo, entradaMsgs, chavePrefetch(clinicaId, meuId));
     const pContato = medirRequest("obterDadosContato", obterContato({ data: { clinicaId, conversaId: alvo } }), alvo);
-    const pNotas = medirRequest("listarNotas", listarNotasFn({ data: { clinicaId, conversaId: alvo } }), alvo).catch(
-      () => [] as any[],
-    );
 
     // Guarda o que as mensagens devolveram: `null` significa que a busca
     // falhou. Falha nunca é gravada no cache como conversa vazia.
@@ -1406,10 +1391,9 @@ export function AtendInbox() {
     // 2) Segundo plano — contato e notas entram quando chegarem.
     const secundarios = (async () => {
       try {
-        const [c, n] = await Promise.all([pContato, pNotas]);
+        const c = await pContato;
         marcarTroca("T3_conversa", alvo);
         marcarTroca("T8_contato", alvo);
-        marcarTroca("T9_notas", alvo);
         if (!aindaVale()) return;
         if (!c) {
           // Conversa não existe mais nesta clínica: limpa a seleção sem quebrar.
@@ -1420,7 +1404,6 @@ export function AtendInbox() {
           setSecundariosCarregadosId(null);
           setMsgs([]);
           setContato(null);
-          setNotas([]);
           setEventos([]);
           return;
         }
@@ -1441,7 +1424,7 @@ export function AtendInbox() {
           cacheConversas.current.guardar(alvo, {
             msgs: msgsFinais,
             contato: c,
-            notas: n,
+            notas: [],
             eventos: mesclarEventos(guardado?.eventos ?? [], eventosCarregados),
             historico: historicoRef.current ?? undefined,
           });
@@ -1451,7 +1434,6 @@ export function AtendInbox() {
         // outras conversas do mesmo paciente.
         cacheContatos.current.guardar((c as any)?.paciente?.id, c);
         setContato(c);
-        setNotas(n);
         setSecundariosCarregadosId(alvo);
       } catch (e: any) {
         // Dados de apoio não podem derrubar o atendimento em andamento.
@@ -1470,12 +1452,8 @@ export function AtendInbox() {
         syncPendenteRef.current = false;
         if (selIdRef.current === alvo) void sincronizarConversaRef.current?.();
       }
-      if (apoioPendenteRef.current) {
-        apoioPendenteRef.current = false;
-        if (selIdRef.current === alvo) void carregarApoioRef.current?.();
-      }
     }
-  }, [clinicaId, meuId, sel?.id, listarHistorico, obterContato, listarNotasFn]);
+  }, [clinicaId, meuId, sel?.id, listarHistorico, obterContato]);
 
   // Atualização incremental (Fase 4): mensagem nova no Realtime traz apenas o
   // que é novo desta conversa — nada de recarregar contato, notas ou resumo.
@@ -1641,32 +1619,8 @@ export function AtendInbox() {
     marcarLidaFn,
   ]);
 
-  // Uma nota nova atualiza só o painel de apoio; eventos usam a paginação conjunta.
-  const carregarApoio = useCallback(async () => {
-    const alvo = selIdRef.current;
-    if (!clinicaId || !alvo) return;
-    if (aberturaEmAndamentoRef.current) {
-      apoioPendenteRef.current = true;
-      return;
-    }
-    try {
-      const n = await listarNotasFn({ data: { clinicaId, conversaId: alvo } }).catch(() => null as any);
-      if (selIdRef.current !== alvo) return;
-      if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
-      if (n) {
-        setNotas(n as any[]);
-        const guardado = cacheConversas.current.obter(alvo);
-        if (guardado) cacheConversas.current.guardar(alvo, { ...guardado, notas: n as any[] });
-      }
-    } catch {
-      /* apoio é auxiliar: falha não derruba o atendimento */
-    }
-  }, [clinicaId, listarNotasFn]);
-
   const sincronizarConversaRef = useRef(sincronizarConversa);
   sincronizarConversaRef.current = sincronizarConversa;
-  const carregarApoioRef = useRef(carregarApoio);
-  carregarApoioRef.current = carregarApoio;
 
   useEffect(() => {
     msgsRef.current = msgs;
@@ -1748,11 +1702,9 @@ export function AtendInbox() {
       if (emCache.parcial) {
         // Veio do prefetch: o chat já abre, os dados de apoio carregam agora.
         setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
-        setNotas([]);
         setSecundariosCarregadosId(null);
       } else {
         setContato(emCache.contato);
-        setNotas(emCache.notas);
         setSecundariosCarregadosId(id);
       }
       return;
@@ -1762,7 +1714,6 @@ export function AtendInbox() {
     setMsgs([]);
     setEventos([]);
     setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
-    setNotas([]);
   }, [sel?.id, clinicaId, meuId]);
 
   // FASE 5 — o vínculo da conversa com o paciente pode nascer depois (cadastro
@@ -1811,7 +1762,6 @@ export function AtendInbox() {
     setErroMsgs(false);
     setTransferOpen(false);
     setAgendaOpen(false);
-    setNovaNota("");
   }, [sel?.id]);
 
   useEffect(() => {
@@ -1936,7 +1886,8 @@ export function AtendInbox() {
         tetoMs: 1000,
       }),
       apoio: criarAgrupador({
-        executar: () => void carregarApoioRef.current?.(),
+        // Sem notas internas na tela, não há mais painel de apoio a recarregar.
+        executar: () => {},
         atrasoMs: 400,
         tetoMs: 2000,
       }),
@@ -2736,22 +2687,6 @@ export function AtendInbox() {
 
     marcarEtapa(clientMessageId, "SEND_T1_OPTIMISTIC_RENDER", "send");
     despacharEnvio(origem, t, clientMessageId);
-  };
-
-  const adicionarNota = async () => {
-    const t = novaNota.trim();
-    if (!t || !sel || !clinicaId) return;
-    const origem = sel.id;
-    try {
-      await criarNotaFn({ data: { clinicaId, conversaId: origem, conteudo: t } });
-      cacheConversas.current.invalidar(origem);
-      prefetchMsgs.current.invalidar(origem);
-      if (selIdRef.current !== origem) return;
-      setNovaNota("");
-      await carregarConversa();
-    } catch (e: any) {
-      mostrarErro(e);
-    }
   };
 
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -3606,14 +3541,23 @@ export function AtendInbox() {
                 ) : (
                   <>
                     <section>
-                      {/* FASE 5 — o título é SEMPRE quem está falando no WhatsApp. */}
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase">
-                        Contato do WhatsApp
+                      {/* O nome e o telefone são SEMPRE os do WhatsApp; o restante vem do cadastro, se houver. */}
+                      <div className="flex items-center gap-3">
+                        <AvatarContato nome={nomeContato(contatoAtual.conversa)} />
+                        <div className="min-w-0">
+                          <div className="font-medium break-words">{tituloConversa(contatoAtual.conversa) || SEM_NOME}</div>
+                          {contatoAtual.conversa?.contato_telefone && (
+                            <div className="text-xs text-muted-foreground">📱 {contatoAtual.conversa.contato_telefone}</div>
+                          )}
+                        </div>
                       </div>
-                      <div className="font-medium">{tituloConversa(contatoAtual.conversa) || SEM_NOME}</div>
-                      <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                        {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
-                          <div>📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}</div>
+                      <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
+                        {contatoAtual.paciente?.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                        {contatoAtual.paciente?.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
+                        {contatoAtual.paciente?.cidade && (
+                          <div>
+                            📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
+                          </div>
                         )}
                         {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
                         {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
@@ -3624,45 +3568,6 @@ export function AtendInbox() {
                           <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
                         )}
                       </div>
-                    </section>
-
-                    <section>
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase">
-                        Cadastro vinculado
-                      </div>
-                      {contatoAtual.paciente ? (
-                        <>
-                          <div className="font-medium">{contatoAtual.paciente.nome}</div>
-                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                            {contatoAtual.paciente.telefone && <div>📱 {contatoAtual.paciente.telefone}</div>}
-                            {contatoAtual.paciente.email && <div>✉️ {contatoAtual.paciente.email}</div>}
-                            {contatoAtual.paciente.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
-                            {contatoAtual.paciente.cidade && (
-                              <div>
-                                📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
-                              </div>
-                            )}
-                          </div>
-                          {divergenciaIdentidade(nomeContato(contatoAtual.conversa), contatoAtual.paciente.nome) && (
-                            <div className="mt-2 rounded border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-800 dark:text-amber-200">
-                              O nome do contato no WhatsApp é diferente do cadastro vinculado. Isso pode ser normal
-                              (responsável, familiar, apelido). Nada foi alterado.
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-xs text-muted-foreground mt-1">Não vinculado a paciente cadastrado.</div>
-                      )}
-                      {contatoAtual.conversa?.id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-2 h-7 text-xs"
-                          onClick={() => setRevisarVinculoAberto(true)}
-                        >
-                          Revisar vínculo
-                        </Button>
-                      )}
                     </section>
 
                     <AgendamentosContato agendamentos={contatoAtual.agendamentos ?? []} />
@@ -3680,39 +3585,6 @@ export function AtendInbox() {
                         ))}
                       </section>
                     )}
-
-                    <section>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Notas internas</div>
-                      <div className="space-y-1.5">
-                        {notas.length === 0 && <p className="text-xs text-muted-foreground">Sem notas.</p>}
-                        {(dadosSecundariosProntos ? notas : []).map((n: any) => (
-                          <div
-                            key={n.id}
-                            className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
-                          >
-                            <div className="whitespace-pre-wrap">{n.conteudo}</div>
-                            <div className="text-[11px] text-muted-foreground mt-1">{fmtData(n.created_at)}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-1 mt-2">
-                        <Textarea
-                          value={novaNota}
-                          onChange={(e) => setNovaNota(e.target.value)}
-                          rows={2}
-                          className="text-xs"
-                          placeholder="Nota interna (não vai para o paciente)…"
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={adicionarNota}
-                          disabled={!novaNota.trim() || carregandoConversa}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </section>
 
                     {contatoAtual.atribuido_nome && (
                       <section className="text-xs text-muted-foreground">
@@ -3736,30 +3608,6 @@ export function AtendInbox() {
               contatoTelefone={sel.contato_telefone ?? null}
               pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
               onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
-            />
-          )}
-
-          {/* FASE 5 — revisão manual e confirmada do cadastro vinculado. */}
-          {clinicaId && sel?.id && (
-            <RevisarVinculoDialog
-              open={revisarVinculoAberto}
-              onOpenChange={setRevisarVinculoAberto}
-              clinicaId={clinicaId}
-              conversaId={sel.id}
-              contatoNome={nomeContato(sel as never)}
-              contatoTelefone={sel.contato_telefone ?? null}
-              pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
-              onVinculado={() => {
-                const id = sel.id;
-                cacheContatos.current.invalidar(contatoAtual?.paciente?.id);
-                void obterContato({ data: { clinicaId, conversaId: id } })
-                  .then((c) => {
-                    if (selIdRef.current !== id) return;
-                    setContato(c as any);
-                    setSecundariosCarregadosId(id);
-                  })
-                  .catch(() => {});
-              }}
             />
           )}
 
