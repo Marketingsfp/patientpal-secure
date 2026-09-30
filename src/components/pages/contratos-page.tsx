@@ -414,6 +414,9 @@ const isTaxaInclusao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parc
  *  renumeração) usam este predicado. */
 const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) <= 0;
 
+/** Taxa cobrada no balcão para reimprimir o carnê/cartão do contrato. */
+const VALOR_TAXA_SEGUNDA_VIA = 10;
+
 const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
   isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa inclusão" : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
@@ -3873,6 +3876,8 @@ function DetalheContrato({
   const [pixOpen, setPixOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
+  /** Cobrança da taxa de 2ª via: recebe no caixa e, em seguida, reimprime o carnê. */
+  const [segundaViaOpen, setSegundaViaOpen] = useState(false);
   // Isenção de juros + multa para a mensalidade atualmente em pagamento.
   // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
   const [isencaoEncargos, setIsencaoEncargos] = useState<{
@@ -5621,6 +5626,25 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <FileText className="h-4 w-4 mr-1" />
                   Gerar carnê (parcelas em aberto)
                 </Button>
+                {podeEscrever && !cancelado ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      // A taxa só faz sentido se houver carnê a reimprimir:
+                      // sem parcela em aberto o carnê não sai e a cobrança
+                      // ficaria no caixa sem entrega.
+                      if (!mens.some((m) => m.status !== "pago" && m.status !== "cancelado")) {
+                        toast.error("Não há parcela em aberto — não há carnê para emitir 2ª via.");
+                        return;
+                      }
+                      setSegundaViaOpen(true);
+                    }}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Emitir 2ª Via ({BRL(VALOR_TAXA_SEGUNDA_VIA)})
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="outline"
@@ -6935,6 +6959,49 @@ h1, h2, h3 { margin: 0 0 6mm; }
         onConfirmar={() => {
           setPixOpen(false);
           setLancOpen(true);
+        }}
+      />
+
+      {/* Taxa de 2ª via: mesmo diálogo de recebimento das mensalidades (valor
+          editável, forma de pagamento, trava de caixa), gravando receita +
+          movimento de caixa pela RPC atômica. Depois de gravado, reabre o
+          carnê das parcelas em aberto. */}
+      <LancamentoDialog
+        open={segundaViaOpen}
+        onOpenChange={setSegundaViaOpen}
+        tipo="receita"
+        pacienteIdFixo={((contrato as any).paciente_id as string | null) ?? null}
+        initialDescricao={`Taxa de 2ª via de carnê/cartão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`}
+        initialValor={VALOR_TAXA_SEGUNDA_VIA.toFixed(2)}
+        categoriaFixaNome="TAXA 2A VIA CARNE/CARTAO"
+        onSavedWithData={async (dados) => {
+          setSegundaViaOpen(false);
+          if (dados.imprimir === false) {
+            toast.success(
+              'Taxa de 2ª via registrada. O carnê não foi impresso — use "Gerar carnê" quando quiser.',
+            );
+            return;
+          }
+          try {
+            await gerarCarnePDF(contrato.id);
+            toast.success("Taxa de 2ª via registrada e carnê aberto para impressão.");
+          } catch (e) {
+            // O navegador pode bloquear a janela do carnê por ela abrir depois
+            // da gravação, e não direto no clique. O pagamento já está gravado:
+            // oferece um clique novo em vez de pedir para cobrar de novo.
+            toast.error(
+              `Taxa de 2ª via registrada, mas o carnê não abriu (${e instanceof Error ? e.message : String(e)}).`,
+              {
+                duration: 20000,
+                action: {
+                  label: "Imprimir carnê",
+                  onClick: () => {
+                    gerarCarnePDF(contrato.id).catch(mostrarErro);
+                  },
+                },
+              },
+            );
+          }
         }}
       />
 
