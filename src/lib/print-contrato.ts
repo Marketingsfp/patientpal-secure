@@ -471,6 +471,26 @@ export async function printContrato(contratoId: string) {
     !((c as any).convenio_id && OVERRIDES_SEM_REDUCAO.has((c as any).convenio_id)),
   );
 
+  imprimirCorpoContrato(corpo, `Contrato #${c.numero} - ${c.paciente_nome ?? ""}`);
+}
+
+/** Imprime o modelo do convênio com a mesma diagramação do contrato do
+ *  paciente, deixando os campos em branco. `modeloEditor` é o texto que está
+ *  na tela de Convênios (mesmo ainda não salvo). */
+export function printModeloContrato(convenioId: string | null | undefined, modeloEditor: string) {
+  const temTexto = modeloEditor.replace(/<[^>]+>/g, "").trim().length > 0;
+  const templateBody =
+    (convenioId ? CONVENIO_TEMPLATE_OVERRIDES[convenioId] : null) ??
+    (temTexto ? modeloEditor : TEXTO_CONTRATO_HTML);
+  // Sem paciente, os blocos condicionais dos dependentes saem todos visíveis
+  // (em branco) e os blocos "quando não houver" são retirados.
+  const semCondicionais = templateBody
+    .replace(/\{\{\^(\w+)\}\}[\s\S]*?\{\{\/\1\}\}/g, "")
+    .replace(/\{\{[#/]\w+\}\}/g, "");
+  imprimirCorpoContrato(applyTemplate(semCondicionais, {}), "Modelo de contrato");
+}
+
+function imprimirCorpoContrato(corpo: string, titulo: string) {
   const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
 
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
@@ -714,7 +734,7 @@ export async function printContrato(contratoId: string) {
       ? corpo.replace(/<\/head>/i, `${cssFinal}</head>`)
       : `${cssFinal}${corpo}`
     : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
-<title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
+<title>${esc(titulo)}</title>
 <style>
   @page { size: A4; margin: 15mm; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #1a1a1a; line-height: 1.6; background: white; max-width: 210mm; margin: 0 auto; padding: 20px; }

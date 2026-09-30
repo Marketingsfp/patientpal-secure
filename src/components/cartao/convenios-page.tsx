@@ -884,14 +884,20 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
+                      onClick={async () => {
                         if (htmlSemTexto(modeloContrato)) {
                           toast.warning(
                             'O modelo do contrato está em branco. Escreva o texto, use "Importar documento" ou clique em "Carregar Modelo Padrão" antes de imprimir.',
                           );
                           return;
                         }
-                        window.print();
+                        // Mesma saída do contrato do paciente, com os campos em branco.
+                        try {
+                          const { printModeloContrato } = await import("@/lib/print-contrato");
+                          printModeloContrato(editing?.id, modeloContrato);
+                        } catch (err) {
+                          mostrarErro(err, "Não foi possível imprimir o modelo");
+                        }
                       }}
                     >
                       <Printer className="h-4 w-4 mr-1" /> Imprimir
