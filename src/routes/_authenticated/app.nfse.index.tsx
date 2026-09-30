@@ -120,11 +120,16 @@ function NfsePage() {
   // NFS-e parte 1b: correção manual (admin) de alíquota/ISS pelo XML oficial.
   const corrigirLote = useServerFn(corrigirIssLote);
   const [corrigindo, setCorrigindo] = useState(false);
-  async function rodarCorrecao(limite: number) {
+  async function rodarCorrecao(limite: number, reprocessarFalhas = false) {
     if (!clinicaAtual) return;
+    const emitenteId = emitentes.find((e) => e.id === filtroEmitente)?.id;
+    if (!emitenteId) {
+      toast.error("Escolha um emitente no filtro antes de corrigir o ISS.");
+      return;
+    }
     setCorrigindo(true);
     try {
-      const r = await corrigirLote({ data: { clinicaId: clinicaAtual.clinica.id, limite } });
+      const r = await corrigirLote({ data: { clinicaId: clinicaAtual.clinica.id, limite, emitenteId, reprocessarFalhas } });
       const falhas = Object.entries(r.falhas).map(([k, v]) => `${k}: ${v}`).join(", ") || "nenhuma";
       const msg = `${r.processadas} notas · ${r.corrigidas} corrigidas · ISS R$ ${r.issAntes.toFixed(2)} → R$ ${r.issDepois.toFixed(2)} · falhas: ${falhas}`;
       if (r.parado) toast.error(`Parado: ${r.semSentido} notas com valor sem sentido (>5%). Nada gravado neste lote. ${msg}`, { duration: 20000 });
@@ -526,6 +531,9 @@ function NfsePage() {
               </Button>
               <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(100)}>
                 Próximo lote (100)
+              </Button>
+              <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(100, true)}>
+                Tentar de novo as falhas
               </Button>
             </>
           )}
