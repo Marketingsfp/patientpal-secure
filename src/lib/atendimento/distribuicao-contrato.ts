@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { ESTADOS_MANUAIS } from "./presenca-manual";
 
-/** null representa ausência de teto, nunca o antigo limite implícito de cinco. */
-export const capacidadeAtendenteSchema = z.number().int().min(1).max(1000).nullable();
-
 export const resultadoDistribuicaoFilaSchema = z.object({
   status: z.enum(["concluida", "bloqueada", "erro", "pendente"]),
   distribuidas: z.number().int().nonnegative(),
@@ -12,8 +9,7 @@ export const resultadoDistribuicaoFilaSchema = z.object({
   meu: z
     .object({
       carga_atual: z.number().int().nonnegative(),
-      reservadas: z.number().int().nonnegative().optional(),
-      // Limites legados podem ultrapassar o máximo permitido para novas configurações.
+      // Sempre null: Online não tem limite de conversas. Mantido para compatibilidade da resposta.
       capacidade: z.number().int().positive().nullable(),
       elegivel: z.boolean(),
       motivo: z.string().nullable(),

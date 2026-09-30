@@ -32,11 +32,8 @@ export const CONTROLE_INICIAL: ControlePresenca = {
   carregado: false,
 };
 
-export const ROTULO_ESTADO_MANUAL: Record<EstadoManualPresenca, string> = {
-  ONLINE: "Online",
-  PAUSA: "Em pausa",
-  OFFLINE: "Offline",
-};
+export { ROTULO_ESTADO_MANUAL } from "./presenca-manual";
+import { ROTULO_ESTADO_MANUAL } from "./presenca-manual";
 
 export const TEXTO_ESCOLHA_PENDENTE = "Escolha sua disponibilidade";
 
@@ -96,7 +93,7 @@ export function textoSituacao(estado: ControlePresenca): string {
   return `Você está ${ROTULO_ESTADO_MANUAL[estado.confirmado]}`;
 }
 
-/** Disponibilidade por presença; a elegibilidade completa é revalidada no banco. */
-export function recebeNovasConversas(estado: ControlePresenca, reservas = 0): boolean {
-  return estado.carregado && (estado.confirmado === "ONLINE" || (estado.confirmado === "PAUSA" && reservas < 10));
+/** Só Online recebe conversas novas; a elegibilidade completa é revalidada no banco. */
+export function recebeNovasConversas(estado: ControlePresenca): boolean {
+  return estado.carregado && estado.confirmado === "ONLINE";
 }

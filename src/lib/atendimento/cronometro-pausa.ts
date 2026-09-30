@@ -1,10 +1,12 @@
-import type { EstadoManualPresenca } from "./presenca-manual";
+import { ehEstadoPausa, type EstadoManualPresenca } from "./presenca-manual";
 
 export type CronometroPausa = {
   clinicaId: string;
   userId: string;
   versao: number;
   inicio: string | null;
+  /** Estado a que `inicio` pertence; mudar de estado zera o cronômetro. */
+  estado?: EstadoManualPresenca | null;
 };
 
 type AtualizacaoCronometro = {
@@ -17,6 +19,10 @@ type AtualizacaoCronometro = {
   cronometroPausaInicio?: string | null;
 };
 
+/**
+ * O cronômetro zera em QUALQUER mudança de estado (Online, Offline, Pausa, Pausa para saída).
+ * Repetir o mesmo estado de pausa preserva o início.
+ */
 export function atualizarCronometroPausa(
   atual: CronometroPausa | null,
   entrada: AtualizacaoCronometro,
@@ -24,10 +30,19 @@ export function atualizarCronometroPausa(
   const mesmoEscopo = atual?.clinicaId === entrada.clinicaId && atual?.userId === entrada.userId;
   if (mesmoEscopo && entrada.versao < atual.versao) return atual;
   let inicio = mesmoEscopo ? atual.inicio : null;
-  if (entrada.estado === "ONLINE" || entrada.estado === "OFFLINE") inicio = null;
-  else if (entrada.cronometroPausaInicio !== undefined) inicio = entrada.cronometroPausaInicio;
-  else if (entrada.estado === "PAUSA" && !inicio) inicio = entrada.em ?? null;
-  return { clinicaId: entrada.clinicaId, userId: entrada.userId, versao: entrada.versao, inicio };
+  if (!ehEstadoPausa(entrada.estado)) inicio = null;
+  else {
+    if (mesmoEscopo && atual.estado && atual.estado !== entrada.estado) inicio = null;
+    if (entrada.cronometroPausaInicio !== undefined) inicio = entrada.cronometroPausaInicio;
+    else if (!inicio) inicio = entrada.em ?? null;
+  }
+  return {
+    clinicaId: entrada.clinicaId,
+    userId: entrada.userId,
+    versao: entrada.versao,
+    inicio,
+    estado: entrada.estado,
+  };
 }
 
 export function formatarTempoPausa(inicio: string, agora: number): string {

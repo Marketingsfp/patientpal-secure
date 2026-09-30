@@ -15,7 +15,6 @@ const conversa = (id: string, entrada: number) => ({
   status: "active",
   owner_type: "HUMAN",
   atribuida_user_id: "ana",
-  fila_pendente: false,
   is_teste: false,
   ultima_msg_preview: "Oi",
   nao_lidas: 0,

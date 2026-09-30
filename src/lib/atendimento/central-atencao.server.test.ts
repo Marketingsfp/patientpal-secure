@@ -59,6 +59,10 @@ function bancoTeste(gestor: boolean) {
           filtro.push((r) => r[campo] === valor);
           return query;
         },
+        neq(campo: string, valor: unknown) {
+          filtro.push((r) => r[campo] !== valor);
+          return query;
+        },
         is(campo: string, _valor: null) {
           filtro.push((r) => r[campo] == null);
           return query;
@@ -178,12 +182,11 @@ function bancoTeste(gestor: boolean) {
 }
 
 describe("consulta da Central de Atenção", () => {
-  it("handoff às 13:02 é crítico na Central e no card às 13:26, ainda na fila individual", async () => {
+  it("handoff às 13:02 é crítico na Central e no card às 13:26, já com a atendente", async () => {
     const db = bancoTeste(false);
     db.add("encaminhada", {
       owner_type: "HUMAN",
       atribuida_user_id: "ana",
-      fila_pendente: true,
     });
     // Instante retornado pela RPC corrigida, apesar do aviso automático posterior.
     db.esperas.push({ conversa_id: "encaminhada", aguardando_desde: "2026-09-20T13:02:12-03:00" });
@@ -198,29 +201,26 @@ describe("consulta da Central de Atenção", () => {
     expect(faixaEsperaDesde(dados.espera.encaminhada, agora)).toBe("critico");
   });
 
-  it("gestão recebe toda a global acima de 500 e pendências identificadas por atendente", async () => {
+  it("gestão recebe toda a global acima de 500; conversas com dono não entram nela", async () => {
     const db = bancoTeste(true);
     for (let i = 0; i < 501; i++) db.add(`g${String(i).padStart(4, "0")}`);
-    db.add("ana1", { atribuida_user_id: "ana", fila_pendente: true });
-    db.add("bia1", { atribuida_user_id: "bia", fila_pendente: true });
+    db.add("ana1", { atribuida_user_id: "ana" });
+    db.add("bia1", { atribuida_user_id: "bia" });
     db.add("outra-clinica", { clinica_id: "outra" });
     db.add("teste", { is_teste: true });
     db.add("fechada", { status: "closed" });
     const dados = await db.carregar();
     const resumo = calcularAtencao({ ...dados, naoAtribuidas: dados.filas });
     expect(resumo.naoAtribuidasGlobal).toBe(501);
-    expect(resumo.filasIndividuais.map((f) => [f.nome, f.total])).toEqual([
-      ["Ana", 1],
-      ["Bia", 1],
-    ]);
+    expect(dados.filas).toHaveLength(501);
     expect(resumo.total).toBe(0);
     expect(db.paginas).toHaveLength(2);
   });
 
-  it("atendente vê própria fila e total global; não recebe nomes ou esperas de colegas", async () => {
+  it("atendente vê só as próprias esperas e o total global; não recebe nomes ou esperas de colegas", async () => {
     const db = bancoTeste(false);
-    db.add("a", { atribuida_user_id: "ana", fila_pendente: true });
-    db.add("b", { atribuida_user_id: "bia", fila_pendente: true });
+    db.add("a", { atribuida_user_id: "ana" });
+    db.add("b", { atribuida_user_id: "bia" });
     db.add("global");
     db.add("nina", { owner_type: "AI" });
     db.esperas.push(
@@ -230,7 +230,8 @@ describe("consulta da Central de Atenção", () => {
       })),
     );
     const dados = await db.carregar();
-    expect(dados.filas.map((f) => f.id)).toEqual(["a"]);
+    // A fila global sem responsável não chega à atendente com detalhes; só o total.
+    expect(dados.filas).toEqual([]);
     expect(dados.globalSemDetalhes).toBe(1);
     expect(Object.keys(dados.espera)).toEqual(["a"]);
     expect(dados.nomes).not.toHaveProperty("b");
@@ -244,12 +245,12 @@ describe("consulta da Central de Atenção", () => {
     ).toBe(1);
   });
 
-  it("primeira resposta e encerramento atualizam o total sem depender da presença", async () => {
+  it("distribuição e encerramento atualizam a fila global sem depender da presença", async () => {
     const db = bancoTeste(true);
-    db.add("a", { atribuida_user_id: "ana", fila_pendente: true });
-    db.add("b", { atribuida_user_id: "bia", fila_pendente: true });
+    db.add("a");
+    db.add("b");
     expect((await db.carregar()).filas).toHaveLength(2);
-    db.conversas[0].fila_pendente = false;
+    db.conversas[0].atribuida_user_id = "ana"; // alguém ficou Online e recebeu
     db.conversas[1].status = "closed";
     expect((await db.carregar()).filas).toEqual([]);
   });
@@ -261,7 +262,7 @@ describe("consulta da Central de Atenção", () => {
     await expect(db.carregar()).rejects.toThrow("consulta indisponível");
   });
 
-  it("inclui pausadas com zero e dez pendências, sem misturar ativas, Nina e fechadas", async () => {
+  it("lista quem está em pausa, sem misturar online, offline, outra clínica e inativos", async () => {
     const db = bancoTeste(true);
     db.presenca("bia", "PAUSA");
     db.presenca("ana", "PAUSA");
@@ -269,19 +270,14 @@ describe("consulta da Central de Atenção", () => {
     db.presenca("offline", "OFFLINE");
     db.presenca("outra", "PAUSA", 2, "outra-clinica");
     db.presenca("inativa", "PAUSA", 2, "clinica", false);
-    for (let i = 0; i < 10; i++) db.add(`a${i}`, { atribuida_user_id: "ana", fila_pendente: true });
-    db.add("ativa", { atribuida_user_id: "ana", fila_pendente: false });
-    db.add("fechada", { atribuida_user_id: "ana", fila_pendente: true, status: "closed" });
-    db.add("nina", { atribuida_user_id: "ana", fila_pendente: true, owner_type: "AI" });
+    for (let i = 0; i < 10; i++) db.add(`a${i}`, { atribuida_user_id: "ana" });
+    db.add("fechada", { atribuida_user_id: "ana", status: "closed" });
+    db.add("nina", { atribuida_user_id: "ana", owner_type: "AI" });
     const dados = await db.carregar();
     expect(dados.pausas.map((p) => p.nome)).toEqual(["Ana", "Bia"]);
     const resumo = calcularAtencao({ ...dados, naoAtribuidas: dados.filas });
-    expect(
-      dados.pausas.map(
-        (p) => resumo.filasIndividuais.find((f) => f.atendenteId === p.atendenteId)?.total ?? 0,
-      ),
-    ).toEqual([10, 0]);
-    expect(resumo.total).toBe(0); // Pausas e filas recentes não acionam o alerta.
+    expect(resumo.naoAtribuidasGlobal).toBe(0); // conversas com dono não são fila global
+    expect(resumo.total).toBe(0); // Pausas e esperas recentes não acionam o alerta.
   });
 
   it("atendente recebe só a própria pausa, mesmo sem conversas; gestão vê a equipe", async () => {
@@ -289,9 +285,21 @@ describe("consulta da Central de Atenção", () => {
     db.presenca("ana", "PAUSA");
     db.presenca("bia", "PAUSA");
     const dados = await db.carregar();
-    expect(dados.pausas).toEqual([{ atendenteId: "ana", nome: "Ana", inicio: null }]);
+    expect(dados.pausas).toEqual([{ atendenteId: "ana", nome: "Ana", inicio: null, tipo: "PAUSA" }]);
     expect(dados.filas).toEqual([]);
     expect(db.leiturasGestao).toEqual([]);
+  });
+
+  it("Em pausa e Em pausa para saída aparecem separadas, cada uma com o próprio tipo", async () => {
+    const db = bancoTeste(true);
+    db.presenca("ana", "PAUSA");
+    db.presenca("bia", "PAUSA_SAIDA");
+    db.presenca("online", "ONLINE");
+    const dados = await db.carregar();
+    expect(dados.pausas.map((p) => [p.nome, p.tipo])).toEqual([
+      ["Ana", "PAUSA"],
+      ["Bia", "PAUSA_SAIDA"],
+    ]);
   });
 
   it("não consulta histórico privilegiado quando a verificação de gestão falha", async () => {

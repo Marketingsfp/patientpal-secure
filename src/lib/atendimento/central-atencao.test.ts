@@ -139,15 +139,10 @@ describe("Central de Atenção", () => {
     expect(itensDaCategoria(r.itens, null).map((i) => i.id)).toEqual(["k"]);
   });
 
-  it("agrupa pendências por atendente, com 1 e 10 conversas, e separa a global", () => {
+  it("só a fila global (sem responsável) conta como não atribuída; conversas com dono não", () => {
     const filas = [
-      ...Array.from({ length: 10 }, (_, i) => ({
-        id: `a${i}`,
-        atribuida_user_id: "ana",
-        atendente_nome: "Ana",
-        fila_pendente: true,
-      })),
-      { id: "b", atribuida_user_id: "bia", atendente_nome: "Bia", fila_pendente: true },
+      ...Array.from({ length: 10 }, (_, i) => ({ id: `a${i}`, atribuida_user_id: "ana", atendente_nome: "Ana" })),
+      { id: "b", atribuida_user_id: "bia", atendente_nome: "Bia" },
       { id: "global1" },
       { id: "global2" },
     ];
@@ -156,53 +151,30 @@ describe("Central de Atenção", () => {
       espera: { a0: haMin(30), global1: haMin(20) },
       agora: AGORA,
     });
-    expect(r.filasIndividuais).toEqual([
-      { atendenteId: "ana", nome: "Ana", total: 10 },
-      { atendenteId: "bia", nome: "Bia", total: 1 },
-    ]);
     expect(r.naoAtribuidasGlobal).toBe(2);
-    expect(r.naoAtribuidas).toBe(13);
-    expect(r.total).toBe(2); // só as críticas acionam o alerta, sem duplicar filas
-  });
-
-  it("contagem usa IDs e não mistura duas atendentes de mesmo nome", () => {
-    const a = { id: "c1", atribuida_user_id: "a", atendente_nome: "Maria", fila_pendente: true };
-    const b = { id: "c2", atribuida_user_id: "b", atendente_nome: "Maria", fila_pendente: true };
-    const r = calcularAtencao({ naoAtribuidas: [a, a, b], espera: {} });
-    expect(r.filasIndividuais.map((f) => [f.atendenteId, f.total])).toEqual([
-      ["a", 1],
-      ["b", 1],
-    ]);
-    expect(r.total).toBe(0);
+    expect(r.naoAtribuidas).toBe(2);
+    expect(r.total).toBe(2); // as duas esperas críticas, mesmo a de conversa que já tem dono
   });
 
   it("resposta ou encerramento tira da fila; Nina e conversas já ativas não entram", () => {
     const r = calcularAtencao({
       naoAtribuidas: [
-        { id: "ativa", atribuida_user_id: "a", fila_pendente: false },
+        { id: "ativa", atribuida_user_id: "a" },
         { id: "fechada", status: "closed" },
-        { id: "finalizada", status: "finished", fila_pendente: true },
+        { id: "finalizada", status: "finished" },
         { id: "nina", owner_type: "AI" },
       ],
       espera: {},
     });
     expect(r.total).toBe(0);
-    expect(r.filasIndividuais).toEqual([]);
     expect(r.naoAtribuidasGlobal).toBe(0);
   });
 
-  it("clicar em uma atendente ou na global isola a lista daquela fila", () => {
+  it("clicar na global isola a lista da fila sem responsável", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [
-        { id: "a1", atribuida_user_id: "a", fila_pendente: true },
-        { id: "b1", atribuida_user_id: "b", fila_pendente: true },
-        { id: "g1" },
-      ],
+      naoAtribuidas: [{ id: "a1", atribuida_user_id: "a" }, { id: "g1" }],
       espera: {},
     });
-    expect(itensDaCategoria(r.itens, "nao_atribuida_individual", "a").map((i) => i.id)).toEqual([
-      "a1",
-    ]);
     expect(itensDaCategoria(r.itens, "nao_atribuida_global").map((i) => i.id)).toEqual(["g1"]);
   });
 
@@ -220,13 +192,13 @@ describe("Central de Atenção", () => {
 
   it("perfil operacional acompanha o total global sem detalhes de outros pacientes", () => {
     const r = calcularAtencao({
-      naoAtribuidas: [{ id: "propria", atribuida_user_id: "a", fila_pendente: true }],
+      naoAtribuidas: [{ id: "propria", atribuida_user_id: "a" }],
       espera: {},
       globalSemDetalhes: 250,
     });
     expect(r.naoAtribuidasGlobal).toBe(250);
     expect(r.total).toBe(0);
-    expect(r.itens).toHaveLength(1);
+    expect(r.itens).toHaveLength(0);
     expect(itensDaCategoria(r.itens, "nao_atribuida_global")).toEqual([]);
   });
 
@@ -234,7 +206,7 @@ describe("Central de Atenção", () => {
     const entrada = {
       naoAtribuidas: [
         { id: "global" },
-        { id: "individual", atribuida_user_id: "ana", fila_pendente: true },
+        { id: "individual", atribuida_user_id: "ana" },
       ],
       espera: { global: haMin(9), individual: haMin(2) },
     };
@@ -247,7 +219,7 @@ describe("Central de Atenção", () => {
     const depois = calcularAtencao({ ...entrada, agora: AGORA + 60_001 });
     expect(depois.total).toBe(1);
     expect(depois.aguardando).toBe(1);
-    expect(depois.naoAtribuidas).toBe(2);
+    expect(depois.naoAtribuidas).toBe(1);
     expect(itensDaCategoria(depois.itens, null).map((i) => [i.id, i.categoria])).toEqual([
       ["global", "critica"],
     ]);

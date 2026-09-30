@@ -28,7 +28,6 @@ const VAZIO: ResumoAtencao = {
   total: 0,
   naoAtribuidas: 0,
   naoAtribuidasGlobal: 0,
-  filasIndividuais: [],
   criticas: 0,
   aguardando: 0,
   itens: [],
@@ -66,10 +65,6 @@ export function CentralAtencao() {
   const [aberto, setAberto] = useState(false);
   /** Categoria em foco dentro da própria Central (não filtra a Inbox). */
   const [categoria, setCategoria] = useState<CategoriaAtencao | null>(null);
-  const [atendenteSelecionada, setAtendenteSelecionada] = useState<{
-    id: string;
-    nome: string;
-  } | null>(null);
 
   const carregar = useCallback(async () => {
     const sequencia = ++sequenciaCarga.current;
@@ -105,7 +100,6 @@ export function CentralAtencao() {
 
   useEffect(() => {
     setCategoria(null);
-    setAtendenteSelecionada(null);
   }, [chaveContexto]);
 
   // Relógio único: reclassifica as faixas de espera sem consultar o banco.
@@ -152,14 +146,12 @@ export function CentralAtencao() {
   );
 
   const pausas = dados?.chave === chaveContexto ? (dados.pausas ?? []) : [];
-  const idsEmPausa = new Set(pausas.map((pausa) => pausa.atendenteId));
-  const filasSemPausa = resumo.filasIndividuais.filter((fila) => !idsEmPausa.has(fila.atendenteId));
 
   // Prioridades: só esperas críticas (8 primeiras), ou a categoria escolhida.
   const lista = useMemo(() => {
-    const base = itensDaCategoria(resumo.itens, categoria, atendenteSelecionada?.id);
+    const base = itensDaCategoria(resumo.itens, categoria);
     return categoria ? base : base.slice(0, 8);
-  }, [resumo.itens, categoria, atendenteSelecionada?.id]);
+  }, [resumo.itens, categoria]);
 
   // Animação de entrada mais perceptível só quando SURGE algo crítico novo.
   const [novo, setNovo] = useState(false);
@@ -181,15 +173,7 @@ export function CentralAtencao() {
   // FASE 3 — as categorias filtram DENTRO da própria Central. A sidebar não é
   // mais usada para alertas operacionais.
   const alternarCategoria = (c: CategoriaAtencao) => {
-    setAtendenteSelecionada(null);
     setCategoria((atual) => (atual === c ? null : c));
-  };
-
-  const alternarAtendente = (atendente: { id: string; nome: string }) => {
-    const limpar =
-      categoria === "nao_atribuida_individual" && atendenteSelecionada?.id === atendente.id;
-    setCategoria(limpar ? null : "nao_atribuida_individual");
-    setAtendenteSelecionada(limpar ? null : atendente);
   };
 
   const abrirConversa = (id: string) => {
@@ -270,37 +254,7 @@ export function CentralAtencao() {
         </div>
 
         <div className="p-2">
-          <AtendentesEmPausa
-            pausas={pausas}
-            filas={resumo.filasIndividuais}
-            selecionada={
-              categoria === "nao_atribuida_individual" ? atendenteSelecionada?.id : undefined
-            }
-            onSelecionar={alternarAtendente}
-          />
-          {filasSemPausa.length > 0 && (
-            <div className="mb-1">
-              <p className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                Não atribuídas individuais
-              </p>
-              <div className="max-h-48 overflow-y-auto">
-                {filasSemPausa.map((fila) => (
-                  <LinhaCategoria
-                    key={fila.atendenteId}
-                    cor="ambar"
-                    icone={<UserX className="h-3.5 w-3.5" aria-hidden />}
-                    titulo={fila.nome}
-                    valor={fila.total}
-                    ativo={
-                      categoria === "nao_atribuida_individual" &&
-                      atendenteSelecionada?.id === fila.atendenteId
-                    }
-                    onClick={() => alternarAtendente({ id: fila.atendenteId, nome: fila.nome })}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+          <AtendentesEmPausa pausas={pausas} />
           <LinhaCategoria
             cor="vermelho"
             icone={<UserX className="h-3.5 w-3.5" aria-hidden />}
@@ -330,11 +284,7 @@ export function CentralAtencao() {
         <div className="border-t border-border px-3 py-2">
           <div className="mb-1 flex items-center gap-2">
             <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {categoria === "nao_atribuida_individual"
-                ? `Não atribuídas · ${atendenteSelecionada?.nome ?? "Atendente"}`
-                : categoria
-                  ? tituloCategoria(categoria)
-                  : "Prioridades agora"}
+              {categoria ? tituloCategoria(categoria) : "Prioridades agora"}
             </p>
             {categoria && (
               <button

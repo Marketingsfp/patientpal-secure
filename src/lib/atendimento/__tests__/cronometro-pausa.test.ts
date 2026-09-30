@@ -21,6 +21,7 @@ function banco(linhas: Linha[]) {
         select: (_campos: string) => query,
         eq: (campo: keyof Linha, valor: unknown) => { dados = dados.filter(l => l[campo] === valor); return query; },
         in: (campo: keyof Linha, valores: unknown[]) => { dados = dados.filter(l => valores.includes(l[campo])); return query; },
+        neq: (campo: keyof Linha, valor: unknown) => { dados = dados.filter(l => l[campo] !== valor); return query; },
         lte: (_campo: string, valor: number) => { dados = dados.filter(l => l.versao <= valor); return query; },
         gt: (_campo: string, valor: number) => { dados = dados.filter(l => l.versao > valor); return query; },
         order: (_campo: string, op: { ascending: boolean }) => { dados.sort((a, b) => op.ascending ? a.versao - b.versao : b.versao - a.versao); return query; },
@@ -48,6 +49,15 @@ describe("cronômetro: Online e Offline encerram o período", () => {
     expect(repetida.inicio).toBe(t0);
     expect(offline.inicio).toBeNull();
     expect(atualizarCronometroPausa(offline, { ...escopo, estado: "PAUSA", versao: 5, em: t2 }).inicio).toBe(t2);
+  });
+
+  test("trocar de Pausa para Pausa para saída (e vice-versa) zera o cronômetro", () => {
+    const pausa = atualizarCronometroPausa(null, { ...escopo, estado: "PAUSA", versao: 2, em: t0 });
+    const saida = atualizarCronometroPausa(pausa, { ...escopo, estado: "PAUSA_SAIDA", versao: 3, em: t1 });
+    expect(saida.inicio).toBe(t1);
+    expect(atualizarCronometroPausa(saida, { ...escopo, estado: "PAUSA_SAIDA", versao: 4, em: t2 }).inicio).toBe(t1);
+    expect(atualizarCronometroPausa(saida, { ...escopo, estado: "PAUSA", versao: 4, em: t2 }).inicio).toBe(t2);
+    expect(atualizarCronometroPausa(saida, { ...escopo, estado: "ONLINE", versao: 4, em: t2 }).inicio).toBeNull();
   });
 
   test("reload e outra aba em Offline descartam até um início de pausa antigo", () => {
@@ -119,6 +129,20 @@ describe("início persistido no histórico do servidor", () => {
   test("muitos cliques não truncam o início do período", async () => {
     const longo = [linha("PAUSA", 1, t0), ...Array.from({ length: 1100 }, (_, i) => linha("PAUSA", i + 2, t1))];
     expect(await consultarInicioCronometroPausa(banco(longo) as any, { ...escopo, estado: "PAUSA", versao: 1101 })).toBe(t0);
+  });
+
+  test("Pausa para saída: qualquer mudança de estado zera; repetir o mesmo estado preserva", async () => {
+    const linhas = [
+      linha("ONLINE", 1, "2026-09-17T13:00:00.000Z"),
+      linha("PAUSA", 2, t0), linha("PAUSA_SAIDA", 3, t1), linha("PAUSA_SAIDA", 4, t2),
+      linha("PAUSA", 5, t2),
+    ];
+    const ler = (estado: "PAUSA" | "PAUSA_SAIDA", versao: number) =>
+      consultarInicioCronometroPausa(banco(linhas) as any, { ...escopo, estado, versao });
+    expect(await ler("PAUSA", 2)).toBe(t0);
+    expect(await ler("PAUSA_SAIDA", 3)).toBe(t1); // mudou de Pausa para Pausa para saída: recomeça
+    expect(await ler("PAUSA_SAIDA", 4)).toBe(t1); // mesmo estado repetido: preserva
+    expect(await ler("PAUSA", 5)).toBe(t2); // voltou a Pausa: recomeça de novo
   });
 
   test("falha na leitura não apaga a contagem nem transforma pausa salva em falha", async () => {

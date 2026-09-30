@@ -18,10 +18,14 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     expect(r.motivo).toBe("status OFFLINE");
   });
 
-  test("Pausa recebe reservas quando ainda não tem 10", () => {
-    const r = verificarElegibilidade({ ...base, status: "PAUSA", emPausa: true });
-    expect(r.eligible_for_nina_handoff).toBe(true);
-    expect(r.user_online).toBe(false);
+  test("Pausa e Pausa para saída não recebem novas conversas", () => {
+    const pausa = verificarElegibilidade({ ...base, status: "PAUSA", emPausa: true });
+    expect(pausa.eligible_for_nina_handoff).toBe(false);
+    expect(pausa.user_online).toBe(false);
+    expect(pausa.motivo).toBe("status PAUSA");
+    const saida = verificarElegibilidade({ ...base, status: "PAUSA_SAIDA" });
+    expect(saida.eligible_for_nina_handoff).toBe(false);
+    expect(saida.motivo).toBe("status PAUSA_SAIDA");
   });
 
   test("sem escolha manual registrada, não recebe", () => {
@@ -56,13 +60,14 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     expect(pool.map((c) => c.userId)).toEqual(["do-setor"]);
   });
 
-  test("pool considera Online e Pausa com espaço", () => {
+  test("pool considera apenas quem está Online", () => {
     const pool = poolElegivel([
       { ...base, userId: "online" },
       { ...base, userId: "offline", status: "OFFLINE" },
       { ...base, userId: "pausa", status: "PAUSA", emPausa: true },
+      { ...base, userId: "saida", status: "PAUSA_SAIDA" },
       { ...base, userId: "sem-escolha", status: null },
     ]);
-    expect(pool.map((c) => c.userId)).toEqual(["online", "pausa"]);
+    expect(pool.map((c) => c.userId)).toEqual(["online"]);
   });
 });

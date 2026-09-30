@@ -27,15 +27,15 @@ export async function carregarDadosCentralAtencao(
       let query = supabase
         .from("atend_conversas")
         .select(
-          "id, contato_nome, whatsapp_profile_name, contato_telefone, atribuida_user_id, fila_pendente, owner_type, status",
+          "id, contato_nome, whatsapp_profile_name, contato_telefone, atribuida_user_id, owner_type, status",
         )
         .eq("clinica_id", clinicaId)
         .eq("is_teste", false)
         .not("status", "in", "(closed,finished)")
         .order("id", { ascending: true })
         .limit(TAMANHO_PAGINA);
-      // Mantém a privacidade da fila individual: atendentes veem só a própria
-      // e as conversas da Nina que já podem acompanhar na Inbox.
+      // Atendentes veem só as próprias conversas e as da Nina que já podem acompanhar
+      // na Inbox; a fila global sem responsável é só da gestão.
       if (!gestor) query = query.or(`atribuida_user_id.eq.${userId},owner_type.eq.AI`);
       if (depoisDe) query = query.gt("id", depoisDe);
       const { data, error } = await query;
@@ -53,16 +53,16 @@ export async function carregarDadosCentralAtencao(
   async function carregarPausasVisiveis() {
     type Presenca = Pick<
       Database["public"]["Tables"]["atend_agente_presenca"]["Row"],
-      "user_id" | "estado_manual_versao"
+      "user_id" | "estado_manual_versao" | "estado_manual"
     >;
     const presencas: Presenca[] = [];
     let depoisDe: string | null = null;
     while (true) {
       let query = supabase
         .from("atend_agente_presenca")
-        .select("user_id, estado_manual_versao")
+        .select("user_id, estado_manual_versao, estado_manual")
         .eq("clinica_id", clinicaId)
-        .eq("estado_manual", "PAUSA")
+        .in("estado_manual", ["PAUSA", "PAUSA_SAIDA"])
         .order("user_id", { ascending: true })
         .limit(TAMANHO_PAGINA);
       if (!gestor) query = query.eq("user_id", userId);
@@ -85,13 +85,14 @@ export async function carregarDadosCentralAtencao(
       if (data.length < TAMANHO_PAGINA) break;
       depoisDe = data[data.length - 1].user_id;
     }
-    const pausas: { atendenteId: string; inicio: string | null }[] = [];
+    const pausas: { atendenteId: string; inicio: string | null; tipo: "PAUSA" | "PAUSA_SAIDA" }[] = [];
     // Reutiliza a mesma leitura da sidebar, com concorrência limitada por clínica.
     for (let i = 0; i < presencas.length; i += 8) {
       pausas.push(
         ...(await Promise.all(
           presencas.slice(i, i + 8).map(async (p) => ({
             atendenteId: p.user_id,
+            tipo: (p.estado_manual === "PAUSA_SAIDA" ? "PAUSA_SAIDA" : "PAUSA") as "PAUSA" | "PAUSA_SAIDA",
             // Gestor pode acompanhar a equipe, mas o log bruto é restrito a admin/próprio.
             // Após can_manage_clinica, lê apenas o início das presenças já autorizadas
             // pela consulta autenticada. Nunca retorna o histórico ou remove seu RLS.
@@ -99,7 +100,7 @@ export async function carregarDadosCentralAtencao(
               (await lerInicioCronometroPausa(gestor ? historicoGestao : supabase, {
                 clinicaId,
                 userId: p.user_id,
-                estado: "PAUSA",
+                estado: p.estado_manual === "PAUSA_SAIDA" ? "PAUSA_SAIDA" : "PAUSA",
                 versao: p.estado_manual_versao,
               })) ?? null,
           })),

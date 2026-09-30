@@ -5,31 +5,29 @@ import { conversaVisivelNoEscopo, usuarioPodeVerConversa } from "../atendimento/
 import { patchListaPorConversa } from "../atendimento/patch-inbox";
 import { escopoParaConversa } from "../atendimento/deep-link";
 
-const agent = (id: string, status: "ONLINE" | "PAUSA" | "OFFLINE", extra: Partial<CandidatoDistribuicao> = {}): CandidatoDistribuicao => ({
+const agent = (id: string, status: "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE", extra: Partial<CandidatoDistribuicao> = {}): CandidatoDistribuicao => ({
   userId: id, status, temTelefonia: true, ...extra,
 });
 
-describe("distribuição Online/Pausa e fila global", () => {
-  test("não prioriza Online; desempate usa carga, última atribuição e id", () => {
-    expect(poolElegivel([agent("online", "ONLINE", { cargaAtiva: 5 }), agent("pausa", "PAUSA", { cargaNaoAtribuida: 2 })])[0].userId).toBe("pausa");
-    expect(poolElegivel([agent("online", "ONLINE", { cargaAtiva: 4 }), agent("pausa", "PAUSA", { cargaAtiva: 3, cargaNaoAtribuida: 2 })])[0].userId).toBe("online");
-    expect(poolElegivel([agent("a", "ONLINE", { ultimaAtribuicaoEm: "2026-09-17T12:00:00Z" }), agent("b", "PAUSA", { ultimaAtribuicaoEm: "2026-09-17T11:00:00Z" })])[0].userId).toBe("b");
+describe("distribuição só para Online e fila global sem dono", () => {
+  test("pausas e offline nunca entram no pool; desempate usa carga, última atribuição e id", () => {
+    expect(poolElegivel([agent("online", "ONLINE", { cargaAtiva: 5 }), agent("pausa", "PAUSA"), agent("saida", "PAUSA_SAIDA")]).map(c => c.userId)).toEqual(["online"]);
+    expect(poolElegivel([agent("a", "ONLINE", { cargaAtiva: 4 }), agent("b", "ONLINE", { cargaAtiva: 3 })])[0].userId).toBe("b");
+    expect(poolElegivel([agent("a", "ONLINE", { ultimaAtribuicaoEm: "2026-09-17T12:00:00Z" }), agent("b", "ONLINE", { ultimaAtribuicaoEm: "2026-09-17T11:00:00Z" })])[0].userId).toBe("b");
   });
-  test("duas pausas recebem 10 cada; sobra fica global e Offline não participa", () => {
-    const r = simularFila([agent("a", "PAUSA"), agent("b", "PAUSA"), agent("c", "OFFLINE")], 25);
-    expect(r.atribuicoes.filter(x => x === "a")).toHaveLength(10);
-    expect(r.atribuicoes.filter(x => x === "b")).toHaveLength(10);
-    expect(r.atribuicoes).not.toContain("c");
-    expect(r.naoAtribuidas).toBe(5);
+  test("duas pausas não recebem nada; tudo fica na fila global até alguém ficar Online", () => {
+    const r = simularFila([agent("a", "PAUSA"), agent("b", "PAUSA_SAIDA"), agent("c", "OFFLINE")], 25);
+    expect(r.atribuicoes.every(x => x === null)).toBe(true);
+    expect(r.naoAtribuidas).toBe(25);
   });
-  test("Online recebe sem limite; teto da Pausa usa apenas as reservas", () => {
+  test("Online recebe sem limite, sem teto de reservas", () => {
     expect(simularFila([agent("a", "ONLINE", { cargaAtiva: 100, capacidadeMaxima: 1 })], 35).naoAtribuidas).toBe(0);
-    expect(verificarElegibilidade(agent("b", "PAUSA", { cargaAtiva: 100, cargaNaoAtribuida: 9 })).eligible_for_nina_handoff).toBe(true);
-    expect(verificarElegibilidade(agent("b", "PAUSA", { cargaNaoAtribuida: 10 })).eligible_for_nina_handoff).toBe(false);
+    expect(verificarElegibilidade(agent("b", "PAUSA", { cargaAtiva: 0 })).eligible_for_nina_handoff).toBe(false);
   });
-  test("revalidação muda o destino ao entrar em Pausa e recusa Offline", () => {
-    expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", "PAUSA") }).destino).toBe("fila_individual");
-    expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", "OFFLINE") }).destino).toBe("nao_atribuidas");
+  test("revalidação: quem entra em Pausa, Pausa para saída ou Offline antes de gravar é descartado", () => {
+    for (const novo of ["PAUSA", "PAUSA_SAIDA", "OFFLINE"] as const)
+      expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", novo) }).destino).toBe("nao_atribuidas");
+    expect(simularAtribuicao([agent("a", "ONLINE")]).destino).toBe("atribuida");
   });
   test("auditoria aceita reserva em Pausa sem afirmar que estava Online", () => {
     const audit = {
@@ -45,25 +43,26 @@ describe("distribuição Online/Pausa e fila global", () => {
   });
 });
 
-describe("visibilidade da fila individual", () => {
-  const own = { id: "c", atribuida_user_id: "a", fila_pendente: true, status: "waiting", owner_type: "HUMAN" };
-  test("reserva fica privada no acesso, no link e nos filtros", () => {
-    expect(usuarioPodeVerConversa(own, { userId: "a", gestor: false })).toBe(true);
-    expect(usuarioPodeVerConversa(own, { userId: "b", gestor: false })).toBe(false);
-    expect(usuarioPodeVerConversa(own, { userId: "b", gestor: true })).toBe(true);
-    expect(escopoParaConversa(own, { userId: "a", gestor: false, escopoAtual: "minhas" })).toBe("nao_atribuidas");
-    expect(conversaVisivelNoEscopo(own, { userId: "a", gestor: false, escopo: "minhas" })).toBe(false);
+describe("visibilidade da fila global (sem responsável)", () => {
+  const dela = { id: "c", atribuida_user_id: "a", status: "waiting", owner_type: "HUMAN" };
+  const global = { id: "g", atribuida_user_id: null, status: "waiting", owner_type: "NONE" };
+  test("conversa com dono é só da pessoa (e da gestão) no acesso, no link e nos filtros", () => {
+    expect(usuarioPodeVerConversa(dela, { userId: "a", gestor: false })).toBe(true);
+    expect(usuarioPodeVerConversa(dela, { userId: "b", gestor: false })).toBe(false);
+    expect(usuarioPodeVerConversa(dela, { userId: "b", gestor: true })).toBe(true);
+    expect(escopoParaConversa(dela, { userId: "a", gestor: false, escopoAtual: "minhas" })).toBe("minhas");
+    expect(conversaVisivelNoEscopo(dela, { userId: "a", gestor: false, escopo: "minhas" })).toBe(true);
   });
-  test("supervisão vê o excedente global; atendente vê apenas suas reservas", () => {
-    const global = { ...own, atribuida_user_id: null, fila_pendente: false };
+  test("a fila global sem responsável é só da gestão", () => {
     expect(conversaVisivelNoEscopo(global, { userId: "a", gestor: true, escopo: "nao_atribuidas" })).toBe(true);
     expect(conversaVisivelNoEscopo(global, { userId: "a", gestor: false, escopo: "nao_atribuidas" })).toBe(false);
+    expect(usuarioPodeVerConversa(global, { userId: "a", gestor: false })).toBe(false);
+    expect(escopoParaConversa(global, { userId: "a", gestor: false, escopoAtual: "minhas" })).toBeNull();
   });
-  test("primeira resposta remove da fila e entra em Ativas mesmo se status já era active", () => {
-    const before = { ...own, status: "active" };
-    const after = { ...before, fila_pendente: false };
+  test("ao ser distribuída a alguém Online, a conversa sai da global e entra direto em Ativas", () => {
+    const distribuida = { ...global, atribuida_user_id: "a", status: "active", owner_type: "HUMAN" };
     const ctx = { userId: "a", gestor: false, buscando: false };
-    expect(patchListaPorConversa([before], after, { ...ctx, escopo: "nao_atribuidas" }).lista).toHaveLength(0);
-    expect(patchListaPorConversa([], after, { ...ctx, escopo: "minhas" }).lista).toHaveLength(1);
+    expect(patchListaPorConversa([global], distribuida, { ...ctx, gestor: true, escopo: "nao_atribuidas", userId: "gestor" }).lista).toHaveLength(0);
+    expect(patchListaPorConversa([], distribuida, { ...ctx, escopo: "minhas" }).lista).toHaveLength(1);
   });
 });
