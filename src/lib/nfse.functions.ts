@@ -778,7 +778,9 @@ export const avancarRpsProximoNumero = createServerFn({ method: "POST" })
       const { error: upErr } = await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: data.novo_numero })
-        .eq("id", data.emitente_id);
+        .eq("id", data.emitente_id)
+        // Nunca abaixa: se outra emissão já passou desse número, não grava.
+        .lt("rps_proximo_numero", data.novo_numero);
       if (upErr) return { ok: false, motivo: upErr.message };
       return { ok: true, novo_numero: data.novo_numero, anterior };
     },
