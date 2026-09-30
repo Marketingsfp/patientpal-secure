@@ -1,10 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
-import {
-  ListaRespostasRapidas,
-  useRespostasFiltradas,
-  useRespostasRapidas,
-} from "@/components/nina/RespostasRapidas";
+import { ListaRespostasRapidas, useRespostasFiltradas, useRespostasRapidas } from "@/components/nina/RespostasRapidas";
 import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
 import {
   aplicarVariaveis,
@@ -17,9 +13,7 @@ import {
 } from "@/lib/atendimento/respostas-rapidas";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { ehEstadoPausa, type EstadoManualPresenca } from "@/lib/atendimento/presenca-manual";
-import type {
-  ResultadoPresencaDistribuicao,
-} from "@/lib/atendimento/distribuicao-contrato";
+import type { ResultadoPresencaDistribuicao } from "@/lib/atendimento/distribuicao-contrato";
 import { avisoPresencaConfirmada } from "@/components/nina/distribuicao-fila-ui";
 import {
   CONTROLE_INICIAL,
@@ -47,35 +41,18 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  EVENTO_FILTRAR_NAO_ATRIBUIDAS,
-  FILTRO_NAO_ATRIBUIDAS_KEY,
-} from "@/components/nina/BannerNaoAtribuidas";
+import { EVENTO_FILTRAR_NAO_ATRIBUIDAS, FILTRO_NAO_ATRIBUIDAS_KEY } from "@/components/nina/BannerNaoAtribuidas";
 import {
   ABRIR_CONVERSA_KEY,
   ABRIR_MENSAGEM_KEY,
-
   EVENTO_ABRIR_CONVERSA,
   EVENTO_FILTRAR_ESPERA_CRITICA,
   FILTRO_ESPERA_CRITICA_KEY,
 } from "@/lib/atendimento/central-atencao";
 import { faixaEsperaDesde, minutosDesde } from "@/lib/atendimento/espera";
 
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Send,
   Loader2,
@@ -101,52 +78,38 @@ import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-rotea
 // FASE 3 — a linha entregue pelo tempo real é usada direto (sem nova consulta).
 import { normalizarMensagemRealtime } from "@/lib/atendimento/mensagem-realtime";
 // FASE 1 — telemetria de latência (só medição; desligada por padrão).
-import {
-  abrirTrace,
-  anexarMarcasDoServidor,
-  marcarEtapa,
-  obterTrace,
-} from "@/lib/atendimento/latencia-cliente";
+import { abrirTrace, anexarMarcasDoServidor, marcarEtapa, obterTrace } from "@/lib/atendimento/latencia-cliente";
 import { criarReconciliadorRetomada, motivoDeRetomada } from "@/lib/atendimento/retomada";
-import {
-  criarWatchdog,
-  registrarDiagnostico,
-  INTERVALO_FALLBACK_MS,
-} from "@/lib/atendimento/watchdog-realtime";
+import { criarWatchdog, registrarDiagnostico, INTERVALO_FALLBACK_MS } from "@/lib/atendimento/watchdog-realtime";
 import {
   aplicarPreviaLocalEnvio,
   atualizarMensagemNoCache,
   transformarMensagensNoCache,
 } from "@/lib/atendimento/pos-envio";
 import { patchListaPorConversa, patchListaPorMensagem } from "@/lib/atendimento/patch-inbox";
-import {
-  mesclarNovas,
-  mesclarEventos,
-} from "@/lib/atendimento/atualizacao-incremental";
+import { mesclarNovas, mesclarEventos } from "@/lib/atendimento/atualizacao-incremental";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { useHistoricoAnterior } from "@/hooks/use-historico-anterior";
 import { listarPaginaHistorico } from "@/lib/atendimento/historico-paginado.functions";
-import { montarPaginaHistorico, manterNaJanelaRecente, type PaginaHistorico, type CursorHistorico } from "@/lib/atendimento/historico-paginado";
+import {
+  montarPaginaHistorico,
+  manterNaJanelaRecente,
+  type PaginaHistorico,
+  type CursorHistorico,
+} from "@/lib/atendimento/historico-paginado";
 import { rotuloNovasMensagens } from "@/lib/atendimento/scroll-chat";
 import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
 import { posicionarEncerramentoAposConclusao } from "@/lib/atendimento/timeline-encerramento";
 import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 
 import { mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
-import {
-  ConversationSystemEvent,
-  type ConversaEvento,
-} from "@/components/nina/ConversationSystemEvent";
+import { ConversationSystemEvent, type ConversaEvento } from "@/components/nina/ConversationSystemEvent";
 import {
   agruparTimeline,
   handoffsAguardandoAtendente,
   type ItemTimelineAgrupado,
 } from "@/lib/atendimento/timeline-grupos";
-import {
-  AtribuicaoGroupCard,
-  EsperaAtendenteCard,
-  HandoffGroupCard,
-} from "@/components/nina/ConversationEventGroup";
+import { AtribuicaoGroupCard, EsperaAtendenteCard, HandoffGroupCard } from "@/components/nina/ConversationEventGroup";
 import {
   listarConversas,
   obterConversa,
@@ -171,36 +134,20 @@ import {
   assumirConversa,
   marcarLida,
 } from "@/lib/atendimento.functions";
-import {
-  aplicarReconciliacao,
-  deveRegistrarLeituraVisivel,
-} from "@/lib/atendimento/leitura-inbox";
-
+import { aplicarReconciliacao, deveRegistrarLeituraVisivel } from "@/lib/atendimento/leitura-inbox";
 
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
-import {
-  conversasDesatualizadas,
-  criarCacheConversas,
-  respostaAindaVale,
-} from "@/lib/atendimento/conversa-cache";
+import { conversasDesatualizadas, criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
 import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
 
 import { CacheContatos, planoAberturaContato } from "@/lib/atendimento/contato-cache";
-import {
-  mesclarAnteriores,
-} from "@/lib/atendimento/mensagens-janela";
+import { mesclarAnteriores } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
-import {
-  contarCicloInbox,
-  iniciarTroca,
-  marcarCache,
-  marcarTroca,
-  medirRequest,
-} from "@/lib/atendimento/perf-troca";
+import { contarCicloInbox, iniciarTroca, marcarCache, marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -249,7 +196,10 @@ import { estadoFiltroAtendente, filtroAtendenteAtual } from "@/lib/atendimento/f
 import { FiltrosAtendente } from "@/components/nina/FiltrosAtendente";
 import { AgendamentosContato } from "@/components/nina/AgendamentosContato";
 import { SeletorStatusPresenca } from "@/components/nina/SeletorStatusPresenca";
-import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
+import {
+  atualizarCronometroPausa,
+  type CronometroPausa as EstadoCronometroPausa,
+} from "@/lib/atendimento/cronometro-pausa";
 import {
   MSG_ADMIN_NAO_RESPONDE_AQUI,
   MSG_DESTINO_EM_PAUSA,
@@ -263,9 +213,7 @@ import {
   type PresencaAtendente,
 } from "@/lib/atendimento/perfil-atendimento";
 
-import {
-  formatarNumeroConversa,
-} from "@/lib/atendimento/numero-conversa";
+import { formatarNumeroConversa } from "@/lib/atendimento/numero-conversa";
 import {
   SEM_NOME,
   nomeContato,
@@ -290,7 +238,6 @@ import {
   revalidarChatSelecionado,
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
-
 
 /**
  * Copia apenas o número visível da conversa (ex.: "#1342").
@@ -426,11 +373,10 @@ export function AtendInbox() {
     // FASE 4 — ao trocar de clínica (ou recarregar) o filtro volta ao que foi
     // usado NAQUELA clínica; nunca a um atendente de outra.
     setBuscaAtendente("");
-    const salvo = lerFiltrosInbox(
-      typeof window === "undefined" ? null : window.localStorage,
-      clinicaId,
-      { gestor: souGestor, usuariosIds: usuarios.map((u: any) => String(u.user_id)) },
-    );
+    const salvo = lerFiltrosInbox(typeof window === "undefined" ? null : window.localStorage, clinicaId, {
+      gestor: souGestor,
+      usuariosIds: usuarios.map((u: any) => String(u.user_id)),
+    });
     setEscopoBase(salvo.base);
     setVisualizacao(salvo.visualizacao);
     setAtendenteEscolhidoId(salvo.atendenteId);
@@ -516,7 +462,6 @@ export function AtendInbox() {
     if (selecaoId) marcarTroca("T1b_url", selecaoId);
   }, [selecaoId]);
 
-
   // Montagens/desmontagens da Inbox: a Fase 1 precisa continuar em zero por
   // troca de conversa. Contadas aqui e expostas para a medição.
   useEffect(() => {
@@ -597,9 +542,7 @@ export function AtendInbox() {
       atendenteId: atendenteSelecionadoId,
     });
     if (souGestor && soCriticas) {
-      base = base.filter(
-        (c: any) => faixaEsperaDesde(espera[c.id]) === "critico",
-      );
+      base = base.filter((c: any) => faixaEsperaDesde(espera[c.id]) === "critico");
     }
     // FASE 2 — o recorte de "paciente aguardando" já vem do backend. Aqui só
     // sobra a ordenação exata pela métrica canônica e a remoção de conversas
@@ -638,22 +581,18 @@ export function AtendInbox() {
     };
   }, []);
 
-
   // Rascunho por conversa: o texto digitado para um paciente nunca aparece
   // no campo de outro.
   const [rascunhos, setRascunhos] = useState<Rascunhos>({});
   const draft = lerRascunho(rascunhos, sel?.id ?? null);
-  const setDraft = useCallback(
-    (valor: string | ((anterior: string) => string)) => {
-      const id = selIdRef.current;
-      setRascunhos((prev) => {
-        const atual = lerRascunho(prev, id);
-        const texto = typeof valor === "function" ? valor(atual) : valor;
-        return texto ? gravarRascunho(prev, id, texto) : limparRascunho(prev, id);
-      });
-    },
-    [],
-  );
+  const setDraft = useCallback((valor: string | ((anterior: string) => string)) => {
+    const id = selIdRef.current;
+    setRascunhos((prev) => {
+      const atual = lerRascunho(prev, id);
+      const texto = typeof valor === "function" ? valor(atual) : valor;
+      return texto ? gravarRascunho(prev, id, texto) : limparRascunho(prev, id);
+    });
+  }, []);
   /**
    * Limpa o rascunho de UMA conversa específica (a de origem da ação), mesmo
    * que a atendente já tenha aberto outra enquanto o envio terminava.
@@ -673,8 +612,8 @@ export function AtendInbox() {
   const [statusCarregado, setStatusCarregado] = useState(false);
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
   const [cronometroPausa, setCronometroPausa] = useState<EstadoCronometroPausa | null>(null);
-  const inicioCronometroPausa = cronometroPausa?.clinicaId === clinicaId && cronometroPausa?.userId === meuId
-    ? cronometroPausa.inicio : null;
+  const inicioCronometroPausa =
+    cronometroPausa?.clinicaId === clinicaId && cronometroPausa?.userId === meuId ? cronometroPausa.inicio : null;
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
   // barra de rolagem (ver use-hover-tolerante).
@@ -688,18 +627,21 @@ export function AtendInbox() {
   });
   const painelAberto = painelFixado || painelHover || painelMenuAberto;
 
-
   useEffect(() => {
     try {
       setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
-    } catch { /* Sem armazenamento local, mantém a preferência desta sessão. */ }
+    } catch {
+      /* Sem armazenamento local, mantém a preferência desta sessão. */
+    }
   }, []);
   const alternarFixado = () => {
     setPainelFixado((v) => {
       const nv = !v;
       try {
         localStorage.setItem("nina.inbox.fixado", nv ? "1" : "0");
-      } catch { /* A preferência visual ainda vale no estado da tela. */ }
+      } catch {
+        /* A preferência visual ainda vale no estado da tela. */
+      }
       return nv;
     });
   };
@@ -712,18 +654,21 @@ export function AtendInbox() {
   useEffect(() => {
     try {
       setContatoFixado(localStorage.getItem("nina.contato.fixado") === "1");
-    } catch { /* Sem armazenamento local, mantém a preferência desta sessão. */ }
+    } catch {
+      /* Sem armazenamento local, mantém a preferência desta sessão. */
+    }
   }, []);
   const alternarContatoFixado = () => {
     setContatoFixado((v) => {
       const nv = !v;
       try {
         localStorage.setItem("nina.contato.fixado", nv ? "1" : "0");
-      } catch { /* A preferência visual ainda vale no estado da tela. */ }
+      } catch {
+        /* A preferência visual ainda vale no estado da tela. */
+      }
       return nv;
     });
   };
-
 
   // FASE 4 — guarda de concorrência: só vale a informação MAIS NOVA do mesmo
   // escopo (clínica + atendente). Resposta atrasada, heartbeat, reconexão ou
@@ -741,10 +686,7 @@ export function AtendInbox() {
     if (!clinicaId || !meuId) return;
     const seq = ++seqPresenca.current;
     try {
-      const [s, p] = await Promise.all([
-        meuStatusFn({ data: { clinicaId } }),
-        pausaAtualFn({ data: { clinicaId } }),
-      ]);
+      const [s, p] = await Promise.all([meuStatusFn({ data: { clinicaId } }), pausaAtualFn({ data: { clinicaId } })]);
       if (`${clinicaId}:${meuId}` !== escopoPresencaAtual.current) return;
       const estado = (s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null;
       const versao = (s as { estadoManualVersao?: number }).estadoManualVersao ?? 0;
@@ -756,11 +698,16 @@ export function AtendInbox() {
       setStatusCarregado(true);
       if (!r.aceita) return; // resposta fora de ordem: mantém a escolha atual
       sincronia.current = r.estado;
-      setCronometroPausa((atual) => atualizarCronometroPausa(atual, {
-        clinicaId, userId: meuId, estado, versao,
-        em: s.estadoManualEm,
-        cronometroPausaInicio: s.cronometroPausaInicio,
-      }));
+      setCronometroPausa((atual) =>
+        atualizarCronometroPausa(atual, {
+          clinicaId,
+          userId: meuId,
+          estado,
+          versao,
+          em: s.estadoManualEm,
+          cronometroPausaInicio: s.cronometroPausaInicio,
+        }),
+      );
       setFilaAberta(s.filaAberta);
       setEstadoManual(estado);
       setVersaoPresenca(versao);
@@ -851,7 +798,6 @@ export function AtendInbox() {
     };
   }, [clinicaId, carregarStatusAgente]);
 
-
   const alternarFila = async (abrir: boolean) => {
     if (!clinicaId) return;
     try {
@@ -873,10 +819,16 @@ export function AtendInbox() {
     }
     if (r.versao < sincronia.current.versao) return null;
     if (clinicaId && meuId) {
-      setCronometroPausa((atual) => atualizarCronometroPausa(atual, {
-        clinicaId, userId: meuId, estado: r.estado, versao: r.versao,
-        em: r.em, cronometroPausaInicio: r.cronometroPausaInicio,
-      }));
+      setCronometroPausa((atual) =>
+        atualizarCronometroPausa(atual, {
+          clinicaId,
+          userId: meuId,
+          estado: r.estado,
+          versao: r.versao,
+          em: r.em,
+          cronometroPausaInicio: r.cronometroPausaInicio,
+        }),
+      );
     }
     setEstadoManual(r.estado);
     setControle((c) => presAoConfirmar(c, r.estado));
@@ -891,8 +843,12 @@ export function AtendInbox() {
     };
     if (clinicaId && meuId)
       avisarOutrasAbas({
-        clinicaId, userId: meuId, estado: r.estado, versao: r.versao,
-        em: r.em, cronometroPausaInicio: r.cronometroPausaInicio,
+        clinicaId,
+        userId: meuId,
+        estado: r.estado,
+        versao: r.versao,
+        em: r.em,
+        cronometroPausaInicio: r.cronometroPausaInicio,
       });
     return r;
   };
@@ -931,7 +887,6 @@ export function AtendInbox() {
       mostrarErro(e);
     }
   };
-
 
   // Perfil de gestor: só ele enxerga a opção "Todas da clínica".
   useEffect(() => {
@@ -1008,17 +963,20 @@ export function AtendInbox() {
       visualizacao,
     });
     try {
-      const brutas = await medirRequest("listarConversas", listarConvs({
-        data: {
-          clinicaId,
-          status: filtroStatus,
-          canal: "todos",
-          escopo,
-          atendenteId: atendenteSelecionadoId,
-          visualizacao,
-          limit: 100,
-        },
-      }));
+      const brutas = await medirRequest(
+        "listarConversas",
+        listarConvs({
+          data: {
+            clinicaId,
+            status: filtroStatus,
+            canal: "todos",
+            escopo,
+            atendenteId: atendenteSelecionadoId,
+            visualizacao,
+            limit: 100,
+          },
+        }),
+      );
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
@@ -1043,17 +1001,18 @@ export function AtendInbox() {
       ) {
         // Trocar de aba ou responder na fila pode tirar o card da lista.
         // A leitura autenticada confirma que o chat ainda pertence à atendente.
-        confirmadaForaLista = await revalidarChatSelecionado(() => obterConversaFn({
-          data: { clinicaId, conversaId: selecionadaParaConferir.id },
-        }));
+        confirmadaForaLista = await revalidarChatSelecionado(() =>
+          obterConversaFn({
+            data: { clinicaId, conversaId: selecionadaParaConferir.id },
+          }),
+        );
         if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
-        if (selIdRef.current !== selecionadaParaConferir.id ||
-            selecaoIdRef.current !== selecionadaParaConferir.id) return;
+        if (selIdRef.current !== selecionadaParaConferir.id || selecaoIdRef.current !== selecionadaParaConferir.id)
+          return;
       }
       // Filtro e status não encerram a seleção. Só uma perda comprovada de
       // acesso ou de contexto pode retirar uma conversa já aberta.
-      if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
-        deepLinkPendente.current = null;
+      if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current) deepLinkPendente.current = null;
       const removeu = selecaoDeveSair({
         selecionada: (selRef.current as any) ?? null,
         linhas: rows as any,
@@ -1062,8 +1021,7 @@ export function AtendInbox() {
         confirmadaForaLista,
       });
       if (!removeu && confirmadaForaLista) {
-        setSel((atual: any) => atual?.id === confirmadaForaLista.id
-          ? { ...atual, ...confirmadaForaLista } : atual);
+        setSel((atual: any) => (atual?.id === confirmadaForaLista.id ? { ...atual, ...confirmadaForaLista } : atual));
       }
       if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
         deepLinkPendente.current = null;
@@ -1130,9 +1088,19 @@ export function AtendInbox() {
     } catch (e: any) {
       mostrarErro(e);
     }
-  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, listarConvs, carregarContadores, meuId, souGestor, abrirConversa, obterConversaFn]);
-
-
+  }, [
+    clinicaId,
+    filtroStatus,
+    escopo,
+    atendenteSelecionadoId,
+    visualizacao,
+    listarConvs,
+    carregarContadores,
+    meuId,
+    souGestor,
+    abrirConversa,
+    obterConversaFn,
+  ]);
 
   // A conversa aberta é sempre a da seleção interna. Quando ela muda (clique
   // na lista, busca por número, Central de Atenção, alerta), o conteúdo
@@ -1183,9 +1151,7 @@ export function AtendInbox() {
         deepLinkTentado.current.delete(idPedido);
         deepLinkPendente.current = destino !== escopo ? idPedido : null;
         setSel(row);
-        setConvs((prev: any[]) =>
-          prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
-        );
+        setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
         if (destino !== escopo) {
           // Link direto: traduz o escopo antigo para os dois eixos atuais.
           const alvo = estadoDeEscopoLegado(destino);
@@ -1249,9 +1215,6 @@ export function AtendInbox() {
     return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, handler);
   }, [abrirConversa]);
 
-
-
-
   // Prefetch controlado: ao passar o mouse (ou focar pelo teclado) num lead,
   // o conteúdo dele já vai para o cache. Nunca baixa a lista inteira: só a
   // conversa apontada e apenas uma vez enquanto estiver em cache.
@@ -1271,8 +1234,7 @@ export function AtendInbox() {
           // Se a conversa foi invalidada (mensagem nova, transferência) ou a
           // clínica/usuário mudou enquanto a busca vinha, o resultado é
           // descartado — nunca repovoa o cache com conteúdo velho.
-          if (!prefetchMsgs.current.resultadoValido(id, entrada, chavePrefetch(clinicaId, meuId)))
-            return;
+          if (!prefetchMsgs.current.resultadoValido(id, entrada, chavePrefetch(clinicaId, meuId))) return;
           if (!cacheConversas.current.obter(id)) {
             cacheConversas.current.guardar(id, {
               msgs: m.mensagens,
@@ -1293,7 +1255,6 @@ export function AtendInbox() {
     },
     [clinicaId, meuId, listarHistorico],
   );
-
 
   // Intenção de abrir: o prefetch só dispara depois de ~150ms com o mouse (ou
   // o foco) parado no lead — evita disparar dezenas de buscas ao passar o
@@ -1356,28 +1317,17 @@ export function AtendInbox() {
     marcarCache("mensagens_cache", !!cacheConversas.current.obter(alvo), alvo);
     const pMensagens = entradaEmVoo
       ? entradaEmVoo.promise
-      : medirRequest(
-          "listarPaginaHistorico",
-          listarHistorico({ data: { clinicaId, conversaId: alvo } }),
-          alvo,
-        );
+      : medirRequest("listarPaginaHistorico", listarHistorico({ data: { clinicaId, conversaId: alvo } }), alvo);
     // A busca fica registrada com a versão atual da conversa. Se a conversa for
     // invalidada (mensagem nova, transferência) ou a clínica/usuário mudarem
     // enquanto a resposta vem, ela não pode mais gravar no cache.
-    const entradaMsgs =
-      entradaEmVoo ?? prefetchMsgs.current.registrar(alvo, chavePf, pMensagens);
+    const entradaMsgs = entradaEmVoo ?? prefetchMsgs.current.registrar(alvo, chavePf, pMensagens);
     const podeGravarCache = () =>
       prefetchMsgs.current.resultadoValido(alvo, entradaMsgs, chavePrefetch(clinicaId, meuId));
-    const pContato = medirRequest(
-      "obterDadosContato",
-      obterContato({ data: { clinicaId, conversaId: alvo } }),
-      alvo,
+    const pContato = medirRequest("obterDadosContato", obterContato({ data: { clinicaId, conversaId: alvo } }), alvo);
+    const pNotas = medirRequest("listarNotas", listarNotasFn({ data: { clinicaId, conversaId: alvo } }), alvo).catch(
+      () => [] as any[],
     );
-    const pNotas = medirRequest(
-      "listarNotas",
-      listarNotasFn({ data: { clinicaId, conversaId: alvo } }),
-      alvo,
-    ).catch(() => [] as any[]);
 
     // Guarda o que as mensagens devolveram: `null` significa que a busca
     // falhou. Falha nunca é gravada no cache como conversa vazia.
@@ -1399,18 +1349,28 @@ export function AtendInbox() {
         // Revalidação com histórico já aberto: mescla em vez de trocar tudo
         // pela janela inicial (as páginas antigas continuam na tela).
         const expandido = historicoExpandidoRef.current && historicoRef.current;
-        setMsgs(prev => preservarOtimistas(prev, mesclarNovas(prev, m).filter(msg =>
-          expandido || msg.optimistic || manterNaJanelaRecente({ em: msg.recebida_em, id: msg.id, tipo: "mensagem" }, pagina),
-        )));
+        setMsgs((prev) =>
+          preservarOtimistas(
+            prev,
+            mesclarNovas(prev, m).filter(
+              (msg) =>
+                expandido ||
+                msg.optimistic ||
+                manterNaJanelaRecente({ em: msg.recebida_em, id: msg.id, tipo: "mensagem" }, pagina),
+            ),
+          ),
+        );
         historicoRef.current = {
           anterior: expandido ? historicoRef.current!.anterior : pagina.anterior,
           posterior: pagina.posterior,
           temMais: expandido ? historicoRef.current!.temMais : pagina.temMais,
         };
         setTemMaisAntigas(historicoRef.current.temMais);
-        setEventos(prev => mesclarEventos(prev, pagina.eventos).filter(ev =>
-          expandido || manterNaJanelaRecente({ em: ev.created_at, id: ev.id, tipo: "evento" }, pagina),
-        ));
+        setEventos((prev) =>
+          mesclarEventos(prev, pagina.eventos).filter(
+            (ev) => expandido || manterNaJanelaRecente({ em: ev.created_at, id: ev.id, tipo: "evento" }, pagina),
+          ),
+        );
         setConversaCarregadaId(alvo);
         // "Mensagens certas visíveis": o estado já é o desta conversa, não
         // um skeleton nem o histórico do lead anterior.
@@ -1437,7 +1397,6 @@ export function AtendInbox() {
         prefetchMsgs.current.concluir(alvo, entradaMsgs);
       }
     })();
-
 
     // 2) Segundo plano — contato e notas entram quando chegarem.
     const secundarios = (async () => {
@@ -1513,8 +1472,6 @@ export function AtendInbox() {
     }
   }, [clinicaId, meuId, sel?.id, listarHistorico, obterContato, listarNotasFn]);
 
-
-
   // Atualização incremental (Fase 4): mensagem nova no Realtime traz apenas o
   // que é novo desta conversa — nada de recarregar contato, notas ou resumo.
   const sincronizarConversa = useCallback(async () => {
@@ -1547,16 +1504,17 @@ export function AtendInbox() {
           if (selIdRef.current !== alvo || cicloHistoricoRef.current !== ciclo) return;
           if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
           if (!pagina.posterior) break;
-          setMsgs(prev => conciliarOtimistas(mesclarNovas(prev, pagina.mensagens)));
-          setEventos(prev => mesclarEventos(prev, pagina.eventos));
+          setMsgs((prev) => conciliarOtimistas(mesclarNovas(prev, pagina.mensagens)));
+          setEventos((prev) => mesclarEventos(prev, pagina.eventos));
           if (historicoRef.current) historicoRef.current.posterior = pagina.posterior;
           const guardado = cacheConversas.current.obter(alvo);
-          if (guardado) cacheConversas.current.guardar(alvo, {
-            ...guardado,
-            msgs: mesclarNovas(guardado.msgs, pagina.mensagens),
-            eventos: mesclarEventos(guardado.eventos, pagina.eventos),
-            historico: historicoRef.current ?? undefined,
-          });
+          if (guardado)
+            cacheConversas.current.guardar(alvo, {
+              ...guardado,
+              msgs: mesclarNovas(guardado.msgs, pagina.mensagens),
+              eventos: mesclarEventos(guardado.eventos, pagina.eventos),
+              historico: historicoRef.current ?? undefined,
+            });
           cursor = pagina.posterior;
           if (!pagina.temMais) break;
         }
@@ -1596,7 +1554,8 @@ export function AtendInbox() {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
     const chavePerfil = `${clinicaId}:${meuId}`;
-    if (!clinicaId || !alvo || carregandoConversa || perfilLeitura?.chave !== chavePerfil || !perfilLeitura.permitida) return;
+    if (!clinicaId || !alvo || carregandoConversa || perfilLeitura?.chave !== chavePerfil || !perfilLeitura.permitida)
+      return;
     const chaveLeitura = `${chavePerfil}:${alvo}`;
     // Mensagens otimistas ainda não existem no banco e não comprovam leitura.
     const ultima = msgs.filter((m: any) => !m.optimistic && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(m.id ?? "")).at(-1);
@@ -1612,8 +1571,7 @@ export function AtendInbox() {
       ultimaMensagemId: mensagemId,
       ultimaRegistradaId: ultimaLidaRef.current.get(chaveLeitura) ?? null,
     };
-    const aberturaPorAlvo =
-      aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem;
+    const aberturaPorAlvo = aberturaPorAlvoRef.current.has(alvo) || buscandoAlvo || !!alvoMensagem;
     const liberado = deveRegistrarLeituraVisivel({ ...base, aberturaPorAlvo, seguindoFim });
     if (!liberado || !mensagemId) return;
 
@@ -1641,9 +1599,7 @@ export function AtendInbox() {
           agrupadores.current?.lista.agendar();
           return;
         }
-        setConvs((prev) =>
-          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: r.valor } : c)),
-        );
+        setConvs((prev) => prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: r.valor } : c)));
       };
       void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
         .then((r: any) => {
@@ -1679,9 +1635,6 @@ export function AtendInbox() {
     alvoMensagem,
     marcarLidaFn,
   ]);
-
-
-
 
   // Uma nota nova atualiza só o painel de apoio; eventos usam a paginação conjunta.
   const carregarApoio = useCallback(async () => {
@@ -1772,13 +1725,17 @@ export function AtendInbox() {
       contactId: (sel as any)?.contato_paciente_id ?? null,
       telefone: (sel as any)?.contato_telefone ?? null,
     });
-    const contatoEmCache =
-      plano.via === "id" ? cacheContatos.current.obter(plano.contactId) : undefined;
+    const contatoEmCache = plano.via === "id" ? cacheContatos.current.obter(plano.contactId) : undefined;
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       const pagina = montarPaginaHistorico(emCache.msgs, emCache.eventos);
       historicoRef.current = { ...pagina, temMais: pagina.temMais || emCache.historico?.temMais === true };
-      cacheConversas.current.guardar(id, { ...emCache, msgs: pagina.mensagens, eventos: pagina.eventos, historico: historicoRef.current });
+      cacheConversas.current.guardar(id, {
+        ...emCache,
+        msgs: pagina.mensagens,
+        eventos: pagina.eventos,
+        historico: historicoRef.current,
+      });
       setTemMaisAntigas(historicoRef.current.temMais);
       setMsgs(pagina.mensagens);
       setEventos(pagina.eventos);
@@ -1802,7 +1759,6 @@ export function AtendInbox() {
     setContato(contatoEmCache ? { ...contatoEmCache, conversa: sel } : null);
     setNotas([]);
   }, [sel?.id, clinicaId, meuId]);
-
 
   // FASE 5 — o vínculo da conversa com o paciente pode nascer depois (cadastro
   // rápido, vínculo manual, identificação pela Nina). Quando o Realtime traz
@@ -1899,8 +1855,6 @@ export function AtendInbox() {
     };
   }, [transferOpen, menuAtendentesAberto, clinicaId, listarUsuariosFn]);
 
-
-
   // Tempo de espera: uma única consulta para toda a lista. O relógio da tela
   // atualiza o texto sozinho; o banco só é consultado quando algo muda
   // (realtime) ou a cada 60s como rede de segurança.
@@ -1910,10 +1864,7 @@ export function AtendInbox() {
     if (!clinicaId || !session) return;
     const pedido = ++seqEspera.current;
     try {
-      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
-        string,
-        string
-      >;
+      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<string, string>;
       if (pedido !== seqEspera.current) return;
       setEspera((prev) => mesclarEspera(prev, m ?? {}));
     } catch {
@@ -2107,8 +2058,10 @@ export function AtendInbox() {
       const g = agrupadores.current;
       if (!g) return;
       watchdog.current.aoEvento();
-      if (evento.table === "atend_leitura_operacional" ||
-          (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT" && evento.new?.direction === "in")) {
+      if (
+        evento.table === "atend_leitura_operacional" ||
+        (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT" && evento.new?.direction === "in")
+      ) {
         const conversaLida = String(evento.new?.conversa_id ?? "");
         if (conversaLida) {
           seqLeituraRef.current.set(conversaLida, (seqLeituraRef.current.get(conversaLida) ?? 0) + 1);
@@ -2135,7 +2088,7 @@ export function AtendInbox() {
           clinicaId: clinicaId ?? null,
           conversaAberta: selIdRef.current,
         });
-        if (r.usar && (evento.eventType !== "UPDATE" || msgsRef.current.some(m => m.id === r.mensagem.id))) {
+        if (r.usar && (evento.eventType !== "UPDATE" || msgsRef.current.some((m) => m.id === r.mensagem.id))) {
           // Mesma mensagem chegando duas vezes (ou junto da resposta do envio)
           // não vira duas bolhas: a chave lógica reconcilia.
           setMsgs((prev) => mesclarNovas(prev, [r.mensagem]));
@@ -2170,12 +2123,16 @@ export function AtendInbox() {
         const atualizada = evento.new;
         const contextoChat = { clinicaId, escopo, userId: meuId, gestor: souGestor };
         if (atualizada?.id === selIdRef.current && podeRevalidarChatEntreFiltros(selRef.current, contextoChat)) {
-          if (chatContinuaEntreFiltros({
-            selecionada: selRef.current, confirmada: atualizada as any, ctx: contextoChat,
-          })) {
+          if (
+            chatContinuaEntreFiltros({
+              selecionada: selRef.current,
+              confirmada: atualizada as any,
+              ctx: contextoChat,
+            })
+          ) {
             // Atualiza o cabeçalho mesmo quando o card sai da lista; mantém
             // seleção, mensagens, rascunho e posição de rolagem do mesmo chat.
-            setSel((atual: any) => atual?.id === atualizada.id ? { ...atual, ...atualizada } : atual);
+            setSel((atual: any) => (atual?.id === atualizada.id ? { ...atual, ...atualizada } : atual));
           } else {
             // Confere perda de acesso/transferência mesmo se o patch já retirou o card.
             g.lista.agendar();
@@ -2229,7 +2186,6 @@ export function AtendInbox() {
       }
     },
   });
-
 
   // Confiança REAL registrada pelo motor para cada resposta da Nina desta
   // conversa. Leitura em lote; nada é calculado na tela.
@@ -2290,7 +2246,9 @@ export function AtendInbox() {
               sistema: i.msg.status === "system" || i.msg.enviada_por === "sistema",
             },
           }
-        : i.item.tipo === "EVENTO" ? { evento: i.item.evento } : {}),
+        : i.item.tipo === "EVENTO"
+          ? { evento: i.item.evento }
+          : {}),
     }));
     const comHandoff = posicionarHandoffAposAviso(comReabertura, (i) => ({
       em: i.at,
@@ -2337,7 +2295,6 @@ export function AtendInbox() {
     setSeguindoFim(chat.novas === 0);
   }, [chat.novas]);
 
-
   // Medição temporária de desempenho (ligue com localStorage "nina:perf"=1):
   // marca quando a conversa terminou de desenhar e quando o scroll ficou no fim.
   useEffect(() => {
@@ -2363,14 +2320,18 @@ export function AtendInbox() {
       historicoExpandidoRef.current = true;
       chat.encerrarAbertura();
     },
-    carregar: () => listarHistorico({ data: {
-      clinicaId: clinicaId!, conversaId: sel.id,
-      antes: historicoRef.current?.anterior ?? undefined,
-    } }),
+    carregar: () =>
+      listarHistorico({
+        data: {
+          clinicaId: clinicaId!,
+          conversaId: sel.id,
+          antes: historicoRef.current?.anterior ?? undefined,
+        },
+      }),
     aplicar: (pagina) => {
       historicoExpandidoRef.current = true;
-      setMsgs(prev => mesclarAnteriores(prev, pagina.mensagens));
-      setEventos(prev => mesclarEventos(pagina.eventos, prev));
+      setMsgs((prev) => mesclarAnteriores(prev, pagina.mensagens));
+      setEventos((prev) => mesclarEventos(pagina.eventos, prev));
       historicoRef.current = {
         anterior: pagina.anterior ?? historicoRef.current?.anterior ?? null,
         posterior: historicoRef.current?.posterior ?? pagina.posterior,
@@ -2379,7 +2340,6 @@ export function AtendInbox() {
       setTemMaisAntigas(pagina.temMais);
     },
   });
-
 
   // Posicionamento na mensagem reportada (exceção à abertura no fim): só
   // acontece quando a conversa foi aberta pelo "Ver conversa" de um erro.
@@ -2392,18 +2352,13 @@ export function AtendInbox() {
 
     const posicionar = () => {
       const cont = chat.containerRef.current;
-      const el = cont?.querySelector(
-        `[data-msg-id="${alvo.mensagemId}"]`,
-      ) as HTMLElement | null;
+      const el = cont?.querySelector(`[data-msg-id="${alvo.mensagemId}"]`) as HTMLElement | null;
       if (!el) return false;
       // A partir daqui a posição é do alvo, não da abertura no fim.
       chat.encerrarAbertura();
       el.scrollIntoView({ block: "center" });
       setMsgDestacada(alvo.mensagemId);
-      window.setTimeout(
-        () => setMsgDestacada((d) => (d === alvo.mensagemId ? null : d)),
-        4000,
-      );
+      window.setTimeout(() => setMsgDestacada((d) => (d === alvo.mensagemId ? null : d)), 4000);
       setAlvoMensagem(null);
       setBuscandoAlvo(false);
       return true;
@@ -2427,8 +2382,7 @@ export function AtendInbox() {
           data: { clinicaId, conversaId: alvo.conversaId, mensagemId: alvo.mensagemId },
         })) as { encontrada: boolean; mensagens: any[] };
         // Troca rápida entre reportes: resposta antiga não mexe na tela.
-        if (cancelado || seqAlvo.current !== alvo.pedido || selIdRef.current !== alvo.conversaId)
-          return;
+        if (cancelado || seqAlvo.current !== alvo.pedido || selIdRef.current !== alvo.conversaId) return;
         if (!r.encontrada) {
           setAlvoIndisponivel(true);
           setAlvoMensagem(null);
@@ -2450,15 +2404,7 @@ export function AtendInbox() {
     return () => {
       cancelado = true;
     };
-  }, [
-    alvoMensagem,
-    conteudoDaConversa,
-    conversaCarregadaId,
-    msgs,
-    clinicaId,
-    chat,
-    carregarJanela,
-  ]);
+  }, [alvoMensagem, conteudoDaConversa, conversaCarregadaId, msgs, clinicaId, chat, carregarJanela]);
 
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
@@ -2531,12 +2477,7 @@ export function AtendInbox() {
     const ags: any[] = contato?.agendamentos ?? [];
     const agora = Date.now();
     const ag = ags
-      .filter(
-        (a) =>
-          String(a?.status ?? "") === "confirmado" &&
-          a?.inicio &&
-          new Date(a.inicio).getTime() >= agora,
-      )
+      .filter((a) => String(a?.status ?? "") === "confirmado" && a?.inicio && new Date(a.inicio).getTime() >= agora)
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())[0];
     const dt = ag?.inicio ? new Date(ag.inicio) : null;
     return {
@@ -2545,9 +2486,7 @@ export function AtendInbox() {
       "patient.phone": p?.telefone ?? "",
       "doctor.name": ag?.medico_nome ?? "",
       "appointment.date": dt ? dt.toLocaleDateString("pt-BR") : "",
-      "appointment.time": dt
-        ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-        : "",
+      "appointment.time": dt ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "",
       "unit.name": (clinicaAtual as any)?.clinica?.nome ?? "",
       "procedure.name": ag?.procedimento ?? "",
       "attendant.name": nomeUsuario(meuId) ?? "",
@@ -2590,42 +2529,44 @@ export function AtendInbox() {
     [ctxVariaveis, slash, draft, clinicaId, registrarUsoFn, sel],
   );
 
-
-
   // Supervisão (admin e gestor) responde no chat da atendente e nas conversas sem responsável,
   // sem assumir: a mensagem fica gravada com o perfil exato e a conversa segue com quem estava
   // (ou sem responsável até alguém clicar em "Assumir conversa"). O admin não responde as da
   // Nina nem as fechadas.
   const meuPerfilSupervisao = perfilSupervisao({ admin: souAdmin, gestor: souGestor });
-  const conversaLivre = !!sel && conversaSemResponsavel({
-    atribuida_user_id: sel.atribuida_user_id,
-    owner_type: sel.owner_type,
-    status: sel.status,
-  });
+  const conversaLivre =
+    !!sel &&
+    conversaSemResponsavel({
+      atribuida_user_id: sel.atribuida_user_id,
+      owner_type: sel.owner_type,
+      status: sel.status,
+    });
   const respondendoComoSupervisao =
     !!meuPerfilSupervisao && !!sel && !souResponsavel && !conversaEncerrada && (!!responsavelId || conversaLivre);
   const motivoBloqueio = !sel
     ? null
-    : souAdmin && !carregandoConversa && !adminPodeResponder({
+    : souAdmin &&
+        !carregandoConversa &&
+        !adminPodeResponder({
           atribuida_user_id: sel.atribuida_user_id,
           owner_type: sel.owner_type,
           status: sel.status,
         })
       ? MSG_ADMIN_NAO_RESPONDE_AQUI
-    : carregandoConversa
-      ? "Carregando conversa…"
-    : conversaEncerrada
-      ? "Conversa encerrada. Não é possível enviar mensagens."
-      : responsavelId && !souResponsavel && !meuPerfilSupervisao
-        ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
-        : !podeAtender
-          ? "Você tem acesso somente de leitura no atendimento."
-          : !filaAberta && !emPausa
-        // Só o Offline (ou a falta de escolha) bloqueia o envio; as duas pausas podem responder.
-        ? "Você está offline. Fique online para enviar mensagens."
-        : janela24hExpirada
-          ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
-          : null;
+      : carregandoConversa
+        ? "Carregando conversa…"
+        : conversaEncerrada
+          ? "Conversa encerrada. Não é possível enviar mensagens."
+          : responsavelId && !souResponsavel && !meuPerfilSupervisao
+            ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
+            : !podeAtender
+              ? "Você tem acesso somente de leitura no atendimento."
+              : !filaAberta && !emPausa
+                ? // Só o Offline (ou a falta de escolha) bloqueia o envio; as duas pausas podem responder.
+                  "Você está offline. Fique online para enviar mensagens."
+                : janela24hExpirada
+                  ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
+                  : null;
 
   /**
    * Assume a conversa. O servidor decide de forma atômica: se outra pessoa
@@ -2647,9 +2588,7 @@ export function AtendInbox() {
       } else if (r?.motivo === "NAO_ENCONTRADA") {
         toast.error("Conversa não encontrada nesta clínica.");
       } else {
-        toast.error(
-          `Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`,
-        );
+        toast.error(`Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`);
       }
       await carregarConvs();
       await carregarConversa();
@@ -2702,12 +2641,13 @@ export function AtendInbox() {
           prefetchMsgs.current.invalidar(origem);
         }
         // Prévia da lista sem recarregar a Inbox; o servidor confirma depois.
-        setConvs((prev) =>
-          aplicarPreviaLocalEnvio(prev as any, {
-            conversaId: origem,
-            texto,
-            quando: oficial?.recebida_em ?? new Date().toISOString(),
-          }) as any[],
+        setConvs(
+          (prev) =>
+            aplicarPreviaLocalEnvio(prev as any, {
+              conversaId: origem,
+              texto,
+              quando: oficial?.recebida_em ?? new Date().toISOString(),
+            }) as any[],
         );
         registrarDiagnostico("atendimento-inbox", { sync_reason: "envio", full_reload: false });
         // Etapa final do envio: fecha o trace e alimenta p50/p95/p99.
@@ -2730,9 +2670,7 @@ export function AtendInbox() {
     const origem = String(m.conversa_id ?? selIdRef.current ?? "");
     if (!origem) return;
     const voltarAEnviando = (lista: any[]) =>
-      lista.map((x) =>
-        x?.client_message_id === m.client_message_id ? { ...x, status: "sending" } : x,
-      );
+      lista.map((x) => (x?.client_message_id === m.client_message_id ? { ...x, status: "sending" } : x));
     if (selIdRef.current === origem) setMsgs((prev) => voltarAEnviando(prev));
     const c = cacheConversas.current.obter(origem);
     if (c) cacheConversas.current.guardar(origem, { ...c, msgs: voltarAEnviando(c.msgs) });
@@ -2743,7 +2681,14 @@ export function AtendInbox() {
     const t = draft.trim();
     if (!t || !sel || !clinicaId) return;
     // A ação só vale para a conversa que está de fato aberta e carregada.
-    if (!acaoPermitida({ alvo: sel.id, selecionadaAgora: selIdRef.current, carregando: carregandoConversa, selecaoAtual: selecaoIdRef.current })) {
+    if (
+      !acaoPermitida({
+        alvo: sel.id,
+        selecionadaAgora: selIdRef.current,
+        carregando: carregandoConversa,
+        selecaoAtual: selecaoIdRef.current,
+      })
+    ) {
       toast.error("Carregando a conversa. Tente novamente em instantes.");
       return;
     }
@@ -2875,11 +2820,7 @@ export function AtendInbox() {
 
   const statusBadge = (s: string, opts?: { ocultarNina?: boolean }) => {
     if (s === "active")
-      return (
-        <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">
-          ● Ativa
-        </Badge>
-      );
+      return <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">● Ativa</Badge>;
     if (s === "waiting")
       return (
         <Badge className="bg-atd-warn-bg text-atd-warn-ink hover:bg-atd-warn-bg border border-atd-warn/40">
@@ -2889,11 +2830,7 @@ export function AtendInbox() {
     if (statusEhRepresentacaoDaNina(s)) {
       // O indicador canônico da Nina é renderizado uma única vez pelo card.
       if (opts?.ocultarNina) return null;
-      return (
-        <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">
-          ✦ Nina
-        </Badge>
-      );
+      return <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">✦ Nina</Badge>;
     }
     if (s === "closed" || s === "finished")
       return (
@@ -2906,1096 +2843,1039 @@ export function AtendInbox() {
 
   return (
     <RelogioEsperaProvider>
-    <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
-      <div className="flex h-full gap-2 overflow-hidden">
-        {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
-        <Card
-          data-a11y-secundario="true"
-          ref={painelRef}
-          className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
-            painelAberto ? "w-[300px]" : "w-[52px]"
-          }`}
-        >
-          {!painelAberto && (
-            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
-              <MessageSquare className="h-5 w-5 text-muted-foreground" />
-              <Badge variant="outline" className="px-1 text-[10px]">
-                {convs.length}
-              </Badge>
-              <Circle
-                className={`h-3 w-3 fill-current ${
-                  emPausa
-                    ? "text-atd-warn"
-                    : filaAberta
-                      ? "text-atd-ok"
-                      : "text-atd-idle"
-                }`}
-              />
-
-            </div>
-          )}
-          <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
-          <div className="shrink-0 border-b p-2 space-y-1.5">
-            {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
-            <div className="flex items-center gap-1.5">
-              <SeletorStatusPresenca
-                selecionado={controle.carregado ? controle.confirmado : null}
-                salvando={controle.salvando}
-                desabilitado={presDesabilitada(controle)}
-                carregando={!controle.carregado}
-                inicioPausa={ehEstadoPausa(estadoManual) ? inicioCronometroPausa : null}
-                onEscolher={(alvo) => void definirStatus(alvo)}
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 shrink-0 p-0"
-                title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
-                onClick={alternarFixado}
-              >
-                {painelFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
-            <p aria-live="polite" className="sr-only">
-              {presTexto(controle)}
-            </p>
-            {controle.erro && !controle.salvando && <p className="text-[11px] text-destructive">{controle.erro}</p>}
-            {presPrecisaEscolher(controle) && (
-              <p className="text-[11px] text-muted-foreground">
-                Escolha Online, Em pausa, Em pausa para almoço ou Offline. Só quem está Online recebe novas conversas.
-              </p>
+      <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
+        <div className="flex h-full gap-2 overflow-hidden">
+          {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
+          <Card
+            data-a11y-secundario="true"
+            ref={painelRef}
+            className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+              painelAberto ? "w-[300px]" : "w-[52px]"
+            }`}
+          >
+            {!painelAberto && (
+              <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+                <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                <Badge variant="outline" className="px-1 text-[10px]">
+                  {convs.length}
+                </Badge>
+                <Circle
+                  className={`h-3 w-3 fill-current ${
+                    emPausa ? "text-atd-warn" : filaAberta ? "text-atd-ok" : "text-atd-idle"
+                  }`}
+                />
+              </div>
             )}
-            {controle.erro && !controle.salvando && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 w-full text-[11px]"
-                onClick={() => setControle((c) => ({ ...c, erro: null }))}
-              >
-                Tentar de novo
-              </Button>
-            )}
-
-          </div>
-          <CardHeader className="py-2 space-y-2">
-            {!souGestor ? (
-              <FiltrosAtendente
-                valor={filtroAtendente}
-                contagens={{
-                  ativas: contadores.minhas,
-                  pendentes,
-                  fechadas: contadores.fechadas,
-                }}
-                onChange={(valor) => {
-                  const alvo = estadoFiltroAtendente(valor);
-                  setEscopoBase(alvo.base);
-                  setAtendenteEscolhidoId(alvo.atendenteId);
-                  setVisualizacao(alvo.visualizacao);
-                  setNaoAtribuidasFiltro(alvo.naoAtribuidas);
-                  setSoCriticas(false);
-                }}
-              />
-            ) : (
-              <>
-            {/* FASE 1 — dois eixos compactos na mesma linha:
+            <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
+              <div className="shrink-0 border-b p-2 space-y-1.5">
+                {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
+                <div className="flex items-center gap-1.5">
+                  <SeletorStatusPresenca
+                    selecionado={controle.carregado ? controle.confirmado : null}
+                    salvando={controle.salvando}
+                    desabilitado={presDesabilitada(controle)}
+                    carregando={!controle.carregado}
+                    inicioPausa={ehEstadoPausa(estadoManual) ? inicioCronometroPausa : null}
+                    onEscolher={(alvo) => void definirStatus(alvo)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 shrink-0 p-0"
+                    title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
+                    onClick={alternarFixado}
+                  >
+                    {painelFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+                <p aria-live="polite" className="sr-only">
+                  {presTexto(controle)}
+                </p>
+                {controle.erro && !controle.salvando && <p className="text-[11px] text-destructive">{controle.erro}</p>}
+                {presPrecisaEscolher(controle) && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Escolha Online, Em pausa, Em pausa para almoço ou Offline. Só quem está Online recebe novas
+                    conversas.
+                  </p>
+                )}
+                {controle.erro && !controle.salvando && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 w-full text-[11px]"
+                    onClick={() => setControle((c) => ({ ...c, erro: null }))}
+                  >
+                    Tentar de novo
+                  </Button>
+                )}
+              </div>
+              <CardHeader className="py-2 space-y-2">
+                {!souGestor ? (
+                  <FiltrosAtendente
+                    valor={filtroAtendente}
+                    contagens={{
+                      ativas: contadores.minhas,
+                      pendentes,
+                      fechadas: contadores.fechadas,
+                    }}
+                    onChange={(valor) => {
+                      const alvo = estadoFiltroAtendente(valor);
+                      setEscopoBase(alvo.base);
+                      setAtendenteEscolhidoId(alvo.atendenteId);
+                      setVisualizacao(alvo.visualizacao);
+                      setNaoAtribuidasFiltro(alvo.naoAtribuidas);
+                      setSoCriticas(false);
+                    }}
+                  />
+                ) : (
+                  <>
+                    {/* FASE 1 — dois eixos compactos na mesma linha:
                 [ Escopo ▾ ] [ Visualização ▾ ]. Atendentes ficam dentro do
                 Escopo (por user_id); a supervisão continua sendo decidida no
                 backend, o menu só reflete a permissão que já existe. */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Select
-                value={soNaoAtribuidas ? "fila_global" : valorEscopoControle(escopoBase, atendenteEscolhidoId)}
-                onValueChange={(v) => {
-                  if (v === "fila_global") {
-                    setSoNaoAtribuidas(true);
-                    return;
-                  }
-                  const alvo = lerValorEscopo(v);
-                  setEscopoBase(alvo.base);
-                  setAtendenteEscolhidoId(alvo.atendenteId);
-                  setNaoAtribuidasFiltro(false);
-                }}
-                onOpenChange={(aberto) => {
-                  setPainelMenuAberto(aberto);
-                  setMenuAtendentesAberto(aberto);
-                  if (!aberto) setBuscaAtendente("");
-                }}
-              >
-                <SelectTrigger
-                  className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
-                  aria-label="Escopo das conversas"
-                  title={soNaoAtribuidas ? "Não atribuídas global" : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
-                >
-                  <span className="truncate">
-                    {soNaoAtribuidas ? "Não atribuídas global" : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
-                  </span>
-                </SelectTrigger>
-                <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                  <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
-                  {souGestor && (
-                    <SelectItem value="equipe">Todas as conversas ({contadores.equipe})</SelectItem>
-                  )}
-                  <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
-                  <SelectItem value="fila_global">Não atribuídas global ({contadores.nao_atribuidas})</SelectItem>
-                  {souGestor && (
-                    <>
-                      <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Atendentes
-                      </div>
-                      {/* Com equipe grande, dá para achar pelo nome sem rolar a
-                          lista inteira. Nada é buscado no servidor por isto. */}
-                      {usuarios.length > 8 && (
-                        <div className="px-2 pb-1">
-                          <Input
-                            value={buscaAtendente}
-                            onChange={(e) => setBuscaAtendente(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            placeholder="Pesquisar atendente"
-                            className="h-7 text-xs"
-                            aria-label="Pesquisar atendente"
-                          />
-                        </div>
-                      )}
-                      {atendentesFiltrados.map((u: any) => (
-                        <SelectItem key={u.user_id} value={valorEscopoControle("equipe", u.user_id)}>
-                          <span className="flex items-center gap-2">
-                            {u.presenca === "ONLINE" && (
-                              <span
-                                aria-hidden="true"
-                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
-                              />
-                            )}
-                            <span>
-                              {u.nome}
-                              {u.presenca
-                                ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}`
-                                : ""}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                      {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
-                        <div className="px-2 py-2 text-xs text-muted-foreground">
-                          Nenhum atendente com esse nome.
-                        </div>
-                      )}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-              <Select
-                value={visualizacao}
-                onValueChange={(v) => setVisualizacao(v as VisualizacaoInbox)}
-                onOpenChange={setPainelMenuAberto}
-              >
-                <SelectTrigger
-                  className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
-                  aria-label="Visualização das conversas"
-                  title={ROTULO_VISUALIZACAO[visualizacao]}
-                >
-                  <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
-                </SelectTrigger>
-                <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                  <SelectItem value="recentes">Recentes</SelectItem>
-                  <SelectItem value="resolvidas">
-                    Resolvidas ({contadores.fechadas})
-                  </SelectItem>
-                  <SelectItem value="espera">Maior tempo esperando</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {soNaoAtribuidas && (
-              <button
-                type="button"
-                onClick={() => setSoNaoAtribuidas(false)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
-                title="Mostrar todas as conversas"
-              >
-                Não atribuídas global ({convsVisiveis.length}) ✕
-              </button>
-            )}
-              </>
-            )}
-          </CardHeader>
-          <div className="flex-1 overflow-auto border-t">
-            {convsVisiveis.length === 0 && (
-              <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>
-            )}
-            {convsVisiveis.map((c) => (
-
-              <button
-                key={c.id}
-                data-testid="item-conversa"
-                data-conversa-id={c.id}
-                onClick={() => {
-                  iniciarTroca(c.id, "clique");
-                  // Abertura normal pela Inbox: volta a valer a leitura
-                  // automática, mesmo que antes tenha vindo de um erro.
-                  aberturaPorAlvoRef.current.delete(c.id);
-
-                  medidor.current = criarMedidorConversa(`conversa ${c.id}`);
-                  medidor.current.marcar("click");
-                  // Seleção interna: a conversa aberta é escolhida aqui mesmo.
-                  abrirConversa(c.id);
-                }}
-                onMouseEnter={() => agendarPrefetch(c.id)}
-                onMouseLeave={() => cancelarPrefetch(c.id)}
-                onFocus={() => agendarPrefetch(c.id)}
-                onBlur={() => cancelarPrefetch(c.id)}
-                className={`relative w-full border-b border-atd-border py-2 pl-4 pr-3 text-left transition-colors hover:bg-atd-blue-hover ${
-                  sel?.id === c.id
-                    ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
-                    : "bg-atd-surface"
-                }`}
-              >
-
-                <div className="flex items-center gap-2">
-                  <span
-                    className="font-medium text-sm truncate flex-1"
-                    title={tituloConversa(c)}
-                  >
-                    {tituloConversa(c)}
-                  </span>
-                  {Number(c.nao_lidas ?? 0) > 0 && (
-                    <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
-                      {Number(c.nao_lidas ?? 0)}
-
-                    </Badge>
-                  )}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
-                  {/* Lista canônica e já deduplicada por chave semântica. */}
-                  {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
-                    // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
-                    if (tipo === "status" || tipo === "timeout-nina") return null;
-                    if (tipo === "sem-responsavel")
-                      return (
-                        <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
-                          🔴 Não atribuída
-                        </Badge>
-                      );
-                    if (tipo === "nina")
-                      return (
-                        <Badge
-                          key={tipo}
-                          className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30"
-                        >
-                          ✦ Nina
-                        </Badge>
-                      );
-                    return (
-                      <Badge
-                        key={tipo}
-                        className="text-[11px] bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Select
+                        value={soNaoAtribuidas ? "fila_global" : valorEscopoControle(escopoBase, atendenteEscolhidoId)}
+                        onValueChange={(v) => {
+                          if (v === "fila_global") {
+                            setSoNaoAtribuidas(true);
+                            return;
+                          }
+                          const alvo = lerValorEscopo(v);
+                          setEscopoBase(alvo.base);
+                          setAtendenteEscolhidoId(alvo.atendenteId);
+                          setNaoAtribuidasFiltro(false);
+                        }}
+                        onOpenChange={(aberto) => {
+                          setPainelMenuAberto(aberto);
+                          setMenuAtendentesAberto(aberto);
+                          if (!aberto) setBuscaAtendente("");
+                        }}
                       >
-                        {nomeUsuario(c.atribuida_user_id)}
-                      </Badge>
-                    );
-                  })}
-                  {c.is_teste && (
-                    <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
-                      Teste
-                    </Badge>
-                  )}
-                  <BadgeEspera desde={espera[c.id]} className="ml-auto" />
-                </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {fmtData(c.ultima_msg_em)}
-                </div>
-              </button>
-            ))}
-          </div>
-          </div>
-        </Card>
-
-        {/* COLUNA 2 — CHAT */}
-        <Card
-          data-a11y-principal="true"
-          ref={colunaChatRef}
-          className="flex min-w-0 flex-1 flex-col overflow-hidden"
-        >
-          {!sel ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
-              {erroAcesso ? (
-                <>
-                  <p className="font-medium text-foreground">{erroAcesso}</p>
-                  <Button variant="outline" size="sm" onClick={() => setErroAcesso(null)}>
-                    Voltar para a Inbox
-                  </Button>
-                </>
-              ) : (
-                "Selecione uma conversa"
-              )}
-            </div>
-          ) : (
-            <>
-              <CardHeader className="py-2 border-b">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <CardTitle
-                      className="text-base flex items-center gap-2 truncate"
-                      title={tituloConversa(sel)}
-                      data-testid="titulo-conversa"
-                      data-conversa-id={sel.id}
-                    >
-                      <span className="truncate">{tituloConversa(sel)}</span>
-                      {statusBadge(sel.status)}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="inline-flex items-center gap-1">
-                        <Phone className="h-3 w-3" /> {sel.contato_telefone}
-                      </span>
-                      {formatarNumeroConversa(sel.numero_conversa) && (
-                        <span className="inline-flex items-center gap-1">
-                          · <code>Conversa {formatarNumeroConversa(sel.numero_conversa)}</code>
-                          <button
-                            type="button"
-                            onClick={() => void copiarNumeroConversa(sel.numero_conversa)}
-                            title="Copiar número da conversa"
-                            aria-label="Copiar número da conversa"
-                            className="rounded p-0.5 hover:bg-atd-blue-hover"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </span>
-                      )}
-                      {sel.is_teste && <span>· Teste (homologação)</span>}
-                      {sel.protocolo_atendimento && (
-                        <span className="inline-flex items-center gap-1">
-                          · <code>Protocolo {sel.protocolo_atendimento}</code>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void navigator.clipboard
-                                .writeText(sel.protocolo_atendimento as string)
-                                .then(() => toast.success("Protocolo copiado"))
-                                .catch(() => toast.error("Não foi possível copiar"));
-                            }}
-                            title="Copiar protocolo de atendimento"
-                            aria-label="Copiar protocolo de atendimento"
-                            className="rounded p-0.5 hover:bg-atd-blue-hover"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </span>
-                      )}
-                    </p>
-                    {espera[sel.id] && (
-                      <BadgeEspera
-                        desde={espera[sel.id]}
-                        prefixo="Aguardando resposta há"
-                        className="mt-1"
-                      />
+                        <SelectTrigger
+                          className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                          aria-label="Escopo das conversas"
+                          title={
+                            soNaoAtribuidas
+                              ? "Não atribuídas global"
+                              : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)
+                          }
+                        >
+                          <span className="truncate">
+                            {soNaoAtribuidas
+                              ? "Não atribuídas global"
+                              : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                          <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
+                          {souGestor && (
+                            <SelectItem value="equipe">Todas as conversas ({contadores.equipe})</SelectItem>
+                          )}
+                          <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
+                          <SelectItem value="fila_global">
+                            Não atribuídas global ({contadores.nao_atribuidas})
+                          </SelectItem>
+                          {souGestor && (
+                            <>
+                              <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                Atendentes
+                              </div>
+                              {/* Com equipe grande, dá para achar pelo nome sem rolar a
+                          lista inteira. Nada é buscado no servidor por isto. */}
+                              {usuarios.length > 8 && (
+                                <div className="px-2 pb-1">
+                                  <Input
+                                    value={buscaAtendente}
+                                    onChange={(e) => setBuscaAtendente(e.target.value)}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    placeholder="Pesquisar atendente"
+                                    className="h-7 text-xs"
+                                    aria-label="Pesquisar atendente"
+                                  />
+                                </div>
+                              )}
+                              {atendentesFiltrados.map((u: any) => (
+                                <SelectItem key={u.user_id} value={valorEscopoControle("equipe", u.user_id)}>
+                                  <span className="flex items-center gap-2">
+                                    {u.presenca === "ONLINE" && (
+                                      <span
+                                        aria-hidden="true"
+                                        className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                                      />
+                                    )}
+                                    <span>
+                                      {u.nome}
+                                      {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
+                                    </span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                              {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
+                                <div className="px-2 py-2 text-xs text-muted-foreground">
+                                  Nenhum atendente com esse nome.
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={visualizacao}
+                        onValueChange={(v) => setVisualizacao(v as VisualizacaoInbox)}
+                        onOpenChange={setPainelMenuAberto}
+                      >
+                        <SelectTrigger
+                          className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                          aria-label="Visualização das conversas"
+                          title={ROTULO_VISUALIZACAO[visualizacao]}
+                        >
+                          <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
+                        </SelectTrigger>
+                        <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                          <SelectItem value="recentes">Recentes</SelectItem>
+                          <SelectItem value="resolvidas">Resolvidas ({contadores.fechadas})</SelectItem>
+                          <SelectItem value="espera">Maior tempo esperando</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {soNaoAtribuidas && (
+                      <button
+                        type="button"
+                        onClick={() => setSoNaoAtribuidas(false)}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
+                        title="Mostrar todas as conversas"
+                      >
+                        Não atribuídas global ({convsVisiveis.length}) ✕
+                      </button>
                     )}
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (
+                  </>
+                )}
+              </CardHeader>
+              <div className="flex-1 overflow-auto border-t">
+                {convsVisiveis.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>}
+                {convsVisiveis.map((c) => (
+                  <button
+                    key={c.id}
+                    data-testid="item-conversa"
+                    data-conversa-id={c.id}
+                    onClick={() => {
+                      iniciarTroca(c.id, "clique");
+                      // Abertura normal pela Inbox: volta a valer a leitura
+                      // automática, mesmo que antes tenha vindo de um erro.
+                      aberturaPorAlvoRef.current.delete(c.id);
+
+                      medidor.current = criarMedidorConversa(`conversa ${c.id}`);
+                      medidor.current.marcar("click");
+                      // Seleção interna: a conversa aberta é escolhida aqui mesmo.
+                      abrirConversa(c.id);
+                    }}
+                    onMouseEnter={() => agendarPrefetch(c.id)}
+                    onMouseLeave={() => cancelarPrefetch(c.id)}
+                    onFocus={() => agendarPrefetch(c.id)}
+                    onBlur={() => cancelarPrefetch(c.id)}
+                    className={`relative w-full border-b border-atd-border py-2 pl-4 pr-3 text-left transition-colors hover:bg-atd-blue-hover ${
+                      sel?.id === c.id
+                        ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
+                        : "bg-atd-surface"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate flex-1" title={tituloConversa(c)}>
+                        {tituloConversa(c)}
+                      </span>
+                      {Number(c.nao_lidas ?? 0) > 0 && (
+                        <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
+                          {Number(c.nao_lidas ?? 0)}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
+                      {/* Lista canônica e já deduplicada por chave semântica. */}
+                      {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
+                        // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
+                        if (tipo === "status" || tipo === "timeout-nina") return null;
+                        if (tipo === "sem-responsavel")
+                          return (
+                            <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
+                              🔴 Não atribuída
+                            </Badge>
+                          );
+                        if (tipo === "nina")
+                          return (
+                            <Badge
+                              key={tipo}
+                              className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30"
+                            >
+                              ✦ Nina
+                            </Badge>
+                          );
+                        return (
+                          <Badge
+                            key={tipo}
+                            className="text-[11px] bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
+                          >
+                            {nomeUsuario(c.atribuida_user_id)}
+                          </Badge>
+                        );
+                      })}
+                      {c.is_teste && (
+                        <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
+                          Teste
+                        </Badge>
+                      )}
+                      <BadgeEspera desde={espera[c.id]} className="ml-auto" />
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtData(c.ultima_msg_em)}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          {/* COLUNA 2 — CHAT */}
+          <Card data-a11y-principal="true" ref={colunaChatRef} className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            {!sel ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+                {erroAcesso ? (
+                  <>
+                    <p className="font-medium text-foreground">{erroAcesso}</p>
+                    <Button variant="outline" size="sm" onClick={() => setErroAcesso(null)}>
+                      Voltar para a Inbox
+                    </Button>
+                  </>
+                ) : (
+                  "Selecione uma conversa"
+                )}
+              </div>
+            ) : (
+              <>
+                <CardHeader className="px-3 py-1 border-b">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle
+                        className="text-base flex items-center gap-2 truncate"
+                        title={tituloConversa(sel)}
+                        data-testid="titulo-conversa"
+                        data-conversa-id={sel.id}
+                      >
+                        <span className="truncate">{tituloConversa(sel)}</span>
+                        {statusBadge(sel.status)}
+                      </CardTitle>
+                      <p className="text-xs leading-4 text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-0">
+                        <span className="inline-flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> {sel.contato_telefone}
+                        </span>
+                        {formatarNumeroConversa(sel.numero_conversa) && (
+                          <span className="inline-flex items-center gap-1">
+                            · <code>Conversa {formatarNumeroConversa(sel.numero_conversa)}</code>
+                            <button
+                              type="button"
+                              onClick={() => void copiarNumeroConversa(sel.numero_conversa)}
+                              title="Copiar número da conversa"
+                              aria-label="Copiar número da conversa"
+                              className="rounded p-0.5 hover:bg-atd-blue-hover"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {sel.is_teste && <span>· Teste (homologação)</span>}
+                        {sel.protocolo_atendimento && (
+                          <span className="inline-flex items-center gap-1">
+                            · <code>Protocolo {sel.protocolo_atendimento}</code>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void navigator.clipboard
+                                  .writeText(sel.protocolo_atendimento as string)
+                                  .then(() => toast.success("Protocolo copiado"))
+                                  .catch(() => toast.error("Não foi possível copiar"));
+                              }}
+                              title="Copiar protocolo de atendimento"
+                              aria-label="Copiar protocolo de atendimento"
+                              className="rounded p-0.5 hover:bg-atd-blue-hover"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                      </p>
+                      {espera[sel.id] && (
+                        <BadgeEspera desde={espera[sel.id]} prefixo="Aguardando resposta há" className="mt-1" />
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          disabled={assumindo || carregandoConversa}
+                          className="bg-atd-blue text-atd-on-strong hover:bg-atd-blue/90"
+                          onClick={() => (responsavelId ? setAssumirOpen(true) : assumir(false))}
+                        >
+                          {assumindo ? (
+                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <UserCheck className="mr-1 h-3.5 w-3.5" />
+                          )}
+                          Assumir conversa
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="default"
-                        disabled={assumindo || carregandoConversa}
-                        className="bg-atd-blue text-atd-on-strong hover:bg-atd-blue/90"
-                        onClick={() => (responsavelId ? setAssumirOpen(true) : assumir(false))}
+                        disabled={!souResponsavel || conversaEncerrada || carregandoConversa}
+                        className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
+                        onClick={() => setAgendaOpen(true)}
                       >
-                        {assumindo ? (
-                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <UserCheck className="mr-1 h-3.5 w-3.5" />
-                        )}
-                        Assumir conversa
+                        <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="default"
-                      disabled={!souResponsavel || conversaEncerrada || carregandoConversa}
-                      className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
-                      onClick={() => setAgendaOpen(true)}
-                    >
-                      <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
-                    </Button>
 
-                    {/* Conversas não atribuídas são distribuídas automaticamente
+                      {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={
-                        (!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa
-                      }
-
-                      className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
-                      onClick={() => setTransferOpen(true)}
-                    >
-                      <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Transferir
-                    </Button>
-                    {sel.status !== "closed" && sel.status !== "finished" && (
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={!souResponsavel || carregandoConversa || fechando}
-                        aria-busy={fechando}
-                        className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
-                        onClick={() => void fechar()}
+                        disabled={(!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa}
+
+                        className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
+                        onClick={() => setTransferOpen(true)}
                       >
-                        {fechando ? (
-                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                        )}
-                        {fechando ? "Encerrando…" : "Encerrar"}
+                        <ArrowRightLeft className="h-3.5 w-3.5 mr-1" /> Transferir
                       </Button>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <div className="relative flex-1 min-h-0">
-              <div
-                ref={chat.containerRef}
-                className="h-full overflow-auto p-4 space-y-2 bg-atd-bg"
-              >
-                {buscandoAlvo && (
-                  <div className="sticky top-0 z-10 mb-2 rounded-md border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
-                    Localizando mensagem reportada…
-                  </div>
-                )}
-                {alvoIndisponivel && (
-                  <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs">
-                    <span>
-                      Não foi possível localizar a mensagem original. O conteúdo reportado continua
-                      disponível na revisão.
-                    </span>
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => setAlvoIndisponivel(false)}
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                )}
-
-                {conteudoDaConversa && temMaisAntigas && (
-                  <div className="flex min-h-8 justify-center pb-1" aria-live="polite">
-                    {historicoAnterior.carregando ? (
-                      <span role="status" className="inline-flex items-center gap-2 text-xs text-atd-ink-soft">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                        Carregando mensagens anteriores…
-                      </span>
-                    ) : (
-                    <button
-                      type="button"
-                      onClick={() => void historicoAnterior.carregar()}
-                      className="rounded-full border border-atd-border bg-atd-surface px-3 py-1 text-xs text-atd-ink-soft hover:bg-atd-blue-hover disabled:opacity-60"
-                    >
-                      {historicoAnterior.erro ? "Falha ao carregar. Tentar novamente" : "Role para cima para carregar anteriores"}
-                    </button>
-                    )}
-                  </div>
-                )}
-
-                {!conteudoDaConversa && !erroMsgs && <ConversaSkeleton />}
-                {erroMsgs && (
-                  <div className="text-center text-sm text-muted-foreground">
-                    <p>Não foi possível carregar as mensagens desta conversa.</p>
-                    <Button size="sm" variant="outline" className="mt-2" onClick={() => void carregarConversa()}>
-                      Tentar novamente
-                    </Button>
-                  </div>
-                )}
-                {conteudoDaConversa && !erroMsgs && timeline.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
-                )}
-
-                {(conteudoDaConversa ? timelineComResumos : []).map((item) => {
-                  // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
-                  if (item.kind === "resumo") {
-                    return (
-                      <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
-                        <ResumoNaConversa resumo={item.resumo} />
-                      </div>
-                    );
-                  }
-                  if (item.kind === "grupo") {
-                    const g = item.item;
-                    if (g.tipo === "HANDOFF") {
-                      return (
-                        <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                          <HandoffGroupCard grupo={g} />
-                          {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
-                        </div>
-                      );
-                    }
-                    if (g.tipo === "ATRIBUICAO") {
-                      return <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}><AtribuicaoGroupCard grupo={g} /></div>;
-                    }
-                    // O resumo da Nina fica apenas no painel superior da
-                    // conversa: o aviso de geração não vira bloco na timeline.
-                    if (g.evento.evento === "RESUMO_IA_GERADO") return null;
-                    return (
-                      <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
-                        <ConversationSystemEvent evento={g.evento as unknown as ConversaEvento} />
-                      </div>
-                    );
-                  }
-                  const m = item.msg;
-                  const out = m.direction === "out";
-                  // Só marcador interno vira faixa central. Mensagem real
-                  // enviada ao paciente (status de envio) fica como conversa.
-                  if (marcadorInternoSistema(m)) {
-                    const texto = textoMarcadorSistema(m.body);
-                    if (!texto) return null;
-                    return (
-                      <div key={`m-${m.id}`} data-historico-id={`m-${m.id}`} className="flex justify-center">
-                        <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
-                          {texto}
-                          <div className="mt-1 text-[10px] opacity-70">
-                            {fmtHora(m.recebida_em)}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
-
-                  const destacada = msgDestacada === m.id;
-                  return (
-                    <div
-                      key={`m-${m.id}`}
-                      data-msg-id={m.id}
-                      data-historico-id={`m-${m.id}`}
-                      className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
-                        destacada
-                          ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
-                          : ""
-                      }`}
-                    >
-                      {destacada && (
-                        <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
-                          Mensagem reportada
-                        </span>
-                      )}
-                      {/* Botão de reporte rápido: fora do balão, sempre visível. */}
-                      {clinicaId && <InspecaoMensagemNina parte="reporte" clinicaId={clinicaId}
-                        conversaId={m.conversa_id ?? sel.id} mensagem={m} saida={saidasPorMensagem[String(m.id)]} />}
-                      <div
-                        className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
-                          out
-                            ? "bg-atd-go text-atd-on-strong rounded-br-sm"
-                            : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
-                        }`}
-                      >
-                        <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
-                        {ehOtimista(m) && m.status === "failed" && (
-                          <div className="mt-1 flex items-center gap-2 text-[11px]">
-                            <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
-                            <button
-                              type="button"
-                              className="underline underline-offset-2"
-                              onClick={() => tentarNovamente(m)}
-                            >
-                              Tentar novamente
-                            </button>
-                          </div>
-                        )}
-                        <div
-                          className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+                      {sel.status !== "closed" && sel.status !== "finished" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!souResponsavel || carregandoConversa || fechando}
+                          aria-busy={fechando}
+                          className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
+                          onClick={() => void fechar()}
                         >
-                          {/* Envio otimista: durante o envio normal a bolha não
-                              exibe nenhum status — só a hora. Falha aparece acima. */}
-                          <span className="whitespace-nowrap">
-                            {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
-                            {out && rotuloAutorSupervisao(m.enviada_por_perfil) && (
-                              <span
-                                data-testid="autor-supervisao"
-                                title={`Resposta da supervisão (${rotuloAutorSupervisao(m.enviada_por_perfil)})${
-                                  usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome
-                                    ? ` — ${usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome}`
-                                    : ""
-                                }`}
-                              >
-                                · {rotuloAutorSupervisao(m.enviada_por_perfil)}
-                              </span>
-                            )}
-                          </span>
-                          {clinicaId && <InspecaoMensagemNina parte="detalhes" clinicaId={clinicaId}
-                            conversaId={m.conversa_id ?? sel.id} mensagem={m} saida={saidasPorMensagem[String(m.id)]} />}
-                        </div>
-                      </div>
+                          {fechando ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                          )}
+                          {fechando ? "Encerrando…" : "Encerrar"}
+                        </Button>
+                      )}
                     </div>
-                  );
-
-                })}
-                {/* Âncora do fim da conversa: é para cá que a tela vai ao abrir. */}
-                <div ref={chat.ancoraRef} />
-              </div>
-              {chat.novas > 0 && (
-                <button
-                  type="button"
-                  onClick={() => chat.irParaFim(true)}
-                  className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-atd-border bg-atd-surface px-3 py-1.5 text-xs font-medium text-atd-ink shadow-md hover:bg-atd-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                  aria-live="polite"
-                >
-                  ↓ {rotuloNovasMensagens(chat.novas)}
-                </button>
-              )}
-              </div>
-
-              <div className="border-t p-3 space-y-2">
-                <div className="relative flex gap-2">
-                  {slash && (
-                    <ListaRespostasRapidas
-                      itens={itensResp}
-                      indice={slashIdx}
-                      termo={slash.termo}
-                      favoritos={respostasRapidas.favoritos}
-                      onSelecionar={inserirRespostaRapida}
-                      onIndice={setSlashIdx}
-                      onFavoritar={respostasRapidas.favoritar}
-                    />
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    title="Respostas rápidas"
-                    aria-label="Respostas rápidas"
-                    aria-expanded={!!slash}
-                    className="h-9 w-9 shrink-0 p-0 text-atd-ink-soft"
-                    disabled={!!motivoBloqueio}
-                    onClick={() => {
-                      const el = composerRef.current;
-                      const pos = el?.selectionStart ?? draft.length;
-                      setSlash((s) => (s ? null : { inicio: pos, fim: pos, termo: "" }));
-                      el?.focus();
-                    }}
-                  >
-                    <Zap className="h-4 w-4" />
-                  </Button>
-                  <Textarea
-                    ref={composerRef}
-                    value={draft}
-                    onChange={(e) => {
-                      setDraft(e.target.value);
-                      setSlash(
-                        detectarComandoNoTexto(e.target.value, e.target.selectionStart ?? 0),
-                      );
-                    }}
-                    onBlur={() => setSlash(null)}
-                    onKeyDown={(e) => {
-                      // Com a lista aberta, o teclado navega nela — Enter insere
-                      // a resposta no campo e NUNCA envia a mensagem.
-                      if (slash && itensResp.length > 0) {
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setSlashIdx((i) => (i + 1) % itensResp.length);
-                          return;
-                        }
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setSlashIdx((i) => (i - 1 + itensResp.length) % itensResp.length);
-                          return;
-                        }
-                        if (e.key === "Enter" || e.key === "Tab") {
-                          e.preventDefault();
-                          const escolhida = itensResp[slashIdx];
-                          if (escolhida) inserirRespostaRapida(escolhida);
-                          return;
-                        }
-                      }
-                      if (slash && e.key === "Escape") {
-                        e.preventDefault();
-                        setSlash(null);
-                        return;
-                      }
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        enviar();
-                      }
-                    }}
-                    placeholder={
-                      motivoBloqueio
-                        ? "Envio bloqueado"
-                        : "Mensagem… (digite / para respostas rápidas)"
-                    }
-                    rows={1}
-                    className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
-                    disabled={!!motivoBloqueio}
-                  />
-
-                  <Button
-                    onClick={enviar}
-                    disabled={!draft.trim() || !!motivoBloqueio}
-                    className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </Card>
-
-        {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
-        <Card
-          data-a11y-secundario="true"
-          ref={contatoRef}
-          className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
-            contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
-          }`}
-        >
-          {!contatoAberto && (
-            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground [writing-mode:vertical-rl]">
-                Contato
-              </span>
-            </div>
-          )}
-          <div
-            className={`${contatoAberto ? "flex" : "hidden"} w-[260px] xl:w-[300px] flex-1 flex-col overflow-hidden`}
-          >
-          <CardHeader className="py-2 border-b">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base">Contato</CardTitle>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto h-6 w-6 p-0"
-                title={contatoFixado ? "Desafixar painel" : "Fixar painel aberto"}
-                onClick={alternarContatoFixado}
-              >
-                {contatoFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
-          </CardHeader>
-
-          <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
-            {!contatoAtual ? (
-              // O esqueleto é só deste painel: o chat nunca espera pelo contato.
-              !dadosSecundariosProntos ? (
-                <ContatoSkeleton />
-              ) : (
-                <p className="text-muted-foreground">—</p>
-              )
-            ) : (
-              <>
-                <section>
-                  {/* FASE 5 — o título é SEMPRE quem está falando no WhatsApp. */}
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">
-                    Contato do WhatsApp
                   </div>
-                  <div className="font-medium">
-                    {tituloConversa(contatoAtual.conversa) || SEM_NOME}
-                  </div>
-                  <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                    {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
-                      <div>
-                        📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}
+                </CardHeader>
+                <div className="relative flex-1 min-h-0">
+                  <div ref={chat.containerRef} className="h-full overflow-auto p-4 space-y-2 bg-atd-bg">
+                    {buscandoAlvo && (
+                      <div className="sticky top-0 z-10 mb-2 rounded-md border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
+                        Localizando mensagem reportada…
                       </div>
                     )}
-                    {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
-                    {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
-                    {contatoAtual.conversa?.atend_departamentos?.nome && (
-                      <div>Depto: {contatoAtual.conversa.atend_departamentos.nome}</div>
+                    {alvoIndisponivel && (
+                      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs">
+                        <span>
+                          Não foi possível localizar a mensagem original. O conteúdo reportado continua disponível na
+                          revisão.
+                        </span>
+                        <button type="button" className="underline" onClick={() => setAlvoIndisponivel(false)}>
+                          Fechar
+                        </button>
+                      </div>
                     )}
-                    {contatoAtual.conversa?.ultima_mensagem_em && (
-                      <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
-                    )}
-                  </div>
-                </section>
 
-                <section>
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase">
-                    Cadastro vinculado
-                  </div>
-                  {contatoAtual.paciente ? (
-                    <>
-                      <div className="font-medium">{contatoAtual.paciente.nome}</div>
-                      <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                        {contatoAtual.paciente.telefone && <div>📱 {contatoAtual.paciente.telefone}</div>}
-                        {contatoAtual.paciente.email && <div>✉️ {contatoAtual.paciente.email}</div>}
-                        {contatoAtual.paciente.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
-                        {contatoAtual.paciente.cidade && (
-                          <div>
-                            📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
-                          </div>
+                    {conteudoDaConversa && temMaisAntigas && (
+                      <div className="flex min-h-8 justify-center pb-1" aria-live="polite">
+                        {historicoAnterior.carregando ? (
+                          <span role="status" className="inline-flex items-center gap-2 text-xs text-atd-ink-soft">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                            Carregando mensagens anteriores…
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void historicoAnterior.carregar()}
+                            className="rounded-full border border-atd-border bg-atd-surface px-3 py-1 text-xs text-atd-ink-soft hover:bg-atd-blue-hover disabled:opacity-60"
+                          >
+                            {historicoAnterior.erro
+                              ? "Falha ao carregar. Tentar novamente"
+                              : "Role para cima para carregar anteriores"}
+                          </button>
                         )}
                       </div>
-                      {divergenciaIdentidade(
-                        nomeContato(contatoAtual.conversa),
-                        contatoAtual.paciente.nome,
-                      ) && (
-                        <div className="mt-2 rounded border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-800 dark:text-amber-200">
-                          O nome do contato no WhatsApp é diferente do cadastro vinculado. Isso pode ser
-                          normal (responsável, familiar, apelido). Nada foi alterado.
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Não vinculado a paciente cadastrado.
-                    </div>
-                  )}
-                  {contatoAtual.conversa?.id && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2 h-7 text-xs"
-                      onClick={() => setRevisarVinculoAberto(true)}
-                    >
-                      Revisar vínculo
-                    </Button>
-                  )}
-                </section>
-
-
-
-                <AgendamentosContato agendamentos={contatoAtual.agendamentos ?? []} />
-
-                {contatoAtual.contratos?.length > 0 && (
-                  <section>
-                    <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
-                      Contratos
-                    </div>
-                    {contatoAtual.contratos.map((c: any) => (
-                      <div key={c.id} className="text-xs border rounded p-2 mb-1">
-                        <div className="font-medium">#{c.numero}</div>
-                        <div className="text-muted-foreground">
-                          {c.status} · {fmtData(c.data_inicio)}
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                )}
-
-                <section>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
-                    Notas internas
-                  </div>
-                  <div className="space-y-1.5">
-                    {notas.length === 0 && (
-                      <p className="text-xs text-muted-foreground">Sem notas.</p>
                     )}
-                    {(dadosSecundariosProntos ? notas : []).map((n: any) => (
-                      <div
-                        key={n.id}
-                        className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
-                      >
-                        <div className="whitespace-pre-wrap">{n.conteudo}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">
-                          {fmtData(n.created_at)}
-                        </div>
+
+                    {!conteudoDaConversa && !erroMsgs && <ConversaSkeleton />}
+                    {erroMsgs && (
+                      <div className="text-center text-sm text-muted-foreground">
+                        <p>Não foi possível carregar as mensagens desta conversa.</p>
+                        <Button size="sm" variant="outline" className="mt-2" onClick={() => void carregarConversa()}>
+                          Tentar novamente
+                        </Button>
                       </div>
-                    ))}
+                    )}
+                    {conteudoDaConversa && !erroMsgs && timeline.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
+                    )}
+
+                    {(conteudoDaConversa ? timelineComResumos : []).map((item) => {
+                      // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
+                      if (item.kind === "resumo") {
+                        return (
+                          <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
+                            <ResumoNaConversa resumo={item.resumo} />
+                          </div>
+                        );
+                      }
+                      if (item.kind === "grupo") {
+                        const g = item.item;
+                        if (g.tipo === "HANDOFF") {
+                          return (
+                            <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
+                              <HandoffGroupCard grupo={g} />
+                              {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
+                            </div>
+                          );
+                        }
+                        if (g.tipo === "ATRIBUICAO") {
+                          return (
+                            <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
+                              <AtribuicaoGroupCard grupo={g} />
+                            </div>
+                          );
+                        }
+                        // O resumo da Nina fica apenas no painel superior da
+                        // conversa: o aviso de geração não vira bloco na timeline.
+                        if (g.evento.evento === "RESUMO_IA_GERADO") return null;
+                        return (
+                          <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
+                            <ConversationSystemEvent evento={g.evento as unknown as ConversaEvento} />
+                          </div>
+                        );
+                      }
+                      const m = item.msg;
+                      const out = m.direction === "out";
+                      // Só marcador interno vira faixa central. Mensagem real
+                      // enviada ao paciente (status de envio) fica como conversa.
+                      if (marcadorInternoSistema(m)) {
+                        const texto = textoMarcadorSistema(m.body);
+                        if (!texto) return null;
+                        return (
+                          <div key={`m-${m.id}`} data-historico-id={`m-${m.id}`} className="flex justify-center">
+                            <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
+                              {texto}
+                              <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
+
+                      const destacada = msgDestacada === m.id;
+                      return (
+                        <div
+                          key={`m-${m.id}`}
+                          data-msg-id={m.id}
+                          data-historico-id={`m-${m.id}`}
+                          className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+                            destacada
+                              ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
+                              : ""
+                          }`}
+                        >
+                          {destacada && (
+                            <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+                              Mensagem reportada
+                            </span>
+                          )}
+                          {/* Botão de reporte rápido: fora do balão, sempre visível. */}
+                          {clinicaId && (
+                            <InspecaoMensagemNina
+                              parte="reporte"
+                              clinicaId={clinicaId}
+                              conversaId={m.conversa_id ?? sel.id}
+                              mensagem={m}
+                              saida={saidasPorMensagem[String(m.id)]}
+                            />
+                          )}
+                          <div
+                            className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
+                              out
+                                ? "bg-atd-go text-atd-on-strong rounded-br-sm"
+                                : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
+                            }`}
+                          >
+                            <div className="whitespace-pre-wrap">{m.body || `[${m.tipo}]`}</div>
+                            {ehOtimista(m) && m.status === "failed" && (
+                              <div className="mt-1 flex items-center gap-2 text-[11px]">
+                                <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
+                                <button
+                                  type="button"
+                                  className="underline underline-offset-2"
+                                  onClick={() => tentarNovamente(m)}
+                                >
+                                  Tentar novamente
+                                </button>
+                              </div>
+                            )}
+                            <div
+                              className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+                            >
+                              {/* Envio otimista: durante o envio normal a bolha não
+                              exibe nenhum status — só a hora. Falha aparece acima. */}
+                              <span className="whitespace-nowrap">
+                                {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                                {out && rotuloAutorSupervisao(m.enviada_por_perfil) && (
+                                  <span
+                                    data-testid="autor-supervisao"
+                                    title={`Resposta da supervisão (${rotuloAutorSupervisao(m.enviada_por_perfil)})${
+                                      usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome
+                                        ? ` — ${usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome}`
+                                        : ""
+                                    }`}
+                                  >
+                                    · {rotuloAutorSupervisao(m.enviada_por_perfil)}
+                                  </span>
+                                )}
+                              </span>
+                              {clinicaId && (
+                                <InspecaoMensagemNina
+                                  parte="detalhes"
+                                  clinicaId={clinicaId}
+                                  conversaId={m.conversa_id ?? sel.id}
+                                  mensagem={m}
+                                  saida={saidasPorMensagem[String(m.id)]}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* Âncora do fim da conversa: é para cá que a tela vai ao abrir. */}
+                    <div ref={chat.ancoraRef} />
                   </div>
-                  <div className="flex gap-1 mt-2">
-                    <Textarea
-                      value={novaNota}
-                      onChange={(e) => setNovaNota(e.target.value)}
-                      rows={2}
-                      className="text-xs"
-                      placeholder="Nota interna (não vai para o paciente)…"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={adicionarNota}
-                      disabled={!novaNota.trim() || carregandoConversa}
+                  {chat.novas > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => chat.irParaFim(true)}
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-atd-border bg-atd-surface px-3 py-1.5 text-xs font-medium text-atd-ink shadow-md hover:bg-atd-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      aria-live="polite"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      ↓ {rotuloNovasMensagens(chat.novas)}
+                    </button>
+                  )}
+                </div>
+
+                <div className="border-t p-3 space-y-2">
+                  <div className="relative flex gap-2">
+                    {slash && (
+                      <ListaRespostasRapidas
+                        itens={itensResp}
+                        indice={slashIdx}
+                        termo={slash.termo}
+                        favoritos={respostasRapidas.favoritos}
+                        onSelecionar={inserirRespostaRapida}
+                        onIndice={setSlashIdx}
+                        onFavoritar={respostasRapidas.favoritar}
+                      />
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      title="Respostas rápidas"
+                      aria-label="Respostas rápidas"
+                      aria-expanded={!!slash}
+                      className="h-9 w-9 shrink-0 p-0 text-atd-ink-soft"
+                      disabled={!!motivoBloqueio}
+                      onClick={() => {
+                        const el = composerRef.current;
+                        const pos = el?.selectionStart ?? draft.length;
+                        setSlash((s) => (s ? null : { inicio: pos, fim: pos, termo: "" }));
+                        el?.focus();
+                      }}
+                    >
+                      <Zap className="h-4 w-4" />
+                    </Button>
+                    <Textarea
+                      ref={composerRef}
+                      value={draft}
+                      onChange={(e) => {
+                        setDraft(e.target.value);
+                        setSlash(detectarComandoNoTexto(e.target.value, e.target.selectionStart ?? 0));
+                      }}
+                      onBlur={() => setSlash(null)}
+                      onKeyDown={(e) => {
+                        // Com a lista aberta, o teclado navega nela — Enter insere
+                        // a resposta no campo e NUNCA envia a mensagem.
+                        if (slash && itensResp.length > 0) {
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setSlashIdx((i) => (i + 1) % itensResp.length);
+                            return;
+                          }
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setSlashIdx((i) => (i - 1 + itensResp.length) % itensResp.length);
+                            return;
+                          }
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            e.preventDefault();
+                            const escolhida = itensResp[slashIdx];
+                            if (escolhida) inserirRespostaRapida(escolhida);
+                            return;
+                          }
+                        }
+                        if (slash && e.key === "Escape") {
+                          e.preventDefault();
+                          setSlash(null);
+                          return;
+                        }
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          enviar();
+                        }
+                      }}
+                      placeholder={motivoBloqueio ? "Envio bloqueado" : "Mensagem… (digite / para respostas rápidas)"}
+                      rows={1}
+                      className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
+                      disabled={!!motivoBloqueio}
+                    />
+
+                    <Button
+                      onClick={enviar}
+                      disabled={!draft.trim() || !!motivoBloqueio}
+                      className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
+                    >
+                      <Send className="h-4 w-4" />
                     </Button>
                   </div>
-                </section>
-
-                {contatoAtual.atribuido_nome && (
-                  <section className="text-xs text-muted-foreground">
-                    Atribuída a{" "}
-                    <span className="font-medium text-foreground">{contatoAtual.atribuido_nome}</span>
-                  </section>
-                )}
+                </div>
               </>
             )}
-          </div>
-          </div>
-        </Card>
+          </Card>
 
-        {/* Agenda dentro da conversa: não troca de tela nem perde o rascunho. */}
-        {clinicaId && sel && (
-          <AgendaConversaDrawer
-            open={agendaOpen}
-            onOpenChange={setAgendaOpen}
-            clinicaId={clinicaId}
-            conversaId={sel.id}
-            contatoNome={nomeContato(sel as never)}
-            contatoTelefone={sel.contato_telefone ?? null}
-            pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
-            onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
-          />
-        )}
-
-        {/* FASE 5 — revisão manual e confirmada do cadastro vinculado. */}
-        {clinicaId && sel?.id && (
-          <RevisarVinculoDialog
-            open={revisarVinculoAberto}
-            onOpenChange={setRevisarVinculoAberto}
-            clinicaId={clinicaId}
-            conversaId={sel.id}
-            contatoNome={nomeContato(sel as never)}
-            contatoTelefone={sel.contato_telefone ?? null}
-            pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
-            onVinculado={() => {
-              const id = sel.id;
-              cacheContatos.current.invalidar(contatoAtual?.paciente?.id);
-              void obterContato({ data: { clinicaId, conversaId: id } })
-                .then((c) => {
-                  if (selIdRef.current !== id) return;
-                  setContato(c as any);
-                  setSecundariosCarregadosId(id);
-                })
-                .catch(() => {});
-            }}
-          />
-        )}
-
-        {/* DIALOGS */}
-
-
-
-        <Dialog open={assumirOpen} onOpenChange={setAssumirOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Assumir conversa</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                void assumir(true, String(fd.get("motivo") || ""));
-              }}
-              className="space-y-3"
+          {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
+          <Card
+            data-a11y-secundario="true"
+            ref={contatoRef}
+            className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+              contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
+            }`}
+          >
+            {!contatoAberto && (
+              <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+                <Users className="h-5 w-5 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground [writing-mode:vertical-rl]">Contato</span>
+              </div>
+            )}
+            <div
+              className={`${contatoAberto ? "flex" : "hidden"} w-[260px] xl:w-[300px] flex-1 flex-col overflow-hidden`}
             >
-              <p className="text-sm text-muted-foreground">
-                Esta conversa está sendo atendida por{" "}
-                <strong>{nomeUsuario(responsavelId)}</strong>. Ao assumir, essa pessoa passa a
-                somente leitura e a troca fica registrada no histórico.
-              </p>
-              <div className="space-y-1">
-                <Label htmlFor="motivo-assumir">Motivo (opcional)</Label>
-                <Textarea id="motivo-assumir" name="motivo" rows={2} maxLength={500} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setAssumirOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={assumindo}>
-                  {assumindo && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-                  Assumir mesmo assim
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+              <CardHeader className="py-2 border-b">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base">Contato</CardTitle>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-6 w-6 p-0"
+                    title={contatoFixado ? "Desafixar painel" : "Fixar painel aberto"}
+                    onClick={alternarContatoFixado}
+                  >
+                    {contatoFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              </CardHeader>
 
-        <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Transferir conversa</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={transferir} className="space-y-3">
-              <div>
-                <Label>Agente</Label>
-                <Select name="userId">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="p-1 sticky top-0 bg-popover z-10">
-                      <Input
-                        autoFocus
-                        value={buscaAgente}
-                        onChange={(e) => setBuscaAgente(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        placeholder="Digite o nome do agente…"
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    {(() => {
-                      const alvo = normalizarNomeBusca(buscaAgente);
-                      const lista = usuarios.filter((u: any) =>
-                        !alvo
-                          ? true
-                          : normalizarNomeBusca(
-                              `${u.nome ?? ""} ${u.email ?? ""}`,
-                            ).includes(alvo),
-                      );
-                      if (lista.length === 0)
-                        return (
-                          <p className="px-3 py-2 text-xs text-muted-foreground">
-                            Nenhum agente encontrado.
-                          </p>
-                        );
-                      return lista.map((u: any) => {
-                        const st: PresencaAtendente = u.presenca ?? "OFFLINE";
-                        const cor =
-                          st === "ONLINE"
-                            ? "bg-emerald-500"
-                            : st === "PAUSA" || st === "PAUSA_SAIDA"
-                              ? "bg-amber-500"
-                              : "bg-muted-foreground";
-                        // Quem está em pausa não recebe transferência manual (o servidor também recusa).
-                        const emPausaDestino = estadoBloqueiaTransferencia(st);
-                        return (
-                          <SelectItem
-                            key={u.user_id}
-                            value={u.user_id}
-                            disabled={emPausaDestino}
-                            title={emPausaDestino ? MSG_DESTINO_EM_PAUSA : undefined}
+              <div className="flex-1 overflow-auto p-3 space-y-4 text-sm">
+                {!contatoAtual ? (
+                  // O esqueleto é só deste painel: o chat nunca espera pelo contato.
+                  !dadosSecundariosProntos ? (
+                    <ContatoSkeleton />
+                  ) : (
+                    <p className="text-muted-foreground">—</p>
+                  )
+                ) : (
+                  <>
+                    <section>
+                      {/* FASE 5 — o título é SEMPRE quem está falando no WhatsApp. */}
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase">
+                        Contato do WhatsApp
+                      </div>
+                      <div className="font-medium">{tituloConversa(contatoAtual.conversa) || SEM_NOME}</div>
+                      <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                        {(contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone) && (
+                          <div>📱 {contatoAtual.conversa?.contato_telefone || contatoAtual.paciente?.telefone}</div>
+                        )}
+                        {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
+                        {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
+                        {contatoAtual.conversa?.atend_departamentos?.nome && (
+                          <div>Depto: {contatoAtual.conversa.atend_departamentos.nome}</div>
+                        )}
+                        {contatoAtual.conversa?.ultima_mensagem_em && (
+                          <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
+                        )}
+                      </div>
+                    </section>
+
+                    <section>
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase">
+                        Cadastro vinculado
+                      </div>
+                      {contatoAtual.paciente ? (
+                        <>
+                          <div className="font-medium">{contatoAtual.paciente.nome}</div>
+                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                            {contatoAtual.paciente.telefone && <div>📱 {contatoAtual.paciente.telefone}</div>}
+                            {contatoAtual.paciente.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                            {contatoAtual.paciente.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
+                            {contatoAtual.paciente.cidade && (
+                              <div>
+                                📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
+                              </div>
+                            )}
+                          </div>
+                          {divergenciaIdentidade(nomeContato(contatoAtual.conversa), contatoAtual.paciente.nome) && (
+                            <div className="mt-2 rounded border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-800 dark:text-amber-200">
+                              O nome do contato no WhatsApp é diferente do cadastro vinculado. Isso pode ser normal
+                              (responsável, familiar, apelido). Nada foi alterado.
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-xs text-muted-foreground mt-1">Não vinculado a paciente cadastrado.</div>
+                      )}
+                      {contatoAtual.conversa?.id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-7 text-xs"
+                          onClick={() => setRevisarVinculoAberto(true)}
+                        >
+                          Revisar vínculo
+                        </Button>
+                      )}
+                    </section>
+
+                    <AgendamentosContato agendamentos={contatoAtual.agendamentos ?? []} />
+
+                    {contatoAtual.contratos?.length > 0 && (
+                      <section>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Contratos</div>
+                        {contatoAtual.contratos.map((c: any) => (
+                          <div key={c.id} className="text-xs border rounded p-2 mb-1">
+                            <div className="font-medium">#{c.numero}</div>
+                            <div className="text-muted-foreground">
+                              {c.status} · {fmtData(c.data_inicio)}
+                            </div>
+                          </div>
+                        ))}
+                      </section>
+                    )}
+
+                    <section>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Notas internas</div>
+                      <div className="space-y-1.5">
+                        {notas.length === 0 && <p className="text-xs text-muted-foreground">Sem notas.</p>}
+                        {(dadosSecundariosProntos ? notas : []).map((n: any) => (
+                          <div
+                            key={n.id}
+                            className="rounded border border-atd-ai-line bg-atd-ai-soft p-2 text-xs text-atd-ai-deep"
                           >
-                            <span className="flex items-center gap-2">
-                              <span
-                                aria-hidden="true"
-                                className={`h-2 w-2 rounded-full ${cor}`}
-                              />
-                              <span>{u.nome ?? u.email ?? u.user_id}</span>
-                              <span className="text-xs text-muted-foreground">
-                                — {ROTULO_PRESENCA[st]}
-                              </span>
-                            </span>
-                          </SelectItem>
+                            <div className="whitespace-pre-wrap">{n.conteudo}</div>
+                            <div className="text-[11px] text-muted-foreground mt-1">{fmtData(n.created_at)}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-1 mt-2">
+                        <Textarea
+                          value={novaNota}
+                          onChange={(e) => setNovaNota(e.target.value)}
+                          rows={2}
+                          className="text-xs"
+                          placeholder="Nota interna (não vai para o paciente)…"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={adicionarNota}
+                          disabled={!novaNota.trim() || carregandoConversa}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </section>
+
+                    {contatoAtual.atribuido_nome && (
+                      <section className="text-xs text-muted-foreground">
+                        Atribuída a <span className="font-medium text-foreground">{contatoAtual.atribuido_nome}</span>
+                      </section>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Agenda dentro da conversa: não troca de tela nem perde o rascunho. */}
+          {clinicaId && sel && (
+            <AgendaConversaDrawer
+              open={agendaOpen}
+              onOpenChange={setAgendaOpen}
+              clinicaId={clinicaId}
+              conversaId={sel.id}
+              contatoNome={nomeContato(sel as never)}
+              contatoTelefone={sel.contato_telefone ?? null}
+              pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
+              onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
+            />
+          )}
+
+          {/* FASE 5 — revisão manual e confirmada do cadastro vinculado. */}
+          {clinicaId && sel?.id && (
+            <RevisarVinculoDialog
+              open={revisarVinculoAberto}
+              onOpenChange={setRevisarVinculoAberto}
+              clinicaId={clinicaId}
+              conversaId={sel.id}
+              contatoNome={nomeContato(sel as never)}
+              contatoTelefone={sel.contato_telefone ?? null}
+              pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
+              onVinculado={() => {
+                const id = sel.id;
+                cacheContatos.current.invalidar(contatoAtual?.paciente?.id);
+                void obterContato({ data: { clinicaId, conversaId: id } })
+                  .then((c) => {
+                    if (selIdRef.current !== id) return;
+                    setContato(c as any);
+                    setSecundariosCarregadosId(id);
+                  })
+                  .catch(() => {});
+              }}
+            />
+          )}
+
+          {/* DIALOGS */}
+
+          <Dialog open={assumirOpen} onOpenChange={setAssumirOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Assumir conversa</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  void assumir(true, String(fd.get("motivo") || ""));
+                }}
+                className="space-y-3"
+              >
+                <p className="text-sm text-muted-foreground">
+                  Esta conversa está sendo atendida por <strong>{nomeUsuario(responsavelId)}</strong>. Ao assumir, essa
+                  pessoa passa a somente leitura e a troca fica registrada no histórico.
+                </p>
+                <div className="space-y-1">
+                  <Label htmlFor="motivo-assumir">Motivo (opcional)</Label>
+                  <Textarea id="motivo-assumir" name="motivo" rows={2} maxLength={500} />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setAssumirOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={assumindo}>
+                    {assumindo && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                    Assumir mesmo assim
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Transferir conversa</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={transferir} className="space-y-3">
+                <div>
+                  <Label>Agente</Label>
+                  <Select name="userId">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <div className="p-1 sticky top-0 bg-popover z-10">
+                        <Input
+                          autoFocus
+                          value={buscaAgente}
+                          onChange={(e) => setBuscaAgente(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder="Digite o nome do agente…"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      {(() => {
+                        const alvo = normalizarNomeBusca(buscaAgente);
+                        const lista = usuarios.filter((u: any) =>
+                          !alvo ? true : normalizarNomeBusca(`${u.nome ?? ""} ${u.email ?? ""}`).includes(alvo),
                         );
-                      });
-
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Departamento</Label>
-                <Select name="departamentoId">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deptos.map((d: any) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setTransferOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">Transferir</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                        if (lista.length === 0)
+                          return <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum agente encontrado.</p>;
+                        return lista.map((u: any) => {
+                          const st: PresencaAtendente = u.presenca ?? "OFFLINE";
+                          const cor =
+                            st === "ONLINE"
+                              ? "bg-emerald-500"
+                              : st === "PAUSA" || st === "PAUSA_SAIDA"
+                                ? "bg-amber-500"
+                                : "bg-muted-foreground";
+                          // Quem está em pausa não recebe transferência manual (o servidor também recusa).
+                          const emPausaDestino = estadoBloqueiaTransferencia(st);
+                          return (
+                            <SelectItem
+                              key={u.user_id}
+                              value={u.user_id}
+                              disabled={emPausaDestino}
+                              title={emPausaDestino ? MSG_DESTINO_EM_PAUSA : undefined}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span aria-hidden="true" className={`h-2 w-2 rounded-full ${cor}`} />
+                                <span>{u.nome ?? u.email ?? u.user_id}</span>
+                                <span className="text-xs text-muted-foreground">— {ROTULO_PRESENCA[st]}</span>
+                              </span>
+                            </SelectItem>
+                          );
+                        });
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Departamento</Label>
+                  <Select name="departamentoId">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deptos.map((d: any) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setTransferOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">Transferir</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-
-    </div>
     </RelogioEsperaProvider>
   );
 }
