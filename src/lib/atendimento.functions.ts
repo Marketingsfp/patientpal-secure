@@ -23,9 +23,12 @@ import {
 import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
+  MSG_ADMIN_SO_COM_ATENDENTE,
   MSG_DESTINO_EM_PAUSA,
   apenasDestinatariosValidos,
+  conversaComAtendente,
   estadoBloqueiaTransferencia,
+  perfilSupervisao,
   statusPresenca,
 
 } from "@/lib/atendimento/perfil-atendimento";
@@ -1908,7 +1911,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
+        "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);
@@ -1950,7 +1953,7 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
     const COLUNAS =
-      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, recebida_em, media_url, media_mime, status, execucao_id, client_message_id";
+      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id";
     const { data: alvo, error: eAlvo } = await context.supabase
       .from("whatsapp_mensagens")
       .select(COLUNAS)
@@ -2018,8 +2021,18 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
-    if (await ehAdminClinica(context.supabase, context.userId, data.clinicaId))
-      throw new Error(MSG_ADMIN_NAO_ATENDE);
+    // Supervisão (admin/gestor) pode responder no chat da atendente, sem assumir a conversa.
+    // O perfil exato fica gravado na mensagem. O admin só responde conversas que estão com uma atendente.
+    const ehAdmin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
+    const ehGestor = ehAdmin
+      ? true
+      : !!(
+          await context.supabase.rpc("can_manage_clinica", {
+            _user_id: context.userId,
+            _clinica_id: data.clinicaId,
+          })
+        ).data;
+    const perfilSup = perfilSupervisao({ admin: ehAdmin, gestor: ehGestor });
     trace.marcar("SEND_T4_AUTH_DONE");
     // IDEMPOTÊNCIA: se este mesmo envio já foi concluído (duplo clique, retry,
     // reenvio acidental), devolvemos a mensagem existente sem chamar o
@@ -2029,7 +2042,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       const { data: jaExiste } = await context.supabase
         .from("whatsapp_mensagens")
         .select(
-          "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
+          "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
         )
         .eq("clinica_id", data.clinicaId)
         .eq("client_message_id", data.clientMessageId)
@@ -2042,7 +2055,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const { data: conv, error: cErr } = await context.supabase
       .from("atend_conversas")
       .select(
-        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status",
+        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status, owner_type",
       )
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
@@ -2055,7 +2068,8 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
       throw new Error("Conversa encerrada. Reabra o atendimento para responder.");
-    if (conv.atribuida_user_id && conv.atribuida_user_id !== context.userId)
+    if (ehAdmin && !conversaComAtendente(conv)) throw new Error(MSG_ADMIN_SO_COM_ATENDENTE);
+    if (conv.atribuida_user_id && conv.atribuida_user_id !== context.userId && !perfilSup)
       throw new Error(
         "Esta conversa está sendo atendida por outra pessoa. Use “Assumir conversa” para responder.",
       );
@@ -2127,11 +2141,14 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         tipo: "text",
         status: "sent",
         enviada_por: "humano",
+        // Quem escreveu e, se for supervisão, com qual perfil (como a Nina é identificada).
+        enviada_por_user_id: context.userId,
+        enviada_por_perfil: perfilSup,
         // Mesmo identificador do clique — nada é gerado de novo aqui.
         client_message_id: data.clientMessageId ?? null,
       } as any)
       .select(
-        "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, status, client_message_id, wa_message_id",
+        "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
       )
       .maybeSingle();
     trace.marcar("SEND_T8_DB_INSERT_DONE");

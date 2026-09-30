@@ -27,6 +27,8 @@ export type MensagemOtimista = {
   status: "sending" | "failed";
   recebida_em: string;
   enviada_por_user_id: string | null;
+  /** Perfil de supervisão de quem enviou (admin/gestor); null para atendente comum. */
+  enviada_por_perfil: "admin" | "gestor" | null;
   optimistic: true;
 };
 
@@ -63,6 +65,7 @@ export function criarMensagemOtimista(p: {
   conversaId: string;
   texto: string;
   usuarioId?: string | null;
+  perfil?: "admin" | "gestor" | null;
   clientMessageId?: string;
   agora?: Date;
 }): MensagemOtimista {
@@ -78,6 +81,7 @@ export function criarMensagemOtimista(p: {
     status: "sending",
     recebida_em: (p.agora ?? new Date()).toISOString(),
     enviada_por_user_id: p.usuarioId ?? null,
+    enviada_por_perfil: p.perfil ?? null,
     optimistic: true,
   };
 }
