@@ -14931,6 +14931,8 @@ export type Database = {
           created_at: string
           direction: string
           enviada_por: string | null
+          enviada_por_perfil: string | null
+          enviada_por_user_id: string | null
           execucao_id: string | null
           from_number: string | null
           id: string
@@ -14962,6 +14964,8 @@ export type Database = {
           created_at?: string
           direction: string
           enviada_por?: string | null
+          enviada_por_perfil?: string | null
+          enviada_por_user_id?: string | null
           execucao_id?: string | null
           from_number?: string | null
           id?: string
@@ -14993,6 +14997,8 @@ export type Database = {
           created_at?: string
           direction?: string
           enviada_por?: string | null
+          enviada_por_perfil?: string | null
+          enviada_por_user_id?: string | null
           execucao_id?: string | null
           from_number?: string | null
           id?: string
