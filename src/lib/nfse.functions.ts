@@ -589,7 +589,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
 
     const { data: emitente } = await supabaseAdmin
       .from("nfse_emitentes")
-      .select("focus_ambiente, usar_ambiente_nacional")
+      .select("focus_ambiente, usar_ambiente_nacional, aliquota_iss")
       .eq("id", nota.emitente_id!)
       .single();
     const token =
@@ -609,8 +609,16 @@ export const consultarNfse = createServerFn({ method: "POST" })
     };
     if (body?.status === "autorizado") {
       updates.status = "emitida";
-      updates.numero = body?.numero ?? null;
-      updates.serie = body?.serie ?? null;
+      // Grava o que a prefeitura autorizou (JSON + XML oficial), não o calculado.
+      const { camposDoRetornoAutorizado } = await import("@/lib/nfse-retorno.server");
+      Object.assign(
+        updates,
+        await camposDoRetornoAutorizado(body, {
+          token,
+          aliquotaCadastro: emitente?.aliquota_iss ?? null,
+          nfseRef: nota.focus_ref,
+        }),
+      );
       updates.codigo_verificacao = body?.codigo_verificacao ?? null;
       // url_danfse já vem absoluta (S3). caminho_* é relativo ao host do Focus.
       updates.url_pdf =
