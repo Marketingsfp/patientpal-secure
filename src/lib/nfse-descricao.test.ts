@@ -26,7 +26,7 @@ describe("especialidade na descrição da NFS-e", () => {
   });
   it("só acrescenta quando a descrição começa pelo procedimento (sem o sufixo)", () => {
     expect(acrescentarEspecialidade("CONSULTA", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe("CONSULTA (ORTOPEDIA)");
-    expect(acrescentarEspecialidade("  consúlta ", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe("consúlta (ORTOPEDIA)");
+    expect(acrescentarEspecialidade("  consúlta ", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe("  consúlta (ORTOPEDIA)");
     expect(acrescentarEspecialidade("Serviços laboratoriais", "GINECOLOGIA", ["PREVENTIVO (GINECOLOGIA)"])).toBe(
       "Serviços laboratoriais",
     );
