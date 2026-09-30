@@ -95,9 +95,9 @@ export const ROTULO_PERFIL_SUPERVISAO: Record<PerfilSupervisao, string> = {
   gestor: "Gestor",
 };
 
-/** Mensagem do admin ao tentar responder fora de uma conversa que está com uma atendente. */
-export const MSG_ADMIN_SO_COM_ATENDENTE =
-  "Administrador responde apenas conversas que estão com uma atendente.";
+/** Mensagem do admin ao tentar responder numa conversa fora do que ele pode responder. */
+export const MSG_ADMIN_NAO_RESPONDE_AQUI =
+  "Administrador responde apenas conversas abertas que estão com uma atendente ou sem responsável.";
 
 /** Perfil exato de supervisão: admin tem precedência sobre gestor. */
 export function perfilSupervisao(args: { admin: boolean; gestor: boolean }): PerfilSupervisao | null {
@@ -117,6 +117,32 @@ export function conversaComAtendente(conversa: {
     conversa.status !== "closed" &&
     conversa.status !== "finished"
   );
+}
+
+/**
+ * Conversa aberta sem responsável (fila global): não é da Nina nem de nenhuma atendente.
+ * A supervisão responde sem que ela seja atribuída a ninguém; só vira dela se clicar em Assumir.
+ */
+export function conversaSemResponsavel(conversa: {
+  atribuida_user_id?: string | null;
+  owner_type?: string | null;
+  status?: string | null;
+}): boolean {
+  return (
+    !conversa.atribuida_user_id &&
+    conversa.owner_type !== "AI" &&
+    conversa.status !== "closed" &&
+    conversa.status !== "finished"
+  );
+}
+
+/** O admin responde conversas com atendente ou sem responsável (não as da Nina nem as fechadas). */
+export function adminPodeResponder(conversa: {
+  atribuida_user_id?: string | null;
+  owner_type?: string | null;
+  status?: string | null;
+}): boolean {
+  return conversaComAtendente(conversa) || conversaSemResponsavel(conversa);
 }
 
 /** Etiqueta exibida na bolha quando a resposta foi de um supervisor; null nos demais casos. */
