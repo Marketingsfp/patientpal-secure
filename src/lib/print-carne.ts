@@ -2,14 +2,71 @@ import { supabase } from "@/integrations/supabase/client";
 import { prontuarioExibicao } from "@/lib/prontuario";
 
 /**
- * Gera um carnê interno em HTML/A4 a partir das parcelas de um contrato
+ * Gera um carnê interno em HTML a partir das parcelas de um contrato
  * de convênio. Abre uma nova aba com window.print() para salvar como PDF
  * ou imprimir direto.
  *
- * Layout: 3 fichas por página A4, cada ficha com nº da parcela,
- * vencimento, valor, dados do titular/convênio e linha picotada para
- * recorte/preenchimento manual.
+ * Layout: bobina térmica 80mm (mesma impressora da GR). Cada parcela sai com
+ * a via do cliente e, logo abaixo, a via da clínica, separadas por linha
+ * picotada para recorte. Antes era A4 com as vias lado a lado e altura fixa
+ * de 1/3 de folha — na impressora de bobina saía enorme e comprido.
  */
+
+/**
+ * Sobrescreve o layout A4 dos dois modelos de carnê para a bobina de 80mm:
+ * vias uma embaixo da outra, sem altura fixa, letra de 10px e linhas juntas.
+ * Vai no fim do <style> para ganhar das regras anteriores.
+ */
+const CSS_BOBINA_80MM = `
+  html, body { background: #fff; color: #000; }
+  body {
+    width: 76mm; max-width: 100%; padding: 3mm 2mm;
+    font-size: 10px; line-height: 1.15;
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  .lab, .capa-grid .lab, .ficha-grid .lab, .ficha-parcela .lab, .campo-manual .lab { font-size: 8px; color: #000; }
+  .capa {
+    height: auto; border: none; border-radius: 0; border-bottom: 1px dashed #000;
+    padding: 0 0 4px; margin: 0; gap: 3px;
+  }
+  .capa h1 { font-size: 12px; margin: 0; }
+  .capa-clinica { font-size: 11px; margin-bottom: 2px; }
+  .capa-clinica .cnpj { font-size: 9px; color: #000; }
+  .capa-grid { grid-template-columns: 1fr 1fr; gap: 3px 8px; font-size: 10px; }
+  .capa-grid .cell { gap: 0; }
+  .capa-topo { gap: 6px; padding-bottom: 3px; }
+  .capa-marca { font-size: 15px; }
+  .capa-nome { font-size: 11px; margin-top: 1px; }
+  .capa-end, .capa-whats { font-size: 9px; margin-top: 1px; color: #000; }
+  .capa-codigo { min-width: 0; flex-shrink: 0; padding: 2px 5px; border-width: 1px; }
+  .capa-topo > div:first-child { min-width: 0; }
+  .capa-codigo .lab { font-size: 8px; }
+  .capa-codigo .val { font-size: 13px; white-space: nowrap; word-break: normal; overflow-wrap: normal; }
+  .capa-titulo { font-size: 10px; }
+  .capa-rodape { font-size: 9px; padding: 3px; margin-top: 2px; }
+
+  .ficha-par { display: block; margin: 0; }
+  .ficha-via { gap: 0; }
+  .ficha, .ficha-via:first-child .ficha, .ficha-via:last-child .ficha {
+    height: auto; border: none; border-radius: 0; border-bottom: 1px dashed #000;
+    padding: 4px 0; gap: 3px;
+  }
+  .via-label { font-size: 8px; margin: 0; }
+  .ficha-header { flex-wrap: wrap; gap: 3px 6px; padding-bottom: 3px; border-bottom-color: #000; }
+  .ficha-marca { font-size: 11px; }
+  .ficha-clinica { font-size: 10px; }
+  .ficha-doc { font-size: 8px; color: #000; }
+  .ficha-parcelas { gap: 6px; }
+  .ficha-parcela .val { font-size: 11px; }
+  .ficha-grid { gap: 2px 8px; font-size: 10px; }
+  .ficha-grid > div { gap: 0; }
+  .ficha-grid .val.destaque { font-size: 12px; }
+  .ficha-grid .val.obs { font-size: 8px; }
+  .ficha-rodape { margin-top: 4px; gap: 8px; }
+  .ficha-rodape .campo-manual .lab { min-height: 0; }
+  .campo-manual .linha-assin { height: 14px; }
+  .campo-manual .val.pago { font-size: 10px; }
+`;
 
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -160,11 +217,11 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
           <div><span class="lab">CPF</span><span class="val">${esc(paciente?.cpf ?? "—")}</span></div>
           <div>
             <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
-            <span class="lab" style="margin-top:10px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
+            <span class="lab" style="margin-top:3px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
           </div>
           <div>
             <span class="lab">Observação</span>
-            <span class="val" style="font-weight:500;font-size:10px;line-height:1.45;">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia.</span>
+            <span class="val" style="font-weight:500;font-size:8px;">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia.</span>
           </div>
           <div></div>
           <div>
@@ -201,7 +258,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
 <meta charset="utf-8" />
 <title>Carnê — Contrato #${esc(contrato.numero)} — ${esc(contrato.paciente_nome)}</title>
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; margin: 0; }
   .capa {
@@ -264,6 +321,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   .footer-imprime { text-align: center; margin: 8px 0 0; }
   .footer-imprime button { padding: 8px 14px; font-size: 14px; cursor: pointer; }
   @media print { .footer-imprime { display: none; } }
+  ${CSS_BOBINA_80MM}
 </style>
 </head>
 <body>
@@ -459,7 +517,7 @@ function htmlCarneSaoFrancisco(args: {
 <meta charset="utf-8" />
 <title>Carnê — Contrato #${esc(contrato.numero)} — ${esc(contrato.paciente_nome)}</title>
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; margin: 0; }
   .lab { display: block; font-size: 8px; color: #555; text-transform: uppercase; letter-spacing: .04em; }
@@ -515,6 +573,7 @@ function htmlCarneSaoFrancisco(args: {
   .footer-imprime { text-align: center; margin: 8px 0 0; }
   .footer-imprime button { padding: 8px 14px; font-size: 14px; cursor: pointer; }
   @media print { .footer-imprime { display: none; } }
+  ${CSS_BOBINA_80MM}
 </style>
 </head>
 <body>
