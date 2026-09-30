@@ -42,6 +42,7 @@ import {
   Crop,
   Upload,
   Code2,
+  RotateCcw,
 } from "lucide-react";
 import {
   Dialog,
@@ -475,9 +476,19 @@ interface Props {
   /** Quando informado, a janela do PDF importado oferece "Salvar só o PDF":
    * o arquivo é entregue a quem usa o editor em vez de virar texto. */
   onSalvarSoPdf?: (file: File) => Promise<boolean>;
+  /** Quando informado, a barra ganha o botão "Carregar Modelo Padrão", que
+   * troca o conteúdo do editor pelo HTML devolvido. */
+  onCarregarPadrao?: () => Promise<string>;
 }
 
-export function RichEditor({ value, onChange, clinicaId, variables, onSalvarSoPdf }: Props) {
+export function RichEditor({
+  value,
+  onChange,
+  clinicaId,
+  variables,
+  onSalvarSoPdf,
+  onCarregarPadrao,
+}: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
@@ -1176,6 +1187,42 @@ export function RichEditor({ value, onChange, clinicaId, variables, onSalvarSoPd
           <Upload className="h-3.5 w-3.5" />
           {importando ? "Importando…" : "Importar documento"}
         </Button>
+        {onCarregarPadrao && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            disabled={importando}
+            title="Substituir o conteúdo pelo modelo padrão"
+            onClick={async () => {
+              if (
+                !editor.isEmpty &&
+                !window.confirm(
+                  "O texto atual será substituído pelo modelo padrão. Deseja continuar?",
+                )
+              ) {
+                return;
+              }
+              setImportando(true);
+              try {
+                const html = await onCarregarPadrao();
+                // Mantém o HTML bruto do modelo, sem passar pela normalização do editor.
+                editor.commands.setContent(html, { emitUpdate: false });
+                onChange(html);
+                setHtmlDraft(html);
+                toast.success("Modelo padrão carregado. Clique em Salvar para gravar.");
+              } catch (err) {
+                mostrarErro(err, "Não foi possível carregar o modelo padrão");
+              } finally {
+                setImportando(false);
+              }
+            }}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Carregar Modelo Padrão
+          </Button>
+        )}
         <Button
           type="button"
           variant={htmlMode ? "default" : "outline"}

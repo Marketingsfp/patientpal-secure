@@ -80,6 +80,13 @@ const DESCRICAO_MAX = 1000;
 const BENEFICIOS_MAX = 2000;
 
 const stripHtml = (v: string) => DOMPurify.sanitize(v, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+// Editor "vazio" ainda devolve <p></p>: considera em branco o que não tem texto nem imagem.
+const htmlSemTexto = (v?: string | null) =>
+  !/<img\b/i.test(v ?? "") &&
+  !(v ?? "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, "")
+    .trim();
 
 // Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
 // "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
@@ -324,7 +331,14 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
     setVigenciaMeses(c.vigencia_meses ?? 12);
     setModalidade(c.modalidade === "cartao_desconto" ? "cartao_desconto" : "cartao_consulta");
     setBeneficiosTxt(c.beneficios ?? "");
-    setModeloContrato(c.modelo_contrato ?? "");
+    // Modelo vazio no banco: a caixa já abre com o mesmo texto que a impressão
+    // do contrato usaria, em vez de ficar em branco.
+    if (htmlSemTexto(c.modelo_contrato)) {
+      const { modeloPadraoContrato } = await import("@/lib/print-contrato");
+      setModeloContrato(modeloPadraoContrato(c.id));
+    } else {
+      setModeloContrato(c.modelo_contrato ?? "");
+    }
     const stripped = (c.informativo_html ?? "")
       .replace(/<[^>]+>/g, "")
       .replace(/&nbsp;/g, "")
@@ -867,7 +881,19 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
                     <div className="flex items-center gap-2 font-medium">
                       <FileText className="h-4 w-4" /> Modelo do Contrato
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (htmlSemTexto(modeloContrato)) {
+                          toast.warning(
+                            'O modelo do contrato está em branco. Escreva o texto, use "Importar documento" ou clique em "Carregar Modelo Padrão" antes de imprimir.',
+                          );
+                          return;
+                        }
+                        window.print();
+                      }}
+                    >
                       <Printer className="h-4 w-4 mr-1" /> Imprimir
                     </Button>
                   </div>
@@ -894,6 +920,10 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
                       onChange={setModeloContrato}
                       clinicaId={clinicaAtual.clinica_id}
                       variables={buildContratoVariaveis(maxDependentes)}
+                      onCarregarPadrao={async () => {
+                        const { modeloPadraoContrato } = await import("@/lib/print-contrato");
+                        return modeloPadraoContrato(editing?.id);
+                      }}
                     />
                   </div>
                   <style>{`

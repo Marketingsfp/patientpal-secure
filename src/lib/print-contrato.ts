@@ -328,6 +328,11 @@ const TEXTO_CONTRATO_HTML = `
 </div>
 `;
 
+/** Modelo usado na impressão quando o convênio não tem texto próprio salvo:
+ *  o modelo fixo do convênio, se houver, senão a minuta geral. */
+export const modeloPadraoContrato = (convenioId?: string | null) =>
+  (convenioId ? CONVENIO_TEMPLATE_OVERRIDES[convenioId] : null) ?? TEXTO_CONTRATO_HTML;
+
 export async function printContrato(contratoId: string) {
   const { data: c, error } = await supabase
     .from("contratos_assinatura")
