@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { corrigirIssLote } from "@/lib/nfse-backfill.functions";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import {
@@ -116,6 +117,24 @@ function NfsePage() {
   // filtrando pelo nome mesmo sem a coluna à vista.
   const podeVerQuemEmitiu = ["admin", "gestor", "supervisor"].includes((clinicaAtual?.role ?? "").toLowerCase());
   const consulta = useServerFn(consultarNfse);
+  // NFS-e parte 1b: correção manual (admin) de alíquota/ISS pelo XML oficial.
+  const corrigirLote = useServerFn(corrigirIssLote);
+  const [corrigindo, setCorrigindo] = useState(false);
+  async function rodarCorrecao(limite: number) {
+    if (!clinicaAtual) return;
+    setCorrigindo(true);
+    try {
+      const r = await corrigirLote({ data: { clinicaId: clinicaAtual.clinica.id, limite } });
+      const falhas = Object.entries(r.falhas).map(([k, v]) => `${k}: ${v}`).join(", ") || "nenhuma";
+      const msg = `${r.processadas} notas · ${r.corrigidas} corrigidas · ISS R$ ${r.issAntes.toFixed(2)} → R$ ${r.issDepois.toFixed(2)} · falhas: ${falhas}`;
+      if (r.parado) toast.error(`Parado: ${r.semSentido} notas com valor sem sentido (>5%). Nada gravado neste lote. ${msg}`, { duration: 20000 });
+      else toast.success(msg, { duration: 15000 });
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCorrigindo(false);
+    }
+  }
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
   const avancarRps = useServerFn(avancarRpsProximoNumero);
@@ -499,6 +518,17 @@ function NfsePage() {
             {exportando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
             Exportar Excel
           </Button>
+          {clinicaAtual?.role?.toLowerCase() === "admin" && (
+            <>
+              <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(20)}>
+                {corrigindo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Corrigir ISS pelo XML (amostra 20)
+              </Button>
+              <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(100)}>
+                Próximo lote (100)
+              </Button>
+            </>
+          )}
           {!ehSaoFrancisco && (
             <>
               <Button
