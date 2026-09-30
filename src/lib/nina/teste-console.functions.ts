@@ -204,14 +204,31 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     // mensagens novas enviadas depois do reset.
     // Falha de rede momentânea ("fetch failed") ganha uma segunda tentativa
     // antes de virar erro, para não derrubar a tela do console.
-    const buscarMsgs = () =>
-      supabaseAdmin
-        .from("whatsapp_mensagens")
-        .select("id, conversa_id, direction, body, tipo, transcricao, status, enviada_por, created_at, execucao_id, wa_message_id")
-        .eq("clinica_id", data.clinicaId)
-        .in("conversa_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(LIMITE_MENSAGENS_LEAD);
+    // Leads com centenas de sessões geram listas de conversa enormes; num único
+    // `.in()` o endereço da consulta passa do limite e a requisição falha como
+    // "fetch failed". Por isso a lista é dividida em blocos de 100.
+    const blocos: string[][] = [];
+    for (let i = 0; i < ids.length; i += 100) blocos.push(ids.slice(i, i + 100));
+    const buscarMsgs = async () => {
+      const partes = await Promise.all(
+        blocos.map((bloco) =>
+          supabaseAdmin
+            .from("whatsapp_mensagens")
+            .select("id, conversa_id, direction, body, tipo, transcricao, status, enviada_por, created_at, execucao_id, wa_message_id")
+            .eq("clinica_id", data.clinicaId)
+            .in("conversa_id", bloco)
+            .order("created_at", { ascending: false })
+            .limit(LIMITE_MENSAGENS_LEAD),
+        ),
+      );
+      const falha = partes.find((p) => p.error);
+      if (falha) return { data: null, error: falha.error };
+      const todas = partes
+        .flatMap((p) => (p.data ?? []) as any[])
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+        .slice(0, LIMITE_MENSAGENS_LEAD);
+      return { data: todas, error: null };
+    };
     let { data: msgsDesc, error } = await buscarMsgs();
     // Até 3 novas tentativas (0,5 s, 1,5 s, 3 s) para oscilações de rede.
     for (const espera of [500, 1500, 3000]) {
@@ -227,14 +244,22 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
 
     // Eventos operacionais (resolvida, memória resetada, atribuição…). O
     // console mescla com as mensagens por `created_at` — nada de popup.
-    const { data: evs } = await supabaseAdmin
-      .from("atend_conversa_eventos")
-      .select("id, evento, user_id, motivo, detalhes, created_at")
-      .eq("clinica_id", data.clinicaId)
-      .in("conversa_id", ids)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    const lista = ((evs ?? []) as any[]).slice().reverse();
+    const partesEv = await Promise.all(
+      blocos.map((bloco) =>
+        supabaseAdmin
+          .from("atend_conversa_eventos")
+          .select("id, evento, user_id, motivo, detalhes, created_at")
+          .eq("clinica_id", data.clinicaId)
+          .in("conversa_id", bloco)
+          .order("created_at", { ascending: false })
+          .limit(200),
+      ),
+    );
+    const lista = partesEv
+      .flatMap((p) => (p.data ?? []) as any[])
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(0, 200)
+      .reverse();
 
     const userIds = Array.from(
       new Set(lista.map((e) => e.user_id).filter((v): v is string => !!v)),
