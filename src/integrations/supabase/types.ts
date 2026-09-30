@@ -14931,6 +14931,8 @@ export type Database = {
           created_at: string
           direction: string
           enviada_por: string | null
+          enviada_por_perfil: string | null
+          enviada_por_user_id: string | null
           execucao_id: string | null
           from_number: string | null
           id: string
@@ -14962,6 +14964,8 @@ export type Database = {
           created_at?: string
           direction: string
           enviada_por?: string | null
+          enviada_por_perfil?: string | null
+          enviada_por_user_id?: string | null
           execucao_id?: string | null
           from_number?: string | null
           id?: string
@@ -14993,6 +14997,8 @@ export type Database = {
           created_at?: string
           direction?: string
           enviada_por?: string | null
+          enviada_por_perfil?: string | null
+          enviada_por_user_id?: string | null
           execucao_id?: string | null
           from_number?: string | null
           id?: string
@@ -15298,14 +15304,6 @@ export type Database = {
       atend_claim_conversa: {
         Args: { _clinica_id: string; _conversa_id: string; _user_id: string }
         Returns: boolean
-      }
-      atend_configurar_capacidade: {
-        Args: {
-          _clinica_id: string
-          _max_simultaneas: number
-          _user_id: string
-        }
-        Returns: Json
       }
       atend_conversa_de_handoff: {
         Args: {
