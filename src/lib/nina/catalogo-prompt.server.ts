@@ -5,7 +5,6 @@
  *
  * Server-only.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { contagemCatalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { REGRA_PIX_CARTAO } from "./pagamento-catalogo";
@@ -17,21 +16,7 @@ import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES
 export async function contarCatalogoPublicado(
   clinicaId: string,
 ): Promise<{ servicos: number; profissionais: number }> {
-  const contagem = await contagemCatalogoDoTurno(clinicaId);
-  if (contagem) return contagem;
-  const [servicos, profissionais] = await Promise.all([
-    supabaseAdmin
-      .from("nina_cat_servicos")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", clinicaId)
-      .eq("status", "PUBLICADO"),
-    supabaseAdmin
-      .from("nina_cat_profissionais")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", clinicaId)
-      .eq("status", "PUBLICADO"),
-  ]);
-  return { servicos: servicos.count ?? 0, profissionais: profissionais.count ?? 0 };
+  return contagemCatalogoDoTurno(clinicaId);
 }
 
 const FUSO = FUSO_PADRAO;

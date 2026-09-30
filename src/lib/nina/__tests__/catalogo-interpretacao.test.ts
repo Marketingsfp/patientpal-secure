@@ -169,12 +169,11 @@ describe("interpretação do catálogo pela Nina", () => {
 
 describe("definição central das instruções", () => {
   it("bloco do catálogo traz data local, condições de pagamento e limites", async () => {
-    mock.module("@/integrations/supabase/client.server", () => ({
-      supabaseAdmin: {
-        from: () => ({
-          select: () => ({ eq: () => ({ eq: () => Promise.resolve({ count: 5 }) }) }),
-        }),
-      },
+    mock.module("../fonte-operacional.server", () => ({
+      lerFonteOperacional: async () => ({
+        servicos: Array.from({ length: 5 }, (_, i) => ({ id: `s${i}` })),
+        profissionais: [],
+      }),
     }));
     const { blocoPromptCatalogo } = await import("../catalogo-prompt.server");
     const bloco = await blocoPromptCatalogo("clinica-1");
@@ -192,12 +191,11 @@ describe("definição central das instruções", () => {
   });
 
   it("sem catálogo publicado o bloco continua e manda encaminhar para humano", async () => {
-    mock.module("@/integrations/supabase/client.server", () => ({
-      supabaseAdmin: {
-        from: () => ({
-          select: () => ({ eq: () => ({ eq: () => Promise.resolve({ count: 0 }) }) }),
-        }),
-      },
+    mock.module("../fonte-operacional.server", () => ({
+      lerFonteOperacional: async () => ({
+        servicos: Array.from({ length: 0 }, (_, i) => ({ id: `s${i}` })),
+        profissionais: [],
+      }),
     }));
     const { blocoPromptCatalogo } = await import("../catalogo-prompt.server");
     const bloco = await blocoPromptCatalogo("clinica-1");

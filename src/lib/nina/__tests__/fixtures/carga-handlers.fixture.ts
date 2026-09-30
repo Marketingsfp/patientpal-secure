@@ -45,6 +45,16 @@ mock.module("@tanstack/react-start", () => ({
 }));
 mock.module("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
 mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: db.admin }));
+// A Nina lê o cadastro (fonte operacional); aqui ele entrega as linhas "publicadas" das tabelas simuladas.
+mock.module("@/lib/nina/fonte-operacional.server", () => ({
+  ninaInformaPeloCadastro: async () => true,
+  limparCacheFonteOperacional: () => {},
+  lerFonteOperacional: async (clinicaId: string) => {
+    const publicados = (t: string) => ((db.tabelas as Record<string, any[]>)[t] ?? [])
+      .filter((l) => l.clinica_id === clinicaId && l.status === "PUBLICADO");
+    return { servicos: publicados("nina_cat_servicos"), profissionais: publicados("nina_cat_profissionais") };
+  },
+}));
 mock.module("@/lib/nina/carga-redacao-luna.server", () => ({
   gerarMensagensPlanoLuna: async (plano: any) => {
     expect(db.locks.size).toBe(0);

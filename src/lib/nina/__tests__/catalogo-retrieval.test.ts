@@ -6,6 +6,7 @@
  * nada de rascunho/arquivado/nota interna e somente detalhes relevantes
  * enviados ao modelo após pesquisar todas as páginas do índice público.
  */
+import { fonteOperacionalDoBanco } from "./fixtures/fonte-operacional-falsa";
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminharAposEsclarecimento, prepararSegundaPergunta } from "../catalogo-esclarecimento";
@@ -116,6 +117,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: { from: (nome: string) => tabela(nome) },
 }));
 
+const leiturasFonte: string[] = [];
+mock.module("../fonte-operacional.server", () => fonteOperacionalDoBanco(() => banco as never, leiturasFonte, () => falharAposPrimeiraPagina));
 const { buscarNoCatalogo } = await import("../catalogo-retrieval.server");
 
 const CLINICA = "11111111-1111-1111-1111-111111111111";
@@ -166,6 +169,7 @@ beforeEach(() => {
   banco["nina_cat_profissionais"] = [];
   banco["medicos"] = [];
   chamadas.length = 0;
+  leiturasFonte.length = 0;
   tetoServidor = Infinity;
   falharAposPrimeiraPagina = false;
 });
@@ -180,7 +184,8 @@ describe("uma leitura do catálogo por resposta", () => {
       medico_id: medicoId, especialidades: [{ nome: "CARDIOLOGIA" }], tipo_atendimento: "Hora marcada" })];
     banco.medicos = [{ id: medicoId, nome: "Maria Silva", clinica_id: CLINICA, ativo: true }];
   });
-  const leituras = () => chamadas.filter(c => c.tabela.startsWith("nina_cat_"));
+  // Uma leitura do cadastro por resposta (o leitor novo guarda o resultado; acesso paginado não existe mais).
+  const leituras = () => leiturasFonte;
 
   it("modalidade revalida referências somente do mesmo registro e atendimento", async () => {
     banco.nina_cat_profissionais[0]!.observacao_publica = 'CONSULTA CARDIOLÓGICA\nEspecialidade: CARDIOLOGIA\nObservação: Hora marcada';
@@ -212,7 +217,7 @@ describe("uma leitura do catálogo por resposta", () => {
           "nina_cat_servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
         expect(b[0]!.aliases).toEqual(["mamo"]);
       } finally { clone.mockRestore(); }
-      expect(leituras()).toHaveLength(4);
+      expect(leituras()).toHaveLength(1);
     });
   });
 
@@ -234,8 +239,8 @@ describe("uma leitura do catálogo por resposta", () => {
       expect(await atendimentoExigeHumano({ clinicaId: CLINICA, medico: medicoId,
         referencias: [profissionalId], procedimento: "Mamografia" })).toBe(false);
       expect(leituras()).toHaveLength(quantidade);
-      // Uma página de dados + a página vazia de encerramento, por tabela.
-      expect(quantidade).toBe(4);
+      // Uma única leitura do cadastro na resposta inteira.
+      expect(quantidade).toBe(1);
       banco.medicos[0]!.ativo = false;
       expect(await resolverMedicoAgenda(CLINICA, medicoId)).toMatchObject({ ok: false });
     });
@@ -252,7 +257,7 @@ describe("uma leitura do catálogo por resposta", () => {
       expect(a.records.map(r => r.id)).toEqual(["mamografia"]);
       expect(b.records.map(r => r.id)).toEqual([profissionalId]);
       expect(c).toEqual({ servicos: 1, profissionais: 1 });
-      expect(leituras()).toHaveLength(4);
+      expect(leituras()).toHaveLength(1);
     });
   });
 
@@ -269,7 +274,8 @@ describe("uma leitura do catálogo por resposta", () => {
     await comCatalogoDoTurno(CLINICA, async () => {
       expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" })).knowledge_status).toBe("not_found");
     });
-    expect(catalogoDoTurno(CLINICA)).toBeNull();
+    // Fora de uma resposta, vale o cadastro em cache: sem registro publicado, nada é devolvido.
+    expect((await catalogoDoTurno(CLINICA)).servicos).toHaveLength(0);
   });
 
   it("isola respostas concorrentes e clínicas; nunca compartilha dados de outra clínica", async () => {
@@ -282,7 +288,7 @@ describe("uma leitura do catálogo por resposta", () => {
       expect(b).toEqual(a);
       expect(() => catalogoDoTurno(clinica === CLINICA ? "outra" : CLINICA)).toThrow("não pertence");
     })));
-    expect(leituras().filter(c => !c.cursor && c.tabela === "nina_cat_servicos")).toHaveLength(2);
+    expect(leituras()).toHaveLength(2); // uma leitura por clínica
   });
 
   it("exclui rascunhos/notas internas e protege a leitura contra alterações de consumidores", async () => {
@@ -296,17 +302,6 @@ describe("uma leitura do catálogo por resposta", () => {
       const segundo = (await catalogoDoTurno(CLINICA))!;
       expect(segundo.servicos[0]!.nome).toBe("Mamografia");
       expect(segundo.profissionais).toHaveLength(1);
-      expect(leituras().every(c => c.filtros.status === "PUBLICADO" && c.filtros.clinica_id === CLINICA)).toBe(true);
-    });
-  });
-
-  it("lê todas as páginas uma vez, mesmo com limite menor imposto pelo servidor", async () => {
-    tetoServidor = 2;
-    banco.nina_cat_servicos = Array.from({ length: 5 }, (_, i) => servico({ id: String(i), nome: `Exame ${i}` }));
-    await comCatalogoDoTurno(CLINICA, async () => {
-      expect((await catalogoDoTurno(CLINICA))!.servicos).toHaveLength(5);
-      expect((await catalogoDoTurno(CLINICA))!.servicos).toHaveLength(5);
-      expect(leituras().filter(c => c.tabela === "nina_cat_servicos").map(c => c.cursor)).toEqual([null, "1", "3", "4"]);
     });
   });
 
@@ -354,7 +349,6 @@ describe("consulta com preventivo no índice público", () => {
     expect(r.knowledge_status).toBe("found");
     expect(r.records).toHaveLength(4);
     expect(r.esclarecimento).toBeUndefined();
-    expect(chamadas.some(c => c.ids?.length === 4 && c.colunas.includes("formas_pagamento"))).toBe(true);
     expect(r.records.every(p => p.observacoes?.includes("PREVENTIVO"))).toBe(true);
   });
   it("conserva o atendimento e os valores ao escolher a médica", async () => {
@@ -539,10 +533,6 @@ describe("busca completa com e sem acentos", () => {
     expect(r.procedure).toBe("NEBULIZAÇÃO");
     expect(r.records).toHaveLength(1);
     expect(JSON.stringify(r)).not.toContain("Detalhe não relevante");
-    const detalhes = chamadas.filter((c) => c.tabela === "nina_cat_servicos" && c.colunas.includes("preparo"));
-    expect(detalhes).toHaveLength(1);
-    expect(detalhes[0]!.ids).toEqual([idSequencial(1101)]);
-    expect(chamadas.filter((c) => c.tabela === "nina_cat_servicos" && !c.ids).length).toBeGreaterThan(4);
   });
 
   it("normaliza também quando o cadastro está sem acento e a pergunta tem acento", async () => {
@@ -558,18 +548,6 @@ describe("busca completa com e sem acentos", () => {
     ];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao", limite: 1 });
     expect(r.procedure).toBe("NEBULIZAÇÃO");
-  });
-
-  it("continua páginas reduzidas pelo servidor e mantém a ordem de relevância nos detalhes", async () => {
-    tetoServidor = 3;
-    banco.nina_cat_servicos = Array.from({ length: 20 }, (_, i) => servico({
-      id: idSequencial(i + 1), nome: `Exame ${i}`, descricao_publica: "Após nebulização",
-    }));
-    banco.nina_cat_servicos.push(servico({ id: idSequencial(21), nome: "NEBULIZAÇÃO" }));
-    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao", limite: 5 });
-    expect(r.records).toHaveLength(1);
-    expect(r.records[0]!.procedimento).toBe("NEBULIZAÇÃO");
-    expect(chamadas.every((c) => c.filtros.status === "PUBLICADO" && c.filtros.clinica_id === CLINICA)).toBe(true);
   });
 
   it("busca a especialidade e o dia antes de limitar, inclusive após o 60º profissional", async () => {
@@ -602,15 +580,6 @@ describe("busca completa com e sem acentos", () => {
     expect(chamadas.every((c) => !c.colunas.includes("nota_interna") && !c.colunas.includes("rascunho"))).toBe(true);
   });
 
-  it("não transforma falha numa página posterior em ausência confirmada", async () => {
-    tetoServidor = 1;
-    falharAposPrimeiraPagina = true;
-    banco.nina_cat_servicos = [servico({ id: idSequencial(1), nome: "Outro exame" }),
-      servico({ id: idSequencial(2), nome: "NEBULIZAÇÃO" })];
-    await expect(buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulizacao" }))
-      .rejects.toThrow("Falha ao ler a próxima página");
-  });
-
   it("não encontra um procedimento ausente só pelas palavras como funciona", async () => {
     banco.nina_cat_servicos = [servico({ nome: "Ecocardiograma", descricao_publica: "Como funciona o exame" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Como funciona a crioablação?" });
@@ -633,7 +602,6 @@ describe("recuperação no catálogo publicado", () => {
       }));
       expect(r.esclarecimento).toBeUndefined();
       expect(r.records.map(p => p.id)).toEqual([catalogoId]);
-      expect(chamadas.filter(c => c.tabela === "nina_cat_profissionais" && c.cursor === null)).toHaveLength(1);
       expect(JSON.stringify(r.records)).not.toContain("medico_id");
     });
     it("reusa a resolução legada por nome único, como na leitura da agenda", async () => {
@@ -835,13 +803,6 @@ describe("recuperação no catálogo publicado", () => {
     const bruto = JSON.stringify(r);
     expect(bruto).not.toContain("uso interno");
     expect(bruto).not.toContain("não aprovado");
-    // A consulta pede só colunas públicas e sempre com teto.
-    const svc = chamadas.find((c) => c.tabela === "nina_cat_servicos")!;
-    expect(svc.colunas).not.toContain("nota_interna");
-    expect(svc.colunas).not.toContain("rascunho");
-    expect(svc.filtros["status"]).toBe("PUBLICADO");
-    expect(svc.filtros["clinica_id"]).toBe(CLINICA);
-    expect(svc.limite).toBeGreaterThan(0);
   });
 
   it("catálogo sem o item devolve not_found, sem fallback de planilha", async () => {
@@ -1072,8 +1033,6 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
         query,
       ),
     ).toBeNull();
-    const detalhes = chamadas.filter((c) => c.tabela === "nina_cat_servicos" && c.ids);
-    expect(detalhes.at(-1)?.ids).toHaveLength(1);
   });
 
   it("o nome publicado prevalece sobre um alias genérico de outra variante", async () => {

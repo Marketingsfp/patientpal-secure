@@ -1,5 +1,4 @@
 /** Candidatos completos do atendimento publicado, sem o corte de relevância do chat. */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { catalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizar } from "@/lib/nina-especialidade";
@@ -11,8 +10,6 @@ import { atendimentosEstruturados, modalidadeEstruturada, textoAtendimentos } fr
 import { orientacaoModalidade } from "./modalidade-atendimento";
 import { chaveConsulta, selecionarAtendimentosConsulta, nomeCompletoConsulta, type PreferenciaAtendimentoConsulta } from "./atendimento-consulta";
 
-const colunasProfissional = "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura";
-const colunasServico = "id, procedimento_id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura";
 const lista = (v: unknown): Record<string, unknown>[] => Array.isArray(v) ? v.filter(x => x && typeof x === "object") : [];
 const chave = chaveConsulta;
 
@@ -29,18 +26,7 @@ export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta"
     : atendimento.some(r => r.registro === id && (tipo === "procedimento" ||
       !!r.procedimento && normalizarNome(r.procedimento) === normalizarNome(nome)));
   const catalogo = await catalogoDoTurno(clinicaId);
-  const linhas: unknown[] = catalogo ? (tipo === "consulta" ? catalogo.profissionais : catalogo.servicos) : [];
-  // Páginas limitadas, com ordem estável. Nunca declarar busca completa com um top-6.
-  for (let pagina = 0; !catalogo; pagina++) {
-    const r = tipo === "consulta"
-      ? await supabaseAdmin.from("nina_cat_profissionais").select(colunasProfissional)
-        .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").order("id").range(pagina * 200, pagina * 200 + 199)
-      : await supabaseAdmin.from("nina_cat_servicos").select(colunasServico)
-        .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").order("id").range(pagina * 200, pagina * 200 + 199);
-    if (r.error) throw new Error(r.error.message);
-    linhas.push(...(r.data ?? []));
-    if ((r.data?.length ?? 0) < 200) break;
-  }
+  const linhas: unknown[] = tipo === "consulta" ? catalogo.profissionais : catalogo.servicos;
   const hoje = agoraNaClinica().iso;
   if (tipo === "consulta") {
     const registros = (linhas as ProfissionalPublicado[]).flatMap(p => {

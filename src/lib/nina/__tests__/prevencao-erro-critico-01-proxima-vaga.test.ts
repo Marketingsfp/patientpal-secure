@@ -5,6 +5,7 @@
  * em 5 quintas-feiras (136 livres) numa única agenda. Código real do executor; banco em memória.
  * Guarda de regressão: a investigação mediu 11 a 17 consultas e ~0,1–0,3 s de CPU por chamada.
  */
+import { fonteOperacionalDoBanco } from "./fixtures/fonte-operacional-falsa";
 import { describe, expect, mock, test } from "bun:test";
 import { cardiologiaAlex } from "./fixtures/consultas-publicadas.fixture";
 
@@ -245,6 +246,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
   },
 }));
 
+mock.module("../fonte-operacional.server", () => fonteOperacionalDoBanco(() => base as never));
 const { executarFerramentaPaciente } = await import("../paciente-tools.server");
 const { comCatalogoDoTurno, catalogoDoTurno } = await import("../catalogo-turno.server");
 const { comColetor } = await import("../evidencias.server");

@@ -1,3 +1,4 @@
+import { fonteOperacionalDoBanco } from "./fixtures/fonte-operacional-falsa";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import { consultaDoNovoTurno, type ConhecimentoSessao } from "../confidence/conhecimento-sessao";
@@ -150,6 +151,7 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
   },
 }));
 
+mock.module("../fonte-operacional.server", () => fonteOperacionalDoBanco(() => banco as never));
 const { executarFerramentaPaciente, consultarDisponibilidadeCore } = await import("../paciente-tools.server");
 
 function contexto(mensagemAtual: string, respostaAnterior?: string) {

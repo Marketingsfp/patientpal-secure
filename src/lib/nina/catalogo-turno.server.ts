@@ -1,9 +1,12 @@
-/** Uma leitura do catálogo por resposta, compartilhada por todas as ferramentas.
- * Não armazena vagas, pacientes, reservas ou dados entre respostas. */
+/** Uma leitura do cadastro por resposta, compartilhada por todas as ferramentas.
+ *
+ * Desde 30/09/2026 a Nina NÃO lê mais a base de conhecimentos (catálogo editorial): a fonte é o
+ * cadastro do sistema (médicos, horários e procedimentos), convertido por `fonte-operacional`.
+ * Não armazena vagas, pacientes ou reservas; o cadastro fica em cache de 60 s por clínica. */
 import { AsyncLocalStorage } from "node:async_hooks";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ProfissionalPublicado, ServicoPublicado } from "./catalogo-conhecimento";
 import { registrarEtapa } from "./evidencias.server";
+import { lerFonteOperacional } from "./fonte-operacional.server";
 
 /** Apenas campos publicados; nunca carregar nota interna ou rascunho. */
 export const COLUNAS_SERVICO =
@@ -27,44 +30,40 @@ export function temCatalogoDoTurno(): boolean {
   return Boolean(escopo.getStore()?.leitura);
 }
 
-/** Sem escopo, os leitores independentes mantêm seu comportamento anterior. */
+/** Dentro de uma resposta, a leitura é memorizada no escopo dela; fora dela vale o cache do cadastro. */
 function leituraDoTurno(clinicaId: string): Promise<Catalogo> | null {
   const turno = escopo.getStore();
   if (!turno) return null;
   if (turno.clinicaId !== clinicaId) throw new Error("O catálogo solicitado não pertence à clínica deste turno.");
   // Memoriza a promessa ANTES de aguardar: chamadas concorrentes e falhas não
   // provocam outra leitura. Uma nova resposta sempre cria outro escopo.
-  turno.leitura ??= Promise.all([
-    lerPublicadosBanco<ServicoPublicado>("nina_cat_servicos", COLUNAS_SERVICO, clinicaId),
-    lerPublicadosBanco<Catalogo["profissionais"][number]>("nina_cat_profissionais", `${COLUNAS_PROFISSIONAL}, medico_id`, clinicaId),
-  ]).then(([servicos, profissionais]) => {
-    registrarEtapa({ tipo: "consulta", fonte: "catalogo", titulo: "Leitura única do catálogo nesta resposta",
-      dados: { clinica_id: clinicaId, status: "PUBLICADO", servicos: servicos.length,
-        profissionais: profissionais.length, escopo: "resposta", cache: false },
+  turno.leitura ??= lerFonteOperacional(clinicaId).then(({ servicos, profissionais }) => {
+    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Leitura única do cadastro nesta resposta",
+      dados: { clinica_id: clinicaId, servicos: servicos.length,
+        profissionais: profissionais.length, escopo: "resposta", cache: true },
       codigo: { arquivo: "src/lib/nina/catalogo-turno.server.ts", funcao: "catalogoDoTurno" } });
     return { servicos, profissionais };
   });
   return turno.leitura;
 }
 
-/** Compatibilidade para consumidores que precisam do catálogo completo. */
-export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> | null {
-  return leituraDoTurno(clinicaId)?.then(catalogo => structuredClone(catalogo)) ?? null;
+/** Cadastro completo da clínica (dentro de uma resposta, a mesma leitura; fora dela, o cache). */
+export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> {
+  return (leituraDoTurno(clinicaId) ?? lerFonteOperacional(clinicaId)).then(catalogo => structuredClone(catalogo));
 }
 
-/** A contagem não precisa criar uma cópia de todos os registros publicados. */
+/** A contagem não precisa criar uma cópia de todos os registros. */
 export function contagemCatalogoDoTurno(clinicaId: string) {
-  return leituraDoTurno(clinicaId)?.then(catalogo => ({
+  return (leituraDoTurno(clinicaId) ?? lerFonteOperacional(clinicaId)).then(catalogo => ({
     servicos: catalogo.servicos.length,
     profissionais: catalogo.profissionais.length,
-  })) ?? null;
+  }));
 }
 
 export async function lerPublicados<T extends { id: string }>(
   tabela: Tabela, colunas: string, clinicaId: string, ids?: string[],
 ): Promise<T[]> {
-  const catalogo = await leituraDoTurno(clinicaId);
-  if (!catalogo) return lerPublicadosBanco<T>(tabela, colunas, clinicaId, ids);
+  const catalogo = await (leituraDoTurno(clinicaId) ?? lerFonteOperacional(clinicaId));
   const linhas = tabela === "nina_cat_servicos" ? catalogo.servicos : catalogo.profissionais;
   // Filtra e projeta ANTES da cópia. Um pedido por nome/id não deve duplicar
   // serviços, profissionais e estruturas que nem serão usados. A cópia do
@@ -77,31 +76,4 @@ export async function lerPublicados<T extends { id: string }>(
       return [campo, fonte[campo]];
     })) as T;
   }));
-}
-
-async function lerPublicadosBanco<T extends { id: string }>(
-  tabela: Tabela, colunas: string, clinicaId: string, ids?: string[],
-): Promise<T[]> {
-  if (ids && !ids.length) return [];
-  const linhas: T[] = [];
-  let cursor: string | null = null;
-  for (;;) {
-    let consulta = supabaseAdmin.from(tabela).select(colunas)
-      .eq("clinica_id", clinicaId).eq("status", "PUBLICADO")
-      .order("id", { ascending: true }).limit(Math.min(TAMANHO_PAGINA, ids?.length ?? TAMANHO_PAGINA));
-    if (cursor) consulta = consulta.gt("id", cursor);
-    if (ids) consulta = consulta.in("id", ids);
-    const resposta = await consulta;
-    if (resposta.error) throw new Error(resposta.error.message);
-    const pagina = (resposta.data ?? []) as unknown as T[];
-    if (!pagina.length) return linhas;
-    const proximo = pagina[pagina.length - 1]?.id;
-    if (!proximo || (cursor && proximo <= cursor)) {
-      throw new Error("A paginação do catálogo não avançou; não foi possível concluir a busca.");
-    }
-    linhas.push(...pagina);
-    if (ids && linhas.length >= ids.length) return linhas;
-    cursor = proximo;
-    // Só a página vazia encerra: o servidor pode impor um limite menor.
-  }
 }

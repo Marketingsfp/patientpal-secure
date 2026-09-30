@@ -127,12 +127,7 @@ export async function publicacaoDoMedicoAgenda(
 export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string, escopo?: EscopoAtendimentoConsulta) {
   const leitura = await catalogoDoTurno(clinicaId);
   if (escopo?.procedimentoId) {
-    const { data, error } = leitura
-      ? { data: leitura.servicos.find(s => s.id === escopo.procedimentoId), error: null }
-      : await supabaseAdmin.from("nina_cat_servicos")
-      .select("id, nome, descricao_publica, estrutura, executantes, formas_pagamento, valor, valor_observacao, preparo, restricoes")
-      .eq("clinica_id", clinicaId).eq("status", "PUBLICADO").eq("id", escopo.procedimentoId).maybeSingle();
-    if (error) throw new Error(error.message);
+    const data = leitura.servicos.find(s => s.id === escopo.procedimentoId);
     // O ID da publicação preserva a identidade mesmo após renomear o serviço.
     if (!data) return "nao_definida" as const;
     const servico = data as ServicoPublicado;
@@ -157,13 +152,8 @@ export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: s
     if (!selecionados.length) return "nao_definida" as const;
     return modalidadeEstruturada(servico.descricao_publica, servico.estrutura, "", null, selecionados);
   }
-  const [ativos, publicados] = await Promise.all([
-    medicosDaClinica(clinicaId),
-    leitura ? { data: leitura.profissionais, error: null } : supabaseAdmin.from("nina_cat_profissionais").select("id, nome, medico_id, tipo_atendimento, estrutura, observacao_publica")
-      .eq("clinica_id", clinicaId).eq("status", "PUBLICADO"),
-  ]);
-  if (publicados.error) throw new Error(publicados.error.message);
-  const catalogo = publicados.data ?? [];
+  const ativos = await medicosDaClinica(clinicaId);
+  const catalogo = leitura.profissionais;
   const cadastros = await incluirCadastrosVinculados(clinicaId, ativos, catalogo);
   const vinculados = catalogo.filter(p => {
     const r = resolverPublicado(p, cadastros);
@@ -201,16 +191,7 @@ export async function resolverMedicoAgenda(
   if (operacional) return { ok: true, ...operacional, candidatosOficiais: medicos };
 
   const leitura = await catalogoDoTurno(clinicaId);
-  const { data, error } = leitura
-    ? { data: leitura.profissionais.find(p => p.id.toLowerCase() === termo.toLowerCase()), error: null }
-    : await supabaseAdmin
-    .from("nina_cat_profissionais")
-    .select("id, nome, medico_id")
-    .eq("id", termo)
-    .eq("clinica_id", clinicaId)
-    .eq("status", "PUBLICADO")
-    .maybeSingle();
-  if (error) throw new Error(error.message);
+  const data = leitura.profissionais.find(p => p.id.toLowerCase() === termo.toLowerCase());
   if (!data) return { ok: false, opcoes: [] };
   const resultado = resolverPublicado(
     data,
@@ -245,25 +226,10 @@ export async function vincularProfissionaisCatalogo(
   const profissionais = registros.filter((r) => r.tipo === "profissional" && r.id && r.medico);
   if (!profissionais.length) return [];
   const leitura = await catalogoDoTurno(clinicaId);
-  const [cadastros, catalogo] = await Promise.all([
-    medicosDaClinica(clinicaId),
-    leitura ? { data: leitura.profissionais.filter(p => profissionais.some(r => r.id === p.id)), error: null } : supabaseAdmin
-      .from("nina_cat_profissionais")
-      .select("id, nome, medico_id")
-      .eq("clinica_id", clinicaId)
-      .eq("status", "PUBLICADO")
-      .in(
-        "id",
-        profissionais.map((r) => r.id!),
-      ),
-  ]);
-  if (catalogo.error) throw new Error(catalogo.error.message);
-  const publicados = new Map((catalogo.data ?? []).map((p) => [p.id, p]));
-  const cadastrosVinculados = await incluirCadastrosVinculados(
-    clinicaId,
-    cadastros,
-    catalogo.data ?? [],
-  );
+  const cadastros = await medicosDaClinica(clinicaId);
+  const catalogo = { data: leitura.profissionais.filter(p => profissionais.some(r => r.id === p.id)) };
+  const publicados = new Map(catalogo.data.map((p) => [p.id, p]));
+  const cadastrosVinculados = await incluirCadastrosVinculados(clinicaId, cadastros, catalogo.data);
   const vinculos = profissionais.map((r) => {
     const publicado = publicados.get(r.id!);
     const resolucao: ResolucaoMedico = publicado

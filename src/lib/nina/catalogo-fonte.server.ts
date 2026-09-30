@@ -5,7 +5,6 @@
  * tabela operacional/legada (procedimentos, medicos, especialidades) como
  * fonte de resposta ao paciente. Rascunho e arquivado não existem aqui.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { catalogoDoTurno } from "./catalogo-turno.server";
 
 /** Mensagem única de "não tenho informação oficial" → encaminhar para humano. */
@@ -14,14 +13,7 @@ export const SEM_CATALOGO_INSTRUCAO =
 
 /** Especialidades realmente publicadas no catálogo de profissionais. */
 export async function especialidadesPublicadas(clinicaId: string): Promise<string[]> {
-  const catalogo = await catalogoDoTurno(clinicaId);
-  const { data, error } = catalogo ? { data: catalogo.profissionais, error: null } : await supabaseAdmin
-    .from("nina_cat_profissionais")
-    .select("especialidades")
-    .eq("clinica_id", clinicaId)
-    .eq("status", "PUBLICADO")
-    .limit(200);
-  if (error) throw new Error(error.message);
+  const { profissionais: data } = await catalogoDoTurno(clinicaId);
   const nomes = new Set<string>();
   for (const linha of (data ?? []) as Array<{ especialidades: unknown }>) {
     const lista = Array.isArray(linha.especialidades)

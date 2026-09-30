@@ -242,6 +242,16 @@ mock.module("@/integrations/supabase/client.server", () => ({
     rpc: async () => ({ data: [], error: null }),
   },
 }));
+// A Nina lê o cadastro (fonte operacional); a simulação entrega as mesmas linhas "publicadas" do cenário.
+mock.module("@/lib/nina/fonte-operacional.server", () => ({
+  ninaInformaPeloCadastro: async () => true,
+  limparCacheFonteOperacional: () => {},
+  lerFonteOperacional: async (clinicaId: string) => {
+    const usar: Record<string, any[]> = (interpretacao || escolhaMedico || clinicoGeral) ? catalogoInterpretado : {};
+    const publicados = (t: string) => (usar[t] ?? []).filter((l) => l.clinica_id === clinicaId && l.status === "PUBLICADO");
+    return { servicos: publicados("nina_cat_servicos"), profissionais: publicados("nina_cat_profissionais") };
+  },
+}));
 mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") }));
 mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
