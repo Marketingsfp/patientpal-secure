@@ -79,3 +79,47 @@ export const ROTULO_PRESENCA: Record<PresencaAtendente, string> = {
   PAUSA_SAIDA: "Em pausa para saída",
   OFFLINE: "Offline",
 };
+
+/* ---------------------------------------------------------------
+ * Supervisão (admin e gestor) respondendo no chat da atendente.
+ *
+ * A conversa continua com a atendente (responsável); o supervisor apenas
+ * responde, e a mensagem fica gravada com o perfil exato dele — como a
+ * resposta da Nina é identificada.
+ * ------------------------------------------------------------- */
+
+export type PerfilSupervisao = "admin" | "gestor";
+
+export const ROTULO_PERFIL_SUPERVISAO: Record<PerfilSupervisao, string> = {
+  admin: "Admin",
+  gestor: "Gestor",
+};
+
+/** Mensagem do admin ao tentar responder fora de uma conversa que está com uma atendente. */
+export const MSG_ADMIN_SO_COM_ATENDENTE =
+  "Administrador responde apenas conversas que estão com uma atendente.";
+
+/** Perfil exato de supervisão: admin tem precedência sobre gestor. */
+export function perfilSupervisao(args: { admin: boolean; gestor: boolean }): PerfilSupervisao | null {
+  if (args.admin) return "admin";
+  return args.gestor ? "gestor" : null;
+}
+
+/** Conversa aberta que está com uma atendente (não é da Nina nem está sem responsável). */
+export function conversaComAtendente(conversa: {
+  atribuida_user_id?: string | null;
+  owner_type?: string | null;
+  status?: string | null;
+}): boolean {
+  return (
+    !!conversa.atribuida_user_id &&
+    conversa.owner_type !== "AI" &&
+    conversa.status !== "closed" &&
+    conversa.status !== "finished"
+  );
+}
+
+/** Etiqueta exibida na bolha quando a resposta foi de um supervisor; null nos demais casos. */
+export function rotuloAutorSupervisao(perfil: string | null | undefined): string | null {
+  return perfil === "admin" || perfil === "gestor" ? ROTULO_PERFIL_SUPERVISAO[perfil] : null;
+}

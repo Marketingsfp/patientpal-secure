@@ -26,6 +26,8 @@ const CAMPOS = [
   "body",
   "tipo",
   "enviada_por",
+  "enviada_por_user_id",
+  "enviada_por_perfil",
   "recebida_em",
   "media_url",
   "media_mime",

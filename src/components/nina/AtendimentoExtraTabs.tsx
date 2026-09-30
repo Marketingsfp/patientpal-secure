@@ -253,10 +253,14 @@ import { AgendamentosContato } from "@/components/nina/AgendamentosContato";
 import { CronometroPausa } from "@/components/nina/CronometroPausa";
 import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
 import {
-  MSG_ADMIN_NAO_ATENDE,
+  MSG_ADMIN_SO_COM_ATENDENTE,
   MSG_DESTINO_EM_PAUSA,
+  ROTULO_PERFIL_SUPERVISAO,
   ROTULO_PRESENCA,
+  conversaComAtendente,
   estadoBloqueiaTransferencia,
+  perfilSupervisao,
+  rotuloAutorSupervisao,
   type PresencaAtendente,
 } from "@/lib/atendimento/perfil-atendimento";
 
@@ -2558,15 +2562,24 @@ export function AtendInbox() {
 
 
 
+  // Supervisão (admin e gestor) responde no chat da atendente sem assumir a conversa; a mensagem
+  // fica gravada com o perfil exato. O admin só responde conversas que estão com uma atendente.
+  const meuPerfilSupervisao = perfilSupervisao({ admin: souAdmin, gestor: souGestor });
+  const respondendoComoSupervisao =
+    !!meuPerfilSupervisao && !!sel && !!responsavelId && !souResponsavel && !conversaEncerrada;
   const motivoBloqueio = !sel
     ? null
-    : souAdmin
-      ? MSG_ADMIN_NAO_ATENDE
+    : souAdmin && !carregandoConversa && !conversaComAtendente({
+          atribuida_user_id: sel.atribuida_user_id,
+          owner_type: sel.owner_type,
+          status: sel.status,
+        })
+      ? MSG_ADMIN_SO_COM_ATENDENTE
     : carregandoConversa
       ? "Carregando conversa…"
     : conversaEncerrada
       ? "Conversa encerrada. Não é possível enviar mensagens."
-      : responsavelId && !souResponsavel
+      : responsavelId && !souResponsavel && !meuPerfilSupervisao
         ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
         : !podeAtender
           ? "Você tem acesso somente de leitura no atendimento."
@@ -2711,6 +2724,7 @@ export function AtendInbox() {
       conversaId: origem,
       texto: t,
       usuarioId: meuId,
+      perfil: meuPerfilSupervisao,
       clientMessageId,
     });
 
@@ -3585,6 +3599,18 @@ export function AtendInbox() {
                               exibe nenhum status — só a hora. Falha aparece acima. */}
                           <span className="whitespace-nowrap">
                             {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                            {out && rotuloAutorSupervisao(m.enviada_por_perfil) && (
+                              <span
+                                data-testid="autor-supervisao"
+                                title={`Resposta da supervisão (${rotuloAutorSupervisao(m.enviada_por_perfil)})${
+                                  usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome
+                                    ? ` — ${usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome}`
+                                    : ""
+                                }`}
+                              >
+                                · {rotuloAutorSupervisao(m.enviada_por_perfil)}
+                              </span>
+                            )}
                           </span>
                           {clinicaId && <InspecaoMensagemNina parte="detalhes" clinicaId={clinicaId}
                             conversaId={m.conversa_id ?? sel.id} mensagem={m} saida={saidasPorMensagem[String(m.id)]} />}
@@ -3614,6 +3640,12 @@ export function AtendInbox() {
                   <div className="flex items-start gap-1.5 rounded-md border border-atd-warn bg-atd-warn-bg px-2 py-1.5 text-xs text-atd-warn-ink">
                     <span aria-hidden="true">⚠️</span>
                     <span>{motivoBloqueio}</span>
+                  </div>
+                )}
+                {respondendoComoSupervisao && !motivoBloqueio && meuPerfilSupervisao && (
+                  <div className="rounded-md border border-atd-border bg-atd-bg px-2 py-1.5 text-xs text-atd-ink-soft">
+                    Você está respondendo como {ROTULO_PERFIL_SUPERVISAO[meuPerfilSupervisao]}. A conversa
+                    continua com {nomeUsuario(responsavelId)}.
                   </div>
                 )}
                 <div className="relative flex gap-2">

@@ -29,7 +29,7 @@ export async function carregarPaginaHistorico(
   let mensagens = supabase
     .from("whatsapp_mensagens")
     .select(
-      "id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
+      "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
     )
     .eq("clinica_id", args.clinicaId)
     .eq("conversa_id", args.conversaId);
