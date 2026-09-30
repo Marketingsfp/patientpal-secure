@@ -642,6 +642,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
           token,
           aliquotaCadastro: emitente?.aliquota_iss ?? null,
           nfseRef: nota.focus_ref,
+          emitenteIdNacional: emitente?.usar_ambiente_nacional ? nota.emitente_id : null,
         }),
       );
       updates.codigo_verificacao = body?.codigo_verificacao ?? null;

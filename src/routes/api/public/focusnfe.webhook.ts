@@ -95,7 +95,7 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
           const { data: emit } = notaRef?.emitente_id
             ? await supabaseAdmin
                 .from("nfse_emitentes")
-                .select("focus_ambiente, aliquota_iss")
+                .select("focus_ambiente, aliquota_iss, usar_ambiente_nacional")
                 .eq("id", notaRef.emitente_id)
                 .maybeSingle()
             : { data: null };
@@ -110,6 +110,7 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
               token: tokenFocus,
               aliquotaCadastro: emit?.aliquota_iss ?? null,
               nfseRef: body.ref,
+              emitenteIdNacional: emit?.usar_ambiente_nacional ? notaRef?.emitente_id : null,
             }),
           );
           updates.codigo_verificacao = body.codigo_verificacao ?? null;

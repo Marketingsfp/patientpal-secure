@@ -28,12 +28,30 @@ async function baixarXml(body: Body, token: string | undefined): Promise<string 
  */
 export async function camposDoRetornoAutorizado(
   body: Body,
-  opts: { token: string | undefined; aliquotaCadastro: number | null; nfseRef?: string | null },
+  opts: {
+    token: string | undefined;
+    aliquotaCadastro: number | null;
+    nfseRef?: string | null;
+    /** Só para emitente do Ambiente Nacional: acompanha a DPS autorizada. */
+    emitenteIdNacional?: string | null;
+  },
 ): Promise<Record<string, unknown>> {
   const xml = await baixarXml(body, opts.token);
   const { campos, conferencia } = montarCamposAutorizados(body, xml, opts.aliquotaCadastro);
   if (conferencia.faltando.length || conferencia.divergencia_aliquota) {
     console.warn("[nfse-retorno] conferência", { ref: opts.nfseRef, ...conferencia });
+  }
+  // DPS autorizada maior que o contador: o contador sobe até ela (nunca desce),
+  // para acompanhar a numeração que o portal também consome.
+  const dps = Number((campos as { rps_numero?: number | null }).rps_numero);
+  if (opts.emitenteIdNacional && Number.isFinite(dps) && dps > 0) {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { avancarContadorDps } = await import("./nfse-numeracao");
+      await avancarContadorDps(supabaseAdmin, opts.emitenteIdNacional, dps + 1);
+    } catch (e) {
+      console.warn("[nfse-retorno] não avançou o contador", { ref: opts.nfseRef, e });
+    }
   }
   return { ...campos, retorno_conferencia: conferencia };
 }
