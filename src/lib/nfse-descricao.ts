@@ -36,3 +36,37 @@ export function montarDiscriminacaoNfse(input: DiscriminacaoInput): string {
   if (data) partes.push(`Data: ${data}`);
   return partes.join(" — ");
 }
+
+const normEsp = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Especialidade que vem no fim do nome do procedimento da agenda, ex.:
+ * "CONSULTA 2 (NEUROLOGIA)" → "NEUROLOGIA". Só vale se o texto entre
+ * parênteses for uma especialidade cadastrada — "(ADULTO)" ou "(2)" não são.
+ */
+export function especialidadeDoProcedimento(
+  procedimento: string | null | undefined,
+  especialidadesCadastradas: string[],
+): string | null {
+  const m = (procedimento ?? "").trim().match(/\(([^()]+)\)\s*$/);
+  if (!m) return null;
+  const alvo = normEsp(m[1]);
+  return especialidadesCadastradas.some((e) => normEsp(e) === alvo) ? alvo : null;
+}
+
+/**
+ * Formato do portal: "CONSULTA (PEDIATRIA)". Põe a especialidade entre
+ * parênteses logo depois do primeiro trecho da descrição (antes do primeiro
+ * " — " ou quebra de linha). Se a descrição já cita a especialidade, ou se ela
+ * não é conhecida, devolve a descrição sem mudança.
+ */
+export function acrescentarEspecialidade(descricao: string, especialidade: string | null): string {
+  if (!especialidade) return descricao;
+  if (normEsp(descricao).includes(`(${normEsp(especialidade)})`)) return descricao;
+  const corte = descricao.search(/\n| — /);
+  const primeiro = corte === -1 ? descricao : descricao.slice(0, corte);
+  const resto = corte === -1 ? "" : descricao.slice(corte);
+  if (!primeiro.trim()) return descricao;
+  return `${primeiro.trimEnd()} (${especialidade})${resto}`;
+}
