@@ -510,7 +510,7 @@ export async function encaminharParaHumano(args: {
 }
 
 /**
- * Distribui entre quem está Online (Pausa, Pausa para saída e Offline não
+ * Distribui entre quem está Online (Pausa, Pausa para almoço e Offline não
  * recebem), escolhendo quem tem MENOS conversas abertas (empate: quem recebeu há mais tempo). Sem candidato
  * elegível, retorna null e a conversa fica na fila "Não atribuídas".
  *

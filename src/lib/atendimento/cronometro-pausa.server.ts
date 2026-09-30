@@ -4,7 +4,7 @@ import { ehEstadoPausa, type EstadoManualPresenca } from "./presenca-manual";
 
 /**
  * Qualquer mudança de estado zera o cronômetro; cliques repetidos no mesmo estado de pausa
- * (Pausa ou Pausa para saída) preservam o início.
+ * (Pausa ou Pausa para almoço) preservam o início.
  */
 export async function consultarInicioCronometroPausa(
   db: SupabaseClient<Database>,

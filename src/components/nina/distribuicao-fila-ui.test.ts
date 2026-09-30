@@ -18,7 +18,7 @@ describe("resultado da distribuição no controle de presença", () => {
   test("Online não tem limite: a carga é só informativa", () => {
     expect(textoCargaAtendente(22)).toBe("22 conversa(s) ativa(s), sem limite.");
   });
-  test("Pausa para saída aparece com o próprio nome e sem receber conversas", () => {
+  test("Pausa para almoço aparece com o próprio nome e sem receber conversas", () => {
     const aviso = avisoPresencaConfirmada(
       "PAUSA_SAIDA",
       resultado({
@@ -28,8 +28,8 @@ describe("resultado da distribuição no controle de presença", () => {
         meu: { carga_atual: 3, capacidade: null, elegivel: false, motivo: "escolha_manual_pausa_saida" },
       }),
     );
-    expect(aviso.texto).toContain("Em pausa para saída.");
-    expect(aviso.texto).toContain("Você está em pausa para saída e não recebe novas conversas.");
+    expect(aviso.texto).toContain("Em pausa para almoço.");
+    expect(aviso.texto).toContain("Você está em pausa para almoço e não recebe novas conversas.");
   });
 
   test("sem limite não inventa capacidade cinco nem impede carga maior", () => {

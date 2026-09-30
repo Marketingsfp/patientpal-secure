@@ -12,7 +12,7 @@ const MOTIVOS: Record<string, string> = {
   sem_escolha_manual: "Escolha sua disponibilidade para receber conversas.",
   escolha_manual_offline: "Você está offline para novas conversas.",
   escolha_manual_pausa: "Você está em pausa para novas conversas.",
-  escolha_manual_pausa_saida: "Você está em pausa para saída e não recebe novas conversas.",
+  escolha_manual_pausa_saida: "Você está em pausa para almoço e não recebe novas conversas.",
   em_pausa: "Você está em pausa para novas conversas.",
   setor_incompativel: "Não há compatibilidade com o setor desta fila.",
   sem_atendentes_elegiveis: "Nenhum atendente pode receber novas conversas agora.",

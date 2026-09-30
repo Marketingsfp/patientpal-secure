@@ -116,7 +116,7 @@ class ServidorPresenca {
     this.dados.set(this.chave(clinicaId, userId), { ...atual, vistoEm: Date.now() });
   }
 
-  /** Distribuição: só Online é elegível (Pausa, Pausa para saída e Offline não recebem). */
+  /** Distribuição: só Online é elegível (Pausa, Pausa para almoço e Offline não recebem). */
   atribuir(clinicaId: string, conversaId: string, candidatos: string[]): string | null {
     const elegiveis = candidatos.filter(
       (u) =>
@@ -289,14 +289,14 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     expect(srv.atribuir(CLINICA, "c1", [ANA])).toBeNull(); // pausa não recebe conversa nova
   });
 
-  test("5b) Pausa para saída: mesma regra da pausa — não recebe, mas a escolha se mantém", () => {
+  test("5b) Pausa para almoço: mesma regra da pausa — não recebe, mas a escolha se mantém", () => {
     const aba = new Aba(srv, CLINICA, ANA);
     aba.carregar();
     aba.escolher("PAUSA_SAIDA");
     aba.recuperarFoco();
     aba.heartbeat();
     expect(srv.ler(CLINICA, ANA).estadoManual).toBe("PAUSA_SAIDA");
-    expect(textoSituacao(aba.controle)).toBe("Você está Em pausa para saída");
+    expect(textoSituacao(aba.controle)).toBe("Você está Em pausa para almoço");
     expect(recebeNovasConversas(aba.controle)).toBe(false);
     expect(srv.atribuir(CLINICA, "c1", [ANA])).toBeNull();
   });
@@ -378,7 +378,7 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
     expect(srv.ler(CLINICA, BRUNO).por).toBe(BRUNO);
   });
 
-  test("12) Distribuição: só Online recebe; Pausa, Pausa para saída e Offline não", () => {
+  test("12) Distribuição: só Online recebe; Pausa, Pausa para almoço e Offline não", () => {
     const ana = new Aba(srv, CLINICA, ANA);
     const bruno = new Aba(srv, CLINICA, BRUNO);
     ana.carregar();

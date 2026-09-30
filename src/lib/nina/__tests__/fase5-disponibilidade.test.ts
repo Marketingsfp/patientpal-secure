@@ -18,7 +18,7 @@ describe("FASE 5 — disponibilidade para receber conversas", () => {
     expect(r.motivo).toBe("status OFFLINE");
   });
 
-  test("Pausa e Pausa para saída não recebem novas conversas", () => {
+  test("Pausa e Pausa para almoço não recebem novas conversas", () => {
     const pausa = verificarElegibilidade({ ...base, status: "PAUSA", emPausa: true });
     expect(pausa.eligible_for_nina_handoff).toBe(false);
     expect(pausa.user_online).toBe(false);

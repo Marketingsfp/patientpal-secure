@@ -14,7 +14,7 @@ import {
 } from "../perfil-atendimento";
 
 describe("FASE 1 — escolha manual de presença", () => {
-  it("aceita apenas Online, Offline, Em pausa e Em pausa para saída", () => {
+  it("aceita apenas Online, Offline, Em pausa e Em pausa para almoço", () => {
     expect(ehEstadoManual("PAUSA_SAIDA")).toBe(true);
     expect(ehEstadoManual("ONLINE")).toBe(true);
     expect(ehEstadoManual("OFFLINE")).toBe(true);
@@ -38,11 +38,11 @@ describe("FASE 1 — escolha manual de presença", () => {
     expect(ehEstadoPausa("OFFLINE")).toBe(false);
     expect(ehEstadoPausa(null)).toBe(false);
     expect(ROTULO_ESTADO_MANUAL.PAUSA).toBe("Em pausa");
-    expect(ROTULO_ESTADO_MANUAL.PAUSA_SAIDA).toBe("Em pausa para saída");
-    expect(ROTULO_PRESENCA.PAUSA_SAIDA).toBe("Em pausa para saída");
+    expect(ROTULO_ESTADO_MANUAL.PAUSA_SAIDA).toBe("Em pausa para almoço");
+    expect(ROTULO_PRESENCA.PAUSA_SAIDA).toBe("Em pausa para almoço");
   });
 
-  it("a presença exibida separa Pausa de Pausa para saída", () => {
+  it("a presença exibida separa Pausa de Pausa para almoço", () => {
     expect(statusPresenca({ status: "PAUSA", emPausa: false })).toBe("PAUSA");
     expect(statusPresenca({ status: "PAUSA_SAIDA", emPausa: false })).toBe("PAUSA_SAIDA");
     expect(statusPresenca({ status: "PAUSA_SAIDA", emPausa: true })).toBe("PAUSA_SAIDA");

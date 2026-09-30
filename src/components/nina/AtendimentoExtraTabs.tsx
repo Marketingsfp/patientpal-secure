@@ -767,7 +767,7 @@ export function AtendInbox() {
       setEstadoManual(estado);
       setVersaoPresenca(versao);
       setPausaAtiva(p);
-      // A pausa para saída é um estado próprio: um registro de pausa aberto não a converte em Pausa.
+      // A pausa para almoço é um estado próprio: um registro de pausa aberto não a converte em Pausa.
       const confirmado = p && estado !== "PAUSA_SAIDA" ? ("PAUSA" as EstadoManualPresenca) : estado;
       setControle((c) => presAoCarregar(c, confirmado));
     } catch {
@@ -2986,7 +2986,7 @@ export function AtendInbox() {
                 size="sm"
                 role="radio"
                 aria-checked={presSelecionada(controle, "PAUSA_SAIDA")}
-                aria-label="Em pausa para saída"
+                aria-label="Em pausa para almoço"
                 disabled={presDesabilitada(controle)}
                 variant={presSelecionada(controle, "PAUSA_SAIDA") ? "default" : "outline"}
                 className={`h-7 px-1 text-[11px] ${
@@ -3001,7 +3001,7 @@ export function AtendInbox() {
                 ) : (
                   <DoorOpen className="h-3 w-3 mr-1" />
                 )}
-                Em pausa para saída
+                Em pausa para almoço
                 {presSelecionada(controle, "PAUSA_SAIDA") && <span className="sr-only"> (selecionado)</span>}
               </Button>
 
@@ -3031,7 +3031,7 @@ export function AtendInbox() {
             {ehEstadoPausa(estadoManual) && inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
-                Escolha Online, Em pausa, Em pausa para saída ou Offline. Só quem está Online recebe novas conversas.
+                Escolha Online, Em pausa, Em pausa para almoço ou Offline. Só quem está Online recebe novas conversas.
               </p>
             )}
             {controle.erro && !controle.salvando && (

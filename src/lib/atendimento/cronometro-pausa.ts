@@ -20,7 +20,7 @@ type AtualizacaoCronometro = {
 };
 
 /**
- * O cronômetro zera em QUALQUER mudança de estado (Online, Offline, Pausa, Pausa para saída).
+ * O cronômetro zera em QUALQUER mudança de estado (Online, Offline, Pausa, Pausa para almoço).
  * Repetir o mesmo estado de pausa preserva o início.
  */
 export function atualizarCronometroPausa(

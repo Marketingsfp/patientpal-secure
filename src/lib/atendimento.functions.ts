@@ -77,7 +77,7 @@ async function ehAdminClinica(
   return !!data;
 }
 /**
- * Transferência/atribuição manual não vai para quem está em Pausa ou Pausa para saída.
+ * Transferência/atribuição manual não vai para quem está em Pausa ou Pausa para almoço.
  * (Offline não entra nesta barreira: a regra pedida vale só para as duas pausas.)
  */
 async function assertDestinoNaoEstaEmPausa(

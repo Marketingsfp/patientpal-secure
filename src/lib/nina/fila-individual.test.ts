@@ -24,7 +24,7 @@ describe("distribuição só para Online e fila global sem dono", () => {
     expect(simularFila([agent("a", "ONLINE", { cargaAtiva: 100, capacidadeMaxima: 1 })], 35).naoAtribuidas).toBe(0);
     expect(verificarElegibilidade(agent("b", "PAUSA", { cargaAtiva: 0 })).eligible_for_nina_handoff).toBe(false);
   });
-  test("revalidação: quem entra em Pausa, Pausa para saída ou Offline antes de gravar é descartado", () => {
+  test("revalidação: quem entra em Pausa, Pausa para almoço ou Offline antes de gravar é descartado", () => {
     for (const novo of ["PAUSA", "PAUSA_SAIDA", "OFFLINE"] as const)
       expect(simularAtribuicao([agent("a", "ONLINE")], { revalidar: () => agent("a", novo) }).destino).toBe("nao_atribuidas");
     expect(simularAtribuicao([agent("a", "ONLINE")]).destino).toBe("atribuida");
