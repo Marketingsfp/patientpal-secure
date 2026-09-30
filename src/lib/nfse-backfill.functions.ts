@@ -10,7 +10,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const corrigirIssLote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ clinicaId: z.string().uuid(), limite: z.number().int().min(1).max(100) }).parse(i),
+    z.object({ clinicaId: z.string().uuid(), limite: z.number().int().min(1).max(100), emitenteId: z.string().uuid(), reprocessarFalhas: z.boolean().optional() }).parse(i),
   )
   .handler(async ({ data, context }) => {
     const { data: m } = await context.supabase
@@ -24,5 +24,5 @@ export const corrigirIssLote = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { executarLoteBackfill } = await import("./nfse-backfill.server");
-    return executarLoteBackfill(supabaseAdmin, data.clinicaId, data.limite);
+    return executarLoteBackfill(supabaseAdmin, data.clinicaId, data.limite, { emitenteId: data.emitenteId, reprocessarFalhas: data.reprocessarFalhas });
   });
