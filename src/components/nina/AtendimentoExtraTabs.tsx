@@ -28,7 +28,6 @@ import {
   aoFalhar as presAoFalhar,
   aoIniciarGravacao as presAoIniciar,
   opcaoDesabilitada as presDesabilitada,
-  opcaoSelecionada as presSelecionada,
   precisaEscolher as presPrecisaEscolher,
   textoSituacao as presTexto,
 } from "@/lib/atendimento/controle-presenca";
@@ -88,9 +87,6 @@ import {
   Phone,
   MessageSquare,
   Circle,
-  Coffee,
-  DoorOpen,
-  PowerOff,
   CalendarPlus,
   Pin,
   PinOff,
@@ -252,7 +248,7 @@ import { lerFiltrosInbox, salvarFiltrosInbox } from "@/lib/atendimento/filtros-p
 import { estadoFiltroAtendente, filtroAtendenteAtual } from "@/lib/atendimento/filtros-atendente";
 import { FiltrosAtendente } from "@/components/nina/FiltrosAtendente";
 import { AgendamentosContato } from "@/components/nina/AgendamentosContato";
-import { CronometroPausa } from "@/components/nina/CronometroPausa";
+import { SeletorStatusPresenca } from "@/components/nina/SeletorStatusPresenca";
 import { atualizarCronometroPausa, type CronometroPausa as EstadoCronometroPausa } from "@/lib/atendimento/cronometro-pausa";
 import {
   MSG_ADMIN_NAO_RESPONDE_AQUI,
@@ -2940,128 +2936,30 @@ export function AtendInbox() {
           )}
           <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
           <div className="shrink-0 border-b p-2 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Meu status</span>
-              <p
-                aria-live="polite"
-                className={`min-w-0 flex-1 break-words text-[11px] ${
-                  controle.erro
-                    ? "text-destructive"
-                    : presPrecisaEscolher(controle)
-                      ? "font-medium text-atd-warn-ink"
-                      : "text-muted-foreground"
-                }`}
-              >
-                {presTexto(controle)}
-              </p>
+            {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
+            <div className="flex items-center gap-1.5">
+              <SeletorStatusPresenca
+                selecionado={controle.carregado ? controle.confirmado : null}
+                salvando={controle.salvando}
+                desabilitado={presDesabilitada(controle)}
+                carregando={!controle.carregado}
+                inicioPausa={ehEstadoPausa(estadoManual) ? inicioCronometroPausa : null}
+                onEscolher={(alvo) => void definirStatus(alvo)}
+              />
               <Button
                 size="sm"
                 variant="ghost"
-                className="ml-auto h-6 w-6 shrink-0 p-0"
+                className="h-6 w-6 shrink-0 p-0"
                 title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
                 onClick={alternarFixado}
               >
                 {painelFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
               </Button>
             </div>
-
-            {/* FASE 3 — controle manual: o selecionado é sempre o que o servidor confirmou. */}
-            <div
-              role="radiogroup"
-              aria-label="Minha disponibilidade"
-              className="grid grid-cols-2 gap-1"
-            >
-              <Button
-                size="sm"
-                role="radio"
-                aria-checked={presSelecionada(controle, "ONLINE")}
-                aria-label="Online"
-                disabled={presDesabilitada(controle)}
-                variant={presSelecionada(controle, "ONLINE") ? "default" : "outline"}
-                className={`h-7 px-1 text-[11px] ${
-                  presSelecionada(controle, "ONLINE")
-                    ? "bg-atd-ok hover:bg-atd-ok/90 text-atd-on-strong ring-2 ring-offset-1 ring-atd-ok"
-                    : "text-atd-ok border-atd-ok/40"
-                }`}
-                onClick={() => definirStatus("online")}
-              >
-                {controle.salvando === "ONLINE" ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <Circle className="h-2.5 w-2.5 mr-1 fill-current" />
-                )}
-                Online
-                {presSelecionada(controle, "ONLINE") && <span className="sr-only"> (selecionado)</span>}
-              </Button>
-              <Button
-                size="sm"
-                role="radio"
-                aria-checked={presSelecionada(controle, "PAUSA")}
-                aria-label="Em pausa"
-                disabled={presDesabilitada(controle)}
-                variant={presSelecionada(controle, "PAUSA") ? "default" : "outline"}
-                className={`h-7 px-1 text-[11px] ${
-                  presSelecionada(controle, "PAUSA")
-                    ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink ring-2 ring-offset-1 ring-atd-warn"
-                    : "text-atd-warn-ink border-atd-warn/40"
-                }`}
-                onClick={() => definirStatus("pausa")}
-              >
-                {controle.salvando === "PAUSA" ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <Coffee className="h-3 w-3 mr-1" />
-                )}
-                Pausa
-                {presSelecionada(controle, "PAUSA") && <span className="sr-only"> (selecionado)</span>}
-              </Button>
-              <Button
-                size="sm"
-                role="radio"
-                aria-checked={presSelecionada(controle, "PAUSA_SAIDA")}
-                aria-label="Em pausa para almoço"
-                disabled={presDesabilitada(controle)}
-                variant={presSelecionada(controle, "PAUSA_SAIDA") ? "default" : "outline"}
-                className={`h-7 px-1 text-[11px] ${
-                  presSelecionada(controle, "PAUSA_SAIDA")
-                    ? "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink ring-2 ring-offset-1 ring-atd-warn"
-                    : "text-atd-warn-ink border-atd-warn/40"
-                }`}
-                onClick={() => definirStatus("pausa_saida")}
-              >
-                {controle.salvando === "PAUSA_SAIDA" ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <DoorOpen className="h-3 w-3 mr-1" />
-                )}
-                Em pausa para almoço
-                {presSelecionada(controle, "PAUSA_SAIDA") && <span className="sr-only"> (selecionado)</span>}
-              </Button>
-
-              <Button
-                size="sm"
-                role="radio"
-                aria-checked={presSelecionada(controle, "OFFLINE")}
-                aria-label="Offline"
-                disabled={presDesabilitada(controle)}
-                variant={presSelecionada(controle, "OFFLINE") ? "default" : "outline"}
-                className={`h-7 px-1 text-[11px] ${
-                  presSelecionada(controle, "OFFLINE")
-                    ? "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong ring-2 ring-offset-1 ring-atd-idle"
-                    : "text-atd-idle-ink border-atd-border"
-                }`}
-                onClick={() => definirStatus("offline")}
-              >
-                {controle.salvando === "OFFLINE" ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <PowerOff className="h-3 w-3 mr-1" />
-                )}
-                Offline
-                {presSelecionada(controle, "OFFLINE") && <span className="sr-only"> (selecionado)</span>}
-              </Button>
-            </div>
-            {ehEstadoPausa(estadoManual) && inicioCronometroPausa && <CronometroPausa inicio={inicioCronometroPausa} />}
+            <p aria-live="polite" className="sr-only">
+              {presTexto(controle)}
+            </p>
+            {controle.erro && !controle.salvando && <p className="text-[11px] text-destructive">{controle.erro}</p>}
             {presPrecisaEscolher(controle) && (
               <p className="text-[11px] text-muted-foreground">
                 Escolha Online, Em pausa, Em pausa para almoço ou Offline. Só quem está Online recebe novas conversas.
