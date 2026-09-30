@@ -21,7 +21,7 @@ export const MSG_ADMIN_NAO_ATENDE =
 export const MSG_DESTINO_EM_PAUSA =
   "Esta pessoa está em pausa e não pode receber conversas. Escolha alguém que esteja Online.";
 
-/** Quem está em Pausa ou em Pausa para saída não recebe transferência manual. */
+/** Quem está em Pausa ou em Pausa para almoço não recebe transferência manual. */
 export function estadoBloqueiaTransferencia(estadoManual: string | null | undefined): boolean {
   return estadoManual === "PAUSA" || estadoManual === "PAUSA_SAIDA";
 }
@@ -64,7 +64,7 @@ export function statusPresenca(p: {
   vistoEm?: string | null | undefined;
   emPausa: boolean;
 }): PresencaAtendente {
-  // A pausa para saída é um estado próprio; não se confunde com a pausa comum.
+  // A pausa para almoço é um estado próprio; não se confunde com a pausa comum.
   if ((p.status ?? "").toUpperCase() === "PAUSA_SAIDA") return "PAUSA_SAIDA";
   // Pausa livre não cria o registro legado com motivo; a escolha manual basta.
   if (p.emPausa || (p.status ?? "").toUpperCase() === "PAUSA") return "PAUSA";
@@ -76,7 +76,7 @@ export function statusPresenca(p: {
 export const ROTULO_PRESENCA: Record<PresencaAtendente, string> = {
   ONLINE: "Online",
   PAUSA: "Em pausa",
-  PAUSA_SAIDA: "Em pausa para saída",
+  PAUSA_SAIDA: "Em pausa para almoço",
   OFFLINE: "Offline",
 };
 

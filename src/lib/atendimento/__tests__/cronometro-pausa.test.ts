@@ -51,7 +51,7 @@ describe("cronômetro: Online e Offline encerram o período", () => {
     expect(atualizarCronometroPausa(offline, { ...escopo, estado: "PAUSA", versao: 5, em: t2 }).inicio).toBe(t2);
   });
 
-  test("trocar de Pausa para Pausa para saída (e vice-versa) zera o cronômetro", () => {
+  test("trocar de Pausa para Pausa para almoço (e vice-versa) zera o cronômetro", () => {
     const pausa = atualizarCronometroPausa(null, { ...escopo, estado: "PAUSA", versao: 2, em: t0 });
     const saida = atualizarCronometroPausa(pausa, { ...escopo, estado: "PAUSA_SAIDA", versao: 3, em: t1 });
     expect(saida.inicio).toBe(t1);
@@ -131,7 +131,7 @@ describe("início persistido no histórico do servidor", () => {
     expect(await consultarInicioCronometroPausa(banco(longo) as any, { ...escopo, estado: "PAUSA", versao: 1101 })).toBe(t0);
   });
 
-  test("Pausa para saída: qualquer mudança de estado zera; repetir o mesmo estado preserva", async () => {
+  test("Pausa para almoço: qualquer mudança de estado zera; repetir o mesmo estado preserva", async () => {
     const linhas = [
       linha("ONLINE", 1, "2026-09-17T13:00:00.000Z"),
       linha("PAUSA", 2, t0), linha("PAUSA_SAIDA", 3, t1), linha("PAUSA_SAIDA", 4, t2),
@@ -140,7 +140,7 @@ describe("início persistido no histórico do servidor", () => {
     const ler = (estado: "PAUSA" | "PAUSA_SAIDA", versao: number) =>
       consultarInicioCronometroPausa(banco(linhas) as any, { ...escopo, estado, versao });
     expect(await ler("PAUSA", 2)).toBe(t0);
-    expect(await ler("PAUSA_SAIDA", 3)).toBe(t1); // mudou de Pausa para Pausa para saída: recomeça
+    expect(await ler("PAUSA_SAIDA", 3)).toBe(t1); // mudou de Pausa para Pausa para almoço: recomeça
     expect(await ler("PAUSA_SAIDA", 4)).toBe(t1); // mesmo estado repetido: preserva
     expect(await ler("PAUSA", 5)).toBe(t2); // voltou a Pausa: recomeça de novo
   });

@@ -1,5 +1,5 @@
 /**
- * Etapas 1 e 2 (30/09/2026) — "Em pausa para saída", recebimento só para quem está Online e
+ * Etapas 1 e 2 (30/09/2026) — "Em pausa para almoço", recebimento só para quem está Online e
  * fim da fila individual (reserva de 10). PostgreSQL temporário em memória (PGlite) com as
  * migrations reais de distribuição (20260914211605, 20260917144041) e as novas (20260930130000 e
  * 20260930140000). Nunca aponta para produção.
@@ -108,7 +108,7 @@ afterAll(async () => {
   await db?.close();
 });
 
-describe("Etapa 1 — pausa para saída (migration)", () => {
+describe("Etapa 1 — pausa para almoço (migration)", () => {
   test("aceita o novo estado e o grava como ocupado, sem receber conversas", async () => {
     const r = await definir(ana, "PAUSA_SAIDA");
     expect(r.ok).toBe(true);
@@ -123,7 +123,7 @@ describe("Etapa 1 — pausa para saída (migration)", () => {
     ).rejects.toThrow();
   });
 
-  test("Pausa e Pausa para saída não recebem conversa, com ou sem outros Online", async () => {
+  test("Pausa e Pausa para almoço não recebem conversa, com ou sem outros Online", async () => {
     await definir(ana, "PAUSA");
     await definir(bia, "PAUSA_SAIDA");
     const conv = await novaConversaNaFila();
@@ -180,7 +180,7 @@ describe("Etapa 1 — pausa para saída (migration)", () => {
     expect(log.map((l) => l.estado)).toEqual(["PAUSA_SAIDA", "PAUSA"]);
   });
 
-  test("Pausa para saída não aceita motivo de pausa", async () => {
+  test("Pausa para almoço não aceita motivo de pausa", async () => {
     await como(ana);
     await expect(
       q("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, $2)", [clinica, motivo]),

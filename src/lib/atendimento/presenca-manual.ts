@@ -25,7 +25,7 @@ export const ROTULO_ESTADO_MANUAL: Record<EstadoManualPresenca, string> = {
   ONLINE: "Online",
   OFFLINE: "Offline",
   PAUSA: "Em pausa",
-  PAUSA_SAIDA: "Em pausa para saída",
+  PAUSA_SAIDA: "Em pausa para almoço",
 };
 
 /** Só aceita os estados permitidos — qualquer outra coisa é recusada. */
@@ -33,7 +33,7 @@ export function ehEstadoManual(v: unknown): v is EstadoManualPresenca {
   return typeof v === "string" && (ESTADOS_MANUAIS as readonly string[]).includes(v);
 }
 
-/** Pausa comum e pausa para saída: não recebem conversas novas, mas podem enviar mensagens. */
+/** Pausa comum e pausa para almoço: não recebem conversas novas, mas podem enviar mensagens. */
 export function ehEstadoPausa(v: unknown): v is "PAUSA" | "PAUSA_SAIDA" {
   return v === "PAUSA" || v === "PAUSA_SAIDA";
 }

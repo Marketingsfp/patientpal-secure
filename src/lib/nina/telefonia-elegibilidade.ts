@@ -9,7 +9,7 @@
  *
  * Regra definitiva:
  *   Cadastros › Perfis → perfil "telefonia"
- *   + escolha manual Online (Pausa, Pausa para saída e Offline não recebem)
+ *   + escolha manual Online (Pausa, Pausa para almoço e Offline não recebem)
  *   + não administrador
  *   + demais critérios operacionais (setor/fila)
  *

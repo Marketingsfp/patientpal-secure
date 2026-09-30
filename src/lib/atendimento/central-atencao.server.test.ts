@@ -290,7 +290,7 @@ describe("consulta da Central de Atenção", () => {
     expect(db.leiturasGestao).toEqual([]);
   });
 
-  it("Em pausa e Em pausa para saída aparecem separadas, cada uma com o próprio tipo", async () => {
+  it("Em pausa e Em pausa para almoço aparecem separadas, cada uma com o próprio tipo", async () => {
     const db = bancoTeste(true);
     db.presenca("ana", "PAUSA");
     db.presenca("bia", "PAUSA_SAIDA");

@@ -71,7 +71,7 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
     expect(r.restantes).toHaveLength(0);
   });
 
-  it("quem está em Pausa ou Pausa para saída não recebe; a fila espera alguém ficar Online", () => {
+  it("quem está em Pausa ou Pausa para almoço não recebe; a fila espera alguém ficar Online", () => {
     const lote = fila(2);
     const parados = simularRedistribuicao(
       [atendente("a", { status: "PAUSA" }), atendente("b", { status: "PAUSA_SAIDA" })],
