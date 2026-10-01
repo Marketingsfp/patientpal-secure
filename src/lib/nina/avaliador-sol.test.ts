@@ -201,3 +201,11 @@ describe("sol-v2 — critérios do Treinador e Auditor", () => {
     expect(a.resultado).toBe("erro_critico");
   });
 });
+
+describe("sol-v2 — condução comercial", () => {
+  const { DIMENSOES, montarInstrucoesSol } = require("./avaliador-sol");
+  it("pede a dimensão de condução e cobra ética comercial", () => {
+    expect(DIMENSOES.some((d: { valor: string }) => d.valor === "conducao_comercial")).toBe(true);
+    expect(montarInstrucoesSol()).toContain("urgência falsa");
+  });
+});
