@@ -242,12 +242,10 @@ import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
 import {
   detectarCheckupRosa,
   itemCheckupRosa,
-  NOME_ITEM_CHECKUP_ROSA,
-  PACOTES_CHECKUP_ROSA,
   ratearPacote,
-  type ItemCheckupRosa,
   type PacoteAplicado,
 } from "@/lib/agenda/checkup-rosa";
+import { TabelaCheckupRosa } from "@/components/agenda/tabela-checkup-rosa";
 import {
   obterEtapaSinal,
   registrarPagamentoEtapaSinal,
@@ -701,9 +699,6 @@ function mesmosAtendimentosDoPacote(agIds: string | string[], aplicado: PacoteAp
   return ids.length === doPacote.length && ids.every((id) => id in aplicado.precoPorAtendimento);
 }
 
-const brlCheckupRosa = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
 /**
  * Faixa recolhida com os quatro pacotes CHECKUP ROSA, os serviços de cada um e
  * os totais. Aparece no agendamento e na cobrança de consulta de ginecologia
@@ -716,22 +711,8 @@ function LembreteCheckupRosa({ complemento }: { complemento: string }) {
         Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com consulta e exames.{" "}
         {complemento}
       </summary>
-      <div className="mt-1.5 space-y-1">
-        {PACOTES_CHECKUP_ROSA.map((p) => {
-          const totais = Object.values(p.itens).reduce(
-            (s, v) => ({ d: s.d + v!.dinheiro, c: s.c + v!.cartao }),
-            { d: 0, c: 0 },
-          );
-          return (
-            <p key={p.id} className="leading-snug">
-              <b>{p.nome}</b>:{" "}
-              {(Object.keys(p.itens) as ItemCheckupRosa[])
-                .map((i) => NOME_ITEM_CHECKUP_ROSA[i])
-                .join(" + ")}{" "}
-              — {brlCheckupRosa(totais.d)} dinheiro / {brlCheckupRosa(totais.c)} Pix/cartão
-            </p>
-          );
-        })}
+      <div className="mt-1.5 space-y-1.5">
+        <TabelaCheckupRosa colunas={2} />
         <p className="text-muted-foreground leading-snug">
           Agende cada serviço na agenda do seu profissional. Na cobrança, marque os atendimentos da
           paciente e use <b>Cobrar selecionados</b>: o sistema reconhece o pacote e oferece aplicar
@@ -2444,6 +2425,8 @@ function AgendaPage() {
       ctx: FormaPagCtx;
     };
   } | null>(null);
+  /** "Colinha" com a tabela de valores do Checkup Rosa (botão na barra). */
+  const [tabelaRosaAberta, setTabelaRosaAberta] = useState(false);
   /** Pacote em vigor no rateio da cobrança agrupada em andamento. */
   const pacoteRosaRef = useRef<PacoteAplicado | null>(null);
   /**
@@ -9561,6 +9544,14 @@ function AgendaPage() {
           )}
           <button
             type="button"
+            title="Tabela de valores dos pacotes Checkup Rosa"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-1.5 text-xs font-semibold text-pink-800 shadow-xs hover:bg-pink-100 dark:border-pink-900 dark:bg-pink-950/40 dark:text-pink-200"
+            onClick={() => setTabelaRosaAberta(true)}
+          >
+            🎀 Checkup Rosa
+          </button>
+          <button
+            type="button"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
             onClick={exportarAgendaExcel}
           >
@@ -9583,6 +9574,9 @@ function AgendaPage() {
                   <Users className="h-4 w-4 mr-2" /> Marcações por atendente
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={() => setTabelaRosaAberta(true)}>
+                🎀 Checkup Rosa (valores)
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={exportarAgendaExcel}>
                 <Download className="h-4 w-4 mr-2" /> Exportar Excel
               </DropdownMenuItem>
@@ -10468,6 +10462,20 @@ function AgendaPage() {
         onOpenChange={setQuickCompleteOpen}
         requireNfse
       />
+
+      <Dialog open={tabelaRosaAberta} onOpenChange={setTabelaRosaAberta}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>🎀 Checkup Rosa — tabela de valores</DialogTitle>
+          </DialogHeader>
+          <TabelaCheckupRosa />
+          <p className="text-xs text-muted-foreground leading-snug">
+            D = dinheiro · C = Pix ou cartão. Agende cada serviço na agenda do seu profissional; na
+            cobrança, marque os atendimentos da paciente e use <b>Cobrar selecionados</b> — o
+            sistema reconhece o pacote e oferece aplicar o preço.
+          </p>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
         <DialogContent className="max-w-sm">

@@ -56,6 +56,19 @@ const TRANSVAGINAL: PrecoItemPacote = { dinheiro: 102, cartao: 120 };
 const USG_MAMA: PrecoItemPacote = { dinheiro: 114, cartao: 135 };
 const MAMOGRAFIA: PrecoItemPacote = { dinheiro: 137, cartao: 165 };
 
+/**
+ * Preço de cada item como a tabela da campanha mostra, ANTES do desconto do
+ * Completo. Serve só para a "colinha" na tela (linhas da tabela e total
+ * cheio); o que se cobra é o preço de cada pacote em `PACOTES_CHECKUP_ROSA`.
+ */
+export const PRECO_TABELA_CHECKUP_ROSA: Record<ItemCheckupRosa, PrecoItemPacote> = {
+  consulta: CONSULTA,
+  preventivo: PREVENTIVO_GRATUITO,
+  transvaginal: TRANSVAGINAL,
+  usg_mama: USG_MAMA,
+  mamografia: MAMOGRAFIA,
+};
+
 export const PACOTES_CHECKUP_ROSA: PacoteCheckupRosa[] = [
   {
     id: "basico",
