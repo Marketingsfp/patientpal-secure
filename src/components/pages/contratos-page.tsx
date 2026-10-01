@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contratoDoProduto, produtoDoModulo, type ProdutoCartao } from "@/lib/cartao/produto";
+import { calcularParcelasQueFaltam } from "@/lib/cartao/parcelas-que-faltam";
 import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import { ContratosCards, type ContratoCardItem } from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
@@ -3564,6 +3565,85 @@ function DetalheContrato({
     toast.success("Parcela adicionada.");
     await load();
   };
+  // "Gerar parcelas que faltam": do mês corrente ao fim da vigência, uma por
+  // mês. Regras em `src/lib/cartao/parcelas-que-faltam.ts`.
+  const gerarParcelasQueFaltam = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if ((contrato.status ?? "").toLowerCase() !== "ativo") {
+      toast.error("Só contrato ativo gera mensalidades.");
+      return;
+    }
+    const valor = Number(valorMensalAtual) || 0;
+    if (valor <= 0) {
+      toast.error("Este contrato não tem mensalidade (valor R$ 0,00).");
+      return;
+    }
+    if (totalRascunhos > 0) {
+      if (
+        !(await confirmDialog(
+          "Existem alterações não salvas nas mensalidades. Deseja descartar e gerar as parcelas que faltam?",
+        ))
+      )
+        return;
+      setRascunhos({});
+    }
+    const agora = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const hojeIso = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`;
+    const r = calcularParcelasQueFaltam({
+      dataInicio: contrato.data_inicio,
+      dataFim: contrato.data_fim ?? null,
+      diaVencimento: (contrato as any).dia_vencimento ?? null,
+      hojeIso,
+      existentes: mens,
+    });
+    if (r.tipo === "vigencia_encerrada") {
+      toast.error(
+        `A vigência deste contrato terminou em ${fmtD(r.dataFim)}. Para cobrar novos meses, renove o contrato.`,
+      );
+      return;
+    }
+    if (r.tipo === "nada_faltando") {
+      toast.info(
+        "Nenhuma mensalidade faltando: todos os meses até o fim da vigência já têm parcela.",
+      );
+      return;
+    }
+    const ok = await confirmDialog({
+      title: `Gerar ${r.vencimentos.length} mensalidade(s)?`,
+      description: (
+        <div className="space-y-2">
+          <p>
+            {r.vencimentos.length} parcela(s) de {BRL(valor)}, com vencimento em:{" "}
+            <strong>{r.vencimentos.map((v) => fmtD(v)).join(", ")}</strong>.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Meses anteriores a este não são gerados: o que o paciente pagou antes (no sistema
+            anterior) não vira dívida. Se ele realmente deve um mês passado, use “Adicionar
+            parcela”.
+          </p>
+        </div>
+      ),
+      confirmText: "Gerar parcelas",
+    });
+    if (!ok) return;
+    let prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0);
+    const rows = r.vencimentos.map((vencimento) => ({
+      contrato_id: contrato.id,
+      clinica_id: (contrato as any).clinica_id,
+      numero_parcela: ++prox,
+      vencimento,
+      valor,
+      status: "pendente",
+    }));
+    const { error } = await supabase.from("contrato_mensalidades").insert(rows as any);
+    if (error) return mostrarErro(error, "falha ao gerar parcelas");
+    toast.success(`${rows.length} mensalidade(s) gerada(s).`);
+    await load();
+  };
   const excluirParcela = async (id: string) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -5715,6 +5795,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       ) : null}
                       <Button size="sm" variant="outline" onClick={adicionarParcela}>
                         <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={gerarParcelasQueFaltam}
+                        title="Gera uma mensalidade por mês, do mês atual até o fim da vigência, só nos meses sem parcela"
+                      >
+                        <CalendarRange className="h-3 w-3 mr-1" /> Gerar parcelas que faltam
                       </Button>
                       <Button size="sm" variant="outline" onClick={abrirRecalcVencimentos}>
                         <RefreshCw className="h-3 w-3 mr-1" /> Recalcular vencimentos
