@@ -9,9 +9,12 @@
  * para a lista se atualizar na hora.
  */
 import { useMemo, useState } from "react";
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ehHtml, htmlSeguro } from "@/lib/prontuario/html";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -44,6 +47,7 @@ type Item = {
   conduta: string | null;
   prescricao: string | null;
   observacoes: string | null;
+  tags: string[];
 };
 
 const SEM_ESPECIALIDADE = "__sem__";
@@ -58,7 +62,7 @@ async function carregar(pacienteId: string): Promise<Item[]> {
   const { data, error } = await supabase
     .from("prontuarios")
     .select(
-      "id, data, medico_id, agendamento_id, queixa_principal, historia_doenca, exame_fisico, hipotese_diagnostica, conduta, prescricao, observacoes",
+      "id, data, medico_id, agendamento_id, queixa_principal, historia_doenca, exame_fisico, hipotese_diagnostica, conduta, prescricao, observacoes, tags",
     )
     .eq("paciente_id", pacienteId)
     .order("data", { ascending: false })
@@ -102,6 +106,7 @@ async function carregar(pacienteId: string): Promise<Item[]> {
       conduta: l.conduta,
       prescricao: l.prescricao,
       observacoes: l.observacoes,
+      tags: ((l as { tags?: string[] | null }).tags ?? []) as string[],
     };
   });
 }
@@ -115,7 +120,69 @@ const CAMPOS: Array<[keyof Item, string]> = [
   ["prescricao", "Prescrição"],
 ];
 
-export function LinhaDoTempoProntuario({ pacienteId }: { pacienteId: string }) {
+/** Texto do prontuário: HTML do editor rico (limpo) ou texto puro. */
+function Texto({ v, className }: { v: string; className?: string }) {
+  return ehHtml(v) ? (
+    <div
+      className={`prose prose-sm max-w-none dark:prose-invert ${className ?? ""}`}
+      dangerouslySetInnerHTML={{ __html: htmlSeguro(v) }}
+    />
+  ) : (
+    <p className={`whitespace-pre-wrap ${className ?? ""}`}>{v}</p>
+  );
+}
+
+function EditorTags({ item, pacienteId }: { item: Item; pacienteId: string }) {
+  const qc = useQueryClient();
+  const [valor, setValor] = useState("");
+  const salvar = async (tags: string[]) => {
+    const { error } = await supabase
+      .from("prontuarios")
+      .update({ tags } as never)
+      .eq("id", item.id)
+      .select("id");
+    if (error) return toast.error("Não foi possível salvar a tag.");
+    void invalidarLinhaDoTempo(qc, pacienteId);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {item.tags.map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => salvar(item.tags.filter((x) => x !== t))}
+          className="rounded-full bg-secondary px-2 py-0.5 text-xs"
+          title="Remover tag"
+        >
+          #{t} ×
+        </button>
+      ))}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const t = valor.trim().toUpperCase();
+          if (t && !item.tags.includes(t)) void salvar([...item.tags, t]);
+          setValor("");
+        }}
+      >
+        <Input
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          placeholder="+ tag"
+          className="h-6 w-24 text-xs"
+        />
+      </form>
+    </div>
+  );
+}
+
+export function LinhaDoTempoProntuario({
+  pacienteId,
+  editarTags = false,
+}: {
+  pacienteId: string;
+  editarTags?: boolean;
+}) {
   const q = useQuery({
     queryKey: chaveLinhaDoTempo(pacienteId),
     queryFn: () => carregar(pacienteId),
@@ -130,6 +197,8 @@ export function LinhaDoTempoProntuario({ pacienteId }: { pacienteId: string }) {
   const [ano, setAno] = useState<number | null>(null); // null = todos
   const [esp, setEsp] = useState<string>("todas");
   const [extras, setExtras] = useState(false);
+  const [tag, setTag] = useState<string>("todas");
+  const tagsDisp = useMemo(() => [...new Set(itens.flatMap((i) => i.tags))].sort(), [itens]);
 
   const especialidades = useMemo(
     () => [...new Set(itens.map((i) => i.especialidade).filter(Boolean))].sort() as string[],
@@ -138,6 +207,7 @@ export function LinhaDoTempoProntuario({ pacienteId }: { pacienteId: string }) {
 
   const visiveis = itens.filter((i) => {
     if (ano !== null && new Date(i.data).getFullYear() !== ano) return false;
+    if (tag !== "todas" && !i.tags.includes(tag)) return false;
     if (esp === "todas") return true;
     if (esp === SEM_ESPECIALIDADE) return !i.especialidade;
     return i.especialidade === esp;
@@ -169,9 +239,7 @@ export function LinhaDoTempoProntuario({ pacienteId }: { pacienteId: string }) {
           <Button variant="outline" size="icon" onClick={anterior} aria-label="Ano anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="min-w-24 text-center text-sm font-medium">
-            {ano ?? "Todos os anos"}
-          </span>
+          <span className="min-w-24 text-center text-sm font-medium">{ano ?? "Todos os anos"}</span>
           <Button variant="outline" size="icon" onClick={proximo} aria-label="Próximo ano">
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -190,6 +258,21 @@ export function LinhaDoTempoProntuario({ pacienteId }: { pacienteId: string }) {
             <SelectItem value={SEM_ESPECIALIDADE}>Sem especialidade</SelectItem>
           </SelectContent>
         </Select>
+        {tagsDisp.length > 0 && (
+          <Select value={tag} onValueChange={setTag}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as tags</SelectItem>
+              {tagsDisp.map((t) => (
+                <SelectItem key={t} value={t}>
+                  #{t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center gap-2">
           <Checkbox id="extras-pront" checked={extras} onCheckedChange={(v) => setExtras(!!v)} />
           <Label htmlFor="extras-pront">Exibir informações extras</Label>
@@ -241,18 +324,37 @@ export function LinhaDoTempoProntuario({ pacienteId }: { pacienteId: string }) {
                       ) : extras ? (
                         <div className="mt-1 space-y-1">
                           {preenchidos.map(([k, rot]) => (
-                            <p key={k} className="whitespace-pre-wrap">
+                            <div key={k}>
                               <span className="font-medium">{rot}: </span>
-                              {i[k] as string}
-                            </p>
+                              <Texto v={i[k] as string} />
+                            </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="mt-1 whitespace-pre-wrap">
-                          {(i.historia_doenca || i.queixa_principal || (preenchidos[0] && (i[preenchidos[0][0]] as string))) ?? ""}
-                        </p>
+                        <Texto
+                          className="mt-1"
+                          v={
+                            (i.historia_doenca ||
+                              i.queixa_principal ||
+                              (preenchidos[0] && (i[preenchidos[0][0]] as string))) ??
+                            ""
+                          }
+                        />
                       )}
                     </div>
+                    {editarTags ? (
+                      <EditorTags item={i} pacienteId={pacienteId} />
+                    ) : (
+                      i.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {i.tags.map((t) => (
+                            <span key={t} className="rounded-full bg-secondary px-2 py-0.5 text-xs">
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    )}
                     {extras && i.observacoes?.trim() && (
                       <p className="whitespace-pre-wrap text-xs text-muted-foreground">
                         Observações: {i.observacoes}

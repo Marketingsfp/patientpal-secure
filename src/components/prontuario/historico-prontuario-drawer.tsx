@@ -1,3 +1,4 @@
+import { textoDoProntuario } from "@/lib/prontuario/html";
 import { useEffect, useState } from "react";
 import {
   Sheet,
@@ -206,7 +207,10 @@ export function HistoricoProntuarioDrawer({
                     {estaAberto && (
                       <div className="space-y-3 border-t px-3 py-3">
                         <Campo titulo="Queixa principal" texto={p.queixa_principal} />
-                        <Campo titulo="História da doença atual" texto={p.historia_doenca} />
+                        <Campo
+                          titulo="História da doença atual"
+                          texto={textoDoProntuario(p.historia_doenca)}
+                        />
                         <Campo titulo="Exame físico" texto={p.exame_fisico} />
                         <Campo titulo="Hipótese diagnóstica" texto={p.hipotese_diagnostica} />
                         <Campo titulo="Conduta" texto={p.conduta} />
