@@ -701,6 +701,47 @@ function mesmosAtendimentosDoPacote(agIds: string | string[], aplicado: PacoteAp
   return ids.length === doPacote.length && ids.every((id) => id in aplicado.precoPorAtendimento);
 }
 
+const brlCheckupRosa = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/**
+ * Faixa recolhida com os quatro pacotes CHECKUP ROSA, os serviços de cada um e
+ * os totais. Aparece no agendamento e na cobrança de consulta de ginecologia
+ * ou preventivo: só lembra a recepção de oferecer o pacote, não muda nada.
+ */
+function LembreteCheckupRosa({ complemento }: { complemento: string }) {
+  return (
+    <details className="text-xs rounded-md border border-pink-200 bg-pink-50/60 text-slate-700 px-2 py-1.5 dark:border-pink-900 dark:bg-pink-950/20 dark:text-slate-200">
+      <summary className="cursor-pointer">
+        Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com consulta e exames.{" "}
+        {complemento}
+      </summary>
+      <div className="mt-1.5 space-y-1">
+        {PACOTES_CHECKUP_ROSA.map((p) => {
+          const totais = Object.values(p.itens).reduce(
+            (s, v) => ({ d: s.d + v!.dinheiro, c: s.c + v!.cartao }),
+            { d: 0, c: 0 },
+          );
+          return (
+            <p key={p.id} className="leading-snug">
+              <b>{p.nome}</b>:{" "}
+              {(Object.keys(p.itens) as ItemCheckupRosa[])
+                .map((i) => NOME_ITEM_CHECKUP_ROSA[i])
+                .join(" + ")}{" "}
+              — {brlCheckupRosa(totais.d)} dinheiro / {brlCheckupRosa(totais.c)} Pix/cartão
+            </p>
+          );
+        })}
+        <p className="text-muted-foreground leading-snug">
+          Agende cada serviço na agenda do seu profissional. Na cobrança, marque os atendimentos da
+          paciente e use <b>Cobrar selecionados</b>: o sistema reconhece o pacote e oferece aplicar
+          o preço.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 /**
  * Guarda as duas versões da mesma cobrança quando o desconto do cartão entra
  * automaticamente: a com o preço do convênio (usada por padrão) e a com o
@@ -9953,36 +9994,7 @@ function AgendaPage() {
                       </p>
                     )}
                     {ofereceCheckupRosa && !(editing && pagosSet.has(editing.id)) && (
-                      <details className="text-xs rounded-md border border-pink-200 bg-pink-50/60 text-slate-700 px-2 py-1.5 dark:border-pink-900 dark:bg-pink-950/20 dark:text-slate-200">
-                        <summary className="cursor-pointer">
-                          Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com
-                          consulta e exames. Nada muda neste agendamento.
-                        </summary>
-                        <div className="mt-1.5 space-y-1">
-                          {PACOTES_CHECKUP_ROSA.map((p) => {
-                            const totais = Object.values(p.itens).reduce(
-                              (s, v) => ({ d: s.d + v!.dinheiro, c: s.c + v!.cartao }),
-                              { d: 0, c: 0 },
-                            );
-                            const brl = (n: number) =>
-                              n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                            return (
-                              <p key={p.id} className="leading-snug">
-                                <b>{p.nome}</b>:{" "}
-                                {(Object.keys(p.itens) as ItemCheckupRosa[])
-                                  .map((i) => NOME_ITEM_CHECKUP_ROSA[i])
-                                  .join(" + ")}{" "}
-                                — {brl(totais.d)} dinheiro / {brl(totais.c)} Pix/cartão
-                              </p>
-                            );
-                          })}
-                          <p className="text-muted-foreground leading-snug">
-                            Agende cada serviço na agenda do seu profissional. Na cobrança, marque
-                            os atendimentos da paciente e use <b>Cobrar selecionados</b>: o sistema
-                            reconhece o pacote e oferece aplicar o preço.
-                          </p>
-                        </div>
-                      </details>
+                      <LembreteCheckupRosa complemento="Nada muda neste agendamento." />
                     )}
                     {previaCobranca && (
                       <div className="space-y-1.5">
@@ -10488,7 +10500,23 @@ function AgendaPage() {
           </div>
           {(() => {
             const pacoteIndividual = pacoteRosaDaCobrancaIndividual(formaPagCtx?.agId);
-            if (!pacoteIndividual) return null;
+            if (!pacoteIndividual) {
+              // Consulta de ginecologia ou preventivo cobrados sozinhos: só o
+              // lembrete com a tabela, para a recepção oferecer o pacote.
+              const ag =
+                formaPagCtx && !formaPagCtx.agId.includes(",")
+                  ? items.find((a) => a.id === formaPagCtx.agId)
+                  : null;
+              const item = ag
+                ? itemCheckupRosa(
+                    ag.procedimento,
+                    medicos.find((m) => m.id === ag.medico_id)?.especialidade_nome ?? null,
+                  )
+                : null;
+              return item === "consulta" || item === "preventivo" ? (
+                <LembreteCheckupRosa complemento="Esta cobrança segue com o preço normal." />
+              ) : null;
+            }
             return (
               <p className="rounded-md border border-pink-300 bg-pink-50 px-2 py-2 text-[12px] leading-snug dark:border-pink-800 dark:bg-pink-950/40">
                 Esta paciente tem hoje os atendimentos do <b>{pacoteIndividual.pacote.nome}</b>.
