@@ -450,6 +450,7 @@ export const avaliarComSol = createServerFn({ method: "POST" })
             eventos: dossie.eventos.length,
             criterios: dossie.criteriosEsperados,
             lacunas: avaliacao.lacunas,
+            auditoria: avaliacao.auditoria ?? null,
           } as never,
           input_tokens: inputTokens,
           output_tokens: outputTokens,
@@ -458,6 +459,23 @@ export const avaliarComSol = createServerFn({ method: "POST" })
         .select("*")
         .maybeSingle();
       if (error) throw new Error(error.message);
+      // "Nova regra sugerida" vira aprendizado PENDENTE: só vale após aprovação de uma pessoa.
+      const regras = avaliacao.auditoria?.regras_sugeridas ?? [];
+      if (regras.length) {
+        const { sugerirAprendizado } = await import("./aprendizado.server");
+        for (const regra of regras) {
+          await sugerirAprendizado({
+            clinicaId: data.clinicaId,
+            tipo: "RULE",
+            titulo: regra.slice(0, 120),
+            conteudo: regra,
+            canal: "whatsapp",
+            origem: "auditoria_homologacao",
+            origemRef: (linha as any)?.id ?? null,
+            tags: ["auditoria", VERSAO_RUBRICA],
+          });
+        }
+      }
       return { avaliacao: linha };
     } catch (e: any) {
       const msg = String(e?.message ?? e).slice(0, 300);

@@ -30,6 +30,10 @@ import { listarCenarios } from "@/lib/nina/cenarios.functions";
 import {
   MODELO_SOL,
   ROTULO_DIMENSAO,
+  ROTULO_ORIGEM,
+  ROTULO_RESULTADO_CONTATO,
+  classificacaoAuditoria,
+  type RelatorioAuditoria,
   ROTULO_RESULTADO,
   type Achado,
   type NotaDimensao,
@@ -52,6 +56,61 @@ const ROTULO_GRAVIDADE: Record<string, string> = {
   critica: "Crítica",
 };
 
+function Lista({ titulo, itens, vazio }: { titulo: string; itens: string[]; vazio?: string }) {
+  if (!itens.length && !vazio) return null;
+  return (
+    <div>
+      <h4 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{titulo}</h4>
+      {itens.length ? (
+        <ul className="list-disc pl-5 text-xs">
+          {itens.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">{vazio}</p>
+      )}
+    </div>
+  );
+}
+
+function Relatorio({ r }: { r: RelatorioAuditoria }) {
+  const ef = r.eficiencia;
+  return (
+    <div className="space-y-3 rounded border p-3">
+      <h4 className="text-xs font-semibold uppercase">Auditoria do atendimento</h4>
+      <Lista titulo="O que fez bem" itens={r.acertos ?? []} />
+      <Lista titulo="O que precisa melhorar" itens={r.melhorar ?? []} />
+      <Lista titulo="Perguntas desnecessárias" itens={r.perguntas_desnecessarias ?? []} />
+      <Lista
+        titulo="Perguntas repetidas"
+        itens={(r.perguntas_repetidas ?? []).map((p) => `${p.pergunta} — já informado: ${p.ja_informado || "—"}`)}
+      />
+      {r.seguranca_medica ? <p className="text-xs"><strong>Segurança médica:</strong> {r.seguranca_medica}</p> : null}
+      {ef && (ef.mensagens != null || ef.comentario) ? (
+        <p className="text-xs">
+          <strong>Eficiência:</strong>{" "}
+          {ef.mensagens != null ? `${ef.mensagens} mensagens` : ""}
+          {ef.ideal != null ? `, poderia ser ~${ef.ideal}` : ""}
+          {ef.comentario ? `. ${ef.comentario}` : ""}
+        </p>
+      ) : null}
+      {r.resultado_contato ? (
+        <p className="text-xs"><strong>Resultado do contato:</strong> {ROTULO_RESULTADO_CONTATO[r.resultado_contato] ?? r.resultado_contato}</p>
+      ) : null}
+      {r.possivel_abandono ? <p className="text-xs"><strong>Possível causa de abandono:</strong> {r.possivel_abandono}</p> : null}
+      {r.melhor_resposta ? (
+        <div>
+          <h4 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Melhor resposta possível</h4>
+          <p className="whitespace-pre-wrap rounded bg-muted p-2 text-xs">{r.melhor_resposta}</p>
+        </div>
+      ) : null}
+      {r.aprendizado ? <p className="text-xs"><strong>Aprendizado:</strong> {r.aprendizado}</p> : null}
+      <Lista titulo="Novas regras sugeridas (aguardam aprovação)" itens={r.regras_sugeridas ?? []} />
+    </div>
+  );
+}
+
 function Avaliacao({ a }: { a: any }) {
   const dimensoes = (a.dimensoes ?? []) as NotaDimensao[];
   const achados = (a.achados ?? []) as Achado[];
@@ -63,6 +122,7 @@ function Avaliacao({ a }: { a: any }) {
           {ROTULO_RESULTADO[a.resultado as Resultado] ?? a.resultado}
         </Badge>
         <span className="text-sm font-medium">{a.score}/100</span>
+        <Badge variant="outline">{classificacaoAuditoria(a.score ?? 0, a.resultado)}</Badge>
         <span className="text-xs text-muted-foreground">
           {new Date(a.created_at).toLocaleString("pt-BR")} · {a.mensagens_avaliadas} mensagens ·
           instruções v{a.prompt_versao ?? "—"}
@@ -120,14 +180,23 @@ function Avaliacao({ a }: { a: any }) {
                 <p>
                   <strong>Esperado:</strong> {c.esperado}
                 </p>
+                {c.recomendacao ? (
+                  <p>
+                    <strong>Recomendação:</strong> {c.recomendacao}
+                  </p>
+                ) : null}
                 <p className="text-muted-foreground">
                   Fonte: {c.fonte} · Componente: {c.componente}
+                  {c.origem ? ` · ${ROTULO_ORIGEM[c.origem] ?? c.origem}` : ""}
+                  {c.prioridade ? ` · Prioridade ${c.prioridade}` : ""}
                 </p>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {a.evidencias?.auditoria ? <Relatorio r={a.evidencias.auditoria as RelatorioAuditoria} /> : null}
 
       {lacunas.length > 0 && (
         <div>
