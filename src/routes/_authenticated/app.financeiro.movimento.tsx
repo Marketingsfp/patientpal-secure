@@ -185,11 +185,15 @@ interface Lanc {
   agenda_nome?: string | null;
   /** Nº da ficha do agendamento vinculado. */
   ficha_numero?: number | null;
-  /** true → linha sintética criada pela decomposição de um pagamento "misto"
-   *  (só para exibição; ações de editar/excluir/estornar ficam desabilitadas). */
+  /** true → linha sintética criada pela decomposição de um pagamento "misto".
+   *  Ela não existe no banco: estornar/editar/excluir/reimprimir agem sobre o
+   *  lançamento original inteiro (`_mistoPai`). Antes as ações sumiam dessas
+   *  linhas e quem tinha permissão achava que não tinha. */
   _mistoParte?: boolean;
   /** id do lançamento pai quando esta linha é uma parte de "misto". */
   _mistoPaiId?: string;
+  /** Lançamento original (pai) desta parte de "misto" — alvo das ações. */
+  _mistoPai?: Lanc;
   /** true → competência de um dia anterior ao da digitação E sem dinheiro na
    *  gaveta daquele dia: é ajuste gerencial, não caixa físico da recepção.
    *  Ver `@/lib/financeiro/retroativos`. */
@@ -301,6 +305,7 @@ function expandMistoItems(items: Lanc[]): Lanc[] {
         descricao: `${l.descricao} — ${label}`,
         _mistoParte: true,
         _mistoPaiId: l.id,
+        _mistoPai: l,
       });
     });
   }
@@ -319,6 +324,17 @@ function diaDeslocado(iso: string, dias: number): string {
  *  gravado no banco, classificado na hora. */
 const baldeDaLinha = (l: Lanc): FormaCanonica =>
   l.formaCanonica ?? classificarForma(l.forma_pagamento);
+
+/** Lançamento real sobre o qual as ações da linha agem: o pai, quando a
+ *  linha é só uma parte exibida de um pagamento "misto". */
+const alvoDaLinha = (l: Lanc): Lanc => l._mistoPai ?? l;
+
+/** Complemento do título dos botões numa parte de "misto": deixa claro que a
+ *  ação pega o pagamento inteiro, não só o valor desta linha. */
+function avisoMisto(l: Lanc): string {
+  if (!l._mistoPai) return "";
+  return `\n\nParte de pagamento misto: a ação vale para o pagamento inteiro (${fmt(Number(l._mistoPai.valor))}).`;
+}
 
 /**
  * Lista final de linhas: decompõe os pagamentos mistos (quando a opção está
@@ -3287,14 +3303,20 @@ function Page() {
                                 {l.status}
                               </Badge>
                             </div>
-                            {l.origem !== "caixa" && !l._mistoParte && (
+                            {l.origem !== "caixa" && (
                               <div className="flex items-center gap-1 pt-1 -ml-2">
+                                {l._mistoParte ? (
+                                  <span className="w-full text-[11px] text-muted-foreground">
+                                    Parte de pagamento misto — as ações valem para o pagamento
+                                    inteiro ({fmt(Number(alvoDaLinha(l).valor))}).
+                                  </span>
+                                ) : null}
                                 {l.tipo !== "transferencia" ? (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-8 px-2 text-xs"
-                                    onClick={() => reimprimirRecibo(l)}
+                                    onClick={() => reimprimirRecibo(alvoDaLinha(l))}
                                   >
                                     <Printer className="h-3.5 w-3.5 mr-1" /> Reimprimir
                                   </Button>
@@ -3306,8 +3328,8 @@ function Page() {
                                     variant="ghost"
                                     size="sm"
                                     className="h-8 px-2 text-xs"
-                                    disabled={estornando === l.id}
-                                    onClick={() => estornar(l)}
+                                    disabled={estornando === alvoDaLinha(l).id}
+                                    onClick={() => estornar(alvoDaLinha(l))}
                                   >
                                     <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Estornar
                                   </Button>
@@ -3318,7 +3340,7 @@ function Page() {
                                       variant="ghost"
                                       size="sm"
                                       className="h-8 px-2 text-xs"
-                                      onClick={() => openEdit(l)}
+                                      onClick={() => openEdit(alvoDaLinha(l))}
                                     >
                                       <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                                     </Button>
@@ -3326,7 +3348,7 @@ function Page() {
                                       variant="ghost"
                                       size="sm"
                                       className="h-8 px-2 text-xs"
-                                      onClick={() => remove(l)}
+                                      onClick={() => remove(alvoDaLinha(l))}
                                     >
                                       <Trash2 className="h-3.5 w-3.5 text-destructive mr-1" />{" "}
                                       Excluir
@@ -3482,7 +3504,6 @@ function Page() {
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-0.5">
                                 {podeEstornar &&
-                                !l._mistoParte &&
                                 l.origem !== "caixa" &&
                                 l.tipo !== "transferencia" &&
                                 l.status !== "cancelado" ? (
@@ -3490,9 +3511,9 @@ function Page() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    title="Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses)."
-                                    disabled={estornando === l.id}
-                                    onClick={() => estornar(l)}
+                                    title={`Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses).${avisoMisto(l)}`}
+                                    disabled={estornando === alvoDaLinha(l).id}
+                                    onClick={() => estornar(alvoDaLinha(l))}
                                   >
                                     <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                                   </Button>
@@ -3511,27 +3532,25 @@ function Page() {
                                     <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                                   </Button>
                                 ) : null}
-                                {!l._mistoParte &&
-                                l.origem !== "caixa" &&
-                                l.tipo !== "transferencia" ? (
+                                {l.origem !== "caixa" && l.tipo !== "transferencia" ? (
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    title="Reimprimir recibo — gera a segunda via do comprovante em folha A4. Não altera o lançamento."
-                                    onClick={() => reimprimirRecibo(l)}
+                                    title={`Reimprimir recibo — gera a segunda via do comprovante em folha A4. Não altera o lançamento.${avisoMisto(l)}`}
+                                    onClick={() => reimprimirRecibo(alvoDaLinha(l))}
                                   >
                                     <Printer className="h-3.5 w-3.5" />
                                   </Button>
                                 ) : null}
-                                {podeEscrever && !l._mistoParte && l.origem !== "caixa" ? (
+                                {podeEscrever && l.origem !== "caixa" ? (
                                   <>
                                     <Button
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8"
-                                      title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento."
-                                      onClick={() => openEdit(l)}
+                                      title={`Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento.${avisoMisto(l)}`}
+                                      onClick={() => openEdit(alvoDaLinha(l))}
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
@@ -3539,8 +3558,8 @@ function Page() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8"
-                                      title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar."
-                                      onClick={() => remove(l)}
+                                      title={`Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar.${avisoMisto(l)}`}
+                                      onClick={() => remove(alvoDaLinha(l))}
                                     >
                                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                     </Button>
