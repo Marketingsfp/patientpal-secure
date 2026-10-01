@@ -1,3 +1,4 @@
+import { AlertasAtivosBanner } from "@/components/medico/paciente-dialogs";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,6 +18,7 @@ import {
   CloudOff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { textoDoProntuario } from "@/lib/prontuario/html";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   invalidarLinhaDoTempo,
@@ -455,7 +457,7 @@ function AtendimentoEditorPage() {
       // navegador é mais recente que o gravado e não pode ser sobrescrito.
       setSoap((s) => ({
         queixa_principal: s.queixa_principal || (data.queixa_principal ?? ""),
-        historia_doenca: s.historia_doenca || (data.historia_doenca ?? ""),
+        historia_doenca: s.historia_doenca || textoDoProntuario(data.historia_doenca),
         exame_fisico: s.exame_fisico || (data.exame_fisico ?? ""),
         hipotese_diagnostica: s.hipotese_diagnostica || (data.hipotese_diagnostica ?? ""),
         conduta: s.conduta || (data.conduta ?? ""),
@@ -1334,6 +1336,7 @@ function AtendimentoEditorPage() {
             </div>
           )}
 
+          <AlertasAtivosBanner pacienteId={pacienteId} />
           <Tabs defaultValue="qp">
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="qp">QP & HMA</TabsTrigger>
