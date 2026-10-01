@@ -258,6 +258,7 @@ export async function transcreverAudioWhatsapp(
  */
 export const CHAVES_TEMPLATE_MIDIA: Record<string, string> = {
   image: "midia.imagem",
+  image_receita: "midia.receita_remedio",
   document: "midia.documento",
   sticker: "midia.figurinha",
 };

@@ -206,6 +206,14 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
       "Recebi sua imagem. No momento não consigo analisar imagens por aqui — um atendente vai olhar e responder. Se puder, me descreva por texto o que precisa.",
   }),
   D({
+    chave: "midia.receita_remedio",
+    categoria: "midia",
+    descricao: "Foto recebida é uma receita de remédios, não um pedido de exames.",
+    variaveis: [],
+    padrao:
+      "Recebi sua foto, mas ela é uma receita de remédios, não um pedido de exames. Se tiver o pedido de exames, me manda a foto que eu passo os valores.",
+  }),
+  D({
     chave: "midia.documento",
     categoria: "midia",
     descricao: "Documento recebido.",
