@@ -208,3 +208,121 @@ export function resumirMensalidades(
   r.inadimplenciaPct = r.faturadoValor > 0 ? (r.atrasadasValor / r.faturadoValor) * 100 : 0;
   return r;
 }
+
+/** Situação de um contrato pagante no mês, para a faixa de indicadores da tela de contratos. */
+export type SituacaoContratoMes = "pago" | "a_vencer" | "inadimplente" | "sem_cobranca";
+
+/** Linha de `contratos_assinatura` usada na situação do mês. */
+export interface ContratoMesRow {
+  id: string;
+  status: string | null;
+  valor_mensal: number | null;
+}
+
+/** Linha de `contrato_mensalidades` com vencimento no mês. */
+export interface ParcelaMesRow {
+  contrato_id: string;
+  status: string | null;
+  vencimento: string;
+  numero_parcela: number | null;
+}
+
+export interface ResumoContratosMes {
+  /** Contratos ativos com mensalidade maior que zero — os mesmos de `ResumoContratos.ativos`. */
+  ativos: number;
+  receitaPrevista: number;
+  /** Contratos ativos de R$ 0 (dependentes vinculados) — mostrados à parte. */
+  dependentes: number;
+  pagos: number;
+  pagosValor: number;
+  aVencer: number;
+  aVencerValor: number;
+  inadimplentes: number;
+  inadimplentesValor: number;
+  semCobranca: number;
+  semCobrancaValor: number;
+  /** Situação de cada contrato pagante, para o filtro ao clicar no indicador. */
+  situacao: Map<string, SituacaoContratoMes>;
+}
+
+/**
+ * Cada contrato ativo pagante cai em UMA situação no mês — a soma de pagos,
+ * a vencer, inadimplentes e sem cobrança fecha com os ativos, em quantidade
+ * e em valor.
+ *
+ * Antes a faixa contava PARCELAS: taxa de adesão paga aparecia em "Pagos",
+ * parcela de contrato cancelado ou renovado também, e contrato com duas
+ * parcelas no mês contava duas vezes. Em 01/10/2026 a Menino Jesus tinha 1.848
+ * ativos e só 1.434 parcelas nos cards de baixo, sem explicação na tela.
+ *
+ * Regras:
+ * - Só entram parcelas de mensalidade (`numero_parcela > 0`) e não canceladas.
+ * - Com mais de uma parcela no mês, vale a pior: inadimplente > a vencer > pago.
+ * - Sem nenhuma parcela válida no mês → "sem cobrança" (parcela nunca gerada,
+ *   parcela do mês cancelada com o contrato ainda ativo, contrato que já
+ *   terminou de pagar etc.). Fica à mostra para a equipe auditar.
+ * - O valor de cada contrato é a mensalidade contratada, não o que foi pago:
+ *   é o que faz os quatro cards somarem a receita prevista.
+ */
+export function resumirContratosDoMes(
+  contratos: readonly ContratoMesRow[],
+  parcelasDoMes: readonly ParcelaMesRow[],
+  hojeIso: string,
+): ResumoContratosMes {
+  const peso: Record<SituacaoContratoMes, number> = {
+    sem_cobranca: 0,
+    pago: 1,
+    a_vencer: 2,
+    inadimplente: 3,
+  };
+  const piorParcela = new Map<string, SituacaoContratoMes>();
+  for (const p of parcelasDoMes) {
+    if (num(p.numero_parcela) <= 0) continue;
+    const c = classificarParcela(p.status, p.vencimento, hojeIso);
+    if (c === "cancelada") continue;
+    const s: SituacaoContratoMes = c === "paga" ? "pago" : c;
+    const atual = piorParcela.get(p.contrato_id);
+    if (!atual || peso[s] > peso[atual]) piorParcela.set(p.contrato_id, s);
+  }
+
+  const r: ResumoContratosMes = {
+    ativos: 0,
+    receitaPrevista: 0,
+    dependentes: 0,
+    pagos: 0,
+    pagosValor: 0,
+    aVencer: 0,
+    aVencerValor: 0,
+    inadimplentes: 0,
+    inadimplentesValor: 0,
+    semCobranca: 0,
+    semCobrancaValor: 0,
+    situacao: new Map(),
+  };
+  for (const c of contratos) {
+    if ((c.status ?? "").toLowerCase() !== "ativo") continue;
+    const valor = num(c.valor_mensal);
+    if (valor <= 0) {
+      r.dependentes += 1;
+      continue;
+    }
+    r.ativos += 1;
+    r.receitaPrevista += valor;
+    const s = piorParcela.get(c.id) ?? "sem_cobranca";
+    r.situacao.set(c.id, s);
+    if (s === "pago") {
+      r.pagos += 1;
+      r.pagosValor += valor;
+    } else if (s === "a_vencer") {
+      r.aVencer += 1;
+      r.aVencerValor += valor;
+    } else if (s === "inadimplente") {
+      r.inadimplentes += 1;
+      r.inadimplentesValor += valor;
+    } else {
+      r.semCobranca += 1;
+      r.semCobrancaValor += valor;
+    }
+  }
+  return r;
+}

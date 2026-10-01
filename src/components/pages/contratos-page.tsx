@@ -1357,6 +1357,8 @@ export function ContratosPage({
             <ContratosCards
               clinicaId={clinicaAtual?.clinica_id ?? ""}
               itens={filtered.map((c) => paraCardItem(c))}
+              produto={produtoFiltro}
+              convenioFiltro={filtroConvenio}
               podeEscrever={podeEscrever}
               onAbrir={(id) => abrirContratoCom(id, "dados", null)}
               onPagar={(id) => abrirContratoCom(id, "resumo", "pagar")}
