@@ -18,7 +18,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { invalidarLinhaDoTempo } from "@/components/prontuario/linha-do-tempo-prontuario";
+import {
+  invalidarLinhaDoTempo,
+  LinhaDoTempoProntuario,
+} from "@/components/prontuario/linha-do-tempo-prontuario";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
