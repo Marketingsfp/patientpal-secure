@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImagemMensagemAmpliada } from "./ImagemMensagemAmpliada";
 import { urlMidiaMensagem } from "@/lib/atendimento/midia-mensagem.functions";
 import { ehCaminhoGuardado } from "@/lib/whatsapp-midia-armazenamento";
 
@@ -111,12 +112,13 @@ export function MidiaMensagem({ clinicaId, mensagem }: { clinicaId: string; mens
             <img src={url} alt="Imagem enviada pelo paciente" loading="lazy" className="max-h-60 max-w-full object-cover" />
           </button>
           <Dialog open={ampliada} onOpenChange={setAmpliada}>
-            <DialogContent className="max-w-3xl">
+            {ampliada && <DialogContent className="max-w-6xl overflow-hidden" onEscapeKeyDown={() => {}}>
               <DialogHeader>
                 <DialogTitle>Imagem enviada pelo paciente</DialogTitle>
+                <DialogDescription className="sr-only">Visualize a imagem e amplie para ler os detalhes.</DialogDescription>
               </DialogHeader>
-              <img src={url} alt="Imagem enviada pelo paciente" className="max-h-[75vh] w-full object-contain" />
-            </DialogContent>
+              <ImagemMensagemAmpliada key={mensagem.id} url={url} />
+            </DialogContent>}
           </Dialog>
         </>
       ) : (

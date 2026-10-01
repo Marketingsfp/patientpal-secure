@@ -20,6 +20,10 @@ describe("supervisão (admin e gestor) respondendo no chat da atendente", () => 
   it("a etiqueta da bolha existe só para admin e gestor, como a da Nina", () => {
     expect(rotuloAutorSupervisao("admin")).toBe("Admin");
     expect(rotuloAutorSupervisao("gestor")).toBe("Gestor");
+    expect(rotuloAutorSupervisao("admin", "Quédima")).toBe("Admin Quédima");
+    expect(rotuloAutorSupervisao("gestor", "  Maria Silva  ")).toBe("Gestor Maria Silva");
+    expect(rotuloAutorSupervisao("admin", " ")).toBe("Admin");
+    expect(rotuloAutorSupervisao("telefonia", "Quédima")).toBeNull();
     expect(rotuloAutorSupervisao(null)).toBeNull();
     expect(rotuloAutorSupervisao("telefonia")).toBeNull();
     expect(ROTULO_PERFIL_SUPERVISAO).toEqual({ admin: "Admin", gestor: "Gestor" });
@@ -45,14 +49,27 @@ describe("supervisão (admin e gestor) respondendo no chat da atendente", () => 
   });
 
   it("o admin responde conversas com atendente ou sem responsável, e só elas", () => {
-    expect(adminPodeResponder({ atribuida_user_id: "ana", owner_type: "HUMAN", status: "active" })).toBe(true);
-    expect(adminPodeResponder({ atribuida_user_id: null, owner_type: "NONE", status: "waiting" })).toBe(true);
-    expect(adminPodeResponder({ atribuida_user_id: null, owner_type: "AI", status: "active" })).toBe(false);
-    expect(adminPodeResponder({ atribuida_user_id: "ana", owner_type: "HUMAN", status: "closed" })).toBe(false);
+    expect(
+      adminPodeResponder({ atribuida_user_id: "ana", owner_type: "HUMAN", status: "active" }),
+    ).toBe(true);
+    expect(
+      adminPodeResponder({ atribuida_user_id: null, owner_type: "NONE", status: "waiting" }),
+    ).toBe(true);
+    expect(
+      adminPodeResponder({ atribuida_user_id: null, owner_type: "AI", status: "active" }),
+    ).toBe(false);
+    expect(
+      adminPodeResponder({ atribuida_user_id: "ana", owner_type: "HUMAN", status: "closed" }),
+    ).toBe(false);
   });
 
   it("a bolha otimista já carrega quem enviou e o perfil, sem esperar o servidor", () => {
-    const comoGestor = criarMensagemOtimista({ conversaId: "c", texto: "oi", usuarioId: "u1", perfil: "gestor" });
+    const comoGestor = criarMensagemOtimista({
+      conversaId: "c",
+      texto: "oi",
+      usuarioId: "u1",
+      perfil: "gestor",
+    });
     expect(comoGestor.enviada_por).toBe("humano"); // métricas e espera continuam contando como resposta humana
     expect(comoGestor.enviada_por_user_id).toBe("u1");
     expect(comoGestor.enviada_por_perfil).toBe("gestor");
