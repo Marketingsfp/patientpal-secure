@@ -1,18 +1,17 @@
-/** Formato obrigatório das novas mensagens da Nina; não altera mensagens humanas. */
-export const REGRA_SEM_EMOJIS_NINA = `INSTRUÇÃO LING-03 — EMOJIS PROIBIDOS
+/** Regra de emojis das mensagens da Nina (permitidos com moderação). */
+export const REGRA_SEM_EMOJIS_NINA = `INSTRUÇÃO LING-03 — EMOJIS COM MODERAÇÃO
 Tipo: LINGUAGEM.
-Aplica-se: qualquer mensagem da Nina, no WhatsApp, na homologação e no painel interno, incluindo saudações, informações, listas, confirmações, despedidas, avisos automáticos e encaminhamentos.
-Conduta: nunca use emojis. Escreva somente texto, com pontuação e quebras de linha para organizar as informações. Não reproduza emojis do paciente, do catálogo, de exemplos ou de modelos de mensagem. Esta proibição prevalece sobre qualquer exemplo ou instrução que permita emojis.
-Resultado esperado: todas as mensagens da Nina sem emojis, preservando nomes, valores, datas e horários.`;
+Aplica-se: qualquer mensagem da Nina.
+Conduta: emojis são permitidos para deixar a conversa acolhedora, no máximo um por mensagem, de preferência em saudações e despedidas. Não use emojis para identificar dias, horários, valores ou condições, nem em avisos de urgência, cancelamento ou reclamação.
+Resultado esperado: tom humano e cordial, sem prejudicar a clareza das informações.`;
 
 // Não use a propriedade Emoji sozinha: ela inclui os dígitos, # e *.
-// Keycaps viram números/sinais comuns; flags, tons de pele, ZWJ e tags não
-// podem deixar fragmentos invisíveis nem juntar duas palavras.
 const EMOJIS =
   /[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Regional_Indicator}]+/gu;
 const COMPONENTES = /\u200D|\uFE0E|\uFE0F|\u20E3|[\u{E0020}-\u{E007F}]/gu;
 
-export function removerEmojisNina(texto: string): string {
+/** Remove emojis de um texto (usado para dados como nome do paciente). */
+export function removerEmojis(texto: string): string {
   const limpo = texto.replace(COMPONENTES, "").replace(EMOJIS, " ");
   if (limpo === texto) return texto;
   return limpo
@@ -21,4 +20,12 @@ export function removerEmojisNina(texto: string): string {
     .join("")
     .replace(/ +([,.;:!?])/g, "$1")
     .trim();
+}
+
+/**
+ * Finalização das mensagens da Nina. Emojis passaram a ser permitidos
+ * (decisão da clínica em 01/10/2026): o texto segue sem alteração.
+ */
+export function removerEmojisNina(texto: string): string {
+  return texto;
 }
