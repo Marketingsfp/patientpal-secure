@@ -9,7 +9,35 @@ import {
   DollarSign,
   Eye,
   FileText,
+  Bell,
+  RefreshCw,
+  CalendarDays,
+  Undo2,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { hojeBR } from "@/lib/date-utils";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import { idadeCompleta, tempoDesde } from "@/lib/prontuario/html";
+import { gravarProntuarioDoAgendamento } from "@/lib/medico/finalizar-atendimento";
+import { invalidarLinhaDoTempo } from "@/components/prontuario/linha-do-tempo-prontuario";
+import { EditorProntuario } from "@/components/medico/editor-prontuario";
+import { AlertasAtivosBanner, TriagemResumo } from "@/components/medico/paciente-dialogs";
+import {
+  BaixaAgendamentoDialog,
+  OpcoesPacienteMenu,
+  type MedicoFila,
+} from "@/components/medico/opcoes-e-baixa";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -47,12 +75,16 @@ type Medico = {
   especialidade_id: string | null;
   especialidades?: { nome: string } | null;
   ativo?: boolean;
+  tipo_repasse?: string | null;
+  valor_repasse_padrao?: number | null;
+  percentual_repasse_padrao?: number | null;
 };
 type FilaItem = {
   id: string;
   paciente_id: string | null;
   paciente_nome: string;
   inicio: string;
+  fim: string | null;
   // Momento em que a ficha foi marcada. Serve de desempate quando dois
   // pacientes têm o mesmo horário (encaixe): quem foi marcado antes é
   // chamado antes.
@@ -146,7 +178,7 @@ function AtendimentoIaPage() {
       const { data, error } = await supabase
         .from("medicos")
         .select(
-          "id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
+          "id, nome, email, user_id, especialidade_id, ativo, tipo_repasse, valor_repasse_padrao, percentual_repasse_padrao, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
         )
         .eq("clinica_id", cid)
         .eq("ativo", true)
@@ -204,7 +236,7 @@ function AtendimentoIaPage() {
         const { data: extras } = await supabase
           .from("medicos")
           .select(
-            "id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
+            "id, nome, email, user_id, especialidade_id, ativo, tipo_repasse, valor_repasse_padrao, percentual_repasse_padrao, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
           )
           .in("id", idsExtras);
         inativos = ((extras ?? []) as unknown as Medico[]).map((m) => ({ ...m, ativo: false }));
@@ -278,7 +310,7 @@ function AtendimentoIaPage() {
     const { data } = await supabase
       .from("agendamentos")
       .select(
-        "id, paciente_id, paciente_nome, inicio, created_at, procedimento, fluxo_etapa, fluxo_atualizado_em, prioridade",
+        "id, paciente_id, paciente_nome, inicio, fim, created_at, procedimento, fluxo_etapa, fluxo_atualizado_em, prioridade",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("medico_id", medId)
@@ -440,28 +472,298 @@ function AtendimentoIaPage() {
   // Contagens do cabeçalho, só informativas: a tabela é uma só e ninguém é
   // separado por pagamento.
   const atendidos = useMemo(() => fila.filter((it) => it.fluxo_etapa === "finalizado"), [fila]);
-  const emEspera = useMemo(
-    () => fila.filter((it) => it.fluxo_etapa !== "finalizado"),
-    [fila],
-  );
+  const emEspera = useMemo(() => fila.filter((it) => it.fluxo_etapa !== "finalizado"), [fila]);
   const aguardandoPagamento = useMemo(
     () => fila.filter((it) => it.fluxo_etapa !== "finalizado" && !pagamentos[it.id]?.pago),
     [fila, pagamentos],
   );
 
+  // ---------------- Agenda do Profissional (abas, contadores, ações) ----------------
+
+  const qc = useQueryClient();
+  const [aba, setAba] = useState<"atendimento" | "aguardando" | "atendidos">("aguardando");
+  const [ordem, setOrdem] = useState<"chegada" | "prioridade">("chegada");
+  const [segundos, setSegundos] = useState(60);
+  const [agora, setAgora] = useState(() => Date.now());
+  const [pacInfo, setPacInfo] = useState<
+    Record<string, { data_nascimento: string | null; numero_pasta: string | null }>
+  >({});
+  const [aberto, setAberto] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState<Record<string, string>>({});
+  const [salvandoId, setSalvandoId] = useState<string | null>(null);
+  const [baixa, setBaixa] = useState<FilaItem | null>(null);
+  const [estorno, setEstorno] = useState<FilaItem | null>(null);
+  const [chamandoId, setChamandoId] = useState<string | null>(null);
+  const [consultorio, setConsultorio] = useState("");
+
+  useEffect(() => {
+    try {
+      setConsultorio(localStorage.getItem("medico-consultorio") ?? "");
+    } catch {
+      /* ok */
+    }
+  }, []);
+
+  // Atualização automática a cada 60 s, com contador visível.
+  useEffect(() => {
+    const t = setInterval(() => {
+      setAgora(Date.now());
+      setSegundos((s) => {
+        if (s <= 1) {
+          void carregarFila(medicoId);
+          setPagamentosTick((x) => x + 1);
+          setTriagensTick((x) => x + 1);
+          return 60;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [medicoId, dia, clinicaAtual?.clinica_id]);
+
+  // Pasta e data de nascimento dos pacientes da fila.
+  const pacIdsKey = [...new Set(fila.map((f) => f.paciente_id).filter(Boolean))].sort().join(",");
+  useEffect(() => {
+    const ids = pacIdsKey ? pacIdsKey.split(",") : [];
+    if (!ids.length) return;
+    void (async () => {
+      const { data } = await supabase
+        .from("pacientes")
+        .select("id, data_nascimento, numero_pasta")
+        .in("id", ids);
+      const m: Record<string, { data_nascimento: string | null; numero_pasta: string | null }> = {};
+      for (const p of (data ?? []) as Array<{
+        id: string;
+        data_nascimento: string | null;
+        numero_pasta: string | null;
+      }>)
+        m[p.id] = { data_nascimento: p.data_nascimento, numero_pasta: p.numero_pasta };
+      setPacInfo(m);
+    })();
+  }, [pacIdsKey]);
+
+  const emAtendimento = useMemo(
+    () => listaVisivel.filter((it) => it.fluxo_etapa === "atendimento"),
+    [listaVisivel],
+  );
+  const aguardando = useMemo(() => {
+    const l = listaVisivel.filter(
+      (it) => it.fluxo_etapa !== "atendimento" && it.fluxo_etapa !== "finalizado",
+    );
+    if (ordem === "prioridade") {
+      const peso = { urgente: 0, prioritario: 1, normal: 2 } as const;
+      return [...l].sort((a, b) => peso[a.prioridade] - peso[b.prioridade] || ordemDeChamada(a, b));
+    }
+    return l;
+  }, [listaVisivel, ordem]);
+  const atendidosLista = useMemo(
+    () => listaVisivel.filter((it) => it.fluxo_etapa === "finalizado"),
+    [listaVisivel],
+  );
+
+  // Rascunho do editor na fila: carrega o prontuário já gravado do agendamento.
+  useEffect(() => {
+    if (!aberto || rascunho[aberto] !== undefined) return;
+    void (async () => {
+      const { data } = await supabase
+        .from("prontuarios")
+        .select("historia_doenca")
+        .eq("agendamento_id", aberto)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      setRascunho((r) => ({ ...r, [aberto]: (data?.historia_doenca as string | null) ?? "" }));
+    })();
+  }, [aberto]);
+
+  async function chamar(item: FilaItem) {
+    if (!clinicaAtual || chamandoId) return;
+    const pag = pagamentos[item.id];
+    if (pag && !pag.pago) {
+      toast.error("Pagamento pendente — envie o paciente ao caixa antes de chamar.");
+      return;
+    }
+    setChamandoId(item.id);
+    try {
+      const hoje = hojeBR();
+      const { data: ult } = await supabase
+        .from("senhas")
+        .select("numero")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("data_dia", hoje)
+        .eq("tipo", "C")
+        .order("numero", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nomeCurto = item.paciente_nome
+        .split(/\s+/)
+        .slice(0, 2)
+        .join(" ")
+        .toUpperCase()
+        .slice(0, 24);
+      const sala = consultorio.trim()
+        ? `Consultório ${consultorio.trim()}`
+        : `Consultório · ${medicoSelecionado?.nome ?? ""}`.trim();
+      const { error } = await supabase.from("senhas").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo: "C",
+        numero: Math.min(9999, (ult?.numero ?? 0) + 1),
+        codigo: nomeCurto,
+        status: "chamada",
+        paciente_id: item.paciente_id,
+        guiche: sala,
+        chamada_em: new Date().toISOString(),
+      } as never);
+      if (error) mostrarErro(error);
+      else toast.success(`Chamando ${nomeCurto} · ${sala}`);
+    } finally {
+      setChamandoId(null);
+    }
+  }
+
+  async function atenderNaFila(item: FilaItem) {
+    const pag = pagamentos[item.id];
+    if (pag && !pag.pago) {
+      toast.error("Pagamento pendente — envie ao caixa antes do atendimento.");
+      return;
+    }
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        fluxo_etapa: "atendimento",
+        fluxo_atualizado_em: new Date().toISOString(),
+      } as never)
+      .eq("id", item.id);
+    if (error) return mostrarErro(error);
+    setAba("atendimento");
+    setAberto(item.id);
+    void carregarFila(medicoId);
+  }
+
+  async function salvarRascunho(item: FilaItem) {
+    if (!clinicaAtual || !item.paciente_id) return;
+    const html = rascunho[item.id] ?? "";
+    if (!html.trim()) return toast.error("Escreva o prontuário antes de salvar.");
+    setSalvandoId(item.id);
+    try {
+      await gravarProntuarioDoAgendamento({
+        clinicaId: clinicaAtual.clinica_id,
+        pacienteId: item.paciente_id,
+        medicoId: medicoId || null,
+        agendamentoId: item.id,
+        html,
+      });
+      void invalidarLinhaDoTempo(qc, item.paciente_id);
+      toast.success("Prontuário salvo");
+    } catch (e) {
+      mostrarErro(e as Error);
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
+  async function confirmarEstorno() {
+    if (!estorno) return;
+    // Decisão da clínica: volta para Aguardando, mantém o prontuário e não
+    // mexe no financeiro.
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({
+        fluxo_etapa: "triagem",
+        status: "confirmado",
+        fluxo_atualizado_em: new Date().toISOString(),
+      } as never)
+      .eq("id", estorno.id);
+    if (error) mostrarErro(error);
+    else toast.success("Atendimento estornado — paciente voltou para Aguardando");
+    setEstorno(null);
+    void carregarFila(medicoId);
+  }
+
   function atender(item: FilaItem) {
     navigate({ to: "/app/atendimento-ia/$agendamentoId", params: { agendamentoId: item.id } });
   }
 
+  const medicoFila: MedicoFila | null = medicoSelecionado
+    ? {
+        id: medicoSelecionado.id,
+        nome: medicoSelecionado.nome,
+        tipo_repasse: medicoSelecionado.tipo_repasse,
+        valor_repasse_padrao: medicoSelecionado.valor_repasse_padrao,
+        percentual_repasse_padrao: medicoSelecionado.percentual_repasse_padrao,
+      }
+    : null;
+
+  const celulasBase = (it: FilaItem) => {
+    const info = it.paciente_id ? pacInfo[it.paciente_id] : undefined;
+    return (
+      <>
+        <TableCell className="tabular-nums font-semibold">{numeroNoDia.get(it.id) ?? ""}</TableCell>
+        <TableCell className="tabular-nums text-xs">
+          {new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        </TableCell>
+        <TableCell className="text-xs">{info?.numero_pasta ?? "—"}</TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1 font-medium uppercase">
+            {it.paciente_nome}
+            {it.prioridade !== "normal" && (
+              <Badge variant="destructive" className="text-[10px]">
+                {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
+              </Badge>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {idadeCompleta(info?.data_nascimento)}
+          </div>
+        </TableCell>
+        <TableCell className="hidden text-xs md:table-cell">{especialidadeMedico || "—"}</TableCell>
+        <TableCell className="text-xs">{it.procedimento ?? "—"}</TableCell>
+      </>
+    );
+  };
+
+  const cabecalhoBase = (
+    <>
+      <TableHead className="w-12">Ficha</TableHead>
+      <TableHead className="w-16">Horário</TableHead>
+      <TableHead className="w-16">Pasta</TableHead>
+      <TableHead>Cliente</TableHead>
+      <TableHead className="hidden md:table-cell">Serviço</TableHead>
+      <TableHead>Procedimento</TableHead>
+    </>
+  );
+
+  const vazio = (cols: number, txt: string) => (
+    <TableRow>
+      <TableCell colSpan={cols} className="py-6 text-center text-sm text-muted-foreground">
+        {txt}
+      </TableCell>
+    </TableRow>
+  );
+
   return (
     <div className="space-y-4 p-1">
-      <div className="flex items-center gap-3">
-        <Stethoscope className="h-6 w-6 text-primary" />
-        <div>
-          <h1 className="text-xl font-semibold">Meus Pacientes — Atendimento</h1>
-          <p className="text-sm text-muted-foreground">
-            Pacientes agendados na data escolhida. Clique em Atender para abrir o prontuário.
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Stethoscope className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-xl font-semibold">Agenda do Profissional</h1>
+            <p className="text-sm font-medium uppercase text-muted-foreground">
+              {medicoSelecionado?.nome ?? "—"}
+              {especialidadeMedico ? ` · ${especialidadeMedico}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className="flex items-center gap-1 text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Atualiza: {segundos} seg.
+          </span>
+          <Button variant="outline" size="sm" onClick={() => navigate({ to: "/app/agenda" })}>
+            <CalendarDays className="h-4 w-4" /> Visualizar agenda geral
+          </Button>
         </div>
       </div>
 
@@ -478,389 +780,367 @@ function AtendimentoIaPage() {
         </Card>
       )}
 
-      <Card className="p-4 space-y-3">
-        <div className="space-y-1">
-          <Label>Profissional</Label>
-          {soMedico || (medicoLogado && medicoSelecionado) ? (
-            // Perfil só de médico não escolhe profissional: a tela fica presa
-            // no cadastro dele, para ninguém abrir a fila de um colega.
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium uppercase">
-              {medicoSelecionado?.nome ?? "—"}
-            </div>
-          ) : (
-            <SearchableSelect
-              options={medicos.map((m) => ({
-                value: m.id,
-                label: `${m.nome.toUpperCase()}${m.ativo === false ? " (INATIVO)" : ""}`,
-              }))}
-              value={medicoId}
-              onChange={setMedicoId}
-              placeholder="Selecione…"
-              searchPlaceholder="Buscar médico…"
-              emptyText="Nenhum médico encontrado."
-            />
-          )}
-          {medicoSelecionado && (
-            <div className="text-xs text-muted-foreground pt-1">
-              Especialidade: <b className="text-foreground">{especialidadeMedico || "—"}</b>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Label className="flex items-center gap-1.5">
-              <Users className="h-4 w-4" /> Fila de atendimento
-            </Label>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setDia(somarDias(dia, -1))}
-              >
-                Ontem
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={dia === hojeLocal ? "default" : "outline"}
-                onClick={() => setDia(hojeLocal)}
-              >
-                Hoje
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setDia(somarDias(dia, 1))}
-              >
-                Amanhã
-              </Button>
-            </div>
-            <Input
-              type="date"
-              value={dia}
-              onChange={(e) => e.target.value && setDia(e.target.value)}
-              className="h-9 w-42"
-              aria-label="Data da fila"
-            />
-            <span className="text-sm font-medium">{dataPorExtenso(dia)}</span>
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="p-3">
+          <div className="text-xs uppercase text-muted-foreground">Agendamentos</div>
+          <div className="text-2xl font-bold tabular-nums">{fila.length}</div>
+        </Card>
+        <Card className="border-amber-300 p-3 dark:border-amber-900/60">
+          <div className="text-xs uppercase text-amber-700 dark:text-amber-400">Aguardando</div>
+          <div className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
+            {emEspera.length}
           </div>
+        </Card>
+        <Card className="border-emerald-300 p-3 dark:border-emerald-900/60">
+          <div className="text-xs uppercase text-emerald-700 dark:text-emerald-400">Atendidos</div>
+          <div className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+            {atendidos.length}
+          </div>
+        </Card>
+      </div>
 
-          {/* Lista única do dia: quem já foi atendido continua aqui, de verde.
-              O contador em cima resume o dia sem esconder ninguém. */}
-          <div className="flex items-center gap-3 border-b pb-2 text-sm">
-            <span className="font-medium">{emEspera.length} na fila</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-              {atendidos.length} atendidos
-            </span>
-            {aguardandoPagamento.length > 0 && (
-              <>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-amber-700 dark:text-amber-400 font-medium">
-                  {aguardandoPagamento.length} aguardando pagamento
-                </span>
-              </>
+      <Card className="space-y-3 p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-64 space-y-1">
+            <Label>Profissional</Label>
+            {soMedico || (medicoLogado && medicoSelecionado) ? (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium uppercase">
+                {medicoSelecionado?.nome ?? "—"}
+              </div>
+            ) : (
+              <SearchableSelect
+                options={medicos.map((m) => ({
+                  value: m.id,
+                  label: `${m.nome.toUpperCase()}${m.ativo === false ? " (INATIVO)" : ""}`,
+                }))}
+                value={medicoId}
+                onChange={setMedicoId}
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar médico…"
+                emptyText="Nenhum médico encontrado."
+              />
             )}
           </div>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" onClick={() => setDia(somarDias(dia, -1))}>
+              Ontem
+            </Button>
+            <Button
+              size="sm"
+              variant={dia === hojeLocal ? "default" : "outline"}
+              onClick={() => setDia(hojeLocal)}
+            >
+              Hoje
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setDia(somarDias(dia, 1))}>
+              Amanhã
+            </Button>
+          </div>
+          <Input
+            type="date"
+            value={dia}
+            onChange={(e) => e.target.value && setDia(e.target.value)}
+            className="h-9 w-42"
+            aria-label="Data da fila"
+          />
+          <span className="text-sm font-medium">{dataPorExtenso(dia)}</span>
+          <div className="space-y-1">
+            <Label htmlFor="consultorio">Consultório (para o painel)</Label>
+            <Input
+              id="consultorio"
+              className="h-9 w-32"
+              value={consultorio}
+              onChange={(e) => {
+                setConsultorio(e.target.value);
+                try {
+                  localStorage.setItem("medico-consultorio", e.target.value);
+                } catch {
+                  /* ok */
+                }
+              }}
+              placeholder="Ex.: 3"
+            />
+          </div>
+        </div>
 
-          {listaVisivel.length === 0 ? (
-            <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
-              Nenhum paciente agendado nesta data.
-            </div>
-          ) : (
+        <Tabs value={aba} onValueChange={(v) => setAba(v as typeof aba)}>
+          <TabsList>
+            <TabsTrigger value="atendimento">Em Atendimento ({emAtendimento.length})</TabsTrigger>
+            <TabsTrigger value="aguardando">Aguardando ({aguardando.length})</TabsTrigger>
+            <TabsTrigger value="atendidos">Atendidos ({atendidosLista.length})</TabsTrigger>
+          </TabsList>
+
+          {/* ---------------- Em Atendimento ---------------- */}
+          <TabsContent value="atendimento" className="space-y-3">
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">#</TableHead>
-                    <TableHead className="w-20">Hora</TableHead>
-                    <TableHead>Paciente</TableHead>
-                    <TableHead className="hidden md:table-cell">Serviço</TableHead>
-                    <TableHead className="w-28">Situação</TableHead>
-                    <TableHead className="w-32">Pagamento</TableHead>
-                    <TableHead className="w-24 text-center">Triagem</TableHead>
-                    <TableHead className="w-28">Prioridade</TableHead>
-                    <TableHead className="w-64 text-right">Ação</TableHead>
+                    {cabecalhoBase}
+                    <TableHead className="w-20 text-center">Opções</TableHead>
+                    <TableHead className="w-20 text-center">Baixar</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {listaVisivel.map((it) => {
-                    const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-                    const prioCls =
-                      it.prioridade === "urgente"
-                        ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
-                        : it.prioridade === "prioritario"
-                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                          : "";
-                    const temRegistroTriagem = Boolean(triagens[it.id]);
-                    const triagemFeita = temRegistroTriagem || it.fluxo_etapa === "atendimento";
-                    const pag = pagamentos[it.id];
-                    const pago = Boolean(pag?.pago);
-                    const atendido = it.fluxo_etapa === "finalizado";
-                    const numero = numeroNoDia.get(it.id);
-                    return (
-                      <Fragment key={it.id}>
-                        <TableRow
-                          // Atendido = linha verde da esquerda a direita, com
-                          // tarja lateral grossa. E o sinal que a medica procura
-                          // de longe, sem ler nada: o que esta verde ja passou.
-                          className={`${
-                            atendido
-                              ? "border-l-4 border-l-green-600 bg-green-50 hover:bg-green-100/80 dark:border-l-green-500 dark:bg-green-950/30"
-                              : ""
-                          } ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
+                  {emAtendimento.length === 0 && vazio(8, "Nenhum paciente em atendimento.")}
+                  {emAtendimento.map((it) => (
+                    <TableRow
+                      key={it.id}
+                      className={`cursor-pointer ${aberto === it.id ? "bg-primary/5" : ""}`}
+                      onClick={() => setAberto(it.id)}
+                    >
+                      {celulasBase(it)}
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {clinicaAtual && it.paciente_id && (
+                          <OpcoesPacienteMenu
+                            item={{ ...it, paciente_id: it.paciente_id }}
+                            clinicaId={clinicaAtual.clinica_id}
+                            medico={medicoFila}
+                            triagem={triagens[it.id]}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="icon"
+                          className="h-8 w-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={() => setBaixa(it)}
+                          aria-label={`Dar baixa em ${it.paciente_nome}`}
+                          title="Baixar (finalizar atendimento)"
                         >
-                          <TableCell
-                            className="tabular-nums text-sm font-semibold"
-                            title={
-                              numero
-                                ? `Ficha ${numero} da agenda — o mesmo número que aparece na Agenda`
-                                : "Ficha da agenda"
-                            }
-                          >
-                            {numero ?? ""}
-                          </TableCell>
-                          <TableCell className="tabular-nums text-xs">{hora}</TableCell>
-                          <TableCell className="font-medium uppercase">
-                            {it.paciente_nome}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                            {it.procedimento ?? "—"} · {it.fluxo_etapa.replace("_", " ")}
-                          </TableCell>
-                          <TableCell>
-                            {atendido ? (
-                              <Badge className="border-0 bg-green-600 text-white font-bold tracking-wide text-[11px] gap-1 hover:bg-green-600">
-                                ✅ ATENDIDO
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {(() => {
+              const it = emAtendimento.find((x) => x.id === aberto) ?? emAtendimento[0];
+              if (!it) return null;
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold uppercase">{it.paciente_nome}</div>
+                    <Button size="sm" variant="ghost" onClick={() => atender(it)}>
+                      <Eye className="h-4 w-4" /> Abrir consulta completa
+                    </Button>
+                  </div>
+                  <AlertasAtivosBanner pacienteId={it.paciente_id} />
+                  <Card className="p-3">
+                    <div className="mb-1 text-sm font-medium">Triagem</div>
+                    <TriagemResumo t={triagens[it.id]} />
+                  </Card>
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">Prontuário</div>
+                    <EditorProntuario
+                      value={rascunho[it.id] ?? ""}
+                      onChange={(v) => setRascunho((r) => ({ ...r, [it.id]: v }))}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => salvarRascunho(it)}
+                        disabled={salvandoId === it.id}
+                      >
+                        Salvar prontuário
+                      </Button>
+                      <Button
+                        onClick={() => setBaixa(it)}
+                        className="bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        <Check className="h-4 w-4" /> Baixar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </TabsContent>
+
+          {/* ---------------- Aguardando ---------------- */}
+          <TabsContent value="aguardando" className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Ordenar por:</span>
+              <Button
+                size="sm"
+                variant={ordem === "chegada" ? "default" : "outline"}
+                onClick={() => setOrdem("chegada")}
+              >
+                Chegada
+              </Button>
+              <Button
+                size="sm"
+                variant={ordem === "prioridade" ? "default" : "outline"}
+                onClick={() => setOrdem("prioridade")}
+              >
+                Prioridade
+              </Button>
+            </div>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {cabecalhoBase}
+                    <TableHead className="hidden lg:table-cell">Profissional</TableHead>
+                    <TableHead className="w-20">Espera</TableHead>
+                    <TableHead className="w-56 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aguardando.length === 0 && vazio(9, "Ninguém aguardando.")}
+                  {aguardando.map((it) => {
+                    const pag = pagamentos[it.id];
+                    const pendente = Boolean(pag && !pag.pago);
+                    return (
+                      <TableRow
+                        key={it.id}
+                        className={pendente ? "border-l-4 border-l-amber-400" : ""}
+                      >
+                        {celulasBase(it)}
+                        <TableCell className="hidden text-xs uppercase lg:table-cell">
+                          {medicoSelecionado?.nome ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-xs tabular-nums">
+                          {tempoDesde(it.fluxo_atualizado_em ?? it.created_at, agora)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {pendente && (
+                              <Badge className="border-0 bg-amber-100 text-[11px] text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                <DollarSign className="h-3 w-3" /> PENDENTE
                               </Badge>
-                            ) : pago ? (
-                              <span className="text-xs text-muted-foreground">Em espera</span>
-                            ) : (
-                              <span className="text-xs text-amber-700 dark:text-amber-400">
-                                Aguardando caixa
-                              </span>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            {!pag ? (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            ) : pag.pago ? (
-                              <Badge
-                                className={
-                                  pag.motivo === "orcamento"
-                                    ? "border-0 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 text-[11px] gap-1"
-                                    : "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] gap-1"
-                                }
-                                title={
-                                  pag.motivo === "orcamento"
-                                    ? "Pago via orçamento"
-                                    : "Pago no caixa"
-                                }
-                              >
-                                <Check className="h-3 w-3" />
-                                {pag.motivo === "orcamento" ? "PAGO (ORÇAMENTO)" : "PAGO"}
-                              </Badge>
-                            ) : (
-                              <Badge
-                                className="border-0 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[11px] gap-1"
-                                title="Pagamento pendente — envie ao caixa antes do atendimento"
-                              >
-                                <DollarSign className="h-3 w-3" />
-                                PENDENTE
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {triagemFeita ? (
-                              <span
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                title={
-                                  temRegistroTriagem
-                                    ? "Triagem realizada"
-                                    : "Paciente avançou no fluxo (sem registro formal de triagem)"
-                                }
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </span>
-                            ) : (
-                              <span
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
-                                title="Triagem pendente"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <HoverCard openDelay={120} closeDelay={80}>
-                              <HoverCardTrigger asChild>
-                                <span className="cursor-help inline-flex">
-                                  {it.prioridade !== "normal" ? (
-                                    <Badge className={`${prioCls} border-0 text-[11px] gap-1`}>
-                                      <AlertTriangle className="h-3 w-3" />
-                                      {it.prioridade === "urgente" ? "URGENTE" : "PRIORITÁRIO"}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                  )}
-                                </span>
-                              </HoverCardTrigger>
-                              <HoverCardContent align="start" className="w-80 text-xs space-y-2">
-                                {(() => {
-                                  const t = triagens[it.id];
-                                  if (!t) {
-                                    return (
-                                      <div className="text-muted-foreground">
-                                        {it.fluxo_etapa === "atendimento"
-                                          ? "Paciente avançou no fluxo sem registro formal de triagem no sistema."
-                                          : "Paciente ainda não passou pela triagem."}
-                                      </div>
-                                    );
-                                  }
-                                  const sv: string[] = [];
-                                  if (t.pa_sistolica && t.pa_diastolica)
-                                    sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
-                                  if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);
-                                  if (t.temperatura) sv.push(`T ${t.temperatura}°`);
-                                  if (t.saturacao) sv.push(`SatO₂ ${t.saturacao}%`);
-                                  if (t.glicemia) sv.push(`Glic ${t.glicemia}`);
-                                  if (t.peso_kg) sv.push(`${t.peso_kg}kg`);
-                                  if (t.altura_cm) sv.push(`${t.altura_cm}cm`);
-                                  if (t.imc) sv.push(`IMC ${t.imc}`);
-                                  return (
-                                    <>
-                                      <div className="flex items-center justify-between gap-2 pb-1 border-b">
-                                        <div className="font-semibold">Triagem da enfermagem</div>
-                                        <div className="text-[11px] text-muted-foreground">
-                                          {new Date(t.created_at).toLocaleString("pt-BR")}
-                                        </div>
-                                      </div>
-                                      {t.enfermeira_nome && (
-                                        <div className="text-[12px] text-muted-foreground">
-                                          Por {t.enfermeira_nome}
-                                        </div>
-                                      )}
-                                      {sv.length > 0 && (
-                                        <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[12px] leading-relaxed">
-                                          {sv.join(" · ")}
-                                        </div>
-                                      )}
-                                      {t.queixa_principal && (
-                                        <div>
-                                          <span className="text-[11px] uppercase text-muted-foreground">
-                                            Queixa
-                                          </span>
-                                          <div>{t.queixa_principal}</div>
-                                        </div>
-                                      )}
-                                      {t.doencas && t.doencas.length > 0 && (
-                                        <div>
-                                          <span className="text-[11px] uppercase text-muted-foreground">
-                                            Doenças
-                                          </span>
-                                          <div className="flex flex-wrap gap-1 mt-0.5">
-                                            {t.doencas.map((d, i) => (
-                                              <Badge
-                                                key={i}
-                                                variant="outline"
-                                                className="text-[11px]"
-                                              >
-                                                {d}
-                                              </Badge>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {t.medicamentos && (
-                                        <div>
-                                          <span className="text-[11px] uppercase text-muted-foreground">
-                                            Medicamentos
-                                          </span>
-                                          <div>{t.medicamentos}</div>
-                                        </div>
-                                      )}
-                                      {t.alergias && (
-                                        <div>
-                                          <span className="text-[11px] uppercase text-muted-foreground">
-                                            Alergias
-                                          </span>
-                                          <div>{t.alergias}</div>
-                                        </div>
-                                      )}
-                                      {t.observacoes && (
-                                        <div>
-                                          <span className="text-[11px] uppercase text-muted-foreground">
-                                            Observações
-                                          </span>
-                                          <div className="whitespace-pre-wrap">{t.observacoes}</div>
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </HoverCardContent>
-                            </HoverCard>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Histórico clínico do paciente sem sair da fila:
-                                abre a gaveta com as consultas anteriores. */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 text-xs"
-                                onClick={() => setHistorico(it)}
-                                title="Ver o histórico de prontuários anteriores deste paciente"
-                                aria-label={`Histórico do prontuário de ${it.paciente_nome}`}
-                              >
-                                <FileText className="h-3.5 w-3.5" />
-                                <span className="hidden lg:inline ml-1.5">Histórico</span>
-                              </Button>
-                              {atendido ? (
-                                // Reabrir o prontuário já finalizado é o caminho da
-                                // segunda via: o paciente volta no balcão pedindo o
-                                // atestado ou a receita que perdeu.
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-xs text-green-800 hover:bg-green-100 hover:text-green-900 dark:text-green-300 dark:hover:bg-green-900/40"
-                                  onClick={() => atender(it)}
-                                  title="Reabrir o prontuário para conferir ou imprimir segunda via"
-                                >
-                                  <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                  Reabrir / Ver Atendimento
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  onClick={() => atender(it)}
-                                  disabled={Boolean(pag && !pag.pago)}
-                                  title={
-                                    pag && !pag.pago
-                                      ? "Pagamento pendente — envie ao caixa antes do atendimento"
-                                      : undefined
-                                  }
-                                >
-                                  <Stethoscope className="h-4 w-4" /> Atender
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      </Fragment>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => chamar(it)}
+                              disabled={pendente || chamandoId === it.id}
+                              title="Chamar o paciente no painel/TV"
+                            >
+                              <Bell className="h-3.5 w-3.5" /> Chamar
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
+                              onClick={() => atenderNaFila(it)}
+                              disabled={pendente}
+                              title={
+                                pendente
+                                  ? "Pagamento pendente — envie ao caixa antes do atendimento"
+                                  : undefined
+                              }
+                            >
+                              <Stethoscope className="h-3.5 w-3.5" /> Atender
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
             </div>
-          )}
-        </div>
+          </TabsContent>
+
+          {/* ---------------- Atendidos ---------------- */}
+          <TabsContent value="atendidos">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {cabecalhoBase}
+                    <TableHead className="w-20 text-center">Opções</TableHead>
+                    <TableHead className="w-56 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {atendidosLista.length === 0 && vazio(8, "Nenhum atendimento finalizado.")}
+                  {atendidosLista.map((it) => (
+                    <TableRow
+                      key={it.id}
+                      className="border-l-4 border-l-green-600 bg-green-50 dark:bg-green-950/30"
+                    >
+                      {celulasBase(it)}
+                      <TableCell className="text-center">
+                        {clinicaAtual && it.paciente_id && (
+                          <OpcoesPacienteMenu
+                            item={{ ...it, paciente_id: it.paciente_id }}
+                            clinicaId={clinicaAtual.clinica_id}
+                            medico={medicoFila}
+                            triagem={triagens[it.id]}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => atender(it)}
+                            title="Reabrir para conferir ou imprimir segunda via"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> Ver
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setEstorno(it)}>
+                            <Undo2 className="h-3.5 w-3.5" /> Estornar
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
       </Card>
+
+      {baixa && clinicaAtual && baixa.paciente_id && (
+        <BaixaAgendamentoDialog
+          open
+          onOpenChange={(v) => !v && setBaixa(null)}
+          item={{ ...baixa, paciente_id: baixa.paciente_id }}
+          clinicaId={clinicaAtual.clinica_id}
+          filial={clinicaAtual.clinica.nome}
+          medico={medicoFila}
+          pago={!pagamentos[baixa.id] || Boolean(pagamentos[baixa.id]?.pago)}
+          htmlInicial={rascunho[baixa.id] ?? ""}
+          onConcluido={() => {
+            setRascunho((r) => {
+              const n = { ...r };
+              delete n[baixa.id];
+              return n;
+            });
+            setAba("atendidos");
+            void carregarFila(medicoId);
+          }}
+        />
+      )}
+
+      <AlertDialog open={Boolean(estorno)} onOpenChange={(v) => !v && setEstorno(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar atendimento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você tem certeza que deseja estornar o atendimento do(a) paciente{" "}
+              {estorno?.paciente_nome}? Ele volta para Aguardando. O prontuário escrito é mantido e
+              o financeiro não é alterado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não, manter atendimento</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarEstorno}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sim, estornar atendimento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <HistoricoProntuarioDrawer
         aberto={Boolean(historico)}
