@@ -1,6 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contratoDoProduto, produtoDoModulo, type ProdutoCartao } from "@/lib/cartao/produto";
-import { calcularParcelasQueFaltam } from "@/lib/cartao/parcelas-que-faltam";
+import {
+  calcularParcelasQueFaltam,
+  vencimentoDaProximaParcela,
+} from "@/lib/cartao/parcelas-que-faltam";
 import { planejarRegeracao } from "@/lib/cartao/regerar-parcelas";
 import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import { ContratosCards, type ContratoCardItem } from "@/components/contratos/contratos-cards";
@@ -3586,17 +3589,27 @@ function DetalheContrato({
       return;
     }
     const prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const agora = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const hojeIso = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`;
+    // Mês seguinte à última mensalidade, não hoje — ver `vencimentoDaProximaParcela`.
+    const vencimento = vencimentoDaProximaParcela(
+      mens,
+      (contrato as any).dia_vencimento ?? null,
+      hojeIso,
+    );
     const { error } = await supabase.from("contrato_mensalidades").insert({
       contrato_id: contrato.id,
       clinica_id: (contrato as any).clinica_id,
       numero_parcela: prox,
-      vencimento: hoje,
+      vencimento,
       valor: Number(valorMensalAtual) || 0,
       status: "pendente",
     } as any);
     if (error) return mostrarErro(error);
-    toast.success("Parcela adicionada.");
+    toast.success(
+      `Parcela adicionada, vencendo em ${fmtD(vencimento)}. A data pode ser ajustada na grade.`,
+    );
     await load();
   };
   // "Gerar parcelas que faltam": do mês corrente ao fim da vigência, uma por
@@ -3684,6 +3697,15 @@ function DetalheContrato({
       return;
     }
     const alvo = mens.find((m) => m.id === id);
+    // Parcela paga é histórico financeiro: apagar sumia com o registro de que o
+    // mês foi quitado, enquanto o dinheiro continuava no caixa. O caminho certo
+    // é "Reverter", que trata o estorno no caixa e reabre a parcela.
+    if ((alvo?.status ?? "").toLowerCase() === "pago") {
+      toast.error(
+        "Parcela paga não pode ser excluída. Use “Reverter” para desfazer o pagamento e depois exclua, se for o caso.",
+      );
+      return;
+    }
     const removendoAdesao = Number(alvo?.numero_parcela ?? -1) === 0;
     if (
       !(await confirmDialog(
@@ -6228,7 +6250,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      title="Excluir parcela"
+                                      title={
+                                        m.status === "pago"
+                                          ? "Parcela paga não pode ser excluída — use “Reverter”"
+                                          : "Excluir parcela"
+                                      }
+                                      disabled={m.status === "pago"}
                                       onClick={() => excluirParcela(m.id)}
                                     >
                                       <Trash2 className="h-3 w-3 text-destructive" />

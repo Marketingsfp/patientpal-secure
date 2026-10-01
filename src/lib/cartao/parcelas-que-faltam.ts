@@ -83,3 +83,38 @@ export function calcularParcelasQueFaltam(e: ParcelasQueFaltamEntrada): Parcelas
   }
   return vencimentos.length > 0 ? { tipo: "ok", vencimentos } : { tipo: "nada_faltando" };
 }
+
+/**
+ * Vencimento sugerido pelo "Adicionar parcela": o mês seguinte à última
+ * mensalidade não cancelada, no dia de vencimento do contrato.
+ *
+ * Antes era sempre a data de hoje — quem adicionava várias parcelas seguidas
+ * ficava com todas vencendo no mesmo dia, e o paciente aparecia com meses de
+ * atraso que não existiam. Sem nenhuma mensalidade, usa o mês corrente (e
+ * hoje, se o dia já passou, para não nascer atrasada). A data continua
+ * editável na grade.
+ */
+export function vencimentoDaProximaParcela(
+  existentes: readonly ParcelaExistente[],
+  diaVencimento: number | null,
+  hojeIso: string,
+): string {
+  const dia = Math.max(1, Math.min(31, Number(diaVencimento) || 10));
+  const ultima = existentes
+    .filter((p) => Number(p.numero_parcela) > 0 && (p.status ?? "").toLowerCase() !== "cancelado")
+    .map((p) => p.vencimento.slice(0, 10))
+    .sort()
+    .at(-1);
+  const hoje = hojeIso.slice(0, 10);
+  let [ano, mes] = (ultima ?? hoje).split("-").map(Number);
+  if (ultima) {
+    mes += 1;
+    if (mes > 12) {
+      mes = 1;
+      ano += 1;
+    }
+  }
+  const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  const venc = `${ano}-${pad(mes)}-${pad(Math.min(dia, ultimoDia))}`;
+  return !ultima && venc < hoje ? hoje : venc;
+}

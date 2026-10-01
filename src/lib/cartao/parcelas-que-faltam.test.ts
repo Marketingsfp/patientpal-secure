@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { calcularParcelasQueFaltam, type ParcelasQueFaltamEntrada } from "./parcelas-que-faltam";
+import {
+  calcularParcelasQueFaltam,
+  vencimentoDaProximaParcela,
+  type ParcelasQueFaltamEntrada,
+} from "./parcelas-que-faltam";
 
 const base = (p: Partial<ParcelasQueFaltamEntrada>): ParcelasQueFaltamEntrada => ({
   dataInicio: "2026-01-01",
@@ -83,5 +87,50 @@ describe("calcularParcelasQueFaltam", () => {
       }),
     );
     expect(r).toEqual({ tipo: "nada_faltando" });
+  });
+});
+
+describe("vencimentoDaProximaParcela", () => {
+  const p = (numero: number, vencimento: string, status = "pendente") => ({
+    numero_parcela: numero,
+    vencimento,
+    status,
+  });
+
+  it("mês seguinte à última mensalidade, no dia do contrato", () => {
+    expect(
+      vencimentoDaProximaParcela(
+        [p(1, "2026-09-14", "pago"), p(2, "2026-10-10")],
+        10,
+        "2026-10-01",
+      ),
+    ).toBe("2026-11-10");
+  });
+
+  it("adicionar várias seguidas não repete a data", () => {
+    const lista = [p(1, "2026-10-10")];
+    const segunda = vencimentoDaProximaParcela(lista, 10, "2026-10-01");
+    const terceira = vencimentoDaProximaParcela([...lista, p(2, segunda)], 10, "2026-10-01");
+    expect([segunda, terceira]).toEqual(["2026-11-10", "2026-12-10"]);
+  });
+
+  it("ignora cancelada e taxa de adesão", () => {
+    expect(
+      vencimentoDaProximaParcela(
+        [p(1, "2026-10-10"), p(2, "2027-03-10", "cancelado"), p(0, "2027-05-01")],
+        10,
+        "2026-10-01",
+      ),
+    ).toBe("2026-11-10");
+  });
+
+  it("sem mensalidade: mês corrente, ou hoje se o dia já passou", () => {
+    expect(vencimentoDaProximaParcela([], 10, "2026-10-01")).toBe("2026-10-10");
+    expect(vencimentoDaProximaParcela([], 10, "2026-10-20")).toBe("2026-10-20");
+  });
+
+  it("virada de ano e dia 31", () => {
+    expect(vencimentoDaProximaParcela([p(1, "2026-12-31")], 31, "2026-12-01")).toBe("2027-01-31");
+    expect(vencimentoDaProximaParcela([p(1, "2027-01-31")], 31, "2027-01-01")).toBe("2027-02-28");
   });
 });
