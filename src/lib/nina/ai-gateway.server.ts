@@ -224,7 +224,13 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
         knowledge_status: pedido.knowledgeStatus ?? null,
         sucesso: resposta.ok,
         categoria_erro: categoria,
-        tokens: { entrada: resposta.uso?.entrada ?? null, saida: resposta.uso?.saida ?? null },
+        tokens: {
+          entrada: resposta.uso?.entrada ?? null,
+          saida: resposta.uso?.saida ?? null,
+          // Medição de custo (01/10/2026): null = o gateway não informou.
+          cache: resposta.uso?.cache ?? null,
+          raciocinio: resposta.uso?.raciocinio ?? null,
+        },
       },
       codigo,
     });

@@ -78,6 +78,12 @@ export type EntradaPrecedenciaTurno = {
   saudacaoObrigatoria: boolean;
   instrucoesAdicionais?: readonly InstrucaoAdicionalTurno[];
   eventos?: readonly EventoDeTurno[];
+  /**
+   * `textoPublicado` vai inteiro no mesmo prompt que o contrato. Nesse caso
+   * as regras gerais publicadas entram no contrato só como referência (ver
+   * `OpcoesContratoPrecedencia`). Padrão: desligado.
+   */
+  regrasPublicadasNoPrompt?: boolean;
 };
 
 export type PrecedenciaTurno = {
@@ -190,7 +196,9 @@ export function resolverPrecedenciaDoTurno(e: EntradaPrecedenciaTurno): Preceden
     saudacaoObrigatoria: obrigatoria,
     saudacaoDispensadaPor:
       e.saudacaoObrigatoria && !obrigatoria && dispensa ? `REGRA_PUBLICADA_${dispensa.ordem}` : null,
-    contrato: textoContratoPrecedencia(resultado),
+    contrato: textoContratoPrecedencia(resultado, {
+      regrasPublicadasNoPrompt: e.regrasPublicadasNoPrompt === true,
+    }),
     resumo: { ...resumoPrecedencia(resultado), limitacoes },
   };
 }

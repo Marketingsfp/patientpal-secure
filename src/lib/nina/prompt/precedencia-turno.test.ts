@@ -152,3 +152,37 @@ describe("deduplicação da mensagem atual", () => {
     expect(ctx.messages.filter((m) => m.role === "user").length).toBe(2);
   });
 });
+
+describe("precedência do turno — regras publicadas já no prompt (custo de tokens, 01/10/2026)", () => {
+  const REGRA_GERAL = "Nunca use emojis nas mensagens enviadas ao paciente.";
+  const TEXTO_COM_REGRA_GERAL = `${REGRA_GERAL}\n${TEXTO_V6}`;
+
+  it("por padrão repete o texto de cada regra geral publicada (comportamento anterior)", () => {
+    const r = base({ textoPublicado: TEXTO_COM_REGRA_GERAL });
+    expect(r.contrato).toContain(REGRA_GERAL);
+    expect(r.contrato).not.toContain("REGRAS_PUBLICADAS_GERAIS");
+  });
+
+  it("com a opção ligada, resume as regras gerais publicadas em uma linha e mantém as exceções", () => {
+    const r = base({ textoPublicado: TEXTO_COM_REGRA_GERAL, regrasPublicadasNoPrompt: true });
+    // A regra geral continua vigente na resolução (auditoria), só não é repetida no texto.
+    expect(
+      r.resumo.vigentes.some(
+        (v) => v.nivel === "regra_geral" && v.codigo.startsWith("REGRA_PUBLICADA_"),
+      ),
+    ).toBe(true);
+    expect(r.contrato).not.toContain(REGRA_GERAL);
+    expect(r.contrato).toContain("REGRAS_PUBLICADAS_GERAIS");
+    expect(r.contrato).toContain("valem integralmente neste turno");
+    // A exceção aplicável a esta mensagem segue com texto completo.
+    expect(r.contrato).toContain("ARQUITETURA_CONFIRMADA_9381");
+    // A regra de apresentação é de código, não publicada: segue com texto.
+    const semGatilho = base({
+      textoPublicado: TEXTO_COM_REGRA_GERAL,
+      regrasPublicadasNoPrompt: true,
+      mensagemPaciente: "oi, quero marcar uma consulta",
+    });
+    expect(semGatilho.contrato).toContain(REGRA_SAUDACAO);
+    expect(semGatilho.contrato).not.toContain("ARQUITETURA_CONFIRMADA_9381");
+  });
+});
