@@ -239,6 +239,7 @@ import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
+import { detectarCheckupRosa, ratearPacote, type PacoteAplicado } from "@/lib/agenda/checkup-rosa";
 import {
   obterEtapaSinal,
   registrarPagamentoEtapaSinal,
@@ -679,6 +680,18 @@ type FormaPagCtx = {
   medico?: string;
   especialidade?: string;
 };
+
+/**
+ * A cobrança em andamento é exatamente a do pacote CHECKUP ROSA reconhecido?
+ * Outras cobranças agrupadas (multi-imagem, cobrança individual) reaproveitam
+ * o mesmo diálogo, e um pacote que sobrou de uma cobrança desistida não pode
+ * aparecer nelas nem mexer no rateio.
+ */
+function mesmosAtendimentosDoPacote(agIds: string | string[], aplicado: PacoteAplicado): boolean {
+  const ids = (Array.isArray(agIds) ? agIds : agIds.split(",")).filter(Boolean);
+  const doPacote = Object.keys(aplicado.precoPorAtendimento);
+  return ids.length === doPacote.length && ids.every((id) => id in aplicado.precoPorAtendimento);
+}
 
 /**
  * Guarda as duas versões da mesma cobrança quando o desconto do cartão entra
@@ -2356,6 +2369,71 @@ function AgendaPage() {
     ativo: boolean;
   } | null>(null);
   const [formaPagCtx, setFormaPagCtx] = useState<FormaPagCtx | null>(null);
+  /**
+   * Pacote CHECKUP ROSA reconhecido na cobrança agrupada (ver
+   * `@/lib/agenda/checkup-rosa`). `normal` guarda a cobrança como ela abriu,
+   * para a recepção poder voltar atrás. O pacote só vale quando alguém clica
+   * em "Aplicar": a campanha é escolha da paciente, não desconto automático.
+   */
+  const [pacoteRosa, setPacoteRosa] = useState<{
+    aplicado: PacoteAplicado;
+    ativo: boolean;
+    normal: {
+      opcoes: FormaOpcao[];
+      pesos: Record<string, number>;
+      rotulos: Record<string, string>;
+      ctx: FormaPagCtx;
+    };
+  } | null>(null);
+  /** Pacote em vigor no rateio da cobrança agrupada em andamento. */
+  const pacoteRosaRef = useRef<PacoteAplicado | null>(null);
+  const alternarPacoteRosa = () => {
+    if (!pacoteRosa) return;
+    const { aplicado, normal } = pacoteRosa;
+    if (pacoteRosa.ativo) {
+      pacoteRosaRef.current = null;
+      setFormaPagOpcoes(normal.opcoes);
+      setPagamentoPesos(normal.pesos);
+      setPagamentoRotulos(normal.rotulos);
+      setFormaPagCtx(normal.ctx);
+      setPacoteRosa({ ...pacoteRosa, ativo: false });
+      return;
+    }
+    const nome = aplicado.pacote.nome;
+    // O atendimento mais caro abre a cobrança: é nele que o diálogo grava o
+    // lançamento principal e que cai o centavo de arredondamento do rateio —
+    // nunca no preventivo, que tem de ficar em R$ 0,00.
+    const ids = normal.ctx.agId
+      .split(",")
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          (aplicado.precoPorAtendimento[b]?.cartao ?? 0) -
+          (aplicado.precoPorAtendimento[a]?.cartao ?? 0),
+      );
+    const pesos: Record<string, number> = {};
+    const rotulos: Record<string, string> = {};
+    for (const id of ids) {
+      pesos[id] = aplicado.precoPorAtendimento[id]?.cartao ?? 0;
+      rotulos[id] = `${normal.rotulos[id] ?? "ATENDIMENTO"} · ${nome}`;
+    }
+    pacoteRosaRef.current = aplicado;
+    setPagamentoPesos(pesos);
+    setPagamentoRotulos(rotulos);
+    setFormaPagOpcoes([
+      { forma: "dinheiro", label: "Dinheiro", valor: aplicado.totalDinheiro },
+      { forma: "pix", label: "Pix", valor: aplicado.totalCartao },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: aplicado.totalCartao },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: aplicado.totalCartao },
+    ]);
+    setFormaPagCtx({
+      ...normal.ctx,
+      agId: ids.join(","),
+      desc: `${normal.ctx.paciente} — ${nome} (${ids.length} serviços, preventivo incluso sem custo)`,
+      procedimento: `${nome} — ${normal.ctx.procedimento ?? ""}`,
+    });
+    setPacoteRosa({ ...pacoteRosa, ativo: true });
+  };
   // Cobrança com desconto do cartão × valor cheio (ver `CobrancaAlternativa`).
   const [cobrancaAlt, setCobrancaAlt] = useState<CobrancaAlternativa | null>(null);
   /**
@@ -4635,7 +4713,7 @@ function AgendaPage() {
       setCobrarParcial(false);
       setSegundoRecebimentoLiberado(false);
       setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
+      const ctx: FormaPagCtx = {
         agId: itens.map((i) => i.id).join(","),
         desc,
         paciente,
@@ -4648,7 +4726,21 @@ function AgendaPage() {
           const m = medicos.find((mm) => mm.id === itens[0].medico_id);
           return m?.especialidade_nome ?? undefined;
         })(),
-      });
+      };
+      setFormaPagCtx(ctx);
+      // Pacote CHECKUP ROSA: a seleção bate com um dos pacotes? Oferece o
+      // botão "Aplicar" no diálogo; a cobrança abre com os preços normais.
+      pacoteRosaRef.current = null;
+      const pacote = detectarCheckupRosa(
+        itens.map((i) => ({
+          id: i.id,
+          procedimento: i.procedimento,
+          especialidade: medicos.find((mm) => mm.id === i.medico_id)?.especialidade_nome ?? null,
+        })),
+      );
+      setPacoteRosa(
+        pacote ? { aplicado: pacote, ativo: false, normal: { opcoes, pesos, rotulos, ctx } } : null,
+      );
       setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarSelecionados]", e);
@@ -10416,6 +10508,48 @@ function AgendaPage() {
                 </Button>
               </div>
             ) : null}
+            {pacoteRosa &&
+            formaPagCtx &&
+            mesmosAtendimentosDoPacote(formaPagCtx.agId, pacoteRosa.aplicado) ? (
+              <div className="mt-1 rounded-md border border-pink-300 bg-pink-50 px-2 py-2 text-[12px] space-y-1.5 dark:border-pink-800 dark:bg-pink-950/40">
+                <p className="leading-snug">
+                  {pacoteRosa.ativo ? (
+                    <>
+                      <b>{pacoteRosa.aplicado.pacote.nome}</b> aplicado: preventivo sem custo
+                      {pacoteRosa.aplicado.pacote.id === "completo"
+                        ? " e desconto na mamografia"
+                        : ""}
+                      .
+                    </>
+                  ) : (
+                    <>
+                      Estes atendimentos formam o <b>{pacoteRosa.aplicado.pacote.nome}</b>:{" "}
+                      {pacoteRosa.aplicado.totalDinheiro.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}{" "}
+                      no dinheiro ou{" "}
+                      {pacoteRosa.aplicado.totalCartao.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}{" "}
+                      no Pix/cartão.
+                    </>
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-full text-[12px]"
+                  onClick={alternarPacoteRosa}
+                >
+                  {pacoteRosa.ativo
+                    ? "Voltar aos preços normais"
+                    : `Aplicar ${pacoteRosa.aplicado.pacote.nome}`}
+                </Button>
+              </div>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
@@ -10547,12 +10681,20 @@ function AgendaPage() {
               const N = todosIds.length;
               const totalPeso = todosIds.reduce((s, id) => s + (pagamentoPesos[id] ?? 0), 0);
               const valorTotal = Number(dados.valor) || 0;
+              // Pacote CHECKUP ROSA aplicado: cada atendimento leva o preço do
+              // pacote (preventivo R$ 0,00), e não a proporção dos pesos.
+              const pacoteAtivo =
+                pacoteRosaRef.current && mesmosAtendimentosDoPacote(todosIds, pacoteRosaRef.current)
+                  ? pacoteRosaRef.current
+                  : null;
               // Rateio proporcional pelo peso; se soma de pesos for 0, divide igualmente.
-              const valoresRat = todosIds.map((id) =>
-                totalPeso > 0
-                  ? Math.round(((pagamentoPesos[id] ?? 0) / totalPeso) * valorTotal * 100) / 100
-                  : Math.round((valorTotal / N) * 100) / 100,
-              );
+              const valoresRat = pacoteAtivo
+                ? ratearPacote(pacoteAtivo, todosIds, valorTotal)
+                : todosIds.map((id) =>
+                    totalPeso > 0
+                      ? Math.round(((pagamentoPesos[id] ?? 0) / totalPeso) * valorTotal * 100) / 100
+                      : Math.round((valorTotal / N) * 100) / 100,
+                  );
               // Ajuste de arredondamento: joga a diferença no principal.
               const somaRat = valoresRat.reduce((s, v) => s + v, 0);
               const diff = Math.round((valorTotal - somaRat) * 100) / 100;
@@ -10629,6 +10771,7 @@ function AgendaPage() {
                     : `${pacNome || pacNomeFallback(id)} — ${rotuloFallback(id)} (${i + 1}/${N} do grupo)`,
                 observacoes: [
                   `Pagamento agrupado (grupo ${grupoId}) — ${i + 1}/${N} atendimentos`,
+                  pacoteAtivo ? `Pacote ${pacoteAtivo.pacote.nome}` : "",
                   trechoMisto,
                 ]
                   .filter(Boolean)
@@ -10733,6 +10876,8 @@ function AgendaPage() {
             setPagamentoAgId(null);
             setPagamentoExtraIds([]);
             setDescontoPendente(null);
+            pacoteRosaRef.current = null;
+            setPacoteRosa(null);
             // Se o usuário escolheu "Pagar/Imprimir/Nota", abre a tela de
             // atendimentos do financeiro com a linha pronta para emitir a NFS-e.
             if (emitirNotaAposRef.current) {

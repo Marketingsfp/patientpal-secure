@@ -201,7 +201,7 @@ export function resolverRepasse(params: {
   forma: FormaRepasse;
 }): { total: number; repasse: number; terceiro: RepasseTerceiro | null } {
   const bruto = resolverRepasseExecutante(params);
-  return { ...bruto, terceiro: repasseDoTerceiro(params.linha, bruto.total) };
+  return { ...bruto, terceiro: repasseDoTerceiro(params.linha, bruto.total, params.base) };
 }
 
 /**
@@ -220,10 +220,17 @@ export function resolverRepasse(params: {
  *
  * Devolve `null` quando a linha não tem terceiro configurado ou quando o
  * número cadastrado é zero.
+ *
+ * `pagoNoCaixa` é o que o paciente de fato pagou. Ele decide o caso "sem
+ * pagamento" do valor fixo: quando o executante também é valor fixo, `total`
+ * já vem inflado até o repasse dele (R$ 10,40 num PREVENTIVO de R$ 0,00), e o
+ * teto cortava o DU PREVENTIVO de R$ 26,00 para R$ 10,40 — preventivo da
+ * gratuidade do Cartão e do pacote Checkup Rosa.
  */
 export function repasseDoTerceiro(
   linha: RepasseConvenio | null | undefined,
   total: number,
+  pagoNoCaixa: number = total,
 ): RepasseTerceiro | null {
   if (!linha?.terceiro_id) return null;
   if (linha.tipo_repasse_terceiro === "valor") {
@@ -232,7 +239,7 @@ export function repasseDoTerceiro(
     return {
       medico_id: linha.terceiro_id,
       percentual: null,
-      valor: +(total > 0 ? Math.min(fixo, total) : fixo).toFixed(2),
+      valor: +(total > 0 && pagoNoCaixa > 0 ? Math.min(fixo, total) : fixo).toFixed(2),
     };
   }
   const pct = valorCelulaRepasse(linha.percentual_terceiro);

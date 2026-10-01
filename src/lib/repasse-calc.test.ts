@@ -336,6 +336,27 @@ describe("repasse triplo (terceiro dono do equipamento)", () => {
     expect(r.terceiro?.valor).toBe(25);
   });
 
+  it("PREVENTIVO de R$ 0,00 paga o DU integral mesmo com executante em valor fixo", () => {
+    // Cadastro real: ginecologista R$ 10,40 fixo + DU PREVENTIVO R$ 26,00 fixo.
+    // Sem pagamento, o total sobe até o repasse do executante (R$ 10,40) e o
+    // teto não pode cortar a parte do DU para esse valor.
+    const linha: RepasseConvenio = {
+      ...LINHA_TERCEIRO_FIXO,
+      nome: "PREVENTIVO",
+      tipo_repasse: "valor",
+      percentual: null,
+      valor: 10.4,
+      valor_terceiro: 26,
+    };
+    const r = resolverRepasse({ linha, med: MEDICO, base: 0, forma: "particular" });
+    expect(r.repasse).toBe(10.4);
+    expect(r.terceiro?.valor).toBe(26);
+    // Com pagamento de verdade o teto continua valendo.
+    const pago = resolverRepasse({ linha, med: MEDICO, base: 52, forma: "particular" });
+    expect(pago.repasse).toBe(10.4);
+    expect(pago.terceiro?.valor).toBe(26);
+  });
+
   it("terceiro em valor fixo ignora o percentual antigo que ficou gravado", () => {
     const linha: RepasseConvenio = { ...LINHA_TERCEIRO_FIXO, percentual_terceiro: 30 };
     const r = resolverRepasse({ linha, med: MEDICO, base: 100, forma: "particular" });
