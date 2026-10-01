@@ -14,7 +14,7 @@
  * de contingência.
  */
 
-import { removerEmojisNina } from "@/lib/nina/resposta/sem-emojis";
+import { removerEmojis, removerEmojisNina } from "@/lib/nina/resposta/sem-emojis";
 
 /** Setores que podem ser citados ao paciente quando vierem estruturados. */
 export const SETORES_MENCIONAVEIS = [
@@ -166,7 +166,7 @@ export function validarMensagemHandoff(
  * ser sempre a mesma frase.
  */
 export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): string {
-  const nome = primeiroNome(removerEmojisNina(ctx.nome ?? ""));
+  const nome = primeiroNome(removerEmojis(ctx.nome ?? ""));
   const destino = destinoTexto(ctx.setor);
   const assunto = (ctx.assunto ?? "").trim();
   const saudacao = nome ? `${nome}, ` : "";
@@ -207,7 +207,7 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
       : `Você é a assistente virtual${ondeAtende}, falando por mensagem com o paciente.`,
     "Escreva UMA mensagem curta (até 3 linhas) avisando que o atendimento será encaminhado para a equipe humana.",
     "Regras obrigatórias:",
-    "- emojis são proibidos em toda a mensagem; use apenas texto;",
+    "- no máximo um emoji, só se combinar com o tom; nunca em avisos de reclamação ou urgência;",
     `- diga que vai encaminhar para ${destino};`,
     "- diga que o atendimento continua por aqui (mesmo canal);",
     `- termine com uma linha exatamente assim: Protocolo do atendimento: ${ctx.protocolo}`,
