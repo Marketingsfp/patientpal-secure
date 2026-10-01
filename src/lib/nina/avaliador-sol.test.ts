@@ -31,7 +31,8 @@ function achado(p: Partial<Achado>): Achado {
 
 describe("score", () => {
   it("é ponderado pelas dimensões avaliadas", () => {
-    expect(calcularScore([nota("correcao_informacao", 10), nota("qualidade_resposta", 0)])).toBe(75);
+    // sol-v2: segurança pesa 15, conversão 4 → 10·15/19 ≈ 79
+    expect(calcularScore([nota("seguranca", 10), nota("conversao", 0)])).toBe(79);
   });
 
   it("ignora dimensões não verificáveis", () => {
