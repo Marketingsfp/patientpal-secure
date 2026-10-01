@@ -2777,7 +2777,9 @@ export function LancamentoDialog({
               />
             </div>
           </div>
-          <DialogFooter>
+          {/* Três botões não cabem numa linha da largura deste diálogo: sem a
+              quebra, o "Cancelar" saía cortado pela borda esquerda. */}
+          <DialogFooter className="flex-wrap gap-2 sm:space-x-0">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={ocupado}>
               Cancelar
             </Button>

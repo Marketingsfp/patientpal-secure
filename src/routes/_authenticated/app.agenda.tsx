@@ -1663,9 +1663,9 @@ function AgendaPage() {
   }, [dupDoDia, form.medico_id, form.procedimento]);
   /** Demais atendimentos do paciente no dia — informativo, não trava nada. */
   /**
-   * Lembrete do CHECKUP ROSA no agendamento novo: a consulta de ginecologia e
-   * o preventivo são a porta de entrada dos pacotes. Só informa — o pacote é
-   * aplicado na cobrança agrupada.
+   * Lembrete do CHECKUP ROSA no agendamento (novo ou em edição, enquanto não
+   * pago): a consulta de ginecologia e o preventivo são a porta de entrada dos
+   * pacotes. Só informa — o pacote é aplicado na cobrança agrupada.
    */
   const ofereceCheckupRosa = useMemo(() => {
     const esp = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? null;
@@ -2405,6 +2405,36 @@ function AgendaPage() {
   } | null>(null);
   /** Pacote em vigor no rateio da cobrança agrupada em andamento. */
   const pacoteRosaRef = useRef<PacoteAplicado | null>(null);
+  /**
+   * Cobrança INDIVIDUAL de um atendimento que, junto com outros da mesma
+   * paciente no mesmo dia (ainda não pagos), forma um CHECKUP ROSA. A
+   * recepção costuma cobrar pelo $ de cada linha, e por ali o pacote nunca
+   * aparece — o aviso manda para "Cobrar selecionados".
+   */
+  const pacoteRosaDaCobrancaIndividual = (agId: string | undefined): PacoteAplicado | null => {
+    if (!agId || agId.includes(",")) return null;
+    const atual = items.find((a) => a.id === agId);
+    if (!atual?.paciente_id) return null;
+    const dia = dataClinicaDe(atual.inicio);
+    const especialidade = (medicoId: string | null) =>
+      medicos.find((m) => m.id === medicoId)?.especialidade_nome ?? null;
+    const doDia = items.filter(
+      (a) =>
+        a.paciente_id === atual.paciente_id &&
+        dataClinicaDe(a.inicio) === dia &&
+        (a.id === agId || !pagosSet.has(a.id)) &&
+        a.status !== "cancelado" &&
+        itemCheckupRosa(a.procedimento, especialidade(a.medico_id)) !== null,
+    );
+    const pacote = detectarCheckupRosa(
+      doDia.map((a) => ({
+        id: a.id,
+        procedimento: a.procedimento,
+        especialidade: especialidade(a.medico_id),
+      })),
+    );
+    return pacote && agId in pacote.precoPorAtendimento ? pacote : null;
+  };
   const alternarPacoteRosa = () => {
     if (!pacoteRosa) return;
     const { aplicado, normal } = pacoteRosa;
@@ -9922,7 +9952,7 @@ function AgendaPage() {
                         desconto, o setor de contratos precisa cadastrá-lo como beneficiário.
                       </p>
                     )}
-                    {!editing && ofereceCheckupRosa && (
+                    {ofereceCheckupRosa && !(editing && pagosSet.has(editing.id)) && (
                       <details className="text-xs rounded-md border border-pink-200 bg-pink-50/60 text-slate-700 px-2 py-1.5 dark:border-pink-900 dark:bg-pink-950/20 dark:text-slate-200">
                         <summary className="cursor-pointer">
                           Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com
@@ -10456,6 +10486,18 @@ function AgendaPage() {
               Dica: use as teclas 1–5 para escolher rapidamente.
             </span>
           </div>
+          {(() => {
+            const pacoteIndividual = pacoteRosaDaCobrancaIndividual(formaPagCtx?.agId);
+            if (!pacoteIndividual) return null;
+            return (
+              <p className="rounded-md border border-pink-300 bg-pink-50 px-2 py-2 text-[12px] leading-snug dark:border-pink-800 dark:bg-pink-950/40">
+                Esta paciente tem hoje os atendimentos do <b>{pacoteIndividual.pacote.nome}</b>.
+                Para cobrar com o preço do pacote (preventivo sem custo), feche esta janela, marque
+                os {Object.keys(pacoteIndividual.precoPorAtendimento).length} atendimentos dela na
+                lista e use <b>Cobrar selecionados</b>.
+              </p>
+            );
+          })()}
           <div className="grid gap-2 mt-2">
             {/* Pagamento parcial (entrada com saldo). Fica escondido na
                 cobrança agrupada — lá o valor é rateado entre vários
