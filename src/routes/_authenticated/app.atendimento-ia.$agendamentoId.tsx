@@ -17,6 +17,11 @@ import {
   CloudOff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  invalidarLinhaDoTempo,
+  LinhaDoTempoProntuario,
+} from "@/components/prontuario/linha-do-tempo-prontuario";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
@@ -203,6 +208,7 @@ function AtendimentoEditorPage() {
   // clique em "Finalizar atendimento" criava uma linha nova no banco e a tela
   // reabria em branco — parecia que nada tinha sido salvo.
   const [prontuarioId, setProntuarioId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [clinicaDados, setClinicaDados] = useState<DadosClinicaA4 | null>(null);
   const [rascunhoEm, setRascunhoEm] = useState<Date | null>(null);
   const rascunhoRestaurado = useRef(false);
@@ -683,7 +689,8 @@ function AtendimentoEditorPage() {
         hipotese_diagnostica: soap.hipotese_diagnostica || null,
         conduta: soap.conduta || null,
         prescricao: soap.prescricao || null,
-        observacoes: null,
+        // `observacoes` não entra aqui de propósito: gravar null apagava as
+        // observações já existentes (ex.: marca de importação do sistema antigo).
       };
       // Uma consulta = um prontuário. Salvar de novo corrige o que já existe
       // em vez de criar outra linha: antes, cada clique gerava um registro
@@ -705,6 +712,7 @@ function AtendimentoEditorPage() {
         );
       }
       setProntuarioId(linhaGravada.id);
+      void invalidarLinhaDoTempo(queryClient, pacienteId);
 
       // Falhas de rede daqui em diante NÃO desfazem o prontuário (ele já está
       // gravado e é o registro clínico que importa), mas precisam aparecer para
@@ -1391,6 +1399,12 @@ function AtendimentoEditorPage() {
                 <p className="text-sm text-muted-foreground">
                   Sem triagem registrada para este atendimento.
                 </p>
+              )}
+              {pacienteId && (
+                <div className="pt-2">
+                  <div className="mb-2 text-sm font-medium">Prontuários anteriores</div>
+                  <LinhaDoTempoProntuario pacienteId={pacienteId} />
+                </div>
               )}
             </TabsContent>
 

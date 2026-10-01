@@ -79,6 +79,7 @@ function ProntuariosPage() {
   const podeEscrever = usePodeEscrever("prontuarios");
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
+  const [filtroPaciente, setFiltroPaciente] = useState<PatientOption | null>(null);
   useEffect(() => {
     (async () => {
       if (!clinicaAtual) return;
@@ -96,7 +97,27 @@ function ProntuariosPage() {
     id ? (medicos.find((m) => m.id === id)?.nome ?? "—") : "—";
 
   return (
+    <div className="space-y-3">
+      <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+        <Label>Buscar paciente (nome, CPF ou pasta)</Label>
+        <div className="mt-1 max-w-xl">
+          <PatientSearchInput
+            value={filtroPaciente}
+            onSelect={(p) => {
+              setFiltroPaciente(p);
+              if (p) cachePacienteNome(p.id, p.nome);
+            }}
+            placeholder="Digite nome, CPF, pasta ou nascimento…"
+          />
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {filtroPaciente
+            ? "Mostrando só os prontuários deste paciente. Limpe a busca para ver todos."
+            : "Sem paciente escolhido: mostra os prontuários mais recentes da clínica."}
+        </p>
+      </div>
     <SimpleCrud<Prontuario, Form>
+      filtroEq={filtroPaciente ? { column: "paciente_id", value: filtroPaciente.id } : null}
       table="prontuarios"
       selectColumns="id, data, paciente_id, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes"
       title="Prontuários"
@@ -249,5 +270,6 @@ function ProntuariosPage() {
         </div>
       )}
     />
+    </div>
   );
 }

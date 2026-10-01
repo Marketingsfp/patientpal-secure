@@ -12,3 +12,9 @@
 - [x] Fase 3 — fila de Não atribuídas só é movimentada por Telefonia
 - [x] Fase 4 — consistência em realtime: sem cache, reavaliar fila ao salvar perfil, auditoria enriquecida
 - [x] Fase 5 — elegibilidade determinística testada (8 cenários) e paridade produção/homologação/Test Runner
+
+## Tela do médico (Agenda do Profissional)
+- [x] Etapa 1: observações preservadas, linha do tempo do prontuário, aba na ficha, busca em /app/prontuarios
+- [ ] Etapa 2: fila do médico (cabeçalho, contadores, abas, chamar/atender/estornar, editor rico) — aguarda conferência da etapa 1
+- [ ] Etapa 3: menu Opções e Baixar — aguarda confirmação das regras (estorno, convênio na baixa, consultas avulsas)
+- [ ] Etapa 4: avaliações corporais, alertas do paciente, anexos/fotos, hiperbárico — precisam de tabelas novas aprovadas

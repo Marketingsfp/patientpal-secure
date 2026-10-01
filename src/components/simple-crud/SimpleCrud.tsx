@@ -81,6 +81,8 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   addLabel?: string;
   /** Opt-in premium visual style for the header/table (does not affect other pages). */
   premium?: boolean;
+  /** Filtro opcional aplicado no banco (ex.: só os registros de um paciente). */
+  filtroEq?: { column: string; value: string } | null;
 }
 
 export function SimpleCrud<T extends { id: string }, F>({
@@ -103,6 +105,7 @@ export function SimpleCrud<T extends { id: string }, F>({
   readOnly,
   addLabel,
   premium,
+  filtroEq,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
   const novoForm = (): F =>
@@ -122,10 +125,11 @@ export function SimpleCrud<T extends { id: string }, F>({
     setLoading(true);
     const o = orderBy ?? { column: "created_at", ascending: false };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from(table as any) as any)
+    let consulta = (supabase.from(table as any) as any)
       .select(selectColumns)
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order(o.column, { ascending: o.ascending ?? false });
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    if (filtroEq) consulta = consulta.eq(filtroEq.column, filtroEq.value);
+    const { data, error } = await consulta.order(o.column, { ascending: o.ascending ?? false });
     setLoading(false);
     if (error) {
       mostrarErro(error);
@@ -135,7 +139,7 @@ export function SimpleCrud<T extends { id: string }, F>({
   };
   useEffect(() => {
     void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id, filtroEq?.column, filtroEq?.value]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
