@@ -140,13 +140,59 @@ export function saudacaoObrigatoriaEfetiva(
  * Bloco de restrições para o system prompt. Vai como CONTRATO nomeado, não
  * como mensagem do paciente. Sem restrição textual, devolve string vazia.
  */
-export function textoContratoPrecedencia(r: ResultadoPrecedencia): string {
+export type OpcoesContratoPrecedencia = {
+  /**
+   * As instruções publicadas já estão inteiras no mesmo prompt (caso do
+   * atendimento comum). As regras gerais publicadas entram então como UMA
+   * linha de referência, sem repetir o texto de cada regra — o modelo lia o
+   * mesmo texto duas vezes (cerca de 20 mil tokens por chamada, 01/10/2026).
+   * Exceções do turno, regras de código e a apresentação continuam com texto
+   * completo. Padrão: desligado, para quem monta o contrato sem as instruções.
+   */
+  regrasPublicadasNoPrompt?: boolean;
+};
+
+/** Prefixo dos códigos das regras extraídas das instruções publicadas. */
+export const PREFIXO_REGRA_PUBLICADA = "REGRA_PUBLICADA_";
+
+/** Código da linha de referência que substitui as regras gerais publicadas. */
+export const CODIGO_REGRAS_PUBLICADAS_GERAIS = "REGRAS_PUBLICADAS_GERAIS";
+
+function ehRegraGeralPublicada(v: RestricaoEstruturada): boolean {
+  return v.nivel === "regra_geral" && v.codigo.startsWith(PREFIXO_REGRA_PUBLICADA);
+}
+
+function linhaDaRestricao(v: RestricaoEstruturada): string {
+  return `- [${v.nivel}] ${v.codigo}${v.motivo ? ` (origem: ${v.origem}; motivo: ${v.motivo})` : ""}: ${v.texto}`;
+}
+
+export function textoContratoPrecedencia(
+  r: ResultadoPrecedencia,
+  opcoes: OpcoesContratoPrecedencia = {},
+): string {
   const comTexto = r.vigentes.filter((v) => (v.texto ?? "").trim().length > 0);
   if (comTexto.length === 0) return "";
-  const linhas = comTexto.map(
-    (v) =>
-      `- [${v.nivel}] ${v.codigo}${v.motivo ? ` (origem: ${v.origem}; motivo: ${v.motivo})` : ""}: ${v.texto}`,
-  );
+  const resumir = opcoes.regrasPublicadasNoPrompt === true;
+  const linhas: string[] = [];
+  let resumidas = 0;
+  for (const v of comTexto) {
+    if (!resumir || !ehRegraGeralPublicada(v)) {
+      linhas.push(linhaDaRestricao(v));
+      continue;
+    }
+    resumidas += 1;
+    if (resumidas === 1) {
+      // Uma linha no lugar da primeira regra geral publicada; as demais são
+      // absorvidas por ela. A contagem é preenchida ao final.
+      linhas.push("");
+    }
+  }
+  if (resumidas > 0) {
+    const primeira = comTexto.find(ehRegraGeralPublicada)!;
+    const posicao = linhas.indexOf("");
+    linhas[posicao] =
+      `- [regra_geral] ${CODIGO_REGRAS_PUBLICADAS_GERAIS} (origem: ${primeira.origem}; motivo: ${resumidas} regra(s) publicada(s) aplicável(is) a qualquer turno): as instruções publicadas acima valem integralmente neste turno. O texto de cada regra geral está lá e não se repete aqui.`;
+  }
   return [
     "CONTRATO DE PRECEDÊNCIA DESTE TURNO (ordem de força: envelope técnico > inegociável > exceção publicada > regra geral):",
     ...linhas,

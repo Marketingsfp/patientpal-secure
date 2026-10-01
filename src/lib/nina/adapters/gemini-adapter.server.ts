@@ -39,7 +39,15 @@ export type RespostaChat = {
   status?: number;
   /** Mensagem pronta para exibir ao usuário, em português. */
   erro?: string;
-  uso?: { entrada?: number; saida?: number; total?: number };
+  uso?: {
+    entrada?: number;
+    saida?: number;
+    total?: number;
+    /** Tokens de entrada servidos do cache do provedor (quando informado). */
+    cache?: number;
+    /** Tokens de raciocínio dentro da saída (quando informado). */
+    raciocinio?: number;
+  };
 };
 
 /** Traduz o status do gateway na mensagem que a clínica vê. */
@@ -140,7 +148,14 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
 
     const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string; tool_calls?: ChatMensagem["tool_calls"] } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        // Campos opcionais no formato OpenAI; o gateway pode ou não enviá-los.
+        prompt_tokens_details?: { cached_tokens?: number };
+        completion_tokens_details?: { reasoning_tokens?: number };
+      };
     };
     const msg = json.choices?.[0]?.message;
     return {
@@ -151,6 +166,8 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
         entrada: json.usage?.prompt_tokens,
         saida: json.usage?.completion_tokens,
         total: json.usage?.total_tokens,
+        cache: json.usage?.prompt_tokens_details?.cached_tokens,
+        raciocinio: json.usage?.completion_tokens_details?.reasoning_tokens,
       },
     };
   } catch (erro) {

@@ -214,6 +214,8 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       mensagemPaciente: null,
       ambiente: "producao",
       saudacaoObrigatoria: true,
+      // Igual ao atendimento: o template já vai inteiro como behaviorPrompt.
+      regrasPublicadasNoPrompt: true,
     });
 
     const req = comporRequestNina({

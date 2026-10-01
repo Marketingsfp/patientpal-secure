@@ -1384,6 +1384,9 @@ async function gerarRespostaNinaInterno(
     // não mudam a conduta. A simulação é tratada pelo código, fora do modelo.
     ambiente: "producao",
     saudacaoObrigatoria,
+    // As instruções publicadas (behaviorPrompt) já vão inteiras no mesmo
+    // system prompt: o contrato não repete o texto das regras gerais.
+    regrasPublicadasNoPrompt: true,
   });
   const saudacaoObrigatoriaEfetivaTurno = precedenciaTurno.saudacaoObrigatoria;
   const saudacaoDispensadaPor = precedenciaTurno.saudacaoDispensadaPor;
