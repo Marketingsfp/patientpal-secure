@@ -31,7 +31,8 @@ function achado(p: Partial<Achado>): Achado {
 
 describe("score", () => {
   it("é ponderado pelas dimensões avaliadas", () => {
-    expect(calcularScore([nota("correcao_informacao", 10), nota("qualidade_resposta", 0)])).toBe(75);
+    // sol-v2: segurança pesa 15, conversão 4 → 10·15/19 ≈ 79
+    expect(calcularScore([nota("seguranca", 10), nota("conversao", 0)])).toBe(79);
   });
 
   it("ignora dimensões não verificáveis", () => {
@@ -171,5 +172,32 @@ describe("dossiê", () => {
     const i = montarInstrucoesSol();
     expect(i).toContain("Não invente a verdade esperada");
     expect(i).toContain("nao_verificavel");
+  });
+});
+
+describe("sol-v2 — critérios do Treinador e Auditor", () => {
+  const { classificacaoAuditoria, parseRelatorioAuditoria, parseAvaliacaoSol, VERSAO_RUBRICA } = require("./avaliador-sol");
+  it("usa a nova rubrica", () => expect(VERSAO_RUBRICA).toBe("sol-v2"));
+  it("escala do documento; erro crítico sempre Crítico", () => {
+    expect(classificacaoAuditoria(97)).toBe("Excelente");
+    expect(classificacaoAuditoria(91)).toBe("Muito bom");
+    expect(classificacaoAuditoria(72)).toBe("Precisa melhorar");
+    expect(classificacaoAuditoria(55)).toBe("Crítico");
+    expect(classificacaoAuditoria(98, "erro_critico")).toBe("Crítico");
+  });
+  it("relatório ausente vira null; resultado inválido não é inventado", () => {
+    expect(parseRelatorioAuditoria(undefined)).toBeNull();
+    const r = parseRelatorioAuditoria({ resultado_contato: "xyz", eficiencia: { mensagens: 12, ideal: 7 } });
+    expect(r.resultado_contato).toBeNull();
+    expect(r.eficiencia.mensagens).toBe(12);
+  });
+  it("achado crítico é sempre prioridade 1 e origem padrão indefinida", () => {
+    const a = parseAvaliacaoSol(JSON.stringify({
+      dimensoes: [], lacunas: [],
+      achados: [{ observado: "inventou preço", esperado: "valor do sistema", fonte: "catálogo", gravidade: "critica", prioridade: 4 }],
+    }));
+    expect(a.achados[0].prioridade).toBe(1);
+    expect(a.achados[0].origem).toBe("indefinido");
+    expect(a.resultado).toBe("erro_critico");
   });
 });
