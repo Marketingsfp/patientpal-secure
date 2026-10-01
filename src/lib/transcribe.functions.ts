@@ -16,39 +16,24 @@ export const transcribeAudio = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) return { text: "", error: "LOVABLE_API_KEY ausente" };
 
-    // A dica de vocabulário reduz muito o erro em nomes próprios e jargão
-    // da clínica (ex.: "nine" no lugar de "Nina", "sabadim" por "sabadinho").
-    const sys = `${
-      data.prompt ??
-      "Transcreva o áudio em português do Brasil com pontuação correta. Retorne apenas o texto transcrito, sem comentários, sem aspas, sem prefixos."
-    }
+    // Modelo dedicado de transcrição (GPT-4o Transcribe). A dica de
+    // vocabulário reduz o erro em nomes próprios e jargão da clínica.
+    const dica = `${data.prompt ? `${data.prompt} ` : ""}Português do Brasil. Vocabulário: ${VOCABULARIO_DICA}.`;
 
-VOCABULÁRIO ESPERADO (prefira estas grafias quando o som for parecido): ${VOCABULARIO_DICA}.
-Regras: mantenha nomes próprios de pessoas com inicial maiúscula; escreva números em dígitos; horários como 14:30; NÃO traduza nem invente termos; se um trecho estiver inaudível, omita-o em vez de adivinhar.`;
+    const mime = data.mimeType.split(";")[0].replace(/^video\//, "audio/");
+    const ext = mime.split("/")[1] || "webm";
+    const bytes = Uint8Array.from(atob(data.audioBase64), (c) => c.charCodeAt(0));
+    const form = new FormData();
+    form.append("model", "openai/gpt-4o-transcribe");
+    form.append("file", new Blob([bytes], { type: mime }), `audio.${ext}`);
+    form.append("response_format", "json");
+    form.append("language", "pt");
+    form.append("prompt", dica.slice(0, 800));
 
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Transcreva este áudio:" },
-              {
-                type: "input_audio",
-                input_audio: { data: data.audioBase64, format: "webm" },
-              },
-            ],
-          },
-        ],
-      }),
+      headers: { Authorization: `Bearer ${key}`, "X-Lovable-AIG-SDK": "fetch" },
+      body: form,
     });
 
     if (!res.ok) {
@@ -60,9 +45,8 @@ Regras: mantenha nomes próprios de pessoas com inicial maiúscula; escreva núm
         return { text: "", error: "Créditos de IA esgotados. Adicione créditos no Workspace." };
       return { text: "", error: `Falha na transcrição (${res.status})` };
     }
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const bruto = json.choices?.[0]?.message?.content?.trim() ?? "";
+    const json = (await res.json()) as { text?: string };
+    const bruto = json.text?.trim() ?? "";
     const text = bruto ? corrigirFala(bruto) : "";
     return { text, error: null as string | null };
-
   });
