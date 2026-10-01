@@ -1,36 +1,59 @@
-# NFS-e parte 1b — corrigir alíquota e ISS das notas antigas pelo XML oficial
+# Tela do médico com as funções da "Agenda do Profissional" (Clínica Total)
 
-## Tipo e risco
-- Tipo: dados fiscais errados guardados no sistema (a nota tem os valores do cadastro, não os autorizados). Qual alíquota é a correta continua sendo decisão fiscal.
-- Área crítica: altera `aliquota_iss`, `valor_iss` e `retorno_conferencia` de notas **emitidas**. Você autorizou isso de forma explícita neste pedido. Nenhum outro campo é alterado.
+O pedido é grande e mistura regra de negócio, tela nova, correção de código e banco. Fazer tudo de uma vez aumenta o risco de erro. A proposta é dividir em **4 etapas**. Cada etapa é entregue, conferida por vocês e só então a próxima começa.
 
-## Situação no banco agora
-- 2.733 notas `emitida`, todas com caminho do XML. Nenhuma tem `retorno_conferencia`. ISS gravado hoje: R$ 8.152,87.
-- (Você citou 2.903 linhas, mas esse número conta todos os status. Só as 2.733 emitidas entram.)
+Tipo do pedido: ajuste de tela e fluxo do médico (principal), correção de código (observações apagadas) e, em parte, regra de negócio e banco (itens que ainda não existem).
 
-## O que será construído
-1. **Uma rotina que corrige um lote por vez** (server function, só admin da clínica):
-   - pega até 100 notas `emitida` da clínica escolhida, com XML e com `retorno_conferencia` vazio;
-   - baixa cada XML na Focus, até 5 ao mesmo tempo, com limite de 10 s por download (só leitura);
-   - lê a alíquota e o ISS com `lerXmlNfse`, a mesma leitura que já existe;
-   - se tiver os dois: grava `aliquota_iss` e `valor_iss` do XML e `retorno_conferencia = { origem: "backfill_xml_1b", conferido_em, xml_lido: true, anterior: {aliquota, iss}, divergencia_aliquota }`;
-   - se falhar: grava só `retorno_conferencia = { origem, falha: "xml_nao_baixou" | "xml_sem_campos" | "sem_caminho" }`, e alíquota e ISS **não mudam**;
-   - devolve as contagens do lote: corrigidas, com divergência, falhas por motivo, e ISS antes e depois.
-   - Vou usar a mesma condição `retorno_conferencia is null` para o lote pular o que já foi feito. Rodar de novo não refaz nada. Para tentar de novo uma nota que falhou, existe a opção "tentar de novo as falhas".
-2. **Um botão "Corrigir ISS pelo XML"** na tela de NFS-e (só aparece para admin):
-   - Antes de tudo, "Rodar amostra (20 notas)".
-   - Depois, "Continuar": um lote por clique, ou vários lotes seguidos com 3 s de pausa entre eles.
-   - Mostra o total acumulado: notas corrigidas, ISS antes e depois, falhas por motivo.
-   - **Trava de divergência:** se, depois dos primeiros 100, mais de 50% das notas vierem com alíquota diferente da gravada, a rotina para e mostra um aviso. Ela só continua se você marcar "Entendo, continuar". Esse limite de 50% foi escolha minha, então confirme se está bom.
-3. Os testes do módulo puro ganham casos para: a nota corrigida, o XML sem campos e a nota que já tem conferência (é pulada).
+## O que já existe e será reaproveitado
+- Fila do médico e tela da consulta (`/app/atendimento-ia`), com prontuário gravado por agendamento.
+- Triagem da enfermagem, prontuários (inclusive os importados do sistema antigo), modelos de prontuário, documentos emitidos e modelos de documento (atestado), orçamentos e itens de orçamento do agendamento, senhas e painel/TV, alertas de enfermagem e Hiperdia.
 
-## O que não muda
-Não mexo em `payload_envio`, `payload_resposta`, no cadastro do emitente, na emissão, em pagamento, boleto, split nem contas a receber. Notas canceladas e com erro ficam de fora. Nada roda sozinho ao abrir o sistema. Nada é publicado.
+## O que NÃO existe hoje no sistema
+Para esses itens seria preciso criar tabela nova, e isso fica para depois da etapa 3:
+- Avaliações corporais (peso, altura, IMC, circunferências ao longo do tempo).
+- Anexos e fotos do paciente: não há tabela nem pasta de arquivos própria.
+- Alertas do paciente (alergias, avisos): só existem alertas de enfermagem e alertas financeiros.
+- Controle Hiperbárico (pré-atendimento, SAE, gestão de mergulhos, escala USP): não há nada. O Hiperdia é outra coisa.
+- Consultas avulsas dentro da baixa: é preciso confirmar se equivalem aos "itens do agendamento" que já existem.
 
-## Como rodar
-Depois de aprovado, eu mesmo rodo **só a amostra de 20 notas**, confiro no banco e te mostro o resultado. As outras você roda pelo botão, ou eu rodo se você pedir. No fim, informo quantas notas foram corrigidas, o ISS antes e depois e as falhas por motivo.
+---
+
+## Etapa 1: correções e histórico (pequena, segura)
+1. **Observações apagadas:** salvar a consulta deixa de gravar observações vazias por cima do que já existia. Só grava quando houver texto novo.
+2. **Linha do tempo do prontuário:** componente único que mostra todos os prontuários do paciente, de qualquer médico, incluindo os importados do sistema antigo. Tem filtro por ano e especialidade, opção "Exibir informações extras" e, em cada cartão, data, "Procedimento realizado: SERVIÇO > PROCEDIMENTO", "Realizado por" e a descrição (ou "Prontuário não cadastrado."). O que o médico acabou de salvar aparece na hora.
+3. **Ficha do paciente:** nova aba "Prontuário" com essa linha do tempo.
+4. **Tela /app/prontuarios:** busca por nome ou número da pasta.
+5. Quem vê o histórico: médico, enfermagem e administração, seguindo as permissões que já existem.
+
+## Etapa 2: a fila do médico igual à antiga
+1. Cabeçalho com o nome do médico, selo "Certificado digital" (só se já houver o dado no cadastro), contador "Atualiza: XX seg." de 60 s, botão "Visualizar agenda geral" e os 3 cartões do dia: Agendamentos, Aguardando (laranja) e Atendidos (verde).
+2. Abas Em Atendimento | Aguardando | Atendidos, com as colunas pedidas: Ficha, Horário, Pasta, Cliente com idade completa, Serviço, Procedimento, Profissional e Espera.
+3. Aguardando: ordenar por Chegada ou Prioridade, botão **Chamar** (usa o painel/TV que já existe) e botão **Atender**.
+4. Em Atendimento: triagem só para leitura e editor de prontuário com texto rico, direto na fila. Ele grava no mesmo prontuário da tela da consulta.
+5. Atendidos: botão **Estornar**, com a confirmação nas palavras pedidas, que devolve o paciente para Aguardando.
+6. Cada médico continua vendo só a própria fila.
+
+## Etapa 3: menu "Opções" e "Baixar"
+1. Menu Opções com Requisição/Orçamento, Prontuário (a linha do tempo da etapa 1, com "+ Adicionar Prontuário" e tags), Atestado (impressão térmica e A4, pelos modelos de documento), Documentos, Retornos (agenda um retorno com a agenda que já existe) e Triagem.
+2. Modal **Baixa de Agendamento**: tabela Filial/Data/Intervalo/Cliente/Profissional/Convênio (convênio editável), campo de prontuário e botões "Fechar" e "Cliente atendido".
+3. Itens que dependem da etapa 4 aparecem no menu como "em breve", sem fingir que funcionam.
+
+## Etapa 4: o que precisa de tabela nova (só com aprovação)
+Avaliações Corporais, Alertas do paciente, Anexos e Fotos (com pasta de arquivos protegida) e Controle Hiperbárico. Para cada um, apresento os campos antes de criar.
+
+---
+
+## Possíveis regras de negócio para validar com a equipe da clínica
+- **Estornar:** devolve para Aguardando e mantém o prontuário já escrito. Não mexe no financeiro. Confirmar.
+- **Baixar e convênio:** trocar o convênio na baixa pode mudar o valor cobrado (área do financeiro). Proposta: na etapa 3, o convênio só pode ser mudado se o atendimento ainda não foi pago. Confirmar.
+- **"Cliente atendido":** usa o mesmo fim de atendimento que já existe hoje (status realizado). Não cria uma regra nova.
+- **Consultas avulsas:** precisam de definição. Hoje não sei com segurança a que isso corresponde no sistema.
+
+## Fora do escopo
+Financeiro, faturamento, NFS-e, agenda da recepção e Nina. Nada do que já funciona é removido.
 
 ## Detalhes técnicos
-- Novo `src/lib/nfse-backfill.ts` (função pura: `resultadoBackfill(xml|null, gravado)`), `src/lib/nfse-backfill.functions.ts` (`corrigirIssLote`, `requireSupabaseAuth` + `has_role admin`, update via `supabaseAdmin` só nas colunas `aliquota_iss, valor_iss, retorno_conferencia`, com filtro `status='emitida' and retorno_conferencia is null`).
-- O token segue a mesma regra de `consultarNfse` (produção/homologação conforme o emitente). O download usa `url_xml` ou `payload_resposta.caminho_xml_nota_fiscal`.
-- Sem migração: as colunas já existem.
+- Correção na gravação de `src/routes/_authenticated/app.atendimento-ia.$agendamentoId.tsx` (tirar o `observacoes: null`).
+- Novo componente compartilhado da linha do tempo, usado na consulta, na fila, na ficha do paciente e no menu Opções. A lista é atualizada logo após salvar.
+- Editor de texto rico: verificar se já existe algum no projeto antes de instalar um novo.
+- Etapa 4: novas tabelas com permissões e regras de acesso por clínica, seguindo o padrão do projeto.
