@@ -201,6 +201,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 let mediaMime: string | null = null;
                 // Caminho do arquivo no bucket privado (imagem e áudio recebidos).
                 let caminhoMidia: string | null = null;
+                // Foto lida como receita de remédio: resposta própria (não é pedido de exames).
+                let receitaRemedio = false;
                 const legendaImagem = ehImagem ? String(msg.image?.caption ?? "").trim() : "";
 
                 if (ehAudio || ehImagem) {
@@ -239,6 +241,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           const { textoDoPedidoLido } = await import("@/lib/nina/leitura-imagem");
                           textoPaciente = textoDoPedidoLido(leitura.itens, legendaImagem);
                           transcricao = textoPaciente;
+                        } else if (leitura.tipo === "receita_remedio") {
+                          receitaRemedio = true;
                         }
                       }
                     }
@@ -551,7 +555,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     textoPaciente,
                     audioFalhou,
                     ehAudio,
-                    tipo,
+                    tipo: receitaRemedio ? "image_receita" : tipo,
                   });
                   if (processamento.resultado) resultado = processamento.resultado;
                   if (processamento.pendente)
