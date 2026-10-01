@@ -30,6 +30,15 @@ export type ItemCheckupRosa =
   | "usg_mama"
   | "mamografia";
 
+/** Nome curto de cada item, para listar o conteúdo dos pacotes na tela. */
+export const NOME_ITEM_CHECKUP_ROSA: Record<ItemCheckupRosa, string> = {
+  consulta: "Consulta",
+  preventivo: "Preventivo (grátis)",
+  transvaginal: "USG Transvaginal",
+  usg_mama: "USG Mamas",
+  mamografia: "Mamografia",
+};
+
 export interface PrecoItemPacote {
   dinheiro: number;
   cartao: number;

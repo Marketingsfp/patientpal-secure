@@ -239,7 +239,15 @@ import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
-import { detectarCheckupRosa, ratearPacote, type PacoteAplicado } from "@/lib/agenda/checkup-rosa";
+import {
+  detectarCheckupRosa,
+  itemCheckupRosa,
+  NOME_ITEM_CHECKUP_ROSA,
+  PACOTES_CHECKUP_ROSA,
+  ratearPacote,
+  type ItemCheckupRosa,
+  type PacoteAplicado,
+} from "@/lib/agenda/checkup-rosa";
 import {
   obterEtapaSinal,
   registrarPagamentoEtapaSinal,
@@ -1654,6 +1662,16 @@ function AgendaPage() {
     );
   }, [dupDoDia, form.medico_id, form.procedimento]);
   /** Demais atendimentos do paciente no dia — informativo, não trava nada. */
+  /**
+   * Lembrete do CHECKUP ROSA no agendamento novo: a consulta de ginecologia e
+   * o preventivo são a porta de entrada dos pacotes. Só informa — o pacote é
+   * aplicado na cobrança agrupada.
+   */
+  const ofereceCheckupRosa = useMemo(() => {
+    const esp = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? null;
+    const item = itemCheckupRosa(form.procedimento, esp);
+    return item === "consulta" || item === "preventivo";
+  }, [medicos, form.medico_id, form.procedimento]);
   const dupOutros = useMemo(
     () => dupDoDia.filter((d) => !dupProvavel.some((p) => p.id === d.id)),
     [dupDoDia, dupProvavel],
@@ -9903,6 +9921,38 @@ function AgendaPage() {
                         atendimento é cobrado como <b>Particular</b>. Se ele também deve ter
                         desconto, o setor de contratos precisa cadastrá-lo como beneficiário.
                       </p>
+                    )}
+                    {!editing && ofereceCheckupRosa && (
+                      <details className="text-xs rounded-md border border-pink-200 bg-pink-50/60 text-slate-700 px-2 py-1.5 dark:border-pink-900 dark:bg-pink-950/20 dark:text-slate-200">
+                        <summary className="cursor-pointer">
+                          Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com
+                          consulta e exames. Nada muda neste agendamento.
+                        </summary>
+                        <div className="mt-1.5 space-y-1">
+                          {PACOTES_CHECKUP_ROSA.map((p) => {
+                            const totais = Object.values(p.itens).reduce(
+                              (s, v) => ({ d: s.d + v!.dinheiro, c: s.c + v!.cartao }),
+                              { d: 0, c: 0 },
+                            );
+                            const brl = (n: number) =>
+                              n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                            return (
+                              <p key={p.id} className="leading-snug">
+                                <b>{p.nome}</b>:{" "}
+                                {(Object.keys(p.itens) as ItemCheckupRosa[])
+                                  .map((i) => NOME_ITEM_CHECKUP_ROSA[i])
+                                  .join(" + ")}{" "}
+                                — {brl(totais.d)} dinheiro / {brl(totais.c)} Pix/cartão
+                              </p>
+                            );
+                          })}
+                          <p className="text-muted-foreground leading-snug">
+                            Agende cada serviço na agenda do seu profissional. Na cobrança, marque
+                            os atendimentos da paciente e use <b>Cobrar selecionados</b>: o sistema
+                            reconhece o pacote e oferece aplicar o preço.
+                          </p>
+                        </div>
+                      </details>
                     )}
                     {previaCobranca && (
                       <div className="space-y-1.5">
