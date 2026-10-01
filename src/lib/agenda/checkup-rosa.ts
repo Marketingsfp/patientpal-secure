@@ -30,6 +30,22 @@ export type ItemCheckupRosa =
   | "usg_mama"
   | "mamografia";
 
+/**
+ * Período da campanha (Outubro Rosa de 2026), em dias da clínica (Brasília).
+ * Fora dele nada do Checkup Rosa aparece — botão, tabela, avisos e o
+ * "Aplicar pacote" — e a cobrança volta ao preço normal. Na cobrança e nos
+ * avisos vale a DATA DO ATENDIMENTO; no botão da barra, o dia de hoje.
+ * Para repetir a campanha em outro ano, basta trocar as duas datas.
+ */
+export const VIGENCIA_CHECKUP_ROSA = { inicio: "2026-10-01", fim: "2026-10-31" } as const;
+
+/** `dia` no formato AAAA-MM-DD (ou data e hora, que é cortada no dia). */
+export function checkupRosaVigente(dia: string | null | undefined): boolean {
+  const d = (dia ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  return d >= VIGENCIA_CHECKUP_ROSA.inicio && d <= VIGENCIA_CHECKUP_ROSA.fim;
+}
+
 /** Nome curto de cada item, para listar o conteúdo dos pacotes na tela. */
 export const NOME_ITEM_CHECKUP_ROSA: Record<ItemCheckupRosa, string> = {
   consulta: "Consulta",
@@ -167,6 +183,8 @@ export interface AtendimentoParaPacote {
   id: string;
   procedimento: string | null;
   especialidade?: string | null;
+  /** Dia do atendimento (AAAA-MM-DD, horário de Brasília) — tem de cair na campanha. */
+  dia: string | null;
 }
 
 export interface PacoteAplicado {
@@ -187,6 +205,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  */
 export function detectarCheckupRosa(atendimentos: AtendimentoParaPacote[]): PacoteAplicado | null {
   if (atendimentos.length < 2) return null;
+  // Campanha encerrada (ou ainda não começou) para qualquer um deles: preço normal.
+  if (!atendimentos.every((a) => checkupRosaVigente(a.dia))) return null;
   const porItem = new Map<ItemCheckupRosa, string>();
   for (const a of atendimentos) {
     const item = itemCheckupRosa(a.procedimento, a.especialidade);

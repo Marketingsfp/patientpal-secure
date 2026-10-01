@@ -240,6 +240,7 @@ import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
 import {
+  checkupRosaVigente,
   detectarCheckupRosa,
   itemCheckupRosa,
   ratearPacote,
@@ -1690,10 +1691,12 @@ function AgendaPage() {
    * pacotes. Só informa — o pacote é aplicado na cobrança agrupada.
    */
   const ofereceCheckupRosa = useMemo(() => {
+    // Só para atendimento marcado dentro da campanha (outubro).
+    if (!checkupRosaVigente(form.inicio)) return false;
     const esp = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? null;
     const item = itemCheckupRosa(form.procedimento, esp);
     return item === "consulta" || item === "preventivo";
-  }, [medicos, form.medico_id, form.procedimento]);
+  }, [medicos, form.medico_id, form.procedimento, form.inicio]);
   const dupOutros = useMemo(
     () => dupDoDia.filter((d) => !dupProvavel.some((p) => p.id === d.id)),
     [dupDoDia, dupProvavel],
@@ -2455,6 +2458,7 @@ function AgendaPage() {
         id: a.id,
         procedimento: a.procedimento,
         especialidade: especialidade(a.medico_id),
+        dia,
       })),
     );
     return pacote && agId in pacote.precoPorAtendimento ? pacote : null;
@@ -4808,6 +4812,7 @@ function AgendaPage() {
           id: i.id,
           procedimento: i.procedimento,
           especialidade: medicos.find((mm) => mm.id === i.medico_id)?.especialidade_nome ?? null,
+          dia: dataClinicaDe(i.inicio),
         })),
       );
       setPacoteRosa(
@@ -9542,14 +9547,16 @@ function AgendaPage() {
               <Users className="h-3.5 w-3.5" /> Marcações por atendente
             </button>
           )}
-          <button
-            type="button"
-            title="Tabela de valores dos pacotes Checkup Rosa"
-            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-1.5 text-xs font-semibold text-pink-800 shadow-xs hover:bg-pink-100 dark:border-pink-900 dark:bg-pink-950/40 dark:text-pink-200"
-            onClick={() => setTabelaRosaAberta(true)}
-          >
-            🎀 Checkup Rosa
-          </button>
+          {checkupRosaVigente(hojeBR()) && (
+            <button
+              type="button"
+              title="Tabela de valores dos pacotes Checkup Rosa"
+              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-1.5 text-xs font-semibold text-pink-800 shadow-xs hover:bg-pink-100 dark:border-pink-900 dark:bg-pink-950/40 dark:text-pink-200"
+              onClick={() => setTabelaRosaAberta(true)}
+            >
+              🎀 Checkup Rosa
+            </button>
+          )}
           <button
             type="button"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
@@ -9574,9 +9581,11 @@ function AgendaPage() {
                   <Users className="h-4 w-4 mr-2" /> Marcações por atendente
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => setTabelaRosaAberta(true)}>
-                🎀 Checkup Rosa (valores)
-              </DropdownMenuItem>
+              {checkupRosaVigente(hojeBR()) && (
+                <DropdownMenuItem onClick={() => setTabelaRosaAberta(true)}>
+                  🎀 Checkup Rosa (valores)
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={exportarAgendaExcel}>
                 <Download className="h-4 w-4 mr-2" /> Exportar Excel
               </DropdownMenuItem>
@@ -10515,12 +10524,13 @@ function AgendaPage() {
                 formaPagCtx && !formaPagCtx.agId.includes(",")
                   ? items.find((a) => a.id === formaPagCtx.agId)
                   : null;
-              const item = ag
-                ? itemCheckupRosa(
-                    ag.procedimento,
-                    medicos.find((m) => m.id === ag.medico_id)?.especialidade_nome ?? null,
-                  )
-                : null;
+              const item =
+                ag && checkupRosaVigente(dataClinicaDe(ag.inicio))
+                  ? itemCheckupRosa(
+                      ag.procedimento,
+                      medicos.find((m) => m.id === ag.medico_id)?.especialidade_nome ?? null,
+                    )
+                  : null;
               return item === "consulta" || item === "preventivo" ? (
                 <LembreteCheckupRosa complemento="Esta cobrança segue com o preço normal." />
               ) : null;
