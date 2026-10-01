@@ -12979,6 +12979,207 @@ export type Database = {
           },
         ]
       }
+      paciente_alertas: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          criado_por_nome: string | null
+          descricao: string
+          id: string
+          paciente_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          criado_por_nome?: string | null
+          descricao: string
+          id?: string
+          paciente_id: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          criado_por_nome?: string | null
+          descricao?: string
+          id?: string
+          paciente_id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paciente_alertas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paciente_alertas_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paciente_arquivos: {
+        Row: {
+          caminho: string
+          clinica_id: string
+          created_at: string
+          data: string
+          descricao: string | null
+          enviado_por: string | null
+          enviado_por_nome: string | null
+          id: string
+          mime: string | null
+          nome_arquivo: string
+          paciente_id: string
+          tamanho_bytes: number | null
+          tipo: string
+        }
+        Insert: {
+          caminho: string
+          clinica_id: string
+          created_at?: string
+          data?: string
+          descricao?: string | null
+          enviado_por?: string | null
+          enviado_por_nome?: string | null
+          id?: string
+          mime?: string | null
+          nome_arquivo: string
+          paciente_id: string
+          tamanho_bytes?: number | null
+          tipo: string
+        }
+        Update: {
+          caminho?: string
+          clinica_id?: string
+          created_at?: string
+          data?: string
+          descricao?: string | null
+          enviado_por?: string | null
+          enviado_por_nome?: string | null
+          id?: string
+          mime?: string | null
+          nome_arquivo?: string
+          paciente_id?: string
+          tamanho_bytes?: number | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paciente_arquivos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paciente_arquivos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paciente_avaliacoes_corporais: {
+        Row: {
+          abdomen_cm: number | null
+          altura_cm: number | null
+          braco_cm: number | null
+          cintura_cm: number | null
+          clinica_id: string
+          coxa_cm: number | null
+          created_at: string
+          criado_por: string | null
+          data: string
+          gordura_pct: number | null
+          id: string
+          imc: number | null
+          observacao: string | null
+          pa_diastolica: number | null
+          pa_sistolica: number | null
+          paciente_id: string
+          peso_kg: number | null
+          profissional_nome: string | null
+          quadril_cm: number | null
+          updated_at: string
+        }
+        Insert: {
+          abdomen_cm?: number | null
+          altura_cm?: number | null
+          braco_cm?: number | null
+          cintura_cm?: number | null
+          clinica_id: string
+          coxa_cm?: number | null
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          gordura_pct?: number | null
+          id?: string
+          imc?: number | null
+          observacao?: string | null
+          pa_diastolica?: number | null
+          pa_sistolica?: number | null
+          paciente_id: string
+          peso_kg?: number | null
+          profissional_nome?: string | null
+          quadril_cm?: number | null
+          updated_at?: string
+        }
+        Update: {
+          abdomen_cm?: number | null
+          altura_cm?: number | null
+          braco_cm?: number | null
+          cintura_cm?: number | null
+          clinica_id?: string
+          coxa_cm?: number | null
+          created_at?: string
+          criado_por?: string | null
+          data?: string
+          gordura_pct?: number | null
+          id?: string
+          imc?: number | null
+          observacao?: string | null
+          pa_diastolica?: number | null
+          pa_sistolica?: number | null
+          paciente_id?: string
+          peso_kg?: number | null
+          profissional_nome?: string | null
+          quadril_cm?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paciente_avaliacoes_corporais_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paciente_avaliacoes_corporais_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paciente_biometria: {
         Row: {
           clinica_id: string
@@ -14092,6 +14293,7 @@ export type Database = {
           paciente_id: string
           prescricao: string | null
           queixa_principal: string | null
+          tags: string[] | null
           updated_at: string
         }
         Insert: {
@@ -14109,6 +14311,7 @@ export type Database = {
           paciente_id: string
           prescricao?: string | null
           queixa_principal?: string | null
+          tags?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -14126,6 +14329,7 @@ export type Database = {
           paciente_id?: string
           prescricao?: string | null
           queixa_principal?: string | null
+          tags?: string[] | null
           updated_at?: string
         }
         Relationships: [
