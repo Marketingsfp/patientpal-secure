@@ -24,26 +24,37 @@ export const urlMidiaMensagem = createServerFn({ method: "POST" })
     // Leitura pelo cliente do usuário: a política de acesso do banco também vale aqui.
     const { data: msg, error } = await context.supabase
       .from("whatsapp_mensagens")
-      .select("id, conversa_id, media_url, media_mime")
+      .select("id, conversa_id, tipo, body, media_url, media_mime")
       .eq("id", data.mensagemId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!msg?.conversa_id) return { url: null, mime: null };
+    if (!msg?.conversa_id) return { url: null, mime: null, nome: "" };
 
     const { assertAcessoConversa } = await import("./acesso-conversa.server");
     await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, msg.conversa_id);
 
-    const { ehCaminhoGuardado, caminhoEhDaClinica, BUCKET_MIDIA_WHATSAPP, VALIDADE_LINK_MIDIA_S } =
-      await import("@/lib/whatsapp-midia-armazenamento");
+    const {
+      ehCaminhoGuardado,
+      caminhoEhDaClinica,
+      nomeDoDocumento,
+      BUCKET_MIDIA_WHATSAPP,
+      VALIDADE_LINK_MIDIA_S,
+    } = await import("@/lib/whatsapp-midia-armazenamento");
     const caminho = String(msg.media_url ?? "");
     if (!ehCaminhoGuardado(caminho) || !caminhoEhDaClinica(caminho, data.clinicaId)) {
-      return { url: null, mime: null };
+      return { url: null, mime: null, nome: "" };
     }
+    const nome = msg.tipo === "document" ? nomeDoDocumento(msg.body) : "";
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Documento de paciente nunca abre no navegador: o link força o download.
     const { data: assinada, error: erroUrl } = await supabaseAdmin.storage
       .from(BUCKET_MIDIA_WHATSAPP)
-      .createSignedUrl(caminho, VALIDADE_LINK_MIDIA_S);
-    if (erroUrl || !assinada?.signedUrl) return { url: null, mime: null };
-    return { url: assinada.signedUrl, mime: msg.media_mime ?? null };
+      .createSignedUrl(
+        caminho,
+        VALIDADE_LINK_MIDIA_S,
+        msg.tipo === "document" ? { download: nome || true } : undefined,
+      );
+    if (erroUrl || !assinada?.signedUrl) return { url: null, mime: null, nome };
+    return { url: assinada.signedUrl, mime: msg.media_mime ?? null, nome };
   });

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { nomeArquivoSeguro, textoDoDocumento } from "@/lib/whatsapp-midia-armazenamento";
 import { createHmac, timingSafeEqual } from "crypto";
 import { loadWhatsAppConfig, metaSendText } from "@/lib/whatsapp.server";
 
@@ -193,6 +194,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 const tipo = tipoBruto === "voice" ? "audio" : tipoBruto;
                 const ehAudio = tipo === "audio";
                 const ehImagem = tipo === "image";
+                const ehDocumento = tipo === "document";
+                const ehVideo = tipo === "video";
 
                 // Texto do paciente que a Nina vai processar (áudio vira transcrição).
                 let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
@@ -203,8 +206,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 let caminhoMidia: string | null = null;
                 const legendaImagem = ehImagem ? String(msg.image?.caption ?? "").trim() : "";
 
-                if (ehAudio || ehImagem) {
-                  // Mantém o armazenamento em dia: apaga mídias com mais de 30 dias (no máx. a cada 10 min).
+                if (ehAudio || ehImagem || ehDocumento || ehVideo) {
+                  // Mantém o armazenamento em dia: apaga só o que passou dos 5 anos de guarda (no máx. a cada hora).
                   const { limparMidiasExpiradasSeChegouAHora } =
                     await import("@/lib/whatsapp-midia.server");
                   await limparMidiasExpiradasSeChegouAHora(params.clinicaId);
@@ -242,6 +245,30 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         }
                       }
                     }
+                  }
+                }
+
+                // Documento e vídeo: guardados para consulta (5 anos). A Nina não os lê.
+                let nomeDocumento = "";
+                let legendaArquivo = "";
+                if ((ehDocumento || ehVideo) && cfg.access_token) {
+                  const origem = ehDocumento ? msg.document : msg.video;
+                  const mediaId = String(origem?.id ?? "");
+                  nomeDocumento = ehDocumento ? nomeArquivoSeguro(origem?.filename) : "";
+                  legendaArquivo = String(origem?.caption ?? "").trim();
+                  if (mediaId) {
+                    const { receberArquivoWhatsapp } = await import("@/lib/whatsapp-midia.server");
+                    const arquivo = await receberArquivoWhatsapp({
+                      clinicaId: params.clinicaId,
+                      waMessageId: wa_message_id,
+                      tipo: ehDocumento ? "document" : "video",
+                      mediaId,
+                      accessToken: cfg.access_token,
+                      mimeInformado: origem?.mime_type ?? null,
+                    });
+                    mediaMime = arquivo.mime;
+                    caminhoMidia = arquivo.caminho;
+                    if (arquivo.erro) console.error("recebimento de arquivo falhou", arquivo.erro);
                   }
                 }
 
@@ -284,7 +311,13 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       ? legendaImagem
                         ? `📷 ${legendaImagem}`
                         : "📷 Imagem"
-                      : `[${tipo}]`;
+                      : ehDocumento
+                        ? textoDoDocumento(nomeDocumento, legendaArquivo)
+                        : ehVideo
+                          ? legendaArquivo
+                            ? `🎞️ ${legendaArquivo}`
+                            : "🎞️ Vídeo"
+                          : `[${tipo}]`;
 
                 // Idempotência: `wa_message_id` é único. Se a Meta reenviar o
                 // mesmo evento (retry/duplicidade), o insert falha aqui e a

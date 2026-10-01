@@ -408,6 +408,22 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               if (erroAudio) {
                 console.error("[nina] falha ao gravar áudio enviado", erroAudio);
               }
+              // Cópia do áudio falado, guardada junto da conversa pelo prazo de 5 anos.
+              // Nunca derruba a resposta: sem a cópia, a mensagem segue com a transcrição.
+              {
+                const idMsgAudio = (msgAudio as { id?: string } | null)?.id ?? null;
+                if (idMsgAudio && audioId) {
+                  const { guardarMidiaEnviada } = await import("@/lib/whatsapp-midia.server");
+                  await guardarMidiaEnviada({
+                    clinicaId: params.clinicaId,
+                    mensagemId: idMsgAudio,
+                    waMessageId: audioId,
+                    tipo: "audio",
+                    bytes: audio.bytes,
+                    mime: audio.mime,
+                  });
+                }
+              }
               // Confirmada só porque a Meta devolveu id da
               // mensagem — não pela simples existência da linha.
               await registrarEntregaSaida({

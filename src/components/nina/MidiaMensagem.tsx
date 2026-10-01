@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileText } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ImagemMensagemAmpliada } from "./ImagemMensagemAmpliada";
 import { urlMidiaMensagem } from "@/lib/atendimento/midia-mensagem.functions";
-import { ehCaminhoGuardado } from "@/lib/whatsapp-midia-armazenamento";
+import { ehCaminhoGuardado, nomeDoDocumento } from "@/lib/whatsapp-midia-armazenamento";
 
 type MensagemComMidia = {
   id: string;
@@ -12,16 +20,31 @@ type MensagemComMidia = {
 };
 
 const TEXTO_PADRAO_IMAGEM = "📷 Imagem";
+const TEXTO_PADRAO_VIDEO = "🎞️ Vídeo";
+const TIPOS_COM_MIDIA = ["image", "audio", "document", "video"];
 
-/** A mensagem tem imagem ou áudio guardado no sistema, que dá para mostrar? */
+/** A mensagem tem imagem, áudio, documento ou vídeo guardado no sistema, que dá para mostrar? */
 export function temMidiaVisivel(m: MensagemComMidia): boolean {
-  return (m.tipo === "image" || m.tipo === "audio") && ehCaminhoGuardado(m.media_url);
+  return TIPOS_COM_MIDIA.includes(String(m.tipo)) && ehCaminhoGuardado(m.media_url);
 }
 
-/** Texto da bolha: com a imagem à mostra, o "📷 Imagem" padrão some; a legenda e a transcrição ficam. */
+/** Legenda de um documento: o que vem depois de "📎 nome — ". */
+function legendaDoDocumento(corpo: string): string {
+  const fim = corpo.indexOf(" — ");
+  return fim >= 0 ? corpo.slice(fim + 3).trim() : "";
+}
+
+/**
+ * Texto da bolha: com o arquivo à mostra, o texto padrão ("📷 Imagem", "🎞️ Vídeo", "📎 nome") some;
+ * a legenda e a transcrição do áudio ficam.
+ */
 export function textoDaBolha(m: MensagemComMidia): string {
   const corpo = String(m.body ?? "");
-  if (m.tipo === "image" && temMidiaVisivel(m) && corpo === TEXTO_PADRAO_IMAGEM) return "";
+  if (temMidiaVisivel(m)) {
+    if (m.tipo === "image" && corpo === TEXTO_PADRAO_IMAGEM) return "";
+    if (m.tipo === "video" && corpo === TEXTO_PADRAO_VIDEO) return "";
+    if (m.tipo === "document") return legendaDoDocumento(corpo);
+  }
   return corpo || `[${m.tipo}]`;
 }
 
@@ -35,7 +58,9 @@ function useLinkDaMidia(clinicaId: string, mensagemId: string, ativo: boolean) {
     const c = cacheLinks.get(mensagemId);
     return c && Date.now() - c.em < CACHE_MS ? c.url : null;
   });
-  const [estado, setEstado] = useState<"carregando" | "pronto" | "indisponivel">(url ? "pronto" : "carregando");
+  const [estado, setEstado] = useState<"carregando" | "pronto" | "indisponivel">(
+    url ? "pronto" : "carregando",
+  );
   useEffect(() => {
     if (!ativo || url) return;
     let cancelado = false;
@@ -82,23 +107,44 @@ function useNaTela() {
   return { ref, visivel };
 }
 
-/** Imagem (clique para ampliar) ou player de áudio da mensagem, no próprio chat. */
-export function MidiaMensagem({ clinicaId, mensagem }: { clinicaId: string; mensagem: MensagemComMidia }) {
+const ROTULO_INDISPONIVEL: Record<string, string> = {
+  image: "Imagem indisponível.",
+  audio: "Áudio indisponível.",
+  video: "Vídeo indisponível.",
+  document: "Arquivo indisponível.",
+};
+
+/** Imagem (clique para ampliar), áudio, vídeo ou arquivo para baixar, no próprio chat. */
+export function MidiaMensagem({
+  clinicaId,
+  mensagem,
+}: {
+  clinicaId: string;
+  mensagem: MensagemComMidia;
+}) {
   const { ref, visivel } = useNaTela();
-  const { url, estado } = useLinkDaMidia(clinicaId, mensagem.id, visivel && temMidiaVisivel(mensagem));
+  const { url, estado } = useLinkDaMidia(
+    clinicaId,
+    mensagem.id,
+    visivel && temMidiaVisivel(mensagem),
+  );
   const [ampliada, setAmpliada] = useState(false);
   if (!temMidiaVisivel(mensagem)) return null;
-  const ehImagem = mensagem.tipo === "image";
+  const tipo = String(mensagem.tipo);
+  const ehImagem = tipo === "image";
+  const nomeArquivo = tipo === "document" ? nomeDoDocumento(mensagem.body) || "Documento" : "";
 
   return (
-    <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo={mensagem.tipo}>
+    <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo={tipo}>
       {estado === "indisponivel" ? (
-        <p className="text-xs opacity-70">{ehImagem ? "Imagem indisponível." : "Áudio indisponível."}</p>
+        <p className="text-xs opacity-70">{ROTULO_INDISPONIVEL[tipo]}</p>
       ) : !url ? (
         <div
-          className={`animate-pulse rounded-lg bg-black/10 dark:bg-white/10 ${ehImagem ? "h-28 w-44" : "h-9 w-56"}`}
+          className={`animate-pulse rounded-lg bg-black/10 dark:bg-white/10 ${
+            ehImagem || tipo === "video" ? "h-28 w-44" : "h-9 w-56"
+          }`}
           role="status"
-          aria-label={ehImagem ? "Carregando imagem" : "Carregando áudio"}
+          aria-label="Carregando arquivo"
         />
       ) : ehImagem ? (
         <>
@@ -108,19 +154,54 @@ export function MidiaMensagem({ clinicaId, mensagem }: { clinicaId: string; mens
             className="block overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             aria-label="Ampliar imagem enviada pelo paciente"
           >
-            <img src={url} alt="Imagem enviada pelo paciente" loading="lazy" className="max-h-60 max-w-full object-cover" />
+            <img
+              src={url}
+              alt="Imagem enviada pelo paciente"
+              loading="lazy"
+              className="max-h-60 max-w-full object-cover"
+            />
           </button>
           <Dialog open={ampliada} onOpenChange={setAmpliada}>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Imagem enviada pelo paciente</DialogTitle>
-              </DialogHeader>
-              <img src={url} alt="Imagem enviada pelo paciente" className="max-h-[75vh] w-full object-contain" />
-            </DialogContent>
+            {ampliada && (
+              <DialogContent className="max-w-6xl overflow-hidden" onEscapeKeyDown={() => {}}>
+                <DialogHeader>
+                  <DialogTitle>Imagem enviada pelo paciente</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Visualize a imagem e amplie para ler os detalhes.
+                  </DialogDescription>
+                </DialogHeader>
+                <ImagemMensagemAmpliada key={mensagem.id} url={url} />
+              </DialogContent>
+            )}
           </Dialog>
         </>
+      ) : tipo === "video" ? (
+        <video
+          controls
+          preload="metadata"
+          src={url}
+          className="max-h-60 max-w-full rounded-lg"
+          aria-label="Vídeo da conversa"
+        />
+      ) : tipo === "document" ? (
+        <a
+          href={url}
+          download={nomeArquivo}
+          rel="noreferrer noopener"
+          className="flex items-center gap-2 rounded-lg border border-current/20 px-3 py-2 text-sm underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          aria-label={`Baixar arquivo ${nomeArquivo}`}
+        >
+          <FileText className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 break-all">{nomeArquivo}</span>
+        </a>
       ) : (
-        <audio controls preload="none" src={url} className="h-9 w-56 max-w-full" aria-label="Áudio enviado pelo paciente" />
+        <audio
+          controls
+          preload="none"
+          src={url}
+          className="h-9 w-56 max-w-full"
+          aria-label="Áudio da conversa"
+        />
       )}
     </div>
   );
