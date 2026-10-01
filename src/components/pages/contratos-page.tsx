@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contratoDoProduto, produtoDoModulo, type ProdutoCartao } from "@/lib/cartao/produto";
 import { calcularParcelasQueFaltam } from "@/lib/cartao/parcelas-que-faltam";
+import { planejarRegeracao } from "@/lib/cartao/regerar-parcelas";
 import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import { ContratosCards, type ContratoCardItem } from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
@@ -3431,7 +3432,9 @@ function DetalheContrato({
     await load();
   };
 
-  // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
+  // Refaz as 12 parcelas a partir da nova data de início; as N primeiras entram
+  // como pagas. Parcela paga, cancelada ou com boleto/guia nunca é apagada —
+  // regras em `src/lib/cartao/regerar-parcelas.ts`.
   const regerarComPagas = async (n: number) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -3440,56 +3443,87 @@ function DetalheContrato({
     if (!retroDialog) return;
     const iniStr = retroDialog.dataInicio;
     if (!iniStr) return;
-    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 10));
     const valor = Number((contrato as any).valor_mensal ?? 0);
-    const pagas = Math.max(0, Math.min(12, Math.floor(n)));
     setRegerandoRetro(true);
-    // 1) Apaga TODAS as mensalidades (≠0) — pendentes e pagas —
-    // para regenerar exatamente 12 parcelas numeradas de 1 a 12.
-    // Sem isso, uma parcela órfã anterior fazia o prox virar 2 e o
-    // contrato terminar com 13 linhas (bug do contrato #20261888).
-    const { error: delErr } = await supabase
+    // Lê as parcelas do banco (não da tela, que pode ter rascunho) e quais têm
+    // boleto ou guia — essas não podem sair, o boleto iria junto em cascata.
+    const { data: atuaisData, error: lerErr } = await supabase
       .from("contrato_mensalidades")
-      .delete()
+      .select("id, numero_parcela, vencimento, status")
       .eq("contrato_id", contrato.id)
       .gt("numero_parcela", 0);
-    if (delErr) {
+    if (lerErr) {
       setRegerandoRetro(false);
-      return mostrarErro(delErr);
+      return mostrarErro(lerErr);
     }
-    // 2) Gera exatamente 12 parcelas (1..12) a partir do mês da nova data de início
-    let prox = 1;
-    const ini = new Date(iniStr + "T00:00:00");
-    const baseAno = ini.getFullYear();
-    const baseMes = ini.getMonth();
-    const rows: any[] = [];
-    for (let i = 0; i < 12; i++) {
-      const ref = new Date(baseAno, baseMes + i, 1);
-      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-      const d = Math.min(dia, lastDay);
-      const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
-      const vencIso = venc.toISOString().slice(0, 10);
-      const paga = i < pagas;
-      rows.push({
-        contrato_id: contrato.id,
-        clinica_id: (contrato as any).clinica_id,
-        numero_parcela: prox++,
-        vencimento: vencIso,
-        valor,
-        status: paga ? "pago" : "pendente",
-        pago_em: paga ? vencIso : null,
-        valor_pago: paga ? valor : null,
-      });
+    const atuais = (atuaisData ?? []) as Array<{
+      id: string;
+      numero_parcela: number | null;
+      vencimento: string;
+      status: string | null;
+    }>;
+    const idsAtuais = atuais.map((m) => m.id);
+    const travadas = new Set<string>();
+    if (idsAtuais.length > 0) {
+      const [bol, gr] = await Promise.all([
+        supabase.from("boletos").select("mensalidade_id").in("mensalidade_id", idsAtuais),
+        supabase.from("gr_impressoes").select("mensalidade_id").in("mensalidade_id", idsAtuais),
+      ]);
+      if (bol.error || gr.error) {
+        setRegerandoRetro(false);
+        return mostrarErro(bol.error ?? gr.error);
+      }
+      for (const r of [...(bol.data ?? []), ...(gr.data ?? [])] as Array<{
+        mensalidade_id: string | null;
+      }>) {
+        if (r.mensalidade_id) travadas.add(r.mensalidade_id);
+      }
     }
-    const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-    setRegerandoRetro(false);
-    if (insErr) return mostrarErro(insErr, "falha ao gerar parcelas");
-    setRetroDialog(null);
-    toast.success(
-      pagas > 0
-        ? `${pagas} parcela${pagas === 1 ? "" : "s"} marcada${pagas === 1 ? "" : "s"} como paga${pagas === 1 ? "" : "s"} e ${12 - pagas} pendente${12 - pagas === 1 ? "" : "s"} gerada${12 - pagas === 1 ? "" : "s"}.`
-        : "12 parcelas pendentes geradas.",
+    const plano = planejarRegeracao(
+      iniStr,
+      (contrato as any).dia_vencimento ?? null,
+      n,
+      atuais.map((m) => ({ ...m, travada: travadas.has(m.id) })),
     );
+    // 1) Apaga só as pendentes livres. Paga, cancelada e com boleto/guia ficam.
+    if (plano.apagar.length > 0) {
+      const { error: delErr } = await supabase
+        .from("contrato_mensalidades")
+        .delete()
+        .in("id", plano.apagar)
+        .neq("status", "pago");
+      if (delErr) {
+        setRegerandoRetro(false);
+        return mostrarErro(delErr);
+      }
+    }
+    // 2) Recria só os meses que ficaram sem parcela.
+    const rows = plano.criar.map((c) => ({
+      contrato_id: contrato.id,
+      clinica_id: (contrato as any).clinica_id,
+      numero_parcela: c.numero_parcela,
+      vencimento: c.vencimento,
+      valor,
+      status: c.paga ? "pago" : "pendente",
+      pago_em: c.paga ? c.vencimento : null,
+      valor_pago: c.paga ? valor : null,
+    }));
+    if (rows.length > 0) {
+      const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows as any);
+      if (insErr) {
+        setRegerandoRetro(false);
+        return mostrarErro(insErr, "falha ao gerar parcelas");
+      }
+    }
+    setRegerandoRetro(false);
+    setRetroDialog(null);
+    const pagasNovas = rows.filter((r) => r.status === "pago").length;
+    const partes = [
+      `${rows.length} parcela(s) gerada(s)`,
+      pagasNovas > 0 ? `${pagasNovas} marcada(s) como paga(s) no sistema anterior` : null,
+      plano.pagasMantidas > 0 ? `${plano.pagasMantidas} paga(s) preservada(s)` : null,
+    ].filter(Boolean);
+    toast.success(partes.join(" · ") + ".");
     await load();
   };
 
@@ -7656,6 +7690,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <p className="text-xs text-muted-foreground">
                   Serão geradas 12 parcelas a partir de {retroDialog.dataInicio.slice(8, 10)}/
                   {retroDialog.dataInicio.slice(5, 7)}/{retroDialog.dataInicio.slice(0, 4)}.
+                  Parcelas já pagas, canceladas ou com boleto/guia são mantidas, e o mês delas não é
+                  gerado de novo.
                 </p>
               </div>
             </div>
