@@ -26,6 +26,7 @@ const GRUPOS = [
 const ALIASES = new Map<string, string>(
   GRUPOS.flatMap(([nome, ...aliases]) => [nome, ...aliases].map((alias) => [alias, nome] as const)),
 );
+const DESCRITORES_PADRAO = new Set(["transtoracico"]);
 
 function escrita(texto: string): string {
   return normalizarBuscaCatalogo(texto)
@@ -129,8 +130,12 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
         ].includes(t),
     )
     .map(canonico);
-  const termos = [...new Set([...tokens, ...curtas])];
   const vocabulario = [...new Set(textosPublicados.flatMap(palavras))];
+  // Via padrão escrita pelo médico no pedido ("ecocardiograma transtorácico"): quando o cadastro
+  // não usa a palavra, ela não pode impedir achar o exame. "Transesofágico" continua obrigatório.
+  const termos = [...new Set([...tokens, ...curtas])].filter(
+    (t) => !(DESCRITORES_PADRAO.has(t) && !vocabulario.includes(t)),
+  );
   const grafias = [
     ...new Set([...vocabulario, ...GRUPOS.filter(([nome]) => vocabulario.includes(nome)).flat()]),
   ];
