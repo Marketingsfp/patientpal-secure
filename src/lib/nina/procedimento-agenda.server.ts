@@ -11,7 +11,7 @@ export class VinculoProcedimentoError extends Error {
  * Nunca inferir este vínculo pelo nome, pelo executor ou pela especialidade. */
 export async function resolverProcedimentoOperacional(clinicaId: string, pedido: ProcedimentoSolicitado) {
   if (pedido.clinica_id !== clinicaId) throw new VinculoProcedimentoError("O pedido pertence a outra clínica.");
-  const publicados = await lerPublicados<ServicoPublicado>("nina_cat_servicos", COLUNAS_SERVICO, clinicaId, [pedido.catalogo_id]);
+  const publicados = await lerPublicados<ServicoPublicado>("servicos", COLUNAS_SERVICO, clinicaId, [pedido.catalogo_id]);
   const publicado = publicados.find(s => s.id === pedido.catalogo_id);
   if (!publicado?.procedimento_id)
     throw new VinculoProcedimentoError("O atendimento foi encontrado na base, mas falta seu vínculo por ID com o procedimento da agenda.");

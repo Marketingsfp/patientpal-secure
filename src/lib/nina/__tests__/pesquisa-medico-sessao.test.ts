@@ -7,7 +7,7 @@ const anterior: ConhecimentoSessao = {
 };
 describe("pesquisa do médico preserva o atendimento identificado", () => {
   it.each([
-    ["consultar_base_conhecimento", { termo: "Suellen", medico: "Suellen" }, "termo"],
+    ["consultar_cadastro", { termo: "Suellen", medico: "Suellen" }, "termo"],
     ["buscar_medicos", { nome: "Suellen" }, "especialidade"],
   ] as const)("reconsulta a especialidade quando %s recebe apenas o nome", (ferramenta, args, campo) => {
     const preparado = JSON.parse(prepararPesquisaMedicoDaSessao(ferramenta, JSON.stringify(args), anterior)!);
@@ -21,12 +21,12 @@ describe("pesquisa do médico preserva o atendimento identificado", () => {
     { termo: "Dermatologia" },
   ])("preserva outro atendimento e a busca sem médico (%#)", args => {
     const original = JSON.stringify(args);
-    expect(prepararPesquisaMedicoDaSessao("consultar_base_conhecimento", original, anterior)).toBe(original);
+    expect(prepararPesquisaMedicoDaSessao("consultar_cadastro", original, anterior)).toBe(original);
   });
   it("não inventa referência se não há contexto da sessão", () => {
     const args = JSON.stringify({ termo: "Suellen", medico: "Suellen" });
-    expect(prepararPesquisaMedicoDaSessao("consultar_base_conhecimento", args, null)).toBe(args);
-    expect(prepararPesquisaMedicoDaSessao("consultar_base_conhecimento", args, { ...anterior, referencias: [] })).toBe(args);
+    expect(prepararPesquisaMedicoDaSessao("consultar_cadastro", args, null)).toBe(args);
+    expect(prepararPesquisaMedicoDaSessao("consultar_cadastro", args, { ...anterior, referencias: [] })).toBe(args);
   });
 });
 
@@ -55,7 +55,7 @@ describe("confirmação da única opção realmente apresentada", () => {
     expect(confirmarProfissionalDaPergunta(pendente, contexto(mensagem))).toBeNull();
   });
   it.each(["Isso", "esse mesmo", "esse", "sim", "Confirmo", "é esse", "esse msm", "ss", "s", "simmm!", "isssooo", "isso aí", "é ele", "aham", "uhum", "blz", "fechou", "Sim, por favor!"])("identifica Sandro e preserva a consulta: %s", mensagem => {
-    const r = JSON.parse(prepararPesquisaMedicoDaSessao("consultar_base_conhecimento", '{"termo":"Sandro","medico":"Sandro"}', pendente, contexto(mensagem))!);
+    const r = JSON.parse(prepararPesquisaMedicoDaSessao("consultar_cadastro", '{"termo":"Sandro","medico":"Sandro"}', pendente, contexto(mensagem))!);
     expect(r).toMatchObject({ termo: "clinica medica", medico: "sandro", tipo_atendimento: "consulta", nova_solicitacao: false });
     expect(confirmarProfissionalDaPergunta(pendente, contexto(mensagem))?.registro).toBe("sandro");
   });

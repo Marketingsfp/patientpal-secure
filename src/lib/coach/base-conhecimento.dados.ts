@@ -6,8 +6,7 @@
  * Por isso o cliente do banco vem por parâmetro.
  *
  * Tudo aqui passa pelo cliente normal do navegador: as políticas de acesso já
- * liberam `procedimentos`, `nina_cat_servicos`, `nina_cat_profissionais`,
- * `medicos`, `especialidades` e `unidades` para qualquer pessoa ATIVA da
+ * liberam `procedimentos`, `medicos`, `especialidades` e `unidades` para qualquer pessoa ATIVA da
  * clínica. Nenhuma chave administrativa é usada — a atendente lê exatamente o
  * que ela já poderia ler nas outras telas.
  */
@@ -61,22 +60,8 @@ export async function gerarBaseDoSistema(
   clinicaId: string,
   clinicaNome?: string | null,
 ): Promise<BaseGerada> {
-  const [procedimentos, servicos, profissionais, medicos, unidades, clinica] = await Promise.all([
+  const [procedimentos, medicos, unidades, clinica] = await Promise.all([
     lerProcedimentos(db, clinicaId),
-    db
-      .from("nina_cat_servicos")
-      .select("nome,valor,valor_observacao,descricao_publica,preparo,restricoes,executantes,formas_pagamento")
-      .eq("clinica_id", clinicaId)
-      .eq("status", "PUBLICADO")
-      .limit(1000),
-    db
-      .from("nina_cat_profissionais")
-      .select(
-        "nome,especialidades,horarios,tipo_atendimento,convenios,formas_pagamento,observacao_publica,aviso_dia,atende_consultorio",
-      )
-      .eq("clinica_id", clinicaId)
-      .eq("status", "PUBLICADO")
-      .limit(500),
     db
       .from("medicos")
       .select("nome,especialidades:especialidade_id(nome)")
@@ -106,8 +91,9 @@ export async function gerarBaseDoSistema(
     clinicaNome: clinicaNome ?? clinica.data?.nome ?? "Clínica",
     geradoEm,
     procedimentos,
-    catalogoServicos: (servicos.data ?? []) as unknown as CatServicoBase[],
-    catalogoProfissionais: (profissionais.data ?? []) as unknown as CatProfissionalBase[],
+    // A Nina não tem mais catálogo próprio: a base do Coach vem só do cadastro do sistema.
+    catalogoServicos: [] as CatServicoBase[],
+    catalogoProfissionais: [] as CatProfissionalBase[],
     medicos: ((medicos.data ?? []) as unknown as Array<{
       nome: string;
       especialidades: { nome: string } | null;

@@ -21,7 +21,7 @@ describe("Clínico Geral: prompt efetivo, pesquisa, escolha do médico e modalid
       expect(r.requests).toHaveLength(4);
       for (const req of r.requests) expect(req.messages.find((m: any) => m.role === "system").content).toContain(REGRA_IDENTIDADE_ATENDIMENTO);
       expect(r.argumentosFerramentas).toEqual([
-        { nome: "consultar_base_conhecimento", args: { termo: "Clínico Geral", tipo_atendimento: "consulta" } },
+        { nome: "consultar_cadastro", args: { termo: "Clínico Geral", tipo_atendimento: "consulta" } },
         { nome: "buscar_medicos", args: { nome: medico, especialidade: "Clínico Geral" } },
         { nome: "proxima_vaga", args: { medico_id: "medico-clinico", especialidade: "Clínico Geral" } },
       ]);

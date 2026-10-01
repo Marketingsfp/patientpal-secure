@@ -871,7 +871,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
   {
     type: "function",
     function: {
-      name: "consultar_base_conhecimento",
+      name: "consultar_cadastro",
       description:
         "FONTE DE VERDADE administrativa da clínica (catálogo publicado). " +
         REGRA_CONSULTA_CATALOGO +
@@ -1333,7 +1333,7 @@ async function executarFerramentaInterna(
         return { ok: true, resumo_confirmacao: resumo, vaga_escolhida: vaga,
           instrucao: "Confira o cadastro e colete os dados faltantes primeiro. Só depois entregue o resumo final ao paciente. Apenas o próximo aceite desse resumo permite gravar a vaga exata." };
       }
-      case "consultar_base_conhecimento": {
+      case "consultar_cadastro": {
         const p = z
           .object({
             termo: z.string().trim().min(2).max(200),
@@ -1376,10 +1376,10 @@ async function executarFerramentaInterna(
               const [servicos, profissionais] = await Promise.all([
                 tipo === "consulta"
                   ? Promise.resolve([] as Array<{ id: string; nome: string }>)
-                  : lerPublicados<{ id: string; nome: string }>("nina_cat_servicos", "id, nome", ctx.clinicaId),
+                  : lerPublicados<{ id: string; nome: string }>("servicos", "id, nome", ctx.clinicaId),
                 tipo === "exame_procedimento"
                   ? Promise.resolve([] as Array<{ id: string; especialidades: unknown }>)
-                  : lerPublicados<{ id: string; especialidades: unknown }>("nina_cat_profissionais", "id, especialidades", ctx.clinicaId),
+                  : lerPublicados<{ id: string; especialidades: unknown }>("profissionais", "id, especialidades", ctx.clinicaId),
               ]);
               const opcoes = esp.opcoesCatalogo(servicos, profissionais, tipo);
               if (opcoes.length) {
@@ -1515,7 +1515,7 @@ async function executarFerramentaInterna(
         if (normalizar(p.termo) === "preventivo" &&
             pedidoConsultaComPreventivo(ctx.consultaAgenda?.mensagemAtual ?? "")) {
           const contexto = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
-          return executarFerramentaInterna(ctx, "consultar_base_conhecimento", {
+          return executarFerramentaInterna(ctx, "consultar_cadastro", {
             termo: "consulta com preventivo", tipo_atendimento: "consulta",
             ...(contexto?.consulta.medico ? { medico: contexto.consulta.medico } : {}),
             nova_solicitacao: p.nova_solicitacao,
@@ -1741,7 +1741,7 @@ async function executarFerramentaInterna(
           // Estes são os ÚNICOS horários realmente livres. A escala da planilha
           // (ex.: 09h-18h) não é vaga.
           instrucao:
-            "Ao apresentar horários, inclua também o valor oficial do atendimento solicitado vindo de consultar_base_conhecimento, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Preserve o exame/procedimento: a consulta da especialidade do executante não o substitui. Se não houver valor cadastrado, não estime nem cite preço. Agrupe por médico, com data, horário e unidade. " +
+            "Ao apresentar horários, inclua também o valor oficial do atendimento solicitado vindo de consultar_cadastro, com a forma de pagamento e a condição correspondentes (se ainda não consultou, consulte antes de responder). Preserve o exame/procedimento: a consulta da especialidade do executante não o substitui. Se não houver valor cadastrado, não estime nem cite preço. Agrupe por médico, com data, horário e unidade. " +
             instrucaoDoPlano(plano),
         };
 

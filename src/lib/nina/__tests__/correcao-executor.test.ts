@@ -26,13 +26,15 @@ describe("papel e escopo do executor", () => {
   });
 
   test("cada camada só recebe as ferramentas dela", () => {
-    expect(ferramentasPermitidas("catalogo")).not.toContain("publicar_prompt");
-    expect(ferramentasPermitidas("modelo")).not.toContain("gravar_item_catalogo");
+    // O cadastro do sistema nunca é alterado pelo executor: só registra a pendência para a equipe.
+    expect(ferramentasPermitidas("catalogo")).toEqual(["registrar_pendencia_tecnica"]);
+    expect(ferramentasPermitidas("modelo")).toContain("publicar_prompt");
     expect(ferramentasPermitidas("busca")).toEqual(["registrar_pendencia_tecnica"]);
   });
 
-  test("camada de código nunca é aplicada automaticamente", () => {
-    expect(podeAplicarAutomaticamente(proposta())).toBe(true);
+  test("só o prompt é aplicado automaticamente; cadastro e código não", () => {
+    expect(podeAplicarAutomaticamente(proposta({ camada: "modelo" }))).toBe(true);
+    expect(podeAplicarAutomaticamente(proposta())).toBe(false);
     expect(podeAplicarAutomaticamente(proposta({ camada: "fluxo" }))).toBe(false);
     expect(podeAplicarAutomaticamente(null)).toBe(false);
   });

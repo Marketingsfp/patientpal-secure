@@ -45,7 +45,7 @@ const registros = [
 
 function contexto(records: unknown[] = registros): ContextoConfianca {
   const evidencia = extrairEvidencia({
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,
@@ -65,7 +65,7 @@ function contexto(records: unknown[] = registros): ContextoConfianca {
     retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true }],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         success: true,
@@ -248,7 +248,7 @@ Gostaria que eu verificasse as vagas disponíveis do Dr. Carlos Silva?`;
   it("retorno canônico doctors/days preserva profissionais e escala em uma única ferramenta", () => {
     const ctx = contexto();
     const e = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,

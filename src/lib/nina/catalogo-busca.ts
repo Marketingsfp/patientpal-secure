@@ -236,7 +236,7 @@ export function perguntaIdentificacaoProfissional(
 }
 
 export const REGRA_CONSULTA_CATALOGO =
-  "Antes de responder fatos administrativos, consulte consultar_base_conhecimento para cada atendimento identificado no pedido atual. " +
+  "Antes de responder fatos administrativos, consulte consultar_cadastro para cada atendimento identificado no pedido atual. " +
   "O catálogo é carregado uma única vez por resposta. Todas as ferramentas, filtros de atendimento/profissional e revisões dessa resposta reutilizam essa leitura. " +
   "Não repita uma ferramenta para recuperar dados que ela já retornou neste turno. Se precisar localizar outro atendimento ou refinar um filtro, pesquise somente o que falta; o sistema usa a mesma leitura, sem buscar o catálogo de novo. " +
   "Uma nova mensagem do paciente inicia outra leitura atualizada; nunca use os fatos de uma resposta anterior como confirmação atual. " +

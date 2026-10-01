@@ -7,13 +7,13 @@ import { FERRAMENTAS_DE_VAGAS, semFerramentasDeVaga } from "../consulta-agenda";
 
 describe("semFerramentasDeVaga", () => {
   const lista = [
-    "consultar_base_conhecimento", "buscar_medicos", "consultar_disponibilidade", "verificar_horario",
+    "consultar_cadastro", "buscar_medicos", "consultar_disponibilidade", "verificar_horario",
     "proxima_vaga", "consultar_primeiro_disponivel", "dados_da_clinica",
   ].map((name) => ({ type: "function", function: { name } }));
 
   test("remove só as 4 ferramentas de vaga livre", () => {
     const nomes = semFerramentasDeVaga(lista).map((f) => f.function.name);
-    expect(nomes).toEqual(["consultar_base_conhecimento", "buscar_medicos", "dados_da_clinica"]);
+    expect(nomes).toEqual(["consultar_cadastro", "buscar_medicos", "dados_da_clinica"]);
     for (const n of FERRAMENTAS_DE_VAGAS) expect(nomes).not.toContain(n);
   });
 

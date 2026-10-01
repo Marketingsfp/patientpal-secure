@@ -27,52 +27,6 @@ function normalizar(v: unknown): string {
     .trim();
 }
 
-/** Relê o item do catálogo e compara o campo alterado. */
-export async function verificarItemCatalogo(
-  supabase: Sb,
-  clinicaId: string,
-  entrada: { itemId: string; campo: string; valorEsperado: string },
-): Promise<Verificacao> {
-  const em = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("nina_cat_servicos")
-    .select(`id, nome, status, ${entrada.campo}`)
-    .eq("id", entrada.itemId)
-    .eq("clinica_id", clinicaId)
-    .maybeSingle();
-  if (error || !data) {
-    return {
-      conferido: false,
-      alvo: `catálogo · ${entrada.itemId} · ${entrada.campo}`,
-      esperado: entrada.valorEsperado,
-      efetivo: null,
-      revisao: null,
-      motivo: error?.message ?? "Item do catálogo não encontrado na releitura.",
-      em,
-    };
-  }
-  const efetivo = (data as Record<string, unknown>)[entrada.campo];
-  const alvo = `catálogo · ${String((data as { nome?: string }).nome ?? "")} · ${entrada.campo}`;
-  const a = normalizar(efetivo);
-  const b = normalizar(entrada.valorEsperado);
-  const numeros: string[] = b.match(/\d+/g) ?? [];
-  const numerosEfetivos: string[] = a.match(/\d+/g) ?? [];
-  const bate = numeros.length
-    ? numeros.every((n) => numerosEfetivos.includes(n))
-    : Boolean(b) && a.includes(b);
-  return {
-    conferido: bate && String((data as { status?: string }).status) === "PUBLICADO",
-    alvo,
-    esperado: entrada.valorEsperado,
-    efetivo: efetivo == null ? null : String(efetivo),
-    revisao: String((data as { status?: string }).status ?? ""),
-    motivo: bate
-      ? "Releitura do catálogo publicado confirma o valor corrigido."
-      : "A releitura do catálogo não trouxe o valor corrigido.",
-    em,
-  };
-}
-
 /** Relê a versão publicada da Arquitetura e confere o conteúdo efetivo. */
 export async function verificarPromptPublicado(
   supabase: Sb,

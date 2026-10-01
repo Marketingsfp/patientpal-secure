@@ -180,8 +180,8 @@ const argumentos = {
 describe("SFP bloqueia ações na publicação vigente, preservando outros profissionais", () => {
   for (const teste of [false, true]) {
     test(`${teste ? "homologação" : "real"}: SFP vinculado a um médico real não agenda`, async () => {
-      banco.nina_cat_profissionais![0]!.nome = " SFP ";
-      banco.nina_cat_profissionais![0]!.medico_id = MEDICO;
+      banco.profissionais![0]!.nome = " SFP ";
+      banco.profissionais![0]!.medico_id = MEDICO;
       const ctx = { ...contextoAgendar(true), teste,
         origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
       const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
@@ -190,7 +190,7 @@ describe("SFP bloqueia ações na publicação vigente, preservando outros profi
       expect(gravacoes).toHaveLength(0);
     });
     test(`${teste ? "homologação" : "real"}: serviço SFP impede coleta automática após o aceite`, async () => {
-      banco.nina_cat_servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO",
+      banco.servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO",
         nome: "Consulta Cardiologia", executantes: [{ nome: "sfp" }] });
       const ctx = { ...contextoAgendar(true), teste,
         origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
@@ -209,7 +209,7 @@ describe("SFP bloqueia ações na publicação vigente, preservando outros profi
     });
   }
   test("SFP arquivado ou de outra clínica não bloqueia o médico publicado atual", async () => {
-    banco.nina_cat_profissionais!.push(
+    banco.profissionais!.push(
       { id: "externo", clinica_id: OUTRO, status: "PUBLICADO", nome: "SFP", medico_id: MEDICO },
       { id: "antigo", clinica_id: CLINICA, status: "ARQUIVADO", nome: "SFP", medico_id: MEDICO });
     const r = await executarFerramentaPaciente(contextoAgendar(true), "agendar", argumentosAgendar);
@@ -283,8 +283,8 @@ beforeEach(() => {
     ],
   };
   banco = {
-    nina_cat_servicos: [],
-    nina_cat_profissionais: [
+    servicos: [],
+    profissionais: [
       {
         id: CATALOGO,
         clinica_id: CLINICA,
@@ -335,18 +335,18 @@ function vincularProcedimentoTeste(servico: Linha) {
 describe("procedimentos do Lead 01 não viram consultas", () => {
   async function iniciar(nome = "Bioimpedância", medico = "Mariana Portugal") {
     banco.medicos![0]!.nome = medico;
-    Object.assign(banco.nina_cat_profissionais![0]!, { nome: medico, tipo_atendimento: "Ordem de chegada",
+    Object.assign(banco.profissionais![0]!, { nome: medico, tipo_atendimento: "Ordem de chegada",
       especialidades: [{ nome: "Nutrição" }] });
     const servico = { id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome,
       executantes: [{ nome: medico }], estrutura: estruturaModalidadeServico(nome),
       valor: 100, formas_pagamento: [], descricao_publica: null, valor_observacao: null, preparo: null, restricoes: null };
     vincularProcedimentoTeste(servico);
-    banco.nina_cat_servicos!.push(servico);
+    banco.servicos!.push(servico);
     resultadoCatalogo = { ...resultadoCatalogo, tipo_atendimento: "exame_procedimento", procedure: nome,
       records: [servicoParaRegistro(servico as ServicoPublicado)], doctors: [medico] };
     const ctx: CtxNinaPaciente = { ...contexto(`Quero ${nome}`), podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
     Object.assign(ctx.estado!.patient, { id: PACIENTE, identified: true, validated: true });
-    await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", { termo: nome, tipo_atendimento: "exame_procedimento" });
+    await executarFerramentaPaciente(ctx, "consultar_cadastro", { termo: nome, tipo_atendimento: "exame_procedimento" });
     return { ctx, servico };
   }
   async function escolher(ctx: CtxNinaPaciente) {
@@ -436,7 +436,7 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     const { ctx, servico } = await iniciar();
     servico.estrutura.complementos = [];
     banco.medico_agendas![0]!.ordem_chegada = null;
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Hora marcada";
+    banco.profissionais![0]!.tipo_atendimento = "Hora marcada";
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r).toMatchObject({ ok: false, erro: "MODALIDADE_NAO_DEFINIDA" });
     expect(gravacoes).toHaveLength(0);
@@ -556,7 +556,7 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
 
 describe("pesquisa com atendimento e objetivos separados", () => {
   test("encaminha a categoria de exame até a busca, mesmo quando há intenção de agendar", async () => {
-    const r = await executarFerramentaPaciente(contexto("Quero marcar ECG"), "consultar_base_conhecimento", {
+    const r = await executarFerramentaPaciente(contexto("Quero marcar ECG"), "consultar_cadastro", {
       termo: "ECG", tipo_atendimento: "exame_procedimento", objetivos: ["agendamento"],
     });
     expect(r.ok).toBe(true);
@@ -575,7 +575,7 @@ describe("pesquisa com atendimento e objetivos separados", () => {
     test(`${origem}: valor, horários e médicos não viram termos de busca nem intenção de agendar`, async () => {
       const ctx = { ...contexto("Qual o valor de cardiologia, quais médicos atendem e em quais dias?"), origem };
       const objetivos = ["valor", "horarios", "medicos"];
-      const r = await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", {
+      const r = await executarFerramentaPaciente(ctx, "consultar_cadastro", {
         termo: "cardiologia", objetivos, tipo_atendimento: "consulta",
       });
       expect(r.ok).toBe(true);
@@ -598,11 +598,11 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     return { ctx, resultado: executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", args) };
   };
   beforeEach(() => {
-    Object.assign(banco.nina_cat_profissionais![0]!, {
+    Object.assign(banco.profissionais![0]!, {
       especialidades: [{ nome: "Cardiologia" }], atende_consultorio: true,
       formas_pagamento: [{ forma: "Dinheiro", valor: 120 }, { forma: "Cartão", valor: 145 }],
     });
-    banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0],
+    banco.profissionais!.push({ ...banco.profissionais![0],
       id: AGENDAMENTO, nome: "Maria Teste", medico_id: OUTRO,
       formas_pagamento: [{ forma: "Dinheiro", valor: 200 }, { forma: "Cartão", valor: 230 }],
       tipo_atendimento: "Ordem de chegada com pré-agendamento" });
@@ -655,7 +655,7 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
   test("mantém todos os candidatos, inclusive além dos seis primeiros do catálogo", async () => {
     for (let i = 0; i < 8; i++) {
       const id = `77777777-7777-4777-8777-${String(i).padStart(12, "0")}`;
-      banco.nina_cat_profissionais!.unshift({ ...banco.nina_cat_profissionais![0], id, nome: `Teste ${i}`, medico_id: id });
+      banco.profissionais!.unshift({ ...banco.profissionais![0], id, nome: `Teste ${i}`, medico_id: id });
       banco.medicos!.push({ id, clinica_id: CLINICA, nome: `Teste ${i}`, ativo: true });
     }
     const r = await chamar().resultado;
@@ -667,14 +667,14 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(r.proxima).toMatchObject({ medico_id: OUTRO });
   });
   test("não inclui especialidade diferente, rascunho ou outra clínica", async () => {
-    banco.nina_cat_profissionais![1]!.especialidades = [{ nome: "Dermatologia" }];
-    banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0], id: PACIENTE, medico_id: OUTRO, status: "RASCUNHO" });
-    banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0], id: OUTRO, medico_id: OUTRO, clinica_id: OUTRO });
+    banco.profissionais![1]!.especialidades = [{ nome: "Dermatologia" }];
+    banco.profissionais!.push({ ...banco.profissionais![0], id: PACIENTE, medico_id: OUTRO, status: "RASCUNHO" });
+    banco.profissionais!.push({ ...banco.profissionais![0], id: OUTRO, medico_id: OUTRO, clinica_id: OUTRO });
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO });
   });
   test("SFP mantém encaminhamento obrigatório", async () => {
-    banco.nina_cat_profissionais![1]!.nome = "SFP";
+    banco.profissionais![1]!.nome = "SFP";
     const r = await chamar().resultado;
     expect(r).toMatchObject({ ok: false, erro: "PROFISSIONAL_SFP" });
     expect(consultasAgenda()).toHaveLength(0);
@@ -688,14 +688,14 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(ctx.estado.appointment.slot_options).toBeNull();
   });
   test("sem pré-agendamento aparece como comparecimento e não como vaga para reservar", async () => {
-    banco.nina_cat_profissionais![1]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+    banco.profissionais![1]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
     const r = await chamar().resultado;
     expect((r.sem_pre_agendamento as Linha[])[0]).toMatchObject({ medico: "Maria Teste", sem_agendamento: true });
     expect((r.sem_pre_agendamento as Linha[])[0]!.orientacao).not.toContain("30 minutos");
     expect(r.proxima).toMatchObject({ medico_id: MEDICO });
   });
   test("ficha traz sua modalidade e orientação de antecedência", async () => {
-    banco.nina_cat_profissionais![1]!.tipo_atendimento = "Por ficha";
+    banco.profissionais![1]!.tipo_atendimento = "Por ficha";
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ modalidade_atendimento: "ficha" });
     expect((r.proxima as Linha).orientacao).toContain("30 minutos");
@@ -711,8 +711,8 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(gravacoes).toHaveLength(0);
   });
   test("preço de outra especialidade do mesmo médico não entra na proposta", async () => {
-    banco.nina_cat_profissionais![1]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Dermatologia" }];
-    banco.nina_cat_profissionais![1]!.formas_pagamento = [
+    banco.profissionais![1]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Dermatologia" }];
+    banco.profissionais![1]!.formas_pagamento = [
       { forma: "Dinheiro", valor: 200, condicao: "Consulta Cardiologia" },
       { forma: "Dinheiro", valor: 50, condicao: "Consulta Dermatologia" },
     ];
@@ -737,10 +737,10 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(r.proxima).toMatchObject({ medico_id: MEDICO, inicio: distante });
   });
   test("procedimento considera somente seus executantes e guarda seu nome", async () => {
-    banco.nina_cat_servicos!.push({ id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome: "Exame Teste",
+    banco.servicos!.push({ id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome: "Exame Teste",
       estrutura: estruturaModalidadeServico("Exame Teste"),
       executantes: [{ nome: "Alex Louza" }], formas_pagamento: [{ forma: "Dinheiro", valor: 80 }], valor: 80 });
-    vincularProcedimentoTeste(banco.nina_cat_servicos![0]!);
+    vincularProcedimentoTeste(banco.servicos![0]!);
     const { ctx, resultado } = chamar("primeiro disponível", { tipo: "procedimento", atendimento: "Exame Teste" });
     const r = await resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO, registro: { procedimento: "Exame Teste", preco_dinheiro: 80 } });
@@ -765,7 +765,7 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
 describe("consulta com preventivo conserva o atendimento publicado", () => {
   const comPreventivo = "CONSULTA + PREVENTIVO — GINECOLOGIA";
   function preparar(variante: "com" | "sem", origem: "homologacao" | "whatsapp" = "homologacao") {
-    Object.assign(banco.nina_cat_profissionais![0]!, {
+    Object.assign(banco.profissionais![0]!, {
       especialidades: [{ nome: "GINECOLOGIA" }, { nome: "CLÍNICO GERAL" }],
       observacao_publica: "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado\n\n" +
         "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 120,00\nPix/cartão: R$ 145,00\nObservação: Agendado\n\n" +
@@ -836,7 +836,7 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
     const ctx = preparar("com");
     ctx.consultaAgenda = { mensagemAtual: "Quero consulta com preventivo junto. Primeira manhã com Alex Louza.", historico: [] };
     ctx.estado!.knowledge_context!.consulta.medico = "Alex Louza";
-    const inicial = await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", { termo: "ginecologia", tipo_atendimento: "consulta", medico: "Alex Louza" });
+    const inicial = await executarFerramentaPaciente(ctx, "consultar_cadastro", { termo: "ginecologia", tipo_atendimento: "consulta", medico: "Alex Louza" });
     expect(inicial.pedido_interpretado).toMatchObject({ atendimento: "consulta com preventivo", tipo_atendimento: "consulta" });
     const auxiliar = await executarFerramentaPaciente(ctx, "buscar_procedimentos", { termo: "preventivo", nova_solicitacao: false });
     expect(auxiliar.ok).toBe(true);
@@ -848,7 +848,7 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
   });
   test("trocar de médico não autoriza trocar o atendimento", async () => {
     const ctx = preparar("com");
-    banco.nina_cat_profissionais![0]!.observacao_publica = "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
+    banco.profissionais![0]!.observacao_publica = "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
     // O atendimento ausente agora é bloqueado antes da consulta de vagas:
     // não se usa a modalidade da variante sem preventivo.
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
@@ -874,7 +874,7 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
   test("médico com uma única consulta publicada conserva o preventivo mesmo após pesquisa genérica", async () => {
     const ctx = preparar("com");
     delete ctx.estado!.knowledge_context!.atendimentoConsulta;
-    banco.nina_cat_profissionais![0]!.observacao_publica = "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
+    banco.profissionais![0]!.observacao_publica = "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
     expect(ctx.estado!.appointment.procedure).toBe(comPreventivo);
   });
@@ -917,7 +917,7 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
     { publicado: avaliacaoOdontologica("Raiani", "Quarta/sex 08:00h"), termo: "avaliação odontológica", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_sem_pre_agendamento", valor: "Gratuito" },
   ] as const;
   function preparar(caso: typeof casos[number], origem: "homologacao" | "whatsapp" = "homologacao") {
-    Object.assign(banco.nina_cat_profissionais![0]!, caso.publicado);
+    Object.assign(banco.profissionais![0]!, caso.publicado);
     banco.medicos![0]!.nome = caso.publicado.nome;
     const ctx: CtxNinaPaciente = { ...contexto(`Quero agendar ${caso.termo} com ${caso.publicado.nome}`), origem,
       teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
@@ -988,23 +988,23 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
   }
   test("regras divergentes da mesma avaliação continuam bloqueando, sem usar a escala genérica", async () => {
     const ctx = preparar(casos[2]!);
-    banco.nina_cat_profissionais![0]!.observacao_publica += "\n\nAVALIAÇÃO ODONTOLÓGICA\nEspecialidade: ODONTOLOGIA\nProfissional: Karen\nObservação: Agendado";
+    banco.profissionais![0]!.observacao_publica += "\n\nAVALIAÇÃO ODONTOLÓGICA\nEspecialidade: ODONTOLOGIA\nProfissional: Karen\nObservação: Agendado";
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);
     expect(gravacoes).toHaveLength(0);
   });
   test("ordem explícita divergente no atendimento genérico exige esclarecer a consulta", async () => {
     const ctx = preparar(casos[2]!);
-    banco.nina_cat_profissionais![0]!.observacao_publica = String(banco.nina_cat_profissionais![0]!.observacao_publica).replace("Observação: Não informada", "Observação: Agendado");
+    banco.profissionais![0]!.observacao_publica = String(banco.profissionais![0]!.observacao_publica).replace("Observação: Não informada", "Observação: Agendado");
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);
     expect(gravacoes).toHaveLength(0);
   });
   test("mudança de modalidade após oferta impede confirmar uma condição antiga", async () => {
     const ctx = preparar(casos[2]!);
-    banco.nina_cat_profissionais![0]!.observacao_publica = String(banco.nina_cat_profissionais![0]!.observacao_publica).replace("Ordem de Chegada", "Ordem de chegada com pré-agendamento");
+    banco.profissionais![0]!.observacao_publica = String(banco.profissionais![0]!.observacao_publica).replace("Ordem de Chegada", "Ordem de chegada com pré-agendamento");
     expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
-    banco.nina_cat_profissionais![0]!.observacao_publica = String(banco.nina_cat_profissionais![0]!.observacao_publica).replace("Ordem de chegada com pré-agendamento", "Agendado");
+    banco.profissionais![0]!.observacao_publica = String(banco.profissionais![0]!.observacao_publica).replace("Ordem de chegada com pré-agendamento", "Agendado");
     ctx.opcoesAgendamentoInicioTurno = true;
     ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [] };
     const r = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: inicio.toISOString(), fim: fim.toISOString() });
@@ -1045,7 +1045,7 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(ctx.estado.appointment.slot_options?.vagas ?? []).toHaveLength(0);
   });
   function referenciaConsulta(ctx: CtxNinaPaciente, termo = "cardiologia") {
-    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Cardiologia Infantil" }];
+    banco.profissionais![0]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Cardiologia Infantil" }];
     ctx.estado!.knowledge_context = {
       versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
       consulta: { termo, tipo_atendimento: "consulta" },
@@ -1115,11 +1115,11 @@ describe("executor real das ferramentas com banco simulado", () => {
         modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
     ]) {
       test(`${origem}: ${caso.especialidade} (${caso.termo}) mantém o vínculo com referências equivalentes até concluir`, async () => {
-        Object.assign(banco.nina_cat_profissionais![0]!, { nome: caso.nome,
+        Object.assign(banco.profissionais![0]!, { nome: caso.nome,
           especialidades: [{ nome: caso.especialidade }], tipo_atendimento: caso.modalidade });
         banco.medicos![0]!.nome = caso.agenda;
         if ('estruturado' in caso && caso.estruturado) {
-          banco.nina_cat_profissionais![0]!.observacao_publica = 'CONSULTA OBSTÉTRICA\nEspecialidade: OBSTETRICIA\nProfissional: Sérgio Satoshi\nObservação: Hora marcada';
+          banco.profissionais![0]!.observacao_publica = 'CONSULTA OBSTÉTRICA\nEspecialidade: OBSTETRICIA\nProfissional: Sérgio Satoshi\nObservação: Hora marcada';
         }
         const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data"), origem,
           teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
@@ -1172,9 +1172,9 @@ describe("executor real das ferramentas com banco simulado", () => {
     referenciaConsulta(ctx, "consulta");
     ctx.estado!.knowledge_context!.referencias.push({ registro: CATALOGO, versao: null,
       procedimento: "Consulta Cardiologia", medicoNome: "Alex Louza" });
-    if (alvo === "registro") banco.nina_cat_profissionais![0]!.id = OUTRO;
-    if (alvo === "clinica") banco.nina_cat_profissionais![0]!.clinica_id = OUTRO;
-    if (alvo === "publicacao") banco.nina_cat_profissionais![0]!.status = "ARQUIVADO";
+    if (alvo === "registro") banco.profissionais![0]!.id = OUTRO;
+    if (alvo === "clinica") banco.profissionais![0]!.clinica_id = OUTRO;
+    if (alvo === "publicacao") banco.profissionais![0]!.status = "ARQUIVADO";
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.ok).toBe(false);
     expect(ctx.estado!.appointment.slot_options?.vagas ?? []).toEqual([]);
@@ -1183,7 +1183,7 @@ describe("executor real das ferramentas com banco simulado", () => {
   test("referência antiga não reutiliza atendimento retirado da publicação", async () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx);
-    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Ortopedia" }];
+    banco.profissionais![0]!.especialidades = [{ nome: "Ortopedia" }];
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.ok).toBe(false);
     expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
@@ -1205,7 +1205,7 @@ describe("executor real das ferramentas com banco simulado", () => {
   test("não troca a modalidade escolhida e retirada da publicação por outra referência", async () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx, "consulta");
-    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
+    banco.profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
     const raizesFonte = [{ fonte: "catalogo_publicado" as const, registro: CATALOGO, versao: null }];
     ctx.estado!.knowledge_context!.selecao = { versao: 1, clinicaId: CLINICA, sessaoId: ctx.estado!.session_id!,
       medicoId: MEDICO, medicoNome: "Alex Louza", referenciaProfissional: `medico:${MEDICO}`, raizesFonte,
@@ -1224,9 +1224,9 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
   });
   test("procedimento mantém executante e nome próprios entre turnos", async () => {
-    banco.nina_cat_servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO", nome: "USG TRANSVAGINAL",
+    banco.servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO", nome: "USG TRANSVAGINAL",
       estrutura: estruturaModalidadeServico("USG TRANSVAGINAL"), executantes: [{ nome: "Alex Louza" }] });
-    vincularProcedimentoTeste(banco.nina_cat_servicos![0]!);
+    vincularProcedimentoTeste(banco.servicos![0]!);
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
       consulta: { termo: "USG TRANSVAGINAL", tipo_atendimento: "exame_procedimento" },
@@ -1326,8 +1326,8 @@ describe("executor real das ferramentas com banco simulado", () => {
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: aceite mantém ortopedia e converte o UUID publicado de Jorge antes de consultar`, async () => {
       banco.medicos![0]!.nome = "JORGE ANTONIO RIBEIRO DOS SANTOS";
-      banco.nina_cat_profissionais![0]!.nome = "Jorge Ribeiro";
-      banco.nina_cat_profissionais![0]!.medico_id = OUTRO;
+      banco.profissionais![0]!.nome = "Jorge Ribeiro";
+      banco.profissionais![0]!.medico_id = OUTRO;
       banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "JORGE RIBEIRO", ativo: false });
       resultadoCatalogo.doctors = ["Jorge Ribeiro"];
       resultadoCatalogo.records = [
@@ -1362,7 +1362,7 @@ describe("executor real das ferramentas com banco simulado", () => {
         teste: origem === "homologacao",
       };
       expect(pesquisa?.continuidade).toBe(true);
-      await executarFerramentaPaciente(ctx, "consultar_base_conhecimento", pesquisa!.args);
+      await executarFerramentaPaciente(ctx, "consultar_cadastro", pesquisa!.args);
       expect(pesquisas[0]).toMatchObject({ query: "ortopedia", medico: "Jorge Ribeiro" });
       const { resultado: busca, coletor } = await comColetor(() =>
         executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Jorge" }),
@@ -1391,7 +1391,7 @@ describe("executor real das ferramentas com banco simulado", () => {
         ),
       ).toBe(true);
       expect(gravacoes).toHaveLength(0);
-      expect(banco.nina_cat_profissionais![0]!.medico_id).toBe(OUTRO);
+      expect(banco.profissionais![0]!.medico_id).toBe(OUTRO);
     });
   }
 
@@ -1408,7 +1408,7 @@ describe("executor real das ferramentas com banco simulado", () => {
   });
 
   test("cadastro inativo não resolve homônimos por ordem de retorno", async () => {
-    banco.nina_cat_profissionais![0]!.medico_id = PACIENTE;
+    banco.profissionais![0]!.medico_id = PACIENTE;
     banco.medicos!.push(
       { id: PACIENTE, clinica_id: CLINICA, nome: "Alex Louza", ativo: false },
       { id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva Louza", ativo: true },
@@ -1426,7 +1426,7 @@ describe("executor real das ferramentas com banco simulado", () => {
   test.each(["nome_divergente", "outra_clinica"])(
     "vínculo inativo com %s não é substituído por coincidência do nome público",
     async (caso) => {
-      banco.nina_cat_profissionais![0]!.medico_id = OUTRO;
+      banco.profissionais![0]!.medico_id = OUTRO;
       banco.medicos!.push({
         id: OUTRO,
         clinica_id: caso === "outra_clinica" ? OUTRO : CLINICA,
@@ -1451,7 +1451,7 @@ describe("executor real das ferramentas com banco simulado", () => {
     "vinculo_invalido",
   ] as const) {
     test(`catálogo ${situacao} não autoriza um vínculo nem consulta vagas`, async () => {
-      const registro = banco.nina_cat_profissionais![0]!;
+      const registro = banco.profissionais![0]!;
       if (situacao === "outra_clinica") registro.clinica_id = OUTRO;
       if (situacao === "rascunho") registro.status = "RASCUNHO";
       if (situacao === "arquivado") registro.status = "ARQUIVADO";
@@ -1469,7 +1469,7 @@ describe("executor real das ferramentas com banco simulado", () => {
   }
 
   test("vínculo explícito do catálogo é preservado ao devolver a identidade da agenda", async () => {
-    banco.nina_cat_profissionais![0]!.medico_id = OUTRO;
+    banco.profissionais![0]!.medico_id = OUTRO;
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva Louza", ativo: true });
     const r = await executarFerramentaPaciente(
       contexto("Quais médicos atendem?"),
@@ -1482,7 +1482,7 @@ describe("executor real das ferramentas com banco simulado", () => {
 
   test("modelo pode interpretar mudança contextual de médico e consultar seu vínculo oficial", async () => {
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Antonio Cobucci", ativo: true });
-    banco.nina_cat_profissionais![0]!.nome = "Antonio Cobucci";
+    banco.profissionais![0]!.nome = "Antonio Cobucci";
     const r = await executarFerramentaPaciente(
       contexto("pensando melhor, veja o outro profissional", "Temos Alex Louza e Antonio Cobucci. Posso verificar vagas do Dr. Alex Louza?"),
       "proxima_vaga",
@@ -1716,7 +1716,7 @@ describe("modalidades na consulta operacional", () => {
       ["Por numeração (ficha)", "ficha", true],
     ] as const) {
       test(`${origem}: escolha após oferta composta e sim consultam sem exigir data (${esperada})`, async () => {
-        banco.nina_cat_profissionais![0]!.tipo_atendimento = publicada;
+        banco.profissionais![0]!.tipo_atendimento = publicada;
         const ctx: CtxNinaPaciente = { ...contexto("com o Alex Louza",
           "Quer verificar vagas na agenda? Se sim, qual profissional prefere?"), origem, teste: origem === "homologacao" };
         const escolhido = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: "Alex Louza" });
@@ -1760,7 +1760,7 @@ describe("modalidades na consulta operacional", () => {
     for (const modalidade of ["Ordem de chegada", "Ordem de chegada sem pré-agendamento"])
     for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"])
       test(`${origem}: ${ferramenta} (${modalidade}) não consulta vagas nem solicita cadastro`, async () => {
-        banco.nina_cat_profissionais![0]!.tipo_atendimento = modalidade;
+        banco.profissionais![0]!.tipo_atendimento = modalidade;
         const ctx = { ...contexto("Tem vaga com Dr. Alex Louza?"), origem, teste: origem === "homologacao" };
         const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
         expect(r.ok).toBe(true);
@@ -1773,13 +1773,13 @@ describe("modalidades na consulta operacional", () => {
         expect((await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro).toBe("ACTION_NOT_AUTHORIZED");
       });
   test("modalidades conflitantes não produzem opções de horário", async () => {
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Hora marcada / por ficha";
+    banco.profissionais![0]!.tipo_atendimento = "Hora marcada / por ficha";
     const r = await executarFerramentaPaciente(contexto("Tem vaga com Dr. Alex Louza?"), "consultar_disponibilidade", argumentos);
     expect(r.erro).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("fallback usa a agenda da vaga, sem generalizar o booleano de outra agenda", async () => {
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = null;
+    banco.profissionais![0]!.tipo_atendimento = null;
     banco.agendamentos![0]!.agenda_id = "agenda-correta";
     banco.medico_agendas = [
       { id: "outra", clinica_id: CLINICA, medico_id: MEDICO, ordem_chegada: true },
@@ -1793,7 +1793,7 @@ describe("modalidades na consulta operacional", () => {
     expect((await executarFerramentaPaciente(ctx, "consultar_disponibilidade", argumentos)).erro).toBe("MODALIDADE_NAO_DEFINIDA");
   });
   test("ficha inclui cancelados e vagas, separa agendas e ignora outras clínicas", async () => {
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Por ficha";
+    banco.profissionais![0]!.tipo_atendimento = "Por ficha";
     const ctx = contextoAgendar(true);
     ctx.estado.appointment.modalidade_atendimento = "ficha";
     resumoEntregueFixture(ctx.estado, CLINICA, true);
@@ -1809,7 +1809,7 @@ describe("modalidades na consulta operacional", () => {
     expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain("*Sua ficha:* 002");
   });
   test("leitura de ficha percorre todas as páginas do dia", async () => {
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Por ficha";
+    banco.profissionais![0]!.tipo_atendimento = "Por ficha";
     const ctx = contextoAgendar(true);
     ctx.estado.appointment.modalidade_atendimento = "ficha";
     resumoEntregueFixture(ctx.estado, CLINICA, true);
@@ -1821,7 +1821,7 @@ describe("modalidades na consulta operacional", () => {
     expect(r.ficha_numero).toBe("1003");
   });
   test("falha ao ler ficha preserva sucesso comprovado e não inventa número", async () => {
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Por ficha";
+    banco.profissionais![0]!.tipo_atendimento = "Por ficha";
     const ctx = contextoAgendar(true);
     ctx.estado.appointment.modalidade_atendimento = "ficha";
     resumoEntregueFixture(ctx.estado, CLINICA, true);
@@ -1877,7 +1877,7 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
       ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
       ["Por numeração (ficha)", "ficha", true],
     ] as const) test(`${teste ? "homologação" : "real"}: reserva e confirmação respeitam ${rotulo}`, async () => {
-      banco.nina_cat_profissionais![0]!.tipo_atendimento = rotulo;
+      banco.profissionais![0]!.tipo_atendimento = rotulo;
       const t = await preparar(teste);
       const resumo = await t.turno("eu prefiro 10:20");
       expect(resumo?.texto).toContain("10:20");
@@ -1897,7 +1897,7 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     test(`${teste ? "homologação" : "real"}: modalidade alterada após resumo transfere sem reservar`, async () => {
       const t = await preparar(teste);
       await t.turno("vou 10:20");
-      banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+      banco.profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
       const r = await t.turno("Sim");
       expect(r?.origem).toBe("handoff");
       expect(r?.texto).toContain("forma de atendimento");
@@ -1988,7 +1988,7 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
 });
 
 describe("identificação pendente bloqueia avanço da agenda", () => {
-  for (const busca of ["consultar_base_conhecimento", "buscar_procedimentos", "buscar_medicos"]) {
+  for (const busca of ["consultar_cadastro", "buscar_procedimentos", "buscar_medicos"]) {
     test(busca + " pede esclarecimento e impede consulta ou reserva no mesmo turno", async () => {
       resultadoCatalogo.esclarecimento = { tipo: "procedimento", pergunta: "Qual ultrassonografia?", opcoes: [] };
       const ctx: CtxNinaPaciente = { ...contexto("Quero USG"), podeAgendar: true };
@@ -2147,7 +2147,7 @@ describe("horários apresentados por período", () => {
   ] as const)
     test(`${esperada}: lista por período preserva modalidade e orientação`, async () => {
       agendaDoDia();
-      banco.nina_cat_profissionais![0]!.tipo_atendimento = publicada;
+      banco.profissionais![0]!.tipo_atendimento = publicada;
       const r = await executarFerramentaPaciente(contexto("à tarde"), "consultar_disponibilidade",
         { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
       const primeira = (r.horarios as Linha[])[0]!;
@@ -2157,7 +2157,7 @@ describe("horários apresentados por período", () => {
 
   test("sem pré-agendamento continua orientando comparecimento, sem horários", async () => {
     agendaDoDia();
-    banco.nina_cat_profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
+    banco.profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
     const ctx = contexto("Tem vaga dia 30?");
     const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
     expect(r.sem_agendamento).toBe(true);
@@ -2235,7 +2235,7 @@ describe("paginação sobrevive entre turnos", () => {
       id: `u${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i * 10).toISOString(),
       fim: depois(dia, i * 10 + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
     }));
-    banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
+    banco.profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
     const ctx = contexto("tanto faz");
     novoTurno(ctx, "tanto faz", "cardiologia");
     const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "qualquer" });

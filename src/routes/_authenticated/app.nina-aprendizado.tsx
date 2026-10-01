@@ -2,7 +2,7 @@
  * Nina → Revisão de Aprendizados (FASE 2).
  *
  * Central administrativa para revisar os erros reportados pelas atendentes.
- * Aprovar/rejeitar aqui NÃO altera o catálogo, a Base de Conhecimentos,
+ * Aprovar/rejeitar aqui NÃO altera o cadastro do sistema,
  * embeddings, prompt, modelo, regras ou ferramentas — apenas registra a
  * decisão. A aplicação real virá em fase posterior.
  */
@@ -1025,7 +1025,7 @@ function Pagina() {
           <p className="text-sm text-muted-foreground">{AVISO_CICLO_APRENDIZADO}</p>
           <p className="text-sm text-muted-foreground">
             Revisão dos erros reportados pela equipe. Aprovar ou rejeitar aqui{" "}
-            <strong>não altera</strong> a Base de Conhecimentos — a aplicação real virá depois.
+            <strong>não altera</strong> o cadastro do sistema — a aplicação real virá depois.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1875,9 +1875,9 @@ function Pagina() {
                   <li className="flex gap-2">
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
                     <span>
-                      O catálogo publicado ainda não contém esta informação. Ao confirmar, fica
-                      registrada a pendência de corrigir e publicar o registro na Base de
-                      Conhecimentos — só depois disso a correção é marcada como aplicada.
+                      O cadastro do sistema ainda não contém esta informação. Ao confirmar, fica
+                      registrada a pendência de a equipe corrigir o cadastro (Clínica médica ›
+                      Cadastros) — só depois disso a correção é marcada como aplicada.
                     </span>
                   </li>
                 )}
@@ -1938,8 +1938,8 @@ function Pagina() {
           <DialogHeader>
             <DialogTitle>Diagnosticar a causa do erro</DialogTitle>
             <DialogDescription>
-              Comparação somente leitura com o catálogo oficial. Salvar o diagnóstico{" "}
-              <strong>não altera</strong> o catálogo nem a Base de Conhecimentos.
+              Comparação somente leitura com o cadastro do sistema. Salvar o diagnóstico{" "}
+              <strong>não altera</strong> o cadastro.
             </DialogDescription>
           </DialogHeader>
 
@@ -2049,7 +2049,7 @@ function Pagina() {
           <DialogHeader>
             <DialogTitle>Rejeitar correção</DialogTitle>
             <DialogDescription>
-              O registro fica marcado como rejeitado. Nada é alterado na Base de Conhecimentos.
+              O registro fica marcado como rejeitado. Nada é alterado no cadastro do sistema.
             </DialogDescription>
           </DialogHeader>
           <Label htmlFor="motivo">Motivo (opcional)</Label>

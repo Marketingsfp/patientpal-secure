@@ -11,7 +11,6 @@ import {
 } from "../catalogo-estrutura";
 import { servicoParaRegistro, profissionalParaRegistro } from "../catalogo-conhecimento";
 import { profissionalSfp, registroExigeHumano } from "../regras-catalogo";
-import { aplicarEdicaoCatalogoIA } from "../catalogo-edicao-ia";
 
 const adulto =
   "CONSULTA CARDIOLOGIA | Especialidade: CARDIOLOGIA | Profissional: Alex Louza | Dias e horários: Quarta 13h | Idade/critério informado: a partir de 15 anos | Dinheiro: R$ 120,00 | Pix/cartão: R$ 145,00 | Observação: Agendado | Pode chegar até que horas: Manhã e tarde";
@@ -154,24 +153,5 @@ describe("organização conservadora do catálogo", () => {
     expect(s.extras?.preparo_status).toBe("nao_informado");
     expect(p.extras?.convenios_status).toBe("nao_informado");
     expect(p.extras?.atendimentos_publicados).toHaveLength(2);
-  });
-  it("edição assistida preserva estrutura e exige prévia manual de mudanças estruturadas no rascunho", () => {
-    const estrutura = { aliases: ["ECG"] };
-    const proposta = {
-      alteracoes: [{ operacao: "definir", caminho: "/preparo", valor_json: '"Regra confirmada"' }],
-      pendencias: [],
-      ambiguidades: [],
-    };
-    const atual = { nome: "Eletrocardiograma", estrutura };
-    expect(aplicarEdicaoCatalogoIA("servico", atual, proposta).dados.estrutura?.aliases).toEqual([
-      "ECG",
-    ]);
-    expect(() =>
-      aplicarEdicaoCatalogoIA(
-        "servico",
-        { ...atual, rascunho: { estrutura: { aliases: ["Outro"] } } },
-        proposta,
-      ),
-    ).toThrow("regras estruturadas");
   });
 });

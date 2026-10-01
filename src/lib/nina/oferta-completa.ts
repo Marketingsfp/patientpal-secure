@@ -201,14 +201,14 @@ export function blocoPromptOfertaCompleta({
 
   if (leitura.pedeInfoConsulta && !leitura.pedeDisponibilidade) {
     linhas.push(
-      `- O paciente pediu INFORMAÇÃO sobre ${assunto ?? "uma consulta/especialidade"}. Chame "consultar_base_conhecimento" e responda reunindo, quando existirem: valor da consulta, médicos, dias de atendimento, horários de atendimento e unidade. Mostre só o que a base realmente trouxe.`,
+      `- O paciente pediu INFORMAÇÃO sobre ${assunto ?? "uma consulta/especialidade"}. Chame "consultar_cadastro" e responda reunindo, quando existirem: valor da consulta, médicos, dias de atendimento, horários de atendimento e unidade. Mostre só o que a base realmente trouxe.`,
       '- Feche com uma frase curta oferecendo o próximo passo, por exemplo: "Se quiser, posso verificar as próximas datas e horários disponíveis. 😊"',
     );
   }
 
   if (leitura.pedeDisponibilidade) {
     linhas.push(
-      `- O paciente quer DISPONIBILIDADE${assunto ? ` de ${assunto}` : ""}: use as DUAS fontes — "consultar_base_conhecimento" (valor, médicos, unidade) e "consultar_disponibilidade" (datas e horários reais).`,
+      `- O paciente quer DISPONIBILIDADE${assunto ? ` de ${assunto}` : ""}: use as DUAS fontes — "consultar_cadastro" (valor, médicos, unidade) e "consultar_disponibilidade" (datas e horários reais).`,
       "- Organize assim: nome da consulta, valor (quando houver na base), médico, data, horários disponíveis e unidade. Com vários profissionais, agrupe POR MÉDICO.",
       `- Ofereça de 3 a 5 boas opções no total (até ${MAX_HORARIOS_POR_MEDICO} por médico), priorizando as próximas datas. Se houver mais, pergunte: "Quer que eu veja mais horários?"`,
       "- Termine perguntando qual médico, dia ou horário o paciente prefere.",

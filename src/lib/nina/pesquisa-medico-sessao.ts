@@ -49,7 +49,7 @@ export function prepararPesquisaMedicoDaSessao(
   anterior: ConhecimentoSessao | null,
   contexto?: ContextoResposta,
 ): string | undefined {
-  if (!["consultar_base_conhecimento", "buscar_medicos"].includes(ferramenta) || !args) return args;
+  if (!["consultar_cadastro", "buscar_medicos"].includes(ferramenta) || !args) return args;
   try {
     const p = JSON.parse(args);
     if (!p || typeof p !== "object" || Array.isArray(p)) return args;
@@ -84,7 +84,7 @@ export function prepararPesquisaMedicoDaSessao(
       return JSON.stringify({
         ...p,
         [campo]: anterior.esclarecimento?.atendimento ?? anterior.consulta.termo,
-        ...(ferramenta === "consultar_base_conhecimento" ? { tipo_atendimento: "consulta" } : {}),
+        ...(ferramenta === "consultar_cadastro" ? { tipo_atendimento: "consulta" } : {}),
       });
     }
   } catch {

@@ -279,7 +279,7 @@ export const INSTRUCOES_AVALIADOR = [
   "Responda em português do Brasil, de forma objetiva, sem expor raciocínio interno.",
   "Além do diagnóstico, devolva em `proposta` a mudança concreta que corrigiria a causa",
   "demonstrada: camada responsável, alvo exato, valor atual, valor novo, justificativa e alcance.",
-  "Camadas possíveis: catalogo (informação oficial publicada), modelo (prompt da Arquitetura),",
+  "Camadas possíveis: catalogo (informação vinda do cadastro do sistema: a equipe corrige no cadastro), modelo (prompt da Arquitetura),",
   "busca, ferramenta e fluxo (estas três vivem em código e não são aplicadas automaticamente).",
   "Sem causa demonstrada, devolva proposta nula: não invente mudança.",
   "Nunca proponha alterar a identidade do atendimento nem regras operacionais fora da causa.",
@@ -402,16 +402,17 @@ export function montarPromptAnalise(p: PacoteEvidencias): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * Camada onde a correção precisa acontecer. Só `catalogo` e `modelo` são
- * configuração viva no banco; as demais dependem de mudança de código e por
- * isso NUNCA são aplicadas automaticamente.
+ * Camada onde a correção precisa acontecer. Só `modelo` (prompt) é configuração
+ * viva aplicada automaticamente. `catalogo` é o cadastro do sistema: quem corrige é a
+ * equipe, na origem. As demais dependem de mudança de código. Nenhuma delas é aplicada
+ * automaticamente.
  */
 export type CamadaProposta = "catalogo" | "modelo" | "busca" | "ferramenta" | "fluxo";
 
-export const CAMADAS_APLICAVEIS: CamadaProposta[] = ["catalogo", "modelo"];
+export const CAMADAS_APLICAVEIS: CamadaProposta[] = ["modelo"];
 
 export const ROTULO_CAMADA_PROPOSTA: Record<CamadaProposta, string> = {
-  catalogo: "Catálogo publicado",
+  catalogo: "Cadastro do sistema",
   modelo: "Prompt da Arquitetura",
   busca: "Busca da Base (código)",
   ferramenta: "Integração / ferramenta (código)",

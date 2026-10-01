@@ -320,7 +320,7 @@ export async function vagasPendentesBateria(admin: any, carga: CargaPersistida) 
 export async function consultasPublicadasBateria(clinicaId: string): Promise<ConsultaCatalogo[]> {
   const { lerPublicados, COLUNAS_PROFISSIONAL } = await import("./catalogo-turno.server");
   const profissionais = await lerPublicados<ProfissionalCatalogo>(
-    "nina_cat_profissionais",
+    "profissionais",
     `${COLUNAS_PROFISSIONAL}, medico_id`,
     clinicaId,
   );

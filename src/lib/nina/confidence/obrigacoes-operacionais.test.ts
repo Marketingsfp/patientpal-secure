@@ -27,7 +27,7 @@ function preparar(prompt = PROMPT_PUBLICADO_V15) {
     retrievedSources: [],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "base_conhecimento",
         success: true,
@@ -144,7 +144,7 @@ describe("prova operacional da regra integral de homologação", () => {
       success: true,
     },
     {
-      nome: "consultar_base_conhecimento",
+      nome: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "agenda",
       success: true,
@@ -165,7 +165,7 @@ describe("prova operacional da regra integral de homologação", () => {
     const { obrigacao, ctx } = preparar();
     ctx.toolResults = [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "base_conhecimento",
         success: false,

@@ -3,7 +3,7 @@ import { extrairEvidencia } from "./evidencia-extrator";
 import { decidirNoTurno, verificarRespostaFinalDoTurno, type EstadoDoTurno } from "./runtime";
 
 const evidencia = extrairEvidencia({
-  ferramenta: "consultar_base_conhecimento",
+  ferramenta: "consultar_cadastro",
   capacidade: "searchKnowledgeBase",
   fonte: "base_conhecimento",
   success: true,
@@ -37,7 +37,7 @@ function turno(textoResposta = texto): EstadoDoTurno {
     consultas: [evidencia.consulta],
     ferramentas: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "base_conhecimento",
         success: true,

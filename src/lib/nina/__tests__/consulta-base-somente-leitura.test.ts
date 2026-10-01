@@ -31,7 +31,7 @@ const resultado = await executarFerramentaPaciente({
   clinicaId: "clinica-simulada", telefone: null, pacienteId: null,
   pacienteNome: null, conversaId: "conversa-simulada",
   origem: "homologacao", teste: true, podeAgendar: false, estado
-}, "consultar_base_conhecimento", entrada.args);
+}, "consultar_cadastro", entrada.args);
 console.log(JSON.stringify({ antes, depois: estado, resultado, chamadas, auditoria,
   resumo: textoResumo(estado, "Unidade de teste") }));
 `;

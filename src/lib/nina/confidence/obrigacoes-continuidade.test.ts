@@ -37,7 +37,7 @@ function preparar(prompt = PROMPT_PUBLICADO_V15) {
     retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true }],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "base_conhecimento",
         success: true,
@@ -45,7 +45,7 @@ function preparar(prompt = PROMPT_PUBLICADO_V15) {
     ],
     fatos: [
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         entidade: "servico",
@@ -53,7 +53,7 @@ function preparar(prompt = PROMPT_PUBLICADO_V15) {
         valor: "Cardiologia",
       },
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         entidade: "profissional",
@@ -62,7 +62,7 @@ function preparar(prompt = PROMPT_PUBLICADO_V15) {
         chave: { medicoNome: "Bruno Costa", medicoId: MEDICO },
       },
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         entidade: "escala",
@@ -88,7 +88,7 @@ describe("continuidade comprovada para a regra publicada integral", () => {
   function pagamento() {
     const preparado = preparar();
     const evidencia = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,

@@ -469,7 +469,7 @@ describe("FASE 6 — resultado do executor", () => {
     const comPassos = montarRelatorio(
       relatorio({
         passos: [
-          { ordem: 1, ferramenta: "gravar_item_catalogo", titulo: "Gravou item", detalhe: "ok", ok: true, em: "x" },
+          { ordem: 1, ferramenta: "publicar_prompt", titulo: "Publicou prompt", detalhe: "ok", ok: true, em: "x" },
         ],
       }),
     );

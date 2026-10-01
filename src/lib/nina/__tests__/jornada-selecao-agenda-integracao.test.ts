@@ -34,7 +34,7 @@ const MEDICOS_AGENDA = [ALEX, BRUNO];
 function catalogoFicticio() {
   return [
     {
-      id: "nina_cat_profissionais:alex-ficticio",
+      id: "profissionais:alex-ficticio",
       medico: "Alex Louza",
       procedimento: "Consulta — CARDIOLOGIA, CARDIOLOGIA INFANTIL",
       dia: "Quarta 13h, Sexta 13h",
@@ -49,7 +49,7 @@ function catalogoFicticio() {
       },
     },
     {
-      id: "nina_cat_profissionais:bruno-ficticio",
+      id: "profissionais:bruno-ficticio",
       medico: "Bruno Costa",
       procedimento: "Consulta — CARDIOLOGIA",
       dia: "Quarta 13h",
@@ -85,7 +85,7 @@ function criarJornada() {
     const versao = `publicacao-simulada-${consultasSimuladas.length + 1}`;
     consultasSimuladas.push({ args, versao });
     return {
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,

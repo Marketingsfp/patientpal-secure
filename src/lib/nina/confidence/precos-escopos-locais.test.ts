@@ -4,7 +4,7 @@ import { avaliarGrounding, extrairClaimsDoTexto } from "./claims";
 import type { ContextoConfianca } from "./types";
 
 const evidencia = extrairEvidencia({
-  ferramenta: "consultar_base_conhecimento",
+  ferramenta: "consultar_cadastro",
   capacidade: "searchKnowledgeBase",
   fonte: "base_conhecimento",
   success: true,

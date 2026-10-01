@@ -20,7 +20,7 @@ const pendente = lembrarConsultaComprovada({
   esclarecimento: { tipo: "sigla", pergunta: "Qual é o nome por extenso?", opcoes: [] },
 })!;
 const resultado = (dados: object) =>
-  validarResultado("consultar_base_conhecimento", { ok: true, ...dados });
+  validarResultado("consultar_cadastro", { ok: true, ...dados });
 const segunda = prepararSegundaPergunta(
   pendente,
   resultado({ esclarecimento: pendente.esclarecimento }),
@@ -79,7 +79,7 @@ describe("até duas perguntas para esclarecer antes de encaminhar", () => {
     expect(
       encaminharAposEsclarecimento(
         pendente,
-        validarResultado("consultar_base_conhecimento", { ok: false, erro: "INTERNAL_ERROR" }),
+        validarResultado("consultar_cadastro", { ok: false, erro: "INTERNAL_ERROR" }),
         "USG tireoide",
       ),
     ).toBeNull();

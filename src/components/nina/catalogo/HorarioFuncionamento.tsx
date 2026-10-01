@@ -1,5 +1,5 @@
 /**
- * Base de Conhecimentos → Informações da clínica → Horário de funcionamento.
+ * Nina → Informações da clínica → Horário de funcionamento.
  *
  * Fonte única do horário oficial: o calendário da Nina, agora com versões.
  * Rascunho não tem efeito nenhum; só a versão publicada é usada pela Nina e

@@ -26,9 +26,9 @@ function preparar(retornos: unknown[]) {
 describe("broker revalida somente leituras comandadas pelo servidor", () => {
   test("retry comum reutiliza a leitura e não duplica execução na trilha", async () => {
     const { broker, chamadas } = preparar([{ ok: true, versao: "v1" }]);
-    const primeira = await broker.executar("consultar_base_conhecimento", { termo: "cardiologia" });
+    const primeira = await broker.executar("consultar_cadastro", { termo: "cardiologia" });
     const repetida = await broker.executar(
-      "consultar_base_conhecimento",
+      "consultar_cadastro",
       '{"termo":"cardiologia"}',
     );
     expect(chamadas).toHaveLength(1);
@@ -42,11 +42,11 @@ describe("broker revalida somente leituras comandadas pelo servidor", () => {
       { ok: true, versao: "v2", price: "R$ 130,00" },
     ]);
     const args = { termo: "cardiologia" };
-    await broker.executar("consultar_base_conhecimento", args);
-    const nova = await broker.executar("consultar_base_conhecimento", args, {
+    await broker.executar("consultar_cadastro", args);
+    const nova = await broker.executar("consultar_cadastro", args, {
       revalidarLeitura: true,
     });
-    const cacheNovo = await broker.executar("consultar_base_conhecimento", args);
+    const cacheNovo = await broker.executar("consultar_cadastro", args);
     expect(chamadas).toHaveLength(2);
     expect(nova.reused).toBe(false);
     expect(nova.dados).toEqual({ ok: true, versao: "v2", price: "R$ 130,00" });
@@ -61,8 +61,8 @@ describe("broker revalida somente leituras comandadas pelo servidor", () => {
       { ok: true, knowledge_status: "found" },
     ]);
     const args = { termo: "cardiologia" };
-    expect((await broker.executar("consultar_base_conhecimento", args)).success).toBe(false);
-    const recuperada = await broker.executar("consultar_base_conhecimento", args, {
+    expect((await broker.executar("consultar_cadastro", args)).success).toBe(false);
+    const recuperada = await broker.executar("consultar_cadastro", args, {
       revalidarLeitura: true,
     });
     expect(chamadas).toHaveLength(2);
@@ -77,9 +77,9 @@ describe("broker revalida somente leituras comandadas pelo servidor", () => {
       { ok: false, erro: "INTERNAL_ERROR" },
     ]);
     const args = { termo: "cardiologia" };
-    await broker.executar("consultar_base_conhecimento", args);
-    await broker.executar("consultar_base_conhecimento", args, { revalidarLeitura: true });
-    const atual = await broker.executar("consultar_base_conhecimento", args);
+    await broker.executar("consultar_cadastro", args);
+    await broker.executar("consultar_cadastro", args, { revalidarLeitura: true });
+    const atual = await broker.executar("consultar_cadastro", args);
     expect(chamadas).toHaveLength(2);
     expect(atual.success).toBe(false);
     expect(atual.erro).toBe("INTERNAL_ERROR");
@@ -123,8 +123,8 @@ describe("broker revalida somente leituras comandadas pelo servidor", () => {
   test("argumento inventado pelo modelo não força revalidação", async () => {
     const { broker, chamadas } = preparar([{ ok: true, versao: "v1" }]);
     const args = { termo: "cardiologia", revalidarLeitura: true };
-    await broker.executar("consultar_base_conhecimento", args);
-    const repetida = await broker.executar("consultar_base_conhecimento", args);
+    await broker.executar("consultar_cadastro", args);
+    const repetida = await broker.executar("consultar_cadastro", args);
     expect(chamadas).toHaveLength(1);
     expect(repetida.reused).toBe(true);
   });
@@ -137,10 +137,10 @@ describe("broker revalida somente leituras comandadas pelo servidor", () => {
     ]);
     const alex = { termo: "cardiologia", medico: "Alex" };
     const marina = { termo: "cardiologia", medico: "Marina" };
-    await broker.executar("consultar_base_conhecimento", alex);
-    const outra = await broker.executar("consultar_base_conhecimento", marina);
-    await broker.executar("consultar_base_conhecimento", alex, { revalidarLeitura: true });
-    expect(await broker.executar("consultar_base_conhecimento", marina)).toEqual({
+    await broker.executar("consultar_cadastro", alex);
+    const outra = await broker.executar("consultar_cadastro", marina);
+    await broker.executar("consultar_cadastro", alex, { revalidarLeitura: true });
+    expect(await broker.executar("consultar_cadastro", marina)).toEqual({
       ...outra,
       reused: true,
     });

@@ -55,46 +55,46 @@ const interpretacao = ({
 // Catálogo misto: a recuperação real precisa separar os quatro cardiologistas
 // dos exames que também mencionam cardiologia. Um único registro escondia o bug.
 const catalogoInterpretado: Record<string, any[]> = {
-  nina_cat_profissionais: ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome, i) => ({
+  profissionais: ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome, i) => ({
     id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
     especialidades: [{ nome: "CARDIOLOGIA" }], formas_pagamento: [], horarios: [], convenios: [],
   })),
-  nina_cat_servicos: ["MAPA 24H", "ECOCARDIOGRAMA", "ELETROCARDIOGRAMA", "HOLTER 24H", "TESTE ERGOMETRICO", "NEBULIZAÇÃO", "ULTRASSONOGRAFIA ABDOME TOTAL SEM DOPPLER", "ULTRASSONOGRAFIA ABDOME SUPERIOR COM DOPPLER"].map((nome, i) => ({
+  servicos: ["MAPA 24H", "ECOCARDIOGRAMA", "ELETROCARDIOGRAMA", "HOLTER 24H", "TESTE ERGOMETRICO", "NEBULIZAÇÃO", "ULTRASSONOGRAFIA ABDOME TOTAL SEM DOPPLER", "ULTRASSONOGRAFIA ABDOME SUPERIOR COM DOPPLER"].map((nome, i) => ({
     id: `servico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
     descricao_publica: i < 5 ? "Exame de cardiologia" : "Atendimento por ordem de chegada",
     executantes: [], formas_pagamento: [], valor: null,
   })),
 };
 if (clinicoGeral) {
-  catalogoInterpretado.nina_cat_profissionais = [{
+  catalogoInterpretado.profissionais = [{
     id: "catalogo-clinico", medico_id: "medico-clinico", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: medicoClinico,
     especialidades: [{ nome: "CLINICO GERAL" }], formas_pagamento: [], horarios: [], convenios: [],
     observacao_publica: `CONSULTA CLINICO GERAL\nEspecialidade: CLINICO GERAL\nDinheiro: R$ 120,00\nObservação: ${cenario.endsWith("carlos") ? "Ficha — 15 vagas" : "Agendado"}`,
   }];
   catalogoInterpretado.medicos = [{ id: "medico-clinico", nome: medicoClinico, clinica_id: "clinica-simulada", ativo: true }];
 }
-if (interpretacao?.publicado === "ODONTOLOGIA") catalogoInterpretado.nina_cat_profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => ({
+if (interpretacao?.publicado === "ODONTOLOGIA") catalogoInterpretado.profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => ({
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
   especialidades: [{ nome: "ODONTOLOGIA" }], tipo_atendimento: "Avaliação odontológica",
   formas_pagamento: [], horarios: [], convenios: [],
 }));
-if (variantePreventivo) catalogoInterpretado.nina_cat_profissionais = ["Conceição Martins", "Marcilio Quintão"].map((nome, i) => ({
+if (variantePreventivo) catalogoInterpretado.profissionais = ["Conceição Martins", "Marcilio Quintão"].map((nome, i) => ({
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome, especialidades: [{ nome: "GINECOLOGIA" }],
   observacao_publica: `${i === 0 ? "CONSULTA + PREVENTIVO" : "CONSULTA GINECOLOGIA"}\nEspecialidade: GINECOLOGIA\nDinheiro: R$ ${i === 0 ? "172" : "120"},00\nObservação: Agendado`,
   formas_pagamento: [], horarios: [], convenios: [],
 }));
-if (escolhaMedico) catalogoInterpretado.nina_cat_profissionais = ["Shirley Martins", "Raisa Moura"].map((nome, i) => ({
+if (escolhaMedico) catalogoInterpretado.profissionais = ["Shirley Martins", "Raisa Moura"].map((nome, i) => ({
   id: `medico-${i}`, clinica_id: "clinica-simulada", status: "PUBLICADO", nome,
   especialidades: [{ nome: "DERMATOLOGIA" }], formas_pagamento: [], horarios: [], convenios: [],
 }));
-if (confirmacaoMedico) catalogoInterpretado.nina_cat_profissionais = [{
+if (confirmacaoMedico) catalogoInterpretado.profissionais = [{
   id: "medico-0", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: "Sandro Prinscewal",
   especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }], formas_pagamento: [], horarios: [], convenios: [],
 }];
 const perguntaEsclarecimento = "Pode informar o nome do procedimento por extenso?";
 const ferramentaAusente = cenario.includes("medicos_modelo") ? "buscar_medicos"
   : cenario.includes("procedimentos_modelo") ? "buscar_procedimentos"
-  : cenario.includes("especialidades_modelo") ? "listar_especialidades" : "consultar_base_conhecimento";
+  : cenario.includes("especialidades_modelo") ? "listar_especialidades" : "consultar_cadastro";
 const escolhaHorario = cenario.startsWith("escolha_");
 const modoConfirmacao = cenario.startsWith("confirmado_") ? cenario.slice("confirmado_".length) : null;
 const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
@@ -249,7 +249,7 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
   lerFonteOperacional: async (clinicaId: string) => {
     const usar: Record<string, any[]> = (interpretacao || escolhaMedico || clinicoGeral) ? catalogoInterpretado : {};
     const publicados = (t: string) => (usar[t] ?? []).filter((l) => l.clinica_id === clinicaId && l.status === "PUBLICADO");
-    return { servicos: publicados("nina_cat_servicos"), profissionais: publicados("nina_cat_profissionais") };
+    return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
 }));
 mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") }));
@@ -263,7 +263,7 @@ mock.module("@/lib/nina/instrucoes-runtime.server", () => ({ promptInstrucoes: a
 }) }));
 mock.module("@/lib/nina/catalogo-prompt.server", () => ({ contarCatalogoPublicado: async () => ({ servicos: 1, profissionais: 1 }) }));
 mock.module("@/lib/nina/paciente-tools.server", () => ({
-  FERRAMENTAS_NINA_CONSULTA: ["consultar_base_conhecimento", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
+  FERRAMENTAS_NINA_CONSULTA: ["consultar_cadastro", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
     .map(name => ({ type: "function", function: { name } })),
   FERRAMENTAS_NINA_PACIENTE: ["selecionar_horario", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
     .map(name => ({ type: "function", function: { name } })),
@@ -384,7 +384,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
         ...(cenario === "falha_consulta" ? { erro: "INTERNAL_ERROR" } : {}) };
     }
     if (ausente && nome === ferramentaAusente && !(cenario.endsWith("misto") && argumentosFerramentas.at(-1)?.args.termo === "eletrocardiograma")) {
-      const tipada = nome !== "consultar_base_conhecimento";
+      const tipada = nome !== "consultar_cadastro";
       const r = { ferramenta: nome, capacidade: tipada ? "listCatalog" : "searchKnowledgeBase", fonte: "base_conhecimento",
         success: !tipada, reused: false, appointment_confirmed: false,
         ...(tipada ? { erro: nome === "buscar_medicos" ? "DOCTOR_NOT_FOUND" : "PROCEDURE_NOT_FOUND" } : {}),
@@ -394,7 +394,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       resultados.push(r);
       return r;
     }
-    if (nome !== "consultar_base_conhecimento") throw new Error(`Ferramenta inesperada: ${nome}`);
+    if (nome !== "consultar_cadastro") throw new Error(`Ferramenta inesperada: ${nome}`);
     if (interpretacao || escolhaMedico) {
       const { searchKnowledgeBase } = await import("../../knowledge.server");
       const parametros = argumentosFerramentas.at(-1)!.args;
@@ -455,7 +455,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     toolCalls: requests.length === 1 ? [{ id: "executante", type: "function", function: { name: "buscar_medicos",
       arguments: JSON.stringify({ nome: "Mariana Portugal", especialidade: "Nutrição" }) } }] : [] };
   if (clinicoGeral) {
-    const chamada = requests.length === 1 ? { name: "consultar_base_conhecimento", arguments: JSON.stringify({ termo: "Clínica Médica", tipo_atendimento: "consulta" }) }
+    const chamada = requests.length === 1 ? { name: "consultar_cadastro", arguments: JSON.stringify({ termo: "Clínica Médica", tipo_atendimento: "consulta" }) }
       : requests.length === 2 ? { name: "buscar_medicos", arguments: JSON.stringify({ nome: medicoClinico }) }
       : requests.length === 3 ? { name: "proxima_vaga", arguments: JSON.stringify({ medico_id: "medico-clinico", especialidade: "Clínica Geral" }) } : null;
     return { ok: true, conteudo: chamada ? "" : "Encontrei o atendimento de Clínico Geral e consultei a agenda.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
@@ -464,7 +464,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
   if (escolhaMedico) return {
     ok: true, conteudo: confirmacaoMedico ? "Vamos continuar com Sandro Prinscewal para Clínico Geral." : "Vamos continuar com Shirley Martins.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: requests.length === 1 ? [
-      { id: "medico", type: "function", function: { name: "consultar_base_conhecimento", arguments: JSON.stringify({
+      { id: "medico", type: "function", function: { name: "consultar_cadastro", arguments: JSON.stringify({
         termo: confirmacaoMedico ? "clinico geral" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", medico: confirmacaoMedico ? "Sandro" : cenario.endsWith("resolvido") ? "Shirley" : "Suellen", tipo_atendimento: "consulta",
       }) } },
       ...(!confirmacaoMedico && !cenario.endsWith("resolvido") ? [{ id: "nao-transferir-antes-de-esclarecer", type: "function", function: { name: "solicitar_atendente_humano", arguments: '{"motivo":"Não encontrado"}' } }] : []),
@@ -473,7 +473,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
   if (interpretacao && cenario.endsWith("_recuperacao") && requests.length === 1) return {
     ok: true, conteudo: "", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
-      { id: "frase-inteira", type: "function", function: { name: "consultar_base_conhecimento", arguments: JSON.stringify({ termo: pergunta }) } },
+      { id: "frase-inteira", type: "function", function: { name: "consultar_cadastro", arguments: JSON.stringify({ termo: pergunta }) } },
       { id: "handoff-prematuro", type: "function", function: { name: "solicitar_atendente_humano", arguments: '{"motivo":"Não encontrado"}' } },
     ],
   };
@@ -487,7 +487,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     ok: true, conteudo: "A clínica não oferece esse serviço.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
       ...(cenario.endsWith("misto") ? [{ id: "catalogo-encontrado", type: "function",
-        function: { name: "consultar_base_conhecimento", arguments: '{"termo":"eletrocardiograma"}' } }] : []),
+        function: { name: "consultar_cadastro", arguments: '{"termo":"eletrocardiograma"}' } }] : []),
       { id: "catalogo-ausente", type: "function", function: { name: ferramentaAusente, arguments: '{"termo":"pneumologia","especialidade":"pneumologia"}' } },
       { id: "nao-agendar-ausente", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
@@ -506,7 +506,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
   if (cenario === "catalogo_sfp_modelo") return {
     ok: true, conteudo: "Vou consultar e marcar.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
-      { id: "catalogo", type: "function", function: { name: "consultar_base_conhecimento", arguments: '{"termo":"eletrocardiograma"}' } },
+      { id: "catalogo", type: "function", function: { name: "consultar_cadastro", arguments: '{"termo":"eletrocardiograma"}' } },
       { id: "nao-agendar-sfp", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
   };
@@ -544,7 +544,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
           id: "pesquisa-interpretada",
           type: "function",
           function: {
-            name: "consultar_base_conhecimento",
+            name: "consultar_cadastro",
             arguments: JSON.stringify({
               termo:
                 interpretacao?.termo ??

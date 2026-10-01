@@ -81,7 +81,7 @@ const base: Record<string, Linha[]> = {
   ],
   medico_agendas: [{ id: AGENDA, clinica_id: CLINICA, medico_id: MEDICO, ordem_chegada: false }],
   agendamentos: horariosDeQuinta(),
-  nina_cat_profissionais: [
+  profissionais: [
     {
       id: PROFISSIONAL,
       clinica_id: CLINICA,
@@ -123,7 +123,7 @@ const base: Record<string, Linha[]> = {
       updated_at: new Date().toISOString(),
     })),
   ],
-  nina_cat_servicos: Array.from({ length: 201 }, (_, i) => ({
+  servicos: Array.from({ length: 201 }, (_, i) => ({
     id: uuid("bbbbbbbb", i + 1),
     clinica_id: CLINICA,
     status: "PUBLICADO",

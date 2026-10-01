@@ -28,8 +28,6 @@ export const ROTULO_RESULTADO_FINAL: Record<ResultadoFinalExecucao, string> = {
 
 /** Operações reais controladas por teto. */
 export type OperacaoLimitada =
-  | "ler_catalogo"
-  | "gravar_item_catalogo"
   | "ler_prompt_publicado"
   | "publicar_prompt"
   | "testar_em_homologacao"
@@ -37,10 +35,8 @@ export type OperacaoLimitada =
 
 export const LIMITES = {
   /** Cada correção altera um alvo. Duas gravações seriam escopo ampliado. */
-  gravar_item_catalogo: 1,
   publicar_prompt: 1,
   testar_em_homologacao: 3,
-  ler_catalogo: 6,
   ler_prompt_publicado: 3,
   registrar_pendencia_tecnica: 2,
 } as const satisfies Record<OperacaoLimitada, number>;

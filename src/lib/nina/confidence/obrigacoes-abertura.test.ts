@@ -18,7 +18,7 @@ const instrucoes = montarInstrucoesDoTurno({
 
 function contexto(ambiente: "producao" | "homologacao", apresentou = false): ContextoConfianca {
   const evidencia = extrairEvidencia({
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,
@@ -53,7 +53,7 @@ function contexto(ambiente: "producao" | "homologacao", apresentou = false): Con
     ],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "base_conhecimento",
         success: true,

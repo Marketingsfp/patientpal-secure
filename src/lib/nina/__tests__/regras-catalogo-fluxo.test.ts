@@ -45,7 +45,7 @@ describe("Regra de catálogo na geração real (modelo/banco simulados, rede pro
           expect(r.requests).toHaveLength(1);
           expect(r.ferramentas).toEqual(cenario === "catalogo_sfp_handoff_modelo"
             ? ["solicitar_atendente_humano"]
-            : [cenario === "catalogo_sfp_recusa_agenda_modelo" ? "consultar_disponibilidade" : "consultar_base_conhecimento", "solicitar_atendente_humano"]);
+            : [cenario === "catalogo_sfp_recusa_agenda_modelo" ? "consultar_disponibilidade" : "consultar_cadastro", "solicitar_atendente_humano"]);
           expect(r.encaminhamentos).toHaveLength(1);
           expect(r.encaminhamentos[0].motivo).toMatch(/PROFISSIONAL_SFP|Profissional SFP/);
           expect(r.resposta).not.toContain("R$ 80");

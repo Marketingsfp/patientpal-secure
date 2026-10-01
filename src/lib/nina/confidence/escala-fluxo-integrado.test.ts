@@ -89,7 +89,7 @@ const retorno = montarResultadoCatalogo({
   priorizar: "profissional",
 });
 const evidencia = extrairEvidencia({
-  ferramenta: "consultar_base_conhecimento",
+  ferramenta: "consultar_cadastro",
   capacidade: "searchKnowledgeBase",
   fonte: "base_conhecimento",
   success: true,
@@ -162,7 +162,7 @@ function estado(texto: string): EstadoDoTurno {
       appointmentAttempted: false,
       appointmentCreated: false,
     },
-    ferramentas: ["consultar_base_conhecimento", "buscar_medicos"].map((nome) => ({
+    ferramentas: ["consultar_cadastro", "buscar_medicos"].map((nome) => ({
       nome,
       capacidade: nome === "buscar_medicos" ? "listCatalog" : "searchKnowledgeBase",
       fonte: "base_conhecimento",

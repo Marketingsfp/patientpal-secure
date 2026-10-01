@@ -52,7 +52,7 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
   lerFonteOperacional: async (clinicaId: string) => {
     const publicados = (t: string) => ((db.tabelas as Record<string, any[]>)[t] ?? [])
       .filter((l) => l.clinica_id === clinicaId && l.status === "PUBLICADO");
-    return { servicos: publicados("nina_cat_servicos"), profissionais: publicados("nina_cat_profissionais") };
+    return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
 }));
 mock.module("@/lib/nina/carga-redacao-luna.server", () => ({
@@ -322,7 +322,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
     expect(chamadas).toHaveLength(0);
   });
   it("bateria por profissional: cenários vêm do catálogo do servidor, um lead por cenário", async () => {
-    db.tabelas.nina_cat_profissionais = [
+    db.tabelas.profissionais = [
       {
         id: P1,
         clinica_id: CLINICA_CARGA,
@@ -385,7 +385,7 @@ describe("handlers reais de carga com fronteiras simuladas", () => {
   });
 
   it("bateria recusa mistura com plano do Sol e seleção sem consulta publicada", async () => {
-    db.tabelas.nina_cat_profissionais = [];
+    db.tabelas.profissionais = [];
     await expect(
       chamar(f.criarTesteCarga, {
         ...input(),

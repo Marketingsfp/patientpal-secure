@@ -2,9 +2,8 @@
  * Ferramentas reais do executor técnico.
  *
  * Cada função abaixo é uma ação de verdade no sistema, não uma sugestão: ler e
- * gravar o catálogo publicado, ler e publicar o prompt da Arquitetura, rodar o
- * turno de teste em homologação e registrar pendência quando a camada vive em
- * código.
+ * publicar o prompt da Arquitetura, rodar o turno de teste em homologação e
+ * registrar pendência quando a camada vive em código ou no cadastro do sistema.
  *
  * Garantias:
  *  - toda escrita confere de novo a permissão real do usuário que autorizou;
@@ -15,20 +14,6 @@
 import { identidadePreservada, type ResultadoTeste } from "./correcao-executor";
 
 type Sb = any;
-
-async function exigirAdminCatalogo(supabase: Sb, userId: string, clinicaId: string) {
-  const { data, error } = await supabase
-    .from("clinica_memberships")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Sem acesso a esta clínica.");
-  if (!["admin", "gestor"].includes(String(data.role)))
-    throw new Error("Apenas administradores e gestores podem alterar o catálogo da Nina.");
-}
 
 async function exigirPublicarPrompt(supabase: Sb, userId: string, clinicaId: string) {
   const { capacidadesDoPapel } = await import("./arquitetura/permissoes");
@@ -41,96 +26,6 @@ async function exigirPublicarPrompt(supabase: Sb, userId: string, clinicaId: str
     capacidadesDoPapel(String(p.role)).includes("nina.instrucoes.publicar"),
   );
   if (!pode) throw new Error("Você não tem permissão para publicar as Instruções da Nina.");
-}
-
-/* ------------------------------------------------------------------ */
-/* Catálogo publicado                                                  */
-/* ------------------------------------------------------------------ */
-
-export type ItemCatalogo = {
-  id: string;
-  nome: string;
-  valor: string | null;
-  valor_observacao: string | null;
-  descricao_publica: string | null;
-  preparo: string | null;
-  status: string;
-};
-
-/** Busca itens do catálogo desta clínica por trecho do nome. */
-export async function lerCatalogo(
-  supabase: Sb,
-  clinicaId: string,
-  termo: string,
-): Promise<ItemCatalogo[]> {
-  const busca = termo.trim().slice(0, 120);
-  let q = supabase
-    .from("nina_cat_servicos")
-    .select("id, nome, valor, valor_observacao, descricao_publica, preparo, status")
-    .eq("clinica_id", clinicaId)
-    .order("nome")
-    .limit(20);
-  if (busca) q = q.ilike("nome", `%${busca}%`);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as ItemCatalogo[];
-}
-
-/**
- * Grava e publica o campo corrigido de um item do catálogo.
- * Só campos de conteúdo público — nunca status, vínculo ou identificador.
- */
-export async function gravarItemCatalogo(
-  supabase: Sb,
-  userId: string,
-  clinicaId: string,
-  entrada: {
-    itemId: string;
-    campo: "valor" | "valor_observacao" | "descricao_publica" | "preparo";
-    valorNovo: string;
-  },
-): Promise<{ anterior: string | null; publicado: boolean; nome: string }> {
-  await exigirAdminCatalogo(supabase, userId, clinicaId);
-  const { data: atual, error } = await supabase
-    .from("nina_cat_servicos")
-    .select("id, nome, valor, valor_observacao, descricao_publica, preparo")
-    .eq("id", entrada.itemId)
-    .eq("clinica_id", clinicaId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!atual) throw new Error("Item do catálogo não encontrado nesta clínica.");
-
-  const anterior = (atual as Record<string, unknown>)[entrada.campo];
-
-  // `valor` é numérico no banco: aceita "R$ 180,00" e grava 180.00.
-  let valorGravar: string | number = entrada.valorNovo;
-  if (entrada.campo === "valor") {
-    const n = Number(
-      entrada.valorNovo.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", "."),
-    );
-    if (!Number.isFinite(n))
-      throw new Error(`Valor inválido para o catálogo: "${entrada.valorNovo}".`);
-    valorGravar = n;
-  }
-
-  const { error: erroUpd } = await supabase
-    .from("nina_cat_servicos")
-    .update({
-      [entrada.campo]: valorGravar,
-      status: "PUBLICADO",
-      rascunho: null,
-      publicado_em: new Date().toISOString(),
-      publicado_por: userId,
-    })
-    .eq("id", entrada.itemId)
-    .eq("clinica_id", clinicaId);
-  if (erroUpd) throw new Error(erroUpd.message);
-
-  return {
-    anterior: anterior == null ? null : String(anterior),
-    publicado: true,
-    nome: String((atual as { nome?: string }).nome ?? ""),
-  };
 }
 
 /* ------------------------------------------------------------------ */

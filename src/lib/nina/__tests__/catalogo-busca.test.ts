@@ -90,7 +90,7 @@ describe("interpretação de escrita sem trocar o atendimento", () => {
       records: [],
       esclarecimento: { tipo: "sigla", pergunta: "Qual é o nome por extenso?", opcoes: [] },
     };
-    for (const nome of ["consultar_base_conhecimento", "buscar_procedimentos", "buscar_medicos"])
+    for (const nome of ["consultar_cadastro", "buscar_procedimentos", "buscar_medicos"])
       expect(encaminhamentoSemRegistro(validarResultado(nome, dados), { termo: "xyz" })).toBeNull();
   });
   it("um nome aproximado sugere confirmação, sem resolver uma identidade", () => {
@@ -127,7 +127,7 @@ describe("interpretação de escrita sem trocar o atendimento", () => {
     };
     expect(resultadoExigeHumano(dados)).toBe(false);
     const ex = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       clinicaId: "clinica",

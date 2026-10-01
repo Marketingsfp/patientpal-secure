@@ -15,7 +15,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
       return { data: retornoRpc, error: null };
     },
     from: (tabela: string) => {
-      if (tabela.startsWith("nina_cat_")) {
+      if (["servicos", "profissionais"].includes(tabela)) {
         const q = { select: () => q, eq: () => q, ilike: () => q, in: () => q,
           then: (fn: (r: { data: unknown[]; error: null }) => unknown) => Promise.resolve(fn({ data: [], error: null })) };
         return q;

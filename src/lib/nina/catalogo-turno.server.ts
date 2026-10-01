@@ -14,7 +14,7 @@ export const COLUNAS_SERVICO =
 export const COLUNAS_PROFISSIONAL =
   "id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura, status, updated_at";
 export const TAMANHO_PAGINA = 250;
-type Tabela = "nina_cat_servicos" | "nina_cat_profissionais";
+type Tabela = "servicos" | "profissionais";
 type Catalogo = {
   servicos: ServicoPublicado[];
   // O vínculo operacional fica no servidor; o conversor de resposta não o expõe.
@@ -64,7 +64,7 @@ export async function lerPublicados<T extends { id: string }>(
   tabela: Tabela, colunas: string, clinicaId: string, ids?: string[],
 ): Promise<T[]> {
   const catalogo = await (leituraDoTurno(clinicaId) ?? lerFonteOperacional(clinicaId));
-  const linhas = tabela === "nina_cat_servicos" ? catalogo.servicos : catalogo.profissionais;
+  const linhas = tabela === "servicos" ? catalogo.servicos : catalogo.profissionais;
   // Filtra e projeta ANTES da cópia. Um pedido por nome/id não deve duplicar
   // serviços, profissionais e estruturas que nem serão usados. A cópia do
   // resultado preserva o isolamento de campos aninhados entre consumidores.

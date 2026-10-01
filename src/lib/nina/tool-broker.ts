@@ -31,9 +31,18 @@ export type DescritorFerramenta = {
   escrita: boolean;
 };
 
+/** Nomes antigos que o modelo ainda pode usar (instruções publicadas antes da troca) → nome atual. */
+const NOMES_ANTIGOS_DE_FERRAMENTAS: Record<string, string> = {
+  consultar_base_conhecimento: "consultar_cadastro",
+};
+
+export function nomeAtualDaFerramenta(nome: string): string {
+  return NOMES_ANTIGOS_DE_FERRAMENTAS[nome] ?? nome;
+}
+
 /** Somente ferramentas que EXISTEM de fato no backend da Nina. */
 export const CATALOGO_FERRAMENTAS: Record<string, DescritorFerramenta> = {
-  consultar_base_conhecimento: {
+  consultar_cadastro: {
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     escrita: false,

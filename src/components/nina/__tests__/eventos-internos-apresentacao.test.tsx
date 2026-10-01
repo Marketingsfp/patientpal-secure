@@ -71,7 +71,7 @@ describe("Apresentação dos registros internos para atendimento real e homologa
     const ev = evento({ motivo: MOTIVO_SEM_REGISTRO });
     const antes = structuredClone(ev);
     const motivo =
-      "A Nina não encontrou a consulta ou o procedimento solicitado na base de conhecimentos.";
+      "A Nina não encontrou a consulta ou o procedimento solicitado no cadastro do sistema.";
     const html = renderizar(ev);
     expect(html).toContain(motivo);
     expect(html).not.toContain("CATALOGO_SEM_REGISTRO");

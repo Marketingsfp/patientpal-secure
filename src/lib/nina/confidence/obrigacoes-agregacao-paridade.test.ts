@@ -52,7 +52,7 @@ function avaliar(
     fatos: fontePresente
       ? [
           {
-            consulta: "consultar_base_conhecimento",
+            consulta: "consultar_cadastro",
             capacidade: "searchKnowledgeBase",
             fonte: "catalogo_publicado",
             entidade: "servico",
@@ -63,7 +63,7 @@ function avaliar(
       : [],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "base_conhecimento",
         success: true,

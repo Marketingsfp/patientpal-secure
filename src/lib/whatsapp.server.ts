@@ -816,7 +816,7 @@ async function gerarRespostaNinaInterno(
   // Nada de lista de médicos, especialidades ou tabela de preços no prompt: a
   // única fonte factual é o catálogo publicado, consultado por ferramenta.
   const SEM_FONTE_NO_PROMPT =
-    "(não disponível aqui — consulte SEMPRE a ferramenta consultar_base_conhecimento. Sem registro PUBLICADO, não responda por conhecimento próprio: encaminhe para atendimento humano com solicitar_atendente_humano.)";
+    "(não disponível aqui — consulte SEMPRE a ferramenta consultar_cadastro. Sem registro PUBLICADO, não responda por conhecimento próprio: encaminhe para atendimento humano com solicitar_atendente_humano.)";
   const medicos = SEM_FONTE_NO_PROMPT;
   const procs = SEM_FONTE_NO_PROMPT;
   const espsCadastradasTexto = SEM_FONTE_NO_PROMPT;
@@ -1691,7 +1691,7 @@ async function gerarRespostaNinaInterno(
 
   // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
   const { FERRAMENTA_HANDOFF } = await import("@/lib/nina/handoff-tool.server");
-  const { respostaParaModelo } = await import("@/lib/nina/tool-broker");
+  const { respostaParaModelo, nomeAtualDaFerramenta } = await import("@/lib/nina/tool-broker");
   ferramentas = [...(ferramentas ?? []), FERRAMENTA_HANDOFF];
   const ctxHandoff = { clinicaId, conversaId: estadoId.conversaId ?? null };
   // FASE 4 — Tool Broker: ponto único de execução das ferramentas reais.
@@ -1821,7 +1821,7 @@ async function gerarRespostaNinaInterno(
   const MAX_RODADAS = podeAgendar ? 6 : 3;
   let agendaComOpcoes = false;
   const consultasSemOperacao = new Set([
-    "consultar_base_conhecimento", "buscar_medicos", "buscar_procedimentos", "listar_especialidades",
+    "consultar_cadastro", "buscar_medicos", "buscar_procedimentos", "listar_especialidades",
     "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel",
   ]);
   // Estado do turno para o Reasoning Router (Fase 2).
@@ -1902,7 +1902,7 @@ async function gerarRespostaNinaInterno(
       /* inválido não vira referência */
     }
     const referenciaAnterior =
-      ["consultar_base_conhecimento", "buscar_procedimentos"].includes(nome) && parametros.nova_solicitacao === true
+      ["consultar_cadastro", "buscar_procedimentos"].includes(nome) && parametros.nova_solicitacao === true
         ? null
         : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
     r = prepararSegundaPergunta(referenciaAnterior, r);
@@ -1970,7 +1970,7 @@ async function gerarRespostaNinaInterno(
     }
     const pedidoInterpretado = (r.dados as { pedido_interpretado?: { atendimento?: string } } | null)?.pedido_interpretado;
     const termoPesquisado = nome === "buscar_medicos" && tipoAtendimento === "exame_procedimento" && pedidoInterpretado?.atendimento
-      ? pedidoInterpretado.atendimento : nome === "consultar_base_conhecimento" || nome === "buscar_procedimentos"
+      ? pedidoInterpretado.atendimento : nome === "consultar_cadastro" || nome === "buscar_procedimentos"
       ? parametros.termo : nome === "buscar_medicos" ? parametros.especialidade ??
         (referenciaAnterior?.consulta.tipo_atendimento === "consulta" ? referenciaAnterior.consulta.termo : parametros.nome) : null;
     const medicoPesquisado = nome === "buscar_medicos" ? parametros.nome : parametros.medico;
@@ -1997,7 +1997,7 @@ async function gerarRespostaNinaInterno(
         const { atualizarPreferenciaAtendimento } = await import("@/lib/nina/atendimento-consulta");
         const { registrosDoRetorno } = await import("@/lib/nina/confidence/evidencia-extrator");
         const atual = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
-        const anterior = nome === "consultar_base_conhecimento" && parametros.nova_solicitacao === true
+        const anterior = nome === "consultar_cadastro" && parametros.nova_solicitacao === true
           ? null : atual?.atendimentoConsulta ?? referenciaAnterior?.atendimentoConsulta;
         const preferencia = atualizarPreferenciaAtendimento({ mensagem: mensagemPaciente, anterior,
           registros: registrosDoRetorno((r.dados ?? {}) as Record<string, unknown>) as import("@/lib/nina/knowledge-contract").RegistroConhecimento[] });
@@ -2225,6 +2225,10 @@ async function gerarRespostaNinaInterno(
     const msg = { content: respostaIA.conteudo, tool_calls: respostaIA.toolCalls };
     textoModeloAtual = msg.content ?? "";
     const chamadas = msg.tool_calls ?? [];
+    // Instruções publicadas antes da troca de nome ainda podem pedir a ferramenta pelo nome antigo.
+    for (const c of chamadas) {
+      if (c.function) c.function.name = nomeAtualDaFerramenta(String(c.function.name ?? ""));
+    }
     if (sintetizarOpcoes && (chamadas.length > 0 || !(msg.content ?? "").trim())) {
       limiteRodadasAtingido = true;
       break;

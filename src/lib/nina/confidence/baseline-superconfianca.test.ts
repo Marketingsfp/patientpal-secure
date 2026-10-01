@@ -170,7 +170,7 @@ describe("BASELINE 3 — mensagem de falha de agendamento sem tentativa de agend
     mensagemPaciente: "Quais os dias e horários e o valor em dinheiro e no cartão?",
     ferramentas: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         success: true,
@@ -230,7 +230,7 @@ describe("BASELINE 4 — a confiança fica presa ao texto avaliado, não ao envi
     intent: "informacao",
     ferramentas: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         success: true,
@@ -356,7 +356,7 @@ describe("BASELINE 6 — sucesso técnico da ferramenta é tratado como prova do
         acao: "responder_informacao",
         ferramentas: [
           {
-            nome: "consultar_base_conhecimento",
+            nome: "consultar_cadastro",
             capacidade: "searchKnowledgeBase",
             fonte: "catalogo_publicado",
             success: true,

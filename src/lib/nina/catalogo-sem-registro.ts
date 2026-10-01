@@ -41,7 +41,7 @@ export function pedidoDeItemCatalogo(query: string): boolean {
 
 /** Regra operacional por ausência confirmada; não calcula nota de confiança. */
 export function encaminhamentoSemRegistro(r: ResultadoBroker, args: unknown, automatica = false) {
-  if (!["consultar_base_conhecimento", "buscar_medicos", "buscar_procedimentos", "listar_especialidades"].includes(r.ferramenta)) return null;
+  if (!["consultar_cadastro", "buscar_medicos", "buscar_procedimentos", "listar_especialidades"].includes(r.ferramenta)) return null;
   const d = r.dados as Record<string, unknown> | null;
   if (!d || typeof d !== "object") return null;
   if (d.esclarecimento) return null;

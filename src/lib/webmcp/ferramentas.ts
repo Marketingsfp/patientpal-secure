@@ -17,8 +17,6 @@ import {
   exigirConversaDeTeste,
   exigirSessao,
   exigirUuid,
-  filtrarCatalogo,
-  sanitizarListaCatalogo,
   type EfeitoWebmcp,
   type LeadTesteResumo,
 } from "./politica";
@@ -44,12 +42,6 @@ export interface ApiWebmcp {
   historicoLeadTeste: Chamada;
   enviarMensagemTeste: Chamada;
   resolverConversaTeste: Chamada;
-  listarCatalogo: Chamada;
-  opcoesCatalogo: Chamada;
-  salvarServicoCatalogo: Chamada;
-  salvarProfissionalCatalogo: Chamada;
-  alterarStatusCatalogo: Chamada;
-  organizarTextoCatalogoIA: Chamada;
 }
 
 export interface DepsWebmcp {
@@ -475,176 +467,5 @@ export function montarFerramentasWebmcp(deps: DepsWebmcp): FerramentaWebmcp[] {
       },
     ),
 
-    /* ----------------------------- Catálogo ------------------------------ */
-    ferramenta(
-      {
-        name: "catalogo_buscar",
-        description:
-          "Busca no catálogo estruturado da Nina (exames/procedimentos e consultas/profissionais) por nome e status. Notas internas não são retornadas.",
-        inputSchema: objeto({
-          tipo: { type: "string", enum: ["servico", "profissional", "todos"] },
-          termo: texto("Parte do nome.", 120),
-          status: { type: "string", enum: ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] },
-          limite: { type: "integer", minimum: 1, maximum: 100 },
-        }),
-        escrita: false,
-        efeito: "leitura",
-        permissao: "membro da clínica",
-      },
-      async (entrada, clinicaId) => {
-        const r = (await api.listarCatalogo({ clinicaId })) as Dados;
-        const tipo = (entrada["tipo"] as string) ?? "todos";
-        const filtro = {
-          termo: entrada["termo"] ? String(entrada["termo"]) : undefined,
-          status: entrada["status"] ? String(entrada["status"]) : undefined,
-          limite: inteiro(entrada["limite"], 30, 1, 100),
-        };
-        return {
-          servicos:
-            tipo === "profissional"
-              ? []
-              : filtrarCatalogo(sanitizarListaCatalogo(r?.["servicos"]), filtro),
-          profissionais:
-            tipo === "servico"
-              ? []
-              : filtrarCatalogo(sanitizarListaCatalogo(r?.["profissionais"]), filtro),
-        };
-      },
-    ),
-
-    ferramenta(
-      {
-        name: "catalogo_opcoes",
-        description:
-          "Lista as opções de vínculo do formulário do catálogo: procedimentos, médicos, especialidades, unidades e convênios cadastrados.",
-        inputSchema: objeto({}),
-        escrita: false,
-        efeito: "leitura",
-        permissao: "membro da clínica",
-      },
-      async (_entrada, clinicaId) => ({ opcoes: await api.opcoesCatalogo({ clinicaId }) }),
-    ),
-
-    ferramenta(
-      {
-        name: "catalogo_salvar_servico",
-        description:
-          "Cria ou edita um exame/procedimento do catálogo pelo mesmo salvamento do formulário. Sem publicar, a alteração fica em revisão.",
-        inputSchema: objeto(
-          {
-            id: uuid("Registro existente (omitir para criar)."),
-            publicar: { type: "boolean", description: "Publica após salvar." },
-            dados: { type: "object", description: "Campos do formulário de exame/procedimento." },
-          },
-          ["dados"],
-        ),
-        escrita: true,
-        efeito: "operacao_concluida",
-        permissao: "administrador da clínica; ambiente de homologação",
-      },
-      async (entrada, clinicaId) => {
-        const resultado = await api.salvarServicoCatalogo({
-          clinicaId,
-          id: entrada["id"] ? exigirUuid(entrada["id"], "id") : null,
-          publicar: entrada["publicar"] === true,
-          dados: entradaComo(entrada["dados"]),
-        });
-        deps.notificar("catalogo");
-        return { resultado };
-      },
-    ),
-
-    ferramenta(
-      {
-        name: "catalogo_salvar_profissional",
-        description:
-          "Cria ou edita uma consulta/profissional do catálogo pelo mesmo salvamento do formulário. Sem publicar, a alteração fica em revisão.",
-        inputSchema: objeto(
-          {
-            id: uuid("Registro existente (omitir para criar)."),
-            publicar: { type: "boolean", description: "Publica após salvar." },
-            dados: { type: "object", description: "Campos do formulário de consulta/profissional." },
-          },
-          ["dados"],
-        ),
-        escrita: true,
-        efeito: "operacao_concluida",
-        permissao: "administrador da clínica; ambiente de homologação",
-      },
-      async (entrada, clinicaId) => {
-        const resultado = await api.salvarProfissionalCatalogo({
-          clinicaId,
-          id: entrada["id"] ? exigirUuid(entrada["id"], "id") : null,
-          publicar: entrada["publicar"] === true,
-          dados: entradaComo(entrada["dados"]),
-        });
-        deps.notificar("catalogo");
-        return { resultado };
-      },
-    ),
-
-    ferramenta(
-      {
-        name: "catalogo_alterar_status",
-        description:
-          "Publica, volta para rascunho ou arquiva um registro do catálogo pelo fluxo existente de revisão.",
-        inputSchema: objeto(
-          {
-            tipo: { type: "string", enum: ["servico", "profissional"] },
-            id: uuid("Registro do catálogo."),
-            status: { type: "string", enum: ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] },
-          },
-          ["tipo", "id", "status"],
-        ),
-        escrita: true,
-        efeito: "operacao_concluida",
-        permissao: "administrador da clínica; ambiente de homologação",
-      },
-      async (entrada, clinicaId) => {
-        const tipo = entrada["tipo"];
-        const status = entrada["status"];
-        if (tipo !== "servico" && tipo !== "profissional")
-          throw new ErroWebmcp("entrada_invalida", 'Campo "tipo" inválido.');
-        if (status !== "RASCUNHO" && status !== "PUBLICADO" && status !== "ARQUIVADO")
-          throw new ErroWebmcp("entrada_invalida", 'Campo "status" inválido.');
-        const resultado = await api.alterarStatusCatalogo({
-          clinicaId,
-          tipo,
-          id: exigirUuid(entrada["id"], "id"),
-          status,
-        });
-        deps.notificar("catalogo");
-        return { resultado };
-      },
-    ),
-
-    ferramenta(
-      {
-        name: "catalogo_organizar_ia",
-        description:
-          "Pede à IA que organize um texto livre nos campos do formulário do catálogo. Devolve apenas um rascunho para revisão: nada é gravado nem publicado por esta ferramenta.",
-        inputSchema: objeto(
-          {
-            tipo: { type: "string", enum: ["servico", "profissional"] },
-            texto: texto("Texto livre a organizar.", 20000),
-          },
-          ["tipo", "texto"],
-        ),
-        escrita: true,
-        efeito: "operacao_iniciada",
-        permissao: "administrador da clínica; ambiente de homologação",
-      },
-      async (entrada, clinicaId) => {
-        const tipo = entrada["tipo"];
-        if (tipo !== "servico" && tipo !== "profissional")
-          throw new ErroWebmcp("entrada_invalida", 'Campo "tipo" inválido.');
-        const rascunho = await api.organizarTextoCatalogoIA({
-          clinicaId,
-          tipo,
-          texto: comoDado(entrada["texto"], 20000),
-        });
-        return { rascunho, gravado: false };
-      },
-    ),
   ];
 }

@@ -23,7 +23,7 @@ describe("geração real: ferramentas disponíveis e continuidade contextual (mo
           const ferramentas = req.tools.map((t: any) => t.function.name);
           // 29/09/2026: flag desligada = Nina só informa e encaminha; sem consulta de vaga livre.
           for (const nome of FERRAMENTAS_DE_VAGAS) expect(ferramentas).not.toContain(nome);
-          expect(ferramentas).toContain("consultar_base_conhecimento");
+          expect(ferramentas).toContain("consultar_cadastro");
           expect(ferramentas).not.toContain("agendar"); // flag de escrita continua separada
           const contexto = JSON.stringify(req.messages);
           expect(contexto).not.toContain('interesse_confirmado');

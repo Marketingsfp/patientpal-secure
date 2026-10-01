@@ -23,7 +23,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useWebmcpContexto } from "@/hooks/use-webmcp-contexto";
 import { registrarFeedbackNina } from "@/lib/nina/aprendizado.functions";
-import { BaseConhecimento } from "@/components/nina/BaseConhecimento";
+import { InformacoesClinica } from "@/components/nina/InformacoesClinica";
 
 import {
   obterWhatsappConfig,
@@ -100,11 +100,15 @@ function NinaPage() {
     "laboratorio-nina",
     "atend-macros",
     "atend-inbox",
+    "informacoes-clinica",
     "base-conhecimento",
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
-      : hashAba
+      : // O nome antigo da aba continua valendo para links e favoritos já guardados.
+        hashAba === "base-conhecimento"
+        ? "informacoes-clinica"
+        : hashAba
     : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
@@ -167,9 +171,9 @@ function NinaPage() {
 
         {/* ============ APRENDIZADO ============ */}
 
-        {/* ============ BASE DE CONHECIMENTOS ============ */}
-        <TabsContent value="base-conhecimento">
-          <BaseConhecimento />
+        {/* ============ INFORMAÇÕES DA CLÍNICA ============ */}
+        <TabsContent value="informacoes-clinica">
+          <InformacoesClinica />
         </TabsContent>
       </Tabs>
     </div>

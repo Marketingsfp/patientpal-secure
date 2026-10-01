@@ -102,11 +102,11 @@ describe("eventos persistidos do turno levam a medição", () => {
       executarPaciente: async () => ({ ok: true, knowledge_status: "found" }),
     });
     await contextoWatchdog.run(controle, () =>
-      broker.executar("consultar_base_conhecimento", { termo: "cardiologia" }),
+      broker.executar("consultar_cadastro", { termo: "cardiologia" }),
     );
     for (const nome of ["TOOL_STARTED", "TOOL_FINISHED"]) {
       expect(eventos.find((e) => e.nome === nome)?.dados?.ferramenta).toBe(
-        "consultar_base_conhecimento",
+        "consultar_cadastro",
       );
       expect(recursosDe(eventos, nome)).toMatchObject({ memoria_medida: true });
     }

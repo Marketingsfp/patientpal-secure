@@ -113,7 +113,7 @@ describe("prompt v19: prova de ausência de operações preserva a paridade", ()
       ctx.mensagemPaciente = "Quanto custa a consulta de Cardiologia?";
       ctx.toolResults = [
         {
-          nome: "consultar_base_conhecimento",
+          nome: "consultar_cadastro",
           capacidade: "searchKnowledgeBase",
           fonte: "base_conhecimento",
           success: false,

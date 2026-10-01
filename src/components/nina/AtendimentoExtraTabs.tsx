@@ -63,7 +63,6 @@ import {
   Phone,
   MessageSquare,
   Circle,
-  CalendarPlus,
   Pin,
   PinOff,
   Zap,
@@ -141,7 +140,6 @@ import { aplicarReconciliacao, deveRegistrarLeituraVisivel } from "@/lib/atendim
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
-import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { AvatarContato } from "@/components/nina/AvatarContato";
 import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
@@ -598,7 +596,6 @@ export function AtendInbox() {
     setRascunhos((prev) => limparRascunho(prev, id));
   }, []);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [agendaOpen, setAgendaOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
   const [fechando, setFechando] = useState(false);
   const fechandoRef = useRef(false);
@@ -1762,7 +1759,6 @@ export function AtendInbox() {
   useEffect(() => {
     setErroMsgs(false);
     setTransferOpen(false);
-    setAgendaOpen(false);
   }, [sel?.id]);
 
   useEffect(() => {
@@ -3167,16 +3163,6 @@ export function AtendInbox() {
                           Assumir conversa
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="default"
-                        disabled={!souResponsavel || conversaEncerrada || carregandoConversa}
-                        className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover"
-                        onClick={() => setAgendaOpen(true)}
-                      >
-                        <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Agendar
-                      </Button>
-
                       {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
                       <Button
@@ -3598,20 +3584,6 @@ export function AtendInbox() {
               </div>
             </div>
           </Card>
-
-          {/* Agenda dentro da conversa: não troca de tela nem perde o rascunho. */}
-          {clinicaId && sel && (
-            <AgendaConversaDrawer
-              open={agendaOpen}
-              onOpenChange={setAgendaOpen}
-              clinicaId={clinicaId}
-              conversaId={sel.id}
-              contatoNome={nomeContato(sel as never)}
-              contatoTelefone={sel.contato_telefone ?? null}
-              pacienteIdVinculado={contatoAtual?.paciente?.id ?? null}
-              onMensagemPronta={(t) => setDraft((d) => (d ? `${d}\n${t}` : t))}
-            />
-          )}
 
           {/* DIALOGS */}
 

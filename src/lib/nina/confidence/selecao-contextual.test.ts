@@ -19,7 +19,7 @@ function profissional(
   extra: Partial<FatoRecuperado> = {},
 ): FatoRecuperado {
   return {
-    consulta: "consultar_base_conhecimento",
+    consulta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     entidade: "profissional",
     campo: "nome",
@@ -35,10 +35,10 @@ function profissional(
 const FATOS = [
   profissional(
     "Alex Silva",
-    "nina_cat_profissionais:alex",
+    "profissionais:alex",
     "Consulta — CARDIOLOGIA GERAL, CARDIOLOGIA INFANTIL",
   ),
-  profissional("Bruno Costa", "nina_cat_profissionais:bruno", "Consulta — DERMATOLOGIA"),
+  profissional("Bruno Costa", "profissionais:bruno", "Consulta — DERMATOLOGIA"),
 ];
 function resolver(
   mensagem: string,
@@ -61,7 +61,7 @@ function alex() {
 
 describe("seleção contextual com fatos oficiais reconsultados", () => {
   it("confirmação contextual revalida ID e nome sem autorizar reserva", () => {
-    const profissionalConfirmado = { registro: "nina_cat_profissionais:bruno", nome: "Bruno Costa" };
+    const profissionalConfirmado = { registro: "profissionais:bruno", nome: "Bruno Costa" };
     const r = resolver("isso", null, { profissionalConfirmado });
     expect(r.selecao?.medicoNome).toBe("Bruno Costa");
     expect(r.estado).toBe("selecionado");
@@ -76,7 +76,7 @@ describe("seleção contextual com fatos oficiais reconsultados", () => {
     expect(r.selecao?.medicoNome).toBe("Alex Silva");
     expect(r.selecao?.medicoId).toBeNull();
     expect(r.selecao?.modalidade).toBeNull();
-    expect(r.selecao?.raizesFonte[0]?.registro).toBe("nina_cat_profissionais:alex");
+    expect(r.selecao?.raizesFonte[0]?.registro).toBe("profissionais:alex");
     expect(r.opcoesModalidades.map((m) => m.nome)).toEqual([
       "CARDIOLOGIA GERAL",
       "CARDIOLOGIA INFANTIL",
@@ -113,7 +113,7 @@ describe("seleção contextual com fatos oficiais reconsultados", () => {
     const r = resolver("vou fazer com o dr alex", null, {
       fatosOficiais: [
         ...FATOS,
-        profissional("Alex Souza", "nina_cat_profissionais:alex2", "Consulta Cardiologia"),
+        profissional("Alex Souza", "profissionais:alex2", "Consulta Cardiologia"),
       ],
     });
     expect(r.estado).toBe("esclarecer_medico");
@@ -125,7 +125,7 @@ describe("seleção contextual com fatos oficiais reconsultados", () => {
     const r = resolver("quero com o dr Alex Silva", null, {
       fatosOficiais: [
         ...FATOS,
-        profissional("Alex Silva", "nina_cat_profissionais:homonimo", "Consulta Cardiologia"),
+        profissional("Alex Silva", "profissionais:homonimo", "Consulta Cardiologia"),
       ],
     });
     expect(r.estado).toBe("esclarecer_medico");

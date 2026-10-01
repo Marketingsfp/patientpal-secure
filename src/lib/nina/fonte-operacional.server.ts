@@ -1,7 +1,7 @@
 /**
  * FONTE OPERACIONAL DA NINA — leitura do cadastro do sistema (server-only).
  *
- * Substitui a leitura do catálogo editorial (`nina_cat_*`): a Nina informa o que está no cadastro
+ * Substitui a leitura do catálogo editorial (tabelas `nina_cat_*`, removidas): a Nina informa o que está no cadastro
  * de médicos/horários/procedimentos, do jeito que está. Quem corrige é a equipe, na origem.
  *
  * Só responde para clínicas com a flag `nina_informa_cadastro` ligada. Sem a flag, a clínica se

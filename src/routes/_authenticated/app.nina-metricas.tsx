@@ -498,7 +498,7 @@ function Pagina() {
       {/* Container "Desempenho dentro e fora do horário" removido da tela a
           pedido. O cálculo, o horário oficial e o uso pelo Analista de
           Métricas continuam ativos no backend. Configuração do horário segue
-          na Base de Conhecimentos (/app/nina#base-conhecimento). */}
+          nas Informações da clínica (/app/nina#informacoes-clinica). */}
 
       {/* Seção da Fase 9: isolada dos cards acima — falha ou lentidão aqui não
           afeta os indicadores, a Nina nem o atendimento. */}

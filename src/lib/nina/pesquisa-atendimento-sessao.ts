@@ -16,7 +16,7 @@ export function prepararPesquisaAtendimentoDaSessao(
 ): string | undefined {
   const anterior = conhecimentoDaMesmaSessao(contexto.conhecimento, contexto.clinicaId, contexto.sessionId);
   const preparado = prepararPesquisaMedicoDaSessao(ferramenta, args, anterior, contexto);
-  const campo = ferramenta === "consultar_base_conhecimento" ? "termo"
+  const campo = ferramenta === "consultar_cadastro" ? "termo"
     : ["buscar_medicos", "proxima_vaga", "consultar_primeiro_disponivel", "consultar_disponibilidade", "verificar_horario"].includes(ferramenta)
       ? "especialidade" : null;
   if (!campo || !preparado) return preparado;

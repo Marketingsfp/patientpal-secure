@@ -135,7 +135,7 @@ describe("consolidação histórica de etapas", () => {
           ...inicio,
           event_type: "completed",
           status: "ok",
-          metadata: { ferramenta: "consultar_base_conhecimento" },
+          metadata: { ferramenta: "consultar_cadastro" },
         },
       ],
       null,

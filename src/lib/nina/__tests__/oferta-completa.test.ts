@@ -44,7 +44,7 @@ describe("leitura do pedido", () => {
 describe("prompt da oferta", () => {
   it("informação: pede valor, médicos, dias e horários da base", () => {
     const t = blocoPromptOfertaCompleta({ ...base, mensagem: "Informações sobre Ortopedia" });
-    expect(t).toContain("consultar_base_conhecimento");
+    expect(t).toContain("consultar_cadastro");
     expect(t).toContain("valor da consulta");
   });
 

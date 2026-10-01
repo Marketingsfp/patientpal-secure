@@ -73,7 +73,7 @@ describe("decisão no turno real", () => {
         // FASE 2 — evidência factual propagada pelo servidor.
         fatos: [
           {
-            consulta: "consultar_base_conhecimento",
+            consulta: "consultar_cadastro",
             capacidade: "searchKnowledgeBase",
             entidade: "procedimento",
             campo: "preco",

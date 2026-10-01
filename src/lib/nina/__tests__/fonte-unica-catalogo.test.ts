@@ -28,7 +28,7 @@ describe("prompt do WhatsApp", () => {
   });
 
   it("substitui os blocos por instrução de consultar o catálogo e encaminhar", () => {
-    expect(whatsapp).toContain("consultar_base_conhecimento");
+    expect(whatsapp).toContain("consultar_cadastro");
     expect(whatsapp).toContain("solicitar_atendente_humano");
   });
 });

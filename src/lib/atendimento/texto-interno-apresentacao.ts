@@ -36,7 +36,7 @@ export function motivoParaAtendimento(valor: unknown): string | null {
     ],
     [
       /\bCATALOGO_MEDICO_SEM_REGISTRO\b/i,
-      "A Nina não encontrou o médico informado na base de conhecimentos. A equipe deve conferir o profissional solicitado.",
+      "A Nina não encontrou o médico informado no cadastro do sistema. A equipe deve conferir o profissional solicitado.",
     ],
     [
       /\bFALHA_OPERACIONAL_AGENDAMENTO\b.*\bATENDIMENTO_AGENDA_NAO_VINCULADO\b/i,
@@ -56,7 +56,7 @@ export function motivoParaAtendimento(valor: unknown): string | null {
     ],
     [
       /\bCATALOGO_SEM_REGISTRO\b/i,
-      "A Nina não encontrou a consulta ou o procedimento solicitado na base de conhecimentos.",
+      "A Nina não encontrou a consulta ou o procedimento solicitado no cadastro do sistema.",
     ],
     [
       /\b(?:MISSING_REQUIRED_SOURCE|MSSING_REQUIRED_SOURCE|UNGROUNDED_CLAIM|informacao_indisponivel)\b/i,

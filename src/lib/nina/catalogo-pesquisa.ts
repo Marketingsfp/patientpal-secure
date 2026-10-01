@@ -22,7 +22,7 @@ export const PESQUISA_NAO_INTERPRETADA = "CATALOGO_QUERY_NAO_INTERPRETADA";
 /** Valida o formato da pesquisa; a interpretação semântica continua com o modelo. */
 export function recusarFraseComoPesquisa(nome: string, args: unknown) {
   const campos =
-    nome === "consultar_base_conhecimento" || nome === "buscar_procedimentos"
+    nome === "consultar_cadastro" || nome === "buscar_procedimentos"
       ? ["termo"]
       : nome === "buscar_medicos"
         ? ["nome", "especialidade"]

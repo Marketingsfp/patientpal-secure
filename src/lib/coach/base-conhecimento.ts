@@ -6,8 +6,7 @@
  * antiga). Isso significa que a IA treinava a atendente com preço, horário e
  * médico que podem não existir mais — e nenhuma clínica nova teria base
  * nenhuma. A fonte de verdade passa a ser a mesma que a Nina usa:
- * `procedimentos`, o catálogo publicado (`nina_cat_servicos` /
- * `nina_cat_profissionais`), `medicos` + `especialidades` e `unidades`.
+ * `procedimentos`, `medicos` + `especialidades` e `unidades` (o catálogo da Nina deixou de existir).
  *
  * Este módulo é PURO de propósito (não conhece Supabase): recebe as linhas já
  * lidas e devolve texto. Assim dá para testar o formato e a seleção sem banco.

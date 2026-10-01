@@ -55,7 +55,7 @@ describe("Context Builder — só o necessário", () => {
 
 describe("Tool Broker — divisão de fontes", () => {
   it("valor vem da Base de Conhecimentos", () =>
-    expect(descreverFerramenta("consultar_base_conhecimento")?.fonte).toBe("base_conhecimento"));
+    expect(descreverFerramenta("consultar_cadastro")?.fonte).toBe("base_conhecimento"));
   it("disponibilidade vem da Agenda", () =>
     expect(descreverFerramenta("consultar_disponibilidade")?.fonte).toBe("agenda"));
   it("dados do paciente vêm do CRM", () =>

@@ -18,7 +18,7 @@ function contexto(
   extra: Partial<RetornoFerramenta> = {},
 ): ContextoConfianca {
   const e = extrairEvidencia({
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,
@@ -36,7 +36,7 @@ function contexto(
     ],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         success: true,

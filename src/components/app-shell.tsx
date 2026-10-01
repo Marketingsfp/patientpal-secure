@@ -610,8 +610,8 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
       {
         to: "/app/nina",
-        hash: "base-conhecimento",
-        label: "Base de conhecimentos",
+        hash: "informacoes-clinica",
+        label: "Informações da clínica",
         icon: BookOpen,
       },
       {

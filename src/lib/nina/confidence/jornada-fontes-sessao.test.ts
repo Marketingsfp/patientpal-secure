@@ -65,7 +65,7 @@ function retornoCatalogo(
   versao = "v1-publicada",
 ): ResultadoBroker {
   return {
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,

@@ -26,8 +26,8 @@ import { atendimentoExigeHumano } from "../regras-catalogo.server";
 type Linha = Record<string, unknown>;
 
 const banco: Record<string, Linha[]> = {
-  nina_cat_servicos: [],
-  nina_cat_profissionais: [],
+  servicos: [],
+  profissionais: [],
 };
 const chamadas: Array<{ tabela: string; colunas: string; filtros: Record<string, string>; limite: number | null; cursor: string | null; ids: string[] | null }> = [];
 let tetoServidor = Infinity;
@@ -165,8 +165,8 @@ function profissional(over: Linha): Linha {
 }
 
 beforeEach(() => {
-  banco["nina_cat_servicos"] = [];
-  banco["nina_cat_profissionais"] = [];
+  banco["servicos"] = [];
+  banco["profissionais"] = [];
   banco["medicos"] = [];
   chamadas.length = 0;
   leiturasFonte.length = 0;
@@ -178,9 +178,9 @@ describe("uma leitura do catálogo por resposta", () => {
   const medicoId = "22222222-2222-4222-8222-222222222222";
   const profissionalId = "33333333-3333-4333-8333-333333333333";
   beforeEach(() => {
-    banco.nina_cat_servicos = [servico({ id: "mamografia", nome: "Mamografia", valor: 147,
+    banco.servicos = [servico({ id: "mamografia", nome: "Mamografia", valor: 147,
       executantes: [{ nome: "Maria Silva", medico_id: medicoId }] })];
-    banco.nina_cat_profissionais = [profissional({ id: profissionalId, nome: "Maria Silva",
+    banco.profissionais = [profissional({ id: profissionalId, nome: "Maria Silva",
       medico_id: medicoId, especialidades: [{ nome: "CARDIOLOGIA" }], tipo_atendimento: "Hora marcada" })];
     banco.medicos = [{ id: medicoId, nome: "Maria Silva", clinica_id: CLINICA, ativo: true }];
   });
@@ -188,7 +188,7 @@ describe("uma leitura do catálogo por resposta", () => {
   const leituras = () => leiturasFonte;
 
   it("modalidade revalida referências somente do mesmo registro e atendimento", async () => {
-    banco.nina_cat_profissionais[0]!.observacao_publica = 'CONSULTA CARDIOLÓGICA\nEspecialidade: CARDIOLOGIA\nObservação: Hora marcada';
+    banco.profissionais[0]!.observacao_publica = 'CONSULTA CARDIOLÓGICA\nEspecialidade: CARDIOLOGIA\nObservação: Hora marcada';
     const escopo = { atendimento: 'consulta do coração' };
     expect(await modalidadePublicadaDoMedico(CLINICA, medicoId, escopo)).toBe('nao_definida');
     expect(await modalidadePublicadaDoMedico(CLINICA, medicoId, { ...escopo,
@@ -200,7 +200,7 @@ describe("uma leitura do catálogo por resposta", () => {
   });
 
   it("conta sem copiar o catálogo e clona só os campos e registros selecionados", async () => {
-    banco.nina_cat_servicos[0]!.estrutura = { aliases: ["mamo"], texto: "x".repeat(100_000) };
+    banco.servicos[0]!.estrutura = { aliases: ["mamo"], texto: "x".repeat(100_000) };
     await comCatalogoDoTurno(CLINICA, async () => {
       // Carrega o snapshot uma vez antes de medir as cópias dos consumidores.
       await catalogoDoTurno(CLINICA);
@@ -209,12 +209,12 @@ describe("uma leitura do catálogo por resposta", () => {
         expect(await contarCatalogoPublicado(CLINICA)).toEqual({ servicos: 1, profissionais: 1 });
         expect(clone).not.toHaveBeenCalled();
         const a = await lerPublicados<{ id: string; aliases: string[] }>(
-          "nina_cat_servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
+          "servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
         expect(clone).toHaveBeenCalledTimes(1);
         expect(JSON.stringify(clone.mock.calls[0]![0]).length).toBeLessThan(100);
         a[0]!.aliases.push("alterado");
         const b = await lerPublicados<{ id: string; aliases: string[] }>(
-          "nina_cat_servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
+          "servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
         expect(b[0]!.aliases).toEqual(["mamo"]);
       } finally { clone.mockRestore(); }
       expect(leituras()).toHaveLength(1);
@@ -247,7 +247,7 @@ describe("uma leitura do catálogo por resposta", () => {
   });
 
   it("compartilha também chamadas concorrentes e preserva filtros e aliases", async () => {
-    banco.nina_cat_servicos[0]!.estrutura = { aliases: ["mamo"] };
+    banco.servicos[0]!.estrutura = { aliases: ["mamo"] };
     await comCatalogoDoTurno(CLINICA, async () => {
       const [a, b, c] = await Promise.all([
         buscarNoCatalogo({ clinicaId: CLINICA, query: "mamo" }),
@@ -264,13 +264,13 @@ describe("uma leitura do catálogo por resposta", () => {
   it("mantém a leitura durante a resposta e atualiza preço e publicação na próxima", async () => {
     await comCatalogoDoTurno(CLINICA, async () => {
       expect((await catalogoDoTurno(CLINICA))!.servicos[0]!.valor).toBe(147);
-      banco.nina_cat_servicos[0]!.valor = 199;
+      banco.servicos[0]!.valor = 199;
       expect((await catalogoDoTurno(CLINICA))!.servicos[0]!.valor).toBe(147);
     });
     await comCatalogoDoTurno(CLINICA, async () => {
       expect((await catalogoDoTurno(CLINICA))!.servicos[0]!.valor).toBe(199);
     });
-    banco.nina_cat_servicos[0]!.status = "ARQUIVADO";
+    banco.servicos[0]!.status = "ARQUIVADO";
     await comCatalogoDoTurno(CLINICA, async () => {
       expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" })).knowledge_status).toBe("not_found");
     });
@@ -279,7 +279,7 @@ describe("uma leitura do catálogo por resposta", () => {
   });
 
   it("isola respostas concorrentes e clínicas; nunca compartilha dados de outra clínica", async () => {
-    banco.nina_cat_servicos.push(servico({ id: "outro", nome: "Mamografia", clinica_id: "outra", valor: 555 }));
+    banco.servicos.push(servico({ id: "outro", nome: "Mamografia", clinica_id: "outra", valor: 555 }));
     await Promise.all([CLINICA, "outra"].map(clinica => comCatalogoDoTurno(clinica, async () => {
       const a = (await catalogoDoTurno(clinica))!;
       await Promise.resolve();
@@ -292,7 +292,7 @@ describe("uma leitura do catálogo por resposta", () => {
   });
 
   it("exclui rascunhos/notas internas e protege a leitura contra alterações de consumidores", async () => {
-    banco.nina_cat_servicos.push(servico({ id: "rascunho", status: "RASCUNHO" }));
+    banco.servicos.push(servico({ id: "rascunho", status: "RASCUNHO" }));
     await comCatalogoDoTurno(CLINICA, async () => {
       const primeiro = (await catalogoDoTurno(CLINICA))!;
       expect(primeiro.servicos).toHaveLength(1);
@@ -322,7 +322,7 @@ describe("uma leitura do catálogo por resposta", () => {
 
 describe("título genérico publicado não equivale a atendimento ausente", () => {
   it("esclarece PROCEDIMENTOS sem escolher uma consulta ou reservar o grupo", async () => {
-    banco.nina_cat_servicos.push(servico({ id: "grupo-procedimentos", nome: "PROCEDIMENTOS" }));
+    banco.servicos.push(servico({ id: "grupo-procedimentos", nome: "PROCEDIMENTOS" }));
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "procedimentos", tipo_atendimento: "exame_procedimento" });
     expect(r.found).toBe(true);
     expect(r.records.map(x => x.id)).toEqual(["grupo-procedimentos"]);
@@ -330,7 +330,7 @@ describe("título genérico publicado não equivale a atendimento ausente", () =
     expect(r.esclarecimento?.pergunta).toContain("Qual procedimento");
   });
   it("não cria um grupo inexistente nem usa publicação de outra clínica", async () => {
-    banco.nina_cat_servicos.push(servico({ nome: "PROCEDIMENTOS", clinica_id: "outra-clinica" }));
+    banco.servicos.push(servico({ nome: "PROCEDIMENTOS", clinica_id: "outra-clinica" }));
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "procedimentos", tipo_atendimento: "exame_procedimento" });
     expect(r.found).toBe(false);
     expect(r.esclarecimento).toBeUndefined();
@@ -341,7 +341,7 @@ const idSequencial = (n: number) => `00000000-0000-0000-0000-${String(n).padStar
 
 describe("consulta com preventivo no índice público", () => {
   beforeEach(() => {
-    banco.nina_cat_profissionais = ["Carlos Alberto Varillas", "Claudia Maria", "Conceição Martins", "Elair Magalhães"]
+    banco.profissionais = ["Carlos Alberto Varillas", "Claudia Maria", "Conceição Martins", "Elair Magalhães"]
       .map((nome, n) => profissional({ ...consultaPreventivo, id: idSequencial(n), nome }));
   });
   it.each(["ginecologia preventivo", "consulta com preventivo", "consulta + preventivo"])("%s encontra os quatro publicados já na primeira pesquisa", async query => {
@@ -359,7 +359,7 @@ describe("consulta com preventivo no índice público", () => {
     expect(r.records[0]!.observacoes).toContain("205,00");
   });
   it("sem preventivo só encontra uma consulta sem o procedimento, quando publicada", async () => {
-    banco.nina_cat_profissionais!.push(profissional({ id: "sem", nome: "Dra. Exemplo", tipo_atendimento: "Consulta",
+    banco.profissionais!.push(profissional({ id: "sem", nome: "Dra. Exemplo", tipo_atendimento: "Consulta",
       especialidades: [{ nome: "GINECOLOGIA" }],
       observacao_publica: "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado" }));
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia sem preventivo", tipo_atendimento: "consulta" });
@@ -372,14 +372,14 @@ describe("consulta com preventivo no índice público", () => {
     expect(r.knowledge_status).toBe("not_found");
   });
   it("não pesquisa a palavra preventivo em observações livres ou notas internas", async () => {
-    banco.nina_cat_profissionais = [profissional({ tipo_atendimento: "Consulta", especialidades: [{ nome: "GINECOLOGIA" }],
+    banco.profissionais = [profissional({ tipo_atendimento: "Consulta", especialidades: [{ nome: "GINECOLOGIA" }],
       observacao_publica: "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Não faz preventivo",
       nota_interna: "CONSULTA + PREVENTIVO" })];
     expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta" })).knowledge_status).toBe("not_found");
     expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta", medico: "Dra. Fulana" })).knowledge_status).toBe("not_found");
   });
   it("mantém o escopo de clínica e publicação na pesquisa dos títulos", async () => {
-    banco.nina_cat_profissionais = [profissional({ ...consultaPreventivo, status: "RASCUNHO" }),
+    banco.profissionais = [profissional({ ...consultaPreventivo, status: "RASCUNHO" }),
       profissional({ ...consultaPreventivo, status: "ARQUIVADO" }), profissional({ ...consultaPreventivo, clinica_id: "outra" })];
     expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "ginecologia preventivo", tipo_atendimento: "consulta" })).knowledge_status).toBe("not_found");
     expect(chamadas.every(c => !c.colunas.includes("nota_interna") && !c.colunas.includes("rascunho"))).toBe(true);
@@ -387,7 +387,7 @@ describe("consulta com preventivo no índice público", () => {
 });
 
 it("a resposta da busca associa a modalidade à avaliação e preserva o bloco de escala de Karen", async () => {
-  banco.nina_cat_profissionais = [profissional(avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"))];
+  banco.profissionais = [profissional(avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"))];
   const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "odontologia", tipo_atendimento: "consulta" });
   expect(r.records[0]!.extras).toMatchObject({ modalidade_atendimento: "chegada_sem_pre_agendamento",
     atendimentos_da_modalidade: ["AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA"] });
@@ -397,11 +397,11 @@ it("a resposta da busca associa a modalidade à avaliação e preserva o bloco d
 
 describe("separação entre consultas e exames", () => {
   beforeEach(() => {
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({ nome: "ELETROCARDIOGRAMA", descricao_publica: "Cardiologia", preparo: "Pedido médico", valor: 90 }),
       servico({ nome: "MAPA 24H cardiologia", descricao_publica: "Cardiologia", valor: 110 }),
     ];
-    banco.nina_cat_profissionais = ["Dr. A", "Dra. B"].map(nome => profissional({
+    banco.profissionais = ["Dr. A", "Dra. B"].map(nome => profissional({
       nome, especialidades: [{ nome: "Cardiologia" }], formas_pagamento: [{ forma: "Cartão", valor: 145 }],
     }));
   });
@@ -413,11 +413,11 @@ describe("separação entre consultas e exames", () => {
     expect(r.price).toContain("145,00");
     expect(r.tipo_atendimento).toBe("consulta");
     expect(r.esclarecimento).toBeUndefined();
-    expect(chamadas.some(c => c.tabela === "nina_cat_servicos")).toBe(false);
+    expect(chamadas.some(c => c.tabela === "servicos")).toBe(false);
   });
 
   it("consulta ausente não é substituída por exames da especialidade", async () => {
-    banco.nina_cat_profissionais = [];
+    banco.profissionais = [];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta" });
     expect(r.knowledge_status).toBe("not_found");
     expect(r.records).toHaveLength(0);
@@ -434,7 +434,7 @@ describe("separação entre consultas e exames", () => {
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ECG", medico: "Dr. A", tipo_atendimento: "exame_procedimento" });
     expect(r.records.map(item => item.procedimento)).toEqual(["ELETROCARDIOGRAMA"]);
     expect(r.esclarecimento).toBeUndefined();
-    expect(chamadas.some(c => c.tabela === "nina_cat_profissionais")).toBe(false);
+    expect(chamadas.some(c => c.tabela === "profissionais")).toBe(false);
   });
 
   it("exames de cardiologia pedem escolha de exame e não devolvem consultas", async () => {
@@ -445,7 +445,7 @@ describe("separação entre consultas e exames", () => {
   });
 
   it("exame ausente não é substituído pelo cadastro de profissional", async () => {
-    banco.nina_cat_servicos = [];
+    banco.servicos = [];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "exame_procedimento" });
     expect(r.knowledge_status).toBe("not_found");
     expect(r.records).toHaveLength(0);
@@ -460,12 +460,12 @@ describe("separação entre consultas e exames", () => {
 
 describe("avaliação odontológica publicada", () => {
   beforeEach(() => {
-    banco.nina_cat_profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => profissional({
+    banco.profissionais = ["Jean Ferreira", "Raiani", "Karen"].map((nome, i) => profissional({
       id: idSequencial(i + 1), nome, especialidades: [{ nome: "ODONTOLOGIA" }],
       tipo_atendimento: "Avaliação odontológica", formas_pagamento: [],
       observacao_publica: "AVALIAÇÃO ODONTOLÓGICA\nDinheiro: Gratuito\nPix/cartão: Gratuito",
     }));
-    banco.nina_cat_servicos = [servico({ nome: "Limpeza odontológica", valor: 180 })];
+    banco.servicos = [servico({ nome: "Limpeza odontológica", valor: 180 })];
   });
   it.each(["avaliação odontológica", "AVALIACAO ODONTOLOGICA", "avaliaçao odontolgica", "avaliação odonto",
     "avaliação com dentista", "consulta odontológica", "odontologia", "odonto", "dentista", "odontologista"])(
@@ -477,7 +477,7 @@ describe("avaliação odontológica publicada", () => {
       expect(r.records.every(item => item.categoria === "CONSULTA" && item.procedimento === "Consulta — ODONTOLOGIA")).toBe(true);
       expect(r.esclarecimento).toBeUndefined();
       expect(JSON.stringify(r)).not.toContain("180,00");
-      expect(chamadas.some(c => c.tabela === "nina_cat_servicos")).toBe(false);
+      expect(chamadas.some(c => c.tabela === "servicos")).toBe(false);
     });
   it("infere consulta pelo atendimento publicado sem categoria explícita", async () => {
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "avaliação odontológica" });
@@ -504,7 +504,7 @@ describe("avaliação odontológica publicada", () => {
     expect(r.doctors).toHaveLength(0);
   });
   it("procura somente o atendimento público, com escopo de clínica e publicação", async () => {
-    banco.nina_cat_profissionais = [
+    banco.profissionais = [
       profissional({ tipo_atendimento: "Avaliação odontológica", clinica_id: "outra" }),
       profissional({ tipo_atendimento: "Avaliação odontológica", status: "ARQUIVADO" }),
       profissional({ tipo_atendimento: "Consulta", especialidades: [{ nome: "ODONTOLOGIA" }],
@@ -524,10 +524,10 @@ describe("busca completa com e sem acentos", () => {
     "nebulizac\u0327a\u0303o",
     "Olá, gostaria de saber como funciona o atendimento para nebulização.",
   ])("encontra %s após 1.100 serviços sem mudar a grafia exibida", async (query) => {
-    banco.nina_cat_servicos = Array.from({ length: 1100 }, (_, i) =>
+    banco.servicos = Array.from({ length: 1100 }, (_, i) =>
       servico({ id: idSequencial(i + 1), nome: `Outro procedimento ${i}`, preparo: "Detalhe não relevante" }),
     );
-    banco.nina_cat_servicos.push(servico({ id: idSequencial(1101), nome: "NEBULIZAÇÃO", valor: 20 }));
+    banco.servicos.push(servico({ id: idSequencial(1101), nome: "NEBULIZAÇÃO", valor: 20 }));
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
     expect(r.found).toBe(true);
     expect(r.procedure).toBe("NEBULIZAÇÃO");
@@ -536,13 +536,13 @@ describe("busca completa com e sem acentos", () => {
   });
 
   it("normaliza também quando o cadastro está sem acento e a pergunta tem acento", async () => {
-    banco.nina_cat_servicos = [servico({ nome: "NEBULIZACAO" })];
+    banco.servicos = [servico({ nome: "NEBULIZACAO" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "nebulização" });
     expect(r.procedure).toBe("NEBULIZACAO");
   });
 
   it("não deixa um resultado secundário sem acento ocultar o nome correto acentuado", async () => {
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({ id: idSequencial(1), nome: "Outro procedimento", descricao_publica: "Orientação após nebulizacao" }),
       servico({ id: idSequencial(2), nome: "NEBULIZAÇÃO" }),
     ];
@@ -551,11 +551,11 @@ describe("busca completa com e sem acentos", () => {
   });
 
   it("busca a especialidade e o dia antes de limitar, inclusive após o 60º profissional", async () => {
-    banco.nina_cat_profissionais = Array.from({ length: 260 }, (_, i) => profissional({
+    banco.profissionais = Array.from({ length: 260 }, (_, i) => profissional({
       id: idSequencial(i + 1), nome: `Dr. Outro ${i}`, especialidades: [{ nome: "Clínico geral" }],
       horarios: [{ dia: "Segunda-feira", inicio: "08:00" }],
     }));
-    banco.nina_cat_profissionais.push(profissional({
+    banco.profissionais.push(profissional({
       id: idSequencial(261), nome: "Dr. João Hélio", especialidades: [{ nome: "Clínico geral" }],
       horarios: [{ dia: "Terça-feira", inicio: "08:00" }],
     }));
@@ -567,7 +567,7 @@ describe("busca completa com e sem acentos", () => {
 
   it("exclui registros privados, arquivados e de outra clínica em todas as páginas", async () => {
     tetoServidor = 1;
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({ id: idSequencial(1), nome: "Exame qualquer" }),
       servico({ id: idSequencial(2), nome: "NEBULIZAÇÃO rascunho", status: "RASCUNHO" }),
       servico({ id: idSequencial(3), nome: "NEBULIZAÇÃO arquivada", status: "ARQUIVADO" }),
@@ -581,7 +581,7 @@ describe("busca completa com e sem acentos", () => {
   });
 
   it("não encontra um procedimento ausente só pelas palavras como funciona", async () => {
-    banco.nina_cat_servicos = [servico({ nome: "Ecocardiograma", descricao_publica: "Como funciona o exame" })];
+    banco.servicos = [servico({ nome: "Ecocardiograma", descricao_publica: "Como funciona o exame" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Como funciona a crioablação?" });
     expect(r.knowledge_status).toBe("not_found");
   });
@@ -592,7 +592,7 @@ describe("recuperação no catálogo publicado", () => {
     const medicoId = "44444444-4444-4444-8444-444444444444";
     const catalogoId = "55555555-5555-4555-8555-555555555555";
     beforeEach(() => {
-      banco.nina_cat_profissionais = [profissional({ id: catalogoId, nome: "Rosângela Riolino",
+      banco.profissionais = [profissional({ id: catalogoId, nome: "Rosângela Riolino",
         medico_id: medicoId, especialidades: [{ nome: "CARDIOLOGIA" }] })];
       banco.medicos = [{ id: medicoId, nome: "ROSANGELA SCHMITZ RIOLINO", ativo: true, clinica_id: CLINICA }];
     });
@@ -605,7 +605,7 @@ describe("recuperação no catálogo publicado", () => {
       expect(JSON.stringify(r.records)).not.toContain("medico_id");
     });
     it("reusa a resolução legada por nome único, como na leitura da agenda", async () => {
-      banco.nina_cat_profissionais![0]!.medico_id = null;
+      banco.profissionais![0]!.medico_id = null;
       const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico: "Rosangela Schmitz Riolino" });
       expect(r.esclarecimento).toBeUndefined();
       expect(r.records.map(p => p.id)).toEqual([catalogoId]);
@@ -615,14 +615,14 @@ describe("recuperação no catálogo publicado", () => {
         if (caso === "inativo") banco.medicos![0]!.ativo = false;
         if (caso === "outra_clinica") banco.medicos![0]!.clinica_id = "outra";
         if (caso === "sem_vinculo") {
-          banco.nina_cat_profissionais![0]!.medico_id = null;
-          banco.nina_cat_profissionais![0]!.nome = "Rosângela Souza";
+          banco.profissionais![0]!.medico_id = null;
+          banco.profissionais![0]!.nome = "Rosângela Souza";
         }
         if (caso === "homonimos") banco.medicos!.push({ ...banco.medicos![0]!, id: crypto.randomUUID() });
-        if (caso === "duplicado") banco.nina_cat_profissionais!.push({ ...banco.nina_cat_profissionais![0]!, id: crypto.randomUUID() });
+        if (caso === "duplicado") banco.profissionais!.push({ ...banco.profissionais![0]!, id: crypto.randomUUID() });
         if (caso === "outra_especialidade") {
-          banco.nina_cat_profissionais![0]!.especialidades = [{ nome: "PSICOLOGIA" }];
-          banco.nina_cat_profissionais!.push(profissional({ nome: "Maria Silva", especialidades: [{ nome: "CARDIOLOGIA" }] }));
+          banco.profissionais![0]!.especialidades = [{ nome: "PSICOLOGIA" }];
+          banco.profissionais!.push(profissional({ nome: "Maria Silva", especialidades: [{ nome: "CARDIOLOGIA" }] }));
         }
         const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico: "Rosangela Schmitz Riolino" });
         expect(r.esclarecimento?.tipo).toBe("profissional");
@@ -631,10 +631,10 @@ describe("recuperação no catálogo publicado", () => {
     );
   });
   it("cardiologia com quatro médicos e cinco exames retorna somente consultas", async () => {
-    banco.nina_cat_profissionais = ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome) =>
+    banco.profissionais = ["Sandro", "Antonio", "Rosângela", "Alex"].map((nome) =>
       profissional({ nome, especialidades: [{ nome: "CARDIOLOGIA" }] }),
     );
-    banco.nina_cat_servicos = ["MAPA 24H", "ECOCARDIOGRAMA", "ELETROCARDIOGRAMA", "HOLTER 24H", "TESTE ERGOMETRICO"].map((nome) =>
+    banco.servicos = ["MAPA 24H", "ECOCARDIOGRAMA", "ELETROCARDIOGRAMA", "HOLTER 24H", "TESTE ERGOMETRICO"].map((nome) =>
       servico({ nome, descricao_publica: "Exame de cardiologia", valor: 90, preparo: "Levar pedido médico" }),
     );
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia" });
@@ -650,24 +650,24 @@ describe("recuperação no catálogo publicado", () => {
     "Bom dia gostaria por favor de saber o valor de uma consulta de pneumologia",
     "Vocês realizam o procedimento crioablação?",
   ])("serviço diferente não comprova o pedido ausente: %s", async (query) => {
-    banco["nina_cat_servicos"] = [
+    banco["servicos"] = [
       servico({ nome: "Consulta Cardiologia", descricao_publica: "Exame realizado na clínica" }),
       servico({ nome: "Procedimento Dermatológico" }),
     ];
-    banco["nina_cat_profissionais"] = [profissional({ especialidades: [{ nome: "Cardiologia" }] })];
+    banco["profissionais"] = [profissional({ especialidades: [{ nome: "Cardiologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
     expect(r.knowledge_status).toBe("not_found");
     expect(r.records).toEqual([]);
     expect(r.instrucao).toContain("Encaminhe obrigatoriamente");
   });
   it("pedido com frase longa encontra a especialidade publicada", async () => {
-    banco["nina_cat_profissionais"] = [profissional({ especialidades: [{ nome: "Pneumologia" }] })];
+    banco["profissionais"] = [profissional({ especialidades: [{ nome: "Pneumologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Bom dia gostaria por favor de saber o valor de uma consulta com pneumologista" });
     expect(r.knowledge_status).toBe("found");
     expect(r.records).toHaveLength(1);
   });
   it("vigência dos avisos muda à meia-noite de São Paulo, não à meia-noite UTC", async () => {
-    banco["nina_cat_profissionais"] = [
+    banco["profissionais"] = [
       profissional({
         nome: "Dr. Silva", especialidades: [{ nome: "Cardiologia" }],
         aviso_dia: "Aviso válido somente no dia 17",
@@ -689,7 +689,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("traz o exame certo mesmo com plural e não confunde com outro parecido", async () => {
-    banco["nina_cat_servicos"] = [
+    banco["servicos"] = [
       servico({ nome: "Ultrassom de tireoide", valor: 180 }),
       servico({ nome: "Ultrassom de abdome total", valor: 220 }),
     ];
@@ -700,7 +700,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("preserva as condições de pagamento vinculadas ao valor", async () => {
-    banco["nina_cat_servicos"] = [
+    banco["servicos"] = [
       servico({
         nome: "Endoscopia",
         formas_pagamento: [
@@ -721,7 +721,7 @@ describe("recuperação no catálogo publicado", () => {
 
   it("mantém recorrência, observação do horário e aviso vigente", async () => {
     const hoje = agoraNaClinica().iso;
-    banco["nina_cat_profissionais"] = [
+    banco["profissionais"] = [
       profissional({
         nome: "Dr. Silva",
         especialidades: [{ nome: "Cardiologia" }],
@@ -740,8 +740,8 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("pergunta de consulta não usa o preço do exame como preço da consulta", async () => {
-    banco["nina_cat_servicos"] = [servico({ nome: "Eletrocardiograma cardiologia", valor: 90 })];
-    banco["nina_cat_profissionais"] = [
+    banco["servicos"] = [servico({ nome: "Eletrocardiograma cardiologia", valor: 90 })];
+    banco["profissionais"] = [
       profissional({
         nome: "Dr. Silva",
         especialidades: [{ nome: "Cardiologia" }],
@@ -754,7 +754,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("vários profissionais da mesma especialidade não viram ambiguidade", async () => {
-    banco["nina_cat_profissionais"] = [
+    banco["profissionais"] = [
       profissional({ nome: "Dr. A", especialidades: [{ nome: "Ortopedia" }] }),
       profissional({ nome: "Dra. B", especialidades: [{ nome: "Ortopedia" }] }),
     ];
@@ -765,7 +765,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("dois exames diferentes empatados devolvem ambiguidade para a Nina perguntar", async () => {
-    banco["nina_cat_servicos"] = [
+    banco["servicos"] = [
       servico({ nome: "Raio-x de tórax" }),
       servico({ nome: "Raio-x de coluna" }),
     ];
@@ -774,7 +774,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("filtra pelo dia pedido sem excluir quem não tem horário cadastrado", async () => {
-    banco["nina_cat_profissionais"] = [
+    banco["profissionais"] = [
       profissional({
         nome: "Dr. Segunda",
         especialidades: [{ nome: "Dermatologia" }],
@@ -791,7 +791,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("não lê rascunho, arquivado, nota interna nem outra clínica", async () => {
-    banco["nina_cat_servicos"] = [
+    banco["servicos"] = [
       servico({ nome: "Ressonância", status: "RASCUNHO" }),
       servico({ nome: "Ressonância antiga", status: "ARQUIVADO" }),
       servico({ nome: "Ressonância outra clínica", clinica_id: "22222222-2222-2222-2222-222222222222" }),
@@ -806,7 +806,7 @@ describe("recuperação no catálogo publicado", () => {
   });
 
   it("catálogo sem o item devolve not_found, sem fallback de planilha", async () => {
-    banco["nina_cat_servicos"] = [servico({ nome: "Ecocardiograma" })];
+    banco["servicos"] = [servico({ nome: "Ecocardiograma" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" });
     expect(r.knowledge_status).toBe("not_found");
     expect(r.records.length).toBe(0);
@@ -816,7 +816,7 @@ describe("recuperação no catálogo publicado", () => {
 
 describe("siglas, escrita aproximada e identidade publicadas", () => {
   it.each(["USG de tireoide", "ultra de tireoide", "ultrassonogragia de tireoide"])("localiza %s sem confundir órgão ou outro procedimento", async (query) => {
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({ nome: "Ultrassonografia de tireoide", valor: 180 }),
       servico({ nome: "Punção de tireoide", valor: 250 }),
       servico({ nome: "Ultrassonografia de abdome total", valor: 220 }),
@@ -828,7 +828,7 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     expect(r.esclarecimento).toBeUndefined();
   });
   it.each([1, 6])("não escolhe um tipo de ultrassom por limite de %i resultados", async (limite) => {
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({ nome: "Ultrassonografia de tireoide", valor: 180 }),
       servico({ nome: "Ultrassonografia de abdome total", valor: 220 }),
     ];
@@ -839,26 +839,26 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     expect(r.price).toBeNull();
   });
   it.each(["ultra", "ultrassonogragia"])("uma única USG publicada não identifica o tipo desejado: %s", async (query) => {
-    banco.nina_cat_servicos = [servico({ nome: "Ultrassonografia de tireoide" })];
+    banco.servicos = [servico({ nome: "Ultrassonografia de tireoide" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
     expect(r.esclarecimento?.tipo).toBe("procedimento");
     expect(r.procedure).toBeNull();
   });
   it.each(["xyz", "tc", "PET-CT"])("pede o nome por extenso de %s sem afirmar ausência", async (query) => {
-    banco.nina_cat_servicos = [servico({ nome: "Exame de tireoide" })];
+    banco.servicos = [servico({ nome: "Exame de tireoide" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query });
     expect(r.esclarecimento?.tipo).toBe("sigla");
     expect(r.esclarecimento?.pergunta).toContain("por extenso");
     expect(r.records).toHaveLength(0);
   });
   it("não substitui urologia ausente por neurologia publicada", async () => {
-    banco.nina_cat_profissionais = [profissional({ especialidades: [{ nome: "Neurologia" }] })];
+    banco.profissionais = [profissional({ especialidades: [{ nome: "Neurologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "urologista" });
     expect(r.knowledge_status).toBe("not_found");
     expect(r.esclarecimento).toBeUndefined();
   });
   it("mantém a consulta, repete a lista uma vez e identifica corretamente o motivo da transferência", async () => {
-    banco.nina_cat_profissionais = [
+    banco.profissionais = [
       profissional({ id: idSequencial(1), nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }] }),
       profissional({ id: idSequencial(2), nome: "Dra. Raisa Moura", especialidades: [{ nome: "Dermatologia" }] }),
       profissional({ nome: "Dra. Suellen Silva", especialidades: [{ nome: "Cardiologia" }] }),
@@ -871,10 +871,10 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     expect(primeira.esclarecimento?.pergunta).toContain("Não encontrei esse nome entre os médicos desta consulta");
     expect(primeira.esclarecimento?.opcoes.map(o => o.nome)).toEqual(["Dra. Shirley Martins", "Dra. Raisa Moura"]);
     expect(primeira.price).toBeNull();
-    const r = validarResultado("consultar_base_conhecimento", { ok: true, ...primeira });
+    const r = validarResultado("consultar_cadastro", { ok: true, ...primeira });
     expect(encaminhamentoSemRegistro(r, args)).toBeNull();
     expect(encaminharAposEsclarecimento(null, r, "quero a Suellen")).toBeNull();
-    const fatos = incorporarResultadoOficial({ clinicaId: CLINICA, nome: "consultar_base_conhecimento", args, resultado: r, fatos: [], consultas: [] }).fatos;
+    const fatos = incorporarResultadoOficial({ clinicaId: CLINICA, nome: "consultar_cadastro", args, resultado: r, fatos: [], consultas: [] }).fatos;
     const anterior = conhecimentoDaMesmaSessao(lembrarConsultaComprovada({
       clinicaId: CLINICA, sessionId: "sessao", args, fatos, esclarecimento: primeira.esclarecimento,
     }), CLINICA, "sessao");
@@ -889,18 +889,18 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     const corrigida = await buscarNoCatalogo({ clinicaId: CLINICA, query: args.termo, medico: "Shirley" });
     expect(corrigida.esclarecimento).toBeUndefined();
     expect(corrigida.records.map(r => r.id)).toEqual([idSequencial(1)]);
-    expect(encaminharAposEsclarecimento(anterior, validarResultado("consultar_base_conhecimento", { ok: true, ...corrigida }), "Shirley")).toBeNull();
-    expect(encaminharAposEsclarecimento(anterior, validarResultado("consultar_base_conhecimento", { ok: false, erro: "INTERNAL_ERROR" }), "Shirley")).toBeNull();
+    expect(encaminharAposEsclarecimento(anterior, validarResultado("consultar_cadastro", { ok: true, ...corrigida }), "Shirley")).toBeNull();
+    expect(encaminharAposEsclarecimento(anterior, validarResultado("consultar_cadastro", { ok: false, erro: "INTERNAL_ERROR" }), "Shirley")).toBeNull();
   });
   it("escrita parecida pede identificação sem negar a existência do médico", async () => {
-    banco.nina_cat_profissionais = [profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }] })];
+    banco.profissionais = [profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Dermatologia", medico: "Shirlei" });
     expect(r.esclarecimento?.motivo).toBe("medico_nao_identificado");
     expect(r.esclarecimento?.pergunta).toContain("Não consegui identificar com segurança");
     expect(r.esclarecimento?.pergunta).not.toContain("Não encontrei");
   });
   it("a lista corretiva não expõe nomes genéricos e não elimina opções pelo dia", async () => {
-    banco.nina_cat_profissionais = [
+    banco.profissionais = [
       profissional({ nome: "Enfermagem", especialidades: [{ nome: "Dermatologia" }] }),
       profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }], horarios: [{ dia: "Sábado" }] }),
     ];
@@ -908,7 +908,7 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     expect(r.esclarecimento?.opcoes.map(o => o.nome)).toEqual(["Dra. Shirley Martins"]);
   });
   it("confirma nome aproximado e diferencia homônimos com os dados do cadastro", async () => {
-    banco.nina_cat_profissionais = [
+    banco.profissionais = [
       profissional({ id: idSequencial(1), nome: "Dr. João Hélio", especialidades: [{ nome: "Cardiologia" }], unidades: { nome: "Centro" } }),
       profissional({ id: idSequencial(2), nome: "Dr. João Hélio", especialidades: [{ nome: "Ortopedia" }], unidades: { nome: "Norte" } }),
     ];
@@ -921,13 +921,13 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     expect(escolhido.records.map((r) => r.id)).toEqual([idSequencial(2)]);
   });
   it("a consulta preventiva por nome também pede esclarecimento", async () => {
-    banco.nina_cat_profissionais = [profissional({ nome: "Alex Silva" }), profissional({ nome: "Alex Souza" })];
+    banco.profissionais = [profissional({ nome: "Alex Silva" }), profissional({ nome: "Alex Souza" })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "quero com Dr. Alex" });
     expect(r.esclarecimento?.tipo).toBe("profissional");
     expect(r.esclarecimento?.opcoes).toHaveLength(2);
   });
   it("dois médicos com nome e especialidade iguais mantêm preços e identidades separados", async () => {
-    banco.nina_cat_profissionais = [
+    banco.profissionais = [
       profissional({ nome: "João Silva", especialidades: [{ nome: "Cardiologia" }], formas_pagamento: [{ forma: "Dinheiro", valor: 100 }] }),
       profissional({ nome: "João Silva", especialidades: [{ nome: "Cardiologia" }], formas_pagamento: [{ forma: "Dinheiro", valor: 200 }] }),
     ];
@@ -940,13 +940,13 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
 
 describe("nomes e opções em respostas curtas", () => {
   it.each(["Sandro Prinscewal", "medico-sandro"])("clínico geral não pede novamente o médico exato: %s", async medico => {
-    banco.nina_cat_profissionais = [profissional({ id: "medico-sandro", nome: "Sandro Prinscewal", especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }] })];
+    banco.profissionais = [profissional({ id: "medico-sandro", nome: "Sandro Prinscewal", especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "clinico geral", medico, tipo_atendimento: "consulta" });
     expect(r.esclarecimento).toBeUndefined();
     expect(r.records.map(r => r.id)).toEqual(["medico-sandro"]);
   });
   it("busca preventiva de Dr. Jaoo sugere João para confirmação", async () => {
-    banco.nina_cat_profissionais = [profissional({ nome: "Dr. João Hélio", especialidades: [{ nome: "Cardiologia" }] })];
+    banco.profissionais = [profissional({ nome: "Dr. João Hélio", especialidades: [{ nome: "Cardiologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Quero com Dr. Jaoo Helio" });
     expect(r.esclarecimento?.tipo).toBe("profissional");
     expect(r.esclarecimento?.pergunta).toContain("Dr. João Hélio");
@@ -957,15 +957,15 @@ describe("nomes e opções em respostas curtas", () => {
 
 describe("aliases publicados por cadastro", () => {
   it("encontra sigla aprovada sem compartilhar regras com outro exame", async () => {
-    banco.nina_cat_servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:["XYZ"]},formas_pagamento:[{forma:"Dinheiro",valor:75}]}));
-    banco.nina_cat_servicos.push(servico({nome:"Exame diferente",estrutura:{aliases:["XYZ contraste"]}}));
+    banco.servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:["XYZ"]},formas_pagamento:[{forma:"Dinheiro",valor:75}]}));
+    banco.servicos.push(servico({nome:"Exame diferente",estrutura:{aliases:["XYZ contraste"]}}));
     const r = await buscarNoCatalogo({clinicaId:CLINICA,query:"XYZ",tipo_atendimento:"exame_procedimento"});
     expect(r.found).toBe(true);
     expect(r.records.some(r => r.procedimento === "Exame de exemplo")).toBe(true);
     expect(r.esclarecimento?.tipo).not.toBe("sigla_desconhecida");
   });
   it("alias de rascunho não é usado para responder", async () => {
-    banco.nina_cat_servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:[]},rascunho:{estrutura:{aliases:["ZZZX"]}}}));
+    banco.servicos.push(servico({nome:"Exame de exemplo",estrutura:{aliases:[]},rascunho:{estrutura:{aliases:["ZZZX"]}}}));
     const r = await buscarNoCatalogo({clinicaId:CLINICA,query:"ZZZX",tipo_atendimento:"exame_procedimento"});
     expect(r.records).toHaveLength(0);
   });
@@ -973,7 +973,7 @@ describe("aliases publicados por cadastro", () => {
 
 describe("escolha completa do exame após esclarecer ultrassonografia", () => {
   beforeEach(() => {
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({
         id: idSequencial(1),
         nome: "USG TRANSVAGINAL COM DOPPLER",
@@ -1029,21 +1029,21 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
     expect(
       encaminharAposEsclarecimento(
         anterior,
-        validarResultado("consultar_base_conhecimento", r),
+        validarResultado("consultar_cadastro", r),
         query,
       ),
     ).toBeNull();
   });
 
   it("o nome publicado prevalece sobre um alias genérico de outra variante", async () => {
-    banco.nina_cat_servicos[0]!.estrutura = { aliases: ["USG TRANSVAGINAL"] };
+    banco.servicos[0]!.estrutura = { aliases: ["USG TRANSVAGINAL"] };
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal" });
     expect(r.records.map((item) => item.procedimento)).toEqual(["USG TRANSVAGINAL"]);
     expect(r.esclarecimento).toBeUndefined();
   });
 
   it("um alias completo publicado identifica o exame e não uma variante do alias", async () => {
-    banco.nina_cat_servicos = [
+    banco.servicos = [
       servico({ nome: "Exame pélvico A", estrutura: { aliases: ["USG TRANSVAGINAL"] } }),
       servico({
         nome: "Exame pélvico B",
@@ -1056,7 +1056,7 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
   });
 
   it("aliases idênticos em exames diferentes mantêm a dúvida, mesmo com limite 1", async () => {
-    banco.nina_cat_servicos = ["Exame A", "Exame B"].map((nome) =>
+    banco.servicos = ["Exame A", "Exame B"].map((nome) =>
       servico({
         nome,
         estrutura: { aliases: ["USG TRANSVAGINAL"] },
@@ -1074,7 +1074,7 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
   });
 
   it("sem correspondência completa preserva a dúvida entre variantes", async () => {
-    banco.nina_cat_servicos = banco.nina_cat_servicos.filter((s) => s.nome !== "USG TRANSVAGINAL");
+    banco.servicos = banco.servicos.filter((s) => s.nome !== "USG TRANSVAGINAL");
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal" });
     expect(r.esclarecimento?.opcoes.map((o) => o.nome)).toEqual([
       "USG TRANSVAGINAL COM DOPPLER",
@@ -1084,7 +1084,7 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
   });
 
   it("Doppler solicitado e ausente não vira transvaginal comum", async () => {
-    banco.nina_cat_servicos = banco.nina_cat_servicos.filter(
+    banco.servicos = banco.servicos.filter(
       (s) => s.nome !== "USG TRANSVAGINAL COM DOPPLER",
     );
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG transvaginal com Doppler" });

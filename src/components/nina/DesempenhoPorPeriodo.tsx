@@ -136,7 +136,7 @@ export function DesempenhoPorPeriodo(props: Props) {
           {props.podeConfigurar ? (
             <Link
               to="/app/nina"
-              hash="base-conhecimento"
+              hash="informacoes-clinica"
               className="inline-flex items-center gap-1 text-sm text-primary underline underline-offset-4"
             >
               Configurar horário de funcionamento
@@ -146,7 +146,7 @@ export function DesempenhoPorPeriodo(props: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           Mesmo intervalo de datas e mesmos critérios dos cartões acima. A classificação usa o
-          horário oficial publicado na Base de Conhecimentos{dados?.fuso ? ` (fuso ${dados.fuso})` : ""}.
+          horário oficial publicado em Informações da clínica{dados?.fuso ? ` (fuso ${dados.fuso})` : ""}.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

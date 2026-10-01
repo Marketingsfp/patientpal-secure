@@ -619,7 +619,7 @@ const GRUPOS_BASE: Grupo[] = [
         key: "nina",
         nome: "Nina — WhatsApp",
         descricao:
-          "Conversas, mensagens prontas, base de conhecimentos, homologação e configuração do WhatsApp",
+          "Conversas, mensagens prontas, informações da clínica, homologação e configuração do WhatsApp",
         menu: "OS ZAP › Atendimento, Nina e Configurações do WhatsApp",
       },
       {

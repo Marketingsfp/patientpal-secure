@@ -32,7 +32,7 @@ describe("pesquisa usa atendimento, não texto conversacional", () => {
         return { ok: true };
       },
     });
-    const r = await broker.executar("consultar_base_conhecimento", JSON.stringify({ termo }));
+    const r = await broker.executar("consultar_cadastro", JSON.stringify({ termo }));
     expect(consultas).toBe(0);
     expect(r.success).toBe(false);
     expect(r.dados).toMatchObject({ codigo: PESQUISA_NAO_INTERPRETADA, consulta_executada: false });
@@ -64,7 +64,7 @@ describe("pesquisa usa atendimento, não texto conversacional", () => {
     "horário de funcionamento",
     "convênios aceitos",
   ])("preserva nome, qualificadores e siglas a esclarecer: %s", (termo) => {
-    expect(recusarFraseComoPesquisa("consultar_base_conhecimento", { termo })).toBeNull();
+    expect(recusarFraseComoPesquisa("consultar_cadastro", { termo })).toBeNull();
   });
   it("aplica a validação também aos atalhos de busca, sem bloquear o motivo de uma transferência legítima", () => {
     for (const nome of ["buscar_medicos", "proxima_vaga", "consultar_primeiro_disponivel", "consultar_disponibilidade", "verificar_horario"]) {

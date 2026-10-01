@@ -29,8 +29,8 @@ export function fonteOperacionalDoBanco(
       registro.push(clinicaId);
       if (falhar()) throw new Error("Falha ao ler o cadastro");
       return {
-      servicos: publicados("nina_cat_servicos", clinicaId),
-      profissionais: publicados("nina_cat_profissionais", clinicaId),
+      servicos: publicados("servicos", clinicaId),
+      profissionais: publicados("profissionais", clinicaId),
       };
     },
   };

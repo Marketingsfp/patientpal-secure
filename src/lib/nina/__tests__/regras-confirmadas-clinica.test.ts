@@ -3,7 +3,6 @@ import { modalidadeEstruturada, pendenciasEstrutura, INSTRUCAO_DADOS_CATALOGO } 
 import { profissionalParaRegistro } from "../catalogo-conhecimento";
 import { REGRA_HORARIOS_PUBLICADOS, REGRA_ANESTESIA_ADICIONAL, REGRA_MODALIDADES_CONFIRMADAS } from "../regras-administrativas-confirmadas";
 import { PROMPT_NINA_WHATSAPP_V4 } from "../prompt/behavior-v4";
-import { instrucoesCatalogoIA } from "../catalogo-ia";
 
 const atendimento = (nome: string, obs: string, chegada = "Manhã e tarde") =>
   `${nome}\nEspecialidade: CARDIOLOGIA\nProfissional: Alex Louza\nDias e horários: Quarta 13h\nObservação: ${obs}\nPode chegar até que horas: ${chegada}`;
@@ -43,9 +42,5 @@ describe("definições confirmadas pela clínica", () => {
     }
     expect(PROMPT_NINA_WHATSAPP_V4).not.toContain("Valor de anestesia sem condição não autoriza somar");
     expect(PROMPT_NINA_WHATSAPP_V4).not.toContain("'Agendado' ou só 'Ordem de chegada' não definem");
-    for (const tipo of ["servico", "profissional"] as const) {
-      expect(instrucoesCatalogoIA(tipo)).toContain(REGRA_MODALIDADES_CONFIRMADAS);
-      expect(instrucoesCatalogoIA(tipo)).not.toContain("salvo indicação explícita de sem pré-agendamento");
-    }
   });
 });

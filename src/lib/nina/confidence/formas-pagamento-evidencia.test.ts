@@ -12,7 +12,7 @@ const formas = [{ forma: "Dinheiro" }, { forma: "Cartão" }];
 describe("prova explícita das formas de pagamento declaradas", () => {
   it("preserva a lista completa e o registro ao gerar a evidência", () => {
     const ex = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,
@@ -55,7 +55,7 @@ describe("prova explícita das formas de pagamento declaradas", () => {
       { procedimento: "consulta cardiologia", formas: [] },
     ]);
     const ex = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,
@@ -148,7 +148,7 @@ describe("prova explícita das formas de pagamento declaradas", () => {
 
   it("emite marcador por especialidade quando o registro agregado não declara formas", () => {
     const ex = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,
@@ -190,7 +190,7 @@ describe("prova explícita das formas de pagamento declaradas", () => {
 
   it("lista de cardiologia geral não fecha a modalidade infantil do mesmo registro", () => {
     const ex = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,

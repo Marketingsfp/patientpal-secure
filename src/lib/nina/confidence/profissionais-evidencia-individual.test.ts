@@ -29,7 +29,7 @@ const exame = {
 
 function extrair(records: unknown[] = [exame, consulta], resumo = "ECOCARDIOGRAMA") {
   return extrairEvidencia({
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,
@@ -70,7 +70,7 @@ describe("evidência individual de profissionais em retorno com vários procedim
     expect(r.naoVerificados).toEqual([]);
     expect(r.claims.find((c) => c.tipo === "profissional")).toMatchObject({
       situacao: "confirmado",
-      referencia: "catalogo_publicado:consultar_base_conhecimento#profissional-c@publicacao-teste",
+      referencia: "catalogo_publicado:consultar_cadastro#profissional-c@publicacao-teste",
     });
   });
 

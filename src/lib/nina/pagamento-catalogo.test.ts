@@ -117,7 +117,7 @@ describe("Pix usa o preço do cartão na Nina", () => {
     ]);
     expect(dados.instrucao).toContain("na mesma frase ou linha");
     const evidencia = extrairEvidencia({
-      ferramenta: "consultar_base_conhecimento",
+      ferramenta: "consultar_cadastro",
       capacidade: "searchKnowledgeBase",
       fonte: "base_conhecimento",
       success: true,

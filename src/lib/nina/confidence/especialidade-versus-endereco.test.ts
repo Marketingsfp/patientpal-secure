@@ -5,7 +5,7 @@ import type { ContextoConfianca } from "./types";
 
 const catalogo: FatoRecuperado[] = [
   {
-    consulta: "consultar_base_conhecimento",
+    consulta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "catalogo_publicado",
     entidade: "servico",
@@ -14,7 +14,7 @@ const catalogo: FatoRecuperado[] = [
     chave: { procedimento: "Cardiologia" },
   },
   {
-    consulta: "consultar_base_conhecimento",
+    consulta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "catalogo_publicado",
     entidade: "profissional",
@@ -24,7 +24,7 @@ const catalogo: FatoRecuperado[] = [
   },
 ];
 const endereco: FatoRecuperado = {
-  consulta: "consultar_base_conhecimento",
+  consulta: "consultar_cadastro",
   capacidade: "searchKnowledgeBase",
   fonte: "catalogo_publicado",
   entidade: "endereco",
@@ -38,7 +38,7 @@ function contexto(fatos = catalogo): ContextoConfianca {
     retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true }],
     toolResults: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         success: true,

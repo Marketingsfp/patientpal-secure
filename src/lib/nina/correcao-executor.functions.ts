@@ -67,30 +67,6 @@ function definicoesFerramentas(camada: PropostaCorrecao["camada"]) {
   });
 
   const todas: Record<string, any> = {
-    ler_catalogo: {
-      type: "function",
-      name: "ler_catalogo",
-      description: "Lista itens do catálogo publicado desta clínica por trecho do nome.",
-      strict: true,
-      parameters: obj({ termo: { type: "string" } }, ["termo"]),
-    },
-    gravar_item_catalogo: {
-      type: "function",
-      name: "gravar_item_catalogo",
-      description: "Corrige e publica um campo público de um item do catálogo.",
-      strict: true,
-      parameters: obj(
-        {
-          item_id: { type: "string" },
-          campo: {
-            type: "string",
-            enum: ["valor", "valor_observacao", "descricao_publica", "preparo"],
-          },
-          valor_novo: { type: "string" },
-        },
-        ["item_id", "campo", "valor_novo"],
-      ),
-    },
     ler_prompt_publicado: {
       type: "function",
       name: "ler_prompt_publicado",
@@ -456,10 +432,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     /** Contagem real de operações desta correção (teto por ferramenta). */
     let contagem: ContagemOperacoes = {};
     /** O que precisa ser relido depois da gravação para conferir o efetivo. */
-    let alvoVerificacao:
-      | { tipo: "catalogo"; itemId: string; campo: string; valorNovo: string }
-      | { tipo: "prompt"; conteudo: string; versao: number | null }
-      | null = null;
+    let alvoVerificacao: { tipo: "prompt"; conteudo: string; versao: number | null } | null = null;
 
     const aplicavel = podeAplicarAutomaticamente(proposta);
     passo(
@@ -468,7 +441,9 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
       `${proposta.alvo} — camada ${proposta.camada}. ${
         aplicavel
           ? "Camada é configuração viva: o executor altera e publica."
-          : "Camada vive em código: o executor registra a mudança para quem publica código."
+          : proposta.camada === "catalogo"
+            ? "Informação vem do cadastro do sistema: o executor não altera o cadastro; a equipe corrige na origem."
+            : "Camada vive em código: o executor registra a mudança para quem publica código."
       }`,
     );
     await atualizarEtapa("aplicando");
@@ -539,34 +514,7 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
             if (!limite.ok) throw new Error(limite.motivo);
             contagem = registrarOperacao(contagem, c.name as OperacaoLimitada);
 
-            if (c.name === "ler_catalogo") {
-              retorno = await ferramentasServer.lerCatalogo(
-                supabase,
-                data.clinicaId,
-                String(args.termo ?? ""),
-              );
-              passo("ler_catalogo", "Catálogo consultado", `Termo: ${args.termo ?? ""}`);
-            } else if (c.name === "gravar_item_catalogo") {
-              const r = await ferramentasServer.gravarItemCatalogo(supabase, userId, data.clinicaId, {
-                itemId: String(args.item_id),
-                campo: args.campo,
-                valorNovo: String(args.valor_novo ?? ""),
-              });
-              valorAnterior = r.anterior;
-              publicado = true;
-              alvoVerificacao = {
-                tipo: "catalogo",
-                itemId: String(args.item_id),
-                campo: String(args.campo),
-                valorNovo: String(args.valor_novo ?? ""),
-              };
-              retorno = r;
-              passo(
-                "gravar_item_catalogo",
-                "Catálogo corrigido e publicado",
-                `${r.nome} · ${args.campo}: "${r.anterior ?? "—"}" → "${args.valor_novo}"`,
-              );
-            } else if (c.name === "ler_prompt_publicado") {
+            if (c.name === "ler_prompt_publicado") {
               retorno = await ferramentasServer.lerPromptPublicado(supabase);
               passo("ler_prompt_publicado", "Prompt publicado lido", "Versão ativa da Arquitetura.");
             } else if (c.name === "publicar_prompt") {
@@ -681,17 +629,10 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     let verificacao: import("./correcao-verificacao.server").Verificacao | null = null;
     if (alvoVerificacao) {
       const v = await import("./correcao-verificacao.server");
-      verificacao =
-        alvoVerificacao.tipo === "catalogo"
-          ? await v.verificarItemCatalogo(supabase, data.clinicaId, {
-              itemId: alvoVerificacao.itemId,
-              campo: alvoVerificacao.campo,
-              valorEsperado: alvoVerificacao.valorNovo,
-            })
-          : await v.verificarPromptPublicado(supabase, {
-              conteudoEsperado: alvoVerificacao.conteudo,
-              versaoEsperada: alvoVerificacao.versao,
-            });
+      verificacao = await v.verificarPromptPublicado(supabase, {
+        conteudoEsperado: alvoVerificacao.conteudo,
+        versaoEsperada: alvoVerificacao.versao,
+      });
       passo(
         "sistema",
         verificacao.conferido ? "Valor efetivo conferido" : "Valor efetivo não confere",

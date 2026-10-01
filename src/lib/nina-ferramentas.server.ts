@@ -282,7 +282,7 @@ export const FERRAMENTAS_NINA = [
   {
     type: "function",
     function: {
-      name: "consultar_base_conhecimento",
+      name: "consultar_cadastro",
       description:
         "Base de Conhecimentos oficial da clínica (planilha administrativa). Use SEMPRE antes de responder sobre especialidades, exames, procedimentos, médicos, dias/horários de atendimento, preços em dinheiro/PIX e cartão, preparos e observações. Horário aqui é escala administrativa, não vaga disponível.",
       parameters: {
@@ -372,7 +372,7 @@ async function executarFerramentaNinaInterno(
   args: any,
 ): Promise<unknown> {
   switch (nome) {
-    case "consultar_base_conhecimento": {
+    case "consultar_cadastro": {
       // FASE 3: única porta de acesso à planilha oficial.
       const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
       const termo = String(args.termo ?? "").trim().slice(0, 200);

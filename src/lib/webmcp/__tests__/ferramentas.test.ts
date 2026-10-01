@@ -38,18 +38,6 @@ function apiFalsa(registro: string[]): ApiWebmcp {
     historicoLeadTeste: marca("historicoLeadTeste", { conversaId: CONVERSA_TESTE, mensagens: [] }),
     enviarMensagemTeste: marca("enviarMensagemTeste", { duplicada: false, reply: "Olá!" }),
     resolverConversaTeste: marca("resolverConversaTeste"),
-    listarCatalogo: marca("listarCatalogo", {
-      servicos: [
-        { id: "s1", nome: "Ultrassom", status: "PUBLICADO", nota_interna: "segredo" },
-        { id: "s2", nome: "Raio-X", status: "RASCUNHO" },
-      ],
-      profissionais: [{ id: "p1", nome: "Dra. Ana", status: "PUBLICADO", nota_interna: "x" }],
-    }),
-    opcoesCatalogo: marca("opcoesCatalogo", {}),
-    salvarServicoCatalogo: marca("salvarServicoCatalogo", { id: "s3" }),
-    salvarProfissionalCatalogo: marca("salvarProfissionalCatalogo", { id: "p2" }),
-    alterarStatusCatalogo: marca("alterarStatusCatalogo"),
-    organizarTextoCatalogoIA: marca("organizarTextoCatalogoIA", { nome: "Ultrassom" }),
   };
 }
 
@@ -218,34 +206,3 @@ describe("homologação da Nina", () => {
   });
 });
 
-describe("catálogo", () => {
-  test("busca filtra por nome e status e nunca devolve nota interna", async () => {
-    const { chamar } = montar();
-    const r = await chamar("catalogo_buscar", { termo: "ultra", status: "PUBLICADO" });
-    const servicos = r["servicos"] as Record<string, unknown>[];
-    expect(servicos).toHaveLength(1);
-    expect(servicos[0]!["nome"]).toBe("Ultrassom");
-    expect(JSON.stringify(r)).not.toContain("nota_interna");
-    expect(JSON.stringify(r)).not.toContain("segredo");
-  });
-
-  test("organizar com IA devolve rascunho e não grava nada", async () => {
-    const { chamar, registro } = montar();
-    const r = await chamar("catalogo_organizar_ia", { tipo: "servico", texto: "Ultrassom 200" });
-    expect(r["gravado"]).toBe(false);
-    expect(r["efeito"]).toBe("operacao_iniciada");
-    expect(registro.join(" ")).not.toContain("salvarServicoCatalogo");
-  });
-
-  test("publicação usa o fluxo existente e avisa a tela", async () => {
-    const { chamar, registro, notificados } = montar();
-    const r = await chamar("catalogo_alterar_status", {
-      tipo: "servico",
-      id: CONVERSA_TESTE,
-      status: "PUBLICADO",
-    });
-    expect(r["ok"]).toBe(true);
-    expect(registro.join(" ")).toContain("alterarStatusCatalogo");
-    expect(notificados).toContain("catalogo");
-  });
-});

@@ -43,14 +43,6 @@ import {
   enviarMensagemTeste,
   resolverConversaTeste,
 } from "@/lib/nina/teste-console.functions";
-import {
-  listarCatalogoNina,
-  opcoesCatalogoNina,
-  salvarServicoCatalogo,
-  salvarProfissionalCatalogo,
-  alterarStatusCatalogo,
-  organizarTextoCatalogoIA,
-} from "@/lib/nina/catalogo.functions";
 
 interface FerramentaRegistravel {
   name: string;
@@ -105,16 +97,6 @@ export function useWebmcpContexto(): void {
     historicoLeadTeste: useServerFn(historicoLeadTeste) as ApiWebmcp["historicoLeadTeste"],
     enviarMensagemTeste: useServerFn(enviarMensagemTeste) as ApiWebmcp["enviarMensagemTeste"],
     resolverConversaTeste: useServerFn(resolverConversaTeste) as ApiWebmcp["resolverConversaTeste"],
-    listarCatalogo: useServerFn(listarCatalogoNina) as ApiWebmcp["listarCatalogo"],
-    opcoesCatalogo: useServerFn(opcoesCatalogoNina) as ApiWebmcp["opcoesCatalogo"],
-    salvarServicoCatalogo: useServerFn(salvarServicoCatalogo) as ApiWebmcp["salvarServicoCatalogo"],
-    salvarProfissionalCatalogo: useServerFn(
-      salvarProfissionalCatalogo,
-    ) as ApiWebmcp["salvarProfissionalCatalogo"],
-    alterarStatusCatalogo: useServerFn(alterarStatusCatalogo) as ApiWebmcp["alterarStatusCatalogo"],
-    organizarTextoCatalogoIA: useServerFn(
-      organizarTextoCatalogoIA,
-    ) as ApiWebmcp["organizarTextoCatalogoIA"],
   };
 
   const email = user?.email ?? null;

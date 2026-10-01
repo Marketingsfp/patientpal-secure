@@ -143,7 +143,7 @@ export const pacoteMJ55: PacoteDetalhesMensagem = {
       status: "running",
       started_at: "2026-09-13T17:11:42.177Z",
       finished_at: null,
-      metadata: { ferramenta: "consultar_base_conhecimento" },
+      metadata: { ferramenta: "consultar_cadastro" },
     },
     {
       ...trace,
@@ -155,7 +155,7 @@ export const pacoteMJ55: PacoteDetalhesMensagem = {
       started_at: "2026-09-13T17:11:42.177Z",
       finished_at: "2026-09-13T17:11:42.331Z",
       duration_ms: 154,
-      metadata: { ferramenta: "consultar_base_conhecimento" },
+      metadata: { ferramenta: "consultar_cadastro" },
     },
     {
       ...trace,

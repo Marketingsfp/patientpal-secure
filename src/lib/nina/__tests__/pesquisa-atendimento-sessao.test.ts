@@ -15,7 +15,7 @@ const preparar = (ferramenta: string, args: object, extra = {}) => JSON.parse(pr
 
 describe("identidade de Clínico Geral nas ferramentas", () => {
   for (const [ferramenta, campo] of [
-    ["consultar_base_conhecimento", "termo"], ["buscar_medicos", "especialidade"],
+    ["consultar_cadastro", "termo"], ["buscar_medicos", "especialidade"],
     ["proxima_vaga", "especialidade"], ["consultar_primeiro_disponivel", "especialidade"],
     ["consultar_disponibilidade", "especialidade"], ["verificar_horario", "especialidade"],
   ]) {
@@ -45,16 +45,16 @@ describe("identidade de Clínico Geral nas ferramentas", () => {
     { mensagem: "Quanto custa?", clinicaId: "outra-clinica" },
     { mensagem: "Quanto custa?", conhecimento: { ...conhecimento, referencias: [] } },
   ])("não converte uma unidade, mudança de pedido ou contexto inválido (%#)", extra => {
-    const r = preparar("consultar_base_conhecimento", { termo: "Clínica Médica" }, extra);
+    const r = preparar("consultar_cadastro", { termo: "Clínica Médica" }, extra);
     expect(r.termo).toBe("Clínica Médica");
-    expect(recusarFraseComoPesquisa("consultar_base_conhecimento", r)).toMatchObject({ consulta_executada: false });
+    expect(recusarFraseComoPesquisa("consultar_cadastro", r)).toMatchObject({ consulta_executada: false });
   });
   it("não recupera especialidade anterior em nova solicitação", () => {
-    expect(preparar("consultar_base_conhecimento", { termo: "Clínica Geral", nova_solicitacao: true }, { mensagem: "Quanto custa?" }).termo).toBe("Clínica Geral");
+    expect(preparar("consultar_cadastro", { termo: "Clínica Geral", nova_solicitacao: true }, { mensagem: "Quanto custa?" }).termo).toBe("Clínica Geral");
   });
   it("preserva nova especialidade e os qualificadores", () => {
     for (const termo of ["Cardiologia", "Clínico Geral infantil", "Clínica Geral infantil", "USG com Doppler"])
-      expect(preparar("consultar_base_conhecimento", { termo }).termo).toBe(termo);
+      expect(preparar("consultar_cadastro", { termo }).termo).toBe(termo);
   });
   it("não altera informações da unidade nem argumentos de escrita", () => {
     for (const nome of ["dados_da_clinica", "agendar", "solicitar_atendente_humano"])

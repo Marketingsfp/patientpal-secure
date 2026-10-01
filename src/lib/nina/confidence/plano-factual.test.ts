@@ -12,7 +12,7 @@ import { executarValidadoresDeConfianca } from "./validators";
 
 function contexto(): ContextoConfianca {
   const evidencia = extrairEvidencia({
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,
@@ -191,7 +191,7 @@ describe("plano factual nasce dos registros oficiais do servidor", () => {
     });
     ctx.consultas!.push({
       ...consulta,
-      id: "consultar_base_conhecimento|outro-escopo",
+      id: "consultar_cadastro|outro-escopo",
       status: "falha",
     });
     expect(construirPlanoFactual(ctx).itens.length).toBeGreaterThan(0);

@@ -23,19 +23,18 @@ export const MODELO_EXECUTOR = "anthropic/claude-opus-5-5" as const;
 export const LIMITE_RODADAS_EXECUTOR = 8;
 
 export type FerramentaExecutor =
-  | "ler_catalogo"
-  | "gravar_item_catalogo"
   | "ler_prompt_publicado"
   | "publicar_prompt"
   | "testar_em_homologacao"
   | "registrar_pendencia_tecnica";
 
 /**
- * Cada camada libera só as ferramentas dela. Uma proposta sobre o catálogo não
+ * Cada camada libera só as ferramentas dela. Uma proposta sobre o cadastro não
  * consegue publicar prompt, e vice-versa.
  */
 const FERRAMENTAS_POR_CAMADA: Record<CamadaProposta, FerramentaExecutor[]> = {
-  catalogo: ["ler_catalogo", "gravar_item_catalogo", "testar_em_homologacao"],
+  // A informação vem do cadastro do sistema: o executor nunca o altera, só registra a pendência para a equipe.
+  catalogo: ["registrar_pendencia_tecnica"],
   modelo: ["ler_prompt_publicado", "publicar_prompt", "testar_em_homologacao"],
   busca: ["registrar_pendencia_tecnica"],
   ferramenta: ["registrar_pendencia_tecnica"],

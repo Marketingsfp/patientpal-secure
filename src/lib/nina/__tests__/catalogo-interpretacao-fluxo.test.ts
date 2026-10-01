@@ -32,11 +32,11 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
         expect(r.ordem).toEqual([
           ...(caso.endsWith("_recuperacao") ? ["modelo"] : []),
           "modelo",
-          "consultar_base_conhecimento",
+          "consultar_cadastro",
           "modelo",
         ]);
         expect(r.argumentosFerramentas).toEqual([
-          { nome: "consultar_base_conhecimento", args: { termo, objetivos: [objetivo], tipo_atendimento } },
+          { nome: "consultar_cadastro", args: { termo, objetivos: [objetivo], tipo_atendimento } },
         ]);
         expect(r.requests[0].messages.some((m: { role: string }) => m.role === "tool")).toBe(false);
         expect(

@@ -11,13 +11,13 @@ describe("ausência de atendimento no catálogo", () => {
     "Qual o preparo da biópsia?", "Quero agendar com Dr. Exemplo",
   ])("pedido identificado: %s", query => {
     expect(pedidoDeItemCatalogo(query)).toBe(true);
-    expect(encaminhamentoSemRegistro(validarResultado("consultar_base_conhecimento", vazio), { termo: query }, true)?.motivo).toContain("CATALOGO_SEM_REGISTRO");
+    expect(encaminhamentoSemRegistro(validarResultado("consultar_cadastro", vazio), { termo: query }, true)?.motivo).toContain("CATALOGO_SEM_REGISTRO");
   });
   it.each(["Oi bom dia", "Meu nome é João Silva", "123.456.789-00", "Quero marcar uma consulta", "Qual o endereço?", "sim, por favor"])("leitura preventiva não transfere sem item: %s", query => {
-    expect(encaminhamentoSemRegistro(validarResultado("consultar_base_conhecimento", vazio), { termo: query }, true)).toBeNull();
+    expect(encaminhamentoSemRegistro(validarResultado("consultar_cadastro", vazio), { termo: query }, true)).toBeNull();
   });
   it("consulta explícita do modelo não depende de uma lista de nomes de exames", () => {
-    expect(encaminhamentoSemRegistro(validarResultado("consultar_base_conhecimento", vazio), { termo: "Novo atendimento XYZ" })).not.toBeNull();
+    expect(encaminhamentoSemRegistro(validarResultado("consultar_cadastro", vazio), { termo: "Novo atendimento XYZ" })).not.toBeNull();
   });
   it.each(["buscar_medicos", "buscar_procedimentos", "listar_especialidades"])("ausência tipada de %s exige humano", ferramenta => {
     const r = validarResultado(ferramenta, { ok: false, erro: ferramenta === "buscar_medicos" ? "DOCTOR_NOT_FOUND" : "PROCEDURE_NOT_FOUND", fonte: "catalogo_publicado", encaminhar_para_humano: true });
@@ -29,7 +29,7 @@ describe("ausência de atendimento no catálogo", () => {
     { ...vazio, found: true, knowledge_status: "found", records: [{ procedimento: "Exame", preco_dinheiro: null }] },
     { ...vazio, found: true, knowledge_status: "conflict", records: [{ procedimento: "Exame A" }, { procedimento: "Exame B" }] },
   ])("erro ou registro encontrado não comprova ausência (%#)", dados => {
-    expect(encaminhamentoSemRegistro(validarResultado("consultar_base_conhecimento", dados), { termo: "exame X" })).toBeNull();
+    expect(encaminhamentoSemRegistro(validarResultado("consultar_cadastro", dados), { termo: "exame X" })).toBeNull();
   });
   it("ferramentas de cadastro e clínica não disparam a regra de catálogo", () => {
     for (const nome of ["identificar_paciente", "dados_da_clinica", "horario_funcionamento", "agendar"])

@@ -21,7 +21,7 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
     acao: "informar_valor",
     ferramentas: [
       {
-        nome: "consultar_base_conhecimento",
+        nome: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         fonte: "catalogo_publicado",
         success: true,
@@ -31,7 +31,7 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
     // FASE 2 — fatos que o servidor extrai do retorno real do catálogo.
     fatos: [
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         entidade: "procedimento",
         campo: "preco",
@@ -40,7 +40,7 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
         chave: { procedimento: "cardiologia" },
       },
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         entidade: "profissional",
         campo: "nome",
@@ -48,7 +48,7 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
         fonte: "catalogo_publicado",
       },
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         entidade: "procedimento",
         campo: "preparo",
@@ -58,7 +58,7 @@ function turno(over: Partial<EstadoDoTurno> = {}): EstadoDoTurno {
       },
       // FASE 2 — a unidade citada na resposta também vem do catálogo.
       {
-        consulta: "consultar_base_conhecimento",
+        consulta: "consultar_cadastro",
         capacidade: "searchKnowledgeBase",
         entidade: "unidade",
         campo: "nome",
@@ -103,7 +103,7 @@ describe("FASE 5 — claim-level grounding", () => {
       ctxDe({
         ferramentas: [
           {
-            nome: "consultar_base_conhecimento",
+            nome: "consultar_cadastro",
             capacidade: "searchKnowledgeBase",
             fonte: "catalogo_publicado",
             success: true,
@@ -117,7 +117,7 @@ describe("FASE 5 — claim-level grounding", () => {
         ],
         fatos: [
           {
-            consulta: "consultar_base_conhecimento",
+            consulta: "consultar_cadastro",
             capacidade: "searchKnowledgeBase",
             entidade: "procedimento",
             campo: "preco",

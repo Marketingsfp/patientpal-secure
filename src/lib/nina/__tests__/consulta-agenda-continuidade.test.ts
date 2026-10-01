@@ -15,12 +15,12 @@ const ALEX = { id: "11111111-1111-4111-8111-111111111111", nome: "ALEX LOUZA" };
 const BRUNO = { id: "22222222-2222-4222-8222-222222222222", nome: "Bruno Costa" };
 const fatos: FatoRecuperado[] = [
   {
-    consulta: "consultar_base_conhecimento",
+    consulta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     entidade: "profissional",
     campo: "nome",
     valor: "Alex Louza",
-    registro: "nina_cat_profissionais:alex-publicado",
+    registro: "profissionais:alex-publicado",
     fonte: "catalogo_publicado",
     clinicaId: CLINICA,
     versao: "v1",
@@ -249,7 +249,7 @@ describe("continuidade da autorização de leitura da agenda", () => {
       ]).permitido,
     ).toBe(false);
     expect(
-      autorizarConsultaAgenda(contexto(), { ...ALEX, id: "nina_cat_profissionais:alex" }).permitido,
+      autorizarConsultaAgenda(contexto(), { ...ALEX, id: "profissionais:alex" }).permitido,
     ).toBe(false);
   });
 

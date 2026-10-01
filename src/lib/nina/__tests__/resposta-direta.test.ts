@@ -16,7 +16,7 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
       expect(r.resposta).toBe(r.respostaModelo);
       expect(r.requests).toHaveLength(2);
-      expect(r.ordem).toEqual(["modelo", "consultar_base_conhecimento", "modelo"]);
+      expect(r.ordem).toEqual(["modelo", "consultar_cadastro", "modelo"]);
       expect(JSON.stringify(r.requests)).toContain(r.prompt);
       expect(JSON.stringify(r.requests)).toContain("95,00");
       expect(JSON.stringify(r.requests)).toContain("Sem jejum");
@@ -29,7 +29,7 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       expect(textoRequest).toContain("saudacao_do_periodo");
       expect(textoRequest).toContain("datas_referencia");
       expect(textoRequest).toContain("America/Sao_Paulo");
-      expect(r.ferramentas).toEqual(["consultar_base_conhecimento"]);
+      expect(r.ferramentas).toEqual(["consultar_cadastro"]);
       expect(r.motorChamado).toBe(0);
       expect(r.rede).toBe(0);
       expect(r.temNota).toBe(false);

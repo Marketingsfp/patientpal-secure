@@ -23,7 +23,7 @@ function contexto(formas_pagamento: unknown = null) {
     hojeISO: "2026-09-13",
   });
   const evidencia = extrairEvidencia({
-    ferramenta: "consultar_base_conhecimento",
+    ferramenta: "consultar_cadastro",
     capacidade: "searchKnowledgeBase",
     fonte: "base_conhecimento",
     success: true,

@@ -110,9 +110,9 @@ export async function buscarNoCatalogo(
   // Não usar ILIKE como pré-filtro: ele exclui nomes acentuados antes da
   // normalização. Não cortar em 40/60: qualquer publicado pode ser o correto.
   const [brutosServicos, brutosProfissionais] = await Promise.all([
-    tipoAtendimento === "consulta" ? [] : lerPublicados<IndiceServico>("nina_cat_servicos", INDICE_SERVICO, pedido.clinicaId),
+    tipoAtendimento === "consulta" ? [] : lerPublicados<IndiceServico>("servicos", INDICE_SERVICO, pedido.clinicaId),
     tipoAtendimento === "exame_procedimento" ? [] : lerPublicados<IndiceProfissional>(
-      "nina_cat_profissionais",
+      "profissionais",
       INDICE_PROFISSIONAL,
       pedido.clinicaId,
     ),
@@ -133,7 +133,7 @@ export async function buscarNoCatalogo(
   if (!termos.length && tipoAtendimento === "exame_procedimento") {
     const genericos = brutosServicos.filter(s => semAcento(s.nome) === semAcento(pedido.query));
     if (genericos.length) {
-      const detalhes = await lerPublicados<ServicoPublicado>("nina_cat_servicos", COLUNAS_SERVICO,
+      const detalhes = await lerPublicados<ServicoPublicado>("servicos", COLUNAS_SERVICO,
         pedido.clinicaId, genericos.map(s => s.id));
       const resultado = montarResultadoCatalogo({ servicos: detalhes, profissionais: [], hojeISO });
       return { ...resultado, tipo_atendimento: tipoAtendimento,
@@ -214,13 +214,13 @@ export async function buscarNoCatalogo(
     .map((p) => p.id);
   const [detalhesServicos, detalhesProfissionais] = await Promise.all([
     lerPublicados<ServicoPublicado>(
-      "nina_cat_servicos",
+      "servicos",
       COLUNAS_SERVICO,
       pedido.clinicaId,
       idsServicos,
     ),
     lerPublicados<ProfissionalPublicado>(
-      "nina_cat_profissionais",
+      "profissionais",
       COLUNAS_PROFISSIONAL,
       pedido.clinicaId,
       idsProfissionais,

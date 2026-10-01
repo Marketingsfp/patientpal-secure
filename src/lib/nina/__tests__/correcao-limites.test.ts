@@ -41,18 +41,13 @@ describe("chave de repetição", () => {
 });
 
 describe("teto de operações reais", () => {
-  it("uma única gravação de catálogo por correção", () => {
+  it("uma única publicação de prompt por correção", () => {
     let c = {};
-    expect(podeExecutar(c, "gravar_item_catalogo").ok).toBe(true);
-    c = registrarOperacao(c, "gravar_item_catalogo");
-    const segunda = podeExecutar(c, "gravar_item_catalogo");
+    expect(podeExecutar(c, "publicar_prompt").ok).toBe(true);
+    c = registrarOperacao(c, "publicar_prompt");
+    const segunda = podeExecutar(c, "publicar_prompt");
     expect(segunda.ok).toBe(false);
     expect(segunda.motivo).toContain("Limite");
-  });
-
-  it("uma única publicação de prompt por correção", () => {
-    const c = registrarOperacao({}, "publicar_prompt");
-    expect(podeExecutar(c, "publicar_prompt").ok).toBe(false);
   });
 
   it("teste em homologação pode repetir dentro do teto", () => {
@@ -65,8 +60,8 @@ describe("teto de operações reais", () => {
   });
 
   it("leitura não bloqueia a gravação", () => {
-    const c = registrarOperacao({}, "ler_catalogo");
-    expect(podeExecutar(c, "gravar_item_catalogo").ok).toBe(true);
+    const c = registrarOperacao({}, "ler_prompt_publicado");
+    expect(podeExecutar(c, "publicar_prompt").ok).toBe(true);
   });
 });
 
