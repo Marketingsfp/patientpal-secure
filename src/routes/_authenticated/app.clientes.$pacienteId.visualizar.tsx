@@ -17,6 +17,7 @@ import { PacienteSessoesPanel } from "@/components/clientes/paciente-sessoes-pan
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { HiperdiaPanel } from "@/components/hiperdia/hiperdia-panel";
 import { CriteriosSbd2025 } from "@/components/hiperdia/criterios-sbd-2025";
+import { LinhaDoTempoProntuario } from "@/components/prontuario/linha-do-tempo-prontuario";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/visualizar")({
   component: VisualizarClientePage,
@@ -35,6 +36,9 @@ function VisualizarClientePage() {
   const verOdonto = acessoOdonto !== "none";
   const acessoFisio = useAcessoModulo("fisioterapia");
   const verFisio = acessoFisio !== "none";
+  // Histórico clínico: só para quem tem o módulo de prontuários liberado
+  // (médico, enfermagem, administração), como no resto do sistema.
+  const verProntuario = useAcessoModulo("prontuarios") !== "none";
   const { user } = useAuth();
   const [paciente, setPaciente] = useState<
     (Paciente & { codigo_prontuario?: string | null }) | null
@@ -124,6 +128,7 @@ function VisualizarClientePage() {
             <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
             <TabsTrigger value="cartoes">Cartões</TabsTrigger>
             <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+            {verProntuario && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}
             <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
             {/* Sem trava de módulo de propósito: a recepção precisa responder
                 "quantas sessões faltam?" no balcão, e ela não tem Fisioterapia
@@ -159,6 +164,12 @@ function VisualizarClientePage() {
               clinicaId={clinicaAtual.clinica_id}
             />
           </TabsContent>
+
+          {verProntuario && (
+            <TabsContent value="prontuario">
+              <LinhaDoTempoProntuario pacienteId={paciente.id} />
+            </TabsContent>
+          )}
 
           <TabsContent value="sessoes">
             <PacienteSessoesPanel pacienteId={paciente.id} />
