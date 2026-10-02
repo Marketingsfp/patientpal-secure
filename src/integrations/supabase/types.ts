@@ -17896,6 +17896,7 @@ export type Database = {
         Args: { _clinica_id: string }
         Returns: undefined
       }
+      servico_nome_chave: { Args: { nome: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       strip_accents: { Args: { _text: string }; Returns: string }
