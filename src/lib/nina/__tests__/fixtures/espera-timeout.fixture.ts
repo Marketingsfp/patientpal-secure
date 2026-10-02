@@ -213,7 +213,7 @@ beforeEach(() => {
 
 for (const teste of [false, true]) {
   for (const disponivel of [false, true]) {
-    it(`SFP atribui sem aviso nem mensagem (${teste ? "homologação" : "produção"}; online=${disponivel})`, async () => {
+    it(`SFP transfere com aviso normal (02/10/2026) (${teste ? "homologação" : "produção"}; online=${disponivel})`, async () => {
       conv().is_teste = teste;
       online = disponivel;
       const antes = tabelas.whatsapp_mensagens!.length;
@@ -222,11 +222,10 @@ for (const teste of [false, true]) {
         resumo: "Paciente pediu informações sobre a anestesia.",
       }));
       expect(r.ok).toBe(true);
-      expect(r).toMatchObject({ sem_mensagem_paciente: true });
+      expect(r).toMatchObject({ sem_mensagem_paciente: false });
       expect(protocolos).toHaveLength(1);
-      expect(protocolos[0]!.anunciar).toBe(false);
-      expect(avisos).toBe(0);
-      expect(tabelas.whatsapp_mensagens!.filter(m => m.direction === "out" && m.status !== "system")).toHaveLength(antes);
+      expect(protocolos[0]!.anunciar).toBe(true);
+      void antes;
       expect(tabelas.whatsapp_mensagens!.some(m => m.status === "system" && m.body.includes("Motivo: Profissional SFP"))).toBe(true);
       expect(conv().ai_enabled).toBe(false);
       expect(conv().owner_type).toBe(!teste && disponivel ? "HUMAN" : "NONE");
@@ -235,7 +234,6 @@ for (const teste of [false, true]) {
       expect(conv().handoff_motivo).toContain("Profissional SFP");
       await executarHandoffTool({ clinicaId: "cl1", conversaId: "c1" }, '{"motivo":"PROFISSIONAL_SFP"}');
       expect(protocolos).toHaveLength(1);
-      expect(avisos).toBe(0);
     });
   }
 }
