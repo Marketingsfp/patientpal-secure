@@ -6,34 +6,56 @@ import { REGRA_IDENTIDADE_ATENDIMENTO } from "./prompt/identidade-atendimento";
 // Equivalências de busca, não equivalências de preço, preparo ou modalidade.
 // Qualificadores (órgão, total/superior, infantil etc.) continuam obrigatórios.
 const GRUPOS = [
-  ["ultrassonografia", "ultra", "usg", "ultrassom", "ultrassons"],
+  ["ultrassonografia", "ultra", "usg", "us", "ultrassom", "ultrassons", "ultrasom", "utrassom", "usam", "ultrasonografia", "ultrassonografias"],
+  ["abdome", "abdominal", "abdomen", "barriga"],
+  ["ecocardiograma", "ecocardio"],
   ["radiografia", "rx", "raio"],
-  ["eletrocardiograma", "ecg"],
+  ["eletrocardiograma", "ecg", "eletro"],
   ["eletroencefalograma", "eeg"],
+  ["papanicolau", "preventivo", "citopatologico"],
   ["cardiologia", "cardio", "cardiologista"],
   ["dermatologia", "dermato", "dermatologista"],
   ["ginecologia", "gineco", "ginecologista"],
   ["oftalmologia", "oftalmo", "oftalmologista"],
   ["odontologia", "odonto", "dentista", "odontologista", "odontologica", "odontologico"],
   ["otorrinolaringologia", "otorrino", "otorrinolaringologista"],
-  ["ortopedia", "ortopedista"],
+  ["ortopedia", "ortopedista", "orto"],
   ["pediatria", "pediatra"],
   ["neurologia", "neuro", "neurologista"],
   ["pneumologia", "pneumo", "pneumologista"],
   ["urologia", "uro", "urologista"],
   ["endocrinologia", "endocrino", "endocrinologista"],
+  ["gastroenterologia", "gastro", "gastroenterologista"],
+  ["nutricao", "nutri", "nutricionista", "nutricionistas"],
+  ["fonoaudiologia", "fono", "fonoaudiologo", "fonoaudiologa"],
+  ["clinico", "clinicos"],
 ] as const;
 const ALIASES = new Map<string, string>(
   GRUPOS.flatMap(([nome, ...aliases]) => [nome, ...aliases].map((alias) => [alias, nome] as const)),
 );
 const DESCRITORES_PADRAO = new Set(["transtoracico"]);
 
+// Expressões populares de várias palavras → nome usual do cadastro.
+const EXPRESSOES: Array<[RegExp, string]> = [
+  [/\bultra[ -]+som\b/g, "ultrassonografia"],
+  [/\braio[s]?[ -]*x\b/g, "radiografia"],
+  [/\burina (?:tipo )?(?:1|i|um)\b/g, "urina tipo 1"],
+  [/\bmedic[oa]s? de mulher(?:es)?\b/g, "ginecologia"],
+  [/\bmedic[oa]s? de crianca[s]?\b/g, "pediatria"],
+  [/\bmedic[oa]s? de pele\b/g, "dermatologia"],
+  [/\bexame de vista\b/g, "oftalmologia"],
+  [/\bexame do coracao\b/g, "eletrocardiograma"],
+  [/\bclinica geral\b/g, "clinico geral"],
+];
+
 function escrita(texto: string): string {
-  return normalizarBuscaCatalogo(texto)
-    .replace(/\bultra[ -]+som\b/g, "ultrassonografia")
-    .replace(/\braio[s]?[ -]*x\b/g, "radiografia");
+  let t = normalizarBuscaCatalogo(texto);
+  for (const [re, para] of EXPRESSOES) t = t.replace(re, para);
+  return t;
 }
 function canonico(termo: string): string {
+  // Prefixo de ultrassom digitado pela metade ("ultrass", "utrasson").
+  if (/^u?l?tras+o/.test(termo) && termo.length >= 6) return "ultrassonografia";
   return (
     ALIASES.get(termo) ??
     ALIASES.get(termo.replace(/s$/, "")) ??
@@ -45,6 +67,16 @@ function palavras(texto: string): string[] {
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .map(canonico);
+}
+
+/** Termo do paciente → nome usual, para registrar no trace o que foi interpretado. */
+export function expansoesDeEscrita(texto: string): { original: string; interpretado: string }[] {
+  const vistos = new Set<string>();
+  return normalizarBuscaCatalogo(texto)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t && !vistos.has(t) && (vistos.add(t), true))
+    .map((t) => ({ original: t, interpretado: canonico(escrita(t)) }))
+    .filter((e) => e.original !== e.interpretado);
 }
 
 /** Distância com transposição adjacente, limitada a pequenos erros de escrita. */
