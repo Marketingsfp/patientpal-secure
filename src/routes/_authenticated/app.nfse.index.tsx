@@ -46,6 +46,10 @@ export const Route = createFileRoute("/_authenticated/app/nfse/")({
   head: () => ({ meta: [{ title: "Notas Fiscais — ClinicaOS" }] }),
 });
 
+/** Espaço mínimo entre consultas à Focus (limite da conta: 100 por minuto). */
+const INTERVALO_CONSULTA_MS = 700;
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 interface Emitente {
   id: string;
   nome: string;
@@ -63,6 +67,9 @@ interface Row {
   emitente_id: string | null;
   emitente: { nome: string; cnpj: string } | null;
   erro_mensagem: string | null;
+  /** Última consulta de status na Focus falhou (ex.: limite_excedido). Não é erro da nota. */
+  consulta_erro_codigo?: string | null;
+  consulta_erro_mensagem?: string | null;
   payload_resposta: unknown;
   /** Quem apertou "Emitir" — `nfse.emitida_por` sempre foi gravado, só nunca era exibido. */
   emitida_por: string | null;
@@ -199,7 +206,7 @@ function NfsePage() {
       const { data, error } = await supabase
         .from("nfse")
         .select(
-          "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at",
+          "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at, consulta_erro_codigo, consulta_erro_mensagem",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data_emissao", periodo.inicio)
@@ -265,15 +272,27 @@ function NfsePage() {
 
   // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
   // (webhook do Focus pode falhar/não estar configurado).
+  //
+  // Foi esta rotina que, em 02/10/2026, disparou 14 consultas em 8 segundos e
+  // levou "limite_excedido" da Focus (100 req/min por conta, somadas todas as
+  // abas abertas). Agora: 700 ms entre chamadas e, ao levar limite_excedido,
+  // para a varredura e só retoma depois de 60 s.
   useEffect(() => {
     const pendentes = rows.filter((r) => r.status === "processando").map((r) => r.id);
     if (pendentes.length === 0) return;
     let cancelled = false;
+    let pausadoAte = 0;
     const tick = async () => {
-      for (const id of pendentes) {
+      if (Date.now() < pausadoAte) return;
+      for (let i = 0; i < pendentes.length; i++) {
         if (cancelled) return;
+        if (i > 0) await esperar(INTERVALO_CONSULTA_MS);
         try {
-          await consulta({ data: { id } });
+          const r = await consulta({ data: { id: pendentes[i] } });
+          if (r?.limiteExcedido) {
+            pausadoAte = Date.now() + 60_000;
+            break;
+          }
         } catch {
           /* ignore */
         }
@@ -288,6 +307,72 @@ function NfsePage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.map((r) => `${r.id}:${r.status}`).join("|")]);
+
+  // "Reconsultar notas presas": percorre TODAS as notas em processando da
+  // clínica (não só as da tela), uma por vez, 700 ms entre chamadas. Só
+  // consulta — não emite, não reenvia, não cancela. Se a Focus responder
+  // limite_excedido mesmo após as novas tentativas, para e informa quantas
+  // ficaram sem consultar.
+  const [reconsultando, setReconsultando] = useState<{ feito: number; total: number } | null>(
+    null,
+  );
+  async function reconsultarPresas() {
+    if (!clinicaAtual) return;
+    const { data: presas, error } = await supabase
+      .from("nfse")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("status", "processando")
+      .not("focus_ref", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(500);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const ids = (presas ?? []).map((p) => p.id);
+    if (ids.length === 0) {
+      toast.info("Nenhuma nota em processando.");
+      return;
+    }
+    let autorizadas = 0;
+    let processando = 0;
+    let erros = 0;
+    let interrompida = 0;
+    setReconsultando({ feito: 0, total: ids.length });
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        if (i > 0) await esperar(INTERVALO_CONSULTA_MS);
+        try {
+          const r = await consulta({ data: { id: ids[i] } });
+          if (r?.limiteExcedido) {
+            erros++;
+            interrompida = ids.length - i - 1;
+            break;
+          }
+          if (r?.erroConsulta) erros++;
+          else if (r?.status === "autorizado") autorizadas++;
+          else if (r?.status === "erro_autorizacao" || r?.status === "erro") erros++;
+          else processando++;
+        } catch {
+          erros++;
+        }
+        setReconsultando({ feito: i + 1, total: ids.length });
+      }
+    } finally {
+      setReconsultando(null);
+      await load();
+    }
+    const resumo = `${autorizadas} autorizada(s), ${processando} continuam processando, ${erros} com erro.`;
+    if (interrompida > 0) {
+      toast.warning(
+        `${resumo} A Focus pediu para esperar (limite de consultas); ${interrompida} nota(s) não foram consultadas. Tente de novo em 1 minuto.`,
+        { duration: 15000 },
+      );
+    } else {
+      toast.success(`Reconsulta concluída: ${resumo}`, { duration: 15000 });
+    }
+  }
 
   // Ao abrir o diálogo de erro, carrega o "Próx. nº RPS" atual do emitente
   // para permitir avançar o contador rapidamente (útil no erro E0014).
@@ -386,7 +471,12 @@ function NfsePage() {
 
   const onConsultar = async (id: string) => {
     try {
-      await consulta({ data: { id } });
+      const r = await consulta({ data: { id } });
+      if (r?.erroConsulta) {
+        toast.error(
+          `A consulta à Focus falhou (${r.erroConsulta.codigo})${r.erroConsulta.mensagem ? `: ${r.erroConsulta.mensagem}` : ""}. A nota não foi alterada.`,
+        );
+      }
       await load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -523,6 +613,23 @@ function NfsePage() {
             {exportando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
             Exportar Excel
           </Button>
+          {podeVerQuemEmitiu && (
+            <Button
+              variant="outline"
+              disabled={reconsultando !== null}
+              onClick={() => void reconsultarPresas()}
+              title="Só consulta a situação na Focus, uma nota por vez. Não emite, não reenvia, não cancela."
+            >
+              {reconsultando ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {reconsultando
+                ? `Reconsultando ${reconsultando.feito}/${reconsultando.total}…`
+                : "Reconsultar notas presas"}
+            </Button>
+          )}
           {clinicaAtual?.role?.toLowerCase() === "admin" && (
             <>
               <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(20)}>
@@ -709,6 +816,14 @@ function NfsePage() {
                     >
                       {r.status}
                     </span>
+                    {r.status === "processando" && r.consulta_erro_codigo && (
+                      <div
+                        className="text-[11px] text-destructive mt-0.5 max-w-[220px] truncate"
+                        title={r.consulta_erro_mensagem ?? r.consulta_erro_codigo}
+                      >
+                        Consulta falhou: {r.consulta_erro_codigo}
+                      </div>
+                    )}
                   </TableCell>
                   {podeVerQuemEmitiu && (
                     <TableCell>
