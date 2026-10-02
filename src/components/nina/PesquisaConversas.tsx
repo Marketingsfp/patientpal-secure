@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useClinica } from "@/hooks/use-clinica";
 import { pesquisarConversasGeral } from "@/lib/atendimento.functions";
-import { pedirSelecaoConversa } from "@/lib/atendimento/selecao-conversa";
+import { pedirSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { normalizarTermoBusca } from "@/lib/busca-texto";
 
 type Linha = Awaited<ReturnType<typeof pesquisarConversasGeral>>[number];
