@@ -104,6 +104,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
         }),
         aliquotaIssOverride: z.number().min(0).max(1).optional(),
         itemListaOverride: z.string().optional(),
+        // Por que o código acima substituiu o do emitente (vai para observacoes).
+        itemListaMotivo: z.string().max(300).optional(),
       })
       .parse(input),
   )
@@ -469,6 +471,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
               ? `Emitida por "${emitenteDivergente.usado}" conforme escolha do formulário; a orientação para este serviço seria "${emitenteDivergente.sugerido}" (${emitenteDivergente.motivo}).`
               : null,
             avisoCep,
+            // Trilha do código de tributação: quando outro código substitui o
+            // do emitente, registra qual foi, qual seria e por quê.
+            data.itemListaOverride
+              ? `Código de tributação ${itemListaServico} usado no lugar do código do emitente (${only(emitente.item_lista_servico) || "vazio"})${data.itemListaMotivo ? `: ${data.itemListaMotivo}` : ""}.`
+              : null,
           ]
             .filter(Boolean)
             .join(" ") || null,
