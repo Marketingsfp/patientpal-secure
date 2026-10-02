@@ -12610,6 +12610,22 @@ function AgendaPage() {
             filtroMedico={filtroMedico}
             medicoNome={medicos.find((m) => m.id === filtroMedico)?.nome ?? null}
             onFechar={alternarResumo}
+            medicos={medicos.map((m) => ({
+              id: m.id,
+              nome: m.nome,
+              especialidade_nome: m.especialidade_nome ?? null,
+            }))}
+            // Login só de médico não vê nome de paciente na Agenda — a lista
+            // detalhada fica desligada para ele.
+            podeDetalhar={!isMedicoOnly}
+            onAbrirFicha={(id) => {
+              const orig = items.find((i) => i.id === id);
+              if (orig) openEdit(orig);
+              else
+                toast.info(
+                  "Esta ficha não está na lista carregada da Agenda. Ajuste a data ou os filtros e abra por ali.",
+                );
+            }}
           />
         )}
 
