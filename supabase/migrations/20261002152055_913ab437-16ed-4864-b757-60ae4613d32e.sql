@@ -1,0 +1,2 @@
+ALTER TABLE public.nfse ADD COLUMN IF NOT EXISTS item_lista_servico text NULL;
+COMMENT ON COLUMN public.nfse.item_lista_servico IS 'Código de tributação nacional (cTribNac) efetivamente usado na emissão desta nota. Vazio em notas emitidas antes da criação da coluna.';
