@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { chaveNomeServicoUnico, MSG_SERVICO_JA_CADASTRADO } from "@/lib/nome-servico";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -426,11 +427,10 @@ function ProcedimentosPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  // Confirmação de cadastro com nome duplicado
+  // Serviço ativo com o mesmo nome — bloqueia o salvamento
   const [dupConflitos, setDupConflitos] = useState<
     { id: string; nome: string; especialidades: string[]; valor: number }[]
   >([]);
-  const [pendingPayload, setPendingPayload] = useState<any | null>(null);
   const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
   const [openTipoPicker, setOpenTipoPicker] = useState(false);
 
@@ -920,12 +920,13 @@ function ProcedimentosPage() {
         Number(form.sessoes_incluidas) >= 2 ? Number(form.sessoes_incluidas) : null,
       ciclo_dias: Number(form.ciclo_dias) >= 1 ? Number(form.ciclo_dias) : null,
     };
-    // Ao criar (não editar), verifica se já existe procedimento com o mesmo nome
-    // nesta clínica e pergunta antes de cadastrar.
-    if (!editing) {
-      const normalizado = payload.nome.trim().toUpperCase();
+    // Nome único por clínica entre os serviços ativos (o banco também recusa,
+    // via uq_procedimentos_clinica_nome_ativo). Vale ao criar, ao renomear e ao
+    // reativar; o serviço em edição não conta como conflito consigo mesmo.
+    if (payload.ativo) {
+      const chave = chaveNomeServicoUnico(payload.nome);
       const conflitos = items
-        .filter((p) => (p.nome ?? "").trim().toUpperCase() === normalizado)
+        .filter((p) => p.ativo && p.id !== editing?.id && chaveNomeServicoUnico(p.nome) === chave)
         .map((p) => {
           const espIds = vincEspMap.get(p.id);
           const espNomes = espIds
@@ -940,7 +941,6 @@ function ProcedimentosPage() {
         });
       if (conflitos.length > 0) {
         setDupConflitos(conflitos);
-        setPendingPayload(payload);
         return;
       }
     }
@@ -1056,14 +1056,14 @@ function ProcedimentosPage() {
       return;
     }
     setSeeding(true);
-    const { data: existentes } = await supabase
-      .from("procedimentos")
-      .select("nome")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("grupo", pacote.grupo);
-    const existSet = new Set((existentes ?? []).map((r: any) => String(r.nome).toLowerCase()));
+    // Compara com todos os serviços ativos da clínica (já carregados em `items`,
+    // paginados), não só os do grupo: o nome é único por clínica e um único
+    // repetido recusaria o lote inteiro.
+    const existSet = new Set(
+      items.filter((p) => p.ativo).map((p) => chaveNomeServicoUnico(p.nome)),
+    );
     const novos = pacote.itens
-      .filter((n) => !existSet.has(n.toLowerCase()))
+      .filter((n) => !existSet.has(chaveNomeServicoUnico(n)))
       .map((nome) => ({
         clinica_id: clinicaAtual.clinica_id,
         nome,
@@ -2052,51 +2052,49 @@ function ProcedimentosPage() {
       <Dialog
         open={dupConflitos.length > 0}
         onOpenChange={(o) => {
-          if (!o) {
-            setDupConflitos([]);
-            setPendingPayload(null);
-          }
+          if (!o) setDupConflitos([]);
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nome já cadastrado</DialogTitle>
-            <DialogDescription>
-              Já existe(m) {dupConflitos.length} serviço(s) com este nome nesta clínica. Deseja
-              cadastrar mesmo assim?
-            </DialogDescription>
+            <DialogTitle>Serviço já cadastrado</DialogTitle>
+            <DialogDescription>{MSG_SERVICO_JA_CADASTRADO}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 max-h-64 overflow-auto">
-            {dupConflitos.map((d) => (
-              <div key={d.id} className="rounded-md border p-2 text-sm">
-                <div className="font-medium">{d.nome}</div>
-                <div className="text-muted-foreground">
-                  Especialidade: {d.especialidades.length > 0 ? d.especialidades.join(", ") : "—"}
+            {dupConflitos.map((d) => {
+              const existente = items.find((p) => p.id === d.id);
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">{d.nome}</div>
+                    <div className="text-muted-foreground">
+                      Especialidade:{" "}
+                      {d.especialidades.length > 0 ? d.especialidades.join(", ") : "—"}
+                    </div>
+                    <div className="text-muted-foreground">Valor: {fmtBRL(d.valor)}</div>
+                  </div>
+                  {existente && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setDupConflitos([]);
+                        openEdit(existente);
+                      }}
+                    >
+                      Abrir este cadastro
+                    </Button>
+                  )}
                 </div>
-                <div className="text-muted-foreground">Valor: {fmtBRL(d.valor)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDupConflitos([]);
-                setPendingPayload(null);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={async () => {
-                const p = pendingPayload;
-                setDupConflitos([]);
-                setPendingPayload(null);
-                if (p) await executarSalvar(p);
-              }}
-              disabled={saving}
-            >
-              {saving ? "Salvando…" : "Cadastrar mesmo assim"}
+            <Button variant="outline" onClick={() => setDupConflitos([])}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

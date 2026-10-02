@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { mostrarErro } from "@/lib/traduzir-erro";
+import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import { confirmDialog } from "@/lib/confirm";
 import { exportToExcel } from "@/lib/export-csv";
 import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
@@ -94,7 +94,7 @@ export const Route = createFileRoute("/_authenticated/app/procedimentos_/importa
 const TAMANHO_MAXIMO = 15 * 1024 * 1024; // 15 MB
 const LOTE = 200;
 
-type ServicoExistente = { id: string; nome: string };
+type ServicoExistente = { id: string; nome: string; ativo: boolean };
 
 type Resultado = {
   criados: number;
@@ -206,7 +206,7 @@ function ImportarServicosPage() {
       for (;;) {
         const { data, error } = await supabase
           .from("procedimentos")
-          .select("id,nome")
+          .select("id,nome,ativo")
           .eq("clinica_id", clinicaId)
           .order("nome")
           .range(de, de + 999);
@@ -231,10 +231,15 @@ function ImportarServicosPage() {
   }, [clinicaId, versaoCatalogo]);
 
   const mapaExistentes = useMemo(() => {
+    // Cópias inativas (ex.: unificação de duplicados de 02/10/2026) têm o mesmo
+    // nome do cadastro em uso; o ativo sempre vence, para que "atualizar" mexa
+    // no serviço que a recepção enxerga.
     const m = new Map<string, ServicoExistente>();
     for (const s of existentes) {
       const k = chaveNomeServico(s.nome);
-      if (k && !m.has(k)) m.set(k, s);
+      if (!k) continue;
+      const atual = m.get(k);
+      if (!atual || (!atual.ativo && s.ativo)) m.set(k, s);
     }
     return m;
   }, [existentes]);
@@ -568,7 +573,7 @@ function ImportarServicosPage() {
             problemas.push({
               linhaExcel: l.linhaExcel,
               nome: l.nome,
-              motivo: `Não foi possível cadastrar: ${error.message}`,
+              motivo: `Não foi possível cadastrar: ${traduzirErro(error)}`,
             });
           }
           continue;
@@ -587,7 +592,7 @@ function ImportarServicosPage() {
             problemas.push({
               linhaExcel: l.linhaExcel,
               nome: l.nome,
-              motivo: `Não foi possível atualizar: ${error.message}`,
+              motivo: `Não foi possível atualizar: ${traduzirErro(error)}`,
             });
             continue;
           }

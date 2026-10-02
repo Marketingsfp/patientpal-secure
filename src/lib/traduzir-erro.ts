@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { INDICE_SERVICO_NOME_UNICO, MSG_SERVICO_JA_CADASTRADO } from "@/lib/nome-servico";
 
 /**
  * Converte erros técnicos (Postgres, Supabase Auth, Focus NFe, rede, storage)
@@ -64,6 +65,9 @@ function traduzirPostgres(msg: string, code?: string, details?: string): string 
       // Cadastro repetido do mesmo funcionário (mesmo CPF na mesma clínica).
       if (detalhe.includes("hr_contratos_cpf_unico_por_clinica")) {
         return "Já existe um funcionário com este CPF nesta clínica.";
+      }
+      if (detalhe.includes(INDICE_SERVICO_NOME_UNICO)) {
+        return MSG_SERVICO_JA_CADASTRADO;
       }
       if (detalhe.includes("ux_fin_lanc_receita_duplicata_exata")) {
         return "Este mesmo recebimento já foi registrado (mesmo atendimento, mesmo valor, mesma data). Confira no caixa antes de lançar de novo — para receber uma parcela diferente, mude o valor ou a data.";
