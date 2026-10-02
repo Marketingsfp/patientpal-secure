@@ -135,7 +135,9 @@ export function AgendaPorMedicoDia({
                     {iniciais(m.nome)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-slate-900">{m.nome}</p>
+                    <p className="truncate text-sm font-bold text-primary" title={m.nome}>
+                      {m.nome}
+                    </p>
                     <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       {m.especialidade_nome || "Profissional"}
                     </p>
@@ -214,12 +216,12 @@ export function AgendaPorMedicoDia({
                                 {STATUS_LABEL[a.status] ?? a.status}
                               </span>
                             </div>
-                            <p className="mt-1 block max-w-full truncate text-xs font-bold uppercase tracking-tight text-slate-900">
+                            <p className="mt-1 block max-w-full truncate text-xs font-semibold uppercase tracking-tight text-slate-700">
                               {ocultarPaciente ? (
                                 "—"
                               ) : (
                                 <span className="flex min-w-0 items-center gap-1">
-                                  <UserRound className="h-3 w-3 shrink-0 text-slate-400" />
+                                  <UserRound className="h-3 w-3 shrink-0 text-primary/60" />
                                   <span className="truncate">{a.paciente_nome}</span>
                                 </span>
                               )}
