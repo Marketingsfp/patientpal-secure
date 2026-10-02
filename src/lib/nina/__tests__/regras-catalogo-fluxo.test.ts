@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
 describe("Regra de catálogo na geração real (modelo/banco simulados, rede proibida)", () => {
-  it("protocolo SFP permanece interno também na atribuição posterior e nas novas tentativas", () => {
+  it("SFP agora gera aviso de transferência com protocolo (02/10/2026)", () => {
     const protocoloFixture = fileURLToPath(new URL("./fixtures/sfp-protocolo.fixture.ts", import.meta.url));
     const p = Bun.spawnSync([process.execPath, protocoloFixture], { stdout: "pipe", stderr: "pipe", timeout: 15000 });
     expect(p.exitCode, p.stdout.toString() + p.stderr.toString()).toBe(0);
@@ -53,10 +53,10 @@ describe("Regra de catálogo na geração real (modelo/banco simulados, rede pro
             expect(r.resposta).toContain("Não consegui transferir");
             expect(r.resposta).not.toContain("Encaminhei");
           } else {
-            expect(r.resposta).toBe("");
-            expect(r.resultado.estado).toBe("descartar");
-            expect(r.resultado.restricoes).toContain("handoff_sfp_silencioso");
-            expect(r.finalizacao).toBeUndefined();
+            // Desde 02/10/2026: informa a unidade São Francisco (diretório) e transfere.
+            expect(r.resposta).toContain("Policlínica São Francisco de Paula");
+            expect(r.resposta).toContain("Avenida Comendador Teles, 2414");
+            expect(r.resposta).not.toMatch(/R\$|\b\d{1,2}h\d{0,2}\b|\d{1,2}:\d{2}/);
           }
         } else {
           expect(r.requests).toHaveLength(2);

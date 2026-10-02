@@ -198,9 +198,12 @@ describe("SFP bloqueia ações na publicação vigente, preservando outros profi
       const r = await aplicarGateIdentificacao({ mensagem: "Sim", estado: ctx.estado, ctx,
         executar: executarFerramentaPaciente,
         encaminharVagaIndisponivel: async motivo => { motivos.push(motivo); return true; } });
-      expect(r?.texto).toBe("");
-      expect(r?.estado).toBe("descartar");
-      expect(r?.restricoes).toContain("handoff_sfp_silencioso");
+      // Desde 02/10/2026: informa a unidade São Francisco e transfere, sem valor nem horário.
+      expect(r?.texto).toContain("Policlínica São Francisco de Paula");
+      expect(r?.texto).toContain("Avenida Comendador Teles, 2414");
+      expect(r?.texto).not.toContain("R$");
+      expect(r?.estado).toBe("entregar");
+      expect(r?.restricoes).toContain("unidade_sao_francisco_informada");
       expect(motivos).toHaveLength(1);
       expect(motivos[0]).toContain("PROFISSIONAL_SFP");
       expect(consultasAgenda()).toHaveLength(0);
