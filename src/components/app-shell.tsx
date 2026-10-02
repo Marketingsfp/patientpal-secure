@@ -50,6 +50,7 @@ import {
   Wallet,
   ChevronDown,
   Search,
+  Monitor,
   X,
   HeartPulse,
   Contact,
@@ -604,6 +605,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
       { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
       { to: "/app/nina", hash: "pesquisa-conversas", label: "Pesquisar conversas", icon: Search },
+      { to: "/app/painel-tv-atendimento", label: "Painel da TV", icon: Monitor },
     ],
   },
   {

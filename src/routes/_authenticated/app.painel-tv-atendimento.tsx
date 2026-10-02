@@ -40,7 +40,7 @@ type Dados = {
 
 function PainelTvAtendimento() {
   const { clinicaAtual } = useClinica();
-  const clinicaId = clinicaAtual?.clinica_id ?? (clinicaAtual as { id?: string } | null)?.id ?? null;
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
   const consultar = useServerFn(consultarPainelTv);
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -118,7 +118,7 @@ function PainelTvAtendimento() {
             <ArrowLeft className="h-[2.6vh] w-[2.6vh]" />
           </Link>
           <div className="min-w-0">
-            <h1 className="truncate text-[3.4vh] font-bold leading-tight">Atendimento — {clinicaAtual?.nome ?? ""}</h1>
+            <h1 className="truncate text-[3.4vh] font-bold leading-tight">Atendimento — {clinicaAtual?.clinica.nome ?? ""}</h1>
             <p className="flex items-center gap-2 text-[1.8vh] text-atd-ink-soft">
               <span className={cn("inline-block h-[1.3vh] w-[1.3vh] rounded-full", conectado ? "bg-atd-ok" : "bg-atd-warn")} />
               {conectado ? "Ao vivo" : "Reconectando…"}
