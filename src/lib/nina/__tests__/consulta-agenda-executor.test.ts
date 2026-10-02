@@ -1924,14 +1924,16 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
       });
     }
     for (const momento of ["antes_da_escolha", "apos_resumo"])
-      test(`${teste ? "homologação" : "real"}: vaga perdida ${momento} transfere, sem reservar 08:00`, async () => {
+      test(`${teste ? "homologação" : "real"}: vaga perdida ${momento} oferece novas opções, sem transferir nem reservar 08:00`, async () => {
         const t = await preparar(teste);
         if (momento === "apos_resumo") await t.turno("vou 10:20");
         banco.agendamentos!.find(v => v.id === "vaga-1")!.paciente_nome = "Outra pessoa";
         const r = await t.turno(momento === "apos_resumo" ? "Sim" : "vou 10:20");
-        expect(r?.origem).toBe("handoff");
-        expect(r?.texto).toContain("Não fiz nenhuma reserva alternativa");
-        expect(t.encaminhamentos).toHaveLength(1);
+        // Decisão 02/10/2026: horário ocupado não transfere mais.
+        expect(r?.origem).toBe("gate");
+        expect(r?.texto).toContain("não fiz nenhuma reserva");
+        expect(r?.texto).toContain("outras opções");
+        expect(t.encaminhamentos).toHaveLength(0);
         expect(gravacoes).toHaveLength(0);
         expect(t.estado.appointment.confirmation).toBeNull();
       });
@@ -1977,12 +1979,12 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     expect(t.estado.appointment.confirmation).toBeNull();
     expect(gravacoes).toHaveLength(0);
   });
-  test("falha ao encaminhar informa a falha sem prometer transferência", async () => {
+  test("vaga sumida após o resumo não promete transferência nem reserva", async () => {
     const t = await preparar(); t.falharHandoff();
     await t.turno("vou 10:20"); banco.agendamentos = [];
     const r = await t.turno("Sim");
-    expect(r?.origem).toBe("erro");
-    expect(r?.texto).toContain("Não consegui transferir");
+    expect(r?.texto).not.toMatch(/Encaminhei|transferi/i);
+    expect(r?.texto).toContain("não fiz nenhuma reserva");
     expect(gravacoes).toHaveLength(0);
   });
 });
