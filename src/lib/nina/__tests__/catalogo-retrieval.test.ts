@@ -971,6 +971,36 @@ describe("aliases publicados por cadastro", () => {
   });
 });
 
+describe("registros equivalentes do cadastro (bateria 02/10, teste 05)", () => {
+  beforeEach(() => {
+    banco.servicos = [
+      servico({ id: idSequencial(11), nome: "ULTRASSONOGRAFIA ABDOMINAL TOTAL", valor: 150 }),
+      servico({ id: idSequencial(12), nome: "USG ABDOMINAL TOTAL", valor: 160 }),
+      servico({ id: idSequencial(13), nome: "USG ABDOMEM TOTAL INFANTIL", valor: 170 }),
+      servico({ id: idSequencial(14), nome: "ULTRASSONOGRAFIA PEDIATRICA - ABDOME TOTAL", valor: 180 }),
+    ];
+  });
+
+  it.each(["ultrassom de abdome total", "ultrassonografia de abdome total", "usg abdome total"])(
+    "nomes que coincidem por inteiro após interpretar siglas não viram pergunta: %s",
+    async (query) => {
+      const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "exame_procedimento" });
+      expect(r.esclarecimento).toBeUndefined();
+      expect(r.records.map((i) => i.procedimento).sort()).toEqual(["ULTRASSONOGRAFIA ABDOMINAL TOTAL", "USG ABDOMINAL TOTAL"]);
+      expect(r.instrucao).toContain("Não pergunte qual deles");
+    },
+  );
+
+  it.each([["USG ABDOMINAL TOTAL"], ["ultrassonografia abdominal total"]])(
+    "o nome escrito exatamente como publicado seleciona aquele registro: %s",
+    async (query) => {
+      const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "exame_procedimento" });
+      expect(r.esclarecimento).toBeUndefined();
+      expect(r.records.map((i) => String(i.procedimento).toUpperCase())).toEqual([query.toUpperCase()]);
+    },
+  );
+});
+
 describe("escolha completa do exame após esclarecer ultrassonografia", () => {
   beforeEach(() => {
     banco.servicos = [

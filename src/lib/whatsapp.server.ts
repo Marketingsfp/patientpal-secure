@@ -2136,10 +2136,14 @@ async function gerarRespostaNinaInterno(
     // Se o modelo consumiu as consultas sem responder, reserva a última
     // rodada para explicar os fatos já obtidos e perguntar o próximo passo.
     // Não aplica a operações/cadastro nem converte falhas em disponibilidade.
-    const sintetizarOpcoes = rodada === MAX_RODADAS - 1 && agendaComOpcoes &&
+    // Sem agenda (modo que só informa), consultas ao cadastro que esgotam as
+    // rodadas sem texto também viram resposta com os fatos, não transferência.
+    const sintetizarOpcoes = rodada === MAX_RODADAS - 1 && (agendaComOpcoes || !podeAgendar) &&
+      nomesFerramentasTurno.length > 0 &&
       nomesFerramentasTurno.every(nome => consultasSemOperacao.has(nome));
-    if (sintetizarOpcoes) mensagens.push({ role: "system", content:
-      "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes." });
+    if (sintetizarOpcoes) mensagens.push({ role: "system", content: agendaComOpcoes
+      ? "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes."
+      : "Conclua esta resposta com os dados já retornados pelas consultas ao cadastro neste turno. Não faça novas consultas. Responda ao pedido atual do paciente com os fatos publicados (profissionais, dias e horários habituais, modalidade e valores) e ofereça o próximo passo. Se algum dado pedido não veio nas consultas, diga que não tem essa informação e ofereça encaminhar à equipe. Não invente fatos ausentes." });
     const respostaIA = await ninaAIGateway({
       clinicaId,
       perfil: "whatsapp",
@@ -2596,7 +2600,16 @@ async function gerarRespostaNinaInterno(
   };
 
   if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo) {
-    resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
+    const { apresentarPerguntaEsclarecimento } = await import("@/lib/nina/esclarecimento-apresentacao");
+    // Primeira resposta da sessão: a pergunta substitui o texto do modelo,
+    // então a apresentação publicada vem junto (CONV-02).
+    const apresentacao = saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
+      ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
+      : null;
+    resposta = apresentarPerguntaEsclarecimento(ctxFerramentas.esclarecimentoCatalogo.pergunta, {
+      tipo: ctxFerramentas.esclarecimentoCatalogo.tipo,
+      apresentacao,
+    });
     transformar(
       "catalogo.esclarecimento",
       "até duas perguntas para identificar o atendimento",

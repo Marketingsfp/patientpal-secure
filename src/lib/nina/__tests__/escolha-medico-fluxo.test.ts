@@ -15,7 +15,7 @@ describe("escolha incorreta de médico no núcleo real com catálogo atual", () 
       expect(r.ferramentas).not.toContain("agendar");
       expect(r.encaminhamentos).toHaveLength(etapa === "segundo" ? 1 : 0);
       if (etapa === "primeiro") {
-        expect(r.resposta).toContain("Não encontrei esse nome entre os médicos desta consulta");
+        expect(r.resposta).toContain("Não encontrei esse nome entre os profissionais desta consulta");
         expect(r.resposta).toContain("Shirley Martins");
         expect(r.resposta).toContain("Raisa Moura");
         expect(JSON.stringify(r.gravacoes)).toContain('"motivo":"medico_nao_identificado"');

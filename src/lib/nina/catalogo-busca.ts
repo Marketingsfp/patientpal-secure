@@ -195,6 +195,13 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
     const candidatos = ajustes.find((ajuste) => ajuste.original === termo)?.candidatos;
     return candidatos?.length === 1 ? candidatos[0]! : termo;
   });
+  // Escrita do paciente sem converter siglas: "USG ABDOMINAL TOTAL" copiado
+  // da lista distingue esse registro de "ULTRASSONOGRAFIA ABDOMINAL TOTAL".
+  const literal = (texto: string) =>
+    normalizarBuscaCatalogo(texto)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t && !["de", "da", "do", "das", "dos"].includes(t));
+  const pedidoLiteral = literal(query);
   return {
     termos,
     ajustes,
@@ -205,6 +212,14 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
         nomePedido.length > 0 &&
         nomePedido.length === nomePublicado.length &&
         nomePedido.every((termo, i) => termo === nomePublicado[i])
+      );
+    },
+    correspondeNomeLiteral(nome: string): boolean {
+      const nomePublicado = literal(nome);
+      return (
+        pedidoLiteral.length > 0 &&
+        pedidoLiteral.length === nomePublicado.length &&
+        pedidoLiteral.every((termo, i) => termo === nomePublicado[i])
       );
     },
     pontuar(nome: string, secundario: string): number {

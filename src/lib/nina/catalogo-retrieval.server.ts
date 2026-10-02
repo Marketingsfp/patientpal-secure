@@ -172,7 +172,15 @@ export async function buscarNoCatalogo(
       : pontuados.filter(({ s }) =>
           aliasesDoIndice(s).some((alias) => busca.correspondeNomeCompleto(alias)),
         );
-  const correspondenciasCompletas = nomesCompletos.length ? nomesCompletos : aliasesCompletos;
+  const completasInterpretadas = nomesCompletos.length ? nomesCompletos : aliasesCompletos;
+  // O nome copiado exatamente como publicado seleciona aquele registro.
+  const literais = completasInterpretadas.filter(({ s }) => busca.correspondeNomeLiteral(s.nome));
+  const correspondenciasCompletas = literais.length === 1 ? literais : completasInterpretadas;
+  // Nomes publicados diferentes que coincidem por inteiro com o pedido depois da
+  // interpretação ("USG" = "ULTRASSONOGRAFIA") são registros equivalentes do
+  // cadastro, não exames diferentes: informa todos, sem escolher nem perguntar.
+  // Aliases compartilhados continuam ambíguos: só o nome publicado comprova.
+  const registrosEquivalentes = nomesCompletos.length > 0 && correspondenciasCompletas.length > 1;
   const servicosRelevantes = correspondenciasCompletas.length
     ? correspondenciasCompletas
     : pontuados;
@@ -238,6 +246,7 @@ export async function buscarNoCatalogo(
   // é a lista legítima que o paciente pediu.
   const melhor = servicosRelevantes[0]?.score ?? 0;
   const ambiguo =
+    !registrosEquivalentes &&
     new Set(servicosRelevantes.filter((x) => x.score === melhor).map((x) => semAcento(x.s.nome)))
       .size > 1;
 
@@ -250,6 +259,11 @@ export async function buscarNoCatalogo(
     atendimentoConsultado: { atendimento: pedido.query },
   });
   resultado.tipo_atendimento = tipoAtendimento;
+  if (registrosEquivalentes && listaServicos.length > 1) {
+    resultado.instrucao = [resultado.instrucao,
+      `O cadastro tem ${listaServicos.length} registros com nomes equivalentes ao pedido (${listaServicos.map((s) => s.nome).join("; ")}). Não pergunte qual deles o paciente deseja: informe os dados de cada registro como estão no cadastro, com o nome de cada um, sem escolher, somar ou corrigir valores.`,
+    ].filter(Boolean).join(" ");
+  }
 
   // Esclarecimento é um resultado próprio, não ausência nem escolha do primeiro.
   // Analisa o conjunto ANTES do limite; limite=1 não elimina a ambiguidade.
