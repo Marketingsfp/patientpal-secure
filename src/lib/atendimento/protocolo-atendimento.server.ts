@@ -21,7 +21,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ambienteDoHandoff, vinculoProtocolo } from "./protocolo-handoff";
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 import { nomeContato } from "./rotulo-conversa";
-import { motivoProfissionalSfp } from "@/lib/nina/regras-catalogo";
 import type { StatusEnvioHandoff, TransporteHandoff } from "./handoff-auditoria";
 import type {
   AmbienteAviso,
@@ -382,8 +381,6 @@ export async function prepararAvisoHandoff(args: {
 }): Promise<AvisoPreparado | null> {
   const conv = await lerConversa(args.clinicaId, args.conversaId);
   if (!conv) return null;
-  // Vale também para atribuição posterior e retry: SFP nunca gera aviso ao paciente.
-  if (motivoProfissionalSfp(conv.handoff_motivo ?? "")) return null;
   const setor = await nomeDepartamento(args.clinicaId, conv.departamento_id);
   const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
   // O texto de transferência usa a MESMA identidade publicada do atendimento;

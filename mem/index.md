@@ -8,3 +8,4 @@ Alterações valem para todas as clínicas; nunca publicar/enviar mensagem real 
 - [Identidade do atendimento](mem://features/identidade-atendimento) — bloco [IDENTIDADE DO ATENDIMENTO] no prompt publicado da aba Arquitetura; sem cadastro paralelo; 5 fases
 - [Ordem de chegada](mem://features/atendimento-ordem-chegada) — sem horário marcado pela Maria; recepção dá numeração; chegar até limite, pagar, aguardar; pago = check-in
 - [Tela do médico — decisões](mem://features/tela-medico-decisoes) — Estorno volta p/ Aguardando sem financeiro; convênio só se não pago; avulsas e hiperbárico adiados
+- [SFP unidade São Francisco](mem://features/sfp-unidade-sao-francisco) — item do profissional SFP na Menino Jesus: informa unidade+endereço do diretório e transfere com protocolo; sem valor/horário

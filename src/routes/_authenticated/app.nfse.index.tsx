@@ -48,6 +48,7 @@ export const Route = createFileRoute("/_authenticated/app/nfse/")({
 
 /** Espaço mínimo entre consultas à Focus (limite da conta: 100 por minuto). */
 const INTERVALO_CONSULTA_MS = 700;
+const varredura = { pausadoAte: 0, rodando: false };
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Emitente {
@@ -281,16 +282,18 @@ function NfsePage() {
     const pendentes = rows.filter((r) => r.status === "processando").map((r) => r.id);
     if (pendentes.length === 0) return;
     let cancelled = false;
-    let pausadoAte = 0;
+    // Pausa e trava ficam fora do efeito: ele é recriado após cada load().
     const tick = async () => {
-      if (Date.now() < pausadoAte) return;
+      if (Date.now() < varredura.pausadoAte || varredura.rodando) return;
+      varredura.rodando = true;
+      try {
       for (let i = 0; i < pendentes.length; i++) {
         if (cancelled) return;
         if (i > 0) await esperar(INTERVALO_CONSULTA_MS);
         try {
           const r = await consulta({ data: { id: pendentes[i] } });
           if (r?.limiteExcedido) {
-            pausadoAte = Date.now() + 60_000;
+            varredura.pausadoAte = Date.now() + 60_000;
             break;
           }
         } catch {
@@ -298,6 +301,9 @@ function NfsePage() {
         }
       }
       if (!cancelled) await load();
+      } finally {
+        varredura.rodando = false;
+      }
     };
     const t = setInterval(() => void tick(), 15000);
     void tick();

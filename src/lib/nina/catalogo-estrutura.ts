@@ -317,4 +317,4 @@ export const INSTRUCAO_ESTRUTURA_CATALOGO =
   INSTRUCAO_DADOS_CATALOGO +
   " " +
   REGRA_APRESENTACAO_VALORES +
-  " Profissional genérico é equipe interna: omita o nome; SFP exige encaminhamento humano silencioso.";
+  " Profissional genérico é equipe interna: omita o nome; SFP exige informar a unidade São Francisco de Paula e encaminhar à equipe.";

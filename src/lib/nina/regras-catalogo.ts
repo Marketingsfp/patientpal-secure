@@ -1,4 +1,7 @@
 import { criarResultado } from "./resposta/contrato";
+import { dadosPublicosClinicaGrupo } from "./clinicas-grupo";
+
+const ID_CLINICA_SFP = "1d3c4f34-2a0f-40fa-b39a-3609677a11a5";
 
 /** Regras administrativas da clínica. Não calcula confiança nem altera o cadastro. */
 export const MARCADOR_REGRAS_CATALOGO =
@@ -6,8 +9,8 @@ export const MARCADOR_REGRAS_CATALOGO =
 export const REGRAS_CATALOGO_PROMPT = `${MARCADOR_REGRAS_CATALOGO}
 Estas regras substituem orientações anteriores sobre SFP, nomes genéricos de profissionais e interpretação de idades, tanto no WhatsApp real quanto na homologação.
 - RAIO-X e MAMOGRAFIA no campo de executante/médico são recursos internos da agenda, não pessoas. Use seus IDs internamente para consultar vagas e agendar; não ofereça escolha desses recursos, não os apresente como profissional e não peça confirmação de profissional. Nas informações, opções de horário, resumo e conclusão, apresente o nome específico do exame, data, horário e demais informações pertinentes. Preserve o nome do exame: MAMOGRAFIA como atendimento pode ser informado; RAIO-X como suposto nome de médico não. Nunca invente médico ou enfermeiro para esses procedimentos.
-- Se o procedimento ou a consulta solicitada tiver o nome do profissional SFP, encaminhe para atendimento humano usando solicitar_atendente_humano com motivo iniciado por PROFISSIONAL_SFP. Esse encaminhamento é silencioso: apenas atribua à equipe, sem mensagem ao paciente, aviso de transferência, protocolo, saudação ou informações do item. Encerre o turno quando a ferramenta confirmar; em caso de falha, informe a dificuldade sem afirmar que transferiu. Uma opção SFP em uma lista ampla não torna as outras opções exclusivas da equipe: identifique o atendimento solicitado.
-- Na identificação do profissional, apresente somente nomes próprios publicados. Cargos, equipes e setores como técnico, técnica, enfermagem, enfermeiro, enfermeira ou equipe de enfermagem não são nomes próprios: omita essa identificação, sem inventar ou substituir por outro profissional. Use o nome do exame/procedimento como título e forneça normalmente as demais informações publicadas, inclusive valores, preparo, horários, modalidade e restrições. Não deixe uma linha "Profissional:" vazia nem pergunte se o paciente prefere "enfermagem" ou "técnica". Preserve nomes próprios em listas que também contenham nomes genéricos. A regra vale com ou sem acento, em qualquer capitalização, também em resumos e confirmações. SFP continua exigindo encaminhamento humano silencioso; não o trate apenas como nome a ocultar.
+- Se o procedimento ou a consulta solicitada tiver o profissional SFP (SAO FRANCISCO DE PAULA), informe que é realizado na unidade Policlínica São Francisco de Paula (endereço/telefone do diretório) e transfira com solicitar_atendente_humano, motivo iniciado por PROFISSIONAL_SFP, com aviso e protocolo. Sem valor, horário ou profissional do item. Em falha, não afirme que transferiu. Uma opção SFP em uma lista ampla não torna as outras opções exclusivas da equipe: identifique o atendimento solicitado.
+- Na identificação do profissional, apresente somente nomes próprios publicados. Cargos, equipes e setores como técnico, técnica, enfermagem, enfermeiro, enfermeira ou equipe de enfermagem não são nomes próprios: omita essa identificação, sem inventar ou substituir por outro profissional. Use o nome do exame/procedimento como título e forneça normalmente as demais informações publicadas, inclusive valores, preparo, horários, modalidade e restrições. Não deixe uma linha "Profissional:" vazia nem pergunte se o paciente prefere "enfermagem" ou "técnica". Preserve nomes próprios em listas que também contenham nomes genéricos. A regra vale com ou sem acento, em qualquer capitalização, também em resumos e confirmações. SFP continua exigindo encaminhamento humano; não o trate apenas como nome a ocultar.
 - As idades informadas no catálogo são idades mínimas. Apresente como “a partir de X anos” ou “a partir de X meses”, conservando o número e a unidade. Exemplos: 18 anos → a partir de 18 anos; 3 anos → a partir de 3 anos; 0 anos → a partir de 0 anos. Uma idade isolada em “Idade/critério informado” também é mínima. Não transforme idade mínima em idade exata, máxima ou faixa. Campo sem idade continua desconhecido. Não interprete preços, horários, duração do preparo ou periodicidade como idade.`;
 
 function nomeNormalizado(nome: unknown): string {
@@ -18,7 +21,9 @@ function nomeNormalizado(nome: unknown): string {
     .trim()
     .toLowerCase();
 }
-export const profissionalSfp = (nome: unknown) => ["sfp", "spf"].includes(nomeNormalizado(nome));
+/** "SAO FRANCISCO DE PAULA" é o nome do profissional-ponte no cadastro da Menino Jesus (agenda da outra unidade). */
+export const profissionalSfp = (nome: unknown) =>
+  ["sfp", "spf", "sao francisco de paula"].includes(nomeNormalizado(nome));
 // Marcadores completos de cargo/equipe. Não busca essas palavras dentro de nomes próprios.
 const NOME_GENERICO = String.raw`(?:t[eé]cnic[oa]s?(?:\s+(?:de|em)\s+(?:enfermagem|radiologia|laborat[oó]rio))?|enfermagem|enfermeir[oa]s?|auxiliar(?:es)?\s+de\s+enfermagem|equipe(?:\s+(?:de\s+enfermagem|t[eé]cnica|m[eé]dica))?)`;
 const NOME_GENERICO_COMPLETO = new RegExp(`^${NOME_GENERICO}$`, "i");
@@ -79,21 +84,42 @@ export const MOTIVO_SFP = "PROFISSIONAL_SFP: atendimento solicitado exclusivo da
 export function motivoProfissionalSfp(motivo: string): boolean {
   return /\bprofissional[_\s]+(?:e\s+)?sfp\b/.test(nomeNormalizado(motivo));
 }
-export function respostaEncaminhamentoSfp(confirmado: boolean): string {
-  return confirmado
-    ? ""
-    : "Esse atendimento precisa do apoio da nossa equipe. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
+/**
+ * Decisão do dono (02/10/2026): o SFP deixou de ser silencioso. A Maria informa
+ * que o atendimento é feito na unidade São Francisco de Paula — endereço e
+ * telefone só do diretório do grupo — e a transferência segue com aviso e
+ * protocolo normais. Nunca informa valor, horário nem profissional do item.
+ */
+export function respostaEncaminhamentoSfp(confirmado: boolean, item?: string | null): string {
+  if (!confirmado)
+    return "Esse atendimento precisa do apoio da nossa equipe. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
+  const u = dadosPublicosClinicaGrupo(ID_CLINICA_SFP);
+  const nome = (item ?? "").trim();
+  const oQue = nome ? `O atendimento de *${nome}*` : "Esse atendimento";
+  const onde = u
+    ? `na nossa unidade ${u.nome_oficial}, que fica na ${u.endereco}${u.telefone ? ` (telefone ${u.telefone})` : ""}`
+    : "na nossa unidade Policlínica São Francisco de Paula";
+  return `Fazemos sim! ${oQue} é realizado ${onde}. Vou passar seu atendimento para a nossa equipe, que segue com você por aqui.`;
 }
 
-/** Silêncio deliberado: o transporte não deve criar fallback, áudio ou outra bolha. */
-export function resultadoEncaminhamentoSfp(confirmado: boolean) {
+export function resultadoEncaminhamentoSfp(confirmado: boolean, item?: string | null) {
   return criarResultado({
     origem: confirmado ? "handoff" : "erro",
-    estado: confirmado ? "descartar" : "entregar",
-    texto: respostaEncaminhamentoSfp(confirmado),
+    estado: "entregar",
+    texto: respostaEncaminhamentoSfp(confirmado, item),
     fatosConfirmados: confirmado ? ["handoff_confirmado"] : [],
-    restricoes: ["atendimento_humano_obrigatorio_sfp", ...(confirmado ? ["handoff_sfp_silencioso"] : [])],
+    restricoes: ["atendimento_humano_obrigatorio_sfp", ...(confirmado ? ["unidade_sao_francisco_informada"] : [])],
   });
+}
+
+/** Nome do primeiro item do resultado que é feito pelo profissional SFP. */
+export function itemSfpDoResultado(dados: unknown): string | null {
+  const r = objeto(dados);
+  if (!r) return null;
+  const registros = [r.records, r.registros, r.itens].find(Array.isArray) as unknown[] | undefined;
+  const reg = objeto(registros?.find(registroExigeHumano));
+  const nome = reg?.procedimento ?? reg?.nome ?? reg?.titulo;
+  return typeof nome === "string" && nome.trim() ? nome.trim() : null;
 }
 
 /** Projeção pública apenas. IDs e nomes usados internamente na agenda não mudam. */

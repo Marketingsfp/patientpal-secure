@@ -6,7 +6,6 @@
  * server-side e escopada por clínica.
  */
 import { encaminharParaHumano } from "@/lib/atendimento/handoff.server";
-import { motivoProfissionalSfp } from "./regras-catalogo";
 
 export const NOME_FERRAMENTA_HANDOFF = "solicitar_atendente_humano";
 
@@ -15,7 +14,7 @@ export const FERRAMENTA_HANDOFF = {
   function: {
     name: NOME_FERRAMENTA_HANDOFF,
     description:
-      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após as respostas a duas perguntas de esclarecimento. Se a primeira resposta não esclarecer a identificação, faça a segunda pergunta antes de encaminhar por esse motivo. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento. Profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
+      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após as respostas a duas perguntas de esclarecimento. Se a primeira resposta não esclarecer a identificação, faça a segunda pergunta antes de encaminhar por esse motivo. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento. Profissional SFP exige motivo PROFISSIONAL_SFP; o sistema informa a unidade São Francisco de Paula e envia o aviso e o protocolo normais.",
     parameters: {
       type: "object",
       properties: {
@@ -74,18 +73,16 @@ export async function executarHandoffTool(
     departamentoNome: setor,
     solicitadoPor: "IA",
   });
-  const silencioso = r.ok && motivoProfissionalSfp(motivo);
 
   return {
     ok: r.ok,
-    sem_mensagem_paciente: silencioso,
+    // Desde 02/10/2026 nenhum encaminhamento é silencioso (nem o SFP).
+    sem_mensagem_paciente: false,
     ja_com_humano: r.ja_estava_com_humano ?? false,
     aviso: r.aviso ?? null,
     posicao_fila: r.posicao_fila ?? null,
     setor: r.departamento ?? null,
-    instrucao_para_voce: silencioso
-      ? "Encerre o turno sem mensagem ao paciente. A transferência por profissional SFP é silenciosa."
-      : r.ok
+    instrucao_para_voce: r.ok
         ? "O sistema coordena o aviso e o protocolo. Encerre o turno sem produzir outro aviso ou continuar o atendimento; não repita a transferência."
         : "O encaminhamento não foi confirmado. Informe a dificuldade sem afirmar que transferiu, seguindo o tratamento de falha disponível.",
   };
