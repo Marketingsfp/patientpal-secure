@@ -17375,6 +17375,14 @@ export type Database = {
         }
         Returns: Json
       }
+      painel_aniversariantes_hoje: {
+        Args: { _clinica_id: string; _limite?: number }
+        Returns: {
+          data_nascimento: string
+          id: string
+          nome: string
+        }[]
+      }
       painel_executivo_periodo: {
         Args: {
           p_ate: string
@@ -17393,6 +17401,10 @@ export type Database = {
           pacientes: number
           recorrentes: number
         }[]
+      }
+      painel_origem_pacientes: {
+        Args: { p_clinica: string; p_fim: string; p_ini: string }
+        Returns: Json
       }
       painel_senhas_publicas: {
         Args: { _clinica_id: string }
