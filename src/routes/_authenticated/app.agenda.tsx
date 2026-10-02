@@ -6399,13 +6399,8 @@ function AgendaPage() {
       // Ficha de fila em EDIÇÃO: mantém o horário gravado (com segundos), que
       // é a posição dela na fila. Encaixe novo continua entrando pelo fim.
       inicio:
-        edicaoFichaFila && editing
-          ? new Date(editing.inicio).toISOString()
-          : inicioIsoParaSalvar,
-      fim:
-        edicaoFichaFila && editing
-          ? new Date(editing.fim).toISOString()
-          : fimIsoParaSalvar,
+        edicaoFichaFila && editing ? new Date(editing.inicio).toISOString() : inicioIsoParaSalvar,
+      fim: edicaoFichaFila && editing ? new Date(editing.fim).toISOString() : fimIsoParaSalvar,
       procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
@@ -9392,7 +9387,9 @@ function AgendaPage() {
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg tela-alta:text-xl font-bold tracking-tight text-slate-900">Agendas</h1>
+            <h1 className="truncate text-lg tela-alta:text-xl font-bold tracking-tight text-slate-900">
+              Agendas
+            </h1>
             <div className="mt-1 tela-alta:mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {(() => {
@@ -14164,7 +14161,42 @@ function AgendaPage() {
                   : a.procedimento,
                 status: a.status,
                 livre: isSlotLivre(a.paciente_nome),
+                pagamento: ehSemFaturamento(a)
+                  ? ("sem_faturamento" as const)
+                  : a.origem_externa
+                    ? ("externo" as const)
+                    : parciaisSet.has(a.id)
+                      ? ("parcial" as const)
+                      : pagosSet.has(a.id)
+                        ? ("pago" as const)
+                        : ("pendente" as const),
               }))}
+            // Atalhos 💲 e ✅ do cartão: as mesmas funções da visão em lista,
+            // com as mesmas travas (particular só realiza depois de pago, nada
+            // de data futura, sem faturamento não cobra). Médico não vê.
+            onCobrar={
+              podeEscrever && !isMedicoOnly
+                ? (a) => {
+                    const orig = items.find((i) => i.id === a.id);
+                    if (orig) void cobrarAgendamento(orig);
+                  }
+                : undefined
+            }
+            onFinalizar={
+              podeEscrever && !isMedicoOnly
+                ? async (a) => {
+                    const orig = items.find((i) => i.id === a.id);
+                    if (!orig) return;
+                    if (
+                      !(await confirmDialog(
+                        `Finalizar o atendimento de ${orig.paciente_nome} (marcar como Realizado)?`,
+                      ))
+                    )
+                      return;
+                    await mudarStatus(orig, "realizado");
+                  }
+                : undefined
+            }
             fmtHora={fmtHora}
             onAgClick={(a) => {
               const orig = items.find((i) => i.id === a.id);
