@@ -192,11 +192,11 @@ export function MapaCalorOrigem({
   const extras = useMemo(() => (clinica?.endereco ? [clinica.endereco] : []), [clinica?.endereco]);
   const { cache, pendentes, total, falhou } = useGeocodificacao(bairros, extras);
 
+  const posEndereco: Coord | null | undefined = clinica?.endereco
+    ? cache[`e|${clinica.endereco}`]
+    : undefined;
   const posClinica: Coord | null =
-    clinica?.pos ??
-    (clinica?.endereco ? cache[`e|${clinica.endereco}`] : undefined) ??
-    cache[chaveCidade("SAO JOAO DE MERITI")] ??
-    null;
+    clinica?.pos || posEndereco || cache[chaveCidade("SAO JOAO DE MERITI")] || null;
 
   const { pontos, foraDoMapa } = useMemo(() => {
     const pontos: Ponto[] = [];
