@@ -452,6 +452,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
         valor_servicos: data.valorServicos,
         valor_iss: valorIss,
         aliquota_iss: aliquota,
+        // Código de tributação efetivamente usado (override ou emitente);
+        // o reenvio reaproveita este valor.
+        item_lista_servico: itemListaServico,
         descricao_servicos: data.descricaoServicos,
         tomador_nome: data.tomador.nome,
         tomador_documento: data.tomador.cpfCnpj ?? null,
@@ -854,7 +857,10 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
     })();
 
-    const itemListaServico = only(emitente.item_lista_servico);
+    // Reenvio repete o código gravado na nota (ex.: 042201 do convênio do
+    // Cartão Benefício). Notas emitidas antes da coluna nfse.item_lista_servico
+    // existir têm o campo vazio — só nesse caso cai no código do emitente.
+    const itemListaServico = only(nota.item_lista_servico || emitente.item_lista_servico);
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço no emitente.");
     const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
       emitente.codigo_tributario_municipio,
