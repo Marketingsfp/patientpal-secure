@@ -266,9 +266,44 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
     }
     return r;
   };
+  // Profissional-ponte "SAO FRANCISCO DE PAULA" (oculto do agendamento online).
+  // Item cujo ÚNICO executante é ele é feito na unidade São Francisco de Paula:
+  // entra no cadastro da Maria só com o nome do item e o executante, sem valor,
+  // horário nem descrição, marcado para encaminhamento (decisão de 02/10/2026).
+  // Item que também tem profissional visível desta clínica segue normal.
+  const idsSfp = new Set(e.medicos.filter((m) => profissionalSfp(m.nome)).map((m) => m.id));
+  const executantesTodos = new Map<string, string[]>();
+  for (const v of e.vinculos) {
+    const lista = executantesTodos.get(v.procedimento_id) ?? [];
+    lista.push(v.medico_id);
+    executantesTodos.set(v.procedimento_id, lista);
+  }
+  const soSfp = (procId: string) => {
+    const ids = executantesTodos.get(procId) ?? [];
+    return ids.length > 0 && !(vinculosPorProc.get(procId)?.length) && ids.every((id) => idsSfp.has(id));
+  };
   return e.procedimentos
     .filter((p) => p.tipo !== "consulta")
-    .map((p) => {
+    .map((p): ServicoPublicado => {
+      if (soSfp(p.id)) {
+        const sfp = e.medicos.find((m) => idsSfp.has(m.id));
+        return {
+          id: p.id,
+          procedimento_id: p.id,
+          nome: p.nome,
+          valor: null,
+          valor_observacao: null,
+          descricao_publica: null,
+          preparo: null,
+          restricoes: null,
+          executantes: [{ nome: sfp?.nome ?? "SAO FRANCISCO DE PAULA", medico_id: null, horarios: null, observacao: null }],
+          formas_pagamento: [],
+          estrutura: {
+            versao: 1, categoria: "exame_procedimento", aliases: [], complementos: [],
+            encaminhamento_humano: true,
+          },
+        } as ServicoPublicado;
+      }
       const preco = precosDoProcedimento(p);
       const executantes = (vinculosPorProc.get(p.id) ?? []).map((v) => ({ v, m: medicos.get(v.medico_id)! }));
       return {
