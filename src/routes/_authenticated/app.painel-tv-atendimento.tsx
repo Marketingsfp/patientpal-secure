@@ -141,14 +141,14 @@ function PainelTvAtendimento() {
         <div className="grid flex-1 place-items-center text-center text-[3vh] text-atd-danger-ink">{erro}</div>
       ) : (
         <>
-          <section className="grid h-[24vh] shrink-0 grid-cols-4 gap-[1.2vw]">
+          <section className="grid h-[17vh] shrink-0 grid-cols-4 gap-[1.2vw]">
             <Kpi titulo="Espera crítica" valor={criticas} icone={AlertTriangle} tom={criticas > 0 ? "danger" : "neutro"} pulsar={criticas > 0} />
             <Kpi titulo="Pendentes" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Não atribuídas" valor={dados?.naoAtribuidas ?? 0} icone={UserX} tom={(dados?.naoAtribuidas ?? 0) > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Conversas hoje" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
           </section>
 
-          <section className="grid min-h-0 flex-1 grid-cols-[3fr_2fr] gap-[1.2vw]">
+          <section className="grid min-h-0 flex-1 grid-cols-[2fr_1fr] gap-[1.2vw]">
             <Coluna titulo="Online" total={online.length} tom="ok">
               <GradeAtendentes lista={online} agora={relogio} />
               {offline.length > 0 && (
@@ -159,7 +159,7 @@ function PainelTvAtendimento() {
               )}
             </Coluna>
             <Coluna titulo="Em pausa" total={pausa.length} tom="warn">
-              <GradeAtendentes lista={pausa} agora={relogio} colunas={1} />
+              <GradeAtendentes lista={pausa} agora={relogio} colunas={pausa.length > 6 ? 2 : 1} />
             </Coluna>
           </section>
         </>
@@ -183,7 +183,7 @@ function Kpi({ titulo, valor, icone: Icone, tom, pulsar }: { titulo: string; val
         <span className="truncate text-[2.4vh] font-semibold uppercase tracking-wide">{titulo}</span>
         <Icone className="h-[3.6vh] w-[3.6vh] shrink-0" />
       </div>
-      <span className="text-[11vh] font-black leading-none tabular-nums">{valor}</span>
+      <span className="text-[8.5vh] font-black leading-none tabular-nums">{valor}</span>
     </div>
   );
 }
@@ -205,43 +205,58 @@ function GradeAtendentes({ lista, agora, colunas, compacto }: { lista: Atendente
   if (!lista.length) {
     return compacto ? null : <p className="grid flex-1 place-items-center text-[2.4vh] text-atd-ink-soft">Ninguém neste status</p>;
   }
-  // Ajusta colunas e tamanho para todos caberem sem rolagem.
-  const cols = colunas ?? (lista.length > 12 ? 3 : 2);
-  const linhas = Math.ceil(lista.length / cols);
-  const denso = linhas > 6 || compacto;
+  // Ajusta colunas e linhas para todos caberem sem rolagem (15+ no Online).
+  const cols = colunas ?? (compacto ? 4 : lista.length > 10 ? 3 : 2);
+  const linhas = Math.max(Math.ceil(lista.length / cols), compacto ? 1 : 5);
+  const denso = linhas > 5 || !!compacto;
   return (
     <ul
-      className="grid min-h-0 flex-1 content-start gap-[1vh] overflow-hidden"
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      className={cn("grid min-h-0 gap-[0.8vh] overflow-hidden", compacto ? "" : "flex-1")}
+      style={{
+        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        gridTemplateRows: compacto ? undefined : `repeat(${linhas}, minmax(0, 1fr))`,
+      }}
     >
       {lista.map((a) => {
         const emPausa = a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA";
         const Icone = a.estado === "PAUSA_SAIDA" ? DoorOpen : Coffee;
+        const pend = a.esperas.length;
+        const crit = a.esperas.filter((d) => faixaEsperaDesde(d, agora) === "critico").length;
         return (
           <li
             key={a.id}
             className={cn(
-              "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-atd-border bg-atd-bg",
-              denso ? "px-[0.8vw] py-[0.7vh]" : "px-[1vw] py-[1.3vh]",
+              "flex min-h-0 flex-col justify-center gap-[0.5vh] overflow-hidden rounded-2xl border bg-atd-bg px-[0.8vw] py-[0.6vh]",
+              crit > 0 ? "border-atd-danger" : "border-atd-border",
             )}
           >
             <div className="min-w-0">
-              <p className={cn("truncate font-semibold", denso ? "text-[2vh]" : "text-[2.6vh]")} title={a.nome}>{a.nome}</p>
+              <p className={cn("truncate font-semibold leading-tight", denso ? "text-[1.9vh]" : "text-[2.3vh]")} title={a.nome}>{a.nome}</p>
               {emPausa && (
-                <p className="flex items-center gap-2 text-[1.9vh] text-atd-warn-ink">
-                  <Icone className="h-[2vh] w-[2vh]" />
+                <p className="flex items-center gap-2 text-[1.7vh] leading-tight text-atd-warn-ink">
+                  <Icone className="h-[1.8vh] w-[1.8vh]" />
                   {a.estado === "PAUSA_SAIDA" ? "Almoço" : "Pausa"}
                   <span className="font-bold tabular-nums">{a.inicioPausa ? formatarTempoPausa(a.inicioPausa, agora) : "—"}</span>
                 </p>
               )}
             </div>
-            <div className="flex flex-col items-end leading-none">
-              <span className={cn("font-black tabular-nums", denso ? "text-[3vh]" : "text-[4.2vh]")}>{a.atribuidas}</span>
-              <span className="text-[1.4vh] text-atd-ink-soft">{a.atribuidas === 1 ? "conversa" : "conversas"}</span>
+            <div className="grid grid-cols-3 gap-[0.4vw]">
+              <Numero rotulo="Atribuídas" valor={a.atribuidas} denso={denso} />
+              <Numero rotulo="Pendentes" valor={pend} denso={denso} tom={pend > 0 ? "warn" : undefined} />
+              <Numero rotulo="Críticas" valor={crit} denso={denso} tom={crit > 0 ? "danger" : undefined} />
             </div>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+function Numero({ rotulo, valor, denso, tom }: { rotulo: string; valor: number; denso: boolean; tom?: "warn" | "danger" }) {
+  return (
+    <div className={cn("flex min-w-0 items-baseline justify-center gap-1 rounded-lg px-1", tom === "danger" ? "bg-atd-danger-bg text-atd-danger-ink" : tom === "warn" ? "bg-atd-warn-bg text-atd-warn-ink" : "")}>
+      <span className={cn("font-black tabular-nums leading-none", denso ? "text-[2.4vh]" : "text-[3vh]")}>{valor}</span>
+      <span className="truncate text-[1.3vh] text-atd-ink-soft">{rotulo}</span>
+    </div>
   );
 }

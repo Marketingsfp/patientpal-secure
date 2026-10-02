@@ -13,6 +13,8 @@ export type AtendenteTv = {
   estado: EstadoTv;
   inicioPausa: string | null;
   atribuidas: number;
+  /** Instante de espera de cada conversa pendente atribuída (TV calcula a crítica). */
+  esperas: string[];
 };
 
 /**
@@ -35,6 +37,7 @@ export async function carregarPainelTv(
 
   // Conversas abertas (todas as páginas).
   const abertas: { id: string; atribuida_user_id: string | null; owner_type: string | null }[] = [];
+
   let depois: string | null = null;
   while (true) {
     let q = supabase
@@ -94,9 +97,15 @@ export async function carregarPainelTv(
 
   const humanas = abertas.filter((c) => c.owner_type !== "AI");
   const idsHumanas = new Set(humanas.map((c) => c.id));
+  const donoDe = new Map(humanas.map((c) => [c.id, c.atribuida_user_id]));
   const espera: string[] = [];
+  const esperasPorAtendente = new Map<string, string[]>();
   for (const t of tempos.data ?? []) {
-    if (idsHumanas.has(t.conversa_id) && t.aguardando_desde) espera.push(t.aguardando_desde);
+    if (idsHumanas.has(t.conversa_id) && t.aguardando_desde) {
+      espera.push(t.aguardando_desde);
+      const dono = donoDe.get(t.conversa_id);
+      if (dono) esperasPorAtendente.set(dono, [...(esperasPorAtendente.get(dono) ?? []), t.aguardando_desde]);
+    }
   }
 
   const atribuidas = new Map<string, number>();
@@ -144,6 +153,7 @@ export async function carregarPainelTv(
             })) ?? null)
           : null,
         atribuidas: atribuidas.get(id) ?? 0,
+        esperas: esperasPorAtendente.get(id) ?? [],
       };
     }),
   );
