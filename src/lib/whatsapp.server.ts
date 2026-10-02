@@ -4,7 +4,7 @@ import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
-  respostaEncaminhamentoSfp, itemSfpDoResultado, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
+  respostaEncaminhamentoSfp, itemSfpDoResultado, motivoProfissionalSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
 
 import { normalizar } from "@/lib/nina-especialidade";
 
@@ -1928,6 +1928,26 @@ async function gerarRespostaNinaInterno(
     // precisa dessa referência para reformular a chamada no mesmo turno.
     if ((r.dados as { codigo?: string } | null)?.codigo === "CATALOGO_QUERY_NAO_INTERPRETADA")
       return limitarRetornoParaModelo(payload);
+    // Transferência SFP pedida pelo próprio modelo: encerra o turno como a do
+    // servidor (sem outras ferramentas), com a mensagem da unidade São Francisco.
+    if (
+      r.capacidade === "requestHumanHandoff" &&
+      r.success && !r.erro &&
+      motivoProfissionalSfp(String(parametros.motivo ?? ""))
+    ) {
+      houveHandoff = true;
+      const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
+      const itemSfp = fluxoEstado.appointment.procedure ?? null;
+      limparEscolhaAgendamento(fluxoEstado);
+      fluxoEstado.appointment.slot_options = null;
+      fluxoEstado.flow.stage = "HANDOFF";
+      finalizacaoHandoff = {
+        texto: respostaEncaminhamentoSfp(true, itemSfp),
+        textoModelo: textoModeloAtual,
+        handoffConfirmado: true,
+        motivo: MOTIVO_SFP,
+      };
+    }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
       if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome, undefined, itemSfpDoResultado(r.dados));
       return limitarRetornoParaModelo(payload);
