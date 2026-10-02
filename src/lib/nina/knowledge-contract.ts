@@ -63,7 +63,7 @@ export type ResultadoConhecimento = {
   esclarecimento?: {
     tipo: "procedimento" | "profissional" | "sigla";
     /** Consulta comprovada; somente a escolha do médico precisa ser corrigida. */
-    motivo?: "medico_nao_identificado";
+    motivo?: "medico_nao_identificado" | "sem_registro_confirmar";
     atendimento?: string;
     pergunta: string;
     opcoes: Array<{ id: string; nome: string; especialidade?: string; unidade?: string | null }>;

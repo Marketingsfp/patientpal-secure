@@ -46,6 +46,9 @@ const PADRAO_LOW =
 const PADRAO_MEDIUM =
   /\b(?:agend|marcar|remarc|reagend|cancel|desmarc|disponibilidade|dispon[íi]ve|vaga|hor[áa]rio livre|encaixe|consulta com|exame|dr\.|dra\.|doutor|doutora|m[ée]dic|especialista|cardiolog|dermatolog|ortoped|ginecolog|pediatr|ultrassom|raio[- ]?x|laborat[óo]rio|de manh[ãa]|[àa] tarde|de tarde|[àa] noite|segunda-?feira|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|amanh[ãa]|semana que vem|pr[óo]xima semana)/i;
 
+/** Exame, especialidade ou sigla citados → interpretar antes de buscar (MEDIUM). */
+const PADRAO_ATENDIMENTO =
+  /\b(?:usg|us|usam|ultra\w*|utra\w*|eco\w*|ecg|eletro\w*|rx|raio|eas|urina|preventivo|papanicolau|tomografia|resson\w*|mamografia|exames?|consultas?|\w+logi(?:a|sta)s?|pediatra|ortopedista|nutri\w*|fono\w*|cl[íi]nic[oa] geral|cl[íi]nico|dentista|gastro|neuro|cardio|gineco|dermato|oftalmo|otorrino|endocrino|uro)\b/i;
 /** Sinais de caso realmente complexo → HIGH (deve ser raro). */
 const PADRAO_ALTERNATIVAS = /\b(ou|alternativ|caso n[ãa]o|se n[ãa]o (der|puder|tiver)|qualquer um dos)\b/i;
 const PADRAO_RESTRICAO =
@@ -100,7 +103,9 @@ export function selectThinkingLevel(ctx: ContextoRaciocinio): DecisaoRaciocinio 
   }
 
   // ---- MEDIUM: agenda, disponibilidade, tools, múltiplas restrições.
-  if (ehAgenda) {
+  // Exame, especialidade ou sigla citada (inclusive escrita popular/errada,
+  // como "usam") exige interpretar antes de buscar: não usa o nível LOW.
+  if (ehAgenda || PADRAO_ATENDIMENTO.test(texto)) {
     return {
       nivel: "medium",
       motivo:

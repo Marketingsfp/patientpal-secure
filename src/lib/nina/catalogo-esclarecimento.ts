@@ -1,6 +1,7 @@
 import type { ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 import type { ResultadoBroker } from "./tool-broker";
 import type { ResultadoConhecimento } from "./knowledge-contract";
+import { MOTIVO_SEM_REGISTRO } from "./catalogo-sem-registro";
 
 export const LIMITE_ESCLARECIMENTOS = 2;
 
@@ -41,6 +42,7 @@ export function prepararSegundaPergunta(
   // duas perguntas gerais para identificar um atendimento ainda desconhecido.
   if (anterior?.esclarecimento?.motivo === "medico_nao_identificado" ||
     (resultado.dados as Partial<ResultadoConhecimento> | null)?.esclarecimento?.motivo === "medico_nao_identificado") return resultado;
+  if (anterior?.esclarecimento?.motivo === "sem_registro_confirmar") return resultado;
   if (contarEsclarecimentos(anterior) !== 1) return resultado;
   const dados = identificacaoPendente(resultado);
   if (!dados) return resultado;
@@ -75,6 +77,14 @@ export function encaminharAposEsclarecimento(
     return {
       motivo: MOTIVO_MEDICO_NAO_IDENTIFICADO,
       resumo: `Consulta encontrada: ${anterior.esclarecimento.atendimento ?? anterior.consulta.termo}. Não foi possível identificar o médico após pedir uma nova escolha. Pergunta feita: ${anterior.esclarecimento.pergunta.slice(0, 1000)}. Resposta recebida: ${respostaPaciente.slice(0, 400)}. A equipe deve confirmar o profissional desejado e continuar o atendimento.`,
+      urgencia: "normal" as const,
+    };
+  }
+  // Já perguntamos uma vez após "não encontrado": nova falha encaminha.
+  if (anterior?.esclarecimento?.motivo === "sem_registro_confirmar" && identificacaoPendente(resultado)) {
+    return {
+      motivo: MOTIVO_SEM_REGISTRO,
+      resumo: `O atendimento solicitado não foi encontrado na base publicada, nem após pedir confirmação ao paciente. Busca inicial: ${anterior.consulta.termo.slice(0, 200)}. Pergunta feita: ${anterior.esclarecimento.pergunta.slice(0, 600)}. Resposta recebida: ${respostaPaciente.slice(0, 400)}. A equipe deve conferir e continuar a conversa; a ausência no catálogo não comprova que a clínica não oferece o serviço.`,
       urgencia: "normal" as const,
     };
   }

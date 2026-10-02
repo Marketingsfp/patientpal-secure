@@ -25,6 +25,7 @@ import { publicacaoDoMedicoAgenda } from "./vinculo-catalogo-agenda.server";
 import {
   compararNomeProfissional,
   prepararBuscaCatalogo,
+  expansoesDeEscrita,
   perguntaIdentificacaoProfissional,
   nomeProfissionalNaPergunta,
 } from "./catalogo-busca";
@@ -340,7 +341,9 @@ export async function buscarNoCatalogo(
           status: "PUBLICADO",
           tipo_atendimento: tipoAtendimento,
           termos,
-          termos_expandidos: expandidos,
+          termo_original: pedido.query,
+          termos_interpretados: termos,
+          termos_expandidos: [...expansoesDeEscrita(pedido.query), ...expandidos],
           correspondencia: nomesCompletos.length
             ? "nome_completo"
             : aliasesCompletos.length
@@ -374,7 +377,9 @@ export async function buscarNoCatalogo(
           medico: pedido.medico ?? null,
           dia: pedido.dia ?? null,
           termos,
-          termos_expandidos: expandidos,
+          termo_original: pedido.query,
+          termos_interpretados: termos,
+          termos_expandidos: [...expansoesDeEscrita(pedido.query), ...expandidos],
           tamanho_pagina: TAMANHO_PAGINA,
           busca_completa: true,
           comparacao: "sem acentos e sem distinção de maiúsculas/minúsculas",

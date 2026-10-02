@@ -1909,6 +1909,10 @@ async function gerarRespostaNinaInterno(
         ? null
         : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
     r = prepararSegundaPergunta(referenciaAnterior, r);
+    {
+      const { confirmarAntesDeEncaminhar } = await import("@/lib/nina/catalogo-sem-registro");
+      r = confirmarAntesDeEncaminhar(r, args, referenciaAnterior);
+    }
     const ex = incorporarResultadoOficial({
       clinicaId,
       nome,
@@ -2591,7 +2595,7 @@ async function gerarRespostaNinaInterno(
     });
   };
 
-  if (!finalizacaoHandoff && !houveHandoff && ctxFerramentas?.esclarecimentoCatalogo) {
+  if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo) {
     resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
     transformar(
       "catalogo.esclarecimento",

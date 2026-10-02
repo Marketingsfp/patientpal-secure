@@ -87,3 +87,35 @@ export function respostaSemRegistro(confirmado: boolean, teste = false): string 
     ? "Vou contar com nossa equipe para te ajudar com esse atendimento. Encaminhei sua conversa para um atendente, que continuará por aqui."
     : "Preciso do apoio da nossa equipe para te ajudar com esse atendimento. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
 }
+
+/**
+ * Primeira busca sem resultado: em vez de transferir, a Maria confirma uma vez
+ * o que entendeu ou pede outra escrita. A segunda falha encaminha
+ * (`encaminharAposEsclarecimento`). Médico não encontrado segue a regra atual.
+ */
+export function confirmarAntesDeEncaminhar(
+  r: ResultadoBroker,
+  args: unknown,
+  anterior: { esclarecimento?: unknown } | null,
+): ResultadoBroker {
+  if (anterior?.esclarecimento) return r;
+  const ausencia = encaminhamentoSemRegistro(r, args);
+  if (!ausencia || ausencia.motivo !== MOTIVO_SEM_REGISTRO) return r;
+  let termo = "";
+  try {
+    const p = typeof args === "string" ? JSON.parse(args) : args;
+    termo = String(p?.termo ?? p?.especialidade ?? "").trim().slice(0, 120);
+  } catch { /* sem termo legível */ }
+  const pergunta = termo
+    ? `Não encontrei "${termo}" no nosso cadastro. Você quis dizer outro nome? Pode escrever de outro jeito ou como está no pedido médico (por exemplo: ultrassom de abdome, cardiologista)?`
+    : "Não consegui identificar o atendimento. Pode escrever o nome do exame ou da especialidade de outro jeito, ou como está no pedido médico?";
+  const dados = (r.dados ?? {}) as Record<string, unknown>;
+  return {
+    ...r,
+    dados: {
+      ...dados,
+      esclarecimento: { tipo: "sigla", motivo: "sem_registro_confirmar", pergunta, opcoes: [] },
+      instrucao: `Busca sem resultado na primeira tentativa. Não transfira ainda. Confirme com o paciente, em uma única pergunta curta, o que você entendeu (ex.: "Você quis dizer ultrassom (USG)? De qual região?") ou peça para escrever de outro jeito. Base sugerida: ${pergunta} Se o paciente pedir atendente, use solicitar_atendente_humano. Depois da resposta, consulte a base novamente.`,
+    },
+  };
+}
