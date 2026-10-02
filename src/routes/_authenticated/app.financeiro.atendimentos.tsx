@@ -362,6 +362,9 @@ function AtendimentosPage() {
   >("gr");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
   const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");
+  // Recorte por produto, independente do filtro "Médico": o Cartão Terapêutico
+  // contra todo o resto (particular e demais convênios).
+  const [fConvenio, setFConvenio] = useState<"todos" | "ct" | "outros">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
@@ -2667,12 +2670,18 @@ function AtendimentosPage() {
         : fTipo === "medico"
           ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
           : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
+    const baseConvenio =
+      fConvenio === "todos"
+        ? baseTipo
+        : fConvenio === "ct"
+          ? baseTipo.filter((a) => ehServicoCartaoTerapeutico(a.procedimento))
+          : baseTipo.filter((a) => !ehServicoCartaoTerapeutico(a.procedimento));
     const baseLaudo =
       fLaudo === "todos"
-        ? baseTipo
+        ? baseConvenio
         : fLaudo === "baixado"
-          ? baseTipo.filter((a) => a.laudo_status === "emitido")
-          : baseTipo.filter((a) => a.laudo_status !== "emitido");
+          ? baseConvenio.filter((a) => a.laudo_status === "emitido")
+          : baseConvenio.filter((a) => a.laudo_status !== "emitido");
     const nomeDe = (a: Atend) =>
       norm(
         ((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim(),
@@ -2705,7 +2714,7 @@ function AtendimentosPage() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo, fConvenio]);
   const totais = useMemo(
     () =>
       filteredItems.reduce(
@@ -3611,6 +3620,22 @@ function AtendimentosPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Convênio</Label>
+                  <Select
+                    value={fConvenio}
+                    onValueChange={(v) => setFConvenio(v as "todos" | "ct" | "outros")}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os atendimentos</SelectItem>
+                      <SelectItem value="ct">Somente Cartão Terapêutico</SelectItem>
+                      <SelectItem value="outros">Particulares / outros convênios</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
                   <Label className="text-xs font-medium">
                     Laudo
                     <span className="ml-1 font-normal text-muted-foreground">
@@ -3938,6 +3963,14 @@ function AtendimentosPage() {
                                 title="Parte do médico que laudou o exame. É o mesmo exame já cobrado do paciente — não conta como um novo atendimento."
                               >
                                 LAUDO DO EXAME
+                              </div>
+                            )}
+                            {ehServicoCartaoTerapeutico(a.procedimento) && (
+                              <div
+                                className="text-[10px] font-semibold text-violet-700 dark:text-violet-400"
+                                title="Atendimento do Cartão Terapêutico. O repasse sai em nome do produto, em recibo próprio."
+                              >
+                                CARTÃO TERAPÊUTICO
                               </div>
                             )}
                             {ehLinhaSemFaturamento(a.forma_pagamento) && (
