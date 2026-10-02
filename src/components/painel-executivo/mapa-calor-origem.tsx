@@ -194,7 +194,7 @@ export function MapaCalorOrigem({
 
   const posClinica: Coord | null =
     clinica?.pos ??
-    (clinica?.endereco ? (cache[`e|${clinica.endereco}`] ?? null) : null) ??
+    (clinica?.endereco ? cache[`e|${clinica.endereco}`] : undefined) ??
     cache[chaveCidade("SAO JOAO DE MERITI")] ??
     null;
 
