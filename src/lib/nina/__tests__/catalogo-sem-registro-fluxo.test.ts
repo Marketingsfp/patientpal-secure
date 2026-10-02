@@ -24,7 +24,7 @@ describe("catálogo ausente no núcleo real, sem rede nem motor de confiança", 
         }
         // Regra de 02/10/2026: a primeira busca sem resultado não transfere;
         // a Maria confirma uma vez o que entendeu. Médico não encontrado segue igual.
-        if (cenario !== "medicos_modelo") {
+        if ((cenario as string) !== "medicos_modelo") {
           expect(r.encaminhamentos).toHaveLength(0);
           expect(r.resposta).not.toContain("não oferece");
           expect(r.resposta).not.toContain("R$ 80");
