@@ -303,7 +303,7 @@ export function CentralAtencao() {
                 : "Nenhuma pendência."}
             </p>
           ) : (
-            <ul className="max-h-64 space-y-0.5 overflow-y-auto">
+            <ul className="max-h-[min(16rem,45vh)] space-y-0.5 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin]">
               {lista.map((i) => (
                 <li key={i.id}>
                   <ItemLinha item={i} onClick={() => abrirConversa(i.id)} />
