@@ -227,8 +227,10 @@ function Kpi({ titulo, valor, icone: Icone, tom, pulsar, dica }: { titulo: strin
         <span className="line-clamp-2 text-[1.9vh] font-semibold uppercase leading-tight tracking-wide">{titulo}</span>
         <Icone className="h-[3.6vh] w-[3.6vh] shrink-0" />
       </div>
-      <span className={cn("font-black leading-none tabular-nums", typeof valor === "string" ? "text-[4.8vh]" : "text-[6vh]")}>{valor}</span>
-      {dica && <span className="truncate text-[1.5vh] opacity-80">{dica}</span>}
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className={cn("shrink-0 font-black leading-none tabular-nums", typeof valor === "string" ? "text-[4.8vh]" : "text-[6vh]")}>{valor}</span>
+        {dica && <span className="truncate text-[1.5vh] opacity-80">{dica}</span>}
+      </div>
     </div>
   );
 }
