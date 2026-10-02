@@ -3089,7 +3089,9 @@ function DetalheContrato({
   const consultarNfseFn = useServerFn(consultarNfse);
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
   const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
-  const [emitentes, setEmitentes] = useState<Array<{ id: string; nome: string }>>([]);
+  const [emitentes, setEmitentes] = useState<
+    Array<{ id: string; nome: string; item_lista_servico: string | null }>
+  >([]);
   const [emitenteId, setEmitenteId] = useState<string>("");
   const [nfsePorLancamento, setNfsePorLancamento] = useState<
     Record<
@@ -4048,7 +4050,7 @@ function DetalheContrato({
         ? supabase
             .from("cb_convenios")
             .select(
-              "nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente",
+              "nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente, item_lista_servico",
             )
             .eq("id", contrato.convenio_id)
             .maybeSingle()
@@ -4226,13 +4228,17 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse_emitentes_publico")
-      .select("id, nome")
+      .select("id, nome, item_lista_servico")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome")
       .then(({ data }) => {
         if (cancel) return;
-        const list = (data ?? []) as Array<{ id: string; nome: string }>;
+        const list = (data ?? []) as Array<{
+          id: string;
+          nome: string;
+          item_lista_servico: string | null;
+        }>;
         setEmitentes(list);
         setEmitenteId((prev) => prev || (list[0]?.id ?? ""));
       });
@@ -4631,6 +4637,22 @@ function DetalheContrato({
     }
   };
 
+  // Código de tributação nacional das notas de mensalidade/adesão: o do
+  // convênio do contrato quando preenchido; senão, o do emitente (sem override).
+  const codigoTributacaoParcelas = () => {
+    const doConvenio = String(convenio?.item_lista_servico ?? "").trim();
+    const doEmitente = emitentes.find((e) => e.id === emitenteId)?.item_lista_servico ?? "";
+    const override = doConvenio
+      ? {
+          itemListaOverride: doConvenio,
+          itemListaMotivo: `código do convênio do Cartão Benefício "${convenio?.nome ?? ""}" (cb_convenios.item_lista_servico)`,
+        }
+      : {};
+    const info = (valor: number) =>
+      `Valor: ${valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · Código de tributação nacional: ${doConvenio || doEmitente || "—"} (${doConvenio ? "do convênio" : "do emitente"})`;
+    return { override, info };
+  };
+
   // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
   // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
   // com bloqueio de endereço e escolha de percentual do valor.
@@ -4692,7 +4714,8 @@ function DetalheContrato({
         ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
-      const descFinal = await pedirDescricaoNfse(descSugerida);
+      const codTrib = codigoTributacaoParcelas();
+      const descFinal = await pedirDescricaoNfse(descSugerida, codTrib.info(parcial.valor));
       if (!descFinal) {
         toast.error("Emissão cancelada.");
         return;
@@ -4706,6 +4729,7 @@ function DetalheContrato({
           valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
+          ...codTrib.override,
         },
       });
       avisarEmitenteDivergente(res);
@@ -4835,7 +4859,8 @@ function DetalheContrato({
         ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
-      const descFinal = await pedirDescricaoNfse(descSugerida);
+      const codTrib = codigoTributacaoParcelas();
+      const descFinal = await pedirDescricaoNfse(descSugerida, codTrib.info(parcial.valor));
       if (!descFinal) {
         toast.error("Emissão cancelada.");
         return;
@@ -4851,6 +4876,7 @@ function DetalheContrato({
           valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
+          ...codTrib.override,
         },
       });
       avisarEmitenteDivergente(res);
