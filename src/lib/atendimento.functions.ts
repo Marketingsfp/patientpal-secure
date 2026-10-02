@@ -2172,12 +2172,23 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
       : `+${conv.contato_telefone}`;
+    // Assinatura: nome de quem escreveu, em negrito no WhatsApp, para o
+    // paciente distinguir uma atendente da outra. Sem nome cadastrado, vai sem.
+    const { data: perfilAutor } = await context.supabase
+      .from("profiles")
+      .select("nome")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const nomeAutor = String((perfilAutor as any)?.nome ?? "")
+      .replace(/[*_~`]/g, "")
+      .trim();
+    const textoEnviado = nomeAutor ? `*${nomeAutor}:*\n${data.text}` : data.text;
     trace.marcar("SEND_T6_META_REQUEST_START");
     const { wa_message_id } = await metaSendText(
       cfg.phone_number_id,
       cfg.access_token,
       to,
-      data.text,
+      textoEnviado,
     );
     trace.marcar("SEND_T7_META_RESPONSE");
 
@@ -2190,7 +2201,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         direction: "out",
         from_number: cfg.display_phone_number,
         to_number: to,
-        body: data.text,
+        body: textoEnviado,
         tipo: "text",
         status: "sent",
         enviada_por: "humano",
