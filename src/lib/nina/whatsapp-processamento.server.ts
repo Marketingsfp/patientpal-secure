@@ -408,6 +408,35 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               if (erroAudio) {
                 console.error("[nina] falha ao gravar áudio enviado", erroAudio);
               }
+              // Guarda o áudio gerado no bucket privado para a equipe ouvir na conversa
+              // (mesmo caminho dos áudios recebidos). Falha aqui nunca derruba o envio.
+              const idMsgAudio = (msgAudio as { id?: string } | null)?.id ?? null;
+              if (idMsgAudio && audioId) {
+                try {
+                  const { tipoMimeAceito, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } = await import(
+                    "@/lib/whatsapp-midia-armazenamento"
+                  );
+                  const mimeOk = tipoMimeAceito("audio", audio.mime);
+                  if (mimeOk) {
+                    const caminho = caminhoDaMidia({
+                      clinicaId: params.clinicaId,
+                      waMessageId: audioId,
+                      mime: mimeOk,
+                    });
+                    const { error: erroUp } = await supabaseAdmin.storage
+                      .from(BUCKET_MIDIA_WHATSAPP)
+                      .upload(caminho, audio.bytes, { contentType: mimeOk, upsert: true });
+                    if (!erroUp)
+                      await supabaseAdmin
+                        .from("whatsapp_mensagens")
+                        .update({ media_url: caminho, media_mime: mimeOk } as never)
+                        .eq("id", idMsgAudio);
+                    else console.error("[nina] áudio não guardado", erroUp.message);
+                  }
+                } catch (e) {
+                  console.error("[nina] áudio não guardado", e);
+                }
+              }
               // Confirmada só porque a Meta devolveu id da
               // mensagem — não pela simples existência da linha.
               await registrarEntregaSaida({
