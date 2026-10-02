@@ -36,7 +36,18 @@ import { textoDaChave, type TextosTemplates } from "./resposta/templates";
 import { aceitarResumoEntregue, confirmacaoDaEscolha, consentimentoDaEscolha,
   limparEscolhaAgendamento, lerEscolhaHorario, vagasDaEscolha, vagasDaSessao,
   resumoDaEscolhaEntregue, LEMBRETE_CONFIRMACAO } from "./agendamento-escolha";
-import { respostaSemVagas } from "./agenda-sem-vagas";
+import { respostaSemVagas, RESPOSTA_VAGA_OCUPADA } from "./agenda-sem-vagas";
+
+/**
+ * Decisão do dono (02/10/2026): horário ocupado entre a escolha e a gravação
+ * não transfere mais. Limpa a escolha (nada reservado) e oferece buscar novas
+ * opções reais; só um novo "sim" grava.
+ */
+function vagaOcupada(estado: EstadoFluxoNina) {
+  limparEscolhaAgendamento(estado);
+  return criarResultado({ origem: "gate", texto: RESPOSTA_VAGA_OCUPADA,
+    restricoes: ["vaga_escolhida_indisponivel", "nenhuma_reserva_feita"] });
+}
 import { respostaFalhaAgendamento } from "./falha-agendamento";
 
 /** Só é enviado se o anúncio do encaminhamento (com protocolo) não saiu. */
@@ -368,7 +379,7 @@ export async function aplicarGateIdentificacao(params: {
       medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
     });
     if (!r.ok && r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
-    if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return encaminhar();
+    if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
     if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro)) return encaminhar(true);
     if (r.ok && typeof r.orientacao_atendimento === "string")
       return criarResultado({ origem: "gate", texto: r.orientacao_atendimento,
@@ -618,7 +629,8 @@ export async function aplicarGateIdentificacao(params: {
       },
     );
   }
-  if (erroAg === "SLOT_UNAVAILABLE" || erroAg === "NO_AVAILABILITY") return encaminhar();
+  if (erroAg === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
+  if (erroAg === "NO_AVAILABILITY") return encaminhar();
   // Uma falha técnica não autoriza escolher uma nova vaga nem afirmar sucesso.
   return encaminharFalha("agendar", erroAg);
 }
