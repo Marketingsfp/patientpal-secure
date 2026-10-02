@@ -37,6 +37,11 @@ import { formatarCpf } from "@/lib/sessoes/busca-ativa-contatos";
 
 type Periodo = { de: string; ate: string };
 type Grupo = "fora" | "sem_endereco";
+/** O que o modal mostra: um grupo inteiro, ou só uma cidade/bairro do ranking. */
+type Abertura = { grupo: Grupo; cidade?: string; bairro?: string | null };
+
+/** Rótulo que o banco devolve no ranking quando o bairro está em branco. */
+const SEM_BAIRRO = "BAIRRO NAO INFORMADO";
 
 type Totais = {
   pacientes: number;
@@ -120,7 +125,7 @@ export function SecaoOrigemPacientes({
 }) {
   const [dados, setDados] = useState<Origem>(VAZIO);
   const [carregando, setCarregando] = useState(false);
-  const [aberto, setAberto] = useState<Grupo | null>(null);
+  const [aberto, setAberto] = useState<Abertura | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -144,7 +149,7 @@ export function SecaoOrigemPacientes({
           icon={MapPin}
           tone="info"
           hint={`${pct(t.fora_pacientes, t.pacientes)} dos ${int(t.pacientes)} pacientes atendidos · clique para ver a lista`}
-          onClick={() => setAberto("fora")}
+          onClick={() => setAberto({ grupo: "fora" })}
         />
         <HhpKpiCard
           label="Atendimentos de quem é de fora"
@@ -152,7 +157,7 @@ export function SecaoOrigemPacientes({
           icon={Users}
           tone="info"
           hint={`${pct(t.fora_atendimentos, t.atendimentos)} dos ${int(t.atendimentos)} atendimentos do período`}
-          onClick={() => setAberto("fora")}
+          onClick={() => setAberto({ grupo: "fora" })}
         />
         <HhpKpiCard
           label="De São João de Meriti"
@@ -167,7 +172,7 @@ export function SecaoOrigemPacientes({
           icon={MapPinOff}
           tone="warn"
           hint={`${pct(t.sem_end_pacientes, t.pacientes)} dos pacientes · clique para ver quem atualizar`}
-          onClick={() => setAberto("sem_endereco")}
+          onClick={() => setAberto({ grupo: "sem_endereco" })}
         />
       </HhpKpiRow>
 
@@ -178,6 +183,7 @@ export function SecaoOrigemPacientes({
             nome: c.cidade,
             valor: c.atendimentos,
             extra: `${int(c.pacientes)} pac.`,
+            onClick: () => setAberto({ grupo: "fora", cidade: c.cidade }),
           }))}
         />
         <Ranking
@@ -186,15 +192,25 @@ export function SecaoOrigemPacientes({
             nome: `${b.bairro} — ${b.cidade}`,
             valor: b.atendimentos,
             extra: `${int(b.pacientes)} pac.`,
+            onClick: () =>
+              setAberto({
+                grupo: "fora",
+                cidade: b.cidade,
+                bairro: b.bairro === SEM_BAIRRO ? null : b.bairro,
+              }),
           }))}
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        Os rankings mostram o número de atendimentos. A cidade vem do cadastro do paciente; quando
-        ela está em branco, o sistema usa o CEP.
+        Os rankings mostram o número de atendimentos — clique numa linha para ver os pacientes. A
+        cidade vem do cadastro do paciente; quando ela está em branco, o sistema usa o CEP.
       </p>
 
-      <ModalPacientes grupo={aberto} pacientes={dados.pacientes} onClose={() => setAberto(null)} />
+      <ModalPacientes
+        abertura={aberto}
+        pacientes={dados.pacientes}
+        onClose={() => setAberto(null)}
+      />
     </div>
   );
 }
@@ -204,7 +220,7 @@ function Ranking({
   linhas,
 }: {
   titulo: string;
-  linhas: { nome: string; valor: number; extra?: string }[];
+  linhas: { nome: string; valor: number; extra?: string; onClick?: () => void }[];
 }) {
   return (
     <Card>
@@ -217,9 +233,12 @@ function Ranking({
         ) : (
           <div className="divide-y max-h-[420px] overflow-y-auto">
             {linhas.map((r, i) => (
-              <div
+              <button
+                type="button"
                 key={`${r.nome}-${i}`}
-                className="flex items-center justify-between py-2 text-sm"
+                onClick={r.onClick}
+                title="Ver os pacientes"
+                className="flex w-full items-center justify-between py-2 text-left text-sm hover:bg-muted/50"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-6 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
@@ -229,7 +248,7 @@ function Ranking({
                   {r.extra && <span className="text-xs text-muted-foreground">{r.extra}</span>}
                   <span className="font-semibold tabular-nums">{int(r.valor)}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -239,21 +258,31 @@ function Ranking({
 }
 
 function ModalPacientes({
-  grupo,
+  abertura,
   pacientes,
   onClose,
 }: {
-  grupo: Grupo | null;
+  abertura: Abertura | null;
   pacientes: PacienteOrigem[];
   onClose: () => void;
 }) {
   const [busca, setBusca] = useState("");
 
   useEffect(() => {
-    if (grupo) setBusca("");
-  }, [grupo]);
+    if (abertura) setBusca("");
+  }, [abertura]);
 
-  const doGrupo = useMemo(() => pacientes.filter((p) => p.grupo === grupo), [pacientes, grupo]);
+  const grupo = abertura?.grupo ?? null;
+  const doGrupo = useMemo(
+    () =>
+      pacientes.filter(
+        (p) =>
+          p.grupo === abertura?.grupo &&
+          (abertura.cidade === undefined || p.cidade === abertura.cidade) &&
+          (abertura.bairro === undefined || p.bairro === abertura.bairro),
+      ),
+    [pacientes, abertura],
+  );
 
   const filtrados = useMemo(() => {
     const termo = busca.trim().toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -283,7 +312,13 @@ function ModalPacientes({
             {semEndereco ? <MapPinOff className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
             {semEndereco
               ? "Pacientes sem endereço no cadastro"
-              : "Pacientes de fora de São João de Meriti"}
+              : abertura?.cidade
+                ? `Pacientes de ${
+                    abertura.bairro !== undefined
+                      ? `${abertura.bairro ?? "bairro não informado"} — ${abertura.cidade}`
+                      : abertura.cidade
+                  }`
+                : "Pacientes de fora de São João de Meriti"}
           </DialogTitle>
           <DialogDescription>
             {semEndereco
