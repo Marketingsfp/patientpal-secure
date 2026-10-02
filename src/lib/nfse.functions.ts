@@ -757,14 +757,34 @@ export const consultarNfse = createServerFn({ method: "POST" })
         : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
-    const resp = await fetch(`${focusNfseBase(emitente)}/${nota.focus_ref}`, {
-      headers: { Authorization: authHeader(token) },
-    });
-    const body = await resp.json().catch(() => ({}));
+    const consultaFocus = await consultarStatusFocus(
+      `${focusNfseBase(emitente)}/${nota.focus_ref}`,
+      token,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = consultaFocus.body as Record<string, any>;
+
+    // Falha da consulta (corpo com `codigo` e sem `status`, já com as novas
+    // tentativas de limite_excedido esgotadas): preserva focus_status e o
+    // status da nota, registra o erro em campo próprio e devolve para a tela.
+    if (consultaFocus.falha) {
+      await supabase
+        .from("nfse")
+        .update({ payload_resposta: body, ...camposDaConsulta(consultaFocus.falha) } as never)
+        .eq("id", nota.id);
+      return {
+        ok: false,
+        status: null,
+        body,
+        erroConsulta: consultaFocus.falha,
+        limiteExcedido: consultaFocus.falha.codigo === "limite_excedido",
+      };
+    }
 
     const updates: Record<string, unknown> = {
       focus_status: body?.status ?? null,
       payload_resposta: body,
+      ...camposDaConsulta(null),
     };
     if (body?.status === "autorizado") {
       updates.status = "emitida";
