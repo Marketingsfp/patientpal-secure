@@ -13370,6 +13370,19 @@ function AgendaPage() {
                       if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
                       if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
 
+                      // Zebrado com contraste real (branco × slate-200) — a
+                      // recepção perdia a linha com o tom quase branco de antes.
+                      // Só vale para a linha sem cor de situação: verde, azul,
+                      // vermelho etc. são informação e continuam valendo.
+                      const zebra = bgClass
+                        ? ""
+                        : idx % 2 === 0
+                          ? "bg-white dark:bg-transparent"
+                          : "bg-slate-200 dark:bg-white/5";
+                      // Destaque ao passar o mouse vem por último para vencer o
+                      // hover da cor de situação: a atendente não perde a linha.
+                      const linhaClass = `${zebra} ${bgClass} ${borderLeft} border-b border-b-slate-300 hover:bg-blue-100 dark:border-b-slate-700 dark:hover:bg-blue-500/20`;
+
                       return (
                         <Fragment key={a.id}>
                           {abreDia && (
@@ -13403,7 +13416,7 @@ function AgendaPage() {
                               </TableCell>
                             </TableRow>
                           )}
-                          <TableRow data-ag-id={a.id} className={`${bgClass} ${borderLeft}`}>
+                          <TableRow data-ag-id={a.id} className={linhaClass}>
                             {/* Checkbox — horário livre TAMBÉM é selecionável: sem
                           isso uma grade aberta por engano não tinha como ser
                           apagada pela tela (o "Excluir" só age no que está
@@ -13441,7 +13454,7 @@ function AgendaPage() {
                             {/* Horário — uma linha só, tabular, 24h. Em agenda de
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-slate-800 dark:text-slate-100">
                               {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
@@ -13462,7 +13475,7 @@ function AgendaPage() {
                                   m && m.usa_sistema === false && !recursoIds.has(m.id);
                                 return (
                                   <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                                    <span className="block truncate text-xs" title={label}>
+                                    <span className="block truncate text-xs font-medium text-slate-800 dark:text-slate-100" title={label}>
                                       {label}
                                     </span>
                                     {manual && (
