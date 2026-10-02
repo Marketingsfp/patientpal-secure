@@ -471,7 +471,12 @@ function NfsePage() {
 
   const onConsultar = async (id: string) => {
     try {
-      await consulta({ data: { id } });
+      const r = await consulta({ data: { id } });
+      if (r?.erroConsulta) {
+        toast.error(
+          `A consulta à Focus falhou (${r.erroConsulta.codigo})${r.erroConsulta.mensagem ? `: ${r.erroConsulta.mensagem}` : ""}. A nota não foi alterada.`,
+        );
+      }
       await load();
     } catch (e) {
       toast.error((e as Error).message);
