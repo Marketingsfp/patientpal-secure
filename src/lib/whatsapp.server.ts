@@ -2595,7 +2595,7 @@ async function gerarRespostaNinaInterno(
     });
   };
 
-  if (!finalizacaoHandoff && !houveHandoff && ctxFerramentas?.esclarecimentoCatalogo) {
+  if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo) {
     resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
     transformar(
       "catalogo.esclarecimento",
