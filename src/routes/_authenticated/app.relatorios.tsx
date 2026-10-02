@@ -70,6 +70,7 @@ import { DateInputBR } from "@/components/ui/date-input-br";
 import { hojeBR } from "@/lib/date-utils";
 import { buscarPaginado, type ConsultaPaginavel } from "@/lib/financeiro/paginacao";
 import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
+import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
 });
@@ -121,15 +122,15 @@ const RELATORIOS: Relatorio[] = [
     cor: "#60a5fa",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("agendamentos")
           .select(
             "id, inicio, fim, status, observacoes, procedimento, paciente_nome, medicos(nome)",
           )
           .eq("clinica_id", clinicaId)
-          .gte("inicio", ini!)
-          .lte("inicio", fim! + "T23:59:59")
+          .gte("inicio", de)
+          .lt("inicio", ate)
           .order("inicio")
           .order("id"),
       );
@@ -204,14 +205,14 @@ const RELATORIOS: Relatorio[] = [
     cor: "#34d399",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("orcamentos")
           .select("id, numero, status, valor_total, desconto, created_at, paciente_nome")
           .eq("clinica_id", clinicaId)
-          .gte("created_at", ini!)
-          .lte("created_at", fim! + "T23:59:59")
-          .order("created_at", { ascending: false })
+          .gte("created_at", de)
+          .lt("created_at", ate)
+          .order("created_at")
           .order("id"),
       );
       // `valor_total` já é gravado com o desconto abatido (tela Orçamentos).
@@ -234,7 +235,7 @@ const RELATORIOS: Relatorio[] = [
     cor: "#facc15",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("fin_lancamentos")
           .select(
@@ -244,9 +245,9 @@ const RELATORIOS: Relatorio[] = [
             "id, data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos!fin_lancamentos_medico_id_fkey(nome)",
           )
           .eq("clinica_id", clinicaId)
-          .gte("data", ini!)
-          .lte("data", fim!)
-          .order("data", { ascending: false })
+          .gte("data", de)
+          .lt("data", ate)
+          .order("data")
           .order("id"),
       );
       return data.map((r: any) => ({
@@ -403,14 +404,14 @@ const RELATORIOS: Relatorio[] = [
     cor: "#fde047",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("exame_resultados")
           .select("id, tipo_exame, status, data_coleta, resultado_texto, paciente_nome")
           .eq("clinica_id", clinicaId)
-          .gte("data_coleta", ini!)
-          .lte("data_coleta", fim! + "T23:59:59")
-          .order("data_coleta", { ascending: false })
+          .gte("data_coleta", de)
+          .lt("data_coleta", ate)
+          .order("data_coleta")
           .order("id"),
       );
       return data.map((r: any) => ({
@@ -455,16 +456,16 @@ const RELATORIOS: Relatorio[] = [
     cor: "#f9a8d4",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("prontuarios")
           .select(
             "id, data, queixa_principal, hipotese_diagnostica, conduta, paciente_id, medico_id",
           )
           .eq("clinica_id", clinicaId)
-          .gte("data", ini!)
-          .lte("data", fim! + "T23:59:59")
-          .order("data", { ascending: false })
+          .gte("data", de)
+          .lt("data", ate)
+          .order("data")
           .order("id"),
       );
       const [pacientes, medicos] = await Promise.all([
@@ -495,14 +496,14 @@ const RELATORIOS: Relatorio[] = [
     cor: "#f87171",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("audit_log")
           .select("id, created_at, user_email, action, table_name, record_id")
           .eq("clinica_id", clinicaId)
-          .gte("created_at", ini!)
-          .lte("created_at", fim! + "T23:59:59")
-          .order("created_at", { ascending: false })
+          .gte("created_at", de)
+          .lt("created_at", ate)
+          .order("created_at")
           .order("id"),
       );
       return data.map(({ id: _id, ...r }: any) => r);
@@ -516,14 +517,14 @@ const RELATORIOS: Relatorio[] = [
     cor: "#34d399",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("documentos_emitidos")
           .select("id, tipo, titulo, created_at, paciente_id, medico_id")
           .eq("clinica_id", clinicaId)
-          .gte("created_at", ini!)
-          .lte("created_at", fim! + "T23:59:59")
-          .order("created_at", { ascending: false })
+          .gte("created_at", de)
+          .lt("created_at", ate)
+          .order("created_at")
           .order("id"),
       );
       const [pacientes, medicos] = await Promise.all([
@@ -595,16 +596,16 @@ const RELATORIOS: Relatorio[] = [
     cor: "#ef4444",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const data = await todas<any>(() =>
+      const data = await buscarPorDia<any>(ini!, fim!, (de, ate) =>
         supabase
           .from("triagens_enfermagem")
           .select(
             "id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes, paciente_id, agendamento_id",
           )
           .eq("clinica_id", clinicaId)
-          .gte("created_at", ini! + "T00:00:00")
-          .lte("created_at", fim! + "T23:59:59")
-          .order("created_at", { ascending: false })
+          .gte("created_at", de)
+          .lt("created_at", ate)
+          .order("created_at")
           .order("id"),
       );
       const [pacientes, agendamentos] = await Promise.all([
@@ -838,10 +839,6 @@ interface RawData {
   prontuarios: Array<{ id: string; data: string; paciente: string | null }>;
 }
 
-// Teto de páginas de 1.000 linhas por consulta do dashboard. Um mês da
-// Policlínica tem ~34 mil agendamentos (34 páginas); o teto só pega período
-// aberto demais, e aí a tela avisa em vez de mostrar número menor calada.
-const TETO_PAGINAS_DASHBOARD = 150;
 // O detalhamento ao clicar num card lista no máximo isto — 34 mil linhas numa
 // janela travam o navegador. A planilha completa sai em "Baixar planilhas".
 const LIMITE_DETALHE = 500;
@@ -850,7 +847,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [raw, setRaw] = useState<RawData | null>(null);
-  const [truncado, setTruncado] = useState(false);
+  const [falhou, setFalhou] = useState(false);
   const [drill, setDrill] = useState<
     null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas"
   >(null);
@@ -884,75 +881,77 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     let cancel = false;
     (async () => {
       setLoading(true);
+      setFalhou(false);
       try {
-        // Tudo paginado: sem isso o PostgREST corta em 1.000 linhas e os cards
-        // mostravam "1000" num mês de mais de 30 mil agendamentos. O prontuário
-        // não tem vínculo cadastrado com `pacientes`, então o nome vem à parte
-        // (e a coluna de data dele é `data` — `data_atendimento` não existe e
-        // a consulta falhava em silêncio, deixando o card em 0).
+        // Lido dia a dia (`buscarPorDia`): sem paginar, o PostgREST cortava em
+        // 1.000 linhas ("1000" num mês de 34 mil agendamentos); paginando o mês
+        // de uma vez, as páginas finais faziam o banco rechecar a permissão de
+        // todas as linhas anteriores e a tela estourava o tempo do servidor.
+        // Nomes de médico e categoria vêm à parte pelo mesmo motivo — juntados
+        // na consulta, o banco rechecava a permissão deles linha a linha. O
+        // prontuário guarda a data em `data` (não `data_atendimento`).
         const [agendRows, finTodas, pacRows, prontRows] = await Promise.all([
-          buscarPaginado<any>(
-            () =>
-              supabase
-                .from("agendamentos")
-                .select("id, paciente_nome, procedimento, inicio, status, medicos(nome)")
-                .eq("clinica_id", clinicaId)
-                .gte("inicio", ini)
-                .lte("inicio", fim + "T23:59:59")
-                .order("inicio")
-                .order("id"),
-            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          buscarPorDia<any>(ini, fim, (de, ate) =>
+            supabase
+              .from("agendamentos")
+              .select("id, paciente_nome, procedimento, inicio, status, medico_id")
+              .eq("clinica_id", clinicaId)
+              .gte("inicio", de)
+              .lt("inicio", ate)
+              .order("inicio")
+              .order("id"),
           ),
-          buscarPaginado<any>(
-            () =>
-              supabase
-                .from("fin_lancamentos")
-                .select("id, data, tipo, valor, status, descricao, fin_categorias(nome)")
-                .eq("clinica_id", clinicaId)
-                .gte("data", ini)
-                .lte("data", fim)
-                .order("data")
-                .order("id"),
-            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          buscarPorDia<any>(ini, fim, (de, ate) =>
+            supabase
+              .from("fin_lancamentos")
+              .select("id, data, tipo, valor, status, descricao, categoria_id")
+              .eq("clinica_id", clinicaId)
+              .gte("data", de)
+              .lt("data", ate)
+              .order("data")
+              .order("id"),
           ),
-          buscarPaginado<any>(
-            () =>
-              supabase
-                .from("pacientes")
-                .select("id, nome, created_at")
-                .eq("clinica_id", clinicaId)
-                .gte("created_at", ini)
-                .lte("created_at", fim + "T23:59:59")
-                .order("created_at")
-                .order("id"),
-            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          buscarPorDia<any>(ini, fim, (de, ate) =>
+            supabase
+              .from("pacientes")
+              .select("id, nome, created_at")
+              .eq("clinica_id", clinicaId)
+              .gte("created_at", de)
+              .lt("created_at", ate)
+              .order("created_at")
+              .order("id"),
           ),
-          buscarPaginado<any>(
-            () =>
-              supabase
-                .from("prontuarios")
-                .select("id, data, paciente_id")
-                .eq("clinica_id", clinicaId)
-                .gte("data", ini)
-                .lte("data", fim + "T23:59:59")
-                .order("data")
-                .order("id"),
-            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          buscarPorDia<any>(ini, fim, (de, ate) =>
+            supabase
+              .from("prontuarios")
+              .select("id, data, paciente_id")
+              .eq("clinica_id", clinicaId)
+              .gte("data", de)
+              .lt("data", ate)
+              .order("data")
+              .order("id"),
           ),
         ]);
-        const nomesPront = await nomesPorId(
-          "pacientes",
-          prontRows.map((p) => p.paciente_id),
-        );
-        const cortado = [agendRows, finTodas, pacRows, prontRows].some(
-          (l) => l.length >= TETO_PAGINAS_DASHBOARD * 1000,
-        );
+        const [nomesPront, nomesMedico, nomesCategoria] = await Promise.all([
+          nomesPorId(
+            "pacientes",
+            prontRows.map((p) => p.paciente_id),
+          ),
+          nomesPorId(
+            "medicos",
+            agendRows.map((r) => r.medico_id),
+          ),
+          nomesPorId(
+            "fin_categorias",
+            finTodas.map((r) => r.categoria_id),
+          ),
+        ]);
 
         const statusMap = new Map<string, number>();
         const medicoMap = new Map<string, number>();
         agendRows.forEach((r) => {
           statusMap.set(r.status ?? "—", (statusMap.get(r.status ?? "—") ?? 0) + 1);
-          const m = r.medicos?.nome ?? "Sem médico";
+          const m = nomesMedico.get(r.medico_id) ?? "Sem médico";
           medicoMap.set(m, (medicoMap.get(m) ?? 0) + 1);
         });
 
@@ -973,7 +972,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             bucket.despesa += v;
           }
           diaMap.set(dia, bucket);
-          const cat = r.fin_categorias?.nome ?? "Sem categoria";
+          const cat = nomesCategoria.get(r.categoria_id) ?? "Sem categoria";
           catMap.set(cat, (catMap.get(cat) ?? 0) + v);
         });
 
@@ -993,7 +992,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             procedimento: r.procedimento ?? null,
             inicio: r.inicio,
             status: r.status ?? null,
-            medico: r.medicos?.nome ?? null,
+            medico: nomesMedico.get(r.medico_id) ?? null,
           })),
           fin: finRows.map((r: any) => ({
             id: r.id,
@@ -1001,7 +1000,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             tipo: r.tipo,
             valor: Number(r.valor) || 0,
             descricao: r.descricao ?? null,
-            categoria: r.fin_categorias?.nome ?? null,
+            categoria: nomesCategoria.get(r.categoria_id) ?? null,
             status: r.status ?? null,
           })),
           pacientes: pacRows.map((p) => ({
@@ -1015,7 +1014,6 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             paciente: nomesPront.get(p.paciente_id) ?? null,
           })),
         });
-        setTruncado(cortado);
         setData({
           totalAgend: agendRows.length,
           agendPorStatus: Array.from(statusMap, ([name, value]) => ({ name, value })),
@@ -1034,6 +1032,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       } catch (e: any) {
         console.error("dashboard relatorios:", e);
         mostrarErro(e);
+        if (!cancel) setFalhou(true);
       } finally {
         if (!cancel) setLoading(false);
       }
@@ -1176,6 +1175,16 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     );
   }
 
+  if (falhou && !loading) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          Não foi possível carregar o dashboard. Troque o período ou recarregue a página.
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (loading || !data) {
     return (
       <Card>
@@ -1248,15 +1257,6 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           </PopoverContent>
         </Popover>
       </div>
-
-      {truncado && (
-        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
-          <CardContent className="py-3 text-sm">
-            O período escolhido é grande demais para ser lido de uma vez — os números abaixo estão
-            incompletos. Reduza o período (por exemplo, um mês por vez).
-          </CardContent>
-        </Card>
-      )}
 
       {/* KPIs */}
       {kpiVisible > 0 && (
@@ -1682,24 +1682,23 @@ function AgendamentosDiarioView({
     (async () => {
       setLoading(true);
       try {
-        const iniISO = `${ini}T00:00:00`;
-        const fimISO = `${fim}T23:59:59`;
-        // Paginado: um mês tem dezenas de milhares de marcações e a consulta
-        // simples parava em 1.000, deixando o total e os grupos menores.
-        const list = await buscarPaginado<AgendDiaRow>(
-          () =>
+        // Dia a dia: um mês tem dezenas de milhares de marcações; a consulta
+        // simples parava em 1.000 e a paginada do mês inteiro estourava o
+        // tempo do servidor (ver `buscarPorDia`). Mais recente primeiro.
+        const list = (
+          await buscarPorDia<AgendDiaRow>(ini, fim, (de, ate) =>
             supabase
               .from("agendamentos")
               .select(
                 "id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id",
               )
               .eq("clinica_id", clinicaId)
-              .gte("created_at", iniISO)
-              .lte("created_at", fimISO)
-              .order("created_at", { ascending: false })
+              .gte("created_at", de)
+              .lt("created_at", ate)
+              .order("created_at")
               .order("id"),
-          { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
-        );
+          )
+        ).reverse();
         const userIds = Array.from(
           new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]),
         );

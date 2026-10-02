@@ -33,6 +33,7 @@ import {
 import { carregarMapaConvenioPacientes } from "@/lib/convenio/modalidade";
 import { buscarPaginado } from "@/lib/financeiro/paginacao";
 import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
+import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
 import {
   Download,
   Save,
@@ -100,15 +101,14 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const fimDia = fim + "T23:59:59";
       const [rows, pagamentos, mapaConvenio] = await Promise.all([
-        fetchAllRows(() =>
+        buscarPorDia<any>(ini, fim, (de, ate) =>
           supabase
             .from("agendamentos")
             .select("id, inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
             .eq("clinica_id", clinicaId)
-            .gte("inicio", ini)
-            .lte("inicio", fimDia)
+            .gte("inicio", de)
+            .lt("inicio", ate)
             .order("inicio", { ascending: true })
             .order("id"),
         ),
@@ -118,7 +118,7 @@ const CUBOS: CubeSpec[] = [
         // Cartão (ver `@/lib/relatorios/modalidade-atendimento`). O recorte é
         // pela data do ATENDIMENTO, não do lançamento, para casar com as linhas
         // acima mesmo quando o pagamento foi feito em outro dia. Não traz valor.
-        fetchAllRows(() =>
+        buscarPorDia<any>(ini, fim, (de, ate) =>
           supabase
             .from("fin_lancamentos")
             .select(
@@ -127,8 +127,8 @@ const CUBOS: CubeSpec[] = [
             .eq("clinica_id", clinicaId)
             .eq("tipo", "receita")
             .eq("status", "confirmado")
-            .gte("agendamentos.inicio", ini)
-            .lte("agendamentos.inicio", fimDia)
+            .gte("agendamentos.inicio", de)
+            .lt("agendamentos.inicio", ate)
             .order("id", { ascending: true }),
         ),
         // Contrato ativo de cada paciente: 2ª regra da modalidade, a mesma que
@@ -195,15 +195,15 @@ const CUBOS: CubeSpec[] = [
       { key: "valor", label: "Valor (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
+      const rows = await buscarPorDia<any>(ini, fim, (de, ate) =>
         supabase
           .from("fin_lancamentos")
           .select(
             "data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id",
           )
           .eq("clinica_id", clinicaId)
-          .gte("data", ini)
-          .lte("data", fim)
+          .gte("data", de)
+          .lt("data", ate)
           .order("data", { ascending: true })
           .order("id"),
       );
@@ -256,13 +256,13 @@ const CUBOS: CubeSpec[] = [
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
+      const rows = await buscarPorDia<any>(ini, fim, (de, ate) =>
         supabase
           .from("prontuarios")
           .select("data, medico_id, paciente_id")
           .eq("clinica_id", clinicaId)
-          .gte("data", ini)
-          .lte("data", fim + "T23:59:59")
+          .gte("data", de)
+          .lt("data", ate)
           .order("data", { ascending: true })
           .order("id"),
       );
@@ -332,15 +332,15 @@ const CUBOS: CubeSpec[] = [
       { key: "desconto", label: "Desconto (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
+      const rows = await buscarPorDia<any>(ini, fim, (de, ate) =>
         supabase
           .from("orcamentos")
           // `orcamentos` não tem `valor_final` nem `paciente_id`: o total já é
           // gravado com o desconto abatido e o paciente vai pelo nome.
           .select("created_at, status, valor_total, desconto, paciente_nome")
           .eq("clinica_id", clinicaId)
-          .gte("created_at", ini)
-          .lte("created_at", fim + "T23:59:59")
+          .gte("created_at", de)
+          .lt("created_at", ate)
           .order("created_at", { ascending: true })
           .order("id"),
       );
