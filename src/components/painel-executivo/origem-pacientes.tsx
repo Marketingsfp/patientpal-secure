@@ -21,6 +21,7 @@ import {
 import { HhpKpiCard, HhpKpiRow } from "@/design-system/hhp/kpi-card";
 import { zonedDateStringToUtcISO } from "@/lib/date-utils";
 import { formatarCpf } from "@/lib/sessoes/busca-ativa-contatos";
+import { MapaCalorOrigem, type BairroMapa } from "./mapa-calor-origem";
 
 /**
  * Aba "Origem" do Painel Executivo: de onde vêm os pacientes atendidos no
@@ -140,6 +141,26 @@ export function SecaoOrigemPacientes({
 
   const t = dados.totais;
 
+  // O mapa usa todos os bairros de fora, montados da lista nominal — o ranking
+  // do banco só traz os 30 maiores.
+  const bairrosMapa = useMemo(() => {
+    const por = new Map<string, BairroMapa>();
+    for (const p of dados.pacientes) {
+      if (p.grupo !== "fora" || !p.cidade) continue;
+      const k = `${p.bairro ?? ""}|${p.cidade}`;
+      const atual = por.get(k) ?? {
+        bairro: p.bairro,
+        cidade: p.cidade,
+        pacientes: 0,
+        atendimentos: 0,
+      };
+      atual.pacientes += 1;
+      atual.atendimentos += Number(p.atendimentos ?? 0);
+      por.set(k, atual);
+    }
+    return [...por.values()];
+  }, [dados.pacientes]);
+
   return (
     <div className="space-y-6">
       <HhpKpiRow>
@@ -175,6 +196,12 @@ export function SecaoOrigemPacientes({
           onClick={() => setAberto({ grupo: "sem_endereco" })}
         />
       </HhpKpiRow>
+
+      <MapaCalorOrigem
+        clinicaId={clinicaId}
+        bairros={bairrosMapa}
+        onAbrirBairro={(b) => setAberto({ grupo: "fora", cidade: b.cidade, bairro: b.bairro })}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Ranking
