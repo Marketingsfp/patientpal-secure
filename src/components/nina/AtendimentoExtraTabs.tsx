@@ -1177,9 +1177,14 @@ export function AtendInbox() {
         }
         const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
         if (!destino || (!souGestor && destino === "nina")) {
-          // A conversa precisa pertencer a uma opção disponível nesta sidebar.
-          // A autorização de acesso continua sendo conferida pelo backend.
-          abrirConversa(null);
+          // Nenhum filtro desta lista mostra a conversa, mas o backend já
+          // liberou a leitura (administração/supervisão abrindo pela aba
+          // "Pesquisar conversas"). Abre sem trocar o filtro e sem mexer em
+          // responsável ou situação; fica protegida da próxima recarga da lista.
+          deepLinkTentado.current.delete(idPedido);
+          deepLinkPendente.current = idPedido;
+          setSel(row);
+          setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
           return;
         }
         deepLinkTentado.current.delete(idPedido);
