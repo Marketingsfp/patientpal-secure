@@ -2938,6 +2938,7 @@ export type Database = {
           id: string
           informativo_html: string | null
           informativo_pdf_path: string | null
+          item_lista_servico: string | null
           max_dependentes: number
           modalidade: string | null
           modelo_contrato: string | null
@@ -2965,6 +2966,7 @@ export type Database = {
           id?: string
           informativo_html?: string | null
           informativo_pdf_path?: string | null
+          item_lista_servico?: string | null
           max_dependentes?: number
           modalidade?: string | null
           modelo_contrato?: string | null
@@ -2992,6 +2994,7 @@ export type Database = {
           id?: string
           informativo_html?: string | null
           informativo_pdf_path?: string | null
+          item_lista_servico?: string | null
           max_dependentes?: number
           modalidade?: string | null
           modelo_contrato?: string | null
