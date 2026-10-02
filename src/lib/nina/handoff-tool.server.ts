@@ -73,19 +73,16 @@ export async function executarHandoffTool(
     departamentoNome: setor,
     solicitadoPor: "IA",
   });
-  // Desde 02/10/2026 o SFP não é mais silencioso: aviso e protocolo normais.
-  const silencioso = false;
 
   return {
     ok: r.ok,
-    sem_mensagem_paciente: silencioso,
+    // Desde 02/10/2026 nenhum encaminhamento é silencioso (nem o SFP).
+    sem_mensagem_paciente: false,
     ja_com_humano: r.ja_estava_com_humano ?? false,
     aviso: r.aviso ?? null,
     posicao_fila: r.posicao_fila ?? null,
     setor: r.departamento ?? null,
-    instrucao_para_voce: silencioso
-      ? "Encerre o turno sem mensagem ao paciente. A transferência por profissional SFP é silenciosa."
-      : r.ok
+    instrucao_para_voce: r.ok
         ? "O sistema coordena o aviso e o protocolo. Encerre o turno sem produzir outro aviso ou continuar o atendimento; não repita a transferência."
         : "O encaminhamento não foi confirmado. Informe a dificuldade sem afirmar que transferiu, seguindo o tratamento de falha disponível.",
   };
