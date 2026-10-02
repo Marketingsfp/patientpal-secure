@@ -71,6 +71,7 @@ import { hojeBR } from "@/lib/date-utils";
 import { buscarPaginado, type ConsultaPaginavel } from "@/lib/financeiro/paginacao";
 import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
 import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
+import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
 });
@@ -126,23 +127,26 @@ const RELATORIOS: Relatorio[] = [
         supabase
           .from("agendamentos")
           .select(
-            "id, inicio, fim, status, observacoes, procedimento, paciente_nome, medicos(nome)",
+            "id, inicio, fim, status, observacoes, procedimento, paciente_nome, paciente_id, medicos(nome)",
           )
           .eq("clinica_id", clinicaId)
           .gte("inicio", de)
           .lt("inicio", ate)
+          .or(FILTRO_SEM_VAGA_LIVRE)
           .order("inicio")
           .order("id"),
       );
-      return data.map((r: any) => ({
-        Inicio: r.inicio,
-        Fim: r.fim,
-        Status: r.status,
-        Paciente: r.paciente_nome ?? "",
-        Medico: r.medicos?.nome ?? "",
-        Serviço: r.procedimento ?? "",
-        Observacao: r.observacoes ?? "",
-      }));
+      return data
+        .filter((r: any) => !ehVagaLivre(r))
+        .map((r: any) => ({
+          Inicio: r.inicio,
+          Fim: r.fim,
+          Status: r.status,
+          Paciente: r.paciente_nome ?? "",
+          Medico: r.medicos?.nome ?? "",
+          Serviço: r.procedimento ?? "",
+          Observacao: r.observacoes ?? "",
+        }));
     },
   },
   {
@@ -890,14 +894,17 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
         // Nomes de médico e categoria vêm à parte pelo mesmo motivo — juntados
         // na consulta, o banco rechecava a permissão deles linha a linha. O
         // prontuário guarda a data em `data` (não `data_atendimento`).
-        const [agendRows, finTodas, pacRows, prontRows] = await Promise.all([
+        // Vagas livres da grade ("DISPONIVEL") ficam de fora, pela mesma regra
+        // do Dashboard Operacional — contá-las inflava o dia de ~310 para ~850.
+        const [agendTodas, finTodas, pacRows, prontRows] = await Promise.all([
           buscarPorDia<any>(ini, fim, (de, ate) =>
             supabase
               .from("agendamentos")
-              .select("id, paciente_nome, procedimento, inicio, status, medico_id")
+              .select("id, paciente_nome, paciente_id, procedimento, inicio, status, medico_id")
               .eq("clinica_id", clinicaId)
               .gte("inicio", de)
               .lt("inicio", ate)
+              .or(FILTRO_SEM_VAGA_LIVRE)
               .order("inicio")
               .order("id"),
           ),
@@ -932,6 +939,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
               .order("id"),
           ),
         ]);
+        const agendRows = agendTodas.filter((r) => !ehVagaLivre(r));
         const [nomesPront, nomesMedico, nomesCategoria] = await Promise.all([
           nomesPorId(
             "pacientes",
@@ -1655,6 +1663,7 @@ type AgendDiaRow = {
   created_at: string;
   criado_por: string | null;
   paciente_nome: string | null;
+  paciente_id: string | null;
   inicio: string;
   procedimento: string | null;
   status: string | null;
@@ -1690,15 +1699,18 @@ function AgendamentosDiarioView({
             supabase
               .from("agendamentos")
               .select(
-                "id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id",
+                "id, created_at, criado_por, paciente_nome, paciente_id, inicio, procedimento, status, medico_id",
               )
               .eq("clinica_id", clinicaId)
               .gte("created_at", de)
               .lt("created_at", ate)
+              .or(FILTRO_SEM_VAGA_LIVRE)
               .order("created_at")
               .order("id"),
           )
-        ).reverse();
+        )
+          .filter((r) => !ehVagaLivre(r))
+          .reverse();
         const userIds = Array.from(
           new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]),
         );

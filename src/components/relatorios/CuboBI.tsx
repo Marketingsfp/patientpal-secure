@@ -34,6 +34,7 @@ import { carregarMapaConvenioPacientes } from "@/lib/convenio/modalidade";
 import { buscarPaginado } from "@/lib/financeiro/paginacao";
 import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
 import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
+import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 import {
   Download,
   Save,
@@ -101,7 +102,9 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const [rows, pagamentos, mapaConvenio] = await Promise.all([
+      const [agendTodas, pagamentos, mapaConvenio] = await Promise.all([
+        // Vagas livres da grade ("DISPONIVEL") não são agendamentos — mesma
+        // regra do Dashboard Operacional.
         buscarPorDia<any>(ini, fim, (de, ate) =>
           supabase
             .from("agendamentos")
@@ -109,6 +112,7 @@ const CUBOS: CubeSpec[] = [
             .eq("clinica_id", clinicaId)
             .gte("inicio", de)
             .lt("inicio", ate)
+            .or(FILTRO_SEM_VAGA_LIVRE)
             .order("inicio", { ascending: true })
             .order("id"),
         ),
@@ -135,6 +139,7 @@ const CUBOS: CubeSpec[] = [
         // o Rateio usa quando o lançamento não tem a marca do cartão.
         carregarMapaConvenioPacientes(clinicaId),
       ]);
+      const rows = agendTodas.filter((r) => !ehVagaLivre(r));
       const pagPorAtendimento = agruparPagamentosPorAtendimento(pagamentos);
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
         lookupNames(

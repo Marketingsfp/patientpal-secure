@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
 import { BannerBoasVindas } from "@/components/painel/banner-boas-vindas";
 import { MedicosDoDiaTv } from "@/components/painel/medicos-do-dia-tv";
+import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -94,17 +95,6 @@ async function buscarTudo<T>(
   }
   return linhas;
 }
-
-/**
- * Vaga vazia da grade. A agenda pré-gera os horários livres do médico como
- * linhas "DISPONIVEL" sem paciente vinculado; elas não são atendimentos e não
- * podem entrar em nenhum indicador do dia.
- */
-const ehVagaLivre = (a: { paciente_nome: string | null; paciente_id?: string | null }) => {
-  if (a.paciente_id) return false;
-  const nome = (a.paciente_nome ?? "").trim().toUpperCase();
-  return nome === "" || nome === "DISPONIVEL";
-};
 
 type Ag = {
   id: string;
@@ -180,7 +170,7 @@ function DashboardOperacional() {
             .in("clinica_id", ids)
             .gte("inicio", de)
             .lte("inicio", ate)
-            .or("paciente_nome.is.null,paciente_nome.neq.DISPONIVEL")
+            .or(FILTRO_SEM_VAGA_LIVRE)
             .order("inicio")
             .order("id")
             .range(pDe, pAte),
