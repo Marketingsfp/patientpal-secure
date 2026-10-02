@@ -8390,6 +8390,10 @@ export type Database = {
           chave_acesso: string | null
           clinica_id: string
           codigo_verificacao: string | null
+          consulta_erro_codigo: string | null
+          consulta_erro_em: string | null
+          consulta_erro_mensagem: string | null
+          consultado_em: string | null
           created_at: string
           data_emissao: string
           descricao_servicos: string | null
@@ -8433,6 +8437,10 @@ export type Database = {
           chave_acesso?: string | null
           clinica_id: string
           codigo_verificacao?: string | null
+          consulta_erro_codigo?: string | null
+          consulta_erro_em?: string | null
+          consulta_erro_mensagem?: string | null
+          consultado_em?: string | null
           created_at?: string
           data_emissao?: string
           descricao_servicos?: string | null
@@ -8476,6 +8484,10 @@ export type Database = {
           chave_acesso?: string | null
           clinica_id?: string
           codigo_verificacao?: string | null
+          consulta_erro_codigo?: string | null
+          consulta_erro_em?: string | null
+          consulta_erro_mensagem?: string | null
+          consultado_em?: string | null
           created_at?: string
           data_emissao?: string
           descricao_servicos?: string | null
