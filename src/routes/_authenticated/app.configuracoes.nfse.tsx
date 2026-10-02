@@ -54,6 +54,8 @@ interface Row {
   ativo: boolean;
   padrao: boolean;
   usar_ambiente_nacional: boolean | null;
+  regime_apuracao_sn: number | null;
+  pct_total_tributos_sn: number | null;
 }
 
 interface Form {
@@ -85,6 +87,8 @@ interface Form {
   ativo: boolean;
   padrao: boolean;
   usar_ambiente_nacional: boolean;
+  regime_apuracao_sn: string;
+  pct_total_tributos_sn: string;
 }
 
 const REGIMES = [
@@ -101,7 +105,7 @@ function NfseConfigPage() {
       <ClinicaNfseModoCard />
       <SimpleCrud<Row, Form>
         table="nfse_emitentes"
-        selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional"
+        selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional, regime_apuracao_sn, pct_total_tributos_sn"
         title="Emitentes NFS-e"
         subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
         icon={<Building2 className="h-5 w-5" />}
@@ -196,6 +200,8 @@ function NfseConfigPage() {
           ativo: true,
           padrao: false,
           usar_ambiente_nacional: false,
+          regime_apuracao_sn: "1",
+          pct_total_tributos_sn: "",
         }}
         toForm={(r) => ({
           nome: r.nome,
@@ -226,6 +232,9 @@ function NfseConfigPage() {
           ativo: r.ativo,
           padrao: r.padrao,
           usar_ambiente_nacional: r.usar_ambiente_nacional ?? false,
+          regime_apuracao_sn: String(r.regime_apuracao_sn ?? 1),
+          pct_total_tributos_sn:
+            r.pct_total_tributos_sn == null ? "" : String(r.pct_total_tributos_sn),
         })}
         toPayload={(f) => ({
           nome: f.nome,
@@ -256,6 +265,11 @@ function NfseConfigPage() {
           ativo: f.ativo,
           padrao: f.padrao,
           usar_ambiente_nacional: f.usar_ambiente_nacional,
+          regime_apuracao_sn: Number(f.regime_apuracao_sn) || 1,
+          pct_total_tributos_sn:
+            f.pct_total_tributos_sn.trim() === ""
+              ? null
+              : Number(f.pct_total_tributos_sn.replace(",", ".")),
         })}
         validate={(f) => {
           if (!f.nome.trim()) return "Informe o apelido do emitente.";
@@ -427,6 +441,36 @@ function NfseConfigPage() {
                     value={f.aliquota_iss}
                     onChange={(e) => set({ ...f, aliquota_iss: e.target.value })}
                     placeholder="0.02"
+                  />
+                </div>
+                {f.optante_simples && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Regime de apuração (Simples Nacional)</Label>
+                    <Select
+                      value={f.regime_apuracao_sn}
+                      onValueChange={(v) => set({ ...f, regime_apuracao_sn: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Tributos federais e ISS pagos pelo Simples</SelectItem>
+                        <SelectItem value="2">Federais pelo Simples e ISS pago por fora</SelectItem>
+                        <SelectItem value="3">Federais e ISS pagos fora do Simples</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label>Total aproximado de tributos federais (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={f.pct_total_tributos_sn}
+                    onChange={(e) => set({ ...f, pct_total_tributos_sn: e.target.value })}
+                    placeholder="Opcional"
                   />
                 </div>
               </div>
