@@ -22,6 +22,7 @@ import {
   CreditCard,
   FlaskConical,
   Handshake,
+  HeartHandshake,
   Receipt,
   Stethoscope,
   TrendingDown,
@@ -740,14 +741,28 @@ export function MovimentoResultado({
             label="Cartão Consulta"
             value={pronto ? int(r.producao.consultasCartao) : "…"}
             accent="primary"
-            onClick={() => alternar({ grupo: "consulta", condicao: "cartao" })}
+            onClick={() =>
+              alternar({ grupo: "consulta", condicao: "cartao", cartaoTerapeutico: false })
+            }
+          />
+          {/* Fixo, mesmo zerado (pedido da clínica em 02/10/2026). As fichas
+              do Cartão Terapêutico saem de Cartão Consulta, particulares e
+              exames, e por isso aqueles cards filtram "sem" ele. */}
+          <KpiCard
+            icon={HeartHandshake}
+            label="Cartão Terapêutico"
+            value={pronto ? int(r.producao.cartaoTerapeutico) : "…"}
+            accent="primary"
+            onClick={() => alternar({ cartaoTerapeutico: true })}
           />
           <KpiCard
             icon={Stethoscope}
             label="Consultas particulares"
             value={pronto ? int(r.producao.consultasParticulares) : "…"}
             accent="success"
-            onClick={() => alternar({ grupo: "consulta", condicao: "particular" })}
+            onClick={() =>
+              alternar({ grupo: "consulta", condicao: "particular", cartaoTerapeutico: false })
+            }
           />
           {/* Hoje todo convênio da clínica é da modalidade Cartão, então este
               card costuma ficar zerado — só aparece quando tem movimento. */}
@@ -757,7 +772,9 @@ export function MovimentoResultado({
               label="Consultas de convênio"
               value={int(r.producao.consultasConvenio)}
               accent="success"
-              onClick={() => alternar({ grupo: "consulta", condicao: "convenio" })}
+              onClick={() =>
+                alternar({ grupo: "consulta", condicao: "convenio", cartaoTerapeutico: false })
+              }
             />
           )}
           <KpiCard
@@ -765,7 +782,7 @@ export function MovimentoResultado({
             label="Exames e procedimentos"
             value={pronto ? int(r.producao.exames) : "…"}
             accent="warning"
-            onClick={() => alternar({ grupo: "exame_procedimento" })}
+            onClick={() => alternar({ grupo: "exame_procedimento", cartaoTerapeutico: false })}
           />
           {pronto && r.producao.outros > 0 && (
             <KpiCard

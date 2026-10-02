@@ -237,7 +237,8 @@ describe("resumoMovimento", () => {
     const p = r.producao;
     expect(p.total).toBe(r.receitaBruta.qtd);
     expect(
-      p.consultasCartao +
+      p.cartaoTerapeutico +
+        p.consultasCartao +
         p.consultasParticulares +
         p.consultasConvenio +
         p.exames +
@@ -269,6 +270,64 @@ describe("resumoMovimento", () => {
     expect(p.total).toBe(2);
     expect(p.consultasParticulares).toBe(1);
     expect(p.cortesias).toBe(1);
+  });
+
+  it("Cartão Terapêutico tem card próprio, pelo serviço, e não conta duas vezes", () => {
+    const comCt = classificarMovimento(
+      [
+        l({
+          agendamento_id: "t1",
+          procedimento: "CONSULTA TERAPEUTICA 1 (PSICOLOGIA)",
+          valor: 290,
+        }),
+        // Do plano mensal: R$ 0,00, mas é ficha do produto, não cortesia.
+        l({ agendamento_id: "t2", procedimento: "CONSULTA TERAPÊUTICA 2 (PSICOLOGIA)", valor: 0 }),
+        // Serviço em branco na agenda: lido da descrição.
+        l({ agendamento_id: "t3", descricao: "ANA — AVALIACAO TERAPEUTICA (PSICOLOGIA)" }),
+        // Cartão de pagamento: consulta comum de quem tem contrato.
+        l({
+          agendamento_id: "t4",
+          procedimento: "CONSULTA (PEDIATRIA)",
+          paciente_id: "pac-cartao",
+          descricao: "CALEB — CONSULTA (PEDIATRIA) — CARTAO TERAPEUTICO (LIMITE ATINGIDO)",
+        }),
+        // Fisioterapia não é Cartão Terapêutico.
+        l({ agendamento_id: "t5", procedimento: "SESSAO FISIOTERAPEUTICA", valor: 80 }),
+        // Mensalidade do produto continua mensalidade.
+        l({ mensalidadeVencimento: "2026-09-10", mensalidadeParcela: 1, valor: 290 }),
+      ],
+      ctx,
+    );
+    const r2 = resumoMovimento(comCt);
+    const p = r2.producao;
+    expect(p.cartaoTerapeutico).toBe(3);
+    expect(p.cortesias).toBe(0);
+    expect(p.consultasCartao).toBe(1);
+    expect(p.exames).toBe(1);
+    expect(p.mensalidades).toBe(1);
+    expect(p.total).toBe(r2.receitaBruta.qtd);
+    expect(
+      p.cartaoTerapeutico +
+        p.consultasCartao +
+        p.consultasParticulares +
+        p.consultasConvenio +
+        p.exames +
+        p.outros +
+        p.mensalidades +
+        p.adesoes +
+        p.cortesias,
+    ).toBe(p.total);
+
+    // O card filtra só as fichas do produto; o de Cartão Consulta, sem elas.
+    const ct = { cartaoTerapeutico: true };
+    expect(comCt.filter((x) => linhaCasaComFiltro(x, ct)).length).toBe(3);
+    expect(rotuloFiltro(ct)).toBe("Cartão Terapêutico");
+    const cartao = {
+      grupo: "consulta" as const,
+      condicao: "cartao" as const,
+      cartaoTerapeutico: false,
+    };
+    expect(comCt.filter((x) => linhaCasaComFiltro(x, cartao)).length).toBe(p.consultasCartao);
   });
 
   it("o filtro do card pega só a condição e o tipo clicados", () => {

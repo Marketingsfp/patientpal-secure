@@ -36,6 +36,7 @@ import {
 } from "@/lib/financeiro/formas-pagamento";
 import { resolverModalidade, type MapaConvenioPaciente } from "@/lib/convenio/modalidade";
 import { formaDoAtendimento } from "@/lib/repasse-calc";
+import { ehServicoCartaoTerapeutico } from "@/lib/financeiro/cartao-terapeutico";
 import { grupoDaDespesa, type GrupoDespesa } from "@/lib/financeiro/painel-financeiro";
 import { SEM_CATEGORIA } from "@/lib/financeiro/filtro-categoria";
 import {
@@ -167,6 +168,26 @@ export function condicaoDoLancamento(
 }
 
 /**
+ * Atendimento do Cartão Terapêutico: a mesma regra do repasse "CARTÃO
+ * TERAPÊUTICO" no Financeiro → Atendimentos — pelo SERVIÇO da ficha
+ * ("CONSULTA TERAPEUTICA 1 (PSICOLOGIA)", "AVALIACAO TERAPEUTICA ..."), não
+ * pelo convênio do paciente. Uma consulta de pediatria de quem tem o cartão
+ * continua consulta de pediatria. Mensalidade e adesão do produto não são
+ * atendimento e ficam nos cards delas.
+ */
+export const ehAtendimentoCartaoTerapeutico = (
+  l: Pick<LinhaClassificada, "grupo" | "procedimento" | "descricao" | "agendamento_id">,
+): boolean =>
+  ehAtendimento(l.grupo) &&
+  ehServicoCartaoTerapeutico(
+    l.procedimento?.trim()
+      ? l.procedimento
+      : l.agendamento_id
+        ? servicoDaDescricao(l.descricao)
+        : null,
+  );
+
+/**
  * Grupo de uma receita do caixa.
  *
  * Pagamento ligado a agendamento é SEMPRE atendimento. Quando o serviço da
@@ -256,6 +277,12 @@ export interface FiltroCard {
   condicao?: CondicaoAtendimento;
   profissional?: string;
   agenda?: string;
+  /**
+   * `true`: só atendimento do Cartão Terapêutico (o card dele). `false`: sem
+   * ele — é o que os cards de Cartão Consulta, particulares e exames passam,
+   * já que a contagem deles não inclui o Cartão Terapêutico.
+   */
+  cartaoTerapeutico?: boolean;
 }
 
 export const linhaCasaComFiltro = (l: LinhaClassificada, f: FiltroCard): boolean => {
@@ -266,6 +293,11 @@ export const linhaCasaComFiltro = (l: LinhaClassificada, f: FiltroCard): boolean
   if (f.condicao && l.condicao !== f.condicao) return false;
   if (f.profissional && profissionalDaLinha(l) !== f.profissional) return false;
   if (f.agenda && agendaDaLinha(l) !== f.agenda) return false;
+  if (
+    f.cartaoTerapeutico !== undefined &&
+    ehAtendimentoCartaoTerapeutico(l) !== f.cartaoTerapeutico
+  )
+    return false;
   return true;
 };
 
@@ -275,10 +307,12 @@ export const mesmoFiltro = (a: FiltroCard | null, b: FiltroCard | null): boolean
   a.grupo === b.grupo &&
   a.condicao === b.condicao &&
   a.profissional === b.profissional &&
-  a.agenda === b.agenda;
+  a.agenda === b.agenda &&
+  a.cartaoTerapeutico === b.cartaoTerapeutico;
 
 export const rotuloFiltro = (f: FiltroCard): string =>
   [
+    f.cartaoTerapeutico ? "Cartão Terapêutico" : null,
     f.grupo ? LABEL_GRUPO_MOV[f.grupo] : null,
     f.condicao ? LABEL_CONDICAO[f.condicao] : null,
     f.profissional ?? null,
@@ -298,8 +332,9 @@ export interface TotalQtd {
  *
  * Um PAGAMENTO conta um: as partes de um pagamento misto somam uma vez só,
  * pelo lançamento de origem, exatamente como `receitaBruta.qtd`. Por isso
- * `consultasCartao + consultasParticulares + consultasConvenio + exames +
- * outros + mensalidades + adesoes + cortesias` é sempre igual a
+ * `cartaoTerapeutico + consultasCartao + consultasParticulares +
+ * consultasConvenio + exames + outros + mensalidades + adesoes + cortesias` é
+ * sempre igual a
  * `receitaBruta.qtd` — o card "N° de GR" e os cards de contagem fecham entre
  * si por construção.
  *
@@ -310,6 +345,12 @@ export interface TotalQtd {
 export interface ProducaoMovimento {
   /** Igual a `receitaBruta.qtd`: todo pagamento recebido no período. */
   total: number;
+  /**
+   * Atendimento do Cartão Terapêutico (`ehAtendimentoCartaoTerapeutico`),
+   * inclusive o de R$ 0,00 do plano mensal: é ficha do produto, não cortesia.
+   * Sai dos baldes de consulta e exame para não contar duas vezes.
+   */
+  cartaoTerapeutico: number;
   consultasCartao: number;
   /**
    * Consulta particular, SEM convênio. O Dashboard antigo somava as duas num
@@ -404,7 +445,12 @@ function contar(linhas: LinhaClassificada[]): TotalQtd {
 export function producaoDoMovimento(receitas: LinhaClassificada[]): ProducaoMovimento {
   const pagamentos = new Map<
     string,
-    { grupo: GrupoMovimento | null; condicao: CondicaoAtendimento | null; valor: number }
+    {
+      grupo: GrupoMovimento | null;
+      condicao: CondicaoAtendimento | null;
+      terapeutico: boolean;
+      valor: number;
+    }
   >();
   for (const l of receitas) {
     const chave = l._mistoPaiId ?? l.id;
@@ -414,11 +460,13 @@ export function producaoDoMovimento(receitas: LinhaClassificada[]): ProducaoMovi
       pagamentos.set(chave, {
         grupo: l.grupo,
         condicao: l.condicao,
+        terapeutico: ehAtendimentoCartaoTerapeutico(l),
         valor: Number(l.valor) || 0,
       });
   }
   const p: ProducaoMovimento = {
     total: pagamentos.size,
+    cartaoTerapeutico: 0,
     consultasCartao: 0,
     consultasParticulares: 0,
     consultasConvenio: 0,
@@ -429,6 +477,10 @@ export function producaoDoMovimento(receitas: LinhaClassificada[]): ProducaoMovi
     cortesias: 0,
   };
   for (const pg of pagamentos.values()) {
+    if (pg.terapeutico) {
+      p.cartaoTerapeutico++;
+      continue;
+    }
     // Atendimento de R$ 0,00 é cortesia ou gratuidade: conta na produção, em
     // card próprio, e não entra em consultas nem em exames.
     if (ehAtendimento(pg.grupo) && pg.valor <= 0) {
