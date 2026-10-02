@@ -9,11 +9,9 @@ export function encaminhamentoSemVagas(resultado: ResultadoBroker, argumentos: u
       resumo: "A modalidade de atendimento está indefinida ou mudou depois do resumo. Nenhuma reserva foi feita. A equipe deve conferir o catálogo e a agenda.",
       urgencia: "normal" as const, setor: "Agendamento" };
   }
-  if (["selecionar_horario", "agendar"].includes(resultado.ferramenta) && resultado.erro === "SLOT_UNAVAILABLE") {
-    return { motivo: "VAGA_ESCOLHIDA_INDISPONIVEL: não substituir o horário escolhido pelo paciente",
-      resumo: "A vaga escolhida não está mais disponível. Nenhuma alternativa foi reservada. A equipe deve continuar o atendimento.",
-      urgencia: "normal" as const, setor: "Agendamento" };
-  }
+  // Horário ocupado não transfere (decisão 02/10/2026): a Maria avisa e
+  // consulta a agenda de novo, sem reservar alternativa sozinha.
+  if (resultado.erro === "SLOT_UNAVAILABLE") return null;
   if (!resultado.success || resultado.erro || resultado.capacidade !== "checkAvailability")
     return null;
   const dados = resultado.dados as Record<string, unknown> | null;
@@ -48,6 +46,9 @@ export function encaminhamentoSemVagas(resultado: ResultadoBroker, argumentos: u
     setor: "Agendamento",
   };
 }
+
+export const RESPOSTA_VAGA_OCUPADA =
+  "Esse horário acabou de ficar indisponível e não fiz nenhuma reserva. Posso verificar outras opções de horário para você?";
 
 export function respostaSemVagas(handoffConfirmado: boolean, vagaEscolhida = false, modalidadePendente = false): string {
   if (modalidadePendente) return handoffConfirmado

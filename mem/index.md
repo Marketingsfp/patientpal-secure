@@ -8,3 +8,4 @@ Alterações valem para todas as clínicas; nunca publicar/enviar mensagem real 
 - [Identidade do atendimento](mem://features/identidade-atendimento) — bloco [IDENTIDADE DO ATENDIMENTO] no prompt publicado da aba Arquitetura; sem cadastro paralelo; 5 fases
 - [Ordem de chegada](mem://features/atendimento-ordem-chegada) — sem horário marcado pela Maria; recepção dá numeração; chegar até limite, pagar, aguardar; pago = check-in
 - [Tela do médico — decisões](mem://features/tela-medico-decisoes) — Estorno volta p/ Aguardando sem financeiro; convênio só se não pago; avulsas e hiperbárico adiados
+- [Maria agendamento](mem://features/maria-agendamento-decisoes) — vaga ocupada oferece opções; remarca sozinha; cancelamento sempre recepção
