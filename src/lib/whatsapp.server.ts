@@ -1909,6 +1909,10 @@ async function gerarRespostaNinaInterno(
         ? null
         : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
     r = prepararSegundaPergunta(referenciaAnterior, r);
+    {
+      const { confirmarAntesDeEncaminhar } = await import("@/lib/nina/catalogo-sem-registro");
+      r = confirmarAntesDeEncaminhar(r, args, referenciaAnterior);
+    }
     const ex = incorporarResultadoOficial({
       clinicaId,
       nome,
