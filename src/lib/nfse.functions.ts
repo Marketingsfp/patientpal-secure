@@ -23,10 +23,82 @@ function authHeader(token: string) {
 }
 
 /**
+ * Resposta da Focus que traz `codigo` e NÃO traz `status` (ex.: limite_excedido,
+ * nao_encontrado, permissao_negada) é FALHA DA CONSULTA, não ausência de status.
+ * Em 02/10/2026 14 notas ficaram dois dias em "processando" porque essa resposta
+ * sobrescrevia `focus_status` com null e nenhum ramo tratava. A nota pode já
+ * estar autorizada na prefeitura — por isso falha de consulta nunca muda o
+ * status da nota, só fica registrada em `consulta_erro_*`.
+ */
+export function falhaDeConsultaFocus(
+  body: unknown,
+): { codigo: string; mensagem: string | null } | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as { status?: unknown; codigo?: unknown; mensagem?: unknown };
+  if (b.status) return null;
+  if (typeof b.codigo !== "string" || !b.codigo) return null;
+  return { codigo: b.codigo, mensagem: typeof b.mensagem === "string" ? b.mensagem : null };
+}
+
+/** Segundos pedidos na mensagem "Tente novamente em N segundos" (padrão 2). */
+export function segundosPedidosPelaFocus(mensagem: string | null | undefined): number {
+  const m = (mensagem ?? "").match(/(\d+)\s*segundo/i);
+  const n = m ? Number(m[1]) : 2;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 30) : 2;
+}
+
+const MAX_TENTATIVAS_LIMITE = 3;
+
+/**
+ * GET de status na Focus. Em `limite_excedido` (transitório) tenta de novo até
+ * 3 vezes, esperando o que a mensagem pede multiplicado pela tentativa
+ * (espaçamento crescente). Devolve o último corpo e, se ainda for falha, qual.
+ */
+async function consultarStatusFocus(
+  url: string,
+  token: string,
+): Promise<{ body: Record<string, unknown>; falha: ReturnType<typeof falhaDeConsultaFocus> }> {
+  let body: Record<string, unknown> = {};
+  let falha: ReturnType<typeof falhaDeConsultaFocus> = null;
+  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS_LIMITE; tentativa++) {
+    const r = await fetch(url, { headers: { Authorization: authHeader(token) } });
+    body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    falha = falhaDeConsultaFocus(body);
+    if (!falha || falha.codigo !== "limite_excedido" || tentativa === MAX_TENTATIVAS_LIMITE) break;
+    const espera = segundosPedidosPelaFocus(falha.mensagem) * 1000 * tentativa;
+    await new Promise((res) => setTimeout(res, espera));
+  }
+  return { body, falha };
+}
+
+/** Campos a gravar na nota conforme a consulta falhou ou não. */
+function camposDaConsulta(falha: ReturnType<typeof falhaDeConsultaFocus>) {
+  const agora = new Date().toISOString();
+  return falha
+    ? {
+        consultado_em: agora,
+        consulta_erro_codigo: falha.codigo,
+        consulta_erro_mensagem: falha.mensagem,
+        consulta_erro_em: agora,
+      }
+    : {
+        consultado_em: agora,
+        consulta_erro_codigo: null,
+        consulta_erro_mensagem: null,
+        consulta_erro_em: null,
+      };
+}
+
+/**
  * O Ambiente Nacional /v2/nfsen é assíncrono: o POST responde
  * `processando_autorizacao` e o resultado real (autorizado / erro_autorizacao
  * com códigos como E0014) só aparece via GET segundos depois. Esta função
  * faz polling até obter status terminal ou timeout.
+ *
+ * Falha de consulta (corpo com `codigo` e sem `status`) não é terminal: espera
+ * o que a Focus pede e tenta de novo. Se o polling acabar só com falhas, devolve
+ * o último corpo com status que tiver visto; sem nenhum, devolve a falha — e
+ * quem chama grava em `consulta_erro_*` sem tocar no status.
  */
 async function pollFocusTerminal(
   baseUrl: string,
@@ -42,20 +114,31 @@ async function pollFocusTerminal(
   } & Record<string, unknown>
 > {
   let last: Record<string, unknown> = {};
+  let ultimoComStatus: Record<string, unknown> | null = null;
+  let proximaEspera = intervalMs;
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, intervalMs));
+    await new Promise((r) => setTimeout(r, proximaEspera));
+    proximaEspera = intervalMs;
     try {
       const r = await fetch(`${baseUrl}/${encodeURIComponent(ref)}`, {
         headers: { Authorization: authHeader(token) },
       });
       last = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      const falha = falhaDeConsultaFocus(last);
+      if (falha) {
+        if (falha.codigo === "limite_excedido") {
+          proximaEspera = Math.max(intervalMs, segundosPedidosPelaFocus(falha.mensagem) * 1000);
+        }
+        continue;
+      }
+      ultimoComStatus = last;
       const s = (last as { status?: string }).status;
       if (s && s !== "processando_autorizacao" && s !== "processando") return last as never;
     } catch {
       // ignora — tenta de novo
     }
   }
-  return last as never;
+  return (ultimoComStatus ?? last) as never;
 }
 
 function only(s: string | null | undefined) {
