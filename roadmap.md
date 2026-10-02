@@ -18,3 +18,9 @@
 - [ ] Etapa 2: fila do médico (cabeçalho, contadores, abas, chamar/atender/estornar, editor rico) — aguarda conferência da etapa 1
 - [ ] Etapa 3: menu Opções e Baixar — aguarda confirmação das regras (estorno, convênio na baixa, consultas avulsas)
 - [ ] Etapa 4: avaliações corporais, alertas do paciente, anexos/fotos, hiperbárico — precisam de tabelas novas aprovadas
+
+## NFS-e
+- [x] Regime de apuração do Simples (regApTribSN) e pTotTribSN configuráveis por emitente — não publicado
+
+## Atendimento
+- [ ] Relatório de tempo de resposta, volume de mensagens e mensagem mais antiga sem resposta — aguarda respostas do Jean
