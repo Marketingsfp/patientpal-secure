@@ -16,6 +16,7 @@
  */
 import type { ProfissionalPublicado, ServicoPublicado } from "./catalogo-conhecimento";
 import { paraNumero } from "./catalogo";
+import { profissionalSfp } from "./regras-catalogo";
 
 export type MedicoOp = {
   id: string;
