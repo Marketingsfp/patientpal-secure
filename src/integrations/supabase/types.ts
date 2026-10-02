@@ -8608,7 +8608,9 @@ export type Database = {
           numero: string
           optante_simples: boolean
           padrao: boolean
+          pct_total_tributos_sn: number | null
           razao_social: string
+          regime_apuracao_sn: number
           regime_tributario: string
           rps_proximo_numero: number
           rps_serie: string
@@ -8649,7 +8651,9 @@ export type Database = {
           numero: string
           optante_simples?: boolean
           padrao?: boolean
+          pct_total_tributos_sn?: number | null
           razao_social: string
+          regime_apuracao_sn?: number
           regime_tributario?: string
           rps_proximo_numero?: number
           rps_serie?: string
@@ -8690,7 +8694,9 @@ export type Database = {
           numero?: string
           optante_simples?: boolean
           padrao?: boolean
+          pct_total_tributos_sn?: number | null
           razao_social?: string
+          regime_apuracao_sn?: number
           regime_tributario?: string
           rps_proximo_numero?: number
           rps_serie?: string

@@ -235,6 +235,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
     }
     const aliquota = data.aliquotaIssOverride ?? Number(emitente.aliquota_iss ?? 0.02);
     const valorIss = +(data.valorServicos * aliquota).toFixed(2);
+    // pTotTribSN: percentual informado pela contabilidade; fallback = valor antigo (alíquota).
+    const pctTotTribSN =
+      emitente.pct_total_tributos_sn != null
+        ? Number(emitente.pct_total_tributos_sn)
+        : +(aliquota * 100).toFixed(2);
     const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
 
     // Focus/Ambiente Nacional NFS-e interpreta o horário no fuso local.
@@ -322,13 +327,17 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // NFS-e Nacional: 1 = Não optante; 2 = MEI; 3 = ME/EPP optante.
       codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional,
       regime_especial_tributacao: "0",
-      // E0166: para optante SN ME/EPP é obrigatório o regime de apuração dos tributos do SN.
-      // 1 = Competência. Sem isso a NFS-e Nacional rejeita.
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+      // E0166: para optante SN ME/EPP é obrigatório o regApTribSN; vem do cadastro
+      // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
       // Bloco <trib> exige tribFed OU totTrib. Sem isto: erro_validacao_schema
       // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
         : {}),
     };
 
@@ -393,15 +402,20 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
       // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
       // pTotTribSN). Enviamos zeros quando não há cálculo IBPT disponível.
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
         : {
             valor_total_tributos_federais: 0,
             valor_total_tributos_estaduais: 0,
             valor_total_tributos_municipais: 0,
           }),
-      // E0166: para optante SN ME/EPP é obrigatório o regime de apuração SN.
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+      // E0166: para optante SN ME/EPP é obrigatório o regApTribSN; vem do cadastro
+      // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
     };
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
@@ -821,6 +835,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const aliquota = Number(nota.aliquota_iss ?? emitente.aliquota_iss ?? 0.02);
     const valorServicos = Number(nota.valor_servicos);
     const valorIss = +(valorServicos * aliquota).toFixed(2);
+    // pTotTribSN: percentual informado pela contabilidade; fallback = valor antigo (alíquota).
+    const pctTotTribSN =
+      emitente.pct_total_tributos_sn != null
+        ? Number(emitente.pct_total_tributos_sn)
+        : +(aliquota * 100).toFixed(2);
     const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
 
     const dataEmissaoBR = (() => {
@@ -954,11 +973,16 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       optante_simples_nacional: codigoOpcaoSimplesNacional !== 1,
       codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional, // 1 = não optante; 2 = MEI; 3 = ME/EPP
       regime_especial_tributacao: "0",
-      // E0166: para optante SN ME/EPP, regime de apuração é obrigatório (1 = Competência).
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+      // E0166: para optante SN ME/EPP o regApTribSN é obrigatório; vem do cadastro
+      // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
       // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
         : {}),
     };
 
@@ -1003,14 +1027,19 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       tributacao_iss: 1,
       tipo_retencao_iss: 1,
       situacao_tributaria_pis_cofins: "08",
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
         : {
             valor_total_tributos_federais: 0,
             valor_total_tributos_estaduais: 0,
             valor_total_tributos_municipais: 0,
           }),
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+      // regApTribSN: 1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN.
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
     };
 
     // Reenvio também reserva o número no banco antes de mandar. Sem isto, um
