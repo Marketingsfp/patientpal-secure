@@ -364,8 +364,8 @@ export async function encaminharParaHumano(args: {
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
       handoffEventoId,
-      // SFP: protocolo e motivo ficam internos; nenhuma mensagem ao paciente.
-      anunciar: !motivoProfissionalSfp(args.motivo),
+      // Desde 02/10/2026 o SFP também recebe aviso e protocolo normais.
+      anunciar: true,
     });
     protocoloHandoff = p?.protocolo ?? null;
     avisoEncaminhamento = p?.anuncio?.aviso ?? null;
