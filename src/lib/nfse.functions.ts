@@ -258,7 +258,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
     if (vinculo) {
       const { data: existentes } = await supabase
         .from("nfse")
-        .select("id, numero, status, valor_servicos, tomador_documento")
+        .select(
+          "id, numero, status, valor_servicos, tomador_documento, created_at, consultado_em, consulta_erro_codigo, consulta_erro_mensagem",
+        )
         .eq(vinculo.coluna, vinculo.valor)
         .in("status", ["processando", "emitida"])
         .limit(50);
@@ -269,8 +271,30 @@ export const emitirNfse = createServerFn({ method: "POST" })
 
       const emProcessamento = (existentes ?? []).find((n) => n.status === "processando");
       if (emProcessamento) {
+        // Dois casos. Nota consultada há pouco e sem falha: está de fato
+        // processando, a mensagem antiga vale. Nota parada há mais de 30 min ou
+        // cuja última consulta falhou: está PRESA e pode já estar autorizada na
+        // prefeitura — a mensagem diz isso e manda consultar. A emissão continua
+        // bloqueada nos dois casos (nunca liberar automaticamente: duplicaria nota).
+        const ultimaAtividade = new Date(
+          emProcessamento.consultado_em ?? emProcessamento.created_at,
+        ).getTime();
+        const paradaMs = Date.now() - new Date(emProcessamento.created_at).getTime();
+        const presa =
+          !!emProcessamento.consulta_erro_codigo || Date.now() - ultimaAtividade > 30 * 60_000;
+        if (!presa) {
+          throw new Error(
+            `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+          );
+        }
+        const horas = Math.floor(paradaMs / 3_600_000);
+        const minutos = Math.floor((paradaMs % 3_600_000) / 60_000);
+        const tempo = horas > 0 ? `${horas}h${String(minutos).padStart(2, "0")}` : `${minutos} min`;
+        const motivo = emProcessamento.consulta_erro_codigo
+          ? ` A última consulta à Focus falhou (${emProcessamento.consulta_erro_codigo}${emProcessamento.consulta_erro_mensagem ? `: ${emProcessamento.consulta_erro_mensagem}` : ""}).`
+          : "";
         throw new Error(
-          `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+          `A NFS-e deste ${vinculo.rotulo} está presa em "processando" há ${tempo}.${motivo} Ela pode já ter sido autorizada pela prefeitura. Não emita de novo: abra Fiscal › NFS-e e clique em "Consultar status" nessa nota (ou em "Reconsultar notas presas") antes de qualquer nova emissão.`,
         );
       }
       const duplicada = (existentes ?? []).find(
