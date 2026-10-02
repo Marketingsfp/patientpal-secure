@@ -23,4 +23,4 @@
 - [x] Regime de apuração do Simples (regApTribSN) e pTotTribSN configuráveis por emitente — não publicado
 
 ## Atendimento
-- [ ] Relatório de tempo de resposta, volume de mensagens e mensagem mais antiga sem resposta — aguarda respostas do Jean
+- [x] Painel da TV: tempo médio de resposta das atendentes, mais antiga sem resposta e volume por hora — não publicado

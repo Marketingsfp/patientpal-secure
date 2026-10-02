@@ -58,27 +58,54 @@ export async function carregarPainelTv(
 
   const { inicio, fimExclusivo } = janelaDiaClinica(hojeBR());
 
-  // Conversas do dia com atendente: alguém da equipe enviou mensagem hoje.
+  // Mensagens de hoje (sem avisos internos): base de "conversas hoje",
+  // tempo médio de resposta das atendentes e volume por hora.
   const doDia = new Set<string>();
+  const msgs: { conversa_id: string | null; direction: string | null; enviada_por_user_id: string | null; created_at: string }[] = [];
   let desde = 0;
   while (true) {
     const { data, error } = await supabase
       .from("whatsapp_mensagens")
-      .select("conversa_id")
+      .select("conversa_id, direction, enviada_por_user_id, created_at")
       .eq("clinica_id", clinicaId)
-      .not("enviada_por_user_id", "is", null)
       .neq("status", "system")
       .gte("created_at", inicio)
       .lt("created_at", fimExclusivo)
       .order("created_at", { ascending: true })
       .range(desde, desde + PAGINA - 1);
     if (error) throw new Error(error.message);
-    for (const m of data ?? []) if (m.conversa_id) doDia.add(m.conversa_id);
+    msgs.push(...((data ?? []) as typeof msgs));
     if (!data || data.length < PAGINA) break;
     desde += PAGINA;
   }
 
-  const [tempos, presencas, membros] = await Promise.all([
+  // Volume: mensagens recebidas de pacientes por hora (fuso de São Paulo).
+  const horaBR = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" });
+  const volumePorHora = Array.from({ length: 24 }, () => 0);
+  // Tempo de resposta: da primeira mensagem do paciente ainda sem retorno até a
+  // próxima mensagem de uma atendente. Resposta da Nina encerra o intervalo sem
+  // contar (a métrica é só das atendentes).
+  const inicioPendente = new Map<string, number>();
+  const tempos: number[] = [];
+  for (const m of msgs) {
+    const conv = m.conversa_id;
+    if (m.direction === "in") {
+      volumePorHora[Number(horaBR.format(new Date(m.created_at))) % 24]++;
+      if (conv && !inicioPendente.has(conv)) inicioPendente.set(conv, Date.parse(m.created_at));
+    } else if (conv) {
+      if (m.enviada_por_user_id) {
+        doDia.add(conv);
+        const ini = inicioPendente.get(conv);
+        if (ini !== undefined) tempos.push(Date.parse(m.created_at) - ini);
+      }
+      inicioPendente.delete(conv);
+    }
+  }
+  const tempoMedioRespostaSeg = tempos.length
+    ? Math.round(tempos.reduce((s, v) => s + v, 0) / tempos.length / 1000)
+    : null;
+
+  const [esperas, presencas, membros] = await Promise.all([
     supabase.rpc("atend_espera_por_conversa", { _clinica_id: clinicaId, _is_teste: false }),
     supabase
       .from("atend_agente_presenca")
@@ -90,7 +117,7 @@ export async function carregarPainelTv(
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
   ]);
-  if (tempos.error) throw new Error(tempos.error.message);
+  if (esperas.error) throw new Error(esperas.error.message);
   if (presencas.error) throw new Error(presencas.error.message);
   if (membros.error) throw new Error(membros.error.message);
   const ativos = new Set((membros.data ?? []).map((m) => m.user_id));
@@ -100,7 +127,7 @@ export async function carregarPainelTv(
   const donoDe = new Map(humanas.map((c) => [c.id, c.atribuida_user_id]));
   const espera: string[] = [];
   const esperasPorAtendente = new Map<string, string[]>();
-  for (const t of tempos.data ?? []) {
+  for (const t of esperas.data ?? []) {
     if (idsHumanas.has(t.conversa_id) && t.aguardando_desde) {
       espera.push(t.aguardando_desde);
       const dono = donoDe.get(t.conversa_id);
@@ -166,6 +193,9 @@ export async function carregarPainelTv(
     comNina: abertas.length - humanas.length,
     espera,
     conversasDoDia: doDia.size,
+    tempoMedioRespostaSeg,
+    respostasMedidas: tempos.length,
+    volumePorHora,
     atualizadoEm: new Date().toISOString(),
   };
 }
