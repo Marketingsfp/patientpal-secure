@@ -3281,3 +3281,87 @@ export const esperaConversas = createServerFn({ method: "POST" })
     }
     return mapa;
   });
+
+/**
+ * Pesquisa geral de conversas do OS ZAP — só admin, gestor e supervisão.
+ * Procura pelo id interno, número (#1342), protocolo, nome, telefone e pelo
+ * texto das mensagens. Somente leitura; conversas de homologação ficam fora.
+ */
+export const pesquisarConversasGeral = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(1).max(200) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
+      _user_id: context.userId,
+      _clinica_id: data.clinicaId,
+    });
+    let permitido = !!podeGerir || (await ehAdminClinica(context.supabase, context.userId, data.clinicaId));
+    if (!permitido) {
+      const { data: sup } = await context.supabase
+        .from("atend_departamento_membros")
+        .select("id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("user_id", context.userId)
+        .in("role", ["supervisor", "gestor", "admin"])
+        .limit(1);
+      permitido = (sup?.length ?? 0) > 0;
+    }
+    if (!permitido) throw new Error("Pesquisa disponível só para administração e supervisão.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bruto = data.termo.replace(/\s+/g, " ").trim();
+    const termo = bruto.replace(/[%_,()'"\\*]/g, "").trim();
+    const campos =
+      "id, numero_conversa, protocolo_atendimento, protocol_number, contato_nome, whatsapp_profile_name, contato_telefone, status, owner_type, ultima_msg_em, created_at, atribuida_user_id";
+    const base = () =>
+      supabaseAdmin.from("atend_conversas").select(campos).eq("clinica_id", data.clinicaId).eq("is_teste", false);
+
+    const ids = new Set<string>();
+    const achados: Record<string, string> = {};
+    const consultas: PromiseLike<{ data: any[] | null }>[] = [];
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bruto);
+    if (uuid) consultas.push(base().eq("id", bruto.toLowerCase()));
+    const num = /^#?\d{1,12}$/.test(bruto) ? Number(bruto.replace("#", "")) : null;
+    if (num) consultas.push(base().eq("numero_conversa", num));
+    if (termo.length >= 2 && !bruto.startsWith("#")) {
+      const digitos = termo.replace(/\D/g, "");
+      const ors = [
+        `contato_nome.ilike.%${termo}%`,
+        `whatsapp_profile_name.ilike.%${termo}%`,
+        `protocolo_atendimento.ilike.%${termo}%`,
+        `protocol_number.ilike.%${termo}%`,
+      ];
+      if (digitos.length >= 3) ors.push(`contato_telefone.ilike.%${digitos}%`);
+      consultas.push(base().or(ors.join(",")).order("ultima_msg_em", { ascending: false, nullsFirst: false }).limit(100));
+    }
+    const res = await Promise.all(consultas);
+    const conversas: any[] = [];
+    for (const r of res) for (const c of r.data ?? []) if (!ids.has(c.id)) { ids.add(c.id); conversas.push(c); }
+
+    if (termo.length >= 2 && !uuid && !bruto.startsWith("#")) {
+      const { data: msgs } = await supabaseAdmin
+        .from("whatsapp_mensagens")
+        .select("conversa_id, body, created_at")
+        .eq("clinica_id", data.clinicaId)
+        .eq("is_teste", false)
+        .neq("status", "system")
+        .not("conversa_id", "is", null)
+        .ilike("body", `%${termo}%`)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      const novos: string[] = [];
+      for (const m of msgs ?? []) {
+        if (!m.conversa_id || achados[m.conversa_id]) continue;
+        achados[m.conversa_id] = m.body ?? "";
+        if (!ids.has(m.conversa_id)) novos.push(m.conversa_id);
+      }
+      if (novos.length) {
+        const { data: extra } = await base().in("id", novos.slice(0, 100));
+        for (const c of extra ?? []) if (!ids.has(c.id)) { ids.add(c.id); conversas.push(c); }
+      }
+    }
+    return conversas.slice(0, 150).map((c) => ({ ...c, trecho: achados[c.id] ?? null }));
+  });

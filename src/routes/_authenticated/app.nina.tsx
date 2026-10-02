@@ -64,6 +64,7 @@ const LaboratorioNina = lazy(() => import("@/components/nina/LaboratorioNina").t
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
+import { PesquisaConversas } from "@/components/nina/PesquisaConversas";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
 
@@ -100,6 +101,7 @@ function NinaPage() {
     "laboratorio-nina",
     "atend-macros",
     "atend-inbox",
+    "pesquisa-conversas",
     "informacoes-clinica",
     "base-conhecimento",
   ].includes(hashAba)
@@ -164,6 +166,9 @@ function NinaPage() {
         {/* ============ ATENDIMENTO — Dashboard ============ */}
         <TabsContent value="atend-macros">
           <RespostasRapidasManager />
+        </TabsContent>
+        <TabsContent value="pesquisa-conversas">
+          <PesquisaConversas />
         </TabsContent>
         <TabsContent value="atend-inbox" className="mt-0 h-full">
           <AtendInbox />
