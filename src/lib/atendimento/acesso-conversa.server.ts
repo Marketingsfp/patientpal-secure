@@ -56,6 +56,35 @@ export async function usuarioEhGestor(
 }
 
 /**
+ * Administração e supervisão (mesma regra da aba "Pesquisar conversas"):
+ * podem LER qualquer conversa da clínica, inclusive as de outra pessoa,
+ * da Nina ou sem responsável. Só leitura — não muda quem assume conversas.
+ */
+export async function usuarioSupervisionaAtendimento(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  clinicaId: string,
+): Promise<boolean> {
+  try {
+    const { data: admin } = await supabase.rpc("atend_usuario_e_admin", {
+      _user_id: userId,
+      _clinica_id: clinicaId,
+    });
+    if (admin) return true;
+    const { data: sup } = await supabase
+      .from("atend_departamento_membros")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .eq("user_id", userId)
+      .in("role", ["supervisor", "gestor", "admin"])
+      .limit(1);
+    return (sup?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Confere se o usuário pode abrir a conversa. Lança `AcessoConversaNegado`
  * com motivo distinto para "não existe" e "sem permissão".
  */
@@ -74,7 +103,9 @@ export async function assertAcessoConversa(
   if (error) throw new Error(error.message);
   if (!conv) throw new AcessoConversaNegado(ERRO_CONVERSA_NAO_ENCONTRADA);
 
-  const gestor = await usuarioEhGestor(supabase, userId, clinicaId);
+  const gestor =
+    (await usuarioEhGestor(supabase, userId, clinicaId)) ||
+    (await usuarioSupervisionaAtendimento(supabase, userId, clinicaId));
   if (!usuarioPodeVerConversa(conv, { userId, gestor })) {
     throw new AcessoConversaNegado(ERRO_CONVERSA_SEM_PERMISSAO);
   }
