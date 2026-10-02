@@ -152,7 +152,7 @@ function PainelTvAtendimento() {
             <Kpi titulo="Pendentes" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Não atribuídas" valor={dados?.naoAtribuidas ?? 0} icone={UserX} tom={(dados?.naoAtribuidas ?? 0) > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Conversas hoje" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
-            <Kpi titulo="Tempo médio de resposta" valor={dados?.tempoMedioRespostaSeg == null ? "—" : duracao(dados.tempoMedioRespostaSeg / 60)} icone={Timer} tom="blue" dica={dados ? `hoje · ${dados.respostasMedidas} respostas` : undefined} />
+            <Kpi titulo="Tempo médio de resposta hoje" valor={dados?.tempoMedioRespostaSeg == null ? "—" : duracao(dados.tempoMedioRespostaSeg / 60)} icone={Timer} tom="blue" />
             <Kpi titulo="Mais antiga sem resposta" valor={minAntiga == null ? "—" : duracao(minAntiga)} icone={Hourglass} tom={minAntiga != null && minAntiga > 10 ? "danger" : minAntiga != null ? "warn" : "neutro"} />
           </section>
 
