@@ -123,6 +123,7 @@ import {
   obterDadosContato,
   transferirConversa,
   fecharConversa,
+  atualizarResumoEncerramento,
   listarDepartamentos,
   listarUsuariosClinica,
   listarAutoresMensagensClinica,
@@ -280,6 +281,7 @@ export function AtendInbox() {
   const obterContato = useServerFn(obterDadosContato);
   const transferirFn = useServerFn(transferirConversa);
   const fecharFn = useServerFn(fecharConversa);
+  const resumoEncerramentoFn = useServerFn(atualizarResumoEncerramento);
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
   const listarAutoresFn = useServerFn(listarAutoresMensagensClinica);
@@ -2800,10 +2802,15 @@ export function AtendInbox() {
           conversaId: origem,
         },
       });
+      void resumoEncerramentoFn({ data: { clinicaId, conversaId: origem } }).catch((e) =>
+        console.error("[encerrar] resumo não atualizado", e),
+      );
       cacheConversas.current.invalidar(origem);
       prefetchMsgs.current.invalidar(origem);
-      await carregarConvs();
-      if (selIdRef.current === origem) await carregarConversa();
+      await Promise.all([
+        carregarConvs(),
+        selIdRef.current === origem ? carregarConversa() : Promise.resolve(),
+      ]);
     } catch (e: any) {
       mostrarErro(e);
     } finally {

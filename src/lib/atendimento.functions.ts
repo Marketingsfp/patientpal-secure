@@ -813,10 +813,38 @@ export const fecharConversa = createServerFn({ method: "POST" })
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
       userId: context.userId,
+      // A IA do resumo é lenta: o botão volta já; o resumo é atualizado em
+      // seguida por `atualizarResumoEncerramento`, chamado pela tela.
+      adiarResumo: true,
     });
     return { ok: true, protocol: r.protocol as string };
 
 
+  });
+
+/** Atualiza o resumo vigente com o desfecho "resolvida" após o encerramento manual. */
+export const atualizarResumoEncerramento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: conv } = await context.supabase
+      .from("atend_conversas")
+      .select("status, resolved_by")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!conv || conv.status !== "closed" || conv.resolved_by !== context.userId) return { ok: false };
+    const { registrarDesfechoResumo } = await import("@/lib/atendimento/handoff-resumo.server");
+    await registrarDesfechoResumo({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      desfecho: "conversa_resolvida",
+      resolvidoPor: context.userId,
+    });
+    return { ok: true };
   });
 
 /** Contagem após a última leitura operacional confirmada no banco. */

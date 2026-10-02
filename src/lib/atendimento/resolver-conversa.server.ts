@@ -26,6 +26,8 @@ export type ResolverConversaArgs = {
   /** Resolução automática da Nina após o paciente confirmar que não precisa de mais nada. */
   automatico?: boolean;
   motivo?: string | null;
+  /** Não espera a IA reescrever o resumo (o chamador dispara depois, em separado). */
+  adiarResumo?: boolean;
 };
 
 export async function resolverConversaCore(
@@ -101,6 +103,7 @@ export async function resolverConversaCore(
     console.error("[resolver-conversa] evento não registrado", (errEvento as any)?.message);
 
   // Resumo vigente passa a representar o resultado FINAL do atendimento.
+  if (args.adiarResumo) return { ok: true, protocol: prot };
   try {
     const { registrarDesfechoResumo } = await import("./handoff-resumo.server");
     await registrarDesfechoResumo({
