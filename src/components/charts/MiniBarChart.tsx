@@ -14,6 +14,12 @@ export interface MiniBarChartProps {
   series: BarSeries[];
   height?: number;
   formatY?: (n: number) => string;
+  /**
+   * Posição de um grupo ainda em andamento (ex.: o mês corrente). As barras
+   * dele saem esmaecidas e o rótulo ganha "(parcial)", para ninguém ler a
+   * barra baixa como queda.
+   */
+  parcialIndex?: number;
 }
 
 /** Largura usada antes de medir a tela (SSR e primeiro render). */
@@ -37,6 +43,7 @@ export function MiniBarChart({
   series,
   height = 320,
   formatY = (n) => String(n),
+  parcialIndex,
 }: MiniBarChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [larguraMedida, setLarguraMedida] = useState(W_PADRAO);
@@ -105,6 +112,7 @@ export function MiniBarChart({
         {/* Barras */}
         {labels.map((lbl, gi) => {
           const gx = padL + groupW * gi + (groupW - barW * series.length) / 2;
+          const parcial = gi === parcialIndex;
           return (
             <g key={lbl + gi}>
               {series.map((s, si) => {
@@ -118,15 +126,18 @@ export function MiniBarChart({
                     width={barW - 2}
                     height={h}
                     fill={s.color}
+                    fillOpacity={parcial ? 0.4 : 1}
+                    stroke={parcial ? s.color : undefined}
+                    strokeDasharray={parcial ? "3 2" : undefined}
                     rx={2}
                   >
                     {/* O rótulo entra na dica porque o eixo X pode ter
                         pulado esta barra. */}
-                    <title>{`${lbl} — ${s.name}: ${formatY(v)}`}</title>
+                    <title>{`${lbl}${parcial ? " (parcial)" : ""} — ${s.name}: ${formatY(v)}`}</title>
                   </rect>
                 );
               })}
-              {gi % passoRotulo === 0 && (
+              {(gi % passoRotulo === 0 || parcial) && (
                 <text
                   x={padL + groupW * gi + groupW / 2}
                   y={height - padB + 16}
@@ -136,6 +147,18 @@ export function MiniBarChart({
                   opacity={0.7}
                 >
                   {lbl}
+                </text>
+              )}
+              {parcial && (
+                <text
+                  x={padL + groupW * gi + groupW / 2}
+                  y={height - padB + 29}
+                  fontSize="9"
+                  textAnchor="middle"
+                  fill="currentColor"
+                  opacity={0.6}
+                >
+                  (parcial)
                 </text>
               )}
             </g>
