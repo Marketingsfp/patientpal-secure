@@ -3365,3 +3365,14 @@ export const pesquisarConversasGeral = createServerFn({ method: "POST" })
     }
     return conversas.slice(0, 150).map((c) => ({ ...c, trecho: achados[c.id] ?? null }));
   });
+
+/** Painel de TV do atendimento: só contagens, só administração/supervisão. */
+export const consultarPainelTv = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { carregarPainelTv } = await import("./atendimento/painel-tv.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return carregarPainelTv(context.supabase, supabaseAdmin, data.clinicaId, context.userId);
+  });
