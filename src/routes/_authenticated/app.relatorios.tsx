@@ -67,6 +67,9 @@ import {
 } from "@/components/ui/table";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { hojeBR } from "@/lib/date-utils";
+import { buscarPaginado, type ConsultaPaginavel } from "@/lib/financeiro/paginacao";
+import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
 });
@@ -85,8 +88,29 @@ type Relatorio = {
   }) => Promise<Record<string, unknown>[]>;
 };
 
-const hoje = new Date().toISOString().slice(0, 10);
-const mesAtras = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+// Datas no fuso da clínica, calculadas na hora: `toISOString()` dá o dia em
+// UTC, que depois das 21h já é amanhã e deslocava o período padrão.
+const hoje = () => hojeBR();
+const mesAtras = () => {
+  const d = new Date(hojeBR() + "T12:00:00");
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
+};
+
+// O PostgREST devolve no máximo 1.000 linhas por pedido; sem paginar, a
+// planilha saía cortada em 1.000 sem aviso. `teto` é a trava contra um período
+// aberto demais baixar o histórico inteiro para o navegador — quando batido, o
+// relatório avisa em vez de entregar meia planilha calada.
+const LINHAS_POR_PAGINA = 1000;
+async function todas<T>(montar: () => ConsultaPaginavel<T>, teto = 100): Promise<T[]> {
+  const rows = await buscarPaginado(montar, { maxPaginas: teto, porOnda: 6 });
+  if (rows.length >= teto * LINHAS_POR_PAGINA) {
+    throw new Error(
+      `O período tem mais de ${(teto * LINHAS_POR_PAGINA).toLocaleString("pt-BR")} registros. Reduza o período e baixe em partes.`,
+    );
+  }
+  return rows;
+}
 
 const RELATORIOS: Relatorio[] = [
   {
@@ -97,24 +121,23 @@ const RELATORIOS: Relatorio[] = [
     cor: "#60a5fa",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
-        .from("agendamentos")
-        .select(
-          "inicio, fim, status, observacoes, procedimento, paciente_nome, pacientes(nome), medicos(nome)",
-        )
-        .eq("clinica_id", clinicaId)
-        .gte("inicio", ini!)
-        .lte("inicio", fim! + "T23:59:59")
-        .order("inicio");
-      if (error) {
-        console.error("relatorio agendamentos:", error);
-        throw error;
-      }
-      return (data ?? []).map((r: any) => ({
+      const data = await todas<any>(() =>
+        supabase
+          .from("agendamentos")
+          .select(
+            "id, inicio, fim, status, observacoes, procedimento, paciente_nome, medicos(nome)",
+          )
+          .eq("clinica_id", clinicaId)
+          .gte("inicio", ini!)
+          .lte("inicio", fim! + "T23:59:59")
+          .order("inicio")
+          .order("id"),
+      );
+      return data.map((r: any) => ({
         Inicio: r.inicio,
         Fim: r.fim,
         Status: r.status,
-        Paciente: r.pacientes?.nome ?? r.paciente_nome ?? "",
+        Paciente: r.paciente_nome ?? "",
         Medico: r.medicos?.nome ?? "",
         Serviço: r.procedimento ?? "",
         Observacao: r.observacoes ?? "",
@@ -124,16 +147,22 @@ const RELATORIOS: Relatorio[] = [
   {
     id: "pacientes",
     titulo: "Clientes / Pacientes",
-    descricao: "Cadastro completo de pacientes.",
+    descricao:
+      "Cadastro completo de pacientes. São centenas de milhares — pode levar alguns minutos.",
     icon: Users,
     cor: "#c084fc",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("pacientes")
-        .select("nome, cpf, telefone, email, data_nascimento, sexo, created_at")
-        .eq("clinica_id", clinicaId)
-        .order("nome");
-      return (data ?? []) as any;
+      const data = await todas<any>(
+        () =>
+          supabase
+            .from("pacientes")
+            .select("nome, cpf, telefone, email, data_nascimento, sexo, created_at, id")
+            .eq("clinica_id", clinicaId)
+            .order("nome")
+            .order("id"),
+        400,
+      );
+      return data.map(({ id: _id, ...r }: any) => r);
     },
   },
   {
@@ -143,12 +172,28 @@ const RELATORIOS: Relatorio[] = [
     icon: ClipboardList,
     cor: "#fb923c",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("procedimentos")
-        .select("nome, codigo, valor, duracao_min, ativo")
-        .eq("clinica_id", clinicaId)
-        .order("nome");
-      return (data ?? []) as any;
+      const data = await todas<any>(() =>
+        supabase
+          .from("procedimentos")
+          .select(
+            "id, nome, codigo, grupo, valor_dinheiro, valor_dinheiro_pix, valor_padrao, valor_cartao, duracao_minutos, ativo",
+          )
+          .eq("clinica_id", clinicaId)
+          .order("nome")
+          .order("id"),
+      );
+      // Mesmo valor que a tela Serviços mostra como preço do serviço.
+      return data.map((r: any) => ({
+        Nome: r.nome,
+        Código: r.codigo ?? "",
+        Grupo: r.grupo ?? "",
+        "Valor (dinheiro/PIX)": Number(
+          r.valor_dinheiro ?? r.valor_dinheiro_pix ?? r.valor_padrao ?? 0,
+        ),
+        "Valor (cartão)": r.valor_cartao ?? "",
+        "Duração (min)": r.duracao_minutos ?? "",
+        Ativo: r.ativo ? "Sim" : "Não",
+      }));
     },
   },
   {
@@ -159,20 +204,24 @@ const RELATORIOS: Relatorio[] = [
     cor: "#34d399",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
-        .from("orcamentos")
-        .select("numero, status, valor_total, desconto, valor_final, created_at, pacientes(nome)")
-        .eq("clinica_id", clinicaId)
-        .gte("created_at", ini!)
-        .lte("created_at", fim! + "T23:59:59")
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((r: any) => ({
+      const data = await todas<any>(() =>
+        supabase
+          .from("orcamentos")
+          .select("id, numero, status, valor_total, desconto, created_at, paciente_nome")
+          .eq("clinica_id", clinicaId)
+          .gte("created_at", ini!)
+          .lte("created_at", fim! + "T23:59:59")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
+      // `valor_total` já é gravado com o desconto abatido (tela Orçamentos).
+      return data.map((r: any) => ({
         Numero: r.numero,
         Status: r.status,
-        Paciente: r.pacientes?.nome ?? "",
-        Valor: r.valor_total,
-        Desconto: r.desconto,
-        Final: r.valor_final,
+        Paciente: r.paciente_nome ?? "",
+        "Valor bruto": (Number(r.valor_total) || 0) + (Number(r.desconto) || 0),
+        Desconto: Number(r.desconto) || 0,
+        "Valor final": Number(r.valor_total) || 0,
         Data: r.created_at,
       }));
     },
@@ -185,23 +234,22 @@ const RELATORIOS: Relatorio[] = [
     cor: "#facc15",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase
-        .from("fin_lancamentos")
-        .select(
-          // `fin_lancamentos` tem duas chaves estrangeiras para `medicos`
-          // (medico_id e medico_laudador_id), então o vínculo precisa ser
-          // nomeado ou o PostgREST devolve PGRST201 e o relatório não abre.
-          "data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos!fin_lancamentos_medico_id_fkey(nome)",
-        )
-        .eq("clinica_id", clinicaId)
-        .gte("data", ini!)
-        .lte("data", fim!)
-        .order("data", { ascending: false });
-      if (error) {
-        console.error("relatorio financeiro:", error);
-        throw error;
-      }
-      return (data ?? []).map((r: any) => ({
+      const data = await todas<any>(() =>
+        supabase
+          .from("fin_lancamentos")
+          .select(
+            // `fin_lancamentos` tem duas chaves estrangeiras para `medicos`
+            // (medico_id e medico_laudador_id), então o vínculo precisa ser
+            // nomeado ou o PostgREST devolve PGRST201 e o relatório não abre.
+            "id, data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos!fin_lancamentos_medico_id_fkey(nome)",
+          )
+          .eq("clinica_id", clinicaId)
+          .gte("data", ini!)
+          .lte("data", fim!)
+          .order("data", { ascending: false })
+          .order("id"),
+      );
+      return data.map((r: any) => ({
         Data: r.data,
         Tipo: r.tipo,
         Descrição: r.descricao,
@@ -223,17 +271,20 @@ const RELATORIOS: Relatorio[] = [
     icon: CreditCard,
     cor: "#22d3ee",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("contratos_assinatura")
-        .select(
-          "numero, status, valor_mensal, data_inicio, data_fim, pacientes(nome), cb_convenios(nome)",
-        )
-        .eq("clinica_id", clinicaId)
-        .order("data_inicio", { ascending: false });
-      return (data ?? []).map((r: any) => ({
+      const data = await todas<any>(() =>
+        supabase
+          .from("contratos_assinatura")
+          .select(
+            "id, numero, status, valor_mensal, data_inicio, data_fim, paciente_nome, cb_convenios(nome)",
+          )
+          .eq("clinica_id", clinicaId)
+          .order("data_inicio", { ascending: false })
+          .order("id"),
+      );
+      return data.map((r: any) => ({
         Numero: r.numero,
         Status: r.status,
-        Paciente: r.pacientes?.nome ?? "",
+        Paciente: r.paciente_nome ?? "",
         Plano: r.cb_convenios?.nome ?? "",
         ValorMensal: r.valor_mensal,
         Inicio: r.data_inicio,
@@ -248,17 +299,25 @@ const RELATORIOS: Relatorio[] = [
     icon: Target,
     cor: "#f472b6",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("crm_oportunidades")
-        .select("titulo, valor, status, created_at, crm_etapas(nome), pacientes(nome)")
-        .eq("clinica_id", clinicaId)
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((r: any) => ({
-        Titulo: r.titulo,
-        Etapa: r.crm_etapas?.nome ?? "",
+      const data = await todas<any>(() =>
+        supabase
+          .from("crm_oportunidades")
+          .select("id, nome_lead, telefone, valor_estimado, status, origem, created_at, etapa_id")
+          .eq("clinica_id", clinicaId)
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
+      const etapas = await nomesPorId(
+        "crm_etapas",
+        data.map((r: any) => r.etapa_id),
+      );
+      return data.map((r: any) => ({
+        Lead: r.nome_lead ?? "",
+        Telefone: r.telefone ?? "",
+        Etapa: etapas.get(r.etapa_id) ?? "",
         Status: r.status,
-        Valor: r.valor,
-        Paciente: r.pacientes?.nome ?? "",
+        Origem: r.origem ?? "",
+        "Valor estimado": r.valor_estimado,
         Data: r.created_at,
       }));
     },
@@ -270,12 +329,22 @@ const RELATORIOS: Relatorio[] = [
     icon: Stethoscope,
     cor: "#fda4af",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("medicos")
-        .select("nome, crm, uf_crm, telefone, email, ativo")
-        .eq("clinica_id", clinicaId)
-        .order("nome");
-      return (data ?? []) as any;
+      const data = await todas<any>(() =>
+        supabase
+          .from("medicos")
+          .select("id, nome, crm, crm_uf, telefone, email, ativo")
+          .eq("clinica_id", clinicaId)
+          .order("nome")
+          .order("id"),
+      );
+      return data.map((r: any) => ({
+        Nome: r.nome,
+        CRM: r.crm ?? "",
+        UF: r.crm_uf ?? "",
+        Telefone: r.telefone ?? "",
+        Email: r.email ?? "",
+        Ativo: r.ativo ? "Sim" : "Não",
+      }));
     },
   },
   {
@@ -284,12 +353,12 @@ const RELATORIOS: Relatorio[] = [
     descricao: "Lista de especialidades.",
     icon: Stethoscope,
     cor: "#f0abfc",
-    carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
+    carregar: async () => {
+      const { data, error } = await supabase
         .from("especialidades")
         .select("nome, descricao, ativo")
         .order("nome");
-      void clinicaId;
+      if (error) throw error;
       return (data ?? []) as any;
     },
   },
@@ -300,19 +369,29 @@ const RELATORIOS: Relatorio[] = [
     icon: Clock,
     cor: "#a78bfa",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("medico_disponibilidades")
-        .select(
-          "dia_semana, hora_inicio, hora_fim, intervalo_min, limite_pacientes_dia, medicos(nome)",
-        )
-        .eq("clinica_id", clinicaId);
-      return (data ?? []).map((r: any) => ({
-        Medico: r.medicos?.nome ?? "",
+      const data = await todas<any>(() =>
+        supabase
+          .from("medico_disponibilidades")
+          .select(
+            "id, dia_semana, hora_inicio, hora_fim, intervalo_min, limite_pacientes, ativo, vigencia_inicio, vigencia_fim, medico_id",
+          )
+          .eq("clinica_id", clinicaId)
+          .order("id"),
+      );
+      const medicos = await nomesPorId(
+        "medicos",
+        data.map((r: any) => r.medico_id),
+      );
+      return data.map((r: any) => ({
+        Medico: medicos.get(r.medico_id) ?? "",
         DiaSemana: r.dia_semana,
         Inicio: r.hora_inicio,
         Fim: r.hora_fim,
         IntervaloMin: r.intervalo_min,
-        LimitePacientesDia: r.limite_pacientes_dia,
+        LimitePacientes: r.limite_pacientes ?? "",
+        Ativo: r.ativo ? "Sim" : "Não",
+        "Vigência início": r.vigencia_inicio ?? "",
+        "Vigência fim": r.vigencia_fim ?? "",
       }));
     },
   },
@@ -324,19 +403,22 @@ const RELATORIOS: Relatorio[] = [
     cor: "#fde047",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
-        .from("exame_resultados")
-        .select("tipo_exame, status, data_exame, observacoes, pacientes(nome)")
-        .eq("clinica_id", clinicaId)
-        .gte("data_exame", ini!)
-        .lte("data_exame", fim!)
-        .order("data_exame", { ascending: false });
-      return (data ?? []).map((r: any) => ({
-        Paciente: r.pacientes?.nome ?? "",
+      const data = await todas<any>(() =>
+        supabase
+          .from("exame_resultados")
+          .select("id, tipo_exame, status, data_coleta, resultado_texto, paciente_nome")
+          .eq("clinica_id", clinicaId)
+          .gte("data_coleta", ini!)
+          .lte("data_coleta", fim! + "T23:59:59")
+          .order("data_coleta", { ascending: false })
+          .order("id"),
+      );
+      return data.map((r: any) => ({
+        Paciente: r.paciente_nome ?? "",
         Exame: r.tipo_exame,
         Status: r.status,
-        Data: r.data_exame,
-        Observacoes: r.observacoes ?? "",
+        "Data da coleta": r.data_coleta,
+        Resultado: r.resultado_texto ?? "",
       }));
     },
   },
@@ -347,16 +429,19 @@ const RELATORIOS: Relatorio[] = [
     icon: BellRing,
     cor: "#ef4444",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("alertas_enfermagem")
-        .select("titulo, descricao, severidade, status, created_at, pacientes(nome)")
-        .eq("clinica_id", clinicaId)
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((r: any) => ({
+      const data = await todas<any>(() =>
+        supabase
+          .from("alertas_enfermagem")
+          .select("id, titulo, descricao, severidade, status, created_at, paciente_nome")
+          .eq("clinica_id", clinicaId)
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
+      return data.map((r: any) => ({
         Titulo: r.titulo,
         Severidade: r.severidade,
         Status: r.status,
-        Paciente: r.pacientes?.nome ?? "",
+        Paciente: r.paciente_nome ?? "",
         Descricao: r.descricao,
         Data: r.created_at,
       }));
@@ -370,19 +455,32 @@ const RELATORIOS: Relatorio[] = [
     cor: "#f9a8d4",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
-        .from("prontuarios")
-        .select(
-          "data_atendimento, queixa_principal, hipotese_diagnostica, conduta, pacientes(nome), medicos(nome)",
-        )
-        .eq("clinica_id", clinicaId)
-        .gte("data_atendimento", ini!)
-        .lte("data_atendimento", fim! + "T23:59:59")
-        .order("data_atendimento", { ascending: false });
-      return (data ?? []).map((r: any) => ({
-        Data: r.data_atendimento,
-        Paciente: r.pacientes?.nome ?? "",
-        Medico: r.medicos?.nome ?? "",
+      const data = await todas<any>(() =>
+        supabase
+          .from("prontuarios")
+          .select(
+            "id, data, queixa_principal, hipotese_diagnostica, conduta, paciente_id, medico_id",
+          )
+          .eq("clinica_id", clinicaId)
+          .gte("data", ini!)
+          .lte("data", fim! + "T23:59:59")
+          .order("data", { ascending: false })
+          .order("id"),
+      );
+      const [pacientes, medicos] = await Promise.all([
+        nomesPorId(
+          "pacientes",
+          data.map((r: any) => r.paciente_id),
+        ),
+        nomesPorId(
+          "medicos",
+          data.map((r: any) => r.medico_id),
+        ),
+      ]);
+      return data.map((r: any) => ({
+        Data: r.data,
+        Paciente: pacientes.get(r.paciente_id) ?? "",
+        Medico: medicos.get(r.medico_id) ?? "",
         Queixa: r.queixa_principal,
         Hipotese: r.hipotese_diagnostica,
         Conduta: r.conduta,
@@ -392,20 +490,22 @@ const RELATORIOS: Relatorio[] = [
   {
     id: "auditoria",
     titulo: "Auditoria",
-    descricao: "Histórico de alterações.",
+    descricao: "Histórico de alterações. Movimento alto — prefira períodos curtos.",
     icon: ShieldCheck,
     cor: "#f87171",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
-        .from("audit_log")
-        .select("created_at, user_email, action, table_name, record_id")
-        .eq("clinica_id", clinicaId)
-        .gte("created_at", ini!)
-        .lte("created_at", fim! + "T23:59:59")
-        .order("created_at", { ascending: false })
-        .limit(5000);
-      return (data ?? []) as any;
+      const data = await todas<any>(() =>
+        supabase
+          .from("audit_log")
+          .select("id, created_at, user_email, action, table_name, record_id")
+          .eq("clinica_id", clinicaId)
+          .gte("created_at", ini!)
+          .lte("created_at", fim! + "T23:59:59")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
+      return data.map(({ id: _id, ...r }: any) => r);
     },
   },
   {
@@ -416,19 +516,32 @@ const RELATORIOS: Relatorio[] = [
     cor: "#34d399",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
-        .from("documentos_emitidos")
-        .select("tipo, titulo, created_at, pacientes(nome), medicos(nome)")
-        .eq("clinica_id", clinicaId)
-        .gte("created_at", ini!)
-        .lte("created_at", fim! + "T23:59:59")
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((r: any) => ({
+      const data = await todas<any>(() =>
+        supabase
+          .from("documentos_emitidos")
+          .select("id, tipo, titulo, created_at, paciente_id, medico_id")
+          .eq("clinica_id", clinicaId)
+          .gte("created_at", ini!)
+          .lte("created_at", fim! + "T23:59:59")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
+      const [pacientes, medicos] = await Promise.all([
+        nomesPorId(
+          "pacientes",
+          data.map((r: any) => r.paciente_id),
+        ),
+        nomesPorId(
+          "medicos",
+          data.map((r: any) => r.medico_id),
+        ),
+      ]);
+      return data.map((r: any) => ({
         Data: r.created_at,
         Tipo: r.tipo,
         Titulo: r.titulo,
-        Paciente: r.pacientes?.nome ?? "",
-        Medico: r.medicos?.nome ?? "",
+        Paciente: pacientes.get(r.paciente_id) ?? "",
+        Medico: medicos.get(r.medico_id) ?? "",
       }));
     },
   },
@@ -439,14 +552,22 @@ const RELATORIOS: Relatorio[] = [
     icon: Users,
     cor: "#93c5fd",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
-        .from("clinica_memberships")
-        .select("role, created_at, profiles(nome, email)")
-        .eq("clinica_id", clinicaId);
-      return (data ?? []).map((r: any) => ({
-        Nome: r.profiles?.nome ?? "",
-        Email: r.profiles?.email ?? "",
+      const data = await todas<any>(() =>
+        supabase
+          .from("clinica_memberships")
+          .select("id, role, ativo, created_at, user_id")
+          .eq("clinica_id", clinicaId)
+          .order("created_at")
+          .order("id"),
+      );
+      const perfis = await nomesPorId(
+        "profiles",
+        data.map((r: any) => r.user_id),
+      );
+      return data.map((r: any) => ({
+        Nome: perfis.get(r.user_id) ?? "",
         Papel: r.role,
+        Ativo: r.ativo === false ? "Não" : "Sim",
         Desde: r.created_at,
       }));
     },
@@ -458,10 +579,11 @@ const RELATORIOS: Relatorio[] = [
     icon: Building2,
     cor: "#22d3ee",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("clinicas")
         .select("nome, cnpj, telefone, email, endereco, created_at")
         .eq("id", clinicaId);
+      if (error) throw error;
       return (data ?? []) as any;
     },
   },
@@ -473,37 +595,56 @@ const RELATORIOS: Relatorio[] = [
     cor: "#ef4444",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase
-        .from("triagens_enfermagem")
-        .select(
-          "created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes, pacientes(nome, cpf), agendamentos(inicio, procedimento)",
-        )
-        .eq("clinica_id", clinicaId)
-        .gte("created_at", ini! + "T00:00:00")
-        .lte("created_at", fim! + "T23:59:59")
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((r: any) => ({
-        Data: r.created_at,
-        Paciente: r.pacientes?.nome ?? "",
-        CPF: r.pacientes?.cpf ?? "",
-        Agendamento: r.agendamentos?.inicio ?? "",
-        Serviço: r.agendamentos?.procedimento ?? "",
-        Enfermeira: r.enfermeira_nome ?? "",
-        "Peso (kg)": r.peso_kg ?? "",
-        "Altura (cm)": r.altura_cm ?? "",
-        IMC: r.imc ?? "",
-        "PA Sistólica": r.pa_sistolica ?? "",
-        "PA Diastólica": r.pa_diastolica ?? "",
-        "FC (bpm)": r.freq_cardiaca ?? "",
-        "Temperatura (°C)": r.temperatura ?? "",
-        "Saturação (%)": r.saturacao ?? "",
-        "Glicemia (mg/dL)": r.glicemia ?? "",
-        "Queixa principal": r.queixa_principal ?? "",
-        Doenças: Array.isArray(r.doencas) ? r.doencas.join(", ") : "",
-        Medicamentos: r.medicamentos ?? "",
-        Alergias: r.alergias ?? "",
-        Observações: r.observacoes ?? "",
-      }));
+      const data = await todas<any>(() =>
+        supabase
+          .from("triagens_enfermagem")
+          .select(
+            "id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes, paciente_id, agendamento_id",
+          )
+          .eq("clinica_id", clinicaId)
+          .gte("created_at", ini! + "T00:00:00")
+          .lte("created_at", fim! + "T23:59:59")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
+      const [pacientes, agendamentos] = await Promise.all([
+        buscarPorIds<{ id: string; nome: string | null; cpf: string | null }>(
+          "pacientes",
+          "id, nome, cpf",
+          data.map((r: any) => r.paciente_id),
+        ),
+        buscarPorIds<{ id: string; inicio: string | null; procedimento: string | null }>(
+          "agendamentos",
+          "id, inicio, procedimento",
+          data.map((r: any) => r.agendamento_id),
+        ),
+      ]);
+      return data.map((r: any) => {
+        const pac = pacientes.get(r.paciente_id);
+        const ag = agendamentos.get(r.agendamento_id);
+        return {
+          Data: r.created_at,
+          Paciente: pac?.nome ?? "",
+          CPF: pac?.cpf ?? "",
+          Agendamento: ag?.inicio ?? "",
+          Serviço: ag?.procedimento ?? "",
+          Enfermeira: r.enfermeira_nome ?? "",
+          "Peso (kg)": r.peso_kg ?? "",
+          "Altura (cm)": r.altura_cm ?? "",
+          IMC: r.imc ?? "",
+          "PA Sistólica": r.pa_sistolica ?? "",
+          "PA Diastólica": r.pa_diastolica ?? "",
+          "FC (bpm)": r.freq_cardiaca ?? "",
+          "Temperatura (°C)": r.temperatura ?? "",
+          "Saturação (%)": r.saturacao ?? "",
+          "Glicemia (mg/dL)": r.glicemia ?? "",
+          "Queixa principal": r.queixa_principal ?? "",
+          Doenças: Array.isArray(r.doencas) ? r.doencas.join(", ") : "",
+          Medicamentos: r.medicamentos ?? "",
+          Alergias: r.alergias ?? "",
+          Observações: r.observacoes ?? "",
+        };
+      });
     },
   },
 ];
@@ -535,7 +676,7 @@ function RelatoriosPage() {
         toast.info("Sem dados no período selecionado.");
         return;
       }
-      exportToExcel(rows, `relatorio-${r.id}-${hoje}`);
+      exportToExcel(rows, `relatorio-${r.id}-${hoje()}`);
       toast.success(`${rows.length} registros exportados.`);
     } catch (e: any) {
       mostrarErro(e);
@@ -694,13 +835,22 @@ interface RawData {
     status: string | null;
   }>;
   pacientes: Array<{ id: string; nome: string; created_at: string }>;
-  prontuarios: Array<{ id: string; data_atendimento: string; paciente: string | null }>;
+  prontuarios: Array<{ id: string; data: string; paciente: string | null }>;
 }
+
+// Teto de páginas de 1.000 linhas por consulta do dashboard. Um mês da
+// Policlínica tem ~34 mil agendamentos (34 páginas); o teto só pega período
+// aberto demais, e aí a tela avisa em vez de mostrar número menor calada.
+const TETO_PAGINAS_DASHBOARD = 150;
+// O detalhamento ao clicar num card lista no máximo isto — 34 mil linhas numa
+// janela travam o navegador. A planilha completa sai em "Baixar planilhas".
+const LIMITE_DETALHE = 500;
 
 function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [raw, setRaw] = useState<RawData | null>(null);
+  const [truncado, setTruncado] = useState(false);
   const [drill, setDrill] = useState<
     null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas"
   >(null);
@@ -735,34 +885,69 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     (async () => {
       setLoading(true);
       try {
-        const [agend, fin, pac, pront] = await Promise.all([
-          supabase
-            .from("agendamentos")
-            .select("id, paciente_nome, procedimento, inicio, status, medicos(nome)")
-            .eq("clinica_id", clinicaId)
-            .gte("inicio", ini)
-            .lte("inicio", fim + "T23:59:59"),
-          supabase
-            .from("fin_lancamentos")
-            .select("id, data, tipo, valor, status, descricao, fin_categorias(nome)")
-            .eq("clinica_id", clinicaId)
-            .gte("data", ini)
-            .lte("data", fim),
-          supabase
-            .from("pacientes")
-            .select("id, nome, created_at")
-            .eq("clinica_id", clinicaId)
-            .gte("created_at", ini)
-            .lte("created_at", fim + "T23:59:59"),
-          supabase
-            .from("prontuarios")
-            .select("id, data_atendimento, pacientes(nome)")
-            .eq("clinica_id", clinicaId)
-            .gte("data_atendimento", ini)
-            .lte("data_atendimento", fim + "T23:59:59"),
+        // Tudo paginado: sem isso o PostgREST corta em 1.000 linhas e os cards
+        // mostravam "1000" num mês de mais de 30 mil agendamentos. O prontuário
+        // não tem vínculo cadastrado com `pacientes`, então o nome vem à parte
+        // (e a coluna de data dele é `data` — `data_atendimento` não existe e
+        // a consulta falhava em silêncio, deixando o card em 0).
+        const [agendRows, finTodas, pacRows, prontRows] = await Promise.all([
+          buscarPaginado<any>(
+            () =>
+              supabase
+                .from("agendamentos")
+                .select("id, paciente_nome, procedimento, inicio, status, medicos(nome)")
+                .eq("clinica_id", clinicaId)
+                .gte("inicio", ini)
+                .lte("inicio", fim + "T23:59:59")
+                .order("inicio")
+                .order("id"),
+            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          ),
+          buscarPaginado<any>(
+            () =>
+              supabase
+                .from("fin_lancamentos")
+                .select("id, data, tipo, valor, status, descricao, fin_categorias(nome)")
+                .eq("clinica_id", clinicaId)
+                .gte("data", ini)
+                .lte("data", fim)
+                .order("data")
+                .order("id"),
+            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          ),
+          buscarPaginado<any>(
+            () =>
+              supabase
+                .from("pacientes")
+                .select("id, nome, created_at")
+                .eq("clinica_id", clinicaId)
+                .gte("created_at", ini)
+                .lte("created_at", fim + "T23:59:59")
+                .order("created_at")
+                .order("id"),
+            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          ),
+          buscarPaginado<any>(
+            () =>
+              supabase
+                .from("prontuarios")
+                .select("id, data, paciente_id")
+                .eq("clinica_id", clinicaId)
+                .gte("data", ini)
+                .lte("data", fim + "T23:59:59")
+                .order("data")
+                .order("id"),
+            { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+          ),
         ]);
+        const nomesPront = await nomesPorId(
+          "pacientes",
+          prontRows.map((p) => p.paciente_id),
+        );
+        const cortado = [agendRows, finTodas, pacRows, prontRows].some(
+          (l) => l.length >= TETO_PAGINAS_DASHBOARD * 1000,
+        );
 
-        const agendRows = (agend.data ?? []) as any[];
         const statusMap = new Map<string, number>();
         const medicoMap = new Map<string, number>();
         agendRows.forEach((r) => {
@@ -771,7 +956,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           medicoMap.set(m, (medicoMap.get(m) ?? 0) + 1);
         });
 
-        const finRows = ((fin.data ?? []) as any[]).filter((r) => r.status !== "cancelado");
+        const finRows = finTodas.filter((r) => r.status !== "cancelado");
         let receitas = 0;
         let despesas = 0;
         const catMap = new Map<string, number>();
@@ -819,17 +1004,18 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             categoria: r.fin_categorias?.nome ?? null,
             status: r.status ?? null,
           })),
-          pacientes: ((pac.data ?? []) as any[]).map((p) => ({
+          pacientes: pacRows.map((p) => ({
             id: p.id,
             nome: p.nome,
             created_at: p.created_at,
           })),
-          prontuarios: ((pront.data ?? []) as any[]).map((p) => ({
+          prontuarios: prontRows.map((p) => ({
             id: p.id,
-            data_atendimento: p.data_atendimento,
-            paciente: p.pacientes?.nome ?? null,
+            data: p.data,
+            paciente: nomesPront.get(p.paciente_id) ?? null,
           })),
         });
+        setTruncado(cortado);
         setData({
           totalAgend: agendRows.length,
           agendPorStatus: Array.from(statusMap, ([name, value]) => ({ name, value })),
@@ -842,8 +1028,8 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             .sort((a, b) => b.value - a.value)
             .slice(0, 8),
           finPorDia,
-          novosPacientes: (pac.data ?? []).length,
-          prontuariosCount: (pront.data ?? []).length,
+          novosPacientes: pacRows.length,
+          prontuariosCount: prontRows.length,
         });
       } catch (e: any) {
         console.error("dashboard relatorios:", e);
@@ -863,7 +1049,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   // cruzando chuva com nº de agendamentos e receita do dia.
   const climaRows = useMemo(() => {
     if (!raw) return [];
-    const fimReal = fim > hoje ? hoje : fim;
+    const fimReal = fim > hoje() ? hoje() : fim;
     if (ini > fimReal) return [];
     const agendPorDia = new Map<string, number>();
     raw.agend.forEach((a) => {
@@ -1000,6 +1186,19 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     );
   }
 
+  const finDetalhe = (raw?.fin ?? []).filter((f) =>
+    drill === "saldo" ? true : drill === "receitas" ? f.tipo === "receita" : f.tipo !== "receita",
+  );
+  const totalDetalhe = !raw
+    ? 0
+    : drill === "agend"
+      ? raw.agend.length
+      : drill === "novos"
+        ? raw.pacientes.length
+        : drill === "pront"
+          ? raw.prontuarios.length
+          : finDetalhe.length;
+
   const kpiVisible = ALL_WIDGETS.filter((w) => w.group === "kpi" && on(w.id)).length;
   const chartsVisible = ALL_WIDGETS.filter((w) => w.group === "chart" && on(w.id)).length;
 
@@ -1050,6 +1249,15 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
         </Popover>
       </div>
 
+      {truncado && (
+        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="py-3 text-sm">
+            O período escolhido é grande demais para ser lido de uma vez — os números abaixo estão
+            incompletos. Reduza o período (por exemplo, um mês por vez).
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPIs */}
       {kpiVisible > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1057,7 +1265,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <Kpi
               icon={<CalendarDays className="h-5 w-5" />}
               label="Agendamentos"
-              value={data.totalAgend.toString()}
+              value={data.totalAgend.toLocaleString("pt-BR")}
               tint="text-blue-600"
               onClick={() => setDrill("agend")}
             />
@@ -1066,7 +1274,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <Kpi
               icon={<Users className="h-5 w-5" />}
               label="Novos pacientes"
-              value={data.novosPacientes.toString()}
+              value={data.novosPacientes.toLocaleString("pt-BR")}
               tint="text-purple-600"
               onClick={() => setDrill("novos")}
             />
@@ -1075,7 +1283,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <Kpi
               icon={<FileHeart className="h-5 w-5" />}
               label="Prontuários"
-              value={data.prontuariosCount.toString()}
+              value={data.prontuariosCount.toLocaleString("pt-BR")}
               tint="text-pink-600"
               onClick={() => setDrill("pront")}
             />
@@ -1306,7 +1514,9 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
               {drill === "despesas" && "Despesas no período"}
             </DialogTitle>
             <DialogDescription>
-              Detalhamento dos registros do período selecionado.
+              {totalDetalhe > LIMITE_DETALHE
+                ? `Mostrando os primeiros ${LIMITE_DETALHE} de ${totalDetalhe.toLocaleString("pt-BR")} registros. A lista completa sai em "Baixar planilhas".`
+                : "Detalhamento dos registros do período selecionado."}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
@@ -1322,7 +1532,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {raw.agend.map((a) => (
+                  {raw.agend.slice(0, LIMITE_DETALHE).map((a) => (
                     <TableRow key={a.id}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(a.inicio).toLocaleString("pt-BR")}
@@ -1345,7 +1555,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {raw.pacientes.map((p) => (
+                  {raw.pacientes.slice(0, LIMITE_DETALHE).map((p) => (
                     <TableRow key={p.id}>
                       <TableCell>{p.nome}</TableCell>
                       <TableCell>{new Date(p.created_at).toLocaleString("pt-BR")}</TableCell>
@@ -1363,9 +1573,9 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {raw.prontuarios.map((p) => (
+                  {raw.prontuarios.slice(0, LIMITE_DETALHE).map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>{new Date(p.data_atendimento).toLocaleString("pt-BR")}</TableCell>
+                      <TableCell>{new Date(p.data).toLocaleString("pt-BR")}</TableCell>
                       <TableCell>{p.paciente ?? "—"}</TableCell>
                     </TableRow>
                   ))}
@@ -1384,30 +1594,22 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {raw.fin
-                    .filter((f) =>
-                      drill === "saldo"
-                        ? true
-                        : drill === "receitas"
-                          ? f.tipo === "receita"
-                          : f.tipo === "despesa",
-                    )
-                    .map((f) => (
-                      <TableRow key={f.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {f.data.slice(0, 10).split("-").reverse().join("/")}
-                        </TableCell>
-                        <TableCell>{f.tipo}</TableCell>
-                        <TableCell>{f.descricao ?? "—"}</TableCell>
-                        <TableCell>{f.categoria ?? "—"}</TableCell>
-                        <TableCell
-                          className={`text-right font-semibold ${f.tipo === "receita" ? "text-emerald-600" : "text-rose-600"}`}
-                        >
-                          {f.tipo === "despesa" ? "-" : ""}
-                          {fmtBRL(f.valor)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                  {finDetalhe.slice(0, LIMITE_DETALHE).map((f) => (
+                    <TableRow key={f.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {f.data.slice(0, 10).split("-").reverse().join("/")}
+                      </TableCell>
+                      <TableCell>{f.tipo}</TableCell>
+                      <TableCell>{f.descricao ?? "—"}</TableCell>
+                      <TableCell>{f.categoria ?? "—"}</TableCell>
+                      <TableCell
+                        className={`text-right font-semibold ${f.tipo === "receita" ? "text-emerald-600" : "text-rose-600"}`}
+                      >
+                        {f.tipo === "despesa" ? "-" : ""}
+                        {fmtBRL(f.valor)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             )}
@@ -1482,27 +1684,30 @@ function AgendamentosDiarioView({
       try {
         const iniISO = `${ini}T00:00:00`;
         const fimISO = `${fim}T23:59:59`;
-        const { data: ags, error } = await supabase
-          .from("agendamentos")
-          .select(
-            "id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id",
-          )
-          .eq("clinica_id", clinicaId)
-          .gte("created_at", iniISO)
-          .lte("created_at", fimISO)
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        const list = (ags ?? []) as AgendDiaRow[];
+        // Paginado: um mês tem dezenas de milhares de marcações e a consulta
+        // simples parava em 1.000, deixando o total e os grupos menores.
+        const list = await buscarPaginado<AgendDiaRow>(
+          () =>
+            supabase
+              .from("agendamentos")
+              .select(
+                "id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id",
+              )
+              .eq("clinica_id", clinicaId)
+              .gte("created_at", iniISO)
+              .lte("created_at", fimISO)
+              .order("created_at", { ascending: false })
+              .order("id"),
+          { maxPaginas: TETO_PAGINAS_DASHBOARD, porOnda: 6 },
+        );
         const userIds = Array.from(
           new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]),
         );
         const medIds = Array.from(
           new Set(list.map((r) => r.medico_id).filter(Boolean) as string[]),
         );
-        const [profsRes, contratosRes, medsRes] = await Promise.all([
-          userIds.length
-            ? supabase.from("profiles").select("id, nome").in("id", userIds)
-            : Promise.resolve({ data: [] as any[] }),
+        const [pMap, contratosRes, mMap] = await Promise.all([
+          nomesPorId("profiles", userIds),
           userIds.length
             ? supabase
                 .from("hr_contratos")
@@ -1510,14 +1715,8 @@ function AgendamentosDiarioView({
                 .eq("clinica_id", clinicaId)
                 .in("user_id", userIds)
             : Promise.resolve({ data: [] as any[] }),
-          medIds.length
-            ? supabase.from("medicos").select("id, nome").in("id", medIds)
-            : Promise.resolve({ data: [] as any[] }),
+          nomesPorId("medicos", medIds),
         ]);
-        const pMap = new Map<string, string>();
-        ((profsRes.data ?? []) as any[]).forEach((p) => pMap.set(p.id, p.nome ?? "—"));
-        const mMap = new Map<string, string>();
-        ((medsRes.data ?? []) as any[]).forEach((m) => mMap.set(m.id, m.nome ?? "—"));
         // Pega o contrato ativo mais recente por usuário
         const userSetor = new Map<string, string | null>();
         const ordered = ((contratosRes.data ?? []) as any[]).sort((a, b) =>
@@ -1681,7 +1880,16 @@ function AgendamentosDiarioView({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {a.lista.map((r) => (
+                      {a.lista.length > LIMITE_DETALHE && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-xs text-muted-foreground">
+                            Mostrando as {LIMITE_DETALHE} mais recentes de{" "}
+                            {a.lista.length.toLocaleString("pt-BR")}. Use "Exportar Excel" para ver
+                            todas.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {a.lista.slice(0, LIMITE_DETALHE).map((r) => (
                         <TableRow key={r.id}>
                           <TableCell className="text-xs">
                             {new Date(r.created_at).toLocaleString("pt-BR")}

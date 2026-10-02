@@ -31,6 +31,8 @@ import {
   resumirPagamentos,
 } from "@/lib/relatorios/modalidade-atendimento";
 import { carregarMapaConvenioPacientes } from "@/lib/convenio/modalidade";
+import { buscarPaginado } from "@/lib/financeiro/paginacao";
+import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
 import {
   Download,
   Save,
@@ -107,7 +109,8 @@ const CUBOS: CubeSpec[] = [
             .eq("clinica_id", clinicaId)
             .gte("inicio", ini)
             .lte("inicio", fimDia)
-            .order("inicio", { ascending: true }),
+            .order("inicio", { ascending: true })
+            .order("id"),
         ),
         // Modalidade e forma de pagamento vêm do lançamento de receita
         // confirmado do atendimento, pela mesma regra do Rateio da Receita —
@@ -138,9 +141,11 @@ const CUBOS: CubeSpec[] = [
           "medicos",
           rows.map((r) => r.medico_id),
         ),
+        // O nome já vem gravado no agendamento; o cadastro só é consultado
+        // quando ele falta (34 mil agendamentos/mês = ~20 mil pacientes).
         lookupNames(
           "pacientes",
-          rows.map((r) => r.paciente_id),
+          rows.filter((r) => !r.paciente_nome).map((r) => r.paciente_id),
         ),
         lookupEspecialidadePorProcedimento(
           clinicaId,
@@ -164,7 +169,7 @@ const CUBOS: CubeSpec[] = [
           procedimento: r.procedimento ?? "—",
           modalidade: LABEL_MODALIDADE[pagamento.modalidade],
           forma_pagamento: pagamento.forma,
-          paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
+          paciente: r.paciente_nome ?? pacMap.get(r.paciente_id) ?? "—",
         });
       });
     },
@@ -199,7 +204,8 @@ const CUBOS: CubeSpec[] = [
           .eq("clinica_id", clinicaId)
           .gte("data", ini)
           .lte("data", fim)
-          .order("data", { ascending: true }),
+          .order("data", { ascending: true })
+          .order("id"),
       );
       const [catMap, contMap, pacMap, medMap, espMap] = await Promise.all([
         lookupNames(
@@ -257,7 +263,8 @@ const CUBOS: CubeSpec[] = [
           .eq("clinica_id", clinicaId)
           .gte("data", ini)
           .lte("data", fim + "T23:59:59")
-          .order("data", { ascending: true }),
+          .order("data", { ascending: true })
+          .order("id"),
       );
       const [medMap, pacMap, espMap] = await Promise.all([
         lookupNames(
@@ -295,7 +302,8 @@ const CUBOS: CubeSpec[] = [
           .from("pacientes")
           .select("sexo, ativo, created_at")
           .eq("clinica_id", clinicaId)
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: true })
+          .order("id"),
       );
       return rows.map((r: any) => {
         const d = (r.created_at ?? "").slice(0, 10);
@@ -327,21 +335,20 @@ const CUBOS: CubeSpec[] = [
       const rows = await fetchAllRows(() =>
         supabase
           .from("orcamentos")
-          .select("created_at, status, valor_final, desconto, paciente_id")
+          // `orcamentos` não tem `valor_final` nem `paciente_id`: o total já é
+          // gravado com o desconto abatido e o paciente vai pelo nome.
+          .select("created_at, status, valor_total, desconto, paciente_nome")
           .eq("clinica_id", clinicaId)
           .gte("created_at", ini)
           .lte("created_at", fim + "T23:59:59")
-          .order("created_at", { ascending: true }),
-      );
-      const pacMap = await lookupNames(
-        "pacientes",
-        rows.map((r) => r.paciente_id),
+          .order("created_at", { ascending: true })
+          .order("id"),
       );
       return rows.map((r) =>
         transformDate(r.created_at, {
           status: r.status ?? "—",
-          paciente: pacMap.get(r.paciente_id) ?? "—",
-          valor_final: Number(r.valor_final) || 0,
+          paciente: r.paciente_nome ?? "—",
+          valor_final: Number(r.valor_total) || 0,
           desconto: Number(r.desconto) || 0,
         }),
       );
@@ -365,19 +372,11 @@ const MESES_NOMES = [
   "12-Dez",
 ];
 
+// Páginas pedidas em ondas paralelas (um mês tem ~34 mil agendamentos e o
+// laço em fila indiana demorava). O teto cobre o cadastro inteiro de
+// pacientes (~254 mil) com folga.
 async function fetchAllRows(builder: () => any): Promise<any[]> {
-  const PAGE_SIZE = 1000;
-  const all: any[] = [];
-  let offset = 0;
-  while (true) {
-    const { data, error } = await builder().range(offset, offset + PAGE_SIZE - 1);
-    if (error) throw error;
-    const rows = (data ?? []) as any[];
-    all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
-  }
-  return all;
+  return buscarPaginado<any>(builder, { maxPaginas: 400, porOnda: 6 });
 }
 
 async function loadFinanceiroAgregado(
@@ -416,25 +415,24 @@ async function lookupNames(
   table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
   ids: Array<string | null | undefined>,
 ): Promise<Map<string, string>> {
-  const unique = Array.from(new Set(ids.filter((x): x is string => !!x)));
-  if (unique.length === 0) return new Map();
-  const { data } = await supabase.from(table).select("id, nome").in("id", unique);
-  const map = new Map<string, string>();
-  for (const r of (data ?? []) as Array<{ id: string; nome: string }>) {
-    map.set(r.id, r.nome);
-  }
-  return map;
+  // Em lotes: um `.in` com milhares de ids estourava a URL ou voltava cortado
+  // em 1.000, e o cubo mostrava "—" no lugar do nome do paciente.
+  return nomesPorId(table, ids);
 }
 
 async function lookupEspecialidadePorMedico(
   medicoIds: Array<string | null | undefined>,
 ): Promise<Map<string, string>> {
-  const unique = Array.from(new Set(medicoIds.filter((x): x is string => !!x)));
-  if (unique.length === 0) return new Map();
-  const { data: meds } = await supabase
-    .from("medicos")
-    .select("id, especialidade_id")
-    .in("id", unique);
+  const meds = Array.from(
+    (
+      await buscarPorIds<{ id: string; especialidade_id: string | null }>(
+        "medicos",
+        "id, especialidade_id",
+        medicoIds,
+      )
+    ).values(),
+  );
+  if (meds.length === 0) return new Map();
   const espIds = Array.from(
     new Set(((meds ?? []) as any[]).map((m) => m.especialidade_id).filter((x): x is string => !!x)),
   );
@@ -476,12 +474,13 @@ async function lookupEspecialidadePorProcedimento(
 ): Promise<Map<string, string>> {
   const unique = Array.from(new Set(procNomes.map(normalizeProcKey).filter((x) => x.length > 0)));
   if (unique.length === 0) return new Map();
-  const { data } = await supabase
-    .from("procedimentos")
-    .select("nome, grupo")
-    .eq("clinica_id", clinicaId);
+  // A clínica tem mais de 4 mil serviços; sem paginar vinham só 1.000 e a
+  // especialidade de boa parte dos atendimentos caía em "—".
+  const data = await fetchAllRows(() =>
+    supabase.from("procedimentos").select("nome, grupo").eq("clinica_id", clinicaId).order("id"),
+  );
   const map = new Map<string, string>();
-  for (const r of (data ?? []) as Array<{ nome: string; grupo: string | null }>) {
+  for (const r of data as Array<{ nome: string; grupo: string | null }>) {
     if (r.grupo) map.set(normalizeProcKey(r.nome), r.grupo);
   }
   return map;
