@@ -13326,50 +13326,42 @@ function AgendaPage() {
                       const ocultarPaciente = estornoPend && isMedicoOnly;
                       const ehLivre = isSlotLivre(a.paciente_nome);
 
-                      // Cor de fundo da linha — no tema claro, tom sólido -200 (o
-                      // overlay translúcido de antes ficava pastel e a recepção não
-                      // distinguia uma situação da outra). Realizado usa slate-300
-                      // para não se confundir com o zebrado slate-200. No modo
-                      // escuro segue o overlay bg-{cor}-500/N: um tom sólido claro
-                      // ali apagaria o texto claro (--foreground).
+                      // Cor de fundo da linha — no tema claro, os tons exatos do
+                      // sistema antigo (verde #d0f3c4, amarelo #ffffbf, azul
+                      // #b0deff), que a recepção pediu para manter: linha inteira
+                      // pintada, sem faixa lateral. O significado de cada cor é o
+                      // deste sistema (azul = check-in feito). No modo escuro segue
+                      // o overlay bg-{cor}-500/N: um tom sólido claro ali apagaria
+                      // o texto claro (--foreground).
                       // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
                       // estorno (mais crítico) e acima das demais cores.
                       const sinalizado = !!a.sinalizado_em;
                       const semFaturamento = ehSemFaturamento(a);
                       let bgClass = "";
-                      let borderLeft = "";
                       const naoVem = !ehLivre && statusNaoVem(a.status);
                       if (estornoPend) {
-                        bgClass = "bg-rose-200 dark:bg-rose-500/10";
-                        borderLeft = "border-l-4 border-rose-500";
+                        bgClass = "bg-[#ffc9c9] dark:bg-rose-500/10";
                       } else if (naoVem) {
                         // Cancelado / desistência / não compareceu: vermelho acima
                         // de qualquer outra marcação, para ninguém contar com ele.
-                        bgClass = "bg-red-200 dark:bg-rose-500/15";
-                        borderLeft = "border-l-4 border-rose-600";
+                        bgClass = "bg-[#ffc9c9] dark:bg-rose-500/15";
                       } else if (sinalizado) {
-                        bgClass = "bg-amber-200 dark:bg-amber-500/10";
-                        borderLeft = "border-l-4 border-amber-500";
+                        bgClass = "bg-[#ffffbf] dark:bg-amber-500/10";
                       } else if (a.origem_externa) {
-                        bgClass = "bg-violet-200 dark:bg-violet-500/10";
-                        borderLeft = "border-l-4 border-violet-400";
+                        bgClass = "bg-[#e2d6ff] dark:bg-violet-500/10";
                       } else if (realizado) {
-                        bgClass = "bg-slate-300 dark:bg-slate-500/10";
-                        borderLeft = "border-l-4 border-slate-500";
+                        bgClass = "bg-[#d3d7dc] dark:bg-slate-500/10";
                       } else if (presente) {
-                        bgClass = "bg-blue-200 dark:bg-blue-500/10";
-                        borderLeft = "border-l-4 border-blue-400";
+                        bgClass = "bg-[#b0deff] dark:bg-blue-500/10";
                       } else if (!ehLivre && a.status === "confirmado") {
                         // Confirmou por telefone/WhatsApp que vem: VERDE. Quem já fez
                         // check-in cai no ramo `presente` acima e fica azul — presença
                         // continua sendo só o clique manual da recepção.
-                        bgClass = "bg-green-200 dark:bg-emerald-500/15";
-                        borderLeft = "border-l-4 border-emerald-500";
+                        bgClass = "bg-[#d0f3c4] dark:bg-emerald-500/15";
                       }
 
                       const ehAgora = a.id === agoraAgId;
                       if (ehAgora && !bgClass) bgClass = "bg-blue-50 dark:bg-blue-500/5";
-                      if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
 
                       // Zebrado com contraste real (branco × slate-200) — a
                       // recepção perdia a linha com o tom quase branco de antes.
@@ -13382,7 +13374,7 @@ function AgendaPage() {
                           : "bg-slate-200 dark:bg-white/5";
                       // Destaque ao passar o mouse vem por último para vencer o
                       // hover da cor de situação: a atendente não perde a linha.
-                      const linhaClass = `${zebra} ${bgClass} ${borderLeft} border-b border-b-slate-300 hover:bg-blue-100 dark:border-b-slate-700 dark:hover:bg-blue-500/20`;
+                      const linhaClass = `${zebra} ${bgClass} border-b border-b-white hover:bg-blue-100 dark:border-b-slate-700 dark:hover:bg-blue-500/20`;
 
                       return (
                         <Fragment key={a.id}>
@@ -13443,19 +13435,19 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Dia da semana */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-slate-900 dark:text-muted-foreground">
                               {fmtDiaSemana(a.inicio)}
                             </TableCell>
 
                             {/* Data */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-slate-900 dark:text-muted-foreground">
                               {fmtData(a.inicio)}
                             </TableCell>
 
                             {/* Horário — uma linha só, tabular, 24h. Em agenda de
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-[#007bf7] dark:text-sky-400">
                               {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
