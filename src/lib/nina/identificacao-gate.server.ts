@@ -314,7 +314,7 @@ export async function aplicarGateIdentificacao(params: {
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "HANDOFF";
     const ok = await params.encaminharVagaIndisponivel?.(MOTIVO_SFP).catch(() => false) ?? false;
-    return resultadoEncaminhamentoSfp(ok);
+    return resultadoEncaminhamentoSfp(ok, a.procedure ?? null);
   };
   const encaminhar = async (modalidadePendente = false) => {
     const motivo = modalidadePendente ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."

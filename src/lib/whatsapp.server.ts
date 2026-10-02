@@ -1928,23 +1928,6 @@ async function gerarRespostaNinaInterno(
     // precisa dessa referência para reformular a chamada no mesmo turno.
     if ((r.dados as { codigo?: string } | null)?.codigo === "CATALOGO_QUERY_NAO_INTERPRETADA")
       return limitarRetornoParaModelo(payload);
-    if (
-      r.capacidade === "requestHumanHandoff" &&
-      r.success &&
-      (r.dados as { sem_mensagem_paciente?: boolean } | null)?.sem_mensagem_paciente === true
-    ) {
-      houveHandoff = true;
-      const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
-      limparEscolhaAgendamento(fluxoEstado);
-      fluxoEstado.appointment.slot_options = null;
-      fluxoEstado.flow.stage = "HANDOFF";
-      finalizacaoHandoff = {
-        texto: "",
-        textoModelo: textoModeloAtual,
-        handoffConfirmado: true,
-        motivo: MOTIVO_SFP,
-      };
-    }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
       if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome, undefined, itemSfpDoResultado(r.dados));
       return limitarRetornoParaModelo(payload);
