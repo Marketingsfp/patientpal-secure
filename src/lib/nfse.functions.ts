@@ -821,7 +821,13 @@ export const consultarNfse = createServerFn({ method: "POST" })
       .from("nfse")
       .update(updates as never)
       .eq("id", nota.id);
-    return { ok: true, status: body?.status ?? null, body };
+    return {
+      ok: true,
+      status: (body?.status as string | undefined) ?? null,
+      body,
+      erroConsulta: null,
+      limiteExcedido: false,
+    };
   });
 
 /** Cancela uma NFS-e já emitida. */
