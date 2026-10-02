@@ -693,6 +693,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
       .update({
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        // Polling terminou só com falha de consulta (ex.: limite_excedido):
+        // registra a falha; o status da nota continua "processando".
+        ...(falhaDeConsultaFocus(body) ? camposDaConsulta(falhaDeConsultaFocus(body)) : {}),
         observacoes: observacoesComRenumeracao,
         payload_envio: payload,
         payload_resposta: body,
@@ -1282,6 +1285,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       .update({
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        // Polling terminou só com falha de consulta (ex.: limite_excedido):
+        // registra a falha; o status da nota continua "processando".
+        ...(falhaDeConsultaFocus(body) ? camposDaConsulta(falhaDeConsultaFocus(body)) : {}),
         observacoes: observacoesComRenumeracao,
         payload_resposta: body,
       })
