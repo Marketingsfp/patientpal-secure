@@ -57,8 +57,7 @@ export function PesquisaConversas() {
     // Pede a seleção ANTES de trocar de aba: com a Inbox ainda desmontada o
     // pedido fica guardado e é entregue quando ela monta.
     pedirSelecaoConversa(id);
-    void navigate({ to: "/app/nina", hash: "atend-inbox" }).then(() =>
-    );
+    void navigate({ to: "/app/nina", hash: "atend-inbox" });
   };
 
   return (
