@@ -4,7 +4,7 @@ import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
 import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
-  respostaEncaminhamentoSfp, resultadoEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
+  respostaEncaminhamentoSfp, itemSfpDoResultado, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
 
 import { normalizar } from "@/lib/nina-especialidade";
 
@@ -1848,6 +1848,7 @@ async function gerarRespostaNinaInterno(
   async function encaminharRegraCatalogo(
     ferramentaOrigem: string,
     ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>,
+    itemSfp?: string | null,
   ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
@@ -1860,8 +1861,7 @@ async function gerarRespostaNinaInterno(
     }
     const argumentos = ausencia ?? {
       motivo: MOTIVO_SFP,
-      resumo:
-        "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.",
+      resumo: `Paciente pediu ${itemSfp ? `"${itemSfp}"` : "um atendimento"}, que no cadastro é feito pelo profissional SFP. A Maria informou ao paciente que esse atendimento é realizado na unidade Policlínica São Francisco de Paula (endereço do diretório) e transferiu, sem informar valor, horário ou profissional. A equipe continua o atendimento.`,
       urgencia: "normal",
     };
     const origem =
@@ -1882,7 +1882,7 @@ async function gerarRespostaNinaInterno(
     limparEscolhaAgendamento(fluxoEstado);
     fluxoEstado.appointment.slot_options = null;
     fluxoEstado.flow.stage = "HANDOFF";
-    finalizacaoHandoff = { texto: ausencia ? respostaSemRegistro(confirmado, opcoes?.teste === true) : respostaEncaminhamentoSfp(confirmado), textoModelo: textoModeloAtual,
+    finalizacaoHandoff = { texto: ausencia ? respostaSemRegistro(confirmado, opcoes?.teste === true) : respostaEncaminhamentoSfp(confirmado, itemSfp), textoModelo: textoModeloAtual,
       handoffConfirmado: confirmado, motivo: argumentos.motivo };
     registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento obrigatório pelo catálogo",
       dados: { origem_solicitacao: "servidor", motivo: argumentos.motivo, ferramenta_origem: ferramentaOrigem,
@@ -1946,7 +1946,7 @@ async function gerarRespostaNinaInterno(
       };
     }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
-      if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome);
+      if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome, undefined, itemSfpDoResultado(r.dados));
       return limitarRetornoParaModelo(payload);
     }
     const esclarecimentoAtual = (
@@ -2065,7 +2065,7 @@ async function gerarRespostaNinaInterno(
         selecaoDoTurno?.selecao?.raizesFonte.map((r) => r.registro),
       )
     )
-      await encaminharRegraCatalogo(nome);
+      await encaminharRegraCatalogo(nome, undefined, itemSfpDoResultado(r.dados));
     return {
       ...(limitarRetornoParaModelo(payload) as Record<string, unknown>),
       // A seleção legada auxilia referências internas; não é uma declaração
@@ -2629,19 +2629,10 @@ async function gerarRespostaNinaInterno(
       `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`,
     );
     if (finalizacaoHandoff.motivo === MOTIVO_SFP && finalizacaoHandoff.handoffConfirmado) {
-      // Não deixar o fallback de texto vazio, o rodapé ou o transporte recriar
-      // uma mensagem depois da atribuição silenciosa solicitada pela clínica.
-      if (opcoes?.auditoria) opcoes.auditoria.resultado = resultadoEncaminhamentoSfp(true);
-      marcarOrigem("nenhuma", "profissional SFP: encaminhamento silencioso confirmado");
-      registrarEtapa({ tipo: "mensagem_final", fonte: "sistema",
-        titulo: "Encaminhamento SFP sem mensagem ao paciente",
-        dados: { texto: "", handoff_confirmado: true, sem_mensagem_paciente: true },
-        codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" } });
-      const { fecharAuditoriaInstrucoesDoTurno } = await import("@/lib/nina/rastreio/turno.server");
-      fecharAuditoriaInstrucoesDoTurno({ textoEntregue: "" });
-      rastro?.concluir("response.validate", { handoff: true, sem_mensagem_paciente: true });
-      rastro?.pular("message.outbound", "profissional SFP: apenas encaminhar para a equipe");
-      return "";
+      // Desde 02/10/2026 o SFP não é silencioso: a mensagem com a unidade São
+      // Francisco de Paula segue o caminho normal de entrega; o aviso e o
+      // protocolo vêm do fluxo de transferência.
+      marcarOrigem("codigo", "profissional SFP: unidade São Francisco informada e transferência confirmada");
     }
   }
 
