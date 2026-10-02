@@ -72,6 +72,16 @@ function banco(ms: any[], es: any[]) {
   const client = {
     rpc: async (nome: string) => ({ data: nome === "is_member" ? membro : gestor, error: null }),
     from(tabela: string) {
+      // Checagem de supervisão (permissão), não é leitura do histórico.
+      if (tabela === "atend_departamento_membros") {
+        const vazio: any = {
+          select: () => vazio,
+          eq: () => vazio,
+          in: () => vazio,
+          limit: async () => ({ data: [], error: null }),
+        };
+        return vazio;
+      }
       const filtros: ((r: any) => boolean)[] = [];
       const ordens: { campo: string; ascending: boolean }[] = [];
       let limite = Infinity;
