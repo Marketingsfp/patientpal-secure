@@ -553,6 +553,44 @@ export function AtendInbox() {
       return ta - tb;
     });
   })();
+
+  // Prévia do card: última mensagem trocada com o paciente (recebida ou
+  // enviada). Avisos internos do sistema (status "system") ficam de fora.
+  const [previas, setPrevias] = useState<Record<string, string>>({});
+  const chavePrevias = convsVisiveis
+    .slice(0, 200)
+    .map((c) => `${c.id}:${c.ultima_msg_em ?? ""}`)
+    .join("|");
+  useEffect(() => {
+    const ids = convsVisiveis.slice(0, 200).map((c) => String(c.id));
+    if (!ids.length) return;
+    let vale = true;
+    const t = setTimeout(async () => {
+      const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      const { data } = await supabase
+        .from("whatsapp_mensagens")
+        .select("conversa_id, body, tipo, created_at")
+        .in("conversa_id", ids)
+        .neq("status", "system")
+        .gte("created_at", desde)
+        .order("created_at", { ascending: false })
+        .limit(3000);
+      if (!vale || !data) return;
+      const novo: Record<string, string> = {};
+      for (const m of data as Array<{ conversa_id: string | null; body: string | null; tipo: string | null }>) {
+        const id = String(m.conversa_id ?? "");
+        if (!id || id in novo) continue;
+        const texto = (m.body ?? "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
+        novo[id] = texto || (m.tipo === "image" ? "📷 Imagem" : m.tipo === "audio" ? "🎤 Áudio" : `[${m.tipo ?? "mensagem"}]`);
+      }
+      setPrevias((prev) => ({ ...prev, ...novo }));
+    }, 400);
+    return () => {
+      vale = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chavePrevias]);
   useEffect(() => {
     const ativar = () => setSoNaoAtribuidas(true);
     const ativarCriticas = () => {
@@ -3082,6 +3120,11 @@ export function AtendInbox() {
                       )}
                       <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                     </div>
+                    {previas[c.id] && (
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground" title={previas[c.id]}>
+                        {previas[c.id]}
+                      </div>
+                    )}
                     <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtData(c.ultima_msg_em)}</div>
                   </button>
                 ))}
