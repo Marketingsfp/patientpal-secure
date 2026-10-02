@@ -196,6 +196,7 @@ type Convenio = {
   // a aba Informativo exibe o PDF em vez do texto do editor.
   informativo_pdf_path?: string | null;
   termo_inclusao_html: string | null;
+  item_lista_servico?: string | null;
 };
 
 type Faixa = {
@@ -231,6 +232,7 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
   const [informativoPdfPath, setInformativoPdfPath] = useState<string | null>(null);
   const [informativoModo, setInformativoModo] = useState<"pdf" | "texto">("texto");
   const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
+  const [itemListaServico, setItemListaServico] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([
     { vidas_de: 1, vidas_ate: null, valor_mensal: 0 },
   ]);
@@ -307,6 +309,7 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
     setInformativoPdfPath(null);
     setInformativoModo("texto");
     setTermoInclusaoHtml("");
+    setItemListaServico("");
     setFaixas([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
     setView("form");
   };
@@ -321,6 +324,7 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
     setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setItemListaServico(c.item_lista_servico ?? "");
     setAdesaoNoAto(Boolean((c as any).adesao_no_ato));
     setTaxaInclusaoDep(
       Number((c as unknown as { taxa_inclusao_dependente?: number }).taxa_inclusao_dependente ?? 0),
@@ -446,6 +450,10 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
       adesao_no_ato: cobrarAdesaoNoAto,
+      // Vazio = notas de mensalidade usam o código do emitente.
+      ...(produto !== "terapeutico"
+        ? { item_lista_servico: itemListaServico.trim() || null }
+        : {}),
       taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
@@ -772,6 +780,21 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
                     {descricao.trim().length} / {DESCRICAO_MAX}
                   </p>
                 </div>
+                {produto !== "terapeutico" ? (
+                  <div>
+                    <Label>Código de tributação nacional (cTribNac)</Label>
+                    <Input
+                      value={itemListaServico}
+                      maxLength={20}
+                      placeholder="Ex.: 042201"
+                      onChange={(e) => setItemListaServico(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Usado nas notas de mensalidade e taxa de adesão deste convênio. Se ficar
+                      vazio, vale o código do emitente.
+                    </p>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <Switch checked={ativo} onCheckedChange={setAtivo} />
                   <Label>Ativo</Label>

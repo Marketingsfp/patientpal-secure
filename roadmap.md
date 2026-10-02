@@ -24,3 +24,4 @@
 
 ## Atendimento
 - [x] Painel da TV: tempo médio de resposta das atendentes, mais antiga sem resposta e volume por hora — não publicado
+- [x] NFS-e — cTribNac por convênio nas notas de mensalidade/adesão do Cartão Benefício (não publicado)

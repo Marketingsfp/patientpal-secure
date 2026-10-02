@@ -1,0 +1,2 @@
+ALTER TABLE public.cb_convenios ADD COLUMN IF NOT EXISTS item_lista_servico text NULL;
+COMMENT ON COLUMN public.cb_convenios.item_lista_servico IS 'Código de tributação nacional (cTribNac) usado nas NFS-e de mensalidade e taxa de adesão deste convênio. Vazio = usa o código do emitente.';
