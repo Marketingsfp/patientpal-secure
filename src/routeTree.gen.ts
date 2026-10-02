@@ -98,6 +98,7 @@ import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppOrcamentosAgendaRouteImport } from './routes/_authenticated/app.orcamentos-agenda'
 import { Route as AuthenticatedAppPainelRouteImport } from './routes/_authenticated/app.painel'
 import { Route as AuthenticatedAppPainelExecutivoRouteImport } from './routes/_authenticated/app.painel-executivo'
+import { Route as AuthenticatedAppPainelTvAtendimentoRouteImport } from './routes/_authenticated/app.painel-tv-atendimento'
 import { Route as AuthenticatedAppPerfisRouteImport } from './routes/_authenticated/app.perfis'
 import { Route as AuthenticatedAppPlanosRouteImport } from './routes/_authenticated/app.planos'
 import { Route as AuthenticatedAppProcedimentosRouteImport } from './routes/_authenticated/app.procedimentos'
@@ -680,6 +681,12 @@ const AuthenticatedAppPainelExecutivoRoute =
   AuthenticatedAppPainelExecutivoRouteImport.update({
     id: '/painel-executivo',
     path: '/painel-executivo',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppPainelTvAtendimentoRoute =
+  AuthenticatedAppPainelTvAtendimentoRouteImport.update({
+    id: '/painel-tv-atendimento',
+    path: '/painel-tv-atendimento',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppPerfisRoute = AuthenticatedAppPerfisRouteImport.update({
@@ -1333,6 +1340,7 @@ export interface FileRoutesByFullPath {
   '/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/app/painel': typeof AuthenticatedAppPainelRoute
   '/app/painel-executivo': typeof AuthenticatedAppPainelExecutivoRoute
+  '/app/painel-tv-atendimento': typeof AuthenticatedAppPainelTvAtendimentoRoute
   '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
@@ -1515,6 +1523,7 @@ export interface FileRoutesByTo {
   '/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/app/painel': typeof AuthenticatedAppPainelRoute
   '/app/painel-executivo': typeof AuthenticatedAppPainelExecutivoRoute
+  '/app/painel-tv-atendimento': typeof AuthenticatedAppPainelTvAtendimentoRoute
   '/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/app/planos': typeof AuthenticatedAppPlanosRoute
   '/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
@@ -1703,6 +1712,7 @@ export interface FileRoutesById {
   '/_authenticated/app/orcamentos-agenda': typeof AuthenticatedAppOrcamentosAgendaRoute
   '/_authenticated/app/painel': typeof AuthenticatedAppPainelRoute
   '/_authenticated/app/painel-executivo': typeof AuthenticatedAppPainelExecutivoRoute
+  '/_authenticated/app/painel-tv-atendimento': typeof AuthenticatedAppPainelTvAtendimentoRoute
   '/_authenticated/app/perfis': typeof AuthenticatedAppPerfisRoute
   '/_authenticated/app/planos': typeof AuthenticatedAppPlanosRoute
   '/_authenticated/app/procedimentos': typeof AuthenticatedAppProcedimentosRoute
@@ -1891,6 +1901,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos-agenda'
     | '/app/painel'
     | '/app/painel-executivo'
+    | '/app/painel-tv-atendimento'
     | '/app/perfis'
     | '/app/planos'
     | '/app/procedimentos'
@@ -2073,6 +2084,7 @@ export interface FileRouteTypes {
     | '/app/orcamentos-agenda'
     | '/app/painel'
     | '/app/painel-executivo'
+    | '/app/painel-tv-atendimento'
     | '/app/perfis'
     | '/app/planos'
     | '/app/procedimentos'
@@ -2260,6 +2272,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/orcamentos-agenda'
     | '/_authenticated/app/painel'
     | '/_authenticated/app/painel-executivo'
+    | '/_authenticated/app/painel-tv-atendimento'
     | '/_authenticated/app/perfis'
     | '/_authenticated/app/planos'
     | '/_authenticated/app/procedimentos'
@@ -3032,6 +3045,13 @@ declare module '@tanstack/react-router' {
       path: '/painel-executivo'
       fullPath: '/app/painel-executivo'
       preLoaderRoute: typeof AuthenticatedAppPainelExecutivoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/painel-tv-atendimento': {
+      id: '/_authenticated/app/painel-tv-atendimento'
+      path: '/painel-tv-atendimento'
+      fullPath: '/app/painel-tv-atendimento'
+      preLoaderRoute: typeof AuthenticatedAppPainelTvAtendimentoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/perfis': {
@@ -3951,6 +3971,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppOrcamentosAgendaRoute: typeof AuthenticatedAppOrcamentosAgendaRoute
   AuthenticatedAppPainelRoute: typeof AuthenticatedAppPainelRoute
   AuthenticatedAppPainelExecutivoRoute: typeof AuthenticatedAppPainelExecutivoRoute
+  AuthenticatedAppPainelTvAtendimentoRoute: typeof AuthenticatedAppPainelTvAtendimentoRoute
   AuthenticatedAppPerfisRoute: typeof AuthenticatedAppPerfisRoute
   AuthenticatedAppPlanosRoute: typeof AuthenticatedAppPlanosRoute
   AuthenticatedAppProcedimentosRoute: typeof AuthenticatedAppProcedimentosRoute
@@ -4058,6 +4079,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppOrcamentosAgendaRoute: AuthenticatedAppOrcamentosAgendaRoute,
   AuthenticatedAppPainelRoute: AuthenticatedAppPainelRoute,
   AuthenticatedAppPainelExecutivoRoute: AuthenticatedAppPainelExecutivoRoute,
+  AuthenticatedAppPainelTvAtendimentoRoute:
+    AuthenticatedAppPainelTvAtendimentoRoute,
   AuthenticatedAppPerfisRoute: AuthenticatedAppPerfisRoute,
   AuthenticatedAppPlanosRoute: AuthenticatedAppPlanosRoute,
   AuthenticatedAppProcedimentosRoute: AuthenticatedAppProcedimentosRoute,
