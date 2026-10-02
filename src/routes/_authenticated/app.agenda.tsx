@@ -13326,11 +13326,12 @@ function AgendaPage() {
                       const ocultarPaciente = estornoPend && isMedicoOnly;
                       const ehLivre = isSlotLivre(a.paciente_nome);
 
-                      // Cor de fundo da linha — overlay translúcido (bg-{cor}-500/N)
-                      // em vez de tom sólido -50/-100: o sólido fica quase branco e,
-                      // no modo escuro, o texto claro (--foreground) perde contraste
-                      // sobre ele. O overlay se mistura com o fundo real da linha e
-                      // funciona nos dois temas.
+                      // Cor de fundo da linha — no tema claro, tom sólido -200 (o
+                      // overlay translúcido de antes ficava pastel e a recepção não
+                      // distinguia uma situação da outra). Realizado usa slate-300
+                      // para não se confundir com o zebrado slate-200. No modo
+                      // escuro segue o overlay bg-{cor}-500/N: um tom sólido claro
+                      // ali apagaria o texto claro (--foreground).
                       // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
                       // estorno (mais crítico) e acima das demais cores.
                       const sinalizado = !!a.sinalizado_em;
@@ -13339,35 +13340,35 @@ function AgendaPage() {
                       let borderLeft = "";
                       const naoVem = !ehLivre && statusNaoVem(a.status);
                       if (estornoPend) {
-                        bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
+                        bgClass = "bg-rose-200 dark:bg-rose-500/10";
                         borderLeft = "border-l-4 border-rose-500";
                       } else if (naoVem) {
                         // Cancelado / desistência / não compareceu: vermelho acima
                         // de qualquer outra marcação, para ninguém contar com ele.
-                        bgClass = "bg-rose-500/15 hover:bg-rose-500/20";
+                        bgClass = "bg-red-200 dark:bg-rose-500/15";
                         borderLeft = "border-l-4 border-rose-600";
                       } else if (sinalizado) {
-                        bgClass = "bg-amber-500/10 hover:bg-amber-500/15";
+                        bgClass = "bg-amber-200 dark:bg-amber-500/10";
                         borderLeft = "border-l-4 border-amber-500";
                       } else if (a.origem_externa) {
-                        bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
+                        bgClass = "bg-violet-200 dark:bg-violet-500/10";
                         borderLeft = "border-l-4 border-violet-400";
                       } else if (realizado) {
-                        bgClass = "bg-slate-500/10 hover:bg-slate-500/15";
+                        bgClass = "bg-slate-300 dark:bg-slate-500/10";
                         borderLeft = "border-l-4 border-slate-500";
                       } else if (presente) {
-                        bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
+                        bgClass = "bg-blue-200 dark:bg-blue-500/10";
                         borderLeft = "border-l-4 border-blue-400";
                       } else if (!ehLivre && a.status === "confirmado") {
                         // Confirmou por telefone/WhatsApp que vem: VERDE. Quem já fez
                         // check-in cai no ramo `presente` acima e fica azul — presença
                         // continua sendo só o clique manual da recepção.
-                        bgClass = "bg-emerald-500/15 hover:bg-emerald-500/20";
+                        bgClass = "bg-green-200 dark:bg-emerald-500/15";
                         borderLeft = "border-l-4 border-emerald-500";
                       }
 
                       const ehAgora = a.id === agoraAgId;
-                      if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
+                      if (ehAgora && !bgClass) bgClass = "bg-blue-50 dark:bg-blue-500/5";
                       if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
 
                       // Zebrado com contraste real (branco × slate-200) — a
@@ -13454,7 +13455,7 @@ function AgendaPage() {
                             {/* Horário — uma linha só, tabular, 24h. Em agenda de
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-slate-800 dark:text-slate-100">
+                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">
                               {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
@@ -13475,7 +13476,7 @@ function AgendaPage() {
                                   m && m.usa_sistema === false && !recursoIds.has(m.id);
                                 return (
                                   <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                                    <span className="block truncate text-xs font-medium text-slate-800 dark:text-slate-100" title={label}>
+                                    <span className="block truncate text-xs font-medium text-slate-900 dark:text-slate-100" title={label}>
                                       {label}
                                     </span>
                                     {manual && (
@@ -13517,7 +13518,7 @@ function AgendaPage() {
                                     {a.status === "confirmado" && (
                                       <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                                     )}
-                                    <span className="block max-w-full truncate text-xs font-bold text-foreground">
+                                    <span className="block max-w-full truncate text-xs font-bold text-slate-900 dark:text-foreground">
                                       {a.paciente_nome}
                                     </span>
                                   </span>

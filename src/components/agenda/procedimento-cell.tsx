@@ -112,7 +112,7 @@ export function ProcedimentoCell({
       <Badge
         variant="secondary"
         title={tituloAtual}
-        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100"
+        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[12px] font-medium leading-snug text-slate-900 dark:text-slate-100"
       >
         {textoAtual}
       </Badge>
@@ -125,7 +125,7 @@ export function ProcedimentoCell({
         <button
           type="button"
           title={`${tituloAtual} — clique para trocar o serviço`}
-          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[12px] font-medium uppercase leading-snug text-slate-800 dark:text-slate-100 hover:bg-primary/10 hover:text-primary"
+          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[12px] font-medium uppercase leading-snug text-slate-900 dark:text-slate-100 hover:bg-primary/10 hover:text-primary"
         >
           <span
             title={tituloAtual}
