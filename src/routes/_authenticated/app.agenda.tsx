@@ -13415,7 +13415,7 @@ function AgendaPage() {
                           apagada pela tela (o "Excluir" só age no que está
                           marcado). Quem protege o paciente é a trava dentro de
                           excluirSelecionados, não a caixinha desabilitada. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-xs">
                               <Checkbox
                                 checked={selecionados.has(a.id)}
                                 onCheckedChange={() => toggleSel(a.id)}
@@ -13424,7 +13424,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Ficha */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-center font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                               {ehFila ? (
                                 <span className="text-sm font-bold text-primary">
                                   #{fichaNum || "—"}
@@ -13435,19 +13435,19 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Dia da semana */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-slate-900 dark:text-muted-foreground">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-slate-900 dark:text-muted-foreground">
                               {fmtDiaSemana(a.inicio)}
                             </TableCell>
 
                             {/* Data */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-slate-900 dark:text-muted-foreground">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle whitespace-nowrap text-[12px] font-medium text-slate-900 dark:text-muted-foreground">
                               {fmtData(a.inicio)}
                             </TableCell>
 
                             {/* Horário — uma linha só, tabular, 24h. Em agenda de
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-[#007bf7] dark:text-sky-400">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-[#007bf7] dark:text-sky-400">
                               {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
@@ -13460,7 +13460,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Profissional */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               {(() => {
                                 const label = medicoNomeAgendamento(a);
                                 const m = medicos.find((x) => x.id === a.medico_id);
@@ -13468,7 +13468,10 @@ function AgendaPage() {
                                   m && m.usa_sistema === false && !recursoIds.has(m.id);
                                 return (
                                   <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                                    <span className="block truncate text-xs font-medium text-slate-900 dark:text-slate-100" title={label}>
+                                    <span
+                                      className="block truncate text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100"
+                                      title={label}
+                                    >
                                       {label}
                                     </span>
                                     {manual && (
@@ -13482,20 +13485,20 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Cliente */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               {ocultarPaciente ? (
-                                <span className="block truncate text-xs italic text-rose-600">
+                                <span className="block truncate text-sm font-medium italic text-rose-600">
                                   — aguardando estorno —
                                 </span>
                               ) : ehLivre ? (
-                                <span className="block truncate text-xs font-medium text-primary/60">
+                                <span className="block truncate text-sm font-medium text-primary/70">
                                   Nenhum paciente agendado
                                 </span>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                                  className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
+                                  className="block w-full max-w-full overflow-hidden text-left text-sm text-foreground hover:text-primary"
                                   title={a.paciente_nome}
                                 >
                                   <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
@@ -13510,7 +13513,7 @@ function AgendaPage() {
                                     {a.status === "confirmado" && (
                                       <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                                     )}
-                                    <span className="block max-w-full truncate text-xs font-bold text-slate-900 dark:text-foreground">
+                                    <span className="block max-w-full truncate text-sm font-bold leading-tight text-slate-900 dark:text-foreground">
                                       {a.paciente_nome}
                                     </span>
                                   </span>
@@ -13549,7 +13552,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Serviço */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               <ProcedimentoCell
                                 valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                                 rotuloExibicao={
@@ -13574,7 +13577,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Situação */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
                               {ehLivre ? (
                                 (() => {
                                   const lockNome = slotTravadoPorOutro(a);
@@ -13640,7 +13643,7 @@ function AgendaPage() {
                           vazia (nem o traço, que já custava largura); com
                           observação mostra o balão com a bolinha vermelha,
                           o texto no tooltip e o modal completo no clique. */}
-                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1 tela-alta:py-1.5 px-1 align-middle text-center">
+                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-0.5 tela-alta:py-1 px-1 align-middle text-center">
                               {(() => {
                                 const obs = (a.observacoes ?? "").trim();
                                 if (ehLivre || ocultarPaciente || !obs) return null;
@@ -13676,14 +13679,16 @@ function AgendaPage() {
                             {/* Ações - Botões na linha + Menu
                                 Os botões desta linha são 24px (`h-6 tela-alta:h-7 w-6 tela-alta:w-7`), e não
                                 28px. Quem define a altura da linha da tabela são
-                                eles, não o texto: com 24px mais o respiro de 4px,
-                                a linha fica em 32px no lugar de 40px, o que cabe
+                                eles, não o texto: com 24px mais o respiro de 2px
+                                (py-0.5, reduzido em 02/10/2026 para caber a fonte
+                                de 14px sem a linha crescer), a linha fica em
+                                ~28px no lugar de 40px, o que cabe
                                 cerca de três linhas a mais na tela de um
                                 notebook. Foi uma troca decidida em 25/09/2026 —
                                 alvo de clique menor em troca de menos rolagem,
                                 porque a recepção reclamou de rolar demais.
                                 24px é o piso: não diminuir mais. */}
-                            <TableCell className="w-[170px] min-w-[170px] py-1 tela-alta:py-1.5 px-2 text-right whitespace-nowrap">
+                            <TableCell className="w-[170px] min-w-[170px] py-0.5 tela-alta:py-1 px-2 text-right whitespace-nowrap">
                               <TooltipProvider delayDuration={200}>
                                 <div className="flex items-center justify-end gap-1.5">
                                   {/* Confirmar (1 clique). Ocupa o lugar do check-in:
