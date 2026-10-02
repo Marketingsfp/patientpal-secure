@@ -5,7 +5,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, ArrowLeft, Clock, Coffee, DoorOpen, Expand, Inbox, MessagesSquare, UserX } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Clock, Coffee, Hourglass, Timer, DoorOpen, Expand, Inbox, MessagesSquare, UserX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRelogioPausa } from "@/hooks/use-relogio-pausa";
@@ -35,6 +35,9 @@ type Dados = {
   naoAtribuidas: number;
   espera: string[];
   conversasDoDia: number;
+  tempoMedioRespostaSeg: number | null;
+  respostasMedidas: number;
+  volumePorHora: number[];
   atualizadoEm: string;
 };
 
@@ -104,6 +107,9 @@ function PainelTvAtendimento() {
   const online = dados?.atendentes.filter((a) => a.estado === "ONLINE") ?? [];
   const pausa = dados?.atendentes.filter((a) => a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA") ?? [];
   const offline = dados?.atendentes.filter((a) => a.estado === "OFFLINE") ?? [];
+  // Mensagem mais antiga ainda sem resposta (só conversas abertas com atendente).
+  const maisAntiga = dados?.espera.length ? Math.min(...dados.espera.map((d) => Date.parse(d))) : null;
+  const minAntiga = maisAntiga ? Math.max(0, Math.floor((relogio - maisAntiga) / 60000)) : null;
 
   const telaCheia = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -141,12 +147,16 @@ function PainelTvAtendimento() {
         <div className="grid flex-1 place-items-center text-center text-[3vh] text-atd-danger-ink">{erro}</div>
       ) : (
         <>
-          <section className="grid h-[17vh] shrink-0 grid-cols-4 gap-[1.2vw]">
+          <section className="grid h-[15vh] shrink-0 grid-cols-6 gap-[1vw]">
             <Kpi titulo="Espera crítica" valor={criticas} icone={AlertTriangle} tom={criticas > 0 ? "danger" : "neutro"} pulsar={criticas > 0} />
             <Kpi titulo="Pendentes" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Não atribuídas" valor={dados?.naoAtribuidas ?? 0} icone={UserX} tom={(dados?.naoAtribuidas ?? 0) > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Conversas hoje" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
+            <Kpi titulo="Tempo médio de resposta" valor={dados?.tempoMedioRespostaSeg == null ? "—" : duracao(dados.tempoMedioRespostaSeg / 60)} icone={Timer} tom="blue" dica={dados ? `hoje · ${dados.respostasMedidas} respostas` : undefined} />
+            <Kpi titulo="Mais antiga sem resposta" valor={minAntiga == null ? "—" : duracao(minAntiga)} icone={Hourglass} tom={minAntiga != null && minAntiga > 10 ? "danger" : minAntiga != null ? "warn" : "neutro"} />
           </section>
+
+          <VolumePorHora valores={dados?.volumePorHora ?? []} horaAtual={Number(new Date(relogio).toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }))} />
 
           <section className="grid min-h-0 flex-1 grid-cols-[2fr_1fr] gap-[1.2vw]">
             <Coluna titulo="Online" total={online.length} tom="ok">
@@ -176,14 +186,49 @@ const TONS = {
   neutro: "border-atd-border bg-atd-surface text-atd-ink",
 } as const;
 
-function Kpi({ titulo, valor, icone: Icone, tom, pulsar }: { titulo: string; valor: number; icone: typeof Inbox; tom: keyof typeof TONS; pulsar?: boolean }) {
+function duracao(min: number): string {
+  if (min < 1) return "<1 min";
+  const t = Math.round(min);
+  if (t < 60) return `${t} min`;
+  return `${Math.floor(t / 60)}h${String(t % 60).padStart(2, "0")}`;
+}
+
+function VolumePorHora({ valores, horaAtual }: { valores: number[]; horaAtual: number }) {
+  // Mostra das 06h às 22h; fora disso o volume é residual.
+  const horas = Array.from({ length: 17 }, (_, i) => i + 6);
+  const max = Math.max(1, ...horas.map((h) => valores[h] ?? 0));
+  const pico = horas.reduce((m, h) => ((valores[h] ?? 0) > (valores[m] ?? 0) ? h : m), horas[0]!);
+  return (
+    <section className="flex h-[15vh] shrink-0 flex-col rounded-3xl border border-atd-border bg-atd-surface p-[1.2vh_1.2vw]">
+      <h2 className="flex shrink-0 items-baseline gap-3 text-[2.2vh] font-bold">
+        Mensagens de pacientes por hora (hoje)
+        {(valores[pico] ?? 0) > 0 && <span className="text-[1.7vh] font-medium text-atd-ink-soft">pico às {pico}h · {valores[pico]} mensagens</span>}
+      </h2>
+      <div className="mt-[0.6vh] grid min-h-0 flex-1 gap-[0.4vw]" style={{ gridTemplateColumns: `repeat(${horas.length}, minmax(0, 1fr))` }}>
+        {horas.map((h) => {
+          const v = valores[h] ?? 0;
+          return (
+            <div key={h} className="flex min-h-0 flex-col items-center justify-end gap-[0.3vh]">
+              <span className="text-[1.5vh] font-bold tabular-nums">{v || ""}</span>
+              <div className={cn("w-full rounded-t-md", h === horaAtual ? "bg-atd-blue" : "bg-atd-blue-soft")} style={{ height: `${(v / max) * 100}%`, minHeight: v ? 3 : 0, maxHeight: "70%" }} />
+              <span className={cn("text-[1.4vh] tabular-nums", h === horaAtual ? "font-bold" : "text-atd-ink-soft")}>{h}h</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function Kpi({ titulo, valor, icone: Icone, tom, pulsar, dica }: { titulo: string; valor: number | string; icone: typeof Inbox; tom: keyof typeof TONS; pulsar?: boolean; dica?: string }) {
   return (
     <div className={cn("flex min-w-0 flex-col justify-between rounded-3xl border-2 p-[2vh_1.4vw]", TONS[tom], pulsar && "animate-pulse")}>
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate text-[2.4vh] font-semibold uppercase tracking-wide">{titulo}</span>
+        <span className="line-clamp-2 text-[1.9vh] font-semibold uppercase leading-tight tracking-wide">{titulo}</span>
         <Icone className="h-[3.6vh] w-[3.6vh] shrink-0" />
       </div>
-      <span className="text-[8.5vh] font-black leading-none tabular-nums">{valor}</span>
+      <span className={cn("font-black leading-none tabular-nums", typeof valor === "string" ? "text-[5.5vh]" : "text-[7vh]")}>{valor}</span>
+      {dica && <span className="truncate text-[1.5vh] opacity-80">{dica}</span>}
     </div>
   );
 }
