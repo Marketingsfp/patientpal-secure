@@ -1,4 +1,7 @@
 import { criarResultado } from "./resposta/contrato";
+import { dadosPublicosClinicaGrupo } from "./clinicas-grupo";
+
+const ID_CLINICA_SFP = "1d3c4f34-2a0f-40fa-b39a-3609677a11a5";
 
 /** Regras administrativas da clínica. Não calcula confiança nem altera o cadastro. */
 export const MARCADOR_REGRAS_CATALOGO =
@@ -18,7 +21,9 @@ function nomeNormalizado(nome: unknown): string {
     .trim()
     .toLowerCase();
 }
-export const profissionalSfp = (nome: unknown) => ["sfp", "spf"].includes(nomeNormalizado(nome));
+/** "SAO FRANCISCO DE PAULA" é o nome do profissional-ponte no cadastro da Menino Jesus (agenda da outra unidade). */
+export const profissionalSfp = (nome: unknown) =>
+  ["sfp", "spf", "sao francisco de paula"].includes(nomeNormalizado(nome));
 // Marcadores completos de cargo/equipe. Não busca essas palavras dentro de nomes próprios.
 const NOME_GENERICO = String.raw`(?:t[eé]cnic[oa]s?(?:\s+(?:de|em)\s+(?:enfermagem|radiologia|laborat[oó]rio))?|enfermagem|enfermeir[oa]s?|auxiliar(?:es)?\s+de\s+enfermagem|equipe(?:\s+(?:de\s+enfermagem|t[eé]cnica|m[eé]dica))?)`;
 const NOME_GENERICO_COMPLETO = new RegExp(`^${NOME_GENERICO}$`, "i");
@@ -79,21 +84,42 @@ export const MOTIVO_SFP = "PROFISSIONAL_SFP: atendimento solicitado exclusivo da
 export function motivoProfissionalSfp(motivo: string): boolean {
   return /\bprofissional[_\s]+(?:e\s+)?sfp\b/.test(nomeNormalizado(motivo));
 }
-export function respostaEncaminhamentoSfp(confirmado: boolean): string {
-  return confirmado
-    ? ""
-    : "Esse atendimento precisa do apoio da nossa equipe. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
+/**
+ * Decisão do dono (02/10/2026): o SFP deixou de ser silencioso. A Maria informa
+ * que o atendimento é feito na unidade São Francisco de Paula — endereço e
+ * telefone só do diretório do grupo — e a transferência segue com aviso e
+ * protocolo normais. Nunca informa valor, horário nem profissional do item.
+ */
+export function respostaEncaminhamentoSfp(confirmado: boolean, item?: string | null): string {
+  if (!confirmado)
+    return "Esse atendimento precisa do apoio da nossa equipe. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
+  const u = dadosPublicosClinicaGrupo(ID_CLINICA_SFP);
+  const nome = (item ?? "").trim();
+  const oQue = nome ? `O atendimento de *${nome}*` : "Esse atendimento";
+  const onde = u
+    ? `na nossa unidade ${u.nome_oficial}, que fica na ${u.endereco}${u.telefone ? ` (telefone ${u.telefone})` : ""}`
+    : "na nossa unidade Policlínica São Francisco de Paula";
+  return `Fazemos sim! ${oQue} é realizado ${onde}. Vou passar seu atendimento para a nossa equipe, que segue com você por aqui.`;
 }
 
-/** Silêncio deliberado: o transporte não deve criar fallback, áudio ou outra bolha. */
-export function resultadoEncaminhamentoSfp(confirmado: boolean) {
+export function resultadoEncaminhamentoSfp(confirmado: boolean, item?: string | null) {
   return criarResultado({
     origem: confirmado ? "handoff" : "erro",
-    estado: confirmado ? "descartar" : "entregar",
-    texto: respostaEncaminhamentoSfp(confirmado),
+    estado: "entregar",
+    texto: respostaEncaminhamentoSfp(confirmado, item),
     fatosConfirmados: confirmado ? ["handoff_confirmado"] : [],
-    restricoes: ["atendimento_humano_obrigatorio_sfp", ...(confirmado ? ["handoff_sfp_silencioso"] : [])],
+    restricoes: ["atendimento_humano_obrigatorio_sfp", ...(confirmado ? ["unidade_sao_francisco_informada"] : [])],
   });
+}
+
+/** Nome do primeiro item do resultado que é feito pelo profissional SFP. */
+export function itemSfpDoResultado(dados: unknown): string | null {
+  const r = objeto(dados);
+  if (!r) return null;
+  const registros = [r.records, r.registros, r.itens].find(Array.isArray) as unknown[] | undefined;
+  const reg = objeto(registros?.find(registroExigeHumano));
+  const nome = reg?.procedimento ?? reg?.nome ?? reg?.titulo;
+  return typeof nome === "string" && nome.trim() ? nome.trim() : null;
 }
 
 /** Projeção pública apenas. IDs e nomes usados internamente na agenda não mudam. */
