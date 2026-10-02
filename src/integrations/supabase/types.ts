@@ -8399,6 +8399,7 @@ export type Database = {
           focus_ref: string | null
           focus_status: string | null
           id: string
+          item_lista_servico: string | null
           medico_id: string | null
           numero: string | null
           observacoes: string | null
@@ -8441,6 +8442,7 @@ export type Database = {
           focus_ref?: string | null
           focus_status?: string | null
           id?: string
+          item_lista_servico?: string | null
           medico_id?: string | null
           numero?: string | null
           observacoes?: string | null
@@ -8483,6 +8485,7 @@ export type Database = {
           focus_ref?: string | null
           focus_status?: string | null
           id?: string
+          item_lista_servico?: string | null
           medico_id?: string | null
           numero?: string | null
           observacoes?: string | null
