@@ -143,9 +143,9 @@ function PainelTvAtendimento() {
         <>
           <section className="grid h-[24vh] shrink-0 grid-cols-4 gap-[1.2vw]">
             <Kpi titulo="Espera crítica" valor={criticas} icone={AlertTriangle} tom={criticas > 0 ? "danger" : "neutro"} pulsar={criticas > 0} />
-            <Kpi titulo="Pendentes de resposta" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
+            <Kpi titulo="Pendentes" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Não atribuídas" valor={dados?.naoAtribuidas ?? 0} icone={UserX} tom={(dados?.naoAtribuidas ?? 0) > 0 ? "warn" : "neutro"} />
-            <Kpi titulo="Conversas hoje com atendente" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
+            <Kpi titulo="Conversas hoje" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
           </section>
 
           <section className="grid min-h-0 flex-1 grid-cols-[3fr_2fr] gap-[1.2vw]">
