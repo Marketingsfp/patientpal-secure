@@ -955,10 +955,20 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           ),
         ]);
 
+        // Agendamento de dia já passado que segue "agendado" é ficha que a
+        // recepção não fechou: ganha fatia própria no gráfico para aparecer
+        // como pendência. Só a exibição muda — o status no banco fica como
+        // está (presença nunca é deduzida aqui).
+        const hojeClinica = hoje();
+        const diaClinica = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
         const statusMap = new Map<string, number>();
         const medicoMap = new Map<string, number>();
         agendRows.forEach((r) => {
-          statusMap.set(r.status ?? "—", (statusMap.get(r.status ?? "—") ?? 0) + 1);
+          const status =
+            r.status === "agendado" && diaClinica.format(new Date(r.inicio)) < hojeClinica
+              ? "Sem baixa (data passada)"
+              : (r.status ?? "—");
+          statusMap.set(status, (statusMap.get(status) ?? 0) + 1);
           const m = nomesMedico.get(r.medico_id) ?? "Sem médico";
           medicoMap.set(m, (medicoMap.get(m) ?? 0) + 1);
         });
