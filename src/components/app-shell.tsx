@@ -626,6 +626,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/nina", hash: "laboratorio-nina", label: "Laboratório Nina", icon: FlaskConical },
       { to: "/app/nina-aprendizado", label: "Revisão de Aprendizados", icon: ShieldCheck },
       { to: "/app/nina-metricas", label: "Métricas de Aprendizado", icon: BarChart3 },
+      { to: "/app/nina-jev", label: "Decisões do Jev", icon: BarChart3 },
       { to: "/app/nina-arquitetura", label: "Arquitetura", icon: Network },
     ],
   },
