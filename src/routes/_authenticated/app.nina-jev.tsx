@@ -45,9 +45,14 @@ const ROTULO_FASE: Record<FaseJev, string> = {
   fase6_conferencia: "Conferência",
   fase7_escolha: "Sim / horário",
   fase8_motivo: "Motivo da transferência",
+  fase9_urgencia: "Sinais de urgência",
 };
 const ROTULO_SINAL: Record<SinalCalibragem, string> = {
-  urgencia: "Urgência clínica",
+  urgencia: "Urgência clínica (sinal geral)",
+  urgencia_dor_ar: "Urgência: dor forte / falta de ar",
+  urgencia_sangramento_desmaio: "Urgência: sangramento / desmaio",
+  urgencia_gestante: "Urgência: gestante com queixa",
+  urgencia_crianca_idoso: "Urgência: criança ou idoso com queixa",
   pedido_atendente: "Pedido de atendente",
   irritacao: "Irritação",
   entendimento: "Entendimento (abaixo de 0,5 conta como dúvida)",

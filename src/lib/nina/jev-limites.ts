@@ -9,6 +9,10 @@ export type LimitesJev = {
   irritacao: number;
   conferencia: number;
   escolha: number;
+  urgencia_dor_ar: number;
+  urgencia_sangramento_desmaio: number;
+  urgencia_gestante: number;
+  urgencia_crianca_idoso: number;
 };
 
 export const LIMITES_JEV_PADRAO: LimitesJev = {
@@ -17,6 +21,10 @@ export const LIMITES_JEV_PADRAO: LimitesJev = {
   irritacao: 0.8,
   conferencia: 0.7,
   escolha: 0.8,
+  urgencia_dor_ar: 0.5,
+  urgencia_sangramento_desmaio: 0.5,
+  urgencia_gestante: 0.5,
+  urgencia_crianca_idoso: 0.5,
 };
 
 export const LIMITE_MIN = 0.3;
@@ -28,6 +36,10 @@ export const ROTULO_LIMITE: Record<keyof LimitesJev, string> = {
   irritacao: "Paciente irritado",
   conferencia: "Conferência antes do envio (segura a resposta)",
   escolha: "Certeza mínima para entender o “sim” e o horário",
+  urgencia_dor_ar: "Urgência: dor forte ou falta de ar",
+  urgencia_sangramento_desmaio: "Urgência: sangramento ou desmaio",
+  urgencia_gestante: "Urgência: gestante com queixa",
+  urgencia_crianca_idoso: "Urgência: criança ou idoso com queixa",
 };
 
 /** Valor fora da faixa ou ausente = padrão. Nunca aceita limite extremo. */
@@ -41,7 +53,10 @@ export function normalizarLimites(bruto: Partial<Record<keyof LimitesJev, unknow
 }
 
 /** Sinais de transferência medidos no relatório (gravados nas decisões da fase 2). */
-export const SINAIS_CALIBRAGEM = ["urgencia", "pedido_atendente", "irritacao", "entendimento"] as const;
+export const SINAIS_CALIBRAGEM = [
+  "urgencia", "urgencia_dor_ar", "urgencia_sangramento_desmaio", "urgencia_gestante", "urgencia_crianca_idoso",
+  "pedido_atendente", "irritacao", "entendimento",
+] as const;
 export type SinalCalibragem = (typeof SINAIS_CALIBRAGEM)[number];
 
 export type FaixaCalibragem = { de: number; ate: number; casos: number };

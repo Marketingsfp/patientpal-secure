@@ -37,3 +37,19 @@ describe("Jev Fase 8 — motivo da transferência", () => {
     if (r.itens.length === 2) expect(r.itens[0].id).toBe("b");
   });
 });
+
+import { decidirEncaminhamento, sinalUrgenciaAcima } from "./jev-encaminhamento";
+describe("Etapa E1 — sinais de urgência separados", () => {
+  const lim = { urgencia: 0.5, pedido_atendente: 0.7, irritacao: 0.8 };
+  test("sinal acima do limite transfere com urgência alta e cita o sinal", () => {
+    const e = decidirEncaminhamento({ urgencia_gestante: { noul: 0.9 }, urgencia_dor_ar: { noul: 0.6 } }, null, lim);
+    expect(e?.urgencia).toBe("alta");
+    expect(e?.motivo).toContain("gestante com queixa");
+    expect(categoriaDoMotivo(e!.motivo)).toBe("urgencia_clinica");
+  });
+  test("abaixo do limite ou sem resposta não transfere", () => {
+    expect(sinalUrgenciaAcima({ urgencia_dor_ar: { noul: 0.4 } }, {})).toBeNull();
+    expect(decidirEncaminhamento({}, null, lim)).toBeNull();
+    expect(sinalUrgenciaAcima({ urgencia_dor_ar: { noul: 0.6 } }, { urgencia_dor_ar: 0.7 })).toBeNull();
+  });
+});
