@@ -132,23 +132,23 @@ function Preview() {
                   </div>
                 </Card>
                 <Card className="oszap-chat flex min-w-0 flex-1 flex-col overflow-hidden">
-                  <CardHeader className="oszap-chat-heading border-b px-4 py-3">
+                  <CardHeader className="oszap-chat-heading border-b px-3 py-1.5">
                     <button className="oszap-back items-center gap-2" onClick={() => setList(true)}>
                       <ArrowLeft className="h-4 w-4" />
                       Voltar às conversas
                     </button>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="oszap-chat-actions flex flex-wrap items-center justify-between gap-1.5">
                       <div>
-                        <h2 className="text-base font-semibold">{patients[selected][0]}</h2>
-                        <p className="text-xs text-muted-foreground">
+                        <h2 className="text-sm font-semibold">{patients[selected][0]}</h2>
+                        <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                           Conversa de exemplo · Em atendimento
-                        </p>
                         <BadgeEspera
                           desde={new Date(Date.now() - 14 * 60000).toISOString()}
                           prefixo="Aguardando resposta há"
                         />
+                        </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 shrink-0">
                         <Button variant="outline" size="sm">
                           <ArrowRightLeft className="h-4 w-4" />
                           Transferir

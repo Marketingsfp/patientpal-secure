@@ -3167,12 +3167,12 @@ export function AtendInbox() {
               </div>
             ) : (
               <>
-                <CardHeader className="oszap-chat-heading px-4 py-3 border-b">
+                <CardHeader className="oszap-chat-heading px-3 py-1.5 border-b">
                   <button type="button" className="oszap-back items-center gap-2 text-sm font-medium text-atd-blue" onClick={() => setListaMobile(true)}><ArrowLeft className="h-4 w-4" />Voltar às conversas</button>
-                  <div className="oszap-chat-actions flex flex-wrap items-center justify-between gap-3">
+                  <div className="oszap-chat-actions flex flex-wrap items-center justify-between gap-1.5">
                     <div className="min-w-0 flex-1 basis-48">
                       <CardTitle
-                        className="text-base flex items-center gap-2 truncate"
+                        className="text-sm flex items-center gap-2 truncate"
                         title={tituloConversa(sel)}
                         data-testid="titulo-conversa"
                         data-conversa-id={sel.id}
@@ -3218,10 +3218,10 @@ export function AtendInbox() {
                             </button>
                           </span>
                         )}
+                        {espera[sel.id] && (
+                          <BadgeEspera desde={espera[sel.id]} prefixo="Aguardando resposta há" />
+                        )}
                       </p>
-                      {espera[sel.id] && (
-                        <BadgeEspera desde={espera[sel.id]} prefixo="Aguardando resposta há" className="mt-1" />
-                      )}
                     </div>
                     <div className="flex gap-1 shrink-0">
                       {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (

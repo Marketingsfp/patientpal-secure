@@ -172,7 +172,7 @@
     min-height: 36px;
   }
   [data-os-zap="true"] .oszap-chat-heading {
-    padding: 10px 12px;
+    padding: 6px 10px;
   }
   [data-os-zap="true"] .oszap-timeline {
     padding: 12px;
@@ -192,3 +192,8 @@
 
 [data-os-zap="true"] .oszap-queue-content > .flex-col { padding-block: 6px; gap: 4px; }
 [data-os-zap="true"] .oszap-conversation [data-wait-level] { font-size: 10px; padding: 1px 4px; }
+
+[data-os-zap="true"] .oszap-chat-heading { padding-block: 6px; gap: 4px; }
+[data-os-zap="true"] .oszap-chat-heading > * + * { margin-top: 0; }
+[data-os-zap="true"] .oszap-chat-heading [data-wait-level] { font-size: 10px; line-height: 14px; padding: 0 4px; }
+[data-os-zap="true"] .oszap-chat-actions > .shrink-0 > button { height: 28px; padding-inline: 8px; font-size: 11px; }
