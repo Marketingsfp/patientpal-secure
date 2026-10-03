@@ -4156,6 +4156,28 @@ function AgendaPage() {
   const rotuloFallbackProc = (medicoId: string | null | undefined) =>
     medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
 
+  // Caixa "Médico ou Exame" do modal: atendimento de laboratório mostra
+  // "Laboratório - EAS, PARASITOLOGICO" em vez só do nome da agenda (ex.: ITB),
+  // para recepção e caixa verem na hora quais exames o paciente contratou.
+  // APENAS exibição — o valor continua sendo a agenda do laboratório.
+  const rotuloCaixaLaboratorio = (() => {
+    const ehLab =
+      (!!form.orcamento_id && orcamentoLaboratorio) ||
+      medicoEhLaboratorioFormulario(form.medico_id);
+    if (!ehLab) return undefined;
+    const brutos =
+      form.orcamento_itens.length > 0
+        ? form.orcamento_itens
+        : form.procedimentos.length > 0
+          ? form.procedimentos
+          : [form.procedimento];
+    const nomes = brutos
+      // Texto montado pelo orçamento: "LABORATÓRIO (2 EXAMES): EAS, PARASITOLOGICO".
+      .map((t) => (t ?? "").replace(/^LABORAT[ÓO]RIO\s*\([^)]*\)\s*:\s*/i, "").trim())
+      .filter((t) => t && normalizar(t) !== normalizar("EXAMES LABORATORIAIS"));
+    return nomes.length > 0 ? `🧪 Laboratório - ${nomes.join(", ")}` : undefined;
+  })();
+
   // Rótulo do serviço na GRADE (Lista, cartão mobile e visão "Por médico").
   // Regra (2026-08-18): agendamento de laboratório sempre aparece na coluna
   // "Serviço" como "EXAMES LABORATORIAIS" — nunca com o nome do exame avulso
@@ -10113,6 +10135,7 @@ function AgendaPage() {
                       </Label>
                       <SearchableSelect
                         value={form.medico_id || "none"}
+                        displayLabel={rotuloCaixaLaboratorio}
                         disabled={!!editing}
                         onChange={(v) => {
                           if (v.startsWith("exame:")) {
