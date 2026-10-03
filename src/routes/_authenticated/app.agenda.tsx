@@ -4156,6 +4156,11 @@ function AgendaPage() {
   const rotuloFallbackProc = (medicoId: string | null | undefined) =>
     medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
 
+  // "LABORATORIO", "EXAMES LABORATORIAIS", "EXAMES LABORATORIAIS (LABORATORIO)":
+  // nomes da categoria, não de um exame.
+  const ehServicoLabGenerico = (t: string) =>
+    /^(exames laboratoriais|laboratorio)( \(laboratorio\))?$/.test(normalizar(t).trim());
+
   // Caixa "Médico ou Exame" do modal: atendimento de laboratório mostra
   // "Laboratório - EAS, PARASITOLOGICO" em vez só do nome da agenda (ex.: ITB),
   // para recepção e caixa verem na hora quais exames o paciente contratou.
@@ -4174,9 +4179,17 @@ function AgendaPage() {
     const nomes = brutos
       // Texto montado pelo orçamento: "LABORATÓRIO (2 EXAMES): EAS, PARASITOLOGICO".
       .map((t) => (t ?? "").replace(/^LABORAT[ÓO]RIO\s*\([^)]*\)\s*:\s*/i, "").trim())
-      .filter((t) => t && normalizar(t) !== normalizar("EXAMES LABORATORIAIS"));
+      .filter((t) => t && !ehServicoLabGenerico(t));
     return nomes.length > 0 ? `🧪 Laboratório - ${nomes.join(", ")}` : undefined;
   })();
+  // Ficha de laboratório sem exame escolhido: o serviço é só o genérico
+  // ("LABORATORIO" / "EXAMES LABORATORIAIS") e não há orçamento ligado.
+  const fichaLabSemExames =
+    !form.orcamento_id &&
+    medicoEhLaboratorioFormulario(form.medico_id) &&
+    (form.procedimentos.length > 0 ? form.procedimentos : [form.procedimento]).every(
+      (t) => !t?.trim() || ehServicoLabGenerico(t),
+    );
 
   // Rótulo do serviço na GRADE (Lista, cartão mobile e visão "Por médico").
   // Regra (2026-08-18): agendamento de laboratório sempre aparece na coluna
@@ -5599,7 +5612,15 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const buscarOrcamento = async (numeroOverride?: number, serieOverride?: string | null) => {
+  const buscarOrcamento = async (
+    numeroOverride?: number,
+    serieOverride?: string | null,
+    // Vindo de abrirNovoComOrcamento: o form/editing deste closure ainda são
+    // os da ficha anterior (o setState acabou de ser chamado).
+    fichaNova = false,
+  ) => {
+    const fichaAtual = fichaNova ? null : editing;
+    const medicoAtual = fichaNova ? "" : form.medico_id;
     if (!clinicaAtual) return;
     const digitado = form.orcamento_numero.trim();
     const parsed = numeroOverride
@@ -5630,13 +5651,14 @@ function AgendaPage() {
         created_at: string | null;
         medico_id: string | null;
         medico_externo: boolean | null;
+        categoria: string | null;
       };
       let orc: OrcBusca | null = null;
       for (const cand of candidatos) {
         let q = supabase
           .from("orcamentos")
           .select(
-            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at, medico_id, medico_externo",
+            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at, medico_id, medico_externo, categoria",
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("numero", cand);
@@ -5796,7 +5818,8 @@ function AgendaPage() {
         const t = norm(p.tipo);
         return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
-      const todosLab = its.every((i) => isLab(i.procedimento_id));
+      const todosLab =
+        orc.categoria === "laboratorio" || its.every((i) => isLab(i.procedimento_id));
       // (Bloqueio antigo removido: agora permitimos agendamentos parciais,
       // controlados via `agendamento_orcamento_itens`.)
       const nomes = its.map((i) => i.descricao);
@@ -5835,18 +5858,32 @@ function AgendaPage() {
       // único agendamento, abre um pop-up para o usuário escolher quais
       // itens usar agora. O restante fica disponível para agendar depois.
       const isOdonto = orc.especialidade_id === ODONTO_ESPECIALIDADE_ID;
+      // Orçamento de laboratório: a tela de Orçamentos grava só
+      // `categoria='laboratorio'` (sem especialidade), então os dois contam.
+      const orcEhLab =
+        orc.categoria === "laboratorio" ||
+        (!!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id));
+      const medicoIncompativel =
+        !!medicoAtual &&
+        ((isOdonto && !medicoEspec.get(medicoAtual)?.has(ODONTO_ESPECIALIDADE_ID)) ||
+          (orcEhLab && !medicoEhLaboratorista(medicoAtual)));
+      // Ficha que já existe não troca de médico (o campo fica travado): ligar
+      // o orçamento a ela deixaria exames de laboratório na agenda de outro
+      // profissional (ex.: ITB). Barra e manda abrir a ficha na agenda certa.
+      if (fichaAtual && medicoIncompativel) {
+        const nomeMed = medicos.find((m) => m.id === medicoAtual)?.nome ?? "deste profissional";
+        toast.error(
+          `Este orçamento é de ${isOdonto ? "Odontologia" : "Laboratório"} e esta ficha é da agenda ${nomeMed}. Abra uma ficha na agenda ${isOdonto ? "de Odontologia" : "do Laboratório"} para vinculá-lo.`,
+        );
+        return;
+      }
       setOrcamentoOdonto(isOdonto);
-      if (
-        isOdonto &&
-        form.medico_id &&
-        !medicoEspec.get(form.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)
-      ) {
+      if (isOdonto && medicoIncompativel) {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
       }
-      const orcEhLab = !!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id);
       setOrcamentoLaboratorio(orcEhLab);
-      if (orcEhLab && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+      if (orcEhLab && medicoAtual && !medicoEhLaboratorista(medicoAtual)) {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Laboratório para este orçamento.");
       }
@@ -5855,7 +5892,7 @@ function AgendaPage() {
       // médico levaria o paciente para a agenda de outro profissional. Médico
       // externo (quem pediu o exame) e médico sem agenda aqui ficam de fora.
       const medicoDoOrc =
-        !editing &&
+        !fichaAtual &&
         orc.medico_id &&
         !orc.medico_externo &&
         medicos.some((m) => m.id === orc.medico_id) &&
@@ -5937,7 +5974,13 @@ function AgendaPage() {
         orcamento_numero: formatNumeroOrcamento(orc.serie, orc.numero),
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
-        paciente_nome: pacNome ?? f.paciente_nome,
+        // Orçamento sem cadastro (só o nome digitado, ex.: "EMANUELLY") não
+        // troca a paciente que a ficha já tem escolhida.
+        paciente_nome: pacId
+          ? (pacNome ?? f.paciente_nome)
+          : f.paciente_id
+            ? f.paciente_nome
+            : (pacNome ?? f.paciente_nome),
         medico_id: f.medico_id || medicoDoOrc || "",
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
@@ -5969,7 +6012,7 @@ function AgendaPage() {
     setEditing(null);
     setForm({ ...EMPTY, inicio, fim, orcamento_numero: String(numero) });
     setOpen(true);
-    void buscarOrcamento(numero);
+    void buscarOrcamento(numero, null, true);
   };
 
   useEffect(() => {
@@ -6144,12 +6187,13 @@ function AgendaPage() {
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
       const { data: orcRow } = await supabase
         .from("orcamentos")
-        .select("especialidade_id")
+        .select("especialidade_id, categoria")
         .eq("id", a.orcamento_id)
         .maybeSingle();
       setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
       setOrcamentoLaboratorio(
-        !!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id),
+        orcRow?.categoria === "laboratorio" ||
+          (!!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id)),
       );
     } else {
       setOrcamentoOdonto(false);
@@ -9789,9 +9833,19 @@ function AgendaPage() {
                             // serviços pelo mesmo fluxo do botão Agendar da tela
                             // de Orçamentos.
                             onSelectOrcamento={(o) => {
+                              // Para digitar o número a recepção apaga o nome, o
+                              // que desmarca a paciente. Na ficha já existente,
+                              // devolve a paciente gravada — o orçamento só a
+                              // troca se tiver cadastro próprio.
                               setForm((f) => ({
                                 ...f,
                                 orcamento_numero: formatNumeroOrcamento(o.serie, o.numero),
+                                ...(editing?.paciente_id && !f.paciente_id
+                                  ? {
+                                      paciente_id: editing.paciente_id,
+                                      paciente_nome: editing.paciente_nome,
+                                    }
+                                  : {}),
                               }));
                               void buscarOrcamento(o.numero, o.serie);
                             }}
@@ -10341,6 +10395,12 @@ function AgendaPage() {
                           />
                         );
                       })()}
+                      {fichaLabSemExames && (
+                        <p className="text-xs text-amber-700 font-medium">
+                          Nenhum exame escolhido — marque os exames nesta caixa ou digite o nº do
+                          orçamento no campo Paciente para trazer os exames dele.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-slate-700">Status</Label>
@@ -14781,7 +14841,11 @@ function AgendaPage() {
               orcamento_numero: String(ctx.orcamento.numero),
               orcamento_itens: nomes,
               paciente_id: ctx.orcamento.paciente_id ?? f.paciente_id,
-              paciente_nome: ctx.orcamento.paciente_nome ?? f.paciente_nome,
+              paciente_nome: ctx.orcamento.paciente_id
+                ? (ctx.orcamento.paciente_nome ?? f.paciente_nome)
+                : f.paciente_id
+                  ? f.paciente_nome
+                  : (ctx.orcamento.paciente_nome ?? f.paciente_nome),
               medico_id: f.medico_id || ctx.orcamento.medico_id || "",
               procedimento: procStr,
               procedimentos: procStr ? [procStr] : [],
