@@ -921,10 +921,13 @@ async function gerarRespostaNinaInterno(
   let jevPontuacoes: Record<string, number | null> | null = null;
   try {
     const jev = await import("@/lib/nina/jev.server");
-    const [f1, f2] = await Promise.all([
+    const [f1, f2Base, f9] = await Promise.all([
       jev.jevAtivo(clinicaId, "fase1_intencao", opcoes?.teste === true),
       jev.jevAtivo(clinicaId, "fase2_encaminhamento", opcoes?.teste === true),
+      jev.jevAtivo(clinicaId, "fase9_urgencia", opcoes?.teste === true),
     ]);
+    // Etapa E1: os sinais separados só valem junto da Fase 2 (que transfere).
+    const f2 = f2Base;
     if (f1 || f2) {
       const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
       const enc = await import("@/lib/nina/jev-encaminhamento");
@@ -933,6 +936,7 @@ async function gerarRespostaNinaInterno(
       const perguntas = {
         ...perguntaIntencao(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
+        ...(f2 && f9 ? enc.perguntasSinaisUrgencia() : {}),
       };
       const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
       const anteriores = ctxJev.montarHistoricoJev(msgsMemoria, {
@@ -972,6 +976,9 @@ async function gerarRespostaNinaInterno(
           urgencia: respostas["urgencia"]?.noul ?? null,
           pedido_atendente: respostas["pedido_atendente"]?.noul ?? null,
           irritacao: respostas["irritacao"]?.noul ?? null,
+          ...(f9
+            ? Object.fromEntries(Object.keys(enc.SINAIS_URGENCIA).map((k) => [k, respostas[k]?.noul ?? null]))
+            : {}),
           falhas_seguidas: contagem?.falhas ?? null,
         };
       }

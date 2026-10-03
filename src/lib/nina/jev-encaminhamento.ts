@@ -44,6 +44,60 @@ export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
   };
 }
 
+/**
+ * Etapa E1 (03/10/2026): sinais de urgência separados, decididos pelo dono.
+ * Gestante e criança/idoso só contam com QUEIXA de saúde. Ação: só transferir
+ * com urgência alta, sem orientação médica. Idoso = 60 anos ou mais (Estatuto)
+ * — possível regra de negócio, validar com a equipe da clínica.
+ */
+export const SINAIS_URGENCIA = {
+  urgencia_dor_ar: "dor forte ou falta de ar",
+  urgencia_sangramento_desmaio: "sangramento ou desmaio",
+  urgencia_gestante: "gestante com queixa de saúde",
+  urgencia_crianca_idoso: "criança ou idoso com queixa de saúde",
+} as const;
+export type SinalUrgencia = keyof typeof SINAIS_URGENCIA;
+
+export function perguntasSinaisUrgencia(): Record<SinalUrgencia, PerguntaJev> {
+  const ctx = "Considere `mensagem_atual` e `mensagens_anteriores`.";
+  return {
+    urgencia_dor_ar: {
+      type: "noul",
+      instructions: `${ctx} O paciente relata, para si ou para quem acompanha, dor forte/intensa (incluindo dor no peito) ou dificuldade/falta de ar AGORA ou recente?`,
+      criteria: { true: "Relata dor forte, dor no peito ou falta de ar.", false: "Não relata; dor leve, crônica estável ou apenas marcar consulta não contam." },
+    },
+    urgencia_sangramento_desmaio: {
+      type: "noul",
+      instructions: `${ctx} O paciente relata sangramento ativo, desmaio, convulsão ou perda de consciência, para si ou para quem acompanha?`,
+      criteria: { true: "Relata sangramento, desmaio, convulsão ou perda de consciência.", false: "Não relata; menção a exame de sangue ou histórico antigo não conta." },
+    },
+    urgencia_gestante: {
+      type: "noul",
+      instructions: `${ctx} A paciente (ou quem ela acompanha) está grávida E relata alguma queixa ou sintoma de saúde atual?`,
+      criteria: { true: "Gestante com queixa ou sintoma atual.", false: "Não é gestante, ou é gestante sem queixa (pré-natal de rotina, ultrassom marcado, dúvidas administrativas)." },
+    },
+    urgencia_crianca_idoso: {
+      type: "noul",
+      instructions: `${ctx} O paciente é criança (menos de 12 anos) ou idoso (60 anos ou mais) E há relato de queixa ou sintoma de saúde atual?`,
+      criteria: { true: "Criança ou idoso com queixa ou sintoma atual.", false: "Não é criança nem idoso, ou não há queixa atual (consulta de rotina, vacina, dúvida administrativa)." },
+    },
+  };
+}
+
+/** Sinal de urgência mais forte acima do seu limite, ou null. */
+export function sinalUrgenciaAcima(
+  respostas: Record<string, RespostaJev> | null,
+  limites: Partial<Record<SinalUrgencia, number>>,
+): { sinal: SinalUrgencia; pontuacao: number } | null {
+  let melhor: { sinal: SinalUrgencia; pontuacao: number } | null = null;
+  for (const sinal of Object.keys(SINAIS_URGENCIA) as SinalUrgencia[]) {
+    const v = respostas?.[sinal]?.noul;
+    const lim = limites[sinal] ?? 0.5;
+    if (typeof v === "number" && v >= lim && (!melhor || v > melhor.pontuacao)) melhor = { sinal, pontuacao: v };
+  }
+  return melhor;
+}
+
 export type Encaminhamento = { motivo: string; urgencia: "normal" | "alta" };
 
 /** O Jev respondeu que NÃO dá para entender a mensagem (sem resposta não é falha). */
@@ -94,9 +148,15 @@ const numero = (n: number) => n.toFixed(2).replace(".", ",");
 export function decidirEncaminhamento(
   respostas: Record<string, RespostaJev> | null,
   contagem: ContagemDuvida | null,
-  limites: { urgencia: number; pedido_atendente: number; irritacao: number } = LIMITES_ENCAMINHAMENTO,
+  limites: { urgencia: number; pedido_atendente: number; irritacao: number } & Partial<Record<SinalUrgencia, number>> = LIMITES_ENCAMINHAMENTO,
 ): Encaminhamento | null {
   const p = (id: keyof typeof LIMITES_ENCAMINHAMENTO) => respostas?.[id]?.noul;
+  const sinal = sinalUrgenciaAcima(respostas, limites);
+  if (sinal)
+    return {
+      motivo: `JEV_URGENCIA_CLINICA: possível urgência — ${SINAIS_URGENCIA[sinal.sinal]} (pontuação ${numero(sinal.pontuacao)})`,
+      urgencia: "alta",
+    };
   const u = p("urgencia");
   if (typeof u === "number" && u >= limites.urgencia)
     return { motivo: `JEV_URGENCIA_CLINICA: possível urgência clínica (pontuação ${numero(u)})`, urgencia: "alta" };
