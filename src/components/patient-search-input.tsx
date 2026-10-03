@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, User, UserPlus } from "lucide-react";
+import { FileText, Search, User, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { prontuarioExibicao } from "@/lib/prontuario";
 import { normalizarTermoBusca } from "@/lib/busca-texto";
 import { formatarIdadeCurta } from "@/lib/date-utils";
 import { BadgeAlertaCritico } from "@/components/paciente/alerta-critico";
+import { formatNumeroOrcamento, parseNumeroOrcamento } from "@/lib/orcamento-numero";
 
 export interface PatientOption {
   id: string;
@@ -31,6 +32,17 @@ export interface PatientOption {
   match_reason?: string;
 }
 
+/** Orçamento achado pelo número digitado no campo de paciente. */
+export interface OrcamentoOption {
+  id: string;
+  numero: number;
+  serie: string | null;
+  paciente_nome: string | null;
+  medico_nome: string | null;
+  valor_total: number | null;
+  status: string | null;
+}
+
 interface PatientSearchInputProps {
   value?: PatientOption | null;
   onSelect: (patient: PatientOption | null) => void;
@@ -46,6 +58,12 @@ interface PatientSearchInputProps {
    * não retorna resultados. O callback recebe o texto atualmente digitado.
    */
   onRequestCreate?: (query: string) => void;
+  /**
+   * Se informado, o campo também aceita o NÚMERO DO ORÇAMENTO (202600530 ou
+   * #202600530): o orçamento aparece no topo da lista, acima dos pacientes,
+   * e escolhê-lo chama este callback em vez de `onSelect`.
+   */
+  onSelectOrcamento?: (orcamento: OrcamentoOption) => void;
 }
 
 /**
@@ -60,6 +78,26 @@ interface PatientSearchInputProps {
 // atrasam justamente a última — a única que interessa. Ao COLAR, a espera é
 // pulada (ver `colouRef`): não há digitação seguinte para agrupar.
 const ATRASO_BUSCA_MS = 300;
+
+// O termo é um número de orçamento? Só nos formatos que não se confundem com
+// CPF, telefone ou prontuário curto: com "#" na frente (#530, #202600530,
+// #D-2026-00001) ou o número completo de 9 dígitos começando pelo ano (20…).
+// Prontuários com esses mesmos dígitos continuam aparecendo logo abaixo.
+function numerosOrcamentoBusca(term: string): { serie: string | null; numeros: number[] } | null {
+  const t = term.trim();
+  const comHash = t.startsWith("#");
+  if (!comHash && !/^20\d{7}$/.test(t)) return null;
+  const corpo = comHash ? t.slice(1).trim() : t;
+  if (!/^[A-Za-z]?[\s-]?\d[\d\s-]*$/.test(corpo)) return null;
+  const p = parseNumeroOrcamento(corpo);
+  const numeros = [p.numero, p.numeroAlternativo].filter(
+    (n): n is number => typeof n === "number" && n > 0,
+  );
+  return numeros.length ? { serie: p.serie, numeros } : null;
+}
+
+const BRL_ORC = (v: number | null) =>
+  Number(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // Tenta interpretar o termo como uma data de nascimento.
 // Aceita: DD/MM/AAAA, DD-MM-AAAA, DDMMAAAA, AAAA-MM-DD, DD/MM (ano qualquer).
@@ -92,6 +130,7 @@ export function PatientSearchInput({
   clinicaIdsOverride,
   enableVoice = false,
   onRequestCreate,
+  onSelectOrcamento,
 }: PatientSearchInputProps) {
   const { clinicaIds } = useClinica();
   const scope = useMemo(
@@ -100,6 +139,12 @@ export function PatientSearchInput({
   );
   const [query, setQuery] = useState(value?.nome ?? "");
   const [options, setOptions] = useState<PatientOption[]>([]);
+  const [orcOptions, setOrcOptions] = useState<OrcamentoOption[]>([]);
+  // Valores simples (não a função nem a lista) na dependência da busca de
+  // orçamento: o pai recria os dois a cada render, e isso reiniciaria a busca
+  // sem parar.
+  const aceitaOrcamento = !!onSelectOrcamento;
+  const escopoOrc = scope.slice().sort().join(",");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,7 +165,8 @@ export function PatientSearchInput({
     // Texto colado costuma vir com espaço sobrando, espaço duplicado ou espaço
     // "duro" de PDF/página web. Sem esta limpeza o LIKE do banco não casa com
     // nada e a recepção conclui que o paciente não está cadastrado.
-    const term = termoLimpo;
+    // "#202600530" é número de orçamento; para os pacientes busca só os dígitos.
+    const term = termoLimpo.replace(/^#\s*/, "");
     const digits = term.replace(/\D/g, "");
     if (term.length < 2 && digits.length < 2) {
       setOptions([]);
@@ -178,6 +224,33 @@ export function PatientSearchInput({
     // Depende do termo JÁ LIMPO: digitar um espaço a mais não refaz a consulta.
   }, [termoLimpo, open, scope]);
 
+  // Busca de orçamento pelo número — corre em paralelo à de pacientes, que
+  // continua igual (o prontuário com os mesmos dígitos aparece abaixo).
+  useEffect(() => {
+    const alvo = aceitaOrcamento && open ? numerosOrcamentoBusca(termoLimpo) : null;
+    const clinicas = escopoOrc ? escopoOrc.split(",") : [];
+    if (!alvo || clinicas.length === 0) {
+      setOrcOptions((atual) => (atual.length ? [] : atual));
+      return;
+    }
+    let vivo = true;
+    const handle = setTimeout(async () => {
+      let q = supabase
+        .from("orcamentos")
+        .select("id, numero, serie, paciente_nome, medico_nome, valor_total, status")
+        .in("clinica_id", clinicas)
+        .in("numero", alvo.numeros);
+      if (alvo.serie) q = q.eq("serie", alvo.serie);
+      const { data, error } = await q.order("numero", { ascending: false }).limit(5);
+      if (error) console.error("[patient-search] orcamento", { termoLimpo, error });
+      if (vivo) setOrcOptions((data ?? []) as OrcamentoOption[]);
+    }, ATRASO_BUSCA_MS);
+    return () => {
+      vivo = false;
+      clearTimeout(handle);
+    };
+  }, [termoLimpo, open, escopoOrc, aceitaOrcamento]);
+
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
@@ -208,7 +281,10 @@ export function PatientSearchInput({
             // Não deixar o Enter submeter o formulário pai sem que o
             // usuário tenha escolhido um paciente da lista.
             e.preventDefault();
-            if (options.length > 0) {
+            if (orcOptions.length > 0 && onSelectOrcamento) {
+              onSelectOrcamento(orcOptions[0]);
+              setOpen(false);
+            } else if (options.length > 0) {
               const first = options[0];
               onSelect(first);
               setQuery(first.nome);
@@ -240,7 +316,41 @@ export function PatientSearchInput({
       {open && termoLimpo.length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg max-h-72 overflow-auto">
           {loading && <div className="px-3 py-2 text-sm text-muted-foreground">Buscando…</div>}
-          {!loading && options.length === 0 && (
+          {orcOptions.length > 0 && onSelectOrcamento && (
+            <div className="border-b border-input">
+              {orcOptions.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectOrcamento(o);
+                    setOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm bg-primary/[0.06] hover:bg-primary/10 flex items-start gap-2"
+                >
+                  <FileText className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                        Orçamento #{formatNumeroOrcamento(o.serie, o.numero)}
+                      </span>
+                      <span className="font-medium truncate">{o.paciente_nome || "—"}</span>
+                      {o.status === "cancelado" && (
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                          Cancelado
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {o.medico_nome?.trim() ? `${o.medico_nome} · ` : ""}
+                      {BRL_ORC(o.valor_total)} · clique para importar paciente e serviços
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {!loading && options.length === 0 && orcOptions.length === 0 && (
             <div className="px-3 py-2 text-sm text-muted-foreground space-y-2">
               <div>Nenhum paciente encontrado.</div>
               {onRequestCreate && (

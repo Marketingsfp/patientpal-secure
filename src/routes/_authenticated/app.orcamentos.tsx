@@ -8,7 +8,7 @@ import {
   Trash2,
   Search,
   AlertTriangle,
-  Calendar,
+  CalendarPlus,
   Columns2,
   CheckCircle2,
   CircleDashed,
@@ -61,16 +61,23 @@ function IconAction({
   label,
   onClick,
   children,
+  className,
 }: {
   label: string;
   onClick: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button type="button" aria-label={label} onClick={onClick} className={ICON_BTN}>
+          <button
+            type="button"
+            aria-label={label}
+            onClick={onClick}
+            className={className ?? ICON_BTN}
+          >
             {children}
           </button>
         </TooltipTrigger>
@@ -394,7 +401,7 @@ function OrcamentosCompactList({
                       </IconAction>
                     )}
                     <Button size="sm" className="h-8 gap-1.5" onClick={() => onAgendar(o)}>
-                      <Calendar className="h-3.5 w-3.5" /> Agendar
+                      <CalendarPlus className="h-3.5 w-3.5" /> Agendar
                     </Button>
                   </div>
                 </div>
@@ -909,11 +916,15 @@ function OrcamentosPage() {
                       </td>
                       <td className="px-3">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Atalho principal da recepção: abre a agenda com a
+                              ficha já preenchida (paciente + serviços). Botão
+                              cheio para se destacar dos ícones secundários. */}
                           <IconAction
-                            label="Agendar este orçamento"
+                            label="Agendar / pagar este orçamento (abre a ficha já preenchida)"
                             onClick={() => enviarParaAgenda(o)}
+                            className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-colors inline-flex items-center justify-center"
                           >
-                            <Calendar className="h-4 w-4 text-emerald-600" />
+                            <CalendarPlus className="h-4 w-4" />
                           </IconAction>
                           {podeEscrever && (
                             <IconAction

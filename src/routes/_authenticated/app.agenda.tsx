@@ -1402,6 +1402,8 @@ function AgendaPage() {
       numero: number;
       paciente_id: string | null;
       paciente_nome: string | null;
+      /** Médico do orçamento a preencher — só em agendamento novo. */
+      medico_id?: string | null;
     };
     itensRestantes: SelectItemOrc[];
     totalItens: number;
@@ -5575,12 +5577,12 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const buscarOrcamento = async (numeroOverride?: number) => {
+  const buscarOrcamento = async (numeroOverride?: number, serieOverride?: string | null) => {
     if (!clinicaAtual) return;
     const digitado = form.orcamento_numero.trim();
     const parsed = numeroOverride
       ? {
-          serie: null as string | null,
+          serie: (serieOverride || null) as string | null,
           numero: numeroOverride,
           numeroAlternativo: null as number | null,
         }
@@ -5604,13 +5606,15 @@ function AgendaPage() {
         especialidade_id: string | null;
         validade_dias: number | null;
         created_at: string | null;
+        medico_id: string | null;
+        medico_externo: boolean | null;
       };
       let orc: OrcBusca | null = null;
       for (const cand of candidatos) {
         let q = supabase
           .from("orcamentos")
           .select(
-            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at",
+            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at, medico_id, medico_externo",
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("numero", cand);
@@ -5824,6 +5828,19 @@ function AgendaPage() {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Laboratório para este orçamento.");
       }
+      // Médico do orçamento: entra só em agendamento NOVO e só se o campo
+      // estiver vazio na hora de aplicar. Numa ficha que já existe, trocar o
+      // médico levaria o paciente para a agenda de outro profissional. Médico
+      // externo (quem pediu o exame) e médico sem agenda aqui ficam de fora.
+      const medicoDoOrc =
+        !editing &&
+        orc.medico_id &&
+        !orc.medico_externo &&
+        medicos.some((m) => m.id === orc.medico_id) &&
+        (!isOdonto || !!medicoEspec.get(orc.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)) &&
+        (!orcEhLab || medicoEhLaboratorista(orc.medico_id))
+          ? orc.medico_id
+          : null;
       if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
@@ -5831,6 +5848,7 @@ function AgendaPage() {
             numero: orc.numero,
             paciente_id: pacId,
             paciente_nome: pacNome,
+            medico_id: medicoDoOrc,
           },
           itensRestantes: its.map((i) => ({
             id: i.id,
@@ -5898,6 +5916,7 @@ function AgendaPage() {
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
         paciente_nome: pacNome ?? f.paciente_nome,
+        medico_id: f.medico_id || medicoDoOrc || "",
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
       }));
@@ -9743,7 +9762,18 @@ function AgendaPage() {
                                 paciente_id: p?.id ?? "",
                               }));
                             }}
-                            placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
+                            // Nº do orçamento (202600530 ou #202600530) também
+                            // vale aqui: escolher o orçamento importa paciente e
+                            // serviços pelo mesmo fluxo do botão Agendar da tela
+                            // de Orçamentos.
+                            onSelectOrcamento={(o) => {
+                              setForm((f) => ({
+                                ...f,
+                                orcamento_numero: formatNumeroOrcamento(o.serie, o.numero),
+                              }));
+                              void buscarOrcamento(o.numero, o.serie);
+                            }}
+                            placeholder="Nome, CPF, nascimento, prontuário ou nº do orçamento…"
                             autoFocus
                             enableVoice
                           />
@@ -14729,6 +14759,7 @@ function AgendaPage() {
               orcamento_itens: nomes,
               paciente_id: ctx.orcamento.paciente_id ?? f.paciente_id,
               paciente_nome: ctx.orcamento.paciente_nome ?? f.paciente_nome,
+              medico_id: f.medico_id || ctx.orcamento.medico_id || "",
               procedimento: procStr,
               procedimentos: procStr ? [procStr] : [],
             }));
