@@ -1149,6 +1149,11 @@ async function gerarRespostaNinaInterno(
   // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
   const { ferramentasAgendaAtivas } = await import("@/lib/nina/agenda-flag.server");
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
+  // Etapa E2 — remarcação pela Maria, só com a chave da clínica ligada.
+  const turnoIniciadoEm = new Date().toISOString();
+  const podeRemarcar = podeAgendar
+    ? await (await import("@/lib/nina/remarcacao.server")).remarcacaoAtiva(clinicaId).catch(() => false)
+    : false;
 
   // Aprendizados APROVADOS pela equipe desta clínica, relevantes para a
   // mensagem atual. Nunca substituem dado vivo (preço/horário/agenda).
@@ -1568,6 +1573,10 @@ async function gerarRespostaNinaInterno(
     ferramentas = podeAgendar
       ? [...mod.FERRAMENTAS_NINA_PACIENTE]
       : semFerramentasDeVaga([...mod.FERRAMENTAS_NINA_CONSULTA]);
+    if (podeRemarcar) {
+      const { FERRAMENTAS_REMARCACAO } = await import("@/lib/nina/remarcacao.server");
+      ferramentas = [...ferramentas, ...FERRAMENTAS_REMARCACAO] as typeof ferramentas;
+    }
     // As leituras ficam acessíveis em todos os turnos. A escolha de consultar
     // vem da interpretação do modelo; expressões literais não removem tools.
     executar = async (...args) => {
@@ -1584,6 +1593,8 @@ async function gerarRespostaNinaInterno(
       conversaId: estadoId.conversaId,
       origem: opcoes?.teste ? "homologacao" : "whatsapp",
       podeAgendar,
+      podeRemarcar,
+      turnoIniciadoEm,
       estado: fluxoEstado,
       teste: opcoes?.teste === true,
       consultaAgenda: contextoConsultaAgenda,
@@ -1756,6 +1767,10 @@ async function gerarRespostaNinaInterno(
   // agora dentro do CONTRATO DE PRECEDÊNCIA do turno (com origem, prioridade e
   // motivo), montado no composer. Nada mais é concatenado aqui.
   const mensagens: MsgIA[] = contexto.messages as MsgIA[];
+  if (podeRemarcar) {
+    const { blocoPromptRemarcacao } = await import("@/lib/nina/remarcacao");
+    mensagens.push({ role: "system", content: blocoPromptRemarcacao() });
+  }
   rastro?.concluir("context.load", {
     mensagens_contexto: mensagens.length,
     paciente_identificado: Boolean(pacienteIdEfetivo),

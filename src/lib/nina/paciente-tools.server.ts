@@ -150,6 +150,10 @@ export type CtxNinaPaciente = {
   opcoesAgendamentoInicioTurno?: boolean;
   /** Dúvida encontrada neste turno; só uma nova mensagem do paciente pode esclarecê-la. */
   esclarecimentoCatalogo?: import("./knowledge-contract").ResultadoConhecimento["esclarecimento"];
+  /** Chave `nina_remarcacao_whatsapp` ligada na clínica (Etapa E2). */
+  podeRemarcar?: boolean;
+  /** Início do turno atual: prova que o "sim" veio depois do resumo. */
+  turnoIniciadoEm?: string;
 };
 
 
@@ -1140,7 +1144,11 @@ async function executarFerramentaInterna(
 
   // Defesa: mesmo que o modelo invente uma chamada, sem a flag da clínica
   // nenhuma ferramenta que grava ou expõe paciente executa.
-  const SOMENTE_COM_FLAG = new Set(["selecionar_horario", "consultar_cadastro_paciente", "identificar_paciente", "meus_agendamentos", "agendar"]);
+  const SOMENTE_COM_FLAG = new Set(["selecionar_horario", "consultar_cadastro_paciente", "identificar_paciente", "meus_agendamentos", "agendar", "propor_remarcacao", "remarcar_agendamento"]);
+  if ((nome === "propor_remarcacao" || nome === "remarcar_agendamento") && ctx.podeAgendar !== false) {
+    const { executarRemarcacao } = await import("./remarcacao.server");
+    return executarRemarcacao(ctx, nome, args);
+  }
   if (SOMENTE_COM_FLAG.has(nome) && ctx.podeAgendar === false)
     return falha("PERMISSION_DENIED", "Agendamento pela assistente não está ativo nesta unidade.");
   // Modo "somente informa": vaga livre também não é consultada. O modelo informa
@@ -2087,6 +2095,7 @@ async function executarFerramentaInterna(
         return {
           ok: true,
           agendamentos: linhas.map((l) => ({
+            ...(ctx.podeRemarcar === true ? { agendamento_id: l["id"] } : {}),
             data: formatarData(String(l["inicio"])),
             hora: formatarHora(String(l["inicio"])),
             profissional: nomeMedico.get(String(l["medico_id"])) ?? null,
