@@ -90,4 +90,26 @@ describe("preferências de acessibilidade", () => {
     salvarLocal(p);
     expect(lerLocal()).toEqual(p);
   });
+  it("preferências antigas recebem ajustes seguros do OS ZAP", () => {
+    const p = normalizarPrefs({ fontScale: 1.15, modoEscuro: true });
+    expect(p.oszap).toEqual({ mensagensEspacadas: false, coresDistintas: false, enterEnvia: true });
+    expect(p.fontScale).toBe(1.15);
+    expect(p.modoEscuro).toBe(true);
+  });
+  it("valida, salva e remove as novas preferências do atendimento", () => {
+    expect(normalizarPrefs({ oszap: { enterEnvia: "não", coresDistintas: 1 } }).oszap).toEqual(
+      A11Y_DEFAULTS.oszap,
+    );
+    const p = normalizarPrefs({
+      oszap: { enterEnvia: false, coresDistintas: true, mensagensEspacadas: true },
+    });
+    salvarLocal(p);
+    expect(lerLocal()?.oszap).toEqual(p.oszap);
+    const doc = docFake();
+    aplicarPrefs(p, doc);
+    expect(doc.classes.has("oszap-a11y-leitura")).toBe(true);
+    expect(doc.classes.has("oszap-a11y-cores")).toBe(true);
+    aplicarPrefs(A11Y_DEFAULTS, doc);
+    expect(doc.classes.has("oszap-a11y-cores")).toBe(false);
+  });
 });

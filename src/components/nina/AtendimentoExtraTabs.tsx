@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
+import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadeProvider";
+import { deveEnviarPorTecla } from "@/lib/atendimento/teclado-envio";
 import { ListaRespostasRapidas, useRespostasFiltradas, useRespostasRapidas } from "@/components/nina/RespostasRapidas";
 import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
 import {
@@ -274,6 +276,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   conversaIdExterna?: string | null;
   onSelecionarConversa?: (id: string | null) => void;
 } = {}) {
+  const { prefs: prefsAcessibilidade } = useAcessibilidade();
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
 
@@ -3519,6 +3522,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       }}
                       onBlur={() => setSlash(null)}
                       onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing) {
+                          e.stopPropagation();
+                          return;
+                        }
                         // Com a lista aberta, o teclado navega nela — Enter insere
                         // a resposta no campo e NUNCA envia a mensagem.
                         if (slash && itensResp.length > 0) {
@@ -3534,6 +3541,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                           }
                           if (e.key === "Enter" || e.key === "Tab") {
                             e.preventDefault();
+                            e.stopPropagation();
                             const escolhida = itensResp[slashIdx];
                             if (escolhida) inserirRespostaRapida(escolhida);
                             return;
@@ -3544,13 +3552,16 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                           setSlash(null);
                           return;
                         }
-                        if (e.key === "Enter" && !e.shiftKey) {
+                        if (deveEnviarPorTecla({ ...e, isComposing: e.nativeEvent.isComposing }, prefsAcessibilidade.oszap.enterEnvia)) {
                           e.preventDefault();
+                          // O atalho global não pode enviar novamente o mesmo rascunho.
+                          e.stopPropagation();
                           enviar();
                         }
                       }}
                       placeholder={motivoBloqueio ? "Envio bloqueado" : "Mensagem… (digite / para respostas rápidas)"}
                       rows={1}
+                      title={prefsAcessibilidade.oszap.enterEnvia ? "Enter envia; Shift+Enter quebra a linha" : "Ctrl+Enter envia; Enter quebra a linha"}
                       className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
                       disabled={!!motivoBloqueio}
                     />

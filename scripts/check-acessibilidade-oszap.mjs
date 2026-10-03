@@ -96,6 +96,57 @@ try {
     "true",
   );
   await page.getByTitle("Texto 100%", { exact: true }).click();
+  await expect(painel.getByRole("switch", { name: "Nova mensagem", exact: true })).toHaveCount(0);
+  await painel.locator("summary").filter({ hasText: "Teclado e envio" }).click();
+  await painel.getByRole("switch", { name: "Enter envia a mensagem", exact: true }).click();
+  await draft.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("[data-envios]")).toHaveText("0");
+  await page.keyboard.press("Control+Enter");
+  await expect(page.locator("[data-envios]")).toHaveText("1");
+  await draft.evaluate((el) =>
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        ctrlKey: true,
+        isComposing: true,
+        bubbles: true,
+      }),
+    ),
+  );
+  await expect(page.locator("[data-envios]")).toHaveText("1");
+  await draft.fill("Chat utilizável com acessibilidade aberta");
+  await painel.getByRole("button", { name: /Leitura confortável/ }).click();
+  const fonte = await page
+    .locator("[data-leitura]")
+    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  if (fonte < 17) throw Error("Fonte das mensagens não aumentou");
+  await expect(page.locator("html")).toHaveClass(/oszap-a11y-leitura/);
+  await expect(
+    painel.getByRole("switch", { name: "Enter envia a mensagem", exact: true }),
+  ).not.toBeChecked();
+  await painel.getByRole("switch", { name: "Diferenciar os avisos", exact: true }).click();
+  const aviso = painel.locator('[data-wait-level="critico"]');
+  if ((await aviso.evaluate((el) => getComputedStyle(el).borderStyle)) !== "double")
+    throw Error("Aviso crítico não se diferenciou");
+  await painel.getByRole("switch", { name: "Modo escuro", exact: true }).click();
+  await painel.getByRole("switch", { name: "Contraste reforçado", exact: true }).click();
+  await expect(
+    painel.getByRole("switch", { name: "Contraste reforçado", exact: true }),
+  ).toBeChecked();
+  await expect(page.locator("html")).toHaveClass(/a11y-alto-contraste/);
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.screenshot({ path: path.join(out, "acessibilidade-reformulada-escuro.png") });
+  await painel.getByRole("switch", { name: "Reduzir movimentos", exact: true }).click();
+  await expect(page.locator("html")).toHaveClass(/a11y-reduzir-animacao/);
+  await painel.getByRole("button", { name: "Restaurar ajustes", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Fechar acessibilidade" })).toBeInViewport();
+  await painel.getByRole("button", { name: "Restaurar", exact: true }).click();
+  await expect(page.locator("html")).not.toHaveClass(/oszap-a11y-cores/);
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await expect(
+    painel.getByRole("switch", { name: "Enter envia a mensagem", exact: true }),
+  ).toBeChecked();
   await page.getByRole("button", { name: "Fechar acessibilidade" }).click();
   await page.waitForTimeout(250);
   const restaurada = await chat.boundingBox();
@@ -104,23 +155,39 @@ try {
   await trigger.click();
   await expect(painel).toBeVisible();
   await page.waitForTimeout(300);
+  await page.getByTitle("Texto 135%", { exact: true }).click();
+  await painel.getByRole("button", { name: "Amplo", exact: true }).click();
+  await expect(painel.getByRole("button", { name: "Amplo", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   const mobileBox = await painel.boundingBox();
   if (Math.abs(mobileBox.width - 360) > 1) throw Error("Painel estreito no celular");
   await expect(page.getByRole("button", { name: "Fechar acessibilidade" })).toBeInViewport();
   if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
     throw Error("Overflow no celular");
+  if (await painel.evaluate((el) => el.scrollWidth > el.clientWidth + 1))
+    throw Error("Controles cortados no painel");
   await page.screenshot({ path: path.join(out, "acessibilidade-mobile.png") });
   await page.getByRole("button", { name: "Fechar acessibilidade" }).click();
   await expect(draft).toHaveValue("Chat utilizável com acessibilidade aberta");
   // Demais portais conservam a gaveta modal existente.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "Alternar portal" }).click();
+  await page.evaluate(() => document.documentElement.classList.add("a11y-cores-deuteranopia"));
+  if ((await page.locator("body").evaluate((el) => getComputedStyle(el).filter)) === "none")
+    throw Error("Filtro legado dos outros portais não foi preservado");
+  await page.getByRole("button", { name: "Alternar portal" }).click();
+  if ((await page.locator("body").evaluate((el) => getComputedStyle(el).filter)) !== "none")
+    throw Error("Filtro antigo continua alterando a página inteira do OS ZAP");
+  await page.evaluate(() => document.documentElement.classList.remove("a11y-cores-deuteranopia"));
+  await page.getByRole("button", { name: "Alternar portal" }).click();
   await trigger.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(painel).toHaveCount(0);
   if (errors.length) throw Error(errors.join("\n"));
   console.log(
-    "Acessibilidade: coluna sem sobreposição, menu+Contatos, chat utilizável, rascunho preservado, foco/Esc, preferências, celular e gaveta dos demais portais: OK.",
+    "Acessibilidade: coluna sem sobreposição, rascunho preservado, fonte do chat, Enter/Ctrl+Enter sem envio duplicado, perfis, cores, contraste, restauração, foco/Esc, celular e gaveta dos demais portais: OK.",
   );
 } finally {
   await browser.close();

@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useAcessibilidade } from "./AcessibilidadeProvider";
+import { AjustesOsZap } from "./AjustesOsZap";
 import type { A11yPrefs, ColorVision, Densidade, FontScale } from "@/lib/acessibilidade/prefs";
 
 const ESCALAS: { valor: FontScale; label: string; titulo: string }[] = [
@@ -135,7 +136,7 @@ export function PainelAcessibilidade({ onFechar }: { onFechar: () => void }) {
       id="oszap-acessibilidade-painel"
       aria-label="Acessibilidade"
       role="region"
-      className="relative h-full overflow-y-auto border-l bg-card p-6 text-foreground"
+      className="relative h-full overflow-y-auto border-l bg-card text-foreground"
       onKeyDown={(e) => {
         if (e.key === "Escape" && !e.defaultPrevented) {
           e.preventDefault();
@@ -144,23 +145,27 @@ export function PainelAcessibilidade({ onFechar }: { onFechar: () => void }) {
         }
       }}
     >
-      <Button
-        ref={fecharRef}
-        size="icon"
-        variant="ghost"
-        className="absolute right-2 top-2 h-7 w-7"
-        aria-label="Fechar acessibilidade"
-        onClick={fechar}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-      <h2 className="flex items-center gap-2 pr-5 text-lg font-semibold">
-        <Accessibility className="h-5 w-5" aria-hidden /> Acessibilidade
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Estas configurações valem apenas para a sua conta.
-      </p>
-      <ConteudoAcessibilidade />
+      <div className="sticky top-0 z-10 border-b bg-card p-4">
+        <Button
+          ref={fecharRef}
+          size="icon"
+          variant="ghost"
+          className="absolute right-2 top-2 h-7 w-7"
+          aria-label="Fechar acessibilidade"
+          onClick={fechar}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+        <h2 className="flex items-center gap-2 pr-8 text-lg font-semibold">
+          <Accessibility className="h-5 w-5" aria-hidden /> Acessibilidade
+        </h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Ajuste a leitura e o conforto do seu atendimento.
+        </p>
+      </div>
+      <div className="px-4 pb-4">
+        <AjustesOsZap />
+      </div>
     </section>
   );
 }

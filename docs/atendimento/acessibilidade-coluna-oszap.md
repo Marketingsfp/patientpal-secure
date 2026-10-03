@@ -7,9 +7,9 @@ restante; ao fechar, recuperam o espaço. A conversa e o rascunho não são
 desmontados durante essa mudança.
 
 Os controles continuam usando o mesmo provider e as mesmas preferências do
-usuário. O conteúdo de configuração é compartilhado entre a coluna do OS ZAP
-e a gaveta existente dos demais portais. Não há alterações em persistência,
-perfis, Nina, envio de mensagens, agenda ou outros módulos.
+usuário. A reformulação posterior dos controles do OS ZAP está descrita em
+[reformulacao-acessibilidade-oszap.md](reformulacao-acessibilidade-oszap.md).
+A gaveta existente dos demais portais conserva seu conteúdo anterior.
 
 Ao abrir a coluna, o foco vai para Fechar acessibilidade. O botão e Escape
 quando o foco está no painel fecham a coluna e devolvem o foco ao botão de

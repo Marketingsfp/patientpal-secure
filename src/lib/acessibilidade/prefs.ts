@@ -19,6 +19,8 @@ export type AlertasSonoros = {
 };
 
 export type A11yPrefs = {
+  /** Ajustes exclusivos do atendimento; preferências antigas recebem os padrões. */
+  oszap: { mensagensEspacadas: boolean; coresDistintas: boolean; enterEnvia: boolean };
   fontScale: FontScale;
   densidade: Densidade;
   altoContraste: boolean;
@@ -35,6 +37,7 @@ export type A11yPrefs = {
 };
 
 export const A11Y_DEFAULTS: A11yPrefs = {
+  oszap: { mensagensEspacadas: false, coresDistintas: false, enterEnvia: true },
   fontScale: 1,
   densidade: "compacta",
   altoContraste: false,
@@ -66,7 +69,13 @@ export function normalizarPrefs(bruto: unknown): A11yPrefs {
   const cores: ColorVision[] = ["padrao", "protanopia", "deuteranopia", "tritanopia"];
   const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
   const sons = (p.sons ?? {}) as Partial<AlertasSonoros>;
+  const oszap = p.oszap ?? A11Y_DEFAULTS.oszap;
   return {
+    oszap: {
+      mensagensEspacadas: bool(oszap.mensagensEspacadas, false),
+      coresDistintas: bool(oszap.coresDistintas, false),
+      enterEnvia: bool(oszap.enterEnvia, true),
+    },
     fontScale: escalas.includes(p.fontScale as FontScale)
       ? (p.fontScale as FontScale)
       : A11Y_DEFAULTS.fontScale,
@@ -98,6 +107,8 @@ export function normalizarPrefs(bruto: unknown): A11yPrefs {
 /** Classes que o <html> recebe para as preferências informadas. */
 export function classesDe(p: A11yPrefs): string[] {
   const cls = [`a11y-dens-${p.densidade}`, `a11y-cores-${p.visaoCores}`];
+  if (p.oszap?.mensagensEspacadas) cls.push("oszap-a11y-leitura");
+  if (p.oszap?.coresDistintas) cls.push("oszap-a11y-cores");
   if (p.altoContraste) cls.push("a11y-alto-contraste");
   if (p.modoEscuro) cls.push("dark", "a11y-escuro");
   if (p.botoesMaiores) cls.push("a11y-botoes-maiores");
@@ -110,6 +121,8 @@ export function classesDe(p: A11yPrefs): string[] {
 }
 
 const TODAS_CLASSES = [
+  "oszap-a11y-leitura",
+  "oszap-a11y-cores",
   "a11y-dens-compacta",
   "a11y-dens-confortavel",
   "a11y-dens-grande",

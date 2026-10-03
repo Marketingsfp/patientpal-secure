@@ -95,7 +95,7 @@
   display: none;
 }
 [data-os-zap="true"] .oszap-bubble {
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.65;
   padding: 12px 16px;
   overflow-wrap: anywhere;
@@ -109,7 +109,7 @@
   color: var(--oszap-out-ink);
 }
 [data-os-zap="true"] .oszap-message-meta {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 [data-os-zap="true"] .oszap-composer textarea {
@@ -217,6 +217,49 @@
   }
 }
 .oszap-central-back { display: none; }
+/* Personalização do atendimento; nenhum filtro é aplicado à página inteira. */
+html:is(.a11y-cores-protanopia,.a11y-cores-deuteranopia,.a11y-cores-tritanopia) body:has([data-os-zap="true"]) { filter: none; }
+.oszap-access-group summary::-webkit-details-marker { display: none; }
+.oszap-access-group[open] > summary .oszap-access-chevron { transform: rotate(180deg); }
+.oszap-access-settings .oszap-access-switch {
+  min-height: 1.25rem !important;
+  min-width: 2.25rem !important;
+}
+html.oszap-a11y-leitura [data-os-zap="true"] .oszap-bubble { line-height: 1.95; }
+html.a11y-dens-confortavel [data-os-zap="true"] .oszap-conversation { padding-block: 10px; }
+html.a11y-dens-grande [data-os-zap="true"] .oszap-conversation { padding-block: 14px; }
+/* Pendências não perdem destaque por uma preferência antiga de "Modo foco". */
+html.a11y-modo-foco [data-os-zap="true"] [data-a11y-secundario="true"] { opacity: 1; filter: none; }
+html.a11y-modo-foco [data-os-zap="true"] [data-a11y-principal="true"] { outline: none; }
+html.a11y-foco-teclado [data-os-zap="true"] :is(a,button,input,textarea,select,summary):focus-visible {
+  outline: 3px solid var(--ring) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 5px var(--background);
+}
+html.oszap-a11y-cores [data-os-zap="true"] {
+  --atd-ok: #2563eb;
+  --atd-ok-bg: #eff6ff;
+  --atd-ok-ink: #1e40af;
+  --atd-danger: #c2410c;
+  --atd-danger-strong: #c2410c;
+  --atd-danger-bg: #fff7ed;
+  --atd-danger-ink: #9a3412;
+}
+html.oszap-a11y-cores.dark [data-os-zap="true"] {
+  --atd-ok: #93c5fd;
+  --atd-ok-bg: #172554;
+  --atd-ok-ink: #bfdbfe;
+  --atd-danger: #fdba74;
+  --atd-danger-strong: #fdba74;
+  --atd-danger-bg: #431407;
+  --atd-danger-ink: #fed7aa;
+}
+html.oszap-a11y-cores [data-os-zap="true"] [data-wait-level="critico"] { border-style: double; border-width: 3px; }
+/* O contraste do OS ZAP usa os seus próprios tokens e respeita o tema. */
+html.a11y-alto-contraste [data-os-zap="true"] { --foreground: #111827; --muted-foreground: #1f2937; --border: #334155; }
+html.a11y-alto-contraste.dark [data-os-zap="true"] { --foreground: #f8fafc; --muted-foreground: #e2e8f0; --border: #cbd5e1; }
+html.a11y-alto-contraste [data-os-zap="true"] :is(p,span,div,label,h1,h2,h3,h4) { color: inherit; }
+html.a11y-alto-contraste [data-os-zap="true"] .text-muted-foreground { color: var(--muted-foreground) !important; }
 @media (max-width: 900px) {
   .oszap-central-list { width: 280px; }
 }
