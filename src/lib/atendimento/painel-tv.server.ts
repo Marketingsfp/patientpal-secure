@@ -15,6 +15,8 @@ export type AtendenteTv = {
   atribuidas: number;
   /** Instante de espera de cada conversa pendente atribuída (TV calcula a crítica). */
   esperas: string[];
+  /** Conversas que esta pessoa resolveu hoje. */
+  resolvidasHoje: number;
 };
 
 /**
@@ -58,16 +60,18 @@ export async function carregarPainelTv(
 
   const { inicio, fimExclusivo } = janelaDiaClinica(hojeBR());
 
-  // Mensagens de hoje (sem avisos internos): base de "conversas hoje",
-  // tempo médio de resposta das atendentes e volume por hora.
+  // Mensagens de hoje (sem avisos internos nem homologação/testes): base de
+  // "conversas hoje", tempo médio de resposta das atendentes, volume por hora
+  // e de quem foram as respostas.
   const doDia = new Set<string>();
-  const msgs: { conversa_id: string | null; direction: string | null; enviada_por_user_id: string | null; created_at: string }[] = [];
+  const msgs: { conversa_id: string | null; direction: string | null; enviada_por: string | null; enviada_por_user_id: string | null; created_at: string }[] = [];
   let desde = 0;
   while (true) {
     const { data, error } = await supabase
       .from("whatsapp_mensagens")
-      .select("conversa_id, direction, enviada_por_user_id, created_at")
+      .select("conversa_id, direction, enviada_por, enviada_por_user_id, created_at")
       .eq("clinica_id", clinicaId)
+      .eq("is_teste", false)
       .neq("status", "system")
       .gte("created_at", inicio)
       .lt("created_at", fimExclusivo)
@@ -87,8 +91,16 @@ export async function carregarPainelTv(
   // contar (a métrica é só das atendentes).
   const inicioPendente = new Map<string, number>();
   const tempos: number[] = [];
+  // Respostas enviadas hoje: atendente (tem usuário), Nina, ou automáticas
+  // do sistema (lembretes, avisos de protocolo e afins).
+  const respostas = { equipe: 0, nina: 0, automaticas: 0 };
   for (const m of msgs) {
     const conv = m.conversa_id;
+    if (m.direction !== "in") {
+      if (m.enviada_por_user_id) respostas.equipe++;
+      else if (m.enviada_por === "nina") respostas.nina++;
+      else respostas.automaticas++;
+    }
     if (m.direction === "in") {
       volumePorHora[Number(horaBR.format(new Date(m.created_at))) % 24]++;
       if (conv && !inicioPendente.has(conv)) inicioPendente.set(conv, Date.parse(m.created_at));
@@ -104,6 +116,32 @@ export async function carregarPainelTv(
   const tempoMedioRespostaSeg = tempos.length
     ? Math.round(tempos.reduce((s, v) => s + v, 0) / tempos.length / 1000)
     : null;
+
+  // Do dia: conversas que a Nina passou para a equipe e conversas resolvidas
+  // (com quem resolveu). Só contagens; nada de paciente sai daqui.
+  const [encaminhadasHoje, resolvidasHoje] = await Promise.all([
+    supabase
+      .from("atend_conversas")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", clinicaId)
+      .eq("is_teste", false)
+      .gte("handoff_em", inicio)
+      .lt("handoff_em", fimExclusivo),
+    supabase
+      .from("atend_conversas")
+      .select("resolved_by")
+      .eq("clinica_id", clinicaId)
+      .eq("is_teste", false)
+      .gte("resolved_at", inicio)
+      .lt("resolved_at", fimExclusivo)
+      .limit(5000),
+  ]);
+  if (encaminhadasHoje.error) throw new Error(encaminhadasHoje.error.message);
+  if (resolvidasHoje.error) throw new Error(resolvidasHoje.error.message);
+  const resolvidasPor = new Map<string, number>();
+  for (const r of resolvidasHoje.data ?? []) {
+    if (r.resolved_by) resolvidasPor.set(r.resolved_by, (resolvidasPor.get(r.resolved_by) ?? 0) + 1);
+  }
 
   const [esperas, presencas, membros] = await Promise.all([
     supabase.rpc("atend_espera_por_conversa", { _clinica_id: clinicaId, _is_teste: false }),
@@ -181,6 +219,7 @@ export async function carregarPainelTv(
           : null,
         atribuidas: atribuidas.get(id) ?? 0,
         esperas: esperasPorAtendente.get(id) ?? [],
+        resolvidasHoje: resolvidasPor.get(id) ?? 0,
       };
     }),
   );
@@ -196,6 +235,9 @@ export async function carregarPainelTv(
     tempoMedioRespostaSeg,
     respostasMedidas: tempos.length,
     volumePorHora,
+    respostas,
+    encaminhadasHoje: encaminhadasHoje.count ?? 0,
+    resolvidasHoje: (resolvidasHoje.data ?? []).length,
     atualizadoEm: new Date().toISOString(),
   };
 }
