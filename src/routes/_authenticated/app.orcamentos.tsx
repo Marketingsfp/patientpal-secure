@@ -53,6 +53,7 @@ import { VirtualList } from "@/components/list-shell";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { ReactNode } from "react";
+import { primeiroValorValido } from "@/lib/convenio/info-convenio-paciente";
 
 const ICON_BTN =
   "p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center";
@@ -291,6 +292,32 @@ type Item = {
   preparo: string | null;
   valores_formas?: Record<string, number> | null;
 };
+
+/**
+ * Valores por forma agrupados para a tela: Dinheiro e, quando PIX, Crédito e
+ * Débito custam o mesmo, uma linha só "PIX / Cartão". Formas extras marcadas
+ * (Boleto, Outro) entram no fim.
+ */
+function gruposPorForma(
+  valores: Record<string, number>,
+  extras: string[],
+): { rotulo: string; valor: number }[] {
+  const cartao = ["PIX", "Cartão de Crédito", "Cartão de Débito"];
+  const out: { rotulo: string; valor: number }[] = [
+    { rotulo: "Dinheiro", valor: Number(valores["Dinheiro"] ?? 0) },
+  ];
+  const vCartao = cartao.map((f) => Number(valores[f] ?? 0));
+  if (vCartao.every((v) => v === vCartao[0])) {
+    out.push({ rotulo: "PIX / Cartão", valor: vCartao[0] });
+  } else {
+    cartao.forEach((f, i) => out.push({ rotulo: f.replace("Cartão de ", ""), valor: vCartao[i] }));
+  }
+  for (const f of extras) {
+    if (f !== "Dinheiro" && !cartao.includes(f) && valores[f] != null)
+      out.push({ rotulo: f, valor: Number(valores[f]) });
+  }
+  return out;
+}
 
 type MedicoOpt = {
   id: string;
@@ -905,10 +932,19 @@ function OrcamentosPage() {
                         {BRL(Number(o.valor_total))}
                         {o.valores_pagamento && Object.keys(o.valores_pagamento).length > 1 && (
                           <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
-                            {Object.entries(o.valores_pagamento).map(([f, v]) => (
-                              <div key={f}>
-                                <span className="uppercase">{f.replace("Cartão de ", "")}:</span>{" "}
-                                {BRL(Number(v))}
+                            {/* Orçamento novo grava as 4 formas: agrupa PIX/Cartão. */}
+                            {(FORMAS_LAB.every((f) => o.valores_pagamento?.[f] != null)
+                              ? gruposPorForma(
+                                  o.valores_pagamento,
+                                  Object.keys(o.valores_pagamento),
+                                )
+                              : Object.entries(o.valores_pagamento).map(([f, v]) => ({
+                                  rotulo: f.replace("Cartão de ", ""),
+                                  valor: Number(v),
+                                }))
+                            ).map((g) => (
+                              <div key={g.rotulo}>
+                                <span className="uppercase">{g.rotulo}:</span> {BRL(g.valor)}
                               </div>
                             ))}
                           </div>
@@ -1150,17 +1186,36 @@ function NovoOrcamentoDialog({
     };
   }, [procQuery, clinicaId, categoria]);
 
+  // Preço do serviço em cada forma. Pula coluna zerada (mesma regra da
+  // cobrança na Agenda): antes o `??` aceitava 0 e o item entrava sem valor.
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro")
-      return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
-    if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
+      return primeiroValorValido(p.valor_dinheiro, p.valor_dinheiro_pix, p.valor_padrao);
+    if (f === "PIX")
+      return primeiroValorValido(
+        p.valor_pix,
+        p.valor_cartao_credito,
+        p.valor_cartao,
+        p.valor_dinheiro_pix,
+        p.valor_padrao,
+      );
     if (f === "Cartão de Crédito")
-      return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
+      return primeiroValorValido(p.valor_cartao_credito, p.valor_cartao, p.valor_padrao);
     if (f === "Cartão de Débito")
-      return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
-    return Number(p.valor_padrao ?? p.valor_dinheiro_pix ?? 0);
+      return primeiroValorValido(p.valor_cartao_debito, p.valor_cartao, p.valor_padrao);
+    return primeiroValorValido(p.valor_padrao, p.valor_dinheiro_pix);
   };
-  const valorDoProc = (p: Procedimento) => valorPorForma(p, formasPagamento[0] ?? "Dinheiro");
+  // Forma que define o "Valor unit." e o Total do orçamento: a primeira
+  // marcada (no valor único do Laboratório, o preço é igual em todas).
+  const formaPrincipal = pagamentoUnico ? "Dinheiro" : (formasPagamento[0] ?? "Dinheiro");
+  const valorDoProc = (p: Procedimento) => valorPorForma(p, formaPrincipal);
+  // O item guarda o preço das 4 formas, mesmo as não marcadas: a Agenda cobra
+  // pela forma escolhida no caixa e o cupom imprime Dinheiro × PIX/Cartão.
+  const valoresTodasFormas = (p: Procedimento) => {
+    const out: Record<string, number> = {};
+    for (const f of new Set([...FORMAS_LAB, ...formasPagamento])) out[f] = valorPorForma(p, f);
+    return out;
+  };
   const abreviar = (f: string) =>
     f === "Cartão de Crédito" ? "Crédito" : f === "Cartão de Débito" ? "Débito" : f;
 
@@ -1221,6 +1276,34 @@ function NovoOrcamentoDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formasPagamento.join("|"), itens.length]);
 
+  // Trocou a forma de pagamento: o "Valor unit." de cada item (e o Total)
+  // passa na hora para o preço da nova forma principal. Valor digitado à mão
+  // fica gravado em `valores_formas` da forma em que foi digitado.
+  // Valor digitado no "Valor unit.": vale para a forma principal, para as
+  // formas sem preço na tabela (serviço de valor variável) e, no valor único
+  // do Laboratório, para todas — senão o caixa cobraria outro valor.
+  const precosComValorDigitado = (atual: Record<string, number>, v: number) => {
+    const out = { ...atual };
+    for (const f of Object.keys(out)) {
+      if (pagamentoUnico || f === formaPrincipal || !(Number(out[f]) > 0)) out[f] = v;
+    }
+    out[formaPrincipal] = v;
+    return out;
+  };
+  const assinaturaPrecos = itens.map((i) => i.valores_formas?.[formaPrincipal] ?? "").join("|");
+  useEffect(() => {
+    setItens((arr) => {
+      let mudou = false;
+      const next = arr.map((it) => {
+        const v = it.valores_formas?.[formaPrincipal];
+        if (v == null || Number(v) === Number(it.valor_unitario)) return it;
+        mudou = true;
+        return { ...it, valor_unitario: Number(v) };
+      });
+      return mudou ? next : arr;
+    });
+  }, [formaPrincipal, assinaturaPrecos]);
+
   const adicionarProc = (p: Procedimento) => {
     if (itens.some((it) => it.procedimento_id === p.id)) {
       toast.warning(`${p.nome} já foi adicionado ao orçamento`);
@@ -1228,9 +1311,7 @@ function NovoOrcamentoDialog({
       setProcResults([]);
       return;
     }
-    const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
-    const valores: Record<string, number> = {};
-    for (const f of formas) valores[f] = valorPorForma(p, f);
+    const valores = valoresTodasFormas(p);
     setItens((arr) => [
       ...arr,
       {
@@ -1301,10 +1382,13 @@ function NovoOrcamentoDialog({
 
   // Total por forma de pagamento: cada forma é uma alternativa de pagamento integral.
   // Ex.: "Se pagar tudo em Dinheiro = R$ X; se pagar tudo no Cartão = R$ Y".
+  // Calculado para as 4 formas básicas além das marcadas: a Agenda cobra pela
+  // forma escolhida no caixa, que pode não ser a marcada aqui.
+  const formasTotais = Array.from(new Set([...FORMAS_LAB, ...formasPagamento]));
   const totaisPorForma = (() => {
     const out: Record<string, number> = {};
     const desc = Number(desconto) || 0;
-    for (const f of formasPagamento) {
+    for (const f of formasTotais) {
       const sub = itens.reduce((s, i) => {
         const v = Number(i.valores_formas?.[f] ?? i.valor_unitario ?? 0);
         return s + Number(i.quantidade || 0) * v;
@@ -1313,6 +1397,8 @@ function NovoOrcamentoDialog({
     }
     return out;
   })();
+  // Há diferença de preço entre Dinheiro e PIX/Cartão em algum item?
+  const precoVariaPorForma = new Set(FORMAS_LAB.map((f) => totaisPorForma[f])).size > 1;
 
   const salvar = async () => {
     if (!categoria) return toast.error("Selecione o tipo do orçamento");
@@ -1348,8 +1434,13 @@ function NovoOrcamentoDialog({
     if ((observacoes ?? "").length > 1000) {
       return toast.error("Observações não podem exceder 1000 caracteres");
     }
-    const valoresPag: Record<string, number> | null =
-      !pagamentoUnico && formasPagamento.length > 1 ? { ...totaisPorForma } : null;
+    // Com preço diferente por forma, grava o total de TODAS as formas (a Agenda
+    // cobra pela escolhida no caixa). Sem diferença, só quando há 2 marcadas.
+    const valoresPag: Record<string, number> | null = precoVariaPorForma
+      ? { ...totaisPorForma }
+      : !pagamentoUnico && formasPagamento.length > 1
+        ? Object.fromEntries(formasPagamento.map((f) => [f, totaisPorForma[f] ?? 0]))
+        : null;
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -1758,7 +1849,20 @@ function NovoOrcamentoDialog({
                               onChange={(v) =>
                                 setItens((a) =>
                                   a.map((x, i) =>
-                                    i === idx ? { ...x, valor_unitario: Number(v) || 0 } : x,
+                                    i === idx
+                                      ? {
+                                          ...x,
+                                          valor_unitario: Number(v) || 0,
+                                          ...(x.valores_formas
+                                            ? {
+                                                valores_formas: precosComValorDigitado(
+                                                  x.valores_formas,
+                                                  Number(v) || 0,
+                                                ),
+                                              }
+                                            : {}),
+                                        }
+                                      : x,
                                   ),
                                 )
                               }
@@ -1766,21 +1870,17 @@ function NovoOrcamentoDialog({
                           </td>
                           <td className="px-2 py-1 text-right font-medium">
                             {BRL(it.quantidade * it.valor_unitario)}
-                            {formasPagamento.length > 1 && (
-                              <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
-                                {formasPagamento.map((f) => {
-                                  const v = Number(
-                                    it.valores_formas?.[f] ?? it.valor_unitario ?? 0,
-                                  );
-                                  return (
-                                    <div key={f}>
-                                      <b className="uppercase">{abreviar(f)}:</b>{" "}
-                                      {BRL(it.quantidade * v)}
+                            {(precoVariaPorForma || formasPagamento.length > 1) &&
+                              it.valores_formas && (
+                                <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
+                                  {gruposPorForma(it.valores_formas, formasPagamento).map((g) => (
+                                    <div key={g.rotulo}>
+                                      <b className="uppercase">{g.rotulo}:</b>{" "}
+                                      {BRL(it.quantidade * g.valor)}
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+                                  ))}
+                                </div>
+                              )}
                           </td>
                           <td className="px-2 py-1">
                             <Button
@@ -1873,15 +1973,29 @@ function NovoOrcamentoDialog({
                     </p>
                   )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
-                    <span>Total</span>
+                    <span>
+                      Total
+                      {precoVariaPorForma && (
+                        <span className="ml-1 text-sm font-medium text-muted-foreground">
+                          ({abreviar(formaPrincipal)})
+                        </span>
+                      )}
+                    </span>
                     <span className="text-primary">{BRL(total)}</span>
                   </div>
-                  {formasPagamento.length > 1 && (
+                  {(precoVariaPorForma || formasPagamento.length > 1) && (
                     <div className="space-y-1 border-t pt-2">
-                      {formasPagamento.map((f) => (
-                        <div key={f} className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Total {abreviar(f)}</span>
-                          <span className="font-semibold">{BRL(totaisPorForma[f] ?? 0)}</span>
+                      {precoVariaPorForma && (
+                        <p className="text-[12px] text-muted-foreground">
+                          O valor muda conforme a forma de pagamento:
+                        </p>
+                      )}
+                      {gruposPorForma(totaisPorForma, formasPagamento).map((g) => (
+                        <div key={g.rotulo} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Total {g.rotulo === "Dinheiro" ? "em" : "no"} {g.rotulo}
+                          </span>
+                          <span className="font-semibold">{BRL(g.valor)}</span>
                         </div>
                       ))}
                     </div>

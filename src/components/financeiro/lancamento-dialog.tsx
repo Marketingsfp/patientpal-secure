@@ -117,6 +117,12 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /**
+   * Valor desta cobrança em cada forma (dinheiro, pix, cartao_debito,
+   * cartao_credito). Se informado, trocar a "Forma pgto" reajusta o valor —
+   * exceto quando o operador já digitou um valor à mão.
+   */
+  valoresPorForma?: Record<string, number>;
   /** Paciente (titular) a vincular quando o recebimento não vem de um
    *  agendamento — ex.: mensalidade do cartão e pagamento avulso. Garante que
    *  a coluna "Paciente" do Caixa mostre o nome. */
@@ -181,6 +187,7 @@ export function LancamentoDialog({
   initialValor,
   agendamentoId,
   initialFormaPagamento,
+  valoresPorForma,
   pacienteIdFixo,
   categoriaFixaNome,
   permiteParcelasEmOutrasDatas = true,
@@ -571,6 +578,24 @@ export function LancamentoDialog({
       cancelado = true;
     };
   }, [open, agendamentoId, tipo]);
+
+  // Trocou a forma aqui dentro (ex.: escolheu Dinheiro na agenda e o paciente
+  // decidiu pagar no PIX): o valor vai para o preço daquela forma. O desconto
+  // continua valendo, porque o efeito abaixo recalcula a partir do novo valor
+  // original. Valor digitado à mão não é sobrescrito.
+  const reajustarValorPelaForma = (forma: string) => {
+    const alvo = Number(valoresPorForma?.[forma]);
+    if (!Number.isFinite(alvo) || alvo <= 0 || ehCategoriaGratuidade) return;
+    if (Math.abs(alvo - origNum) < 0.005) return;
+    const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const esperado = Math.max(0, origNum - descontoNum);
+    if (Math.abs(Number(valor || 0) - esperado) > 0.004) {
+      toast.info(`Valor digitado mantido. Nesta forma de pagamento o valor seria ${brl(alvo)}.`);
+      return;
+    }
+    setValorOriginal(alvo.toFixed(2));
+    toast.info(`Valor ajustado para esta forma de pagamento: ${brl(alvo)}.`);
+  };
 
   // Mantém o `valor` (total a pagar) sincronizado com o desconto.
   useEffect(() => {
@@ -2227,6 +2252,7 @@ export function LancamentoDialog({
                   value={formaPagamento}
                   onValueChange={(v) => {
                     setFormaPagamento(v);
+                    reajustarValorPelaForma(v);
                     if (v !== "cartao_credito") {
                       setBandeiraCartao("");
                       setParcelas("1");

@@ -758,6 +758,31 @@ type ItemOrcamentoCobranca = {
   valores_formas?: Record<string, number> | null;
 };
 
+/** Rótulos gravados pelo orçamento para cada forma da cobrança. */
+const ROTULOS_FORMA_ORCAMENTO: Record<string, string[]> = {
+  dinheiro: ["Dinheiro"],
+  pix: ["PIX", "Pix"],
+  cartao_debito: ["Cartão de Débito"],
+  cartao_credito: ["Cartão de Crédito"],
+};
+const FORMAS_BASICAS_ORCAMENTO = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"];
+
+/**
+ * Valor do item do orçamento se pago na `forma` (dinheiro, pix, …). Só usa o
+ * preço por forma do item quando ele tem as 4 formas gravadas (orçamento feito
+ * a partir de 03/10/2026); item antigo segue no valor único (`valor_total`).
+ */
+function valorItemOrcamentoNaForma(i: ItemOrcamentoCobranca, forma: string): number {
+  const qtd = Number(i.quantidade ?? 1) || 1;
+  const base = Number(i.valor_total ?? qtd * Number(i.valor_unitario ?? 0));
+  const vf = i.valores_formas;
+  if (!vf || !FORMAS_BASICAS_ORCAMENTO.every((k) => vf[k] != null)) return base;
+  const rotulo = ROTULOS_FORMA_ORCAMENTO[forma]?.[0];
+  if (!rotulo) return base;
+  const unit = Number(vf[rotulo] ?? 0);
+  return unit > 0 ? Math.round(qtd * unit * 100) / 100 : base;
+}
+
 /** Resultado da leitura de um orçamento para cobrança na agenda. */
 type OrcamentoCobranca = {
   opcoes: FormaOpcao[];
@@ -1976,6 +2001,9 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // Valor de cada forma nesta cobrança: a janela de pagamento usa para
+  // reajustar o valor se o caixa trocar a forma lá dentro.
+  const [pagamentoValoresForma, setPagamentoValoresForma] = useState<Record<string, number>>({});
   // Peso por atendimento p/ rateio quando o pagamento é agrupado.
   // key = agendamento_id, value = valor cheio (cartão preferido, senão dinheiro).
   const [pagamentoPesos, setPagamentoPesos] = useState<Record<string, number>>({});
@@ -7592,8 +7620,8 @@ function AgendaPage() {
     // cobrado é o dos itens escolhidos (menos o que já foi pago neles). Os
     // demais itens continuam livres para outros agendamentos/pagamentos.
     let totalLiquido = totalOrcamento;
-    let proporcao = 1;
     let itensCobranca: ItemOrcamentoCobranca[] = [];
+    let soItensVinculados = false;
     if (agendamentoId) {
       const { data: links } = await supabase
         .from("agendamento_orcamento_itens")
@@ -7620,7 +7648,7 @@ function AgendaPage() {
           );
           const pago = rows.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
           totalLiquido = Math.round(Math.max(0, subtotal - pago) * 100) / 100;
-          proporcao = totalOrcamento > 0 ? Math.min(1, totalLiquido / totalOrcamento) : 1;
+          soItensVinculados = true;
         }
       }
     }
@@ -7633,17 +7661,38 @@ function AgendaPage() {
         .eq("orcamento_id", orcamentoId);
       itensCobranca = (todos ?? []) as ItemOrcamentoCobranca[];
     }
+    // Valor pela forma escolhida no caixa (ex.: ultrassom R$ 110 no dinheiro,
+    // R$ 130 no PIX/cartão).
+    //  - Ficha com itens vinculados: soma o preço de cada item NAQUELA forma,
+    //    menos o que já foi pago neles.
+    //  - Orçamento inteiro: total da forma gravado no orçamento (já com o
+    //    desconto); sem ele, ajusta o total pela diferença de preço dos itens.
+    // Orçamento antigo, sem preço por forma, cobra o mesmo valor em todas.
     const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
-    const pegar = (label: string) => {
-      const v = vals ? Number(vals[label] ?? 0) : 0;
-      if (v <= 0) return totalLiquido;
-      return proporcao >= 1 ? v : Math.round(v * proporcao * 100) / 100;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const pegar = (forma: string) => {
+      if (soItensVinculados) {
+        const soma = itensCobranca.reduce((s, i) => s + valorItemOrcamentoNaForma(i, forma), 0);
+        const pago = itensCobranca.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
+        return r2(Math.max(0, soma - pago));
+      }
+      const gravado = (ROTULOS_FORMA_ORCAMENTO[forma] ?? [])
+        .map((k) => Number(vals?.[k] ?? 0))
+        .find((v) => v > 0);
+      if (gravado) return gravado;
+      const base = itensCobranca.reduce(
+        (s, i) => s + valorItemOrcamentoNaForma(i, "valor_unico"),
+        0,
+      );
+      const naForma = itensCobranca.reduce((s, i) => s + valorItemOrcamentoNaForma(i, forma), 0);
+      if (base > 0 && naForma !== base) return r2(Math.max(0, totalLiquido * (naForma / base)));
+      return totalLiquido;
     };
     const opcoesBase: FormaOpcao[] = [
-      { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
-      { forma: "pix", label: "Pix", valor: pegar("Pix") },
-      { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("Cartão de Débito") },
-      { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("Cartão de Crédito") },
+      { forma: "dinheiro", label: "Dinheiro", valor: pegar("dinheiro") },
+      { forma: "pix", label: "Pix", valor: pegar("pix") },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("cartao_debito") },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("cartao_credito") },
     ];
     // Benefício do convênio: o orçamento é sempre gravado em valor PARTICULAR.
     // O desconto é apurado agora, no momento do pagamento, porque a situação do
@@ -8232,6 +8281,18 @@ function AgendaPage() {
     setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
     setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma(op.forma);
+    // Pagamento parcial guarda o total da forma escolhida para calcular o que
+    // falta: ali a troca de forma dentro da janela não reajusta o valor.
+    setPagamentoValoresForma(
+      cobrancaParcialRef.current?.ativo
+        ? {}
+        : Object.fromEntries(
+            formaPagOpcoes.map((o) => [
+              o.forma,
+              Math.round(aplicarDescontoPendente(o.valor) * 100) / 100,
+            ]),
+          ),
+    );
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
     // Abre o diálogo de pagamento ANTES de fechar o de forma de pagamento.
@@ -8253,6 +8314,7 @@ function AgendaPage() {
     setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
     setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma("__misto__");
+    setPagamentoValoresForma({});
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
     setPagamentoOpen(true);
@@ -10822,12 +10884,21 @@ function AgendaPage() {
             setDescontoPendente(null);
             setSaldoOrcResumo(null);
             setSegundoRecebimentoLiberado(false);
+            setPagamentoValoresForma({});
           }
         }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
         initialFormaPagamento={pagamentoForma}
+        // Trocar a forma dentro da janela reajusta o valor (ex.: dinheiro
+        // R$ 110 → PIX R$ 130). Fora na cobrança com saldo (entrada/parcial)
+        // e na agrupada, cujos totais são montados para a forma já escolhida.
+        valoresPorForma={
+          saldoOrcResumo || segundoRecebimentoLiberado || pagamentoExtraIds.length > 0
+            ? undefined
+            : pagamentoValoresForma
+        }
         agendamentoId={pagamentoAgId}
         resumoSaldo={saldoOrcResumo}
         // Cobrança de um atendimento só: o pagamento pode ter parcelas pagas
