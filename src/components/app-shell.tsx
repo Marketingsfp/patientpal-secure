@@ -183,7 +183,7 @@ import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { AcessibilidadeProvider } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { AtalhosAcessibilidade } from "@/components/acessibilidade/AtalhosAcessibilidade";
-import { BotaoAcessibilidade } from "@/components/acessibilidade/BotaoAcessibilidade";
+import { BotaoAcessibilidade, PainelAcessibilidade } from "@/components/acessibilidade/BotaoAcessibilidade";
 import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 
 const VoiceInput = lazy(() =>
@@ -843,6 +843,15 @@ function AppShellInner() {
   // Aberto, o menu ocupa uma coluna e desloca o conteúdo; fechado, devolve
   // toda a largura ao atendimento. AppSidebarLayout adapta as telas pequenas.
   const [sidebarAberta, setSidebarAberta] = useState(false);
+  const [acessibilidadeAberta, setAcessibilidadeAberta] = useState(false);
+  const alternarAcessibilidade = useCallback((aberta: boolean) => {
+    setAcessibilidadeAberta(aberta);
+    // No celular, cada painel ocupa a largura da tela: nunca abrir os dois.
+    if (aberta && window.innerWidth < 1024) setSidebarAberta(false);
+  }, []);
+  useEffect(() => {
+    if (sidebarAberta && window.innerWidth < 1024) setAcessibilidadeAberta(false);
+  }, [sidebarAberta]);
   // Busca/filtro das telas dentro do menu lateral.
   const [buscaMenu, setBuscaMenu] = useState("");
   const buscaMenuInputRef = useRef<HTMLInputElement | null>(null);
@@ -1656,7 +1665,10 @@ function AppShellInner() {
             >
               <span className="text-base font-semibold">?</span>
             </Button>
-            <BotaoAcessibilidade />
+            <BotaoAcessibilidade
+              aberto={subsystem === "os-zap" ? acessibilidadeAberta : undefined}
+              onAbertoChange={subsystem === "os-zap" ? alternarAcessibilidade : undefined}
+            />
             <div className="flex items-center gap-1.5 [&_button]:text-foreground [&_button:hover]:bg-muted [&_button:hover]:text-foreground">
               <EstornosBell />
               {/* Leitura em voz alta: recurso de mesa, escondido no celular
@@ -1682,6 +1694,8 @@ function AppShellInner() {
       )}
 
       <AppSidebarLayout
+        painelDireitoAberto={subsystem === "os-zap" && acessibilidadeAberta}
+        painelDireito={<PainelAcessibilidade onFechar={() => setAcessibilidadeAberta(false)} />}
         aberta={!isChooser && sidebarAberta}
         modo={subsystem === "os-zap" ? "coluna" : "gaveta"}
         onFechar={fecharSidebar}
@@ -1985,7 +1999,7 @@ function AppShellInner() {
           Francisco), e no celular sobrava apenas o hambúrguer para navegar.
           Ela some enquanto a gaveta está aberta: é fixa no rodapé e cobriria o
           menu do usuário dentro da gaveta. */}
-      {!isChooser && !sidebarAberta && bottomNavItens.length > 0 && (
+      {!isChooser && !sidebarAberta && !(subsystem === "os-zap" && acessibilidadeAberta) && bottomNavItens.length > 0 && (
         <LiquidBottomNav
           pathname={location.pathname}
           onNavigate={irPara}
