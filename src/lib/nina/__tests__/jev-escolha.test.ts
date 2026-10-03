@@ -6,7 +6,7 @@ import type { VagaAgendamento } from "../agendamento-escolha";
 const vaga = (hora: string): VagaAgendamento => ({
   medico_id: "m1", medico: "Dra. Ana", procedimento: "Consulta", data: "2026-10-05", hora,
   inicio: `2026-10-05T${hora}:00-03:00`, fim: `2026-10-05T${hora}:30-03:00`, modalidade: "agendamento",
-} as VagaAgendamento);
+} as unknown as VagaAgendamento);
 const opcoes: SituacaoEscolha = { tipo: "opcoes", opcoes: [vaga("08:00"), vaga("10:00"), vaga("14:00")] };
 const resumo: SituacaoEscolha = { tipo: "resumo", vaga: vaga("10:00"), resumo: "Consulta 05/10 às 10:00. Confirma?" };
 
@@ -14,7 +14,8 @@ describe("Jev Fase 7 — escolha e aceite", () => {
   test("só oferece ao Jev as opções reais + nenhuma", () => {
     const p = perguntasEscolha(opcoes).horario as { criteria: Record<string, string> };
     expect(Object.keys(p.criteria)).toEqual(["opcao_1", "opcao_2", "opcao_3", "nenhuma"]);
-    expect(estadoEscolha("a segunda", null, opcoes).opcoes_oferecidas).toHaveLength(3);
+    const estado = estadoEscolha("a segunda", null, opcoes);
+    expect("opcoes_oferecidas" in estado ? estado.opcoes_oferecidas : []).toHaveLength(3);
   });
   test("escolha com 80% vira a vaga oferecida", () => {
     const d = decisaoEscolha({ horario: { choice: "opcao_2", probabilities: { opcao_2: 0.9 } } }, opcoes);
