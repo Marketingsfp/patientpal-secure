@@ -2095,6 +2095,7 @@ async function executarFerramentaInterna(
         return {
           ok: true,
           agendamentos: linhas.map((l) => ({
+            ...(ctx.podeRemarcar === true ? { agendamento_id: l["id"] } : {}),
             data: formatarData(String(l["inicio"])),
             hora: formatarHora(String(l["inicio"])),
             profissional: nomeMedico.get(String(l["medico_id"])) ?? null,
