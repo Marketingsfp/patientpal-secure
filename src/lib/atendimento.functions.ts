@@ -3300,30 +3300,33 @@ export const esperaConversas = createServerFn({ method: "POST" })
  * Procura pelo id interno, número (#1342), protocolo, nome, telefone e pelo
  * texto das mensagens. Somente leitura; conversas de homologação ficam fora.
  */
+async function assertPesquisaConversas(supabase: SupabaseClient<Database>, userId: string, clinicaId: string) {
+  await assertMember(supabase, userId, clinicaId);
+  const { data: podeGerir } = await supabase.rpc("can_manage_clinica", {
+    _user_id: userId,
+    _clinica_id: clinicaId,
+  });
+  let permitido = !!podeGerir || (await ehAdminClinica(supabase, userId, clinicaId));
+  if (!permitido) {
+    const { data: sup } = await supabase
+      .from("atend_departamento_membros")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .eq("user_id", userId)
+      .in("role", ["supervisor", "gestor", "admin"])
+      .limit(1);
+    permitido = (sup?.length ?? 0) > 0;
+  }
+  if (!permitido) throw new Error("Pesquisa disponível só para administração e supervisão.");
+}
+
 export const pesquisarConversasGeral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
     z.object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(1).max(200) }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
-      _user_id: context.userId,
-      _clinica_id: data.clinicaId,
-    });
-    let permitido = !!podeGerir || (await ehAdminClinica(context.supabase, context.userId, data.clinicaId));
-    if (!permitido) {
-      const { data: sup } = await context.supabase
-        .from("atend_departamento_membros")
-        .select("id")
-        .eq("clinica_id", data.clinicaId)
-        .eq("user_id", context.userId)
-        .in("role", ["supervisor", "gestor", "admin"])
-        .limit(1);
-      permitido = (sup?.length ?? 0) > 0;
-    }
-    if (!permitido) throw new Error("Pesquisa disponível só para administração e supervisão.");
-
+    await assertPesquisaConversas(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const bruto = data.termo.replace(/\s+/g, " ").trim();
     const termo = bruto.replace(/[%_,()'"\\*]/g, "").trim();
@@ -3388,4 +3391,20 @@ export const consultarPainelTv = createServerFn({ method: "POST" })
     const { carregarPainelTv } = await import("./atendimento/painel-tv.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     return carregarPainelTv(context.supabase, supabaseAdmin, data.clinicaId, context.userId);
+  });
+
+/** Central de conversas: todas as situações, com paginação e a mesma autorização da pesquisa. */
+export const listarCentralConversas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    clinicaId: z.string().uuid(),
+    situacao: z.enum(["todas", "abertas", "encerradas"]).default("todas"),
+    offset: z.number().int().min(0).default(0),
+    limit: z.number().int().min(1).max(100).default(50),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertPesquisaConversas(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { listarPaginaCentral } = await import("@/lib/atendimento/central-conversas.server");
+    return listarPaginaCentral(supabaseAdmin, data);
   });

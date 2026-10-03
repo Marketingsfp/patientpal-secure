@@ -269,7 +269,11 @@ function fmtData(s?: string | null) {
 /* ============================================================
  *  INBOX UNIFICADO — 3 colunas
  * ========================================================== */
-export function AtendInbox() {
+export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSelecionarConversa }: {
+  modoCentral?: boolean;
+  conversaIdExterna?: string | null;
+  onSelecionarConversa?: (id: string | null) => void;
+} = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
 
@@ -452,8 +456,16 @@ export function AtendInbox() {
   const abrirConversa = useCallback((id: string | null) => {
     // Caminho único de abertura: lista, busca por número, Central de Atenção,
     // fila, alertas e atalhos passam todos por aqui.
-    setSelecaoId(id ? (idConversaValido(id) ?? null) : null);
-  }, []);
+    const selecionada = id ? (idConversaValido(id) ?? null) : null;
+    setSelecaoId(selecionada);
+    // Mantém a Central sincronizada com atalhos internos. Uma falha de
+    // acesso deve conservar o painel aberto para mostrar o erro ao usuário.
+    if (selecionada) onSelecionarConversa?.(selecionada);
+  }, [onSelecionarConversa]);
+
+  useEffect(() => {
+    if (modoCentral) abrirConversa(conversaIdExterna);
+  }, [modoCentral, conversaIdExterna, abrirConversa]);
 
   // A automação (WebMCP) pede abertura pelo MESMO caminho, sempre por id.
   useEffect(() => assinarSelecaoConversa((id) => abrirConversa(id)), [abrirConversa]);
@@ -992,7 +1004,7 @@ export function AtendInbox() {
   }, [chaveAtual]);
 
   const carregarConvs = useCallback(async () => {
-    if (!clinicaId) return;
+    if (!clinicaId || modoCentral) return;
     const pedido = ++seqConvs.current;
     const chavePedido = chaveInbox({
       clinicaId,
@@ -1138,6 +1150,7 @@ export function AtendInbox() {
     souGestor,
     abrirConversa,
     obterConversaFn,
+    modoCentral,
   ]);
 
   // A conversa aberta é sempre a da seleção interna. Quando ela muda (clique
@@ -1178,6 +1191,11 @@ export function AtendInbox() {
           abrirConversa(null);
           return;
         }
+        if (modoCentral) {
+          deepLinkTentado.current.delete(idPedido);
+          setSel(row);
+          return;
+        }
         const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
         if (!destino || (!souGestor && destino === "nina")) {
           // Nenhum filtro desta lista mostra a conversa, mas o backend já
@@ -1215,7 +1233,7 @@ export function AtendInbox() {
         abrirConversa(null);
       }
     })();
-  }, [selecaoId, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirConversa]);
+  }, [selecaoId, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirConversa, modoCentral]);
 
   // Abrir uma conversa a partir da Central de Atenção ou da Revisão de
   // aprendizados, sem trocar de página e sem mexer em filtros/rascunho de quem
@@ -2852,9 +2870,10 @@ export function AtendInbox() {
 
   return (
     <RelogioEsperaProvider>
-      <div className="oszap-inbox h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3" data-mobile-view={listaMobile || !sel ? "lista" : "conversa"}>
+      <div className={`oszap-inbox h-full overflow-hidden ${modoCentral ? "" : "-mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3"}`} data-mobile-view={modoCentral ? "conversa" : listaMobile || !sel ? "lista" : "conversa"}>
         <div className="oszap-columns flex h-full gap-2 overflow-hidden">
           {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
+          {!modoCentral && (
           <Card
             data-a11y-secundario="true"
             ref={painelRef}
@@ -3150,6 +3169,7 @@ export function AtendInbox() {
               </div>
             </div>
           </Card>
+          )}
 
           {/* COLUNA 2 — CHAT */}
           <Card data-a11y-principal="true" ref={colunaChatRef} className="oszap-chat flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -3169,7 +3189,7 @@ export function AtendInbox() {
             ) : (
               <>
                 <CardHeader className="oszap-chat-heading px-3 py-1.5 border-b">
-                  <button type="button" className="oszap-back items-center gap-2 text-sm font-medium text-atd-blue" onClick={() => setListaMobile(true)}><ArrowLeft className="h-4 w-4" />Voltar às conversas</button>
+                  {!modoCentral && <button type="button" className="oszap-back items-center gap-2 text-sm font-medium text-atd-blue" onClick={() => setListaMobile(true)}><ArrowLeft className="h-4 w-4" />Voltar às conversas</button>}
                   <div className="oszap-chat-actions flex flex-wrap items-center justify-between gap-1.5">
                     <div className="min-w-0 flex-1 basis-48">
                       <CardTitle

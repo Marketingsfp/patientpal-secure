@@ -115,7 +115,7 @@ function NinaPage() {
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
-  const areaChat = abaAtiva === "atend-inbox" || abaAtiva === "homologacao";
+  const areaChat = abaAtiva === "atend-inbox" || abaAtiva === "homologacao" || abaAtiva === "pesquisa-conversas";
   useEffect(() => {
     // Só normaliza o hash enquanto o usuário ainda está na tela da Nina.
     // Sem essa guarda, ao clicar em outro item do menu a rota muda, o hash
@@ -167,7 +167,7 @@ function NinaPage() {
         <TabsContent value="atend-macros">
           <RespostasRapidasManager />
         </TabsContent>
-        <TabsContent value="pesquisa-conversas">
+        <TabsContent value="pesquisa-conversas" className="mt-0 h-full">
           <PesquisaConversas />
         </TabsContent>
         <TabsContent value="atend-inbox" className="mt-0 h-full">

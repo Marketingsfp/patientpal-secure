@@ -216,3 +216,13 @@
     padding-bottom: 112px;
   }
 }
+.oszap-central-back { display: none; }
+@media (max-width: 900px) {
+  .oszap-central-list { width: 280px; }
+}
+@media (max-width: 767px) {
+  .oszap-central-list { width: 100%; }
+  .oszap-central-body[data-selected="true"] .oszap-central-list,
+  .oszap-central-body[data-selected="false"] .oszap-central-chat { display: none; }
+  .oszap-central-back { display: flex; }
+}
