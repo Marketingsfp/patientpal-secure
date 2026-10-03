@@ -217,6 +217,44 @@
   }
 }
 .oszap-central-back { display: none; }
+.oszap-dashboard .oszap-dash-section,
+.oszap-dashboard .oszap-dash-kpi {
+  min-width: 0;
+  border: 1px solid var(--atd-border);
+  border-radius: 14px;
+  background: var(--atd-surface);
+}
+.oszap-dashboard .oszap-dash-section { padding: 20px; scroll-margin-top: 12px; }
+.oszap-dashboard .oszap-dash-kpi { padding: 14px 16px; }
+.oszap-dashboard .oszap-dash-critical { border-color: var(--atd-warn); }
+.oszap-dashboard .oszap-dash-link { color: var(--atd-ink); }
+.oszap-dashboard .oszap-dash-link:hover { color: var(--atd-ink); background: var(--atd-surface-2); }
+.oszap-dashboard .oszap-dash-urgency .oszap-dash-link { color: var(--atd-danger-ink); }
+.oszap-dashboard .oszap-dash-urgency {
+  border: 1px solid var(--atd-danger);
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--atd-danger-bg);
+  color: var(--atd-danger-ink);
+}
+.oszap-dash-facts { font-size: .75rem; }
+.oszap-dash-facts > div { display: flex; justify-content: space-between; gap: 16px; padding-block: 9px; border-bottom: 1px solid var(--atd-border); }
+.oszap-dash-facts dt { color: var(--atd-ink-soft); }
+.oszap-dash-facts dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.oszap-dash-table { width: 100%; border-collapse: collapse; font-size: .75rem; }
+.oszap-dash-table th { color: var(--atd-ink-soft); font-weight: 500; text-align: left; }
+.oszap-dash-table :is(th,td) { padding: 10px 8px; border-bottom: 1px solid var(--atd-border); }
+.oszap-dash-table td:nth-child(n+3) { text-align: center; font-variant-numeric: tabular-nums; }
+.oszap-dash-hourly { height: 150px; display: grid; grid-template-columns: repeat(24,minmax(0,1fr)); align-items: end; gap: 5px; padding-bottom: 20px; position: relative; }
+.oszap-dash-hourly > div { height: 100%; display: flex; align-items: flex-end; position: relative; }
+.oszap-dash-hourly .oszap-dash-hour-bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--atd-blue); }
+.oszap-dash-hourly span { position: absolute; bottom: -20px; font-size: 9px; color: var(--atd-ink-soft); }
+@media (max-width: 640px) {
+  .oszap-dashboard .oszap-dash-section { padding: 14px; }
+  .oszap-dashboard .oszap-dash-kpi { padding: 12px; }
+  .oszap-dash-hourly { gap: 3px; }
+}
 /* Personalização do atendimento; nenhum filtro é aplicado à página inteira. */
 html:is(.a11y-cores-protanopia,.a11y-cores-deuteranopia,.a11y-cores-tritanopia) body:has([data-os-zap="true"]) { filter: none; }
 .oszap-access-group summary::-webkit-details-marker { display: none; }

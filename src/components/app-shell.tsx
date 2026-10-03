@@ -604,6 +604,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Atendimento",
     items: [
+      { to: "/app/nina", hash: "dashboard-oszap", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
       { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
       { to: "/app/nina", hash: "pesquisa-conversas", label: "Central de conversas", icon: Search },

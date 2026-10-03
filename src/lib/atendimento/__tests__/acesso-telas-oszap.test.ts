@@ -4,6 +4,7 @@ import { podeAbrirTelaOsZap } from "../acesso-telas-oszap";
 describe("Telefonia — menu e links diretos do OS ZAP", () => {
   it("bloqueia todas as abas da imagem e o link antigo da base", () => {
     for (const hash of [
+      "dashboard-oszap",
       "informacoes-clinica",
       "base-conhecimento",
       "homologacao",

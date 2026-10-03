@@ -61,6 +61,7 @@ import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
 import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
 
 const LaboratorioNina = lazy(() => import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })));
+const DashboardOsZap = lazy(() => import("@/components/nina/DashboardOsZap").then((m) => ({ default: m.DashboardOsZap })));
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
@@ -94,6 +95,7 @@ function NinaPage() {
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
   const abaAtiva = [
+    "dashboard-oszap",
     "chat",
     "config",
     "templates",
@@ -137,6 +139,11 @@ function NinaPage() {
         className={areaChat ? "h-full" : "space-y-4"}
       >
         {/* ============ CONVERSAS ============ */}
+        <TabsContent value="dashboard-oszap">
+          <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Carregando dashboard do OS ZAP…</p>}>
+            <DashboardOsZap key={clinicaId} />
+          </Suspense>
+        </TabsContent>
 
         {/* ============ CONFIGURAÇÃO ============ */}
         <TabsContent value="config">
