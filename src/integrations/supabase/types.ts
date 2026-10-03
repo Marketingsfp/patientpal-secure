@@ -10945,6 +10945,10 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           urgencia: number | null
+          urgencia_crianca_idoso: number | null
+          urgencia_dor_ar: number | null
+          urgencia_gestante: number | null
+          urgencia_sangramento_desmaio: number | null
         }
         Insert: {
           clinica_id: string
@@ -10955,6 +10959,10 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           urgencia?: number | null
+          urgencia_crianca_idoso?: number | null
+          urgencia_dor_ar?: number | null
+          urgencia_gestante?: number | null
+          urgencia_sangramento_desmaio?: number | null
         }
         Update: {
           clinica_id?: string
@@ -10965,6 +10973,10 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           urgencia?: number | null
+          urgencia_crianca_idoso?: number | null
+          urgencia_dor_ar?: number | null
+          urgencia_gestante?: number | null
+          urgencia_sangramento_desmaio?: number | null
         }
         Relationships: [
           {
