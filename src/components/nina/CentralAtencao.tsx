@@ -23,6 +23,7 @@ import { criarAgrupador } from "@/lib/atendimento/realtime-roteador";
 import { ouvirOutrasAbas } from "@/lib/atendimento/presenca-sync";
 import { AtendentesEmPausa } from "./AtendentesEmPausa";
 import { cn } from "@/lib/utils";
+import { CATEGORIAS_MOTIVO, type CategoriaMotivo } from "@/lib/nina/jev-motivo";
 
 const VAZIO: ResumoAtencao = {
   total: 0,
@@ -65,6 +66,8 @@ export function CentralAtencao() {
   const [aberto, setAberto] = useState(false);
   /** Categoria em foco dentro da própria Central (não filtra a Inbox). */
   const [categoria, setCategoria] = useState<CategoriaAtencao | null>(null);
+  /** Filtro pela categoria do motivo da transferência (Jev). */
+  const [motivo, setMotivo] = useState<CategoriaMotivo | null>(null);
 
   const carregar = useCallback(async () => {
     const sequencia = ++sequenciaCarga.current;
@@ -100,6 +103,7 @@ export function CentralAtencao() {
 
   useEffect(() => {
     setCategoria(null);
+    setMotivo(null);
   }, [chaveContexto]);
 
   // Relógio único: reclassifica as faixas de espera sem consultar o banco.
@@ -148,10 +152,16 @@ export function CentralAtencao() {
   const pausas = dados?.chave === chaveContexto ? (dados.pausas ?? []) : [];
 
   // Prioridades: só esperas críticas (8 primeiras), ou a categoria escolhida.
+  const baseCategoria = useMemo(() => itensDaCategoria(resumo.itens, categoria), [resumo.itens, categoria]);
+  const motivosPresentes = useMemo(() => {
+    const cont = new Map<CategoriaMotivo, number>();
+    for (const i of baseCategoria) if (i.motivoCategoria) cont.set(i.motivoCategoria, (cont.get(i.motivoCategoria) ?? 0) + 1);
+    return [...cont.entries()];
+  }, [baseCategoria]);
   const lista = useMemo(() => {
-    const base = itensDaCategoria(resumo.itens, categoria);
-    return categoria ? base : base.slice(0, 8);
-  }, [resumo.itens, categoria]);
+    const base = motivo ? baseCategoria.filter((i) => i.motivoCategoria === motivo) : baseCategoria;
+    return categoria || motivo ? base : base.slice(0, 8);
+  }, [baseCategoria, categoria, motivo]);
 
   // Animação de entrada mais perceptível só quando SURGE algo crítico novo.
   const [novo, setNovo] = useState(false);
@@ -296,6 +306,24 @@ export function CentralAtencao() {
               </button>
             )}
           </div>
+          {motivosPresentes.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1" aria-label="Filtrar pelo motivo da transferência">
+              {motivosPresentes.map(([c, n]) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setMotivo((atual) => (atual === c ? null : c))}
+                  aria-pressed={motivo === c}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    motivo === c ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted",
+                  )}
+                >
+                  {CATEGORIAS_MOTIVO[c]} · {n}
+                </button>
+              ))}
+            </div>
+          )}
           {lista.length === 0 ? (
             <p className="py-2 text-xs text-muted-foreground">
               {categoria === "nao_atribuida_global" && resumo.naoAtribuidasGlobal > 0
@@ -387,11 +415,15 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
     >
       <span
         aria-hidden
-        className={cn("h-2 w-2 shrink-0 rounded-full", critico ? "bg-destructive" : "bg-amber-500")}
+        className={cn(
+          "h-2 w-2 shrink-0 rounded-full",
+          critico || item.motivoCategoria === "urgencia_clinica" ? "bg-destructive" : "bg-amber-500",
+        )}
       />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium">{item.nome}</span>
         <span className="block truncate text-[11px] text-muted-foreground">
+          {item.motivoCategoria ? `${CATEGORIAS_MOTIVO[item.motivoCategoria]} · ` : ""}
           {marca}
           {item.minutos > 0 ? ` • ${formatarEspera(item.minutos)}` : ""}
         </span>
