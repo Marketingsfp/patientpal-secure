@@ -214,3 +214,32 @@ export async function conferirRespostaJev(ctx: {
     return { acao: "enviar" };
   }
 }
+
+/**
+ * (Fase 7) Entende o "sim" e a escolha de horário quando as regras não
+ * entenderam. Só escolhe entre opções oferecidas; abaixo de 80% = "nada".
+ * Erro/demora/chave desligada = "nada" (fluxo atual).
+ */
+export async function interpretarEscolhaJev(ctx: {
+  clinicaId: string;
+  conversaId: string | null;
+  teste: boolean;
+  mensagem: string;
+  ultimaMaria: string | null;
+  situacao: import("./jev-escolha").SituacaoEscolha;
+}): Promise<import("./jev-escolha").DecisaoEscolha> {
+  try {
+    if (!(await jevAtivo(ctx.clinicaId, "fase7_escolha", ctx.teste))) return { tipo: "nada" };
+    const e = await import("./jev-escolha");
+    const perguntas = e.perguntasEscolha(ctx.situacao);
+    const resultado = await perguntarJev(e.estadoEscolha(ctx.mensagem, ctx.ultimaMaria, ctx.situacao), perguntas);
+    const decisao = resultado.ok ? e.decisaoEscolha(resultado.respostas, ctx.situacao) : { tipo: "nada" as const };
+    await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId,
+      fase: "fase7_escolha", teste: ctx.teste, perguntas, resultado, aplicada: decisao.tipo !== "nada",
+      contexto: { situacao: ctx.situacao.tipo, decisao: decisao.tipo,
+        ...(decisao.tipo === "escolheu" ? { inicio: decisao.vaga.inicio, medico_id: decisao.vaga.medico_id } : {}) } });
+    return decisao;
+  } catch {
+    return { tipo: "nada" };
+  }
+}
