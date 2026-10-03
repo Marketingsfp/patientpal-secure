@@ -395,6 +395,9 @@ export const listarConversas = createServerFn({ method: "POST" })
       marcar("nao_lidas");
     }
 
+    const { carregarAberturasInbox } = await import("./atendimento/conversa-nova.server");
+    const comAberturas = await carregarAberturasInbox(context.supabase, data.clinicaId, rows ?? [], context.userId);
+    marcar("aberturas");
     const total = Date.now() - t0;
     // Só registra quando realmente demorou, para não poluir o log.
     if (total > 400) {
@@ -404,7 +407,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         etapas: marcos,
       });
     }
-    const saida = (rows ?? []).map((r: any) => ({
+    const saida = comAberturas.map((r: any) => ({
       ...r,
       nao_lidas: naoLidas.get(r.id) ?? 0,
       // Métrica canônica de espera (mesma da Central "Prioridades Agora"),
@@ -440,7 +443,9 @@ export const obterConversa = createServerFn({ method: "POST" })
       .eq("is_teste", false)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return row ?? null;
+    if (!row) return null;
+    const { carregarAberturasInbox } = await import("./atendimento/conversa-nova.server");
+    return (await carregarAberturasInbox(context.supabase, data.clinicaId, [row], context.userId))[0] ?? null;
   });
 
 /**
@@ -876,16 +881,26 @@ async function contarNaoLidasConversa(
   return Number(linha?.nao_lidas ?? 0) || 0;
 }
 
-/**
+/** Registra abertura do chat pelo responsável atual, separada do cursor de não lidas. */
+export const registrarPrimeiraAbertura = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    clinicaId: z.string().uuid(), conversaId: z.string().uuid(),
+    entradaEm: z.string().datetime(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+    await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    const { registrarAberturaInbox } = await import("./atendimento/conversa-nova.server");
+    return registrarAberturaInbox(context.supabase, data.clinicaId, context.userId, data.conversaId, data.entradaEm);
+  });
 
+/**
  * Registra a leitura DESTE usuário até uma mensagem real da timeline.
- *
- * A leitura operacional atualiza o indicador da equipe e preserva o histórico
- * individual. O usuário vem da autenticação. Admin, gestão e supervisão não
- * consomem mensagens, inclusive em chamadas explícitas.
- *
- * O contador antigo da conversa (`unread_count`) NÃO é zerado: fica como
- * referência histórica.
+ * A leitura operacional preserva o histórico individual. Admin, gestão e
+ * supervisão não consomem mensagens, inclusive em chamadas explícitas.
+ * O contador legado `unread_count` permanece como referência histórica.
  */
 export const marcarLida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

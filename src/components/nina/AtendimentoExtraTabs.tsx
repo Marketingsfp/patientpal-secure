@@ -138,7 +138,13 @@ import {
   esperaConversas,
   assumirConversa,
   marcarLida,
+  registrarPrimeiraAbertura,
 } from "@/lib/atendimento.functions";
+import {
+  entradaAtendimento,
+  deveRegistrarPrimeiraAbertura, aplicarAberturaConfirmada,
+} from "@/lib/atendimento/conversa-nova";
+import { BadgeConversaNova } from "@/components/nina/BadgeConversaNova";
 import { aplicarReconciliacao, deveRegistrarLeituraVisivel } from "@/lib/atendimento/leitura-inbox";
 
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
@@ -335,6 +341,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // 200 conversas do filtro.
   const convsRef = useRef<any[]>([]);
   convsRef.current = convs;
+  const aberturasConfirmadasRef = useRef(new Map<string, { userId: string; entradaEm: string }>());
   const conteudoDaConversa = !!sel?.id && conversaCarregadaId === sel.id;
   const dadosSecundariosProntos = !!sel?.id && secundariosCarregadosId === sel.id;
   // Contato exibido: só o da conversa aberta agora. Ter `contato` preenchido
@@ -1046,7 +1053,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         gestor: souGestor,
         atendenteId: atendenteSelecionadoId,
       };
-      const rows = filtrarPorEscopo(brutas as any[], ctxEscopo);
+      const rows = filtrarPorEscopo(brutas as any[], ctxEscopo).map((c: any) => {
+        const confirmada = aberturasConfirmadasRef.current.get(`${clinicaId}:${meuId}:${c.id}:${entradaAtendimento(c)}`);
+        // Uma lista iniciada antes da confirmação não faz o selo voltar.
+        return confirmada ? aplicarAberturaConfirmada(c, confirmada) : c;
+      });
       const selecionadaParaConferir = selRef.current;
       let confirmadaForaLista: any = undefined;
       if (
@@ -1597,12 +1608,37 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const [abaVisivel, setAbaVisivel] = useState(true);
   /** Acompanhando o fim da conversa (sem indicador de novas pendentes). */
   const [seguindoFim, setSeguindoFim] = useState(true);
+  const registrarAberturaFn = useServerFn(registrarPrimeiraAbertura);
+  const aberturasPendentesRef = useRef(new Set<string>());
   useEffect(() => {
     const ler = () => setAbaVisivel(document.visibilityState === "visible");
     ler();
     document.addEventListener("visibilitychange", ler);
     return () => document.removeEventListener("visibilitychange", ler);
   }, []);
+  // "Novo" é a primeira abertura desta atribuição, independente de ler até o fim.
+  useEffect(() => {
+    const c = sel;
+    if (!clinicaId || !meuId || !c || !deveRegistrarPrimeiraAbertura(c, {
+      userId: meuId,
+      operacional: perfilLeitura?.chave === `${clinicaId}:${meuId}` && perfilLeitura.permitida && !souGestor && !souAdmin,
+      carregadaId: conversaCarregadaId, visivel: abaVisivel, carregando: carregandoConversa,
+    })) return;
+    const entradaEm = entradaAtendimento(c)!;
+    const chave = `${clinicaId}:${meuId}:${c.id}:${entradaEm}`;
+    if (aberturasPendentesRef.current.has(chave) || aberturasConfirmadasRef.current.has(chave)) return;
+    aberturasPendentesRef.current.add(chave);
+    void registrarAberturaFn({ data: { clinicaId, conversaId: c.id, entradaEm } })
+      .then((r) => {
+        if (!r.marcada) { agrupadores.current?.lista.agendar(); return; }
+        aberturasConfirmadasRef.current.set(chave, { userId: r.userId, entradaEm: r.entradaEm });
+        setConvs(prev => prev.map(item => item.id === c.id ? aplicarAberturaConfirmada(item, r) : item));
+        setSel((atual: any) => atual?.id === c.id ? aplicarAberturaConfirmada(atual, r) : atual);
+      })
+      .catch(() => agrupadores.current?.lista.agendar())
+      .finally(() => aberturasPendentesRef.current.delete(chave));
+  }, [clinicaId, meuId, sel, perfilLeitura, souGestor, souAdmin, conversaCarregadaId,
+    abaVisivel, carregandoConversa, registrarAberturaFn]);
   useEffect(() => {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
@@ -3119,6 +3155,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       <span className="font-semibold text-sm truncate flex-1" title={tituloConversa(c)}>
                         {tituloConversa(c)}
                       </span>
+                      <BadgeConversaNova conversa={c} />
                       {Number(c.nao_lidas ?? 0) > 0 && (
                         <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
                           {Number(c.nao_lidas ?? 0)}
