@@ -1942,6 +1942,8 @@ function AppShellInner() {
         }
       >
         <main
+          data-oszap-chat={subsystem === "os-zap" && areaConversas ? "true" : undefined}
+          data-header-recolhido={headerRecolhido ? "true" : undefined}
           key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
           className={cn(
             "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",

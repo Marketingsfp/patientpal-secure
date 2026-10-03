@@ -62,13 +62,17 @@
 }
 [data-os-zap="true"] .oszap-inbox {
   container: oszap / inline-size;
+  margin: 0;
+  padding: 0;
 }
 [data-os-zap="true"] .oszap-columns {
-  gap: 12px;
+  gap: 0;
 }
 [data-os-zap="true"] :is(.oszap-queue, .oszap-chat, .oszap-contact) {
-  border-radius: 16px;
-  box-shadow: 0 2px 6px oklch(0.2 0.02 245 / 0.035);
+  border-radius: 0;
+  box-shadow: none;
+  border-width: 0;
+  border-right: 1px solid var(--border);
   min-height: 0;
 }
 [data-os-zap="true"] .oszap-queue-content {
@@ -197,3 +201,18 @@
 [data-os-zap="true"] .oszap-chat-heading > * + * { margin-top: 0; }
 [data-os-zap="true"] .oszap-chat-heading [data-wait-level] { font-size: 10px; line-height: 14px; padding: 0 4px; }
 [data-os-zap="true"] .oszap-chat-actions > .shrink-0 > button { height: 28px; padding-inline: 8px; font-size: 11px; }
+
+/* Fill the conversation workspace; other OS ZAP screens keep their padding. */
+[data-os-zap="true"] main[data-oszap-chat="true"] {
+  padding: 0;
+  overflow: hidden;
+}
+[data-os-zap="true"] main[data-oszap-chat="true"][data-header-recolhido="true"] {
+  padding-top: 28px;
+}
+@media (max-width: 767px) {
+  /* Keep the existing fixed navigation from covering the composer. */
+  [data-os-zap="true"] main[data-oszap-chat="true"] {
+    padding-bottom: 112px;
+  }
+}

@@ -72,7 +72,7 @@ function Preview() {
               Todos os dados são fictícios.
             </p>
           </aside>
-          <main className="min-w-0 flex-1 p-3">
+          <main className="min-w-0 flex-1">
             <div className="oszap-inbox h-full" data-mobile-view={list ? "lista" : "conversa"}>
               <div className="oszap-columns flex h-full">
                 <Card className="oszap-queue flex shrink-0 flex-col overflow-hidden">
