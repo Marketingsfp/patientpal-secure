@@ -1,3 +1,4 @@
+import "@/components/nina/os-zap.css";
 import { AppSidebarLayout } from "@/components/app-sidebar-layout";
 import {
   Link,
@@ -1474,6 +1475,7 @@ function AppShellInner() {
 
   return (
     <div
+      data-os-zap={subsystem === "os-zap" ? "true" : undefined}
       className={cn(
         "flex flex-col bg-background overflow-hidden",
         // `dvh` acompanha a barra de endereço do navegador do celular, que

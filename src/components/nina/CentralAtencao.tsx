@@ -252,9 +252,9 @@ export function CentralAtencao() {
 
       <PopoverContent
         align="start"
-        className="max-h-[var(--radix-popover-content-available-height)] w-[340px] max-w-[calc(100vw-1rem)] overflow-y-auto p-0"
+        className="oszap-attention max-h-[var(--radix-popover-content-available-height)] w-[420px] max-w-[calc(100vw-1rem)] overflow-y-auto p-0"
       >
-        <div className="border-b border-border px-3 py-2">
+        <div className="border-b border-border px-4 py-3">
           <p className="text-sm font-semibold">Central de Atenção</p>
           <p className="text-[11px] text-muted-foreground" aria-live="polite">
             {alerta
@@ -291,7 +291,7 @@ export function CentralAtencao() {
           />
         </div>
 
-        <div className="border-t border-border px-3 py-2">
+        <div className="border-t border-border px-4 py-3">
           <div className="mb-1 flex items-center gap-2">
             <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               {categoria ? tituloCategoria(categoria) : "Prioridades agora"}
@@ -331,7 +331,7 @@ export function CentralAtencao() {
                 : "Nenhuma pendência."}
             </p>
           ) : (
-            <ul className="max-h-[min(16rem,45vh)] space-y-0.5 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin]">
+            <ul className="max-h-[min(16rem,45vh)] space-y-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin]">
               {lista.map((i) => (
                 <li key={i.id}>
                   <ItemLinha item={i} onClick={() => abrirConversa(i.id)} />
@@ -375,7 +375,7 @@ function LinhaCategoria({
       onClick={onClick}
       aria-pressed={Boolean(ativo)}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
+        "flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm hover:bg-muted",
         ativo && "bg-muted",
       )}
     >
@@ -411,7 +411,7 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+      className="flex w-full items-center gap-2 rounded-lg border border-border/60 px-3 py-3 text-left hover:bg-muted"
     >
       <span
         aria-hidden
@@ -421,8 +421,8 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
         )}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium">{item.nome}</span>
-        <span className="block truncate text-[11px] text-muted-foreground">
+        <span className="block truncate text-sm font-semibold">{item.nome}</span>
+        <span className="block text-xs leading-5 text-muted-foreground">
           {item.motivoCategoria ? `${CATEGORIAS_MOTIVO[item.motivoCategoria]} · ` : ""}
           {marca}
           {item.minutos > 0 ? ` • ${formatarEspera(item.minutos)}` : ""}

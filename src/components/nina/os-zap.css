@@ -1,0 +1,189 @@
+/* OS ZAP only. No global theme changes: the shell sets this attribute only
+   inside the WhatsApp workspace. Portal styles are explicitly opted in. */
+[data-os-zap="true"] {
+  --background: oklch(0.973 0.007 230);
+  --foreground: oklch(0.28 0.028 248);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.957 0.01 230);
+  --muted-foreground: oklch(0.47 0.025 248);
+  --border: oklch(0.895 0.014 230);
+  --input: var(--border);
+  --color-border: var(--border);
+  --primary: oklch(0.43 0.085 185);
+  --primary-foreground: oklch(1 0 0);
+  --ring: var(--primary);
+  --atd-bg: oklch(0.967 0.009 230);
+  --atd-surface: var(--card);
+  --atd-surface-2: var(--muted);
+  --atd-ink: var(--foreground);
+  --atd-ink-soft: var(--muted-foreground);
+  --atd-border: var(--border);
+  --atd-blue: var(--primary);
+  --atd-blue-ink: oklch(0.37 0.07 185);
+  --atd-blue-soft: oklch(0.943 0.026 185);
+  --atd-blue-hover: oklch(0.96 0.017 185);
+  --atd-blue-tint: var(--atd-blue-soft);
+  --atd-go: oklch(0.43 0.085 185);
+  --atd-go-hover: oklch(0.36 0.075 185);
+  --oszap-out: oklch(0.923 0.04 174);
+  --oszap-out-ink: oklch(0.29 0.04 174);
+  color: var(--foreground);
+}
+.dark [data-os-zap="true"] {
+  --background: oklch(0.205 0.02 245);
+  --foreground: oklch(0.94 0.01 230);
+  --card: oklch(0.255 0.023 245);
+  --muted: oklch(0.3 0.024 245);
+  --muted-foreground: oklch(0.77 0.023 230);
+  --border: oklch(0.38 0.026 245);
+  --primary: oklch(0.78 0.11 180);
+  --primary-foreground: oklch(0.22 0.03 180);
+  --atd-bg: oklch(0.22 0.018 245);
+  --atd-blue: oklch(0.45 0.095 185);
+  --atd-blue-ink: oklch(0.83 0.08 180);
+  --atd-blue-soft: oklch(0.32 0.045 185);
+  --atd-blue-hover: oklch(0.3 0.038 185);
+  --atd-go: oklch(0.43 0.085 185);
+  --atd-go-hover: oklch(0.48 0.09 185);
+  --oszap-out: oklch(0.34 0.048 180);
+  --oszap-out-ink: oklch(0.95 0.02 180);
+}
+[data-os-zap="true"] #menu-lateral {
+  background: oklch(0.255 0.035 245) !important;
+}
+[data-os-zap="true"] #menu-lateral nav a {
+  border-radius: 10px;
+}
+[data-os-zap="true"] :is(button, a, textarea, input):focus-visible,
+.oszap-attention button:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+[data-os-zap="true"] .oszap-inbox {
+  container: oszap / inline-size;
+}
+[data-os-zap="true"] .oszap-columns {
+  gap: 12px;
+}
+[data-os-zap="true"] :is(.oszap-queue, .oszap-chat, .oszap-contact) {
+  border-radius: 16px;
+  box-shadow: 0 2px 6px oklch(0.2 0.02 245 / 0.035);
+  min-height: 0;
+}
+[data-os-zap="true"] .oszap-queue-content {
+  width: 320px;
+}
+[data-os-zap="true"] .oszap-queue:has(.oszap-queue-content.flex) {
+  width: 320px;
+}
+[data-os-zap="true"] .oszap-queue-content > .flex-col {
+  padding-inline: 12px;
+}
+[data-os-zap="true"] .oszap-conversation {
+  min-height: 112px;
+}
+[data-os-zap="true"] .oszap-conversation[aria-current="true"] {
+  background: var(--atd-blue-soft);
+}
+[data-os-zap="true"] .oszap-list-caption {
+  background: var(--muted);
+}
+[data-os-zap="true"] .oszap-back {
+  display: none;
+}
+[data-os-zap="true"] .oszap-bubble {
+  font-size: 15px;
+  line-height: 1.65;
+  padding: 12px 16px;
+  overflow-wrap: anywhere;
+}
+[data-os-zap="true"] .oszap-bubble-out {
+  background: var(--oszap-out);
+  color: var(--oszap-out-ink);
+  border: 1px solid color-mix(in oklch, var(--oszap-out-ink) 12%, transparent);
+}
+[data-os-zap="true"] .oszap-bubble-out .oszap-message-meta {
+  color: var(--oszap-out-ink);
+}
+[data-os-zap="true"] .oszap-message-meta {
+  font-size: 12px;
+  line-height: 1.5;
+}
+[data-os-zap="true"] .oszap-composer textarea {
+  min-height: 48px;
+  font-size: 15px;
+  padding: 12px;
+}
+[data-os-zap="true"] .oszap-composer > .relative {
+  align-items: flex-end;
+}
+[data-os-zap="true"] .oszap-composer > .relative > button {
+  min-height: 44px;
+}
+[data-os-zap="true"] [data-wait-level="critico"] {
+  border-width: 1px;
+  font-weight: 700;
+}
+[data-os-zap="true"] .central-atencao-novo {
+  animation-iteration-count: 2;
+}
+.oszap-attention {
+  border-radius: 16px;
+  box-shadow: 0 16px 48px oklch(0.2 0.02 245 / 0.18);
+}
+@container oszap (max-width: 1000px) {
+  [data-os-zap="true"] .oszap-queue-content {
+    width: 290px;
+  }
+  [data-os-zap="true"] .oszap-queue:has(.oszap-queue-content.flex) {
+    width: 290px;
+  }
+  [data-os-zap="true"] .oszap-bubble {
+    max-width: 88%;
+  }
+}
+@container oszap (max-width: 650px) {
+  [data-os-zap="true"] .oszap-contact {
+    display: none;
+  }
+  [data-os-zap="true"] .oszap-columns {
+    gap: 0;
+  }
+  [data-os-zap="true"] .oszap-queue,
+  [data-os-zap="true"] .oszap-queue:has(.oszap-queue-content.flex),
+  [data-os-zap="true"] .oszap-queue-content {
+    width: 100%;
+  }
+  [data-os-zap="true"] .oszap-queue-content {
+    display: flex;
+  }
+  [data-os-zap="true"] .oszap-queue-rail {
+    display: none;
+  }
+  [data-os-zap="true"] .oszap-inbox[data-mobile-view="lista"] .oszap-chat,
+  [data-os-zap="true"] .oszap-inbox[data-mobile-view="conversa"] .oszap-queue {
+    display: none;
+  }
+  [data-os-zap="true"] .oszap-back {
+    display: flex;
+    min-height: 36px;
+  }
+  [data-os-zap="true"] .oszap-chat-heading {
+    padding: 10px 12px;
+  }
+  [data-os-zap="true"] .oszap-timeline {
+    padding: 12px;
+  }
+  [data-os-zap="true"] .oszap-bubble {
+    max-width: 90%;
+    padding: 10px 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-os-zap="true"] *,
+  .oszap-attention * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

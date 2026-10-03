@@ -51,6 +51,7 @@ export function BadgeEspera({
   return (
     <span
       role="status"
+      data-wait-level={faixa}
       title={rotuloEspera(min)}
       aria-label={rotuloEspera(min)}
       className={cn(
@@ -61,7 +62,7 @@ export function BadgeEspera({
     >
       <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
       <span>
-        {prefixo ? `${prefixo} ` : ""}
+        {prefixo ? `${prefixo} ` : faixa === "critico" ? "Espera crítica · " : "Espera · "}
         {formatarEspera(min)}
       </span>
     </span>

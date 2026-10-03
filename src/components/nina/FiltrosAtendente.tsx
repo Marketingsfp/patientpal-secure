@@ -11,11 +11,7 @@ export function FiltrosAtendente({
   onChange: (valor: FiltroAtendente) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Filtrar conversas"
-      className="grid grid-cols-3 gap-1 pt-1.5"
-    >
+    <div role="group" aria-label="Filtrar conversas" className="grid grid-cols-3 gap-1 pt-1.5">
       {OPCOES_FILTRO_ATENDENTE.map((opcao) => {
         const quantidade = contagens[opcao.valor];
         const descricao = `${opcao.rotulo}: ${quantidade} ${quantidade === 1 ? "conversa" : "conversas"}`;
@@ -27,14 +23,11 @@ export function FiltrosAtendente({
             aria-pressed={valor === opcao.valor}
             aria-label={descricao}
             title={descricao}
-            className="relative h-9 min-w-0 px-1 text-[11px]"
+            className="h-auto min-h-12 min-w-0 flex-col gap-1 px-1 py-2 text-xs"
             onClick={() => onChange(opcao.valor)}
           >
             {opcao.rotulo}
-            <span
-              aria-hidden="true"
-              className="absolute -top-1.5 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold leading-none text-background tabular-nums ring-2 ring-card"
-            >
+            <span aria-hidden="true" className="text-base font-semibold leading-none tabular-nums">
               {quantidade.toLocaleString("pt-BR")}
             </span>
           </Button>

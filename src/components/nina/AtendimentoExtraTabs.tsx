@@ -55,6 +55,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Send,
+  ArrowLeft,
   Loader2,
   UserCheck,
   ArrowRightLeft,
@@ -300,6 +301,8 @@ export function AtendInbox() {
 
   const [convs, setConvs] = useState<any[]>([]);
   const [sel, setSel] = useState<any>(null);
+  const [listaMobile, setListaMobile] = useState(true);
+  useEffect(() => { if (sel?.id) setListaMobile(false); }, [sel?.id]);
   const [msgs, setMsgs] = useState<any[]>([]);
   const [eventos, setEventos] = useState<ConversaEvento[]>([]);
   const [contato, setContato] = useState<any>(null);
@@ -653,7 +656,7 @@ export function AtendInbox() {
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
   // barra de rolagem (ver use-hover-tolerante).
-  const [painelFixado, setPainelFixado] = useState(false);
+  const [painelFixado, setPainelFixado] = useState(true);
   // Enquanto um menu suspenso da coluna estiver aberto o painel não pode
   // encolher: o menu é renderizado fora do painel, o mouse "sai" da coluna e
   // a lista sumia embaixo do menu.
@@ -665,7 +668,7 @@ export function AtendInbox() {
 
   useEffect(() => {
     try {
-      setPainelFixado(localStorage.getItem("nina.inbox.fixado") === "1");
+      setPainelFixado(localStorage.getItem("nina.inbox.fixado") !== "0");
     } catch {
       /* Sem armazenamento local, mantém a preferência desta sessão. */
     }
@@ -2849,18 +2852,18 @@ export function AtendInbox() {
 
   return (
     <RelogioEsperaProvider>
-      <div className="h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3">
-        <div className="flex h-full gap-2 overflow-hidden">
+      <div className="oszap-inbox h-full overflow-hidden -mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3" data-mobile-view={listaMobile || !sel ? "lista" : "conversa"}>
+        <div className="oszap-columns flex h-full gap-2 overflow-hidden">
           {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
           <Card
             data-a11y-secundario="true"
             ref={painelRef}
-            className={`shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            className={`oszap-queue shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
               painelAberto ? "w-[300px]" : "w-[52px]"
             }`}
           >
             {!painelAberto && (
-              <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+              <button type="button" aria-label="Abrir lista de conversas" onClick={alternarFixado} className="oszap-queue-rail flex h-full w-[52px] flex-col items-center gap-2 py-3">
                 <MessageSquare className="h-5 w-5 text-muted-foreground" />
                 <Badge variant="outline" className="px-1 text-[10px]">
                   {convs.length}
@@ -2870,10 +2873,14 @@ export function AtendInbox() {
                     emPausa ? "text-atd-warn" : filaAberta ? "text-atd-ok" : "text-atd-idle"
                   }`}
                 />
-              </div>
+              </button>
             )}
-            <div className={`${painelAberto ? "flex" : "hidden"} w-[300px] flex-1 flex-col overflow-hidden`}>
-              <div className="shrink-0 border-b p-2 space-y-1.5">
+            <div className={`${painelAberto ? "flex" : "hidden"} oszap-queue-content w-[300px] flex-1 flex-col overflow-hidden`}>
+              <div className="shrink-0 border-b p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div><h2 className="text-lg font-semibold tracking-tight">Conversas</h2><p className="text-xs text-muted-foreground">Seu espaço de atendimento</p></div>
+                  <MessageSquare className="h-5 w-5 text-atd-blue" aria-hidden />
+                </div>
                 {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
                 <div className="flex items-center gap-1.5">
                   <SeletorStatusPresenca
@@ -2888,6 +2895,7 @@ export function AtendInbox() {
                     size="sm"
                     variant="ghost"
                     className="h-6 w-6 shrink-0 p-0"
+                    aria-label={painelFixado ? "Desafixar lista de conversas" : "Fixar lista de conversas"}
                     title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
                     onClick={alternarFixado}
                   >
@@ -3057,15 +3065,19 @@ export function AtendInbox() {
                     )}
                   </>
                 )}
+                {soCriticas && souGestor && <button type="button" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" onClick={() => setSoCriticas(false)}>Espera crítica · Limpar filtro ×</button>}
               </CardHeader>
-              <div className="flex-1 overflow-auto border-t">
+              <div className="oszap-list-caption flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground"><span>{convsVisiveis.length} conversas nesta lista</span><span>Espera do paciente</span></div>
+              <div className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas">
                 {convsVisiveis.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>}
                 {convsVisiveis.map((c) => (
                   <button
                     key={c.id}
                     data-testid="item-conversa"
                     data-conversa-id={c.id}
+                    aria-current={sel?.id === c.id ? "true" : undefined}
                     onClick={() => {
+                      setListaMobile(false);
                       iniciarTroca(c.id, "clique");
                       // Abertura normal pela Inbox: volta a valer a leitura
                       // automática, mesmo que antes tenha vindo de um erro.
@@ -3080,14 +3092,14 @@ export function AtendInbox() {
                     onMouseLeave={() => cancelarPrefetch(c.id)}
                     onFocus={() => agendarPrefetch(c.id)}
                     onBlur={() => cancelarPrefetch(c.id)}
-                    className={`relative w-full border-b border-atd-border py-2 pl-4 pr-3 text-left transition-colors hover:bg-atd-blue-hover ${
+                    className={`oszap-conversation relative w-full border-b border-atd-border py-3 pl-4 pr-3 text-left transition-colors hover:bg-atd-blue-hover ${
                       sel?.id === c.id
                         ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
                         : "bg-atd-surface"
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate flex-1" title={tituloConversa(c)}>
+                      <span className="font-semibold text-[15px] truncate flex-1" title={tituloConversa(c)}>
                         {tituloConversa(c)}
                       </span>
                       {Number(c.nao_lidas ?? 0) > 0 && (
@@ -3104,7 +3116,7 @@ export function AtendInbox() {
                         if (tipo === "sem-responsavel")
                           return (
                             <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
-                              🔴 Não atribuída
+                              Sem responsável
                             </Badge>
                           );
                         if (tipo === "nina")
@@ -3119,7 +3131,7 @@ export function AtendInbox() {
                         return (
                           <Badge
                             key={tipo}
-                            className="text-[11px] bg-atd-warn-bg text-atd-warn-ink border border-atd-warn"
+                            className="text-[11px] bg-muted text-muted-foreground border border-border"
                           >
                             {nomeUsuario(c.atribuida_user_id)}
                           </Badge>
@@ -3133,7 +3145,7 @@ export function AtendInbox() {
                       <BadgeEspera desde={espera[c.id]} className="ml-auto" />
                     </div>
                     {previas[c.id] && (
-                      <div className="mt-0.5 truncate text-xs text-muted-foreground" title={previas[c.id]}>
+                      <div className="mt-2 line-clamp-2 text-[13px] leading-5 text-muted-foreground" title={previas[c.id]}>
                         {previas[c.id]}
                       </div>
                     )}
@@ -3145,7 +3157,7 @@ export function AtendInbox() {
           </Card>
 
           {/* COLUNA 2 — CHAT */}
-          <Card data-a11y-principal="true" ref={colunaChatRef} className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Card data-a11y-principal="true" ref={colunaChatRef} className="oszap-chat flex min-w-0 flex-1 flex-col overflow-hidden">
             {!sel ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
                 {erroAcesso ? (
@@ -3156,14 +3168,15 @@ export function AtendInbox() {
                     </Button>
                   </>
                 ) : (
-                  "Selecione uma conversa"
+                  <><div className="grid h-16 w-16 place-items-center rounded-2xl bg-atd-blue-soft text-atd-blue"><MessageSquare className="h-7 w-7" aria-hidden /></div><h2 className="text-xl font-semibold text-foreground">Vamos atender?</h2><p className="max-w-xs leading-6">Selecione uma conversa na fila para ler as mensagens e continuar o atendimento.</p></>
                 )}
               </div>
             ) : (
               <>
-                <CardHeader className="px-3 py-1 border-b">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
+                <CardHeader className="oszap-chat-heading px-4 py-3 border-b">
+                  <button type="button" className="oszap-back items-center gap-2 text-sm font-medium text-atd-blue" onClick={() => setListaMobile(true)}><ArrowLeft className="h-4 w-4" />Voltar às conversas</button>
+                  <div className="oszap-chat-actions flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-48">
                       <CardTitle
                         className="text-base flex items-center gap-2 truncate"
                         title={tituloConversa(sel)}
@@ -3265,7 +3278,7 @@ export function AtendInbox() {
                   </div>
                 </CardHeader>
                 <div className="relative flex-1 min-h-0">
-                  <div ref={chat.containerRef} className="h-full overflow-auto p-4 space-y-2 bg-atd-bg">
+                  <div ref={chat.containerRef} className="oszap-timeline h-full overflow-auto p-4 space-y-4 bg-atd-bg">
                     {buscandoAlvo && (
                       <div className="sticky top-0 z-10 mb-2 rounded-md border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
                         Localizando mensagem reportada…
@@ -3402,9 +3415,9 @@ export function AtendInbox() {
                             />
                           )}
                           <div
-                            className={`max-w-[68%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
+                            className={`oszap-bubble max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
                               out
-                                ? "bg-atd-go text-atd-on-strong rounded-br-sm"
+                                ? "oszap-bubble-out bg-atd-go text-atd-on-strong rounded-br-sm"
                                 : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
                             }`}
                           >
@@ -3423,7 +3436,7 @@ export function AtendInbox() {
                               </div>
                             )}
                             <div
-                              className={`text-[11px] mt-1 flex items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+                              className={`oszap-message-meta text-[11px] mt-2 flex flex-wrap items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                             >
                               {/* Envio otimista: durante o envio normal a bolha não
                               exibe nenhum status — só a hora. Falha aparece acima. */}
@@ -3467,7 +3480,8 @@ export function AtendInbox() {
                   )}
                 </div>
 
-                <div className="border-t p-3 space-y-2">
+                <div className="oszap-composer border-t p-3 space-y-2">
+                  <label htmlFor="oszap-resposta" className="block text-xs font-semibold text-muted-foreground">Resposta ao paciente</label>
                   <div className="relative flex gap-2">
                     {slash && (
                       <ListaRespostasRapidas
@@ -3499,6 +3513,7 @@ export function AtendInbox() {
                       <Zap className="h-4 w-4" />
                     </Button>
                     <Textarea
+                      id="oszap-resposta"
                       ref={composerRef}
                       value={draft}
                       onChange={(e) => {
@@ -3544,13 +3559,15 @@ export function AtendInbox() {
                     />
 
                     <Button
+                      aria-label="Enviar mensagem"
                       onClick={enviar}
                       disabled={!draft.trim() || !!motivoBloqueio}
                       className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                     >
-                      <Send className="h-4 w-4" />
+                      <Send className="h-4 w-4" /><span className="hidden sm:inline">Enviar</span>
                     </Button>
                   </div>
+                  <p className="hidden sm:block text-[11px] text-muted-foreground">Enter envia · Shift + Enter quebra a linha · / abre respostas rápidas</p>
                 </div>
               </>
             )}
@@ -3560,7 +3577,7 @@ export function AtendInbox() {
           <Card
             data-a11y-secundario="true"
             ref={contatoRef}
-            className={`hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            className={`oszap-contact hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
               contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
             }`}
           >
