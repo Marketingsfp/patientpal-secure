@@ -20,7 +20,7 @@ const conversa = (id: string, entrada: number) => ({
   nao_lidas: 0,
 });
 const contexto = { clinicaId: "clinica", userId: "ana", gestor: false, escopo: "minhas" as const };
-const lista = [conversa("b", 12), conversa("a", 11)];
+const lista = [conversa("a", 11), conversa("b", 12)];
 const ids = (linhas: { id: string }[]) => linhas.map((c) => c.id);
 
 describe("cards reais fixos durante o atendimento", () => {
@@ -37,14 +37,14 @@ describe("cards reais fixos durante o atendimento", () => {
         },
         { conversaAberta: "b" },
       ).lista as typeof lista;
-      expect(ids(atual)).toEqual(["b", "a"]);
+      expect(ids(atual)).toEqual(["a", "b"]);
       expect(
         selecaoDeveSair({ selecionada: lista[0], linhas: atual, buscando: false, ctx: contexto }),
       ).toBe(false);
     }
-    expect(atual[1].ultima_msg_preview).toBe("Mensagem 15");
-    expect(atual[1].nao_lidas).toBe(3);
-    expect(atual[0]).toBe(lista[0]);
+    expect(atual[0].ultima_msg_preview).toBe("Mensagem 15");
+    expect(atual[0].nao_lidas).toBe(3);
+    expect(atual[1]).toBe(lista[1]);
   });
 
   it("resposta humana e confirmação do banco não sobem o card", () => {
@@ -65,13 +65,13 @@ describe("cards reais fixos durante o atendimento", () => {
       },
       contexto,
     );
-    expect(ids(enviada)).toEqual(["b", "a"]);
-    expect(ids(confirmada.lista)).toEqual(["b", "a"]);
+    expect(ids(enviada)).toEqual(["a", "b"]);
+    expect(ids(confirmada.lista)).toEqual(["a", "b"]);
   });
 
-  it("novo paciente atribuído entra no topo e empurra os anteriores mantendo a ordem", () => {
+  it("novo paciente atribuído entra no final sem ultrapassar os anteriores", () => {
     const nova = patchListaPorConversa(lista, conversa("c", 13), contexto).lista;
-    expect(ids(nova)).toEqual(["c", "b", "a"]);
+    expect(ids(nova)).toEqual(["a", "b", "c"]);
     const mensagem = patchListaPorMensagem(
       nova,
       {
@@ -82,21 +82,21 @@ describe("cards reais fixos durante o atendimento", () => {
       },
       { conversaAberta: "a" },
     ).lista;
-    expect(ids(mensagem)).toEqual(["c", "b", "a"]);
+    expect(ids(mensagem)).toEqual(["a", "b", "c"]);
   });
 
-  it("reabertura registrada pelo banco volta ao topo, mesmo no mesmo id", () => {
+  it("reabertura registrada pelo banco volta ao final como novo atendimento", () => {
     const reaberta = patchListaPorConversa(lista, conversa("a", 17), contexto).lista;
-    expect(ids(reaberta)).toEqual(["a", "b"]);
-    expect(ids(ordenarInbox(mesclarListaConversas([], reaberta)))).toEqual(["a", "b"]);
+    expect(ids(reaberta)).toEqual(["b", "a"]);
+    expect(ids(ordenarInbox(mesclarListaConversas([], reaberta)))).toEqual(["b", "a"]);
   });
 
   it("F5/reconexão e troca de filtro reproduzem a posição persistida", () => {
-    const resposta = [{ ...lista[1], ultima_msg_em: instante(18), nao_lidas: 4 }, lista[0]];
+    const resposta = [lista[1], { ...lista[0], ultima_msg_em: instante(18), nao_lidas: 4 }];
     const servidorOrdenado = ordenarInbox(resposta);
-    expect(ids(servidorOrdenado)).toEqual(["b", "a"]);
-    expect(ids(mesclarListaConversas(lista, servidorOrdenado))).toEqual(["b", "a"]);
-    expect(ids(mesclarListaConversas([], servidorOrdenado))).toEqual(["b", "a"]);
+    expect(ids(servidorOrdenado)).toEqual(["a", "b"]);
+    expect(ids(mesclarListaConversas(lista, servidorOrdenado))).toEqual(["a", "b"]);
+    expect(ids(mesclarListaConversas([], servidorOrdenado))).toEqual(["a", "b"]);
   });
 
   it("mantém Maior espera e Resolvidas com seus critérios específicos", () => {
@@ -108,13 +108,25 @@ describe("cards reais fixos durante o atendimento", () => {
       ids(
         ordenarInbox(
           [
-            { ...lista[0], resolved_at: instante(16) },
-            { ...lista[1], resolved_at: instante(17) },
+            { ...lista[1], resolved_at: instante(16) },
+            { ...lista[0], resolved_at: instante(17) },
           ],
           "resolvidas",
         ),
       ),
     ).toEqual(["a", "b"]);
+  });
+
+  it("encerrar o primeiro mantém a ordem dos restantes e próximos chegam ao final", () => {
+    const comNova = patchListaPorConversa(lista, conversa("c", 13), contexto).lista;
+    const encerrada = patchListaPorConversa(
+      comNova,
+      { ...conversa("a", 11), status: "closed" },
+      contexto,
+    ).lista;
+    expect(ids(encerrada)).toEqual(["b", "c"]);
+    const proxima = patchListaPorConversa(encerrada, conversa("d", 14), contexto).lista;
+    expect(ids(proxima)).toEqual(["b", "c", "d"]);
   });
 
   it("empates e ausência do campo nunca usam a última mensagem", () => {
@@ -125,5 +137,6 @@ describe("cards reais fixos durante o atendimento", () => {
     ).toEqual(["a", "z"]);
     const prontas = ordenarInbox(lista);
     expect(ordenarInbox(prontas)).toBe(prontas);
+    expect(ids(ordenarInbox([{ id: "sem-data" }, ...lista]))).toEqual(["a", "b", "sem-data"]);
   });
 });

@@ -3,7 +3,7 @@
  *
  * Eixo 1 (Escopo): "de quem são as conversas?" — Minhas, Todas (equipe),
  * Nina ou um atendente específico (sempre por `user_id`, nunca por nome).
- * Eixo 2 (Visualização): "que tipo de conversa quero ver?" — Recentes,
+ * Eixo 2 (Visualização): "que tipo de conversa quero ver?" — Fila de chegada,
  * Resolvidas ou Maior tempo esperando (cada uma já traz sua ordenação).
  *
  * Este módulo é a fonte única que traduz os dois controles para os filtros
@@ -120,7 +120,7 @@ export interface PlanoVisualizacao {
   exigeEsperaPaciente: boolean;
   /** Coluna de ordenação aplicada no banco. */
   ordenarPor: "inbox_entrada_em" | "resolved_at" | "aguardando_desde";
-  /** Ascendente = mais antigo primeiro (maior espera). */
+  /** Ascendente = mais antigo primeiro (fila de chegada ou maior espera). */
   ascendente: boolean;
 }
 
@@ -145,7 +145,7 @@ export function planoVisualizacao(v: VisualizacaoInbox): PlanoVisualizacao {
     somenteResolvidas: false,
     exigeEsperaPaciente: false,
     ordenarPor: "inbox_entrada_em",
-    ascendente: false,
+    ascendente: true,
   };
 }
 
@@ -177,7 +177,7 @@ export function rotuloEscopo(
 }
 
 export const ROTULO_VISUALIZACAO: Record<VisualizacaoInbox, string> = {
-  recentes: "Recentes",
+  recentes: "Fila de chegada",
   resolvidas: "Resolvidas",
   espera: "Maior espera",
 };

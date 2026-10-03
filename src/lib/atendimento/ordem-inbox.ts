@@ -13,11 +13,18 @@ function instante(valor: unknown): number {
 }
 
 /** Mesmo desempate do banco (UUID ascendente); nunca usa ultima_msg_em. */
-export function compararEntradaInbox(a: ConversaOrdenavel, b: ConversaOrdenavel): number {
-  return (
-    instante(b.inbox_entrada_em ?? b.created_at) - instante(a.inbox_entrada_em ?? a.created_at) ||
-    a.id.localeCompare(b.id)
-  );
+export function compararEntradaInbox(
+  a: ConversaOrdenavel,
+  b: ConversaOrdenavel,
+  ascendente = true,
+): number {
+  const entrada = (c: ConversaOrdenavel) => {
+    const t = Date.parse(String(c.inbox_entrada_em ?? c.created_at ?? ""));
+    // Mesmo nullsFirst=false do banco: metadado ausente fica no final.
+    return Number.isFinite(t) ? t : ascendente ? Infinity : -Infinity;
+  };
+  const diferenca = entrada(a) - entrada(b);
+  return (ascendente ? diferenca : -diferenca) || a.id.localeCompare(b.id);
 }
 
 export function ordenarInbox<T extends ConversaOrdenavel>(
@@ -35,7 +42,9 @@ export function ordenarInbox<T extends ConversaOrdenavel>(
       const tb = espera[b.id] ? instante(espera[b.id]) : Infinity;
       if (ta !== tb) return ta - tb;
     }
-    return compararEntradaInbox(a, b);
+    // "recentes" é o identificador legado da fila: primeiro a entrar, primeiro na lista.
+    // Os outros filtros mantêm o desempate do servidor.
+    return compararEntradaInbox(a, b, visualizacao === "recentes");
   });
   return ordenada.every((c, i) => c === lista[i]) ? lista : ordenada;
 }

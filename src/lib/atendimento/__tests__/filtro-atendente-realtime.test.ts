@@ -106,7 +106,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
     expect(r.lista).toEqual([]);
   });
 
-  it("nova atribuição entra antes das anteriores, independentemente da última mensagem", () => {
+  it("nova atribuição entra depois das anteriores, independentemente da última mensagem", () => {
     const antiga = conversa({
       id: "c0",
       inbox_entrada_em: "2026-01-01T09:00:00.000Z",
@@ -117,7 +117,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
       conversa({ inbox_entrada_em: "2026-01-01T10:00:00.000Z" }),
       ctx(),
     );
-    expect(r.lista.map((c) => c.id)).toEqual(["c1", "c0"]);
+    expect(r.lista.map((c) => c.id)).toEqual(["c0", "c1"]);
   });
 
   it("'Todos os atendentes' volta ao escopo normal", () => {

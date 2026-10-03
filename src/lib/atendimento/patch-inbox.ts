@@ -46,7 +46,7 @@ function instante(v: any): number {
 
 /**
  * FASE 4 — a ordem do card segue o eixo de Visualização ativo, igual à do
- * servidor: Recentes por entrada do atendimento, Resolvidas por data de resolução,
+ * servidor: Fila de chegada por entrada crescente, Resolvidas por data de resolução,
  * Maior espera pela métrica canônica de paciente aguardando.
  */
 export type VisualizacaoPatch = "recentes" | "resolvidas" | "espera";

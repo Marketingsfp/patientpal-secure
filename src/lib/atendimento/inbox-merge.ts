@@ -56,7 +56,7 @@ export function mesclarListaConversas<T extends ConversaInbox>(anteriores: T[], 
   return mudou ? saida : anteriores;
 }
 
-/** "Recentes" significa novos atendimentos, não novas mensagens. */
+/** Identificador legado: fila de chegada, do mais antigo ao mais novo, sem usar mensagens. */
 export function ordenarPorRecentes<T extends ConversaInbox>(lista: T[]): T[] {
   return ordenarInbox(lista);
 }

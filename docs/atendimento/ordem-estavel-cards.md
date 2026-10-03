@@ -1,8 +1,9 @@
 # Ordem dos cards do atendimento real
 
-Regra solicitada em 19/09/2026: mensagens posteriores do paciente e respostas
+Regra atualizada por JEAN em 03/10/2026: mensagens posteriores do paciente e respostas
 da atendente atualizam prévia e não lidas, mas não fazem o card subir.
-Uma nova entrada na fila humana, nova atribuição ou reabertura entra no topo.
+Uma nova entrada na fila humana, nova atribuição ou reabertura entra no final.
+O primeiro atendimento a entrar fica no início; os demais seguem a ordem de chegada.
 O usuário confirmou que atendimento encerrado e reaberto conta como novo e
 que “Maior tempo esperando” conserva sua ordenação pela espera.
 
@@ -16,14 +17,20 @@ que “Maior tempo esperando” conserva sua ordenação pela espera.
 - Registros anteriores recebem a maior data entre criação, atribuição,
   encaminhamento e evento de reabertura da mesma clínica/conversa.
   Não se usa `ultima_msg_em` nem o momento da implantação para esse preenchimento.
-- A consulta ordena por essa referência e UUID antes do limite de 200 registros.
+- A consulta ordena por essa referência crescente e UUID antes do limite de 200 registros.
   O Realtime usa o mesmo critério. Envios locais mantêm a posição.
+- O controle antes chamado Recentes passa a mostrar Fila de chegada. O valor
+  técnico `recentes` permanece para compatibilidade com filtros salvos.
 - O recarregamento respeita a ordem devolvida pelo servidor: espera segue
   a métrica canônica e resolvidas seguem a data de resolução.
 - A homologação não usa esta lista e o gatilho ignora suas transições.
   Posse, distribuição, RLS, agenda e financeiro mantêm suas regras.
 
 ## Banco e implantação
+
+A atualização de 03/10/2026 não cria ou executa migrações: reutiliza a coluna e
+o gatilho existentes e muda apenas a direção da ordenação no código compartilhado.
+Nenhum índice ou registro do banco publicado é alterado.
 
 Migração: `20260919170000_atend_inbox_ordem_estavel.sql`.
 Adiciona uma coluna, um índice parcial para conversas reais, uma função e um
@@ -42,6 +49,18 @@ retornar o código anterior da Inbox e manter a coluna/índice sem uso; não é
 necessário apagar registros nem reverter atendimentos.
 
 ## Validação
+
+Os resultados abaixo registram a validação original da posição persistida.
+A validação da atualização para fila de chegada cobre mensagens recebidas e enviadas,
+novo lead no final, fechamento do primeiro, reabertura no final e reconexão.
+O teste PostgreSQL temporário agora consulta `inbox_entrada_em ASC, id ASC` usando
+a mesma migração histórica, sem mudar o banco da clínica.
+
+Resultados da atualização: 793 testes do atendimento passaram; checagem de tipos
+passou; PostgreSQL temporário confirmou que mensagens, avisos e primeira resposta
+preservam a posição e que novas entradas/reaberturas vão ao final. Não foi realizado
+teste operacional com pacientes reais. Conferir a publicação no Lovable e validar
+manualmente a fila após a sincronização.
 
 - 574 testes da Inbox/atendimento passaram, incluindo sete cenários novos de
   posição fixa, nova atribuição, reabertura, reconexão, desempate e filtros.

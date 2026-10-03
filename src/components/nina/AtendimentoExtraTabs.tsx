@@ -3065,7 +3065,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                           <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
                         </SelectTrigger>
                         <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                          <SelectItem value="recentes">Recentes</SelectItem>
+                          <SelectItem value="recentes">{ROTULO_VISUALIZACAO.recentes}</SelectItem>
                           <SelectItem value="resolvidas">Resolvidas ({contadores.fechadas})</SelectItem>
                           <SelectItem value="espera">Maior tempo esperando</SelectItem>
                         </SelectContent>
