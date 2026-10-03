@@ -921,13 +921,12 @@ async function gerarRespostaNinaInterno(
   let jevPontuacoes: Record<string, number | null> | null = null;
   try {
     const jev = await import("@/lib/nina/jev.server");
-    const [f1, f2Base, f9] = await Promise.all([
+    const [f1, f2, f9] = await Promise.all([
       jev.jevAtivo(clinicaId, "fase1_intencao", opcoes?.teste === true),
       jev.jevAtivo(clinicaId, "fase2_encaminhamento", opcoes?.teste === true),
       jev.jevAtivo(clinicaId, "fase9_urgencia", opcoes?.teste === true),
     ]);
     // Etapa E1: os sinais separados só valem junto da Fase 2 (que transfere).
-    const f2 = f2Base;
     if (f1 || f2) {
       const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
       const enc = await import("@/lib/nina/jev-encaminhamento");
