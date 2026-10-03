@@ -11464,6 +11464,42 @@ export type Database = {
           },
         ]
       }
+      nina_remarcacoes_pendentes: {
+        Row: {
+          agendamento_id: string
+          clinica_id: string
+          conversa_id: string
+          criado_em: string
+          expira_em: string
+          novo_fim: string
+          novo_inicio: string
+          paciente_id: string
+          teste: boolean
+        }
+        Insert: {
+          agendamento_id: string
+          clinica_id: string
+          conversa_id: string
+          criado_em?: string
+          expira_em: string
+          novo_fim: string
+          novo_inicio: string
+          paciente_id: string
+          teste?: boolean
+        }
+        Update: {
+          agendamento_id?: string
+          clinica_id?: string
+          conversa_id?: string
+          criado_em?: string
+          expira_em?: string
+          novo_fim?: string
+          novo_inicio?: string
+          paciente_id?: string
+          teste?: boolean
+        }
+        Relationships: []
+      }
       nina_teste_avaliacoes: {
         Row: {
           achados: Json
