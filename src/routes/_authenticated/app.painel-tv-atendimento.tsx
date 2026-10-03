@@ -149,11 +149,12 @@ function PainelTvAtendimento() {
         <>
           <section className="grid h-[16vh] shrink-0 grid-cols-6 gap-[1vw]">
             <Kpi titulo="Espera crítica" valor={criticas} icone={AlertTriangle} tom={criticas > 0 ? "danger" : "neutro"} pulsar={criticas > 0} />
-            <Kpi titulo="Pendentes" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Não atribuídas" valor={dados?.naoAtribuidas ?? 0} icone={UserX} tom={(dados?.naoAtribuidas ?? 0) > 0 ? "warn" : "neutro"} />
-            <Kpi titulo="Conversas hoje" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
-            <Kpi titulo="Tempo médio de resposta hoje" valor={dados?.tempoMedioRespostaSeg == null ? "—" : duracao(dados.tempoMedioRespostaSeg / 60)} icone={Timer} tom="blue" />
+            {/* Pendentes e a mais antiga sem resposta ficam no centro, lado a lado. */}
+            <Kpi titulo="Pendentes" valor={pendentes} icone={Inbox} tom={pendentes > 0 ? "warn" : "neutro"} />
             <Kpi titulo="Mais antiga sem resposta" valor={minAntiga == null ? "—" : duracao(minAntiga)} icone={Hourglass} tom={minAntiga != null && minAntiga > 10 ? "danger" : minAntiga != null ? "warn" : "neutro"} />
+            <Kpi titulo="Tempo médio de resposta hoje" valor={dados?.tempoMedioRespostaSeg == null ? "—" : duracao(dados.tempoMedioRespostaSeg / 60)} icone={Timer} tom="blue" />
+            <Kpi titulo="Conversas hoje" valor={dados?.conversasDoDia ?? 0} icone={MessagesSquare} tom="blue" />
           </section>
 
           <VolumePorHora valores={dados?.volumePorHora ?? []} horaAtual={Number(new Date(relogio).toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }))} />
