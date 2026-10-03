@@ -95,6 +95,7 @@ import {
   rotaSomenteAdmin,
 } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
+import { podeAbrirTelaOsZap } from "@/lib/atendimento/acesso-telas-oszap";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getSubsystem,
@@ -1130,6 +1131,7 @@ function AppShellInner() {
             if (filhos.length === 0) return null;
             return { ...item, children: filhos };
           }
+          if (!podeAbrirTelaOsZap(clinicaAtual?.role, item.to, item.hash)) return null;
           return leafAllowed(item.to, allowedModules, configuredModules) ? item : null;
         })
         .filter((it): it is NavItem => it !== null);
@@ -1421,6 +1423,8 @@ function AppShellInner() {
   // para evitar flash de "Acesso negado".
   const currentModulo = moduloDaRota(location.pathname);
   const rotaPermitida = (() => {
+    // Mesma restrição do menu, inclusive para favoritos e links com hash.
+    if (!podeAbrirTelaOsZap(clinicaAtual?.role, location.pathname, location.hash)) return false;
     // Rotas administrativas: só o admin da clínica entra, mesmo digitando a URL.
     if (rotaSomenteAdmin(location.pathname)) return allowedModules === null;
     // Mesma regra do menu lateral (`leafAllowed`): submódulo sem linha salva
