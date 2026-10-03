@@ -2107,6 +2107,12 @@ async function gerarRespostaNinaInterno(
       },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
   }
+  // JEV — Fase 6 (flag `nina_jev_fase6`): confere a resposta antes do envio.
+  const inicioMensagensTurno = mensagens.length;
+  let conferenciaJevUsada = false;
+  const conferenciaJevAtiva = await import("@/lib/nina/jev.server")
+    .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
+    .catch(() => false);
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
     if (ctxFerramentas?.esclarecimentoCatalogo) {
@@ -2282,6 +2288,36 @@ async function gerarRespostaNinaInterno(
           );
         }
         break;
+      }
+      if (conferenciaJevAtiva && texto) {
+        const decisao = await (await import("@/lib/nina/jev.server")).conferirRespostaJev({
+          clinicaId,
+          conversaId: estadoId.conversaId ?? null,
+          teste: opcoes?.teste === true,
+          texto,
+          fatos: {
+            agendaConsultada: agendaComOpcoes ||
+              (await import("@/lib/nina/jev-contexto")).opcoesOferecidasJev(sessaoNina.estado).length > 0,
+            agendamentoConfirmado: Boolean(agendamentoConfirmado),
+            dadosConsultados: mensagens.slice(inicioMensagensTurno)
+              .filter((m) => m.role === "tool" && typeof m.content === "string")
+              .map((m) => String(m.content)),
+          },
+          jaCorrigida: conferenciaJevUsada,
+        });
+        if (decisao.acao === "refazer" && rodada < MAX_RODADAS - 1) {
+          conferenciaJevUsada = true;
+          mensagens.push({ role: "assistant", content: texto });
+          mensagens.push({ role: "system", content: decisao.instrucao });
+          continue;
+        }
+        if (decisao.acao === "refazer" || decisao.acao === "bloquear") {
+          const { RESPOSTA_SEGURA_CONFERENCIA } = await import("@/lib/nina/jev-conferencia");
+          resposta = RESPOSTA_SEGURA_CONFERENCIA;
+          const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
+          registrarOrigemResposta("codigo", "texto do modelo substituído: conferência do Jev (Fase 6) reprovou após correção");
+          break;
+        }
       }
       resposta = texto;
       {
