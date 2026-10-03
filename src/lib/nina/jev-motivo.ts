@@ -38,7 +38,7 @@ const POR_CODIGO: Array<[RegExp, CategoriaMotivo]> = [
   [/^JEV_IRRITACAO\b/, "insatisfacao"],
   [/^JEV_PEDIDO_ATENDENTE\b/, "pedido_atendente"],
   [/^JEV_DUVIDA_REPETIDA\b/, "nao_compreendido"],
-  [/^PROFISSIONAL_SFP\b/, "outra_unidade"],
+  [/profissional[_\s]+(?:e\s+)?sfp\b/i, "outra_unidade"],
 ];
 
 const ROTULO_PARA_CATEGORIA = new Map<string, CategoriaMotivo>(
