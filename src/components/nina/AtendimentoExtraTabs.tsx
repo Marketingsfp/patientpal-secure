@@ -66,7 +66,6 @@ import {
   Circle,
   Pin,
   PinOff,
-  Zap,
   Copy,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
@@ -2876,11 +2875,7 @@ export function AtendInbox() {
               </button>
             )}
             <div className={`${painelAberto ? "flex" : "hidden"} oszap-queue-content w-[300px] flex-1 flex-col overflow-hidden`}>
-              <div className="shrink-0 border-b p-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div><h2 className="text-lg font-semibold tracking-tight">Conversas</h2><p className="text-xs text-muted-foreground">Seu espaço de atendimento</p></div>
-                  <MessageSquare className="h-5 w-5 text-atd-blue" aria-hidden />
-                </div>
+              <div className="shrink-0 border-b px-3 py-2 space-y-1">
                 {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
                 <div className="flex items-center gap-1.5">
                   <SeletorStatusPresenca
@@ -3067,7 +3062,6 @@ export function AtendInbox() {
                 )}
                 {soCriticas && souGestor && <button type="button" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" onClick={() => setSoCriticas(false)}>Espera crítica · Limpar filtro ×</button>}
               </CardHeader>
-              <div className="oszap-list-caption flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground"><span>{convsVisiveis.length} conversas nesta lista</span><span>Espera do paciente</span></div>
               <div className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas">
                 {convsVisiveis.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>}
                 {convsVisiveis.map((c) => (
@@ -3092,14 +3086,14 @@ export function AtendInbox() {
                     onMouseLeave={() => cancelarPrefetch(c.id)}
                     onFocus={() => agendarPrefetch(c.id)}
                     onBlur={() => cancelarPrefetch(c.id)}
-                    className={`oszap-conversation relative w-full border-b border-atd-border py-3 pl-4 pr-3 text-left transition-colors hover:bg-atd-blue-hover ${
+                    className={`oszap-conversation relative w-full border-b border-atd-border py-1.5 pl-3 pr-2 text-left transition-colors hover:bg-atd-blue-hover ${
                       sel?.id === c.id
                         ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
                         : "bg-atd-surface"
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[15px] truncate flex-1" title={tituloConversa(c)}>
+                      <span className="font-semibold text-sm truncate flex-1" title={tituloConversa(c)}>
                         {tituloConversa(c)}
                       </span>
                       {Number(c.nao_lidas ?? 0) > 0 && (
@@ -3142,10 +3136,10 @@ export function AtendInbox() {
                           Teste
                         </Badge>
                       )}
-                      <BadgeEspera desde={espera[c.id]} className="ml-auto" />
+                      <BadgeEspera desde={espera[c.id]} />
                     </div>
                     {previas[c.id] && (
-                      <div className="mt-2 line-clamp-2 text-[13px] leading-5 text-muted-foreground" title={previas[c.id]}>
+                      <div className="mt-1 truncate text-xs leading-4 text-muted-foreground" title={previas[c.id]}>
                         {previas[c.id]}
                       </div>
                     )}
@@ -3480,8 +3474,7 @@ export function AtendInbox() {
                   )}
                 </div>
 
-                <div className="oszap-composer border-t p-3 space-y-2">
-                  <label htmlFor="oszap-resposta" className="block text-xs font-semibold text-muted-foreground">Resposta ao paciente</label>
+                <div className="oszap-composer border-t p-2">
                   <div className="relative flex gap-2">
                     {slash && (
                       <ListaRespostasRapidas
@@ -3494,26 +3487,9 @@ export function AtendInbox() {
                         onFavoritar={respostasRapidas.favoritar}
                       />
                     )}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      title="Respostas rápidas"
-                      aria-label="Respostas rápidas"
-                      aria-expanded={!!slash}
-                      className="h-9 w-9 shrink-0 p-0 text-atd-ink-soft"
-                      disabled={!!motivoBloqueio}
-                      onClick={() => {
-                        const el = composerRef.current;
-                        const pos = el?.selectionStart ?? draft.length;
-                        setSlash((s) => (s ? null : { inicio: pos, fim: pos, termo: "" }));
-                        el?.focus();
-                      }}
-                    >
-                      <Zap className="h-4 w-4" />
-                    </Button>
                     <Textarea
                       id="oszap-resposta"
+                      aria-label="Mensagem ao paciente"
                       ref={composerRef}
                       value={draft}
                       onChange={(e) => {
@@ -3567,7 +3543,6 @@ export function AtendInbox() {
                       <Send className="h-4 w-4" /><span className="hidden sm:inline">Enviar</span>
                     </Button>
                   </div>
-                  <p className="hidden sm:block text-[11px] text-muted-foreground">Enter envia · Shift + Enter quebra a linha · / abre respostas rápidas</p>
                 </div>
               </>
             )}

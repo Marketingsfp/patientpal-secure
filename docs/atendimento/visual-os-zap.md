@@ -38,3 +38,7 @@ Saída em `../oszap-design-preview/index.html` e capturas PNG. A prévia usa os 
 Não equivale a teste de ponta a ponta da aplicação autenticada. Conferir visualmente no sistema com perfis de atendente e gestão, preferência de painel previamente salva, histórico longo, mídia e recursos de acessibilidade antes da publicação. Não foram publicados frontend nem backend. Nenhuma alteração no comportamento da Nina foi realizada por este trabalho.
 
 A reversão é apenas de código: remover este conjunto de mudanças visuais, preservando alterações posteriores. Não há migração, exclusão ou transformação de dados.
+
+## Ajuste de densidade solicitado por JEAN em 03/10/2026
+
+Removidos o título da lista, subtítulo, ícone decorativo e faixa de contagem/espera. Cards com menor padding e prévia em uma linha. Filtros de atendente em uma linha. Compositor reduzido a campo de mensagem (34px) e botão de envio, com nome acessível; respostas rápidas continuam disponíveis pelo comando `/`. Verificação de sintaxe TSX e prévia nos três tamanhos passaram, sem erros JavaScript ou rolagem horizontal. Esta validação visual usa dados fictícios.

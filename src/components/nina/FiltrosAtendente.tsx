@@ -23,11 +23,11 @@ export function FiltrosAtendente({
             aria-pressed={valor === opcao.valor}
             aria-label={descricao}
             title={descricao}
-            className="h-auto min-h-12 min-w-0 flex-col gap-1 px-1 py-2 text-xs"
+            className="h-8 min-w-0 gap-1.5 px-1 text-xs"
             onClick={() => onChange(opcao.valor)}
           >
             {opcao.rotulo}
-            <span aria-hidden="true" className="text-base font-semibold leading-none tabular-nums">
+            <span aria-hidden="true" className="text-xs font-semibold leading-none tabular-nums">
               {quantidade.toLocaleString("pt-BR")}
             </span>
           </Button>

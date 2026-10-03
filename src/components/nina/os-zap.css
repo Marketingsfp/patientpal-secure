@@ -81,13 +81,11 @@
   padding-inline: 12px;
 }
 [data-os-zap="true"] .oszap-conversation {
-  min-height: 112px;
+  min-height: 0;
+  padding-block: 6px;
 }
 [data-os-zap="true"] .oszap-conversation[aria-current="true"] {
   background: var(--atd-blue-soft);
-}
-[data-os-zap="true"] .oszap-list-caption {
-  background: var(--muted);
 }
 [data-os-zap="true"] .oszap-back {
   display: none;
@@ -111,15 +109,19 @@
   line-height: 1.5;
 }
 [data-os-zap="true"] .oszap-composer textarea {
-  min-height: 48px;
-  font-size: 15px;
-  padding: 12px;
+  min-height: 34px;
+  height: 34px;
+  max-height: 120px;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 6px 10px;
 }
 [data-os-zap="true"] .oszap-composer > .relative {
   align-items: flex-end;
 }
 [data-os-zap="true"] .oszap-composer > .relative > button {
-  min-height: 44px;
+  min-height: 34px;
+  height: 34px;
 }
 [data-os-zap="true"] [data-wait-level="critico"] {
   border-width: 1px;
@@ -187,3 +189,6 @@
     transition: none !important;
   }
 }
+
+[data-os-zap="true"] .oszap-queue-content > .flex-col { padding-block: 6px; gap: 4px; }
+[data-os-zap="true"] .oszap-conversation [data-wait-level] { font-size: 10px; padding: 1px 4px; }

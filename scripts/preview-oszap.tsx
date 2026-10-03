@@ -78,10 +78,6 @@ function Preview() {
                 <Card className="oszap-queue flex shrink-0 flex-col overflow-hidden">
                   <div className="oszap-queue-content flex min-h-0 flex-1 flex-col">
                     <div className="border-b p-3">
-                      <h2 className="text-lg font-semibold">Conversas</h2>
-                      <p className="mb-4 text-xs text-muted-foreground">
-                        Seu espaço de atendimento
-                      </p>
                       <div className="flex items-center gap-2 text-sm">
                         <span className="h-2 w-2 rounded-full bg-emerald-600" />
                         Online{" "}
@@ -97,23 +93,19 @@ function Preview() {
                         onChange={setFilter}
                       />
                     </CardHeader>
-                    <div className="oszap-list-caption flex justify-between px-4 py-2 text-xs text-muted-foreground">
-                      <span>4 conversas nesta lista</span>
-                      <span>Espera do paciente</span>
-                    </div>
                     <div className="min-h-0 flex-1 overflow-auto">
                       {patients.map(([name, preview, wait], i) => (
                         <button
                           key={name}
                           aria-current={selected === i ? "true" : undefined}
-                          className="oszap-conversation w-full border-b border-atd-border bg-atd-surface px-4 py-3 text-left"
+                          className="oszap-conversation w-full border-b border-atd-border bg-atd-surface px-3 py-1.5 text-left"
                           onClick={() => {
                             select(i);
                             setList(false);
                           }}
                         >
                           <div className="flex justify-between gap-2">
-                            <span className="text-[15px] font-semibold">{name}</span>
+                            <span className="text-sm font-semibold">{name}</span>
                             {wait > 0 && (
                               <span className="rounded-full bg-primary px-2 text-xs text-primary-foreground">
                                 1
@@ -130,7 +122,7 @@ function Preview() {
                               />
                             )}
                           </div>
-                          <p className="mt-2 text-[13px] leading-5 text-muted-foreground">
+                          <p className="mt-1 truncate text-xs leading-4 text-muted-foreground">
                             {preview}
                           </p>
                           <p className="mt-1 text-[11px] text-muted-foreground">Hoje, 10:42</p>
@@ -195,13 +187,11 @@ function Preview() {
                       </div>
                     </div>
                   </div>
-                  <div className="oszap-composer space-y-2 border-t p-3">
-                    <label htmlFor="draft" className="text-xs font-semibold text-muted-foreground">
-                      Resposta ao paciente
-                    </label>
+                  <div className="oszap-composer border-t p-2">
                     <div className="relative flex gap-2">
                       <textarea
                         id="draft"
+                        aria-label="Mensagem ao paciente"
                         rows={1}
                         className="w-full rounded-lg border bg-card"
                         placeholder="Mensagem… (digite / para respostas rápidas)"
@@ -211,9 +201,6 @@ function Preview() {
                         <span className="hidden sm:inline">Enviar</span>
                       </Button>
                     </div>
-                    <p className="hidden sm:block text-[11px] text-muted-foreground">
-                      Enter envia · Shift + Enter quebra a linha · / abre respostas rápidas
-                    </p>
                   </div>
                 </Card>
                 <Card className="oszap-contact hidden 2xl:flex w-64 shrink-0 flex-col overflow-hidden">
