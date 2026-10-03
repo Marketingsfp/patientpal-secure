@@ -2,8 +2,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { lerInicioCronometroPausa } from "./cronometro-pausa.server";
+import { ehPerfilAdmin } from "./perfil-atendimento";
 
 const PAGINA = 1000;
+
+/** Mesmo perfil de telefonia do pool; administrador prevalece em vínculo duplo. */
+export function idsTelefoniaTv(membros: readonly { user_id: string; role: string }[]) {
+  const admins = new Set(membros.filter((m) => ehPerfilAdmin(m.role)).map((m) => m.user_id));
+  return new Set(membros.filter((m) => m.role === "telefonia" && !admins.has(m.user_id)).map((m) => m.user_id));
+}
 
 export type EstadoTv = "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE";
 
@@ -151,14 +158,14 @@ export async function carregarPainelTv(
       .eq("clinica_id", clinicaId),
     supabase
       .from("clinica_memberships")
-      .select("user_id")
+      .select("user_id, role")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
   ]);
   if (esperas.error) throw new Error(esperas.error.message);
   if (presencas.error) throw new Error(presencas.error.message);
   if (membros.error) throw new Error(membros.error.message);
-  const ativos = new Set((membros.data ?? []).map((m) => m.user_id));
+  const ativos = idsTelefoniaTv(membros.data ?? []);
 
   const humanas = abertas.filter((c) => c.owner_type !== "AI");
   const idsHumanas = new Set(humanas.map((c) => c.id));
@@ -193,7 +200,7 @@ export async function carregarPainelTv(
       ...[...estados.entries()].filter(([, v]) => v.estado !== "OFFLINE").map(([id]) => id),
       ...atribuidas.keys(),
     ]),
-  ];
+  ].filter((id) => ativos.has(id));
   const perfis = ids.length
     ? await supabase.from("profiles").select("id, nome").in("id", ids)
     : { data: [], error: null };
