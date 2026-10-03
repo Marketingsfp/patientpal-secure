@@ -921,9 +921,10 @@ async function gerarRespostaNinaInterno(
   let jevPontuacoes: Record<string, number | null> | null = null;
   try {
     const jev = await import("@/lib/nina/jev.server");
-    const [f1, f2] = await Promise.all([
+    const [f1, f2, f9] = await Promise.all([
       jev.jevAtivo(clinicaId, "fase1_intencao", opcoes?.teste === true),
       jev.jevAtivo(clinicaId, "fase2_encaminhamento", opcoes?.teste === true),
+      jev.jevAtivo(clinicaId, "fase9_urgencia", opcoes?.teste === true),
     ]);
     if (f1 || f2) {
       const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
@@ -933,6 +934,7 @@ async function gerarRespostaNinaInterno(
       const perguntas = {
         ...perguntaIntencao(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
+        ...(f2 && f9 ? enc.perguntasUrgencia() : {}),
       };
       const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
       const anteriores = ctxJev.montarHistoricoJev(msgsMemoria, {
@@ -972,6 +974,10 @@ async function gerarRespostaNinaInterno(
           urgencia: respostas["urgencia"]?.noul ?? null,
           pedido_atendente: respostas["pedido_atendente"]?.noul ?? null,
           irritacao: respostas["irritacao"]?.noul ?? null,
+          urgencia_dor_ar: respostas["urgencia_dor_ar"]?.noul ?? null,
+          urgencia_sangramento_desmaio: respostas["urgencia_sangramento_desmaio"]?.noul ?? null,
+          urgencia_gestante: respostas["urgencia_gestante"]?.noul ?? null,
+          urgencia_crianca_idoso: respostas["urgencia_crianca_idoso"]?.noul ?? null,
           falhas_seguidas: contagem?.falhas ?? null,
         };
       }

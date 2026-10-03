@@ -44,6 +44,25 @@ export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
   };
 }
 
+/** Etapa E1 (03/10/2026): sinais separados. Criança = até 12 anos; idoso = 60 anos ou mais. */
+export const SINAIS_URGENCIA = {
+  urgencia_dor_ar: "dor forte ou falta de ar",
+  urgencia_sangramento_desmaio: "sangramento ou desmaio",
+  urgencia_gestante: "gestante com queixa",
+  urgencia_crianca_idoso: "criança ou idoso com queixa",
+} as const;
+export type SinalUrgencia = keyof typeof SINAIS_URGENCIA;
+
+export function perguntasUrgencia(): Record<SinalUrgencia, PerguntaJev> {
+  const q = (instructions: string, t: string, f: string): PerguntaJev => ({ type: "noul", instructions, criteria: { true: t, false: f } });
+  return {
+    urgencia_dor_ar: q("A `mensagem_atual` relata dor forte ou falta de ar agora?", "Relata dor forte ou falta de ar.", "Não relata; dor leve, antiga ou só pedido de consulta não contam."),
+    urgencia_sangramento_desmaio: q("A `mensagem_atual` relata sangramento ou desmaio?", "Relata sangramento ou desmaio.", "Não relata."),
+    urgencia_gestante: q("A `mensagem_atual` fala de uma gestante COM uma queixa ou sintoma (dor, sangramento, mal-estar, perda de líquido)?", "Gestante com queixa.", "Não há gestante, ou é só rotina (pré-natal, ultrassom, marcação) sem queixa."),
+    urgencia_crianca_idoso: q("A `mensagem_atual` fala de uma criança de até 12 anos ou de um idoso de 60 anos ou mais COM uma queixa ou sintoma (febre, dor, mal-estar, queda)?", "Criança (até 12) ou idoso (60+) com queixa.", "Não há criança/idoso, ou é só marcação de rotina sem queixa."),
+  };
+}
+
 export type Encaminhamento = { motivo: string; urgencia: "normal" | "alta" };
 
 /** O Jev respondeu que NÃO dá para entender a mensagem (sem resposta não é falha). */
@@ -94,9 +113,14 @@ const numero = (n: number) => n.toFixed(2).replace(".", ",");
 export function decidirEncaminhamento(
   respostas: Record<string, RespostaJev> | null,
   contagem: ContagemDuvida | null,
-  limites: { urgencia: number; pedido_atendente: number; irritacao: number } = LIMITES_ENCAMINHAMENTO,
+  limites: { urgencia: number; pedido_atendente: number; irritacao: number } & Partial<Record<SinalUrgencia, number>> = LIMITES_ENCAMINHAMENTO,
 ): Encaminhamento | null {
-  const p = (id: keyof typeof LIMITES_ENCAMINHAMENTO) => respostas?.[id]?.noul;
+  const p = (id: string) => respostas?.[id]?.noul;
+  for (const s of Object.keys(SINAIS_URGENCIA) as SinalUrgencia[]) {
+    const v = p(s);
+    if (typeof v === "number" && v >= (limites[s] ?? 0.5))
+      return { motivo: `JEV_URGENCIA_CLINICA: possível urgência clínica — ${SINAIS_URGENCIA[s]} (pontuação ${numero(v)})`, urgencia: "alta" };
+  }
   const u = p("urgencia");
   if (typeof u === "number" && u >= limites.urgencia)
     return { motivo: `JEV_URGENCIA_CLINICA: possível urgência clínica (pontuação ${numero(u)})`, urgencia: "alta" };
