@@ -349,9 +349,28 @@ export async function aplicarGateIdentificacao(params: {
   };
   let selecionouAgora = params.aposSelecao === true;
   const cadastroProntoNoInicio = Boolean(p.identified && p.validated && p.id);
-  const aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
-  const escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
+  let aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
+  let escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
   const opcoes = vagasDaSessao(estado, ctx.clinicaId);
+  // Jev Fase 7: só quando as regras não entenderam a resposta a um resumo ou
+  // a uma lista de horários. Escolhe apenas entre opções oferecidas; abaixo
+  // de 80% nada muda. A gravação continua dependendo do sistema.
+  let vagaDoJev: (typeof opcoes)[number] | null = null;
+  if (!selecionouAgora && !aceiteDaVaga && !escolha && !a.confirmation?.aceita && !ehNegacao(mensagem)) {
+    const resumo = confirmacaoDaEscolha(estado, ctx.clinicaId);
+    const situacao = resumo && !consentimentoDaEscolha(estado, ctx.clinicaId)
+      ? { tipo: "resumo" as const, vaga: resumo.vaga, resumo: resumo.resumo }
+      : !resumo && opcoes.length ? { tipo: "opcoes" as const, opcoes } : null;
+    if (situacao) {
+      const { interpretarEscolhaJev } = await import("./jev.server");
+      const ultima = [...(ctx.consultaAgenda?.historico ?? [])].reverse().find((h) => h.role === "assistant");
+      const d = await interpretarEscolhaJev({ clinicaId: ctx.clinicaId, conversaId: ctx.conversaId,
+        teste: Boolean(ctx.teste || ctx.origem === "homologacao"), mensagem,
+        ultimaMaria: ultima?.content ?? null, situacao });
+      if (d.tipo === "aceitou") aceiteDaVaga = true;
+      if (d.tipo === "escolheu") { vagaDoJev = d.vaga; escolha = { hora: d.vaga.hora, data: d.vaga.data }; }
+    }
+  }
   // Uma correção/recusa após o aceite suspende a gravação. A Nina não troca
   // a vaga no meio da coleta; a equipe humana deverá tratar a mudança.
   if (a.confirmation?.aceita && (!consentimentoDaEscolha(estado, ctx.clinicaId) || ehNegacao(mensagem) ||
@@ -363,7 +382,7 @@ export async function aplicarGateIdentificacao(params: {
     return null;
   }
   if (escolha && opcoes.length && !consentimentoDaEscolha(estado, ctx.clinicaId)) {
-    const vagas = vagasDaEscolha(opcoes, escolha);
+    const vagas = vagaDoJev ? [vagaDoJev] : vagasDaEscolha(opcoes, escolha);
     // Um horário ainda não consultado precisa de nova leitura da agenda.
     // Não o declare indisponível e não o substitua por uma opção da lista.
     if (vagas.length === 0) {
