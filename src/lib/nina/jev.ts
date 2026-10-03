@@ -9,7 +9,8 @@ export type FaseJev =
   | "fase4_cadastro"
   | "fase5_avaliacao"
   | "fase6_conferencia"
-  | "fase7_escolha";
+  | "fase7_escolha"
+  | "fase8_motivo";
 
 export const FLAG_JEV: Record<FaseJev, string> = {
   fase1_intencao: "nina_jev_fase1",
@@ -19,6 +20,7 @@ export const FLAG_JEV: Record<FaseJev, string> = {
   fase5_avaliacao: "nina_jev_fase5",
   fase6_conferencia: "nina_jev_fase6",
   fase7_escolha: "nina_jev_fase7",
+  fase8_motivo: "nina_jev_fase8",
 };
 
 export type PerguntaJev =

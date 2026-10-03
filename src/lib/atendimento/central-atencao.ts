@@ -1,3 +1,4 @@
+import { categoriaDoMotivo, pesoCategoriaMotivo, type CategoriaMotivo } from "@/lib/nina/jev-motivo";
 import { nomeContato } from "./rotulo-conversa";
 /**
  * Central de Atenção — regras puras.
@@ -79,6 +80,8 @@ export interface ItemAtencao {
   aguardandoResposta: boolean;
   atendenteId?: string | null;
   atendenteNome?: string | null;
+  /** Categoria do motivo da transferência (Jev Fase 8 ou código conhecido). */
+  motivoCategoria?: CategoriaMotivo | null;
 }
 
 export interface PausaAtencao {
@@ -170,6 +173,7 @@ export function calcularAtencao(args: {
       aguardandoResposta: critica || idsAguardando.has(id),
       atendenteId: naoAtribuida ? (porConversa.get(id)?.atribuida_user_id ?? null) : null,
       atendenteNome: naoAtribuida ? (porConversa.get(id)?.atendente_nome ?? null) : null,
+      motivoCategoria: categoriaDoMotivo(porConversa.get(id)?.handoff_motivo),
     });
   }
 
@@ -179,7 +183,13 @@ export function calcularAtencao(args: {
     critica: 0,
     aguardando: 2,
   };
-  itens.sort((a, b) => peso[a.categoria] - peso[b.categoria] || b.minutos - a.minutos);
+  // Dentro da mesma faixa, urgência e insatisfação sobem (Etapa D); as regras de espera não mudam.
+  itens.sort(
+    (a, b) =>
+      peso[a.categoria] - peso[b.categoria] ||
+      pesoCategoriaMotivo(a.motivoCategoria) - pesoCategoriaMotivo(b.motivoCategoria) ||
+      b.minutos - a.minutos,
+  );
 
   return {
     total: idsCriticas.size,
