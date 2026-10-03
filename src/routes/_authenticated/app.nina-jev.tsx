@@ -44,6 +44,7 @@ const ROTULO_FASE: Record<FaseJev, string> = {
   fase5_avaliacao: "Avaliação",
   fase6_conferencia: "Conferência",
   fase7_escolha: "Sim / horário",
+  fase8_motivo: "Motivo da transferência",
 };
 const ROTULO_SINAL: Record<SinalCalibragem, string> = {
   urgencia: "Urgência clínica",
