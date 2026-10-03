@@ -213,6 +213,7 @@ import {
   conversaSemResponsavel,
   estadoBloqueiaTransferencia,
   perfilSupervisao,
+  podeEncerrarConversa,
   rotuloAutorSupervisao,
   type PresencaAtendente,
 } from "@/lib/atendimento/perfil-atendimento";
@@ -3255,7 +3256,7 @@ export function AtendInbox() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={!souResponsavel || carregandoConversa || fechando}
+                          disabled={!podeEncerrarConversa({ userId: meuId, responsavelId: responsavelId, admin: souAdmin, gestor: souGestor }) || carregandoConversa || fechando}
                           aria-busy={fechando}
                           className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
                           onClick={() => void fechar()}

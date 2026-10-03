@@ -30,6 +30,7 @@ import {
   conversaSemResponsavel,
   estadoBloqueiaTransferencia,
   perfilSupervisao,
+  podeEncerrarConversa,
   statusPresenca,
 
 } from "@/lib/atendimento/perfil-atendimento";
@@ -797,15 +798,27 @@ export const fecharConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    // Só o responsável atual encerra (evita encerrar atendimento de outra pessoa).
-    const { data: dono } = await context.supabase
+    // Supervisão encerra sem assumir; autoria continua sendo a sessão autenticada.
+    const { data: dono, error: erroConversa } = await context.supabase
       .from("atend_conversas")
-      .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado")
+      .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, status")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    if (dono?.atribuida_user_id && dono.atribuida_user_id !== context.userId)
-      throw new Error("Esta conversa está com outro atendente. Assuma antes de encerrar.");
+    if (erroConversa) throw new Error(erroConversa.message);
+    if (!dono) throw new Error("Conversa não encontrada nesta clínica.");
+    if (dono.status === "closed" || dono.status === "finished")
+      throw new Error("Esta conversa já foi encerrada.");
+    const [{ data: gestao, error: erroGestao }, admin] = await Promise.all([
+      context.supabase.rpc("can_manage_clinica", {
+        _user_id: context.userId,
+        _clinica_id: data.clinicaId,
+      }),
+      ehAdminClinica(context.supabase, context.userId, data.clinicaId),
+    ]);
+    if (erroGestao) throw new Error(erroGestao.message);
+    if (!podeEncerrarConversa({ userId: context.userId, responsavelId: dono.atribuida_user_id, admin, gestor: gestao === true }))
+      throw new Error("Somente o responsável, a supervisão ou um administrador pode encerrar esta conversa.");
     // Mecanismo ÚNICO de resolução (o mesmo usado pela Nina no encerramento
     // automático): status, prazos, estados transacionais, evento e resumo.
     const { resolverConversaCore } = await import("@/lib/atendimento/resolver-conversa.server");

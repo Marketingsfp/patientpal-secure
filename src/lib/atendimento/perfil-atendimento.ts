@@ -155,3 +155,13 @@ export function rotuloAutorSupervisao(
   const autor = nome?.trim();
   return autor ? `${rotulo} ${autor}` : rotulo;
 }
+
+/** Encerramento por responsável ou supervisão; não exige assumir a conversa. */
+export function podeEncerrarConversa(args: {
+  userId: string | null | undefined;
+  responsavelId: string | null | undefined;
+  admin: boolean;
+  gestor: boolean;
+}): boolean {
+  return Boolean(args.userId && (args.admin || args.gestor || args.responsavelId === args.userId));
+}
