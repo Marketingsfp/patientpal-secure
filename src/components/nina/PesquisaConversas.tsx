@@ -27,6 +27,9 @@ export function PesquisaConversas() {
   const pesquisar = useServerFn(pesquisarConversasGeral);
   const [termo, setTermo] = useState("");
   const [buscado, setBuscado] = useState("");
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+  const [periodo, setPeriodo] = useState({ de: "", ate: "" });
   const [situacao, setSituacao] = useState<Situacao>("todas");
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [selecionada, setSelecionada] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export function PesquisaConversas() {
   const [temMais, setTemMais] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const seq = useRef(0);
-  const chave = `${clinicaId ?? ""}:${situacao}:${buscado}`;
+  const chave = `${clinicaId ?? ""}:${situacao}:${buscado}:${periodo.de}:${periodo.ate}`;
   const chaveRef = useRef(chave);
   chaveRef.current = chave;
 
@@ -48,15 +51,18 @@ export function PesquisaConversas() {
       try {
         let rows: Linha[];
         let mais = false;
+        const datas = { de: periodo.de || undefined, ate: periodo.ate || undefined };
         if (buscado) {
-          const resultado = await pesquisar({ data: { clinicaId, termo: buscado } });
+          const resultado = await pesquisar({ data: { clinicaId, termo: buscado, ...datas } });
           rows = resultado.filter(
             (c) =>
               situacao === "todas" ||
               ["closed", "finished"].includes(c.status ?? "") === (situacao === "encerradas"),
           );
         } else {
-          const pagina = await listar({ data: { clinicaId, situacao, offset, limit: 50 } });
+          const pagina = await listar({
+            data: { clinicaId, situacao, offset, limit: 50, ...datas },
+          });
           rows = pagina.conversas;
           mais = pagina.temMais;
         }
@@ -72,7 +78,7 @@ export function PesquisaConversas() {
         if (pedido === seq.current) setCarregando(false);
       }
     },
-    [clinicaId, situacao, buscado, chave, listar, pesquisar],
+    [clinicaId, situacao, buscado, periodo, chave, listar, pesquisar],
   );
 
   useEffect(() => {
@@ -87,6 +93,9 @@ export function PesquisaConversas() {
     setSelecionada(null);
     setTermo("");
     setBuscado("");
+    setDe("");
+    setAte("");
+    setPeriodo({ de: "", ate: "" });
   }, [clinicaId]);
 
   return (
@@ -108,9 +117,16 @@ export function PesquisaConversas() {
           className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
+            if (de && ate && de > ate) {
+              setErro("A data inicial deve ser igual ou anterior à data final.");
+              return;
+            }
             const t = normalizarTermoBusca(termo);
-            if (t === buscado) void carregar();
-            else setBuscado(t);
+            if (t === buscado && de === periodo.de && ate === periodo.ate) void carregar();
+            else {
+              setBuscado(t);
+              setPeriodo({ de, ate });
+            }
           }}
         >
           <div className="relative min-w-0 flex-1 basis-48">
@@ -136,10 +152,32 @@ export function PesquisaConversas() {
             <option value="abertas">Ativas / abertas</option>
             <option value="encerradas">Encerradas</option>
           </select>
+          <label className="flex items-center gap-1 text-xs">
+            De
+            <Input
+              type="date"
+              aria-label="Data inicial da conversa"
+              className="h-8 w-36 text-xs"
+              value={de}
+              max={ate || undefined}
+              onChange={(e) => setDe(e.target.value)}
+            />
+          </label>
+          <label className="flex items-center gap-1 text-xs">
+            Até
+            <Input
+              type="date"
+              aria-label="Data final da conversa"
+              className="h-8 w-36 text-xs"
+              value={ate}
+              min={de || undefined}
+              onChange={(e) => setAte(e.target.value)}
+            />
+          </label>
           <Button type="submit" size="sm" disabled={carregando}>
             Buscar
           </Button>
-          {buscado && (
+          {(buscado || de || ate || periodo.de || periodo.ate) && (
             <Button
               size="sm"
               type="button"
@@ -147,12 +185,18 @@ export function PesquisaConversas() {
               onClick={() => {
                 setTermo("");
                 setBuscado("");
+                setDe("");
+                setAte("");
+                setPeriodo({ de: "", ate: "" });
               }}
             >
               Limpar busca
             </Button>
           )}
         </form>
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Datas de abertura da conversa · horário de Brasília. O último dia é incluído por inteiro.
+        </p>
       </div>
       <div
         className="oszap-central-body flex min-h-0 flex-1 overflow-hidden"

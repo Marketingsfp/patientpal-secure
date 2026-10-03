@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
+import { periodoCentralSchema, aplicarPeriodoCentral } from "@/lib/atendimento/periodo-central";
 import { z } from "zod";
 import {
   STATUS_FECHADOS,
@@ -3323,7 +3324,7 @@ async function assertPesquisaConversas(supabase: SupabaseClient<Database>, userI
 export const pesquisarConversasGeral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(1).max(200) }).parse(i),
+    z.object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(1).max(200) }).and(periodoCentralSchema).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertPesquisaConversas(context.supabase, context.userId, data.clinicaId);
@@ -3332,12 +3333,14 @@ export const pesquisarConversasGeral = createServerFn({ method: "POST" })
     const termo = bruto.replace(/[%_,()'"\\*]/g, "").trim();
     const campos =
       "id, numero_conversa, protocolo_atendimento, protocol_number, contato_nome, whatsapp_profile_name, contato_telefone, status, owner_type, ultima_msg_em, created_at, atribuida_user_id";
-    const base = () =>
-      supabaseAdmin.from("atend_conversas").select(campos).eq("clinica_id", data.clinicaId).eq("is_teste", false);
+    const base = () => aplicarPeriodoCentral(
+      supabaseAdmin.from("atend_conversas").select(campos).eq("clinica_id", data.clinicaId).eq("is_teste", false),
+      data,
+    );
 
     const ids = new Set<string>();
     const achados: Record<string, string> = {};
-    const consultas: PromiseLike<{ data: any[] | null }>[] = [];
+    const consultas: PromiseLike<{ data: any[] | null; error: { message: string } | null }>[] = [];
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bruto);
     if (uuid) consultas.push(base().eq("id", bruto.toLowerCase()));
     const num = /^#?\d{1,12}$/.test(bruto) ? Number(bruto.replace("#", "")) : null;
@@ -3355,19 +3358,31 @@ export const pesquisarConversasGeral = createServerFn({ method: "POST" })
     }
     const res = await Promise.all(consultas);
     const conversas: any[] = [];
-    for (const r of res) for (const c of r.data ?? []) if (!ids.has(c.id)) { ids.add(c.id); conversas.push(c); }
+    for (const r of res) {
+      if (r.error) throw new Error(r.error.message);
+      for (const c of r.data ?? []) if (!ids.has(c.id)) { ids.add(c.id); conversas.push(c); }
+    }
 
     if (termo.length >= 2 && !uuid && !bruto.startsWith("#")) {
-      const { data: msgs } = await supabaseAdmin
+      // Filtra pela abertura da conversa vinculada, antes do limite de mensagens.
+      // A data da mensagem pode ser diferente da data de abertura pesquisada.
+      const { data: msgs, error: erroMsgs } = await aplicarPeriodoCentral(
+        supabaseAdmin
         .from("whatsapp_mensagens")
-        .select("conversa_id, body, created_at")
+        .select("conversa_id, body, created_at, atend_conversas!inner(created_at)")
         .eq("clinica_id", data.clinicaId)
         .eq("is_teste", false)
+        .eq("atend_conversas.clinica_id", data.clinicaId)
+        .eq("atend_conversas.is_teste", false)
         .neq("status", "system")
         .not("conversa_id", "is", null)
-        .ilike("body", `%${termo}%`)
+        .ilike("body", `%${termo}%`),
+        data,
+        "atend_conversas.created_at",
+      )
         .order("created_at", { ascending: false })
         .limit(300);
+      if (erroMsgs) throw new Error(erroMsgs.message);
       const novos: string[] = [];
       for (const m of msgs ?? []) {
         if (!m.conversa_id || achados[m.conversa_id]) continue;
@@ -3375,7 +3390,8 @@ export const pesquisarConversasGeral = createServerFn({ method: "POST" })
         if (!ids.has(m.conversa_id)) novos.push(m.conversa_id);
       }
       if (novos.length) {
-        const { data: extra } = await base().in("id", novos.slice(0, 100));
+        const { data: extra, error: erroExtra } = await base().in("id", novos.slice(0, 100));
+        if (erroExtra) throw new Error(erroExtra.message);
         for (const c of extra ?? []) if (!ids.has(c.id)) { ids.add(c.id); conversas.push(c); }
       }
     }
@@ -3401,7 +3417,7 @@ export const listarCentralConversas = createServerFn({ method: "POST" })
     situacao: z.enum(["todas", "abertas", "encerradas"]).default("todas"),
     offset: z.number().int().min(0).default(0),
     limit: z.number().int().min(1).max(100).default(50),
-  }).parse(i))
+  }).and(periodoCentralSchema).parse(i))
   .handler(async ({ data, context }) => {
     await assertPesquisaConversas(context.supabase, context.userId, data.clinicaId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

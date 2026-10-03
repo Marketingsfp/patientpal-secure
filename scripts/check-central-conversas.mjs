@@ -14,18 +14,24 @@ const fixtures = {
   "@/hooks/use-clinica":
     "export const useClinica = () => ({clinicaAtual:{clinica_id:'clinica-teste'}});",
   "@/lib/atendimento.functions": `
+    import {limitesPeriodoCentral} from '@/lib/atendimento/periodo-central';
+    window.centralChamadas=[];
     const rows = Array.from({length:54}, (_,i)=>({id:'conversa-'+i,
       contato_nome:'Paciente fictício '+i,contato_telefone:'000000000',
       numero_conversa:1000+i,protocolo_atendimento:'TESTE-'+i,
-      status:i%2?'closed':'active',ultima_msg_em:'2026-10-03T12:00:00Z',trecho:null}));
+      status:i%2?'closed':'active',ultima_msg_em:'2026-10-03T12:00:00Z',
+      created_at:i===53?'2026-10-04T02:59:59Z':i<27?'2026-10-02T12:00:00Z':'2026-10-03T12:00:00Z',trecho:null}));
+    function noPeriodo(data){const {inicio,fim}=limitesPeriodoCentral(data);return rows.filter(c=>(!inicio||Date.parse(c.created_at)>=Date.parse(inicio))&&(!fim||Date.parse(c.created_at)<Date.parse(fim)));}
     export async function listarCentralConversas({data}) {
+      window.centralChamadas.push(data);
       if(window.falharLista) throw Error('Falha simulada de acesso');
       await new Promise(r=>setTimeout(r,data.situacao==='abertas'?100:10));
-      const filtradas=rows.filter(c=>data.situacao==='todas'||(c.status==='closed')===(data.situacao==='encerradas'));
+      const filtradas=noPeriodo(data).filter(c=>data.situacao==='todas'||(c.status==='closed')===(data.situacao==='encerradas'));
       return {conversas:filtradas.slice(data.offset,data.offset+data.limit),temMais:filtradas.length>data.offset+data.limit};
     }
     export async function pesquisarConversasGeral({data}) {
-      return rows.filter(c=>c.contato_nome.toLowerCase().includes(data.termo.toLowerCase())).map(c=>({...c,trecho:'Mensagem fictícia encontrada'}));
+      window.centralChamadas.push(data);
+      return noPeriodo(data).filter(c=>c.contato_nome.toLowerCase().includes(data.termo.toLowerCase())).map(c=>({...c,trecho:'Mensagem fictícia encontrada'}));
     }
   `,
   "./AtendimentoExtraTabs": `
@@ -113,12 +119,30 @@ try {
   await page.waitForTimeout(150);
   await expect(cards.filter({ hasText: "Encerrada" })).toHaveCount(27);
   await filtro.selectOption("todas");
+  const de = page.getByLabel("Data inicial da conversa");
+  const ate = page.getByLabel("Data final da conversa");
+  await de.fill("2026-10-03");
+  await ate.fill("2026-10-03");
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  await expect(cards).toHaveCount(27);
+  await expect(page.locator('[data-conversa-id="conversa-53"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "Carregar mais conversas" })).toHaveCount(0);
+  await filtro.selectOption("encerradas");
+  await expect(cards).toHaveCount(14);
+  await filtro.selectOption("todas");
   await page.getByLabel("Pesquisar na central de conversas").fill("Paciente fictício 53");
   await page.getByRole("button", { name: "Buscar", exact: true }).click();
   await expect(cards).toHaveCount(1);
   await expect(cards).toContainText("Mensagem fictícia encontrada");
+  await de.fill("2026-10-02");
+  await ate.fill("2026-10-02");
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  await expect(cards).toHaveCount(0);
+  await expect(page.getByText("Nenhuma conversa encontrada.")).toBeVisible();
   await page.getByRole("button", { name: "Limpar busca" }).click();
   await expect(cards).toHaveCount(50);
+  await expect(de).toHaveValue("");
+  await expect(ate).toHaveValue("");
   await page.screenshot({ path: path.join(out, "central-desktop.png") });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("button", { name: "Voltar à lista" })).toBeVisible();
@@ -139,7 +163,7 @@ try {
   await expect(page.getByRole("alert")).toHaveText("Falha simulada de acesso");
   if (errors.length) throw Error(errors.join("\n"));
   console.log(
-    "Central: paginação, abertas/encerradas, seleção sem navegação, sincronização, busca, requisições concorrentes, celular e erro: OK (serviços simulados).",
+    "Central: datas inclusivas de Brasília, texto/status/período, limpar filtros, paginação, seleção sem navegação, requisições concorrentes, celular e erro: OK (serviços simulados).",
   );
 } finally {
   await browser.close();

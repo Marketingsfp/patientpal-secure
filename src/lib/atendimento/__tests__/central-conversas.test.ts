@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { listarPaginaCentral } from "../central-conversas.server";
+import {
+  limitesPeriodoCentral,
+  periodoCentralSchema,
+  aplicarPeriodoCentral,
+} from "../periodo-central";
 function fake(rows: any[], error: { message: string } | null = null) {
   const calls: any[] = [];
   const q: any = {
@@ -17,6 +22,14 @@ function fake(rows: any[], error: { message: string } | null = null) {
     },
     in(...a: any[]) {
       calls.push(["in", ...a]);
+      return q;
+    },
+    gte(...a: any[]) {
+      calls.push(["gte", ...a]);
+      return q;
+    },
+    lt(...a: any[]) {
+      calls.push(["lt", ...a]);
       return q;
     },
     order(...a: any[]) {
@@ -88,5 +101,57 @@ describe("central de conversas — todas as situações e paginação", () => {
     await expect(
       listarPaginaCentral(db, { clinicaId: "clinica", situacao: "todas", offset: 0, limit: 50 }),
     ).rejects.toThrow("Falha de leitura");
+  });
+  it("datas filtram a abertura antes da paginação e incluem o último dia de Brasília", async () => {
+    const { db, calls } = fake([]);
+    await listarPaginaCentral(db, {
+      clinicaId: "clinica",
+      situacao: "encerradas",
+      offset: 50,
+      limit: 50,
+      de: "2026-10-02",
+      ate: "2026-10-03",
+    });
+    expect(calls).toContainEqual(["gte", "created_at", "2026-10-02T03:00:00.000Z"]);
+    expect(calls).toContainEqual(["lt", "created_at", "2026-10-04T03:00:00.000Z"]);
+    expect(calls.findIndex((c) => c[0] === "lt")).toBeLessThan(
+      calls.findIndex((c) => c[0] === "range"),
+    );
+    expect(calls).toContainEqual(["in", "status", ["closed", "finished"]]);
+    expect(calls).toContainEqual(["range", 50, 100]);
+  });
+  it("aceita um único limite, o mesmo dia, fim de ano e fevereiro bissexto", () => {
+    expect(limitesPeriodoCentral({})).toEqual({ inicio: undefined, fim: undefined });
+    expect(limitesPeriodoCentral({ de: "2026-10-03" }).fim).toBeUndefined();
+    expect(limitesPeriodoCentral({ ate: "2026-12-31" }).fim).toBe("2027-01-01T03:00:00.000Z");
+    expect(limitesPeriodoCentral({ de: "2024-02-29", ate: "2024-02-29" })).toEqual({
+      inicio: "2024-02-29T03:00:00.000Z",
+      fim: "2024-03-01T03:00:00.000Z",
+    });
+  });
+  it("rejeita data inexistente e período invertido", () => {
+    expect(periodoCentralSchema.safeParse({ de: "2026-02-29" }).success).toBe(false);
+    expect(periodoCentralSchema.safeParse({ de: "03/10/2026" }).success).toBe(false);
+    expect(() => limitesPeriodoCentral({ de: "2026-10-04", ate: "2026-10-03" })).toThrow(
+      "data inicial",
+    );
+  });
+  it("busca por mensagens filtra a abertura da conversa vinculada, não a data da mensagem", () => {
+    const calls: unknown[][] = [];
+    const q = {
+      gte(c: string, v: string) {
+        calls.push(["gte", c, v]);
+        return this;
+      },
+      lt(c: string, v: string) {
+        calls.push(["lt", c, v]);
+        return this;
+      },
+    };
+    aplicarPeriodoCentral(q, { de: "2026-10-03", ate: "2026-10-03" }, "atend_conversas.created_at");
+    expect(calls).toEqual([
+      ["gte", "atend_conversas.created_at", "2026-10-03T03:00:00.000Z"],
+      ["lt", "atend_conversas.created_at", "2026-10-04T03:00:00.000Z"],
+    ]);
   });
 });

@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { aplicarPeriodoCentral, type PeriodoCentral } from "./periodo-central";
 
 export async function listarPaginaCentral(
   db: SupabaseClient<Database>,
-  args: {
+  args: PeriodoCentral & {
     clinicaId: string;
     situacao: "todas" | "abertas" | "encerradas";
     offset: number;
@@ -19,6 +20,7 @@ export async function listarPaginaCentral(
     .eq("is_teste", false);
   if (args.situacao === "abertas") q = q.not("status", "in", "(closed,finished)");
   if (args.situacao === "encerradas") q = q.in("status", ["closed", "finished"]);
+  q = aplicarPeriodoCentral(q, args);
   const { data, error } = await q
     .order("ultima_msg_em", { ascending: false, nullsFirst: false })
     .order("id", { ascending: true })
