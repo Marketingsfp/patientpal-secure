@@ -261,3 +261,37 @@ export async function interpretarEscolhaJev(ctx: {
     return { tipo: "nada" };
   }
 }
+
+/**
+ * (Fase 8) Categoria fixa do motivo da transferência. O Jev só escolhe entre
+ * categorias; a frase continua da Maria. Erro, demora ou pouca certeza = motivo
+ * original, sem categoria. Nunca impede a transferência.
+ */
+export async function categorizarMotivoJev(ctx: {
+  clinicaId: string;
+  conversaId: string | null;
+  teste: boolean;
+  motivo: string;
+  resumo: string | null;
+}): Promise<string> {
+  try {
+    const m = await import("./jev-motivo");
+    if (!m.precisaClassificar(ctx.motivo)) return ctx.motivo;
+    if (!(await jevAtivo(ctx.clinicaId, "fase8_motivo", ctx.teste))) return ctx.motivo;
+    const perguntas = m.perguntaMotivo();
+    const resultado = await perguntarJev(
+      { motivo: ctx.motivo, resumo: ctx.resumo ?? "", mensagem_atual: "" },
+      perguntas,
+      2500,
+    );
+    const categoria = resultado.ok ? m.decidirCategoria(resultado.respostas["categoria"]) : null;
+    await registrarDecisaoJev({
+      clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase8_motivo", teste: ctx.teste,
+      perguntas, resultado, aplicada: categoria !== null,
+    });
+    return m.motivoComCategoria(ctx.motivo, categoria);
+  } catch (e) {
+    console.warn("[nina-jev] fase 8 ignorada:", e instanceof Error ? e.message : e);
+    return ctx.motivo;
+  }
+}

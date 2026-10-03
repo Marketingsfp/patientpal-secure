@@ -46,7 +46,7 @@ export function ehFerramentaHandoff(nome: string | undefined | null) {
 }
 
 export async function executarHandoffTool(
-  ctx: { clinicaId: string; conversaId: string | null },
+  ctx: { clinicaId: string; conversaId: string | null; teste?: boolean },
   argumentosJson: string | undefined,
 ) {
   if (!ctx.conversaId) {
@@ -58,8 +58,12 @@ export async function executarHandoffTool(
   } catch {
     args = {};
   }
-  const motivo = String(args.motivo ?? "Paciente solicitou atendimento humano").slice(0, 500);
+  const motivoMaria = String(args.motivo ?? "Paciente solicitou atendimento humano").slice(0, 500);
   const resumo = args.resumo ? String(args.resumo).slice(0, 2000) : null;
+  // Jev Fase 8: categoria fixa como prefixo "[Rótulo]"; sem decisão = motivo da Maria.
+  const motivo = await (await import("./jev.server")).categorizarMotivoJev({
+    clinicaId: ctx.clinicaId, conversaId: ctx.conversaId, teste: ctx.teste === true, motivo: motivoMaria, resumo,
+  });
   const urgencia = ["baixa", "normal", "alta"].includes(String(args.urgencia))
     ? (String(args.urgencia) as "baixa" | "normal" | "alta")
     : "normal";
