@@ -178,3 +178,39 @@ export async function sugerirCadastroJev(
   await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase4_cadastro",
     teste, perguntas, resultado: registro, aplicada: false });
 }
+
+/**
+ * (Fase 6) Confere a resposta da Maria antes do envio. "refazer" = a Maria
+ * reescreve uma vez com a instrução; já corrigida e ainda com problema =
+ * "bloquear" (vai a mensagem segura). Erro/demora = "enviar" (fluxo atual).
+ */
+export async function conferirRespostaJev(ctx: {
+  clinicaId: string;
+  conversaId: string | null;
+  teste: boolean;
+  texto: string;
+  fatos: import("./jev-conferencia").FatosTurno;
+  jaCorrigida: boolean;
+}): Promise<{ acao: "enviar" } | { acao: "refazer"; instrucao: string } | { acao: "bloquear" }> {
+  try {
+    const c = await import("./jev-conferencia");
+    const perguntas = c.perguntasConferencia(ctx.fatos);
+    const resultado = await perguntarJev(c.estadoConferencia(ctx.texto, ctx.fatos), perguntas);
+    const problemas = resultado.ok ? c.problemasConferencia(resultado.respostas, ctx.fatos) : [];
+    const registro = resultado.ok
+      ? { ...resultado, respostas: { ...resultado.respostas,
+          _nina: { problemas, ja_corrigida: ctx.jaCorrigida,
+            agenda_consultada: ctx.fatos.agendaConsultada,
+            agendamento_confirmado: ctx.fatos.agendamentoConfirmado } as never } }
+      : resultado;
+    await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId,
+      fase: "fase6_conferencia", teste: ctx.teste, perguntas, resultado: registro,
+      aplicada: problemas.length > 0 });
+    if (problemas.length === 0) return { acao: "enviar" };
+    if (ctx.jaCorrigida) return { acao: "bloquear" };
+    return { acao: "refazer", instrucao: c.instrucaoCorrecao(problemas) };
+  } catch (e) {
+    console.warn("[nina-jev] conferência ignorada:", e instanceof Error ? e.message : e);
+    return { acao: "enviar" };
+  }
+}
