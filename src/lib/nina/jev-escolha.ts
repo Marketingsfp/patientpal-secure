@@ -68,17 +68,17 @@ export function perguntasEscolha(s: SituacaoEscolha): Record<string, PerguntaJev
 }
 
 /** Só aplica com certeza mínima; qualquer outra coisa = fluxo atual. */
-export function decisaoEscolha(respostas: Record<string, RespostaJev>, s: SituacaoEscolha): DecisaoEscolha {
+export function decisaoEscolha(respostas: Record<string, RespostaJev>, s: SituacaoEscolha, certeza: number = CERTEZA_MINIMA_ESCOLHA): DecisaoEscolha {
   if (s.tipo === "resumo") {
     const r = respostas.aceite;
     const p = r?.choice ? r.probabilities?.[r.choice] ?? r.confidence : undefined;
-    return r?.choice === "aceitou" && typeof p === "number" && p >= CERTEZA_MINIMA_ESCOLHA
+    return r?.choice === "aceitou" && typeof p === "number" && p >= certeza
       ? { tipo: "aceitou" } : { tipo: "nada" };
   }
   const r = respostas.horario;
   const m = /^opcao_(\d+)$/.exec(r?.choice ?? "");
   const p = r?.choice ? r.probabilities?.[r.choice] ?? r.confidence : undefined;
-  if (!m || typeof p !== "number" || p < CERTEZA_MINIMA_ESCOLHA) return { tipo: "nada" };
+  if (!m || typeof p !== "number" || p < certeza) return { tipo: "nada" };
   const vaga = s.opcoes.slice(0, MAX_OPCOES_JEV)[Number(m[1]) - 1];
   return vaga ? { tipo: "escolheu", vaga } : { tipo: "nada" };
 }

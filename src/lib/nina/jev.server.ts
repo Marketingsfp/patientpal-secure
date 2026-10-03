@@ -65,6 +65,18 @@ export async function jevAtivo(clinicaId: string | null, fase: FaseJev, teste: b
   return jevPermitido(teste, Boolean(data.ativo));
 }
 
+/** Etapa C: limites da clínica (padrão quando não há configuração ou em erro). */
+export async function limitesJev(clinicaId: string | null): Promise<import("./jev-limites").LimitesJev> {
+  const { normalizarLimites, LIMITES_JEV_PADRAO } = await import("./jev-limites");
+  if (!clinicaId) return LIMITES_JEV_PADRAO;
+  try {
+    const { data } = await supabaseAdmin.from("nina_jev_limites" as never).select("*").eq("clinica_id", clinicaId).maybeSingle();
+    return normalizarLimites(data as never);
+  } catch {
+    return LIMITES_JEV_PADRAO;
+  }
+}
+
 export async function perguntarJev(
   state: unknown,
   perguntas: Record<string, PerguntaJev>,
@@ -195,8 +207,11 @@ export async function conferirRespostaJev(ctx: {
   try {
     const c = await import("./jev-conferencia");
     const perguntas = c.perguntasConferencia(ctx.fatos);
-    const resultado = await perguntarJev(c.estadoConferencia(ctx.texto, ctx.fatos), perguntas);
-    const problemas = resultado.ok ? c.problemasConferencia(resultado.respostas, ctx.fatos) : [];
+    const [resultado, limites] = await Promise.all([
+      perguntarJev(c.estadoConferencia(ctx.texto, ctx.fatos), perguntas),
+      limitesJev(ctx.clinicaId),
+    ]);
+    const problemas = resultado.ok ? c.problemasConferencia(resultado.respostas, ctx.fatos, limites.conferencia) : [];
     const registro = resultado.ok
       ? { ...resultado, respostas: { ...resultado.respostas,
           _nina: { problemas, ja_corrigida: ctx.jaCorrigida,
@@ -232,8 +247,11 @@ export async function interpretarEscolhaJev(ctx: {
     if (!(await jevAtivo(ctx.clinicaId, "fase7_escolha", ctx.teste))) return { tipo: "nada" };
     const e = await import("./jev-escolha");
     const perguntas = e.perguntasEscolha(ctx.situacao);
-    const resultado = await perguntarJev(e.estadoEscolha(ctx.mensagem, ctx.ultimaMaria, ctx.situacao), perguntas);
-    const decisao = resultado.ok ? e.decisaoEscolha(resultado.respostas, ctx.situacao) : { tipo: "nada" as const };
+    const [resultado, limites] = await Promise.all([
+      perguntarJev(e.estadoEscolha(ctx.mensagem, ctx.ultimaMaria, ctx.situacao), perguntas),
+      limitesJev(ctx.clinicaId),
+    ]);
+    const decisao = resultado.ok ? e.decisaoEscolha(resultado.respostas, ctx.situacao, limites.escolha) : { tipo: "nada" as const };
     await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId,
       fase: "fase7_escolha", teste: ctx.teste, perguntas, resultado, aplicada: decisao.tipo !== "nada",
       contexto: { situacao: ctx.situacao.tipo, decisao: decisao.tipo,

@@ -52,10 +52,11 @@ export function perguntasConferencia(fatos: FatosTurno): Record<string, Pergunta
   return p;
 }
 
-const sim = (r: RespostaJev | undefined) => typeof r?.noul === "number" && r.noul >= LIMITE_CONFERENCIA;
+
 
 /** Problemas encontrados. Resposta ausente nunca vira problema (não bloqueia o envio). */
-export function problemasConferencia(respostas: Record<string, RespostaJev>, fatos: FatosTurno): ProblemaConferencia[] {
+export function problemasConferencia(respostas: Record<string, RespostaJev>, fatos: FatosTurno, limite: number = LIMITE_CONFERENCIA): ProblemaConferencia[] {
+  const sim = (r: RespostaJev | undefined) => typeof r?.noul === "number" && r.noul >= limite;
   const out: ProblemaConferencia[] = [];
   if (sim(respostas["afirma_vaga"]) && !fatos.agendaConsultada) out.push("vaga_sem_agenda");
   if (sim(respostas["afirma_agendado"]) && !fatos.agendamentoConfirmado) out.push("agendado_sem_confirmacao");
