@@ -2290,7 +2290,7 @@ async function gerarRespostaNinaInterno(
         break;
       }
       if (conferenciaJevAtiva && texto) {
-        const decisao = await conferirRespostaJev({
+        const decisao = await (await import("@/lib/nina/jev.server")).conferirRespostaJev({
           clinicaId,
           conversaId: estadoId.conversaId ?? null,
           teste: opcoes?.teste === true,
