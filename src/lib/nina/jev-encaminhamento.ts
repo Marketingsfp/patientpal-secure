@@ -94,16 +94,17 @@ const numero = (n: number) => n.toFixed(2).replace(".", ",");
 export function decidirEncaminhamento(
   respostas: Record<string, RespostaJev> | null,
   contagem: ContagemDuvida | null,
+  limites: { urgencia: number; pedido_atendente: number; irritacao: number } = LIMITES_ENCAMINHAMENTO,
 ): Encaminhamento | null {
   const p = (id: keyof typeof LIMITES_ENCAMINHAMENTO) => respostas?.[id]?.noul;
   const u = p("urgencia");
-  if (typeof u === "number" && u >= LIMITES_ENCAMINHAMENTO.urgencia)
+  if (typeof u === "number" && u >= limites.urgencia)
     return { motivo: `JEV_URGENCIA_CLINICA: possível urgência clínica (pontuação ${numero(u)})`, urgencia: "alta" };
   const a = p("pedido_atendente");
-  if (typeof a === "number" && a >= LIMITES_ENCAMINHAMENTO.pedido_atendente)
+  if (typeof a === "number" && a >= limites.pedido_atendente)
     return { motivo: `JEV_PEDIDO_ATENDENTE: paciente pediu atendente (pontuação ${numero(a)})`, urgencia: "normal" };
   const i = p("irritacao");
-  if (typeof i === "number" && i >= LIMITES_ENCAMINHAMENTO.irritacao)
+  if (typeof i === "number" && i >= limites.irritacao)
     return { motivo: `JEV_IRRITACAO: paciente insatisfeito (pontuação ${numero(i)})`, urgencia: "normal" };
   if (contagem && contagem.falhas >= FALHAS_PARA_ENCAMINHAR)
     return {

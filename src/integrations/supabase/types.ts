@@ -10935,6 +10935,47 @@ export type Database = {
         }
         Relationships: []
       }
+      nina_jev_limites: {
+        Row: {
+          clinica_id: string
+          conferencia: number | null
+          escolha: number | null
+          irritacao: number | null
+          pedido_atendente: number | null
+          updated_at: string
+          updated_by: string | null
+          urgencia: number | null
+        }
+        Insert: {
+          clinica_id: string
+          conferencia?: number | null
+          escolha?: number | null
+          irritacao?: number | null
+          pedido_atendente?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          urgencia?: number | null
+        }
+        Update: {
+          clinica_id?: string
+          conferencia?: number | null
+          escolha?: number | null
+          irritacao?: number | null
+          pedido_atendente?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          urgencia?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_jev_limites_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_kb_bases: {
         Row: {
           arquivo_hash: string | null

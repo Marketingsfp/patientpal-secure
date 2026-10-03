@@ -942,9 +942,10 @@ async function gerarRespostaNinaInterno(
       });
       const contextoJev = ctxJev.contextoAtendimentoJev(sessaoNina.estado);
       const conversaJev = estadoId.conversaId ?? null;
-      const [resultado, anterior] = await Promise.all([
+      const [resultado, anterior, limitesClinica] = await Promise.all([
         jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores, contextoJev), perguntas),
         jev.contagemAnteriorFase1(clinicaId, conversaJev, inicioCiclo),
+        jev.limitesJev(clinicaId),
       ]);
       const respostas = resultado.ok ? resultado.respostas : null;
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
@@ -964,7 +965,7 @@ async function gerarRespostaNinaInterno(
           })
         : null;
       if (f2 && respostas) {
-        jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem);
+        jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem, limitesClinica);
         jevPontuacoes = {
           confianca_intencao: respostas["intencao"]?.confidence ?? null,
           entendimento: respostas["entendimento"]?.noul ?? null,
