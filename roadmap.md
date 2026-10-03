@@ -25,3 +25,10 @@
 ## Atendimento
 - [x] Painel da TV: tempo médio de resposta das atendentes, mais antiga sem resposta e volume por hora — não publicado
 - [x] NFS-e — cTribNac por convênio nas notas de mensalidade/adesão do Cartão Benefício (não publicado)
+
+## Melhorias do Jev (plano 03/10/2026)
+- [x] Etapa A — conferência antes do envio (`nina_jev_fase6`, desligada)
+- [ ] Etapa B — entender o "sim" e a escolha de horário (aguarda aprovação da A)
+- [ ] Etapa C — painel de decisões e limites ajustáveis
+- [ ] Etapa D — motivo da transferência, filtro e prioridade na Central
+- [ ] Etapa E — remarcação e sinais de urgência (aguarda regras da clínica)
