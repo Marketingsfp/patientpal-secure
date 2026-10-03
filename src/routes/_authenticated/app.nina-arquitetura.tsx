@@ -14,7 +14,7 @@ import { Network } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
+import { CaminhoProducaoCanvas } from "@/components/nina/CaminhoProducaoCanvas";
 import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { InstrucoesNina } from "@/components/nina/InstrucoesNina";
 import { VisaoSimplesNina } from "@/components/nina/VisaoSimplesNina";
@@ -24,11 +24,7 @@ import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functi
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
 import { NODES_ARQUITETURA } from "@/lib/nina/arquitetura/manifesto";
 import { statusArquitetura } from "@/lib/nina/arquitetura/conferencia";
-import {
-  HISTORICO_ARQUITETURA,
-  comparacaoRecente,
-  destaquesDaComparacao,
-} from "@/lib/nina/arquitetura/versoes";
+import { HISTORICO_ARQUITETURA, comparacaoRecente } from "@/lib/nina/arquitetura/versoes";
 import { mudancaConfiguracaoPrompt } from "@/lib/nina/arquitetura/sync";
 import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
@@ -112,8 +108,6 @@ function Pagina() {
   const nivelAcesso = nivelAcessoDe(capacidades);
   const chavePosicoes = `nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`;
   const status = statusArquitetura(NODES_ARQUITETURA);
-  const comparacao = comparacaoRecente();
-  const marcasAlteracao = destaquesDaComparacao(comparacao);
   const sinal =
     status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
 
@@ -182,16 +176,11 @@ function Pagina() {
           <VisaoSimplesNina />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">O que a Nina pode fazer</CardTitle>
+              <CardTitle className="text-base">Caminho da mensagem em produção</CardTitle>
               <Badge variant="outline">Somente leitura</Badge>
             </CardHeader>
             <CardContent>
-              <ArquiteturaCanvas
-                chavePosicoes={chavePosicoes}
-                clinicaId={clinicaId}
-                nivelAcesso={nivelAcesso}
-                marcasAlteracao={marcasAlteracao}
-              />
+              <CaminhoProducaoCanvas clinicaId={clinicaId} nivelAcesso={nivelAcesso} />
             </CardContent>
           </Card>
 
