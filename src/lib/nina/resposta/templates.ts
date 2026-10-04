@@ -14,7 +14,6 @@
  * enviamos texto com `{algo}` cru para o paciente.
  */
 
-import { omitirNomeGenerico, profissionalGenerico } from "../regras-catalogo";
 import { removerEmojisNina } from "./sem-emojis";
 
 export const ESCOPO_TEMPLATES = "whatsapp" as const;
@@ -56,7 +55,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     chave: "fluxo.agendamento.revisar_ficha", categoria: "fluxo",
     descricao: "Resumo do atendimento por ficha, sem prometer hora da consulta.",
     variaveis: ["profissional", "procedimento", "data", "horario", "unidade"],
-    padrao: "Confira os dados do atendimento por ficha:\n\n*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário de comparecimento:* {horario}\n*Clínica:* {unidade}\n\nO atendimento segue a numeração das fichas. Chegue com 30 minutos de antecedência para realizar o check-in na Recepção Principal. O horário informado não é garantia da hora da consulta.\n\nVocê confirma esse agendamento?",
+    padrao: "Confira os dados do atendimento por ficha:\n\n*Atendimento:* {procedimento}\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário de comparecimento:* {horario}\n*Clínica:* {unidade}\n\nO atendimento segue a numeração das fichas. O horário informado não é garantia da hora da consulta.\n\nVocê confirma esse agendamento?",
   }),
   D({
     chave: "fluxo.agendamento.sem_pre_agendamento", categoria: "fluxo",
@@ -66,7 +65,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
   }),
   D({
     chave: "fluxo.agendamento.confirmado_pre_agendamento", categoria: "fluxo",
-    descricao: "Confirmação da reserva por ordem de chegada, sem exigir 30 minutos.",
+    descricao: "Confirmação da reserva por ordem de chegada.",
     variaveis: ["profissional", "data", "horario"],
     padrao: "Seu pré-agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário pré-agendado:* {horario}\n\nO atendimento é por ordem de chegada entre os pacientes daquele horário: quem chegar primeiro será atendido primeiro. O horário pré-agendado não garante o horário exato da consulta.",
   }),
@@ -74,13 +73,13 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     chave: "fluxo.agendamento.confirmado_ficha", categoria: "fluxo",
     descricao: "Confirmação por ficha calculada pela mesma fonte da Agenda.",
     variaveis: ["profissional", "data", "horario", "ficha"],
-    padrao: "Seu agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Sua ficha:* {ficha}\n*Horário de comparecimento:* {horario}\n\nO atendimento é por numeração, seguindo a ordem das fichas. Chegue com 30 minutos de antecedência para realizar o check-in na Recepção Principal. O horário informado não é garantia da hora da consulta.",
+    padrao: "Seu agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Sua ficha:* {ficha}\n*Horário de comparecimento:* {horario}\n\nO atendimento é por numeração, seguindo a ordem das fichas. O horário informado não é garantia da hora da consulta.",
   }),
   D({
     chave: "fluxo.agendamento.confirmado_ficha_pendente", categoria: "fluxo",
     descricao: "Reserva comprovada por ficha, quando a leitura da numeração falhou.",
     variaveis: ["profissional", "data", "horario"],
-    padrao: "Seu agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário de comparecimento:* {horario}\n\nO atendimento é por numeração de ficha. Não consegui consultar seu número neste momento; a recepção poderá informá-lo. Chegue com 30 minutos de antecedência para realizar o check-in na Recepção Principal. O horário informado não é garantia da hora da consulta.",
+    padrao: "Seu agendamento foi realizado!\n\n*Profissional:* {profissional}\n*Data:* {data}\n*Horário de comparecimento:* {horario}\n\nO atendimento é por numeração de ficha. Não consegui consultar seu número neste momento; a recepção poderá informá-lo. O horário informado não é garantia da hora da consulta.",
   }),
   ...(["pre_agendamento", "ficha"] as const).map((tipo) => D({
     chave: `fluxo.agendamento.despedida_${tipo}`, categoria: "fluxo",
@@ -156,7 +155,7 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     padrao:
       "Prontinho! Seu agendamento foi realizado com sucesso.\n\n" +
       "*Profissional:* {profissional}\n*Data:* {data}\n*Horário:* {horario}\n\n" +
-      "O atendimento será no horário marcado. Chegue com 30 minutos de antecedência para realizar o check-in na Recepção Principal e traga um documento com foto.",
+      "O atendimento será no horário marcado. Traga um documento com foto.",
   }),
   D({
     chave: "fluxo.agendamento.despedida",
@@ -288,27 +287,6 @@ export function validarTemplatePublicado(
 
 export type TextosTemplates = Record<string, string>;
 
-/** Remove o papel de profissional antes da interpolação, sem apagar o nome do exame. */
-function templateSemProfissional(texto: string, valores: Record<string, string>): string {
-  if (!profissionalGenerico(valores.profissional)) return texto;
-  return texto
-    .replace(/\*{0,2}(?:profissional|m[eé]dic[oa]|executante)\s*:?\*{0,2}\s*:?\s*\{profissional\}[\t ]*/gi, "")
-    .replace(/\s+com\s+(?:(?:o|a)\s+)?\{profissional\}/gi, "")
-    .replace(/\s+com esse profissional,?/gi, "")
-    .replace(/desse profissional/gi, "do atendimento")
-    .replace(/\{profissional\}/g, "")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
-/** Compatibilidade dos modelos salvos: altera só a antiga orientação de chegada. */
-function antecedenciaAtual(chave: string, texto: string): string {
-  if (!/^fluxo\.agendamento\.(?:revisar|revisar_ficha|confirmado|confirmado_ficha|confirmado_ficha_pendente)$/.test(chave)) return texto;
-  return texto.replace(
-    /\b(chegue|chegar)(\s+com)?\s+(?:15|quinze)(\s+minutos\s+(?:de\s+anteced[eê]ncia|antes))/giu,
-    "$1$2 30$3",
-  );
-}
-
 /**
  * Resolve o texto de uma chave: template publicado quando válido, senão o
  * padrão do código. Nunca devolve texto com variável não substituída.
@@ -319,7 +297,7 @@ export function textoDaChave(
   publicados?: TextosTemplates | null,
 ): { texto: string; origemTemplate: "publicado" | "padrao"; motivo: string | null } {
   const resultado = resolverTextoDaChave(chave, valores, publicados);
-  resultado.texto = antecedenciaAtual(chave, removerEmojisNina(omitirNomeGenerico(resultado.texto)));
+  resultado.texto = removerEmojisNina(resultado.texto);
   if (!CHAVES_CONFIRMACAO_AGENDAMENTO.has(chave) || !resultado.texto) return resultado;
   // Inclui o atendimento também nos templates já publicados, preservando
   // suas orientações e despedida. Não exige republicar textos no banco.
@@ -330,7 +308,7 @@ export function textoDaChave(
   const despedida = acrescentarDespedidaAgendamento(resultado.texto, valores.unidade, publicados, modalidade);
   return {
     ...despedida,
-    texto: antecedenciaAtual(chave, despedida.texto),
+    texto: despedida.texto,
     origemTemplate:
       resultado.origemTemplate === "publicado" || despedida.origemTemplate === "publicado"
         ? "publicado"
@@ -374,7 +352,7 @@ function resolverTextoDaChave(
   if (publicado) {
     const v = validarTemplatePublicado(chave, publicado);
     if (v.ok) {
-      const r = renderizarTemplate(templateSemProfissional(publicado, valores), valores);
+      const r = renderizarTemplate(publicado, valores);
       if (r.ok) return { texto: r.texto, origemTemplate: "publicado", motivo: null };
       return {
         texto: renderizarPadrao(def, valores),
@@ -388,6 +366,6 @@ function resolverTextoDaChave(
 }
 
 function renderizarPadrao(def: DefinicaoTemplate, valores: Record<string, string>): string {
-  const r = renderizarTemplate(templateSemProfissional(def.padrao, valores), valores);
+  const r = renderizarTemplate(def.padrao, valores);
   return r.ok ? r.texto : def.padrao.replace(/\{([a-z_]+)\}/gi, "-");
 }

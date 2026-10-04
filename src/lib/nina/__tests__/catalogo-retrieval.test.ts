@@ -714,7 +714,7 @@ describe("recuperação no catálogo publicado", () => {
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "endoscopia" });
     const notas = r.notes.join(" | ");
     expect(notas).toContain("à vista — PIX");
-    expect(notas).toContain("em até 3x — Pix/cartão");
+    expect(notas).toContain("em até 3x — Cartão");
     expect(notas).toContain("Requisitos: Necessário pedido médico");
     expect(notas).toContain("Preparo: Jejum de 8 horas");
   });
@@ -899,13 +899,13 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     expect(r.esclarecimento?.pergunta).toContain("Não consegui identificar com segurança");
     expect(r.esclarecimento?.pergunta).not.toContain("Não encontrei");
   });
-  it("a lista corretiva não expõe nomes genéricos e não elimina opções pelo dia", async () => {
+  it("a lista devolve os nomes cadastrados ao modelo e não elimina opções pelo dia", async () => {
     banco.profissionais = [
       profissional({ nome: "Enfermagem", especialidades: [{ nome: "Dermatologia" }] }),
       profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }], horarios: [{ dia: "Sábado" }] }),
     ];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Dermatologia", medico: "Suellen", dia: "segunda" });
-    expect(r.esclarecimento?.opcoes.map(o => o.nome)).toEqual(["Dra. Shirley Martins"]);
+    expect(r.esclarecimento?.opcoes.map(o => o.nome).sort()).toEqual(["Dra. Shirley Martins", "Enfermagem"]);
   });
   it("confirma nome aproximado e diferencia homônimos com os dados do cadastro", async () => {
     banco.profissionais = [

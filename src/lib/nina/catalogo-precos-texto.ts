@@ -10,7 +10,7 @@ const norm = (v: string) =>
     .replace(/\s+/g, " ")
     .trim();
 const forma = (v: string) =>
-  /dinheiro/i.test(v) ? "dinheiro" : /pix|cart[aã]o/i.test(v) ? "cartao" : null;
+  /dinheiro/i.test(v) ? "dinheiro" : /pix/i.test(v) && /cart[aã]o/i.test(v) ? "pix_cartao" : /pix/i.test(v) ? "pix" : /cart[aã]o/i.test(v) ? "cartao" : null;
 
 /** Sincroniza somente linhas de preços rotuladas, sem substituir números na prosa clínica. */
 export function sincronizarPrecosPublicados(
@@ -43,19 +43,24 @@ export function sincronizarPrecosPublicados(
     .map((bloco, index) => {
       const item = itens[index]!;
       const alvo = norm(tipo === "profissional" ? item.atendimento : (item.profissional ?? ""));
-      for (const grupo of ["dinheiro", "cartao"] as const) {
+      for (const grupo of ["dinheiro", "cartao", "pix", "pix_cartao"] as const) {
         const candidatas = (depois.formas_pagamento ?? []).filter(
           (p: any) => forma(p.forma) === grupo,
         );
+        const anteriores = (antes.formas_pagamento ?? []).filter(
+          (p: any) => forma(p.forma) === grupo,
+        );
+        // Mudar dinheiro não reinterpreta uma linha antiga de Pix/cartão.
+        if (JSON.stringify(anteriores) === JSON.stringify(candidatas)) continue;
         let aplicaveis = candidatas.filter(
           (p: any) =>
             !p.condicao || p.condicao.split(/[,;\n]/).some((c: string) => norm(c) === alvo),
         );
         if (itens.length === 1) aplicaveis = candidatas;
         const valores = [...new Set(aplicaveis.map((p: any) => p.valor))];
-        const rotulo = grupo === "dinheiro" ? "Dinheiro" : "Pix/cartão";
+        const rotulo = { dinheiro: "Dinheiro", cartao: "Cartão", pix: "Pix", pix_cartao: "Pix/cartão" }[grupo];
         const regex =
-          grupo === "dinheiro" ? /^Dinheiro\s*:.*$/im : /^(?:Pix\s*\/\s*)?Cart[aã]o\s*:.*$/im;
+          grupo === "dinheiro" ? /^Dinheiro\s*:.*$/im : grupo === "pix" ? /^Pix\s*:.*$/im : grupo === "pix_cartao" ? /^Pix\s*\/\s*Cart[aã]o\s*:.*$/im : /^Cart[aã]o\s*:.*$/im;
         if (!valores.length && !regex.test(bloco)) continue;
         if (valores.length !== 1)
           throw new Error(

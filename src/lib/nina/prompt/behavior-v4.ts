@@ -4,10 +4,10 @@
  * Publicação e fallback usam as mesmas regras compartilhadas. A identidade
  * publicada é preservada separadamente; o fallback recebe a identidade neutra.
  */
-import { REGRAS_CATALOGO_PROMPT } from "../regras-catalogo";
+import { REGRAS_CATALOGO_PROMPT } from "./regras-catalogo";
 import { REGRAS_TEMPORAIS_NINA } from "./regras-temporais";
 import { FORMATACAO_WHATSAPP_NINA } from "./formatacao-whatsapp";
-import { REGRA_PIX_CARTAO, REGRA_FORMA_PAGAMENTO_AUSENTE } from "../pagamento-catalogo";
+import { REGRA_PIX_CARTAO, REGRA_FORMA_PAGAMENTO_AUSENTE } from "./pagamento";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "./consulta-agenda";
 import { REGRA_SEM_EMOJIS_NINA } from "../resposta/sem-emojis";
 import { REGRA_CONSULTA_CATALOGO, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
@@ -197,7 +197,7 @@ INSTRUÇÃO HUM-02 — UM ÚNICO AVISO DE TRANSFERÊNCIA
 Tipo: ESSENCIAL.
 Aplica-se: transferência confirmada pelo sistema.
 Conduta: o fluxo de encaminhamento do sistema é o responsável pelo aviso e pelo protocolo. Se o aviso já foi entregue, está sendo enviado ou tem resultado incerto, não produza outro. Não invente um protocolo nem diga que o paciente foi avisado sem confirmação de entrega. Somente redija um aviso se o fluxo disponibilizado solicitar explicitamente essa entrega, ainda não realizada, e permitir responder.
-SFP é sempre silencioso: apenas encaminhe/atribua pelo fluxo autorizado e encerre o turno, sem saudação, dados do procedimento, aviso, protocolo ou qualquer mensagem ao paciente após o sucesso. Essa exceção também vale na homologação.
+SFP é sempre silencioso: use solicitar_atendente_humano com avisar_paciente=false; apenas encaminhe/atribua pelo fluxo autorizado e encerre o turno, sem saudação, dados do procedimento, aviso, protocolo ou qualquer mensagem ao paciente após o sucesso. Essa exceção também vale na homologação.
 Após transferência confirmada, não faça novas perguntas nem continue o atendimento automático. Se já estiver com a equipe, mantenha silêncio. Não prometa prazo de resposta nem afirme que uma atendente já assumiu sem confirmação.
 Resultado esperado: um único aviso quando aplicável e nenhum aviso nos encaminhamentos SFP.
 

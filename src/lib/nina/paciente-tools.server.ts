@@ -32,7 +32,6 @@ import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
 import { diaDaSemanaISO } from "./horario-oficial";
 import { atendimentoExigeHumano } from "./regras-catalogo.server";
-import { MOTIVO_SFP } from "./regras-catalogo";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
@@ -42,7 +41,6 @@ import { agendasDoProcedimento, resolverProcedimentoOperacional, VinculoProcedim
 import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 import { pedidoConsultaComPreventivo } from "./atendimento-consulta";
-import { profissionalGenerico, profissionalSfp } from "./regras-catalogo";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
@@ -71,7 +69,7 @@ import {
 
 /** Códigos de erro estáveis — a Nina usa para decidir como continuar a conversa. */
 export type CodigoErroNina =
-  | "PROFISSIONAL_SFP"
+  | "CATALOGO_ATENDIMENTO_HUMANO"
   | "PATIENT_NOT_FOUND"
   | "PATIENT_NOT_VERIFIED"
   | "PATIENT_DATA_MISMATCH"
@@ -745,7 +743,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "buscar_procedimentos",
       description:
-      "Busca exames/procedimentos cadastrados: valores com suas formas de pagamento específicas e preparo. Pix tem sempre o mesmo valor do cartão: informe juntos como Pix/cartão. Dinheiro fica separado. Use sempre que perguntarem preço ou preparo.",
+      "Busca exames/procedimentos cadastrados: valores com suas formas de pagamento específicas e preparo. Use sempre que perguntarem preço ou preparo.",
       parameters: {
         type: "object",
         properties: {
@@ -1079,7 +1077,7 @@ async function orientarSemPreAgendamento(ctx: CtxNinaPaciente, profissional: str
   }
   return { ok: true, modalidade_atendimento: "chegada_sem_pre_agendamento",
     consulta_realizada: false, sem_agendamento: true, orientacao_atendimento: texto,
-    instrucao: "Não selecione horário, não colete cadastro para reserva e não agende. Não peça 30 minutos de antecedência. Oriente o comparecimento nos dias e períodos publicados desse profissional." };
+    instrucao: "Não selecione horário, não colete cadastro para reserva e não agende. Oriente o comparecimento nos dias e períodos publicados desse profissional." };
 }
 
 const modalidadePendente = () => falha("MODALIDADE_NAO_DEFINIDA",
@@ -1165,8 +1163,8 @@ async function executarFerramentaInterna(
       const procedimento = String(pedido?.nome ?? procedimentoEscolhido ?? args.procedimento ?? ctx.estado?.appointment.procedure ?? selecao?.modalidade?.procedimento ?? "");
       if ((medico || procedimento) && await atendimentoExigeHumano({ clinicaId: ctx.clinicaId,
         medico, procedimento, referencias: pedido ? [pedido.catalogo_id] : selecao?.raizesFonte.map(r => r.registro) })) {
-        return falha("PROFISSIONAL_SFP", MOTIVO_SFP, {
-          codigo: "PROFISSIONAL_SFP", consulta_realizada: false, atendimento_humano_obrigatorio: true,
+        return falha("CATALOGO_ATENDIMENTO_HUMANO", "O cadastro exige atendimento humano para este item.", {
+          codigo: "CATALOGO_ATENDIMENTO_HUMANO", consulta_realizada: false, atendimento_humano_obrigatorio: true,
         });
       }
       return null;
@@ -1214,11 +1212,11 @@ async function executarFerramentaInterna(
             catalogo_id: candidatos[0]!.registro.id!, nome: candidatos[0]!.registro.procedimento!, tipo_atendimento: "exame_procedimento" };
         if (!candidatos.length) return falha("PROCEDURE_NOT_FOUND",
           "Não encontrei esse atendimento publicado. Encaminhe para a equipe humana.", { encaminhar_para_humano: true });
-        // SFP, vínculo ausente e consulta com erro não equivalem a agenda vazia.
+        // Restrição explícita, vínculo ausente e consulta com erro não equivalem a agenda vazia.
         for (const c of candidatos) {
           if (await atendimentoExigeHumano({ clinicaId: ctx.clinicaId, medico: c.medicoId ?? c.medicoNome,
             procedimento: c.registro.procedimento, referencias: c.registro.id ? [c.registro.id] : [] }))
-            return falha("PROFISSIONAL_SFP", MOTIVO_SFP, { atendimento_humano_obrigatorio: true });
+            return falha("CATALOGO_ATENDIMENTO_HUMANO", "O cadastro exige atendimento humano para este item.", { atendimento_humano_obrigatorio: true });
           if (!c.medicoId && p.tipo === "procedimento") return { ...falhaVinculoAtendimento(), comparacao_completa: false };
           if (!c.medicoId) return falha("DOCTOR_NOT_FOUND",
             "Não foi possível resolver todos os vínculos com a agenda. A equipe deve conferir antes de afirmar qual é o primeiro disponível.",
@@ -1453,8 +1451,7 @@ async function executarFerramentaInterna(
           const candidatos = p.nome ? todos.filter(c => escolhido?.ok ? c.medicoId === escolhido.id
             : normalizar(c.medicoNome) === normalizar(p.nome!)) : todos;
           if (!candidatos.length) {
-            const publicos = todos.filter(c => c.medicoNome.trim() &&
-              !profissionalGenerico(c.medicoNome) && !profissionalSfp(c.medicoNome));
+            const publicos = todos.filter(c => c.medicoNome.trim());
             if (!publicos.length) return falhaVinculoAtendimento();
             const esclarecimento = { tipo: "profissional" as const, motivo: "medico_nao_identificado" as const,
               atendimento: pedido.nome,

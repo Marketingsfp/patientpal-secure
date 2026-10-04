@@ -21,7 +21,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ambienteDoHandoff, vinculoProtocolo } from "./protocolo-handoff";
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 import { nomeContato } from "./rotulo-conversa";
-import { motivoProfissionalSfp } from "@/lib/nina/regras-catalogo";
+import { handoffSemAviso } from "@/lib/nina/handoff-silencioso";
 import type { StatusEnvioHandoff, TransporteHandoff } from "./handoff-auditoria";
 import type {
   AmbienteAviso,
@@ -38,6 +38,7 @@ type LinhaConversa = {
   protocolo_sessao_id: string | null;
   handoff_em: string | null;
   handoff_motivo: string | null;
+  handoff_resumo: unknown;
   contato_telefone: string | null;
   contato_nome: string | null;
   whatsapp_profile_name: string | null;
@@ -55,7 +56,7 @@ async function lerConversa(clinicaId: string, conversaId: string) {
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "protocolo_atendimento, protocolo_sessao_id, handoff_em, handoff_motivo, contato_telefone, contato_nome, whatsapp_profile_name, departamento_id, is_teste, nina_fluxo_estado",
+      "protocolo_atendimento, protocolo_sessao_id, handoff_em, handoff_motivo, handoff_resumo, contato_telefone, contato_nome, whatsapp_profile_name, departamento_id, is_teste, nina_fluxo_estado",
     )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
@@ -382,8 +383,8 @@ export async function prepararAvisoHandoff(args: {
 }): Promise<AvisoPreparado | null> {
   const conv = await lerConversa(args.clinicaId, args.conversaId);
   if (!conv) return null;
-  // Vale também para atribuição posterior e retry: SFP nunca gera aviso ao paciente.
-  if (motivoProfissionalSfp(conv.handoff_motivo ?? "")) return null;
+  // Atribuição posterior e retry preservam a opção explícita deste ciclo.
+  if (handoffSemAviso(conv.handoff_resumo, conv.handoff_motivo ?? "")) return null;
   const setor = await nomeDepartamento(args.clinicaId, conv.departamento_id);
   const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
   // O texto de transferência usa a MESMA identidade publicada do atendimento;

@@ -3,8 +3,8 @@ import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
-import { dadosPublicosCatalogo, resultadoExigeHumano, MOTIVO_SFP,
-  respostaEncaminhamentoSfp, resultadoEncaminhamentoSfp, omitirNomeGenerico } from "@/lib/nina/regras-catalogo";
+import { resultadoExigeHumano } from "@/lib/nina/regras-catalogo";
+import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 
 import { normalizar } from "@/lib/nina-especialidade";
 
@@ -1380,20 +1380,6 @@ async function gerarRespostaNinaInterno(
     motivo: "Preservar Clínico Geral e separar a consulta da escolha do profissional nas pesquisas.",
     texto: REGRA_IDENTIDADE_ATENDIMENTO,
   });
-  const { REGRA_PIX_ANTECIPADO } = await import("@/lib/nina/pagamento-catalogo");
-  instrucoesAdicionaisTurno.push({
-    codigo: "INFORMAR_PIX_ANTECIPADO",
-    origem: "src/lib/nina/pagamento-catalogo.ts",
-    motivo: "Informar a condição obrigatória do Pix junto aos valores, sem estendê-la ao cartão.",
-    texto: REGRA_PIX_ANTECIPADO,
-  });
-  const { REGRA_ANTECEDENCIA_CHEGADA } = await import("@/lib/nina/modalidade-atendimento");
-  instrucoesAdicionaisTurno.push({
-    codigo: "ANTECEDENCIA_CHEGADA_30_MINUTOS",
-    origem: "src/lib/nina/modalidade-atendimento.ts",
-    motivo: "Atualizar a antecedência de chegada para hora marcada e ficha, preservando as demais modalidades.",
-    texto: REGRA_ANTECEDENCIA_CHEGADA,
-  });
   // O motor antigo não impõe pendências aos novos turnos.
   fluxoEstado.clarification = undefined;
   const precedenciaTurno = resolverPrecedenciaDoTurno({
@@ -1887,9 +1873,9 @@ async function gerarRespostaNinaInterno(
       }
     }
     const argumentos = ausencia ?? {
-      motivo: MOTIVO_SFP,
+      motivo: "CATALOGO_ATENDIMENTO_HUMANO",
       resumo:
-        "O atendimento solicitado está publicado com profissional SFP. A equipe humana deve continuar o atendimento.",
+        "O cadastro exige atendimento humano para este item. A equipe deve continuar o atendimento.",
       urgencia: "normal",
     };
     const origem =
@@ -1897,7 +1883,7 @@ async function gerarRespostaNinaInterno(
         ? "regra_catalogo_limite_esclarecimento"
         : ausencia
           ? "regra_catalogo_sem_registro"
-          : "regra_catalogo_sfp";
+          : "regra_catalogo_humano";
     rastro?.iniciar("tool.execute", {
       ferramenta: "solicitar_atendente_humano",
       origem_solicitacao: origem,
@@ -1910,7 +1896,7 @@ async function gerarRespostaNinaInterno(
     limparEscolhaAgendamento(fluxoEstado);
     fluxoEstado.appointment.slot_options = null;
     fluxoEstado.flow.stage = "HANDOFF";
-    finalizacaoHandoff = { texto: ausencia ? respostaSemRegistro(confirmado, opcoes?.teste === true) : respostaEncaminhamentoSfp(confirmado), textoModelo: textoModeloAtual,
+    finalizacaoHandoff = { texto: respostaSemRegistro(confirmado, opcoes?.teste === true), textoModelo: textoModeloAtual,
       handoffConfirmado: confirmado, motivo: argumentos.motivo };
     registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento obrigatório pelo catálogo",
       dados: { origem_solicitacao: "servidor", motivo: argumentos.motivo, ferramenta_origem: ferramentaOrigem,
@@ -1951,14 +1937,23 @@ async function gerarRespostaNinaInterno(
     });
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
-    const payload = dadosPublicosCatalogo(respostaParaModelo(r));
+    const payload = respostaParaModelo(r);
     // Pesquisa bloqueada não apaga o atendimento já identificado. O modelo
     // precisa dessa referência para reformular a chamada no mesmo turno.
     if ((r.dados as { codigo?: string } | null)?.codigo === "CATALOGO_QUERY_NAO_INTERPRETADA")
       return limitarRetornoParaModelo(payload);
+    if (r.capacidade === "requestHumanHandoff" && (!r.success || r.erro)) {
+      // Uma transferência que falhou não autoriza executar o restante do lote.
+      finalizacaoHandoff = {
+        texto: respostaSemRegistro(false, opcoes?.teste === true),
+        textoModelo: textoModeloAtual,
+        handoffConfirmado: false,
+        motivo: "HANDOFF_FALHOU",
+      };
+    }
     if (
       r.capacidade === "requestHumanHandoff" &&
-      r.success &&
+      r.success && !r.erro &&
       (r.dados as { sem_mensagem_paciente?: boolean } | null)?.sem_mensagem_paciente === true
     ) {
       houveHandoff = true;
@@ -1970,11 +1965,11 @@ async function gerarRespostaNinaInterno(
         texto: "",
         textoModelo: textoModeloAtual,
         handoffConfirmado: true,
-        motivo: MOTIVO_SFP,
+        motivo: "HANDOFF_SILENCIOSO",
       };
     }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
-      if (r.erro === "PROFISSIONAL_SFP") await encaminharRegraCatalogo(nome);
+      if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") await encaminharRegraCatalogo(nome);
       return limitarRetornoParaModelo(payload);
     }
     const esclarecimentoAtual = (
@@ -2427,7 +2422,7 @@ async function gerarRespostaNinaInterno(
       }
       if (r.success && !r.erro) rastro?.concluir("tool.execute", { ferramenta: nome });
       else rastro?.falhar("tool.execute", r.erro ?? "falha na ferramenta", { ferramenta: nome });
-      if (r.capacidade === "requestHumanHandoff" && r.success) houveHandoff = true;
+      if (r.capacidade === "requestHumanHandoff" && r.success && !r.erro) houveHandoff = true;
       if (r.appointment_confirmed) {
         agendamentoConfirmado = reservaDaSessaoAtual(fluxoEstado);
       }
@@ -2687,8 +2682,10 @@ async function gerarRespostaNinaInterno(
     const antes = respostaDoModelo;
     resposta = finalizacaoHandoff.texto;
     transformar(
-      finalizacaoHandoff.motivo === MOTIVO_SFP
-        ? "catalogo.sfp"
+      finalizacaoHandoff.motivo === "HANDOFF_SILENCIOSO"
+        ? "handoff.silencioso"
+        : finalizacaoHandoff.motivo === "HANDOFF_FALHOU"
+          ? "handoff.falha"
         : [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(finalizacaoHandoff.motivo)
           ? "catalogo.limite_esclarecimento"
           : [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO].includes(finalizacaoHandoff.motivo)
@@ -2705,19 +2702,19 @@ async function gerarRespostaNinaInterno(
       "codigo",
       `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`,
     );
-    if (finalizacaoHandoff.motivo === MOTIVO_SFP && finalizacaoHandoff.handoffConfirmado) {
+    if (finalizacaoHandoff.motivo === "HANDOFF_SILENCIOSO" && finalizacaoHandoff.handoffConfirmado) {
       // Não deixar o fallback de texto vazio, o rodapé ou o transporte recriar
       // uma mensagem depois da atribuição silenciosa solicitada pela clínica.
-      if (opcoes?.auditoria) opcoes.auditoria.resultado = resultadoEncaminhamentoSfp(true);
-      marcarOrigem("nenhuma", "profissional SFP: encaminhamento silencioso confirmado");
+      if (opcoes?.auditoria) opcoes.auditoria.resultado = resultadoHandoffSilencioso();
+      marcarOrigem("nenhuma", "encaminhamento solicitado sem aviso: encaminhamento silencioso confirmado");
       registrarEtapa({ tipo: "mensagem_final", fonte: "sistema",
-        titulo: "Encaminhamento SFP sem mensagem ao paciente",
+        titulo: "Encaminhamento sem mensagem ao paciente",
         dados: { texto: "", handoff_confirmado: true, sem_mensagem_paciente: true },
         codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" } });
       const { fecharAuditoriaInstrucoesDoTurno } = await import("@/lib/nina/rastreio/turno.server");
       fecharAuditoriaInstrucoesDoTurno({ textoEntregue: "" });
       rastro?.concluir("response.validate", { handoff: true, sem_mensagem_paciente: true });
-      rastro?.pular("message.outbound", "profissional SFP: apenas encaminhar para a equipe");
+      rastro?.pular("message.outbound", "encaminhamento solicitado sem aviso: apenas encaminhar para a equipe");
       return "";
     }
   }
@@ -2730,13 +2727,6 @@ async function gerarRespostaNinaInterno(
       : resumoEscolha.acoesConcluidas.length ? "confirmação da reserva comprovada com a modalidade oficial"
       : "orientação da modalidade sem reserva individual");
     if (opcoes?.auditoria) opcoes.auditoria.resultado = resumoEscolha;
-  }
-
-  const semNomeGenerico = omitirNomeGenerico(resposta);
-  if (semNomeGenerico !== resposta) {
-    transformar("catalogo.nome_profissional", "omitir cargo, equipe ou setor usado como nome do profissional", resposta, semNomeGenerico);
-    resposta = semNomeGenerico;
-    if (resumoEscolha) resumoEscolha.texto = resposta;
   }
 
   // MENSAGEM ÚNICA DE ENCAMINHAMENTO (25/09/2026, sessão 470): o módulo de

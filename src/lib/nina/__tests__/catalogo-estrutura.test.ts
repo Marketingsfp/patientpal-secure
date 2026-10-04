@@ -10,7 +10,7 @@ import {
   pagamentosJaDescritos,
 } from "../catalogo-estrutura";
 import { servicoParaRegistro, profissionalParaRegistro } from "../catalogo-conhecimento";
-import { profissionalSfp, registroExigeHumano } from "../regras-catalogo";
+import { registroExigeHumano } from "../regras-catalogo";
 
 const adulto =
   "CONSULTA CARDIOLOGIA | Especialidade: CARDIOLOGIA | Profissional: Alex Louza | Dias e horários: Quarta 13h | Idade/critério informado: a partir de 15 anos | Dinheiro: R$ 120,00 | Pix/cartão: R$ 145,00 | Observação: Agendado | Pode chegar até que horas: Manhã e tarde";
@@ -119,12 +119,9 @@ describe("organização conservadora do catálogo", () => {
       false,
     );
   });
-  it("SFP e variante legada acionam o mesmo encaminhamento", () => {
-    expect(profissionalSfp("SPF")).toBe(true);
-    expect(profissionalSfp("SFP")).toBe(true);
-    expect(profissionalSfp("Dr. SPF Silva")).toBe(false);
+  it("preserva o nome da fonte e só encaminha pela restrição explícita", () => {
     expect(organizarTextoCatalogo("Profissional: SPF | R$ 120,00")).toBe(
-      "Profissional: SFP\nR$ 120,00",
+      "Profissional: SPF\nR$ 120,00",
     );
     const registro = servicoParaRegistro({
       id: "1",

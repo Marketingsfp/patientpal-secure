@@ -119,7 +119,7 @@ const pergunta = clinicoGeral ? `Quero clínico geral com ${medicoClinico} na pr
     : cenario.endsWith("procedimento") ? "Vocês fazem o procedimento crioablação?"
     : "Gostaria de marca a pneumologista"
   : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
-const nomeProfissional = cenario === "catalogo_enfermagem" ? "Enfermagem"
+const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"
   : cenario === "catalogo_equipe_enfermagem" ? "Equipe de Enfermagem"
   : regraCatalogo ? "Técnica" : "Dra. Ana Souza";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + nomeProfissional + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
@@ -367,16 +367,17 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       };
     }
     if (nome === "solicitar_atendente_humano" && (agenda || regraCatalogo)) {
-      encaminhamentos.push(typeof args === "string" ? JSON.parse(args) : args);
+      const pedido = (typeof args === "string" ? JSON.parse(args) : args) as Record<string, unknown>;
+      encaminhamentos.push(pedido);
       return { ferramenta: nome, capacidade: "requestHumanHandoff", fonte: "atendimento",
         success: !cenario.endsWith("falha_handoff"), reused: false, appointment_confirmed: false,
-        dados: { ok: !cenario.endsWith("falha_handoff"), sem_mensagem_paciente: sfp && !cenario.endsWith("falha_handoff") },
+        dados: { ok: !cenario.endsWith("falha_handoff"), sem_mensagem_paciente: pedido.avisar_paciente === false && !cenario.endsWith("falha_handoff") },
         ...(cenario.endsWith("falha_handoff") ? { erro: "INTERNAL_ERROR" } : {}) };
     }
     if (nome === "consultar_disponibilidade" && cenario === "catalogo_sfp_recusa_agenda_modelo") return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
-      reused: false, appointment_confirmed: false, erro: "PROFISSIONAL_SFP",
-      dados: { ok: false, erro: "PROFISSIONAL_SFP", atendimento_humano_obrigatorio: true },
+      reused: false, appointment_confirmed: false, erro: "CATALOGO_ATENDIMENTO_HUMANO",
+      dados: { ok: false, erro: "CATALOGO_ATENDIMENTO_HUMANO", atendimento_humano_obrigatorio: true },
     };
     if (nome === "agendar" && modoConfirmacao) return {
       ferramenta: nome, capacidade: "createAppointment", fonte: "agenda", success: true,
@@ -511,13 +512,13 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
       { id: "nao-agendar-ausente", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
   };
-  if (cenario === "catalogo_sfp_handoff_modelo" || cenario === "catalogo_sfp_recusa_agenda_modelo") return {
+  if (cenario.startsWith("catalogo_sfp_handoff_modelo") || cenario === "catalogo_sfp_recusa_agenda_modelo") return {
     ok: true, conteudo: "Boa noite! Anestesia da Videohisteroscopia: R$ 1.100,00. Nesta simulação, nenhuma transferência real foi realizada.",
     modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     toolCalls: [
       { id: "encaminhar-sfp", type: "function", function: {
-        name: cenario === "catalogo_sfp_handoff_modelo" ? "solicitar_atendente_humano" : "consultar_disponibilidade",
-        arguments: JSON.stringify({ motivo: "Profissional SFP exige atendimento humano para o procedimento de Anestesia da Videohisteroscopia", resumo: "Paciente pediu informações sobre a anestesia." }),
+        name: cenario.startsWith("catalogo_sfp_handoff_modelo") ? "solicitar_atendente_humano" : "consultar_disponibilidade",
+        arguments: JSON.stringify({ motivo: "Profissional SFP exige atendimento humano para o procedimento de Anestesia da Videohisteroscopia", resumo: "Paciente pediu informações sobre a anestesia.", avisar_paciente: false }),
       } },
       { id: "nao-agendar-sfp", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],

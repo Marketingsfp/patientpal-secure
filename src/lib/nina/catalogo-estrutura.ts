@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { interpretarModalidade } from "./modalidade-atendimento";
-import { REGRA_APRESENTACAO_VALORES } from "./pagamento-catalogo";
 import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
 
 const texto = z.string().trim().max(4000).nullable().optional();
@@ -74,7 +73,6 @@ export function lerEstrutura(v: unknown): EstruturaCatalogo {
   return r.success ? r.data : estruturaVazia();
 }
 
-export const padronizarSfp = (s: string) => s.replace(/\bSPF\b/gi, "SFP");
 const normal = (v: string) =>
   v
     .normalize("NFD")
@@ -85,7 +83,7 @@ const normal = (v: string) =>
 
 /** Alteração editorial: preserva palavras, números, critérios e ordem dos blocos. */
 export function organizarTextoCatalogo(v: string): string {
-  return padronizarSfp(v)
+  return v
     .replace(/[ \t]+\|[ \t]+/g, "\n")
     .trim();
 }
@@ -103,6 +101,8 @@ export type AtendimentoPublicado = {
   modalidade: ReturnType<typeof interpretarModalidade>;
   dinheiro: string | null;
   pix_cartao: string | null;
+  cartao?: string | null;
+  pix?: string | null;
   observacoes: string | null;
   outros: string[];
   complemento?: ComplementoAtendimento;
@@ -132,6 +132,7 @@ export function separarAtendimentos(
       "dinheiro",
       "pix/cartao",
       "cartao",
+      "pix",
       "observacao",
       "pode chegar ate que horas",
     ];
@@ -159,7 +160,9 @@ export function separarAtendimentos(
       unidade_idade: idade ? (/^a/i.test(idade[2]!) ? "anos" : "meses") : null,
       modalidade: interpretarModalidade(obs),
       dinheiro: campos.get("dinheiro") || null,
-      pix_cartao: campos.get("pix/cartao") || campos.get("cartao") || null,
+      pix_cartao: campos.get("pix/cartao") || null,
+      cartao: campos.get("cartao") || null,
+      pix: campos.get("pix") || null,
       observacoes: obs,
       outros,
     });
@@ -238,6 +241,8 @@ export function textoAtendimentos(itens: AtendimentoPublicado[]): string {
         a.criterio_publicado && `Critério publicado: ${a.criterio_publicado}`,
         a.dinheiro && `Dinheiro: ${a.dinheiro}`,
         a.pix_cartao && `Pix/cartão: ${a.pix_cartao}`,
+        a.cartao && `Cartão: ${a.cartao}`,
+        a.pix && `Pix: ${a.pix}`,
         a.observacoes && `Observações: ${a.observacoes}`,
         ...a.outros,
       ]
@@ -250,7 +255,7 @@ export function textoAtendimentos(itens: AtendimentoPublicado[]): string {
 /** Elimina somente a cópia comprovadamente idêntica; condições extras são preservadas. */
 export function pagamentosJaDescritos(formas: unknown, itens: AtendimentoPublicado[]): boolean {
   if (!Array.isArray(formas) || !formas.length || !itens.length) return false;
-  const valor = (t: string | null) => {
+  const valor = (t: string | null | undefined) => {
     if (!t || !/^R\$\s*[\d.]+,\d{2}$/.test(t)) return null;
     return Number(t.replace(/R\$|\s|\./g, "").replace(",", "."));
   };
@@ -260,9 +265,9 @@ export function pagamentosJaDescritos(formas: unknown, itens: AtendimentoPublica
     const campo =
       forma === "dinheiro"
         ? "dinheiro"
-        : ["cartao", "pix/cartao"].includes(forma)
-          ? "pix_cartao"
-          : null;
+        : forma === "pix/cartao" ? "pix_cartao"
+          : forma === "cartao" ? "cartao"
+            : forma === "pix" ? "pix" : null;
     if (!campo) return false;
     const alvos = f.condicao
       ? itens.filter((a) => normal(a.atendimento) === normal(f.condicao))
@@ -314,7 +319,4 @@ export const INSTRUCAO_DADOS_CATALOGO =
   "Responda somente aos objetivos do pedido, sem copiar os rótulos internos ou repetir fatos.";
 
 export const INSTRUCAO_ESTRUTURA_CATALOGO =
-  INSTRUCAO_DADOS_CATALOGO +
-  " " +
-  REGRA_APRESENTACAO_VALORES +
-  " Profissional genérico é equipe interna: omita o nome; SFP exige encaminhamento humano silencioso.";
+  INSTRUCAO_DADOS_CATALOGO;

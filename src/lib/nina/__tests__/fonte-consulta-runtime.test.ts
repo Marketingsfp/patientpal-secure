@@ -15,6 +15,10 @@ for (const ambiente of ["producao", "homologacao"]) {
       expect(entrada).toContain(fonte === "base" ? "157,00" : "93,00");
       expect(entrada).not.toContain(fonte === "base" ? "93,00" : "157,00");
       expect(entrada).not.toContain("PROFISSIONAL_DESATUALIZADO");
+      expect(entrada).not.toContain("INFORMAR_PIX_ANTECIPADO");
+      expect(entrada).not.toContain("Pix tem sempre o mesmo valor do cartão");
+      expect(entrada).not.toContain("pagamento somente antecipado, pelo WhatsApp");
+      expect(entrada).not.toContain("ANTECEDENCIA_CHEGADA_30_MINUTOS");
       expect(r.resultados[0].dados.fonte_consulta).toBe(fonte === "base" ? "base_conhecimento" : "clinica_os");
       expect(r.etapas.some((e: any) => e.dados?.fonte_consulta === (fonte === "base" ? "base_conhecimento" : "clinica_os"))).toBe(true);
       expect(r.rede).toBe(0);

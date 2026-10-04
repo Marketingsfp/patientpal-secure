@@ -38,7 +38,7 @@ describe("modalidades oficiais de atendimento", () => {
       expect(r.texto).toContain("10:20");
       expect(r.texto).toContain("Uma hora antes");
       expect(r.texto).toContain("A Clínica Teste agradece");
-      expect(r.texto.includes("30 minutos")).toBe(modo !== "chegada_com_pre_agendamento");
+      expect(r.texto).not.toContain("30 minutos");
       if (modo === "chegada_com_pre_agendamento") {
         expect(r.texto).toContain("quem chegar primeiro");
         expect(r.texto).toContain("entre os pacientes daquele horário");
@@ -65,9 +65,9 @@ describe("modalidades oficiais de atendimento", () => {
       date: "22/09/2026", time: "10:40", medico: "Conceição Martins", agendamento: { procedimento: "CONSULTA + PREVENTIVO — GINECOLOGIA" } },
       estadoVazio(), "Clínica", textos)!;
     expect(r.texto).toContain("Traga documento.");
-    expect(r.texto).toContain("Chegue com 30 minutos de antecedência.");
+    expect(r.texto).toContain("Chegue com 15 minutos de antecedência.");
     expect(r.texto).toContain("Duração: 15 minutos.");
-    expect(r.texto).not.toContain("Chegue com 15 minutos");
+    expect(r.texto).not.toContain("Chegue com 30 minutos");
     expect(r.texto).toContain("*Atendimento:* CONSULTA + PREVENTIVO — GINECOLOGIA");
     expect(r.texto.match(/CONSULTA \+ PREVENTIVO/g)).toHaveLength(1);
     expect(textoDaChave(r.chaveTemplate!, r.variaveis, textos).texto).toBe(r.texto);

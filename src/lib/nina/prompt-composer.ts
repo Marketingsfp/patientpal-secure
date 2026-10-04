@@ -12,7 +12,6 @@
  * Módulo PURO: sem banco, sem rede.
  */
 
-import { dadosPublicosCatalogo } from "./regras-catalogo";
 
 /** Envelope técnico: só requisitos de formato/segurança da chamada. */
 export const ENVELOPE_TECNICO = `ENVELOPE TÉCNICO (regras da API, não são regras de atendimento):
@@ -113,7 +112,7 @@ export function comporRequestNina(entrada: EntradaComposer): RequestNina {
     console.warn("[NINA_PROMPT_COMPOSER] runtime context com texto imperativo", avisos);
   }
   const contratoPrecedencia = (entrada.contratoPrecedencia ?? "").trim();
-  const runtimeContext = dadosPublicosCatalogo(entrada.runtimeContext);
+  const runtimeContext = entrada.runtimeContext;
   const json = JSON.stringify(runtimeContext, null, 2);
   const systemPrompt = [
     envelope,

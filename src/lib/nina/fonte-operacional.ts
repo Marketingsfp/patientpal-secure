@@ -104,7 +104,7 @@ function formas(p: ProcedimentoOp, condicao: string | null) {
   const { dinheiro, cartao } = precosDoProcedimento(p);
   return [
     ...(dinheiro !== null ? [{ condicao, forma: "Dinheiro", observacao: null, valor: dinheiro }] : []),
-    // O código da Nina apresenta "Cartão" como Pix/cartão (regra da clínica: Pix = cartão).
+    // Preserva o rótulo da origem; a política de apresentação pertence ao system prompt.
     ...(cartao !== null ? [{ condicao, forma: "Cartão", observacao: null, valor: cartao }] : []),
   ];
 }

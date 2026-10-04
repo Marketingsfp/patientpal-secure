@@ -125,8 +125,8 @@ export function resumoDePrecos(
 ): string | null {
   const d = moeda(dinheiro);
   const c = moeda(cartao);
-  if (d && c) return `Dinheiro: ${d} / Pix/cartão: ${c}`;
-  if (c) return `Pix/cartão: ${c}`;
+  if (d && c) return `Dinheiro: ${d} / Cartão: ${c}`;
+  if (c) return `Cartão: ${c}`;
   return d ? `Dinheiro: ${d}` : null;
 }
 

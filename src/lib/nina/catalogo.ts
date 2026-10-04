@@ -12,8 +12,7 @@
  *    fonte: havendo formas de pagamento com valor, o resumo é derivado delas.
  */
 import { z } from "zod";
-import { estruturaCatalogoSchema, padronizarSfp } from "./catalogo-estrutura";
-import { rotuloPagamentoNina } from "./pagamento-catalogo";
+import { estruturaCatalogoSchema } from "./catalogo-estrutura";
 
 export const STATUS_CATALOGO = ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] as const;
 export type StatusCatalogo = (typeof STATUS_CATALOGO)[number];
@@ -92,7 +91,7 @@ const textoOpcional = z
   .max(4000)
   .optional()
   .nullable()
-  .transform((v) => (v ? padronizarSfp(v) : null));
+  .transform((v) => v || null);
 
 const textoCurtoOpcional = z
   .string()
@@ -100,7 +99,7 @@ const textoCurtoOpcional = z
   .max(200)
   .optional()
   .nullable()
-  .transform((v) => (v ? padronizarSfp(v) : null));
+  .transform((v) => v || null);
 
 const valorOpcional = z
   .union([z.number(), z.string(), z.null()])
@@ -129,7 +128,7 @@ const dataOpcional = z
 /* ------------------------------------------------------------------ */
 
 export const formaPagamentoSchema = z.object({
-  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80).transform(rotuloPagamentoNina),
+  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80),
   valor: valorOpcional,
   condicao: textoCurtoOpcional,
   observacao: textoOpcional,
@@ -138,7 +137,7 @@ export type FormaPagamento = z.infer<typeof formaPagamentoSchema>;
 
 export const executanteSchema = z.object({
   medico_id: z.string().uuid().nullable().optional().default(null),
-  nome: z.string().trim().min(1, "Informe quem realiza").max(160).transform(padronizarSfp),
+  nome: z.string().trim().min(1, "Informe quem realiza").max(160),
   horarios: textoCurtoOpcional,
   observacao: textoOpcional,
 });

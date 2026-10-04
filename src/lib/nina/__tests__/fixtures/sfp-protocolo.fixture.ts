@@ -2,7 +2,7 @@
 import { strict as assert } from "node:assert";
 import { mock } from "bun:test";
 
-let motivo = "PROFISSIONAL_SFP: atendimento exclusivo da equipe humana";
+let motivo = "Encaminhamento solicitado";
 let teste = false;
 let geracoes = 0;
 let rede = 0;
@@ -22,6 +22,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
           assert.deepEqual(filtros, { id: "conversa", clinica_id: "clinica" });
           return { error: null, data: {
             handoff_em: "2026-09-19T12:00:00Z", handoff_motivo: motivo,
+            handoff_resumo: { avisar_paciente: false },
             nina_fluxo_estado: { session_id: "sessao" },
             is_teste: teste, departamento_id: null, contato_nome: "Paciente fictício",
           } };
@@ -38,15 +39,14 @@ mock.module("@/integrations/supabase/client.server", () => ({
   },
 }));
 mock.module("@/lib/atendimento/mensagem-handoff.server", () => ({
-  gerarMensagemHandoff: async () => { geracoes++; throw new Error("SFP não deve gerar aviso"); },
+  gerarMensagemHandoff: async () => { geracoes++; throw new Error("Encaminhamento silencioso não deve gerar aviso"); },
 }));
 const { protocoloAoIniciarHandoff, protocoloAoAtribuirHumano, anunciarHandoffAoPaciente, prepararAvisoHandoff } =
   await import("@/lib/atendimento/protocolo-atendimento.server");
 const args = { clinicaId: "clinica", conversaId: "conversa", protocolo: "TESTE-1" };
 let cenarios = 0;
 for (teste of [false, true]) {
-  for (motivo of ["PROFISSIONAL_SFP: atendimento exclusivo da equipe humana",
-    "Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia"]) {
+  for (motivo of ["PROFISSIONAL_SFP", "Conferência administrativa"]) {
     const inicial = await protocoloAoIniciarHandoff(args);
     assert.equal(inicial?.protocolo, "TESTE-1");
     assert.equal(inicial?.anuncio?.informado, false);
@@ -66,4 +66,4 @@ for (teste of [false, true]) {
 }
 assert.equal(geracoes, 0);
 assert.equal(rede, 0);
-console.log(`SFP_PROTOCOLO_OK: ${cenarios} cenários sem geração nem envio`);
+console.log(`SILENCIO_PROTOCOLO_OK: ${cenarios} cenários sem geração nem envio`);

@@ -19,7 +19,6 @@
  */
 
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
-import { MOTIVO_SFP, resultadoEncaminhamentoSfp } from "./regras-catalogo";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 import { autorizarAcao } from "./acoes/autorizacao";
@@ -319,13 +318,13 @@ export async function aplicarGateIdentificacao(params: {
     estado.flow.stage = "CHOOSING_SLOT";
     return null;
   }
-  const encaminharSfp = async () => {
+  const encaminharRestricaoCatalogo = async () => {
     limparEscolhaAgendamento(estado);
     a.slot_options = null;
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "HANDOFF";
-    const ok = await params.encaminharVagaIndisponivel?.(MOTIVO_SFP).catch(() => false) ?? false;
-    return resultadoEncaminhamentoSfp(ok);
+    const ok = await params.encaminharVagaIndisponivel?.("CATALOGO_ATENDIMENTO_HUMANO: restrição explícita do cadastro").catch(() => false) ?? false;
+    return criarResultado({ origem: "handoff", texto: ok ? "A equipe continuará seu atendimento." : "Não consegui encaminhar neste momento. Tente novamente.", fatosConfirmados: ok ? ["handoff_confirmado"] : [] });
   };
   const encaminhar = async (modalidadePendente = false) => {
     const motivo = modalidadePendente ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."
@@ -397,7 +396,7 @@ export async function aplicarGateIdentificacao(params: {
     const r = await executar(ctx, "selecionar_horario", {
       medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
     });
-    if (!r.ok && r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
+    if (!r.ok && r.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
     if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
     if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro)) return encaminhar(true);
     if (r.ok && typeof r.orientacao_atendimento === "string")
@@ -449,7 +448,7 @@ export async function aplicarGateIdentificacao(params: {
   // Lê o cadastro confirmado antes de pedir dados. Telefone sozinho não
   // confirma o paciente: nesse caso ainda faltam nome e nascimento.
   const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
-  if (!consulta.ok && consulta.erro === "PROFISSIONAL_SFP") return encaminharSfp();
+  if (!consulta.ok && consulta.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
   if (!consulta.ok) return encaminharFalha("consultar_cadastro_paciente", consulta.erro);
   const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
   {
@@ -504,7 +503,7 @@ export async function aplicarGateIdentificacao(params: {
     ),
   );
   if (!r.ok) {
-    if (r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
+    if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
     estado.flow.stage = "AWAITING_PATIENT_DATA";
     if (r.erro === "PATIENT_DATA_REQUIRED") {
       const campos = (r.campos_faltantes ?? []) as CampoCadastro[];
@@ -602,7 +601,7 @@ export async function aplicarGateIdentificacao(params: {
   }
 
   const erroAg = (ag as { erro?: string }).erro;
-  if (erroAg === "PROFISSIONAL_SFP") return encaminharSfp();
+  if (erroAg === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
   if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(erroAg ?? "")) return encaminhar(true);
   log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
   // Reserva anterior encontrada pela idempotência: consultada, nunca criada

@@ -7,7 +7,7 @@ export const REGRA_HORARIOS_PUBLICADOS =
 
 export const REGRA_ANESTESIA_ADICIONAL =
   "Quando o procedimento tiver valor de anestesia separado no catálogo, a anestesia é adicional: total = valor do procedimento + valor da anestesia. " +
-  "Explique o adicional e, com ambos os valores confirmados, informe o total para cada forma de pagamento, mantendo Pix/cartão juntos. " +
+  "Explique o adicional e, com ambos os valores confirmados, informe o total para cada forma de pagamento. " +
   "Não declare a anestesia incluída, não invente um valor ausente nem acrescente anestesia a procedimentos sem esse adicional publicado. " +
   "Um serviço cujo próprio objeto é a anestesia não deve ter seu preço somado a ele mesmo.";
 

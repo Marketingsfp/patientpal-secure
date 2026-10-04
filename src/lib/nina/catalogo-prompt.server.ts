@@ -7,7 +7,6 @@
  */
 import { contagemCatalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
-import { REGRA_PIX_CARTAO } from "./pagamento-catalogo";
 import { REGRA_INTERPRETACAO_CATALOGO } from "./catalogo-busca";
 import { REGRA_INFORMACOES_GRUPO } from "./clinicas-grupo";
 import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
@@ -59,11 +58,9 @@ A. FONTE E LIMITES
 
 B. VALOR, FORMA DE PAGAMENTO E CONDIÇÃO — leia sempre em conjunto
 - O campo "price" é apenas um valor de referência. A resposta ao paciente usa as formas de pagamento e condições que vieram junto (em "notes"/"formas de pagamento").
-- Havendo valores diferentes por forma de pagamento, informe TODOS com sua forma: "Dinheiro: R$ 150,00. Pix/cartão: R$ 180,00". NUNCA informe só o menor preço como se valesse para qualquer pagamento.
+- Havendo valores diferentes por forma de pagamento, informe TODOS com sua forma: "Dinheiro: R$ 150,00. Cartão: R$ 180,00". NUNCA informe só o menor preço como se valesse para qualquer pagamento.
 - Preserve a condição escrita: "a partir de", "por sessão", "pagamento antecipado", "no atendimento", parcelamento, número de parcelas. Não reescreva a condição em algo mais forte nem mais vago.
-- ${REGRA_PIX_CARTAO}
 - ${REGRA_ANESTESIA_ADICIONAL}
-- Se o paciente perguntar por Pix ou cartão, responda primeiro o preço como Pix/cartão, sempre juntos. Para parcelamento, explique a condição específica do cartão; outras condições só como complemento.
 
 C. HORÁRIOS, MODALIDADES E RECORRÊNCIA — leia sempre em conjunto
 - Combine dia, horário, profissional, unidade, recorrência, tipo de atendimento, observação pública e aviso vigente. Um dia sem sua recorrência é informação errada.

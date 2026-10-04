@@ -1,215 +1,50 @@
 import { describe, expect, it } from "bun:test";
-import {
-  apresentarIdadeMinima,
-  dadosPublicosCatalogo,
-  profissionalSfp,
-  profissionalGenerico,
-  resultadoExigeHumano,
-  omitirNomeGenerico,
-  REGRAS_CATALOGO_PROMPT,
-  motivoProfissionalSfp,
-} from "../regras-catalogo";
-import {
-  servicoParaRegistro,
-  profissionalParaRegistro,
-  type ServicoPublicado,
-  type ProfissionalPublicado,
-} from "../catalogo-conhecimento";
+import { apresentarIdadeMinima, resultadoExigeHumano } from "../regras-catalogo";
+import { servicoParaRegistro, profissionalParaRegistro } from "../catalogo-conhecimento";
 import { textoDaChave } from "../resposta/templates";
 import { comporRequestNina } from "../prompt-composer";
+import { handoffSemAviso, resultadoHandoffSilencioso } from "../handoff-silencioso";
 
-describe("Regras administrativas do catálogo", () => {
-  it("oculta recursos de agenda como executantes e preserva o nome do exame e os IDs", () => {
-    const dados = {
-      records: [{ nome: "MAMOGRAFIA", procedimento: "MAMOGRAFIA", medico: "MAMOGRAFIA",
-        extras: { executantes: [{ nome: "MAMOGRAFIA", medico_id: "mamografia-id" }] } }],
-      slots: [{ medico_nome: "RAIO-X", medico_id: "rx-id", procedimento: "RX ABDOME SIMPLES", hora: "08:00" }],
-      procedimentos: [{ nome: "RAIO-X" }, { nome: "MAMOGRAFIA" }],
-      profissionais: [{ nome: "RAIO-X", id: "rx-id" }, { nome: "Dra. Ana" }],
-    };
-    const copia = structuredClone(dados);
-    const p = dadosPublicosCatalogo(dados);
-    expect(p.records[0]).toMatchObject({ nome: "MAMOGRAFIA", procedimento: "MAMOGRAFIA", medico: null,
-      extras: { executantes: [{ nome: null, medico_id: "mamografia-id" }] } });
-    expect(p.slots[0]).toEqual({ medico_nome: null, medico_id: "rx-id", procedimento: "RX ABDOME SIMPLES", hora: "08:00" });
-    expect(p.procedimentos).toEqual(dados.procedimentos);
-    expect(p.profissionais).toEqual([{ nome: null, id: "rx-id" }, { nome: "Dra. Ana" }]);
-    expect(dados).toEqual(copia);
-  });
-  it("mantém o nome específico do exame nos resumos e conclusões sem tratar o recurso como pessoa", () => {
-    for (const profissional of ["RAIO-X", "raio - x", "MAMOGRAFIA"])
-    for (const chave of ["revisar", "revisar_pre_agendamento", "revisar_ficha", "confirmado", "confirmado_pre_agendamento", "confirmado_ficha", "confirmado_ficha_pendente"]) {
-      const procedimento = profissional === "MAMOGRAFIA" ? "MAMOGRAFIA" : "RX ABDOME SIMPLES";
-      const texto = textoDaChave(`fluxo.agendamento.${chave}`, {
-        profissional, procedimento, data: "28/09/2026", horario: "08:00", unidade: "Clínica", ficha: "3",
-      }).texto;
-      expect(texto).toContain(procedimento);
-      expect(texto).toContain("08:00");
-      expect(texto).not.toMatch(/profissional|m[eé]dic[oa]:|executante:/i);
-      if (profissional !== "MAMOGRAFIA") expect(texto).not.toMatch(/raio\s*-?\s*x/i);
+describe("separação entre fatos, prompt e execução", () => {
+  it("SFP e nomes de equipe chegam literais ao modelo sem decidir conduta", () => {
+    for (const nome of ["SFP", "SPF", "TÉCNICA", "Enfermagem", "MAMOGRAFIA", "Dra. Ana"]) {
+      const r = servicoParaRegistro({ id: "e", nome: "Exame", executantes: [{ nome }], formas_pagamento: [] } as any);
+      expect(r.medico).toBe(nome);
+      expect(r.extras?.atendimento_humano_obrigatorio).toBe(false);
+      expect(r.extras?.omitir_nome_profissional).toBeUndefined();
+      expect(resultadoExigeHumano({ records: [r] })).toBe(false);
+      const p = profissionalParaRegistro({ id: "p", nome, horarios: [] } as any, "2026-10-04");
+      expect(resultadoExigeHumano({ records: [p] })).toBe(false);
+      const req = comporRequestNina({ behaviorPrompt: "Apresente conforme estas instruções.", runtimeContext: { medico: nome } });
+      expect(req.runtimeContext.medico).toBe(nome);
     }
-    const publicado = "Confira: *Atendimento:* {procedimento} *Profissional:* {profissional} *Data:* {data} *Horário:* {horario} *Clínica:* {unidade}. Confirma com esse profissional?";
-    const texto = textoDaChave("fluxo.agendamento.revisar", { profissional: "MAMOGRAFIA", procedimento: "MAMOGRAFIA", data: "28/09/2026", horario: "08:00", unidade: "Clínica" }, { "fluxo.agendamento.revisar": publicado }).texto;
-    expect(texto).toContain("*Atendimento:* MAMOGRAFIA");
-    expect(texto).not.toContain("Profissional");
-    expect(texto).not.toContain("esse profissional");
-    expect(omitirNomeGenerico("*Atendimento:* MAMOGRAFIA\n*Profissional:* MAMOGRAFIA\n*Data:* 28/09/2026")).toContain("*Atendimento:* MAMOGRAFIA");
-    expect(omitirNomeGenerico("MAMOGRAFIA\nExame de raio-x" )).toBe("MAMOGRAFIA\nExame de raio-x");
-    expect(omitirNomeGenerico("Atendimento: RX ABDOME SIMPLES Profissional: RAIO-X Data: 28/09/2026")).toBe("Atendimento: RX ABDOME SIMPLES Data: 28/09/2026");
   });
-  it("distingue o encaminhamento SFP do pedido comum de atendente", () => {
-    for (const motivo of ["PROFISSIONAL_SFP: exclusivo da equipe", "Profissional SFP exige atendimento humano", "O profissional é sfp"])
-      expect(motivoProfissionalSfp(motivo)).toBe(true);
-    for (const motivo of ["Paciente pediu atendente", "CATALOGO_SEM_REGISTRO", "Profissional Dra. Ana", "Paciente João SFP", "Procedimento SFP"])
-      expect(motivoProfissionalSfp(motivo)).toBe(false);
-  });
-  it("reconhece apenas nomes marcadores completos, sem atingir nomes reais ou descrições", () => {
-    expect(profissionalSfp(" sfp ")).toBe(true);
-    expect(profissionalSfp("Dr. José SFP Junior")).toBe(false);
-    for (const nome of ["técnico", "TÉCNICA", " Tecnica ", "Enfermagem", "ENFERMEIRA", "enfermeiro", " Equipe  de Enfermagem ", "Técnica em Enfermagem", "Auxiliar de enfermagem"])
-      expect(profissionalGenerico(nome)).toBe(true);
-    for (const nome of ["Ana Técnica", "Dra. Ana Souza", "Enfermeira Ana Souza", "SFP", "Orientações de enfermagem", "Técnica do exame"])
-      expect(profissionalGenerico(nome)).toBe(false);
-  });
-  it("SFP no executante do exame e no profissional da consulta exige equipe humana", () => {
-    const exame = servicoParaRegistro({
-      id: "e",
-      nome: "Mamografia",
-      executantes: [{ nome: "SFP" }],
-      formas_pagamento: [],
-    } as unknown as ServicoPublicado);
-    const consulta = profissionalParaRegistro(
-      {
-        id: "p",
-        nome: "sfp",
-        especialidades: [{ nome: "Cardiologia" }],
-        horarios: [],
-      } as unknown as ProfissionalPublicado,
-      "2026-09-17",
-    );
-    expect(resultadoExigeHumano({ records: [exame] })).toBe(true);
-    expect(resultadoExigeHumano({ registros: [consulta] })).toBe(true);
-    expect(resultadoExigeHumano({ erro: "PROFISSIONAL_SFP" })).toBe(true);
-    // A sigla no procedimento não é o nome do profissional.
-    expect(
-      resultadoExigeHumano({ records: [{ procedimento: "Exame SFP", medico: "Dra. Ana" }] }),
-    ).toBe(false);
-  });
-  it("não atribui toda lista ampla ao SFP; aplica a regra ao item escolhido", () => {
-    const records = [
-      { id: "s", medico: "SFP" },
-      { id: "a", medico: "Ana" },
-    ];
+  it("preserva uma restrição humana explícita do cadastro sem deduzir pelo nome", () => {
+    const records = [{ id: "sfp", medico: "SFP" }, { id: "a", medico: "Ana", extras: { atendimento_humano_obrigatorio: true } }];
     expect(resultadoExigeHumano({ records })).toBe(false);
-    expect(resultadoExigeHumano({ records }, ["a"])).toBe(false);
-    expect(resultadoExigeHumano({ records }, ["s"])).toBe(true);
-    expect(resultadoExigeHumano({ records: [] })).toBe(false);
+    expect(resultadoExigeHumano({ records }, ["sfp"])).toBe(false);
+    expect(resultadoExigeHumano({ records }, ["a"])).toBe(true);
+    expect(resultadoExigeHumano({ erro: "PROFISSIONAL_SFP" })).toBe(false);
   });
-  it("apresenta idade mínima inclusive zero e meses, sem alterar preço, preparo e periodicidade", () => {
-    for (const idade of ["18 anos", "3 anos", "0 anos", "1 mês", "6 meses"]) {
-      expect(apresentarIdadeMinima(`Idade/critério informado: ${idade}`)).toBe(
-        `Idade/critério informado: a partir de ${idade}`,
-      );
-      expect(apresentarIdadeMinima(idade)).toBe(`a partir de ${idade}`);
-    }
-    for (const s of [
-      "A partir de 6 meses",
-      "Jejum: 8 horas; R$ 18,00; retorno a cada 6 meses",
-      null,
-    ])
-      expect(apresentarIdadeMinima(s)).toBe(s);
-    const registro = servicoParaRegistro({
-      id: "e",
-      nome: "Exame",
-      restricoes: "Idade: 0 anos",
-      formas_pagamento: [],
-      executantes: [],
-    } as unknown as ServicoPublicado);
-    expect(registro.observacoes).toContain("a partir de 0 anos");
-    expect(REGRAS_CATALOGO_PROMPT).toContain("idades mínimas");
+  it("template não apaga nomes nem troca a antecedência publicada e continua retirando emojis", () => {
+    const chave = "fluxo.agendamento.revisar";
+    const texto = "{profissional}: {procedimento}, {data}, {horario}, {unidade}. Chegue 15 minutos antes. 😊";
+    const r = textoDaChave(chave, { profissional: "Enfermagem", procedimento: "Exame", data: "05/10", horario: "08h", unidade: "Clínica" }, { [chave]: texto });
+    expect(r.texto).toContain("Enfermagem");
+    expect(r.texto).toContain("15 minutos");
+    expect(r.texto).not.toContain("30 minutos");
+    expect(r.texto).not.toContain("😊");
   });
-  it("oculta nome genérico no payload sem perder valores, preparo, horários ou IDs internos", () => {
-    const dados = {
-      medico_id: "id-agenda",
-      medico: "TÉCNICA",
-      records: [{ medico: "técnico", preparo: "Sem jejum", preco: 90, dia: "Segunda" }],
-    };
-    const publico = dadosPublicosCatalogo(dados);
-    expect(publico).toEqual({
-      medico_id: "id-agenda",
-      medico: null,
-      records: [{ medico: null, preparo: "Sem jejum", preco: 90, dia: "Segunda" }],
-    });
-    expect(dados.medico).toBe("TÉCNICA");
-    const req = comporRequestNina({
-      behaviorPrompt: REGRAS_CATALOGO_PROMPT,
-      runtimeContext: dados,
-    });
-    expect(req.runtimeContext.medico).toBeNull();
+  it("silêncio depende de opção explícita, não do motivo ou nome", () => {
+    expect(handoffSemAviso({ avisar_paciente: true }, "PROFISSIONAL_SFP")).toBe(false);
+    expect(handoffSemAviso({ avisar_paciente: false }, "Conferência")).toBe(true);
+    expect(handoffSemAviso({ avisar_paciente: false }, "[Outra unidade] PROFISSIONAL_SFP")).toBe(true);
+    expect(handoffSemAviso({}, "PROFISSIONAL_SFP")).toBe(true);
+    expect(handoffSemAviso({}, "Paciente pediu humano")).toBe(false);
+    expect(resultadoHandoffSilencioso()).toMatchObject({ estado: "descartar", texto: "" });
   });
-  it("omite o nome também no resumo que o paciente aceita e na confirmação final", () => {
-    for (const profissional of ["Técnica", "Enfermagem", "Equipe de enfermagem"])
-    for (const chave of [
-      "fluxo.agendamento.revisar",
-      "fluxo.agendamento.revisar_pre_agendamento",
-      "fluxo.agendamento.revisar_ficha",
-      "fluxo.agendamento.confirmado",
-    ]) {
-      const r = textoDaChave(chave, {
-        profissional,
-        procedimento: "Exame",
-        data: "20/09/2026",
-        horario: "10:20",
-        unidade: "Clínica",
-      });
-      expect(r.texto.length).toBeGreaterThan(0);
-      expect(r.texto).not.toMatch(/t[eé]cnic[oa]|enfermagem/i);
-      expect(r.texto).toContain("10:20");
-    }
-    expect(omitirNomeGenerico("Exame com a técnica às 10:20. Valor: R$ 90,00.")).toBe(
-      "Exame às 10:20. Valor: R$ 90,00.",
-    );
-    expect(omitirNomeGenerico("Profissional: Dr. João. Técnica do exame: ultrassom.")).toBe(
-      "Profissional: Dr. João. Técnica do exame: ultrassom.",
-    );
-  });
-  it("filtra cargos dos executantes, preserva nomes próprios e não apaga a especialidade nem a mensagem do paciente", () => {
-    const registro = servicoParaRegistro({
-      id: "ecg", nome: "Eletrocardiograma",
-      executantes: [
-        { nome: "Enfermagem", horarios: "Segunda a sábado às 07:00", observacao: "Ordem de chegada" },
-        { nome: "Dra. Ana Souza", horarios: "Quarta às 08:00" },
-      ],
-      formas_pagamento: [{ forma: "Dinheiro", valor: 51 }, { forma: "Cartão", valor: 60 }],
-      preparo: "Procure a enfermagem para as orientações de preparo.",
-    } as unknown as ServicoPublicado);
-    const original = structuredClone(registro);
-    const publico = dadosPublicosCatalogo({
-      records: [registro], doctors: ["Enfermagem", "Dra. Ana Souza"],
-      mensagemAtual: "Enfermagem", especialidade: "Enfermagem", medico_id: "enfermagem",
-    });
-    expect(publico.records[0]?.medico).toBe("Dra. Ana Souza");
-    expect(publico.records[0]?.extras).toMatchObject({ omitir_nome_profissional: true, executantes: [
-      { nome: null, horarios: "Segunda a sábado às 07:00", observacao: "Ordem de chegada" },
-      { nome: "Dra. Ana Souza", horarios: "Quarta às 08:00" },
-    ] });
-    expect(publico.records[0]).toMatchObject({ preco_dinheiro: 51, preco_cartao: 60, preparo: original.preparo });
-    expect(publico.doctors).toEqual(["Dra. Ana Souza"]);
-    expect(publico).toMatchObject({ mensagemAtual: "Enfermagem", especialidade: "Enfermagem", medico_id: "enfermagem" });
-    expect(registro).toEqual(original);
-  });
-  it.each([
-    "Profissional: Enfermagem", "*Profissional:* Enfermagem", "**Profissional:** **ENFERMAGEM**",
-    "- Profissional: Técnica de Enfermagem", "*Enfermagem*", "*Equipe de Enfermagem*",
-  ])("omite identificação genérica da mensagem sem retirar os fatos: %s", (rotulo) => {
-    const fatos = "Dias: segunda a sábado às 07:00\nDinheiro: R$ 51,00\nCartão: R$ 60,00\nModalidade: ordem de chegada";
-    expect(omitirNomeGenerico(`Eletrocardiograma\n${rotulo}\n${fatos}`)).toBe(`Eletrocardiograma\n\n${fatos}`);
-  });
-  it("preserva nomes próprios em lista mista e referências a enfermagem fora da identificação", () => {
-    expect(omitirNomeGenerico("Profissional: Enfermagem, Dra. Ana Souza\nValor: R$ 51,00")).toBe("Profissional: Dra. Ana Souza\nValor: R$ 51,00");
-    expect(omitirNomeGenerico("Exame. *Profissional:* Enfermagem. Valor: R$ 51,00.")).toBe("Exame. Valor: R$ 51,00.");
-    expect(omitirNomeGenerico("Exame com a enfermagem às 07:00.")).toBe("Exame às 07:00.");
-    for (const original of ["Profissional: Dra. Ana Souza", "Orientações de preparo fornecidas pela enfermagem da unidade.", "Exame com a técnica de ultrassom.", "Profissional: Enfermeira Ana Souza"])
-      expect(omitirNomeGenerico(original)).toBe(original);
+  it("mantém a regra de idade que não faz parte desta alteração", () => {
+    expect(apresentarIdadeMinima("Idade: 18 anos")).toBe("Idade: a partir de 18 anos");
+    expect(apresentarIdadeMinima("Jejum: 8 horas; R$ 18,00")).toBe("Jejum: 8 horas; R$ 18,00");
   });
 });

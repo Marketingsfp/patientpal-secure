@@ -17,7 +17,6 @@ import {
 } from "./catalogo-conhecimento";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
-import { profissionalGenerico, profissionalSfp } from "./regras-catalogo";
 import { separarAtendimentos } from "./catalogo-estrutura";
 import { pedidoPreventivo } from "./atendimento-consulta";
 import { publicacaoDoMedicoAgenda } from "./vinculo-catalogo-agenda.server";
@@ -285,7 +284,7 @@ async function buscarNaFonteDoTurno(
     (medicosAmbiguos || pedirServico || busca.siglasDesconhecidas.length)
   ) {
     const opcoes = medicosAmbiguos
-      ? listaProfissionais.filter((p) => !profissionalGenerico(p.nome) && !profissionalSfp(p.nome)).map((p) => ({
+      ? listaProfissionais.map((p) => ({
           id: p.id,
           nome: p.nome,
           especialidade: Array.isArray(p.especialidades)

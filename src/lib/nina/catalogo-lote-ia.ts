@@ -56,7 +56,7 @@ export const instrucoesSelecaoLote = [
   "Se o operador não especificou qual médico ou todos os médicos, pergunte. Não confunda cardiologia adulta com infantil, consulta com exame, nem consulta simples com consulta + preventivo.",
   "Se falta forma de pagamento, valor, atendimento específico ou há nomes parecidos/ambíguos, retorne esclarecimentos e itens vazio. Nunca distribua um preço entre todos por suposição.",
   "Se um pedido abrange todos, selecione TODOS os cadastros correspondentes, sem truncar. Se algum pedido não foi encontrado, explique em esclarecimentos; não omita silenciosamente.",
-  "Pix/cartão compartilham valor; dinheiro é separado. Quando o preço é compartilhado por várias consultas, peça na instrução do item para separar as condições, preservando o preço das consultas não solicitadas.",
+  "Preserve cada forma de pagamento da fonte, sem supor equivalências. Quando o preço é compartilhado por várias consultas, peça na instrução do item para separar as condições, preservando o preço das consultas não solicitadas.",
   `No máximo ${LIMITE_EDICAO_LOTE} cadastros por pedido. Se exceder, retorne esclarecimento pedindo para dividir o pedido, sem selecionar parcialmente.`,
 ].join("\n");
 

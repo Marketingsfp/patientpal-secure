@@ -28,7 +28,7 @@ describe("runtime entrega resumo validado e aguarda nova mensagem", () => {
           expect(r.resposta).toContain("10:20");
           expect(r.resposta).not.toContain("08:00");
           expect(r.ferramentas.filter((f: string) => f === "agendar")).toHaveLength(1);
-          expect(r.resposta.includes("30 minutos")).toBe(cenario !== "confirmado_chegada_com_pre_agendamento");
+          expect(r.resposta).not.toContain("30 minutos");
           expect(r.resposta).toContain("Uma hora antes");
           if (cenario === "confirmado_ficha") expect(r.resposta).toContain("*Sua ficha:* 007");
         }

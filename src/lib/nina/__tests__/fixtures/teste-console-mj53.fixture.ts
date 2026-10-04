@@ -5,7 +5,7 @@
  */
 import { mock } from "bun:test";
 import { criarResultadoSemNovaMensagem } from "@/lib/nina/resposta/contrato";
-import { resultadoEncaminhamentoSfp } from "@/lib/nina/regras-catalogo";
+import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
 
 type Linha = Record<string, any>;
@@ -181,7 +181,7 @@ mock.module("@/lib/whatsapp.server", () => ({
     if (cenario === "erro-real") throw new Error("Falha simulada do provedor");
     if (cenario.startsWith("handoff-sfp-")) {
       transferidaSfp = true;
-      opcoes.auditoria.resultado = resultadoEncaminhamentoSfp(true);
+      opcoes.auditoria.resultado = resultadoHandoffSilencioso();
       return "";
     }
     if (encaminhada) {

@@ -177,32 +177,32 @@ const argumentos = {
   data: inicio.toISOString().slice(0, 10),
   hora: "14:00",
 };
-describe("SFP bloqueia ações na publicação vigente, preservando outros profissionais", () => {
+describe("restrição explícita de atendimento humano, sem deduzir pelo nome", () => {
   for (const teste of [false, true]) {
-    test(`${teste ? "homologação" : "real"}: SFP vinculado a um médico real não agenda`, async () => {
+    test(`${teste ? "homologação" : "real"}: profissional com restrição publicada não agenda`, async () => {
       banco.profissionais![0]!.nome = " SFP ";
       banco.profissionais![0]!.medico_id = MEDICO;
+      banco.profissionais![0]!.estrutura = { encaminhamento_humano: true };
       const ctx = { ...contextoAgendar(true), teste,
         origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
       const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
-      expect(r.erro).toBe("PROFISSIONAL_SFP");
+      expect(r.erro).toBe("CATALOGO_ATENDIMENTO_HUMANO");
       expect(consultasAgenda()).toHaveLength(0);
       expect(gravacoes).toHaveLength(0);
     });
-    test(`${teste ? "homologação" : "real"}: serviço SFP impede coleta automática após o aceite`, async () => {
+    test(`${teste ? "homologação" : "real"}: serviço restrito impede coleta automática após o aceite`, async () => {
       banco.servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO",
-        nome: "Consulta Cardiologia", executantes: [{ nome: "sfp" }] });
+        nome: "Consulta Cardiologia", executantes: [{ nome: "sfp" }], estrutura: { encaminhamento_humano: true } });
       const ctx = { ...contextoAgendar(true), teste,
         origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
       const motivos: string[] = [];
       const r = await aplicarGateIdentificacao({ mensagem: "Sim", estado: ctx.estado, ctx,
         executar: executarFerramentaPaciente,
         encaminharVagaIndisponivel: async motivo => { motivos.push(motivo); return true; } });
-      expect(r?.texto).toBe("");
-      expect(r?.estado).toBe("descartar");
-      expect(r?.restricoes).toContain("handoff_sfp_silencioso");
+      expect(r?.texto).toBe("A equipe continuará seu atendimento.");
+      expect(r?.fatosConfirmados).toContain("handoff_confirmado");
       expect(motivos).toHaveLength(1);
-      expect(motivos[0]).toContain("PROFISSIONAL_SFP");
+      expect(motivos[0]).toContain("CATALOGO_ATENDIMENTO_HUMANO");
       expect(consultasAgenda()).toHaveLength(0);
       expect(gravacoes).toHaveLength(0);
       expect(ctx.estado.appointment.confirmation).toBeNull();
@@ -363,11 +363,11 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(ctx.esclarecimentoCatalogo?.pergunta).toContain("Mariana Portugal");
     expect(gravacoes).toHaveLength(0);
   });
-  test("recurso genérico não gera pergunta de escolha sem nomes", async () => {
+  test("recurso genérico permanece no retorno para interpretação pelo prompt", async () => {
     const { ctx } = await iniciar("PREVENTIVO", "Enfermagem");
     const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Carlos Alberto Varillas" });
-    expect(r.ok).toBe(false);
-    expect(ctx.esclarecimentoCatalogo).toBeUndefined();
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(r)).toContain("Enfermagem");
     expect(gravacoes).toHaveLength(0);
   });
   test.each([true, false])("cadastro %s: identificação e reserva usam o mesmo ID do Clínica OS", async criado => {
@@ -630,7 +630,7 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     banco.agendamentos = banco.agendamentos!.filter(s => s.medico_id === MEDICO);
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO, modalidade_atendimento: "hora_marcada" });
-    expect((r.proxima as Linha).orientacao).toContain("30 minutos");
+    expect((r.proxima as Linha).orientacao).not.toContain("30 minutos");
     expect(encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido)).toBeNull();
   });
   test("nenhuma vaga em todas as agendas aciona a regra de encaminhamento", async () => {
@@ -673,10 +673,11 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO });
   });
-  test("SFP mantém encaminhamento obrigatório", async () => {
+  test("restrição explícita mantém encaminhamento obrigatório", async () => {
     banco.profissionais![1]!.nome = "SFP";
+    banco.profissionais![1]!.estrutura = { encaminhamento_humano: true };
     const r = await chamar().resultado;
-    expect(r).toMatchObject({ ok: false, erro: "PROFISSIONAL_SFP" });
+    expect(r).toMatchObject({ ok: false, erro: "CATALOGO_ATENDIMENTO_HUMANO" });
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("falha em uma agenda não permite afirmar qual é a mais próxima", async () => {
@@ -694,11 +695,11 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect((r.sem_pre_agendamento as Linha[])[0]!.orientacao).not.toContain("30 minutos");
     expect(r.proxima).toMatchObject({ medico_id: MEDICO });
   });
-  test("ficha traz sua modalidade e orientação de antecedência", async () => {
+  test("ficha traz modalidade sem acrescentar antecedência comercial", async () => {
     banco.profissionais![1]!.tipo_atendimento = "Por ficha";
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ modalidade_atendimento: "ficha" });
-    expect((r.proxima as Linha).orientacao).toContain("30 minutos");
+    expect((r.proxima as Linha).orientacao).not.toContain("30 minutos");
   });
   test.each(["preciso de quem consiga me atender antes da viagem", "tanto faz a pessoa, quanto antes melhor"])(
     "decisão contextual do modelo chega à comparação sem filtro literal: %s", async (mensagem) => {
@@ -1710,10 +1711,10 @@ describe("executor real das ferramentas com banco simulado", () => {
 describe("modalidades na consulta operacional", () => {
   for (const origem of ["whatsapp", "homologacao"] as const) {
     for (const [publicada, esperada, antecedencia] of [
-      ["Hora marcada", "hora_marcada", true],
-      ["Agendado", "hora_marcada", true],
+      ["Hora marcada", "hora_marcada", false],
+      ["Agendado", "hora_marcada", false],
       ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
-      ["Por numeração (ficha)", "ficha", true],
+      ["Por numeração (ficha)", "ficha", false],
     ] as const) {
       test(`${origem}: escolha após oferta composta e sim consultam sem exigir data (${esperada})`, async () => {
         banco.profissionais![0]!.tipo_atendimento = publicada;
@@ -1873,9 +1874,9 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
   }
   for (const teste of [false, true]) {
     for (const [rotulo, modo, antecedencia] of [
-      ["Hora marcada", "hora_marcada", true],
+      ["Hora marcada", "hora_marcada", false],
       ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
-      ["Por numeração (ficha)", "ficha", true],
+      ["Por numeração (ficha)", "ficha", false],
     ] as const) test(`${teste ? "homologação" : "real"}: reserva e confirmação respeitam ${rotulo}`, async () => {
       banco.profissionais![0]!.tipo_atendimento = rotulo;
       const t = await preparar(teste);
@@ -2144,7 +2145,7 @@ describe("horários apresentados por período", () => {
   });
 
   for (const [publicada, esperada, trecho] of [
-    ["Hora marcada", "hora_marcada", "30 minutos"],
+    ["Hora marcada", "hora_marcada", "Atendimento no horário marcado"],
     ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", "quem chegar primeiro"],
   ] as const)
     test(`${esperada}: lista por período preserva modalidade e orientação`, async () => {

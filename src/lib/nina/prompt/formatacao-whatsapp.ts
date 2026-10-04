@@ -1,4 +1,4 @@
-import { REGRA_APRESENTACAO_VALORES, REGRA_PIX_ANTECIPADO } from "../pagamento-catalogo";
+import { REGRA_APRESENTACAO_VALORES, REGRA_PIX_ANTECIPADO } from "./pagamento";
 
 /** Compartilhada pela publicação e pelo fallback. */
 export const FORMATACAO_WHATSAPP_NINA = `INSTRUÇÃO LING-02 — ORGANIZAÇÃO DAS MENSAGENS PARA CELULAR
