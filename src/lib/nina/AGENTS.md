@@ -1,5 +1,7 @@
 # Nina — decisões técnicas
 
+- Dicionários existem somente na base de conhecimento: com `base_conhecimento` selecionada, `lerDicionarioDaMensagem` consulta aliases publicados antes da primeira interpretação e registra os candidatos no contexto/auditoria. A busca do catálogo também considera aliases. Compartilha a leitura do turno nos dois ambientes, preserva ambiguidades e não consulta a base quando a fonte é `clinica_os`. Aliases são pistas de identificação, nunca regras ou prova de preço/vaga.
+
 - Recursos internos da Nina que usam Claude chamam `chamarClaudeComoResponses` (`claude-messages.server.ts`), que traduz o corpo Responses para `/v1/messages` — por quê: Opus 5.5 só é servido em Messages e os chamadores não precisam ser reescritos.
 - Decisões do Jev passam por `perguntarJev` (`jev.server.ts`), igual em produção e homologação, só com a flag `nina_jev_faseN` ligada na clínica, e registro em `nina_jev_decisoes` — por quê: erro ou demora vira "sem decisão" e a Maria segue o fluxo atual.
 - Avaliação da homologação usa a rubrica `sol-v2` (`avaliador-sol.ts`): critérios do documento "Treinador e Auditor" + critérios de prova; nota e veredito calculados no código; "nova regra sugerida" vira `nina_aprendizados` PENDING — por quê: o modelo nunca aprova nem aplica regra sozinho.

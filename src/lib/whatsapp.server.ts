@@ -1380,6 +1380,13 @@ async function gerarRespostaNinaInterno(
     motivo: "Preservar Clínico Geral e separar a consulta da escolha do profissional nas pesquisas.",
     texto: REGRA_IDENTIDADE_ATENDIMENTO,
   });
+  const { REGRA_DICIONARIO_PUBLICADO } = await import("@/lib/nina/dicionario-leitura");
+  if (catalogoPublicado.selecao?.fonte === "base_conhecimento") instrucoesAdicionaisTurno.push({
+    codigo: "CONSULTAR_DICIONARIO_PUBLICADO",
+    origem: "src/lib/nina/dicionario-leitura.ts",
+    motivo: "Consultar as variações publicadas antes de interpretar consultas, exames e procedimentos.",
+    texto: REGRA_DICIONARIO_PUBLICADO,
+  });
   // O motor antigo não impõe pendências aos novos turnos.
   fluxoEstado.clarification = undefined;
   const precedenciaTurno = resolverPrecedenciaDoTurno({
@@ -1412,7 +1419,10 @@ async function gerarRespostaNinaInterno(
   const contextoRespostaProfissional = { mensagem: mensagemPaciente, historico: contextoConsultaAgenda.historico };
   const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
   fluxoEstado.knowledge_context = conhecimentoAnterior;
+  const { lerDicionarioDaMensagem } = await import("@/lib/nina/dicionario-leitura.server");
+  const dicionarioDaMensagem = await lerDicionarioDaMensagem(clinicaId, mensagemPaciente);
   const runtimeContext = {
+    dicionario_da_mensagem: dicionarioDaMensagem,
     canal: "whatsapp",
     // O modelo vê sempre "producao": mesma conduta nos dois ambientes. O
     // ambiente real fica nos registros do turno e nos detalhes técnicos.

@@ -53,6 +53,30 @@ const { gerenciarFonteConsulta } = await import("../fonte-consulta-admin.server"
 const { catalogoDoTurno, comCatalogoDoTurno } = await import("../catalogo-turno.server");
 const { lerSelecaoFonte } = await import("../fonte-consulta-config.server");
 const { buscarNoCatalogo } = await import("../catalogo-retrieval.server");
+const { lerDicionarioDaMensagem } = await import("../dicionario-leitura.server");
+
+it("consulta dicionário só na base, reutiliza leitura concorrente e atualiza no próximo turno", async () => {
+  configurar();
+  await comCatalogoDoTurno("clinica-a", async () => {
+    const [a, b] = await Promise.all([lerDicionarioDaMensagem("clinica-a", "Quero ultra"), lerDicionarioDaMensagem("clinica-a", "Quero ultra")]);
+    expect(a).toEqual(b);
+    expect(a.status).toBe("consultado");
+    expect(JSON.stringify(a)).toContain("base-exame");
+    expect(chamadas.filter(c => c.tabela === "nina_cat_servicos")).toHaveLength(2); // página e fim
+    tabelas.nina_cat_servicos[0].estrutura.aliases = ["novo termo"];
+    expect(JSON.stringify(await lerDicionarioDaMensagem("clinica-a", "ultra"))).toContain("base-exame");
+  });
+  expect(JSON.stringify(await comCatalogoDoTurno("clinica-a", () => lerDicionarioDaMensagem("clinica-a", "novo termo")))).toContain("base-exame");
+  configurar("clinica_os"); chamadas = [];
+  expect(await lerDicionarioDaMensagem("clinica-a", "ultra")).toEqual({ status: "nao_aplicavel" });
+  expect(chamadas.some(c => c.tabela.startsWith("nina_cat_"))).toBe(false);
+});
+
+it("falha de leitura não é dicionário vazio e não ativa outra fonte", async () => {
+  configurar(); falha = "nina_cat_servicos";
+  expect(await lerDicionarioDaMensagem("clinica-a", "ultra")).toEqual({ status: "indisponivel" });
+  expect(leiturasOS).toEqual([]);
+});
 
 function configurar(fonte = "base_conhecimento", revisao = "v1", clinica = "clinica-a") {
   tabelas.clinica_feature_flags = [{ id: "config", clinica_id: clinica, flag_key: FLAG_FONTE_CONSULTA,

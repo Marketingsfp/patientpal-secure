@@ -72,7 +72,7 @@ const catalogoInterpretado: Record<string, any[]> = {
   })),
 };
 const baseFonte = [{ id: "base-ecg", clinica_id: "clinica-simulada", status: "PUBLICADO",
-  nome: "Eletrocardiograma", valor: 157, descricao_publica: "Informação exclusiva da base", formas_pagamento: [], executantes: [] }];
+  nome: "Eletrocardiograma", estrutura: { aliases: ["traçado do coração"] }, valor: 157, descricao_publica: "Informação exclusiva da base", formas_pagamento: [], executantes: [] }];
 if (fonteCenario) catalogoInterpretado.servicos = [{ ...baseFonte[0], id: "os-ecg", valor: 93, descricao_publica: "Informação exclusiva do cadastro" }];
 if (clinicoGeral) {
   catalogoInterpretado.profissionais = [{
@@ -118,7 +118,7 @@ const pergunta = clinicoGeral ? `Quero clínico geral com ${medicoClinico} na pr
     : cenario.endsWith("exame") ? "Quanto custa o exame PET-CT?"
     : cenario.endsWith("procedimento") ? "Vocês fazem o procedimento crioablação?"
     : "Gostaria de marca a pneumologista"
-  : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
+  : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"
   : cenario === "catalogo_equipe_enfermagem" ? "Equipe de Enfermagem"
   : regraCatalogo ? "Técnica" : "Dra. Ana Souza";

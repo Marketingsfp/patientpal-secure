@@ -12,6 +12,18 @@ for (const ambiente of ["producao", "homologacao"]) {
       expect(linha).toBeDefined();
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
       const entrada = JSON.stringify(r.requests);
+      const primeiraEntrada = JSON.stringify(r.requests[0]);
+      expect(primeiraEntrada).toContain("dicionario_da_mensagem");
+      if (fonte === "base") {
+        expect(primeiraEntrada).toContain("variacoes_encontradas");
+        expect(primeiraEntrada).toContain("traçado do coração");
+        expect(primeiraEntrada).toContain("CONSULTAR_DICIONARIO_PUBLICADO");
+        expect(r.etapas.some((e: any) => e.titulo === "Dicionário publicado consultado antes da interpretação")).toBe(true);
+      } else {
+        expect(primeiraEntrada).toContain("nao_aplicavel");
+        expect(primeiraEntrada).not.toContain("variacoes_encontradas");
+        expect(primeiraEntrada).not.toContain("CONSULTAR_DICIONARIO_PUBLICADO");
+      }
       expect(entrada).toContain(fonte === "base" ? "157,00" : "93,00");
       expect(entrada).not.toContain(fonte === "base" ? "93,00" : "157,00");
       expect(entrada).not.toContain("PROFISSIONAL_DESATUALIZADO");
