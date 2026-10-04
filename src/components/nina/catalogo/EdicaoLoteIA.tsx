@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { TextoCatalogo as Textarea } from "./TextoCatalogo";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -194,7 +194,7 @@ export function EdicaoLoteIA({
       >
         <DialogContent
           data-os-zap="true"
-          className="oszap-base-dialog max-w-4xl max-h-[85vh] overflow-y-auto"
+          className="oszap-base-dialog"
           aria-describedby={undefined}
         >
           <DialogHeader>

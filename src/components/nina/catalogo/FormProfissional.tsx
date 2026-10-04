@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { TextoCatalogo as Textarea, CampoTextoCatalogo } from "./TextoCatalogo";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
@@ -180,7 +180,7 @@ export function FormProfissional({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label>Nome do profissional *</Label>
-          <Input
+          <CampoTextoCatalogo
             value={estado.nome}
             disabled={somenteLeitura}
             onChange={(e) => set({ nome: e.target.value })}
@@ -345,7 +345,7 @@ export function FormProfissional({
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <Input
+              <CampoTextoCatalogo
                 value={h.observacao}
                 disabled={somenteLeitura}
                 placeholder="Observação do horário (opcional)"

@@ -7,9 +7,8 @@ import {
 } from "@/lib/nina/catalogo-estrutura";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { TextoCatalogo as Textarea, CampoTextoCatalogo } from "./TextoCatalogo";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -161,7 +160,7 @@ export function FormServico({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label>Procedimento *</Label>
-          <Input
+          <CampoTextoCatalogo
             value={estado.nome}
             disabled={somenteLeitura}
             placeholder="Ex.: Ultrassonografia de tireoide"
@@ -207,7 +206,7 @@ export function FormServico({
         </div>
         <div className="space-y-1">
           <Label>Observação do valor</Label>
-          <Input
+          <CampoTextoCatalogo
             value={estado.valor_observacao}
             disabled={somenteLeitura}
             placeholder="Ex.: valor por sessão"
@@ -288,7 +287,7 @@ export function FormServico({
                 });
               }}
             />
-            <Input
+            <CampoTextoCatalogo
               value={ex.horarios}
               disabled={somenteLeitura}
               placeholder="Ex.: Seg e Qua, 08:00–12:00"

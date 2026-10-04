@@ -331,8 +331,10 @@
 .oszap-base-record-status[data-status="PUBLICADO"] { color: var(--atd-blue-ink); background: var(--atd-blue-soft); border-color: var(--border); box-shadow: none; }
 .oszap-base :is(.oszap-base-toolbar-actions, .oszap-base-record-actions) button { height: auto; min-height: 32px; padding: 6px 10px; border-radius: 8px; box-shadow: none; }
 .oszap-base :is(.oszap-base-toolbar-actions, .oszap-base-record-actions) button svg { margin-right: 0; }
-.oszap-base-dialog { background: var(--card); border-color: var(--border); border-radius: 12px; padding: 20px; }
+.oszap-base-dialog { width: calc(100vw - 2rem); max-width: none; max-height: calc(100dvh - 2rem); overflow-y: auto; background: var(--card); border-color: var(--border); border-radius: 12px; padding: 20px; overflow-wrap: anywhere; }
 .oszap-base-dialog :is(input, textarea) { background: var(--background); border-radius: 8px; box-shadow: none; }
+.oszap-base-dialog .grid > *, .oszap-base-dialog .flex > * { min-width: 0; }
+.oszap-base-texto { field-sizing: content; min-height: 2.25rem; height: auto; max-height: none; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
 .oszap-base-dialog button { border-radius: 8px; }
 html.a11y-dens-confortavel .oszap-base .oszap-base-record-header { padding-top: 16px; }
 html.a11y-dens-confortavel .oszap-base .oszap-base-record-content { padding-bottom: 16px; }
@@ -343,7 +345,7 @@ html.a11y-dens-grande .oszap-base .oszap-base-record-content { padding-bottom: 2
   .oszap-base-catalog, .oszap-base-clinic { padding: 12px; }
   .oszap-base .oszap-base-tab-list { padding: 8px; }
   .oszap-base-tab-list [role="tab"] { flex: 1 1 100%; justify-content: flex-start; }
-  .oszap-base-dialog { padding: 16px; }
+  .oszap-base-dialog { width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); padding: 16px; }
 }
 /* Personalização do atendimento; nenhum filtro é aplicado à página inteira. */
 html:is(.a11y-cores-protanopia,.a11y-cores-deuteranopia,.a11y-cores-tritanopia) body:has([data-os-zap="true"]) { filter: none; }

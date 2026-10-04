@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { BookOpen, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { TextoCatalogo as Textarea } from "./TextoCatalogo";
 import { gerarVariacoesCatalogoIA } from "@/lib/nina/catalogo.functions";
 import {
   juntarVariacoes,

@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { TextoCatalogo as Textarea, CampoTextoCatalogo } from "./TextoCatalogo";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Plus, Trash2 } from "lucide-react";
@@ -49,7 +48,7 @@ export function FormasPagamentoEditor({
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <Label>Forma</Label>
-              <Input
+              <CampoTextoCatalogo
                 value={linha.forma}
                 disabled={somenteLeitura}
                 placeholder="Ex.: Dinheiro ou Pix/cartão"
@@ -67,7 +66,7 @@ export function FormasPagamentoEditor({
             </div>
             <div className="space-y-1">
               <Label>Quando / condição</Label>
-              <Input
+              <CampoTextoCatalogo
                 value={linha.condicao}
                 disabled={somenteLeitura}
                 placeholder="Ex.: à vista, até 3x sem juros"

@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { TextoCatalogo as Textarea, CampoTextoCatalogo } from "./TextoCatalogo";
 import { Button } from "@/components/ui/button";
 import { MODALIDADES_ATENDIMENTO } from "@/lib/nina/modalidade-atendimento";
 import {
@@ -118,7 +118,7 @@ export function EstruturaCatalogoEditor({
           />
           <div className="space-y-1">
             <Label htmlFor={`grupo-${tipo}`}>Grupo ao qual pertence</Label>
-            <Input
+            <CampoTextoCatalogo
               id={`grupo-${tipo}`}
               value={valor.grupo ?? ""}
               disabled={somenteLeitura}
