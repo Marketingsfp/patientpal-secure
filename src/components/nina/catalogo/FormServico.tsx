@@ -180,8 +180,8 @@ export function FormServico({
             }}
           />
           <p className="text-xs text-muted-foreground">
-            Necessário para a Nina consultar vagas e agendar este exame ou procedimento. O vínculo
-            usa o cadastro selecionado, mesmo que os nomes sejam diferentes.
+            Associa este registro ao procedimento selecionado. Para copiar os dados da origem, use
+            “Sincronizar com Clínica OS” na lista. O vínculo não atualiza os campos sozinho.
           </p>
         </div>
       </div>

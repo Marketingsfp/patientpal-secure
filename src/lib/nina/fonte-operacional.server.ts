@@ -93,6 +93,11 @@ async function lerCadastro(clinicaId: string): Promise<FonteOperacional> {
 
 const cache = new Map<string, { em: number; leitura: Promise<FonteOperacional> }>();
 
+/** Uso editorial autenticado: leitura fresca para prévia/cópia manual, sem ativar atendimento. */
+export async function lerFonteParaSincronizacao(clinicaId: string): Promise<FonteOperacional> {
+  return lerCadastro(clinicaId);
+}
+
 /** Limpa o cache (uso em testes). */
 export function limparCacheFonteOperacional() {
   cache.clear();

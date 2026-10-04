@@ -15,6 +15,7 @@ import { EdicaoLoteIA } from "./EdicaoLoteIA";
 import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
 import { DicionarioCatalogoEditor } from "./DicionarioCatalogoEditor";
 import { MapaCamposCatalogo } from "./MapaCamposCatalogo";
+import { SincronizacaoCatalogo } from "./SincronizacaoCatalogo";
 import {
   Dialog,
   DialogContent,
@@ -408,6 +409,15 @@ export function CatalogoNina({
         </div>
         {podeEditar && !erroCarga && !carregando && (
           <div className="oszap-base-toolbar-actions flex flex-wrap items-center gap-2">
+            {clinicaId && (
+              <SincronizacaoCatalogo
+                key={`${clinicaId}:${tipo}`}
+                clinicaId={clinicaId}
+                tipo={tipo}
+                itens={itens}
+                onSincronizado={carregar}
+              />
+            )}
             <EdicaoLoteIA clinicaId={clinicaId} podeEditar={podeEditar} onPublicado={carregar} />
             <Button
               onClick={() => {

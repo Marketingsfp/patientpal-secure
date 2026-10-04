@@ -198,6 +198,10 @@ export function FormProfissional({
               set({ medico_id: v || null, nome: estado.nome || (m?.nome ?? "") });
             }}
           />
+          <p className="text-xs text-muted-foreground">
+            Para copiar os dados da origem, use “Sincronizar com Clínica OS” na lista. O vínculo não
+            atualiza os campos sozinho.
+          </p>
         </div>
       </div>
 
