@@ -84,7 +84,7 @@ describe("dicionário por cadastro", () => {
     expect(r.text.format.strict).toBe(true);
     expect(r.tools).toEqual([{ type: "web_search" }]);
     expect(r.tool_choice).toBe("required");
-    expect(r.max_tool_calls).toBe(3);
+    expect(r).not.toHaveProperty("max_tool_calls");
     expect(r.include).toContain("web_search_call.action.sources");
   });
   test("rejeita SSE interrompido mesmo contendo JSON válido no delta", async () => {
@@ -219,13 +219,10 @@ describe("dicionário por cadastro", () => {
       ).rejects.toThrow("sem fontes verificáveis");
     }
   });
-  test("deduplica fontes reais e rejeita provedor que desrespeita teto", async () => {
-    const r = await lerRespostaDicionario(resposta(saida, [pesquisa, pesquisa]));
-    expect(r.pesquisa.chamadas).toBe(2);
+  test("aceita mais de três buscas e deduplica fontes reais", async () => {
+    const r = await lerRespostaDicionario(resposta(saida, Array.from({ length: 10 }, () => pesquisa)));
+    expect(r.pesquisa.chamadas).toBe(10);
     expect(r.pesquisa.fontes).toHaveLength(1);
-    await expect(
-      lerRespostaDicionario(resposta(saida, [pesquisa, pesquisa, pesquisa, pesquisa])),
-    ).rejects.toThrow("excedeu");
   });
   test("ferramenta recusada não causa fallback sem web", async () => {
     let chamadas = 0;

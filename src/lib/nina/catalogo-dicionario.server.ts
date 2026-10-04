@@ -1,6 +1,5 @@
 import {
   MODELO_DICIONARIO,
-  LIMITE_CHAMADAS_WEB,
   LIMITE_VARIACOES,
   requisicaoDicionario,
   validarSugestoesDicionario,
@@ -38,8 +37,6 @@ function evidenciaPesquisa(output: ItemResposta[]): PesquisaDicionario {
     throw Error(
       "O provedor não confirmou a pesquisa na web. Verifique o suporte a web_search no Lovable; nenhuma sugestão foi aplicada.",
     );
-  if (chamadas.length > LIMITE_CHAMADAS_WEB)
-    throw Error("O provedor excedeu o limite de pesquisa. Nenhuma sugestão foi aplicada.");
   const fontes = new Map<string, { url: string; titulo: string }>();
   const adicionar = (fonte: { url?: unknown; title?: unknown }) => {
     const url = urlPublica(fonte.url);

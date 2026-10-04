@@ -8,7 +8,7 @@ A geração usa nome, descrição pública, especialidades, abrangência (item/g
 
 ## Pesquisa web na geração
 
-O botão solicita `web_search` pela Responses API, com `tool_choice: required`, `max_tool_calls: 3` e `include: ["web_search_call.action.sources"]`. Mantém Astra, limite de 6.000 tokens de saída/raciocínio e 120 segundos. Cadastro já com 50 variações não inicia uma chamada cobrada. Não há busca web nas conversas ou alteração do Gemini.
+O botão solicita `web_search` pela Responses API, com `tool_choice: required` e `include: ["web_search_call.action.sources"]`, sem definir `max_tool_calls` ou rejeitar resultados pela quantidade de chamadas. O prompt orienta concluir com evidências suficientes, evitando buscas repetidas sem ganho de informação. Mantém Astra, limite de 6.000 tokens de saída/raciocínio e 120 segundos; limites próprios do provedor continuam aplicáveis. Mais buscas podem aumentar custo e duração. Cadastro já com 50 variações não inicia uma chamada cobrada. Não há busca web nas conversas ou alteração do Gemini.
 
 O servidor só entrega a prévia quando a resposta completa contém uma busca executada e fontes HTTP(S) retornadas pela ferramenta ou por suas anotações de citação. Texto do modelo afirmando que pesquisou não comprova execução. Se o gateway recusar a ferramenta, omitir a execução, omitir as fontes ou devolver uma resposta incompleta, a tela mostra erro e preserva o dicionário. Não há nova tentativa automática nem fallback silencioso sem pesquisa.
 

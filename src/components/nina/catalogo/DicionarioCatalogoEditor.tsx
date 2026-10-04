@@ -119,7 +119,7 @@ export function DicionarioCatalogoEditor({
         exames diferentes equivalentes.
       </p>
       <p className="text-xs text-muted-foreground">
-        Pesquisa na web ao gerar, com até 3 chamadas e cobrança de IA/pesquisa. A internet ajuda a
+        Pesquisa na web ao gerar, sem teto de chamadas definido pelo sistema e com cobrança de IA/pesquisa. A internet ajuda a
         descobrir nomes; valores, preparo e regras continuam vindo do cadastro da clínica.
       </p>
       <div className="space-y-1">
