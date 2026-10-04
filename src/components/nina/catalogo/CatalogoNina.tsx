@@ -808,6 +808,7 @@ export function CatalogoNina({
                     descricao: servico.descricao_publica,
                     especialidades: [],
                     aliases: servico.estrutura.aliases,
+                    abrangencia: servico.estrutura.abrangencia,
                   }
                 : {
                     tipo,
@@ -820,6 +821,7 @@ export function CatalogoNina({
                       ...profissional.especialidadesLivres,
                     ],
                     aliases: profissional.estrutura.aliases,
+                    abrangencia: profissional.estrutura.abrangencia,
                   }
             }
             onChange={(aliases) =>

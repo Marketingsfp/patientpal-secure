@@ -9,7 +9,7 @@ import {
   juntarVariacoes,
   LIMITE_VARIACOES,
   type ContextoDicionario,
-  type SugestoesDicionario,
+  type ResultadoDicionario,
 } from "@/lib/nina/catalogo-dicionario";
 
 const rotulos = {
@@ -35,7 +35,7 @@ export function DicionarioCatalogoEditor({
   const gerar = useServerFn(gerarVariacoesCatalogoIA);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
-  const [previa, setPrevia] = useState<SugestoesDicionario | null>(null);
+  const [previa, setPrevia] = useState<ResultadoDicionario | null>(null);
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const chave = JSON.stringify([clinicaId, contexto]);
   const atual = useRef(chave);
@@ -110,13 +110,17 @@ export function DicionarioCatalogoEditor({
             ) : (
               <Sparkles className="h-4 w-4" aria-hidden="true" />
             )}
-            {ocupado ? "Gerando variações…" : "Gerar com GPT-6 Astra"}
+            {ocupado ? "Pesquisando e gerando…" : "Pesquisar e gerar com GPT-6 Astra"}
           </Button>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
         Siglas, nomes populares e formas de escrever este mesmo atendimento. Semelhança não torna
         exames diferentes equivalentes.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Pesquisa na web ao gerar, com até 3 chamadas e cobrança de IA/pesquisa. A internet ajuda a
+        descobrir nomes; valores, preparo e regras continuam vindo do cadastro da clínica.
       </p>
       <div className="space-y-1">
         <Label htmlFor={id}>Variações revisadas · uma por linha</Label>
@@ -142,8 +146,15 @@ export function DicionarioCatalogoEditor({
       {previa && (
         <div className="space-y-3 border-t pt-3" aria-live="polite">
           <p className="text-sm font-medium">
-            Revise e selecione as sugestões que correspondem ao cadastro.
+            {previa.variacoes.length} sugestões para revisar e selecionar.
           </p>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {Object.entries(rotulos).map(([categoria, rotulo]) => (
+              <span key={categoria} className="rounded-md border px-2 py-1">
+                {rotulo}: {previa.variacoes.filter((v) => v.categoria === categoria).length}
+              </span>
+            ))}
+          </div>
           {!previa.variacoes.length && (
             <p className="text-sm text-muted-foreground">Nenhuma nova variação foi sugerida.</p>
           )}
@@ -170,10 +181,51 @@ export function DicionarioCatalogoEditor({
                   <strong>{v.termo}</strong>
                   <span className="ml-2 text-xs text-muted-foreground">{rotulos[v.categoria]}</span>
                   <span className="block text-xs text-muted-foreground">{v.explicacao}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {v.origem === "web"
+                      ? "Com referência da pesquisa"
+                      : "Hipótese de escrita gerada pela IA — revise"}
+                  </span>
+                  {v.fontes.map((url, i) => (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mr-3 inline-block text-xs text-primary underline"
+                    >
+                      Fonte {i + 1} · {new URL(url).hostname}
+                    </a>
+                  ))}
                 </span>
               </label>
             ))}
           </div>
+          <details className="rounded-md border p-3 text-sm">
+            <summary className="cursor-pointer font-medium">
+              Pesquisa executada · {previa.pesquisa.chamadas} chamadas ·{" "}
+              {previa.pesquisa.fontes.length} fontes
+            </summary>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Links retornados pela ferramenta de pesquisa. Confira o conteúdo antes de aprovar uma
+              equivalência. As fontes ficam disponíveis nesta prévia; ao salvar, somente os termos
+              selecionados entram no dicionário.
+            </p>
+            <ul className="mt-2 space-y-2">
+              {previa.pesquisa.fontes.map((fonte) => (
+                <li key={fonte.url}>
+                  <a
+                    href={fonte.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    {fonte.titulo || new URL(fonte.url).hostname}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
           {!!previa.duvidas.length && (
             <div className="rounded-md border p-3 text-sm">
               <p className="font-medium">Expressões que precisam de esclarecimento</p>
