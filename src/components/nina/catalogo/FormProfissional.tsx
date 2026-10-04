@@ -1,4 +1,5 @@
 import { EstruturaCatalogoEditor } from "./EstruturaCatalogoEditor";
+import { PedidoMedicoEditor } from "./PedidoMedicoEditor";
 import {
   estruturaVazia,
   lerEstrutura,
@@ -170,6 +171,11 @@ export function FormProfissional({
         profissional={estado.nome}
         somenteLeitura={somenteLeitura}
         onOrganizar={(observacao_publica) => set({ observacao_publica })}
+      />
+      <PedidoMedicoEditor
+        valor={estado.estrutura.pedido_medico}
+        somenteLeitura={somenteLeitura}
+        onChange={(pedido_medico) => set({ estrutura: { ...estado.estrutura, pedido_medico } })}
       />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">

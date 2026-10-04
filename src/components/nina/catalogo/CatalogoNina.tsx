@@ -12,6 +12,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { PreviaEdicaoCatalogo } from "@/lib/nina/catalogo-edicao-ia";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { EdicaoLoteIA } from "./EdicaoLoteIA";
+import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
 import {
   Dialog,
   DialogContent,
@@ -686,7 +687,7 @@ export function CatalogoNina({
                 </div>
               </CardHeader>
               <CardContent className="oszap-base-record-content text-sm text-muted-foreground">
-                <div className="min-w-0">
+                <div className="min-w-0 space-y-1">
                   {tipo === "servico" ? (
                     item.formas_pagamento?.length ? (
                       <dl className="oszap-base-payments">
@@ -719,6 +720,12 @@ export function CatalogoNina({
                   ) : (
                     <p>{resumoHorarios(item.horarios ?? [])}</p>
                   )}
+                  <p>
+                    Pedido médico:{" "}
+                    <span className="font-medium text-foreground">
+                      {rotuloPedidoMedico(item.estrutura?.pedido_medico)}
+                    </span>
+                  </p>
                 </div>
                 {podeEditar && (
                   <div className="oszap-base-record-actions flex flex-wrap gap-2">
