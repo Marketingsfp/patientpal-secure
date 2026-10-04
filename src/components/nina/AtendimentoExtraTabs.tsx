@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ConsultaBaseChat } from "./ConsultaBaseChat";
+import { AssistenteEscritaChat } from "./AssistenteEscritaChat";
 import { acrescentarBaseAoRascunho } from "@/lib/atendimento/consulta-base-chat";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadeProvider";
@@ -650,7 +651,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // no campo de outro.
   const [rascunhos, setRascunhos] = useState<Rascunhos>({});
   const [consultaBaseAberta, setConsultaBaseAberta] = useState(false);
-  useEffect(() => { setConsultaBaseAberta(false); }, [clinicaId, sel?.id]);
+  const [escritaAberta, setEscritaAberta] = useState(false);
+  useEffect(() => { setConsultaBaseAberta(false); setEscritaAberta(false); }, [clinicaId, sel?.id]);
   const draft = lerRascunho(rascunhos, sel?.id ?? null);
   const setDraft = useCallback((valor: string | ((anterior: string) => string)) => {
     const id = selIdRef.current;
@@ -3291,8 +3293,13 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     <div className="flex flex-wrap justify-end gap-1">
                       <Button size="sm" variant="outline" disabled={carregandoConversa}
                         aria-expanded={consultaBaseAberta}
-                        onClick={() => setConsultaBaseAberta(v => !v)}>
+                        onClick={() => { setConsultaBaseAberta(v => !v); setEscritaAberta(false); }}>
                         Consultar base
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={!!motivoBloqueio}
+                        aria-expanded={escritaAberta}
+                        onClick={() => { setEscritaAberta(v => !v); setConsultaBaseAberta(false); }}>
+                        Assistente de escrita
                       </Button>
                       {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (
                         <Button
@@ -3341,6 +3348,18 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     </div>
                   </div>
                 </CardHeader>
+                {escritaAberta && clinicaId && conteudoDaConversa && (
+                  <AssistenteEscritaChat key={`${clinicaId}:${sel.id}`} clinicaId={clinicaId}
+                    conversaId={sel.id} rascunho={draft} contextoVersao={`${msgs.length}:${msgs.at(-1)?.id ?? ""}`}
+                    bloqueio={motivoBloqueio} onFechar={() => setEscritaAberta(false)}
+                    onAplicar={(texto, original) => {
+                      if (selIdRef.current !== sel.id || motivoBloqueio || !conteudoDaConversa || draft !== original) return false;
+                      setDraft(anterior => anterior === original ? texto : anterior);
+                      setSlash(null);
+                      requestAnimationFrame(() => composerRef.current?.focus());
+                      return true;
+                    }} />
+                )}
                 {consultaBaseAberta && clinicaId && conteudoDaConversa && (
                   <ConsultaBaseChat key={`${clinicaId}:${sel.id}`} clinicaId={clinicaId}
                     conversaId={sel.id} bloqueio={motivoBloqueio}
