@@ -92,16 +92,6 @@ export function EstruturaCatalogoEditor({
             preencher.
           </p>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor={`aliases-${tipo}`}>Nomes alternativos e siglas</Label>
-          <Textarea
-            id={`aliases-${tipo}`}
-            disabled={somenteLeitura}
-            value={valor.aliases.join("\n")}
-            placeholder="Um nome por linha. Apenas equivalências confirmadas deste atendimento."
-            onChange={(e) => set({ aliases: e.target.value.split("\n") })}
-          />
-        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {tipo === "servico" && (
             <Escolha

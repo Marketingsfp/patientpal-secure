@@ -16,6 +16,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { profissionalSchema, servicoSchema, valorResumo, STATUS_CATALOGO } from "./catalogo";
 import { separarAtendimentos } from "./catalogo-estrutura";
+import { contextoDicionarioSchema } from "./catalogo-dicionario";
 import { validarSelecaoLote, publicarLoteValidado, LIMITE_EDICAO_LOTE } from "./catalogo-lote-ia";
 import {
   aplicarEdicaoCatalogoIA,
@@ -352,6 +353,28 @@ export const organizarTextoCatalogoIA = createServerFn({ method: "POST" })
     await exigirAdmin(context.supabase, context.userId, data.clinicaId);
     const { organizarTextoComIA } = await import("./catalogo-ia.server");
     return await organizarTextoComIA(data.tipo, data.texto);
+  });
+
+/** Sugestões de linguagem: nenhum dado é salvo ou publicado nesta operação. */
+export const gerarVariacoesCatalogoIA = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        contexto: contextoDicionarioSchema,
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    const { gerarDicionarioComIA, comLimiteDicionario } =
+      await import("./catalogo-dicionario.server");
+    const resultado = await comLimiteDicionario(context.userId, () =>
+      gerarDicionarioComIA(data.contexto),
+    );
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    return resultado;
   });
 
 /** Lê o cadastro da clínica e gera uma prévia. Não grava nem publica. */

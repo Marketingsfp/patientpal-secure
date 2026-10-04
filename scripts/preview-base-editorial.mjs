@@ -22,7 +22,7 @@ async function salvar(tipo,{data}){const lista=registros[tipo];const anterior=li
 export const salvarServicoCatalogo=x=>salvar('servicos',x);
 export const salvarProfissionalCatalogo=x=>salvar('profissionais',x);
 const indisponivel=async()=>{throw Error('Esta prévia não acessa banco ou modelo real.')};
-export const alterarStatusCatalogo=indisponivel,excluirItemCatalogo=indisponivel,organizarTextoCatalogoIA=indisponivel,preverEdicaoCatalogoIA=indisponivel,selecionarEdicoesCatalogoIA=indisponivel,publicarEdicoesCatalogoIA=indisponivel;
+export const alterarStatusCatalogo=indisponivel,excluirItemCatalogo=indisponivel,organizarTextoCatalogoIA=indisponivel,preverEdicaoCatalogoIA=indisponivel,selecionarEdicoesCatalogoIA=indisponivel,publicarEdicoesCatalogoIA=indisponivel,gerarVariacoesCatalogoIA=indisponivel;
 `;
 const mocks = {
   "@tanstack/react-start": "export const useServerFn=fn=>fn;",

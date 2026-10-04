@@ -13,6 +13,7 @@ import type { PreviaEdicaoCatalogo } from "@/lib/nina/catalogo-edicao-ia";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { EdicaoLoteIA } from "./EdicaoLoteIA";
 import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
+import { DicionarioCatalogoEditor } from "./DicionarioCatalogoEditor";
 import {
   Dialog,
   DialogContent,
@@ -117,6 +118,7 @@ export function CatalogoNina({
     if (!termos.length) return itens;
     return itens.filter((item) => {
       const nomes = [item.nome];
+      nomes.push(...(item.estrutura?.aliases ?? []));
       if (tipo === "profissional") {
         nomes.push(...(item.especialidades ?? []).map((e: { nome?: string }) => e?.nome));
       }
@@ -726,6 +728,14 @@ export function CatalogoNina({
                       {rotuloPedidoMedico(item.estrutura?.pedido_medico)}
                     </span>
                   </p>
+                  {!!item.estrutura?.aliases?.length && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-primary">
+                        Dicionário · {item.estrutura.aliases.length} variações
+                      </summary>
+                      <p className="mt-1 break-words">{item.estrutura.aliases.join(" · ")}</p>
+                    </details>
+                  )}
                 </div>
                 {podeEditar && (
                   <div className="oszap-base-record-actions flex flex-wrap gap-2">
@@ -786,6 +796,41 @@ export function CatalogoNina({
               </ul>
             </div>
           )}
+          <DicionarioCatalogoEditor
+            key={`${tipo}-${tipo === "servico" ? servico.id : profissional.id}-${posicao}`}
+            clinicaId={clinicaId}
+            somenteLeitura={!podeEditar || salvando}
+            contexto={
+              tipo === "servico"
+                ? {
+                    tipo,
+                    nome: servico.nome,
+                    descricao: servico.descricao_publica,
+                    especialidades: [],
+                    aliases: servico.estrutura.aliases,
+                  }
+                : {
+                    tipo,
+                    nome: profissional.nome,
+                    descricao: profissional.observacao_publica,
+                    especialidades: [
+                      ...opcoes.especialidades
+                        .filter((e) => profissional.especialidades.includes(e.id))
+                        .map((e) => e.nome),
+                      ...profissional.especialidadesLivres,
+                    ],
+                    aliases: profissional.estrutura.aliases,
+                  }
+            }
+            onChange={(aliases) =>
+              tipo === "servico"
+                ? setServico((atual) => ({ ...atual, estrutura: { ...atual.estrutura, aliases } }))
+                : setProfissional((atual) => ({
+                    ...atual,
+                    estrutura: { ...atual.estrutura, aliases },
+                  }))
+            }
+          />
           {tipo === "servico" ? (
             <FormServico
               estado={servico}
