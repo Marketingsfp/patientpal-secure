@@ -1,8 +1,32 @@
-# JEV: leitura ampliada em observação
+# JEV: leitura ampliada orientando as respostas
 
-Base: `2e859c781`, origin/main conferida em 04/10/2026.
-Escopo: atendimento WhatsApp/Nina/OS ZAP. Implementação da primeira etapa
-recomendada e aprovada: registrar e revisar antes de aplicar novas ações.
+Base da ativação: `4321d1d39`, origin/main conferida em 04/10/2026.
+Escopo: atendimento WhatsApp/Nina/OS ZAP. JEAN autorizou expressamente colocar
+os quatro recursos para funcionar, após a primeira etapa em observação.
+
+## Ativação
+
+`orientarIntencaoJev` usa os sinais válidos a partir de 80% para ampliar as
+intenções do turno e construir instruções específicas. Estas passam pelo
+contrato de precedência e por `comporRequestNina`, entrando de fato no system
+prompt da Nina no fluxo compartilhado pelo atendimento real e homologação.
+Não são apenas informações da tela.
+
+- Múltiplos pedidos: mantém as intenções identificadas e acrescenta os pedidos
+  confiáveis, orientando responder todos com as fontes oficiais.
+- Horário habitual: informa a escala da base; oferece consultar vagas sem
+  presumir disponibilidade. Pedido de vagas orienta usar as ferramentas
+  permitidas, depois das seleções necessárias.
+- Aceite: distingue consulta, resumo, condição, recusa e ambiguidade; confirmação
+  ainda exige as verificações existentes. Aceite ambíguo pede esclarecimento.
+- Correção: orienta identificar a substituição na mensagem, refazer as consultas
+  dependentes e não reutilizar a seleção anterior como confirmação. Um sinal
+  de correção prevalece sobre um sinal simultâneo de aceite do resumo.
+
+Não modifica diretamente cadastro, identidade, reservas nem permissões de
+ferramentas. Pontuações baixas/ausentes não adicionam orientação. Gates que
+respondem antes do modelo continuam valendo. Nenhum sinal do JEV, isoladamente,
+garante que uma operação foi executada ou uma resposta foi enviada.
 
 ## O que foi implementado
 
@@ -23,8 +47,9 @@ extras; isso aumenta conteúdo/tokenização e pode afetar custo, latência e as
 respostas do próprio modelo, mesmo compartilhando a chamada. O limite atual
 de 4 segundos e a ausência de repetição automática permanecem.
 
-As respostas antigas seguem separadas das observações antes de entrar em
-`intencaoAplicavel` e nas regras de encaminhamento. Uma observação ausente,
+As respostas antigas seguem separadas dos sinais ampliados antes de entrar em
+`intencaoAplicavel` e nas regras de encaminhamento. Depois, os pedidos confiáveis
+complementam `intencoesTurno` e as instruções do turno. Uma observação ausente,
 inválida, sem confiança, infinita ou fora de 0–1 não invalida respostas antigas
 válidas. Se a chamada inteira falhar, vale o fallback atual de sem decisão.
 
@@ -33,20 +58,26 @@ válidas. Se a chamada inteira falhar, vale o fallback atual de sem decisão.
 O registro da fase 1 guarda `_observacao_intencao` em `respostas`, versão
 `intencoes-v1`, modo `observacao`, `aplicada: false`. Não duplica essa leitura
 na fase 2 nem a mistura com a contagem de falhas em `_nina`.
+Esse campo é o resultado bruto compatível com o histórico. Nas novas decisões,
+`_orientacao_intencao` registra o plano derivado, versão `intencoes-ativas-v1`:
+pedidos, intenções e instruções preparadas. A montagem efetiva do prompt fica
+também no contrato de precedência dos detalhes técnicos.
 O JSON `perguntas` registra também o contexto enviado, início do ciclo e a
 intenção operacional aplicada. Registros anteriores não são alterados.
 
-A tabela apresenta **Leitura ampliada · em observação**. Ao expandir:
+A tabela apresenta **Leitura ampliada · orienta a resposta** quando existe
+orientação preparada. Registros antigos mantêm **em observação**. Ao expandir:
 
 - pedidos apontados e pontuações;
 - horário habitual e vagas separados;
 - alcance do aceite e tipo de correção;
 - ausência de dados e baixa certeza indicadas explicitamente.
 
-As faixas de apresentação (até 20% não indicado; entre 20% e 80% incerto;
-a partir de 80% indicado) são apenas convenções de leitura. Não são limites
-de ação ou probabilidades calibradas. A coluna Aplicada continua se referindo
-à decisão original, e a observação informa que não foi aplicada ao atendimento.
+As faixas de apresentação são até 20% não indicado, entre 20% e 80% incerto e
+a partir de 80% indicado. A orientação utiliza apenas os sinais a partir de
+80%; isso não autoriza ferramenta nem constitui probabilidade calibrada. A
+coluna Aplicada se refere à decisão original; o bloco expandido identifica
+explicitamente a orientação preparada, sem afirmar envio ou agendamento.
 
 ## Validação e limites
 
@@ -85,8 +116,8 @@ mensagens a pacientes reais para validar o recurso.
 | Repetição de mensagem e retomada após reiniciar sessão | Usar somente o ciclo atual; não herdar uma confirmação de ciclo anterior. |
 
 Registrar revisão humana com acertos, erros e casos inconclusivos, além de
-latência e falhas da chamada. Só depois desenhar e validar a aplicação das
-novas classificações ao fluxo. Nenhuma confirmação do JEV substitui base
+latência e falhas da chamada. A orientação está conectada ao fluxo por autorização
+do usuário; sua precisão real ainda precisa ser medida. Nenhuma confirmação do JEV substitui base
 oficial, agenda, identificação do paciente ou confirmação do sistema.
 
 Publicação no Lovable e precisão do modelo real continuam pendentes de

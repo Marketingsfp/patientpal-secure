@@ -12,6 +12,7 @@ import {
 import { perguntaIntencao, intencaoAplicavel } from "../jev-intencao";
 import { perguntasEncaminhamento, decidirEncaminhamento } from "../jev-encaminhamento";
 import { perguntasComAuditoriaJev } from "../jev-auditoria";
+import { orientarIntencaoJev, orientacaoDaDecisaoJev } from "../jev-orientacao-intencao";
 
 const perguntas = { ...perguntaIntencao(), ...perguntasEncaminhamento() };
 const principal = {
@@ -250,12 +251,17 @@ describe("Integração da observação com chamada e registro existentes", () =>
           perguntas,
           resultado,
           aplicada: true,
+          orientacao: orientarIntencaoJev(resultado.observacaoIntencao, ["valor"]),
           mensagem: { origem: "paciente", texto: "Pode confirmar" },
         });
       }
     }
     for (const i of [0, 2]) {
       expect(observacaoDaDecisao(registros[i].respostas)?.aplicada).toBe(false);
+      expect(orientacaoDaDecisaoJev(registros[i].respostas)?.instrucoes.join("\n")).toContain(
+        "Prossiga pela verificação de confirmação",
+      );
+      expect(orientacaoDaDecisaoJev(registros[i + 1].respostas)).toBeNull();
       expect(observacaoDaDecisao(registros[i + 1].respostas)).toBeNull();
     }
     expect(registros[0].respostas).toEqual(registros[2].respostas);

@@ -910,6 +910,7 @@ async function gerarRespostaNinaInterno(
   })();
   const { detectarIntencoes, intencaoAmbigua } = await import("@/lib/nina/atendimento-fase1");
   let intencoesTurno = detectarIntencoes(mensagemPaciente);
+  const intencoesDetectadasTurno = [...intencoesTurno];
   let intencaoAmbiguaTurno = intencaoAmbigua(mensagemPaciente, intencoesTurno);
 
   // JEV — Fases 1 e 2 (produção e homologação, flags `nina_jev_fase1/2`), numa
@@ -919,6 +920,7 @@ async function gerarRespostaNinaInterno(
   // uma opção já oferecida nunca conta como falha. Erro/demora = fluxo atual.
   let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
   let jevPontuacoes: Record<string, number | null> | null = null;
+  let orientacaoIntencaoJev: import("@/lib/nina/jev-orientacao-intencao").OrientacaoIntencaoJev | null = null;
   try {
     const jev = await import("@/lib/nina/jev.server");
     const [f1, f2] = await Promise.all([
@@ -943,8 +945,7 @@ async function gerarRespostaNinaInterno(
       const contextoJev = ctxJev.contextoAtendimentoJev(sessaoNina.estado);
       const conversaJev = estadoId.conversaId ?? null;
       const [resultado, anterior, limitesClinica] = await Promise.all([
-        // A leitura ampliada só alimenta auditoria. Não entra em intencoesTurno,
-        // confiança, escolha de vaga, confirmação ou encaminhamento.
+        // A leitura ampliada orienta a resposta; permissões de ferramentas seguem no fluxo.
         jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores, contextoJev), perguntas, undefined, f1),
         jev.contagemAnteriorFase1(clinicaId, conversaJev, inicioCiclo),
         jev.limitesJev(clinicaId),
@@ -954,6 +955,15 @@ async function gerarRespostaNinaInterno(
       if (escolhida) {
         intencoesTurno = [escolhida];
         intencaoAmbiguaTurno = false;
+      }
+      if (f1 && resultado.ok) {
+        const { orientarIntencaoJev } = await import("@/lib/nina/jev-orientacao-intencao");
+        orientacaoIntencaoJev = orientarIntencaoJev(resultado.observacaoIntencao,
+          [...new Set([...intencoesDetectadasTurno, ...intencoesTurno])]);
+        if (orientacaoIntencaoJev) {
+          intencoesTurno = orientacaoIntencaoJev.intencoes;
+          if (orientacaoIntencaoJev.pedidos.length) intencaoAmbiguaTurno = false;
+        }
       }
       const contagem = respostas
         ? enc.contarDuvida({
@@ -982,8 +992,9 @@ async function gerarRespostaNinaInterno(
         jev.registrarDecisaoJev({
           clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
           perguntas, resultado, aplicada: escolhida !== null, contagem,
+          orientacao: orientacaoIntencaoJev,
           mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
-          contexto: f1 ? { observacao_intencao: { versao: "intencoes-v1", modo: "observacao" },
+          contexto: f1 ? { observacao_intencao: { versao: "intencoes-v1", modo: "orientacao" },
             contexto_interpretacao: { mensagens_anteriores: anteriores, contexto_atendimento: contextoJev,
               inicio_ciclo: inicioCiclo, intencao_aplicada: escolhida } } : undefined,
         }),
@@ -1349,6 +1360,8 @@ async function gerarRespostaNinaInterno(
     motivo: string;
     texto: string;
   }> = [];
+  const { instrucaoJevDoTurno } = await import("@/lib/nina/jev-orientacao-intencao");
+  instrucoesAdicionaisTurno.push(...instrucaoJevDoTurno(orientacaoIntencaoJev));
   const { REGRA_CONSULTA_CATALOGO } = await import("@/lib/nina/catalogo-busca");
   instrucoesAdicionaisTurno.push({
     codigo: "CATALOGO_UMA_LEITURA_POR_RESPOSTA",

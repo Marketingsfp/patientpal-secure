@@ -136,6 +136,8 @@ export async function registrarDecisaoJev(r: {
   contexto?: Record<string, unknown>;
   /** Cópia do texto efetivamente analisado nesta chamada, para leitura da auditoria. */
   mensagem?: TextoDecisaoJev;
+  /** Orientação preparada para o prompt deste turno; não comprova envio nem operação. */
+  orientacao?: import("./jev-orientacao-intencao").OrientacaoIntencaoJev | null;
 }): Promise<void> {
   try {
     await supabaseAdmin.from("nina_jev_decisoes" as never).insert({
@@ -147,7 +149,8 @@ export async function registrarDecisaoJev(r: {
       respostas: r.resultado.ok
         ? { ...r.resultado.respostas, ...(r.contagem ? { _nina: r.contagem } : {}),
             ...(r.fase === "fase1_intencao" && r.resultado.observacaoIntencao
-              ? { _observacao_intencao: r.resultado.observacaoIntencao } : {}) }
+              ? { _observacao_intencao: r.resultado.observacaoIntencao } : {}),
+            ...(r.fase === "fase1_intencao" && r.orientacao ? { _orientacao_intencao: r.orientacao } : {}) }
         : null,
       aplicada: r.aplicada,
       latency_ms: r.resultado.latencyMs,

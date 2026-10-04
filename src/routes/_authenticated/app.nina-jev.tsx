@@ -269,7 +269,7 @@ function Pagina() {
       <Card>
         <CardHeader><CardTitle className="text-base">Decisões ({decisoes.length}{decisoes.length === 300 ? ", mais recentes" : ""})</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
-          <p className="mb-3 text-xs text-muted-foreground">Nas novas decisões de Intenção, a leitura ampliada observa múltiplos pedidos, horários habituais e vagas, alcance do aceite e correções. Esses sinais são apenas para revisão; a coluna “Aplicada” se refere à decisão original.</p>
+          <p className="mb-3 text-xs text-muted-foreground">A leitura ampliada orienta a Nina sobre múltiplos pedidos, horários habituais e vagas, alcance do aceite e correções. Abra o registro para ver a orientação do turno. Registros antigos em observação permanecem identificados; a coluna “Aplicada” se refere à decisão original.</p>
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
               <tr><th className="p-2">Quando</th><th className="p-2">Conversa</th><th className="p-2">Texto analisado</th><th className="p-2">Fase</th><th className="p-2">Resposta</th><th className="p-2">Aplicada</th><th className="p-2">Tempo</th></tr>
