@@ -7,6 +7,7 @@ import { mock } from "bun:test";
 import { criarResultadoSemNovaMensagem } from "@/lib/nina/resposta/contrato";
 import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
+import { formatarMensagemNina } from "@/lib/nina/resposta/formato-mobile";
 
 type Linha = Record<string, any>;
 const cenario = process.argv[2];
@@ -18,7 +19,7 @@ const entradasGerador: Linha[] = [];
 const encaminhada = cenario.startsWith("handoff-");
 const AVISO = "Nesta simulação, o atendimento precisaria de uma pessoa da equipe. Protocolo MJ-53.";
 const RESPOSTA = paridade
-  ? "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão."
+  ? "Olá! Temos Cardiologia. Dinheiro: R$ 120,00 Cartão: R$ 145,00. Quer consultar os horários?"
   : "Olá! Como posso ajudar?";
 const lead: Linha = {
   id: "lead-mj53",
@@ -213,9 +214,11 @@ mock.module("@/lib/whatsapp.server", () => ({
       return "";
     }
     if (cenario === "vazio-real") return "";
-    opcoes.auditoria.textoFinalHash = hashDoTexto(RESPOSTA);
+    // Núcleo atual já finaliza; cenário legado exercita a defesa do transporte.
+    const resposta = cenario === "resposta-antiga-sem-formatacao" || paridade ? RESPOSTA : formatarMensagemNina(RESPOSTA);
+    opcoes.auditoria.textoFinalHash = hashDoTexto(resposta);
     opcoes.auditoria.decisaoId = "avaliacao-resposta";
-    return RESPOSTA;
+    return resposta;
   },
 }));
 mock.module("@/lib/nina/resposta/finalizacao.server", () => ({

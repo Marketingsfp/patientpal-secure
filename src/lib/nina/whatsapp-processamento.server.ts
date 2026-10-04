@@ -1,5 +1,5 @@
 import { POLITICA_WATCHDOG } from "./watchdog";
-import { removerEmojisNina } from "./resposta/sem-emojis";
+import { formatarMensagemNina } from "./resposta/formato-mobile";
 /** Transporte canônico da Nina, reutilizado pelo webhook e pela retomada de lotes. */
 import {
   carregarControleWatchdog,
@@ -265,7 +265,7 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       }
     }
     // Também protege checkpoints de versões antigas e falha da finalização.
-    reply = removerEmojisNina(reply);
+    reply = formatarMensagemNina(reply);
     // FASE 4 — antes de QUALQUER envio: a resposta ainda vale?
     if (reply && revisaoTurno) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");

@@ -34,7 +34,8 @@ describe("Políticas no prompt, execução compartilhada (modelo/banco simulados
           }
         } else {
           expect(r.requests).toHaveLength(2);
-          expect(r.resposta).toBe(r.respostaModelo);
+          expect(r.resposta.replace(/\s/g, "")).toBe(r.respostaModelo.replace(/\s/g, ""));
+          expect(r.resposta).toContain("\nProfissional:");
           const ferramenta = r.requests[1].messages.find((m: {role: string}) => m.role === "tool");
           expect(JSON.stringify(ferramenta)).toContain(cenario === "catalogo_sfp" ? "SFP"
             : cenario === "catalogo_tecnica" ? "TÉCNICA" : cenario === "catalogo_enfermagem" ? "ENFERMAGEM" : "EQUIPE DE ENFERMAGEM");

@@ -13,6 +13,7 @@ for (const ambiente of ["producao", "homologacao"]) {
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
       const entrada = JSON.stringify(r.requests);
       const primeiraEntrada = JSON.stringify(r.requests[0]);
+      expect(primeiraEntrada).toContain("FORMATO_MOBILE_OBRIGATORIO");
       expect(primeiraEntrada).toContain("dicionario_da_mensagem");
       if (fonte === "base") {
         expect(primeiraEntrada).toContain("variacoes_encontradas");

@@ -574,8 +574,15 @@ export async function gerarRespostaNina(
             validarReservaTurno: conferirReserva,
           }));
           // Inclui saídas antecipadas do gate e chamadores sem transporte.
-          const { removerEmojisNina } = await import("@/lib/nina/resposta/sem-emojis");
-          return removerEmojisNina(texto);
+          const { formatarMensagemNina } = await import("@/lib/nina/resposta/formato-mobile");
+          const formatado = formatarMensagemNina(texto);
+          if (formatado !== texto) {
+            const { registrarTransformacaoResposta } = await import("@/lib/nina/rastreio/turno.server");
+            const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+            registrarTransformacaoResposta({ etapa: "formato.mobile", motivo: "Organização para celular e remoção de emojis",
+              antesHash: hashDoTexto(texto), depoisHash: hashDoTexto(formatado) });
+          }
+          return formatado;
         });
         await conferirReserva();
         rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
@@ -1364,6 +1371,10 @@ async function gerarRespostaNinaInterno(
     motivo: string;
     texto: string;
   }> = [];
+  const { REGRA_FORMATO_MOBILE } = await import("@/lib/nina/resposta/formato-mobile");
+  instrucoesAdicionaisTurno.push({ codigo: "FORMATO_MOBILE_OBRIGATORIO",
+    origem: "src/lib/nina/resposta/formato-mobile.ts", motivo: "Organizar todas as mensagens para leitura no celular.",
+    texto: REGRA_FORMATO_MOBILE });
   const { instrucaoJevDoTurno } = await import("@/lib/nina/jev-orientacao-intencao");
   instrucoesAdicionaisTurno.push(...instrucaoJevDoTurno(orientacaoIntencaoJev));
   const { REGRA_CONSULTA_CATALOGO } = await import("@/lib/nina/catalogo-busca");

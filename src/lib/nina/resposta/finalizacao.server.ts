@@ -25,7 +25,7 @@ import {
 } from "./contrato";
 import { acrescentarDespedidaAgendamento, textoDaChave, CHAVES_CONFIRMACAO_AGENDAMENTO } from "./templates";
 import { carregarTemplatesPublicados } from "./templates.server";
-import { removerEmojisNina } from "./sem-emojis";
+import { formatarMensagemNina } from "./formato-mobile";
 
 export type CanalFinalizacao = "whatsapp" | "test-console";
 
@@ -240,7 +240,7 @@ export async function finalizarResposta(
   }
 
   // Depois de TODOS os templates e despedidas, antes do hash e da entrega.
-  resultado.texto = removerEmojisNina(resultado.texto ?? "");
+  resultado.texto = formatarMensagemNina(resultado.texto ?? "");
   if (!resultado.texto && resultado.estado === "entregar") {
     resultado.estado = "descartar";
     resultado.restricoes = [...resultado.restricoes, "sem_texto_apos_remover_emojis"];

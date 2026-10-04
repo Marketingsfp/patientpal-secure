@@ -13,7 +13,7 @@ type Linha = Record<string, any>;
 const cenario = process.argv[2]!;
 const paridade = cenario === "paridade-cardiologia";
 const respostaCardiologia =
-  "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão.";
+  "Olá! Temos Cardiologia. Dinheiro: R$ 120,00 Cartão: R$ 145,00. Quer consultar os horários?";
 const entradasGerador: Linha[] = [];
 const db: Record<string, Linha[]> = {
   nina_message_batches: [],

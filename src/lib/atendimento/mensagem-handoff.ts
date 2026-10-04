@@ -15,6 +15,7 @@
  */
 
 import { removerEmojisNina } from "@/lib/nina/resposta/sem-emojis";
+import { formatarMensagemNina, REGRA_FORMATO_MOBILE } from "@/lib/nina/resposta/formato-mobile";
 
 /** Setores que podem ser citados ao paciente quando vierem estruturados. */
 export const SETORES_MENCIONAVEIS = [
@@ -190,7 +191,7 @@ export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): str
       corpo = `${saudacao ? saudacao.charAt(0).toUpperCase() + saudacao.slice(1) : ""}vou encaminhar seu atendimento${sobre} para ${destino} continuar com você por aqui.`;
   }
   corpo = corpo.charAt(0).toUpperCase() + corpo.slice(1);
-  return removerEmojisNina(`${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`);
+  return formatarMensagemNina(`${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`);
 }
 
 /** Instrução do modelo para redigir a mensagem contextual. */
@@ -207,6 +208,7 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
       : `Você é a assistente virtual${ondeAtende}, falando por mensagem com o paciente.`,
     "Escreva UMA mensagem curta (até 3 linhas) avisando que o atendimento será encaminhado para a equipe humana.",
     "Regras obrigatórias:",
+    REGRA_FORMATO_MOBILE,
     "- emojis são proibidos em toda a mensagem; use apenas texto;",
     `- diga que vai encaminhar para ${destino};`,
     "- diga que o atendimento continua por aqui (mesmo canal);",

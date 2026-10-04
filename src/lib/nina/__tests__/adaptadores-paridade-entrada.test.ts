@@ -67,6 +67,7 @@ describe("paridade de entrada e saída dos adaptadores reais", () => {
     expect(real.entradasGerador[0].opcoes.conversaId).toBeUndefined();
     expect(real.entradasGerador[0].telefone).not.toBe(teste.entradasGerador[0].telefone);
     expect(real.saidas[0].body).toBe(teste.saidas[0].body);
+    expect(real.saidas[0].body).toBe("Olá!\n\nTemos Cardiologia.\nDinheiro: R$ 120,00\nCartão: R$ 145,00.\n\nQuer consultar os horários?");
     expect(real.saidas[0].body).toContain("R$ 120,00");
     expect(teste.saidas[0].is_teste).toBe(true);
   });

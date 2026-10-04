@@ -14,7 +14,8 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
       expect(linha).toBeDefined();
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
-      expect(r.resposta).toBe(r.respostaModelo);
+      expect(r.resposta.replace(/\s/g, "")).toBe(r.respostaModelo.replace(/\s/g, ""));
+      expect(r.resposta).toContain("\nProfissional:");
       expect(r.requests).toHaveLength(2);
       expect(r.ordem).toEqual(["modelo", "consultar_cadastro", "modelo"]);
       expect(JSON.stringify(r.requests)).toContain(r.prompt);
@@ -22,6 +23,7 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       expect(JSON.stringify(r.requests)).toContain("Sem jejum");
       // Mesma geração de produção/homologação recebe o relógio do servidor.
       const textoRequest = JSON.stringify(r.requests);
+      expect(textoRequest).toContain("FORMATO_MOBILE_OBRIGATORIO");
       expect(textoRequest).not.toContain("INFORMAR_PIX_ANTECIPADO");
       expect(textoRequest).not.toContain("*Pix:* pagamento somente antecipado, pelo WhatsApp.");
       expect(textoRequest).not.toContain("ANTECEDENCIA_CHEGADA_30_MINUTOS");

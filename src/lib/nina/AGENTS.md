@@ -1,5 +1,7 @@
 # Nina — decisões técnicas
 
+- Mensagens para celular usam `resposta/formato-mobile.ts`: regra de apresentação obrigatória antes do modelo e acabamento compartilhado no núcleo, finalização, avisos de handoff e retomadas de transporte. Só espaços/quebras são ajustados, além da remoção de emojis já existente; preservar fatos, links, números e histórico. Formatar antes do hash da entrega, sem chamada extra à IA e sem alterar mensagens humanas.
+
 - Dicionários existem somente na base de conhecimento: com `base_conhecimento` selecionada, `lerDicionarioDaMensagem` consulta aliases publicados antes da primeira interpretação e registra os candidatos no contexto/auditoria. A busca do catálogo também considera aliases. Compartilha a leitura do turno nos dois ambientes, preserva ambiguidades e não consulta a base quando a fonte é `clinica_os`. Aliases são pistas de identificação, nunca regras ou prova de preço/vaga.
 
 - Recursos internos da Nina que usam Claude chamam `chamarClaudeComoResponses` (`claude-messages.server.ts`), que traduz o corpo Responses para `/v1/messages` — por quê: Opus 5.5 só é servido em Messages e os chamadores não precisam ser reescritos.

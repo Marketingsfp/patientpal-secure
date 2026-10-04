@@ -135,13 +135,21 @@ describe("MJ-53 — finalização real do console de homologação", () => {
   it("resposta normal mantém uma saída e vínculo da avaliação correspondente", () => {
     const registro = executar("resposta-normal");
     expect(registro.saidas).toHaveLength(1);
-    expect(registro.saidas[0].body).toBe("Olá! Como posso ajudar?");
+    expect(registro.saidas[0].body).toBe("Olá!\n\nComo posso ajudar?");
     expect(registro.saidas[0].execucao_id).toBe("execucao-mj53");
     expect(registro.entregas).toHaveLength(1);
     expect(registro.entregas[0].outgoingMessageId).toBe(registro.saidas[0].id);
     expect(registro.entregas[0].decisaoId).toBe("avaliacao-resposta");
     expect(registro.entregas[0].vincularAvaliacao).toBe(true);
     expect(registro.rastreios).toHaveLength(1);
+  });
+
+  it("formata saída antiga sem vincular uma avaliação de texto diferente", () => {
+    const registro = executar("resposta-antiga-sem-formatacao");
+    expect(registro.saidas).toHaveLength(1);
+    expect(registro.saidas[0].body).toBe("Olá!\n\nComo posso ajudar?");
+    expect(registro.entregas[0].decisaoId).toBeNull();
+    expect(registro.entregas[0].vincularAvaliacao).toBe(false);
   });
 
   it("falha técnica real mantém um aviso de contingência e libera a trava", () => {
