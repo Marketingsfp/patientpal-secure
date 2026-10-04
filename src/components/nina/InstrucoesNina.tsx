@@ -16,10 +16,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { IdentidadeAtendimentoCampos } from "@/components/nina/IdentidadeAtendimentoCampos";
+import { PromptSystemEditor } from "@/components/nina/PromptSystemEditor";
 import { validarIdentidadeParaPublicacao } from "@/lib/nina/identidade-atendimento";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -269,16 +269,12 @@ function Editor({
         />
       ) : null}
 
-      <label className="sr-only" htmlFor={`instrucoes-${bloco.escopo}`}>
-        Instruções da Nina — {ROTULO_ESCOPO[bloco.escopo]}
-      </label>
-      <Textarea
+      <PromptSystemEditor
         id={`instrucoes-${bloco.escopo}`}
+        label={`Instruções da Nina — ${ROTULO_ESCOPO[bloco.escopo]}`}
         value={texto}
-        onChange={(e) => setTexto(e.target.value)}
+        onChange={setTexto}
         readOnly={!podeEditar}
-        spellCheck={false}
-        className="min-h-[520px] resize-y overflow-auto whitespace-pre font-mono text-xs leading-relaxed"
       />
 
 
