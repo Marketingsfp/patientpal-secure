@@ -28,7 +28,7 @@ export async function carregarAberturasInbox<T extends ConversaNova>(
 
   // Compatibilidade com atendimentos que já foram abertos antes do selo existir.
   // Só a leitura do responsável atual após a entrada pode tirar o selo.
-  const [operacionais, individuais] = await Promise.all([
+  const [operacionais, individuais, aberturas] = await Promise.all([
     supabase
       .from("atend_leitura_operacional")
       .select("conversa_id, user_id, read_at")
@@ -42,6 +42,26 @@ export async function carregarAberturasInbox<T extends ConversaNova>(
           .eq("user_id", userId)
           .in("conversa_id", ids)
       : Promise.resolve({ data: [], error: null }),
+    (async () => {
+      const aberturas: { conversa_id: string; user_id: string | null; detalhes: unknown }[] = [];
+      // Paginação preservada, mas independente das leituras de compatibilidade.
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await supabase
+          .from("atend_conversa_eventos")
+          .select("conversa_id, user_id, detalhes")
+          .eq("clinica_id", clinicaId)
+          .eq("evento", EVENTO_INBOX_ABERTA)
+          .in("conversa_id", ids)
+          .gte("created_at", inicio)
+          .in("user_id", [...new Set(alvos.map((c) => c.atribuida_user_id!))])
+          .in("detalhes->>entrada_em", [...new Set(alvos.map((c) => entradaAtendimento(c)!))])
+          .order("id", { ascending: true })
+          .range(de, de + 999);
+        if (error) throw new Error(error.message);
+        aberturas.push(...(data ?? []));
+        if ((data?.length ?? 0) < 1000) return aberturas;
+      }
+    })(),
   ]);
   if (operacionais.error) throw new Error(operacionais.error.message);
   if (individuais.error) throw new Error(individuais.error.message);
@@ -62,28 +82,12 @@ export async function carregarAberturasInbox<T extends ConversaNova>(
       );
     }
   }
-  // Paginação: o teto do PostgREST não pode esconder uma abertura válida.
-  for (let de = 0; ; de += 1000) {
-    const { data, error } = await supabase
-      .from("atend_conversa_eventos")
-      .select("conversa_id, user_id, detalhes")
-      .eq("clinica_id", clinicaId)
-      .eq("evento", EVENTO_INBOX_ABERTA)
-      .in("conversa_id", ids)
-      .gte("created_at", inicio)
-      .in("user_id", [...new Set(alvos.map((c) => c.atribuida_user_id!))])
-      .in("detalhes->>entrada_em", [...new Set(alvos.map((c) => entradaAtendimento(c)!))])
-      .order("id", { ascending: true })
-      .range(de, de + 999);
-    if (error) throw new Error(error.message);
-    for (const ev of data ?? []) {
-      const c = porId.get(ev.conversa_id);
-      const entradaEm = (ev.detalhes as { entrada_em?: string } | null)?.entrada_em;
-      if (c && ev.user_id && entradaEm) {
-        Object.assign(c, aplicarAberturaConfirmada(c, { userId: ev.user_id, entradaEm }));
-      }
+  for (const ev of aberturas) {
+    const c = porId.get(ev.conversa_id);
+    const entradaEm = (ev.detalhes as { entrada_em?: string } | null)?.entrada_em;
+    if (c && ev.user_id && entradaEm) {
+      Object.assign(c, aplicarAberturaConfirmada(c, { userId: ev.user_id, entradaEm }));
     }
-    if ((data?.length ?? 0) < 1000) break;
   }
   return saida;
 }

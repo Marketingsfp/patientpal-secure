@@ -383,21 +383,12 @@ export const listarConversas = createServerFn({ method: "POST" })
 
     // Não lidas pela equipe operacional; supervisão acompanha o mesmo número.
     // O contador legado permanece apenas como referência histórica.
-    let naoLidas = new Map<string, number>();
-    const ids = (rows ?? []).map((r: any) => r.id);
-    if (ids.length) {
-      const { data: cont, error: erroLeitura } = await context.supabase.rpc("atend_nao_lidas", {
-        _clinica_id: data.clinicaId,
-        _conversa_ids: ids,
-      });
-      if (erroLeitura) throw new Error(erroLeitura.message);
-      naoLidas = new Map((cont ?? []).map((c: any) => [c.conversa_id, Number(c.nao_lidas) || 0]));
-      marcar("nao_lidas");
-    }
-
-    const { carregarAberturasInbox } = await import("./atendimento/conversa-nova.server");
-    const comAberturas = await carregarAberturasInbox(context.supabase, data.clinicaId, rows ?? [], context.userId);
-    marcar("aberturas");
+    const { carregarMetadadosLista } = await import("./atendimento/metadados-lista.server");
+    const { naoLidas, comAberturas, tempos } = await carregarMetadadosLista(
+      context.supabase, data.clinicaId, context.userId, rows ?? [],
+    );
+    marcar("metadados_paralelos");
+    Object.assign(marcos, tempos);
     const total = Date.now() - t0;
     // Só registra quando realmente demorou, para não poluir o log.
     if (total > 400) {

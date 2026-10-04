@@ -105,7 +105,7 @@ import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
 import { posicionarEncerramentoAposConclusao } from "@/lib/atendimento/timeline-encerramento";
 import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 
-import { mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
+import { incorporarEsperaDaLista, mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
 import { ConversationSystemEvent, type ConversaEvento } from "@/components/nina/ConversationSystemEvent";
 import {
   agruparTimeline,
@@ -316,6 +316,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const podeAtender = usePodeEscrever("nina");
 
   const [convs, setConvs] = useState<any[]>([]);
+  const [carregandoLista, setCarregandoLista] = useState(false);
   const [sel, setSel] = useState<any>(null);
   const [listaMobile, setListaMobile] = useState(true);
   useEffect(() => { if (sel?.id) setListaMobile(false); }, [sel?.id]);
@@ -1017,11 +1018,13 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   useEffect(() => {
     seqConvs.current++;
     setConvs([]);
+    setCarregandoLista(!!clinicaId && !modoCentral);
   }, [chaveAtual]);
 
   const carregarConvs = useCallback(async () => {
     if (!clinicaId || modoCentral) return;
     const pedido = ++seqConvs.current;
+    setCarregandoLista(true);
     const chavePedido = chaveInbox({
       clinicaId,
       userId: meuId,
@@ -1064,6 +1067,39 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         // Uma lista iniciada antes da confirmação não faz o selo voltar.
         return confirmada ? aplicarAberturaConfirmada(c, confirmada) : c;
       });
+      // Os cards autorizados aparecem antes da conferência secundária do chat aberto.
+      if (visualizacao === "espera") {
+        // Esta resposta já contém a espera canônica: não depende de outro request
+        // para mostrar os cards. Descarta consultas auxiliares anteriores à lista.
+        seqEspera.current++;
+        esperaRef.current = incorporarEsperaDaLista(esperaRef.current, rows);
+        setEspera(prev => incorporarEsperaDaLista(prev, rows));
+      }
+      setConvs((prev: any[]) => {
+        // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
+        // aberta)? O conteúdo dela sai do cache para não voltar desatualizado.
+        // Cada conversa é tratada pelo próprio id: uma nunca invalida a outra.
+        const vencidas = conversasDesatualizadas({
+          anteriores: prev as any,
+          atuais: rows as any,
+          emCache: cacheConversas.current.chaves(),
+        });
+        for (const id of vencidas) {
+          if (id === selIdRef.current) continue;
+          cacheConversas.current.invalidar(id);
+          prefetchMsgs.current.invalidar(id);
+        }
+        // Quem saiu deste filtro não pode continuar guardado em cache.
+        for (const id of idsQueSairam(prev as any, rows as any)) {
+          if (id === selIdRef.current) continue;
+          cacheConversas.current.invalidar(id);
+          prefetchMsgs.current.invalidar(id);
+        }
+        // O servidor já ordena a visualização antes do LIMIT, inclusive espera
+        // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
+        return mesclarListaConversas(prev as any, rows as any) as any[];
+      });
+      setCarregandoLista(false);
       const selecionadaParaConferir = selRef.current;
       let confirmadaForaLista: any = undefined;
       if (
@@ -1112,30 +1148,6 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         // conversa". O motivo continua visível na lista e nos eventos.
         abrirConversa(null);
       }
-      setConvs((prev: any[]) => {
-        // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
-        // aberta)? O conteúdo dela sai do cache para não voltar desatualizado.
-        // Cada conversa é tratada pelo próprio id: uma nunca invalida a outra.
-        const vencidas = conversasDesatualizadas({
-          anteriores: prev as any,
-          atuais: rows as any,
-          emCache: cacheConversas.current.chaves(),
-        });
-        for (const id of vencidas) {
-          if (id === selIdRef.current) continue;
-          cacheConversas.current.invalidar(id);
-          prefetchMsgs.current.invalidar(id);
-        }
-        // Quem saiu deste filtro não pode continuar guardado em cache.
-        for (const id of idsQueSairam(prev as any, rows as any)) {
-          if (!removeu && id === selIdRef.current) continue;
-          cacheConversas.current.invalidar(id);
-          prefetchMsgs.current.invalidar(id);
-        }
-        // O servidor já ordena a visualização antes do LIMIT, inclusive espera
-        // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
-        return mesclarListaConversas(prev as any, rows as any) as any[];
-      });
       // Os totais vêm da contagem do servidor; esta página pode conter só 100 cards.
       // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
       // nunca troca sozinha para outra.
@@ -1157,6 +1169,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       void carregarContadores();
     } catch (e: any) {
       mostrarErro(e);
+    } finally {
+      if (pedido === seqConvs.current && chavePedido === chaveAtualRef.current) setCarregandoLista(false);
     }
   }, [
     clinicaId,
@@ -3127,8 +3141,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                 )}
                 {soCriticas && souGestor && <button type="button" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" onClick={() => setSoCriticas(false)}>Espera crítica · Limpar filtro ×</button>}
               </CardHeader>
-              <div className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas">
-                {convsVisiveis.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>}
+              <div className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas" aria-busy={carregandoLista}>
+                {convsVisiveis.length === 0 && (carregandoLista
+                  ? <p role="status" className="p-4 text-sm text-muted-foreground">Carregando conversas…</p>
+                  : <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>)}
                 {convsVisiveis.map((c) => (
                   <button
                     key={c.id}

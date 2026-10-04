@@ -73,3 +73,16 @@ export function mesclarEspera(
   }
   return novo;
 }
+
+/** Aproveita a mesma métrica canônica já devolvida pela consulta de Pendentes. */
+export function incorporarEsperaDaLista(
+  anterior: Record<string, string>,
+  linhas: { id: string; aguardando_desde?: string | null }[],
+): Record<string, string> {
+  const novo = { ...anterior };
+  for (const c of linhas) {
+    if (c.aguardando_desde) novo[c.id] = c.aguardando_desde;
+    else delete novo[c.id];
+  }
+  return mesclarEspera(anterior, novo);
+}
