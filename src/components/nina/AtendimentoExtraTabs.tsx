@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ConsultaBaseChat } from "./ConsultaBaseChat";
+import { acrescentarBaseAoRascunho } from "@/lib/atendimento/consulta-base-chat";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { deveEnviarPorTecla } from "@/lib/atendimento/teclado-envio";
@@ -647,6 +649,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // Rascunho por conversa: o texto digitado para um paciente nunca aparece
   // no campo de outro.
   const [rascunhos, setRascunhos] = useState<Rascunhos>({});
+  const [consultaBaseAberta, setConsultaBaseAberta] = useState(false);
+  useEffect(() => { setConsultaBaseAberta(false); }, [clinicaId, sel?.id]);
   const draft = lerRascunho(rascunhos, sel?.id ?? null);
   const setDraft = useCallback((valor: string | ((anterior: string) => string)) => {
     const id = selIdRef.current;
@@ -3284,7 +3288,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                         )}
                       </p>
                     </div>
-                    <div className="flex gap-1 shrink-0">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <Button size="sm" variant="outline" disabled={carregandoConversa}
+                        aria-expanded={consultaBaseAberta}
+                        onClick={() => setConsultaBaseAberta(v => !v)}>
+                        Consultar base
+                      </Button>
                       {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (
                         <Button
                           size="sm"
@@ -3332,6 +3341,20 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     </div>
                   </div>
                 </CardHeader>
+                {consultaBaseAberta && clinicaId && conteudoDaConversa && (
+                  <ConsultaBaseChat key={`${clinicaId}:${sel.id}`} clinicaId={clinicaId}
+                    conversaId={sel.id} bloqueio={motivoBloqueio}
+                    onFechar={() => setConsultaBaseAberta(false)}
+                    onInserir={(texto) => {
+                      if (selIdRef.current !== sel.id || motivoBloqueio || !conteudoDaConversa) return false;
+                      setDraft(anterior => acrescentarBaseAoRascunho(anterior, texto));
+                      setConsultaBaseAberta(false);
+                      setSlash(null);
+                      requestAnimationFrame(() => composerRef.current?.focus());
+                      toast.success("Informação acrescentada ao rascunho. Revise antes de enviar.");
+                      return true;
+                    }} />
+                )}
                 <div className="relative flex-1 min-h-0">
                   <div ref={chat.containerRef} className="oszap-timeline h-full overflow-auto p-4 space-y-4 bg-atd-bg">
                     {buscandoAlvo && (
