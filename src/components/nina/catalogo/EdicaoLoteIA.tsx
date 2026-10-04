@@ -172,6 +172,7 @@ export function EdicaoLoteIA({
     <>
       <Button
         variant="outline"
+        size="sm"
         disabled={!clinicaId || !podeEditar}
         onClick={() => setAberto(true)}
       >
@@ -192,7 +193,8 @@ export function EdicaoLoteIA({
         }}
       >
         <DialogContent
-          className="max-w-4xl max-h-[85vh] overflow-y-auto"
+          data-os-zap="true"
+          className="oszap-base-dialog max-w-4xl max-h-[85vh] overflow-y-auto"
           aria-describedby={undefined}
         >
           <DialogHeader>

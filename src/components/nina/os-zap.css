@@ -255,6 +255,96 @@
   .oszap-dashboard .oszap-dash-kpi { padding: 12px; }
   .oszap-dash-hourly { gap: 3px; }
 }
+/* Base editorial: as mesmas superfícies e cores do chat, sem afetar outros módulos. */
+.oszap-base {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.oszap-base-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.oszap-base-status {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--muted-foreground);
+  font-size: .75rem;
+}
+.oszap-base-notice {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: .8125rem;
+  line-height: 1.5;
+}
+.oszap-base .oszap-base-tab-list {
+  display: flex;
+  height: auto;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.oszap-base-tab-list [role="tab"] {
+  min-height: 34px;
+  gap: 8px;
+  white-space: normal;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.oszap-base-tab-list [role="tab"] svg { width: 16px; height: 16px; flex-shrink: 0; }
+.oszap-base-tab-list [role="tab"][data-state="active"] {
+  background: var(--atd-blue-soft);
+  color: var(--atd-blue-ink);
+  border-color: var(--primary);
+}
+.oszap-base-tabs > [role="tabpanel"] { margin-top: 0; }
+.oszap-base-catalog, .oszap-base-clinic { padding: 16px; }
+.oszap-base-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.oszap-base-toolbar > div:first-child { flex: 1 1 260px; min-width: 0; }
+.oszap-base-toolbar p { margin-top: 4px; }
+.oszap-base-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-block: 14px; }
+.oszap-base-search > .relative { flex: 1 1 260px; min-width: 0; }
+.oszap-base-search input { min-height: 36px; border-radius: 8px; background: var(--background); box-shadow: none; }
+.oszap-base-records { border: 1px solid var(--border); border-radius: 8px; }
+.oszap-base .oszap-base-record { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; }
+.oszap-base .oszap-base-record:last-child { border-bottom: 0; }
+.oszap-base .oszap-base-record-header { padding: 12px 12px 6px; }
+.oszap-base .oszap-base-record-content { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 0 12px 12px; }
+.oszap-base-record-content > .min-w-0 { flex: 1 1 280px; overflow-wrap: anywhere; }
+.oszap-base-payments { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.oszap-base-badges { font-size: .75rem; }
+.oszap-base-record-status[data-status="PUBLICADO"] { color: var(--atd-blue-ink); background: var(--atd-blue-soft); border-color: var(--border); box-shadow: none; }
+.oszap-base :is(.oszap-base-toolbar-actions, .oszap-base-record-actions) button { height: auto; min-height: 32px; padding: 6px 10px; border-radius: 8px; box-shadow: none; }
+.oszap-base :is(.oszap-base-toolbar-actions, .oszap-base-record-actions) button svg { margin-right: 0; }
+.oszap-base-dialog { background: var(--card); border-color: var(--border); border-radius: 12px; padding: 20px; }
+.oszap-base-dialog :is(input, textarea) { background: var(--background); border-radius: 8px; box-shadow: none; }
+.oszap-base-dialog button { border-radius: 8px; }
+html.a11y-dens-confortavel .oszap-base .oszap-base-record-header { padding-top: 16px; }
+html.a11y-dens-confortavel .oszap-base .oszap-base-record-content { padding-bottom: 16px; }
+html.a11y-dens-grande .oszap-base .oszap-base-record-header { padding-top: 20px; }
+html.a11y-dens-grande .oszap-base .oszap-base-record-content { padding-bottom: 20px; }
+@media (max-width: 640px) {
+  .oszap-base-header { gap: 8px; }
+  .oszap-base-catalog, .oszap-base-clinic { padding: 12px; }
+  .oszap-base .oszap-base-tab-list { padding: 8px; }
+  .oszap-base-tab-list [role="tab"] { flex: 1 1 100%; justify-content: flex-start; }
+  .oszap-base-dialog { padding: 16px; }
+}
 /* Personalização do atendimento; nenhum filtro é aplicado à página inteira. */
 html:is(.a11y-cores-protanopia,.a11y-cores-deuteranopia,.a11y-cores-tritanopia) body:has([data-os-zap="true"]) { filter: none; }
 .oszap-access-group summary::-webkit-details-marker { display: none; }

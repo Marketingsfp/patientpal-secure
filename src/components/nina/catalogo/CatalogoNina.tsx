@@ -69,8 +69,12 @@ const OPCOES_VAZIAS: OpcoesCatalogo = {
 
 function BadgeStatus({ status, emRevisao }: { status: string; emRevisao?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <Badge variant={status === "PUBLICADO" ? "default" : "secondary"}>
+    <div className="oszap-base-badges flex flex-wrap items-center gap-2">
+      <Badge
+        className="oszap-base-record-status"
+        data-status={status}
+        variant={status === "PUBLICADO" ? "default" : "secondary"}
+      >
         {ROTULO_STATUS[status as StatusCatalogo] ?? status}
       </Badge>
       {emRevisao && <Badge variant="outline">Alterações em revisão</Badge>}
@@ -390,17 +394,16 @@ export function CatalogoNina({
   const titulo = tipo === "servico" ? "Exames e procedimentos" : "Consultas e profissionais";
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="oszap-base-catalog">
+      <div className="oszap-base-toolbar">
         <div>
           <h3 className="text-base font-semibold">{titulo}</h3>
           <p className="text-sm text-muted-foreground">
-            Cadastro manual ou com IA. Publicar aprova o registro nesta base, sem disponibilizá-lo
-            para a Maria.
+            Pesquise um registro ou organize o conteúdo manualmente e com IA.
           </p>
         </div>
         {podeEditar && !erroCarga && !carregando && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="oszap-base-toolbar-actions flex flex-wrap items-center gap-2">
             <EdicaoLoteIA clinicaId={clinicaId} podeEditar={podeEditar} onPublicado={carregar} />
             <Button
               onClick={() => {
@@ -418,8 +421,10 @@ export function CatalogoNina({
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={buscaId}>Pesquisar {titulo.toLowerCase()}</Label>
+      <div className="oszap-base-search">
+        <Label htmlFor={buscaId} className="sr-only">
+          Pesquisar {titulo.toLowerCase()}
+        </Label>
         <div className="relative">
           <Search
             aria-hidden="true"
@@ -470,7 +475,8 @@ export function CatalogoNina({
         }}
       >
         <DialogContent
-          className="max-w-3xl max-h-[85vh] overflow-y-auto"
+          data-os-zap="true"
+          className="oszap-base-dialog max-w-3xl max-h-[85vh] overflow-y-auto"
           aria-describedby={undefined}
         >
           <DialogHeader>
@@ -668,50 +674,54 @@ export function CatalogoNina({
           Nenhum resultado para “{busca.trim()}”. Tente outro nome ou limpe a pesquisa.
         </p>
       ) : (
-        <div className="grid gap-3">
+        <div className="oszap-base-records">
           {itensFiltrados.map((item) => (
-            <Card key={item.id}>
-              <CardHeader className="pb-2">
+            <Card key={item.id} className="oszap-base-record">
+              <CardHeader className="oszap-base-record-header">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="text-sm">{item.nome}</CardTitle>
+                  <CardTitle className="min-w-0 break-words text-sm leading-snug">
+                    {item.nome}
+                  </CardTitle>
                   <BadgeStatus status={item.status} emRevisao={!!item.rascunho} />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                {tipo === "servico" ? (
-                  item.formas_pagamento?.length ? (
-                    <dl className="space-y-1">
-                      {item.formas_pagamento.map(
-                        (
-                          pagamento: {
-                            forma: string;
-                            valor?: number | null;
-                            condicao?: string | null;
-                          },
-                          index: number,
-                        ) => (
-                          <div key={index} className="flex flex-wrap gap-x-1">
-                            <dt>
-                              {pagamento.forma}
-                              {pagamento.condicao ? ` (${pagamento.condicao})` : ""}:
-                            </dt>
-                            <dd className="font-medium text-foreground">
-                              {pagamento.valor == null
-                                ? "Não informado"
-                                : formatarBRL(pagamento.valor)}
-                            </dd>
-                          </div>
-                        ),
-                      )}
-                    </dl>
+              <CardContent className="oszap-base-record-content text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  {tipo === "servico" ? (
+                    item.formas_pagamento?.length ? (
+                      <dl className="oszap-base-payments">
+                        {item.formas_pagamento.map(
+                          (
+                            pagamento: {
+                              forma: string;
+                              valor?: number | null;
+                              condicao?: string | null;
+                            },
+                            index: number,
+                          ) => (
+                            <div key={index} className="flex flex-wrap gap-x-1">
+                              <dt>
+                                {pagamento.forma}
+                                {pagamento.condicao ? ` (${pagamento.condicao})` : ""}:
+                              </dt>
+                              <dd className="font-medium text-foreground">
+                                {pagamento.valor == null
+                                  ? "Não informado"
+                                  : formatarBRL(pagamento.valor)}
+                              </dd>
+                            </div>
+                          ),
+                        )}
+                      </dl>
+                    ) : (
+                      <p>Valor: {formatarBRL(item.valor)}</p>
+                    )
                   ) : (
-                    <p>Valor: {formatarBRL(item.valor)}</p>
-                  )
-                ) : (
-                  <p>{resumoHorarios(item.horarios ?? [])}</p>
-                )}
+                    <p>{resumoHorarios(item.horarios ?? [])}</p>
+                  )}
+                </div>
                 {podeEditar && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="oszap-base-record-actions flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => abrirEdicao(item)}>
                       <Pencil className="mr-2 h-4 w-4" /> Editar
                     </Button>
@@ -745,7 +755,10 @@ export function CatalogoNina({
       )}
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent
+          data-os-zap="true"
+          className="oszap-base-dialog max-w-3xl max-h-[85vh] overflow-y-auto"
+        >
           <DialogHeader>
             <DialogTitle>
               {titulo}
