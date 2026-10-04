@@ -1,4 +1,5 @@
 import { atendimentosEstruturados, textoAtendimentos, pagamentosJaDescritos, lerEstrutura, modalidadeEstruturada, INSTRUCAO_ESTRUTURA_CATALOGO } from "./catalogo-estrutura";
+import { mapaCamposResultado } from "./catalogo-mapa-campos";
 import { selecionarAtendimentosConsulta, nomeCompletoConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
 /**
  * FASE 5 — CATÁLOGO COMO FONTE DE CONHECIMENTO DA NINA (regras puras).
@@ -175,6 +176,9 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
     extras: {
       catalogo_tipo: "servico",
       procedimento_id: s.procedimento_id ?? null,
+      descricao_publica: texto(s.descricao_publica),
+      restricoes: texto(s.restricoes),
+      valor_observacao: texto(s.valor_observacao),
       estrutura,
       atendimentos_publicados: atendimentos,
       preparo_status: s.preparo ? "informado" : estrutura.preparo_status,
@@ -253,6 +257,14 @@ export function profissionalParaRegistro(
     aba_origem: "Catálogo — consultas e profissionais",
     extras: {
       catalogo_tipo: "profissional",
+      observacao_publica: texto(p.observacao_publica),
+      aviso_vigente: aviso
+        ? {
+            texto: aviso,
+            valido_de: p.aviso_valido_de ?? null,
+            valido_ate: p.aviso_valido_ate ?? null,
+          }
+        : null,
       estrutura,
       atendimentos_publicados: atendimentos,
       convenios_status: convenios.length ? "aceita" : estrutura.convenios_status,
@@ -346,6 +358,14 @@ export function montarResultadoCatalogo(entrada: {
     days: [] as string[],
     notes: [] as string[],
     records: registros,
+    ...(registros.length
+      ? {
+          mapa_campos: mapaCamposResultado([
+            ...(deServicos.length ? ["servico" as const] : []),
+            ...(deProfissionais.length ? ["profissional" as const] : []),
+          ]),
+        }
+      : {}),
     trace: traces,
     instrucao: INSTRUCAO_NOT_FOUND,
   };

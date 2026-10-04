@@ -25,6 +25,7 @@
 
 import { z } from "zod";
 import { REGRA_CONSULTA_CATALOGO } from "./catalogo-busca";
+import { mapaCamposResultado } from "./catalogo-mapa-campos";
 import { consultarDadosClinicasGrupo, consultarHorariosClinicasGrupo, selecionarClinicasGrupo, PARAMETRO_CLINICA_INFORMATIVA } from "./clinicas-grupo";
 import { OBJETIVOS_PESQUISA_CATALOGO, TIPOS_ATENDIMENTO_CATALOGO } from "./catalogo-pesquisa";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
@@ -1462,13 +1463,14 @@ async function executarFerramentaInterna(
             ctx.esclarecimentoCatalogo = esclarecimento;
             return { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento",
               procedure: pedido.nome, pedido_interpretado: { atendimento: pedido.nome },
-              registros: todos.map(c => c.registro), esclarecimento };
+              registros: todos.map(c => c.registro), mapa_campos: mapaCamposResultado(["servico"]), esclarecimento };
           }
           return { ok: true, found: true, knowledge_status: "found", source: "nina_catalogo", source_type: "catalog",
             tipo_atendimento: "exame_procedimento", procedure: pedido.nome,
             pedido_interpretado: { atendimento: pedido.nome, tipo_atendimento: "exame_procedimento" },
             doctors: candidatos.map(c => c.medicoNome), profissionais: candidatos.map(c => c.medicoNome),
             registros: candidatos.map(c => c.registro), records: candidatos.map(c => c.registro),
+            mapa_campos: mapaCamposResultado(["servico"]),
             vinculos_agenda: candidatos.map(c => ({ catalogo_id: pedido.catalogo_id, medico_id: c.medicoId,
               nome_catalogo: c.medicoNome, situacao: c.medicoId ? "vinculado" : "nao_resolvido" })),
             instrucao: "Preserve este exame/procedimento ao consultar vagas. O médico é seu executante; sua especialidade não substitui o atendimento." };
@@ -1499,6 +1501,7 @@ async function executarFerramentaInterna(
           fonte: "catalogo_publicado",
           knowledge_status: r.knowledge_status,
           profissionais: r.doctors,
+          mapa_campos: r.mapa_campos,
           vinculos_agenda: vinculos,
           dias: r.days,
           observacoes: r.notes,
@@ -1551,6 +1554,7 @@ async function executarFerramentaInterna(
           preco: r.price,
           observacoes: r.notes,
           registros: r.records,
+          mapa_campos: r.mapa_campos,
           trace: r.trace,
           instrucao: r.instrucao,
         };

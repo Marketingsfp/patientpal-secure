@@ -49,6 +49,13 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
         expect(r.resposta).toContain(resposta);
         expect(r.resposta).not.toContain("Qual exame");
         const catalogo = r.resultados[0].dados;
+        expect(catalogo.mapa_campos?.versao).toBe(1);
+        const retornoAoModelo = r.requests[r.requests.length - 1].messages
+          .filter((m: { role: string }) => m.role === "tool")
+          .map((m: { content?: string }) => m.content ?? "")
+          .join("\n");
+        expect(retornoAoModelo).toContain('"mapa_campos"');
+        expect(retornoAoModelo).toContain('"nome_medico"');
         expect(catalogo.tipo_atendimento).toBe(tipo_atendimento);
         expect(catalogo.esclarecimento).toBeUndefined();
         expect(catalogo.records).toHaveLength(caso === "odontologia" ? 3 : tipo_atendimento === "consulta" ? 4 : 1);

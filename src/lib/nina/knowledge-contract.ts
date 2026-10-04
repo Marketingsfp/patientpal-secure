@@ -11,6 +11,7 @@
  */
 
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
+import type { mapaCamposResultado } from "./catalogo-mapa-campos";
 
 export type KnowledgeStatus = "found" | "not_found" | "conflict";
 
@@ -41,6 +42,8 @@ export type TraceConhecimento = {
 };
 
 export type ResultadoConhecimento = {
+  /** Índice de caminhos do retorno. Não contém fatos ou decisões de atendimento. */
+  mapa_campos?: ReturnType<typeof mapaCamposResultado>;
   /** Categoria da pesquisa, preservada separadamente do termo e do objetivo. */
   tipo_atendimento?: TipoAtendimentoCatalogo;
   found: boolean;

@@ -14,6 +14,7 @@ import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { EdicaoLoteIA } from "./EdicaoLoteIA";
 import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
 import { DicionarioCatalogoEditor } from "./DicionarioCatalogoEditor";
+import { MapaCamposCatalogo } from "./MapaCamposCatalogo";
 import {
   Dialog,
   DialogContent,
@@ -470,6 +471,8 @@ export function CatalogoNina({
           </p>
         )}
       </div>
+
+      <MapaCamposCatalogo tipo={tipo} />
 
       <Dialog
         open={iaAberta}
