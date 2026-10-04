@@ -39,10 +39,10 @@ export async function contagemAnteriorFase1(
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { perguntasComAuditoriaJev, type TextoDecisaoJev } from "./jev-auditoria";
+import { perguntasObservacaoIntencao, separarRetornoJev } from "./jev-observacao-intencao";
 import {
   FLAG_JEV,
   jevPermitido,
-  validarRespostas,
   type FaseJev,
   type PerguntaJev,
   type ResultadoJev,
@@ -82,6 +82,7 @@ export async function perguntarJev(
   state: unknown,
   perguntas: Record<string, PerguntaJev>,
   limiteMs: number = LIMITE_MS,
+  observarIntencao: boolean = false,
 ): Promise<ResultadoJev> {
   const inicio = Date.now();
   const chave = process.env["LOVABLE_API_KEY"];
@@ -97,16 +98,17 @@ export async function perguntarJev(
         "Content-Type": "application/json",
         "X-Lovable-AIG-SDK": "fetch",
       },
-      body: JSON.stringify({ model: MODELO_JEV, state, questions: perguntas }),
+      body: JSON.stringify({ model: MODELO_JEV, state,
+        questions: observarIntencao ? { ...perguntas, ...perguntasObservacaoIntencao() } : perguntas }),
     });
     const latencyMs = Date.now() - inicio;
     if (!resp.ok) {
       const txt = await resp.text().catch(() => "");
       return { ok: false, motivo: `http_${resp.status}: ${txt.slice(0, 200)}`, status: resp.status, latencyMs };
     }
-    const respostas = validarRespostas(perguntas, await resp.json());
-    if (!respostas) return { ok: false, motivo: "resposta_invalida", latencyMs };
-    return { ok: true, respostas, latencyMs };
+    const retorno = separarRetornoJev(perguntas, await resp.json(), observarIntencao);
+    if (!retorno) return { ok: false, motivo: "resposta_invalida", latencyMs };
+    return { ok: true, ...retorno, latencyMs };
   } catch (e) {
     const motivo = controle.signal.aborted ? "tempo_esgotado" : e instanceof Error ? e.message : "erro";
     return { ok: false, motivo, latencyMs: Date.now() - inicio };
@@ -143,7 +145,9 @@ export async function registrarDecisaoJev(r: {
       teste: r.teste,
       perguntas: perguntasComAuditoriaJev(Object.keys(r.perguntas), r.contexto, r.mensagem),
       respostas: r.resultado.ok
-        ? { ...r.resultado.respostas, ...(r.contagem ? { _nina: r.contagem } : {}) }
+        ? { ...r.resultado.respostas, ...(r.contagem ? { _nina: r.contagem } : {}),
+            ...(r.fase === "fase1_intencao" && r.resultado.observacaoIntencao
+              ? { _observacao_intencao: r.resultado.observacaoIntencao } : {}) }
         : null,
       aplicada: r.aplicada,
       latency_ms: r.resultado.latencyMs,

@@ -13,6 +13,7 @@ const fixture = `
 import React from 'react'; import {createRoot} from 'react-dom/client';
 import {Route} from './src/routes/_authenticated/app.nina-jev';
 import {perguntasComAuditoriaJev} from './src/lib/nina/jev-auditoria';
+import {lerObservacaoIntencao} from './src/lib/nina/jev-observacao-intencao';
 const g=globalThis;g.consultas=[];
 const id='11111111-1111-4111-8111-111111111111';
 g.linhas=[
@@ -22,6 +23,7 @@ g.linhas=[
  {id:'4',fase:'fase3_especialidade',conversation_id:null,perguntas:{termo:'cardio'}},
  {id:'5',fase:'fase7_escolha',conversation_id:id,perguntas:perguntasComAuditoriaJev([],undefined,{origem:'paciente',texto:'texto longo '.repeat(700)})}
 ].map((d)=>({created_at:'2026-10-04T12:00:00Z',teste:false,aplicada:true,latency_ms:366,erro:null,respostas:{intencao:{choice:'medico',confidence:.98}},...d}));
+g.linhas[0].respostas._observacao_intencao=lerObservacaoIntencao({obs_pedido_preco:{noul:.98},obs_pedido_horario_habitual:{noul:.96},obs_pedido_disponibilidade:{noul:.01},obs_autorizacao:{choice:'nenhuma',confidence:.99},obs_correcao:{choice:'especialidade',confidence:.65}});
 const App=Route.component; createRoot(document.getElementById('root')).render(<App/>);`;
 const mocks = {
   "@tanstack/react-router": `export const createFileRoute=()=>x=>x;`,
@@ -58,6 +60,12 @@ try {
   await expect(primeira.getByText("11111111-1111-4111-8111-111111111111")).toBeVisible();
   await primeira.getByText("Ver texto registrado", { exact: true }).click();
   await expect(primeira.locator("details[open]").last()).toContainText("<script>alert(1)</script>");
+  await primeira.getByText("Leitura ampliada · em observação", { exact: true }).click();
+  await expect(primeira.getByText("Não aplicada ao atendimento.", { exact: true })).toBeVisible();
+  await expect(primeira.getByText("2 pedido(s) indicado(s): Preço; Dias / horários habituais do profissional.", { exact: true })).toBeVisible();
+  await expect(primeira.getByText("Não indicado · 1%", { exact: true })).toBeVisible();
+  await expect(primeira.getByText("Correção da especialidade · 65% · Incerto", { exact: true })).toHaveCount(1);
+  await expect(primeira.getByText(/Leitura incompleta:/)).toBeVisible();
   const ultima = tabela.locator("tbody tr").last();
   await ultima.getByText("Ver texto registrado", { exact: true }).click();
   await expect(ultima.getByText("Registro parcial: primeiros 6.000 caracteres.")).toBeVisible();
@@ -73,7 +81,7 @@ try {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(392);
   await page.screenshot({ path: path.join(out, "jev-auditoria-mobile.png"), fullPage: true });
   expect(errors).toEqual([]);
-  console.log("OK: tela real, conversa/UUID, mensagem expandida, histórico sem texto, corte explícito, consulta em lote por clínica, texto escapado e mobile.");
+  console.log("OK: tela real, conversa/UUID, mensagem, observação não aplicada, múltiplos pedidos, habitual/vagas, incerteza, leitura incompleta, consulta em lote e mobile.");
 } finally {
   await browser.close();
   await new Promise((r) => server.close(r));

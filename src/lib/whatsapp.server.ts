@@ -943,7 +943,9 @@ async function gerarRespostaNinaInterno(
       const contextoJev = ctxJev.contextoAtendimentoJev(sessaoNina.estado);
       const conversaJev = estadoId.conversaId ?? null;
       const [resultado, anterior, limitesClinica] = await Promise.all([
-        jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores, contextoJev), perguntas),
+        // A leitura ampliada só alimenta auditoria. Não entra em intencoesTurno,
+        // confiança, escolha de vaga, confirmação ou encaminhamento.
+        jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores, contextoJev), perguntas, undefined, f1),
         jev.contagemAnteriorFase1(clinicaId, conversaJev, inicioCiclo),
         jev.limitesJev(clinicaId),
       ]);
@@ -981,6 +983,9 @@ async function gerarRespostaNinaInterno(
           clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
           perguntas, resultado, aplicada: escolhida !== null, contagem,
           mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
+          contexto: f1 ? { observacao_intencao: { versao: "intencoes-v1", modo: "observacao" },
+            contexto_interpretacao: { mensagens_anteriores: anteriores, contexto_atendimento: contextoJev,
+              inicio_ciclo: inicioCiclo, intencao_aplicada: escolhida } } : undefined,
         }),
         f2
           ? jev.registrarDecisaoJev({

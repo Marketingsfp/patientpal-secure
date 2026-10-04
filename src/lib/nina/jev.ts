@@ -38,7 +38,8 @@ export type RespostaJev = {
 
 /** "sem decisão": a Nina segue o fluxo atual. Nunca inventa certeza. */
 export type ResultadoJev =
-  | { ok: true; respostas: Record<string, RespostaJev>; latencyMs: number }
+  | { ok: true; respostas: Record<string, RespostaJev>; latencyMs: number;
+      observacaoIntencao?: import("./jev-observacao-intencao").ObservacaoIntencaoJev }
   | { ok: false; motivo: string; status?: number; latencyMs: number };
 
 /** Valida que cada pergunta voltou com o campo do seu tipo. */

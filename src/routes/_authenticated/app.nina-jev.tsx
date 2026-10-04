@@ -19,6 +19,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { FLAG_JEV, type FaseJev } from "@/lib/nina/jev";
 import { idsConversasJev } from "@/lib/nina/jev-auditoria";
 import { JevConversa, JevTextoAnalisado } from "@/components/nina/JevDecisaoContexto";
+import { JevObservacaoIntencao } from "@/components/nina/JevObservacaoIntencao";
 import {
   LIMITES_JEV_PADRAO, LIMITE_MAX, LIMITE_MIN, ROTULO_LIMITE, casosAcima, normalizarLimites, relatorioCalibragem,
   type LimitesJev, type SinalCalibragem,
@@ -268,6 +269,7 @@ function Pagina() {
       <Card>
         <CardHeader><CardTitle className="text-base">Decisões ({decisoes.length}{decisoes.length === 300 ? ", mais recentes" : ""})</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
+          <p className="mb-3 text-xs text-muted-foreground">Nas novas decisões de Intenção, a leitura ampliada observa múltiplos pedidos, horários habituais e vagas, alcance do aceite e correções. Esses sinais são apenas para revisão; a coluna “Aplicada” se refere à decisão original.</p>
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
               <tr><th className="p-2">Quando</th><th className="p-2">Conversa</th><th className="p-2">Texto analisado</th><th className="p-2">Fase</th><th className="p-2">Resposta</th><th className="p-2">Aplicada</th><th className="p-2">Tempo</th></tr>
@@ -279,7 +281,7 @@ function Pagina() {
                   <td className="p-2"><JevConversa id={d.conversation_id} numero={d.numero_conversa} /></td>
                   <td className="p-2"><JevTextoAnalisado perguntas={d.perguntas} /></td>
                   <td className="p-2">{ROTULO_FASE[d.fase] ?? d.fase}</td>
-                  <td className="p-2">{d.erro ? <span className="text-muted-foreground">Sem decisão: {d.erro.slice(0, 60)}</span> : resumoResposta(d.respostas)}</td>
+                  <td className="p-2">{d.erro ? <span className="text-muted-foreground">Sem decisão: {d.erro.slice(0, 60)}</span> : resumoResposta(d.respostas)}<JevObservacaoIntencao respostas={d.respostas} /></td>
                   <td className="p-2">{d.aplicada ? "Sim" : "Não"}</td>
                   <td className="p-2 tabular-nums">{d.latency_ms ?? "—"} ms</td>
                 </tr>
