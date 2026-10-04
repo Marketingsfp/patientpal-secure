@@ -1,68 +1,87 @@
-# Dashboard do atendimento humano — OS ZAP
+# Relatórios históricos do atendimento humano — OS ZAP
 
-## Antes / depois
+## Comportamento
 
-Antes, fila, equipe e resultados eram consultados em telas separadas. A nova aba
-**Atendimento → Dashboard** reúne somente atendimento humano, no ambiente real.
-Não apresenta indicadores de Nina, modelos, confiança, prompt, testes ou aprendizagem.
+A aba **Atendimento → Dashboard** reúne somente resultados passados do atendimento
+humano real. Presença, fila atual, urgências e contadores ao vivo permanecem no painel
+TV; o dashboard não consulta essas fontes nem atualiza automaticamente.
 
-O acesso usa a autorização existente `can_manage_clinica`: administração e supervisão.
-Telefonia não vê o item nem abre o dashboard por link direto. O servidor também valida
-a autorização antes de consultar dados. Não há nova permissão, migração ou alteração de RLS.
+- Abre nos últimos 30 dias completos, até ontem.
+- Datas inicial e final livres, inclusivas, no fuso `America/Sao_Paulo`.
+- Atalhos: ontem, semana passada, mês, bimestre, trimestre e ano anteriores.
+- Agrupamentos independentes: dias, semanas, meses, bimestres, trimestres e anos.
+- Semana de segunda a domingo. Bimestres jan/fev, mar/abr etc.; trimestres jan/mar etc.
+- Recortes incompletos identificados e dias sem movimento incluídos como zero.
+- O dia atual pode ser consultado como fotografia incompleta, com aviso; datas futuras são recusadas.
+- `Consultar` aplica as datas. Trocar o agrupamento reaproveita a consulta sem buscar novamente.
+- `Detalhar` em uma linha consulta aquele intervalo e recalcula seus horários.
+- Tabela paginada de 50 em 50 linhas, sem perder totais; os resultados abrangem todo o intervalo.
 
-## Informações e fontes
+## Contagem e fontes
 
-| Bloco | Origem e significado |
-| --- | --- |
-| Fila agora | Conversas reais abertas sob responsabilidade humana, atribuídas ou sem responsável. Mesma regra central da TV. |
-| Esperas e urgências | RPC `atend_espera_por_conversa`; faixas centralizadas: menos de 5 min, de 5 a 10 min, acima de 10 min. |
-| Equipe agora | Mesma seleção da TV: perfil telefonia ativo; administrador prevalece em vínculo duplo. Online, pausas e offline com carga. Presença manual não prova conexão. |
-| Encerradas hoje | Conversas reais com `resolved_by` preenchido e `resolved_at` no dia civil de Brasília. A contagem por pessoa usa quem encerrou. Não herda o total de encerramentos automáticos da TV. |
-| Mensagens no período | Saídas reais de autoria humana, sem avisos internos e remetentes automáticos. Enviadas = `sent`, `delivered` ou `read`. Falhas e outros estados aparecem separadamente. |
-| Conversas respondidas | Conversas distintas com pelo menos uma resposta humana enviada no período. |
-| Primeira resposta | Média de `sla_first_response_seg`, pela data de `primeiro_resp_em`. Só valores válidos medidos; zero é válido, ausência não vira zero. |
-| Encerramentos no período | Data `resolved_at` e evidência de atendimento humano. Autoria ausente fica separada; não é atribuída ao responsável atual. |
-| Tempo até encerrar | De `handoff_em`, ou `assigned_at` disponível, até `resolved_at`. Inclui espera; não é tempo de trabalho ativo. Só durações válidas medidas. |
-| Transferências manuais | `atend_transferencias` com pessoa de origem, verificando que cada conversa pertence à clínica e não é de teste. |
-| Resultados por pessoa | Mensagens atribuídas ao autor; encerramentos atribuídos a `resolved_by`, inclusive administração/supervisão. A lista de resultados é distinta da equipe atual de telefonia. |
-| Evolução | Respostas humanas enviadas por dia e por hora, em São Paulo, nos 7, 30 ou 90 dias selecionados. |
-| Departamentos | Distribuição atual das conversas humanas abertas. Sem responsável é um subconjunto das abertas, não um total adicional. |
-| Histórico | Contagens em todas as datas de conversas com evidência humana; encerradas são os registros atualmente fechados. |
+Somente leitura das tabelas existentes; nenhuma migração, regravação histórica,
+alteração de RLS ou efeito no envio de mensagens. Autorização existente
+`can_manage_clinica` antes das consultas; cache separado por usuário, clínica e datas.
 
-Todas as consultas de conversas e mensagens restringem a clínica e `is_teste=false`.
-Agregações leem metadados; não retornam textos, telefones ou nomes de pacientes.
-Os únicos nomes exibidos são os dos integrantes da equipe.
+| Informação            | Definição                                                                                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recebidas             | Mensagens `direction=in` em etapa humana comprovada pelos eventos da conversa. Exclui avisos e falhas.                                                                       |
+| Enviadas              | Respostas `direction=out` com autoria humana (`enviada_por=humano` ou usuário), status `sent`, `delivered` ou `read`, excluindo remetentes automáticos e avisos `system`.    |
+| Total                 | Recebidas + enviadas, com as duas quantidades também separadas.                                                                                                              |
+| Volume por hora       | Soma das duas direções nas 24 horas de Brasília dentro das datas consultadas.                                                                                                |
+| Períodos do dia       | Madrugada 00h–06h, manhã 06h–12h, tarde 12h–18h, noite 18h–24h. Limite final exclusivo.                                                                                      |
+| Maior / menor volume  | Extremos do total, preservando empates. Mínimo inclui zero. Nenhum pico é anunciado quando todo o intervalo está zerado. Não presume horário comercial.                      |
+| Conversas respondidas | IDs distintos de conversa com resposta humana enviada no intervalo.                                                                                                          |
+| Encerramentos         | Eventos históricos `FINALIZADA` com `user_id` e sem `automatico=true`. Uma conversa pode encerrar mais de uma vez.                                                           |
+| Transferências        | Eventos históricos `TRANSFERIDA` com autoria humana e sem `automatico=true`. Atribuições e avisos de protocolo não são transferências.                                       |
+| Primeira resposta     | Tempo desde o início humano registrado até a primeira saída humana confirmada daquele ciclo. Inclui ciclos anteriores ao filtro se a primeira resposta estiver no intervalo. |
+| Tempo até encerrar    | Tempo desde o início humano registrado até o encerramento humano no intervalo. Inclui espera; não mede trabalho ativo.                                                       |
+| Resultados por pessoa | Autor da mensagem, encerramento ou transferência, inclusive supervisão/administração. Nunca atribui ações antigas ao responsável atual.                                      |
 
-## Atualização e limites
+A reconstrução usa os eventos `HANDOFF_SOLICITADO`, `ENTROU_NA_FILA`, `ASSUMIDA`,
+`TRANSFERIDA`, `DESATRIBUIDA`, `FINALIZADA`, `REABERTA`, `ATRIBUIDA_IA` e
+`DEVOLVIDA_PARA_IA`. Os eventos técnicos de geração/anúncio de protocolo não iniciam
+outra etapa. Encerramento, reabertura e devolução terminam a etapa anterior. São lidos
+os eventos anteriores ao filtro e as respostas anteriores dos IDs envolvidos para
+não reiniciar artificialmente os tempos na data inicial. IDs repetidos não duplicam a contagem.
 
-- Fila a cada 30 segundos e período a cada 60 segundos, enquanto a aba está ativa.
-- Cache separado por usuário, clínica e período; fila depende da autorização inicial.
-- Falhas em blocos não viram zero: aparecem indisponíveis. Dados anteriores mantêm
-  sua data. Falha na contagem diária não impede a visualização da fila.
-- Consultas agregadas são paginadas até 20 mil registros. Uma leitura extra detecta
-  truncamento; o painel sinaliza amostra parcial. Contagens do histórico usam total exato.
-- Encerramentos usam os metadados atuais. Não reconstrói sessões antigas cujos campos
-  de resolução foram apagados em reinícios. Sem registro de autoria, não inventa quem encerrou.
-- O painel é somente leitura. Não dispara mensagens, resolve conversas, altera a Nina
-  nem modifica módulos fora do OS ZAP.
+O relatório não usa `resolved_at`, `resolved_by`, `assigned_at`, presença ou responsável
+atual como fonte histórica: reabrir a conversa não faz desaparecer os encerramentos.
+Os únicos nomes retornados são os da equipe. Não consulta corpo de mensagem, telefone,
+resumo clínico nem o objeto completo de detalhes; projeta apenas três sinalizadores
+dos eventos, além dos metadados de data/tipo/autoria.
 
-## Validação
+## Limitações explícitas
 
-- 15 testes passaram nos arquivos de dashboard, acesso às telas e seleção da equipe da TV.
-  Cobrem datas, autoria, isolamento por clínica, exclusão de testes/automáticos,
-  paginação, permissão, falha parcial e contagem diária humana.
-- TypeScript verificado com `tsc --noEmit`.
-- Build completo cliente/servidor passou com Vite/Nitro. O projeto emitiu avisos
-  de APIs depreciadas e empacotamento, sem erro de compilação.
-- `scripts/check-dashboard-oszap.mjs` monta os componentes reais com React Query e
-  serviços simulados, testa filtros, atalhos, falhas, autorização, tema claro/escuro,
-  leitura de atalhos no escuro e celular a 135%, sem envio ao WhatsApp.
-- `scripts/preview-dashboard-oszap.tsx` contém somente dados fictícios e aviso visível.
-  Não constitui teste do banco publicado nem comprovação de publicação no Lovable.
+- Registros recebidos sem evidência anterior de etapa humana ficam fora do volume,
+  com a quantidade informada em aviso. Não há inferência baseada no dono atual.
+- Não é possível reconstruir eventos que nunca foram gravados. Tempos sem início
+  comprovado ficam sem medição; a interface informa o número de amostras válidas.
+- Mensagens humanas sem autora identificada entram no total, mas não no resultado
+  de uma pessoa. Mensagens sem conversa vinculada não inventam uma conversa respondida.
+- Falhas/pending de envio são informados separadamente e não entram no volume enviado.
+- As consultas leem todas as páginas, sem o antigo corte em 20 mil linhas. Intervalos
+  extensos podem demorar; qualquer falha de página invalida a consulta, sem apresentar
+  um total parcial como completo. Escala/latência do banco publicado não foi aferida.
+- Falha na consulta mantém o relatório anterior identificado como anterior; no primeiro
+  carregamento, não mostra números como se fossem zero. Falha de nomes preserva as contagens.
+- Consultas de mensagens restringem clínica e `is_teste=false`; eventos restringem
+  clínica e fazem join com conversas reais. Nenhuma fonte do painel TV é carregada.
 
-## Pendências e reversão
+## Validação e publicação
 
-Após sincronização/publicação, validar manualmente no Lovable com usuário de gestão:
-abrir a aba, comparar resultados com as conversas reais e conferir acesso da telefonia.
-Não foi realizado teste com dados reais nesta implementação.
-Reversão por revert do commit do dashboard; não exige desfazer dados ou migrações.
+- Testes de calendário, fuso, dias vazios, empates, separação de direções, exclusão
+  de automações, ciclos reabertos, autoria, transferências e paginação acima de 20 mil.
+- Testes do backend verificam autorização prévia, filtros de clínica/ambiente e projeção
+  de metadados. Usam serviços simulados, não o banco publicado.
+- `scripts/check-dashboard-oszap.mjs`: componentes e React Query reais, transportes
+  simulados. Verifica datas, seis agrupamentos, ano bissexto, paginação, detalhamento,
+  consulta explícita, ausência de polling/foco/reconexão, vazio, erros, permissão,
+  tema claro/escuro e tela móvel com texto a 135%.
+- `scripts/preview-dashboard-oszap.tsx` gera somente dados fictícios identificados.
+- TypeScript, lint dos módulos alterados e compilação cliente/servidor.
+
+Após a publicação no Lovable, conferir com usuário de gestão um intervalo conhecido
+contra o histórico das conversas. Validação local e push no GitHub não comprovam
+publicação nem igualdade com dados reais. Reversão por revert do commit; não há
+alterações de dados ou migrations para desfazer.

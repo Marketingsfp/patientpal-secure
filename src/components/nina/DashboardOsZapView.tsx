@@ -1,671 +1,637 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
-  Activity,
+  ArrowDownLeft,
   ArrowUpRight,
-  CheckCircle2,
+  BarChart3,
+  CalendarDays,
   Clock3,
-  Inbox,
-  LayoutDashboard,
-  RefreshCw,
+  MessagesSquare,
+  Search,
   Users,
-  Building2,
-  ArrowLeftRight,
 } from "lucide-react";
-import type {
-  carregarResumoDashboardOsZap,
-  carregarFilaHumanaDashboard,
-} from "@/lib/atendimento/dashboard-oszap.server";
+import type { carregarResumoDashboardOsZap } from "@/lib/atendimento/dashboard-oszap.server";
 import {
-  faixaEsperaDesde,
-  formatarEspera,
-  minutosDesde,
-  LIMITES_ESPERA_ATD,
-} from "@/lib/atendimento/espera";
-import { formatarTempoPausa } from "@/lib/atendimento/cronometro-pausa";
-import { ROTULO_ESTADO_MANUAL } from "@/lib/atendimento/presenca-manual";
-import { formatDatePura } from "@/lib/date-utils";
+  agruparDiasDashboard,
+  agrupamentosDashboard,
+  extremosVolume,
+  periodoAnterior,
+  periodoDashboardSchema,
+  periodoPadraoDashboard,
+  type AgrupamentoDashboard,
+  type PeriodoDashboard,
+} from "@/lib/atendimento/dashboard-oszap-periodos";
+import { formatDatePura, hojeBR } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 
-export type DadosDashboardOsZap = {
-  resumo?: Awaited<ReturnType<typeof carregarResumoDashboardOsZap>>;
-  fila?: Awaited<ReturnType<typeof carregarFilaHumanaDashboard>>;
-};
-const numero = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("pt-BR"));
-const tempo = (n: number | null | undefined) =>
-  n == null ? "—" : n < 60 ? `${Math.round(n)} s` : formatarEspera(n / 60);
-const dataHora = (d: string | undefined) =>
-  d
-    ? new Date(d).toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Aguardando consulta";
+type Resumo = Awaited<ReturnType<typeof carregarResumoDashboardOsZap>>;
+const numero = (n: number | undefined | null) => (n == null ? "—" : n.toLocaleString("pt-BR"));
+const intervalo = (p: PeriodoDashboard) =>
+  p.de === p.ate ? formatDatePura(p.de) : `${formatDatePura(p.de)} a ${formatDatePura(p.ate)}`;
+const tempo = (n: number | undefined | null) =>
+  n == null
+    ? "Sem medição"
+    : n < 60
+      ? `${n} s`
+      : n < 3600
+        ? `${Math.round(n / 60)} min`
+        : `${(n / 3600).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
+const campo =
+  "h-9 min-w-0 rounded-lg border border-atd-border bg-atd-surface px-3 text-sm text-atd-ink";
 function Indicador({
   nome,
   valor,
   ajuda,
   icon,
-  alerta = false,
 }: {
   nome: string;
   valor: string;
   ajuda: string;
   icon?: ReactNode;
-  alerta?: boolean;
 }) {
   return (
-    <div className={`oszap-dash-kpi ${alerta ? "oszap-dash-critical" : ""}`}>
+    <div className="oszap-dash-kpi">
       <div className="flex items-center justify-between gap-2 text-xs text-atd-ink-soft">
-        <span>{nome}</span>
+        {nome}
         {icon}
       </div>
-      <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">{valor}</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-atd-ink-soft">{ajuda}</p>
+      <p className="mt-2 text-3xl font-semibold tabular-nums">{valor}</p>
+      <p className="mt-1 text-xs text-atd-ink-soft">{ajuda}</p>
     </div>
   );
 }
 function Secao({
-  id,
   titulo,
   descricao,
-  icon,
   children,
-  acao,
+  icon,
 }: {
-  id?: string;
   titulo: string;
   descricao: string;
-  icon: ReactNode;
   children: ReactNode;
-  acao?: ReactNode;
+  icon: ReactNode;
 }) {
   return (
-    <section id={id} className="oszap-dash-section" aria-label={titulo}>
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            {icon}
-            {titulo}
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-atd-ink-soft">{descricao}</p>
-        </div>
-        {acao}
-      </header>
+    <section className="oszap-dash-section min-w-0" aria-label={titulo}>
+      <h2 className="flex items-center gap-2 text-base font-semibold">
+        {icon}
+        {titulo}
+      </h2>
+      <p className="mb-5 mt-1 text-xs leading-relaxed text-atd-ink-soft">{descricao}</p>
       {children}
     </section>
   );
 }
-function Indisponivel() {
+function Destaques({ linhas }: { linhas: { nome: string; total: number }[] }) {
+  const extremos = extremosVolume(linhas);
+  if (!extremos)
+    return (
+      <p className="my-3 text-sm text-atd-ink-soft">Sem movimento registrado neste período.</p>
+    );
   return (
-    <p className="rounded-lg border border-dashed border-atd-border p-4 text-sm text-atd-ink-soft">
-      Dados indisponíveis ou ainda em carregamento.
-    </p>
-  );
-}
-function Barra({
-  nome,
-  total,
-  max,
-  classe = "bg-primary",
-}: {
-  nome: string;
-  total: number;
-  max: number;
-  classe?: string;
-}) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between gap-3 text-xs">
-        <span>{nome}</span>
-        <b className="tabular-nums">{numero(total)}</b>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-atd-surface-2">
-        <div
-          className={`h-full rounded-full ${classe}`}
-          style={{ width: `${max > 0 ? Math.max(0, Math.min(100, (total / max) * 100)) : 0}%` }}
-        />
-      </div>
+    <div className="mb-4 grid gap-3 sm:grid-cols-2">
+      {[
+        { titulo: "Maior volume", linhas: extremos.maiores },
+        { titulo: "Menor volume", linhas: extremos.menores },
+      ].map((g) => (
+        <div key={g.titulo} className="rounded-lg border border-atd-border bg-atd-surface-2 p-3">
+          <p className="text-xs text-atd-ink-soft">{g.titulo}</p>
+          <p className="mt-1 font-semibold">{numero(g.linhas[0].total)} mensagens</p>
+          <p className="mt-1 text-xs" title={g.linhas.map((l) => l.nome).join(" · ")}>
+            {g.linhas
+              .slice(0, 4)
+              .map((l) => l.nome)
+              .join(" · ")}
+            {g.linhas.length > 4 ? ` · e mais ${g.linhas.length - 4}` : ""}
+            {g.linhas.length > 1 ? " (empate)" : ""}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
-export function DashboardOsZapView({
-  dados,
-  dias,
-  onDias,
-  atualizar,
-  atualizando,
-  erros = {},
-  agora,
-  abrir,
-  clinica,
+function TabelaPeriodos({
+  linhas,
+  detalhar,
 }: {
-  dados: DadosDashboardOsZap;
-  dias: 7 | 30 | 90;
-  onDias: (d: 7 | 30 | 90) => void;
-  atualizar: () => void;
-  atualizando: boolean;
-  erros?: { resumo?: string; fila?: string };
-  agora: number;
-  abrir: (aba: string) => void;
-  clinica: string;
+  linhas: ReturnType<typeof agruparDiasDashboard>;
+  detalhar: (p: PeriodoDashboard) => void;
 }) {
-  const { resumo: r, fila: f } = dados;
-  const faixas = { normal: 0, atencao: 0, critico: 0 };
-  for (const t of f?.espera ?? []) faixas[faixaEsperaDesde(t, agora)]++;
-  const maior = f?.espera.length ? Math.max(...f.espera.map((t) => minutosDesde(t, agora))) : null;
-  const ir = (aba: string, texto: string) => (
-    <Button
-      size="sm"
-      variant="ghost"
-      className="oszap-dash-link h-8 gap-1 text-xs"
-      onClick={() => abrir(aba)}
-    >
-      {texto}
-      <ArrowUpRight className="h-3.5 w-3.5" />
-    </Button>
-  );
-  const parciais = [r?.mensagens, r?.encerramentos, r?.primeiraResposta, r?.transferencias].some(
-    (q) => q?.parcial,
-  );
+  const [pagina, setPagina] = useState(0);
+  const max = Math.max(1, ...linhas.map((l) => l.total));
+  const paginas = Math.max(1, Math.ceil(linhas.length / 50));
   return (
-    <div className="oszap-dashboard space-y-5 text-atd-ink">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <>
+      <div className="overflow-x-auto">
+        <table className="oszap-dash-table">
+          <caption className="sr-only">Volume e resultados por período</caption>
+          <thead>
+            <tr>
+              {[
+                "Período",
+                "Recebidas",
+                "Enviadas",
+                "Total",
+                "Encerramentos",
+                "Transferências",
+                "",
+              ].map((t, i) => (
+                <th key={i} scope="col">
+                  {t}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.slice(pagina * 50, pagina * 50 + 50).map((l) => (
+              <tr key={l.de}>
+                <th scope="row" className="min-w-40">
+                  <span className="text-atd-ink">{intervalo(l)}</span>
+                  {l.parcial && (
+                    <span className="mt-1 block text-[11px]">Recorte de {l.dias} dia(s)</span>
+                  )}
+                  <div className="mt-2 h-1 rounded bg-atd-surface-2">
+                    <div
+                      className="h-full rounded bg-atd-blue"
+                      style={{ width: `${(l.total / max) * 100}%` }}
+                    />
+                  </div>
+                </th>
+                <td>{numero(l.recebidas)}</td>
+                <td>{numero(l.enviadas)}</td>
+                <td className="font-semibold">{numero(l.total)}</td>
+                <td>{numero(l.encerradas)}</td>
+                <td>{numero(l.transferencias)}</td>
+                <td>
+                  <button
+                    type="button"
+                    className="oszap-dash-link rounded px-2 py-1 underline"
+                    onClick={() => detalhar({ de: l.de, ate: l.ate })}
+                    aria-label={`Detalhar ${intervalo(l)}`}
+                  >
+                    Detalhar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Total do intervalo</th>
+              {["recebidas", "enviadas", "total", "encerradas", "transferencias"].map((chave) => (
+                <td className="font-semibold" key={chave}>
+                  {numero(linhas.reduce((n, l) => n + l[chave as "total"], 0))}
+                </td>
+              ))}
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {paginas > 1 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span>
+            Página {pagina + 1} de {paginas} · {linhas.length} períodos
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pagina === 0}
+              onClick={() => setPagina((p) => p - 1)}
+            >
+              Anterior
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pagina + 1 === paginas}
+              onClick={() => setPagina((p) => p + 1)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function DashboardOsZapView({
+  resumo,
+  periodo,
+  agrupamento,
+  onAgrupamento,
+  consultar,
+  clinica,
+  atualizando,
+  erro,
+}: {
+  resumo?: Resumo;
+  periodo: PeriodoDashboard;
+  agrupamento: AgrupamentoDashboard;
+  onAgrupamento: (v: AgrupamentoDashboard) => void;
+  consultar: (v: PeriodoDashboard) => void;
+  clinica: string;
+  atualizando: boolean;
+  erro?: string;
+}) {
+  const [rascunho, setRascunho] = useState(periodo);
+  const [atalho, setAtalho] = useState("30");
+  const [erroData, setErroData] = useState<string>();
+  const grupos = useMemo(
+    () => (resumo ? agruparDiasDashboard(resumo.porDia, resumo.periodo, agrupamento) : []),
+    [resumo, agrupamento],
+  );
+  const horas = resumo?.mensagens.porHora ?? [];
+  const turnos = [
+    "Madrugada · 00h–06h",
+    "Manhã · 06h–12h",
+    "Tarde · 12h–18h",
+    "Noite · 18h–24h",
+  ].map((nome, i) => {
+    const h = horas.filter((h) => h.hora >= i * 6 && h.hora < i * 6 + 6);
+    return {
+      nome,
+      recebidas: h.reduce((n, h) => n + h.recebidas, 0),
+      enviadas: h.reduce((n, h) => n + h.enviadas, 0),
+      total: h.reduce((n, h) => n + h.total, 0),
+    };
+  });
+  const maxHora = Math.max(1, ...horas.map((h) => h.total));
+  function pesquisar(p: PeriodoDashboard) {
+    const resultado = periodoDashboardSchema.safeParse(p);
+    if (!resultado.success) {
+      setErroData(resultado.error.issues[0].message);
+      return;
+    }
+    setErroData(undefined);
+    consultar(resultado.data);
+  }
+  return (
+    <div className="oszap-dashboard space-y-5 text-atd-ink" aria-busy={atualizando}>
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[.18em] text-atd-ink-soft">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-atd-ink-soft">
             OS ZAP · {clinica}
           </p>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <LayoutDashboard className="h-6 w-6" />
-            Dashboard de atendimento
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Relatórios de atendimento</h1>
           <p className="mt-1 text-sm text-atd-ink-soft">
-            Fila, equipe e resultados do atendimento humano.
+            Histórico do atendimento humano, organizado por data.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs" htmlFor="oszap-dash-periodo">
-            Resultados por período
+        <span className="rounded-full border border-atd-border px-3 py-1 text-xs">
+          Consulta histórica
+        </span>
+      </header>
+      <form
+        className="oszap-dash-section"
+        aria-label="Pesquisar relatório por data"
+        onSubmit={(e) => {
+          e.preventDefault();
+          pesquisar(rascunho);
+        }}
+      >
+        <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr_auto]">
+          <label className="grid gap-1 text-xs">
+            Período rápido
+            <select
+              aria-label="Período rápido"
+              className={campo}
+              value={atalho}
+              onChange={(e) => {
+                const v = e.target.value;
+                setAtalho(v);
+                if (v === "30") setRascunho(periodoPadraoDashboard());
+                else if (v !== "personalizado") {
+                  setRascunho(periodoAnterior(v as AgrupamentoDashboard));
+                  onAgrupamento(v as AgrupamentoDashboard);
+                }
+              }}
+            >
+              <option value="30">Últimos 30 dias completos</option>
+              <option value="dia">Ontem</option>
+              <option value="semana">Semana passada</option>
+              <option value="mes">Mês passado</option>
+              <option value="bimestre">Bimestre anterior</option>
+              <option value="trimestre">Trimestre anterior</option>
+              <option value="ano">Ano anterior</option>
+              <option value="personalizado">Personalizado</option>
+            </select>
           </label>
-          <select
-            id="oszap-dash-periodo"
-            className="h-9 rounded-lg border border-atd-border bg-atd-surface px-2 text-xs"
-            value={dias}
-            onChange={(e) => onDias(Number(e.target.value) as 7 | 30 | 90)}
-          >
-            <option value={7}>Últimos 7 dias</option>
-            <option value={30}>Últimos 30 dias</option>
-            <option value={90}>Últimos 90 dias</option>
-          </select>
-          <Button size="sm" variant="outline" onClick={atualizar} disabled={atualizando}>
-            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${atualizando ? "animate-spin" : ""}`} />
-            {atualizando ? "Atualizando…" : "Atualizar"}
+          <label className="grid gap-1 text-xs">
+            Data inicial
+            <input
+              type="date"
+              required
+              className={campo}
+              value={rascunho.de}
+              max={hojeBR()}
+              onChange={(e) => {
+                setAtalho("personalizado");
+                setRascunho((p) => ({ ...p, de: e.target.value }));
+              }}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            Data final
+            <input
+              type="date"
+              required
+              className={campo}
+              value={rascunho.ate}
+              max={hojeBR()}
+              onChange={(e) => {
+                setAtalho("personalizado");
+                setRascunho((p) => ({ ...p, ate: e.target.value }));
+              }}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            Agrupar por
+            <select
+              aria-label="Agrupar por"
+              className={campo}
+              value={agrupamento}
+              onChange={(e) => onAgrupamento(e.target.value as AgrupamentoDashboard)}
+            >
+              {Object.entries(agrupamentosDashboard).map(([valor, rotulo]) => (
+                <option value={valor} key={valor}>
+                  {rotulo}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button type="submit" disabled={atualizando} size="sm" className="h-9">
+            <Search className="size-4" />
+            {atualizando ? "Consultando…" : "Consultar"}
           </Button>
         </div>
-      </header>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-atd-ink-soft">
-        <span className="rounded-full border border-atd-border px-2 py-1">
-          ATENDIMENTO HUMANO · AMBIENTE REAL
-        </span>
-        <span>Fila atualizada: {dataHora(f?.atualizadoEm)}</span>
-      </div>
-      {erros.resumo || erros.fila || r?.avisos.length ? (
-        <div role="alert" className="rounded-xl border border-atd-warn bg-atd-warn-bg p-3 text-xs">
-          <b>Algumas informações não puderam ser carregadas.</b>
-          <p className="mt-1">
-            {[erros.resumo, erros.fila, ...(r?.avisos ?? [])].filter(Boolean).join(" ")}
+        {erroData && (
+          <p role="alert" className="mt-3 text-sm text-atd-danger-ink">
+            {erroData}
           </p>
-          <p className="mt-1">
-            Valores sem consulta aparecem como “—”. Dados anteriores mantêm sua data de atualização.
-          </p>
-        </div>
-      ) : null}
-      {parciais && (
-        <p role="status" className="rounded-lg border border-atd-warn p-3 text-xs">
-          Um ou mais blocos atingiram o limite de {numero(r?.limite)} registros. Os números desses
-          blocos representam uma amostra parcial do período.
+        )}
+        <p className="mt-3 text-xs text-atd-ink-soft">
+          Horário de Brasília. Sem atualização automática. Semanas de segunda a domingo; bimestres e
+          trimestres seguem o calendário.
         </p>
-      )}
-      {f && f.resolvidasHoje == null && (
-        <p role="alert" className="rounded-lg border border-atd-warn p-3 text-xs">
-          Não foi possível consultar os encerramentos humanos de hoje. A fila continua disponível.
-        </p>
-      )}
-      {f?.encerramentosHojeParcial && (
-        <p role="status" className="rounded-lg border border-atd-warn p-3 text-xs">
-          Os encerramentos de hoje e por atendente representam uma amostra parcial.
-        </p>
-      )}
-      {!!faixas.critico && (
-        <div
-          className="oszap-dash-urgency flex flex-wrap items-center justify-between gap-3"
-          role="status"
+      </form>
+      {erro && (
+        <p
+          role="alert"
+          className="rounded-lg border border-atd-warn bg-atd-warn-bg p-3 text-sm text-atd-warn-ink"
         >
-          <div>
-            <b>{numero(faixas.critico)} conversa(s) com espera crítica</b>
-            <p className="mt-1 text-xs">
-              Maior espera: {formatarEspera(maior ?? 0)}. Priorize as respostas pendentes.
+          {erro}
+          {resumo
+            ? " O relatório abaixo é da última consulta concluída, não desta tentativa."
+            : " Nenhum total foi calculado para esta consulta."}
+        </p>
+      )}
+      {!resumo ? (
+        <p role="status" className="p-5 text-sm">
+          {atualizando
+            ? "Consultando o histórico completo do período…"
+            : "Selecione o período e consulte o relatório."}
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <p className="font-semibold">Período consultado: {intervalo(resumo.periodo)}</p>
+            <p className="text-atd-ink-soft">
+              Consulta concluída em{" "}
+              {new Date(resumo.atualizadoEm).toLocaleString("pt-BR", {
+                timeZone: "America/Sao_Paulo",
+              })}
             </p>
           </div>
-          {ir("atend-inbox", "Abrir atendimento")}
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Indicador
-          nome="Conversas humanas abertas"
-          valor={numero(f?.emAndamento)}
-          ajuda="Todas as conversas atuais sob atendimento humano"
-          icon={<Inbox className="h-4 w-4" />}
-        />
-        <Indicador
-          nome="Pacientes aguardando"
-          valor={f ? numero(f.espera.length) : "—"}
-          ajuda="Conversas humanas com resposta pendente"
-          icon={<Clock3 className="h-4 w-4" />}
-          alerta={faixas.critico > 0}
-        />
-        <Indicador
-          nome="Sem responsável"
-          valor={numero(f?.naoAtribuidas)}
-          ajuda="Conversas humanas ainda não atribuídas"
-          icon={<Users className="h-4 w-4" />}
-          alerta={!!f?.naoAtribuidas}
-        />
-        <Indicador
-          nome="Encerradas hoje"
-          valor={numero(f?.resolvidasHoje)}
-          ajuda="Encerramentos com autoria humana no dia de Brasília"
-          icon={<CheckCircle2 className="h-4 w-4" />}
-        />
-      </div>
-      <nav aria-label="Seções do dashboard" className="flex flex-wrap gap-2">
-        {[
-          ["fila", "Fila e equipe"],
-          ["volume", "Mensagens e tempos"],
-          ["resultados", "Resultados por pessoa"],
-          ["departamentos", "Departamentos"],
-        ].map(([id, nome]) => (
-          <button
-            key={id}
-            type="button"
-            className="rounded-full border border-atd-border px-3 py-1.5 text-xs hover:bg-atd-surface-2"
-            onClick={() =>
-              document
-                .getElementById(`oszap-dash-${id}`)
-                ?.scrollIntoView({ behavior: "instant", block: "start" })
-            }
-          >
-            {nome}
-          </button>
-        ))}
-      </nav>
-      <div id="oszap-dash-fila" className="grid items-start gap-4 xl:grid-cols-[.9fr_1.4fr]">
-        <Secao
-          titulo="Pendências e tempo de espera"
-          descricao="Mesmos limites e cronômetro usados no atendimento e no painel da TV."
-          icon={<Clock3 className="h-4 w-4" />}
-        >
-          {!f ? (
-            <Indisponivel />
-          ) : (
-            <>
-              <div className="space-y-3">
-                <Barra
-                  nome={`Normal · menos de ${LIMITES_ESPERA_ATD.atencao} min`}
-                  total={faixas.normal}
-                  max={f.espera.length}
-                  classe="bg-atd-ok"
-                />
-                <Barra
-                  nome={`Atenção · ${LIMITES_ESPERA_ATD.atencao} a ${LIMITES_ESPERA_ATD.critico} min`}
-                  total={faixas.atencao}
-                  max={f.espera.length}
-                  classe="bg-atd-warn"
-                />
-                <Barra
-                  nome={`Crítica · acima de ${LIMITES_ESPERA_ATD.critico} min`}
-                  total={faixas.critico}
-                  max={f.espera.length}
-                  classe="bg-atd-danger"
-                />
-              </div>
-              <dl className="oszap-dash-facts mt-5">
-                <div>
-                  <dt>Maior espera atual</dt>
-                  <dd>{maior === null ? "Sem espera registrada" : formatarEspera(maior)}</dd>
-                </div>
-              </dl>
-              <p className="mt-3 text-[11px] text-atd-ink-soft">
-                Os tempos de resposta e encerramento aparecem abaixo, no período selecionado.
-              </p>
-            </>
+          {resumo.periodo.ate === hojeBR() && (
+            <p className="text-xs text-atd-ink-soft">
+              O dia de hoje está incompleto: inclui somente os registros disponíveis no momento da
+              consulta.
+            </p>
           )}
-        </Secao>
-        <Secao
-          titulo="Equipe de telefonia agora"
-          descricao="Presença escolhida pela atendente. Administradores não entram nesta lista."
-          icon={<Users className="h-4 w-4" />}
-          acao={ir("tv", "Painel da TV")}
-        >
-          {!f ? (
-            <Indisponivel />
-          ) : (
-            <>
-              <div className="mb-4 flex flex-wrap gap-3 text-xs">
-                <span>
-                  <b>{f.atendentes.filter((p) => p.estado === "ONLINE").length}</b> online
-                </span>
-                <span>
-                  <b>{f.atendentes.filter((p) => p.estado.startsWith("PAUSA")).length}</b> em pausa
-                </span>
-                <span>
-                  <b>{f.atendentes.filter((p) => p.estado === "OFFLINE").length}</b> offline com
-                  carga
-                </span>
+          {resumo.avisos.length > 0 && (
+            <div
+              role="status"
+              className="rounded-lg border border-atd-warn bg-atd-warn-bg p-3 text-sm text-atd-warn-ink"
+            >
+              {resumo.avisos.map((a) => (
+                <p key={a}>{a}</p>
+              ))}
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Indicador
+              nome="Mensagens recebidas"
+              valor={numero(resumo.mensagens.recebidas)}
+              ajuda="Dos pacientes, durante a etapa humana"
+              icon={<ArrowDownLeft className="size-4" />}
+            />
+            <Indicador
+              nome="Mensagens enviadas"
+              valor={numero(resumo.mensagens.enviadas)}
+              ajuda="Respostas da equipe com envio confirmado"
+              icon={<ArrowUpRight className="size-4" />}
+            />
+            <Indicador
+              nome="Volume total"
+              valor={numero(resumo.mensagens.total)}
+              ajuda="Recebidas + enviadas no intervalo"
+              icon={<MessagesSquare className="size-4" />}
+            />
+            <Indicador
+              nome="Atendimentos encerrados"
+              valor={numero(resumo.encerramentos.total)}
+              ajuda="Encerramentos feitos por pessoas no período"
+              icon={<CalendarDays className="size-4" />}
+            />
+          </div>
+          <Secao
+            titulo="Volume por período"
+            descricao="Compare o movimento e os resultados. Detalhar abre os horários do intervalo escolhido. Dias sem mensagens contam como zero; os recortes incompletos estão identificados."
+            icon={<BarChart3 className="size-4" />}
+          >
+            <Destaques linhas={grupos.map((g) => ({ nome: intervalo(g), total: g.total }))} />
+            <TabelaPeriodos
+              key={`${resumo.atualizadoEm}:${resumo.periodo.de}:${resumo.periodo.ate}:${agrupamento}`}
+              linhas={grupos}
+              detalhar={(p) => {
+                setRascunho(p);
+                setAtalho("personalizado");
+                pesquisar(p);
+              }}
+            />
+          </Secao>
+          <Secao
+            titulo="Movimento ao longo do dia"
+            descricao={`Soma das mensagens em cada horário, entre ${intervalo(resumo.periodo)}. Inclui todas as 24 horas, sem presumir o horário de funcionamento.`}
+            icon={<Clock3 className="size-4" />}
+          >
+            <Destaques linhas={turnos} />
+            <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {turnos.map((t) => (
+                <div className="rounded-lg border border-atd-border p-3" key={t.nome}>
+                  <p className="text-xs text-atd-ink-soft">{t.nome}</p>
+                  <p className="my-1 text-xl font-semibold">{numero(t.total)}</p>
+                  <p className="text-xs">
+                    {numero(t.recebidas)} recebidas · {numero(t.enviadas)} enviadas
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="mb-4 flex flex-wrap gap-4 text-xs">
+              <span>
+                <span className="mr-1 inline-block size-2 rounded bg-sky-600 dark:bg-sky-400" />
+                Recebidas
+              </span>
+              <span>
+                <span className="mr-1 inline-block size-2 rounded bg-primary" />
+                Enviadas
+              </span>
+            </div>
+            <div className="overflow-x-auto pb-3">
+              <div
+                className="grid h-44 min-w-[560px] grid-cols-[repeat(24,minmax(0,1fr))] items-end gap-2"
+                role="img"
+                aria-label="Volume recebido e enviado por hora; valores disponíveis na tabela abaixo"
+              >
+                {horas.map((h) => (
+                  <div
+                    key={h.hora}
+                    className="flex h-full flex-col justify-end gap-1 text-center"
+                    title={`${h.hora}h: ${h.recebidas} recebidas, ${h.enviadas} enviadas, ${h.total} no total`}
+                  >
+                    <div
+                      className="flex min-h-0 flex-col justify-end"
+                      style={{ height: `${(h.total / maxHora) * 85}%` }}
+                    >
+                      <div
+                        className="bg-primary"
+                        style={{ height: `${h.total ? (h.enviadas / h.total) * 100 : 0}%` }}
+                      />
+                      <div
+                        className="bg-sky-600 dark:bg-sky-400"
+                        style={{ height: `${h.total ? (h.recebidas / h.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-atd-ink-soft">{h.hora}h</span>
+                  </div>
+                ))}
               </div>
-              <div className="overflow-x-auto">
+            </div>
+            <details className="mt-3">
+              <summary className="cursor-pointer text-sm font-semibold">
+                Ver os números por hora
+              </summary>
+              <div className="mt-3 overflow-x-auto">
                 <table className="oszap-dash-table">
                   <thead>
                     <tr>
-                      <th>Atendente</th>
-                      <th>Estado</th>
-                      <th>Atribuídas</th>
-                      <th>Pendentes</th>
-                      <th>Críticas</th>
-                      <th>Encerradas hoje</th>
+                      <th>Hora</th>
+                      <th>Recebidas</th>
+                      <th>Enviadas</th>
+                      <th>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {f.atendentes.map((p) => (
-                      <tr key={p.id}>
-                        <td className="font-medium">{p.nome}</td>
-                        <td>
-                          <span className="whitespace-nowrap">
-                            {ROTULO_ESTADO_MANUAL[p.estado]}
-                          </span>
-                          {p.inicioPausa && (
-                            <span className="block text-[10px] text-atd-ink-soft">
-                              {formatarTempoPausa(p.inicioPausa, agora)}
-                            </span>
-                          )}
-                        </td>
-                        <td>{numero(p.atribuidas)}</td>
-                        <td>{numero(p.esperas.length)}</td>
-                        <td>
-                          {numero(
-                            p.esperas.filter((t) => faixaEsperaDesde(t, agora) === "critico")
-                              .length,
-                          )}
-                        </td>
-                        <td>{numero(p.resolvidasHoje)}</td>
+                    {horas.map((h) => (
+                      <tr key={h.hora}>
+                        <th scope="row">
+                          {String(h.hora).padStart(2, "0")}:00–{String(h.hora).padStart(2, "0")}:59
+                        </th>
+                        <td>{numero(h.recebidas)}</td>
+                        <td>{numero(h.enviadas)}</td>
+                        <td>{numero(h.total)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {!f.atendentes.length && (
-                <p className="p-3 text-xs text-atd-ink-soft">
-                  Nenhuma atendente online, em pausa ou com carga atribuída.
-                </p>
-              )}
-              <p className="mt-3 text-[11px] text-atd-ink-soft">
-                Offline sem conversas não entra na lista de operação atual. Estar online é um estado
-                manual, não uma garantia de conexão.
-              </p>
-            </>
-          )}
-        </Secao>
-      </div>
-      <Secao
-        id="oszap-dash-volume"
-        titulo="Mensagens e tempos no período"
-        descricao={
-          r
-            ? `${formatDatePura(r.periodo.de)} a ${formatDatePura(r.periodo.ate)} · dias civis de Brasília · atualizado ${dataHora(r.atualizadoEm)}.`
-            : "Resultados por período de atendimento humano."
-        }
-        icon={<Activity className="h-4 w-4" />}
-        acao={ir("pesquisa-conversas", "Central de conversas")}
-      >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Indicador
-            nome="Respostas humanas enviadas"
-            valor={numero(r?.mensagens?.enviadas)}
-            ajuda="Mensagens com status enviada, entregue ou lida"
-          />
-          <Indicador
-            nome="Conversas respondidas"
-            valor={numero(r?.mensagens?.conversasRespondidas)}
-            ajuda="Conversas distintas com resposta humana enviada"
-          />
-          <Indicador
-            nome="Encerradas no período"
-            valor={numero(r?.encerramentos?.total)}
-            ajuda="Pela data de encerramento registrada na conversa"
-          />
-          <Indicador
-            nome="Transferências manuais"
-            valor={numero(r?.transferencias?.total)}
-            ajuda="Com pessoa de origem e conversa real comprovada"
-            icon={<ArrowLeftRight className="h-4 w-4" />}
-          />
-        </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-          <div>
-            <h3 className="mb-3 text-sm font-semibold">
-              Respostas humanas por hora · período inteiro
-            </h3>
-            {r?.mensagens ? (
-              <>
-                <div
-                  className="oszap-dash-hourly"
-                  role="img"
-                  aria-label={`Respostas humanas por hora em Brasília: ${r.mensagens.porHora.map((n, h) => `${h}h: ${n}`).join("; ")}`}
-                >
-                  {r.mensagens.porHora.map((n, h) => (
-                    <div key={h} title={`${h}h: ${numero(n)} respostas humanas`}>
-                      <div
-                        className="oszap-dash-hour-bar"
-                        style={{
-                          height: `${n ? Math.max(3, (n / Math.max(1, ...r.mensagens!.porHora)) * 100) : 0}%`,
-                        }}
-                      />
-                      <span>{h % 3 === 0 ? `${h}h` : ""}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-2 text-[11px] text-atd-ink-soft">
-                  Soma das respostas humanas em cada hora, nos dias selecionados. Falhas e mensagens
-                  automáticas ficam fora.
-                </p>
-              </>
-            ) : (
-              <Indisponivel />
-            )}
-          </div>
-          <dl className="oszap-dash-facts">
-            <div>
-              <dt>Primeira resposta humana média</dt>
-              <dd>{tempo(r?.primeiraResposta?.mediaSeg)}</dd>
+            </details>
+          </Secao>
+          <Secao
+            titulo="Resultados do atendimento"
+            descricao="Medições reconstruídas a partir dos registros do atendimento humano, dentro do período consultado."
+            icon={<CalendarDays className="size-4" />}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Indicador
+                nome="Conversas respondidas"
+                valor={numero(resumo.mensagens.conversasRespondidas)}
+                ajuda="Conversas únicas com resposta humana enviada"
+              />
+              <Indicador
+                nome="Transferências manuais"
+                valor={numero(resumo.transferencias.total)}
+                ajuda="Mudanças registradas com autor humano"
+              />
+              <Indicador
+                nome="Primeira resposta"
+                valor={tempo(resumo.primeiraResposta.mediaSeg)}
+                ajuda={`Média desde a entrada humana registrada · ${numero(resumo.primeiraResposta.medidas)} medições`}
+              />
+              <Indicador
+                nome="Tempo até encerrar"
+                valor={tempo(resumo.encerramentos.duracaoMediaSeg)}
+                ajuda={`Média desde a entrada humana registrada · ${numero(resumo.encerramentos.duracoesMedidas)} medições`}
+              />
             </div>
-            <div>
-              <dt>Conversas com primeira resposta medida</dt>
-              <dd>{numero(r?.primeiraResposta?.medidas)}</dd>
-            </div>
-            <div>
-              <dt>Tempo médio até encerrar</dt>
-              <dd>{tempo(r?.encerramentos?.duracaoMediaSeg)}</dd>
-            </div>
-            <div>
-              <dt>Encerramentos com duração medida</dt>
-              <dd>{numero(r?.encerramentos?.duracoesMedidas)}</dd>
-            </div>
-            <div>
-              <dt>Falhas registradas em mensagens humanas</dt>
-              <dd>{numero(r?.mensagens?.falhas)}</dd>
-            </div>
-            <div>
-              <dt>Mensagens em outros estados</dt>
-              <dd>{numero(r?.mensagens?.outrosEstados)}</dd>
-            </div>
-          </dl>
-        </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-atd-ink-soft">
-          A primeira resposta usa o SLA registrado quando a equipe responde. O tempo até encerrar
-          começa na entrada humana registrada, ou na atribuição disponível; inclui espera e não mede
-          trabalho ativo. Sem medição, o valor aparece como “—”.
-        </p>
-      </Secao>
-      <div id="oszap-dash-resultados" className="grid items-start gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <Secao
-          titulo="Resultados por pessoa"
-          descricao="Mensagens atribuídas a quem escreveu e encerramentos a quem efetivamente encerrou, incluindo supervisão e administração."
-          icon={<Users className="h-4 w-4" />}
-        >
-          {r?.pessoas && r.mensagens && r.encerramentos ? (
-            <>
+            <p className="mt-4 text-xs text-atd-ink-soft">
+              Envios que falharam: {numero(resumo.mensagens.falhas)} · Sem confirmação de envio:{" "}
+              {numero(resumo.mensagens.outrosEstados)}. Esses registros não entram no volume
+              enviado.
+            </p>
+          </Secao>
+          <Secao
+            titulo="Resultados por pessoa"
+            descricao="Cada ação pertence a quem a executou, incluindo encerramentos feitos pela supervisão. Não depende de quem está responsável pela conversa hoje."
+            icon={<Users className="size-4" />}
+          >
+            {resumo.pessoas.length ? (
               <div className="overflow-x-auto">
                 <table className="oszap-dash-table">
                   <thead>
                     <tr>
                       <th>Pessoa</th>
-                      <th>Respostas enviadas</th>
-                      <th>Conversas encerradas</th>
+                      <th>Mensagens enviadas</th>
+                      <th>Encerramentos</th>
+                      <th>Transferências</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {r.pessoas.map((p) => (
+                    {resumo.pessoas.map((p) => (
                       <tr key={p.id}>
-                        <td>{p.nome}</td>
+                        <th scope="row">{p.nome}</th>
                         <td>{numero(p.mensagens)}</td>
                         <td>{numero(p.encerradas)}</td>
+                        <td>{numero(p.transferencias)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {!r.pessoas.length && (
-                <p className="p-3 text-xs text-atd-ink-soft">
-                  Nenhuma atividade humana atribuída a uma pessoa neste período.
-                </p>
-              )}
-              <p className="mt-3 text-[11px] text-atd-ink-soft">
-                {numero(r.mensagens.semAutora)} mensagem(ns) e {numero(r.encerramentos.semAutoria)}{" "}
-                encerramento(s) sem autoria não são atribuídos a outra pessoa.
+            ) : (
+              <p className="text-sm text-atd-ink-soft">
+                Nenhuma ação humana com autoria identificada neste período.
               </p>
-            </>
-          ) : (
-            <Indisponivel />
-          )}
-        </Secao>
-        <Secao
-          titulo="Evolução das respostas humanas"
-          descricao="Mensagens enviadas por dia. Dias sem registro aparecem com zero, quando a consulta está disponível."
-          icon={<Activity className="h-4 w-4" />}
-        >
-          {!r?.mensagens ? (
-            <Indisponivel />
-          ) : (
-            <>
-              <div className="oszap-dash-daily max-h-72 space-y-3 overflow-y-auto">
-                {Array.from({ length: dias }, (_, i) => {
-                  const data = new Date(`${r.periodo.de}T12:00:00Z`);
-                  data.setUTCDate(data.getUTCDate() + i);
-                  const dia = data.toISOString().slice(0, 10);
-                  const total = r.mensagens!.porDia.find((d) => d.dia === dia)?.total ?? 0;
-                  return (
-                    <Barra
-                      key={dia}
-                      nome={formatDatePura(dia)}
-                      total={total}
-                      max={Math.max(1, ...r.mensagens!.porDia.map((d) => d.total))}
-                    />
-                  );
-                })}
-              </div>
-              {r.mensagens.parcial && (
-                <p className="mt-2 text-xs text-atd-warn-ink">
-                  Amostra parcial: zero nesta série pode significar registro fora da amostra.
-                </p>
-              )}
-            </>
-          )}
-        </Secao>
-      </div>
-      <div id="oszap-dash-departamentos" className="grid items-start gap-4 xl:grid-cols-2">
-        <Secao
-          titulo="Conversas por departamento agora"
-          descricao="Distribuição das conversas humanas abertas; sem responsável é parte das abertas, não um total adicional."
-          icon={<Building2 className="h-4 w-4" />}
-        >
-          {f?.departamentos ? (
-            <>
-              <div className="overflow-x-auto">
-                <table className="oszap-dash-table">
-                  <thead>
-                    <tr>
-                      <th>Departamento</th>
-                      <th>Abertas</th>
-                      <th>Sem responsável</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {f.departamentos.map((d) => (
-                      <tr key={d.id ?? "sem-departamento"}>
-                        <td>{d.nome}</td>
-                        <td>{numero(d.abertas)}</td>
-                        <td>{numero(d.semResponsavel)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {!f.departamentos.length && (
-                <p className="p-3 text-xs text-atd-ink-soft">Nenhuma conversa humana aberta.</p>
-              )}
-              {f.departamentosParcial && (
-                <p className="mt-2 text-xs text-atd-warn-ink">
-                  Distribuição por departamento parcial: limite de 20.000 conversas.
-                </p>
-              )}
-            </>
-          ) : (
-            <Indisponivel />
-          )}
-        </Secao>
-        <Secao
-          titulo="Histórico e atalhos"
-          descricao="Somente conversas com evidência de atendimento humano. Histórico completo, independente do filtro de período."
-          icon={<Inbox className="h-4 w-4" />}
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <Indicador
-              nome="Conversas humanas no histórico"
-              valor={numero(r?.historico?.total)}
-              ajuda="Todas as datas; registros de teste excluídos"
-            />
-            <Indicador
-              nome="Encerradas no histórico"
-              valor={numero(r?.historico?.encerradas)}
-              ajuda="Conversas atualmente encerradas no histórico humano"
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {ir("atend-inbox", "Abrir atendimento")}
-            {ir("pesquisa-conversas", "Buscar uma conversa")}
-            {ir("atend-macros", "Mensagens prontas")}
-            {ir("tv", "Painel da TV")}
-          </div>
-        </Secao>
-      </div>
-      <footer className="text-[11px] leading-relaxed text-atd-ink-soft">
-        Somente leitura · clínica selecionada · Brasília. Testes e mensagens automáticas não entram
-        nos resultados humanos. Encerramentos usam os metadados atuais de autoria e data; o painel
-        não reconstrói sessões antigas que tiveram esses campos reiniciados. Atualização automática:
-        fila a cada 30 s e período a cada 60 s, enquanto esta aba estiver ativa.
-      </footer>
+            )}
+            {resumo.mensagens.semAutora > 0 && (
+              <p className="mt-3 text-xs">
+                {numero(resumo.mensagens.semAutora)} mensagens humanas sem identificação da autora
+                entram no total, sem atribuição a uma pessoa.
+              </p>
+            )}
+          </Secao>
+          <footer className="rounded-lg border border-atd-border p-4 text-xs leading-relaxed text-atd-ink-soft">
+            Como contamos: mensagens recebidas após um registro de entrada na fila humana ou
+            atribuição, até o encerramento ou saída dessa etapa; respostas enviadas pela equipe;
+            eventos de encerramento e transferência com autoria humana. Uma conversa pode ter mais
+            de um encerramento no período. Reabrir não apaga os resultados anteriores. Avisos
+            automáticos e conversas de teste não entram. Os tempos são calculados apenas quando o
+            começo da etapa foi registrado; históricos incompletos podem limitar as medições.
+          </footer>
+        </>
+      )}
     </div>
   );
 }

@@ -7,18 +7,12 @@ import { createServer } from "node:http";
 import path from "node:path";
 const out = path.resolve("../oszap-design-preview");
 await mkdir(out, { recursive: true });
-const fn = (nome, tipo) =>
-  `export async function ${nome}({data}){const g=globalThis;g.__dashboardChamadas.push({tipo:${JSON.stringify(tipo)},...data});if(g.__dashboardModo==='permissao'&&${JSON.stringify(tipo)}==='resumo')throw Error('Dashboard destinado à administração e supervisão');if(g.__dashboardModo==='falha-fila'&&${JSON.stringify(tipo)}==='fila')throw Error('Fonte da fila temporariamente indisponível');const r=structuredClone(g.__dashboardFixtures[${JSON.stringify(tipo)}]);if(${JSON.stringify(tipo)}==='resumo'){const d=new Date('2026-10-03T12:00:00Z');d.setUTCDate(d.getUTCDate()-data.dias+1);r.periodo={de:d.toISOString().slice(0,10),ate:'2026-10-03'};}return r;}`;
 const mocks = {
   "@tanstack/react-start": "export const useServerFn=fn=>fn;",
-  "@tanstack/react-router":
-    "export const useNavigate=()=>async destino=>{globalThis.__dashboardNavegacao=destino;};",
   "@/hooks/use-auth": "export const useAuth=()=>({user:{id:'gestor-demonstracao'}});",
   "@/hooks/use-clinica":
     "export const useClinica=()=>({clinicaAtual:globalThis.__dashboardModo==='sem-clinica'?null:{clinica_id:'clinica-demonstracao',clinica:{nome:'Clínica de demonstração'}}});",
-  "@/hooks/use-relogio-pausa": "export const useRelogioPausa=()=>globalThis.__dashboardAgora;",
-  "@/lib/atendimento/dashboard-oszap.functions":
-    fn("consultarResumoDashboardOsZap", "resumo") + fn("consultarFilaHumanaDashboardOsZap", "fila"),
+  "@/lib/atendimento/dashboard-oszap.functions": `export async function consultarResumoDashboardOsZap({data}) {const g=globalThis;g.__dashboardChamadas.push(data);if(g.__dashboardModo==='permissao')throw Error('Dashboard destinado à administração e supervisão');if(g.__dashboardModo==='falha')throw Error('Não foi possível carregar todo o histórico');return g.__dashboardConsultar(data.periodo);}`,
 };
 const bundle = await build({
   entryPoints: ["scripts/preview-dashboard-oszap.tsx"],
@@ -52,8 +46,12 @@ const scan = new Scanner({
     { base: process.cwd(), pattern: "scripts/preview-dashboard-oszap.tsx", negated: false },
   ],
 });
-const styles = css.build(scan.scan()) + (await readFile("src/components/nina/os-zap.css", "utf8"));
-const html = `<!doctype html><html lang="pt-BR"><head><title>Dashboard de atendimento · prévia fictícia</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${styles}</style></head><body><div id="root"></div><script>${bundle.outputFiles[0].text}</script></body></html>`;
+// A prévia é uma página avulsa; o aplicativo real possui seu próprio contêiner de rolagem.
+const styles =
+  css.build(scan.scan()) +
+  (await readFile("src/components/nina/os-zap.css", "utf8")) +
+  "\nhtml,body,#root{height:auto;overflow:visible;}";
+const html = `<!doctype html><html lang="pt-BR"><head><title>Relatórios de atendimento · prévia fictícia</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${styles}</style></head><body><div id="root"></div><script>${bundle.outputFiles[0].text}</script></body></html>`;
 await writeFile(path.join(out, "dashboard.html"), html);
 const server = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -69,51 +67,90 @@ try {
   );
   const erros = [];
   page.on("pageerror", (e) => erros.push(e.message));
+  await page.clock.install({ time: new Date("2026-10-03T21:10:00Z") });
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await expect(
-    page.getByRole("heading", { name: "Dashboard de atendimento", exact: true }),
+    page.getByRole("heading", { name: "Relatórios de atendimento", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("2 conversa(s) com espera crítica", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Equipe de telefonia agora" }).getByRole("row"),
-  ).toHaveCount(4);
+    page.getByText("Período consultado: 03/09/2026 a 02/10/2026", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("region", { name: "Resultados por pessoa" })).toContainText(
     "Supervisão · demonstração",
   );
   const texto = await page.locator(".oszap-dashboard").innerText();
-  if (/Nina|confiança|homologação|prompt|modelo/i.test(texto))
-    throw Error("Informações de IA no dashboard humano");
-  const chamadas = await page.evaluate(() => globalThis.__dashboardChamadas);
   if (
-    chamadas[0]?.tipo !== "resumo" ||
-    chamadas.some((c) => c.clinicaId !== "clinica-demonstracao")
+    /Nina|confiança|homologação|prompt|modelo|online|na fila agora|Equipe de telefonia agora/i.test(
+      texto,
+    )
   )
-    throw Error("Consultas fora do contexto autorizado");
+    throw Error("Indicador automático ou ao vivo no relatório humano");
+  if ((await page.evaluate(() => globalThis.__dashboardChamadas)).length !== 1)
+    throw Error("Consulta inicial duplicada");
+  await page.clock.runFor(125000);
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("online"));
+  });
+  await page.clock.runFor(1000);
+  if ((await page.evaluate(() => globalThis.__dashboardChamadas)).length !== 1)
+    throw Error("Atualização automática indevida");
+  await page.getByLabel("Data inicial", { exact: true }).fill("2024-01-01");
+  await page.getByLabel("Data final", { exact: true }).fill("2024-12-31");
+  if ((await page.evaluate(() => globalThis.__dashboardChamadas)).length !== 1)
+    throw Error("Rascunho disparou consulta");
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
+  await expect(
+    page.getByText("Período consultado: 01/01/2024 a 31/12/2024", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Página 1 de 8 · 366 períodos", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Próxima", exact: true }).click();
+  await expect(page.getByText("Página 2 de 8 · 366 períodos", { exact: true })).toBeVisible();
+  for (const [tipo, numeroLinhas] of [
+    ["semana", 53],
+    ["mes", 12],
+    ["bimestre", 6],
+    ["trimestre", 4],
+    ["ano", 1],
+  ]) {
+    await page.getByLabel("Agrupar por", { exact: true }).selectOption(tipo);
+    await expect(
+      page.getByRole("region", { name: "Volume por período" }).locator("tbody tr"),
+    ).toHaveCount(Math.min(50, numeroLinhas));
+  }
+  if ((await page.evaluate(() => globalThis.__dashboardChamadas)).length !== 2)
+    throw Error("Agrupamento repetiu consulta");
+  await page.getByLabel("Agrupar por", { exact: true }).selectOption("trimestre");
+  await page.getByRole("button", { name: "Detalhar 01/01/2024 a 31/03/2024", exact: true }).click();
+  await expect(
+    page.getByText("Período consultado: 01/01/2024 a 31/03/2024", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Data inicial", { exact: true }).fill("2024-04-01");
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("data inicial");
+  if ((await page.evaluate(() => globalThis.__dashboardChamadas)).length !== 3)
+    throw Error("Data inválida chegou ao servidor");
+  await page.getByLabel("Período rápido", { exact: true }).selectOption("mes");
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
+  await expect(
+    page.getByText("Período consultado: 01/09/2026 a 30/09/2026", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Agrupar por", { exact: true }).selectOption("semana");
   if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
     throw Error("Overflow no desktop");
   await page.screenshot({ path: path.join(out, "dashboard-desktop.png"), fullPage: true });
-  await page.getByLabel("Resultados por período").selectOption("30");
-  await expect(page.getByRole("region", { name: "Mensagens e tempos no período" })).toContainText(
-    "04/09/2026 a 03/10/2026",
-  );
-  await page.getByRole("button", { name: "Abrir atendimento", exact: true }).first().click();
-  if ((await page.evaluate(() => globalThis.__dashboardNavegacao)).hash !== "atend-inbox")
-    throw Error("Atalho incorreto");
-  await page.getByRole("button", { name: "Mensagens e tempos", exact: true }).click();
-  await expect(
-    page.getByRole("region", { name: "Mensagens e tempos no período" }),
-  ).toBeInViewport();
   await page.evaluate(() => {
     document.documentElement.classList.add("dark");
     window.scrollTo(0, 0);
   });
-  await page.getByRole("button", { name: "Central de conversas", exact: true }).hover();
-  await expect.poll(() => page.evaluate(() => {
-    const painel = document.querySelector(".oszap-dashboard");
-    const link = document.querySelector("#oszap-dash-volume .oszap-dash-link");
-    return { painel: getComputedStyle(painel).color, link: getComputedStyle(link).color };
-  }).then((c) => c.painel === c.link ? "legível" : JSON.stringify(c))).toBe("legível");
   await page.screenshot({ path: path.join(out, "dashboard-escuro.png"), fullPage: true });
+  await page
+    .getByRole("region", { name: "Movimento ao longo do dia" })
+    .screenshot({ path: path.join(out, "dashboard-horarios.png") });
+  await page.getByText("Ver os números por hora", { exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "Movimento ao longo do dia" }).locator("tbody tr"),
+  ).toHaveCount(24);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => {
     document.documentElement.classList.remove("dark");
@@ -123,20 +160,17 @@ try {
   if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
     throw Error("Overflow no celular a 135%");
   await page.screenshot({ path: path.join(out, "dashboard-mobile.png"), fullPage: true });
-  await page.goto(url + "?modo=falha-fila", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("alert")).toContainText("Fonte da fila");
-  await expect(page.getByRole("region", { name: "Equipe de telefonia agora" })).toContainText(
-    "Dados indisponíveis",
+  await page.goto(url + "?modo=vazio", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Sem movimento registrado neste período.").first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Resultados do atendimento" })).toContainText(
+    "Sem medição",
   );
-  await expect(page.getByRole("region", { name: "Resultados por pessoa" })).toContainText(
-    "Ana · demonstração",
-  );
+  await page.goto(url + "?modo=falha", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("alert")).toContainText("Nenhum total foi calculado");
+  await expect(page.getByText("Volume total", { exact: true })).toHaveCount(0);
   await page.goto(url + "?modo=permissao", { waitUntil: "domcontentloaded" });
-  await expect(
-    page.getByRole("heading", { name: "Dashboard de atendimento indisponível" }),
-  ).toBeVisible();
-  if ((await page.evaluate(() => globalThis.__dashboardChamadas)).some((c) => c.tipo !== "resumo"))
-    throw Error("Consulta sem autorização");
+  await expect(page.getByRole("alert")).toContainText("administração e supervisão");
+  await expect(page.getByRole("region", { name: "Resultados por pessoa" })).toHaveCount(0);
   await page.goto(url + "?modo=sem-clinica", { waitUntil: "domcontentloaded" });
   await expect(
     page.getByText("Selecione uma clínica para abrir o dashboard.", { exact: true }),
@@ -145,7 +179,7 @@ try {
     throw Error("Consulta sem clínica");
   if (erros.length) throw Error(erros.join("\n"));
   console.log(
-    "Dashboard humano: nenhum indicador de IA, acesso/contexto, período, autoria, alertas, atalhos, falha parcial, temas e celular a 135%: OK. Serviços simulados; nenhum WhatsApp real.",
+    "Relatórios humanos: datas, 6 agrupamentos, ano bissexto, paginação, detalhe, ausência de polling, recebidas/enviadas, vazio, falhas, acesso, temas e celular a 135%: OK. Serviços simulados; nenhum WhatsApp real.",
   );
 } finally {
   await browser.close();
