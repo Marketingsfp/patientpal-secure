@@ -61,6 +61,7 @@ import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
 import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
 
 const LaboratorioNina = lazy(() => import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })));
+const BaseConhecimento = lazy(() => import("@/components/nina/BaseConhecimento").then((m) => ({ default: m.BaseConhecimento })));
 const DashboardOsZap = lazy(() => import("@/components/nina/DashboardOsZap").then((m) => ({ default: m.DashboardOsZap })));
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
@@ -109,10 +110,7 @@ function NinaPage() {
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
-      : // O nome antigo da aba continua valendo para links e favoritos já guardados.
-        hashAba === "base-conhecimento"
-        ? "informacoes-clinica"
-        : hashAba
+      : hashAba
     : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
@@ -184,6 +182,11 @@ function NinaPage() {
         {/* ============ APRENDIZADO ============ */}
 
         {/* ============ INFORMAÇÕES DA CLÍNICA ============ */}
+        <TabsContent value="base-conhecimento">
+          <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Carregando base de conhecimento…</p>}>
+            <BaseConhecimento key={clinicaId} />
+          </Suspense>
+        </TabsContent>
         <TabsContent value="informacoes-clinica">
           <InformacoesClinica />
         </TabsContent>

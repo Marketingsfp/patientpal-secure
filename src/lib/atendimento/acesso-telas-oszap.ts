@@ -2,7 +2,7 @@
 const ABAS_RESTRITAS = new Set([
   "dashboard-oszap", // Visão consolidada de gestão da equipe, com o mesmo acesso da TV.
   "informacoes-clinica",
-  "base-conhecimento", // Link antigo da mesma tela.
+  "base-conhecimento", // Catálogo editorial independente do atendimento.
   "homologacao",
   "laboratorio-nina",
   "config",
