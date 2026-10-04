@@ -50,8 +50,8 @@ export function MapaCamposCatalogo({ tipo }: { tipo: "servico" | "profissional" 
         </table>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Caminhos relativos a cada registro, sem cruzar dados de outros atendimentos. A ligação da
-        base editorial com a Maria continua pendente.
+        Caminhos relativos a cada registro, sem cruzar dados de outros atendimentos. A Maria usa
+        estes registros publicados quando a Base de conhecimento está selecionada como fonte.
       </p>
     </details>
   );

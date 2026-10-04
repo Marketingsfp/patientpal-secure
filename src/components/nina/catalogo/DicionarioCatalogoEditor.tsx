@@ -256,8 +256,8 @@ export function DicionarioCatalogoEditor({
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        As sugestões não são salvas automaticamente. O uso pela Maria depende da ativação da
-        consulta por esta base, ainda pendente.
+        As sugestões não são salvas automaticamente. A Maria consulta as variações revisadas
+        dos registros publicados quando a fonte selecionada é a Base de conhecimento.
       </p>
     </section>
   );

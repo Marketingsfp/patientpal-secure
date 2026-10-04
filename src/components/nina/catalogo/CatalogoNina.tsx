@@ -88,7 +88,7 @@ function BadgeStatus({ status, emRevisao }: { status: string; emRevisao?: boolea
 
 /**
  * Catálogo estruturado da Nina: exames/procedimentos e consultas/profissionais.
- * Base editorial independente. Nenhum registro é usado pelo atendimento da Maria.
+ * Base editorial: registros publicados são usados quando esta fonte está selecionada.
  */
 export function CatalogoNina({
   clinicaId,

@@ -1,5 +1,8 @@
 /** Núcleo real; apenas banco, modelo e catálogo externos são simulados. */
 import { mock } from "bun:test";
+if (!process.argv[3]?.startsWith("fonte_")) mock.module("../../fonte-consulta-config.server", () => ({
+  lerSelecaoFonte: async () => ({ fonte: "clinica_os", revisao: null }),
+}));
 import { textoDaChave } from "../../resposta/templates";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
 import { estadoVazio } from "../../fluxo-estado-normalizar";
@@ -10,6 +13,9 @@ import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const fonteCenario = cenario.startsWith("fonte_");
+const fonteRetomada = fonteCenario && cenario.endsWith("retomada");
+const fonteEscolhida = cenario.startsWith("fonte_base") ? "base_conhecimento" : "clinica_os";
 const clinicoGeral = cenario.startsWith("catalogo_clinico_geral_");
 const procedimentoExecutante = cenario === "procedimento_executante";
 const medicoClinico = cenario.endsWith("carlos") ? "Carlos Alberto Varillas" : cenario.endsWith("milton") ? "Milton Guimarães" : "Ana Souza";
@@ -65,6 +71,9 @@ const catalogoInterpretado: Record<string, any[]> = {
     executantes: [], formas_pagamento: [], valor: null,
   })),
 };
+const baseFonte = [{ id: "base-ecg", clinica_id: "clinica-simulada", status: "PUBLICADO",
+  nome: "Eletrocardiograma", valor: 157, descricao_publica: "Informação exclusiva da base", formas_pagamento: [], executantes: [] }];
+if (fonteCenario) catalogoInterpretado.servicos = [{ ...baseFonte[0], id: "os-ecg", valor: 93, descricao_publica: "Informação exclusiva do cadastro" }];
 if (clinicoGeral) {
   catalogoInterpretado.profissionais = [{
     id: "catalogo-clinico", medico_id: "medico-clinico", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: medicoClinico,
@@ -101,7 +110,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
   ? textoDaChave(cenario === "escolha_pre" ? "fluxo.agendamento.revisar_pre_agendamento" : "fluxo.agendamento.revisar_ficha",
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
-const agenda = cenario !== "direta" && !regraCatalogo;
+const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
 const pergunta = clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
@@ -121,6 +130,14 @@ const estadoContextual = { ...estadoVazio(), session_id: "sessao-contextual",
   session_started_at: new Date(agora - 30 * 60_000).toISOString(),
   updated_at: new Date(agora).toISOString(),
 };
+if (fonteRetomada) {
+  estadoContextual.fonte_consulta = { fonte: fonteEscolhida === "clinica_os" ? "base_conhecimento" : "clinica_os", revisao: "anterior" };
+  estadoContextual.appointment.doctor_id = "id-da-fonte-anterior";
+  estadoContextual.appointment.doctor_name = "PROFISSIONAL_DESATUALIZADO";
+  estadoContextual.knowledge_context = { versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
+    consulta: { termo: "Eletrocardiograma", tipo_atendimento: "exame_procedimento" },
+    referencias: [{ registro: "id-da-fonte-anterior", versao: null, procedimento: "Eletrocardiograma", medicoNome: "PROFISSIONAL_DESATUALIZADO" }] };
+}
 if (procedimentoExecutante) {
   estadoContextual.appointment.procedimento_solicitado = { clinica_id: "clinica-simulada", session_id: "sessao-contextual",
     catalogo_id: "servico-bio", nome: "Bioimpedância", tipo_atendimento: "exame_procedimento" };
@@ -229,9 +246,11 @@ mock.module("@/integrations/supabase/client.server", () => ({
         upsert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         then: (resolve: any) => Promise.resolve(resolve({
-          data: (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
+          data: fonteCenario && tabela === "clinica_feature_flags" ? [{ clinica_id: "clinica-simulada", flag_key: "nina_fonte_conhecimento", ativo: true, config: { fonte: fonteEscolhida }, updated_at: "2026-10-04T15:00:00Z" }].find(l => filtrosCatalogo.every(f => f(l))) ?? null
+            : fonteCenario && tabela === "nina_cat_servicos" ? baseFonte.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
+            : (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
             : (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
           count: (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
@@ -247,7 +266,7 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
   ninaInformaPeloCadastro: async () => true,
   limparCacheFonteOperacional: () => {},
   lerFonteOperacional: async (clinicaId: string) => {
-    const usar: Record<string, any[]> = (interpretacao || escolhaMedico || clinicoGeral) ? catalogoInterpretado : {};
+    const usar: Record<string, any[]> = (interpretacao || escolhaMedico || clinicoGeral || fonteCenario) ? catalogoInterpretado : {};
     const publicados = (t: string) => (usar[t] ?? []).filter((l) => l.clinica_id === clinicaId && l.status === "PUBLICADO");
     return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
@@ -261,7 +280,7 @@ mock.module("@/lib/nina/instrucoes-runtime.server", () => ({ promptInstrucoes: a
   texto: prompt, template: prompt, origem: "publicada", versao: 42,
   versaoId: "prompt-42", publicadoEm: "2026-09-16T12:00:00Z", fallbackPorErro: false,
 }) }));
-mock.module("@/lib/nina/catalogo-prompt.server", () => ({ contarCatalogoPublicado: async () => ({ servicos: 1, profissionais: 1 }) }));
+if (!fonteCenario) mock.module("@/lib/nina/catalogo-prompt.server", () => ({ contarCatalogoPublicado: async () => ({ servicos: 1, profissionais: 1 }) }));
 mock.module("@/lib/nina/paciente-tools.server", () => ({
   FERRAMENTAS_NINA_CONSULTA: ["consultar_cadastro", "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]
     .map(name => ({ type: "function", function: { name } })),
@@ -395,7 +414,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       return r;
     }
     if (nome !== "consultar_cadastro") throw new Error(`Ferramenta inesperada: ${nome}`);
-    if (interpretacao || escolhaMedico) {
+    if (interpretacao || escolhaMedico || fonteCenario) {
       const { searchKnowledgeBase } = await import("../../knowledge.server");
       const parametros = argumentosFerramentas.at(-1)!.args;
       const dados = await searchKnowledgeBase({ clinicaId: "clinica-simulada", query: parametros.termo,
@@ -585,7 +604,7 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
-const resposta = await gerarRespostaNina("clinica-simulada", procedimentoExecutante ? "Quero com Mariana Portugal" : pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante ? "55000100999" : null, {
+const resposta = await gerarRespostaNina("clinica-simulada", procedimentoExecutante ? "Quero com Mariana Portugal" : pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],

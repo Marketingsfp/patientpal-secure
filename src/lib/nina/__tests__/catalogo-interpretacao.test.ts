@@ -7,6 +7,9 @@
  * Não se exige redação idêntica: verifica-se a preservação da informação.
  */
 import { describe, expect, it, mock } from "bun:test";
+mock.module("../fonte-consulta-config.server", () => ({
+  lerSelecaoFonte: async () => ({ fonte: "clinica_os", revisao: null }),
+}));
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,

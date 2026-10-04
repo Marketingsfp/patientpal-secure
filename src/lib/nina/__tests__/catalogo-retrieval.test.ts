@@ -206,7 +206,7 @@ describe("uma leitura do catálogo por resposta", () => {
       await catalogoDoTurno(CLINICA);
       const clone = spyOn(globalThis as { structuredClone: (value: unknown) => unknown }, "structuredClone");
       try {
-        expect(await contarCatalogoPublicado(CLINICA)).toEqual({ servicos: 1, profissionais: 1 });
+        expect(await contarCatalogoPublicado(CLINICA)).toMatchObject({ servicos: 1, profissionais: 1 });
         expect(clone).not.toHaveBeenCalled();
         const a = await lerPublicados<{ id: string; aliases: string[] }>(
           "servicos", "id, aliases:estrutura->aliases", CLINICA, ["mamografia"]);
@@ -223,7 +223,7 @@ describe("uma leitura do catálogo por resposta", () => {
 
   it("reutiliza a leitura na contagem, pesquisas, modalidade e vínculo sem guardar a agenda", async () => {
     await comCatalogoDoTurno(CLINICA, async () => {
-      expect(await contarCatalogoPublicado(CLINICA)).toEqual({ servicos: 1, profissionais: 1 });
+      expect(await contarCatalogoPublicado(CLINICA)).toMatchObject({ servicos: 1, profissionais: 1 });
       const quantidade = leituras().length;
       const exame = await buscarNoCatalogo({ clinicaId: CLINICA, query: "mamografia" });
       expect(exame.records.map(r => r.id)).toEqual(["mamografia"]);
@@ -256,7 +256,7 @@ describe("uma leitura do catálogo por resposta", () => {
       ]);
       expect(a.records.map(r => r.id)).toEqual(["mamografia"]);
       expect(b.records.map(r => r.id)).toEqual([profissionalId]);
-      expect(c).toEqual({ servicos: 1, profissionais: 1 });
+      expect(c).toMatchObject({ servicos: 1, profissionais: 1 });
       expect(leituras()).toHaveLength(1);
     });
   });

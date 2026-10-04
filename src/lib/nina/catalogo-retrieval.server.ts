@@ -5,10 +5,9 @@
  * interna, rascunho, registro em RASCUNHO e registro ARQUIVADO nunca saem do
  * banco — não é o modelo que decide o que omitir.
  *
- * FASE 7: fonte única. Não há flag de seleção de fonte nem fallback — o que
- * não está PUBLICADO aqui é tratado como informação desconhecida.
+ * A fonte escolhida na clínica fica fixa durante a resposta, sem fallback.
  */
-import { COLUNAS_SERVICO, COLUNAS_PROFISSIONAL, TAMANHO_PAGINA, lerPublicados, temCatalogoDoTurno } from "./catalogo-turno.server";
+import { COLUNAS_SERVICO, COLUNAS_PROFISSIONAL, TAMANHO_PAGINA, lerPublicados, temCatalogoDoTurno, comCatalogoDoTurno, contagemCatalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 import {
@@ -88,7 +87,7 @@ function atendeNoDia(p: IndiceProfissional, dia: string | null): boolean {
  * Compara pergunta e índice completo sem acentos, pontua e só então limita.
  * O modelo recebe apenas os detalhes públicos dos registros selecionados.
  */
-export async function buscarNoCatalogo(
+async function buscarNaFonteDoTurno(
   pedido: {
     clinicaId: string;
     query: string;
@@ -414,4 +413,13 @@ export async function buscarNoCatalogo(
   }
 
   return resultado;
+}
+
+/** A pesquisa avulsa também usa uma única fonte para índice e detalhes. */
+export function buscarNoCatalogo(pedido: Parameters<typeof buscarNaFonteDoTurno>[0], agora = new Date()): Promise<ResultadoConhecimento> {
+  return comCatalogoDoTurno(pedido.clinicaId, async () => {
+    const { selecao } = await contagemCatalogoDoTurno(pedido.clinicaId);
+    const resultado = await buscarNaFonteDoTurno(pedido, agora);
+    return { ...resultado, fonte_consulta: selecao.fonte, revisao_fonte: selecao.revisao };
+  });
 }

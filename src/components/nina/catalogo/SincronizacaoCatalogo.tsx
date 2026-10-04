@@ -304,8 +304,8 @@ export function SincronizacaoCatalogo({
             </section>
           )}
           <p className="text-xs text-muted-foreground">
-            Sem atualização automática. Este recurso atualiza apenas a base editorial e não ativa
-            sua consulta pela Nina.
+            Sem atualização automática. Este recurso atualiza a base editorial e não troca a fonte
+            selecionada. Se a base estiver em uso, os dados publicados serão consultados pela Nina.
           </p>
         </DialogContent>
       </Dialog>

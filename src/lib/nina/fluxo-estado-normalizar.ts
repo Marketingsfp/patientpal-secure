@@ -93,6 +93,7 @@ export type EstadoFluxoNina = {
   clarification?: PendenciaEsclarecimento;
   /** Referências de catálogo da sessão, reconsultadas antes de cada reutilização. */
   knowledge_context?: ConhecimentoSessao | null;
+  fonte_consulta?: import("./fonte-consulta").SelecaoFonte | null;
   updated_at: string | null;
   /** Identificador da sessão operacional atual (nova sessão = novo id). */
   session_id?: string | null;
@@ -170,6 +171,9 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     flow: { stage: (o["flow"]?.stage ?? "IDLE") as EtapaFluxoNina },
     clarification: normalizarPendencia(o["clarification"]),
     knowledge_context: normalizarConhecimentoSessao(o["knowledge_context"]),
+    fonte_consulta: ["clinica_os", "base_conhecimento"].includes(o.fonte_consulta?.fonte)
+      ? { fonte: o.fonte_consulta.fonte, revisao: typeof o.fonte_consulta.revisao === "string" ? o.fonte_consulta.revisao : null }
+      : null,
     updated_at: o["updated_at"] ?? null,
     session_id: o["session_id"] ?? null,
     session_started_at: o["session_started_at"] ?? null,

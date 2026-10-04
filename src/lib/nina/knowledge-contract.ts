@@ -42,6 +42,9 @@ export type TraceConhecimento = {
 };
 
 export type ResultadoConhecimento = {
+  /** Fonte efetivamente consultada neste turno, escolhida pela clínica. */
+  fonte_consulta?: import("./fonte-consulta").FonteConsulta;
+  revisao_fonte?: string | null;
   /** Índice de caminhos do retorno. Não contém fatos ou decisões de atendimento. */
   mapa_campos?: ReturnType<typeof mapaCamposResultado>;
   /** Categoria da pesquisa, preservada separadamente do termo e do objetivo. */

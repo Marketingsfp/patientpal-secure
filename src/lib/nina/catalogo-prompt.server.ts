@@ -15,7 +15,7 @@ import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES
 /** Quantos registros publicados a clínica tem hoje (serviços + profissionais). */
 export async function contarCatalogoPublicado(
   clinicaId: string,
-): Promise<{ servicos: number; profissionais: number }> {
+): Promise<{ servicos: number; profissionais: number; selecao?: import("./fonte-consulta").SelecaoFonte }> {
   return contagemCatalogoDoTurno(clinicaId);
 }
 

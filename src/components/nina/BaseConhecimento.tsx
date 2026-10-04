@@ -1,14 +1,14 @@
 import { useClinica } from "@/hooks/use-clinica";
-import { BookOpen, Building2, FlaskConical, Info, Stethoscope } from "lucide-react";
+import { BookOpen, Building2, FlaskConical, Stethoscope } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
 import { HorarioFuncionamento } from "@/components/nina/catalogo/HorarioFuncionamento";
+import { FonteConsultaMaria } from "@/components/nina/catalogo/FonteConsultaMaria";
 
 /**
  * Aba "Base de conhecimentos da Nina".
  *
- * Catálogo editorial recuperado, independente da fonte operacional da Maria.
- * Publicar aqui aprova o registro nesta base; não o ativa no atendimento.
+ * Catálogo editorial e seleção manual da fonte usada pela Maria.
  */
 export function BaseConhecimento() {
   const { clinicaAtual } = useClinica();
@@ -25,15 +25,8 @@ export function BaseConhecimento() {
             Exames, profissionais e informações da clínica.
           </p>
         </div>
-        <span className="oszap-base-status">Sem vínculo com a Maria</span>
       </header>
-      <div className="oszap-base-notice" role="note">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <p>
-          Publicar aprova o conteúdo nesta base. As informações ainda não são usadas nas respostas,
-          buscas ou decisões da Maria.
-        </p>
-      </div>
+      <FonteConsultaMaria key={clinicaId} clinicaId={clinicaId} podeEditar={podeEditar} />
       <Tabs defaultValue="servicos" className="oszap-base-tabs">
         <TabsList className="oszap-base-tab-list" aria-label="Categorias da base">
           <TabsTrigger value="servicos">
@@ -57,8 +50,7 @@ export function BaseConhecimento() {
         </TabsContent>
         <TabsContent value="clinica" className="oszap-base-clinic">
           <p className="mb-4 text-sm text-muted-foreground">
-            O horário de funcionamento abaixo é compartilhado com o atendimento atual. Nesta base,
-            ele aparece somente para consulta, para preservar o isolamento da Maria.
+            O horário de funcionamento é compartilhado pelas duas fontes e aparece aqui para consulta.
           </p>
           <HorarioFuncionamento clinicaId={clinicaId} podeEditar={false} />
         </TabsContent>

@@ -1234,12 +1234,16 @@ async function gerarRespostaNinaInterno(
       const { contarCatalogoPublicado } = await import("@/lib/nina/catalogo-prompt.server");
       return await contarCatalogoPublicado(clinicaId);
     } catch {
-      return { servicos: 0, profissionais: 0 };
+      return { servicos: 0, profissionais: 0, selecao: undefined };
     }
   })();
   const baseAtiva = catalogoPublicado.servicos > 0 || catalogoPublicado.profissionais > 0;
+  const { alinharFonteDaSessao } = await import("@/lib/nina/fonte-consulta-sessao");
+  const fonteAlterada = catalogoPublicado.selecao ? alinharFonteDaSessao(fluxoEstado, catalogoPublicado.selecao) : false;
   rastro?.concluir("tool.knowledge.lookup", {
     base_ativa: baseAtiva,
+    fonte_consulta: catalogoPublicado.selecao?.fonte ?? null,
+    revisao_fonte: catalogoPublicado.selecao?.revisao ?? null,
     servicos: catalogoPublicado.servicos,
     profissionais: catalogoPublicado.profissionais,
   });
@@ -1477,6 +1481,9 @@ async function gerarRespostaNinaInterno(
       confirmacao_final: fluxoEstado.appointment.confirmation ?? null,
     },
     catalogo: {
+      fonte_consulta: catalogoPublicado.selecao?.fonte ?? null,
+      revisao_fonte: catalogoPublicado.selecao?.revisao ?? null,
+      fonte_alterada_nesta_resposta: fonteAlterada,
       confirmacao_profissional_na_resposta: profissionalConfirmadoNaResposta,
       publicado: baseAtiva,
       servicos: catalogoPublicado.servicos,
