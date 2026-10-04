@@ -38,6 +38,7 @@ export async function contagemAnteriorFase1(
  * Sem nova tentativa automática (regras do gateway).
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { perguntasComAuditoriaJev, type TextoDecisaoJev } from "./jev-auditoria";
 import {
   FLAG_JEV,
   jevPermitido,
@@ -131,6 +132,8 @@ export async function registrarDecisaoJev(r: {
    * perguntas, também quando o Jev falha.
    */
   contexto?: Record<string, unknown>;
+  /** Cópia do texto efetivamente analisado nesta chamada, para leitura da auditoria. */
+  mensagem?: TextoDecisaoJev;
 }): Promise<void> {
   try {
     await supabaseAdmin.from("nina_jev_decisoes" as never).insert({
@@ -138,7 +141,7 @@ export async function registrarDecisaoJev(r: {
       conversation_id: r.conversationId,
       fase: r.fase,
       teste: r.teste,
-      perguntas: r.contexto ? { chaves: Object.keys(r.perguntas), ...r.contexto } : Object.keys(r.perguntas),
+      perguntas: perguntasComAuditoriaJev(Object.keys(r.perguntas), r.contexto, r.mensagem),
       respostas: r.resultado.ok
         ? { ...r.resultado.respostas, ...(r.contagem ? { _nina: r.contagem } : {}) }
         : null,
@@ -220,7 +223,8 @@ export async function conferirRespostaJev(ctx: {
       : resultado;
     await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId,
       fase: "fase6_conferencia", teste: ctx.teste, perguntas, resultado: registro,
-      aplicada: problemas.length > 0 });
+      aplicada: problemas.length > 0,
+      mensagem: { origem: "resposta_nina", texto: ctx.texto } });
     if (problemas.length === 0) return { acao: "enviar" };
     if (ctx.jaCorrigida) return { acao: "bloquear" };
     return { acao: "refazer", instrucao: c.instrucaoCorrecao(problemas) };
@@ -254,6 +258,7 @@ export async function interpretarEscolhaJev(ctx: {
     const decisao = resultado.ok ? e.decisaoEscolha(resultado.respostas, ctx.situacao, limites.escolha) : { tipo: "nada" as const };
     await registrarDecisaoJev({ clinicaId: ctx.clinicaId, conversationId: ctx.conversaId,
       fase: "fase7_escolha", teste: ctx.teste, perguntas, resultado, aplicada: decisao.tipo !== "nada",
+      mensagem: { origem: "paciente", texto: ctx.mensagem },
       contexto: { situacao: ctx.situacao.tipo, decisao: decisao.tipo,
         ...(decisao.tipo === "escolheu" ? { inicio: decisao.vaga.inicio, medico_id: decisao.vaga.medico_id } : {}) } });
     return decisao;
@@ -288,6 +293,7 @@ export async function categorizarMotivoJev(ctx: {
     await registrarDecisaoJev({
       clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase8_motivo", teste: ctx.teste,
       perguntas, resultado, aplicada: categoria !== null,
+      mensagem: { origem: "motivo_transferencia", texto: ctx.motivo },
     });
     return m.motivoComCategoria(ctx.motivo, categoria);
   } catch (e) {

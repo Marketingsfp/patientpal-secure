@@ -1401,6 +1401,9 @@ async function executarFerramentaInterna(
                   clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase3_especialidade",
                   teste: ctx.teste === true || ctx.origem === "homologacao", perguntas, resultado: r, aplicada,
                   contexto: { termo: p.termo, tipo_atendimento: tipo, opcoes: opcoes.length, escolhida, refez_busca: aplicada },
+                  mensagem: ctx.consultaAgenda?.mensagemAtual?.trim()
+                    ? { origem: "paciente", texto: ctx.consultaAgenda.mensagemAtual.trim() }
+                    : { origem: "termo_busca", texto: p.termo },
                 });
               }
             }

@@ -1,10 +1,10 @@
 /**
  * Nina → Decisões do Jev (Etapa C). Lista somente leitura das decisões,
  * relatório de calibragem dos sinais de transferência e limites por clínica
- * (só administradores alteram). Não mostra texto do paciente.
+ * (só administradores alteram). Identifica a conversa e o texto registrado em cada decisão.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { FLAG_JEV, type FaseJev } from "@/lib/nina/jev";
+import { idsConversasJev } from "@/lib/nina/jev-auditoria";
+import { JevConversa, JevTextoAnalisado } from "@/components/nina/JevDecisaoContexto";
 import {
   LIMITES_JEV_PADRAO, LIMITE_MAX, LIMITE_MIN, ROTULO_LIMITE, casosAcima, normalizarLimites, relatorioCalibragem,
   type LimitesJev, type SinalCalibragem,
@@ -56,6 +58,7 @@ const ROTULO_SINAL: Record<SinalCalibragem, string> = {
 type Decisao = {
   id: string; created_at: string; fase: FaseJev; teste: boolean; aplicada: boolean;
   latency_ms: number | null; erro: string | null; respostas: Record<string, any> | null;
+  conversation_id: string | null; perguntas: unknown; numero_conversa?: number;
 };
 
 function resumoResposta(r: Record<string, any> | null): string {
@@ -83,14 +86,17 @@ function Pagina() {
   const [limites, setLimites] = useState<LimitesJev>(LIMITES_JEV_PADRAO);
   const [editando, setEditando] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
+  const cargaAtual = useRef(0);
+  const invalidarCarga = useCallback(() => { cargaAtual.current++; }, []);
 
   const carregar = useCallback(async () => {
+    const carga = ++cargaAtual.current;
     if (!clinicaId) return;
     setCarregando(true);
     try {
       const desde = new Date(Date.now() - Number(dias) * 86_400_000).toISOString();
       let q = supabase.from("nina_jev_decisoes" as never)
-        .select("id,created_at,fase,teste,aplicada,latency_ms,erro,respostas")
+        .select("id,created_at,fase,teste,aplicada,latency_ms,erro,respostas,conversation_id,perguntas")
         .eq("clinica_id", clinicaId).gte("created_at", desde)
         .order("created_at", { ascending: false }).limit(300);
       if (fase !== "todas") q = q.eq("fase", fase);
@@ -101,19 +107,37 @@ function Pagina() {
         supabase.from("nina_jev_limites" as never).select("*").eq("clinica_id", clinicaId).maybeSingle(),
       ]);
       if (lista.error) throw lista.error;
-      setDecisoes((lista.data ?? []) as unknown as Decisao[]);
+      const linhas = (lista.data ?? []) as unknown as Decisao[];
+      const ids = idsConversasJev(linhas);
+      const numeros = new Map<string, number>();
+      // Uma consulta em lote, com sessão/RLS e clínica; sem acesso administrativo.
+      if (ids.length) {
+        const conversas = await supabase.from("atend_conversas")
+          .select("id,numero_conversa").eq("clinica_id", clinicaId).in("id", ids);
+        if (!conversas.error) {
+          for (const conversa of conversas.data ?? []) numeros.set(conversa.id, conversa.numero_conversa);
+        }
+        // Mesmo sem permissão para consultar a conversa, seu ID auditado continua disponível.
+      }
+      if (carga !== cargaAtual.current) return;
+      setDecisoes(linhas.map((d) => ({ ...d, numero_conversa: numeros.get(d.conversation_id ?? "") })));
       setCalib(((c.data ?? []) as Array<{ respostas: Record<string, unknown> | null }>).map((x) => x.respostas));
       const lim = normalizarLimites(l.data as never);
       setLimites(lim);
       setEditando(Object.fromEntries(Object.entries(lim).map(([k, v]) => [k, String(v).replace(".", ",")])));
     } catch (e) {
-      mostrarErro(e);
+      if (carga === cargaAtual.current) mostrarErro(e);
     } finally {
-      setCarregando(false);
+      if (carga === cargaAtual.current) setCarregando(false);
     }
   }, [clinicaId, dias, fase]);
 
-  useEffect(() => { void carregar(); }, [carregar]);
+  useEffect(() => {
+    setDecisoes([]);
+    setCalib([]);
+    void carregar();
+    return invalidarCarga;
+  }, [carregar, invalidarCarga]);
 
   const relatorio = useMemo(() => relatorioCalibragem(calib), [calib]);
   const totais = useMemo(() => {
@@ -246,19 +270,21 @@ function Pagina() {
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
-              <tr><th className="p-2">Quando</th><th className="p-2">Fase</th><th className="p-2">Resposta</th><th className="p-2">Aplicada</th><th className="p-2">Tempo</th></tr>
+              <tr><th className="p-2">Quando</th><th className="p-2">Conversa</th><th className="p-2">Texto analisado</th><th className="p-2">Fase</th><th className="p-2">Resposta</th><th className="p-2">Aplicada</th><th className="p-2">Tempo</th></tr>
             </thead>
             <tbody>
               {decisoes.map((d) => (
                 <tr key={d.id} className="border-t align-top">
                   <td className="p-2 whitespace-nowrap">{new Date(d.created_at).toLocaleString("pt-BR")}{d.teste && <Badge variant="outline" className="ml-1">teste</Badge>}</td>
+                  <td className="p-2"><JevConversa id={d.conversation_id} numero={d.numero_conversa} /></td>
+                  <td className="p-2"><JevTextoAnalisado perguntas={d.perguntas} /></td>
                   <td className="p-2">{ROTULO_FASE[d.fase] ?? d.fase}</td>
                   <td className="p-2">{d.erro ? <span className="text-muted-foreground">Sem decisão: {d.erro.slice(0, 60)}</span> : resumoResposta(d.respostas)}</td>
                   <td className="p-2">{d.aplicada ? "Sim" : "Não"}</td>
                   <td className="p-2 tabular-nums">{d.latency_ms ?? "—"} ms</td>
                 </tr>
               ))}
-              {decisoes.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">Nenhuma decisão no período.</td></tr>}
+              {decisoes.length === 0 && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">{carregando ? "Carregando decisões…" : "Nenhuma decisão no período."}</td></tr>}
             </tbody>
           </table>
         </CardContent>

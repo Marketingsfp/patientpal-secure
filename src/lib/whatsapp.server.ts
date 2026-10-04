@@ -980,11 +980,13 @@ async function gerarRespostaNinaInterno(
         jev.registrarDecisaoJev({
           clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
           perguntas, resultado, aplicada: escolhida !== null, contagem,
+          mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
         }),
         f2
           ? jev.registrarDecisaoJev({
               clinicaId, conversationId: conversaJev, fase: "fase2_encaminhamento", teste: opcoes?.teste === true,
               perguntas, resultado, aplicada: jevEncaminhamento !== null,
+              mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
             })
           : Promise.resolve(),
       ]);
