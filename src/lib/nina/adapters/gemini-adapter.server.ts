@@ -23,6 +23,7 @@ export type OpcoesChamada = {
   messages: ChatMensagem[];
   tools?: readonly unknown[];
   maxTokens?: number;
+  temperature?: number;
   /** Fase 2: esforço de raciocínio decidido pelo Reasoning Router. */
   reasoning?: "none" | "low" | "medium" | "high";
   stream?: boolean;
@@ -119,6 +120,7 @@ export async function chamarModeloGemini(opcoes: OpcoesChamada): Promise<Respost
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: opcoes.modelo,
+        ...(opcoes.temperature !== undefined ? { temperature: opcoes.temperature } : {}),
         // Fase 2: nível LOW/MEDIUM/HIGH escolhido pelo Reasoning Router.
         ...(opcoes.reasoning && opcoes.reasoning !== "none"
           ? { reasoning_effort: opcoes.reasoning }
@@ -205,6 +207,7 @@ export async function chamarModeloGeminiStream(
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: opcoes.modelo,
+      ...(opcoes.temperature !== undefined ? { temperature: opcoes.temperature } : {}),
       stream: true,
       ...(opcoes.reasoning && opcoes.reasoning !== "none"
         ? { reasoning_effort: opcoes.reasoning }

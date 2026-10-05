@@ -1,6 +1,7 @@
 import { POLITICA_WATCHDOG, esperaRetryWatchdog } from "./watchdog";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { medirMemoriaProcesso } from "./memoria-processo";
+import { lerTemperaturaNina } from "./temperatura.server";
 /**
  * NINA AI GATEWAY — camada única de acesso ao modelo.
  *
@@ -96,7 +97,9 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
   const nivel =
     pedido.nivelForcado ?? nivelNaoRegride(decisao.nivel, pedido.raciocinio?.nivelAnterior);
 
+  const temperatura = pedido.perfil === "whatsapp" ? await lerTemperaturaNina(pedido.clinicaId) : null;
   const opcoes: OpcoesChamada = {
+    ...(temperatura ? { temperature: temperatura.temperatura } : {}),
     timeoutMs:
       pedido.perfil === "whatsapp" && processamentoWatchdogAtual()
         ? POLITICA_WATCHDOG.modeloTimeoutMs
@@ -134,6 +137,7 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
     };
     await controle?.evento("MODEL_STARTED", {
       modelo: opcoes.modelo,
+      temperatura: opcoes.temperature ?? null,
       tentativa: tentativa + 1,
       recursos,
     });
@@ -216,6 +220,9 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
       dados: {
         model: resolucao.modelo,
         thinking_level: nivel,
+        temperature: opcoes.temperature ?? null,
+        temperatura_origem: temperatura?.origem ?? null,
+        temperatura_revisao: temperatura?.revisao ?? null,
         route_reason: routeReason,
         max_tokens: pedido.maxTokens ?? null,
         tentativas: tentativa,

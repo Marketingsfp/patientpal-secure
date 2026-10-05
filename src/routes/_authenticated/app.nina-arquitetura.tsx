@@ -1,10 +1,10 @@
 /**
  * Nina → Arquitetura.
  *
- * Tela somente leitura. Ela desenha o Architecture Manifest já existente
+ * O mapa desenha o Architecture Manifest já existente
  * (`src/lib/nina/arquitetura/manifesto.ts`) e, no modo Execução, mostra o
- * caminho real de uma mensagem a partir do tracing. Nada aqui altera o backend,
- * a ordem de execução, prompts, ferramentas ou dados de atendimento.
+ * caminho real de uma mensagem a partir do tracing. Os controles abaixo do mapa
+ * permitem alterar instruções e temperatura, com permissão e auditoria no servidor.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CaminhoProducaoCanvas } from "@/components/nina/CaminhoProducaoCanvas";
 import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { InstrucoesNina } from "@/components/nina/InstrucoesNina";
+import { TemperaturaNina } from "@/components/nina/TemperaturaNina";
 import { VisaoSimplesNina } from "@/components/nina/VisaoSimplesNina";
 
 import { useClinica } from "@/hooks/use-clinica";
@@ -184,6 +185,7 @@ function Pagina() {
             </CardContent>
           </Card>
 
+          {clinicaId && podeVer ? <TemperaturaNina key={clinicaId} clinicaId={clinicaId} /> : null}
           <div id="instrucoes-nina" className="scroll-mt-24">
             {clinicaId && podeArquitetura(capacidades, "nina.instrucoes.ver") ? (
               <InstrucoesNina
