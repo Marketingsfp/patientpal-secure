@@ -110,13 +110,14 @@ export async function receberMidiaWhatsapp(entrada: {
   }
 }
 
-/** Lê a imagem com IA só para identificar pedido médico. Qualquer falha vira "outro" (atendente). */
+/** Lê a imagem com IA só para identificar pedido médico. Qualquer falha vira "ilegivel" (controle de nova foto). */
 export async function lerPedidoNaImagem(base64: string, mime: string): Promise<LeituraImagem> {
   const key = process.env.LOVABLE_API_KEY;
-  if (!key) return { tipo: "outro" };
+  if (!key) return { tipo: "ilegivel" };
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
@@ -134,13 +135,13 @@ export async function lerPedidoNaImagem(base64: string, mime: string): Promise<L
     });
     if (!res.ok) {
       console.error("[whatsapp-midia] leitura de imagem falhou", res.status);
-      return { tipo: "outro" };
+      return { tipo: "ilegivel" };
     }
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     return interpretarLeituraImagem(json.choices?.[0]?.message?.content);
   } catch (e) {
     console.error("[whatsapp-midia] leitura de imagem exception", e);
-    return { tipo: "outro" };
+    return { tipo: "ilegivel" };
   }
 }
 

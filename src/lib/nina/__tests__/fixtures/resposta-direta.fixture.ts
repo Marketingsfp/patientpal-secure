@@ -11,6 +11,8 @@ import { cenariosContextuais } from "./consulta-contextual-cenarios";
 import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
+const fotoCenario = process.argv[3]?.startsWith("foto_");
+const { PEDIR_NOVA_FOTO } = await import("../../fotos");
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
 const linkCenario = cenario.includes("_links_");
@@ -200,7 +202,14 @@ if (confirmacaoMedico) estadoContextual.knowledge_context = {
   esclarecimento: { tipo: "profissional", pergunta: perguntaMedico,
     opcoes: [{ id: "medico-0", nome: "Sandro Prinscewal", especialidade: "CARDIOLOGIA, CLINICO GERAL" }] },
 };
-const mensagensContextuais = unificado ? [
+if (cenario === "foto_sessao_nova") estadoContextual.session_started_at = new Date(agora - 3 * 60_000).toISOString();
+const mensagensContextuais = fotoCenario ? [
+  ...(cenario === "foto_primeira" ? [] : [{ ...registroMensagem(PEDIR_NOVA_FOTO, 1), enviada_por: "nina",
+    clinica_id: "clinica-simulada", status: cenario === "foto_pedido_pendente" ? "pending" : "sent" }]),
+  { ...registroMensagem("Foto", 18, "in", "received"), id: "entrada-simulada", clinica_id: "clinica-simulada", tipo: "image",
+    transcricao: cenario === "foto_resolvida" ? "Enviei a foto de um pedido médico com: ECG." : "[Foto recebida: não foi possível ler com segurança.]",
+    raw: { nina_leitura_imagem: cenario === "foto_resolvida" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" } } },
+] : unificado ? [
   ...(cenario.endsWith("primeiro") ? [] : [registroMensagem(perguntaEsclarecimento, 1)]),
   { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
 ] : linkCenario ? [
@@ -263,7 +272,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
         in: (k: string, valores: unknown[]) => { filtrosCatalogo.push(l => valores.includes(l[k])); return q; },
         gt: (k: string, v: string) => { filtrosCatalogo.push(l => l[k] > v); return q; },
         neq: () => q, or: () => q,
-        order: () => q, limit: (n: number) => { limiteCatalogo = n; return q; }, gte: () => q, is: () => q,
+        order: () => q, limit: (n: number) => { limiteCatalogo = n; return q; }, gte: (k: string, v: string) => { if (fotoCenario) filtrosCatalogo.push(l => l[k] >= v); return q; }, lte: (k: string, v: string) => { if (fotoCenario) filtrosCatalogo.push(l => l[k] <= v); return q; }, is: () => q,
         maybeSingle: () => { unica = true; return q; },
         insert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         upsert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
@@ -274,10 +283,10 @@ mock.module("@/integrations/supabase/client.server", () => ({
             : fonteCenario && tabela === "nina_cat_servicos" ? baseFonte.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-            : (contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais
+            : (fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? (fotoCenario ? mensagensContextuais.filter(l => filtrosCatalogo.every(f => f(l))) : mensagensContextuais)
             : unica ? null : [], error: null,
-          count: (contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
+          count: (fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
       };
       return q;
@@ -629,7 +638,9 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
-const resposta = await gerarRespostaNina("clinica-simulada", procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente, contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario ? "55000100999" : null, {
+const ultimaEntrada = mensagensContextuais.at(-1);
+const textoFoto = ultimaEntrada && "transcricao" in ultimaEntrada ? String(ultimaEntrada.transcricao) : "";
+const resposta = await gerarRespostaNina("clinica-simulada", fotoCenario ? textoFoto : procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente, fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],

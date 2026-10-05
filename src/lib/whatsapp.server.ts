@@ -908,6 +908,24 @@ async function gerarRespostaNinaInterno(
     ...dadosPublicosClinicaGrupo(clinicaId),
   };
 
+  // Fotos não compreendidas seguem a mesma regra nos dois transportes, antes do Jev/modelo.
+  const { resolverFotosDoTurno } = await import("@/lib/nina/fotos.server");
+  const fotosOuEntradasNaoLidas = (opcoes?.mensagensEntrada ?? []).some(id =>
+    !msgsMemoria.some(m => m.id === id && m.tipo !== "image"));
+  const respostaFoto = fotosOuEntradasNaoLidas ? await resolverFotosDoTurno({ clinicaId, conversaId: estadoId.conversaId,
+    mensagensEntrada: opcoes?.mensagensEntrada ?? [], teste: opcoes?.teste === true,
+    desde: (sessaoNina.expirou || sessaoNina.saneouEncerramento) ? new Date().toISOString()
+      : sessaoNina.estado.session_started_at ?? new Date(corteMemoria).toISOString(), validar: conferirReserva,
+    obsoleta: async () => opcoes?.revisao?.valor ? (await import("@/lib/nina/revisao-conversa.server")).respostaObsoleta({
+      clinicaId, telefone: opcoes.revisao.telefone, revisaoProcessada: opcoes.revisao.valor }) : false }) : null;
+  if (respostaFoto) {
+    if (rastro) rastro.ids.conversation_id = estadoId.conversaId;
+    (await import("@/lib/nina/rastreio/turno.server")).registrarConversaDoTurno(estadoId.conversaId);
+    if (opcoes?.auditoria) opcoes.auditoria.resultado = respostaFoto;
+    rastro?.pular("llm.generate", "controle da leitura de fotos respondeu antes do modelo");
+    return respostaFoto.texto;
+  }
+
   // FASE 3 — leitura da intenção vira FATO no runtime context (não texto de
   // prompt). A flag da Fase 1 continua existindo para o restante do fluxo.
   const fase1Ativa = await (async () => {

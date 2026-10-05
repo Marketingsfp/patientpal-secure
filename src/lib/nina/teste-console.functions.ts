@@ -300,6 +300,10 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
           base64: z.string().min(4).max(22_369_624).regex(/^[A-Za-z0-9+/]+={0,2}$/),
           mime: z.enum(["audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "audio/amr", "audio/wav"]),
         }).optional(),
+        imagemArquivo: z.object({
+          base64: z.string().min(4).max(6_990_508).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+          mime: z.enum(["image/jpeg", "image/png", "image/webp"]),
+        }).optional(),
         chave: z.string().min(6).max(80),
       })
       .parse(input),

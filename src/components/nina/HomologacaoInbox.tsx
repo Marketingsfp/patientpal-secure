@@ -761,6 +761,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     conteudo: string,
     tipoForcado?: TipoMensagem,
     audioArquivo?: { base64: string; mime: "audio/ogg" | "audio/mpeg" | "audio/mp4" | "audio/aac" | "audio/amr" | "audio/wav" },
+    imagemArquivo?: { base64: string; mime: "image/jpeg" | "image/png" | "image/webp" },
   ): Promise<{ ok: boolean; transferida: boolean; erro: string | null }> => {
     const leadOrigem = leadId;
     const conversaOrigem = conversaId;
@@ -827,7 +828,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         mensagemPersistida?: boolean;
         recuperavel?: boolean;
       };
-      const entrada = { data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave, audioArquivo } };
+      const entrada = { data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave, audioArquivo, imagemArquivo } };
       const r = await enviarComRetomadaRecuperavel(
         async () => (await enviar(entrada)) as ResultadoEnvio, meuLead,
       );
@@ -1897,6 +1898,28 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                         });
                         await dispararMensagem("", "audio", { base64, mime: mime as NonNullable<Parameters<typeof dispararMensagem>[2]>["mime"] });
                       } catch { toast.error("Não foi possível enviar o áudio."); }
+                    }} />
+                </label>
+                <label className="flex min-h-9 shrink-0 items-center rounded-md border border-atd-border px-2 text-xs cursor-pointer focus-within:ring-2">
+                  Enviar foto
+                  <input type="file" className="sr-only" aria-label="Enviar foto como paciente de teste"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    disabled={composerBloqueado || processando}
+                    onChange={async e => {
+                      const arquivo = e.currentTarget.files?.[0]; e.currentTarget.value = "";
+                      if (!arquivo) return;
+                      if (!arquivo.size || arquivo.size > 5 * 1024 * 1024) { toast.error("A foto deve ter até 5 MB."); return; }
+                      const mimes = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
+                      const mime = mimes[arquivo.name.split(".").at(-1)?.toLowerCase() as keyof typeof mimes];
+                      if (!mime) { toast.error("Use foto JPG, PNG ou WebP."); return; }
+                      try {
+                        const base64 = await new Promise<string>((resolve, reject) => {
+                          const leitor = new FileReader();
+                          leitor.onload = () => resolve(String(leitor.result).split(",")[1] ?? "");
+                          leitor.onerror = reject; leitor.readAsDataURL(arquivo);
+                        });
+                        await dispararMensagem("", "image", undefined, { base64, mime });
+                      } catch { toast.error("Não foi possível enviar a foto."); }
                     }} />
                 </label>
                 <Textarea

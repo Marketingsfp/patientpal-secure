@@ -14,6 +14,8 @@ export type MensagemHistoricoJev = {
   id?: string | null;
   direction?: string | null;
   body?: string | null;
+  tipo?: string | null;
+  transcricao?: string | null;
   created_at?: string | null;
   conversa_id?: string | null;
 };
@@ -58,7 +60,7 @@ export function montarHistoricoJev(
   const validas = mensagens
     .map((m) => ({ m, t: Date.parse(String(m.created_at ?? "")), de: autorDaMensagem(m.direction) }))
     .filter(({ m, t, de }) => {
-      if (!de || !String(m.body ?? "").trim()) return false;
+      if (!de || !String((m.tipo === "image" || m.tipo === "audio") ? m.transcricao ?? m.body ?? "" : m.body ?? "").trim()) return false;
       if (m.id && excluir.has(m.id)) return false;
       if (opcoes.conversaId && m.conversa_id && m.conversa_id !== opcoes.conversaId) return false;
       if (Number.isFinite(desde) && Number.isFinite(t) && t < desde) return false;
@@ -68,7 +70,7 @@ export function montarHistoricoJev(
   const recentes = validas.slice(-(opcoes.limite ?? 6));
   const ultimaDaAtendente = recentes.map((r) => r.de).lastIndexOf("atendente");
   return recentes.map(({ m, de }, i) => {
-    const texto = String(m.body).trim();
+    const texto = String((m.tipo === "image" || m.tipo === "audio") ? m.transcricao ?? m.body ?? "" : m.body ?? "").trim();
     return {
       de: de!,
       texto: i === ultimaDaAtendente ? cortarMeio(texto, LIMITE_ULTIMA_PERGUNTA) : cortar(texto, LIMITE_FALA),

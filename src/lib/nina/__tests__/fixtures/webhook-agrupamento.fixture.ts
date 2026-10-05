@@ -32,6 +32,7 @@ let falhaRevisao = [
 ].includes(cenario);
 let fechada = cenario === "revisao-conversa-fechada";
 let reservaPerdidaDepois = false;
+let leiturasFoto = 0;
 let tts = 0,
   uploads = 0;
 let closedAt = "2026-09-14T03:00:00.000Z";
@@ -180,19 +181,19 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
     ai_enabled: true,
     status: fechada ? "closed" : "open",
   }),
-  ninaPodeResponder: () => true,
+  ninaPodeResponder: () => cenario !== "foto-humano",
 }));
 mock.module("@/lib/nina-desligada.server", () => ({ ninaDesativadaNaClinica: async () => false }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
   transcreverAudioWhatsapp: async () => ({ texto: "Bom dia", mime: "audio/ogg" }),
   receberMidiaWhatsapp: async () => ({
     base64: "AAAA",
-    mime: "audio/ogg",
+    mime: cenario.startsWith("foto-") ? "image/jpeg" : "audio/ogg",
     caminho: "clinica/2026-09/wamid_teste.ogg",
     erro: null,
   }),
   transcreverAudioBase64: async () => ({ texto: "Bom dia", erro: null }),
-  lerPedidoNaImagem: async () => ({ tipo: "outro" }),
+  lerPedidoNaImagem: async () => { leiturasFoto++; return cenario === "foto-legivel" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" }; },
   limparMidiasExpiradasSeChegouAHora: async () => {},
   RESPOSTA_AUDIO_FALHOU: "Áudio indisponível",
   respostaMidiaNaoSuportada: () => "Mídia indisponível",
@@ -216,7 +217,7 @@ mock.module("@/lib/nina/burst.server", () => ({
       lerMensagens: async (ids) =>
         db
           .whatsapp_mensagens!.filter((m) => ids.includes(m.id))
-          .map((m) => ({ id: m.id, texto: m.body, tipo: m.tipo })),
+          .map((m) => ({ id: m.id, texto: m.tipo === "image" ? m.transcricao : m.body, tipo: m.tipo })),
       lerRevisao: async () => revisao,
       iniciar: async () => true,
       concluir: async (id) => {
@@ -317,7 +318,8 @@ const corpo = JSON.stringify({
               {
                 id: "wa-entrada",
                 from: "5511999991111",
-                type: ["reserva-perdida-tts", "reserva-perdida-upload", "audio-recebido"].includes(cenario)
+                image: { id: "foto-entrada" },
+                type: cenario.startsWith("foto-") ? "image" : ["reserva-perdida-tts", "reserva-perdida-upload", "audio-recebido"].includes(cenario)
                   ? "audio"
                   : "text",
                 audio: { id: "audio-entrada" },
@@ -372,6 +374,7 @@ console.log(
       encerramentos,
       entradasGerador,
       esperas,
+      leiturasFoto,
       entradas: db.whatsapp_mensagens!.filter((m) => m.direction === "in"),
       saidas: db.whatsapp_mensagens!.filter((m) => m.direction === "out"),
       logs: db.whatsapp_webhook_logs!.map((l) => l.resultado),

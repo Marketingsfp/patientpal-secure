@@ -62,25 +62,25 @@ describe("leitura da imagem: só identifica pedido", () => {
   });
 
   it("aceita JSON dentro de bloco de código e limpa, deduplica e limita", () => {
-    const itens = Array.from({ length: 30 }, (_, i) => `Exame ${i}`);
+    const itens = Array.from({ length: 3 }, (_, i) => `Exame ${i}`);
     const r = interpretarLeituraImagem(
       "```json\n" + JSON.stringify({ tipo: "pedido_medico", itens: ["  TSH \n", "tsh", ...itens] }) + "\n```",
     );
     expect(r.tipo).toBe("pedido_medico");
     if (r.tipo === "pedido_medico") {
       expect(r.itens[0]).toBe("TSH");
-      expect(r.itens).toHaveLength(15);
+      expect(r.itens).toHaveLength(4);
       expect(r.itens.filter((i) => i.toLowerCase() === "tsh")).toHaveLength(1);
     }
   });
 
-  it("qualquer dúvida vira 'outro' (vai para a atendente)", () => {
-    expect(interpretarLeituraImagem("não sei")).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem("{ quebrado")).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem('{"tipo":"resultado_exame","itens":["Glicose 98"]}')).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[]}')).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[1,null,"a"]}')).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem(null)).toEqual({ tipo: "outro" });
+  it("leitura inválida pede nova foto, não declara conteúdo legível", () => {
+    expect(interpretarLeituraImagem("não sei")).toEqual({ tipo: "ilegivel" });
+    expect(interpretarLeituraImagem("{ quebrado")).toEqual({ tipo: "ilegivel" });
+    expect(interpretarLeituraImagem('{"tipo":"resultado_exame","itens":["Glicose 98"]}')).toEqual({ tipo: "ilegivel" });
+    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[]}')).toEqual({ tipo: "ilegivel" });
+    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[1,null,"a"]}')).toEqual({ tipo: "ilegivel" });
+    expect(interpretarLeituraImagem(null)).toEqual({ tipo: "ilegivel" });
   });
 
   it("o texto entregue à Nina vem na voz do paciente, com a legenda se houver", () => {

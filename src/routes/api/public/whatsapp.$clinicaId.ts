@@ -202,8 +202,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 let mediaMime: string | null = null;
                 // Caminho do arquivo no bucket privado (imagem e áudio recebidos).
                 let caminhoMidia: string | null = null;
-                // Foto lida como receita de remédio: resposta própria (não é pedido de exames).
-                let receitaRemedio = false;
+                // Classificação persistida: o núcleo controla leitura, nova tentativa e encaminhamento.
+                let leituraImagem: import("@/lib/nina/leitura-imagem").LeituraImagem = { tipo: "ilegivel" };
                 const legendaImagem = ehImagem ? bloquearLinksRecebidos(String(msg.image?.caption ?? "").trim()) : "";
 
                 if (ehAudio || ehImagem) {
@@ -213,7 +213,17 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   await limparMidiasExpiradasSeChegouAHora(params.clinicaId);
                 }
 
-                if (ehImagem && cfg.access_token) {
+                const imagemExistente = ehImagem ? await supabaseAdmin.from("whatsapp_mensagens")
+                  .select("id,transcricao,media_url,media_mime,raw").eq("clinica_id", params.clinicaId)
+                  .eq("wa_message_id", wa_message_id).maybeSingle() : null;
+                if (imagemExistente?.error) throw new Error("Não foi possível conferir a foto recebida anteriormente");
+                if (imagemExistente?.data) {
+                  const { leituraSalvaDaFoto } = await import("@/lib/nina/fotos");
+                  leituraImagem = leituraSalvaDaFoto(imagemExistente.data.raw) ?? { tipo: "ilegivel" };
+                  caminhoMidia = imagemExistente.data.media_url;
+                  mediaMime = imagemExistente.data.media_mime;
+                }
+                if (ehImagem && cfg.access_token && !imagemExistente?.data) {
                   const mediaId = String(msg.image?.id ?? "");
                   if (mediaId) {
                     const { receberMidiaWhatsapp, lerPedidoNaImagem } =
@@ -237,17 +247,16 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         await import("@/lib/nina-desligada.server");
                       const estado = from ? await estadoAntes(params.clinicaId, from) : null;
                       if (podeAntes(estado) && !(await desligadaAntes(params.clinicaId))) {
-                        const leitura = await lerPedidoNaImagem(recebida.base64, recebida.mime);
-                        if (leitura.tipo === "pedido_medico") {
-                          const { textoDoPedidoLido } = await import("@/lib/nina/leitura-imagem");
-                          textoPaciente = textoDoPedidoLido(leitura.itens, legendaImagem);
-                          transcricao = textoPaciente;
-                        } else if (leitura.tipo === "receita_remedio") {
-                          receitaRemedio = true;
-                        }
+                        leituraImagem = await lerPedidoNaImagem(recebida.base64, recebida.mime);
                       }
                     }
                   }
+                }
+
+                if (ehImagem) {
+                  const { textoDaImagem } = await import("@/lib/nina/leitura-imagem");
+                  textoPaciente = textoDaImagem(leituraImagem, legendaImagem);
+                  transcricao = textoPaciente;
                 }
 
                 if (ehAudio && cfg.access_token) {
@@ -311,7 +320,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   media_url: caminhoMidia,
                   status: "received",
                   enviada_por: "paciente",
-                  raw: msg,
+                  raw: ehImagem ? { ...msg, nina_leitura_imagem: leituraImagem } : msg,
                 });
                 const msgInserida = entradaPersistida.mensagem;
                 trace.marcar("RECV_T5_DB_INSERT_DONE");
@@ -557,7 +566,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     textoPaciente,
                     audioFalhou,
                     ehAudio,
-                    tipo: receitaRemedio ? "image_receita" : tipo,
+                    tipo,
                   });
                   if (processamento.resultado) resultado = processamento.resultado;
                   if (processamento.pendente)

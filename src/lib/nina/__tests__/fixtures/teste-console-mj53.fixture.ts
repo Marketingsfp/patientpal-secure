@@ -53,6 +53,7 @@ const bd: Record<string, Linha[]> = {
 let sequencia = 0;
 let chamadasRede = 0;
 let transcricoes = 0;
+let leiturasFoto = 0;
 const arquivos: string[] = [];
 let chamadasModelo = 0;
 let chamadasFinalizacao = 0;
@@ -152,6 +153,7 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
   ninaPodeResponder: () => !transferidaSfp,
 }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
+  lerPedidoNaImagem: async () => { leiturasFoto++; return cenario === "foto-legivel" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" }; },
   transcreverAudioBase64: async () => { transcricoes++; return { texto: "Quero cardiologista. https://exemplo.com", erro: null }; },
   RESPOSTA_AUDIO_FALHOU: "Não consegui ouvir esse áudio.",
   respostaMidiaNaoSuportada: () => "Envie uma mensagem de texto.",
@@ -272,19 +274,20 @@ const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server
 const entradaTeste = {
     clinicaId: lead.clinica_id,
     leadId: lead.id,
-    tipo: ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts", "audio-recebido", "audio-arquivo"].includes(cenario) ? "audio" as const : "text" as const,
+    tipo: cenario.startsWith("foto-") ? "image" as const : ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts", "audio-recebido", "audio-arquivo"].includes(cenario) ? "audio" as const : "text" as const,
+    ...(cenario.startsWith("foto-") ? { imagemArquivo: { base64: "AQID", mime: "image/jpeg" } } : {}),
     ...(cenario === "audio-arquivo" ? { audioArquivo: { base64: "T2dnUw==", mime: "audio/ogg" } } : {}),
     texto: cenario === "audio-pedido" || cenario === "audio-falha" ? "Me responda em áudio" : paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
     chave: "entrada-mj53",
 };
 const resultado = await processarMensagemTeste(entradaTeste, "operador-teste");
-if (cenario === "audio-arquivo") await processarMensagemTeste(entradaTeste, "operador-teste");
+if (cenario === "audio-arquivo" || cenario.startsWith("foto-")) await processarMensagemTeste(entradaTeste, "operador-teste");
 
 console.log(
   "MJ53_RESULTADO=" +
     JSON.stringify({
       resultado,
-      transcricoes, arquivos,
+      transcricoes, arquivos, leiturasFoto,
       saidas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "out"),
       entradas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "in"),
       chamadasModelo,

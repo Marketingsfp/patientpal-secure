@@ -206,6 +206,7 @@ export type EntradaMensagemTeste = {
   texto: string;
   chave: string;
   audioArquivo?: { base64: string; mime: string };
+  imagemArquivo?: { base64: string; mime: string };
 };
 
 /** Processa uma mensagem de paciente de teste pelo pipeline real da Nina. */
@@ -256,6 +257,7 @@ export async function processarMensagemTeste(
         : await garantirCiclo(supabaseAdmin, data.clinicaId, lead, userId);
       const waId = retomada?.mensagem.wa_message_id ?? `test-${lead.id}-${data.chave}`;
       const agora = new Date().toISOString();
+      let leituraImagem: import("./leitura-imagem").LeituraImagem = { tipo: "ilegivel" };
       let media_url: string | null = null;
       let media_mime: string | null = null;
       if (ehAudio && data.audioArquivo && !retomada) {
@@ -278,6 +280,28 @@ export async function processarMensagemTeste(
           if (!erroUpload) media_url = caminho;
         }
       }
+      if (data.tipo === "image" && !retomada) {
+        const { data: existente, error: erroExistente } = await supabaseAdmin.from("whatsapp_mensagens")
+          .select("id").eq("clinica_id", data.clinicaId).eq("wa_message_id", waId).maybeSingle();
+        if (erroExistente) throw new Error("Não foi possível conferir a foto anterior");
+        if (!existente) {
+          if (data.imagemArquivo) {
+            const { tipoMimeAceito, LIMITE_BYTES_IMAGEM, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } = await import("@/lib/whatsapp-midia-armazenamento");
+            const bytes = Buffer.from(data.imagemArquivo.base64, "base64");
+            media_mime = tipoMimeAceito("image", data.imagemArquivo.mime);
+            if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_IMAGEM) throw new Error("Foto inválida ou acima de 5 MB");
+            const { lerPedidoNaImagem } = await import("@/lib/whatsapp-midia.server");
+            leituraImagem = await lerPedidoNaImagem(data.imagemArquivo.base64, media_mime);
+            const caminho = caminhoDaMidia({ clinicaId: data.clinicaId, waMessageId: waId, mime: media_mime });
+            const { error: erroUpload } = await supabaseAdmin.storage.from(BUCKET_MIDIA_WHATSAPP)
+              .upload(caminho, bytes, { contentType: media_mime, upsert: true });
+            if (!erroUpload) media_url = caminho;
+          }
+          const { textoDaImagem } = await import("./leitura-imagem");
+          textoPaciente = bloquearLinksRecebidos(textoDaImagem(leituraImagem, data.texto));
+          body = data.texto ? "📷 " + bloquearLinksRecebidos(data.texto) : "📷 Imagem";
+        }
+      }
       conferirSessao?.(); // A transcrição pode ter aguardado o provedor; revalide antes de gravar.
       const entradaPersistida = retomada
         ? { mensagem: retomada.mensagem, repetida: true, consumida: false }
@@ -291,7 +315,8 @@ export async function processarMensagemTeste(
             to_number: CANAL_TESTE,
             body,
             tipo: data.tipo,
-            transcricao: ehAudio && textoPaciente ? textoPaciente : null,
+            transcricao: (ehAudio || data.tipo === "image") && textoPaciente ? textoPaciente : null,
+            ...(data.tipo === "image" ? { raw: { nina_leitura_imagem: leituraImagem } } : {}),
             media_url,
             media_mime,
             status: "received",
@@ -315,7 +340,7 @@ export async function processarMensagemTeste(
     };
   if (entradaPersistida.repetida)
     textoPaciente =
-      msgEntrada.tipo === "audio"
+      (msgEntrada.tipo === "audio" || msgEntrada.tipo === "image")
         ? (msgEntrada.transcricao ?? "")
         : msgEntrada.tipo === "text"
           ? (msgEntrada.body ?? "")
