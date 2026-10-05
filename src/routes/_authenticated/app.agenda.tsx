@@ -4395,8 +4395,11 @@ function AgendaPage() {
       avisoSemPermissaoAgenda();
       return;
     }
-    const nomeFinal = novoNome.trim();
-    // Sentinela vazio: limpa o procedimento (volta ao padrão do médico).
+    // Sentinela vazio: volta ao padrão do médico. Grava o nome do padrão em vez
+    // de vazio — gravando vazio a Agenda mostrava o padrão, mas o Financeiro
+    // (que lê o que está gravado) mostrava "—". Sem padrão cadastrado
+    // (laboratório) continua gravando vazio, que as telas já tratam.
+    const nomeFinal = novoNome.trim() || procedimentoPadraoDoMedico(ag.medico_id);
     const limpar = nomeFinal === "";
     if (!limpar && nomeFinal === (ag.procedimento ?? "")) return;
     const anterior = ag.procedimento;
