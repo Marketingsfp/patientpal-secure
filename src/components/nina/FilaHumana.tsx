@@ -1,3 +1,4 @@
+import { motivoParaAtendimento, MOTIVO_TRANSFERENCIA_AUSENTE } from "@/lib/atendimento/texto-interno-apresentacao";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -133,11 +134,10 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                         {c.contato_telefone}
                       </p>
                     )}
-                    {c.handoff_motivo && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <span className="font-medium">Motivo:</span> {c.handoff_motivo}
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <span className="font-medium">Motivo:</span>{" "}
+                      {motivoParaAtendimento(c.handoff_motivo) ?? MOTIVO_TRANSFERENCIA_AUSENTE}
+                    </p>
                     {c.handoff_resumo?.resumo && (
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                         <span className="font-medium">Resumo da Nina:</span>{" "}

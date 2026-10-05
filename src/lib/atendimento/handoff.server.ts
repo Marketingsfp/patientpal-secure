@@ -388,7 +388,8 @@ export async function encaminharParaHumano(args: {
         conversaId: args.conversaId,
         texto:
           `🧾 Handoff realizado pela Nina · Protocolo: ${p.protocolo}` +
-          ` · Destino: ${depto?.nome ?? "Não atribuídas"}`,
+          ` · Destino: ${depto?.nome ?? "Não atribuídas"}` +
+          ` · Motivo: ${args.motivo}`,
       });
   } catch (e) {
     console.error("[handoff] falha ao gerar protocolo do handoff", e);

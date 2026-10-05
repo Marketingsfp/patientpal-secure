@@ -1,3 +1,4 @@
+import { motivoParaAtendimento } from "@/lib/atendimento/texto-interno-apresentacao";
 import { Badge } from "@/components/ui/badge";
 import type { LeituraDetalhesMensagem } from "@/lib/nina/detalhes-mensagem-contrato";
 import { registrosSemMotor } from "@/lib/nina/fluxo-direto";
@@ -334,9 +335,8 @@ export function DetalhesMensagemNina({
           {leitura.encaminhamentos.map((e, i) => (
             <div key={i} className="space-y-1">
               <p className="font-medium">
-                {e.motivo === "CATALOGO_ATENDIMENTO_HUMANO"
-                  ? "O cadastro consultado exige atendimento humano."
-                  : e.motivo}
+                {motivoParaAtendimento(e.motivo)}
+                <span className="block text-xs text-muted-foreground">Registro original: {e.motivo}</span>
               </p>
               {e.ferramenta && <p>Ferramenta de origem: {e.ferramenta}</p>}
               {e.registros.map((r, j) => (
@@ -346,9 +346,9 @@ export function DetalhesMensagemNina({
                   Configuração: {r.campo} = {String(r.valor)}
                 </p>
               ))}
-              {e.motivo === "CATALOGO_ATENDIMENTO_HUMANO" && !e.registros.length && (
+              {e.motivo.includes("CATALOGO_ATENDIMENTO_HUMANO") && !e.registros.length && (
                 <p className="text-muted-foreground">
-                  Este registro antigo não guardou o cadastro responsável junto da decisão. Não é
+                  Este encaminhamento não guardou o cadastro responsável junto da decisão. Não é
                   possível reconstruí-lo consultando a configuração atual.
                 </p>
               )}

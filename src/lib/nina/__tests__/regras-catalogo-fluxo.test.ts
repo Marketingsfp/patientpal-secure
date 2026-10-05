@@ -11,7 +11,7 @@ describe("Políticas no prompt, execução compartilhada (modelo/banco simulados
   });
   for (const ambiente of ["producao", "homologacao"]) {
     for (const cenario of ["catalogo_sfp", "catalogo_tecnica", "catalogo_enfermagem", "catalogo_equipe_enfermagem",
-      "catalogo_sfp_handoff_modelo", "catalogo_sfp_handoff_modelo_falha_handoff"]) {
+      "catalogo_sfp_restricao_publicada", "catalogo_sfp_recusa_agenda_modelo", "catalogo_sfp_handoff_modelo", "catalogo_sfp_handoff_modelo_falha_handoff"]) {
       it(`${ambiente}: ${cenario}`, () => {
         const p = Bun.spawnSync([process.execPath, fixture, ambiente, cenario], {
           cwd: fileURLToPath(new URL("../../../../../", import.meta.url)), stdout: "pipe", stderr: "pipe", timeout: 15000,
@@ -21,7 +21,11 @@ describe("Políticas no prompt, execução compartilhada (modelo/banco simulados
         const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
         expect(r.rede).toBe(0);
         expect(r.motorChamado).toBe(0);
-        if (cenario.includes("handoff_modelo")) {
+        if (["catalogo_sfp_recusa_agenda_modelo", "catalogo_sfp_restricao_publicada"].includes(cenario)) {
+          expect(r.encaminhamentos).toHaveLength(1);
+          expect(r.encaminhamentos[0].motivo).toContain("PROFISSIONAL_SFP");
+          expect(r.encaminhamentos[0].motivo.toLowerCase()).toContain("eletrocardiograma");
+        } else if (cenario.includes("handoff_modelo")) {
           expect(r.encaminhamentos).toHaveLength(1);
           expect(r.encaminhamentos[0].avisar_paciente).toBe(false);
           expect(r.ferramentas).toEqual(["solicitar_atendente_humano"]);

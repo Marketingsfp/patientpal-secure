@@ -65,3 +65,11 @@ describe("encaminhamento e resumo da Nina num cartão só", () => {
     expect(soltos.map((r) => r.id)).toEqual(["r2", "r3"]);
   });
 });
+
+it("motivo SFP aparece sem depender do resumo e ausência não é inventada", () => {
+  const sfp = renderToStaticMarkup(<HandoffGroupCard grupo={{ ...grupo, motivo: "PROFISSIONAL_SFP: Eletrocardiograma" }} />);
+  expect(sfp).toContain("Regra SFP");
+  expect(sfp).toContain("Eletrocardiograma");
+  const vazio = renderToStaticMarkup(<HandoffGroupCard grupo={{ ...grupo, motivo: null }} />);
+  expect(vazio).toContain("Motivo não registrado neste atendimento.");
+});

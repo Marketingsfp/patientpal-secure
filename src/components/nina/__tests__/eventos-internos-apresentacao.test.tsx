@@ -131,7 +131,7 @@ describe("Apresentação dos registros internos para atendimento real e homologa
   );
   test("código desconhecido não vaza e não inventa causa específica", () => {
     expect(motivoParaAtendimento("INTERNAL_FAILURE_XYZ: new_detail=42")).toBe(
-      "A equipe dará continuidade à solicitação do paciente.",
+      "O motivo registrado contém informações técnicas. Consulte os detalhes técnicos da transferência.",
     );
   });
   test("texto operacional preserva motivos manuais e informações de contato", () => {

@@ -1,4 +1,5 @@
 import { catalogoDoTurno } from "./catalogo-turno.server";
+import { motivoRegraHumano } from "./regras-catalogo";
 import { lerEstrutura } from "./catalogo-estrutura";
 
 /** Valida ações pelo cadastro lido neste turno, inclusive em sessões antigas. */
@@ -7,6 +8,7 @@ export async function atendimentoExigeHumano(entrada: {
   medico?: string | null;
   procedimento?: string | null;
   referencias?: readonly string[];
+  registrarMotivo?: (motivo: string) => void;
 }): Promise<boolean> {
   const { clinicaId, medico, procedimento } = entrada;
   const referencias = (entrada.referencias ?? []).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
@@ -14,11 +16,24 @@ export async function atendimentoExigeHumano(entrada: {
   const restritos = catalogo.profissionais.filter(
     (p) => lerEstrutura(p.estrutura).encaminhamento_humano === true,
   );
-  const registrar = async (registros: Array<{ id: string; nome: string }>) => {
+  const registrar = async (
+    registros: Array<{ id: string; nome: string; executantes?: unknown }>,
+    profissional = false,
+  ) => {
+    const evidencia = registros.map((r) => ({
+      nome: r.nome,
+      profissional: profissional
+        ? r.nome
+        : Array.isArray(r.executantes)
+          ? r.executantes.map((e) => (typeof e?.nome === "string" ? e.nome : "")).join(", ")
+          : undefined,
+    }));
+    const motivo = motivoRegraHumano(evidencia);
+    entrada.registrarMotivo?.(motivo);
     try {
       const { registrarEventoIATurno } = await import("./auditoria-ia.server");
       await registrarEventoIATurno("catalog.rule", {
-        motivo: "CATALOGO_ATENDIMENTO_HUMANO",
+        motivo,
         ferramenta_origem: "atendimentoExigeHumano",
         registros: registros.map((r) => ({
           id: r.id,
@@ -40,7 +55,7 @@ export async function atendimentoExigeHumano(entrada: {
         p.nome.trim().toLocaleLowerCase("pt-BR") === medico?.trim().toLocaleLowerCase("pt-BR")),
   );
   if (profissionais.length) {
-    await registrar(profissionais);
+    await registrar(profissionais, true);
     return true;
   }
   if (medico && restritos.some((p) => p.medico_id)) {
@@ -50,7 +65,7 @@ export async function atendimentoExigeHumano(entrada: {
       ? restritos.filter((p) => p.medico_id === resolvido.id)
       : [];
     if (profissionaisResolvidos.length) {
-      await registrar(profissionaisResolvidos);
+      await registrar(profissionaisResolvidos, true);
       return true;
     }
   }

@@ -19,9 +19,71 @@ export function textoOperacional(valor: unknown, alternativa: string | null = nu
   return texto.length > 600 || contemRegistroTecnico(texto) ? alternativa : texto;
 }
 
+/** Preserva o contexto legível (item, profissional ou causa) sem expor erros brutos. */
+function complementoMotivo(valor: string): string {
+  const sufixo = valor.slice(valor.indexOf(":") + 1).trim();
+  if (!valor.includes(":")) {
+    const livre = textoOperacional(valor);
+    return livre ? ` Detalhe: ${livre}` : "";
+  }
+  const seguro = textoOperacional(sufixo);
+  return seguro ? ` Detalhe: ${seguro}` : "";
+}
+
+export const MOTIVO_TRANSFERENCIA_AUSENTE = "Motivo não registrado neste atendimento.";
+
 export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
+    [
+      /^(?:\[[^\]]+\]\s*)?(?:CATALOGO_ATENDIMENTO_HUMANO\s*\/\s*)?PROFISSIONAL[_\s]+(?:[EÉ]\s+)?SFP\b/i,
+      "Regra SFP: atendimento encaminhado para a equipe humana por estar vinculado ao profissional SFP.",
+    ],
+    [
+      /\bCATALOGO_ATENDIMENTO_HUMANO\b/i,
+      "O cadastro consultado exige atendimento humano para este item.",
+    ],
+    [
+      /\bJEV_URGENCIA_CLINICA\b/i,
+      "O Jev identificou sinais de possível urgência clínica; a Nina encaminhou com prioridade para a equipe.",
+    ],
+    [
+      /\bJEV_PEDIDO_ATENDENTE\b/i,
+      "O Jev identificou um pedido do paciente para falar com uma atendente.",
+    ],
+    [
+      /\bJEV_IRRITACAO\b/i,
+      "O Jev identificou irritação ou insatisfação do paciente acima do limite configurado.",
+    ],
+    [
+      /\bJEV_DUVIDA_REPETIDA\b/i,
+      "O Jev identificou dificuldade persistente de entendimento após tentativas de esclarecimento.",
+    ],
+    [
+      /\bFOTO_NAO_LIDA_APOS_NOVA_TENTATIVA\b/i,
+      "A Nina não conseguiu ler a nova foto enviada após pedir outra imagem. A equipe precisa conferir o documento.",
+    ],
+    [
+      /\bFOTO_REQUER_AVALIACAO_HUMANA\b/i,
+      "O conteúdo da foto exige avaliação humana e não pode ser tratado pela leitura administrativa da Nina.",
+    ],
+    [
+      /\bVAGA_ESCOLHIDA_INDISPONIVEL\b/i,
+      "Não foi possível concluir a reserva da vaga escolhida. A equipe deve conferir a disponibilidade sem substituir a escolha do paciente.",
+    ],
+    [
+      /\bNINA_PROCESSING_FAILED\b/i,
+      "O processamento da resposta da Nina falhou definitivamente. O sistema encaminhou para evitar deixar o paciente sem atendimento.",
+    ],
+    [
+      /\b(?:LIMITE_RODADAS|max_rounds)\b/i,
+      "A Nina atingiu o limite de etapas de processamento sem produzir uma resposta ao paciente.",
+    ],
+    [
+      /\bMOTIVO_NAO_INFORMADO\b/i,
+      "A Nina solicitou transferência, mas não informou o motivo. É necessário conferir os detalhes técnicos.",
+    ],
+
     [
       /\bMODALIDADE_NAO_DEFINIDA\b/i,
       "A Nina encontrou o atendimento, mas a modalidade de agendamento não está definida ou apresenta informações divergentes. A equipe precisa confirmar se é horário marcado ou ordem de chegada e se exige pré-agendamento.",
@@ -52,7 +114,7 @@ export function motivoParaAtendimento(valor: unknown): string | null {
     ],
     [
       /\bCATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA\b/i,
-      "A Nina pediu esclarecimento uma vez e ainda não conseguiu identificar com segurança o atendimento ou o profissional solicitado. A equipe dará continuidade.",
+      "A Nina pediu esclarecimento e ainda não conseguiu identificar com segurança o atendimento ou o profissional solicitado. A equipe dará continuidade.",
     ],
     [
       /\bCATALOGO_SEM_REGISTRO\b/i,
@@ -83,14 +145,22 @@ export function motivoParaAtendimento(valor: unknown): string | null {
       "Não foi encontrada uma vaga disponível para o agendamento solicitado.",
     ],
     [
-      /\b(?:limite_rodadas|max_rounds|tool_error|llm_error|watchdog_timeout)\b/i,
-      "A Nina não conseguiu concluir a solicitação. A equipe dará continuidade ao atendimento.",
+      /\btool_error\b/i,
+      "Uma ferramenta de atendimento falhou e a Nina não conseguiu continuar automaticamente.",
+    ],
+    [/\bllm_error\b/i, "O modelo de conversa apresentou uma falha ao produzir a resposta."],
+    [
+      /\bwatchdog_timeout\b/i,
+      "O processamento excedeu o tempo de espera e o sistema encaminhou para a equipe.",
     ],
   ];
   const traducao = motivos.find(([padrao]) => padrao.test(valor));
   return (
-    traducao?.[1] ??
-    textoOperacional(valor, "A equipe dará continuidade à solicitação do paciente.")
+    (traducao ? traducao[1] + complementoMotivo(valor) : null) ??
+    textoOperacional(
+      valor,
+      "O motivo registrado contém informações técnicas. Consulte os detalhes técnicos da transferência.",
+    )
   );
 }
 

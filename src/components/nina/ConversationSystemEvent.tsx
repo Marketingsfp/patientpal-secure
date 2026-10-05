@@ -8,6 +8,7 @@ import { formatarDataHoraMensagem } from "@/lib/atendimento/data-hora";
 import {
   avisoProtocolo,
   motivoParaAtendimento,
+  MOTIVO_TRANSFERENCIA_AUSENTE,
   textoOperacional,
 } from "@/lib/atendimento/texto-interno-apresentacao";
 
@@ -105,7 +106,7 @@ export function ConversationSystemEvent({ evento }: { evento: ConversaEvento }) 
   const motivo = avisoProtocolo(evento)
     ? null
     : evento.evento === "HANDOFF_SOLICITADO"
-      ? motivoParaAtendimento(evento.motivo)
+      ? motivoParaAtendimento(evento.motivo) ?? MOTIVO_TRANSFERENCIA_AUSENTE
       : textoOperacional(evento.motivo);
   const hora = formatarDataHoraMensagem(evento.created_at);
   return (

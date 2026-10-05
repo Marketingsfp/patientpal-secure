@@ -1161,10 +1161,11 @@ async function executarFerramentaInterna(
       const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
       const medico = String(args.medico_id ?? ctx.estado?.appointment.doctor_id ?? selecao?.medicoId ?? selecao?.medicoNome ?? "");
       const procedimento = String(pedido?.nome ?? procedimentoEscolhido ?? args.procedimento ?? ctx.estado?.appointment.procedure ?? selecao?.modalidade?.procedimento ?? "");
+      let motivoTransferencia: string | undefined;
       if ((medico || procedimento) && await atendimentoExigeHumano({ clinicaId: ctx.clinicaId,
-        medico, procedimento, referencias: pedido ? [pedido.catalogo_id] : selecao?.raizesFonte.map(r => r.registro) })) {
+        medico, procedimento, registrarMotivo: motivo => { motivoTransferencia = motivo; }, referencias: pedido ? [pedido.catalogo_id] : selecao?.raizesFonte.map(r => r.registro) })) {
         return falha("CATALOGO_ATENDIMENTO_HUMANO", "O cadastro exige atendimento humano para este item.", {
-          codigo: "CATALOGO_ATENDIMENTO_HUMANO", consulta_realizada: false, atendimento_humano_obrigatorio: true,
+          codigo: "CATALOGO_ATENDIMENTO_HUMANO", consulta_realizada: false, atendimento_humano_obrigatorio: true, motivo_transferencia: motivoTransferencia,
         });
       }
       return null;
@@ -1214,9 +1215,10 @@ async function executarFerramentaInterna(
           "Não encontrei esse atendimento publicado. Encaminhe para a equipe humana.", { encaminhar_para_humano: true });
         // Restrição explícita, vínculo ausente e consulta com erro não equivalem a agenda vazia.
         for (const c of candidatos) {
+          let motivoTransferencia: string | undefined;
           if (await atendimentoExigeHumano({ clinicaId: ctx.clinicaId, medico: c.medicoId ?? c.medicoNome,
-            procedimento: c.registro.procedimento, referencias: c.registro.id ? [c.registro.id] : [] }))
-            return falha("CATALOGO_ATENDIMENTO_HUMANO", "O cadastro exige atendimento humano para este item.", { atendimento_humano_obrigatorio: true });
+            registrarMotivo: motivo => { motivoTransferencia = motivo; }, procedimento: c.registro.procedimento, referencias: c.registro.id ? [c.registro.id] : [] }))
+            return falha("CATALOGO_ATENDIMENTO_HUMANO", "O cadastro exige atendimento humano para este item.", { atendimento_humano_obrigatorio: true, motivo_transferencia: motivoTransferencia });
           if (!c.medicoId && p.tipo === "procedimento") return { ...falhaVinculoAtendimento(), comparacao_completa: false };
           if (!c.medicoId) return falha("DOCTOR_NOT_FOUND",
             "Não foi possível resolver todos os vínculos com a agenda. A equipe deve conferir antes de afirmar qual é o primeiro disponível.",

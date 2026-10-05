@@ -318,12 +318,12 @@ export async function aplicarGateIdentificacao(params: {
     estado.flow.stage = "CHOOSING_SLOT";
     return null;
   }
-  const encaminharRestricaoCatalogo = async () => {
+  const encaminharRestricaoCatalogo = async (motivo?: unknown) => {
     limparEscolhaAgendamento(estado);
     a.slot_options = null;
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "HANDOFF";
-    const ok = await params.encaminharVagaIndisponivel?.("CATALOGO_ATENDIMENTO_HUMANO: restrição explícita do cadastro").catch(() => false) ?? false;
+    const ok = await params.encaminharVagaIndisponivel?.(typeof motivo === "string" && motivo.trim() ? motivo : "CATALOGO_ATENDIMENTO_HUMANO: restrição explícita do cadastro").catch(() => false) ?? false;
     return criarResultado({ origem: "handoff", texto: ok ? "A equipe continuará seu atendimento." : "Não consegui encaminhar neste momento. Tente novamente.", fatosConfirmados: ok ? ["handoff_confirmado"] : [] });
   };
   const encaminhar = async (modalidadePendente = false) => {
@@ -396,7 +396,7 @@ export async function aplicarGateIdentificacao(params: {
     const r = await executar(ctx, "selecionar_horario", {
       medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
     });
-    if (!r.ok && r.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
+    if (!r.ok && r.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo(r.motivo_transferencia);
     if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
     if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro)) return encaminhar(true);
     if (r.ok && typeof r.orientacao_atendimento === "string")
@@ -448,7 +448,7 @@ export async function aplicarGateIdentificacao(params: {
   // Lê o cadastro confirmado antes de pedir dados. Telefone sozinho não
   // confirma o paciente: nesse caso ainda faltam nome e nascimento.
   const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
-  if (!consulta.ok && consulta.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
+  if (!consulta.ok && consulta.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo(consulta.motivo_transferencia);
   if (!consulta.ok) return encaminharFalha("consultar_cadastro_paciente", consulta.erro);
   const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
   {
@@ -503,7 +503,7 @@ export async function aplicarGateIdentificacao(params: {
     ),
   );
   if (!r.ok) {
-    if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
+    if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo(r.motivo_transferencia);
     estado.flow.stage = "AWAITING_PATIENT_DATA";
     if (r.erro === "PATIENT_DATA_REQUIRED") {
       const campos = (r.campos_faltantes ?? []) as CampoCadastro[];
@@ -601,7 +601,7 @@ export async function aplicarGateIdentificacao(params: {
   }
 
   const erroAg = (ag as { erro?: string }).erro;
-  if (erroAg === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo();
+  if (erroAg === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo(ag.motivo_transferencia);
   if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(erroAg ?? "")) return encaminhar(true);
   log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
   // Reserva anterior encontrada pela idempotência: consultada, nunca criada

@@ -24,7 +24,7 @@ export const FERRAMENTA_HANDOFF = {
         },
         motivo: {
           type: "string",
-          description: "Motivo curto do encaminhamento (ex.: 'paciente pediu atendente').",
+          description: "Informe a causa concreta da transferência e o atendimento ou profissional envolvido. Se decorrer da regra SFP das instruções publicadas, identifique com PROFISSIONAL_SFP e descreva o item. Não atribua o pedido ao paciente se ele não pediu atendente.",
         },
         resumo: {
           type: "string",
@@ -57,11 +57,14 @@ export async function executarHandoffTool(
   }
   let args: Record<string, unknown> = {};
   try {
-    args = argumentosJson ? JSON.parse(argumentosJson) : {};
+    const lido: unknown = argumentosJson ? JSON.parse(argumentosJson) : {};
+    args = lido && typeof lido === "object" && !Array.isArray(lido) ? lido as Record<string, unknown> : {};
   } catch {
     args = {};
   }
-  const motivoMaria = String(args.motivo ?? "Paciente solicitou atendimento humano").slice(0, 500);
+  const motivoMaria = (typeof args.motivo === "string" && args.motivo.trim()
+    ? args.motivo.trim()
+    : "MOTIVO_NAO_INFORMADO: Nina solicitou transferência sem detalhar a causa").slice(0, 500);
   const resumo = args.resumo ? String(args.resumo).slice(0, 2000) : null;
   // Jev Fase 8: categoria fixa como prefixo "[Rótulo]"; sem decisão = motivo da Maria.
   const motivo = await (await import("./jev.server")).categorizarMotivoJev({

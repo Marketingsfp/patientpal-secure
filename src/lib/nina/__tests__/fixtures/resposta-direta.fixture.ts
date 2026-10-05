@@ -410,7 +410,8 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
     if (nome === "consultar_disponibilidade" && cenario === "catalogo_sfp_recusa_agenda_modelo") return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
       reused: false, appointment_confirmed: false, erro: "CATALOGO_ATENDIMENTO_HUMANO",
-      dados: { ok: false, erro: "CATALOGO_ATENDIMENTO_HUMANO", atendimento_humano_obrigatorio: true },
+      dados: { ok: false, erro: "CATALOGO_ATENDIMENTO_HUMANO", atendimento_humano_obrigatorio: true,
+        motivo_transferencia: "CATALOGO_ATENDIMENTO_HUMANO / PROFISSIONAL_SFP: Eletrocardiograma. Encaminhamento obrigatório no cadastro." },
     };
     if (nome === "agendar" && modoConfirmacao) return {
       ferramenta: nome, capacidade: "createAppointment", fonte: "agenda", success: true,
@@ -487,7 +488,8 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
     const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado",
       success: true, reused: false, dados: { itens: [{ id: "ecg", procedimento: "ELETROCARDIOGRAMA",
         valor: "R$ 80,00 dinheiro / R$ 95,00 cartão", medico: sfp ? "SFP" : nomeProfissional.toUpperCase(),
-        dias_horarios: "Segunda a sexta, 8h às 12h", preparo: "Sem jejum", restricoes: "Levar pedido médico" }] },
+        dias_horarios: "Segunda a sexta, 8h às 12h", preparo: "Sem jejum", restricoes: "Levar pedido médico",
+        ...(cenario === "catalogo_sfp_restricao_publicada" ? { extras: { atendimento_humano_obrigatorio: true } } : {}) }] },
     };
     resultados.push(r);
     return r;

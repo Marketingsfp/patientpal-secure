@@ -14,6 +14,7 @@ import type { ResumoNaConversa } from "@/lib/atendimento/resumo-retencao";
 import type { GrupoAtribuicao, GrupoHandoff } from "@/lib/atendimento/timeline-grupos";
 import {
   motivoParaAtendimento,
+  MOTIVO_TRANSFERENCIA_AUSENTE,
   textoOperacional,
 } from "@/lib/atendimento/texto-interno-apresentacao";
 
@@ -131,7 +132,7 @@ const STATUS_HANDOFF: Record<GrupoHandoff["status"], string> = {
 };
 
 export function HandoffGroupCard({ grupo, resumo }: { grupo: GrupoHandoff; resumo?: ResumoNaConversa }) {
-  const motivo = motivoParaAtendimento(grupo.motivo);
+  const motivo = motivoParaAtendimento(grupo.motivo) ?? MOTIVO_TRANSFERENCIA_AUSENTE;
 
   const linha2: Array<{ rotulo?: string; valor: string }> = [];
   if (grupo.protocolo) linha2.push({ rotulo: "Protocolo", valor: grupo.protocolo });

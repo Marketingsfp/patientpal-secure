@@ -38,3 +38,13 @@ describe("orientação após encaminhamento", () => {
     expect(r.instrucao_para_voce).not.toContain("uma atendente da equipe vai continuar");
   });
 });
+
+it("ausência de motivo não inventa um pedido do paciente", async () => {
+  retorno = { ok: true };
+  for (const motivo of [undefined, null, " ", {}, 12]) {
+    await executarHandoffTool(contexto, JSON.stringify({ motivo }));
+    expect(encaminhar.mock.calls.at(-1)?.[0]).toMatchObject({
+      motivo: expect.stringContaining("MOTIVO_NAO_INFORMADO"),
+    });
+  }
+});

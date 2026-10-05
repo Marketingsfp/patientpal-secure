@@ -3,7 +3,7 @@ import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
-import { resultadoExigeHumano, evidenciaRegraHumano } from "@/lib/nina/regras-catalogo";
+import { resultadoExigeHumano, evidenciaRegraHumano, motivoRegraHumano } from "@/lib/nina/regras-catalogo";
 import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 
 import { normalizar } from "@/lib/nina-especialidade";
@@ -1917,6 +1917,7 @@ async function gerarRespostaNinaInterno(
     ferramentaOrigem: string,
     ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>,
     evidencia?: ReturnType<typeof evidenciaRegraHumano>,
+    motivoRegistrado?: unknown,
   ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
@@ -1928,7 +1929,7 @@ async function gerarRespostaNinaInterno(
       }
     }
     const argumentos = ausencia ?? {
-      motivo: "CATALOGO_ATENDIMENTO_HUMANO",
+      motivo: typeof motivoRegistrado === "string" && motivoRegistrado.trim() ? motivoRegistrado : motivoRegraHumano(evidencia),
       resumo:
         "O cadastro exige atendimento humano para este item. A equipe deve continuar o atendimento.",
       urgencia: "normal",
@@ -2035,7 +2036,7 @@ async function gerarRespostaNinaInterno(
       };
     }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
-      if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") await encaminharRegraCatalogo(nome);
+      if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") await encaminharRegraCatalogo(nome, undefined, undefined, (r.dados as { motivo_transferencia?: unknown } | null)?.motivo_transferencia);
       return limitarRetornoParaModelo(payload);
     }
     const esclarecimentoAtual = (

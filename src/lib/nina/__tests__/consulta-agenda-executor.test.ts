@@ -187,6 +187,7 @@ describe("restrição explícita de atendimento humano, sem deduzir pelo nome", 
         origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
       const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
       expect(r.erro).toBe("CATALOGO_ATENDIMENTO_HUMANO");
+      expect(r.motivo_transferencia).toContain("PROFISSIONAL_SFP");
       expect(consultasAgenda()).toHaveLength(0);
       expect(gravacoes).toHaveLength(0);
     });
@@ -203,6 +204,8 @@ describe("restrição explícita de atendimento humano, sem deduzir pelo nome", 
       expect(r?.fatosConfirmados).toContain("handoff_confirmado");
       expect(motivos).toHaveLength(1);
       expect(motivos[0]).toContain("CATALOGO_ATENDIMENTO_HUMANO");
+      expect(motivos[0]).toContain("PROFISSIONAL_SFP");
+      expect(motivos[0]).toContain("Consulta Cardiologia");
       expect(consultasAgenda()).toHaveLength(0);
       expect(gravacoes).toHaveLength(0);
       expect(ctx.estado.appointment.confirmation).toBeNull();
