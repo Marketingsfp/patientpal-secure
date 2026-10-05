@@ -4,7 +4,7 @@ import { cadastroMinimoSchema, camposCadastroFaltantes } from "../cadastro-pacie
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "../paciente-tools.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
-import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO } from "../agendamento-escolha";
+import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO, incluirPacienteNoResumo } from "../agendamento-escolha";
 import { derivarEtapa } from "../atendimento-fase6";
 
 test.each(["O paciente é", "A paciente se chama", "O paciente eh"])("declaração explícita de paciente: %s", prefixo => {
@@ -59,6 +59,12 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
       ctx.pacienteId = "paciente";
       ctx.pacienteNome = "Ana da Silva";
       estado.patient.id = "paciente";
+      if (estado.patient.alteracao_telefone?.telefone) {
+        const telefone = estado.patient.alteracao_telefone.telefone;
+        estado.patient.telefone_confirmado = { paciente_id: "paciente", telefone };
+        estado.patient.alteracao_telefone = null;
+        incluirPacienteNoResumo(estado, "clinica", { id:"paciente",nome:"Ana da Silva",data_nascimento:"1990-01-02",telefone });
+      }
       faltantes = [];
       return { ok: true };
     }
@@ -92,6 +98,36 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
 }
 
 describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
+  test("correção explícita conserva vaga, mostra Telefone e só reserva após novo aceite", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    const vaga = t.estado.appointment.slot_inicio;
+    const r = await t.turno("não é esse telefone, altere para 21988887777, pode marcar");
+    expect(r!.texto).toContain("*Telefone:* 21988887777");
+    expect(r!.texto).not.toContain("WhatsApp de contato");
+    expect(t.estado.appointment.slot_inicio).toBe(vaga);
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(0);
+    await t.turno("confirmo");
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(1);
+  });
+  test("pedido sem número pergunta só DDD e aceita o número na mensagem seguinte", async () => {
+    const t = preparar(); await t.turno("Ana da Silva, 02/01/1990");
+    expect((await t.turno("quero trocar o telefone"))!.texto).toContain("com DDD");
+    expect((await t.turno("21988887777"))!.texto).toContain("*Telefone:* 21988887777");
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(0);
+  });
+  test("pedido de troca com gravação falhando não agenda nem afirma alteração", async () => {
+    const t = preparar(); await t.turno("Ana da Silva, 02/01/1990");
+    t.falhar({ok:false,erro:"INTERNAL_ERROR",mensagem:"Falha simulada"});
+    expect((await t.turno("troque o telefone para 21988887777"))!.texto).toContain("Não consegui atualizar");
+    await t.turno("confirmo");
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(0);
+  });
+  test("telefone de reserva já concluída pode mudar sem nova reserva", async () => {
+    const t = preparar(); await t.turno("Ana da Silva, 02/01/1990"); await t.turno("confirmo");
+    expect((await t.turno("troque o telefone para 21988887777"))!.texto).toContain("Seu agendamento permanece o mesmo");
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(1);
+  });
   test("CPF, endereço e e-mail não são necessários", () => {
     expect(
       cadastroMinimoSchema.safeParse({

@@ -39,7 +39,7 @@ export function incluirPacienteNoResumo(estado: EstadoFluxoNina, clinicaId: stri
   if (!c || JSON.stringify(c.cadastro) === JSON.stringify(cadastro)) return;
   c.resumo_sem_paciente ??= c.resumo;
   c.cadastro = { ...cadastro };
-  c.resumo = `*Paciente:* ${cadastro.nome}\n*Data de nascimento:* ${cadastro.data_nascimento.split("-").reverse().join("/")}\n*WhatsApp de contato:* ${cadastro.telefone}\n\n${c.resumo_sem_paciente}`;
+  c.resumo = `*Paciente:* ${cadastro.nome}\n*Data de nascimento:* ${cadastro.data_nascimento.split("-").reverse().join("/")}\n*Telefone:* ${cadastro.telefone}\n\n${c.resumo_sem_paciente}`;
   c.aceita = false;
   estado.appointment.slot_confirmed_by_patient = false;
   estado.appointment.intent_confirmed = false;

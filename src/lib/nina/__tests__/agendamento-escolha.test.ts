@@ -41,7 +41,7 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
     const resumo = e.appointment.confirmation!.resumo;
     expect(resumo).toContain("SOFIA LIMA ROCHA");
     expect(resumo).toContain("14/02/2023");
-    expect(resumo).toContain("WhatsApp de contato:* 21999990000");
+    expect(resumo).toContain("Telefone:* 21999990000");
     expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: anterior }])).toBe(false);
     expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: resumo }])).toBe(true);
     incluirPacienteNoResumo(e, "clinica", filha);

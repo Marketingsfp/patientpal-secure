@@ -44,6 +44,6 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         ).not.toContain("999");
         const chamadas = r.requests[0].messages;
         expect(JSON.stringify(chamadas)).toContain("Perguntas independentes");
-        expect(JSON.stringify(chamadas)).toContain("WhatsApp de contato é sempre o número do remetente");
+        expect(JSON.stringify(chamadas)).toContain("telefone de contato usa por padrão o número do remetente");
       });
 });

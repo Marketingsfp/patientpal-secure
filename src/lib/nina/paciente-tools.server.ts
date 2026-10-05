@@ -43,8 +43,7 @@ import { agendasDoProcedimento, resolverProcedimentoOperacional, VinculoProcedim
 import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 import { pedidoConsultaComPreventivo } from "./atendimento-consulta";
-import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
-import { normalizarTelefone } from "@/lib/atendimento/telefone";
+import { consultarCadastroConfirmado, alterarTelefoneSolicitado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
   vagasDaSessao, vagasDaEscolha, lerEscolhaHorario, incluirPacienteNoResumo, type VagaAgendamento } from "./agendamento-escolha";
@@ -942,14 +941,14 @@ export const FERRAMENTAS_NINA_AGENDAMENTO = [
     function: {
       name: "identificar_paciente",
       description:
-        "Após escolher procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS antes da confirmação final do agendamento. Peça apenas nome, data de nascimento e telefone que estiverem faltando; aproveite o telefone do WhatsApp. CPF é opcional, nunca solicite. Cruza nome completo, nascimento e telefone do WhatsApp para distinguir homônimos. Reutiliza o ID correspondente; só cria cadastro se não houver candidato compatível. Ambiguidade ou divergência exige conferência humana, sem duplicar. Cadastro confirmado é reutilizado e apenas campos vazios podem ser completados.",
+        "Após escolher procedimento, profissional e vaga, confere ou cadastra o paciente no Clínica OS antes da confirmação final do agendamento. Peça apenas nome completo e nascimento faltantes; use o telefone da conversa por padrão, inclusive para dependentes. CPF é opcional, nunca solicite. Cruza nome completo, nascimento e telefone para distinguir homônimos. Reutiliza o ID correspondente; só cria cadastro se não houver candidato compatível. Ambiguidade ou divergência exige conferência humana, sem duplicar. Pode aplicar correção de telefone explicitamente solicitada na mensagem do paciente e registrada pelo núcleo. Não ofereça trocar o telefone. Após correção, apresente o resumo atualizado e aguarde novo aceite antes de agendar.",
       parameters: {
         type: "object",
         properties: {
           cpf: { type: "string" },
           nome: { type: "string", description: "Nome completo" },
           data_nascimento: { type: "string", description: "AAAA-MM-DD" },
-          telefone: { type: "string", description: "Só quando não houver telefone do WhatsApp ou do cadastro confirmado" },
+          telefone: { type: "string", description: "O núcleo resolve o telefone da conversa ou a correção explicitamente solicitada pelo paciente; este argumento não autoriza alteração cadastral." },
         },
         additionalProperties: false,
       },
@@ -2127,7 +2126,7 @@ async function executarFerramentaInterna(
         const p = cadastroMinimoSchema.safeParse({
           nome: nomeInformado ? entrada.nome : cadastro.dados.nome || entrada.nome,
           data_nascimento: nascimentoInformado ? entrada.data_nascimento : outroPaciente ? undefined : cadastro.dados.data_nascimento || entrada.data_nascimento,
-          telefone: normalizarTelefone(ctx.telefone ?? ctx.estado?.whatsapp_remetente),
+          telefone: cadastro.dados.telefone,
         });
         if (!p.success) return falha("PATIENT_DATA_REQUIRED", "Ainda faltam dados obrigatórios válidos.", {
           campos_faltantes: [...new Set(p.error.issues.map(i => String(i.path[0])))],
@@ -2139,7 +2138,12 @@ async function executarFerramentaInterna(
         // dentro da simulação, sem substituir por um paciente fixo do lead.
         // CPF não identifica nem cadastra (regra da clínica, 25/09/2026): a
         // identidade é o número do WhatsApp, o nome completo e o nascimento.
-        const { data, error } = await supabaseAdmin.rpc("nina_resolver_cadastro", {
+        const contatoCorrigido = cadastro.confirmado && (ctx.estado?.patient.telefone_confirmado?.paciente_id === ctx.pacienteId ||
+          ctx.estado?.patient.alteracao_telefone?.paciente_id === ctx.pacienteId) &&
+          normalizar(dados.nome) === normalizar(cadastro.dados.nome ?? "") && dados.data_nascimento === cadastro.dados.data_nascimento;
+        const { data, error } = contatoCorrigido
+          ? { data: { ok: true, paciente_id: ctx.pacienteId, criado: false }, error: null }
+          : await supabaseAdmin.rpc("nina_resolver_cadastro", {
           _clinica_id: ctx.clinicaId,
           _conversa_id: ctx.conversaId,
           _cpf: null,
@@ -2198,6 +2202,8 @@ async function executarFerramentaInterna(
           ok: true,
           id: r.paciente_id,
         });
+        if (!await alterarTelefoneSolicitado(ctx, dados))
+          return falha("INTERNAL_ERROR", "Não foi possível atualizar o telefone com segurança.");
         if (ctx.estado) incluirPacienteNoResumo(ctx.estado, ctx.clinicaId, { id: r.paciente_id, ...dados });
         return {
           ok: true,

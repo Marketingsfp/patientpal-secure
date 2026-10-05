@@ -45,6 +45,9 @@ export type EstadoFluxoNina = {
   /** Contato do remetente registrado pelo transporte; pode pertencer ao responsável. */
   whatsapp_remetente?: string | null;
   patient: {
+    /** Pedido explícito, separado do remetente e dos argumentos produzidos pelo modelo. */
+    alteracao_telefone?: { telefone: string | null; paciente_id: string | null; mensagem: string } | null;
+    telefone_confirmado?: { paciente_id: string; telefone: string } | null;
     id: string | null;
     /** Primeiro nome apenas — o suficiente para tratar a pessoa pelo nome. */
     first_name: string | null;

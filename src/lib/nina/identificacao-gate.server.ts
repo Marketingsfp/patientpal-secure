@@ -54,6 +54,7 @@ import { respostaFalhaAgendamento } from "./falha-agendamento";
 export const TEXTO_ENCAMINHADO_FALHA =
   "Vou encaminhar sua conversa para nossa equipe, que continuará o atendimento por aqui.";
 import { reservaDaSessaoAtual } from "./agendamento-sessao";
+import { registrarPedidoTelefone, PEDIR_TELEFONE } from "./telefone-paciente";
 
 /* ------------------------------------------------------------ confirmações */
 
@@ -282,6 +283,20 @@ export async function aplicarGateIdentificacao(params: {
   const p = estado.patient;
   const mensagemAceite = aceiteParaPacienteIdentificado(mensagem, ctx);
   if (estado.flow.stage === "HANDOFF") return null;
+  const corrigindoTelefone = registrarPedidoTelefone(estado, mensagem);
+  if (p.alteracao_telefone?.telefone === null)
+    return criarResultado({ origem: "gate", texto: PEDIR_TELEFONE, restricoes: ["aguardar_telefone_solicitado", "nao_agendar"] });
+  // Corrigir contato não é recusar a vaga nem confirmar o resumo anterior.
+  if (p.alteracao_telefone && p.validated && p.id && confirmacaoDaEscolha(estado, ctx.clinicaId) && !declaracaoDePaciente(mensagem)) {
+    const etapa = estado.flow.stage;
+    const r = await executar(ctx, "identificar_paciente", {});
+    if (!r.ok) return criarResultado({ origem: "erro", texto: "Não consegui atualizar o telefone agora. Seu agendamento não foi alterado. Tente novamente.", restricoes: ["nao_agendar", "nao_afirmar_telefone_alterado"] });
+    estado.flow.stage = a.appointment_id ? etapa : "WAITING_FINAL_CONFIRMATION";
+    return criarResultado({ origem: "gate", texto: a.appointment_id
+      ? `Telefone atualizado para ${p.telefone_confirmado?.telefone}. Seu agendamento permanece o mesmo.`
+      : confirmacaoDaEscolha(estado, ctx.clinicaId)!.resumo,
+      fatosConfirmados: ["telefone_atualizado"], restricoes: ["aguardar_aceite_do_resumo"] });
+  }
   if (a.appointment_id) {
     if (reservaDaSessaoAtual(estado) &&
       ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga)) {
@@ -333,14 +348,14 @@ export async function aplicarGateIdentificacao(params: {
   };
   let selecionouAgora = params.aposSelecao === true;
   const cadastroProntoNoInicio = Boolean(p.identified && p.validated && p.id);
-  let aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
+  let aceiteDaVaga = !corrigindoTelefone && !p.alteracao_telefone && !selecionouAgora && ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
   let escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
   const opcoes = vagasDaSessao(estado, ctx.clinicaId);
   // Jev Fase 7: só quando as regras não entenderam a resposta a um resumo ou
   // a uma lista de horários. Escolhe apenas entre opções oferecidas; abaixo
   // de 80% nada muda. A gravação continua dependendo do sistema.
   let vagaDoJev: (typeof opcoes)[number] | null = null;
-  if (!selecionouAgora && !aceiteDaVaga && !escolha && !a.confirmation?.aceita && !ehNegacao(mensagem)) {
+  if (!corrigindoTelefone && !p.alteracao_telefone && !selecionouAgora && !aceiteDaVaga && !escolha && !a.confirmation?.aceita && !ehNegacao(mensagem)) {
     const resumo = confirmacaoDaEscolha(estado, ctx.clinicaId);
     const situacao = resumo && !consentimentoDaEscolha(estado, ctx.clinicaId)
       ? { tipo: "resumo" as const, vaga: resumo.vaga, resumo: resumo.resumo }
@@ -398,7 +413,7 @@ export async function aplicarGateIdentificacao(params: {
   }
   // "Prefiro 08:10" é uma escolha já validada, não uma recusa que a apaga.
   // Negativas sem seleção válida continuam suspendendo o fluxo.
-  if (!selecionouAgora && ehNegacao(mensagem)) {
+  if (!corrigindoTelefone && !p.alteracao_telefone && !selecionouAgora && ehNegacao(mensagem)) {
     limparEscolhaAgendamento(estado);
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "CHOOSING_SLOT";
@@ -422,7 +437,7 @@ export async function aplicarGateIdentificacao(params: {
     : aceiteDaVaga || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
   if (
     !aceiteDaVaga &&
-    pareceAssuntoParalelo(mensagem) &&
+    !p.alteracao_telefone && pareceAssuntoParalelo(mensagem) &&
     !novo?.data_nascimento &&
     !novo?.telefone
   )
@@ -439,6 +454,8 @@ export async function aplicarGateIdentificacao(params: {
   const mudouPaciente = Boolean(novo?.nome && nomeAtual && compararNome(novo.nome) !== compararNome(nomeAtual));
   const mudouNascimento = Boolean(novo?.data_nascimento && dadosConfirmados?.data_nascimento && novo.data_nascimento !== dadosConfirmados.data_nascimento);
   if ((mudouPaciente || mudouNascimento) && novo) {
+    if (p.alteracao_telefone?.paciente_id) p.alteracao_telefone = null;
+    p.telefone_confirmado = null;
     // Uma declaração nova não pode herdar nome/nascimento da pessoa anterior.
     p.pending = { nome: novo.nome ?? p.pending.nome, data_nascimento: novo.data_nascimento ?? null, cpf: null };
     resumoEscolhido.aceita = false;

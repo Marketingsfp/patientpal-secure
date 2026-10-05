@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente } from "../paciente-tools.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
+import { registrarPedidoTelefone } from "../telefone-paciente";
 type Linha = Record<string, unknown>;
 let banco: Record<string, Linha[]>;
 let retornoRpc: Linha;
@@ -12,6 +13,12 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     rpc: async (nome: string, args: Linha) => {
       rpcs.push({ nome, args });
+      if (nome === "nina_alterar_telefone_paciente") {
+        if (!retornoRpc.ok) return { data: retornoRpc, error: null };
+        const paciente = banco.pacientes!.find(p => p.id === args._paciente_id)!;
+        paciente.telefone = args._telefone_novo;
+        return { data: { ok: true, paciente_id: paciente.id, telefone: paciente.telefone }, error: null };
+      }
       return { data: retornoRpc, error: null };
     },
     from: (tabela: string) => {
@@ -120,6 +127,31 @@ beforeEach(() => {
 });
 
 describe("executor do cadastro com banco simulado", () => {
+  test.each([false, true])("correção explícita preserva ID e remetente; confirmação seguinte reutiliza telefone corrigido (teste=%s)", async teste => {
+    const ctx = contexto(teste); vincular(ctx, { is_mock_data: teste, teste });
+    registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {});
+    expect(r.ok).toBe(true);
+    expect(rpcs.map(r => r.nome)).toEqual(["nina_alterar_telefone_paciente"]);
+    expect(rpcs[0]!.args).toMatchObject({ _paciente_id: "paciente", _telefone_anterior: "21999990000", _telefone_novo: "21988887777" });
+    expect(ctx.telefone).toBe("5521999990000");
+    expect(ctx.estado!.appointment.confirmation!.resumo).toContain("*Telefone:* 21988887777");
+    expect(ctx.estado!.appointment.confirmation!.aceita).toBe(false);
+    expect(ctx.estado!.patient.alteracao_telefone).toBeNull();
+    rpcs.length = 0;
+    expect((await executarFerramentaPaciente(ctx, "identificar_paciente", {})).ok).toBe(true);
+    expect(rpcs).toHaveLength(0);
+    expect(ctx.estado!.appointment.confirmation!.resumo).toContain("21988887777");
+  });
+  test("falha na gravação não confirma alteração e mantém pedido para retry", async () => {
+    const ctx = contexto(); vincular(ctx);
+    registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
+    retornoRpc = { ok: false };
+    expect((await executarFerramentaPaciente(ctx, "identificar_paciente", {})).ok).toBe(false);
+    expect(ctx.estado!.patient.telefone_confirmado).toBeUndefined();
+    expect(ctx.estado!.patient.alteracao_telefone?.telefone).toBe("21988887777");
+    expect(banco.pacientes![0]!.telefone).toBe("21999990000");
+  });
   test("ferramenta não completa o nascimento da filha com o do responsável", async () => {
     const ctx = contexto(); vincular(ctx);
     ctx.estado!.patient.pending = { nome: "Sofia Lima Rocha", data_nascimento: null, cpf: null };

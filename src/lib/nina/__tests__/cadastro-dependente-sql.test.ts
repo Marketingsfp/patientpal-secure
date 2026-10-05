@@ -18,9 +18,10 @@ beforeAll(async () => {
     CREATE TABLE pacientes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), clinica_id uuid, nome text, data_nascimento date,
       telefone text, telefone2 text, cpf text, cpf_digits text, sexo text, ativo boolean DEFAULT true,
       is_mock_data boolean DEFAULT false, teste boolean DEFAULT false);
-    CREATE TABLE audit_log(clinica_id uuid, table_name text, record_id uuid, action text, dados_depois jsonb);
+    CREATE TABLE audit_log(clinica_id uuid, table_name text, record_id uuid, action text, dados_antes jsonb, dados_depois jsonb);
   `);
   await db.exec(readFileSync("supabase/migrations/20261005190000_nina_cadastro_dependente_whatsapp.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migrations/20261005210000_nina_alterar_telefone_paciente.sql", "utf8"));
 }, 30000);
 afterAll(async () => { await db.close(); });
 beforeEach(async () => {
@@ -33,6 +34,48 @@ async function resolver(nome = "Sofia Lima Rocha", nascimento = "2023-02-14", te
   return rows[0]!.resultado;
 }
 async function pacientes() { return (await db.query<Record<string, unknown>>("SELECT * FROM pacientes ORDER BY nome")).rows; }
+
+async function trocar(id: string, tel = "21988887777", anterior = telefone, cid = clinica) {
+  return (await db.query<{ r: {ok: boolean; erro?: string} }>(
+    "SELECT nina_alterar_telefone_paciente($1,$2,$3,'SOFIA LIMA ROCHA','2023-02-14',$4,$5,'troque o telefone para 21988887777') r",
+    [cid, conversa, id, anterior, tel])).rows[0]!.r;
+}
+test.each([false, true])("correção atômica só do contato com auditoria e repetição segura (teste=%s)", async teste => {
+  await db.query("UPDATE atend_conversas SET is_teste=$1", [teste]);
+  const r = await resolver(); const id = r.paciente_id!;
+  await db.exec("UPDATE pacientes SET telefone2='2133334444'");
+  const antes = (await pacientes())[0]!;
+  expect(await trocar(id)).toMatchObject({ok:true});
+  expect((await pacientes())[0]).toEqual({...antes, telefone:"21988887777"});
+  expect((await db.query<{contato_telefone:string}>("SELECT contato_telefone FROM atend_conversas")).rows[0]!.contato_telefone).toBe(`55${telefone}`);
+  expect(await trocar(id)).toMatchObject({ok:true});
+  const logs = (await db.query<{dados_antes:unknown;dados_depois:Record<string,unknown>}>("SELECT dados_antes,dados_depois FROM audit_log WHERE action='NINA_TELEFONE_ALTERADO'")).rows;
+  expect(logs).toHaveLength(1);
+  expect(logs[0]!.dados_antes).toEqual({telefone});
+  expect(logs[0]!.dados_depois).toMatchObject({telefone:"21988887777",origem:teste?"nina_homologacao":"nina_whatsapp"});
+});
+test("alteração concorrente, clínica errada e paciente não vinculado não são sobrescritos", async () => {
+  const r = await resolver(); const id = r.paciente_id!;
+  expect((await trocar(id,"21988887777","11900000000")).ok).toBe(false);
+  expect((await trocar(id,"21988887777",telefone,outra)).ok).toBe(false);
+  expect((await trocar(outra)).ok).toBe(false);
+  expect((await pacientes())[0]!.telefone).toBe(telefone);
+  await db.exec("UPDATE atend_conversas SET identidade_confirmada=false");
+  expect((await trocar(id)).ok).toBe(false);
+});
+test("homologação nunca altera telefone de paciente real vinculado por engano", async () => {
+  const r = await resolver();
+  await db.exec("UPDATE atend_conversas SET is_teste=true");
+  expect((await trocar(r.paciente_id!)).ok).toBe(false);
+  expect((await pacientes())[0]!.telefone).toBe(telefone);
+});
+test("falha da auditoria reverte a mudança do telefone", async () => {
+  const r = await resolver();
+  await db.exec("ALTER TABLE audit_log ADD CONSTRAINT bloquear_teste CHECK (action <> 'NINA_TELEFONE_ALTERADO')");
+  try { await expect(trocar(r.paciente_id!)).rejects.toThrow(); }
+  finally { await db.exec("ALTER TABLE audit_log DROP CONSTRAINT bloquear_teste"); }
+  expect((await pacientes())[0]!.telefone).toBe(telefone);
+});
 
 test.each([false, true])("filha usa WhatsApp do responsável, cria uma vez e reutiliza (homologação=%s)", async teste => {
   await db.query("UPDATE atend_conversas SET is_teste=$1", [teste]);
