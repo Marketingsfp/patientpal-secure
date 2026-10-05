@@ -15,6 +15,16 @@ const fotoCenario = process.argv[3]?.startsWith("foto_");
 const { PEDIR_NOVA_FOTO } = await import("../../fotos");
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const progressoLongo = cenario.startsWith("progresso_longo");
+const conferencias: any[] = [];
+if (cenario.includes("_jev_")) mock.module("@/lib/nina/jev.server", () => ({
+  jevAtivo: async (_clinica: string, fase: string) => fase === "fase6_conferencia",
+  conferirRespostaJev: async (ctx: any) => {
+    conferencias.push(structuredClone(ctx));
+    return !ctx.jaCorrigida ? { acao: "refazer", instrucao: "Corrija apenas o valor sem novas consultas ou ações." }
+      : { acao: cenario.endsWith("reprovada") ? "bloquear" : "enviar" };
+  },
+}));
 const linkCenario = cenario.includes("_links_");
 const pedidoConsulta = cenario.includes("_pedido_consulta");
 const pedidoCenario = cenario.includes("_pedido_");
@@ -316,7 +326,7 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
     return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
 }));
-mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") }));
+mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") || (progressoLongo && !cenario.endsWith("informativo")) }));
 mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase6.server", () => ({ flagFluxoFase6Ativa: async () => false }));
@@ -458,6 +468,16 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
       reused: false, appointment_confirmed: false, erro: "MODALIDADE_NAO_DEFINIDA", dados: { ok: false },
     };
+    if (nome === "consultar_cadastro" && progressoLongo) return {
+      ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "base_conhecimento", success: true,
+      reused: false, appointment_confirmed: false,
+      dados: { ok: true, records: [{ id: `atendimento-${requests.length}`, preco_cartao: 145 }] },
+    };
+    if (nome === "consultar_disponibilidade" && progressoLongo) return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: true,
+      reused: false, appointment_confirmed: false,
+      dados: { ok: true, horarios: [{ data: `2030-01-${10 + requests.length}`, hora: "10:00" }] },
+    };
     if (nome === "consultar_disponibilidade" && agenda) {
       return { ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda",
         success: cenario !== "falha_consulta", reused: false, appointment_confirmed: false,
@@ -527,6 +547,18 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (progressoLongo) return {
+    ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "medium",
+    conteudo: requests.length > 8 ? "Encontrei horários às 10:00 nos dias consultados. Qual data você prefere?" : "",
+    toolCalls: requests.length <= 8 ? [{ id: `progresso-${requests.length}`, type: "function", function: {
+      name: cenario.endsWith("informativo") ? "consultar_cadastro" : "consultar_disponibilidade",
+      arguments: JSON.stringify(cenario.endsWith("informativo") ? { termo: `atendimento-${requests.length}` } : { medico_id: "jorge", data: `2030-01-${10 + requests.length}` }),
+    } }] : [],
+  };
+  if (cenario.startsWith("resposta_vazia")) return {
+    ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
+    conteudo: requests.length > 1 && cenario === "resposta_vazia_recuperada" ? "Posso ajudar com as informações da consulta." : "",
+  };
   if (perguntasMultiplas) {
     const chamada = (termo: string, medico: string, id: string) => ({ id, type: "function", function: {
       name: "consultar_cadastro", arguments: JSON.stringify({ termo, medico, tipo_atendimento: "consulta", nova_solicitacao: true }) } });
@@ -699,7 +731,7 @@ await registrarEntregaSaida({
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
   resposta, respostaModelo, resumoEscolhido, prompt, pergunta, motorChamado, rede, requests, ferramentas, consultas, ordem, argumentosFerramentas, estadoPerguntas,
   temNota: auditoria.decisaoId != null, gravacoes,
-  encaminhamentos, resultados,
+  encaminhamentos, resultados, conferencias,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],
   finalizacao: auditoria.finalizacao,
   resultado: auditoria.resultado,

@@ -792,7 +792,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
           especialidade: { type: "string" },
           medico_id: {
             type: "string",
-            description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
+            description: "medico_id de vinculos_agenda devolvido por consultar_cadastro ou buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           data: { type: "string", description: "AAAA-MM-DD, quando o paciente pediu um dia" },
           periodo: { type: "string", enum: ["madrugada", "manha", "tarde", "noite", "qualquer"], description: "Preferência do paciente: madrugada (00h-04h59), manha (05h-11h59; também \"mais cedo\"), tarde (12h-17h59; também \"depois do almoço\"), noite (18h-23h59) ou qualquer (\"tanto faz\", \"qualquer período\": primeiros horários do dia)." },
@@ -814,7 +814,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         properties: {
           medico_id: {
             type: "string",
-            description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
+            description: "medico_id de vinculos_agenda devolvido por consultar_cadastro ou buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           data: { type: "string", description: "AAAA-MM-DD já resolvida (hoje/amanhã viram data)" },
           hora: { type: "string", description: "HH:MM, ex.: 15:00" },
@@ -850,7 +850,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         properties: {
           medico_id: {
             type: "string",
-            description: "medico_id de vinculos_agenda devolvido por buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
+            description: "medico_id de vinculos_agenda devolvido por consultar_cadastro ou buscar_medicos OU nome do profissional escolhido. catalogo_id/id do registro de conhecimento não é o UUID operacional.",
           },
           especialidade: { type: "string" },
           a_partir_de: { type: "string", description: "AAAA-MM-DD (padrão: hoje)" },
@@ -1417,10 +1417,29 @@ async function executarFerramentaInterna(
         }
         if (resultado.esclarecimento) ctx.esclarecimentoCatalogo = resultado.esclarecimento;
         lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, resultado, p.nova_solicitacao);
+        // O retorno já foi filtrado por atendimento, médico e dia. Resolver
+        // somente estes vínculos evita outra rodada de busca ampla pelo modelo.
+        let vinculos: Awaited<ReturnType<typeof vincularProfissionaisCatalogo>> = [];
+        let vinculosIndisponiveis = false;
+        if (resultado.found && !resultado.esclarecimento && resultado.knowledge_status !== "conflict") {
+          try {
+            vinculos = await vincularProfissionaisCatalogo(ctx.clinicaId, resultado.records);
+          } catch {
+            // Identidade operacional indisponível não apaga fatos do catálogo.
+            // A consulta de agenda continuará exigindo vínculo validado.
+            vinculosIndisponiveis = true;
+            const { registrarEtapa } = await import("./evidencias.server");
+            registrarEtapa({ tipo: "consulta", fonte: "agenda", titulo: "Vínculos de agenda indisponíveis; catálogo preservado",
+              dados: { consulta_de_vagas: false, erro: "VINCULOS_AGENDA_INDISPONIVEIS" },
+              codigo: { arquivo: "src/lib/nina/paciente-tools.server.ts", funcao: "executarFerramentaPaciente" } });
+          }
+        }
         // Consulta de leitura: `price` resume o primeiro resultado e pode ser
         // de outro serviço, profissional ou forma de pagamento. Não é o preço
         // do atendimento selecionado e não pode sobrescrever seu estado.
         return { ok: true, ...resultado,
+          ...(vinculos.length ? { vinculos_agenda: vinculos } : {}),
+          ...(vinculosIndisponiveis ? { vinculos_agenda_erro: "VINCULOS_AGENDA_INDISPONIVEIS" } : {}),
           pedido_interpretado: { atendimento: p.termo,
             tipo_atendimento: resultado.tipo_atendimento ?? p.tipo_atendimento ?? "nao_identificado",
             objetivos: p.objetivos ?? ["informacoes_gerais"] } };

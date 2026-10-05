@@ -32,14 +32,14 @@ describe("Reasoning Router — MEDIUM", () => {
 describe("Reasoning Router — HIGH (raro)", () => {
   it("conflito de ferramenta sobe para HIGH", () =>
     expect(nivel("Quero sábado", { houveConflito: true })).toBe("high"));
-  it("várias ferramentas interdependentes sobe para HIGH", () =>
+  it("sequência normal de catálogo e agenda não sobe para HIGH só por quantidade", () =>
     expect(
       nivel("Quero sábado", {
-        rodada: 2,
-        ferramentasExecutadas: 2,
-        nomesFerramentas: ["disponibilidade", "buscar_paciente"],
+        rodada: 12,
+        ferramentasExecutadas: 12,
+        nomesFerramentas: ["consultar_cadastro", "buscar_medicos", "consultar_disponibilidade"],
       }),
-    ).toBe("high"));
+    ).toBe("medium"));
   it("pergunta clínica fora de escopo NÃO vira HIGH", () =>
     expect(nivel("Estou com dor no peito, o que devo tomar?")).not.toBe("high"));
 });

@@ -5,6 +5,7 @@
  * Flag `nina_jev_fase6`. Erro/demora = resposta segue como hoje.
  */
 import type { PerguntaJev, RespostaJev } from "./jev";
+import { REGRA_MODALIDADES_PAGAMENTO } from "./eficiencia-turno";
 
 export const LIMITE_CONFERENCIA = 0.7;
 const LIMITE_DADOS = 12_000;
@@ -47,7 +48,7 @@ export function perguntasConferencia(fatos: FatosTurno): Record<string, Pergunta
     p.dado_sem_fonte = {
       type: "noul",
       instructions:
-        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados.",
+        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. " + REGRA_MODALIDADES_PAGAMENTO,
     };
   return p;
 }

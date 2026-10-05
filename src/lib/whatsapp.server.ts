@@ -1388,6 +1388,12 @@ async function gerarRespostaNinaInterno(
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
   const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
+  const { criarProgressoTurno, criarCompactadorRetornos, REGRA_EFICIENCIA_CONSULTAS, REGRA_MODALIDADES_PAGAMENTO, RESPOSTA_SEM_PROGRESSO } =
+    await import("@/lib/nina/eficiencia-turno");
+  instrucoesAdicionaisTurno.push(
+    { codigo: "CONSULTAS_SEM_REDUNDANCIA", origem: "src/lib/nina/eficiencia-turno.ts", motivo: "Reutilizar vínculos oficiais sem repetir pesquisas.", texto: REGRA_EFICIENCIA_CONSULTAS },
+    { codigo: "PAGAMENTO_COMPROVADO", nivel: "inegociavel", origem: "src/lib/nina/eficiencia-turno.ts", motivo: "Regra confirmada pelo responsável: Pix e cartão têm sempre o mesmo valor.", texto: REGRA_MODALIDADES_PAGAMENTO },
+  );
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
   instrucoesAdicionaisTurno.push({ codigo: "FORMATO_AUDIO", origem: "src/lib/nina/audio.ts",
     motivo: "O transporte responde em voz a áudio ou pedido explícito.", texto: REGRA_RESPOSTA_AUDIO });
@@ -1851,7 +1857,8 @@ async function gerarRespostaNinaInterno(
       modelParameters: {
         perfil: "whatsapp",
         pode_agendar: podeAgendar,
-        max_rodadas: podeAgendar ? 6 : 3,
+        max_rodadas: null,
+        controle_progresso: "novidade_dos_retornos",
         mensagens_contexto: mensagens.length,
       },
       toolSchemas: (ferramentas ?? []).map((f) => {
@@ -1884,17 +1891,14 @@ async function gerarRespostaNinaInterno(
   // FASE 2 — fatos concretos e consultas do turno (com retry consolidado).
   const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
   const consultasDoTurno: import("@/lib/nina/confidence/evidencia").ConsultaDoTurno[] = [];
-  // FASE 4 — desfecho explícito quando o laço termina sem resposta textual.
-  let limiteRodadasAtingido = false;
+  let semRespostaAposSintese = false;
+  let modoSintese: "sem_progresso" | "correcao" | null = null;
+  const progressoTurno = criarProgressoTurno();
+  const compactarRetorno = criarCompactadorRetornos();
   // Modalidade publicada ("atendimento agendado") não é uma reserva do
   // paciente. Uma afirmação real de reserva continua exigindo confirmação.
   const { afirmaOuPrometeAgendamento } = await import("@/lib/nina/afirmacao-agendamento");
-  const MAX_RODADAS = podeAgendar ? 6 : 3;
   let agendaComOpcoes = false;
-  const consultasSemOperacao = new Set([
-    "consultar_cadastro", "buscar_medicos", "buscar_procedimentos", "listar_especialidades",
-    "consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel",
-  ]);
   // Estado do turno para o Reasoning Router (Fase 2).
   const nomesFerramentasTurno: string[] = [];
   let conflitoFerramenta = false;
@@ -2245,7 +2249,7 @@ async function gerarRespostaNinaInterno(
   const conferenciaJevAtiva = await import("@/lib/nina/jev.server")
     .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
     .catch(() => false);
-  for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
+  for (let rodada = 0; ; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
     if (perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo) {
       resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
@@ -2271,17 +2275,12 @@ async function gerarRespostaNinaInterno(
     await conferirReserva();
     if (rastro && rodada > 0) rastro.novoCiclo();
     rastro?.iniciar("llm.generate", { rodada });
-    // Se o modelo consumiu as consultas sem responder, reserva a última
-    // rodada para explicar os fatos já obtidos e perguntar o próximo passo.
-    // Não aplica a operações/cadastro nem converte falhas em disponibilidade.
-    // Sem agenda (modo que só informa), consultas ao cadastro que esgotam as
-    // rodadas sem texto também viram resposta com os fatos, não transferência.
-    const sintetizarOpcoes = rodada === MAX_RODADAS - 1 && (agendaComOpcoes || !podeAgendar || Boolean(ctxFerramentas?.esclarecimentoCatalogo)) &&
-      nomesFerramentasTurno.length > 0 &&
-      nomesFerramentasTurno.every(nome => consultasSemOperacao.has(nome));
-    if (sintetizarOpcoes) mensagens.push({ role: "system", content: agendaComOpcoes
+    // Rodadas com dados novos continuam. Repetição sem novidade pede síntese;
+    // correções de texto também não autorizam ferramentas ou escritas extras.
+    const sintetizarOpcoes = modoSintese !== null;
+    if (modoSintese === "sem_progresso") mensagens.push({ role: "system", content: agendaComOpcoes
       ? "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes."
-      : "Conclua esta resposta com os dados já retornados pelas consultas ao cadastro neste turno. Não faça novas consultas. Responda ao pedido atual do paciente com os fatos publicados (profissionais, dias e horários habituais, modalidade e valores) e ofereça o próximo passo. Se algum dado pedido não veio nas consultas, diga que não tem essa informação e ofereça encaminhar à equipe. Não invente fatos ausentes." });
+      : "As últimas consultas não trouxeram informação nova. Conclua com os fatos confirmados deste turno e preserve todas as perguntas independentes. Peça esclarecimento apenas sobre o item incerto. Falha técnica não significa dado ausente ou falta de vaga. Não faça novas consultas, não afirme operação sem gravação confirmada e não invente fatos ausentes." });
     const respostaIA = await ninaAIGateway({
       clinicaId,
       perfil: "whatsapp",
@@ -2379,12 +2378,13 @@ async function gerarRespostaNinaInterno(
       if (c.function) c.function.name = nomeAtualDaFerramenta(String(c.function.name ?? ""));
     }
     if (sintetizarOpcoes && (chamadas.length > 0 || !(msg.content ?? "").trim())) {
-      limiteRodadasAtingido = true;
+      semRespostaAposSintese = true;
       break;
     }
 
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
+      if (!texto) { modoSintese = "sem_progresso"; continue; }
       // ---------------- defesa contra falso sucesso ----------------
       // O modelo afirmou uma reserva sem gravação confirmada. A tentativa
       // de correção não constitui autorização para criar um agendamento.
@@ -2392,10 +2392,10 @@ async function gerarRespostaNinaInterno(
         podeAgendar &&
         !agendamentoConfirmado &&
         afirmaOuPrometeAgendamento(texto) &&
-        !correcaoFalsoSucessoUsada &&
-        rodada < MAX_RODADAS - 1
+        !correcaoFalsoSucessoUsada
       ) {
         correcaoFalsoSucessoUsada = true;
+        modoSintese = "correcao";
         console.warn("[NINA_APPOINTMENT] falso sucesso bloqueado", {
           conversa_id: estadoId.conversaId,
           texto: texto.slice(0, 200),
@@ -2437,8 +2437,9 @@ async function gerarRespostaNinaInterno(
           },
           jaCorrigida: conferenciaJevUsada,
         });
-        if (decisao.acao === "refazer" && rodada < MAX_RODADAS - 1) {
+        if (decisao.acao === "refazer" && !conferenciaJevUsada) {
           conferenciaJevUsada = true;
+          modoSintese = "correcao";
           mensagens.push({ role: "assistant", content: texto });
           mensagens.push({ role: "system", content: decisao.instrucao });
           continue;
@@ -2462,6 +2463,7 @@ async function gerarRespostaNinaInterno(
 
 
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
+    let houveProgresso = false;
     for (const c of chamadas) {
       const nome = String(c.function?.name ?? "");
       if (c.function) {
@@ -2513,6 +2515,7 @@ async function gerarRespostaNinaInterno(
 
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
+      houveProgresso = progressoTurno.registrar(nome, r) || houveProgresso;
       if (["consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"].includes(nome)) {
         const dados = r.dados as Record<string, unknown> | null;
         agendaComOpcoes = r.success && !r.erro && dados?.ok === true &&
@@ -2558,7 +2561,7 @@ async function gerarRespostaNinaInterno(
       mensagens.push({
         role: "tool",
         tool_call_id: c.id,
-        content: JSON.stringify(resultadoCompartilhado),
+        content: JSON.stringify(compactarRetorno(resultadoCompartilhado)),
       });
       if ((r.dados as { codigo?: string } | null)?.codigo === "CATALOGO_QUERY_NAO_INTERPRETADA") {
         // Uma pesquisa recusada não é "não encontrado". Devolve ao modelo
@@ -2668,7 +2671,12 @@ async function gerarRespostaNinaInterno(
       break;
     }
     if (finalizacaoHandoff || resumoEscolha) break;
-    if (rodada === MAX_RODADAS - 1) limiteRodadasAtingido = true;
+    if (!houveProgresso) {
+      modoSintese = "sem_progresso";
+      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Consultas sem informação nova: concluir resposta",
+        dados: { rodada: rodada + 1, motivo: "retornos_repetidos_ou_chamadas_bloqueadas" },
+        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarProgressoTurno" } });
+    }
   }
 
   // Uma pergunta determinística também precisa pertencer à revisão atual.
@@ -2677,39 +2685,21 @@ async function gerarRespostaNinaInterno(
     turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
       revisaoProcessada: opcoes.revisao.valor });
   }
-  // FASE 4 — LIMITE DE RODADAS: desfecho explícito. O último rascunho NÃO
-  // vira resposta entregue; tenta-se a transferência e o paciente recebe a
-  // verdade sobre o que aconteceu.
+  // Ausência de progresso não autoriza transferência nem sucesso fictício.
   if (turnoObsoleto) {
     const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
     registrarOrigemResposta("nenhuma", "turno abortado por revisão obsoleta da conversa");
     return "";
   }
-  if (ctxFerramentas?.esclarecimentoCatalogo && limiteRodadasAtingido) {
+  if (ctxFerramentas?.esclarecimentoCatalogo && semRespostaAposSintese) {
     resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
-    limiteRodadasAtingido = false;
+    semRespostaAposSintese = false;
   }
-  if (limiteRodadasAtingido && resposta.trim() === "") {
-    const rhLimite = await broker
-      .executar(
-        "solicitar_atendente_humano",
-        JSON.stringify({
-          motivo: `LIMITE_RODADAS: ${MAX_RODADAS} rodadas sem resposta textual`,
-          urgencia: "normal",
-        }),
-      )
-      .catch(() => ({ success: false, erro: "handoff_indisponivel" }) as { success: boolean; erro?: string });
-    const { desfechoLimiteRodadas } = await import("@/lib/nina/confidence/desfecho");
-    const desfecho = desfechoLimiteRodadas({
-      handoffConfirmado: rhLimite.success === true,
-      rodadas: MAX_RODADAS,
-      erro: rhLimite.erro ?? null,
-    });
-    if (desfecho.handoffConfirmado) houveHandoff = true;
-    resposta = desfecho.resposta;
+  if (semRespostaAposSintese && resposta.trim() === "") {
+    resposta = RESPOSTA_SEM_PROGRESSO;
     {
       const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
-      registrarOrigemResposta("codigo", `${desfecho.estado}: ${desfecho.explicacao}`);
+      registrarOrigemResposta("codigo", "SEM_PROGRESSO: síntese sem resposta; aguarda escolha do paciente sem transferência automática");
     }
   }
 

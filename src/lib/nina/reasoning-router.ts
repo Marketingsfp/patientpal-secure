@@ -74,15 +74,13 @@ export function selectThinkingLevel(ctx: ContextoRaciocinio): DecisaoRaciocinio 
   const texto = (ctx.mensagem ?? "").trim();
   const rodada = ctx.rodada ?? 0;
   const executadas = ctx.ferramentasExecutadas ?? 0;
-  const distintas = new Set(ctx.nomesFerramentas ?? []).size;
 
   // ---- HIGH: exceção. Só quando o próprio turno mostrou complexidade real.
   if (ctx.houveConflito) {
     return { nivel: "high", motivo: "resultado conflitante ou falha de ferramenta no turno" };
   }
-  if (distintas >= 2 && rodada >= 2) {
-    return { nivel: "high", motivo: "várias ferramentas interdependentes no mesmo turno" };
-  }
+  // Catálogo → vínculo → agenda é uma sequência normal. Contar ferramentas
+  // diferentes não comprova conflito e não justifica subir para HIGH.
 
   const alternativas = contar(texto, PADRAO_ALTERNATIVAS);
   const restricoes = contar(texto, PADRAO_RESTRICAO);

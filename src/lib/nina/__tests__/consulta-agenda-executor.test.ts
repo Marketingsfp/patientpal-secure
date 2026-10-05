@@ -27,6 +27,7 @@ let banco: Record<string, Linha[]>;
 let falharLeituraFicha = false;
 let falharAgendaMedico: string | null = null;
 let falharEscala = false;
+let falharVinculos = false;
 let procedimentoGravadoDivergente = false;
 let resultadoCatalogo: ResultadoConhecimento;
 let cadastroResolvido: { id: string; criado: boolean } | null = null;
@@ -66,6 +67,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
       let faixa: [number, number] | null = null;
       let limite: number | null = null;
       const ler = () => {
+        if (tabela === "medicos" && falharVinculos) throw new Error("Falha simulada de vínculos");
         if (tabela === "medico_disponibilidades" && falharEscala) throw new Error("Falha simulada de escala");
         if (tabela === "agendamentos" && falharAgendaMedico &&
           (filtros.medico_id as string[] | undefined)?.includes(falharAgendaMedico))
@@ -254,6 +256,7 @@ beforeEach(() => {
   cadastroResolvido = null;
   procedimentoGravadoDivergente = false;
   falharEscala = false;
+  falharVinculos = false;
   falharLeituraFicha = false;
   falharAgendaMedico = null;
   leituras.length = 0;
@@ -1297,6 +1300,28 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(futuro.map(s => s.hora)).toEqual(["12:00"]);
     const hoje = await consultarDisponibilidadeCore(pedido, new Date("2026-09-17T16:00:00Z"));
     expect(hoje.map(s => s.hora)).toEqual(["15:00"]);
+  });
+
+  test("consultar_cadastro já entrega o vínculo de agenda sem buscar outros médicos nem consultar vagas", async () => {
+    const r = await executarFerramentaPaciente(contexto("Quero consulta com Alex"), "consultar_cadastro",
+      { termo: "cardiologia", medico: "Alex", tipo_atendimento: "consulta" });
+    expect(r.ok).toBe(true);
+    expect(r.vinculos_agenda).toEqual([expect.objectContaining({ catalogo_id: CATALOGO, medico_id: MEDICO, situacao: "vinculado" })]);
+    expect(r.records).toEqual(resultadoCatalogo.records);
+    expect(pesquisas).toHaveLength(1);
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
+  });
+
+  test("falha na leitura do vínculo preserva as informações confirmadas do catálogo", async () => {
+    falharVinculos = true;
+    const r = await executarFerramentaPaciente(contexto("Qual o valor de cardiologia?"), "consultar_cadastro", { termo: "cardiologia" });
+    expect(r.ok).toBe(true);
+    expect(r.records).toEqual(resultadoCatalogo.records);
+    expect(r.vinculos_agenda).toBeUndefined();
+    expect(r.vinculos_agenda_erro).toBe("VINCULOS_AGENDA_INDISPONIVEIS");
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
   });
 
   test("buscar_medicos separa a identidade do catálogo e a da agenda sem consultar vagas", async () => {
