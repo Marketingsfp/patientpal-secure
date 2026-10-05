@@ -786,7 +786,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "consultar_disponibilidade",
       description:
-        "Consulta vagas REALMENTE livres na agenda do médico escolhido, após solicitação do paciente ou aceite da oferta de verificar vagas. Horários habituais de atendimento vêm do catálogo e dispensam esta consulta. Não usar em uma pergunta geral sobre médicos ou escala. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
+        "Consulta vagas REALMENTE livres na agenda do médico escolhido. Primeiro apresente os dias e horários habituais do catálogo; use esta ferramenta depois que o paciente sinalizar interesse em agendar. Não antecipe a busca na apresentação inicial nem use escala como prova de vaga. Em uma busca de vagas já iniciada, aproveite a preferência sem repetir a apresentação. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
       parameters: {
         type: "object",
         properties: {
@@ -809,7 +809,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "verificar_horario",
       description:
-        "Verifica UMA vaga específica solicitada pelo paciente, com o médico já escolhido ('tem 15h amanhã com o Dr. João?'). Devolve se está livre e, se ocupado, alternativas no mesmo dia. Não consulta escala habitual nem informa quem ocupa a vaga.",
+        "Verifica UMA vaga específica solicitada pelo paciente, com o médico já escolhido ('tem 15h amanhã com o Dr. João?'), depois da apresentação dos horários habituais e do interesse em agendar. Preserve a continuidade de uma busca de vagas já iniciada. Devolve se está livre e, se ocupado, alternativas no mesmo dia. Não consulta escala habitual nem informa quem ocupa a vaga.",
       parameters: {
         type: "object",
         properties: {
@@ -828,7 +828,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     type: "function",
     function: {
       name: "consultar_primeiro_disponivel",
-      description: "Quando o paciente escolher o primeiro disponível/sem preferência de médico, compara as agendas de TODOS os profissionais publicados do atendimento solicitado. Não exige médico definido. Informe o nome oficial do atendimento obtido no catálogo. Retorna a disponibilidade mais próxima, modalidade, orientações e valores próprios do profissional. Não seleciona vaga nem reserva. Um sim à pergunta com duas alternativas não escolhe automaticamente este caminho.",
+      description: "Depois de apresentar os dias e horários habituais e de o paciente demonstrar interesse em agendar, se ele escolher o primeiro disponível/sem preferência de médico, compara as agendas de TODOS os profissionais publicados do atendimento solicitado. Não antecipe esta busca na apresentação inicial nem por haver muitos médicos. Não exige médico definido. Informe o nome oficial do atendimento obtido no catálogo. Retorna a disponibilidade mais próxima, modalidade, orientações e valores próprios do profissional. Não seleciona vaga nem reserva. Um sim à pergunta com duas alternativas não escolhe automaticamente este caminho.",
       parameters: { type: "object", properties: {
         tipo: { type: "string", enum: ["consulta", "procedimento"] },
         atendimento: { type: "string", description: "Especialidade ou procedimento exato publicado, ex.: Otorrinolaringologia. Preserve a consulta/procedimento do paciente." },
@@ -845,7 +845,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "proxima_vaga",
       description:
-        "Primeira vaga REAL disponível do médico escolhido, após pedido do paciente por vagas. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir uma data exata. Exige definir o médico; uma pergunta geral sobre a especialidade não autoriza consultar vagas. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
+        "Primeira vaga REAL disponível do médico escolhido, depois da apresentação dos dias e horários habituais e do interesse do paciente em agendar. Não antecipe a busca na apresentação inicial. Em uma busca já iniciada, não repita essa apresentação. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir uma data exata. Exige definir o médico; uma pergunta geral sobre a especialidade não autoriza consultar vagas. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
       parameters: {
         type: "object",
         properties: {

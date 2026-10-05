@@ -8,7 +8,7 @@ import { REGRAS_CATALOGO_PROMPT } from "./regras-catalogo";
 import { REGRAS_TEMPORAIS_NINA } from "./regras-temporais";
 import { FORMATACAO_WHATSAPP_NINA } from "./formatacao-whatsapp";
 import { REGRA_PIX_CARTAO, REGRA_FORMA_PAGAMENTO_AUSENTE } from "./pagamento";
-import { CONTINUIDADE_CONSULTA_AGENDA } from "./consulta-agenda";
+import { CONTINUIDADE_CONSULTA_AGENDA, REGRA_HORARIOS_HABITUAIS_PRIMEIRO } from "./consulta-agenda";
 import { REGRA_SEM_EMOJIS_NINA } from "../resposta/sem-emojis";
 import { REGRA_CONSULTA_CATALOGO, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
 import { INSTRUCAO_DADOS_CATALOGO } from "../catalogo-estrutura";
@@ -123,14 +123,14 @@ Tipo: CONVERSACIONAL.
 Aplica-se: informação geral, valores, profissionais ou horários de um atendimento identificado.
 Conduta: consulte a base conforme FAT-01 e responda aos objetivos do pedido. Perguntar preço, preparo ou horário não autoriza agendar nem iniciar coleta de cadastro. A escolha para consultar vagas segue CONV-07.
 - Conte profissionais distintos vinculados ao mesmo atendimento, sem contar dias ou registros repetidos como outros médicos. Não compare consultas e exames diferentes.
-- Até quatro profissionais: apresente as informações pertinentes em blocos e faça a pergunta adequada à quantidade, conforme CONV-07. Uma dúvida específica recebe a informação pedida e as condições necessárias, sem uma lista extensa de campos não solicitados.
-- Mais de quatro profissionais: antes de listar todos os médicos e horários, confirme o atendimento e pergunte: "Você prefere o primeiro disponível ou deseja escolher entre os profissionais e horários?" Se todos os preços e condições forem iguais, pode informar o bloco comum uma vez. Se houver diferenças, não atribua um preço único a todos.
+- Apresente os profissionais e suas escalas habituais em blocos, conforme CONV-07. Uma dúvida específica recebe a informação pedida e as condições necessárias, sem uma lista extensa de campos não solicitados.
+- Se todos os preços e condições forem iguais, pode informar o bloco comum uma vez. Se houver diferenças, não atribua um preço único a todos.
 - Se o paciente já pediu todos os profissionais/horários ou já escolheu compará-los, apresente as opções pertinentes, com preços agrupados apenas quando comprovadamente iguais. Não peça novamente autorização para mostrar a lista.
-- Se já escolheu o primeiro disponível, consulte a comparação de agendas e apresente a opção real retornada; não envie primeiro a lista inteira. Se já indicou médico, dia ou período, aproveite essa preferência sem repetir escolhas resolvidas.
-- Com apenas um profissional, pergunte pela primeira data disponível ou outra data. Com vários, ofereça escolher o profissional ou consultar o primeiro disponível. SFP e atendimento sem pré-agendamento seguem suas exceções em CONV-07.
+- Depois da apresentação da escala e do interesse do paciente, se ele escolheu o primeiro disponível, consulte a comparação de agendas e apresente a opção real retornada. Se já indicou médico, dia ou período, aproveite essa preferência sem repetir escolhas resolvidas.
+${REGRA_HORARIOS_HABITUAIS_PRIMEIRO}
 Oferecer verificar vagas não é autorização para buscá-las; um pedido direto de vagas ou uma resposta que complete a escolha já demonstra o interesse. Consultar vagas, escolher uma opção e confirmar a reserva são etapas distintas.
 “Agendado”, “por agendamento” e “ordem de chegada” no catálogo descrevem modalidade, não uma reserva deste paciente. Quantidades em observações não comprovam vagas livres agora.
-Resultado esperado: resposta útil e compacta, escolha apresentada antes de listas extensas e continuidade sem perguntas repetidas.
+Resultado esperado: escala habitual antes da busca de vagas, interesse do paciente respeitado e continuidade sem perguntas repetidas.
 
 ${CONTINUIDADE_CONSULTA_AGENDA}
 

@@ -1402,6 +1402,10 @@ async function gerarRespostaNinaInterno(
   );
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
   const { REGRA_CADASTRO_AGENDAMENTO } = await import("@/lib/nina/cadastro-paciente");
+  const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO } = await import("@/lib/nina/prompt/consulta-agenda");
+  instrucoesAdicionaisTurno.push({ codigo: "ESCALA_ANTES_DAS_VAGAS", nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "Apresentar a escala habitual antes de oferecer vagas reais, conforme regra confirmada.",
+    texto: REGRA_HORARIOS_HABITUAIS_PRIMEIRO });
   instrucoesAdicionaisTurno.push({ codigo: "CADASTRO_PESSOA_ATENDIDA", nivel: "inegociavel",
     origem: "src/lib/nina/cadastro-paciente.ts", motivo: "Dados da pessoa atendida com o WhatsApp do remetente, inclusive responsáveis.",
     texto: REGRA_CADASTRO_AGENDAMENTO });
