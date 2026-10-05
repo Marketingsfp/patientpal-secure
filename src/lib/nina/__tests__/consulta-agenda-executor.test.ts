@@ -10,6 +10,7 @@ import type { CtxNinaPaciente } from "../paciente-tools.server";
 import { resultadoAgendamentoConfirmado } from "../resposta/agendamento";
 import { validarResultado } from "../tool-broker";
 import { encaminhamentoSemVagas } from "../agenda-sem-vagas";
+import { encaminhamentoFalhaAgendamento } from "../falha-agendamento";
 import { cardiologiaAlex, avaliacaoOdontologica } from "./fixtures/consultas-publicadas.fixture";
 import { atendimentosEstruturados } from "../catalogo-estrutura";
 import { servicoParaRegistro, type ServicoPublicado } from "../catalogo-conhecimento";
@@ -2070,6 +2071,29 @@ describe("horários apresentados por período", () => {
     ctx.estado?.appointment.slot_options?.vagas ?? [];
 
   for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: filtros opcionais null consultam agenda sem encaminhar nem reservar`, async () => {
+      agendaDoDia();
+      const ctx: CtxNinaPaciente = { ...contexto("sábado de manhã"), origem, teste: origem === "homologacao" };
+      const args = { medico_id: MEDICO, data: dataDia, periodo: "manha", a_partir_da_hora: null, especialidade: null, mais: null, dias: null };
+      const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", args);
+      expect(r.ok).toBe(true);
+      expect(horas(r)[0]).toBe("08:00");
+      expect(leituras.some(l => l.tabela === "agendamentos")).toBe(true);
+      expect(encaminhamentoFalhaAgendamento(validarResultado("consultar_disponibilidade", r))).toBeNull();
+      expect(gravacoes).toHaveLength(0);
+      expect(args.a_partir_da_hora).toBeNull(); // não altera o argumento auditado
+    });
+    test(`${origem}: próxima vaga ignora opcionais null, inclusive dia da semana numérico`, async () => {
+      agendaDoDia();
+      const ctx: CtxNinaPaciente = { ...contexto("o primeiro horário"), origem, teste: origem === "homologacao" };
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO,
+        especialidade: null, a_partir_de: null, periodo: null, a_partir_da_hora: null, mais: null, dia_semana: null, dias: null });
+      expect(r.ok).toBe(true);
+      expect(r.proxima).toMatchObject({ hora: "08:00" });
+      expect(r.data).toBe(dataDia);
+      expect(encaminhamentoFalhaAgendamento(validarResultado("proxima_vaga", r))).toBeNull();
+      expect(gravacoes).toHaveLength(0);
+    });
     test(`${origem}: mais de 10 em manhã e tarde → pergunta o período sem listar nem encaminhar`, async () => {
       agendaDoDia();
       const ctx: CtxNinaPaciente = { ...contexto("Tem vaga dia 30?"), origem, teste: origem === "homologacao" };
@@ -2084,6 +2108,14 @@ describe("horários apresentados por período", () => {
       expect(opcoes(ctx)).toHaveLength(0);
     });
   }
+
+  test("opcional inválido e horário obrigatório null continuam rejeitados", async () => {
+    agendaDoDia();
+    const ctx = contexto("quero o primeiro horário");
+    expect(await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, a_partir_da_hora: "25:99" })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+    expect(await executarFerramentaPaciente(ctx, "verificar_horario", { medico_id: MEDICO, data: dataDia, hora: null })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+    expect(gravacoes).toHaveLength(0);
+  });
 
   test("até 10 horários: todos, e todos ficam escolhíveis", async () => {
     banco.agendamentos = Array.from({ length: 6 }, (_, i) => linha(`p${i}`, depois(dia, i * 30), true));

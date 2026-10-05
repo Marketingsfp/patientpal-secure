@@ -24,6 +24,7 @@
  */
 
 import { z } from "zod";
+import { encontrarDataNascimento } from "./data-nascimento";
 import { REGRA_CONSULTA_CATALOGO } from "./catalogo-busca";
 import { REGRA_SOMENTE_PRIMEIRO_HORARIO } from "./prompt/consulta-agenda";
 import { mapaCamposResultado } from "./catalogo-mapa-campos";
@@ -1043,15 +1044,17 @@ const zIdentificar = z.object({
   cpf: z.string().max(20).optional(),
   nome: z.string().trim().min(2).max(200).optional(),
   telefone: z.string().max(30).optional(),
-  // Aceita AAAA-MM-DD e também DD/MM/AAAA — o paciente escreve como fala e o
-  // modelo às vezes repassa igual. Normaliza para ISO antes de consultar.
+  // Mesmo normalizador da coleta: ISO, data numérica ou mês por extenso.
   data_nascimento: z
     .string()
     .trim()
-    .transform((v) => {
-      const br = v.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
-      if (!br) return v;
-      return `${br[3]}-${br[2]!.padStart(2, "0")}-${br[1]!.padStart(2, "0")}`;
+    .transform((v, ctx) => {
+      const encontrada = encontrarDataNascimento(v);
+      if (!encontrada?.data || encontrada.trecho !== v) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Data de nascimento inválida." });
+        return z.NEVER;
+      }
+      return encontrada.data;
     })
     .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
 });
@@ -1203,6 +1206,16 @@ async function executarFerramentaInterna(
     }
   } else if (argsRaw && typeof argsRaw === "object") {
     args = argsRaw as Record<string, unknown>;
+  }
+
+  // Modelos podem representar campos opcionais ausentes como null. Remova
+  // apenas os opcionais declarados, antes das coerções (null não vira 0/domingo).
+  // Campos obrigatórios e valores inválidos continuam sujeitos ao schema.
+  const definicao = FERRAMENTAS_NINA_PACIENTE.find((f) => f.function.name === nome)?.function.parameters;
+  if (definicao && args && typeof args === "object" && !Array.isArray(args)) {
+    const obrigatorios = new Set<string>("required" in definicao ? definicao.required : []);
+    args = Object.fromEntries(Object.entries(args).filter(([campo, valor]) =>
+      valor !== null || !(campo in definicao.properties) || obrigatorios.has(campo)));
   }
 
   // Contexto transitório da chamada; não altera o ctx compartilhado por outras ferramentas.

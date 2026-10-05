@@ -124,6 +124,27 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: escolher vaga → coletar dados → confirmar → agendar", () => {
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: nascimento por extenso completa a coleta sem reservar antes da confirmação`, async () => {
+      const t = preparar();
+      t.ctx.origem = origem;
+      t.ctx.teste = origem === "homologacao";
+      await t.turno("Meu nome é Ana da Silva");
+      const r = await t.turno("15 de janeiro de 1979");
+      expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
+        nome: "Ana Da Silva", data_nascimento: "1979-01-15",
+      });
+      expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+      expect(t.encaminhamentos).toHaveLength(0);
+      await t.turno("Isso, pode confirmar.");
+      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    });
+  }
+  test.each(["15 de janeiro de 1979", "15/01/79", "1979-01-15"])("extrai nome e data sem incorporar o mês ao nome: %s", data => {
+    expect(extrairDadosIdentificacao(`Ana da Silva, ${data}`)).toMatchObject({ nome: "Ana Da Silva", data_nascimento: "1979-01-15" });
+    expect(extrairDadosIdentificacao(data)).toMatchObject({ nome: null, data_nascimento: "1979-01-15" });
+  });
   test("troca responsável pela filha sem herdar o nascimento antigo e sem agendar durante a coleta", async () => {
     const t = preparar([]);
     Object.assign(t.estado.patient, { id: "responsavel", identified: true, validated: true });

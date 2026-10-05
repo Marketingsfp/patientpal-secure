@@ -194,6 +194,19 @@ describe("executor do cadastro com banco simulado", () => {
       campos_faltantes: ["data_nascimento"],
     });
   });
+  test.each(["15 de janeiro de 1979", "15/01/79", "1979-01-15"])("identificação normaliza %s e aceita CPF opcional null", async data => {
+    const ctx = contexto();
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Ana da Silva", data_nascimento: data, cpf: null, telefone: null,
+    });
+    expect(r.ok).toBe(true);
+    expect(rpcs[0]?.args).toMatchObject({ _nome: "ANA DA SILVA", _data_nascimento: "1979-01-15", _cpf: null, _telefone: "21999990000" });
+  });
+  test("data impossível não chega à RPC de cadastro", async () => {
+    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", { nome: "Ana da Silva", data_nascimento: "31 de fevereiro de 1979" });
+    expect(r).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+    expect(rpcs).toHaveLength(0);
+  });
   test("produção usa a função atômica sem CPF e registra identidade", async () => {
     const ctx = contexto();
     expect(

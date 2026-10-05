@@ -21,6 +21,7 @@
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { encontrarDataNascimento } from "./data-nascimento";
 import { autorizarAcao } from "./acoes/autorizacao";
 import { resultadoAgendamentoConfirmado } from "./resposta/agendamento";
 import {
@@ -89,21 +90,6 @@ export type DadosIdentificacao = {
   data_nascimento: string | null;
   telefone: string | null;
 };
-
-function normalizarData(bruto: string): string | null {
-  const iso = bruto.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const br = bruto.match(/\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b/);
-  if (!br) return null;
-  const d = Number(br[1]);
-  const m = Number(br[2]);
-  let a = Number(br[3]);
-  if (a < 100) a += a > 30 ? 1900 : 2000;
-  if (d < 1 || d > 31 || m < 1 || m > 12) return null;
-  const hoje = new Date();
-  if (a < 1900 || a > hoje.getFullYear()) return null;
-  return `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
 
 /** Abertura que antecede o nome ("meu nome é", "o nome dele é", "se chama"). */
 const ABERTURA_NOME =
@@ -209,13 +195,12 @@ function extrairNome(semData: string): string | null {
  */
 export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
-  const data = normalizarData(t);
+  const dataEncontrada = encontrarDataNascimento(t);
 
   // CPF: 11 dígitos, com ou sem pontuação. Remove a data antes para não
   // confundir "21/10/1999" com número.
   let semData = t;
-  const alvoData = t.match(/\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/);
-  if (alvoData) semData = t.replace(alvoData[0], " ");
+  if (dataEncontrada) semData = t.replace(dataEncontrada.trecho, " ");
   let cpf: string | null = null;
   for (const m of semData.matchAll(/\d[\d.\- ]{9,17}\d/g)) {
     const d = somenteDigitos(m[0]);
@@ -230,7 +215,7 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
   const numeros = semData.match(/(?:\+?55\s*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g) ?? [];
   const telefone =
     numeros.map(somenteDigitos).find((n) => n !== cpf && n.length >= 10 && n.length <= 13) ?? null;
-  return { nome, cpf, data_nascimento: data, telefone };
+  return { nome, cpf, data_nascimento: dataEncontrada?.data ?? null, telefone };
 }
 
 /* -------------------------------------------------------------- mensagens */
