@@ -33,6 +33,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   listarLeadsTeste,
   historicoLeadTeste,
+  mensagensPdfLeadTeste,
   enviarMensagemTeste,
   resolverConversaTeste,
   ferramentasUsadasTeste,
@@ -65,6 +66,10 @@ import {
 
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { diaExportacao, periodoExportacaoSchema, rotuloPeriodoExportacao, type PeriodoExportacao } from "@/lib/nina/homologacao-exportacao";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -206,6 +211,15 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
 
   const listar = useServerFn(listarLeadsTeste);
   const historico = useServerFn(historicoLeadTeste);
+  const mensagensPdf = useServerFn(mensagensPdfLeadTeste);
+  const [pdfAberto, setPdfAberto] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [modoPdf, setModoPdf] = useState<"periodo" | "todos">("periodo");
+  const [inicioPdf, setInicioPdf] = useState(() => diaExportacao(new Date()));
+  const [fimPdf, setFimPdf] = useState(() => diaExportacao(new Date()));
+  const periodoPdf: PeriodoExportacao = modoPdf === "todos"
+    ? { modo: "todos" } : { modo: "periodo", inicio: inicioPdf, fim: fimPdf };
+  const periodoPdfValido = periodoExportacaoSchema.safeParse(periodoPdf).success;
   const enviar = useServerFn(enviarMensagemTeste);
   const resolver = useServerFn(resolverConversaTeste);
   const ferramentasFn = useServerFn(ferramentasUsadasTeste);
@@ -1062,11 +1076,14 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
 
 
   const baixarPdf = async () => {
-    if (!leadAtual || msgs.length === 0) {
-      toast.error("Não há mensagens para exportar.");
-      return;
-    }
+    if (!leadAtual || !clinicaId || !leadId || gerandoPdf || !periodoPdfValido) return;
+    setGerandoPdf(true);
     try {
+      const mensagens = await mensagensPdf({ data: { clinicaId, leadId, periodo: periodoPdf } });
+      if (mensagens.length === 0) {
+        toast.error("Não há mensagens registradas no período selecionado.");
+        return;
+      }
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const margem = 40;
@@ -1111,7 +1128,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       escrever(
         doc.splitTextToSize(
           sanear(
-            `${nomeLead(leadAtual)} · ${leadAtual.telefone} · sessão ${leadAtual.sessao} · exportado em ${new Date().toLocaleString("pt-BR")}`,
+            `${nomeLead(leadAtual)} · ${leadAtual.telefone} · exportado em ${formatarDataHoraMensagem(new Date())}`,
           ),
           largura,
         ) as string[],
@@ -1119,9 +1136,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         10,
         false,
       );
+      escrever([sanear(`Período: ${rotuloPeriodoExportacao(periodoPdf)} · horário de Brasília`)], margem, 10, false);
       y += 10;
 
-      for (const m of msgs) {
+      for (const m of mensagens) {
         const texto = marcadorInternoSistema(m) ? textoMarcadorSistema(m.body) : String(m.body ?? "");
         if (marcadorInternoSistema(m) && !texto) continue;
         const quem =
@@ -1130,7 +1148,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
             : m.direction === "out"
               ? "Nina"
               : "Paciente (teste)";
-        const quando = new Date(m.created_at).toLocaleString("pt-BR");
+        const quando = formatarDataHoraMensagem(m.created_at);
         escrever([sanear(`${quem} · ${quando}`)], margem, 9, true);
 
         const corpo = sanear(texto).split("\n");
@@ -1146,13 +1164,16 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         y += 8;
       }
 
-      const nome = `nina-homologacao-${nomeLead(leadAtual).toLowerCase().replace(/\s+/g, "-")}-${new Date()
-        .toISOString()
-        .slice(0, 10)}.pdf`;
+      const sufixo = periodoPdf.modo === "todos" ? "todo-historico"
+        : periodoPdf.inicio === periodoPdf.fim ? periodoPdf.inicio : `${periodoPdf.inicio}-a-${periodoPdf.fim}`;
+      const nome = `nina-homologacao-${nomeLead(leadAtual).toLowerCase().replace(/\s+/g, "-")}-${sufixo}.pdf`;
       doc.save(nome);
       toast.success("PDF gerado com as mensagens do lead de teste.");
+      setPdfAberto(false);
     } catch (e: any) {
       mostrarErro(e);
+    } finally {
+      setGerandoPdf(false);
     }
   };
 
@@ -1291,11 +1312,49 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={msgs.length === 0}
-                    onClick={() => void baixarPdf()}
+                    disabled={gerandoPdf || carregandoConversa}
+                    onClick={() => setPdfAberto(true)}
                   >
                     <Download className="mr-1 h-3.5 w-3.5" /> PDF
                   </Button>
+                  <Dialog open={pdfAberto} onOpenChange={(aberto) => { if (!gerandoPdf) setPdfAberto(aberto); }}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Baixar conversa de teste em PDF</DialogTitle>
+                        <DialogDescription>
+                          Escolha os dias de {nomeLead(leadAtual)}. Para baixar um único dia, use a mesma data nos dois campos.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="pdf-periodo">O que deseja baixar?</Label>
+                          <select id="pdf-periodo" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            disabled={gerandoPdf} value={modoPdf} onChange={(e) => setModoPdf(e.target.value as "periodo" | "todos")}>
+                            <option value="periodo">Selecionar período</option>
+                            <option value="todos">Todo o histórico disponível</option>
+                          </select>
+                        </div>
+                        {modoPdf === "periodo" && <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="pdf-inicio">Data inicial</Label>
+                            <Input id="pdf-inicio" type="date" value={inicioPdf} disabled={gerandoPdf} onChange={(e) => setInicioPdf(e.target.value)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="pdf-fim">Data final</Label>
+                            <Input id="pdf-fim" type="date" value={fimPdf} disabled={gerandoPdf} onChange={(e) => setFimPdf(e.target.value)} />
+                          </div>
+                        </div>}
+                        {!periodoPdfValido && <p role="alert" className="text-sm text-destructive">Informe datas válidas, com a data final igual ou posterior à inicial.</p>}
+                        <p className="text-xs text-muted-foreground">Inclui os dias completos, no horário de Brasília, com as mensagens ainda disponíveis no histórico.</p>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" disabled={gerandoPdf} onClick={() => setPdfAberto(false)}>Cancelar</Button>
+                        <Button disabled={gerandoPdf || !periodoPdfValido} onClick={() => void baixarPdf()}>
+                          <Download className="mr-2 h-4 w-4" />{gerandoPdf ? "Gerando PDF…" : "Baixar PDF"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                   {laboratorio && <><Button
                     size="sm"
                     variant="outline"

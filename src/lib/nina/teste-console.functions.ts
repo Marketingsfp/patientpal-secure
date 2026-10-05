@@ -13,6 +13,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { periodoExportacaoSchema } from "./homologacao-exportacao";
 
 import {
   CANAL_TESTE,
@@ -181,6 +182,19 @@ export const marcarLeadTesteLido = createServerFn({ method: "POST" })
     return { ok: true, naoLidas: Number(linha?.nao_lidas ?? 0) || 0 };
   });
 
+
+export const mensagensPdfLeadTeste = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    clinicaId: z.string().uuid(), leadId: z.string().uuid(), periodo: periodoExportacaoSchema,
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
+    const { lerMensagensExportacao } = await import("./homologacao-exportacao.server");
+    return lerMensagensExportacao(supabaseAdmin, data.clinicaId, lead, data.periodo);
+  });
 
 export const historicoLeadTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
