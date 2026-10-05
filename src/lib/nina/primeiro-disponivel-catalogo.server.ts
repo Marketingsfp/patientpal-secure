@@ -8,7 +8,7 @@ import type { RegistroConhecimento } from "./knowledge-contract";
 import { resolverMedicoAgenda, vincularProfissionaisCatalogo } from "./vinculo-catalogo-agenda.server";
 import { atendimentosEstruturados, modalidadeEstruturada, textoAtendimentos } from "./catalogo-estrutura";
 import { orientacaoModalidade } from "./modalidade-atendimento";
-import { chaveConsulta, selecionarAtendimentosConsulta, nomeCompletoConsulta, type PreferenciaAtendimentoConsulta } from "./atendimento-consulta";
+import { chaveConsulta, selecionarAtendimentosConsulta, nomeCompletoConsulta, type PreferenciaAtendimentoConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
 
 const lista = (v: unknown): Record<string, unknown>[] => Array.isArray(v) ? v.filter(x => x && typeof x === "object") : [];
 const chave = chaveConsulta;
@@ -17,7 +17,8 @@ export type CandidatoPrimeiraVaga = { registro: RegistroConhecimento; medicoId: 
 type ReferenciaAtendimento = { registro: string; procedimento: string | null };
 
 export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta" | "procedimento",
-  atendimento: string | readonly ReferenciaAtendimento[], preferencia?: PreferenciaAtendimentoConsulta | null): Promise<CandidatoPrimeiraVaga[]> {
+  atendimento: string | readonly ReferenciaAtendimento[], preferencia?: PreferenciaAtendimentoConsulta | null,
+  periodo?: EscopoAtendimentoConsulta["periodo"]): Promise<CandidatoPrimeiraVaga[]> {
   const normalizarNome = tipo === "consulta" ? chave : normalizar;
   // Referências são pistas para consultar a publicação deste turno, ligadas ao ID.
   // Grafias diferentes do mesmo atendimento não são modalidades diferentes.
@@ -34,7 +35,7 @@ export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta"
       const nomes = typeof atendimento === "string" ? [atendimento] : atendimento
         .filter(r => r.registro === p.id && r.procedimento).map(r => r.procedimento!);
       const escolhidos = [...new Set(nomes.flatMap(nome => selecionarAtendimentosConsulta(itens,
-        { atendimento: nome, preferencia })))];
+        { atendimento: nome, preferencia, periodo })))];
       if (escolhidos.length) return escolhidos.map(item => {
         const especialidades = lista(p.especialidades).filter(e => chave(String(e.nome ?? "")) === chave(item.especialidade ?? ""));
         const formas = lista(p.formas_pagamento).filter(f => normalizar(String(f.condicao ?? "")) === normalizar(item.atendimento));
@@ -42,7 +43,7 @@ export async function candidatosPrimeiraVaga(clinicaId: string, tipo: "consulta"
           observacao_publica: textoAtendimentos([item]) }, hoje);
         const modalidade = modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento, [item]);
         return { ...registro, procedimento: nomeCompletoConsulta(item), preco_dinheiro: item.dinheiro,
-          preco_cartao: item.pix_cartao, extras: { ...registro.extras, atendimentos_publicados: [item],
+          preco_cartao: item.cartao ?? item.pix_cartao ?? item.pix, extras: { ...registro.extras, atendimentos_publicados: [item],
             modalidade_atendimento: modalidade, orientacao_atendimento: modalidade ? orientacaoModalidade(modalidade) : null } };
       });
       // Compatibilidade com especialidades sem bloco estruturado: só depois

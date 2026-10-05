@@ -891,7 +891,7 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
   test("duas variantes não são reduzidas à mesma especialidade", async () => {
     const ctx = preparar("com");
     delete ctx.estado!.knowledge_context!.atendimentoConsulta;
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).codigo).toBe("ATENDIMENTO_CONSULTA_PENDENTE");
   });
   test("mudança para sem preventivo invalida o resumo antigo, sem reservar", async () => {
     const ctx = contextoAgendar(true);
@@ -1173,7 +1173,9 @@ describe("executor real das ferramentas com banco simulado", () => {
     ctx.estado!.knowledge_context!.referencias.push({ registro: CATALOGO, versao: null,
       procedimento: "Consulta Cardiologia Infantil", medicoNome: "Alex Louza" });
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-    expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
+    expect(r.codigo).toBe("ATENDIMENTO_CONSULTA_PENDENTE");
+    expect(r.consulta_realizada).toBe(false);
+    expect(consultasAgenda()).toHaveLength(0);
     expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
     expect(gravacoes).toHaveLength(0);
   });
@@ -2098,6 +2100,7 @@ describe("horários apresentados por período", () => {
     expect(String(tarde.instrucao)).toContain("Esses são os primeiros horários disponíveis nesse período. Se preferir, posso mostrar os próximos.");
     ctx.consultaAgenda.mensagemAtual = "mostra os outros";
     const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, mais: true });
+    expect(segunda.ok, JSON.stringify(segunda)).toBe(true);
     expect(horas(segunda)[0]).toBe("14:30");
     expect(horas(segunda)).toHaveLength(10);
     expect(horas(segunda).some((h) => horas(tarde).includes(h))).toBe(false);
@@ -2248,6 +2251,96 @@ describe("regressão 26/09: horário de página anterior continua escolhível", 
 
 // Reteste 02 (26/09/2026): entre os turnos o estado é salvo e relido, e o termo
 // da pesquisa do catálogo é refeito a cada mensagem. A lista não pode se perder.
+describe("consultas comuns, revisão e noturna do Lead 01", () => {
+  function preparar(nome: string, especialidade: string, titulos: string[], periodo: "manha" | "noite" = "manha") {
+    banco.medicos![0]!.nome = nome;
+    Object.assign(banco.profissionais![0]!, { nome, medico_id: MEDICO, especialidades: [{ nome: especialidade }],
+      observacao_publica: titulos.map((titulo, i) => `${titulo}\nEspecialidade: ${especialidade}\nDias e horários: Sábado 08:00–12:00\nDinheiro: R$ ${120 + i * 10},00\nPix/cartão: R$ ${145 + i * 10},00\nObservação: Hora marcada`).join("\n\n") });
+    const slot = new Date(inicio); slot.setUTCHours(periodo === "manha" ? 12 : 22);
+    Object.assign(banco.agendamentos![0]!, { inicio: slot.toISOString(), fim: new Date(slot.getTime() + 30 * 60000).toISOString() });
+    Object.assign(banco.medico_disponibilidades![0]!, { hora_inicio: "08:00", hora_fim: "23:00" });
+    const ctx: CtxNinaPaciente = { ...contexto(`Quero ${especialidade} com ${nome}`), podeAgendar: true };
+    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+      consulta: { termo: especialidade, tipo_atendimento: "consulta", medico: nome },
+      referencias: [{ registro: CATALOGO, versao: null, procedimento: `Consulta — ${especialidade}`, medicoNome: nome }] };
+    return { ctx, data: slot.toISOString().slice(0, 10) };
+  }
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    for (const caso of [
+      { nome: "Sandro da Silva Prinsceswal", especialidade: "CLINICO GERAL", titulos: ["CONSULTA CLINICA MEDICA", "REVISAO"] },
+      { nome: "Marina Almeida Dias", especialidade: "OFTALMOLOGIA", titulos: ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"] },
+    ]) test(`${origem}: ${caso.nome} preserva consulta comum, médico e manhã`, async () => {
+      const { ctx, data } = preparar(caso.nome, caso.especialidade, caso.titulos);
+      ctx.origem = origem; ctx.teste = origem === "homologacao";
+      const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
+      expect(r.ok, JSON.stringify(r)).toBe(true);
+      expect(ctx.estado!.appointment.slot_options!.vagas).toHaveLength(1);
+      expect(ctx.estado!.appointment.slot_options!.vagas[0]).toMatchObject({ medico_id: MEDICO, medico: caso.nome,
+        procedimento: `${caso.titulos[0]} — ${caso.especialidade}`, data, hora: "09:00" });
+      expect(gravacoes).toHaveLength(0);
+      expect((await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar)).ok).toBe(false);
+      expect(gravacoes).toHaveLength(0);
+    });
+  }
+  test("primeiro disponível também distingue noturna pelo período e conserva o valor da opção", async () => {
+    const { ctx, data } = preparar("Marina Almeida Dias", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"], "noite");
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "consulta", atendimento: "OFTALMOLOGIA", data, periodo: "noite" });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(r.proxima).toMatchObject({ registro: { preco_dinheiro: "R$ 130,00", preco_cartao: "R$ 155,00" } });
+    expect(ctx.estado!.appointment.slot_options!.vagas[0]).toMatchObject({ medico_id: MEDICO,
+      procedimento: "CONSULTA NOTURNA — OFTALMOLOGIA", hora: "19:00" });
+    expect(gravacoes).toHaveLength(0);
+  });
+  test.each(["proxima_vaga", "consultar_primeiro_disponivel"])("%s: dúvida real esclarece antes da agenda; título escolhido permite continuar", async ferramenta => {
+    const { ctx, data } = preparar("Marina Almeida Dias", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"]);
+    const r = await executarFerramentaPaciente(ctx, ferramenta, ferramenta === "proxima_vaga"
+      ? { medico_id: MEDICO } : { tipo: "consulta", atendimento: "OFTALMOLOGIA" });
+    expect(r).toMatchObject({ codigo: "ATENDIMENTO_CONSULTA_PENDENTE", aguardando_paciente: true, consulta_realizada: false });
+    expect(r.atendimentos).toEqual(["CONSULTA OFTALMO — OFTALMOLOGIA", "CONSULTA NOTURNA — OFTALMOLOGIA"]);
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+    ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
+    ctx.estado.knowledge_context!.consulta.termo = "CONSULTA OFTALMO";
+    const retomada = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
+    expect(retomada.ok, JSON.stringify(retomada)).toBe(true);
+    expect(ctx.estado.appointment.slot_options!.vagas[0]!.procedimento).toBe("CONSULTA OFTALMO — OFTALMOLOGIA");
+    expect(gravacoes).toHaveLength(0);
+  });
+  test.each(["consultar_disponibilidade", "consultar_primeiro_disponivel"])("%s: pedido noturno conflitante com manhã pede esclarecimento sem consultar agenda", async ferramenta => {
+    const { ctx, data } = preparar("Marina", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA"]);
+    ctx.estado!.knowledge_context!.consulta.termo = "CONSULTA NOTURNA";
+    const r = await executarFerramentaPaciente(ctx, ferramenta, ferramenta === "consultar_disponibilidade"
+      ? { medico_id: MEDICO, data, periodo: "manha" }
+      : { tipo: "consulta", atendimento: "CONSULTA NOTURNA", data, periodo: "manha" });
+    expect(r).toMatchObject({ codigo: "ATENDIMENTO_CONSULTA_PENDENTE", aguardando_paciente: true, consulta_realizada: false });
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("consulta noturna explícita não oferece vaga diurna mesmo sem filtro de período", async () => {
+    const { ctx, data } = preparar("Marina", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA"], "noite");
+    banco.agendamentos!.push({ ...banco.agendamentos![0]!, id: "diurna", inicio: `${data}T12:00:00.000Z`, fim: `${data}T12:30:00.000Z` });
+    ctx.estado!.knowledge_context!.consulta.termo = "CONSULTA NOTURNA";
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(ctx.estado!.appointment.slot_options!.vagas.map(v => v.hora)).toEqual(["19:00"]);
+  });
+  test("referência de revisão não substitui consulta comum ausente", async () => {
+    const { ctx, data } = preparar("Sandro", "CLINICO GERAL", ["REVISAO"]);
+    ctx.estado!.knowledge_context!.referencias[0]!.procedimento = "REVISAO — CLINICO GERAL";
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
+    expect(r.ok).toBe(false);
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("revisão explicitamente solicitada não é trocada por consulta comum", async () => {
+    const { ctx, data } = preparar("Sandro", "CLINICO GERAL", ["CONSULTA CLINICA MEDICA", "REVISAO"]);
+    ctx.estado!.knowledge_context!.consulta.termo = "REVISAO — CLINICO GERAL";
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(ctx.estado!.appointment.slot_options!.vagas[0]!.procedimento).toBe("REVISAO — CLINICO GERAL");
+  });
+});
+
 describe("paginação sobrevive entre turnos", () => {
   const dia = new Date(Date.now() + 3 * 86_400_000);
   dia.setUTCHours(11, 0, 0, 0);
@@ -2276,6 +2369,7 @@ describe("paginação sobrevive entre turnos", () => {
     expect(((primeira.horarios as Linha[]) ?? [])[0]!.hora).toBe("08:00");
     novoTurno(ctx, "mostra os outros", "mostra os outros");
     const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, mais: true });
+    expect((segunda.horarios as unknown[]).length, JSON.stringify(segunda)).toBeGreaterThan(0);
     expect(((segunda.horarios as Linha[]) ?? [])[0]!.hora).toBe("09:40");
     expect(String(segunda.instrucao)).toContain("Esses são os próximos");
     novoTurno(ctx, "Pensando melhor, vou querer aquele das 08:20.", "vou querer aquele das 08:20");

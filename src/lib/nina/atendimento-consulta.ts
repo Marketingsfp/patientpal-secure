@@ -2,6 +2,9 @@ import { normalizar, type RegistroConhecimento } from "./knowledge-contract";
 import type { AtendimentoPublicado } from "./catalogo-estrutura";
 import { detectarEspecialidades } from "@/lib/nina-especialidade";
 
+export const REGRA_SELECAO_ATENDIMENTO_CONSULTA = `TIPO DE CONSULTA E PERÍODO: preserve atendimento, médico, data e período pedidos ao passar do catálogo à agenda. Consulta comum, revisão/retorno, risco cirúrgico e consulta noturna são atendimentos distintos, mesmo quando pertencem à mesma especialidade ou ao mesmo médico. Não ofereça revisão como consulta comum. Envie à ferramenta de vagas o período informado; consulta noturna não pode ser oferecida pela manhã ou à tarde. Escalas genéricas copiadas entre atendimentos não comprovam que uma consulta noturna ocorra de manhã.
+Quando a ferramenta retornar ATENDIMENTO_CONSULTA_PENDENTE, não trate como falta de vaga nem falha operacional: faça somente a pergunta indicada, aguarde a resposta e reconsulte o catálogo pelo título escolhido. Preserve médico e filtros já informados. Se faltar apenas o período para distinguir comum de noturna, pergunte o período. Não escolha uma alternativa por preço ou posição na lista. A escolha do tipo de consulta não autoriza reserva: mantenha escolha da vaga, cadastro e aceite do resumo final.`;
+
 /** Preferência do paciente, sem preço/regra copiados. Revalidada em cada publicação. */
 export type PreferenciaAtendimentoConsulta = {
   especialidade: string;
@@ -11,6 +14,8 @@ export type PreferenciaAtendimentoConsulta = {
 
 export type EscopoAtendimentoConsulta = {
   atendimento: string;
+  /** Filtro já interpretado pela ferramenta; não deduz horário de uma escala genérica. */
+  periodo?: "madrugada" | "manha" | "tarde" | "noite" | "qualquer" | null;
   /** Referências da pesquisa já identificada, revalidadas na publicação atual. */
   referencias?: Array<{ registro: string; procedimento: string | null }>;
   /** Quando presente, a modalidade pertence ao serviço, nunca à consulta do médico. */
@@ -40,7 +45,18 @@ export function selecionarAtendimentosConsulta(
   const exatos = permitidos.filter(i => [i.atendimento, nomeCompletoConsulta(i)].some(n => chaveConsulta(n) === alvo));
   const familia = permitidos.filter(i => chaveConsulta(i.especialidade ?? "") === alvo);
   const variantesPreventivo = familia.some(i => /\bpreventivo\b/.test(normalizar(i.atendimento)));
-  const escolhidos = exatos.length && !variantesPreventivo ? exatos : familia;
+  let escolhidos = exatos.length && !variantesPreventivo ? exatos : familia;
+  if (!exatos.length && !escopo.preferencia?.nome) {
+    // Revisão/retorno e risco cirúrgico são atendimentos próprios. Uma busca
+    // genérica pela especialidade não equivale a pedir esses serviços.
+    escolhidos = escolhidos.filter(i => !/\b(revisao|retorno|risco cirurgico)\b/.test(normalizar(i.atendimento)));
+  }
+  const noturna = (i: AtendimentoPublicado) => /\bnoturn[ao]\b/.test(normalizar(i.atendimento));
+  if (escopo.periodo === "manha" || escopo.periodo === "tarde") {
+    escolhidos = escolhidos.filter(i => !noturna(i));
+  } else if (escopo.periodo === "noite" && !exatos.length && !escopo.preferencia?.nome && escolhidos.some(noturna)) {
+    escolhidos = escolhidos.filter(noturna);
+  }
   // O bloco genérico de escala não é uma segunda consulta. Só o omite quando
   // existe um atendimento específico identificado na mesma publicação.
   return escolhidos.some(i => normalizar(i.atendimento) !== "atendimento")

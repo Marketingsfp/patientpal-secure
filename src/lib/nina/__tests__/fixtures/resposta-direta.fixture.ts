@@ -414,6 +414,12 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       resultados.push(r);
       return r;
     }
+    if (cenario === "tipo_consulta_pendente" && nome !== "solicitar_atendente_humano") return {
+      ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
+      reused: false, appointment_confirmed: false, erro: "ACTION_NOT_AUTHORIZED",
+      dados: { ok: false, erro: "ACTION_NOT_AUTHORIZED", codigo: "ATENDIMENTO_CONSULTA_PENDENTE",
+        consulta_realizada: false, aguardando_paciente: true, pergunta: "Você deseja consulta comum ou noturna?" },
+    };
     if (["falha_vinculo", "falha_selecao"].includes(cenario) && nome !== "solicitar_atendente_humano") return {
       ferramenta: nome, capacidade: "checkAvailability", fonte: "agenda", success: false,
       reused: false, appointment_confirmed: false, erro: "ACTION_NOT_AUTHORIZED",

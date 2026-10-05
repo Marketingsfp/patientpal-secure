@@ -11,6 +11,22 @@ const registro = profissionalParaRegistro({ id: "medica", nome: "Conceição Mar
   especialidades: [{ nome: "GINECOLOGIA" }], observacao_publica:
     "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado" }, "2026-09-21");
 const com = { especialidade: "GINECOLOGIA", preventivo: "com" as const };
+
+test("Sandro: a especialidade seleciona consulta comum, sem incluir revisão ou risco", () => {
+  const itens = atendimentosEstruturados("CONSULTA CLINICA MEDICA\nEspecialidade: CLINICO GERAL\n\nREVISAO\nEspecialidade: CLINICO GERAL\n\nRISCO CIRURGICO\nEspecialidade: CLINICO GERAL", null);
+  expect(selecionarAtendimentosConsulta(itens, { atendimento: "Clínico Geral" }).map(i => i.atendimento)).toEqual(["CONSULTA CLINICA MEDICA"]);
+  expect(selecionarAtendimentosConsulta(itens, { atendimento: "REVISAO — CLINICO GERAL" }).map(i => i.atendimento)).toEqual(["REVISAO"]);
+});
+
+test("Marina: período distingue noturna da comum sem usar a escala copiada como prova", () => {
+  const itens = atendimentosEstruturados(["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"].map(n => `${n}\nEspecialidade: OFTALMOLOGIA\nDias e horários: Sábado 08:00–12:00`).join("\n\n"), null);
+  const nomes = (periodo?: "manha" | "tarde" | "noite") => selecionarAtendimentosConsulta(itens, { atendimento: "Oftalmologia", periodo }).map(i => i.atendimento);
+  expect(nomes("manha")).toEqual(["CONSULTA OFTALMO"]);
+  expect(nomes("tarde")).toEqual(["CONSULTA OFTALMO"]);
+  expect(nomes("noite")).toEqual(["CONSULTA NOTURNA"]);
+  expect(nomes()).toEqual(["CONSULTA OFTALMO", "CONSULTA NOTURNA"]);
+  expect(selecionarAtendimentosConsulta(itens, { atendimento: "CONSULTA NOTURNA", periodo: "manha" })).toEqual([]);
+});
 test.each(["Quero ginecologista Carlos, mas preciso da consulta com preventivo junto", "Consulta + preventivo", "Eu quero a consulta de ginecologia COM preventivo, não só o exame"])("preserva o pacote explícito: %s", m => expect(pedidoConsultaComPreventivo(m)).toBe(true));
 test.each(["Quero só o exame preventivo", "Não quero consulta com preventivo, preciso só o exame", "Quero consulta sem preventivo", "Quanto custa o preventivo?", "Quero só o exame, não a consulta com preventivo"])("não inventa pacote: %s", m => expect(pedidoConsultaComPreventivo(m)).toBe(false));
 

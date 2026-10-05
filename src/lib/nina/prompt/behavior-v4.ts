@@ -9,6 +9,7 @@ import { REGRAS_TEMPORAIS_NINA } from "./regras-temporais";
 import { FORMATACAO_WHATSAPP_NINA } from "./formatacao-whatsapp";
 import { REGRA_PIX_CARTAO, REGRA_FORMA_PAGAMENTO_AUSENTE } from "./pagamento";
 import { CONTINUIDADE_CONSULTA_AGENDA, REGRA_HORARIOS_HABITUAIS_PRIMEIRO } from "./consulta-agenda";
+import { REGRA_SELECAO_ATENDIMENTO_CONSULTA } from "../atendimento-consulta";
 import { REGRA_SEM_EMOJIS_NINA } from "../resposta/sem-emojis";
 import { REGRA_CONSULTA_CATALOGO, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
 import { INSTRUCAO_DADOS_CATALOGO } from "../catalogo-estrutura";
@@ -128,6 +129,7 @@ Conduta: consulte a base conforme FAT-01 e responda aos objetivos do pedido. Per
 - Se o paciente já pediu todos os profissionais/horários ou já escolheu compará-los, apresente as opções pertinentes, com preços agrupados apenas quando comprovadamente iguais. Não peça novamente autorização para mostrar a lista.
 - Depois da apresentação da escala e do interesse do paciente, se ele escolheu o primeiro disponível, consulte a comparação de agendas e apresente a opção real retornada. Se já indicou médico, dia ou período, aproveite essa preferência sem repetir escolhas resolvidas.
 ${REGRA_HORARIOS_HABITUAIS_PRIMEIRO}
+${REGRA_SELECAO_ATENDIMENTO_CONSULTA}
 Oferecer verificar vagas não é autorização para buscá-las; um pedido direto de vagas ou uma resposta que complete a escolha já demonstra o interesse. Consultar vagas, escolher uma opção e confirmar a reserva são etapas distintas.
 “Agendado”, “por agendamento” e “ordem de chegada” no catálogo descrevem modalidade, não uma reserva deste paciente. Quantidades em observações não comprovam vagas livres agora.
 Resultado esperado: escala habitual antes da busca de vagas, interesse do paciente respeitado e continuidade sem perguntas repetidas.

@@ -1403,6 +1403,10 @@ async function gerarRespostaNinaInterno(
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
   const { REGRA_CADASTRO_AGENDAMENTO } = await import("@/lib/nina/cadastro-paciente");
   const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO } = await import("@/lib/nina/prompt/consulta-agenda");
+  const { REGRA_SELECAO_ATENDIMENTO_CONSULTA } = await import("@/lib/nina/atendimento-consulta");
+  instrucoesAdicionaisTurno.push({ codigo: "TIPO_CONSULTA_ANTES_AGENDA", nivel: "inegociavel",
+    origem: "src/lib/nina/atendimento-consulta.ts", motivo: "Distinguir consulta, revisão e noturna antes de vincular vagas.",
+    texto: REGRA_SELECAO_ATENDIMENTO_CONSULTA });
   const { REGRA_ESCOLHA_PROFISSIONAL_NOMINAL } = await import("@/lib/nina/prompt/regras-catalogo");
   instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_PROFISSIONAL_NOMINAL", nivel: "inegociavel",
     origem: "src/lib/nina/prompt/regras-catalogo.ts", motivo: "Setores e equipes não são opções de médicos para o paciente escolher.",
@@ -2545,9 +2549,9 @@ async function gerarRespostaNinaInterno(
             Array.isArray(dados[chave]) && dados[chave].length > 0);
       }
       if (consultaAgendaAguardandoPaciente(r.dados)) {
-        // Médico ausente/ambíguo não é agenda vazia nem falha técnica.
+        // Médico ou atendimento ambíguo não é agenda vazia nem falha técnica.
         // Registra a tentativa, sem produzir evidência de consulta à agenda.
-        rastro?.pular("tool.execute", "consulta de vagas aguardando identificação inequívoca do médico");
+        rastro?.pular("tool.execute", "consulta de vagas aguardando identificação inequívoca do médico ou atendimento");
         registrarEtapa({
           tipo: "consulta",
           fonte: "sistema",
