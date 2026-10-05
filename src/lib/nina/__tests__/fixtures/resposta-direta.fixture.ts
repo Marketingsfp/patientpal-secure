@@ -127,6 +127,7 @@ const pergunta = perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Ant
     : cenario.endsWith("exame") ? "Quanto custa o exame PET-CT?"
     : cenario.endsWith("procedimento") ? "Vocês fazem o procedimento crioablação?"
     : "Gostaria de marca a pneumologista"
+  : escolhaHorario ? "Quero o horário das 10:20 com Dr. Jorge Ribeiro no dia 21/01/2030."
   : pedidoConsulta ? "Quero consulta de cardiologia" : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const entradaPaciente = pergunta + (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
 const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"

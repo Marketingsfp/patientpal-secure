@@ -46,7 +46,10 @@ describe("runtime entrega resumo validado e aguarda nova mensagem", () => {
         expect(p.exitCode, output + p.stderr.toString()).toBe(0);
         const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
         const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
-        if (cenario.endsWith("cadastro_completo")) expect(r.resposta).toBe(r.resumoEscolhido);
+        // O acabamento mobile pode separar a pergunta final em um parágrafo;
+        // os fatos e a confirmação do resumo devem permanecer idênticos.
+        if (cenario.endsWith("cadastro_completo"))
+          expect(r.resposta.replace(/\s+/g, " ")).toBe(r.resumoEscolhido.replace(/\s+/g, " "));
         else {
           expect(r.resposta).toContain("nome completo");
           expect(r.resposta).toContain("data de nascimento");
