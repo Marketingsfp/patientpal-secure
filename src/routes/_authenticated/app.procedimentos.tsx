@@ -406,12 +406,14 @@ function ProcedimentosPage() {
   const [items, setItems] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "exames_procedimentos" | Tipo>("todos");
   const [filtroSituacao, setFiltroSituacao] = useState<"todos" | "ativos" | "inativos">("ativos");
   // Valores aplicados (só mudam ao clicar em Pesquisar)
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [grupoAplicado, setGrupoAplicado] = useState<string>("todos");
-  const [tipoAplicado, setTipoAplicado] = useState<"todos" | Tipo>("todos");
+  const [tipoAplicado, setTipoAplicado] = useState<"todos" | "exames_procedimentos" | Tipo>(
+    "todos",
+  );
   const [situacaoAplicada, setSituacaoAplicada] = useState<"todos" | "ativos" | "inativos">(
     "ativos",
   );
@@ -668,7 +670,9 @@ function ProcedimentosPage() {
     const espIdFiltro =
       grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter((p) => {
-      if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (tipoAplicado === "exames_procedimentos") {
+        if (p.tipo !== "exame" && p.tipo !== "procedimento") return false;
+      } else if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
       if (situacaoAplicada === "ativos" && !p.ativo) return false;
       if (situacaoAplicada === "inativos" && p.ativo) return false;
       if (grupoAplicado !== "todos") {
@@ -697,8 +701,12 @@ function ProcedimentosPage() {
   ]);
 
   const ordenados = useMemo(() => {
-    if (!sort) return filtrados;
     const cmp = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    // Filtrando por categoria, a lista vem A→Z pelo nome do serviço (sem
+    // agrupar por especialidade), salvo se o usuário clicou numa coluna.
+    if (!sort && tipoAplicado !== "todos")
+      return [...filtrados].sort((a, b) => cmp(a.nome ?? "", b.nome ?? ""));
+    if (!sort) return filtrados;
     const get = (p: Procedimento): string => {
       if (sort.col === "nome") return p.nome ?? "";
       if (sort.col === "grupo") return p.grupo ?? "";
@@ -714,7 +722,7 @@ function ProcedimentosPage() {
       return sort.dir === "asc" ? r : -r;
     });
     return arr;
-  }, [filtrados, sort]);
+  }, [filtrados, sort, tipoAplicado]);
 
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
   const paginaAtual = Math.min(pagina, totalPaginas);
@@ -1285,6 +1293,7 @@ function ProcedimentosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Categorias</SelectItem>
+              <SelectItem value="exames_procedimentos">Exames e procedimentos</SelectItem>
               {tipos.map((t) => (
                 <SelectItem key={t.id} value={t.nome}>
                   {tipoLabel(t.nome)}
