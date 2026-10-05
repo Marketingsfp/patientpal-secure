@@ -2071,23 +2071,23 @@ describe("horários apresentados por período", () => {
     ctx.estado?.appointment.slot_options?.vagas ?? [];
 
   for (const origem of ["homologacao", "whatsapp"] as const) {
-    test(`${origem}: filtros opcionais null consultam agenda sem encaminhar nem reservar`, async () => {
+    test.each([null, "", " \t\n "])(`${origem}: filtros opcionais vazios (%j) consultam agenda sem encaminhar nem reservar`, async vazio => {
       agendaDoDia();
       const ctx: CtxNinaPaciente = { ...contexto("sábado de manhã"), origem, teste: origem === "homologacao" };
-      const args = { medico_id: MEDICO, data: dataDia, periodo: "manha", a_partir_da_hora: null, especialidade: null, mais: null, dias: null };
+      const args = { medico_id: MEDICO, data: dataDia, periodo: "manha", a_partir_da_hora: vazio, especialidade: vazio, mais: vazio, dias: vazio };
       const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", args);
       expect(r.ok).toBe(true);
       expect(horas(r)[0]).toBe("08:00");
       expect(leituras.some(l => l.tabela === "agendamentos")).toBe(true);
       expect(encaminhamentoFalhaAgendamento(validarResultado("consultar_disponibilidade", r))).toBeNull();
       expect(gravacoes).toHaveLength(0);
-      expect(args.a_partir_da_hora).toBeNull(); // não altera o argumento auditado
+      expect(args.a_partir_da_hora).toBe(vazio); // não altera o argumento auditado
     });
-    test(`${origem}: próxima vaga ignora opcionais null, inclusive dia da semana numérico`, async () => {
+    test.each([null, "", " \t\n "])(`${origem}: próxima vaga ignora opcionais vazios (%j), inclusive dia da semana numérico`, async vazio => {
       agendaDoDia();
       const ctx: CtxNinaPaciente = { ...contexto("o primeiro horário"), origem, teste: origem === "homologacao" };
       const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO,
-        especialidade: null, a_partir_de: null, periodo: null, a_partir_da_hora: null, mais: null, dia_semana: null, dias: null });
+        especialidade: vazio, a_partir_de: vazio, periodo: vazio, a_partir_da_hora: vazio, mais: vazio, dia_semana: vazio, dias: vazio });
       expect(r.ok).toBe(true);
       expect(r.proxima).toMatchObject({ hora: "08:00" });
       expect(r.data).toBe(dataDia);
@@ -2109,11 +2109,26 @@ describe("horários apresentados por período", () => {
     });
   }
 
-  test("opcional inválido e horário obrigatório null continuam rejeitados", async () => {
+  test.each([null, "", " \t "])("opcional inválido e horário obrigatório vazio (%j) continuam rejeitados", async vazio => {
     agendaDoDia();
     const ctx = contexto("quero o primeiro horário");
     expect(await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, a_partir_da_hora: "25:99" })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
-    expect(await executarFerramentaPaciente(ctx, "verificar_horario", { medico_id: MEDICO, data: dataDia, hora: null })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+    expect(await executarFerramentaPaciente(ctx, "verificar_horario", { medico_id: MEDICO, data: dataDia, hora: vazio })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+    expect(await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, dias: 0 })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+    expect(gravacoes).toHaveLength(0);
+  });
+
+  test("zero e false são preservados como filtros: domingo e primeira página", async () => {
+    const domingo = new Date(dia);
+    domingo.setUTCDate(domingo.getUTCDate() + (7 - domingo.getUTCDay()) % 7);
+    const sabado = new Date(domingo.getTime() - 86_400_000);
+    banco.agendamentos = [linha("sabado", sabado, true), linha("domingo", domingo, true)];
+    const r = await executarFerramentaPaciente(contexto("primeiro horário de domingo"), "proxima_vaga", {
+      medico_id: MEDICO, dia_semana: 0, mais: false, a_partir_da_hora: "",
+    });
+    expect(r.ok).toBe(true);
+    expect(r.data).toBe(domingo.toISOString().slice(0, 10));
+    expect(r.proxima).toMatchObject({ hora: "08:00" });
     expect(gravacoes).toHaveLength(0);
   });
 

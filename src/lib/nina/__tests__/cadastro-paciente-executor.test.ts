@@ -207,6 +207,18 @@ describe("executor do cadastro com banco simulado", () => {
     expect(r).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
     expect(rpcs).toHaveLength(0);
   });
+  test.each(["", " \t "])("cadastro trata opcionais vazios (%j) como ausentes e preserva o WhatsApp", async vazio => {
+    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", {
+      nome: "Ana da Silva", data_nascimento: "15 de janeiro de 1979", cpf: vazio, telefone: vazio,
+    });
+    expect(r.ok).toBe(true);
+    expect(rpcs[0]?.args).toMatchObject({ _nome: "ANA DA SILVA", _data_nascimento: "1979-01-15", _cpf: null, _telefone: "21999990000" });
+  });
+  test("nome e nascimento vazios pedem os dados, sem gravar cadastro", async () => {
+    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", { nome: " ", data_nascimento: "", cpf: "", telefone: "" });
+    expect(r).toMatchObject({ ok: false, erro: "PATIENT_DATA_REQUIRED", campos_faltantes: ["nome", "data_nascimento"] });
+    expect(rpcs).toHaveLength(0);
+  });
   test("produção usa a função atômica sem CPF e registra identidade", async () => {
     const ctx = contexto();
     expect(

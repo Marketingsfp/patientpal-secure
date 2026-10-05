@@ -1208,14 +1208,16 @@ async function executarFerramentaInterna(
     args = argsRaw as Record<string, unknown>;
   }
 
-  // Modelos podem representar campos opcionais ausentes como null. Remova
-  // apenas os opcionais declarados, antes das coerções (null não vira 0/domingo).
+  // Modelos podem enviar opcionais ausentes como null, "" ou espaços. Remova
+  // apenas os opcionais declarados, antes das coerções (vazio não vira 0/domingo).
   // Campos obrigatórios e valores inválidos continuam sujeitos ao schema.
   const definicao = FERRAMENTAS_NINA_PACIENTE.find((f) => f.function.name === nome)?.function.parameters;
   if (definicao && args && typeof args === "object" && !Array.isArray(args)) {
     const obrigatorios = new Set<string>("required" in definicao ? definicao.required : []);
-    args = Object.fromEntries(Object.entries(args).filter(([campo, valor]) =>
-      valor !== null || !(campo in definicao.properties) || obrigatorios.has(campo)));
+    args = Object.fromEntries(Object.entries(args).filter(([campo, valor]) => {
+      const vazio = valor === null || (typeof valor === "string" && valor.trim() === "");
+      return !vazio || !(campo in definicao.properties) || obrigatorios.has(campo);
+    }));
   }
 
   // Contexto transitório da chamada; não altera o ctx compartilhado por outras ferramentas.
