@@ -70,10 +70,12 @@ describe("fonte operacional — médicos e consultas", () => {
 
   test("o texto por consulta é lido pelo interpretador que a Nina já usa", () => {
     const blocos = separarAtendimentos(alex.observacao_publica, alex.nome);
-    expect(blocos.map((b) => [b.atendimento, b.especialidade, b.dinheiro, b.pix_cartao])).toEqual([
+    // A origem rotula Cartão; o parser mantém esse campo separado de Pix/cartão.
+    expect(blocos.map((b) => [b.atendimento, b.especialidade, b.dinheiro, b.cartao])).toEqual([
       ["CONSULTA", "CARDIOLOGIA", "R$ 120,00", "R$ 145,00"],
       ["CONSULTA CARDIOLOGIA INFANTIL", "CARDIOLOGIA INFANTIL", "R$ 160,00", "R$ 190,00"],
     ]);
+    expect(blocos.every((b) => b.pix_cartao === null)).toBe(true);
   });
 
   test("vira registro de conhecimento da Nina com preço da consulta certa e Pix/cartão", () => {

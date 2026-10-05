@@ -95,7 +95,36 @@ const cache = new Map<string, { em: number; leitura: Promise<FonteOperacional> }
 
 /** Uso editorial autenticado: leitura fresca para prévia/cópia manual, sem ativar atendimento. */
 export async function lerFonteParaSincronizacao(clinicaId: string): Promise<FonteOperacional> {
-  return lerCadastro(clinicaId);
+  const db = supabaseAdmin as unknown as { from: (t: string) => any };
+  const [fonte, vinculos] = await Promise.all([
+    lerCadastro(clinicaId),
+    // Mesma origem de Cadastros > Médicos > Editar médico > Especialidade.
+    // A tabela não tem clinica_id: o escopo vem do médico vinculado.
+    todasAsPaginas<{ medico_id: string; especialidade: EspecialidadeOp | null }>(() =>
+      db.from("medico_especialidades")
+        .select("medico_id, especialidade:especialidades(id, nome), medicos!inner(clinica_id)")
+        .eq("medicos.clinica_id", clinicaId)
+        .order("medico_id", { ascending: true }).order("especialidade_id", { ascending: true })),
+  ]);
+  const medicos = new Set(fonte.profissionais.map((p) => p.id));
+  const porMedico = new Map<string, EspecialidadeOp[]>();
+  for (const v of vinculos) {
+    if (!medicos.has(v.medico_id)) continue;
+    if (!v.especialidade?.id || !v.especialidade.nome?.trim())
+      throw new Error("Não foi possível conferir uma especialidade do cadastro médico. Nenhum registro foi sincronizado.");
+    const lista = porMedico.get(v.medico_id) ?? [];
+    lista.push(v.especialidade);
+    porMedico.set(v.medico_id, lista);
+  }
+  return {
+    ...fonte,
+    profissionais: fonte.profissionais.map((p) => ({
+      ...p,
+      // Uma lista vazia é um cadastro sem especialidade, não autorização para
+      // recuperar o campo legado ou inferir especialidades pelos procedimentos.
+      especialidades: porMedico.get(p.id) ?? [],
+    })),
+  };
 }
 
 /** Limpa o cache (uso em testes). */
