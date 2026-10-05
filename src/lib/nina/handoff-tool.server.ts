@@ -14,7 +14,7 @@ export const FERRAMENTA_HANDOFF = {
   function: {
     name: NOME_FERRAMENTA_HANDOFF,
     description:
-      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após as respostas a duas perguntas de esclarecimento. Se a primeira resposta não esclarecer a identificação, faça a segunda pergunta antes de encaminhar por esse motivo. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento.",
+      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou duas mensagens do paciente sem entendimento: na primeira peça esclarecimento; se a resposta continuar incompreendida, encaminhe sem pedir uma terceira tentativa. Chamadas ao modelo e pesquisas no mesmo turno não contam como mensagens do paciente. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento.",
     parameters: {
       type: "object",
       properties: {

@@ -1,7 +1,6 @@
 /**
  * Jev — Fase 2: encaminhar para a recepção. Puro (sem rede), testável.
- * Limites aprovados em 25/09/2026 (proposta do plano; ajustáveis depois).
- * Possível regra de negócio — validar com a equipe da clínica.
+ * Duas falhas de entendimento encaminham (regra confirmada em 05/10/2026).
  */
 import type { PerguntaJev, RespostaJev } from "./jev";
 
@@ -14,6 +13,8 @@ export const LIMITES_ENCAMINHAMENTO = { urgencia: 0.5, pedido_atendente: 0.7, ir
  * sobrepõem, mesmo quando a mensagem é clara.
  */
 export const LIMITE_ENTENDIMENTO = 0.5;
+
+export const REGRA_DUAS_FALHAS_ENTENDIMENTO = "ENTENDIMENTO-02 — Na primeira mensagem do paciente que não conseguir compreender, peça esclarecimento objetivo. Se não compreender a nova resposta do paciente, essa é a segunda falha: encaminhe para atendimento humano pela ferramenta disponível, com o motivo e a dúvida restante, sem pedir uma terceira tentativa. Conte mensagens do paciente, nunca chamadas ao modelo, pesquisas de ferramentas ou reprocessamentos da mesma entrada. Entendimento confirmado ou avanço real reinicia a sequência. Falha técnica, dado ausente na fonte e perguntas necessárias de cadastro, data, horário ou confirmação não são falhas de entendimento. Preserve respostas confirmadas às perguntas independentes. Esta regra prevalece sobre instruções antigas de três mensagens ou duas perguntas de esclarecimento. Na homologação use somente o encaminhamento simulado; transferência real só pode ser anunciada após confirmação do sistema.";
 
 export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
   return {
@@ -66,10 +67,12 @@ export type ContagemDuvida = {
    * para a mais recente. (Nome mantido pelos registros já gravados.)
    */
   confiancas: number[];
+  /** IDs da entrada já avaliada, para reprocessamento não contar outra falha. */
+  mensagensEntrada?: string[];
 };
 
-/** Igual à CONV-04: até duas perguntas de esclarecimento; encaminha se a resposta à segunda ainda não resolver. */
-export const FALHAS_PARA_ENCAMINHAR = 3;
+/** Primeira mensagem incompreendida: esclarecer. Segunda: encaminhar. */
+export const FALHAS_PARA_ENCAMINHAR = 2;
 
 export function contarDuvida(a: {
   /** Resposta à pergunta `entendimento` (Fase 2). */
@@ -78,14 +81,22 @@ export function contarDuvida(a: {
   selecaoValida: boolean;
   marco: string;
   anterior: ContagemDuvida | null;
+  mensagensEntrada?: readonly string[];
 }): ContagemDuvida {
-  if (!naoEntendeu(a.entendimento) || a.selecaoValida) return { falhas: 0, marco: a.marco, confiancas: [] };
+  const ids = [...new Set(a.mensagensEntrada ?? [])];
+  const entrada = ids.length ? { mensagensEntrada: ids } : {};
+  if (a.selecaoValida || (typeof a.entendimento?.noul === "number" && !naoEntendeu(a.entendimento)))
+    return { falhas: 0, marco: a.marco, confiancas: [], ...entrada };
+  if (a.anterior?.marco === a.marco && (typeof a.entendimento?.noul !== "number" ||
+    (ids.length > 0 && ids.every(id => a.anterior!.mensagensEntrada?.includes(id))))) return a.anterior;
+  if (!naoEntendeu(a.entendimento)) return { falhas: 0, marco: a.marco, confiancas: [], ...entrada };
   const confianca = a.entendimento!.noul!;
   const continua = a.anterior !== null && a.anterior.falhas > 0 && a.anterior.marco === a.marco;
   return {
     falhas: continua ? a.anterior!.falhas + 1 : 1,
     marco: a.marco,
-    confiancas: [...(continua ? a.anterior!.confiancas : []), confianca].slice(-3),
+    confiancas: [...(continua ? a.anterior!.confiancas : []), confianca].slice(-FALHAS_PARA_ENCAMINHAR),
+    ...entrada,
   };
 }
 

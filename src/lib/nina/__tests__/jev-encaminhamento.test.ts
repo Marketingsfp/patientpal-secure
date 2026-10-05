@@ -26,13 +26,12 @@ describe("Jev Fase 2 — encaminhamento", () => {
     expect(decidirEncaminhamento({ ...base, irritacao: { noul: 0.79 } }, null)).toBeNull();
     expect(decidirEncaminhamento({ ...base, irritacao: { noul: 0.8 } }, null)?.motivo).toContain("IRRITACAO");
   });
-  test("dúvida só encaminha com 3 falhas seguidas sem avanço (igual à CONV-04), com as confianças no motivo", () => {
+  test("dúvida encaminha na segunda mensagem sem entendimento, com as confianças no motivo", () => {
     expect(decidirEncaminhamento(base, falhas(1, [0.39]))).toBeNull();
-    expect(decidirEncaminhamento(base, falhas(2, [0.39, 0.37]))).toBeNull();
-    const e = decidirEncaminhamento(base, falhas(3, [0.39, 0.37, 0.3]));
+    const e = decidirEncaminhamento(base, falhas(2, [0.39, 0.37]));
     expect(e?.motivo).toContain("JEV_DUVIDA_REPETIDA");
-    expect(e?.motivo).toContain("em 3 mensagens seguidas");
-    expect(e?.motivo).toContain("entendimento 0,39 e 0,37 e 0,30");
+    expect(e?.motivo).toContain("em 2 mensagens seguidas");
+    expect(e?.motivo).toContain("entendimento 0,39 e 0,37");
     expect(motivoLegivel(e!.motivo)).not.toContain("JEV_");
   });
   test("falha de entendimento = pergunta própria de entendimento abaixo de 0,5; sem resposta não é falha", () => {
@@ -54,14 +53,24 @@ describe("Jev Fase 2 — contagem de falhas reais", () => {
     expect(c.falhas).toBe(1);
     expect(decidirEncaminhamento(base, c)).toBeNull();
   });
-  test("falhas sem avanço somam; a segunda ainda não encaminha, a terceira sim", () => {
+  test("falhas sem avanço somam; a segunda encaminha sem esperar uma terceira", () => {
     const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
     const c2 = contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: false, marco: "a", anterior: c1 });
     expect(c2.falhas).toBe(2);
-    expect(decidirEncaminhamento(base, c2)).toBeNull();
-    const c3 = contarDuvida({ entendimento: { noul: 0.15 }, selecaoValida: false, marco: "a", anterior: c2 });
-    expect(c3.falhas).toBe(3);
-    expect(decidirEncaminhamento(base, c3)?.motivo).toContain("DUVIDA");
+    expect(decidirEncaminhamento(base, c2)?.motivo).toContain("DUVIDA");
+  });
+  test("reprocessar as mesmas entradas não vira uma segunda falha", () => {
+    const parametros = { entendimento: baixa, selecaoValida: false, marco: "a", mensagensEntrada: ["m1", "m2"] };
+    const c1 = contarDuvida({ ...parametros, anterior: null });
+    const repetida = contarDuvida({ ...parametros, mensagensEntrada: ["m2", "m1"], anterior: c1 });
+    expect(repetida.falhas).toBe(1);
+    expect(decidirEncaminhamento(base, repetida)).toBeNull();
+    const nova = contarDuvida({ ...parametros, mensagensEntrada: ["m3"], anterior: repetida });
+    expect(decidirEncaminhamento(base, nova)?.motivo).toContain("em 2 mensagens");
+  });
+  test("sem avaliação de entendimento não inventa falha nem entendimento confirmado", () => {
+    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
+    expect(contarDuvida({ entendimento: undefined, selecaoValida: false, marco: "a", anterior: c1 })).toEqual(c1);
   });
   test("atendimento avançou: a contagem recomeça", () => {
     const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });

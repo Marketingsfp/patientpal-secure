@@ -17,6 +17,20 @@ const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
 const progressoLongo = cenario.startsWith("progresso_longo");
 const conferencias: any[] = [];
+const duvidaCenario = cenario.startsWith("catalogo_duvida_");
+const decisoesEntendimento: any[] = [];
+if (duvidaCenario) mock.module("@/lib/nina/jev.server", () => ({
+  jevAtivo: async (_clinica: string, fase: string) => fase === "fase2_encaminhamento",
+  perguntarJev: async () => ({ ok: true, respostas: { entendimento: { noul: cenario.endsWith("entendida") ? 0.95 : 0.1 } } }),
+  contagemAnteriorFase1: async () => {
+    if (cenario.endsWith("primeira")) return null;
+    const { marcoAtendimento } = await import("../../jev-contexto");
+    return { falhas: 1, marco: marcoAtendimento(estadoVazio()), confiancas: [0.2],
+      mensagensEntrada: [cenario.endsWith("reprocessamento") ? "entrada-simulada" : "entrada-anterior"] };
+  },
+  limitesJev: async () => ({ urgencia: 0.5, pedido_atendente: 0.7, irritacao: 0.8 }),
+  registrarDecisaoJev: async (decisao: any) => { decisoesEntendimento.push(structuredClone(decisao)); },
+}));
 if (cenario.includes("_jev_")) mock.module("@/lib/nina/jev.server", () => ({
   jevAtivo: async (_clinica: string, fase: string) => fase === "fase6_conferencia",
   conferirRespostaJev: async (ctx: any) => {
@@ -547,6 +561,8 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (duvidaCenario) return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
+    conteudo: cenario.endsWith("entendida") ? "Entendi seu pedido." : "Pode explicar de outra forma o que você precisa?" };
   if (progressoLongo) return {
     ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "medium",
     conteudo: requests.length > 8 ? "Encontrei horários às 10:00 nos dias consultados. Qual data você prefere?" : "",
@@ -731,7 +747,7 @@ await registrarEntregaSaida({
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
   resposta, respostaModelo, resumoEscolhido, prompt, pergunta, motorChamado, rede, requests, ferramentas, consultas, ordem, argumentosFerramentas, estadoPerguntas,
   temNota: auditoria.decisaoId != null, gravacoes,
-  encaminhamentos, resultados, conferencias,
+  encaminhamentos, resultados, conferencias, decisoesEntendimento,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],
   finalizacao: auditoria.finalizacao,
   resultado: auditoria.resultado,

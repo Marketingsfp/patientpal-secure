@@ -943,7 +943,7 @@ async function gerarRespostaNinaInterno(
 
   // JEV — Fases 1 e 2 (produção e homologação, flags `nina_jev_fase1/2`), numa
   // única chamada. Fase 1: com confiança alta a intenção do Jev prevalece.
-  // Fase 2: sinais acima do limite, ou falha de entendimento em 3 mensagens
+  // Fase 2: sinais acima do limite, ou falha de entendimento em 2 mensagens
   // seguidas SEM avanço do atendimento, encaminham para a recepção. Escolher
   // uma opção já oferecida nunca conta como falha. Erro/demora = fluxo atual.
   let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
@@ -1002,6 +1002,7 @@ async function gerarRespostaNinaInterno(
               respondeEscolhaDeHorarios(sessaoNina.estado, mensagemPaciente),
             marco: ctxJev.marcoAtendimento(sessaoNina.estado),
             anterior,
+            mensagensEntrada: opcoes?.mensagensEntrada,
           })
         : null;
       if (f2 && respostas) {
@@ -1388,6 +1389,10 @@ async function gerarRespostaNinaInterno(
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
   const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
+  const { REGRA_DUAS_FALHAS_ENTENDIMENTO } = await import("@/lib/nina/jev-encaminhamento");
+  instrucoesAdicionaisTurno.push({ codigo: "ENTENDIMENTO_DUAS_FALHAS", nivel: "inegociavel",
+    origem: "src/lib/nina/jev-encaminhamento.ts", motivo: "Regra confirmada: duas mensagens do paciente sem entendimento encaminham.",
+    texto: REGRA_DUAS_FALHAS_ENTENDIMENTO });
   const { criarProgressoTurno, criarCompactadorRetornos, REGRA_EFICIENCIA_CONSULTAS, REGRA_MODALIDADES_PAGAMENTO, RESPOSTA_SEM_PROGRESSO } =
     await import("@/lib/nina/eficiencia-turno");
   instrucoesAdicionaisTurno.push(
@@ -2181,8 +2186,7 @@ async function gerarRespostaNinaInterno(
   }
   // JEV — Fase 2: encaminhamento decidido pelo Jev, pelo fluxo de handoff
   // existente, igual em produção e homologação.
-  // Identificação pendente usa o fluxo comum; os demais motivos do Jev continuam imediatos.
-  if (conhecimentoAnterior?.esclarecimento && jevEncaminhamento?.motivo.startsWith("JEV_DUVIDA_REPETIDA")) jevEncaminhamento = null;
+  // Duas falhas reais de entendimento também encaminham com identificação pendente.
   const perguntaComplementar = perguntaParaCompletarIdentificacao(conhecimentoAnterior, contextoRespostaProfissional);
   if (perguntaComplementar && ctxFerramentas && conhecimentoAnterior) {
     ctxFerramentas.esclarecimentoCatalogo = { ...conhecimentoAnterior.esclarecimento!, pergunta: perguntaComplementar, opcoes: [] };

@@ -146,15 +146,14 @@ describe("regressão da sessão 470", () => {
     expect(decidirEncaminhamento(base, c3)).toBeNull();
   });
 
-  test("três respostas realmente incompreensíveis, sem avanço, encaminham (duas não)", () => {
+  test("duas mensagens realmente incompreensíveis, sem avanço, encaminham", () => {
     const base = { urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
     const e = estadoComOferta();
     const marco = marcoAtendimento(e);
     const c1 = contarDuvida({ entendimento: { noul: 0.1 }, selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null, marco, anterior: null });
     const c2 = contarDuvida({ entendimento: { noul: 0.12 }, selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null, marco, anterior: c1 });
-    expect(decidirEncaminhamento(base, c2)).toBeNull();
-    const c3 = contarDuvida({ entendimento: { noul: 0.08 }, selecaoValida: opcaoEscolhidaJev("??", opcoesOferecidasJev(e)) !== null, marco, anterior: c2 });
-    expect(decidirEncaminhamento(base, c3)?.motivo).toContain("JEV_DUVIDA_REPETIDA");
+    expect(decidirEncaminhamento(base, c1)).toBeNull();
+    expect(decidirEncaminhamento(base, c2)?.motivo).toContain("JEV_DUVIDA_REPETIDA");
   });
 
   test("confirmação curta ('sim') entendida não conta como falha", () => {

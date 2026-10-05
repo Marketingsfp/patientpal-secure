@@ -187,7 +187,7 @@ export const SAIDAS_VISAO_SIMPLES: SaidaVisaoSimples[] = [
     resumo: "Pedido, regra ou falha",
     depoisDe: "acao",
     explicacao: [
-      "Quando o paciente pede uma pessoa, quando uma regra da clínica manda encaminhar, quando não há vaga ou quando o pedido continua sem entendimento mesmo depois de duas perguntas de esclarecimento, a conversa passa para a equipe.",
+      "Quando o paciente pede uma pessoa, quando uma regra da clínica manda encaminhar, quando não há vaga ou quando a Nina não entende duas mensagens seguidas do paciente, a conversa passa para a equipe. Na primeira falha, ela pede esclarecimento; na segunda, encaminha.",
       "O paciente recebe uma única mensagem de transferência, com o número do protocolo.",
       "Se algo falhar ou travar, o vigia do atendimento tenta retomar. Sem sucesso, avisa o paciente com a frase padrão de encaminhamento e coloca a conversa na fila.",
       "Quem assume recebe um resumo do que já foi conversado. Na homologação a transferência é simulada: a mensagem leva o aviso de simulação e nenhuma atendente real é acionada.",

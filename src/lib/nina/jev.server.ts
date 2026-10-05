@@ -28,6 +28,7 @@ export async function contagemAnteriorFase1(
       falhas: salva.falhas,
       marco: salva.marco,
       confiancas: Array.isArray(salva.confiancas) ? salva.confiancas.filter((c) => typeof c === "number") : [],
+      ...(Array.isArray(salva.mensagensEntrada) ? { mensagensEntrada: salva.mensagensEntrada.filter(id => typeof id === "string") } : {}),
     };
   const conf = (respostas?.["intencao"] as { confidence?: unknown } | undefined)?.confidence;
   return typeof conf === "number" && conf < 0.8 ? { falhas: 1, marco: "", confiancas: [conf] } : null;
