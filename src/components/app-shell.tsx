@@ -614,6 +614,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Nina",
     items: [
+      { to: "/app/nina", hash: "voz-nina", label: "Voz da Nina", icon: Mic },
       {
         to: "/app/nina",
         hash: "base-conhecimento",

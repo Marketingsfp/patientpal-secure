@@ -62,6 +62,7 @@ import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
 
 const LaboratorioNina = lazy(() => import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })));
 const BaseConhecimento = lazy(() => import("@/components/nina/BaseConhecimento").then((m) => ({ default: m.BaseConhecimento })));
+const VozNina = lazy(() => import("@/components/nina/VozNina").then((m) => ({ default: m.VozNina })));
 const DashboardOsZap = lazy(() => import("@/components/nina/DashboardOsZap").then((m) => ({ default: m.DashboardOsZap })));
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
@@ -107,6 +108,7 @@ function NinaPage() {
     "pesquisa-conversas",
     "informacoes-clinica",
     "base-conhecimento",
+    "voz-nina",
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
@@ -189,6 +191,11 @@ function NinaPage() {
         </TabsContent>
         <TabsContent value="informacoes-clinica">
           <InformacoesClinica />
+        </TabsContent>
+        <TabsContent value="voz-nina">
+          <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Carregando voz da Nina…</p>}>
+            <VozNina key={clinicaId} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
