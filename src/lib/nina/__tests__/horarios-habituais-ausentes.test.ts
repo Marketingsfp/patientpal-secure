@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { motivoSemHorariosHabituais } from "../horarios-habituais";
+import { motivoSemHorariosHabituais, orientacaoHorariosHabituais } from "../horarios-habituais";
 import type { ResultadoBroker } from "../tool-broker";
 
 const registro = (nome = "Paulo Guilherme", horarios: unknown[] = []) => ({ id: nome, tipo: "profissional", medico: nome,
@@ -8,6 +8,22 @@ const registro = (nome = "Paulo Guilherme", horarios: unknown[] = []) => ({ id: 
 const retorno = (records: unknown[], extra = {}): ResultadoBroker => ({ ferramenta: "consultar_cadastro", capacidade: "searchKnowledgeBase",
   fonte: "base_conhecimento", success: true, reused: false, appointment_confirmed: false, dados: { found: true, knowledge_status: "found", records, ...extra } });
 const escala = [{ dia: "Quarta-feira", inicio: "07:30", fim: "08:30" }];
+
+test("apresentação genérica separa escala confirmada, ausente e leitura parcial sem alterar a fonte", () => {
+  const r = retorno([registro("Eneida", escala), registro("Mauricio"),
+    { id: "parcial", tipo: "profissional", medico: "Andrea" },
+    { ...registro("Legado"), dias_horarios: "Terça-feira das 08h às 12h" }]);
+  const antes = structuredClone(r);
+  expect(orientacaoHorariosHabituais(r)).toMatchObject({
+    com_horarios: [{ registro: "Eneida", nome: "Eneida" }, { registro: "Legado", nome: "Legado" }],
+    sem_horarios: [{ registro: "Mauricio", nome: "Mauricio" }],
+    nao_verificados: [{ registro: "parcial", nome: "Andrea" }],
+  });
+  expect(r).toEqual(antes);
+  expect(orientacaoHorariosHabituais(retorno([registro()], { esclarecimento: {} }))).toBeNull();
+  expect(orientacaoHorariosHabituais({ ...r, success: false })).toBeNull();
+  expect(orientacaoHorariosHabituais({ ...r, capacidade: "checkAvailability" })).toBeNull();
+});
 
 test("falta de escala só encaminha o médico identificado; busca ampla não escolhe por conta própria", () => {
   expect(motivoSemHorariosHabituais(retorno([registro(), registro("André", escala)]))).toBeNull();
@@ -53,6 +69,14 @@ for (const ambiente of ["producao", "homologacao"])
         expect(r.ferramentas).toContain("buscar_medicos");
         expect(r.requests).toHaveLength(3);
         expect(r.resposta).toContain("Horários habituais");
+        if (caso === "otorrino") {
+          const retornos = r.requests.at(-1).messages.filter((m: any) => m.role === "tool")
+            .map((m: any) => JSON.parse(m.content));
+          const orientacao = retornos.at(-1).consulta_agenda.apresentacao_profissionais;
+          expect(orientacao.com_horarios.map((p: any) => p.nome)).toEqual(["Eneida de Oliveira Rodrigues"]);
+          expect(orientacao.sem_horarios.map((p: any) => p.nome)).toEqual(["Mauricio Albuquerque de Paula"]);
+          expect(orientacao.nao_verificados).toEqual([]);
+        }
         if (caso === "clinico") {
           const selecao = r.etapas.filter((e: any) => e.titulo === "Dados atuais da base compartilhados com a Nina").at(-1).dados.selecao;
           expect(selecao.selecao.medicoNome).toBe("Claudia Maria Rodrigues dos Santos");

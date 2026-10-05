@@ -2208,6 +2208,9 @@ async function gerarRespostaNinaInterno(
         permite_reservar: false,
         fonte_vagas: "agenda",
         fonte_horarios_habituais: "catalogo_publicado",
+        ...(!esclarecimentoAtual ? {
+          apresentacao_profissionais: (await import("@/lib/nina/horarios-habituais")).orientacaoHorariosHabituais(r),
+        } : {}),
       },
     };
   }

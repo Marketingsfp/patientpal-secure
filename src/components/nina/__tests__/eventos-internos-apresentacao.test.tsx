@@ -28,6 +28,23 @@ const renderizar = (ev: ConversaEvento) =>
   renderToStaticMarkup(<ConversationSystemEvent evento={ev} />);
 
 describe("Apresentação dos registros internos para atendimento real e homologação", () => {
+  test("falta de horários mostra causa e profissional no evento, grupo e marcador sem reescrever histórico", () => {
+    const motivo = "HORARIOS_HABITUAIS_NAO_INFORMADOS: Dr. Nicolas. A equipe deve conferir a escala; não consultar vagas nem substituir o profissional.";
+    const ev = evento({ motivo });
+    const antes = structuredClone(ev);
+    const grupo = agruparTimeline({ eventos: [ev] }).itens[0] as GrupoHandoff;
+    for (const texto of [renderizar(ev), renderToStaticMarkup(<HandoffGroupCard grupo={grupo} />),
+      textoMarcadorSistema(`🔁 Conversa transferida da Nina para atendimento humano · Motivo: ${motivo}`)]) {
+      expect(texto).toContain("Faltam dias e horários habituais cadastrados");
+      expect(texto).toContain("Dr. Nicolas");
+      expect(texto).not.toContain("contém informações técnicas");
+      expect(texto).not.toContain("HORARIOS_HABITUAIS_NAO_INFORMADOS");
+    }
+    expect(ev).toEqual(antes);
+    expect(grupo.motivo).toBe(motivo);
+    expect(motivoParaAtendimento("HORARIOS_HABITUAIS_NAO_INFORMADOS")).toContain("confirmar esses horários");
+    expect(motivoParaAtendimento("HORARIOS_HABITUAIS_NAO_INFORMADOS: {\"trace_id\":42}" )).not.toContain("trace_id");
+  });
   test("um único cartão mostra encaminhamento e reserva sem aviso azul repetido", () => {
     const reserva = {
       id: "reserva",

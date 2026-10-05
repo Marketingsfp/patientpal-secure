@@ -36,6 +36,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
     [
+      /\bHORARIOS_HABITUAIS_NAO_INFORMADOS\b/i,
+      "Faltam dias e horários habituais cadastrados para o profissional. A equipe precisa confirmar esses horários para continuar o atendimento.",
+    ],
+    [
       /^(?:\[[^\]]+\]\s*)?(?:CATALOGO_ATENDIMENTO_HUMANO\s*\/\s*)?PROFISSIONAL[_\s]+(?:[EÉ]\s+)?SFP\b/i,
       "Regra SFP: atendimento encaminhado para a equipe humana por estar vinculado ao profissional SFP.",
     ],
