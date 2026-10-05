@@ -33,10 +33,12 @@ export type ConhecimentoSessao = {
   esclarecimento?: ResultadoConhecimento["esclarecimento"];
   esclarecimentoTentativas?: number;
   esclarecimentoPerguntas?: string[];
+  /** Perguntas independentes pendentes; apenas referências, nunca fatos antigos. */
+  pendenciasIdentificacao?: ConhecimentoSessao[];
 };
 
 const texto = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | null {
+export function normalizarConhecimentoSessao(v: unknown, incluirPendencias = true): ConhecimentoSessao | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   if (o.versao !== 1 || !texto(o.clinicaId, 80) || !texto(o.sessionId, 80)) return null;
@@ -100,6 +102,11 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
       ...(texto(q.dia, 40) ? { dia: texto(q.dia, 40) } : {}),
     },
     referencias,
+    ...(incluirPendencias && Array.isArray(o.pendenciasIdentificacao) ? {
+      pendenciasIdentificacao: o.pendenciasIdentificacao.slice(0, 20)
+        .map(p => normalizarConhecimentoSessao(p, false))
+        .filter((p): p is ConhecimentoSessao => !!p?.esclarecimento && p.clinicaId === o.clinicaId && p.sessionId === o.sessionId),
+    } : {}),
     ...(normalizarPreferenciaAtendimento(o.atendimentoConsulta)
       ? { atendimentoConsulta: normalizarPreferenciaAtendimento(o.atendimentoConsulta)! } : {}),
     ...(esclarecer

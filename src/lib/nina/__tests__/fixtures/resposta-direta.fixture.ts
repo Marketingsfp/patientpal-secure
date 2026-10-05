@@ -25,6 +25,8 @@ const clinicoGeral = cenario.startsWith("catalogo_clinico_geral_");
 const procedimentoExecutante = cenario === "procedimento_executante";
 const medicoClinico = cenario.endsWith("carlos") ? "Carlos Alberto Varillas" : cenario.endsWith("milton") ? "Milton Guimarães" : "Ana Souza";
 const contextual = cenariosContextuais[cenario];
+const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_");
+let estadoPerguntas: any = null;
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
 const ausente = cenario.startsWith("catalogo_ausente");
@@ -117,7 +119,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
-const pergunta = unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
+const pergunta = perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
   : cenario.endsWith("novo_pedido") ? "Agora quero outro exame XYZ" : clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
@@ -137,6 +139,12 @@ const agora = Date.now();
 const estadoContextual = { ...estadoVazio(), session_id: "sessao-contextual",
   session_started_at: new Date(agora - 30 * 60_000).toISOString(),
   updated_at: new Date(agora).toISOString(),
+};
+if (cenario === "catalogo_multiplas_retomada") estadoContextual.knowledge_context = {
+  versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual", consulta: { termo: "Urologia", medico: "Adrian" },
+  referencias: [{ registro: "Urologia", procedimento: "Urologia", medicoNome: "Marcelo", versao: null }],
+  esclarecimento: { tipo: "profissional", opcoes: [{ id: "Urologia", nome: "Marcelo" }], pergunta: "Sobre Urologia, você quis dizer Marcelo? Pode confirmar ou escrever o nome novamente." },
+  esclarecimentoTentativas: 1,
 };
 if (fonteRetomada) {
   estadoContextual.fonte_consulta = { fonte: fonteEscolhida === "clinica_os" ? "base_conhecimento" : "clinica_os", revisao: "anterior" };
@@ -203,7 +211,10 @@ if (confirmacaoMedico) estadoContextual.knowledge_context = {
     opcoes: [{ id: "medico-0", nome: "Sandro Prinscewal", especialidade: "CARDIOLOGIA, CLINICO GERAL" }] },
 };
 if (cenario === "foto_sessao_nova") estadoContextual.session_started_at = new Date(agora - 3 * 60_000).toISOString();
-const mensagensContextuais = fotoCenario ? [
+const mensagensContextuais = perguntasMultiplas ? [
+  ...(cenario === "catalogo_multiplas_retomada" ? [registroMensagem(estadoContextual.knowledge_context!.esclarecimento!.pergunta, 1)] : []),
+  { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+] : fotoCenario ? [
   ...(cenario === "foto_primeira" ? [] : [{ ...registroMensagem(PEDIR_NOVA_FOTO, 1), enviada_por: "nina",
     clinica_id: "clinica-simulada", status: cenario === "foto_pedido_pendente" ? "pending" : "sent" }]),
   { ...registroMensagem("Foto", 18, "in", "received"), id: "entrada-simulada", clinica_id: "clinica-simulada", tipo: "image",
@@ -276,15 +287,15 @@ mock.module("@/integrations/supabase/client.server", () => ({
         maybeSingle: () => { unica = true; return q; },
         insert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         upsert: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
-        update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
+        update: (valor: any) => { gravacoes.push({ tabela, valor: perguntasMultiplas ? structuredClone(valor) : valor }); return q; },
         then: (resolve: any) => Promise.resolve(resolve({
           data: fonteCenario && tabela === "clinica_feature_flags" ? [{ clinica_id: "clinica-simulada", flag_key: "nina_fonte_conhecimento", ativo: true, config: { fonte: fonteEscolhida }, updated_at: "2026-10-04T15:00:00Z" }].find(l => filtrosCatalogo.every(f => f(l))) ?? null
             : pedidoConsulta && tabela === "nina_cat_profissionais" ? [{ id: "medico-base", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: "Ana Souza", especialidades: [{ nome: "CARDIOLOGIA" }], estrutura: { pedido_medico: "obrigatorio" }, formas_pagamento: [], horarios: [], convenios: [] }].filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : fonteCenario && tabela === "nina_cat_servicos" ? baseFonte.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-            : (fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? (fotoCenario ? mensagensContextuais.filter(l => filtrosCatalogo.every(f => f(l))) : mensagensContextuais)
+            : (perguntasMultiplas || fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (perguntasMultiplas || fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? (fotoCenario ? mensagensContextuais.filter(l => filtrosCatalogo.every(f => f(l))) : mensagensContextuais)
             : unica ? null : [], error: null,
           count: (fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
@@ -399,6 +410,23 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
       };
     }
+    if (perguntasMultiplas && nome === "consultar_cadastro") {
+      estadoPerguntas = params.ctxPaciente.estado;
+      const a = typeof args === "string" ? JSON.parse(args) : args as any;
+      const incerto = a.termo === "Urologia" || cenario.endsWith("duas_duvidas");
+      const dados = incerto ? { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "consulta",
+        records: [{ id: a.termo, procedimento: a.termo, medico: "Candidato", valor: "R$ 999,00" }],
+        esclarecimento: { tipo: "profissional", pergunta: a.termo === "Urologia"
+          ? "Sobre Urologia, você quis dizer Marcelo? Pode confirmar ou escrever o nome novamente."
+          : "Sobre Psiquiatria, você quis dizer Antonia? Pode confirmar ou escrever o nome novamente.",
+          opcoes: [{ id: a.termo, nome: a.termo === "Urologia" ? "Marcelo" : "Antonia" }] }
+      } : { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "consulta", records: [
+        { id: "psiquiatria", procedimento: "Consulta Psiquiatria", medico: "Dr. Antonio", dia: "Segunda", horario: "08:00" }
+      ] };
+      const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "base_conhecimento", success: true, reused: false, dados };
+      resultados.push(r);
+      return r;
+    }
     if (nome === "solicitar_atendente_humano" && (agenda || regraCatalogo)) {
       const pedido = (typeof args === "string" ? JSON.parse(args) : args) as Record<string, unknown>;
       encaminhamentos.push(pedido);
@@ -498,6 +526,18 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (perguntasMultiplas) {
+    const chamada = (termo: string, medico: string, id: string) => ({ id, type: "function", function: {
+      name: "consultar_cadastro", arguments: JSON.stringify({ termo, medico, tipo_atendimento: "consulta", nova_solicitacao: true }) } });
+    const u = chamada("Urologia", "Adrian", "u"), ps = chamada("Psiquiatria", "Antonio", "p");
+    const sequencial = cenario.endsWith("sequencial");
+    return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+      conteudo: requests.length === 1 ? "" : "Sim, o Dr. Antonio atende Psiquiatria às segundas, às 08:00.",
+      toolCalls: requests.length === 1 ? cenario.endsWith("retomada") ? [ps] : sequencial ? [u] : cenario.endsWith("invertida") ? [ps, u] : cenario.endsWith("repetida") ? [u, { ...u, id: "u-repetida" }, ps] : [u, ps,
+        { id: "nao-agendar", type: "function", function: { name: "agendar", arguments: "{}" } }]
+        : sequencial && requests.length === 2 ? [ps] : [],
+    };
+  }
   if (cenario.startsWith("loop_alternativas")) return {
     ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
     conteudo: !req.tools && cenario === "loop_alternativas" ? "Não há vaga no dia pedido. Como alternativa, temos 22/01 às 14:00. Essa data serve?" : "",
@@ -642,7 +682,7 @@ const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
 const ultimaEntrada = mensagensContextuais.at(-1);
 const textoFoto = ultimaEntrada && "transcricao" in ultimaEntrada ? String(ultimaEntrada.transcricao) : "";
-const resposta = await gerarRespostaNina("clinica-simulada", fotoCenario ? textoFoto : procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente, fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario ? "55000100999" : null, {
+const resposta = await gerarRespostaNina("clinica-simulada", fotoCenario ? textoFoto : procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente, perguntasMultiplas || fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],
@@ -656,7 +696,7 @@ await registrarEntregaSaida({
   decisaoId: "decisao-antiga", textoHash: "hash-direto",
 });
 console.log("DIRETA_RESULTADO=" + JSON.stringify({
-  resposta, respostaModelo, resumoEscolhido, prompt, pergunta, motorChamado, rede, requests, ferramentas, consultas, ordem, argumentosFerramentas,
+  resposta, respostaModelo, resumoEscolhido, prompt, pergunta, motorChamado, rede, requests, ferramentas, consultas, ordem, argumentosFerramentas, estadoPerguntas,
   temNota: auditoria.decisaoId != null, gravacoes,
   encaminhamentos, resultados,
   etapas: gravacoes.find(g => g.tabela === "nina_execucao_evidencias")?.valor.etapas ?? [],

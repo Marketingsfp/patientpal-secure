@@ -34,7 +34,7 @@ describe("Nina: confirmação e encaminhamento após reformulação inconclusiva
         if (etapa === "primeiro" || etapa === "novo_pedido") {
           expect(r.resposta).toContain("Pode informar o nome do procedimento por extenso?");
           expect(r.resposta).not.toContain("R$");
-          expect(r.requests).toHaveLength(1);
+          expect(r.requests).toHaveLength(2); // permite pesquisar outras perguntas antes de concluir
           expect(JSON.stringify(r.gravacoes)).toContain("esclarecimento");
           expect(JSON.stringify(r.gravacoes)).toContain('"esclarecimentoTentativas":1');
         } else if (etapa === "terceiro" || etapa.startsWith("segundo")) {

@@ -1910,6 +1910,9 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/confidence/selecao-contextual");
   const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO } =
     await import("@/lib/nina/catalogo-esclarecimento");
+  const { criarPerguntasDoTurno, comporRespostaParcial, PESQUISAS_INDEPENDENTES } = await import("@/lib/nina/perguntas-independentes");
+  const perguntasDoTurno = criarPerguntasDoTurno(conhecimentoAnterior, mensagemPaciente);
+  let respostaParcialConfirmada = false;
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
     | null = null;
@@ -1976,10 +1979,7 @@ async function gerarRespostaNinaInterno(
     } catch {
       /* inválido não vira referência */
     }
-    const referenciaAnterior =
-      ["consultar_cadastro", "buscar_procedimentos"].includes(nome) && parametros.nova_solicitacao === true
-        ? null
-        : conhecimentoAnterior;
+    const referenciaAnterior = perguntasDoTurno.referencia(parametros);
     r = prepararSegundaPergunta(referenciaAnterior, r);
     {
       const { confirmarAntesDeEncaminhar } = await import("@/lib/nina/catalogo-sem-registro");
@@ -2144,6 +2144,9 @@ async function gerarRespostaNinaInterno(
         },
       });
     }
+    perguntasDoTurno.registrar(parametros, fluxoEstado.knowledge_context ?? null, referenciaAnterior,
+      !esclarecimentoAtual && ex.consulta.status === "com_itens");
+    if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = perguntasDoTurno.pendentes[0]?.esclarecimento;
     const ausencia =
       encaminharAposEsclarecimento(referenciaAnterior, r, mensagemPaciente) ??
       encaminhamentoSemRegistro(r, args);
@@ -2157,7 +2160,10 @@ async function gerarRespostaNinaInterno(
     )
       await encaminharRegraCatalogo(nome, undefined, evidenciaRegraHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)));
     return {
-      ...(limitarRetornoParaModelo(payload) as Record<string, unknown>),
+      ...(esclarecimentoAtual ? {
+        ok: true, precisa_esclarecer: true, consulta: parametros, esclarecimento: esclarecimentoAtual,
+        instrucao: "Identificação pendente apenas nesta pergunta. As opções são hipóteses, não fatos confirmados. Continue pesquisando as outras perguntas independentes; responda o que estiver confirmado e inclua esta pergunta de esclarecimento.",
+      } : limitarRetornoParaModelo(payload) as Record<string, unknown>),
       // A seleção legada auxilia referências internas; não é uma declaração
       // de intenção do paciente. Essa interpretação cabe ao modelo no histórico.
       consulta_agenda: {
@@ -2241,7 +2247,7 @@ async function gerarRespostaNinaInterno(
     .catch(() => false);
   for (let rodada = 0; rodada < MAX_RODADAS; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto) break;
-    if (ctxFerramentas?.esclarecimentoCatalogo) {
+    if (perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo) {
       resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
       break;
     }
@@ -2270,7 +2276,7 @@ async function gerarRespostaNinaInterno(
     // Não aplica a operações/cadastro nem converte falhas em disponibilidade.
     // Sem agenda (modo que só informa), consultas ao cadastro que esgotam as
     // rodadas sem texto também viram resposta com os fatos, não transferência.
-    const sintetizarOpcoes = rodada === MAX_RODADAS - 1 && (agendaComOpcoes || !podeAgendar) &&
+    const sintetizarOpcoes = rodada === MAX_RODADAS - 1 && (agendaComOpcoes || !podeAgendar || Boolean(ctxFerramentas?.esclarecimentoCatalogo)) &&
       nomesFerramentasTurno.length > 0 &&
       nomesFerramentasTurno.every(nome => consultasSemOperacao.has(nome));
     if (sintetizarOpcoes) mensagens.push({ role: "system", content: agendaComOpcoes
@@ -2446,6 +2452,7 @@ async function gerarRespostaNinaInterno(
         }
       }
       resposta = texto;
+      respostaParcialConfirmada = perguntasDoTurno.temConfirmadas;
       {
         const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
         registrarOrigemResposta("modelo", "texto devolvido pelo modelo, sem substituição");
@@ -2461,7 +2468,7 @@ async function gerarRespostaNinaInterno(
         const originais = c.function.arguments;
         c.function.arguments = prepararPesquisaAtendimentoDaSessao(nome, originais, {
           clinicaId, sessionId: fluxoEstado.session_id ?? null,
-          conhecimento: itemConfirmadoNaResposta || profissionalConfirmadoNaResposta ? conhecimentoAnterior : fluxoEstado.knowledge_context,
+          conhecimento: itemConfirmadoNaResposta || profissionalConfirmadoNaResposta ? conhecimentoAnterior : PESQUISAS_INDEPENDENTES.has(nome) ? perguntasDoTurno.referencia(originais) : fluxoEstado.knowledge_context,
           ...contextoRespostaProfissional,
         }) ?? originais;
         if (c.function.arguments !== originais) registrarEtapa({
@@ -2469,6 +2476,13 @@ async function gerarRespostaNinaInterno(
           dados: { ferramenta: nome, argumentos_originais: originais, argumentos_efetivos: c.function.arguments },
           codigo: { arquivo: "src/lib/nina/pesquisa-atendimento-sessao.ts", funcao: "prepararPesquisaAtendimentoDaSessao" },
         });
+      }
+      if (ctxFerramentas?.esclarecimentoCatalogo && !PESQUISAS_INDEPENDENTES.has(nome)) {
+        mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
+          ok: false, executada: false, erro: "IDENTIFICACAO_PENDENTE",
+          mensagem: "Há uma identificação pendente. Continue as pesquisas independentes no catálogo e responda somente o que elas confirmarem. Aguarde esclarecimento antes de executar ações.",
+        }) });
+        continue;
       }
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
@@ -2557,7 +2571,7 @@ async function gerarRespostaNinaInterno(
         }
         break;
       }
-      if (ctxFerramentas?.esclarecimentoCatalogo) break;
+      // A dúvida de um item não interrompe as consultas restantes do lote.
       if (finalizacaoHandoff || turnoObsoleto) break;
       const dadosAgendamento = r.dados as Record<string, unknown> | null;
       if (r.success && dadosAgendamento?.sem_agendamento === true &&
@@ -2671,6 +2685,10 @@ async function gerarRespostaNinaInterno(
     registrarOrigemResposta("nenhuma", "turno abortado por revisão obsoleta da conversa");
     return "";
   }
+  if (ctxFerramentas?.esclarecimentoCatalogo && limiteRodadasAtingido) {
+    resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
+    limiteRodadasAtingido = false;
+  }
   if (limiteRodadasAtingido && resposta.trim() === "") {
     const rhLimite = await broker
       .executar(
@@ -2698,6 +2716,9 @@ async function gerarRespostaNinaInterno(
 
   // Texto tal como saiu do modelo, antes dos ajustes obrigatórios abaixo.
   const respostaDoModelo = finalizacaoHandoff?.textoModelo ?? (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
+
+  if (!finalizacaoHandoff && !houveHandoff && !perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo)
+    fluxoEstado.knowledge_context = perguntasDoTurno.estado(fluxoEstado.knowledge_context ?? null);
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
@@ -2769,15 +2790,14 @@ async function gerarRespostaNinaInterno(
 
   if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo) {
     const { apresentarPerguntaEsclarecimento } = await import("@/lib/nina/esclarecimento-apresentacao");
-    // Primeira resposta da sessão: a pergunta substitui o texto do modelo,
-    // então a apresentação publicada vem junto (CONV-02).
+    // Sem fatos independentes confirmados, entrega apenas o esclarecimento.
+    // Com resposta parcial, preserva o texto e acrescenta as pendências.
     const apresentacao = saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
       ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
       : null;
-    resposta = apresentarPerguntaEsclarecimento(ctxFerramentas.esclarecimentoCatalogo.pergunta, {
-      tipo: ctxFerramentas.esclarecimentoCatalogo.tipo,
-      apresentacao,
-    });
+    resposta = perguntaComplementar
+      ? apresentarPerguntaEsclarecimento(ctxFerramentas.esclarecimentoCatalogo.pergunta, { tipo: ctxFerramentas.esclarecimentoCatalogo.tipo, apresentacao })
+      : comporRespostaParcial(respostaParcialConfirmada ? resposta : "", perguntasDoTurno.pendentes, apresentacao);
     transformar(
       "catalogo.esclarecimento",
       "confirmar o candidato ou pedir nova escrita antes de encaminhar",
@@ -2785,7 +2805,7 @@ async function gerarRespostaNinaInterno(
       resposta,
       "aviso_operacional",
     );
-    marcarOrigem("codigo", "identificação pendente: aguardar uma resposta do paciente");
+    marcarOrigem(respostaParcialConfirmada ? "modelo_transformado" : "codigo", "identificação pendente por pergunta; respostas confirmadas preservadas");
   }
   if (finalizacaoHandoff) {
     const antes = respostaDoModelo;

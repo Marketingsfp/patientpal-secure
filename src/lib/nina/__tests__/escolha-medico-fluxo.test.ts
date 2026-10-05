@@ -19,7 +19,7 @@ describe("escolha incorreta de médico no núcleo real com catálogo atual", () 
         expect(r.resposta).toContain("Shirley Martins");
         expect(r.resposta).toContain("Raisa Moura");
         expect(JSON.stringify(r.gravacoes)).toContain('"motivo":"medico_nao_identificado"');
-        expect(r.requests).toHaveLength(1);
+        expect(r.requests).toHaveLength(2); // o restante da mensagem ainda pode conter perguntas independentes
       } else if (etapa === "segundo") {
         expect(r.encaminhamentos[0].motivo).toContain("CATALOGO_MEDICO_NAO_IDENTIFICADO");
         expect(r.encaminhamentos[0].resumo).toContain("Consulta encontrada: Dermatologia");
