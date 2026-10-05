@@ -25,6 +25,7 @@
 
 import { z } from "zod";
 import { REGRA_CONSULTA_CATALOGO } from "./catalogo-busca";
+import { REGRA_SOMENTE_PRIMEIRO_HORARIO } from "./prompt/consulta-agenda";
 import { mapaCamposResultado } from "./catalogo-mapa-campos";
 import { consultarDadosClinicasGrupo, consultarHorariosClinicasGrupo, selecionarClinicasGrupo, PARAMETRO_CLINICA_INFORMATIVA } from "./clinicas-grupo";
 import { OBJETIVOS_PESQUISA_CATALOGO, TIPOS_ATENDIMENTO_CATALOGO } from "./catalogo-pesquisa";
@@ -849,7 +850,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
     function: {
       name: "proxima_vaga",
       description:
-        "Primeira vaga REAL disponível do médico escolhido, depois da apresentação dos dias e horários habituais e do interesse do paciente em agendar. Não antecipe a busca na apresentação inicial. Em uma busca já iniciada, não repita essa apresentação. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir uma data exata. Exige definir o médico; uma pergunta geral sobre a especialidade não autoriza consultar vagas. Apresentação por período: com até 10 horários no dia, mostra todos; com mais de 10, devolve só os períodos com vaga para você perguntar a preferência (não liste horários ainda). Consulte de novo com periodo, a_partir_da_hora ou mais=true (próximos horários, sem repetir). Se o paciente já disse o período ou um horário de preferência, envie-o direto. Muitos horários nunca justificam encaminhamento.",
+        "Primeira vaga REAL disponível do médico escolhido, depois da apresentação dos dias e horários habituais e do interesse do paciente em agendar. Não antecipe a busca na apresentação inicial. Retorna somente o primeiro horário, mesmo quando há muitas vagas. Aceita 'a próxima disponível', 'a primeira vaga', 'a quinta-feira mais próxima' ou 'qualquer horário', sem exigir data/período. Preserve os filtros já informados. Não consulte outra ferramenta para acrescentar uma lista não pedida. Se o paciente pedir outros horários, use consultar_disponibilidade ou mais=true para continuar sem repetir. A oferta não autoriza reservar.",
       parameters: {
         type: "object",
         properties: {
@@ -1351,7 +1352,7 @@ async function executarFerramentaInterna(
           criterio: "menor data e horário entre os profissionais com agendamento", dias_consultados: p.dias ?? 60,
           proxima: melhores[0] ? apresentar(melhores[0]) : null,
           empatados: melhores.slice(1).map(apresentar), sem_pre_agendamento: semAgendamento,
-          instrucao: "Apresente médico, atendimento, dia/data, horário real, modalidade, orientações e todas as formas de pagamento do registro desse médico. Em empate, mostre as opções e peça a escolha. Não confirme reserva: a vaga ainda depende da escolha e do resumo final aceito. Se há atendimento sem pré-agendamento, informe separadamente os dias/períodos publicados e que basta comparecer; não prometa horário individual nem diga que a vaga agendada é mais cedo que o atendimento sem agendamento." };
+          instrucao: REGRA_SOMENTE_PRIMEIRO_HORARIO + " Apresente médico, atendimento, dia/data, horário real, modalidade, orientações e todas as formas de pagamento do registro desse médico. Em empate, mostre as opções e peça a escolha. Não confirme reserva: a vaga ainda depende da escolha e do resumo final aceito. Se há atendimento sem pré-agendamento, informe separadamente os dias/períodos publicados e que basta comparecer; não prometa horário individual nem diga que a vaga agendada é mais cedo que o atendimento sem agendamento." };
       }
       case "selecionar_horario": {
         const p = z.object({ medico_id: z.string(), inicio: z.string(), fim: z.string() }).parse(args);
@@ -1995,6 +1996,8 @@ async function executarFerramentaInterna(
         let slots = desde ? todos.filter((s) => dataISODoSlot(s.inicio) >= desde) : todos;
         if (p.dia_semana !== undefined)
           slots = slots.filter((s) => diaSemanaDe(dataISODoSlot(s.inicio)) === p.dia_semana);
+        if (!p.mais && p.a_partir_da_hora)
+          slots = slots.filter(s => s.hora >= p.a_partir_da_hora!);
         logAgenda("proxima_vaga", {
           medico: medicoNome,
           medico_id: medicoId,
@@ -2023,6 +2026,21 @@ async function executarFerramentaInterna(
         // O primeiro dia com vaga, lido inteiro: o período e a página vêm da apresentação.
         const dataDia = dataISODoSlot(horariosDistintos(slots)[0]!.inicio);
         const base = { especialidadeId, medicoId };
+        if (!p.mais) {
+          const primeira = horariosDistintos(slots)[0]!;
+          // Só a vaga apresentada fica elegível para escolha. Registra a página
+          // para um pedido posterior de outros horários não repetir a primeira.
+          const { pendencia } = await apresentarDia(ctx, {
+            chave: chaveDoDia(ctx, base, dataDia), slots: [primeira],
+            filtro: { periodo: p.periodo ?? "qualquer", a_partir_da_hora: p.a_partir_da_hora },
+          });
+          if (pendencia) return pendencia;
+          return { ok: true, data: dataDia, modo_apresentacao: "primeiro_horario",
+            proxima: { modalidade_atendimento: primeira.modalidade, orientacao: orientacaoModalidade(primeira.modalidade!),
+              medico_id: primeira.medico_id, medico: primeira.medico_nome, especialidade: primeira.especialidade,
+              data: primeira.data, hora: primeira.hora, inicio: primeira.inicio, fim: primeira.fim },
+            instrucao: REGRA_SOMENTE_PRIMEIRO_HORARIO };
+        }
         let doDia: SlotNina[];
         try {
           const dia = await lerDiaCompleto(ctx, base, dataDia);

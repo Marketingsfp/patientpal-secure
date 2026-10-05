@@ -1402,7 +1402,10 @@ async function gerarRespostaNinaInterno(
   );
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
   const { REGRA_CADASTRO_AGENDAMENTO } = await import("@/lib/nina/cadastro-paciente");
-  const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO } = await import("@/lib/nina/prompt/consulta-agenda");
+  const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO, REGRA_SOMENTE_PRIMEIRO_HORARIO } = await import("@/lib/nina/prompt/consulta-agenda");
+  instrucoesAdicionaisTurno.push({ codigo: "SOMENTE_PRIMEIRO_HORARIO", nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "Pedido pela primeira vaga não solicita uma lista de alternativas.",
+    texto: REGRA_SOMENTE_PRIMEIRO_HORARIO });
   const { REGRA_SELECAO_ATENDIMENTO_CONSULTA } = await import("@/lib/nina/atendimento-consulta");
   instrucoesAdicionaisTurno.push({ codigo: "TIPO_CONSULTA_ANTES_AGENDA", nivel: "inegociavel",
     origem: "src/lib/nina/atendimento-consulta.ts", motivo: "Distinguir consulta, revisão e noturna antes de vincular vagas.",

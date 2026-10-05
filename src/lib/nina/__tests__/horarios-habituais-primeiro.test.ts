@@ -1,12 +1,13 @@
 import { expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 import { PROMPT_NINA_WHATSAPP_V4 } from "../prompt/behavior-v4";
-import { REGRA_HORARIOS_HABITUAIS_PRIMEIRO } from "../prompt/consulta-agenda";
+import { REGRA_HORARIOS_HABITUAIS_PRIMEIRO, REGRA_SOMENTE_PRIMEIRO_HORARIO } from "../prompt/consulta-agenda";
 import { validarTemplateInstrucoes } from "../instrucoes-template";
 
 test("prompt de referência preserva as exceções e remove atalhos anteriores à escala", () => {
   expect(validarTemplateInstrucoes("whatsapp", PROMPT_NINA_WHATSAPP_V4).ok).toBe(true);
   expect(PROMPT_NINA_WHATSAPP_V4).toContain(REGRA_HORARIOS_HABITUAIS_PRIMEIRO);
+  expect(PROMPT_NINA_WHATSAPP_V4).toContain(REGRA_SOMENTE_PRIMEIRO_HORARIO);
   expect(PROMPT_NINA_WHATSAPP_V4).not.toContain("Mais de quatro profissionais: antes de listar");
   expect(PROMPT_NINA_WHATSAPP_V4).not.toContain('Pergunte: "Você prefere a primeira data disponível');
   expect(PROMPT_NINA_WHATSAPP_V4).toContain("sem pré-agendamento");
@@ -27,6 +28,7 @@ for (const ambiente of ["producao", "homologacao"])
       const sistemas = r.requests[0].messages.filter((m: any) => m.role === "system").map((m: any) => m.content).join("\n");
       expect(sistemas).toContain(REGRA_HORARIOS_HABITUAIS_PRIMEIRO);
       expect(sistemas).toContain("ESCALA_ANTES_DAS_VAGAS");
+      expect(sistemas).toContain(REGRA_SOMENTE_PRIMEIRO_HORARIO);
       expect(r.requests).toHaveLength(1);
       expect(r.encaminhamentos).toHaveLength(0);
       expect(r.rede).toBe(0);

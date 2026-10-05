@@ -738,6 +738,9 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     Object.assign(banco.agendamentos![0]!, { inicio: `${data}T09:00:00-03:00`, fim: `${data}T09:30:00-03:00` });
     Object.assign(banco.agendamentos![1]!, { inicio: `${data}T14:00:00-03:00`, fim: `${data}T14:30:00-03:00` });
     const r = await chamar("primeiro disponível à tarde", { ...pedido, periodo: "tarde" }).resultado;
+    expect(r.horarios).toBeUndefined();
+    expect(r.seguintes).toBeUndefined();
+    expect(String(r.instrucao)).toContain("não faça outra consulta de disponibilidade");
     expect(r.proxima).toMatchObject({ medico_id: OUTRO, hora: "14:00" });
   });
   test("busca cobre a janela de 60 dias declarada", async () => {
@@ -2122,20 +2125,58 @@ describe("horários apresentados por período", () => {
   test("próxima vaga com período já informado não pergunta de novo", async () => {
     agendaDoDia();
     const r = await executarFerramentaPaciente(contexto("a primeira data, de tarde"), "proxima_vaga", { medico_id: MEDICO, periodo: "tarde" });
-    expect(r.modo_apresentacao).toBe("lista");
+    expect(r.modo_apresentacao).toBe("primeiro_horario");
     expect((r.proxima as Linha).hora).toBe("13:40");
-    expect(r.seguintes as Linha[]).toHaveLength(9);
-    expect(r.ha_mais).toBe(true);
+    expect(r.seguintes).toBeUndefined();
+    expect(r.ha_mais).toBeUndefined();
   });
 
-  test("próxima vaga sem período, com mais de 10 no dia: informa o dia e pergunta o período", async () => {
+  test("próxima vaga sem período, com mais de 10 no dia: oferece somente a primeira", async () => {
     agendaDoDia();
     const r = await executarFerramentaPaciente(contexto("a primeira data"), "proxima_vaga", { medico_id: MEDICO });
-    expect(r.modo_apresentacao).toBe("escolher_periodo");
-    expect(r.proxima).toBeUndefined();
+    expect(r.modo_apresentacao).toBe("primeiro_horario");
+    expect(r.proxima).toMatchObject({ hora: "08:00" });
     expect(r.data).toBe(dataDia);
-    expect(r.proxima_data).toBeTruthy();
+    expect(r.seguintes).toBeUndefined();
+    expect(r.periodos_com_vagas).toBeUndefined();
   });
+
+  test("primeira vaga não abre lista mesmo quando há menos de dez opções", async () => {
+    banco.agendamentos = Array.from({ length: 6 }, (_, i) => linha(`primeira-${i}`, depois(dia, i * 30), true));
+    const ctx = contexto("o primeiro horário");
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.proxima).toMatchObject({ hora: "08:00" });
+    expect(r.seguintes).toBeUndefined();
+    expect(opcoes(ctx)).toHaveLength(1);
+  });
+
+  test("primeira vaga depois das 14h ignora dia que só tem manhã", async () => {
+    banco.agendamentos = [linha("manha", dia, true), linha("tarde-amanha", depois(dia, 24 * 60 + 7 * 60), true)];
+    const ctx = contexto("o primeiro horário depois das 14h");
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO, a_partir_da_hora: "14:00" });
+    expect(r.proxima).toMatchObject({ data: dataSeguinte.split("-").reverse().join("/"), hora: "15:00" });
+    expect(opcoes(ctx)).toHaveLength(1);
+  });
+
+  for (const origem of ["homologacao", "whatsapp"] as const)
+    test(`${origem}: primeira vaga registra só uma opção; pedido posterior permite outras sem repetir`, async () => {
+      agendaDoDia();
+      const ctx = { ...contexto("pode ser o primeiro horário"), origem, teste: origem === "homologacao" };
+      const primeira = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(primeira.proxima).toMatchObject({ hora: "08:00" });
+      expect(primeira.seguintes).toBeUndefined();
+      expect(opcoes(ctx)).toHaveLength(1);
+      expect(String(primeira.instrucao)).toContain("somente a opção mais cedo");
+      expect(gravacoes).toHaveLength(0);
+      ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
+      ctx.consultaAgenda.mensagemAtual = "quero ver outros horários";
+      const outras = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO, mais: true });
+      expect(outras.ok, JSON.stringify(outras)).toBe(true);
+      expect((outras.proxima as Linha).hora).not.toBe("08:00");
+      expect(outras.seguintes as Linha[]).toHaveLength(9);
+      expect(opcoes(ctx)).toHaveLength(11);
+      expect(gravacoes).toHaveLength(0);
+    });
 
   test("troca de data e reset recomeçam a lista", async () => {
     agendaDoDia(15);
