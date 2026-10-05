@@ -311,6 +311,9 @@ function acharEspecialidade(termo: string, lista: Array<{ id: string; nome: stri
 function escopoModalidade(ctx: CtxNinaPaciente, procedimento?: string | null): EscopoAtendimentoConsulta | undefined {
   const pedido = procedimentoDaSessao(ctx.estado, ctx.clinicaId);
   if (pedido) return { atendimento: pedido.nome, procedimentoId: pedido.catalogo_id };
+  const escolha = confirmacaoDaEscolha(ctx.estado, ctx.clinicaId)?.vaga;
+  if (escolha?.tipo_atendimento === "consulta" && escolha.procedimento &&
+    (!procedimento || procedimento === escolha.procedimento)) return { atendimento: escolha.procedimento };
   if (ctx.consultaResolvida && !procedimento) return ctx.consultaResolvida.escopo;
   const conhecimento = conhecimentoDaMesmaSessao(ctx.estado?.knowledge_context, ctx.clinicaId, ctx.estado?.session_id ?? null);
   if (conhecimento?.consulta.tipo_atendimento !== "consulta") return undefined;
@@ -1571,16 +1574,15 @@ async function executarFerramentaInterna(
           const candidatos = p.nome ? todos.filter(c => escolhido?.ok ? c.medicoId === escolhido.id
             : normalizar(c.medicoNome) === normalizar(p.nome!)) : todos;
           if (!candidatos.length) {
-            const publicos = todos.filter(c => c.medicoNome.trim());
-            if (!publicos.length) return falhaVinculoAtendimento();
-            const esclarecimento = { tipo: "profissional" as const, motivo: "medico_nao_identificado" as const,
-              atendimento: pedido.nome,
-              pergunta: `Não identifiquei esse profissional entre os executantes de ${pedido.nome}. Qual destes profissionais você deseja?\n${[...new Set(publicos.map(c => c.medicoNome))].join("\n")}`,
-              opcoes: publicos.map(c => ({ id: pedido.catalogo_id, nome: c.medicoNome })) };
-            ctx.esclarecimentoCatalogo = esclarecimento;
+            // Executante pode ser setor/recurso. Uma busca de nome incompatível
+            // não autoriza o código a montar uma lista de médicos para escolher.
+            // Preserve os fatos e IDs, sem selecionar substituto nem criar uma
+            // pendência global a partir desta pesquisa auxiliar.
             return { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento",
               procedure: pedido.nome, pedido_interpretado: { atendimento: pedido.nome },
-              registros: todos.map(c => c.registro), mapa_campos: mapaCamposResultado(["servico"]), esclarecimento };
+              profissional_solicitado_encontrado: false, profissional_pesquisado: p.nome,
+              registros: todos.map(c => c.registro), mapa_campos: mapaCamposResultado(["servico"]),
+              instrucao: "O nome pesquisado não corresponde aos executantes deste atendimento. Confira a qual pedido pertence o profissional antes de perguntar. Não associe o médico de um exame a outro. Interprete os executantes publicados: setores/equipes/recursos não são opções de médicos. Com setor, informe o atendimento e a modalidade; sem pré-agendamento não ofereça reserva. Para pessoas identificadas, esclareça somente a escolha ainda necessária. Não selecione substituto nem afirme vínculo para o nome não encontrado." };
           }
           return { ok: true, found: true, knowledge_status: "found", source: "nina_catalogo", source_type: "catalog",
             tipo_atendimento: "exame_procedimento", procedure: pedido.nome,

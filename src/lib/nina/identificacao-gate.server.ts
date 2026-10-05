@@ -58,7 +58,7 @@ import { registrarPedidoTelefone, PEDIR_TELEFONE } from "./telefone-paciente";
 
 /* ------------------------------------------------------------ confirmações */
 
-import { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
+import { ehConfirmacaoDeAgendamento, separarAceiteComPergunta } from "./confirmacao-agendamento";
 import { ehRespostaNegativaCurta } from "./resposta-afirmativa";
 export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 
@@ -551,6 +551,9 @@ export async function aplicarGateIdentificacao(params: {
     aceitarResumoEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? []);
   }
   const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
+  // Guarda o aceite do resumo entregue, mas deixa o modelo responder também
+  // aos pedidos paralelos. A ferramenta agendar conserva todas as validações.
+  if (confirmacao && (separarAceiteComPergunta(mensagem) || pareceAssuntoParalelo(mensagem))) return null;
   if (!confirmacao) {
     estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
     const resumoJaEntregue = cadastroProntoNoInicio && !selecionouAgora &&

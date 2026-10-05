@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
 describe("perguntas independentes no núcleo compartilhado (serviços simulados)", () => {
   for (const ambiente of ["producao", "homologacao"])
-    for (const caso of ["normal", "invertida", "sequencial", "repetida", "duas_duvidas", "retomada", "obsoleto"])
+    for (const caso of ["normal", "invertida", "sequencial", "repetida", "duas_duvidas", "retomada", "obsoleto", "reserva", "reserva_primeiro", "reserva_repetida", "transferencia_ficticia"])
       it(ambiente + ": " + caso, () => {
         const p = Bun.spawnSync(
           [process.execPath, fixture, ambiente, "catalogo_multiplas_" + caso],
@@ -17,7 +17,19 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         const r = JSON.parse(linha.slice("DIRETA_RESULTADO=".length));
         expect(r.rede).toBe(0);
         expect(r.encaminhamentos).toHaveLength(0);
-        expect(r.ferramentas).not.toContain("agendar");
+        if (caso.startsWith("reserva")) {
+          expect(r.ferramentas.filter((n: string) => n === "agendar")).toHaveLength(1);
+          expect(r.estadoPerguntas.appointment.confirmation.vaga.catalogo_id).toBe("usg");
+          expect(r.estadoPerguntas.appointment.confirmation.aceita).toBe(true);
+        } else expect(r.ferramentas).not.toContain("agendar");
+        if (caso === "transferencia_ficticia") {
+          expect(r.resposta).not.toContain("Vou encaminhar");
+          expect(r.resposta).not.toContain("instabilidade técnica");
+          expect(r.resposta).toContain("ainda não foi realizado");
+          const alteracao = r.etapas.find((e: any) => e.tipo === "alteracao_posterior");
+          expect(alteracao.dados.antes).toContain("Vou encaminhar");
+          expect(alteracao.dados.depois).not.toContain("Vou encaminhar");
+        }
         if (caso === "obsoleto") {
           expect(r.resposta).toBe("");
           return;
@@ -44,6 +56,7 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         ).not.toContain("999");
         const chamadas = r.requests[0].messages;
         expect(JSON.stringify(chamadas)).toContain("Perguntas independentes");
+        expect(JSON.stringify(chamadas)).toContain("PEDIDOS PARALELOS");
         expect(JSON.stringify(chamadas)).toContain("telefone de contato usa por padrão o número do remetente");
       });
 });

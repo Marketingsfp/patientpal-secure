@@ -98,6 +98,16 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
 }
 
 describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
+  test.each([true, false])("sessão 670: aceite com pergunta mantém outras perguntas para o modelo (%s)", async teste => {
+    const t = preparar(); t.ctx.teste = teste; t.ctx.origem = teste ? "homologacao" : "whatsapp";
+    await t.turno("Ana da Silva, 02/01/1990");
+    const resposta = await t.turno("isso ai pode marca. ah e da pra fazer um hemograma e o TSH no msm dia?");
+    expect(resposta).toBeNull();
+    expect(t.estado.appointment.confirmation?.aceita).toBe(true);
+    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(true);
+    expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(0);
+    expect(t.encaminhamentos).toHaveLength(0);
+  });
   test("correção explícita conserva vaga, mostra Telefone e só reserva após novo aceite", async () => {
     const t = preparar();
     await t.turno("Ana da Silva, 02/01/1990");

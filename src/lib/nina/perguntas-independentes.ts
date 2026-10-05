@@ -3,6 +3,8 @@ import { apresentarPerguntaEsclarecimento } from "./esclarecimento-apresentacao"
 import type { ResultadoBroker } from "./tool-broker";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import { sugerirResultadoJev } from "./identificacao-catalogo";
+import { confirmacaoDaEscolha } from "./agendamento-escolha";
+import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 
 const normal = (v: unknown) =>
   typeof v === "string"
@@ -32,6 +34,29 @@ export const PESQUISAS_INDEPENDENTES = new Set([
   "buscar_procedimentos",
   "listar_especialidades",
 ]);
+
+/** Só libera a escolha já validada e inequívoca. IDs de catálogo distintos
+ * comprovam que a pendência pertence a outro pedido; ausência de prova bloqueia.
+ * Isso não autoriza reserva: o executor ainda exige paciente, aceite e vaga. */
+export function pendenciaBloqueiaFerramenta(nome: string, args: unknown,
+  pendentes: readonly ConhecimentoSessao[], estado: EstadoFluxoNina, clinicaId: string): boolean {
+  if (!pendentes.length || PESQUISAS_INDEPENDENTES.has(nome)) return false;
+  if (!["agendar", "verificar_horario", "selecionar_horario", "consultar_cadastro_paciente", "identificar_paciente"].includes(nome)) return true;
+  const c = confirmacaoDaEscolha(estado, clinicaId), p = parametrosPesquisa(args);
+  if (!c?.vaga.catalogo_id) return true;
+  const v = c.vaga;
+  if ((p.medico_id != null && p.medico_id !== v.medico_id) ||
+      (p.procedimento != null && normal(p.procedimento) !== normal(v.procedimento)) ||
+      (p.data != null && p.data !== v.data) || (p.hora != null && p.hora !== v.hora) ||
+      (p.inicio != null && Date.parse(String(p.inicio)) !== Date.parse(v.inicio)) ||
+      (p.fim != null && Date.parse(String(p.fim)) !== Date.parse(v.fim))) return true;
+  return pendentes.some(q => {
+    if (q.clinicaId !== clinicaId || q.sessionId !== estado.session_id ||
+        normal(q.consulta.termo) === normal(v.procedimento)) return true;
+    const ids = [...q.referencias.map(r => r.registro), ...(q.esclarecimento?.opcoes.map(o => o.id) ?? [])].filter(Boolean);
+    return !ids.length || ids.includes(v.catalogo_id!);
+  });
+}
 
 /** Uma dúvida pertence à pergunta pesquisada, não ao conjunto da mensagem. */
 export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensagem = "") {

@@ -41,12 +41,12 @@ export function perguntasEscolha(s: SituacaoEscolha): Record<string, PerguntaJev
       aceite: {
         type: "choice",
         instructions:
-          "A Maria propôs o agendamento em `resumo_proposto` e pediu confirmação. Como o paciente respondeu em `resposta_do_paciente`?",
+          "A Maria propôs o agendamento em `resumo_proposto` e pediu confirmação. Avalie o aceite desse resumo separadamente das perguntas adicionais da mensagem. Confirmar a reserva e perguntar sobre outro exame são intenções compatíveis. Uma pergunta adicional não revoga um aceite explícito; condições ou mudanças da reserva não são aceite.",
         criteria: {
-          aceitou: "Aceitou o agendamento exatamente como proposto, sem pedir mudança nem impor condição.",
+          aceitou: "Aceitou o agendamento exatamente como proposto, sem pedir mudança nem impor condição, inclusive quando também pergunta sobre outro exame. Exemplo: 'isso ai pode marca. ah e da pra fazer hemograma e TSH no mesmo dia?'.",
           recusou: "Recusou, desistiu ou disse que não quer esse agendamento.",
           pediu_outra_coisa:
-            "Pediu mudança (outro dia, horário, período, profissional ou paciente), aceitou com condição ou mudou de assunto.",
+            "Pediu mudança da reserva (outro dia, horário, período, profissional ou paciente), aceitou com condição ou mudou de assunto sem confirmar o resumo. Pergunta adicional acompanhada de aceite explícito não pertence a esta categoria.",
           nao_claro: "Não dá para saber se aceitou ou não.",
         },
       },

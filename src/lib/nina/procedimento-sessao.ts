@@ -1,7 +1,9 @@
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import { conhecimentoDaMesmaSessao } from "./confidence/conhecimento-sessao";
-import { limparEscolhaAgendamento } from "./agendamento-escolha";
+import { limparEscolhaAgendamento, confirmacaoDaEscolha, vagasDaSessao } from "./agendamento-escolha";
+
+export const REGRA_PRESERVAR_RESERVA = "PEDIDOS PARALELOS — Preserve atendimento, profissional e vaga escolhidos ao pesquisar outro exame. Um aceite explícito do resumo entregue pode vir junto de uma pergunta independente: conclua a reserva autorizada e responda à pergunta, sem pedir o mesmo aceite novamente. Condição, recusa ou mudança da reserva exige esclarecimento. Uma dúvida sobre outro item não impede a operação que o sistema vinculou à escolha identificada; siga as validações das ferramentas. Não associe o médico de um exame aos demais. Bloqueio de identificação não significa instabilidade técnica. Só confirme reserva ou encaminhamento após retorno de execução bem-sucedida.";
 
 /** Identidade do pedido, independente da última busca auxiliar e da especialidade. */
 export type ProcedimentoSolicitado = {
@@ -15,6 +17,8 @@ export function procedimentoDaSessao(estado: EstadoFluxoNina | undefined, clinic
   const salvo = estado.appointment.procedimento_solicitado;
   if (salvo?.clinica_id === clinicaId && salvo.session_id === estado.session_id &&
     salvo.tipo_atendimento === "exame_procedimento" && salvo.catalogo_id && salvo.nome) return salvo;
+  // Uma pesquisa auxiliar de exame não muda a modalidade da consulta escolhida.
+  if (confirmacaoDaEscolha(estado, clinicaId)?.vaga.tipo_atendimento === "consulta") return null;
   const contexto = conhecimentoDaMesmaSessao(estado.knowledge_context, clinicaId, estado.session_id);
   if (contexto?.consulta.tipo_atendimento !== "exame_procedimento" || contexto.esclarecimento?.tipo === "procedimento") return null;
   const refs = contexto.referencias.filter(r => r.registro && r.procedimento);
@@ -26,6 +30,9 @@ export function procedimentoDaSessao(estado: EstadoFluxoNina | undefined, clinic
 export function lembrarProcedimentoSolicitado(estado: EstadoFluxoNina | undefined, clinicaId: string,
   resultado: ResultadoConhecimento, novaSolicitacao = false) {
   if (!estado?.session_id || estado.appointment.appointment_id) return;
+  // Consultar outro exame não cancela uma vaga oferecida/escolhida. A troca de
+  // escolha passa por selecionar_horario; nova_solicitacao organiza só a busca.
+  if (confirmacaoDaEscolha(estado, clinicaId) || vagasDaSessao(estado, clinicaId).length) return;
   if (novaSolicitacao) {
     estado.knowledge_context = null;
     estado.appointment.procedimento_solicitado = null;

@@ -364,10 +364,12 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(selecionada.ok, JSON.stringify(selecionada)).toBe(true);
     return selecionada;
   }
-  test("nome incorreto reapresenta os executantes nominais publicados", async () => {
+  test("nome incorreto retorna os executantes sem selecionar substituto nem impor pergunta", async () => {
     const { ctx } = await iniciar();
-    await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Nome Incorreto" });
-    expect(ctx.esclarecimentoCatalogo?.pergunta).toContain("Mariana Portugal");
+    const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Nome Incorreto" });
+    expect(r.profissional_solicitado_encontrado).toBe(false);
+    expect(JSON.stringify(r)).toContain("Mariana Portugal");
+    expect(ctx.esclarecimentoCatalogo).toBeUndefined();
     expect(gravacoes).toHaveLength(0);
   });
   test("recurso genérico permanece no retorno para interpretação pelo prompt", async () => {
@@ -375,7 +377,33 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Carlos Alberto Varillas" });
     expect(r.ok).toBe(true);
     expect(JSON.stringify(r)).toContain("Enfermagem");
+    expect(ctx.esclarecimentoCatalogo).toBeUndefined();
+    expect(JSON.stringify(r)).not.toContain("Qual destes profissionais");
     expect(gravacoes).toHaveLength(0);
+  });
+  test.each([true, false])("sessão 670 (%s): pesquisas de sangue não apagam vaga/aceite nem trocam médica", async teste => {
+    const { ctx } = await iniciar("USG ABDOMINAL TOTAL", "Isis Serrano Duarte");
+    ctx.teste = teste; ctx.origem = teste ? "homologacao" : "whatsapp";
+    const selecionada = await escolher(ctx);
+    const antes = JSON.stringify(ctx.estado!.appointment);
+    resultadoCatalogo = { ...resultadoCatalogo, procedure: "TSH", records: [{
+      id: CATALOGO, tipo: "servico", procedimento: "TSH", medico: "LABORATORIO",
+    }], doctors: ["LABORATORIO"] };
+    // Inclusive consultas repetidas e restauração do estado entre mensagens.
+    for (const termo of ["HEMOGRAMA COMPLETO", "TSH", "TSH"]) {
+      await executarFerramentaPaciente(ctx, "consultar_cadastro", { termo, tipo_atendimento: "exame_procedimento", nova_solicitacao: true });
+      ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
+      expect(JSON.stringify(ctx.estado!.appointment)).toBe(antes);
+    }
+    const medica = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Isis Serrano Duarte" });
+    expect(medica).toMatchObject({ ok: true, procedure: "USG ABDOMINAL TOTAL" });
+    expect(ctx.esclarecimentoCatalogo).toBeUndefined();
+    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{role:"assistant",content:String(selecionada.resumo_confirmacao)}])).toBe(true);
+    const r = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "USG ABDOMINAL TOTAL" });
+    expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
+    expect(gravacoes).toHaveLength(1);
+    expect(gravacoes[0]!.procedimento).toBe("USG ABDOMINAL TOTAL");
+    expect(gravacoes[0]!.medico_id).toBe(MEDICO);
   });
   test.each([true, false])("cadastro %s: identificação e reserva usam o mesmo ID do Clínica OS", async criado => {
     const { ctx } = await iniciar();
@@ -479,11 +507,12 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(r).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
     expect(gravacoes).toHaveLength(0);
   });
-  test("nome de executante não reconhecido pede esclarecimento sem perder o serviço", async () => {
+  test("nome de executante não reconhecido retorna o fato sem perder o serviço", async () => {
     const { ctx } = await iniciar();
     const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Nome inexistente" });
     expect(r).toMatchObject({ ok: true, tipo_atendimento: "exame_procedimento", procedure: "Bioimpedância",
-      esclarecimento: { tipo: "profissional", motivo: "medico_nao_identificado", atendimento: "Bioimpedância" } });
+      profissional_solicitado_encontrado: false });
+    expect(r.esclarecimento).toBeUndefined();
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("remoção de executante depois do aceite impede a gravação", async () => {

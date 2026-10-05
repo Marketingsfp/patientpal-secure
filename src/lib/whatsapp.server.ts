@@ -1411,6 +1411,10 @@ async function gerarRespostaNinaInterno(
     origem: "src/lib/nina/atendimento-consulta.ts", motivo: "Distinguir consulta, revisão e noturna antes de vincular vagas.",
     texto: REGRA_SELECAO_ATENDIMENTO_CONSULTA });
   const { REGRA_ESCOLHA_PROFISSIONAL_NOMINAL } = await import("@/lib/nina/prompt/regras-catalogo");
+  const { REGRA_PRESERVAR_RESERVA } = await import("@/lib/nina/procedimento-sessao");
+  instrucoesAdicionaisTurno.push({ codigo: "PEDIDOS_PARALELOS_PRESERVAM_RESERVA", nivel: "inegociavel",
+    origem: "src/lib/nina/procedimento-sessao.ts", motivo: "Perguntas sobre outros exames não apagam a escolha ou o aceite do resumo entregue.",
+    texto: REGRA_PRESERVAR_RESERVA });
   instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_PROFISSIONAL_NOMINAL", nivel: "inegociavel",
     origem: "src/lib/nina/prompt/regras-catalogo.ts", motivo: "Setores e equipes não são opções de médicos para o paciente escolher.",
     texto: REGRA_ESCOLHA_PROFISSIONAL_NOMINAL });
@@ -1900,6 +1904,7 @@ async function gerarRespostaNinaInterno(
   let houveHandoff = false;
   let finalizacaoHandoff: { texto: string; textoModelo: string; handoffConfirmado: boolean; motivo: string } | null = null;
   let resumoEscolha: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null = null;
+  let reservaComPerguntas = false;
   const { encaminhamentoSemVagas, respostaSemVagas } = await import("@/lib/nina/agenda-sem-vagas");
   // FASE 4 — vira true quando a conversa avançou durante a geração.
   let turnoObsoleto = false;
@@ -1912,6 +1917,7 @@ async function gerarRespostaNinaInterno(
   let agendamentoConfirmado = jaTinhaAgendamento;
 
   let correcaoFalsoSucessoUsada = false;
+  let bloqueioIdentificacaoNoTurno = false;
   // Retornos oficiais alimentam o modelo sem avaliação de confiança.
   // FASE 2 — fatos concretos e consultas do turno (com retry consolidado).
   const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
@@ -1939,7 +1945,7 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/confidence/selecao-contextual");
   const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO } =
     await import("@/lib/nina/catalogo-esclarecimento");
-  const { criarPerguntasDoTurno, comporRespostaParcial, PESQUISAS_INDEPENDENTES } = await import("@/lib/nina/perguntas-independentes");
+  const { criarPerguntasDoTurno, comporRespostaParcial, PESQUISAS_INDEPENDENTES, pendenciaBloqueiaFerramenta } = await import("@/lib/nina/perguntas-independentes");
   const perguntasDoTurno = criarPerguntasDoTurno(conhecimentoAnterior, mensagemPaciente);
   let respostaParcialConfirmada = false;
   let selecaoDoTurno:
@@ -2130,7 +2136,8 @@ async function gerarRespostaNinaInterno(
           registros: registrosDoRetorno((r.dados ?? {}) as Record<string, unknown>) as import("@/lib/nina/knowledge-contract").RegistroConhecimento[] });
         if (preferencia) referencia.atendimentoConsulta = preferencia;
         else delete referencia.atendimentoConsulta;
-        if (JSON.stringify(anterior ?? null) !== JSON.stringify(preferencia) && !fluxoEstado.appointment.appointment_id) {
+        if (JSON.stringify(anterior ?? null) !== JSON.stringify(preferencia) && !fluxoEstado.appointment.appointment_id &&
+          !fluxoEstado.appointment.confirmation && !fluxoEstado.appointment.slot_options?.vagas.length) {
           const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
           limparEscolhaAgendamento(fluxoEstado);
           fluxoEstado.appointment.slot_options = null;
@@ -2514,10 +2521,19 @@ async function gerarRespostaNinaInterno(
           codigo: { arquivo: "src/lib/nina/pesquisa-atendimento-sessao.ts", funcao: "prepararPesquisaAtendimentoDaSessao" },
         });
       }
-      if (ctxFerramentas?.esclarecimentoCatalogo && !PESQUISAS_INDEPENDENTES.has(nome)) {
+      if (reservaComPerguntas && !PESQUISAS_INDEPENDENTES.has(nome)) {
+        mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
+          ok: false, executada: false, erro: "RESERVA_JA_CONCLUIDA_NO_TURNO",
+          mensagem: "A reserva foi concluída. Responda às perguntas informativas restantes com as pesquisas do catálogo. Não repita a reserva nem inicie outra operação neste turno.",
+        }) });
+        continue;
+      }
+      if (ctxFerramentas?.esclarecimentoCatalogo && pendenciaBloqueiaFerramenta(nome, c.function?.arguments,
+        perguntasDoTurno.pendentes, fluxoEstado, clinicaId)) {
+        bloqueioIdentificacaoNoTurno = true;
         mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
           ok: false, executada: false, erro: "IDENTIFICACAO_PENDENTE",
-          mensagem: "Há uma identificação pendente. Continue as pesquisas independentes no catálogo e responda somente o que elas confirmarem. Aguarde esclarecimento antes de executar ações.",
+          mensagem: "Esta operação ainda não está vinculada a um pedido identificado sem ambiguidade. Continue as pesquisas independentes e esclareça somente esse pedido. Isto é um bloqueio de identificação, não instabilidade técnica nem falta de vaga. Nenhuma transferência foi realizada.",
         }) });
         continue;
       }
@@ -2624,7 +2640,11 @@ async function gerarRespostaNinaInterno(
         const { resultadoAgendamentoConfirmado } = await import("@/lib/nina/resposta/agendamento");
         resumoEscolha = resultadoAgendamentoConfirmado(dadosAgendamento, fluxoEstado,
           ctxFerramentas?.nomeUnidade || "nossa clínica", null, estadoId.conversaId);
-        if (resumoEscolha) break;
+        const { separarAceiteComPergunta } = await import("@/lib/nina/confirmacao-agendamento");
+        reservaComPerguntas = !!resumoEscolha && (!!separarAceiteComPergunta(mensagemPaciente) || mensagemPaciente.includes("?") ||
+          perguntasDoTurno.temConfirmadas || perguntasDoTurno.pendentes.length > 0 ||
+          chamadas.slice(chamadas.indexOf(c) + 1).some(p => PESQUISAS_INDEPENDENTES.has(p.function?.name ?? "")));
+        if (resumoEscolha && !reservaComPerguntas) break;
       }
       if (nome === "selecionar_horario" && r.success &&
         (typeof dadosAgendamento?.resumo_confirmacao === "string" ||
@@ -2705,7 +2725,9 @@ async function gerarRespostaNinaInterno(
       }
       break;
     }
-    if (finalizacaoHandoff || resumoEscolha) break;
+    if (finalizacaoHandoff || (resumoEscolha && !reservaComPerguntas)) break;
+    if (reservaComPerguntas) mensagens.push({ role: "system", content:
+      "A reserva acabou de ser comprovada. Sua confirmação será incluída pelo sistema. Continue as pesquisas informativas restantes e redija somente a resposta às outras perguntas, com esclarecimento específico do que ainda estiver incerto. Não repita o resumo, não peça novo aceite e não execute outra reserva ou transferência neste turno." });
     if (!houveProgresso) {
       modoSintese = "sem_progresso";
       registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Consultas sem informação nova: concluir resposta",
@@ -2813,6 +2835,16 @@ async function gerarRespostaNinaInterno(
     });
   };
 
+  if (!finalizacaoHandoff && !houveHandoff) {
+    const { protegerEfeitosDaResposta } = await import("@/lib/nina/resposta/efeitos-confirmados");
+    const protegida = protegerEfeitosDaResposta(resposta, {
+      handoffConfirmado: false, bloqueioIdentificacao: bloqueioIdentificacaoNoTurno,
+    });
+    if (protegida.alterado) {
+      transformar("resposta.efeitos_confirmados", "não anunciar transferência sem execução nem identificação pendente como instabilidade", resposta, protegida.texto);
+      resposta = protegida.texto;
+    }
+  }
   if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo) {
     const { apresentarPerguntaEsclarecimento } = await import("@/lib/nina/esclarecimento-apresentacao");
     // Sem fatos independentes confirmados, entrega apenas o esclarecimento.
@@ -2874,8 +2906,11 @@ async function gerarRespostaNinaInterno(
   }
 
   if (resumoEscolha) {
-    transformar("agenda.resposta_modalidade", "orientação, resumo ou confirmação com a modalidade oficial do atendimento", resposta, resumoEscolha.texto);
-    resposta = resumoEscolha.texto;
+    if (reservaComPerguntas && resposta.trim()) resumoEscolha.complementoTexto = resposta.trim();
+    const composta = [resumoEscolha.texto, resumoEscolha.complementoTexto].filter(Boolean).join("\n\n");
+    transformar("agenda.resposta_modalidade", "orientação, resumo ou confirmação com a modalidade oficial do atendimento, preservando perguntas independentes", resposta, composta);
+    resposta = composta;
+    resumoEscolha.texto = composta;
     marcarOrigem("gate", resumoEscolha.restricoes.includes("aguardar_aceite_do_resumo")
       ? "resumo final vinculado à vaga escolhida, aguardando aceite do paciente"
       : resumoEscolha.acoesConcluidas.length ? "confirmação da reserva comprovada com a modalidade oficial"

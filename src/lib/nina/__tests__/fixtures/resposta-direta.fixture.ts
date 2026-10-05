@@ -64,6 +64,8 @@ const nomeRenal = "ULTRASSONOGRAFIA DE RINS E VIAS URINARIAS";
 const pedidoDensitometria = "densitometria óssea coluna lombar e colo de fêmur";
 const nomeDensitometria = "DENSITOMETRIA / DENSITOMETRIA DUO ENERGETICA";
 const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_") || reformulacoes || continuidadeCatalogo;
+const reservaIndependente = cenario.startsWith("catalogo_multiplas_reserva");
+const transferenciaFicticia = cenario === "catalogo_multiplas_transferencia_ficticia";
 let estadoPerguntas: any = null;
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
@@ -403,6 +405,16 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
     ordem.push(nome);
     argumentosFerramentas.push({ nome, args: typeof args === "string" ? JSON.parse(args) : args });
     ferramentas.push(nome);
+    if (reservaIndependente && !params.ctxPaciente.estado.appointment.confirmation) {
+      const estado = params.ctxPaciente.estado;
+      selecionarVagaValidada(estado, "clinica-simulada", {
+        medico_id: "isis", medico: "Isis Serrano Duarte", procedimento: "USG ABDOMINAL TOTAL",
+        catalogo_id: "usg", tipo_atendimento: "exame_procedimento", modalidade: "hora_marcada", agenda_id: "agenda-usg",
+        data: "2030-01-21", hora: "08:00", inicio: "2030-01-21T11:00:00Z", fim: "2030-01-21T11:10:00Z",
+      }, "Resumo entregue do ultrassom");
+      // A prova de aceite/cadastro é coberta pelo gate/executor reais em testes próprios.
+      estado.appointment.confirmation.aceita = true;
+    }
     if (procedimentoExecutante) {
       const r = { ferramenta: nome, capacidade: "listCatalog", fonte: "base_conhecimento", success: true, reused: false,
         dados: { ok: true, found: true, knowledge_status: "found", source: "nina_catalogo", source_type: "catalog",
@@ -518,11 +530,11 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       dados: { ok: false, erro: "CATALOGO_ATENDIMENTO_HUMANO", atendimento_humano_obrigatorio: true,
         motivo_transferencia: "CATALOGO_ATENDIMENTO_HUMANO / PROFISSIONAL_SFP: Eletrocardiograma. Encaminhamento obrigatório no cadastro." },
     };
-    if (nome === "agendar" && modoConfirmacao) return {
+    if (nome === "agendar" && (modoConfirmacao || reservaIndependente)) return {
       ferramenta: nome, capacidade: "createAppointment", fonte: "agenda", success: true,
       reused: false, appointment_confirmed: true, dados: {
-        ok: true, verificado_no_banco: true, appointment_id: "ag-simulada", modalidade_atendimento: modoConfirmacao,
-        date: "21/01/2030", time: "10:20", medico: "Dr. Jorge Ribeiro", ficha_numero: "007",
+        ok: true, verificado_no_banco: true, appointment_id: "ag-simulada", modalidade_atendimento: modoConfirmacao ?? "hora_marcada",
+        date: "21/01/2030", time: reservaIndependente ? "08:00" : "10:20", medico: reservaIndependente ? "Isis Serrano Duarte" : "Dr. Jorge Ribeiro", ficha_numero: "007",
       },
     };
     if (nome === "consultar_disponibilidade" && cenario === "sem_pre") return {
@@ -670,9 +682,14 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
       name: "consultar_cadastro", arguments: JSON.stringify({ termo, medico, tipo_atendimento: "consulta", nova_solicitacao: true }) } });
     const u = chamada("Urologia", "Adrian", "u"), ps = chamada("Psiquiatria", "Antonio", "p");
     const sequencial = cenario.endsWith("sequencial");
+    const reserva = { id: "reserva", type: "function", function: { name: "agendar", arguments:
+      JSON.stringify({ medico_id: "isis", procedimento: "USG ABDOMINAL TOTAL", inicio: "2030-01-21T11:00:00Z", fim: "2030-01-21T11:10:00Z" }) } };
     return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
-      conteudo: requests.length === 1 ? "" : "Sim, o Dr. Antonio atende Psiquiatria às segundas, às 08:00.",
-      toolCalls: requests.length === 1 ? cenario.endsWith("retomada") ? [ps] : sequencial ? [u] : cenario.endsWith("invertida") ? [ps, u] : cenario.endsWith("repetida") ? [u, { ...u, id: "u-repetida" }, ps] : [u, ps,
+      conteudo: requests.length === 1 ? "" : "Sim, o Dr. Antonio atende Psiquiatria às segundas, às 08:00." +
+        (transferenciaFicticia ? "\n\nTive uma instabilidade técnica. Vou encaminhar você agora para a equipe." : ""),
+      toolCalls: requests.length === 1 ? reservaIndependente ? cenario.endsWith("primeiro") ? [reserva, u, ps]
+        : cenario.endsWith("repetida") ? [u, ps, reserva, { ...reserva, id: "reserva-duplicada" }] : [u, ps, reserva]
+        : cenario.endsWith("retomada") ? [ps] : sequencial ? [u] : cenario.endsWith("invertida") ? [ps, u] : cenario.endsWith("repetida") ? [u, { ...u, id: "u-repetida" }, ps] : [u, ps,
         { id: "nao-agendar", type: "function", function: { name: "agendar", arguments: "{}" } }]
         : sequencial && requests.length === 2 ? [ps] : [],
     };

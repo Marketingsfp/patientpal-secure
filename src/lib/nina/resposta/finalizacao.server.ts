@@ -88,7 +88,7 @@ export type RespostaFinalizada = {
 /** Chave de idempotência: turno + candidato exato que entrou. */
 function chaveDeEntrada(pedido: PedidoFinalizacao): string {
   const bruto = pedido.resultado.texto ?? "";
-  return `${pedido.chaveTurno}::${hashDoTexto(bruto) ?? "-"}::${pedido.resultado.chaveTemplate ?? "-"}`;
+  return `${pedido.chaveTurno}::${hashDoTexto([bruto, pedido.resultado.complementoTexto ?? ""].join("\n")) ?? "-"}::${pedido.resultado.chaveTemplate ?? "-"}`;
 }
 
 const finalizados = new Map<string, RespostaFinalizada>();
@@ -143,7 +143,8 @@ export async function finalizarResposta(
   //    e sem repetir efeito externo.
   const aprovada = ultimaPorTurno.get(raiz);
   const candidatoHash = hashDoTexto(pedido.resultado.texto ?? "");
-  if (aprovada && candidatoHash && aprovada.textoHash === candidatoHash) {
+  if (aprovada && candidatoHash && aprovada.textoHash === candidatoHash &&
+    (!pedido.resultado.complementoTexto || pedido.resultado.complementoTexto === aprovada.resultado.complementoTexto)) {
     return { ...aprovada, reaproveitada: true };
   }
 
@@ -158,7 +159,7 @@ export async function finalizarResposta(
   if (resultado.chaveTemplate) {
     const t = textoDaChave(resultado.chaveTemplate, resultado.variaveis, publicados.textos);
     if (t.texto) {
-      resultado.texto = t.texto;
+      resultado.texto = [t.texto, resultado.complementoTexto?.trim()].filter(Boolean).join("\n\n");
       usouPublicado = t.origemTemplate === "publicado";
     }
     if (t.motivo) resultado.restricoes = [...resultado.restricoes, `template:${t.motivo}`];
