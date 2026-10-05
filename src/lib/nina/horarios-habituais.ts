@@ -25,9 +25,12 @@ export function motivoSemHorariosHabituais(resultado: ResultadoBroker, referenci
   const dados = objeto(resultado.dados);
   if (dados.esclarecimento || dados.found === false || ["conflict", "not_found"].includes(String(dados.knowledge_status))) return null;
   const registros = registrosDoRetorno(dados).map(objeto);
-  const selecionados = registros.filter(r => referencias.includes(String(r.id ?? "")));
-  const alvos = selecionados.length ? selecionados : registros;
-  const profissionais = alvos.filter(r => (r.tipo === "profissional" || objeto(r.extras).catalogo_tipo === "profissional") && texto(r.medico));
+  const profissionaisRetornados = registros.filter(r => (r.tipo === "profissional" || objeto(r.extras).catalogo_tipo === "profissional") && texto(r.medico));
+  // Busca ampla não é escolha de todos os médicos. Uma referência ausente
+  // neste retorno tampouco autoriza avaliar outro profissional em seu lugar.
+  const profissionais = referencias.length
+    ? profissionaisRetornados.filter(r => referencias.includes(String(r.id ?? "")))
+    : profissionaisRetornados.length === 1 ? profissionaisRetornados : [];
   const semEscala = profissionais.filter(r => {
     // Retorno parcial, sem o campo, não comprova ausência no cadastro.
     if (!Array.isArray(objeto(r.extras).horarios)) return false;

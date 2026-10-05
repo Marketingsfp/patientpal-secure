@@ -16,6 +16,14 @@ const fotoCenario = process.argv[3]?.startsWith("foto_");
 const { PEDIR_NOVA_FOTO } = await import("../../fotos");
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const escopoEscala = ({
+  clinico: ["Clínico Geral", "Claudia Maria Rodrigues dos Santos", "Nicolas Cesar Alves Nunes"],
+  urologia: ["Urologia", "Marcelo Barreto Franco da Silveira", "Adrian Andres Jara Benitez"],
+  dermatologia: ["Dermatologia", "Shirley Martins", "Raisa Moura"],
+  otorrino: ["Otorrinolaringologia", "Eneida de Oliveira Rodrigues", "Mauricio Albuquerque de Paula"],
+  cardiologia: ["Cardiologia", "Roberta Corredeira", "Isis Duarte"],
+  escolhido_sem: ["Clínico Geral", "Nicolas Cesar Alves Nunes", "Claudia Maria Rodrigues dos Santos"],
+} as Record<string, string[]>)[cenario.replace("catalogo_escopo_escala_", "")];
 const progressoLongo = cenario.startsWith("progresso_longo");
 const conferencias: any[] = [];
 const duvidaCenario = cenario.startsWith("catalogo_duvida_");
@@ -159,7 +167,8 @@ const pergunta = continuidadeCatalogo ? "é a primeira, rins e vias urinarias, e
     : "Gostaria de marca a pneumologista"
   : escolhaHorario ? "Quero o horário das 10:20 com Dr. Jorge Ribeiro no dia 21/01/2030."
   : pedidoConsulta ? "Quero consulta de cardiologia" : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
-const entradaPaciente = pergunta + (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
+const entradaPaciente = (escopoEscala ? cenario.endsWith("otorrino") ? "Tem otorrino amanhã?"
+  : `Quero ${escopoEscala[0]} com Dr. ${escopoEscala[1]} amanhã de manhã` : pergunta) + (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
 const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"
   : cenario === "catalogo_laboratorio" ? "Laboratório"
   : cenario === "catalogo_nome_proprio" ? "Dra. Ana Souza"
@@ -554,6 +563,16 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       resultados.push(r);
       return r;
     }
+    if (escopoEscala && ["consultar_cadastro", "buscar_medicos"].includes(nome)) {
+      // MJ-722: segunda busca não devolveu Claudia, mas a seleção dela persistia.
+      const nomes = nome === "buscar_medicos" && cenario.endsWith("clinico") ? [escopoEscala[2]!]
+        : nome === "buscar_medicos" || cenario.endsWith("otorrino") ? escopoEscala.slice(1) : [escopoEscala[1]!];
+      return { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "base_conhecimento", success: true,
+        reused: false, appointment_confirmed: false, dados: { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "consulta",
+          records: nomes.map(medico => ({ id: medico, tipo: "profissional", medico, procedimento: `Consulta ${escopoEscala[0]}`,
+            extras: { catalogo_tipo: "profissional", horarios: (medico === escopoEscala[1]) !== cenario.endsWith("escolhido_sem") || cenario.endsWith("cardiologia")
+              ? [{ dia: "Terça-feira", inicio: "08:00", fim: "12:00" }] : [] } })) } };
+    }
     if (nome !== "consultar_cadastro") throw new Error(`Ferramenta inesperada: ${nome}`);
     if (cenario.startsWith("catalogo_sem_escala")) return {
       ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado", success: true,
@@ -717,6 +736,13 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
       } },
       { id: "nao-agendar-sfp", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
+  };
+  if (escopoEscala) return {
+    ok: true, conteudo: requests.length < 3 ? "" : `Horários habituais de ${escopoEscala[1]}: terça-feira, das 08:00 às 12:00.`,
+    modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: requests.length < 3 ? [{ id: `escala-${requests.length}`, type: "function", function: requests.length === 1
+      ? { name: "consultar_cadastro", arguments: JSON.stringify({ termo: escopoEscala[0], tipo_atendimento: "consulta", ...(cenario.endsWith("otorrino") ? {} : { medico: escopoEscala[1] }) }) }
+      : { name: "buscar_medicos", arguments: JSON.stringify({ especialidade: escopoEscala[0] }) } }] : [],
   };
   if (cenario.startsWith("catalogo_sem_escala")) return {
     ok: true, conteudo: "Vou consultar a agenda dele e oferecer outro médico.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
