@@ -2504,6 +2504,7 @@ async function gerarRespostaNinaInterno(
           conhecimento: itemConfirmadoNaResposta || profissionalConfirmadoNaResposta ? conhecimentoAnterior : PESQUISAS_INDEPENDENTES.has(nome) ? perguntasDoTurno.referencia(originais) : fluxoEstado.knowledge_context,
           ...contextoRespostaProfissional,
         }) ?? originais;
+        c.function.arguments = perguntasDoTurno.prepararContinuidade(nome, c.function.arguments);
         if (c.function.arguments !== originais) registrarEtapa({
           tipo: "consulta", fonte: "sistema", titulo: "Pesquisa preservou o atendimento identificado",
           dados: { ferramenta: nome, argumentos_originais: originais, argumentos_efetivos: c.function.arguments },

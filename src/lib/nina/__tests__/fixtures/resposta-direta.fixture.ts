@@ -1,7 +1,7 @@
 /** Núcleo real; apenas banco, modelo e catálogo externos são simulados. */
 import { mock } from "bun:test";
 if (!process.argv[3]?.startsWith("fonte_")) mock.module("../../fonte-consulta-config.server", () => ({
-  lerSelecaoFonte: async () => ({ fonte: "clinica_os", revisao: null }),
+  lerSelecaoFonte: async () => ({ fonte: process.argv[3]?.startsWith("catalogo_continuidade_") ? "base_conhecimento" : "clinica_os", revisao: null }),
 }));
 import { textoDaChave } from "../../resposta/templates";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
@@ -51,9 +51,11 @@ const procedimentoExecutante = cenario === "procedimento_executante";
 const medicoClinico = cenario.endsWith("carlos") ? "Carlos Alberto Varillas" : cenario.endsWith("milton") ? "Milton Guimarães" : "Ana Souza";
 const contextual = cenariosContextuais[cenario];
 const reformulacoes = cenario.startsWith("catalogo_reformulacoes_");
+const continuidadeCatalogo = cenario.startsWith("catalogo_continuidade_");
+const nomeRenal = "ULTRASSONOGRAFIA DE RINS E VIAS URINARIAS";
 const pedidoDensitometria = "densitometria óssea coluna lombar e colo de fêmur";
 const nomeDensitometria = "DENSITOMETRIA / DENSITOMETRIA DUO ENERGETICA";
-const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_") || reformulacoes;
+const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_") || reformulacoes || continuidadeCatalogo;
 let estadoPerguntas: any = null;
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
@@ -147,7 +149,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
-const pergunta = reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
+const pergunta = continuidadeCatalogo ? "é a primeira, rins e vias urinarias, ele é adulto" : reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
   : cenario.endsWith("novo_pedido") ? "Agora quero outro exame XYZ" : clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
@@ -449,6 +451,19 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
       };
     }
+    if (continuidadeCatalogo && ["consultar_cadastro", "buscar_procedimentos"].includes(nome)) {
+      estadoPerguntas = params.ctxPaciente.estado;
+      const a = typeof args === "string" ? JSON.parse(args) : args as any;
+      const ampla = a.termo !== nomeRenal;
+      const records = [{ id: "rins", procedimento: nomeRenal },
+        ...(ampla ? [{ id: "pediatrico", procedimento: "ULTRASSONOGRAFIA PEDIATRICA - RINS E VIAS URINARIAS" }] : [])];
+      return { ferramenta: nome, capacidade: nome === "consultar_cadastro" ? "searchKnowledgeBase" : "listCatalog",
+        fonte: "base_conhecimento", success: true, reused: false, dados: {
+          found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento", records,
+          ...(ampla ? { esclarecimento: { tipo: "procedimento", pergunta: "Qual exame, comum ou pediátrico?",
+            opcoes: records.map(r => ({ id: r.id, nome: r.procedimento })) } } : {}),
+        } };
+    }
     if (reformulacoes && ["consultar_cadastro", "buscar_procedimentos"].includes(nome) && !String(args).includes("Psiquiatria")) {
       estadoPerguntas = params.ctxPaciente.estado;
       const a = typeof args === "string" ? JSON.parse(args) : args as any;
@@ -609,6 +624,16 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
     conteudo: requests.length > 1 && cenario === "resposta_vazia_recuperada" ? "Posso ajudar com as informações da consulta." : "",
   };
+  if (continuidadeCatalogo) {
+    const passos = [
+      { name: "consultar_cadastro", arguments: JSON.stringify({ termo: nomeRenal, tipo_atendimento: "exame_procedimento" }) },
+      { name: "buscar_procedimentos", arguments: JSON.stringify({ termo: "RINS E VIAS URINARIAS", reformula_de: nomeRenal }) },
+      { name: "consultar_cadastro", arguments: JSON.stringify({ termo: "ultrassom renal", reformula_de: "RINS E VIAS URINARIAS" }) },
+    ];
+    return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+      conteudo: requests.length <= 3 ? "" : "Identifiquei o exame escolhido: ultrassonografia de rins e vias urinárias.",
+      toolCalls: requests.length <= 3 ? [{ id: `renal-${requests.length}`, type: "function", function: passos[requests.length - 1] }] : [] };
+  }
   if (reformulacoes) {
     const passos = [
       { name: "consultar_cadastro", arguments: JSON.stringify({ termo: pedidoDensitometria, tipo_atendimento: "exame_procedimento" }) },

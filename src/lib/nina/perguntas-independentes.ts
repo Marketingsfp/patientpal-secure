@@ -45,6 +45,7 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   );
   const pesquisas = new Set<string>();
   const confirmadas = new Set<string>();
+  const identificadas = new Map<string, ConhecimentoSessao>();
   // Apenas pesquisas deste turno. Nunca contam como nova resposta do paciente.
   const aliases = new Map<string, string>();
   const consultas = new Map<string, ReturnType<typeof consulta>>();
@@ -82,6 +83,25 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   }
   return {
     referencia,
+    prepararContinuidade(ferramenta: string, args: string | undefined): string | undefined {
+      if (!["consultar_cadastro", "buscar_procedimentos"].includes(ferramenta)) return args;
+      const p = parametrosPesquisa(args);
+      if (p.nova_solicitacao === true) return args;
+      const k = grupo(p), identificada = identificadas.get(k);
+      if (!identificada || (p.tipo_atendimento && p.tipo_atendimento !== identificada.consulta.tipo_atendimento)) return args;
+      // Só um registro identificado neste turno. Nunca unir exames por semelhança
+      // nem reutilizar preço/preparo: a ferramenta relê o catálogo normalmente.
+      if (identificada.referencias.length !== 1) return args;
+      const nome = identificada.referencias[0]?.procedimento;
+      if (!nome) return args;
+      const id = chave(consulta(p));
+      aliases.set(id, k);
+      consultas.set(id, consulta(p));
+      const preparado = { ...p, termo: nome,
+        ...(identificada.consulta.tipo_atendimento ? { tipo_atendimento: identificada.consulta.tipo_atendimento } : {}) };
+      aliases.set(chave(consulta(preparado)), k);
+      return JSON.stringify(preparado);
+    },
     reconciliar(args: unknown, resultado: ResultadoBroker): ResultadoBroker {
       if (!resultado.success || resultado.erro || !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")) return resultado;
       const p = parametrosPesquisa(args), k = grupo(p);
@@ -118,11 +138,14 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       if (origem) pendentes.delete(chave(origem.consulta));
       if (atual?.esclarecimento) {
         confirmadas.delete(k);
+        identificadas.delete(k);
         pendentes.set(k, anteriorDoTurno ? { ...atual, consulta: anteriorDoTurno.consulta } : atual);
       }
       else {
         pendentes.delete(k);
         if (confirmado) confirmadas.add(k);
+        if (confirmado && atual) identificadas.set(k, atual);
+        else identificadas.delete(k);
       }
     },
     get pendentes() {

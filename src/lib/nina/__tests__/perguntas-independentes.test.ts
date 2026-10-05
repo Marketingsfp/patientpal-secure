@@ -96,6 +96,39 @@ const duvidaExame = (): ConhecimentoSessao => ({ ...pendente("Densitometria colu
   consulta: { termo: "Densitometria coluna lombar e colo de fêmur", tipo_atendimento: "exame_procedimento" },
 });
 
+it("preserva o exame identificado em reformulações encadeadas, sem copiar fatos", () => {
+  const turno = criarPerguntasDoTurno(null);
+  const nome = "ULTRASSONOGRAFIA DE RINS E VIAS URINARIAS";
+  const estado: ConhecimentoSessao = { ...pendente(nome), esclarecimento: undefined,
+    consulta: { termo: nome, tipo_atendimento: "exame_procedimento" },
+    referencias: [{ registro: "rins", procedimento: nome, medicoNome: null, versao: "atual" }] };
+  turno.registrar(estado.consulta, estado, null, true);
+  const ampla = { termo: "rins e vias urinarias", reformula_de: nome };
+  const args = JSON.parse(turno.prepararContinuidade("buscar_procedimentos", JSON.stringify(ampla))!);
+  expect(args.termo).toBe(nome);
+  expect(args).not.toHaveProperty("price");
+  expect(JSON.parse(turno.prepararContinuidade("consultar_cadastro", JSON.stringify({
+    termo: "ultrassom renal", reformula_de: ampla.termo,
+  }))!).termo).toBe(nome);
+  // Uma releitura que perdeu o registro não pode reaproveitar a referência.
+  turno.registrar(args, null, null, false);
+  const novamente = JSON.stringify(ampla);
+  expect(turno.prepararContinuidade("buscar_procedimentos", novamente)).toBe(novamente);
+});
+
+it("continuidade não substitui pedido independente, tipo diferente, outro médico ou ambiguidade", () => {
+  const turno = criarPerguntasDoTurno(null), estado = duvidaExame();
+  turno.registrar(estado.consulta, { ...estado, esclarecimento: undefined }, null, true);
+  for (const extra of [ { nova_solicitacao: true }, { medico: "Ana" },
+    { reformula_de: "inexistente" }, { tipo_atendimento: "consulta" } ]) {
+    const args = JSON.stringify({ termo: "outro", reformula_de: estado.consulta.termo, ...extra });
+    expect(turno.prepararContinuidade("consultar_cadastro", args)).toBe(args);
+  }
+  turno.registrar(estado.consulta, estado, null, false);
+  const args = JSON.stringify({ termo: "duo", reformula_de: estado.consulta.termo });
+  expect(turno.prepararContinuidade("consultar_cadastro", args)).toBe(args);
+});
+
 it("reformulação preserva qualificadores, não confirma preço e permite confirmação no próximo turno", () => {
   const turno = criarPerguntasDoTurno(null), original = duvidaExame();
   turno.registrar(original.consulta, original, null, false);
