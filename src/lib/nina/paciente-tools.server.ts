@@ -1362,7 +1362,7 @@ async function executarFerramentaInterna(
           canal: "whatsapp",
         });
         // JEV — Fase 3 (produção e homologação, flag `nina_jev_fase3`): a busca
-        // normal não achou nada → o Jev escolhe na lista publicada. Erro/dúvida = como hoje.
+        // normal não achou nada → o Jev sugere um candidato publicado para o paciente confirmar.
         if (resultado.knowledge_status === "not_found" && !p.medico) {
           try {
             const jev = await import("@/lib/nina/jev.server");
@@ -1394,7 +1394,10 @@ async function executarFerramentaInterna(
                     clinicaId: ctx.clinicaId, query: escolhida, tipo_atendimento: p.tipo_atendimento,
                     medico: null, dia: p.dia ?? null, canal: "whatsapp",
                   });
-                  if (novo.knowledge_status !== "not_found") { resultado = novo; aplicada = true; }
+                  if (novo.knowledge_status !== "not_found") {
+                    const { sugerirResultadoJev } = await import("./identificacao-catalogo");
+                    resultado = sugerirResultadoJev(novo); aplicada = true;
+                  }
                 }
                 await jev.registrarDecisaoJev({
                   clinicaId: ctx.clinicaId, conversationId: ctx.conversaId, fase: "fase3_especialidade",

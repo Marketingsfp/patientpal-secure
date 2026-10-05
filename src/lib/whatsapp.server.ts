@@ -1369,12 +1369,7 @@ async function gerarRespostaNinaInterno(
   const { hashDoTexto: hashPrecedencia } = await import("@/lib/nina/confidence/hash");
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
-  const instrucoesAdicionaisTurno: Array<{
-    codigo: string;
-    origem: string;
-    motivo: string;
-    texto: string;
-  }> = [];
+  const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
   const { REGRA_FORMATO_MOBILE } = await import("@/lib/nina/resposta/formato-mobile");
   instrucoesAdicionaisTurno.push({ codigo: "FORMATO_MOBILE_OBRIGATORIO",
     origem: "src/lib/nina/resposta/formato-mobile.ts", motivo: "Organizar todas as mensagens para leitura no celular.",
@@ -1395,6 +1390,9 @@ async function gerarRespostaNinaInterno(
     motivo: "Preservar Clínico Geral e separar a consulta da escolha do profissional nas pesquisas.",
     texto: REGRA_IDENTIDADE_ATENDIMENTO,
   });
+  const { REGRA_IDENTIFICACAO_UNIFICADA: regraIdentificacao } = await import("@/lib/nina/identificacao-catalogo");
+  instrucoesAdicionaisTurno.push({ codigo: "IDENTIFICACAO_UNIFICADA", nivel: "inegociavel", origem: "src/lib/nina/identificacao-catalogo.ts",
+    motivo: "Confirmação de candidatos e uma releitura inconclusiva antes do encaminhamento.", texto: regraIdentificacao });
   const { REGRA_DICIONARIO_PUBLICADO } = await import("@/lib/nina/dicionario-leitura");
   const { REGRA_FOTO_PEDIDO_MEDICO, atualizarSolicitacoesPedido, acrescentarSolicitacaoPedido } = await import("@/lib/nina/pedido-medico");
   if (catalogoPublicado.selecao?.fonte === "base_conhecimento") instrucoesAdicionaisTurno.push({
@@ -1433,15 +1431,19 @@ async function gerarRespostaNinaInterno(
   // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
   // ------------------------------------------------------------------
   const { conhecimentoDaMesmaSessao } = await import("@/lib/nina/confidence/conhecimento-sessao");
-  const conhecimentoAnterior = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+  const { mudouSolicitacaoExplicitamente, perguntaParaCompletarIdentificacao, confirmarItemDaPergunta } = await import("@/lib/nina/identificacao-catalogo");
+  const conhecimentoAnterior = mudouSolicitacaoExplicitamente(mensagemPaciente) ? null
+    : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
   const { confirmarProfissionalDaPergunta } = await import("@/lib/nina/pesquisa-medico-sessao");
   const { prepararPesquisaAtendimentoDaSessao } = await import("@/lib/nina/pesquisa-atendimento-sessao");
   const contextoRespostaProfissional = { mensagem: mensagemPaciente, historico: contextoConsultaAgenda.historico };
   const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
+  const itemConfirmadoNaResposta = confirmarItemDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const { lerDicionarioDaMensagem } = await import("@/lib/nina/dicionario-leitura.server");
   const dicionarioDaMensagem = await lerDicionarioDaMensagem(clinicaId, mensagemPaciente);
   const runtimeContext = {
+    identificacao_pendente: conhecimentoAnterior?.esclarecimento ?? null,
     pedido_medico_do_turno: [] as import("@/lib/nina/pedido-medico").SolicitacaoPedidoMedico[],
     dicionario_da_mensagem: dicionarioDaMensagem,
     canal: "whatsapp",
@@ -1952,7 +1954,7 @@ async function gerarRespostaNinaInterno(
     const referenciaAnterior =
       ["consultar_cadastro", "buscar_procedimentos"].includes(nome) && parametros.nova_solicitacao === true
         ? null
-        : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+        : conhecimentoAnterior;
     r = prepararSegundaPergunta(referenciaAnterior, r);
     {
       const { confirmarAntesDeEncaminhar } = await import("@/lib/nina/catalogo-sem-registro");
@@ -2144,6 +2146,17 @@ async function gerarRespostaNinaInterno(
   }
   // JEV — Fase 2: encaminhamento decidido pelo Jev, pelo fluxo de handoff
   // existente, igual em produção e homologação.
+  // Identificação pendente usa o fluxo comum; os demais motivos do Jev continuam imediatos.
+  if (conhecimentoAnterior?.esclarecimento && jevEncaminhamento?.motivo.startsWith("JEV_DUVIDA_REPETIDA")) jevEncaminhamento = null;
+  const perguntaComplementar = perguntaParaCompletarIdentificacao(conhecimentoAnterior, contextoRespostaProfissional);
+  if (perguntaComplementar && ctxFerramentas && conhecimentoAnterior) {
+    ctxFerramentas.esclarecimentoCatalogo = { ...conhecimentoAnterior.esclarecimento!, pergunta: perguntaComplementar, opcoes: [] };
+    fluxoEstado.knowledge_context = { ...conhecimentoAnterior,
+      esclarecimento: ctxFerramentas.esclarecimentoCatalogo, esclarecimentoTentativas: 2,
+      esclarecimentoPerguntas: [...(conhecimentoAnterior.esclarecimentoPerguntas ?? [conhecimentoAnterior.esclarecimento!.pergunta]), perguntaComplementar].slice(-2) };
+    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação aguardando o novo nome",
+      dados: { pergunta: perguntaComplementar, motivo: "recusa ou aceite sem opção única; nenhuma escolha presumida" } });
+  }
   if (jevEncaminhamento && !finalizacaoHandoff && !turnoObsoleto) {
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
@@ -2169,6 +2182,29 @@ async function gerarRespostaNinaInterno(
         handoff_confirmado: confirmado, erro: rh.erro ?? null,
       },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
+  }
+  // Um aceite de identificação reconsulta a fonte antes de devolver o controle ao modelo.
+  if (!finalizacaoHandoff && !turnoObsoleto && !ctxFerramentas?.esclarecimentoCatalogo &&
+    (itemConfirmadoNaResposta || profissionalConfirmadoNaResposta)) {
+    const argsOriginais = JSON.stringify(profissionalConfirmadoNaResposta ? {
+      termo: profissionalConfirmadoNaResposta.termo, medico: profissionalConfirmadoNaResposta.registro,
+      tipo_atendimento: "consulta", nova_solicitacao: false,
+    } : { termo: itemConfirmadoNaResposta!.nome, tipo_atendimento: conhecimentoAnterior?.consulta.tipo_atendimento,
+      nova_solicitacao: false });
+    await conferirReserva();
+    const args = prepararPesquisaAtendimentoDaSessao("consultar_cadastro", argsOriginais, {
+      clinicaId, sessionId: fluxoEstado.session_id ?? null, conhecimento: conhecimentoAnterior,
+      ...contextoRespostaProfissional,
+    }) ?? argsOriginais;
+    const id = "reconsulta_identificacao_confirmada";
+    mensagens.push({ role: "assistant", content: null, tool_calls: [{ id, type: "function",
+      function: { name: "consultar_cadastro", arguments: args } }] });
+    const r = await broker.executar("consultar_cadastro", args);
+    const retorno = await compartilharResultado("consultar_cadastro", args, r);
+    mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(retorno) });
+    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação confirmada e reconsultada",
+      dados: { registro: itemConfirmadoNaResposta?.id ?? profissionalConfirmadoNaResposta?.registro,
+        sucesso: r.success && !r.erro, permite_reservar: false } });
   }
   // JEV — Fase 6 (flag `nina_jev_fase6`): confere a resposta antes do envio.
   const inicioMensagensTurno = mensagens.length;
@@ -2398,7 +2434,7 @@ async function gerarRespostaNinaInterno(
         const originais = c.function.arguments;
         c.function.arguments = prepararPesquisaAtendimentoDaSessao(nome, originais, {
           clinicaId, sessionId: fluxoEstado.session_id ?? null,
-          conhecimento: fluxoEstado.knowledge_context,
+          conhecimento: itemConfirmadoNaResposta || profissionalConfirmadoNaResposta ? conhecimentoAnterior : fluxoEstado.knowledge_context,
           ...contextoRespostaProfissional,
         }) ?? originais;
         if (c.function.arguments !== originais) registrarEtapa({
@@ -2594,6 +2630,12 @@ async function gerarRespostaNinaInterno(
     if (rodada === MAX_RODADAS - 1) limiteRodadasAtingido = true;
   }
 
+  // Uma pergunta determinística também precisa pertencer à revisão atual.
+  if (!turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo && opcoes?.revisao?.valor) {
+    const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+    turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
+      revisaoProcessada: opcoes.revisao.valor });
+  }
   // FASE 4 — LIMITE DE RODADAS: desfecho explícito. O último rascunho NÃO
   // vira resposta entregue; tenta-se a transferência e o paciente recebe a
   // verdade sobre o que aconteceu.
@@ -2711,7 +2753,7 @@ async function gerarRespostaNinaInterno(
     });
     transformar(
       "catalogo.esclarecimento",
-      "até duas perguntas para identificar o atendimento",
+      "confirmar o candidato ou pedir nova escrita antes de encaminhar",
       respostaDoModelo,
       resposta,
       "aviso_operacional",

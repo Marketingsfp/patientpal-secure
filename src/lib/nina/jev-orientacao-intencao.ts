@@ -2,6 +2,7 @@
 import type { IntencaoNina } from "./atendimento-fase1";
 import { CORRECOES_JEV, PEDIDOS_JEV, type ObservacaoIntencaoJev } from "./jev-observacao-intencao";
 import type { InstrucaoAdicionalTurno } from "./prompt/precedencia-turno";
+import { REGRA_IDENTIFICACAO_UNIFICADA } from "./identificacao-catalogo";
 
 const MAPA_PEDIDO: Record<keyof typeof PEDIDOS_JEV, IntencaoNina> = {
   preco: "valor",
@@ -79,6 +80,7 @@ export function orientarIntencaoJev(
       `O JEV identificou: ${CORRECOES_JEV[correcao as keyof typeof CORRECOES_JEV]}. Leia na mensagem atual o que foi substituído e o que passou a ser solicitado. Não use a seleção anterior como confirmação do novo pedido. Refaça as consultas oficiais necessárias à informação corrigida antes de oferecer ou confirmar opções. Se o novo valor não estiver claro, pergunte. Não altere identidade, cadastro nem reserva existente apenas por esta classificação; utilize os fluxos e validações próprios.`,
     );
   if (!instrucoes.length) return null;
+  instrucoes.push(REGRA_IDENTIFICACAO_UNIFICADA);
   instrucoes.push(
     "Estas interpretações ajudam a entender o pedido. Não são fatos do catálogo, prova de vaga nem autorização operacional. Em conflito com a mensagem explícita do paciente, esclareça; preserve as restrições de segurança e todas as verificações das ferramentas. Respeite pedido_medico_do_turno: aceite textual não comprova recebimento de foto nem dispensa a exigência publicada.",
   );

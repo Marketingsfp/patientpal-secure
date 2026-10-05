@@ -1,6 +1,7 @@
 import type { ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 import { normalizarBuscaCatalogo, termosItemCatalogo } from "./catalogo-sem-registro";
 import { ehRespostaAfirmativaCurta, normalizarRespostaInformal } from "./resposta-afirmativa";
+import { perguntaIdentificacaoEntregue } from "./identificacao-catalogo";
 
 type ContextoResposta = {
   mensagem: string;
@@ -22,15 +23,7 @@ export function confirmarProfissionalDaPergunta(
     !ehRespostaAfirmativaCurta(contexto.mensagem)
   )
     return null;
-  const ultima = contexto.historico.at(-1);
-  const comparar = (t: string) =>
-    normalizarBuscaCatalogo(t).replace(/\*/g, "").replace(/\s+/g, " ").trim();
-  if (
-    ultima?.role !== "assistant" ||
-    !pendente.pergunta.trim() ||
-    !comparar(ultima.content ?? "").endsWith(comparar(pendente.pergunta))
-  )
-    return null;
+  if (!perguntaIdentificacaoEntregue(anterior, contexto)) return null;
   const opcao = pendente.opcoes[0]!;
   if (!anterior.referencias.some((r) => r.registro === opcao.id)) return null;
   return {

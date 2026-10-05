@@ -1,6 +1,6 @@
 /** Interpretação de escrita para buscar fatos publicados; nunca cria um atendimento. */
 import { normalizarBuscaCatalogo, termosItemCatalogo } from "./catalogo-sem-registro";
-import { REGRA_ESCLARECIMENTO_DUAS } from "./prompt/limite-esclarecimento";
+import { REGRA_IDENTIFICACAO_UNIFICADA } from "./identificacao-catalogo";
 import { REGRA_IDENTIDADE_ATENDIMENTO } from "./prompt/identidade-atendimento";
 
 // Equivalências de busca, não equivalências de preço, preparo ou modalidade.
@@ -300,7 +300,7 @@ export const REGRA_INTERPRETACAO_CATALOGO = `INTERPRETAÇÃO DO PEDIDO E IDENTID
 - Analise a mensagem inteira e o histórico atual antes de buscar. Extraia somente a consulta ou o procedimento e seus qualificadores para o termo; não envie a frase inteira, saudações, sintomas ou preferências de data como termo. Identifique separadamente o objetivo: informações gerais, valor, horários, médicos, preparo, condições ou intenção de agendar. Abreviações, siglas, erros de escrita e respostas curtas podem retomar um atendimento já identificado; nunca invente órgão, modalidade, profissional ou equivalência para uma sigla desconhecida.
 - Antes de buscar, converta a escrita do paciente no nome usual do exame/especialidade (ex.: usam/ultra → ultrassonografia, uro → urologia, médico de criança → pediatria). A busca aceita equivalências e pequenos erros. Isso só localiza candidatos publicados; não autoriza escolher um exame parecido. Preserve total/superior, órgão, infantil/adulto e demais diferenças do pedido.
 - Quando o retorno trouxer esclarecimento, faça a pergunta indicada, usando as opções publicadas. Não informe preço, preparo nem consulte agenda como se o item ou profissional já estivesse escolhido. Sigla desconhecida: peça o nome por extenso ou como está no pedido. Após esclarecer, consulte novamente a base.
-- ${REGRA_ESCLARECIMENTO_DUAS}
+- ${REGRA_IDENTIFICACAO_UNIFICADA}
 - Nomes iguais ou parecidos: apresente nome completo, especialidade e unidade disponíveis no próprio registro. Se esses dados não distinguirem os profissionais, peça outra informação de identificação e encaminhe à equipe se a dúvida persistir. Nunca escolha pelo primeiro resultado, preço ou disponibilidade sem a preferência do paciente.
 - Confirme com o paciente um nome de médico encontrado por escrita aproximada. Depois da escolha inequívoca, use o identificador do registro e o vínculo oficial da agenda; não reúna pessoas diferentes só por terem o mesmo nome.
 - Um termo não identificado não comprova ausência do atendimento. Depois que o atendimento estiver identificado e for pesquisado, ausência confirmada na base segue a transferência humana obrigatória.`;

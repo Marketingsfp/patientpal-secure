@@ -67,7 +67,7 @@ export function normalizarConhecimentoSessao(v: unknown): ConhecimentoSessao | n
           pergunta: texto(bruto.pergunta, 1600),
           ...(bruto.tipo === "profissional" && bruto.motivo === "medico_nao_identificado" && texto(bruto.atendimento, 200)
             ? { motivo: "medico_nao_identificado" as const, atendimento: texto(bruto.atendimento, 200) } : {}),
-          ...(bruto.tipo === "sigla" && bruto.motivo === "sem_registro_confirmar"
+          ...(bruto.motivo === "sem_registro_confirmar"
             ? { motivo: "sem_registro_confirmar" as const } : {}),
           opcoes: bruto.opcoes.slice(0, 40).flatMap((v: unknown) => {
             if (!v || typeof v !== "object") return [];

@@ -26,7 +26,8 @@ const contextual = cenariosContextuais[cenario];
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
 const ausente = cenario.startsWith("catalogo_ausente");
-const esclarecer = cenario.startsWith("catalogo_esclarecimento");
+const unificado = cenario.startsWith("catalogo_identificacao_");
+const esclarecer = cenario.startsWith("catalogo_esclarecimento") || unificado;
 const escolhaMedico = cenario.startsWith("catalogo_medico_");
 const confirmacaoMedico = cenario.startsWith("catalogo_medico_confirmacao");
 const variantePreventivo = cenario.includes("interpretado_preventivo");
@@ -103,7 +104,7 @@ if (confirmacaoMedico) catalogoInterpretado.profissionais = [{
   id: "medico-0", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: "Sandro Prinscewal",
   especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }], formas_pagamento: [], horarios: [], convenios: [],
 }];
-const perguntaEsclarecimento = "Pode informar o nome do procedimento por extenso?";
+const perguntaEsclarecimento = unificado ? "Você quis dizer Eletrocardiograma? Pode confirmar ou escrever o nome novamente." : "Pode informar o nome do procedimento por extenso?";
 const ferramentaAusente = cenario.includes("medicos_modelo") ? "buscar_medicos"
   : cenario.includes("procedimentos_modelo") ? "buscar_procedimentos"
   : cenario.includes("especialidades_modelo") ? "listar_especialidades" : "consultar_cadastro";
@@ -114,7 +115,8 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
-const pergunta = clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
+const pergunta = unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
+  : cenario.endsWith("novo_pedido") ? "Agora quero outro exame XYZ" : clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
     : cenario.endsWith("generico") ? "Quero marcar uma consulta"
@@ -180,6 +182,12 @@ if (escolhaMedico) estadoContextual.knowledge_context = {
     opcoes: [{ id: "medico-0", nome: "Shirley Martins", especialidade: "Dermatologia" }],
   } } : {}),
 };
+if (unificado && !cenario.endsWith("primeiro")) estadoContextual.knowledge_context = {
+  versao: 1, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
+  consulta: { termo: "eletrcardiograma", tipo_atendimento: "exame_procedimento" },
+  referencias: [{ registro: "ecg", versao: null, procedimento: "Eletrocardiograma", medicoNome: null }],
+  esclarecimento: { tipo: "procedimento", pergunta: perguntaEsclarecimento, opcoes: [{ id: "ecg", nome: "Eletrocardiograma" }] }, esclarecimentoTentativas: 1,
+};
 const registroMensagem = (body: string, indice: number, direction = "out", status = "sent") => ({
   id: `historico-${indice}`, conversa_id: "conversa-contextual", direction, body, status,
   created_at: new Date(agora - (20 - indice) * 60_000).toISOString(), is_teste: teste,
@@ -192,7 +200,10 @@ if (confirmacaoMedico) estadoContextual.knowledge_context = {
   esclarecimento: { tipo: "profissional", pergunta: perguntaMedico,
     opcoes: [{ id: "medico-0", nome: "Sandro Prinscewal", especialidade: "CARDIOLOGIA, CLINICO GERAL" }] },
 };
-const mensagensContextuais = linkCenario ? [
+const mensagensContextuais = unificado ? [
+  ...(cenario.endsWith("primeiro") ? [] : [registroMensagem(perguntaEsclarecimento, 1)]),
+  { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+] : linkCenario ? [
   registroMensagem("Tenho um pedido https://historico-paciente.com", 1, "in", "received"),
   registroMensagem("Pode informar o exame?", 2),
   { ...registroMensagem(entradaPaciente, 18, "in", "received"), id: "entrada-simulada" },
@@ -263,10 +274,10 @@ mock.module("@/integrations/supabase/client.server", () => ({
             : fonteCenario && tabela === "nina_cat_servicos" ? baseFonte.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-            : (contextual || confirmacaoMedico || pedidoCenario || linkCenario) && tabela === "whatsapp_mensagens" ? mensagensContextuais
+            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
-          count: (contextual || confirmacaoMedico || pedidoCenario || linkCenario) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
+          count: (contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
       };
       return q;
@@ -454,9 +465,9 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
             ? {}
             : {
                 esclarecimento: {
-                  tipo: "sigla",
+                  tipo: unificado ? "procedimento" : "sigla",
                   pergunta: perguntaEsclarecimento,
-                  opcoes: [],
+                  opcoes: unificado ? [{ id: "ecg", nome: "Eletrocardiograma" }] : [],
                 },
               }),
         },
@@ -581,7 +592,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
             arguments: JSON.stringify({
               termo:
                 (pedidoConsulta ? "cardiologia" : undefined) ?? interpretacao?.termo ??
-                (esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
+                (unificado && cenario.includes("confirmou") ? "isso" : esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
               ...(interpretacao
                 ? {
                     objetivos: interpretacao.objetivos,

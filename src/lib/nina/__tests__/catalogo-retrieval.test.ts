@@ -410,9 +410,11 @@ describe("separação entre consultas e exames", () => {
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query, tipo_atendimento: "consulta" });
     expect(r.records).toHaveLength(2);
     expect(r.records.every(item => item.categoria === "CONSULTA")).toBe(true);
-    expect(r.price).toContain("145,00");
+    if (query === "cardiolgia") {
+      expect(r.price).toBeNull();
+      expect(r.esclarecimento?.pergunta).toContain("Você quis dizer Cardiologia?");
+    } else { expect(r.price).toContain("145,00"); expect(r.esclarecimento).toBeUndefined(); }
     expect(r.tipo_atendimento).toBe("consulta");
-    expect(r.esclarecimento).toBeUndefined();
     expect(chamadas.some(c => c.tabela === "servicos")).toBe(false);
   });
 
@@ -475,7 +477,8 @@ describe("avaliação odontológica publicada", () => {
       expect(r.doctors).toEqual(["Jean Ferreira", "Raiani", "Karen"]);
       expect(r.records).toHaveLength(3);
       expect(r.records.every(item => item.categoria === "CONSULTA" && item.procedimento === "Consulta — ODONTOLOGIA")).toBe(true);
-      expect(r.esclarecimento).toBeUndefined();
+      if (query === "avaliaçao odontolgica") expect(r.esclarecimento?.pergunta).toContain("Você quis dizer ODONTOLOGIA?");
+      else expect(r.esclarecimento).toBeUndefined();
       expect(JSON.stringify(r)).not.toContain("180,00");
       expect(chamadas.some(c => c.tabela === "servicos")).toBe(false);
     });
@@ -896,7 +899,7 @@ describe("siglas, escrita aproximada e identidade publicadas", () => {
     banco.profissionais = [profissional({ nome: "Dra. Shirley Martins", especialidades: [{ nome: "Dermatologia" }] })];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "Dermatologia", medico: "Shirlei" });
     expect(r.esclarecimento?.motivo).toBe("medico_nao_identificado");
-    expect(r.esclarecimento?.pergunta).toContain("Não consegui identificar com segurança");
+    expect(r.esclarecimento?.pergunta).toContain("Você quis dizer Dra. Shirley Martins");
     expect(r.esclarecimento?.pergunta).not.toContain("Não encontrei");
   });
   it("a lista devolve os nomes cadastrados ao modelo e não elimina opções pelo dia", async () => {
@@ -1026,10 +1029,18 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
     ];
   });
 
+  it("erro de escrita sugere candidato; confirmação exata permite consultar os fatos", async () => {
+    const aproximado = await buscarNoCatalogo({ clinicaId: CLINICA, query: "ultrassonografia transavaginal" });
+    expect(aproximado.price).toBeNull();
+    expect(aproximado.esclarecimento?.pergunta).toContain("Você quis dizer USG TRANSVAGINAL");
+    const confirmado = await buscarNoCatalogo({ clinicaId: CLINICA, query: "USG TRANSVAGINAL" });
+    expect(confirmado.esclarecimento).toBeUndefined();
+    expect(confirmado.price).toBe("R$ 100,00");
+  });
+
   it.each([
     ["Usg transvaginal", "USG TRANSVAGINAL", 100],
     ["ultrassom transvaginal", "USG TRANSVAGINAL", 100],
-    ["ultrassonografia transavaginal", "USG TRANSVAGINAL", 100],
     ["USG transvaginal com Doppler", "USG TRANSVAGINAL COM DOPPLER", 200],
     ["USG transvaginal gemelar", "USG TRANSVAGINAL GEMELAR", 300],
   ])("ultra → %s resolve sem transferir nem misturar condições", async (query, nome, valor) => {

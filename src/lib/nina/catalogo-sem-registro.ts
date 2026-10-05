@@ -91,7 +91,7 @@ export function respostaSemRegistro(confirmado: boolean, teste = false): string 
 /**
  * Primeira busca sem resultado: em vez de transferir, a Maria confirma uma vez
  * o que entendeu ou pede outra escrita. A segunda falha encaminha
- * (`encaminharAposEsclarecimento`). Médico não encontrado segue a regra atual.
+ * (`encaminharAposEsclarecimento`), inclusive para profissional não identificado.
  */
 export function confirmarAntesDeEncaminhar(
   r: ResultadoBroker,
@@ -100,13 +100,14 @@ export function confirmarAntesDeEncaminhar(
 ): ResultadoBroker {
   if (anterior?.esclarecimento) return r;
   const ausencia = encaminhamentoSemRegistro(r, args);
-  if (!ausencia || ausencia.motivo !== MOTIVO_SEM_REGISTRO) return r;
+  if (!ausencia) return r;
   let termo = "";
   try {
     const p = typeof args === "string" ? JSON.parse(args) : args;
-    termo = String(p?.termo ?? p?.especialidade ?? "").trim().slice(0, 120);
+    termo = String(p?.medico ?? p?.nome ?? p?.termo ?? p?.especialidade ?? "").trim().slice(0, 120);
   } catch { /* sem termo legível */ }
-  const pergunta = termo
+  const profissional = ausencia.motivo === MOTIVO_MEDICO_SEM_REGISTRO;
+  const pergunta = profissional ? `Não consegui identificar o profissional "${termo}". Pode escrever o nome novamente ou informar a especialidade?` : termo
     ? `Não encontrei "${termo}" no nosso cadastro. Você quis dizer outro nome? Pode escrever de outro jeito ou como está no pedido médico (por exemplo: ultrassom de abdome, cardiologista)?`
     : "Não consegui identificar o atendimento. Pode escrever o nome do exame ou da especialidade de outro jeito, ou como está no pedido médico?";
   const dados = (r.dados ?? {}) as Record<string, unknown>;
@@ -114,8 +115,8 @@ export function confirmarAntesDeEncaminhar(
     ...r,
     dados: {
       ...dados,
-      esclarecimento: { tipo: "sigla", motivo: "sem_registro_confirmar", pergunta, opcoes: [] },
-      instrucao: `Busca sem resultado na primeira tentativa. Não transfira ainda. Confirme com o paciente, em uma única pergunta curta, o que você entendeu (ex.: "Você quis dizer ultrassom (USG)? De qual região?") ou peça para escrever de outro jeito. Base sugerida: ${pergunta} Se o paciente pedir atendente, use solicitar_atendente_humano. Depois da resposta, consulte a base novamente.`,
+      esclarecimento: { tipo: profissional ? "profissional" : "sigla", motivo: "sem_registro_confirmar", pergunta, opcoes: [] },
+      instrucao: `Busca sem resultado na primeira tentativa. Não transfira ainda. Peça para escrever o nome de outro jeito. Sem candidato publicado, não invente uma hipótese. Base sugerida: ${pergunta} Se o paciente pedir atendente, use solicitar_atendente_humano. Depois da resposta, consulte a base novamente.`,
     },
   };
 }

@@ -10,6 +10,7 @@
 import { COLUNAS_SERVICO, COLUNAS_PROFISSIONAL, TAMANHO_PAGINA, lerPublicados, temCatalogoDoTurno, comCatalogoDoTurno, contagemCatalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
+import { perguntaCandidatoCatalogo } from "./identificacao-catalogo";
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,
@@ -214,7 +215,7 @@ async function buscarNaFonteDoTurno(
       p.id !== medico && compararNomeProfissional(medico, p.nome) !== "exato"));
   // Reapresenta os nomes da consulta, sem transformar nenhum deles em seleção.
   // O dia não filtra a correção do nome: escala não comprova identidade.
-  const profissionaisRelevantes = escolhaMedicoPendente ? profissionaisDaConsulta
+  const profissionaisRelevantes = escolhaMedicoPendente ? (profissionaisPorNome.length ? profissionaisPorNome : profissionaisDaConsulta)
     : profissionaisPorNome.filter((p) => atendeNoDia(p, pedido.dia ?? null));
   const idsProfissionais = profissionaisRelevantes
     .slice(0, escolhaMedicoPendente ? 40 : medico ? Math.max(6, limite) : limite)
@@ -277,11 +278,12 @@ async function buscarNaFonteDoTurno(
         (p) => compararNomeProfissional(medico, p.nome) === "aproximado",
       ));
   const familiaSemTipo = familiaGenerica && listaServicos.length > 0;
+  const consultaAproximada = perguntaSobreConsulta && !perguntaPorNome && busca.ajustes.length > 0 && listaProfissionais.length > 0;
   const pedirServico =
-    (ambiguo || familiaSemTipo) && !(perguntaSobreConsulta && listaProfissionais.length);
+    (ambiguo || familiaSemTipo || busca.ajustes.length > 0 && listaServicos.length > 0) && !(perguntaSobreConsulta && listaProfissionais.length);
   if (
     resultado.knowledge_status !== "conflict" &&
-    (medicosAmbiguos || pedirServico || busca.siglasDesconhecidas.length)
+    (medicosAmbiguos || consultaAproximada || pedirServico || busca.siglasDesconhecidas.length)
   ) {
     const opcoes = medicosAmbiguos
       ? listaProfissionais.map((p) => ({
@@ -295,20 +297,28 @@ async function buscarNaFonteDoTurno(
             : "",
           unidade: p.unidades?.nome ?? null,
         }))
+      : consultaAproximada
+        ? listaProfissionais.flatMap(p => {
+          const todas = Array.isArray(p.especialidades) ? p.especialidades : [];
+          const correspondentes = todas.filter(e => busca.pontuar(String(e.nome ?? ""), "") > 0);
+          return (correspondentes.length ? correspondentes : todas).map(e => ({ id: p.id, nome: String(e.nome ?? "") }));
+        })
+          .filter((o, i, todos) => o.nome && todos.findIndex(a => a.nome === o.nome) === i)
       : pedirServico
         ? servicosRelevantes
             .filter((x) => x.score === melhor)
             .slice(0, 6)
             .map(({ s }) => ({ id: s.id, nome: s.nome }))
         : [];
-    const tipo = medicosAmbiguos ? "profissional" : pedirServico ? "procedimento" : "sigla";
+    const tipo = medicosAmbiguos ? "profissional" : pedirServico || consultaAproximada ? "procedimento" : "sigla";
     const nomes = opcoes.map((p) =>
       [p.nome, "especialidade" in p ? p.especialidade : null, "unidade" in p ? p.unidade : null]
         .filter(Boolean)
         .join(" — "),
     );
-    const pergunta =
-      escolhaMedicoPendente
+    const pergunta = opcoes.length === 1 || consultaAproximada || pedirServico && busca.ajustes.length > 0
+      ? perguntaCandidatoCatalogo(opcoes, tipo === "profissional")
+      : escolhaMedicoPendente
         ? `${profissionaisPorNome.length === 0 ? "Não encontrei esse nome entre os médicos desta consulta." : "Não consegui identificar com segurança qual médico você escolheu."} Pode informar novamente qual deseja?\n${nomes.join("\n")}`
         : tipo === "profissional"
         ? perguntaIdentificacaoProfissional(opcoes)

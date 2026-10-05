@@ -1,3 +1,4 @@
+import { confirmarItemDaPergunta, mudouSolicitacaoExplicitamente } from "./identificacao-catalogo";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 import { conhecimentoDaMesmaSessao, consultaDoNovoTurno } from "./confidence/conhecimento-sessao";
 import { prepararPesquisaMedicoDaSessao } from "./pesquisa-medico-sessao";
@@ -15,7 +16,17 @@ export function prepararPesquisaAtendimentoDaSessao(
   },
 ): string | undefined {
   const anterior = conhecimentoDaMesmaSessao(contexto.conhecimento, contexto.clinicaId, contexto.sessionId);
-  const preparado = prepararPesquisaMedicoDaSessao(ferramenta, args, anterior, contexto);
+  let preparado = prepararPesquisaMedicoDaSessao(ferramenta, args, anterior, contexto);
+  if (preparado && ["consultar_cadastro", "buscar_procedimentos"].includes(ferramenta)) {
+    try {
+      const p = JSON.parse(preparado);
+      const confirmada = confirmarItemDaPergunta(anterior, contexto);
+      if (confirmada) preparado = JSON.stringify({ ...p, termo: confirmada.nome,
+        ...(anterior?.consulta.tipo_atendimento ? { tipo_atendimento: anterior.consulta.tipo_atendimento } : {}), nova_solicitacao: false });
+      else if (anterior?.esclarecimento) preparado = JSON.stringify({ ...p,
+        nova_solicitacao: mudouSolicitacaoExplicitamente(contexto.mensagem) });
+    } catch { /* Validação dos argumentos permanece no executor. */ }
+  }
   const campo = ferramenta === "consultar_cadastro" ? "termo"
     : ["buscar_medicos", "proxima_vaga", "consultar_primeiro_disponivel", "consultar_disponibilidade", "verificar_horario"].includes(ferramenta)
       ? "especialidade" : null;
