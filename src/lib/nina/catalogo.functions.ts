@@ -79,21 +79,39 @@ export const listarCatalogoNina = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await exigirMembro(context.supabase, context.userId, data.clinicaId);
+    const { lerPaginasCatalogo } = await import("./catalogo-importacao.server");
     const [servicos, profissionais] = await Promise.all([
-      context.supabase
+      lerPaginasCatalogo<any>(() => context.supabase
         .from(TABELA.servico)
         .select(COLUNAS_SERVICO)
         .eq("clinica_id", data.clinicaId)
-        .order("nome"),
-      context.supabase
+        .order("nome").order("id")).catch(e => { throw erroLeituraCatalogo(e); }),
+      lerPaginasCatalogo<any>(() => context.supabase
         .from(TABELA.profissional)
         .select(COLUNAS_PROFISSIONAL)
         .eq("clinica_id", data.clinicaId)
-        .order("nome"),
+        .order("nome").order("id")).catch(e => { throw erroLeituraCatalogo(e); }),
     ]);
-    if (servicos.error) throw erroLeituraCatalogo(servicos.error);
-    if (profissionais.error) throw erroLeituraCatalogo(profissionais.error);
-    return { servicos: servicos.data ?? [], profissionais: profissionais.data ?? [] };
+    return { servicos, profissionais };
+  });
+
+/** Informações públicas compartilhadas: aparecem na base sem duplicar a fonte oficial. */
+export const informacoesPublicasBase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
+    const { lerPaginasCatalogo } = await import("./catalogo-importacao.server");
+    const [clinica, unidades, convenios] = await Promise.all([
+      context.supabase.from("clinicas").select("nome, endereco, cidade, estado, cep, telefone, email")
+        .eq("id", data.clinicaId).maybeSingle(),
+      lerPaginasCatalogo<any>(() => context.supabase.from("unidades").select("id, nome")
+        .eq("clinica_id", data.clinicaId).eq("ativo", true).order("id")),
+      lerPaginasCatalogo<any>(() => context.supabase.from("cb_convenios").select("id, nome")
+        .eq("clinica_id", data.clinicaId).eq("ativo", true).order("id")),
+    ]);
+    if (clinica.error) throw Error(clinica.error.message);
+    return { clinica: clinica.data, unidades, convenios };
   });
 
 /** Cadastros já existentes no sistema, reutilizados nos vínculos do catálogo. */

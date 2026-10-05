@@ -22,6 +22,8 @@ export type MedicoOp = {
   nome: string;
   especialidade_id: string | null;
   visivel_agendamento_online?: boolean | null;
+  /** Lista oficial usada na adaptação editorial completa, inclusive lista vazia. */
+  especialidades_cadastro?: EspecialidadeOp[];
 };
 export type DisponibilidadeOp = {
   medico_id: string;
@@ -193,7 +195,7 @@ export function visivelAoPaciente(m: MedicoOp): boolean {
 }
 
 /** Médicos do cadastro → profissionais no formato da Nina (um por médico, sem deduplicar). */
-export function mapearProfissionais(e: EntradaOperacional): ProfissionalOperacional[] {
+export function mapearProfissionais(e: EntradaOperacional, incluirConsultasSemValor = false): ProfissionalOperacional[] {
   const nomesEsp = new Map(e.especialidades.map((x) => [x.id, x.nome]));
   const proc = new Map(e.procedimentos.map((p) => [p.id, p]));
   return e.medicos.filter(visivelAoPaciente).map((m) => {
@@ -202,16 +204,18 @@ export function mapearProfissionais(e: EntradaOperacional): ProfissionalOperacio
     const vinculos = e.vinculos.filter((v) => v.medico_id === m.id);
     const consultas = vinculos
       .map((v) => ({ v, p: proc.get(v.procedimento_id) }))
-      .filter((x): x is { v: VinculoOp; p: ProcedimentoOp } => !!x.p && x.p.tipo === "consulta" && temValor(x.p))
+      .filter((x): x is { v: VinculoOp; p: ProcedimentoOp } => !!x.p && x.p.tipo === "consulta" && (incluirConsultasSemValor || temValor(x.p)))
       .sort((a, b) => ordemConsultas(a.p, b.p));
 
     const idsEsp = [
       ...new Set([m.especialidade_id, ...vinculos.map((v) => v.especialidade_id ?? null)].filter((x): x is string => !!x)),
     ];
-    const especialidades = idsEsp
+    const especialidades = m.especialidades_cadastro ?? idsEsp
       .map((id) => ({ id, nome: nomeDe(nomesEsp, id) }))
       .filter((x): x is { id: string; nome: string } => !!x.nome);
-    const espPadrao = nomeDe(nomesEsp, m.especialidade_id);
+    const espPadrao = m.especialidades_cadastro !== undefined
+      ? m.especialidades_cadastro.map(x => x.nome).join(", ") || null
+      : nomeDe(nomesEsp, m.especialidade_id);
     const resumo = resumoDosHorarios(horarios);
 
     return {
@@ -282,7 +286,8 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
               .map(({ v, m }) =>
                 bloco({
                   atendimento: p.nome,
-                  especialidade: nomeDe(nomesEsp, v.especialidade_id) ?? nomeDe(nomesEsp, m.especialidade_id),
+                  especialidade: nomeDe(nomesEsp, v.especialidade_id) ?? (m.especialidades_cadastro !== undefined
+                    ? m.especialidades_cadastro.map(x => x.nome).join(", ") || null : nomeDe(nomesEsp, m.especialidade_id)),
                   profissional: m.nome,
                   horarios: resumoDe(m.id),
                   preco,

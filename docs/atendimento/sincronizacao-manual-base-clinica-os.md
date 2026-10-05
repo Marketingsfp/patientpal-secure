@@ -1,4 +1,28 @@
-# Sincronização manual da base com apoio do Jev
+# Sincronização manual da Base com Clínica OS
+
+## Ampliação de 05/10/2026: sincronizar toda a base
+
+Solicitação de JEAN: incluir todos os médicos (82 informados no Clínica OS, contra 66 na base), consultas, exames e informações administrativas do atendimento, adaptadas à estrutura existente. Confirmação explícita: médicos inativos ou ocultos também entram, como rascunho, sem oferta pela Nina.
+
+O cabeçalho da Base de conhecimentos agora oferece **Sincronizar toda a base com Clínica OS** para administradores e gestores. O botão individual descrito abaixo continua disponível. A ampliação cria registros ausentes, além de atualizar os existentes; não depende do Jev.
+
+1. Abrir a prévia: quantidades efetivamente lidas, novos registros, atualizações, rascunhos e conflitos, com diferenças antes/depois.
+2. Conferir e confirmar. Novos médicos ativos/visíveis e exames/procedimentos ativos são publicados; rascunhos existentes continuam rascunhos. Inativos/ocultos ficam rascunhos. Consultas sem médico vinculado e consultas inativas são preservadas como registros de consulta em rascunho.
+3. Conferir o resultado. Falha interrompe a execução e informa o que já foi gravado. Uma nova prévia permite retomar; não há transação global ou promessa de reversão automática.
+
+### Adaptação e limites
+
+- Todos os médicos são lidos, inclusive inativos e ocultos. Especialidades usam `medico_especialidades`, o mesmo cadastro de Editar médico. Horários habituais vigentes, modalidade e consultas vinculadas usam os campos existentes da base. Consultas sem preço permanecem sem preço confirmado.
+- Exames/procedimentos incluem nomes, vínculos, executantes ativos/visíveis, horários vigentes, preços/pagamentos conforme conversor existente, preparo, observações, grupo e exigências explícitas de autorização/termo. Consultas preservam preparo, observações e exigências qualificadas pelo nome da consulta no texto público. Horários habituais não comprovam vagas: a consulta e a gravação da agenda continuam no Clínica OS.
+- A aba da clínica mostra dados públicos de contato/endereço, unidades e convênios cadastrados, lendo a fonte compartilhada. O cadastro de um convênio não atesta cobertura de qualquer atendimento. Não copia pacientes, prontuários, dados pessoais privados ou bancários dos médicos.
+- Correspondência por vínculo/ID; sem vínculo, somente nome normalizado exato e único. Homônimos, grupos, registros arquivados e revisões pendentes são sinalizados, sem sobrescrita. Exceção: se um médico publicado ficou inativo/oculto e tem revisão pendente, somente o status passa a rascunho; a revisão é preservada.
+- Aliases e nota interna são preservados. Fatos públicos são recompostos da origem, com campos ausentes explícitos na prévia. Limites da estrutura existente são validados, sem truncamento; itens incompatíveis ficam para revisão.
+- Todas as listas são paginadas, inclusive acima de mil registros. A origem é guardada no JSON existente; nenhuma migration. IDs estáveis impedem criações duplicadas no reenvio. Prévia assinada por item permite lotes de até 50, com releitura, controle de versão e revalidação de permissão. As escritas usam o cliente autenticado e as políticas/auditorias existentes.
+- Não muda a fonte selecionada para a Nina, o prompt, o Jev, o transporte de WhatsApp ou a agenda. Nenhuma chamada adicional de IA na sincronização completa. Rascunhos não são consumidos pelo catálogo publicado.
+
+Validação local: 52 testes em cinco arquivos cobrem adaptação, especialidades, cenário simulado de 66 para 82 médicos, exclusão de executantes inativos/ocultos, revisão preservada, repetição sem novas gravações, lotes, paginação, falha parcial, concorrência, mudança na origem e permissões. TypeScript e compilação local passaram. As quantidades reais e a implantação não foram comprovadas: o painel do Lovable apresentou prévia desatualizada/build malsucedido e depois deixou de responder à navegação automatizada. Nenhuma importação em produção foi realizada nesta etapa. Os números 82/66 dos testes são dados simulados baseados no relato, não uma auditoria da base real.
+
+## Sincronização individual existente
 
 Decisão de JEAN em 04/10/2026: usar o Jev para mapear e sincronizar apenas manualmente. Substitui a proposta anterior de atualização automática. Não cria agendamento, job, cron, migration ou ativação da base no atendimento.
 

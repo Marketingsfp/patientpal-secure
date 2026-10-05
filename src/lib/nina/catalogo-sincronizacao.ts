@@ -103,21 +103,22 @@ export function prepararSincronizacao(
     );
   const dados = resultado.data;
   if ("valor" in dados) dados.valor = valorResumo(dados);
+  const estruturaFinal = dados.estrutura ?? estrutura;
   const mudancas = compararDadosCatalogo(tipo, atual, dados);
   const vinculo = tipo === "servico" ? "procedimento_id" : "medico_id";
   const camposExtras: [string, unknown, unknown][] = [
-    ["Vínculo com Clínica OS", atual[vinculo], fonte.id],
+    ["Vínculo com Clínica OS", atual[vinculo], (dados as Record<string, unknown>)[vinculo]],
     ...(tipo === "profissional"
       ? [["Unidade vinculada", atual.unidade_id, null] as [string, unknown, unknown]]
       : []),
-    ...[...new Set([...Object.keys(atual.estrutura ?? {}), ...Object.keys(estrutura)])]
+    ...[...new Set([...Object.keys(atual.estrutura ?? {}), ...Object.keys(estruturaFinal)])]
       .filter((k) => k !== "versao")
       .map(
         (k) =>
           [
             rotulosEstrutura[k] ?? k,
             atual.estrutura?.[k],
-            (estrutura as Record<string, unknown>)[k],
+            (estruturaFinal as Record<string, unknown>)[k],
           ] as [string, unknown, unknown],
       ),
   ];
@@ -132,6 +133,7 @@ export function prepararSincronizacao(
 }
 
 const rotulosEstrutura: Record<string, string> = {
+  origem_clinica_os: "Origem no Clínica OS",
   aliases: "Variações de escrita",
   categoria: "Categoria",
   abrangencia: "Abrangência",

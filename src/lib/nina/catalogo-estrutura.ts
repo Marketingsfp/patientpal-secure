@@ -44,6 +44,12 @@ export const complementoAtendimentoSchema = z
 export const estruturaCatalogoSchema = z
   .object({
     versao: z.literal(1).default(1),
+    origem_clinica_os: z.object({
+      tipo: z.enum(["medico", "procedimento", "consulta"]),
+      id: z.string().uuid(),
+      ativo: z.boolean(),
+      visivel: z.boolean(),
+    }).optional(),
     aliases: z.array(z.string().trim().min(2).max(160)).max(50).default([]),
     categoria: z
       .enum(["consulta", "exame", "procedimento", "exame_procedimento"])

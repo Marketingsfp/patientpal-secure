@@ -4,6 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
 import { HorarioFuncionamento } from "@/components/nina/catalogo/HorarioFuncionamento";
 import { FonteConsultaMaria } from "@/components/nina/catalogo/FonteConsultaMaria";
+import { ImportacaoCompleta } from "@/components/nina/catalogo/ImportacaoCompleta";
+import { DadosClinicaBase } from "@/components/nina/catalogo/DadosClinicaBase";
+import { useState } from "react";
 
 /**
  * Aba "Base de conhecimentos da Nina".
@@ -14,6 +17,7 @@ export function BaseConhecimento() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const podeEditar = ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
+  const [revisao, setRevisao] = useState(0);
 
   return (
     <section className="oszap-base" data-os-zap="true" aria-label="Base de conhecimento">
@@ -27,6 +31,7 @@ export function BaseConhecimento() {
         </div>
       </header>
       <FonteConsultaMaria key={clinicaId} clinicaId={clinicaId} podeEditar={podeEditar} />
+      {podeEditar && clinicaId && <ImportacaoCompleta key={clinicaId} clinicaId={clinicaId} onConcluido={() => setRevisao(v => v + 1)} />}
       <Tabs defaultValue="servicos" className="oszap-base-tabs">
         <TabsList className="oszap-base-tab-list" aria-label="Categorias da base">
           <TabsTrigger value="servicos">
@@ -43,12 +48,13 @@ export function BaseConhecimento() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="servicos">
-          <CatalogoNina clinicaId={clinicaId} podeEditar={podeEditar} tipo="servico" />
+          <CatalogoNina key={`${clinicaId}:${revisao}:servico`} clinicaId={clinicaId} podeEditar={podeEditar} tipo="servico" />
         </TabsContent>
         <TabsContent value="profissionais">
-          <CatalogoNina clinicaId={clinicaId} podeEditar={podeEditar} tipo="profissional" />
+          <CatalogoNina key={`${clinicaId}:${revisao}:profissional`} clinicaId={clinicaId} podeEditar={podeEditar} tipo="profissional" />
         </TabsContent>
         <TabsContent value="clinica" className="oszap-base-clinic">
+          <DadosClinicaBase clinicaId={clinicaId} />
           <p className="mb-4 text-sm text-muted-foreground">
             O horário de funcionamento é compartilhado pelas duas fontes e aparece aqui para consulta.
           </p>
