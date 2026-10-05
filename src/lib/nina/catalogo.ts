@@ -138,7 +138,8 @@ export type FormaPagamento = z.infer<typeof formaPagamentoSchema>;
 export const executanteSchema = z.object({
   medico_id: z.string().uuid().nullable().optional().default(null),
   nome: z.string().trim().min(1, "Informe quem realiza").max(160),
-  horarios: textoCurtoOpcional,
+  // A origem pode reunir vários dias, turnos e exceções. Preserve o texto completo.
+  horarios: z.string().trim().optional().nullable().transform((v) => v || null),
   observacao: textoOpcional,
 });
 export type Executante = z.infer<typeof executanteSchema>;

@@ -147,6 +147,22 @@ describe("sincronização manual da base", () => {
       prepararSincronizacao("servico", atual(), { ...fonte(), preparo: "x".repeat(4001) }),
     ).toThrow("Nenhum texto foi cortado");
   });
+  test("prévia e sincronização preservam horários extensos de todos os executantes", async () => {
+    const e = ambiente();
+    const horarios = "Segunda e quarta: 08:00–12:00; sexta: 13:00–17:00.\n".repeat(100) + "Último turno: sábado, 09:00–11:00.";
+    expect(horarios.length).toBeGreaterThan(4000);
+    const executantes = [
+      { medico_id: null, nome: "Profissional A", horarios, observacao: null },
+      { medico_id: null, nome: "Profissional B", horarios: horarios + "\nSomente com confirmação prévia.", observacao: null },
+    ];
+    e.configurar({ origem: { ...fonte(), executantes } });
+    const p = await e.api.prever(CLINICA, "servico", ID, FONTE);
+    expect(e.ver().escritas).toBe(0);
+    await e.api.aplicar(CLINICA, "servico", p);
+    expect(e.ver().escritas).toBe(1);
+    expect(e.ver().r.executantes).toEqual(executantes);
+    expect(e.ver().chamadasJev).toBe(0);
+  });
   test("profissional mantém vínculo exato e horários, sem completar campos com conteúdo antigo", () => {
     const p = prepararSincronizacao("profissional", atual(), {
       id: FONTE,
