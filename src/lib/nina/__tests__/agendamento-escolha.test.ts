@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import {
   aceitarResumoEntregue,
+  incluirPacienteNoResumo,
   consentimentoDaEscolha,
   LEMBRETE_CONFIRMACAO,
   lerEscolhaHorario,
@@ -31,6 +32,26 @@ function preparar() {
   return e;
 }
 describe("escolha de horário e consentimento do resumo entregue", () => {
+  test("resumo identifica filha com WhatsApp do responsável e exige novo aceite se mudar paciente", () => {
+    const e = preparar();
+    const anterior = e.appointment.confirmation!.resumo;
+    e.patient.id = "filha"; e.patient.validated = true;
+    const filha = { id: "filha", nome: "SOFIA LIMA ROCHA", data_nascimento: "2023-02-14", telefone: "21999990000" };
+    incluirPacienteNoResumo(e, "clinica", filha);
+    const resumo = e.appointment.confirmation!.resumo;
+    expect(resumo).toContain("SOFIA LIMA ROCHA");
+    expect(resumo).toContain("14/02/2023");
+    expect(resumo).toContain("WhatsApp de contato:* 21999990000");
+    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: anterior }])).toBe(false);
+    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: resumo }])).toBe(true);
+    incluirPacienteNoResumo(e, "clinica", filha);
+    expect(consentimentoDaEscolha(e, "clinica")).not.toBeNull();
+    e.patient.id = "outra-pessoa";
+    expect(consentimentoDaEscolha(e, "clinica")).toBeNull();
+    incluirPacienteNoResumo(e, "clinica", { ...filha, id: "outra-pessoa", nome: "ANA ROCHA" });
+    expect(e.appointment.confirmation!.aceita).toBe(false);
+    expect(e.appointment.confirmation!.resumo).not.toContain("SOFIA");
+  });
   test("reconsultar ou selecionar a mesma vaga preserva o resumo e o aceite", () => {
     const e = preparar();
     const resumo = e.appointment.confirmation!;

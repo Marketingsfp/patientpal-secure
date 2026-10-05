@@ -124,6 +124,26 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: escolher vaga → coletar dados → confirmar → agendar", () => {
+  test("troca responsável pela filha sem herdar o nascimento antigo e sem agendar durante a coleta", async () => {
+    const t = preparar([]);
+    Object.assign(t.estado.patient, { id: "responsavel", identified: true, validated: true });
+    t.ctx.pacienteId = "responsavel";
+    t.ctx.pacienteNome = "Ana da Silva";
+    t.estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
+    t.ctx.consultaAgenda!.historico.unshift({ role: "user", content: "Meu nome é Ana da Silva, 02/01/1990" });
+    const executar = async (ctx: CtxNinaPaciente, nome: string, args: unknown): Promise<ResultadoFerramenta> =>
+      nome === "consultar_cadastro_paciente"
+        ? { ok: true, campos_faltantes: [], dados_confirmados: { nome: "Ana da Silva", data_nascimento: "1990-01-02" } }
+        : t.executar(ctx, nome, args);
+    const primeiro = await aplicarGateIdentificacao({ mensagem: "O nome dela é Sofia Lima Rocha", estado: t.estado, ctx: t.ctx, executar });
+    expect(primeiro?.texto).toContain("data de nascimento");
+    expect(t.estado.patient.pending).toMatchObject({ nome: "Sofia Lima Rocha", data_nascimento: null });
+    expect(t.chamadas).toHaveLength(0);
+    const segundo = await aplicarGateIdentificacao({ mensagem: "Nasceu em 14/02/2023", estado: t.estado, ctx: t.ctx, executar });
+    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({ nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14" });
+    expect(segundo?.restricoes).toContain("aguardar_aceite_do_resumo");
+    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+  });
   test.each(["Sim, confirmo para minha mãe.", "Isso aí, pode marcar pra minha mãe!"])(
     "aceita referência à mesma paciente identificada: %s", async frase => {
       const t = preparar();

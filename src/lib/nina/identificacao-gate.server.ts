@@ -431,9 +431,7 @@ export async function aplicarGateIdentificacao(params: {
   const ultimaMensagem = ctx.consultaAgenda?.historico.at(-1);
   const coletandoDados = ["AWAITING_PATIENT_DATA", "COLLECTING_PATIENT_DATA", "IDENTIFYING_PATIENT"].includes(estado.flow.stage) ||
     (ultimaMensagem?.role === "assistant" && /nome completo|data de nascimento|telefone com DDD/i.test(ultimaMensagem.content ?? ""));
-  const declaracaoNaEscolha = selecionouAgora
-    ? declaracaoDePaciente(mensagem)
-    : null;
+  const declaracaoNaEscolha = declaracaoDePaciente(mensagem);
   const novo = declaracaoNaEscolha ? extrairDadosIdentificacao(declaracaoNaEscolha)
     : selecionouAgora ? dadosJuntoDaEscolha(mensagem)
     : aceiteDaVaga || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
@@ -450,8 +448,21 @@ export async function aplicarGateIdentificacao(params: {
   const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
   if (!consulta.ok && consulta.erro === "CATALOGO_ATENDIMENTO_HUMANO") return encaminharRestricaoCatalogo(consulta.motivo_transferencia);
   if (!consulta.ok) return encaminharFalha("consultar_cadastro_paciente", consulta.erro);
-  const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
-  {
+  const compararNome = (nome: string) => nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const dadosConfirmados = consulta.dados_confirmados as { nome?: string; data_nascimento?: string } | undefined;
+  const nomeAtual = dadosConfirmados?.nome ?? ctx.pacienteNome;
+  const mudouPaciente = Boolean(novo?.nome && nomeAtual && compararNome(novo.nome) !== compararNome(nomeAtual));
+  const mudouNascimento = Boolean(novo?.data_nascimento && dadosConfirmados?.data_nascimento && novo.data_nascimento !== dadosConfirmados.data_nascimento);
+  if ((mudouPaciente || mudouNascimento) && novo) {
+    // Uma declaração nova não pode herdar nome/nascimento da pessoa anterior.
+    p.pending = { nome: novo.nome ?? p.pending.nome, data_nascimento: novo.data_nascimento ?? null, cpf: null };
+    resumoEscolhido.aceita = false;
+    a.slot_confirmed_by_patient = false;
+    a.intent_confirmed = false;
+  }
+  const outraIdentificacao = mudouPaciente || mudouNascimento || Boolean(p.pending.nome && nomeAtual && compararNome(p.pending.nome) !== compararNome(nomeAtual));
+  const faltantesNoCadastro = outraIdentificacao ? ["nome", "data_nascimento"] as CampoCadastro[] : (consulta.campos_faltantes ?? []) as CampoCadastro[];
+  if (!outraIdentificacao) {
     // Dados já informados são candidatos ao cadastro, nunca prova de identidade.
     // Não extraia nomes de pedidos de consulta ou de resumos do assistente.
     const historico = ctx.consultaAgenda?.historico ?? [];

@@ -883,6 +883,7 @@ async function gerarRespostaNinaInterno(
   const { resolverSessao, persistirEstadoSessao } = await import("@/lib/nina/sessao.server");
   const { ttlSessaoMinutos } = await import("@/lib/nina/sessao");
   const sessaoNina = resolverSessao(estadoId.fluxoEstadoBruto, estadoId.memoriaDesde);
+  if (telefoneNorm) sessaoNina.estado.whatsapp_remetente = telefoneNorm;
   if (sessaoNina.expirou || sessaoNina.saneouEncerramento) {
     await conferirReserva();
     await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
@@ -1400,6 +1401,10 @@ async function gerarRespostaNinaInterno(
     { codigo: "PAGAMENTO_COMPROVADO", nivel: "inegociavel", origem: "src/lib/nina/eficiencia-turno.ts", motivo: "Regra confirmada pelo responsável: Pix e cartão têm sempre o mesmo valor.", texto: REGRA_MODALIDADES_PAGAMENTO },
   );
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
+  const { REGRA_CADASTRO_AGENDAMENTO } = await import("@/lib/nina/cadastro-paciente");
+  instrucoesAdicionaisTurno.push({ codigo: "CADASTRO_PESSOA_ATENDIDA", nivel: "inegociavel",
+    origem: "src/lib/nina/cadastro-paciente.ts", motivo: "Dados da pessoa atendida com o WhatsApp do remetente, inclusive responsáveis.",
+    texto: REGRA_CADASTRO_AGENDAMENTO });
   instrucoesAdicionaisTurno.push({ codigo: "FORMATO_AUDIO", origem: "src/lib/nina/audio.ts",
     motivo: "O transporte responde em voz a áudio ou pedido explícito.", texto: REGRA_RESPOSTA_AUDIO });
   const { REGRA_FORMATO_MOBILE } = await import("@/lib/nina/resposta/formato-mobile");
@@ -1654,7 +1659,7 @@ async function gerarRespostaNinaInterno(
     };
     ctxFerramentas = {
       clinicaId,
-      telefone: telefoneNorm,
+      telefone: telefoneNorm ?? fluxoEstado.whatsapp_remetente ?? null,
       // Identificação persistente: telefone do remetente OU identificação
       // feita em qualquer mensagem anterior desta mesma conversa.
       pacienteId: pacienteIdEfetivo,

@@ -389,7 +389,10 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     });
     expect(cadastro).toMatchObject({ ok: true, paciente: { cadastro: criado ? "novo" : "existente" } });
     expect(gravacoes).toHaveLength(0);
-    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(escolha.resumo_confirmacao) }])).toBe(true);
+    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(escolha.resumo_confirmacao) }])).toBe(false);
+    expect(cadastro.resumo_confirmacao).toContain("PACIENTE HOMONIMO");
+    expect(cadastro.resumo_confirmacao).toContain("02/01/1990");
+    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(cadastro.resumo_confirmacao) }])).toBe(true);
     const r = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
     expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
     expect(gravacoes).toHaveLength(1);

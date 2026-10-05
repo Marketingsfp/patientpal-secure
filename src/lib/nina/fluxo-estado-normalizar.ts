@@ -42,6 +42,8 @@ export type EtapaFluxoNina =
 
 
 export type EstadoFluxoNina = {
+  /** Contato do remetente registrado pelo transporte; pode pertencer ao responsável. */
+  whatsapp_remetente?: string | null;
   patient: {
     id: string | null;
     /** Primeiro nome apenas — o suficiente para tratar a pessoa pelo nome. */
@@ -161,6 +163,7 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
   if (!bruto || typeof bruto !== "object") return base;
   const o = bruto as Record<string, any>;
   return {
+    whatsapp_remetente: typeof o.whatsapp_remetente === "string" && /^\d{10,13}$/.test(o.whatsapp_remetente) ? o.whatsapp_remetente : null,
     patient: {
       ...base.patient,
       ...(o["patient"] ?? {}),

@@ -29,7 +29,21 @@ export type ConfirmacaoAgendamento = {
   /** Texto do resumo que precisa ter sido entregue antes do aceite. */
   resumo: string;
   aceita: boolean;
+  cadastro?: { id: string; nome: string; data_nascimento: string; telefone: string };
+  resumo_sem_paciente?: string;
 };
+
+/** Vincula o aceite ao paciente conferido, além da vaga. Mudança exige novo resumo. */
+export function incluirPacienteNoResumo(estado: EstadoFluxoNina, clinicaId: string, cadastro: NonNullable<ConfirmacaoAgendamento["cadastro"]>) {
+  const c = confirmacaoDaEscolha(estado, clinicaId);
+  if (!c || JSON.stringify(c.cadastro) === JSON.stringify(cadastro)) return;
+  c.resumo_sem_paciente ??= c.resumo;
+  c.cadastro = { ...cadastro };
+  c.resumo = `*Paciente:* ${cadastro.nome}\n*Data de nascimento:* ${cadastro.data_nascimento.split("-").reverse().join("/")}\n*WhatsApp de contato:* ${cadastro.telefone}\n\n${c.resumo_sem_paciente}`;
+  c.aceita = false;
+  estado.appointment.slot_confirmed_by_patient = false;
+  estado.appointment.intent_confirmed = false;
+}
 
 export function limparEscolhaAgendamento(estado: EstadoFluxoNina) {
   Object.assign(estado.appointment, {
@@ -217,6 +231,7 @@ export function confirmacaoDaEscolha(
 
 export function consentimentoDaEscolha(estado: EstadoFluxoNina | undefined, clinicaId?: string) {
   const c = confirmacaoDaEscolha(estado, clinicaId);
+  if (c?.cadastro && (c.cadastro.id !== estado?.patient.id || !estado.patient.validated)) return null;
   return c?.aceita && estado?.appointment.slot_confirmed_by_patient === true ? c : null;
 }
 

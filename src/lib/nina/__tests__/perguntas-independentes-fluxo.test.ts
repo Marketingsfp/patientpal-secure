@@ -23,6 +23,9 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
           return;
         }
         const salvo = r.gravacoes.filter((g: any) => g.tabela === "atend_conversas" && g.valor.nina_fluxo_estado).at(-1)?.valor.nina_fluxo_estado;
+        // Contato é capturado mesmo antes de o paciente escolher um horário.
+        expect(salvo?.whatsapp_remetente).toBe("55000100999");
+        expect(r.estadoPerguntas.whatsapp_remetente).toBe("55000100999");
         expect(salvo?.knowledge_context?.consulta.termo).toBe("Urologia");
         expect(r.resposta).toContain("Sobre Urologia");
         if (caso === "duas_duvidas") {
@@ -41,5 +44,6 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         ).not.toContain("999");
         const chamadas = r.requests[0].messages;
         expect(JSON.stringify(chamadas)).toContain("Perguntas independentes");
+        expect(JSON.stringify(chamadas)).toContain("WhatsApp de contato é sempre o número do remetente");
       });
 });

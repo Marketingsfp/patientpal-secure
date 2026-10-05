@@ -120,6 +120,34 @@ beforeEach(() => {
 });
 
 describe("executor do cadastro com banco simulado", () => {
+  test("ferramenta não completa o nascimento da filha com o do responsável", async () => {
+    const ctx = contexto(); vincular(ctx);
+    ctx.estado!.patient.pending = { nome: "Sofia Lima Rocha", data_nascimento: null, cpf: null };
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", { nome: "Sofia Lima Rocha" });
+    expect(r).toMatchObject({ ok: false, erro: "PATIENT_DATA_REQUIRED", campos_faltantes: ["data_nascimento"] });
+    expect(rpcs).toHaveLength(0);
+  });
+  test.each([false, true])("dados coletados da filha substituem vínculo do responsável, mantendo WhatsApp (teste=%s)", async teste => {
+    const ctx = contexto(teste);
+    vincular(ctx, { is_mock_data: teste, teste });
+    ctx.estado!.patient.pending = { nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14", cpf: null };
+    retornoRpc = { ok: true, paciente_id: "filha", criado: true };
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14", telefone: "21912345678",
+    });
+    expect(r.ok).toBe(true);
+    expect(rpcs[0]?.args).toMatchObject({ _nome: "SOFIA LIMA ROCHA", _data_nascimento: "2023-02-14", _telefone: "21999990000" });
+    expect(ctx.pacienteId).toBe("filha");
+    expect(ctx.estado!.appointment.confirmation?.resumo).toContain("SOFIA LIMA ROCHA");
+    expect(ctx.estado!.appointment.confirmation?.aceita).toBe(false);
+    expect(banco.pacientes![0]!.nome).toBe("ANA DA SILVA");
+  });
+  test("telefone fornecido pelo modelo não substitui remetente ausente", async () => {
+    const ctx = contexto(); ctx.telefone = null;
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", { nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14", telefone: "21912345678" });
+    expect(r.ok).toBe(false);
+    expect(rpcs).toHaveLength(0);
+  });
   test("só aceita cadastro depois de atendimento definido e escolha validada", async () => {
     const ctx = contexto();
     ctx.estado!.appointment.confirmation = null;

@@ -42,9 +42,10 @@ import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 import { pedidoConsultaComPreventivo } from "./atendimento-consulta";
 import { consultarCadastroConfirmado } from "./cadastro-paciente.server";
+import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
-  vagasDaSessao, vagasDaEscolha, lerEscolhaHorario, type VagaAgendamento } from "./agendamento-escolha";
+  vagasDaSessao, vagasDaEscolha, lerEscolhaHorario, incluirPacienteNoResumo, type VagaAgendamento } from "./agendamento-escolha";
 import { chaveResumoModalidade, permiteReserva, orientacaoModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { enriquecerModalidades, fichaDoAgendamento, modalidadeAtualDaAgenda } from "./modalidade-atendimento.server";
 import {
@@ -1996,6 +1997,7 @@ async function executarFerramentaInterna(
         if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e valide a escolha da vaga antes de consultar o cadastro.");
         const cadastro = await consultarCadastroConfirmado(ctx);
         return { ok: true, cadastro: cadastro.confirmado ? "confirmado" : "a_identificar",
+          ...(cadastro.confirmado ? { dados_confirmados: cadastro.dados } : {}),
           campos_faltantes: cadastro.camposFaltantes };
       }
 
@@ -2003,10 +2005,16 @@ async function executarFerramentaInterna(
         if (!cadastroAutorizado(ctx.estado)) return falha("ACTION_NOT_AUTHORIZED", "Defina o atendimento e valide a escolha da vaga antes de cadastrar.");
         const entrada = zIdentificar.parse(args);
         const cadastro = await consultarCadastroConfirmado(ctx);
+        // Dados novos coletados pelo gate pertencem a quem será atendido,
+        // inclusive dependentes; o WhatsApp continua sendo o do remetente.
+        const coletados = ctx.estado?.patient.pending;
+        const nomeInformado = coletados?.nome && entrada.nome && normalizar(coletados.nome) === normalizar(entrada.nome);
+        const nascimentoInformado = coletados?.data_nascimento && coletados.data_nascimento === entrada.data_nascimento;
+        const outroPaciente = nomeInformado && cadastro.dados.nome && normalizar(entrada.nome!) !== normalizar(cadastro.dados.nome);
         const p = cadastroMinimoSchema.safeParse({
-          nome: cadastro.dados.nome || entrada.nome,
-          data_nascimento: cadastro.dados.data_nascimento || entrada.data_nascimento,
-          telefone: cadastro.dados.telefone || entrada.telefone,
+          nome: nomeInformado ? entrada.nome : cadastro.dados.nome || entrada.nome,
+          data_nascimento: nascimentoInformado ? entrada.data_nascimento : outroPaciente ? undefined : cadastro.dados.data_nascimento || entrada.data_nascimento,
+          telefone: normalizarTelefone(ctx.telefone ?? ctx.estado?.whatsapp_remetente),
         });
         if (!p.success) return falha("PATIENT_DATA_REQUIRED", "Ainda faltam dados obrigatórios válidos.", {
           campos_faltantes: [...new Set(p.error.issues.map(i => String(i.path[0])))],
@@ -2077,9 +2085,11 @@ async function executarFerramentaInterna(
           ok: true,
           id: r.paciente_id,
         });
+        if (ctx.estado) incluirPacienteNoResumo(ctx.estado, ctx.clinicaId, { id: r.paciente_id, ...dados });
         return {
           ok: true,
           paciente: { nome: dados.nome.split(" ")[0], cadastro: r.criado ? "novo" : "existente" },
+          resumo_confirmacao: confirmacaoDaEscolha(ctx.estado, ctx.clinicaId)?.resumo,
         };
       }
 

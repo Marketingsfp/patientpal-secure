@@ -40,10 +40,12 @@ export function cadastroAutorizado(estado: EstadoFluxoNina | undefined): boolean
 }
 
 export const ROTULOS_CADASTRO: Record<CampoCadastro, string> = {
-  nome: "seu *nome completo*",
-  data_nascimento: "sua *data de nascimento*",
+  nome: "*nome completo* da pessoa que será atendida",
+  data_nascimento: "*data de nascimento* da pessoa que será atendida",
   telefone: "seu *telefone com DDD*",
 };
+
+export const REGRA_CADASTRO_AGENDAMENTO = "Após a escolha de uma vaga real, obtenha nome completo e data de nascimento da pessoa que será atendida; aproveite dados já informados. O WhatsApp de contato é sempre o número do remetente recebido pelo sistema, inclusive quando um responsável agenda para filha, filho ou outra pessoa. Não peça telefone próprio do dependente nem use nome/nascimento do responsável como dados do paciente. Consulte ou cadastre no Clínica OS cruzando nome, nascimento e WhatsApp do remetente. Depois apresente a conferência do paciente e da consulta/exame. Só agende após o paciente aceitar esse resumo; só afirme sucesso depois da gravação confirmada.";
 
 export const EXEMPLOS_CADASTRO: Record<CampoCadastro, string> = {
   nome: "João Neves",

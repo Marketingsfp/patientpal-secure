@@ -10,7 +10,8 @@ export async function consultarCadastroConfirmado(ctx: CtxNinaPaciente): Promise
   camposFaltantes: ReturnType<typeof camposCadastroFaltantes>;
 }> {
   const teste = ctx.teste || ctx.origem === "homologacao";
-  let dados: DadosCadastro = { telefone: normalizarTelefone(ctx.telefone) };
+  const whatsapp = normalizarTelefone(ctx.telefone ?? ctx.estado?.whatsapp_remetente);
+  let dados: DadosCadastro = { telefone: whatsapp };
   let confirmado = false;
   if (ctx.pacienteId && ctx.estado?.patient.validated) {
     let consulta = supabaseAdmin
@@ -27,7 +28,7 @@ export async function consultarCadastroConfirmado(ctx: CtxNinaPaciente): Promise
     dados = {
       nome: data.nome,
       data_nascimento: data.data_nascimento,
-      telefone: normalizarTelefone(ctx.telefone) || data.telefone,
+      telefone: whatsapp,
     };
     confirmado = true;
   }
