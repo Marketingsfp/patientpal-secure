@@ -2014,6 +2014,7 @@ async function gerarRespostaNinaInterno(
       const { confirmarAntesDeEncaminhar } = await import("@/lib/nina/catalogo-sem-registro");
       r = confirmarAntesDeEncaminhar(r, args, referenciaAnterior);
     }
+    r = perguntasDoTurno.reconciliar(parametros, r);
     const ex = incorporarResultadoOficial({
       clinicaId,
       nome,
@@ -2196,7 +2197,8 @@ async function gerarRespostaNinaInterno(
     return {
       ...(esclarecimentoAtual ? {
         ok: true, precisa_esclarecer: true, consulta: parametros, esclarecimento: esclarecimentoAtual,
-        instrucao: "Identificação pendente apenas nesta pergunta. As opções são hipóteses, não fatos confirmados. Continue pesquisando as outras perguntas independentes; responda o que estiver confirmado e inclua esta pergunta de esclarecimento.",
+        pendencias_atuais: perguntasDoTurno.pendentes.map(p => ({ pedido: p.consulta.termo, pergunta: p.esclarecimento!.pergunta })),
+        instrucao: "Identificação pendente apenas nesta pergunta. As opções são hipóteses, não fatos confirmados. Use somente pendencias_atuais: reformulações substituem perguntas anteriores do mesmo pedido. Continue pesquisando as outras perguntas independentes; responda o que estiver confirmado e inclua uma pergunta por pedido pendente.",
       } : limitarRetornoParaModelo(payload) as Record<string, unknown>),
       // A seleção legada auxilia referências internas; não é uma declaração
       // de intenção do paciente. Essa interpretação cabe ao modelo no histórico.
@@ -2517,9 +2519,9 @@ async function gerarRespostaNinaInterno(
       }
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
-      // FASE 4 — ação crítica NUNCA roda sobre estado obsoleto: se chegou
-      // mensagem nova durante a geração, o turno é abortado antes de gravar.
-      if (opcoes?.revisao?.valor && ehFerramentaCritica(nome)) {
+      // Abortar também pesquisas de catálogo evita rodadas extras de um pedido
+      // já substituído. A proteção de escrita continua valendo para ações críticas.
+      if (opcoes?.revisao?.valor && (ehFerramentaCritica(nome) || PESQUISAS_INDEPENDENTES.has(nome))) {
         const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
         const obsoleta = await respostaObsoleta({
           clinicaId,
@@ -2527,7 +2529,7 @@ async function gerarRespostaNinaInterno(
           revisaoProcessada: opcoes.revisao.valor,
         });
         if (obsoleta) {
-          console.warn("[nina] ação crítica abortada por revisão obsoleta", {
+          console.warn("[nina] ferramenta abortada por revisão obsoleta", {
             ferramenta: nome,
             revisao_processada: opcoes.revisao.valor,
           });

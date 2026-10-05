@@ -6,6 +6,8 @@ import {
   type ConhecimentoSessao,
 } from "../confidence/conhecimento-sessao";
 import { confirmarItemDaPergunta } from "../identificacao-catalogo";
+import type { ResultadoBroker } from "../tool-broker";
+import type { ResultadoConhecimento } from "../knowledge-contract";
 const pendente = (termo: string): ConhecimentoSessao => ({
   versao: 1,
   clinicaId: "c",
@@ -75,4 +77,60 @@ it("correção explícita não reinicia a tentativa como novo assunto", () => {
   const a = pendente("ECG");
   const turno = criarPerguntasDoTurno(a, "não, é hemograma");
   expect(turno.referencia({ termo: "hemograma", nova_solicitacao: true })).toBe(a);
+});
+
+const resultadoExame = (): ResultadoBroker => ({
+  ferramenta: "consultar_cadastro", capacidade: "searchKnowledgeBase", fonte: "base_conhecimento",
+  success: true, reused: false, appointment_confirmed: false,
+  dados: { found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento",
+    records: [{ id: "duo", procedimento: "Densitometria duo energética", preco_cartao: 180 }] },
+});
+const duvidaExame = (): ConhecimentoSessao => ({ ...pendente("Densitometria coluna lombar e colo de fêmur"),
+  consulta: { termo: "Densitometria coluna lombar e colo de fêmur", tipo_atendimento: "exame_procedimento" },
+});
+
+it("reformulação preserva qualificadores, não confirma preço e permite confirmação no próximo turno", () => {
+  const turno = criarPerguntasDoTurno(null), original = duvidaExame();
+  turno.registrar(original.consulta, original, null, false);
+  const args = { termo: "Densitometria duo energética", reformula_de: original.consulta.termo };
+  expect(turno.referencia(args)).toBeNull(); // não é outra tentativa do paciente
+  const dados = turno.reconciliar(args, resultadoExame()).dados as ResultadoConhecimento;
+  expect(dados.price).toBeNull();
+  expect(dados.esclarecimento?.pergunta).toContain("coluna lombar e colo de fêmur");
+  turno.registrar(args, { ...original, consulta: { termo: args.termo },
+    referencias: [{ registro: "duo", versao: null, procedimento: "Densitometria duo energética", medicoNome: null }],
+    esclarecimento: dados.esclarecimento }, null, false);
+  const salvo = normalizarConhecimentoSessao(turno.estado(null))!;
+  expect(turno.pendentes).toHaveLength(1);
+  expect(turno.temConfirmadas).toBe(false);
+  expect(confirmarItemDaPergunta(salvo, { mensagem: "sim", historico: [{ role: "assistant", content: salvo.esclarecimento!.pergunta }] })?.id).toBe("duo");
+  const proximo = criarPerguntasDoTurno(salvo, "sim");
+  const r = resultadoExame();
+  expect(proximo.reconciliar({ termo: args.termo }, r)).toBe(r);
+  proximo.registrar({ termo: args.termo }, { ...salvo, esclarecimento: undefined }, proximo.referencia({ termo: args.termo }), true);
+  expect(proximo.pendentes).toHaveLength(0);
+});
+
+it("não associa por semelhança de nomes, referência inexistente, outro médico ou pedido independente", () => {
+  for (const args of [
+    { termo: "Densitometria corpo inteiro" },
+    { termo: "Densitometria duo energética", reformula_de: "inexistente" },
+    { termo: "Densitometria duo energética", reformula_de: duvidaExame().consulta.termo, medico: "Outro médico" },
+    { termo: "Densitometria duo energética", reformula_de: duvidaExame().consulta.termo, nova_solicitacao: true },
+  ]) {
+    const turno = criarPerguntasDoTurno(null), original = duvidaExame(), r = resultadoExame();
+    turno.registrar(original.consulta, original, null, false);
+    expect(turno.reconciliar(args, r)).toBe(r);
+    turno.registrar(args, null, null, true);
+    expect(turno.pendentes).toHaveLength(1);
+    expect(turno.temConfirmadas).toBe(true);
+  }
+});
+
+it("conflito oficial e falha técnica não viram hipótese de equivalência", () => {
+  const turno = criarPerguntasDoTurno(null), original = duvidaExame();
+  turno.registrar(original.consulta, original, null, false);
+  const args = { termo: "Densitometria duo energética", reformula_de: original.consulta.termo };
+  for (const r of [{ ...resultadoExame(), dados: { knowledge_status: "conflict" } },
+    { ...resultadoExame(), success: false, erro: "TIMEOUT" }]) expect(turno.reconciliar(args, r)).toBe(r);
 });

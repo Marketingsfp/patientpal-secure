@@ -49,7 +49,10 @@ const clinicoGeral = cenario.startsWith("catalogo_clinico_geral_");
 const procedimentoExecutante = cenario === "procedimento_executante";
 const medicoClinico = cenario.endsWith("carlos") ? "Carlos Alberto Varillas" : cenario.endsWith("milton") ? "Milton Guimarães" : "Ana Souza";
 const contextual = cenariosContextuais[cenario];
-const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_");
+const reformulacoes = cenario.startsWith("catalogo_reformulacoes_");
+const pedidoDensitometria = "densitometria óssea coluna lombar e colo de fêmur";
+const nomeDensitometria = "DENSITOMETRIA / DENSITOMETRIA DUO ENERGETICA";
+const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_") || reformulacoes;
 let estadoPerguntas: any = null;
 const regraCatalogo = cenario.startsWith("catalogo_");
 const sfp = cenario.startsWith("catalogo_sfp");
@@ -143,7 +146,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
-const pergunta = perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
+const pergunta = reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
   : cenario.endsWith("novo_pedido") ? "Agora quero outro exame XYZ" : clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
@@ -443,6 +446,20 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       reused: false, appointment_confirmed: false, dados: { ok: true, resumo_confirmacao: resumoEscolhido },
       };
     }
+    if (reformulacoes && ["consultar_cadastro", "buscar_procedimentos"].includes(nome) && !String(args).includes("Psiquiatria")) {
+      estadoPerguntas = params.ctxPaciente.estado;
+      const a = typeof args === "string" ? JSON.parse(args) : args as any;
+      const inicial = a.termo === pedidoDensitometria;
+      const ampla = a.termo === "densitometria";
+      const records = inicial ? [] : [{ id: "densito", procedimento: nomeDensitometria, valor: "R$ 180,00" },
+        ...(ampla ? [{ id: "corpo", procedimento: "DENSITOMETRIA CORPO INTEIRO", valor: "R$ 999,00" }] : [])];
+      return { ferramenta: nome, capacidade: nome === "consultar_cadastro" ? "searchKnowledgeBase" : "listCatalog",
+        fonte: "base_conhecimento", success: true, reused: false, dados: {
+          ok: true, found: !inicial, knowledge_status: inicial ? "not_found" : "found", tipo_atendimento: "exame_procedimento", records,
+          ...(ampla ? { esclarecimento: { tipo: "procedimento", pergunta: "Qual densitometria?",
+            opcoes: records.map(r => ({ id: r.id, nome: r.procedimento })) } } : {}),
+        } };
+    }
     if (perguntasMultiplas && nome === "consultar_cadastro") {
       estadoPerguntas = params.ctxPaciente.estado;
       const a = typeof args === "string" ? JSON.parse(args) : args as any;
@@ -589,6 +606,18 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
     conteudo: requests.length > 1 && cenario === "resposta_vazia_recuperada" ? "Posso ajudar com as informações da consulta." : "",
   };
+  if (reformulacoes) {
+    const passos = [
+      { name: "consultar_cadastro", arguments: JSON.stringify({ termo: pedidoDensitometria, tipo_atendimento: "exame_procedimento" }) },
+      { name: "buscar_procedimentos", arguments: JSON.stringify({ termo: "densitometria", reformula_de: pedidoDensitometria }) },
+      { name: "consultar_cadastro", arguments: JSON.stringify({ termo: nomeDensitometria, tipo_atendimento: "exame_procedimento", reformula_de: "densitometria" }) },
+    ];
+    const toolCalls: any[] = requests.length <= 3 ? [{ id: `densito-${requests.length}`, type: "function", function: passos[requests.length - 1] }] : [];
+    if (requests.length === 1 && cenario.endsWith("independente")) toolCalls.push({ id: "psiq", type: "function",
+      function: { name: "consultar_cadastro", arguments: JSON.stringify({ termo: "Psiquiatria", medico: "Antonio", tipo_atendimento: "consulta", nova_solicitacao: true }) } });
+    return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls,
+      conteudo: requests.length <= 3 ? "" : cenario.endsWith("independente") ? "O Dr. Antonio atende Psiquiatria às segundas, às 08:00." : "O valor é R$ 180,00. Não encontrei o exame. Qual densitometria?" };
+  }
   if (perguntasMultiplas) {
     const chamada = (termo: string, medico: string, id: string) => ({ id, type: "function", function: {
       name: "consultar_cadastro", arguments: JSON.stringify({ termo, medico, tipo_atendimento: "consulta", nova_solicitacao: true }) } });

@@ -754,6 +754,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
         type: "object",
         properties: {
           termo: { type: "string", description: "Nome ou parte do nome do exame/procedimento" },
+          reformula_de: { type: "string", description: "Ao refinar uma pesquisa do mesmo pedido neste turno, copie o termo da pesquisa anterior. Não use para outro exame independente." },
           nova_solicitacao: { type: "boolean", description: "True somente se o paciente pediu outro atendimento independente; uma busca auxiliar ou escolha de executante não muda o procedimento." },
         },
         required: ["termo"],
@@ -885,6 +886,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
       parameters: {
         type: "object",
         properties: {
+          reformula_de: { type: "string", description: "Ao refinar uma pesquisa do mesmo pedido neste turno, copie o termo da pesquisa anterior. Vincula as dúvidas, sem confirmar equivalência clínica. Não use para outro pedido independente." },
           nova_solicitacao: {
             type: "boolean",
             description:
@@ -1462,7 +1464,7 @@ async function executarFerramentaInterna(
                   ? Promise.resolve([] as Array<{ id: string; especialidades: unknown }>)
                   : lerPublicados<{ id: string; especialidades: unknown }>("profissionais", "id, especialidades", ctx.clinicaId),
               ]);
-              const opcoes = esp.opcoesCatalogo(servicos, profissionais, tipo);
+              const opcoes = esp.opcoesCatalogo(servicos, profissionais, tipo, p.termo);
               if (opcoes.length) {
                 const perguntas = esp.perguntaEspecialidade(opcoes);
                 const r = await jev.perguntarJev(

@@ -1,5 +1,8 @@
 import type { ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 import { apresentarPerguntaEsclarecimento } from "./esclarecimento-apresentacao";
+import type { ResultadoBroker } from "./tool-broker";
+import type { ResultadoConhecimento } from "./knowledge-contract";
+import { sugerirResultadoJev } from "./identificacao-catalogo";
 
 const normal = (v: unknown) =>
   typeof v === "string"
@@ -42,6 +45,19 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   );
   const pesquisas = new Set<string>();
   const confirmadas = new Set<string>();
+  // Apenas pesquisas deste turno. Nunca contam como nova resposta do paciente.
+  const aliases = new Map<string, string>();
+  const consultas = new Map<string, ReturnType<typeof consulta>>();
+  function grupo(p: Record<string, unknown>) {
+    const q = consulta(p), k = chave(q);
+    if (p.nova_solicitacao !== true && typeof p.reformula_de === "string") {
+      const candidatos = [...consultas.entries()].filter(([, a]) =>
+        normal(a.termo) === normal(p.reformula_de) && normal(a.medico) === normal(q.medico));
+      const raizes = [...new Set(candidatos.map(([id]) => aliases.get(id) ?? id))];
+      if (raizes.length === 1) return raizes[0]!;
+    }
+    return aliases.get(k) ?? k;
+  }
   function referencia(args: unknown) {
     const p = parametrosPesquisa(args),
       q = consulta(p);
@@ -66,16 +82,44 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   }
   return {
     referencia,
+    reconciliar(args: unknown, resultado: ResultadoBroker): ResultadoBroker {
+      if (!resultado.success || resultado.erro || !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")) return resultado;
+      const p = parametrosPesquisa(args), k = grupo(p);
+      const anteriorDoTurno = [...aliases.values()].includes(k) ? pendentes.get(k) : null;
+      if (!anteriorDoTurno?.esclarecimento) return resultado;
+      const dados = resultado.dados as ResultadoConhecimento | null;
+      if (!dados || dados.knowledge_status === "conflict") return resultado;
+      if (dados.esclarecimento && chave(consulta(p)) === k) return resultado;
+      // Encontrar o título reformulado não comprova os qualificadores do pedido original.
+      const hipotese = dados.esclarecimento || !Array.isArray(dados.records) ? dados : sugerirResultadoJev(dados);
+      const esclarecimento = hipotese.esclarecimento ?? anteriorDoTurno.esclarecimento;
+      const nomes = [...new Map(esclarecimento.opcoes.map(o =>
+        [normal(o.nome).replace(/[^a-z0-9]/g, ""), o.nome])).values()];
+      const pedido = anteriorDoTurno.consulta.termo;
+      const referencia = anteriorDoTurno.consulta.tipo_atendimento === "exame_procedimento" ? "pedido médico" : "atendimento solicitado";
+      const pergunta = nomes.length
+        ? `Para o pedido “${pedido}”, pode conferir qual nome corresponde ao ${referencia}?\n${nomes.join("\n")}`
+        : `Para o pedido “${pedido}”, pode conferir e escrever o nome completo do ${referencia}?`;
+      return { ...resultado, dados: { ...hipotese, procedure: null, price: null,
+        esclarecimento: { ...esclarecimento, pergunta },
+        instrucao: "Reformulação do mesmo pedido, ainda sem correspondência confirmada. Esta pergunta substitui as anteriores deste pedido. Não informe preço nem presuma equivalência clínica." } };
+    },
     registrar(
       args: unknown,
       atual: ConhecimentoSessao | null,
       origem: ConhecimentoSessao | null,
       confirmado: boolean,
     ) {
-      const k = chave(consulta(parametrosPesquisa(args)));
-      pesquisas.add(k);
+      const p = parametrosPesquisa(args), q = consulta(p), id = chave(q), k = grupo(p);
+      const anteriorDoTurno = pendentes.get(k);
+      aliases.set(id, k);
+      consultas.set(id, q);
+      pesquisas.add(id);
       if (origem) pendentes.delete(chave(origem.consulta));
-      if (atual?.esclarecimento) pendentes.set(k, atual);
+      if (atual?.esclarecimento) {
+        confirmadas.delete(k);
+        pendentes.set(k, anteriorDoTurno ? { ...atual, consulta: anteriorDoTurno.consulta } : atual);
+      }
       else {
         pendentes.delete(k);
         if (confirmado) confirmadas.add(k);

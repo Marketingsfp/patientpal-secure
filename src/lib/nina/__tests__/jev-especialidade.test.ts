@@ -10,6 +10,27 @@ const SERVICOS = [{ nome: "USG ABDOMEN" }, { nome: "usg abdomen" }, { nome: "Ult
 const PROFISSIONAIS = [{ especialidades: [{ nome: "ODONTOLOGIA" }, { nome: "PNEUMOLOGIA" }] }, { especialidades: null }];
 
 describe("Jev Fase 3 — especialidade", () => {
+  test("prioriza candidatos relevantes antes de limitar um catálogo grande", () => {
+    const servicos = Array.from({ length: 600 }, (_, i) => ({ nome: `HEMOGRAMA ${i}` }));
+    servicos.push({ nome: "DENSITOMETRIA DUO ENERGÉTICA" }, { nome: "DENSITOMETRIA ÓSSEA" });
+    const selecionadas = opcoesCatalogo(servicos, PROFISSIONAIS, "exame_procedimento", "densitometria óssea coluna lombar e colo de fêmur");
+    expect(selecionadas).toEqual(["DENSITOMETRIA ÓSSEA", "DENSITOMETRIA DUO ENERGÉTICA"]);
+    expect(opcoesCatalogo(servicos, [], "exame_procedimento", "hemograma")).toHaveLength(40);
+  });
+
+  test("reserva uma escolha para nenhuma e protege também chamadores legados", () => {
+    const servicos = Array.from({ length: 600 }, (_, i) => ({ nome: `SERVIÇO ${i}` }));
+    const selecionadas = opcoesCatalogo(servicos, [], "exame_procedimento", "nome popular desconhecido");
+    expect(selecionadas).toHaveLength(254);
+    const pergunta = perguntaEspecialidade(servicos.map(s => s.nome)).especialidade as { criteria: Record<string, unknown> };
+    expect(Object.keys(pergunta.criteria)).toHaveLength(255);
+    expect(pergunta.criteria.nenhuma).toBeDefined();
+    expect(opcoesCatalogo([{ nome: "nenhuma" }], [])).toHaveLength(0);
+  });
+
+  test("sem pista lexical mantém especialidades para interpretação de nomes populares", () => {
+    expect(opcoesCatalogo(SERVICOS, PROFISSIONAIS, "consulta", "médico do pulmão")).toEqual(["ODONTOLOGIA", "PNEUMOLOGIA"]);
+  });
   const opcoes = opcoesCatalogo(SERVICOS, PROFISSIONAIS);
 
   test("sem tipo definido: junta especialidades e serviços sem repetir", () => {
