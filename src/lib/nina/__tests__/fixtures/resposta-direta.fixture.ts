@@ -155,6 +155,8 @@ const pergunta = perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Ant
   : pedidoConsulta ? "Quero consulta de cardiologia" : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const entradaPaciente = pergunta + (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
 const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"
+  : cenario === "catalogo_laboratorio" ? "Laboratório"
+  : cenario === "catalogo_nome_proprio" ? "Dra. Ana Souza"
   : cenario === "catalogo_equipe_enfermagem" ? "Equipe de Enfermagem"
   : regraCatalogo ? "Técnica" : "Dra. Ana Souza";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + nomeProfissional + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";

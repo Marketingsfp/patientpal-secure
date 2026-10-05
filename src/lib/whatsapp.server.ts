@@ -1403,6 +1403,10 @@ async function gerarRespostaNinaInterno(
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
   const { REGRA_CADASTRO_AGENDAMENTO } = await import("@/lib/nina/cadastro-paciente");
   const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO } = await import("@/lib/nina/prompt/consulta-agenda");
+  const { REGRA_ESCOLHA_PROFISSIONAL_NOMINAL } = await import("@/lib/nina/prompt/regras-catalogo");
+  instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_PROFISSIONAL_NOMINAL", nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/regras-catalogo.ts", motivo: "Setores e equipes não são opções de médicos para o paciente escolher.",
+    texto: REGRA_ESCOLHA_PROFISSIONAL_NOMINAL });
   instrucoesAdicionaisTurno.push({ codigo: "ESCALA_ANTES_DAS_VAGAS", nivel: "inegociavel",
     origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "Apresentar a escala habitual antes de oferecer vagas reais, conforme regra confirmada.",
     texto: REGRA_HORARIOS_HABITUAIS_PRIMEIRO });
