@@ -1,5 +1,7 @@
 # Nina — decisões técnicas
 
+- Links recebidos: `atendimento/links-entrada.ts` substitui URLs por `[link bloqueado]` antes de persistir corpo, transcrição e payload de mensagens de entrada no WhatsApp/homologação. Núcleo protege também entrada direta e histórico lido; bolhas de entrada usam a mesma proteção. Texto restante e mídias privadas anexadas são preservados. Sem navegação nem IA extra; mensagens de saída não são filtradas. Não reescreve registros históricos nem logs técnicos do webhook.
+
 - Pedido médico: `pedido-medico.ts` lê a exigência estruturada de consultas/exames/procedimentos identificados na fonte `base_conhecimento`. O núcleo solicita foto quando obrigatório, depois de resolver ambiguidades, antes da finalização/hash. Pedido já entregue ou foto reconhecida do mesmo atendimento/sessão/ambiente evita repetição; texto “já enviei” não é prova. Jev não dispensa a exigência. Campo desconhecido/dispensado não exige foto e o campo não cria bloqueio de agenda. Não altera a fonte Clínica OS nem faz validação clínica da imagem.
 
 - Mensagens para celular usam `resposta/formato-mobile.ts`: regra de apresentação obrigatória antes do modelo e acabamento compartilhado no núcleo, finalização, avisos de handoff e retomadas de transporte. Só espaços/quebras são ajustados, além da remoção de emojis já existente; preservar fatos, links, números e histórico. Formatar antes do hash da entrega, sem chamada extra à IA e sem alterar mensagens humanas.

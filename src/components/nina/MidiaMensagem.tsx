@@ -4,10 +4,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ImagemMensagemAmpliada } from "./ImagemMensagemAmpliada";
 import { urlMidiaMensagem } from "@/lib/atendimento/midia-mensagem.functions";
 import { ehCaminhoGuardado } from "@/lib/whatsapp-midia-armazenamento";
+import { protegerMensagemRecebida } from "@/lib/atendimento/links-entrada";
 
 type MensagemComMidia = {
   id: string;
   tipo?: string | null;
+  direction?: string | null;
   body?: string | null;
   media_url?: string | null;
 };
@@ -21,7 +23,7 @@ export function temMidiaVisivel(m: MensagemComMidia): boolean {
 
 /** Texto da bolha: com a imagem à mostra, o "📷 Imagem" padrão some; a legenda e a transcrição ficam. */
 export function textoDaBolha(m: MensagemComMidia): string {
-  const corpo = String(m.body ?? "");
+  const corpo = String(protegerMensagemRecebida(m).body ?? "");
   if (m.tipo === "image" && temMidiaVisivel(m) && corpo === TEXTO_PADRAO_IMAGEM) return "";
   return corpo || `[${m.tipo}]`;
 }

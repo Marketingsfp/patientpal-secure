@@ -513,6 +513,8 @@ export async function gerarRespostaNina(
     conversaId?: string | null;
   },
 ): Promise<string> {
+  const { bloquearLinksRecebidos } = await import("@/lib/atendimento/links-entrada");
+  mensagemPaciente = bloquearLinksRecebidos(mensagemPaciente);
   const { comColetor } = await import("@/lib/nina/evidencias.server");
   const { comCatalogoDoTurno } = await import("@/lib/nina/catalogo-turno.server");
   const conferirReserva = criarGuardiaoReservaTurno(opcoes?.validarReservaTurno);
@@ -886,7 +888,8 @@ async function gerarRespostaNinaInterno(
     await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
   }
   const corteMemoria = Date.now() - ttlSessaoMinutos() * 60_000;
-  const msgsMemoria = (((histR as any)?.data ?? []) as any[]).filter((m: any) => {
+  const { protegerMensagemRecebida } = await import("@/lib/atendimento/links-entrada");
+  const msgsMemoria = (((histR as any)?.data ?? []) as any[]).map(protegerMensagemRecebida).filter((m: any) => {
     const t = Date.parse(String(m?.created_at ?? ""));
     return !Number.isFinite(t) || t >= corteMemoria;
   });
@@ -1327,7 +1330,7 @@ async function gerarRespostaNinaInterno(
       ? consultaHistorico.eq("is_teste", true)
       : consultaHistorico.or("is_teste.eq.false,is_teste.is.null");
     const h = await consultaHistorico.order("created_at", { ascending: true }).limit(1000);
-    mensagensFluxo = h.data ?? [];
+    mensagensFluxo = (h.data ?? []).map(protegerMensagemRecebida);
     historicoFluxoCompleto = !h.error && h.count !== null && h.count === mensagensFluxo.length;
   }
   // Snapshot só de mensagens já entregues da sessão. Respostas candidatas do

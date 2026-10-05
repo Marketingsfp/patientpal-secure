@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { loadWhatsAppConfig, metaSendText } from "@/lib/whatsapp.server";
+import { bloquearLinksRecebidos } from "@/lib/atendimento/links-entrada";
 
 function verifySignature(
   appSecret: string,
@@ -203,7 +204,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 let caminhoMidia: string | null = null;
                 // Foto lida como receita de remédio: resposta própria (não é pedido de exames).
                 let receitaRemedio = false;
-                const legendaImagem = ehImagem ? String(msg.image?.caption ?? "").trim() : "";
+                const legendaImagem = ehImagem ? bloquearLinksRecebidos(String(msg.image?.caption ?? "").trim()) : "";
 
                 if (ehAudio || ehImagem) {
                   // Mantém o armazenamento em dia: apaga mídias com mais de 30 dias (no máx. a cada 10 min).
@@ -319,8 +320,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   resultado = "duplicada_ignorada";
                   continue;
                 }
-                if (entradaPersistida.repetida) {
-                  // Retry reutiliza o conteúdo imutável da entrada, não o payload reenviado.
+                {
+                  // Sempre usa a entrada protegida, também no primeiro recebimento.
+                  // Retry reutiliza o conteúdo persistido, não o payload reenviado.
                   textoPaciente =
                     msgInserida.tipo === "audio" || msgInserida.tipo === "image"
                       ? (msgInserida.transcricao ?? "")

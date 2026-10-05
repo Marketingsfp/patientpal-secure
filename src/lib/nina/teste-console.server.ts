@@ -215,7 +215,8 @@ export async function processarMensagemTeste(
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const ehAudio = data.tipo === "audio";
-  let textoPaciente = data.tipo === "text" || ehAudio ? data.texto : "";
+  const { bloquearLinksRecebidos } = await import("@/lib/atendimento/links-entrada");
+  let textoPaciente = data.tipo === "text" || ehAudio ? bloquearLinksRecebidos(data.texto) : "";
   const audioFalhou = ehAudio && !textoPaciente;
   if (data.tipo === "text" && !textoPaciente) {
     // Nada foi gravado: o envio em si não aconteceu.
@@ -293,6 +294,7 @@ export async function processarMensagemTeste(
         : msgEntrada.tipo === "text"
           ? (msgEntrada.body ?? "")
           : "";
+  textoPaciente = bloquearLinksRecebidos(textoPaciente);
   if (!entradaPersistida.repetida) {
     await supabaseAdmin
       .from("atend_conversas")
