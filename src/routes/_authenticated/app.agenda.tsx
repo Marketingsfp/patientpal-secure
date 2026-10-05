@@ -195,6 +195,10 @@ import {
   podeAutorizarSemFaturamento,
   rotuloSemFaturamento,
 } from "@/lib/agenda/sem-faturamento";
+import {
+  avisarOrcamentoObrigatorio,
+  fichasSemOrcamentoObrigatorio,
+} from "@/lib/agenda/orcamento-obrigatorio";
 import { useAlcadasNominais } from "@/hooks/use-alcadas";
 import {
   vaosEntreHorarios,
@@ -4748,6 +4752,10 @@ function AgendaPage() {
         toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
         return;
       }
+      if ((await fichasSemOrcamentoObrigatorio(clinicaAtual.clinica_id, ids)).length > 0) {
+        avisarOrcamentoObrigatorio();
+        return;
+      }
       let totalDinheiro = 0,
         totalPix = 0,
         totalDebito = 0,
@@ -6674,7 +6682,13 @@ function AgendaPage() {
     const recargaAgenda = load().catch((err) => {
       mostrarErro(err, "agendamento salvo, mas a lista da agenda não recarregou");
     });
-    if (irParaPagamento && novoId) {
+    // A ficha já está salva; só a cobrança fica barrada até ligar o orçamento.
+    const barradaSemOrcamento =
+      irParaPagamento &&
+      !!novoId &&
+      (await fichasSemOrcamentoObrigatorio(clinicaAtual.clinica_id, [novoId])).length > 0;
+    if (barradaSemOrcamento) avisarOrcamentoObrigatorio();
+    if (irParaPagamento && novoId && !barradaSemOrcamento) {
       // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
       // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
       // no cadastro. Resolvemos cada procedimento individualmente e somamos.
@@ -7809,6 +7823,11 @@ function AgendaPage() {
       return;
     }
     try {
+      // Exame/procedimento só se cobra com orçamento (ver orcamento-obrigatorio.ts).
+      if ((await fichasSemOrcamentoObrigatorio(clinicaAtual.clinica_id, [a.id])).length > 0) {
+        avisarOrcamentoObrigatorio();
+        return;
+      }
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
       // que não bate com a tabela de procedimentos e zeraria as opções).

@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import {
+  avisarOrcamentoObrigatorio,
+  fichasSemOrcamentoObrigatorio,
+} from "@/lib/agenda/orcamento-obrigatorio";
 import { supabase } from "@/integrations/supabase/client";
 import { hojeBR } from "@/lib/date-utils";
 import { precoAtendimentoParaCaixa, type PrecoCaixa } from "@/lib/convenio/info-convenio-paciente";
@@ -2051,6 +2055,18 @@ function Page() {
     }
     if (linhasValidadas.length === 0) {
       toast.error("Adicione ao menos uma forma de pagamento");
+      return;
+    }
+    // Exame/procedimento só se cobra com orçamento (ver orcamento-obrigatorio.ts).
+    try {
+      if (
+        (await fichasSemOrcamentoObrigatorio(clinicaAtual.clinica_id, [openCobranca.id])).length > 0
+      ) {
+        avisarOrcamentoObrigatorio();
+        return;
+      }
+    } catch (err) {
+      mostrarErro(err, "não foi possível conferir o orçamento da ficha");
       return;
     }
     setSaving(true);

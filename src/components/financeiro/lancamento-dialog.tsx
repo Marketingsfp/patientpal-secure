@@ -39,6 +39,10 @@ import {
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
 import { planoDeMovimento } from "@/lib/financeiro/registro-no-caixa";
+import {
+  avisarOrcamentoObrigatorio,
+  fichasSemOrcamentoObrigatorio,
+} from "@/lib/agenda/orcamento-obrigatorio";
 import { aceitaNovoRecebimento } from "@/lib/agenda/saldo-atendimento";
 import { dataClinicaDe, hojeBR } from "@/lib/date-utils";
 import { contaPadrao, dedupContas, type ContaOpcao } from "@/lib/financeiro/contas";
@@ -1071,6 +1075,18 @@ export function LancamentoDialog({
           setSaving(false);
           onOpenChange(false);
           return;
+        }
+        // Exame/procedimento só se cobra com orçamento (ver orcamento-obrigatorio.ts).
+        // Gratuidade R$ 0,00 não é cobrança e segue livre.
+        if (!ehSemCobranca && somaRecebida === 0) {
+          const semOrc = await fichasSemOrcamentoObrigatorio(clinicaAtual.clinica_id, [
+            agendamentoId,
+          ]);
+          if (semOrc.length > 0) {
+            avisarOrcamentoObrigatorio();
+            setSaving(false);
+            return;
+          }
         }
         // Sessão de pacote já quitado. Não é bloqueio definitivo — pode haver
         // uma cobrança legítima à parte —, mas exige o operador dizer que sabe
