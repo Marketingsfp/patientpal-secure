@@ -239,6 +239,8 @@ export function profissionalParaRegistro(
         convenios.length ? `Convênios: ${convenios.join(", ")}` : estrutura.convenios_status === "nao_aceita" ? "A clínica confirmou que não aceita convênios neste atendimento." : null,
         unidadeDoProfissional(p) ? `Unidade: ${unidadeDoProfissional(p)}` : null,
         texto(atendimentos.length ? textoAtendimentos(atendimentos) : p.observacao_publica),
+        estrutura.pedido_medico === "obrigatorio" ? "Pedido médico: obrigatório para este atendimento."
+          : estrutura.pedido_medico === "dispensado" ? "Pedido médico: dispensado para este atendimento." : null,
         aviso ? `Aviso vigente: ${aviso}` : null,
         pagamentosJaDescritos(p.formas_pagamento, atendimentos) ? null : descricaoPagamentos(p.formas_pagamento),
       ]
@@ -260,6 +262,7 @@ export function profissionalParaRegistro(
       estrutura,
       atendimentos_publicados: atendimentos,
       convenios_status: convenios.length ? "aceita" : estrutura.convenios_status,
+      pedido_medico: estrutura.pedido_medico,
       atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true,
       modalidade_atendimento: modalidade,
       ...(selecionados.length ? { atendimentos_da_modalidade: selecionados.map(nomeCompletoConsulta) } : {}),

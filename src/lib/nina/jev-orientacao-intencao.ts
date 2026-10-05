@@ -80,7 +80,7 @@ export function orientarIntencaoJev(
     );
   if (!instrucoes.length) return null;
   instrucoes.push(
-    "Estas interpretações ajudam a entender o pedido. Não são fatos do catálogo, prova de vaga nem autorização operacional. Em conflito com a mensagem explícita do paciente, esclareça; preserve as restrições de segurança e todas as verificações das ferramentas.",
+    "Estas interpretações ajudam a entender o pedido. Não são fatos do catálogo, prova de vaga nem autorização operacional. Em conflito com a mensagem explícita do paciente, esclareça; preserve as restrições de segurança e todas as verificações das ferramentas. Respeite pedido_medico_do_turno: aceite textual não comprova recebimento de foto nem dispensa a exigência publicada.",
   );
   return {
     versao: "intencoes-ativas-v1",

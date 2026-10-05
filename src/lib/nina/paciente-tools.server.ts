@@ -896,7 +896,7 @@ export const FERRAMENTAS_NINA_CONSULTA = [
           },
           tipo_atendimento: {
             type: "string", enum: TIPOS_ATENDIMENTO_CATALOGO,
-            description: "Categoria identificada na mensagem completa e no histórico: consulta para atendimento com médico/especialidade (ex.: consulta com cardiologista → termo cardiologia, tipo consulta); exame_procedimento para exame ou procedimento (ex.: ECG, MAPA, nebulização); nao_identificado somente se ainda não houver informação suficiente. Consulta não é exame: sintomas não autorizam substituir a consulta por exames nem pedir pedido médico. Agendamento é objetivo e pode existir nas duas categorias. Para consulta e exame na mesma mensagem, faça pesquisas separadas. Preserve a categoria nas continuações da mesma solicitação.",
+            description: "Categoria identificada na mensagem completa e no histórico: consulta para atendimento com médico/especialidade (ex.: consulta com cardiologista → termo cardiologia, tipo consulta); exame_procedimento para exame ou procedimento (ex.: ECG, MAPA, nebulização); nao_identificado somente se ainda não houver informação suficiente. Consulta não é exame: sintomas não autorizam substituir a consulta por exames nem pedir pedido médico. Após identificar a consulta, pedido_medico obrigatório na base publicada exige solicitar a foto conforme pedido_medico_do_turno. Agendamento é objetivo e pode existir nas duas categorias. Para consulta e exame na mesma mensagem, faça pesquisas separadas. Preserve a categoria nas continuações da mesma solicitação.",
           },
           medico: { type: "string", description: "Filtrar por nome do profissional (opcional)." },
           dia: { type: "string", description: "Filtrar por dia da semana (opcional)." },

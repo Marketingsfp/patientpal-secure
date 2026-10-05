@@ -13,6 +13,8 @@ import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const pedidoConsulta = cenario.includes("_pedido_consulta");
+const pedidoCenario = cenario.includes("_pedido_");
 const fonteCenario = cenario.startsWith("fonte_");
 const fonteRetomada = fonteCenario && cenario.endsWith("retomada");
 const fonteEscolhida = cenario.startsWith("fonte_base") ? "base_conhecimento" : "clinica_os";
@@ -72,7 +74,7 @@ const catalogoInterpretado: Record<string, any[]> = {
   })),
 };
 const baseFonte = [{ id: "base-ecg", clinica_id: "clinica-simulada", status: "PUBLICADO",
-  nome: "Eletrocardiograma", estrutura: { aliases: ["traçado do coração"] }, valor: 157, descricao_publica: "Informação exclusiva da base", formas_pagamento: [], executantes: [] }];
+  nome: "Eletrocardiograma", estrutura: { aliases: ["traçado do coração"], pedido_medico: pedidoCenario ? (cenario.includes("dispensado") ? "dispensado" : "obrigatorio") : "nao_informado" }, valor: 157, descricao_publica: "Informação exclusiva da base", formas_pagamento: [], executantes: [] }];
 if (fonteCenario) catalogoInterpretado.servicos = [{ ...baseFonte[0], id: "os-ecg", valor: 93, descricao_publica: "Informação exclusiva do cadastro" }];
 if (clinicoGeral) {
   catalogoInterpretado.profissionais = [{
@@ -118,7 +120,7 @@ const pergunta = clinicoGeral ? `Quero clínico geral com ${medicoClinico} na pr
     : cenario.endsWith("exame") ? "Quanto custa o exame PET-CT?"
     : cenario.endsWith("procedimento") ? "Vocês fazem o procedimento crioablação?"
     : "Gostaria de marca a pneumologista"
-  : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
+  : pedidoConsulta ? "Quero consulta de cardiologia" : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
 const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"
   : cenario === "catalogo_equipe_enfermagem" ? "Equipe de Enfermagem"
   : regraCatalogo ? "Técnica" : "Dra. Ana Souza";
@@ -188,7 +190,11 @@ if (confirmacaoMedico) estadoContextual.knowledge_context = {
   esclarecimento: { tipo: "profissional", pergunta: perguntaMedico,
     opcoes: [{ id: "medico-0", nome: "Sandro Prinscewal", especialidade: "CARDIOLOGIA, CLINICO GERAL" }] },
 };
-const mensagensContextuais = confirmacaoMedico ? [
+const mensagensContextuais = pedidoCenario ? [
+  ...(cenario.includes("foto") ? [{ ...registroMensagem("Foto", 1, "in", "received"), tipo: "image", transcricao: "Enviei a foto de um pedido médico com: Eletrocardiograma." }] : []),
+  ...(cenario.includes("solicitado") ? [registroMensagem("Para Eletrocardiograma, é necessário pedido médico.\n\nPode enviar uma foto legível do pedido médico por aqui?", 1)] : []),
+  { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+] : confirmacaoMedico ? [
   registroMensagem("Quero agendar um clínico geral", 0, "in", "received"),
   registroMensagem("Qual profissional você prefere?", 1),
   registroMensagem("Quero o dr Sandro por favor", 2, "in", "received"),
@@ -247,13 +253,14 @@ mock.module("@/integrations/supabase/client.server", () => ({
         update: (valor: any) => { gravacoes.push({ tabela, valor }); return q; },
         then: (resolve: any) => Promise.resolve(resolve({
           data: fonteCenario && tabela === "clinica_feature_flags" ? [{ clinica_id: "clinica-simulada", flag_key: "nina_fonte_conhecimento", ativo: true, config: { fonte: fonteEscolhida }, updated_at: "2026-10-04T15:00:00Z" }].find(l => filtrosCatalogo.every(f => f(l))) ?? null
+            : pedidoConsulta && tabela === "nina_cat_profissionais" ? [{ id: "medico-base", clinica_id: "clinica-simulada", status: "PUBLICADO", nome: "Ana Souza", especialidades: [{ nome: "CARDIOLOGIA" }], estrutura: { pedido_medico: "obrigatorio" }, formas_pagamento: [], horarios: [], convenios: [] }].filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : fonteCenario && tabela === "nina_cat_servicos" ? baseFonte.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-            : (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais
+            : (contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (contextual || confirmacaoMedico || pedidoCenario) && tabela === "whatsapp_mensagens" ? mensagensContextuais
             : unica ? null : [], error: null,
-          count: (contextual || confirmacaoMedico) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
+          count: (contextual || confirmacaoMedico || pedidoCenario) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
       };
       return q;
@@ -567,7 +574,7 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
             name: "consultar_cadastro",
             arguments: JSON.stringify({
               termo:
-                interpretacao?.termo ??
+                (pedidoConsulta ? "cardiologia" : undefined) ?? interpretacao?.termo ??
                 (esclarecer && !cenario.endsWith("resolvido") ? "XYZ" : "eletrocardiograma"),
               ...(interpretacao
                 ? {
@@ -605,7 +612,7 @@ mock.module("@/lib/nina/resposta/templates.server", () => ({
 
 const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
-const resposta = await gerarRespostaNina("clinica-simulada", procedimentoExecutante ? "Quero com Mariana Portugal" : pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada ? "55000100999" : null, {
+const resposta = await gerarRespostaNina("clinica-simulada", procedimentoExecutante ? "Quero com Mariana Portugal" : pergunta, contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],

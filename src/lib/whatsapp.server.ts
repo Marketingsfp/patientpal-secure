@@ -689,7 +689,7 @@ async function gerarRespostaNinaInterno(
       telefoneRemetente
         ? supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("id, direction, body, created_at, conversa_id, status, is_teste, enviada_por")
+            .select("id, direction, body, created_at, conversa_id, status, is_teste, enviada_por, tipo, transcricao")
             .eq("clinica_id", clinicaId)
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
@@ -1313,12 +1313,13 @@ async function gerarRespostaNinaInterno(
   let mensagensFluxo: Array<{
     id: string; conversa_id: string | null; direction: string; body: string | null;
     created_at: string; status: string | null; is_teste: boolean | null;
+    tipo?: string | null; transcricao?: string | null;
   }> = [];
   const inicioFluxo = sessaoNina.estado.session_started_at;
   if (estadoId.conversaId && inicioFluxo && Number.isFinite(Date.parse(inicioFluxo))) {
     const corteFluxo = new Date(Date.parse(inicioFluxo)).toISOString();
     let consultaHistorico = supabaseAdmin.from("whatsapp_mensagens")
-      .select("id, conversa_id, direction, body, created_at, status, is_teste", { count: "exact" })
+      .select("id, conversa_id, direction, body, created_at, status, is_teste, tipo, transcricao", { count: "exact" })
       .eq("clinica_id", clinicaId)
       .eq("conversa_id", estadoId.conversaId)
       .gte("created_at", corteFluxo);
@@ -1392,6 +1393,11 @@ async function gerarRespostaNinaInterno(
     texto: REGRA_IDENTIDADE_ATENDIMENTO,
   });
   const { REGRA_DICIONARIO_PUBLICADO } = await import("@/lib/nina/dicionario-leitura");
+  const { REGRA_FOTO_PEDIDO_MEDICO, atualizarSolicitacoesPedido, acrescentarSolicitacaoPedido } = await import("@/lib/nina/pedido-medico");
+  if (catalogoPublicado.selecao?.fonte === "base_conhecimento") instrucoesAdicionaisTurno.push({
+    codigo: "SOLICITAR_FOTO_PEDIDO_MEDICO", origem: "src/lib/nina/pedido-medico.ts",
+    motivo: "Solicitar foto quando o atendimento identificado exige pedido na base publicada.", texto: REGRA_FOTO_PEDIDO_MEDICO,
+  });
   if (catalogoPublicado.selecao?.fonte === "base_conhecimento") instrucoesAdicionaisTurno.push({
     codigo: "CONSULTAR_DICIONARIO_PUBLICADO",
     origem: "src/lib/nina/dicionario-leitura.ts",
@@ -1433,6 +1439,7 @@ async function gerarRespostaNinaInterno(
   const { lerDicionarioDaMensagem } = await import("@/lib/nina/dicionario-leitura.server");
   const dicionarioDaMensagem = await lerDicionarioDaMensagem(clinicaId, mensagemPaciente);
   const runtimeContext = {
+    pedido_medico_do_turno: [] as import("@/lib/nina/pedido-medico").SolicitacaoPedidoMedico[],
     dicionario_da_mensagem: dicionarioDaMensagem,
     canal: "whatsapp",
     // O modelo vê sempre "producao": mesma conduta nos dois ambientes. O
@@ -1958,6 +1965,15 @@ async function gerarRespostaNinaInterno(
     });
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
+    if (r.success && !r.erro && ["searchKnowledgeBase", "listCatalog"].includes(r.capacidade ?? "")) {
+      const pedidos = atualizarSolicitacoesPedido(runtimeContext.pedido_medico_do_turno, (r.dados ?? {}) as import("@/lib/nina/knowledge-contract").ResultadoConhecimento, {
+        conversaId: estadoId.conversaId ?? null, inicioSessao: fluxoEstado.session_started_at ?? null,
+        teste: opcoes?.teste === true, mensagens: historicoFluxoCompleto ? mensagensFluxo : msgsMemoria,
+      }, parametros.nova_solicitacao === true);
+      runtimeContext.pedido_medico_do_turno = pedidos;
+      if (pedidos.length) registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Exigência de foto do pedido médico",
+        dados: { solicitacoes: pedidos }, codigo: { arquivo: "src/lib/nina/pedido-medico.ts", funcao: "avaliarPedidoMedico" } });
+    }
     const payload = respostaParaModelo(r);
     // Pesquisa bloqueada não apaga o atendimento já identificado. O modelo
     // precisa dessa referência para reformular a chamada no mesmo turno.
@@ -2778,6 +2794,12 @@ async function gerarRespostaNinaInterno(
           texto: aviso.texto,
         });
     }
+  }
+
+  if (!semNovaMensagem && !turnoObsoleto && !houveHandoff && !finalizacaoHandoff && !ctxFerramentas?.esclarecimentoCatalogo && resposta.trim()) {
+    const comPedido = acrescentarSolicitacaoPedido(resposta, runtimeContext.pedido_medico_do_turno);
+    if (comPedido !== resposta) transformar("pedido_medico.solicitar_foto", "Pedido médico obrigatório na base publicada", resposta, comPedido);
+    resposta = comPedido;
   }
 
   // Sem aviso do protocolo: a própria Nina avisa. Na homologação o aviso é de
