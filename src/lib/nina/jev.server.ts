@@ -1,3 +1,4 @@
+import { fetchComAuditoriaIA, registrarChamadaIATurno, registrarEventoIATurno } from "./auditoria-ia.server";
 /**
  * (Fase 2) Contagem de falhas de entendimento até a mensagem anterior deste
  * ciclo, gravada em `respostas._nina` da última decisão da Fase 1. Decisões
@@ -85,12 +86,13 @@ export async function perguntarJev(
   observarIntencao: boolean = false,
 ): Promise<ResultadoJev> {
   const inicio = Date.now();
+  let chamadaId: string | undefined;
   const chave = process.env["LOVABLE_API_KEY"];
   if (!chave) return { ok: false, motivo: "sem_chave", latencyMs: 0 };
   const controle = new AbortController();
   const timer = setTimeout(() => controle.abort(), limiteMs);
   try {
-    const resp = await fetch(URL_JEV, {
+    const resp = await fetchComAuditoriaIA(URL_JEV, {
       method: "POST",
       signal: controle.signal,
       headers: {
@@ -100,18 +102,18 @@ export async function perguntarJev(
       },
       body: JSON.stringify({ model: MODELO_JEV, state,
         questions: observarIntencao ? { ...perguntas, ...perguntasObservacaoIntencao() } : perguntas }),
-    });
+    }, { finalidade: "jev", modelo: MODELO_JEV }, async c => { chamadaId = c.id; await registrarChamadaIATurno(c); });
     const latencyMs = Date.now() - inicio;
     if (!resp.ok) {
       const txt = await resp.text().catch(() => "");
-      return { ok: false, motivo: `http_${resp.status}: ${txt.slice(0, 200)}`, status: resp.status, latencyMs };
+      return { ok: false, motivo: `http_${resp.status}: ${txt.slice(0, 200)}`, status: resp.status, latencyMs, chamadaId };
     }
     const retorno = separarRetornoJev(perguntas, await resp.json(), observarIntencao);
-    if (!retorno) return { ok: false, motivo: "resposta_invalida", latencyMs };
-    return { ok: true, ...retorno, latencyMs };
+    if (!retorno) return { ok: false, motivo: "resposta_invalida", latencyMs, chamadaId };
+    return { ok: true, ...retorno, latencyMs, chamadaId };
   } catch (e) {
     const motivo = controle.signal.aborted ? "tempo_esgotado" : e instanceof Error ? e.message : "erro";
-    return { ok: false, motivo, latencyMs: Date.now() - inicio };
+    return { ok: false, motivo, latencyMs: Date.now() - inicio, chamadaId };
   } finally {
     clearTimeout(timer);
   }
@@ -140,6 +142,10 @@ export async function registrarDecisaoJev(r: {
   orientacao?: import("./jev-orientacao-intencao").OrientacaoIntencaoJev | null;
 }): Promise<void> {
   try {
+    await registrarEventoIATurno("jev.decision", { fase: r.fase, chamada_id: r.resultado.chamadaId ?? null,
+      aplicada: r.aplicada, respostas: r.resultado.ok ? r.resultado.respostas : null,
+      erro: r.resultado.ok ? null : r.resultado.motivo, estado: r.resultado.ok ? "concluido" : "falhou" },
+      undefined, r.resultado.latencyMs);
     await supabaseAdmin.from("nina_jev_decisoes" as never).insert({
       clinica_id: r.clinicaId,
       conversation_id: r.conversationId,

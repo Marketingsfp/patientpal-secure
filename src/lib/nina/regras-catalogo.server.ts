@@ -11,29 +11,69 @@ export async function atendimentoExigeHumano(entrada: {
   const { clinicaId, medico, procedimento } = entrada;
   const referencias = (entrada.referencias ?? []).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
   const catalogo = await catalogoDoTurno(clinicaId);
-  const restritos = catalogo.profissionais.filter((p) => lerEstrutura(p.estrutura).encaminhamento_humano === true);
-  if (
-    restritos.some(
-      (p) =>
-        referencias.includes(p.id) ||
-        p.id === medico ||
-        (Boolean(medico) && p.medico_id === medico) ||
-        (Boolean(medico) && p.nome.trim().toLocaleLowerCase("pt-BR") === medico?.trim().toLocaleLowerCase("pt-BR")),
-    )
-  )
+  const restritos = catalogo.profissionais.filter(
+    (p) => lerEstrutura(p.estrutura).encaminhamento_humano === true,
+  );
+  const registrar = async (registros: Array<{ id: string; nome: string }>) => {
+    try {
+      const { registrarEventoIATurno } = await import("./auditoria-ia.server");
+      await registrarEventoIATurno("catalog.rule", {
+        motivo: "CATALOGO_ATENDIMENTO_HUMANO",
+        ferramenta_origem: "atendimentoExigeHumano",
+        registros: registros.map((r) => ({
+          id: r.id,
+          nome: r.nome,
+          campo: "estrutura.encaminhamento_humano",
+          valor: true,
+        })),
+      });
+    } catch {
+      /* Auditoria não interfere na regra do catálogo. */
+    }
+  };
+  const profissionais = restritos.filter(
+    (p) =>
+      referencias.includes(p.id) ||
+      p.id === medico ||
+      (Boolean(medico) && p.medico_id === medico) ||
+      (Boolean(medico) &&
+        p.nome.trim().toLocaleLowerCase("pt-BR") === medico?.trim().toLocaleLowerCase("pt-BR")),
+  );
+  if (profissionais.length) {
+    await registrar(profissionais);
     return true;
+  }
   if (medico && restritos.some((p) => p.medico_id)) {
     const { resolverMedicoAgenda } = await import("./vinculo-catalogo-agenda.server");
     const resolvido = await resolverMedicoAgenda(clinicaId, medico);
-    if (resolvido.ok && restritos.some((p) => p.medico_id === resolvido.id)) return true;
+    const profissionaisResolvidos = resolvido.ok
+      ? restritos.filter((p) => p.medico_id === resolvido.id)
+      : [];
+    if (profissionaisResolvidos.length) {
+      await registrar(profissionaisResolvidos);
+      return true;
+    }
   }
   if (referencias.length) {
-    if (catalogo.servicos.filter((s) => referencias.includes(s.id)).some((s) => lerEstrutura(s.estrutura).encaminhamento_humano === true)) return true;
+    const servicos = catalogo.servicos.filter(
+      (s) => referencias.includes(s.id) && lerEstrutura(s.estrutura).encaminhamento_humano === true,
+    );
+    if (servicos.length) {
+      await registrar(servicos);
+      return true;
+    }
   }
   if (procedimento?.trim()) {
     const alvo = procedimento.trim().toLocaleLowerCase("pt-BR");
-    if (catalogo.servicos.filter((s) => s.nome.toLocaleLowerCase("pt-BR") === alvo).some((s) => lerEstrutura(s.estrutura).encaminhamento_humano === true))
+    const servicos = catalogo.servicos.filter(
+      (s) =>
+        s.nome.toLocaleLowerCase("pt-BR") === alvo &&
+        lerEstrutura(s.estrutura).encaminhamento_humano === true,
+    );
+    if (servicos.length) {
+      await registrar(servicos);
       return true;
+    }
   }
   return false;
 }

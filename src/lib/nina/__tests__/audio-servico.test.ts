@@ -5,6 +5,8 @@ for (const caso of ["recebido", "pedido", "texto", "desativado", "longa", "falha
     { stdout: "pipe", stderr: "pipe", timeout: 15000 });
   expect(p.exitCode, p.stderr.toString()).toBe(0);
   const r = JSON.parse(p.stdout.toString().split(/\r?\n/).find(l => l.startsWith("AUDIO="))!.slice(6));
+  expect(r.auditoria).toHaveLength(r.chamadas.length);
+  expect(r.auditoria.every((c: any) => c.finalidade === "sintese_voz" && c.modelo === "openai/gpt-4o-mini-tts")).toBe(true);
   if (["texto", "desativado"].includes(caso)) {
     expect(r.audio).toBeNull(); expect(r.chamadas).toHaveLength(0);
   } else if (["falha", "json"].includes(caso)) {

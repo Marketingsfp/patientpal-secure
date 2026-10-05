@@ -1,4 +1,5 @@
 import { eventoDoMotor } from "./fluxo-direto";
+import { complementarAuditoria } from "./detalhes-auditoria-ia";
 /** Apresentação somente de fatos registrados; não decide nem altera atendimento. */
 import type {
   EstadoFerramentaRodada,
@@ -16,6 +17,8 @@ export type PacoteDetalhesMensagem = {
   etapas: RegistroDetalhes[];
   eventos: RegistroDetalhes[];
   decisoes: RegistroDetalhes[];
+  decisoesJev?: RegistroDetalhes[];
+  fingerprintServidor?: string | null;
   vinculos: RegistroDetalhes[];
   avisos: RegistroDetalhes[];
   alertas?: string[];
@@ -83,6 +86,10 @@ const NOMES_PASSOS: Record<string, string> = {
   "response.validate": "Finalização do gerador",
   "message.outbound": "Retorno do gerador",
   "turn.delivery": "Registro da entrega",
+  "ai.auxiliary": "Chamada auxiliar de IA",
+  "jev.decision": "Decisão do Jev",
+  "handoff.reason": "Motivo do encaminhamento",
+  "catalog.rule": "Restrição do catálogo identificada",
 };
 
 function descreverConclusao(
@@ -91,6 +98,13 @@ function descreverConclusao(
   mensagemId: string | null,
 ): string {
   switch (node) {
+    case "ai.auxiliary":
+      return `${s(meta.finalidade) ?? "IA"}: ${s(meta.modelo) ?? "modelo não registrado"}. Consumo e tentativas em Outras chamadas de IA.`;
+    case "jev.decision":
+      return `${s(meta.fase) ?? "Fase não registrada"}: ${meta.aplicada === true ? "decisão aplicada" : "decisão não aplicada"}. Veja Participação do Jev.`;
+    case "handoff.reason":
+    case "catalog.rule":
+      return s(meta.motivo) ?? "Motivo não registrado.";
     case "instructions.published":
       return meta.versao != null
         ? `Versão ${String(meta.versao)} das instruções carregada.`
@@ -173,6 +187,7 @@ export function consolidarPassosDetalhes(
       e.node_id,
       e.cycle_id ?? null,
       inicio ? instante(inicio) : `ausente-${i}`,
+      ...(e.node_id === "ai.auxiliary" || e.node_id === "jev.decision" ? [meta.id ?? meta.chamada_id ?? null, meta.fase ?? null] : []),
     ];
     const baseChave = JSON.stringify(base);
     const irmaos = porBase.get(baseChave) ?? [];
@@ -564,7 +579,7 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
         ? `Os registros técnicos desta mensagem foram apagados pela limpeza automática (são guardados por ${DIAS_RETENCAO_REGISTROS} dias). O texto da conversa continua preservado.`
         : "Execução da Nina não vinculada a esta mensagem.",
     );
-  if (!respostaOriginal && p.execucao)
+  if (!respostaOriginal && p.execucao && !p.etapas.some(e => e.tipo === "resposta_original" && lista(o(e.dados).tool_calls).length))
     alertas.push("Texto original do modelo não encontrado na captura do gateway.");
   if (hashEntregue && vinculo?.texto_hash && vinculo.texto_hash !== hashEntregue)
     alertas.push(
@@ -615,6 +630,7 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
           : "Mensagem localizada no histórico da conversa.";
   const passos = consolidarPassosDetalhes(p.eventos, mensagemId);
   const linhaDoTempo = montarLinhaDoTempo(p.etapas, p.eventos);
+  const complemento = complementarAuditoria(p, resumo, alertas);
   const rodadasResumo = n(resumo.rodadas);
   if (
     linhaDoTempo.rodadas.length &&
@@ -630,6 +646,7 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
       "Algumas etapas têm o mesmo horário registrado; a ordem exata entre elas não foi comprovada.",
     );
   return {
+    ...complemento,
     resultado,
     ambiente,
     mensagem: mensagemId
@@ -649,12 +666,12 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
       : null,
     entradas: p.entradas
       .filter((e) => doEscopo(e) && e.direction === "in")
-      .map((e) => s(e.body) ?? s(e.transcricao))
-      .filter((v): v is string => v != null),
+      .map((e) => [...new Set([s(e.body), s(e.transcricao)].filter(Boolean))].join("\n\nTranscrição / leitura da mídia:\n"))
+      .filter(v => v.length > 0),
     respostaOriginal,
     protocolo: s(aviso?.protocolo) ?? s(avisoRegistrado?.protocolo),
     modelo: s(p.execucao?.model),
-    versaoPrompt: n(p.execucao?.prompt_versao) ?? s(p.execucao?.prompt_versao),
+    versaoPrompt: complemento.versaoPrompt,
     versaoRuntime: s(resumo.runtime_versao),
     rodadas: n(resumo.rodadas),
     duracaoMs: n(resumos.length === 1 ? resumos[0]?.duration_ms : null),

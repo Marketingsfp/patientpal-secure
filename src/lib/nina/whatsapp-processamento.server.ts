@@ -311,7 +311,12 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       if (cfg.access_token) {
         try {
           const { prepararAudioResposta } = await import("@/lib/nina-audio.server");
-          const audio = await prepararAudioResposta(params.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: mensagemDoTurno });
+          const { registrarChamadaIATurno } = await import("./auditoria-ia.server");
+          const chamadasVoz: import("./auditoria-ia").ChamadaIA[] = [];
+          const audio = await prepararAudioResposta(params.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: mensagemDoTurno },
+            c => { chamadasVoz.push(c); });
+          if (auditoriaNina.traceId) await Promise.all(chamadasVoz.map(c => registrarChamadaIATurno(c, {
+            clinicaId: params.clinicaId, conversaId: convId, traceId: auditoriaNina.traceId!, execucaoId: auditoriaNina.execucaoId })));
           if (audio) {
             const { longa, texto: falado } = audio;
             {

@@ -194,6 +194,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 const tipo = tipoBruto === "voice" ? "audio" : tipoBruto;
                 const ehAudio = tipo === "audio";
                 const ehImagem = tipo === "image";
+                const chamadasIA: import("@/lib/nina/auditoria-ia").ChamadaIA[] = [];
+                const registrarIA = (c: import("@/lib/nina/auditoria-ia").ChamadaIA) => { chamadasIA.push(c); };
 
                 // Texto do paciente que a Nina vai processar (áudio vira transcrição).
                 let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
@@ -247,7 +249,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                         await import("@/lib/nina-desligada.server");
                       const estado = from ? await estadoAntes(params.clinicaId, from) : null;
                       if (podeAntes(estado) && !(await desligadaAntes(params.clinicaId))) {
-                        leituraImagem = await lerPedidoNaImagem(recebida.base64, recebida.mime);
+                        leituraImagem = await lerPedidoNaImagem(recebida.base64, recebida.mime, registrarIA);
                       }
                     }
                   }
@@ -273,7 +275,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     });
                     caminhoMidia = recebido.caminho;
                     const r = recebido.base64
-                      ? await transcreverAudioBase64(recebido.base64, recebido.mime)
+                      ? await transcreverAudioBase64(recebido.base64, recebido.mime, registrarIA)
                       : { texto: "", erro: recebido.erro };
                     mediaMime = recebido.mime;
                     if (r.texto) {
@@ -320,7 +322,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   media_url: caminhoMidia,
                   status: "received",
                   enviada_por: "paciente",
-                  raw: ehImagem ? { ...msg, nina_leitura_imagem: leituraImagem } : msg,
+                  raw: { ...msg, ...(ehImagem ? { nina_leitura_imagem: leituraImagem } : {}), nina_chamadas_ia: chamadasIA },
                 });
                 const msgInserida = entradaPersistida.mensagem;
                 trace.marcar("RECV_T5_DB_INSERT_DONE");

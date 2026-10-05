@@ -12,5 +12,6 @@ globalThis.fetch = Object.assign(async (_url: unknown, opcoes: any) => {
   return Response.json({ choices: [{ message: { content } }] });
 }, { preconnect: () => {} }) as typeof fetch;
 const { lerPedidoNaImagem } = await import("../../../whatsapp-midia.server");
-const resultado = await lerPedidoNaImagem("AQID", "image/jpeg");
-console.log("FOTO=" + JSON.stringify({ resultado, requisicao }));
+const auditoria: unknown[] = [];
+const resultado = await lerPedidoNaImagem("AQID", "image/jpeg", c => { auditoria.push(c); });
+console.log("FOTO=" + JSON.stringify({ resultado, requisicao, auditoria }));

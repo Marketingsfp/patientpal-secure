@@ -257,6 +257,8 @@ export async function processarMensagemTeste(
         : await garantirCiclo(supabaseAdmin, data.clinicaId, lead, userId);
       const waId = retomada?.mensagem.wa_message_id ?? `test-${lead.id}-${data.chave}`;
       const agora = new Date().toISOString();
+      const chamadasIA: import("./auditoria-ia").ChamadaIA[] = [];
+      const registrarIA = (c: import("./auditoria-ia").ChamadaIA) => { chamadasIA.push(c); };
       let leituraImagem: import("./leitura-imagem").LeituraImagem = { tipo: "ilegivel" };
       let media_url: string | null = null;
       let media_mime: string | null = null;
@@ -270,7 +272,7 @@ export async function processarMensagemTeste(
           media_mime = tipoMimeAceito("audio", data.audioArquivo.mime);
           if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_AUDIO) throw new Error("Áudio inválido ou acima de 16 MB");
           const { transcreverAudioBase64 } = await import("@/lib/whatsapp-midia.server");
-          const transcrita = await transcreverAudioBase64(data.audioArquivo.base64, media_mime);
+          const transcrita = await transcreverAudioBase64(data.audioArquivo.base64, media_mime, registrarIA);
           textoPaciente = bloquearLinksRecebidos(transcrita.texto);
           audioFalhou = !textoPaciente;
           body = textoPaciente ? `🎤 ${textoPaciente}` : "🎤 [áudio não transcrito]";
@@ -291,7 +293,7 @@ export async function processarMensagemTeste(
             media_mime = tipoMimeAceito("image", data.imagemArquivo.mime);
             if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_IMAGEM) throw new Error("Foto inválida ou acima de 5 MB");
             const { lerPedidoNaImagem } = await import("@/lib/whatsapp-midia.server");
-            leituraImagem = await lerPedidoNaImagem(data.imagemArquivo.base64, media_mime);
+            leituraImagem = await lerPedidoNaImagem(data.imagemArquivo.base64, media_mime, registrarIA);
             const caminho = caminhoDaMidia({ clinicaId: data.clinicaId, waMessageId: waId, mime: media_mime });
             const { error: erroUpload } = await supabaseAdmin.storage.from(BUCKET_MIDIA_WHATSAPP)
               .upload(caminho, bytes, { contentType: media_mime, upsert: true });
@@ -316,7 +318,7 @@ export async function processarMensagemTeste(
             body,
             tipo: data.tipo,
             transcricao: (ehAudio || data.tipo === "image") && textoPaciente ? textoPaciente : null,
-            ...(data.tipo === "image" ? { raw: { nina_leitura_imagem: leituraImagem } } : {}),
+            raw: { ...(data.tipo === "image" ? { nina_leitura_imagem: leituraImagem } : {}), nina_chamadas_ia: chamadasIA },
             media_url,
             media_mime,
             status: "received",
@@ -784,7 +786,12 @@ export async function processarMensagemTeste(
     if (reply.trim()) {
       try {
         const { prepararAudioResposta, guardarAudioMensagem } = await import("@/lib/nina-audio.server");
-        const sintetizado = await prepararAudioResposta(data.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: textoDoTurno });
+        const { registrarChamadaIATurno } = await import("./auditoria-ia.server");
+        const chamadasVoz: import("./auditoria-ia").ChamadaIA[] = [];
+        const sintetizado = await prepararAudioResposta(data.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: textoDoTurno },
+          c => { chamadasVoz.push(c); });
+        if (auditoriaNina.traceId) await Promise.all(chamadasVoz.map(c => registrarChamadaIATurno(c, {
+            clinicaId: data.clinicaId, conversaId, traceId: auditoriaNina.traceId!, execucaoId: auditoriaNina.execucaoId })));
         if (sintetizado) {
           const { longa, texto: falado } = sintetizado;
           const { avaliarFala } = await import("@/lib/nina-audio.server");

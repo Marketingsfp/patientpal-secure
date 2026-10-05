@@ -367,6 +367,8 @@ export function evidenciaSaidaDoTurno(dados: {
 }
 
 export type RegistroTurno = {
+  /** Buffer da requisição, persistido separado do resumo; não contém mídias ou prompts. */
+  eventosAuxiliares?: import("../arquitetura/tracing").EventoTrace[];
   /** Ausente em registros antigos; nunca inferir a versão a partir do servidor atual. */
   runtimeVersao?: string;
   /** Fingerprint dos fontes cobertos pelo build; ausente/nulo em registros sem comprovação. */
@@ -527,6 +529,7 @@ export function resumoTurnoParaTrace(r: RegistroTurno): Record<string, unknown> 
     teste: r.teste,
     batch_id: r.batchId,
     mensagens_entrada: r.mensagensEntrada.length,
+    mensagens_entrada_ids: r.mensagensEntrada,
     revisao_conversa: r.revisaoConversa,
     modelo_chamado: r.modeloChamado,
     rodadas: r.rodadas,

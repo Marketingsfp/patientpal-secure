@@ -1,3 +1,5 @@
+import { fetchComAuditoriaIA } from "./nina/auditoria-ia.server";
+import type { RegistrarChamadaIA } from "./nina/auditoria-ia";
 import { VOCABULARIO_DICA, corrigirFala } from "@/lib/voz-correcoes";
 import { MAPA_TEMPLATES } from "@/lib/nina/resposta/templates";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -111,11 +113,11 @@ export async function receberMidiaWhatsapp(entrada: {
 }
 
 /** Lê a imagem com IA só para identificar pedido médico. Qualquer falha vira "ilegivel" (controle de nova foto). */
-export async function lerPedidoNaImagem(base64: string, mime: string): Promise<LeituraImagem> {
+export async function lerPedidoNaImagem(base64: string, mime: string, registrar?: RegistrarChamadaIA): Promise<LeituraImagem> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) return { tipo: "ilegivel" };
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetchComAuditoriaIA("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       signal: AbortSignal.timeout(30_000),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -132,7 +134,7 @@ export async function lerPedidoNaImagem(base64: string, mime: string): Promise<L
           },
         ],
       }),
-    });
+    }, { finalidade: "leitura_imagem", modelo: "google/gemini-2.5-flash" }, registrar);
     if (!res.ok) {
       console.error("[whatsapp-midia] leitura de imagem falhou", res.status);
       return { tipo: "ilegivel" };
@@ -190,6 +192,7 @@ function formatoDeMime(mime: string | null): string {
 export async function transcreverAudioBase64(
   base64: string,
   mime: string | null,
+  registrar?: RegistrarChamadaIA,
 ): Promise<{ texto: string; erro: string | null }> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) return { texto: "", erro: "LOVABLE_API_KEY ausente" };
@@ -200,7 +203,7 @@ VOCABULÁRIO ESPERADO (prefira estas grafias quando o som for parecido): ${VOCAB
 Se o áudio estiver inaudível ou vazio, responda exatamente: (inaudível)`;
 
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetchComAuditoriaIA("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       signal: AbortSignal.timeout(30_000),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -220,7 +223,7 @@ Se o áudio estiver inaudível ou vazio, responda exatamente: (inaudível)`;
           },
         ],
       }),
-    });
+    }, { finalidade: "transcricao_audio", modelo: "google/gemini-2.5-flash" }, registrar);
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("transcrever audio whatsapp erro", res.status, body);

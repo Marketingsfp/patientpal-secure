@@ -24,10 +24,11 @@ globalThis.fetch = Object.assign(async (_url: any, init: any) => {
 }, { preconnect: () => {} }) as typeof fetch;
 const { prepararAudioResposta, guardarAudioMensagem, avaliarFala } = await import("../../../nina-audio.server");
 const resposta = caso === "longa" ? "Confira as informações. " + "Detalhes da consulta. ".repeat(40) : "Podemos consultar os horários.";
-const audio = await prepararAudioResposta("clinica", resposta, { recebeuAudio: caso === "recebido", mensagem: caso === "texto" ? "Olá" : "Responda em áudio" });
+const auditoria: unknown[] = [];
+const audio = await prepararAudioResposta("clinica", resposta, { recebeuAudio: caso === "recebido", mensagem: caso === "texto" ? "Olá" : "Responda em áudio" }, c => { auditoria.push(c); });
 let avaliacao = null;
 if (audio) {
   await guardarAudioMensagem("clinica", "mensagem", audio);
   avaliacao = await avaliarFala(audio, { textoFinalHash: "outro-hash", decisaoId: "nao-herdar" });
 }
-console.log("AUDIO=" + JSON.stringify({ audio: audio ? { texto: audio.texto, longa: audio.longa } : null, chamadas, arquivos, vinculos, avaliacao }));
+console.log("AUDIO=" + JSON.stringify({ audio: audio ? { texto: audio.texto, longa: audio.longa } : null, chamadas, auditoria, arquivos, vinculos, avaliacao }));

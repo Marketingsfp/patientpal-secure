@@ -3,7 +3,7 @@ import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
-import { resultadoExigeHumano } from "@/lib/nina/regras-catalogo";
+import { resultadoExigeHumano, evidenciaRegraHumano } from "@/lib/nina/regras-catalogo";
 import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 
 import { normalizar } from "@/lib/nina-especialidade";
@@ -1916,6 +1916,7 @@ async function gerarRespostaNinaInterno(
   async function encaminharRegraCatalogo(
     ferramentaOrigem: string,
     ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>,
+    evidencia?: ReturnType<typeof evidenciaRegraHumano>,
   ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
@@ -1954,10 +1955,12 @@ async function gerarRespostaNinaInterno(
       handoffConfirmado: confirmado, motivo: argumentos.motivo };
     registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento obrigatório pelo catálogo",
       dados: { origem_solicitacao: "servidor", motivo: argumentos.motivo, ferramenta_origem: ferramentaOrigem,
-        handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
+        registros: evidencia ?? [], handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "encaminharRegraCatalogo" } });
-    if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem });
-    else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", { ferramenta: "solicitar_atendente_humano" });
+    if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem,
+      motivo: argumentos.motivo, registros: evidencia ?? [] });
+    else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", { ferramenta: "solicitar_atendente_humano",
+      motivo: argumentos.motivo, registros: evidencia ?? [] });
   }
   async function compartilharResultado(
     nome: string,
@@ -2151,7 +2154,7 @@ async function gerarRespostaNinaInterno(
         selecaoDoTurno?.selecao?.raizesFonte.map((r) => r.registro),
       )
     )
-      await encaminharRegraCatalogo(nome);
+      await encaminharRegraCatalogo(nome, undefined, evidenciaRegraHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)));
     return {
       ...(limitarRetornoParaModelo(payload) as Record<string, unknown>),
       // A seleção legada auxilia referências internas; não é uma declaração
@@ -2203,6 +2206,8 @@ async function gerarRespostaNinaInterno(
         handoff_confirmado: confirmado, erro: rh.erro ?? null,
       },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
+    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: "jev", urgencia: argumentos.urgencia,
+      pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
   }
   // Um aceite de identificação reconsulta a fonte antes de devolver o controle ao modelo.
   if (!finalizacaoHandoff && !turnoObsoleto && !ctxFerramentas?.esclarecimentoCatalogo &&

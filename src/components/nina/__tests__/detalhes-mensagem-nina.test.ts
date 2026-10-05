@@ -35,6 +35,20 @@ function renderizar(dados: LeituraDetalhesMensagem, registros?: unknown) {
 }
 
 describe("Detalhes técnicos da mensagem — apresentação fiel", () => {
+  it("distingue rodadas de conversa, Jev, consumo ausente e código do turno", () => {
+    const html = renderizar(leitura({ rodadas: 0, versaoPrompt: 64, fonteVersaoPrompt: "Carregamento do turno",
+      fingerprintTurno: `sha256:${"a".repeat(64)}`, fingerprintServidor: `sha256:${"b".repeat(64)}`,
+      chamadasAuxiliares: [{ id: "voz", finalidade: "sintese_voz", modelo: "tts", inicio: "", duracaoMs: 100,
+        estado: "concluido", erro: null, consumoEntrada: null, consumoSaida: null, caracteres: 80, formato: "opus" }],
+      decisoesJev: [{ fase: "Encaminhamento", aplicada: true, resumo: "Urgência: 0.97", erro: null }],
+      encaminhamentos: [{ motivo: "CATALOGO_ATENDIMENTO_HUMANO", ferramenta: "consultar_cadastro",
+        registros: [{ id: "registro-A", nome: "Exame A", campo: "extras.atendimento_humano_obrigatorio", valor: true }] }],
+    }));
+    for (const texto of ["Rodadas do modelo de conversa", "Participação do Jev", "Decisão aplicada", "Geração de voz",
+      "não informados", "não significa custo zero", "registro-A", "Exame A", "código diferente", "Carregamento do turno"])
+      expect(html).toContain(texto);
+    expect(html).not.toContain("Chamadas ao modelo registradas");
+  });
   it("MJ-55 preserva aviso e entrega sem exibir notas antigas", () => {
     const aviso = "Aviso simbólico: a equipe continuaria este atendimento. Protocolo MJ-55.";
     const dados = leitura({

@@ -8,7 +8,6 @@ const AMBIENTES = {
   nao_registrado: "Ambiente não registrado",
 } as const;
 
-
 const ESTADOS_PASSO = {
   concluido: { texto: "Concluído", classe: "text-emerald-700 dark:text-emerald-400" },
   falhou: { texto: "Falhou", classe: "text-destructive" },
@@ -151,9 +150,7 @@ function LinhaDoTempo({ linha }: { linha: NonNullable<LeituraDetalhesMensagem["l
                         {f.argumentos && <Bloco rotulo="Pediu" texto={f.argumentos} />}
                         {f.resultado ? (
                           <details>
-                            <summary className="cursor-pointer text-xs">
-                              Recebeu de volta
-                            </summary>
+                            <summary className="cursor-pointer text-xs">Recebeu de volta</summary>
                             <div className="mt-1">
                               <Bloco rotulo="Como a Nina recebeu o resultado" texto={f.resultado} />
                             </div>
@@ -163,8 +160,8 @@ function LinhaDoTempo({ linha }: { linha: NonNullable<LeituraDetalhesMensagem["l
                           !f.pedidaPeloSistema && (
                             <p className="text-xs text-muted-foreground">
                               Resultado não registrado: não houve rodada seguinte do modelo (a
-                              resposta foi montada logo após esta ferramenta) ou o resultado não pôde
-                              ser ligado a ela com segurança.
+                              resposta foi montada logo após esta ferramenta) ou o resultado não
+                              pôde ser ligado a ela com segurança.
                             </p>
                           )
                         )}
@@ -224,15 +221,23 @@ export function DetalhesMensagemNina({
         <p className="font-medium">{leitura.resultado}</p>
         <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
           {[
-            ["Modelo", leitura.modelo ?? "Não registrado"],
-            ["Versão do núcleo neste turno", leitura.versaoRuntime ?? "Não registrada"],
+            ["Modelo de conversa", leitura.modelo ?? "Não registrado"],
+            ["Rótulo do núcleo neste turno", leitura.versaoRuntime ?? "Não registrado"],
+            [
+              "Código usado neste turno (SHA-256)",
+              leitura.fingerprintTurno ?? "Não registrado neste histórico",
+            ],
+            [
+              "Código do servidor consultado agora (SHA-256)",
+              leitura.fingerprintServidor ?? "Não informado pelo build",
+            ],
             [
               "Versão do prompt",
               leitura.versaoPrompt == null ? "Não registrada" : String(leitura.versaoPrompt),
             ],
             ["Duração registrada", duracao(leitura.duracaoMs)],
             [
-              "Chamadas ao modelo registradas",
+              "Rodadas do modelo de conversa",
               leitura.rodadas == null ? "Não registradas" : String(leitura.rodadas),
             ],
             ...(leitura.protocolo ? [["Protocolo", leitura.protocolo]] : []),
@@ -243,7 +248,114 @@ export function DetalhesMensagemNina({
             </div>
           ))}
         </dl>
+        {leitura.fonteVersaoPrompt && (
+          <p className="text-xs text-muted-foreground">
+            Fonte da versão do prompt: {leitura.fonteVersaoPrompt}.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          As rodadas contam apenas o modelo de conversa. Jev, leitura de fotos, transcrição e voz
+          aparecem abaixo. O rótulo do núcleo não comprova publicação; o SHA-256 identifica os
+          fontes cobertos pelo build, não um commit do GitHub.
+        </p>
+        {leitura.fingerprintTurno && leitura.fingerprintServidor && (
+          <p className="text-xs text-muted-foreground">
+            {leitura.fingerprintTurno === leitura.fingerprintServidor
+              ? "O código registrado no turno corresponde ao servidor consultado agora."
+              : "O turno foi executado com código diferente do servidor consultado agora."}
+          </p>
+        )}
       </section>
+
+      <section aria-label="Outras chamadas de IA" className="space-y-2 rounded-lg border p-3">
+        <h3 className="font-semibold">
+          Outras chamadas de IA ({leitura.chamadasAuxiliares?.length ?? 0} registradas)
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Cada linha representa uma tentativa ao provedor, inclusive falhas e novas tentativas.
+          Consumo ausente não significa custo zero; este painel não é uma fatura.
+        </p>
+        {!leitura.chamadasAuxiliares?.length && (
+          <p>
+            Nenhuma chamada auxiliar foi localizada. Registros antigos podem não conter essa
+            auditoria.
+          </p>
+        )}
+        {leitura.chamadasAuxiliares?.map((c) => (
+          <div key={c.id} className="space-y-1 rounded border p-2">
+            <p className="font-medium">
+              {
+                {
+                  jev: "Jev",
+                  leitura_imagem: "Leitura de foto",
+                  transcricao_audio: "Transcrição de áudio",
+                  sintese_voz: "Geração de voz",
+                }[c.finalidade]
+              }{" "}
+              · {c.modelo}
+            </p>
+            <p>
+              {c.estado === "concluido" ? "Provedor respondeu com sucesso" : "Falha na chamada"} ·{" "}
+              {duracao(c.duracaoMs)}
+              {c.erro ? ` · ${c.erro}` : ""}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Tokens de entrada: {c.consumoEntrada ?? "não informados"} · Tokens de saída:{" "}
+              {c.consumoSaida ?? "não informados"}
+              {c.caracteres != null ? ` · Caracteres enviados para voz: ${c.caracteres}` : ""}
+              {c.formato ? ` · Formato solicitado: ${c.formato}` : ""}
+            </p>
+          </div>
+        ))}
+      </section>
+
+      {!!leitura.decisoesJev?.length && (
+        <section aria-label="Participação do Jev" className="space-y-2 rounded-lg border p-3">
+          <h3 className="font-semibold">Participação do Jev</h3>
+          {leitura.decisoesJev.map((d, i) => (
+            <div key={i} className="space-y-1">
+              <p className="font-medium">
+                {d.fase} ·{" "}
+                {d.aplicada === true
+                  ? "Decisão aplicada"
+                  : d.aplicada === false
+                    ? "Decisão não aplicada"
+                    : "Aplicação não registrada"}
+              </p>
+              <p className="whitespace-pre-wrap break-words">{d.erro ?? d.resumo}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {!!leitura.encaminhamentos?.length && (
+        <section aria-label="Motivo do encaminhamento" className="space-y-2 rounded-lg border p-3">
+          <h3 className="font-semibold">Motivo do encaminhamento</h3>
+          {leitura.encaminhamentos.map((e, i) => (
+            <div key={i} className="space-y-1">
+              <p className="font-medium">
+                {e.motivo === "CATALOGO_ATENDIMENTO_HUMANO"
+                  ? "O cadastro consultado exige atendimento humano."
+                  : e.motivo}
+              </p>
+              {e.ferramenta && <p>Ferramenta de origem: {e.ferramenta}</p>}
+              {e.registros.map((r, j) => (
+                <p className="break-words" key={j}>
+                  {r.nome ?? "Nome não registrado"} · ID: {r.id ?? "não registrado"}
+                  <br />
+                  Configuração: {r.campo} = {String(r.valor)}
+                </p>
+              ))}
+              {e.motivo === "CATALOGO_ATENDIMENTO_HUMANO" && !e.registros.length && (
+                <p className="text-muted-foreground">
+                  Este registro antigo não guardou o cadastro responsável junto da decisão. Não é
+                  possível reconstruí-lo consultando a configuração atual.
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section aria-label="Mensagem registrada" className="space-y-2">
         <h3 className="font-semibold">Mensagem registrada</h3>

@@ -22,6 +22,18 @@ export function registroExigeHumano(valor: unknown): boolean {
   return extras?.atendimento_humano_obrigatorio === true;
 }
 
+/** Snapshot restrito à regra que foi avaliada; não lê o cadastro atual para explicar o passado. */
+export function evidenciaRegraHumano(dados: unknown, referencias: readonly string[] = []) {
+  const r = objeto(dados) ?? {};
+  const registros = [r.records, r.registros, r.itens].find(Array.isArray) as unknown[] | undefined;
+  const escolhidos = registros?.filter(v => referencias.includes(String(objeto(v)?.id ?? ""))) ?? [];
+  return (escolhidos.length ? escolhidos : registros ?? []).filter(registroExigeHumano).map(v => {
+    const item = objeto(v)!;
+    return { id: item.id ?? null, nome: item.procedimento ?? item.nome ?? null,
+      campo: "extras.atendimento_humano_obrigatorio", valor: true };
+  });
+}
+
 /** Não usa o primeiro resultado de uma lista ambígua como escolha do paciente. */
 export function resultadoExigeHumano(
   dados: unknown,

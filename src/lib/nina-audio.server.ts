@@ -1,3 +1,5 @@
+import { fetchComAuditoriaIA } from "./nina/auditoria-ia.server";
+import type { RegistrarChamadaIA } from "./nina/auditoria-ia";
 /**
  * Resposta em ÁUDIO da Nina no WhatsApp.
  *
@@ -79,6 +81,7 @@ export function resumoFalado(texto: string): string {
  */
 export async function sintetizarFala(
   texto: string,
+  registrar?: RegistrarChamadaIA,
 ): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) {
@@ -91,7 +94,7 @@ export async function sintetizarFala(
   ];
   for (const t of tentativas) {
     try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+      const res = await fetchComAuditoriaIA("https://ai.gateway.lovable.dev/v1/audio/speech", {
         method: "POST",
         signal: AbortSignal.timeout(20_000),
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -101,7 +104,7 @@ export async function sintetizarFala(
           voice: VOZ_NINA,
           response_format: t.format,
         }),
-      });
+      }, { finalidade: "sintese_voz", modelo: MODELO_TTS, caracteres: texto.slice(0, 3000).length, formato: t.format }, registrar);
       if (!res.ok) {
         console.error(
           "nina audio tts erro",
@@ -127,11 +130,11 @@ export async function sintetizarFala(
 
 /** Mesmo critério e mesma fala nos dois transportes; só o envio é diferente. */
 export async function prepararAudioResposta(clinicaId: string, resposta: string,
-  entrada: { recebeuAudio: boolean; mensagem: string }) {
+  entrada: { recebeuAudio: boolean; mensagem: string }, registrar?: RegistrarChamadaIA) {
   if (!resposta.trim() || !deveResponderEmAudio(entrada) || await respostaAudioDesativada(clinicaId)) return null;
   const longa = resposta.length > LIMITE_FALA_CURTA || pareceLista(resposta);
   const texto = longa ? resumoFalado(resposta) : prepararParaFala(resposta);
-  const audio = await sintetizarFala(texto);
+  const audio = await sintetizarFala(texto, registrar);
   return audio ? { ...audio, texto, longa } : null;
 }
 

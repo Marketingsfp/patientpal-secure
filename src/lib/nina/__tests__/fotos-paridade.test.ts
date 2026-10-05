@@ -14,6 +14,9 @@ for (const caso of ["legivel", "ilegivel", "invalida", "indisponivel", "timeout"
   expect(r.requisicao.model).toBe("google/gemini-2.5-flash");
   expect(r.requisicao.messages[1].content[1].image_url.url).toBe("data:image/jpeg;base64,AQID");
   expect(r.requisicao.temTimeout).toBe(true);
+  expect(r.auditoria).toHaveLength(1);
+  expect(r.auditoria[0].finalidade).toBe("leitura_imagem");
+  expect(r.auditoria[0].estado).toBe(["indisponivel", "timeout"].includes(caso) ? "falhou" : "concluido");
 });
 for (const ambiente of ["producao", "homologacao"]) {
   it(`${ambiente}: foto legível segue ao modelo e não aciona limite de leitura`, () => {
