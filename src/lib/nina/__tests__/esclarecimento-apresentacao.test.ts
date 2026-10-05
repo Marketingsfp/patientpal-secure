@@ -1,7 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import { apresentarPerguntaEsclarecimento } from "../esclarecimento-apresentacao";
+import { apresentarPerguntaEsclarecimento, FECHAMENTO_CORRECAO_EXAME } from "../esclarecimento-apresentacao";
 
 describe("pergunta de identificação entregue ao paciente (bateria 02/10, testes 04 e 05)", () => {
+  it("hipótese única de exame termina com convite para corrigir sem repetir confirmação", () => {
+    const texto = apresentarPerguntaEsclarecimento("Você quis dizer USG MORFOLOGICA? Pode confirmar ou escrever o nome novamente.",
+      { tipo: "procedimento", tipoAtendimento: "exame_procedimento", apresentacao: "Olá! Sou a Maria." });
+    expect(texto).toBe(`Olá! Sou a Maria.\n\nVocê se refere a USG MORFOLOGICA?\n\n${FECHAMENTO_CORRECAO_EXAME}`);
+    expect(texto.match(/\?/g)).toHaveLength(1);
+  });
+
+  it("não aplica linguagem de exame a consultas ou profissionais", () => {
+    const pergunta = "Você quis dizer Cardiologia? Pode confirmar ou escrever o nome novamente.";
+    expect(apresentarPerguntaEsclarecimento(pergunta, { tipo: "procedimento", tipoAtendimento: "consulta" })).toBe(pergunta);
+    expect(apresentarPerguntaEsclarecimento(pergunta, { tipo: "profissional" })).toBe(pergunta);
+  });
   it("profissional: frase de conversa, nomes em lista e sem MAIÚSCULAS", () => {
     const texto = apresentarPerguntaEsclarecimento(
       "Não consegui identificar com segurança qual médico você escolheu. Pode informar novamente qual deseja?\nANDERSON LUIS ELOY AMARAL — NEUROLOGIA\nCARLOS EDUARDO GONCALVES MONTEIRO — NEUROLOGIA, PSIQUIATRIA",

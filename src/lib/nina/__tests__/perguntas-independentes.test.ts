@@ -60,6 +60,13 @@ it("repetir consulta no mesmo turno não multiplica perguntas", () => {
   expect(resposta).toContain("Consulta confirmada.");
   expect(resposta.match(/Você quis dizer/g)).toHaveLength(1);
 });
+
+it("esclarecimentos com o mesmo texto aparecem uma vez, preservando a resposta independente", () => {
+  const p = pendente("ECG");
+  const texto = comporRespostaParcial("A consulta de Psiquiatria está confirmada no catálogo.", [p, { ...p, consulta: { termo: "eletrocardiograma" } }]);
+  expect(texto.match(/Você quis dizer ECG/g)).toHaveLength(1);
+  expect(texto).toContain("Psiquiatria");
+});
 it("normalização descarta pendências de outra sessão e limita profundidade", () => {
   const p = pendente("ECG");
   const r = normalizarConhecimentoSessao({

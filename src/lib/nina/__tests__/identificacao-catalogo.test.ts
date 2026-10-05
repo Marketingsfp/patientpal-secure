@@ -12,6 +12,15 @@ const anterior: ConhecimentoSessao = { versao: 1, clinicaId: "clinica", sessionI
   referencias: [{ registro: "ecg", versao: null, procedimento: "Eletrocardiograma", medicoNome: null }],
   esclarecimento: { tipo: "procedimento", pergunta: perguntaCandidatoCatalogo([opcao]), opcoes: [opcao] }, esclarecimentoTentativas: 1 };
 const contexto = (mensagem: string, a = anterior) => ({ mensagem, historico: [{ role: "assistant", content: a.esclarecimento!.pergunta }] });
+it("o fechamento condicional permite confirmar, recusar e corrigir sem confundir o não da instrução", () => {
+  const historico = [{ role: "assistant", content: apresentarPerguntaEsclarecimento(anterior.esclarecimento!.pergunta,
+    { tipo: "procedimento", tipoAtendimento: "exame_procedimento" }) }];
+  expect(historico[0]!.content).toContain("Se não for esse");
+  expect(confirmarItemDaPergunta(anterior, { mensagem: "sim", historico })).toEqual(opcao);
+  expect(confirmarItemDaPergunta(anterior, { mensagem: "não", historico })).toBeNull();
+  expect(perguntaParaCompletarIdentificacao(anterior, { mensagem: "não", historico })).toContain("escrever novamente");
+  expect(confirmarItemDaPergunta(anterior, { mensagem: "não, é hemograma", historico })).toBeNull();
+});
 for (const mensagem of ["isso", "sim", "isso mesmo", "é esse", "pode ser"])
   it(`confirma hipótese única entregue: ${mensagem}`, () => {
     expect(confirmarItemDaPergunta(anterior, contexto(mensagem))).toEqual(opcao);

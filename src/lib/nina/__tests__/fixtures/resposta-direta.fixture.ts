@@ -9,6 +9,7 @@ import { estadoVazio } from "../../fluxo-estado-normalizar";
 import { selecionarVagaValidada } from "../../agendamento-escolha";
 import { cenariosContextuais } from "./consulta-contextual-cenarios";
 import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
+import { apresentarPerguntaEsclarecimento } from "../../esclarecimento-apresentacao";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const fotoCenario = process.argv[3]?.startsWith("foto_");
@@ -251,7 +252,9 @@ const mensagensContextuais = perguntasMultiplas ? [
     transcricao: cenario === "foto_resolvida" ? "Enviei a foto de um pedido médico com: ECG." : "[Foto recebida: não foi possível ler com segurança.]",
     raw: { nina_leitura_imagem: cenario === "foto_resolvida" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" } } },
 ] : unificado ? [
-  ...(cenario.endsWith("primeiro") ? [] : [registroMensagem(perguntaEsclarecimento, 1)]),
+  ...(cenario.endsWith("primeiro") ? [] : [registroMensagem(cenario.includes("fechamento")
+    ? apresentarPerguntaEsclarecimento(perguntaEsclarecimento, { tipo: "procedimento", tipoAtendimento: "exame_procedimento" })
+    : perguntaEsclarecimento, 1)]),
   { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
 ] : linkCenario ? [
   registroMensagem("Tenho um pedido https://historico-paciente.com", 1, "in", "received"),

@@ -24,6 +24,9 @@ const CABECALHOS: Array<[RegExp, string]> = [
 
 const MINUSCULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
 
+export const FECHAMENTO_CORRECAO_EXAME =
+  "Se não for esse o exame ou procedimento que você procura, pode escrever o nome novamente, como aparece no pedido médico.";
+
 /** "ANDERSON LUIS ELOY — NEUROLOGIA" → "Anderson Luis Eloy — Neurologia". */
 export function nomeEmTitulo(texto: string): string {
   return texto
@@ -35,8 +38,17 @@ export function nomeEmTitulo(texto: string): string {
 
 export function apresentarPerguntaEsclarecimento(
   pergunta: string,
-  opcoes: { tipo?: string | null; apresentacao?: string | null } = {},
+  opcoes: { tipo?: string | null; tipoAtendimento?: string | null; apresentacao?: string | null } = {},
 ): string {
+  // Apenas apresentação: manter a pergunta original no estado permite reconhecer
+  // confirmações de mensagens antigas e não transforma o "não" condicional em recusa.
+  const candidatoUnico = opcoes.tipo === "procedimento" && opcoes.tipoAtendimento !== "consulta"
+    ? /^Você quis dizer (.+)\? Pode confirmar ou escrever o nome novamente\.$/.exec(pergunta.trim())
+    : null;
+  if (candidatoUnico) {
+    return [opcoes.apresentacao?.trim(), `Você se refere a ${candidatoUnico[1]}?`, FECHAMENTO_CORRECAO_EXAME]
+      .filter(Boolean).join("\n\n");
+  }
   const linhas = pergunta.split("\n").map((l) => l.trim()).filter(Boolean);
   if (!linhas.length) return pergunta;
   const cabecalho: string[] = [linhas[0]!];

@@ -149,6 +149,7 @@ export function perguntas(lista: readonly ConhecimentoSessao[]): string {
     .map((p) =>
       apresentarPerguntaEsclarecimento(p.esclarecimento!.pergunta, {
         tipo: p.esclarecimento!.tipo,
+        tipoAtendimento: p.consulta.tipo_atendimento,
       }),
     )
     .join("\n\n");
@@ -159,8 +160,7 @@ export function comporRespostaParcial(
   apresentacao?: string | null,
 ): string {
   const texto = textoConfirmado.trim();
-  const faltantes = lista
-    .map((p) => perguntas([p]))
+  const faltantes = [...new Set(lista.map((p) => perguntas([p])))]
     .filter((p) => !normal(texto).includes(normal(p)));
   return [!texto && apresentacao ? apresentacao : "", texto, ...faltantes]
     .filter(Boolean)
