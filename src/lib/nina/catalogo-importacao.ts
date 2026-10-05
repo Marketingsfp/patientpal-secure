@@ -1,6 +1,8 @@
-import { mapearProfissionais, mapearServicos, type EntradaOperacional } from "./fonte-operacional";
+import { horariosDoMedico, mapearProfissionais, mapearServicos, type EntradaOperacional } from "./fonte-operacional";
 import { prepararSincronizacao, type RegistroSincronizacao, type TipoSincronizacao } from "./catalogo-sincronizacao";
 import { lerEstrutura } from "./catalogo-estrutura";
+import { dadosDoServico, type DadosServicoOrigem } from "./catalogo-importacao-servicos";
+import type { Executante } from "./catalogo";
 
 export type OrigemImportacao = {
   tipo: TipoSincronizacao;
@@ -9,11 +11,14 @@ export type OrigemImportacao = {
 };
 export type CadastroImportacao = Omit<EntradaOperacional, "medicos" | "procedimentos"> & {
   medicos: (EntradaOperacional["medicos"][number] & { ativo: boolean })[];
-  procedimentos: (EntradaOperacional["procedimentos"][number] & {
+  procedimentos: (EntradaOperacional["procedimentos"][number] & DadosServicoOrigem & {
     ativo: boolean; observacoes?: string | null; grupo?: string | null;
     exige_autorizacao?: boolean; exige_termo?: boolean;
   })[];
   especialidadesMedicos: { medico_id: string; especialidade_id: string }[];
+  convenios?: { id: string; nome: string; ativo: boolean }[];
+  valoresConvenios?: { procedimento_id: string; convenio_id: string; valor_dinheiro: unknown; valor_outros: unknown }[];
+  especialidadesProcedimentos?: { procedimento_id: string; especialidade_id: string }[];
 };
 
 /** Adapta todos os cadastros; filtros de oferta ao paciente viram estado editorial. */
@@ -50,13 +55,23 @@ export function adaptarCadastroCompleto(e: CadastroImportacao): OrigemImportacao
     medicos: medicos.filter(m => m.ativo && m.visivel_agendamento_online !== false),
   }).map(s => {
     const p = e.procedimentos.find(x => x.id === s.id)!;
-    const restricoes = [p.exige_autorizacao === true ? "Exige autorização." : null,
-      p.exige_termo === true ? "Exige termo." : null].filter(Boolean).join("\n") || null;
+    const convenios = (e.valoresConvenios ?? []).filter(v => v.procedimento_id === p.id).flatMap(v => {
+      const c = e.convenios?.find(c => c.id === v.convenio_id && c.ativo);
+      return c ? [{ ...v, nome: c.nome }] : [];
+    });
+    const especialidades = (e.especialidadesProcedimentos ?? []).filter(v => v.procedimento_id === p.id).map(v => {
+      const esp = especiais.get(v.especialidade_id);
+      if (!esp) throw Error(`Especialidade não localizada para ${p.nome}.`);
+      return esp.nome;
+    });
+    const { categoria, ...dados } = dadosDoServico(p, convenios, especialidades);
     return {
       tipo: "servico" as const, somenteRascunho: !p.ativo,
-      fonte: { ...s, restricoes,
-        descricao_publica: [s.descricao_publica, p.observacoes].filter(Boolean).join("\n\n") || null,
-        estrutura: { ...lerEstrutura(s.estrutura), grupo: p.grupo ?? null,
+      fonte: { ...s, ...dados,
+        executantes: [...s.executantes as Executante[]].sort((a, b) => String(a.medico_id).localeCompare(String(b.medico_id))).map(x => ({ ...x, horarios: x.horarios === "não informado no cadastro" ? null : x.horarios,
+          observacao: horariosDoMedico(x.medico_id!, entrada).filter(h => h.observacao).map(h =>
+            `${h.dia}${h.inicio ? ` ${h.inicio}` : ""}${h.fim ? `–${h.fim}` : ""}: ${h.observacao}`).join("\n") || null })),
+        estrutura: { ...lerEstrutura(s.estrutura), categoria, grupo: p.grupo ?? null,
           origem_clinica_os: metadados("procedimento", p.id, p.ativo) } },
     };
   });

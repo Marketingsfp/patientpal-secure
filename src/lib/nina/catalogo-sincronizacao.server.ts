@@ -16,6 +16,7 @@ type Contexto = { supabase: any; userId: string };
 type Dependencias = {
   lerFonte: (
     clinicaId: string,
+    tipo?: TipoSincronizacao,
   ) => Promise<{ servicos: RegistroSincronizacao[]; profissionais: RegistroSincronizacao[] }>;
   perguntar: (estado: unknown, perguntas: Record<string, PerguntaJev>) => Promise<ResultadoJev>;
 };
@@ -56,7 +57,7 @@ export function sincronizacaoManual(contexto: Contexto, deps: Dependencias) {
     return data;
   }
   async function fontes(clinicaId: string, tipo: TipoSincronizacao) {
-    const f = await deps.lerFonte(clinicaId);
+    const f = await deps.lerFonte(clinicaId, tipo);
     return tipo === "servico" ? f.servicos : f.profissionais;
   }
   async function montar(clinicaId: string, tipo: TipoSincronizacao, id: string, fonteId: string) {

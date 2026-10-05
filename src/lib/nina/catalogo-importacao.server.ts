@@ -16,10 +16,10 @@ export async function lerPaginasCatalogo<T>(consulta: () => any): Promise<T[]> {
 
 /** Apenas dados administrativos do atendimento; nunca dados pessoais/financeiros do médico. */
 export async function lerCadastroCompleto(db: any, clinicaId: string): Promise<OrigemImportacao[]> {
-  const [medicos, procedimentos, disponibilidades, agendas, vinculos, especialidades, especialidadesMedicos] = await Promise.all([
+  const [medicos, procedimentos, disponibilidades, agendas, vinculos, especialidades, especialidadesMedicos, convenios, valoresConvenios, especialidadesProcedimentos] = await Promise.all([
     lerPaginasCatalogo<any>(() => db.from("medicos").select("id, nome, ativo, especialidade_id, visivel_agendamento_online")
       .eq("clinica_id", clinicaId).order("id")),
-    lerPaginasCatalogo<any>(() => db.from("procedimentos").select("id, nome, ativo, tipo, valor_padrao, valor_dinheiro_pix, valor_dinheiro, valor_cartao, preparo, observacoes, grupo, exige_autorizacao, exige_termo")
+    lerPaginasCatalogo<any>(() => db.from("procedimentos").select("id, nome, ativo, tipo, valor_padrao, valor_dinheiro_pix, valor_dinheiro, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, valor_cartao_consulta, valor_cartao_desconto, valor_variavel, preparo, observacoes, grupo, exige_preparo, exige_autorizacao, exige_termo, duracao_minutos, sessoes_incluidas, ciclo_dias, requer_laudo")
       .eq("clinica_id", clinicaId).order("id")),
     lerPaginasCatalogo<any>(() => db.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, vigencia_inicio, vigencia_fim")
       .eq("clinica_id", clinicaId).eq("ativo", true).order("id")),
@@ -30,8 +30,13 @@ export async function lerCadastroCompleto(db: any, clinicaId: string): Promise<O
     lerPaginasCatalogo<any>(() => db.from("especialidades").select("id, nome").order("id")),
     lerPaginasCatalogo<any>(() => db.from("medico_especialidades").select("medico_id, especialidade_id, medicos!inner(clinica_id)")
       .eq("medicos.clinica_id", clinicaId).order("medico_id").order("especialidade_id")),
+    lerPaginasCatalogo<any>(() => db.from("cb_convenios").select("id, nome, ativo").eq("clinica_id", clinicaId).order("id")),
+    lerPaginasCatalogo<any>(() => db.from("procedimento_cb_convenio_valores").select("procedimento_id, convenio_id, valor_dinheiro, valor_outros")
+      .eq("clinica_id", clinicaId).order("id")),
+    lerPaginasCatalogo<any>(() => db.from("procedimento_especialidades").select("procedimento_id, especialidade_id, procedimentos!inner(clinica_id)")
+      .eq("procedimentos.clinica_id", clinicaId).order("procedimento_id").order("especialidade_id")),
   ]);
-  return adaptarCadastroCompleto({ medicos, procedimentos, disponibilidades, agendas, vinculos, especialidades, especialidadesMedicos, hojeISO: hojeBR() });
+  return adaptarCadastroCompleto({ medicos, procedimentos, disponibilidades, agendas, vinculos, especialidades, especialidadesMedicos, convenios, valoresConvenios, especialidadesProcedimentos, hojeISO: hojeBR() });
 }
 const tabelas = { profissional: "nina_cat_profissionais", servico: "nina_cat_servicos" };
 const assinar = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");

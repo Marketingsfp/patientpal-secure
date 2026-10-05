@@ -112,6 +112,23 @@ describe("adaptação completa do Clínica OS", () => {
     expect(planejarImportacao(repetidas, { profissional: [atual], servico: [] }).map(i => i.acao)).toEqual(["revisar", "revisar"]);
     expect(planejarImportacao(fontes, { profissional: [atual, { ...atual, id: id(1001) }], servico: [] })[0]!.acao).toBe("revisar");
   });
+  test("exame conserva convênios ativos, especialidades e condições dos horários", () => {
+    const c = cadastro();
+    c.procedimentos[1]!.valor_pix = 85;
+    c.convenios = [{ id: id(401), nome: "Convênio A", ativo: true }, { id: id(402), nome: "Inativo", ativo: false }];
+    c.valoresConvenios = [
+      { procedimento_id: id(102), convenio_id: id(401), valor_dinheiro: 70, valor_outros: 75 },
+      { procedimento_id: id(102), convenio_id: id(402), valor_dinheiro: 60, valor_outros: 65 },
+    ];
+    c.especialidadesProcedimentos = [{ procedimento_id: id(102), especialidade_id: id(201) }];
+    c.disponibilidades[0]!.observacoes = "Somente adultos";
+    const s = adaptarCadastroCompleto(c).find(o => o.fonte.id === id(102))!.fonte;
+    expect(s.formas_pagamento).toHaveLength(3);
+    expect(s.formas_pagamento).toContainEqual({ forma: "Pix", valor: 85, condicao: null, observacao: null });
+    expect(s.formas_pagamento.some((f: any) => f.condicao === "Inativo")).toBe(false);
+    expect(s.descricao_publica).toContain("Especialidades cadastradas: Cardiologia.");
+    expect(s.executantes[0].observacao).toBe("Sábado 08:00–12:00: Somente adultos");
+  });
 });
 describe("sincronização completa autenticada", () => {
   test("66 registros viram 82 médicos sem duplicar nomes; repetição não grava novamente", async () => {
@@ -201,5 +218,9 @@ describe("sincronização completa autenticada", () => {
     for (const tabela of ["medicos", "procedimentos"]) expect(leituras.find(l => l.tabela === tabela).filtros).toEqual({ clinica_id: CLINICA });
     expect(leituras.find(l => l.tabela === "medicos").campos).not.toMatch(/cpf|banco|email|telefone|repasse|face|pix/);
     for (const tabela of ["medico_procedimentos", "medico_especialidades"]) expect(leituras.find(l => l.tabela === tabela).filtros).toEqual({ "medicos.clinica_id": CLINICA });
+    for (const tabela of ["cb_convenios", "procedimento_cb_convenio_valores"]) expect(leituras.find(l => l.tabela === tabela).filtros).toEqual({ clinica_id: CLINICA });
+    expect(leituras.find(l => l.tabela === "procedimento_especialidades").filtros).toEqual({ "procedimentos.clinica_id": CLINICA });
+    expect(leituras.find(l => l.tabela === "procedimentos").campos).toContain("valor_pix");
+    expect(leituras.find(l => l.tabela === "procedimentos").campos).toContain("valor_variavel");
   });
 });

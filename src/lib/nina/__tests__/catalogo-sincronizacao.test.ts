@@ -89,7 +89,9 @@ function ambiente() {
   const api = sincronizacaoManual(
     { supabase: sb, userId: "operador" },
     {
-      lerFonte: async () => {
+      lerFonte: async (clinicaId, tipo) => {
+        expect(clinicaId).toBe(CLINICA);
+        expect(tipo).toBe("servico");
         leiturasFonte++;
         if (revogarNaLeitura) role = "telefonia";
         if (erroFonte) throw Error("Fonte indisponível");

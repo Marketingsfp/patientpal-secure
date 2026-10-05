@@ -29,7 +29,15 @@ async function servico(contexto: { supabase: any; userId: string }) {
       import("./jev.server"),
     ]);
   return sincronizacaoManual(contexto, {
-    lerFonte: lerFonteParaSincronizacao,
+    lerFonte: async (clinicaId, tipo) => {
+      if (tipo !== "servico") return lerFonteParaSincronizacao(clinicaId);
+      const { lerCadastroCompleto } = await import("./catalogo-importacao.server");
+      // Mesma adaptação da importação completa, para não perder preços e detalhes
+      // na próxima sincronização individual. A seleção continua apenas de ativos.
+      const origens = await lerCadastroCompleto(contexto.supabase, clinicaId);
+      return { profissionais: [], servicos: origens
+        .filter(o => o.tipo === "servico" && !o.somenteRascunho).map(o => o.fonte) };
+    },
     perguntar: perguntarJev,
   });
 }
