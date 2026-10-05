@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { filtrosOrNomeServico } from "@/lib/busca-servico";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -1149,13 +1150,6 @@ function NovoOrcamentoDialog({
     }
     setSearchingProc(true);
     const t = setTimeout(async () => {
-      const norm = procQuery
-        .trim()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
-      const safeQ = sanitizePostgrestSearch(procQuery);
-      const safeNorm = sanitizePostgrestSearch(norm);
       let q = supabase
         .from("procedimentos")
         .select(
@@ -1163,18 +1157,14 @@ function NovoOrcamentoDialog({
         )
         .eq("clinica_id", clinicaId)
         .eq("ativo", true);
-      if (safeQ.length > 0 || safeNorm.length > 0) {
-        const parts: string[] = [];
-        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
-        if (safeNorm.length > 0 && safeNorm !== safeQ) parts.push(`nome.ilike.%${safeNorm}%`);
-        q = q.or(parts.join(","));
-      }
+      // Palavra por palavra, com as abreviações do cadastro (RM, USG, TC…).
+      for (const filtro of filtrosOrNomeServico(procQuery)) q = q.or(filtro);
       if (categoria === "laboratorio") {
         q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
       } else if (categoria === "demais") {
         q = q.not("tipo_procedimento", "eq", "laboratorio").not("grupo", "ilike", "%labor%");
       }
-      const { data } = await q.limit(20);
+      const { data } = await q.order("nome").limit(20);
       if (!cancel) {
         setProcResults((data ?? []) as Procedimento[]);
         setSearchingProc(false);
