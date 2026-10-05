@@ -512,6 +512,12 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
       return r;
     }
     if (nome !== "consultar_cadastro") throw new Error(`Ferramenta inesperada: ${nome}`);
+    if (cenario.startsWith("catalogo_sem_escala")) return {
+      ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "catalogo_publicado", success: true,
+      reused: false, appointment_confirmed: false, dados: { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "consulta",
+        records: [{ id: "paulo", tipo: "profissional", procedimento: "Consulta Angiologia", medico: "Paulo Guilherme Nader Damasceno",
+          dia: null, horario: null, extras: { catalogo_tipo: "profissional", horarios: [] } }] },
+    };
     if (interpretacao || escolhaMedico || fonteCenario) {
       const { searchKnowledgeBase } = await import("../../knowledge.server");
       const parametros = argumentosFerramentas.at(-1)!.args;
@@ -645,6 +651,14 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
         arguments: JSON.stringify({ motivo: "Profissional SFP exige atendimento humano para o procedimento de Anestesia da Videohisteroscopia", resumo: "Paciente pediu informações sobre a anestesia.", avisar_paciente: false }),
       } },
       { id: "nao-agendar-sfp", type: "function", function: { name: "agendar", arguments: "{}" } },
+    ],
+  };
+  if (cenario.startsWith("catalogo_sem_escala")) return {
+    ok: true, conteudo: "Vou consultar a agenda dele e oferecer outro médico.", modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low",
+    toolCalls: [
+      { id: "catalogo", type: "function", function: { name: "consultar_cadastro", arguments: '{"termo":"angiologia","medico":"Paulo Guilherme","tipo_atendimento":"consulta"}' } },
+      { id: "nao-consultar-sem-escala", type: "function", function: { name: "consultar_disponibilidade", arguments: "{}" } },
+      { id: "nao-agendar-sem-escala", type: "function", function: { name: "agendar", arguments: "{}" } },
     ],
   };
   if (cenario === "catalogo_sfp_modelo") return {

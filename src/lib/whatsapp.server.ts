@@ -2177,6 +2177,11 @@ async function gerarRespostaNinaInterno(
       )
     )
       await encaminharRegraCatalogo(nome, undefined, evidenciaRegraHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)));
+    else {
+      const { motivoSemHorariosHabituais } = await import("@/lib/nina/horarios-habituais");
+      const motivo = motivoSemHorariosHabituais(r, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro));
+      if (motivo) await encaminharRegraCatalogo(nome, undefined, undefined, motivo);
+    }
     return {
       ...(esclarecimentoAtual ? {
         ok: true, precisa_esclarecer: true, consulta: parametros, esclarecimento: esclarecimentoAtual,
