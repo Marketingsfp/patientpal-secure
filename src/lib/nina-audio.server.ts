@@ -10,6 +10,7 @@
  * quem chama cai para texto.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { deveResponderEmAudio } from "./nina/audio";
 
 /** Flag por clínica que DESLIGA a resposta em áudio (padrão: ligada). */
 export const FLAG_NINA_AUDIO_DESATIVADO = "nina_resposta_audio_desativada";
@@ -92,6 +93,7 @@ export async function sintetizarFala(
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
         method: "POST",
+        signal: AbortSignal.timeout(20_000),
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: MODELO_TTS,
@@ -110,11 +112,57 @@ export async function sintetizarFala(
         continue;
       }
       const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.length === 0) continue;
-      return { bytes, mime: t.mime, ext: t.ext };
+      if (bytes.length === 0 || bytes.length > 16 * 1024 * 1024) continue;
+      const tipo = (res.headers.get("content-type") ?? "").split(";")[0]!.trim();
+      const { tipoMimeAceito, extensaoDoMime } = await import("./whatsapp-midia-armazenamento");
+      const mime = tipo === "application/octet-stream" ? t.mime : tipoMimeAceito("audio", tipo);
+      if (!mime) continue;
+      return { bytes, mime, ext: extensaoDoMime(mime) };
     } catch (e) {
       console.error("nina audio tts exception", t.format, e);
     }
   }
   return null;
+}
+
+/** Mesmo critério e mesma fala nos dois transportes; só o envio é diferente. */
+export async function prepararAudioResposta(clinicaId: string, resposta: string,
+  entrada: { recebeuAudio: boolean; mensagem: string }) {
+  if (!resposta.trim() || !deveResponderEmAudio(entrada) || await respostaAudioDesativada(clinicaId)) return null;
+  const longa = resposta.length > LIMITE_FALA_CURTA || pareceLista(resposta);
+  const texto = longa ? resumoFalado(resposta) : prepararParaFala(resposta);
+  const audio = await sintetizarFala(texto);
+  return audio ? { ...audio, texto, longa } : null;
+}
+
+/** Homologação também guarda o arquivo para reprodução após recarregar a conversa. */
+export async function guardarAudioMensagem(clinicaId: string, mensagemId: string,
+  audio: { bytes: Uint8Array; mime: string }) {
+  const { caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } = await import("./whatsapp-midia-armazenamento");
+  const caminho = caminhoDaMidia({ clinicaId, waMessageId: mensagemId, mime: audio.mime });
+  const { error } = await supabaseAdmin.storage.from(BUCKET_MIDIA_WHATSAPP)
+    .upload(caminho, audio.bytes, { contentType: audio.mime, upsert: true });
+  if (error) throw new Error("Não foi possível guardar o áudio da mensagem");
+  const { error: erroVinculo } = await supabaseAdmin.from("whatsapp_mensagens")
+    .update({ media_url: caminho, media_mime: audio.mime }).eq("id", mensagemId).eq("clinica_id", clinicaId);
+  if (erroVinculo) throw new Error("Não foi possível vincular o áudio à mensagem");
+}
+
+export type AuditoriaAudio = {
+  textoFinalHash?: string | null;
+  decisaoId?: string | null;
+  avaliarRepresentacao?: (texto: string, representacao: "audio_integral" | "audio_resumo") =>
+    Promise<{ decisaoId: string | null; textoHash: string | null } | null>;
+};
+
+/** A nota acompanha a fala efetiva, nunca é copiada de um texto diferente. */
+export async function avaliarFala(audio: { texto: string; longa: boolean }, auditoria: AuditoriaAudio) {
+  const { hashDoTexto } = await import("./nina/confidence/hash");
+  const { falaPrecisaDeAvaliacaoPropria } = await import("./nina/confidence/identidade-saida");
+  const representacao = audio.longa ? "audio_resumo" as const : "audio_integral" as const;
+  const textoHash = hashDoTexto(audio.texto);
+  const precisa = falaPrecisaDeAvaliacaoPropria({ textoAvaliadoHash: auditoria.textoFinalHash, conteudoFalado: audio.texto }).precisa;
+  const decisaoId = precisa ? (await auditoria.avaliarRepresentacao?.(audio.texto, representacao))?.decisaoId ?? null
+    : auditoria.decisaoId ?? null;
+  return { decisaoId, textoHash, representacao };
 }

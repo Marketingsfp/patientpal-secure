@@ -5,12 +5,14 @@ import { ImagemMensagemAmpliada } from "./ImagemMensagemAmpliada";
 import { urlMidiaMensagem } from "@/lib/atendimento/midia-mensagem.functions";
 import { ehCaminhoGuardado } from "@/lib/whatsapp-midia-armazenamento";
 import { protegerMensagemRecebida } from "@/lib/atendimento/links-entrada";
+import { AudioMensagem } from "./AudioMensagem";
 
 type MensagemComMidia = {
   id: string;
   tipo?: string | null;
   direction?: string | null;
   body?: string | null;
+  transcricao?: string | null;
   media_url?: string | null;
 };
 
@@ -23,6 +25,7 @@ export function temMidiaVisivel(m: MensagemComMidia): boolean {
 
 /** Texto da bolha: com a imagem à mostra, o "📷 Imagem" padrão some; a legenda e a transcrição ficam. */
 export function textoDaBolha(m: MensagemComMidia): string {
+  if (m.tipo === "audio") return ""; // A transcrição pertence ao player expansível.
   const corpo = String(protegerMensagemRecebida(m).body ?? "");
   if (m.tipo === "image" && temMidiaVisivel(m) && corpo === TEXTO_PADRAO_IMAGEM) return "";
   return corpo || `[${m.tipo}]`;
@@ -90,6 +93,10 @@ export function MidiaMensagem({ clinicaId, mensagem }: { clinicaId: string; mens
   const { ref, visivel } = useNaTela();
   const { url, estado } = useLinkDaMidia(clinicaId, mensagem.id, visivel && temMidiaVisivel(mensagem));
   const [ampliada, setAmpliada] = useState(false);
+  if (mensagem.tipo === "audio") return <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo="audio">
+    <AudioMensagem mensagem={mensagem} url={temMidiaVisivel(mensagem) ? url : null}
+      carregando={temMidiaVisivel(mensagem) && estado === "carregando"} />
+  </div>;
   if (!temMidiaVisivel(mensagem)) return null;
   const ehImagem = mensagem.tipo === "image";
 

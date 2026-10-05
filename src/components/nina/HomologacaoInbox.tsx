@@ -11,6 +11,7 @@
  * resposta → conversa de homologação. Nunca → WhatsApp real.
  */
 
+import { MidiaMensagem, textoDaBolha } from "./MidiaMensagem";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -152,6 +153,8 @@ type Msg = {
   status?: string | null;
   tipo?: string | null;
   transcricao?: string | null;
+  media_url?: string | null;
+  media_mime?: string | null;
   created_at: string;
   execucao_id?: string | null;
   /** Identidade idempotente do envio — usada para reconciliar a bolha. */
@@ -243,7 +246,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const [ultimoTexto, setUltimoTexto] = useState("");
 
   const [tipo, setTipo] = useState<TipoMensagem>("text");
-  const [audio, setAudio] = useState<string | null>(null);
   const [limparAgenda, setLimparAgenda] = useState(true);
   const [ferramentas, setFerramentas] = useState<EventoFerramenta[]>([]);
   const [debugEstado, setDebugEstado] = useState<Record<string, unknown> | null>(null);
@@ -677,7 +679,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       setMsgs([]);
       setEventosConversa([]);
       setConversaId(null);
-      setAudio(null);
       return;
     }
     const selecao = `${clinicaId}:${leadId}`;
@@ -687,7 +688,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       setMsgs([]);
       setEventosConversa([]);
       setConversaId(null);
-      setAudio(null);
       setErro(null);
       setEncerrado(null);
       marcadoRef.current = "";
@@ -760,6 +760,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const dispararMensagem = async (
     conteudo: string,
     tipoForcado?: TipoMensagem,
+    audioArquivo?: { base64: string; mime: "audio/ogg" | "audio/mpeg" | "audio/mp4" | "audio/aac" | "audio/amr" | "audio/wav" },
   ): Promise<{ ok: boolean; transferida: boolean; erro: string | null }> => {
     const leadOrigem = leadId;
     const conversaOrigem = conversaId;
@@ -791,6 +792,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       conversa_id: conversaOrigem,
       direction: "in",
       body: corpo,
+      tipo: tipoEnvio,
       enviada_por: "paciente",
       created_at: new Date().toISOString(),
       wa_message_id: waIdDoEnvio(leadOrigem, chave),
@@ -825,7 +827,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         mensagemPersistida?: boolean;
         recuperavel?: boolean;
       };
-      const entrada = { data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave } };
+      const entrada = { data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave, audioArquivo } };
       const r = await enviarComRetomadaRecuperavel(
         async () => (await enviar(entrada)) as ResultadoEnvio, meuLead,
       );
@@ -847,7 +849,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         r.processamento === "AGRUPADA" ||
         r.processamento === "OBSOLETA";
       if (meuLead()) {
-        setAudio(r.audio ? `data:${r.audio.mime};base64,${r.audio.base64}` : null);
         // Conciliação eventual (ferramentas, eventos, execuções): a timeline
         // em si já foi atualizada pelo Realtime, sem esperar esta chamada.
         void carregarHistorico(leadOrigem);
@@ -1037,7 +1038,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       setConversaId(null);
       setErro(null);
       setEncerrado(null);
-      setAudio(null);
       setFerramentas([]);
       // Nova sessão: leitura e idempotência recomeçam; o histórico anterior
       // continua disponível no console.
@@ -1500,10 +1500,11 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                             : "rounded-bl-sm border border-atd-border bg-atd-surface text-atd-ink"
                         }`}
                       >
-                        <NinaMessage
-                          content={m.body || "[mídia]"}
+                        {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
+                        {textoDaBolha(m) && <NinaMessage
+                          content={textoDaBolha(m)}
                           variant={daNina ? "assistant" : "user"}
-                        />
+                        />}
                         <div
                           className={`mt-1 flex items-center justify-between gap-2 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
@@ -1569,15 +1570,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                 >
                   Tentar novamente
                 </Button>
-              </div>
-            )}
-
-            {audio && (
-              <div className="space-y-1 border-t p-2">
-                <p className="text-xs text-muted-foreground">
-                  Resposta em áudio da Nina (mesma voz usada no WhatsApp)
-                </p>
-                <audio controls src={audio} className="w-full" />
               </div>
             )}
 
@@ -1883,6 +1875,30 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                     <SelectItem value="sticker">Figurinha</SelectItem>
                   </SelectContent>
                 </Select>
+                <label className="flex min-h-9 shrink-0 items-center rounded-md border border-atd-border px-2 text-xs cursor-pointer focus-within:ring-2" title="Enviar arquivo de áudio como paciente de teste">
+                  Enviar áudio
+                  <input type="file" className="sr-only" aria-label="Enviar arquivo de áudio"
+                    accept="audio/ogg,audio/mpeg,audio/mp4,audio/aac,audio/amr,audio/wav,.ogg,.mp3,.m4a,.wav,.aac,.amr"
+                    disabled={composerBloqueado || processando}
+                    onChange={async e => {
+                      const arquivo = e.currentTarget.files?.[0];
+                      e.currentTarget.value = "";
+                      if (!arquivo) return;
+                      if (arquivo.size > 16 * 1024 * 1024) { toast.error("O áudio deve ter até 16 MB."); return; }
+                      const extensoes: Record<string, string> = { ogg: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", aac: "audio/aac", amr: "audio/amr" };
+                      const mime = extensoes[arquivo.name.split(".").at(-1)?.toLowerCase() ?? ""];
+                      if (!mime) { toast.error("Use áudio OGG, MP3, M4A, WAV, AAC ou AMR."); return; }
+                      try {
+                        const base64 = await new Promise<string>((resolve, reject) => {
+                          const leitor = new FileReader();
+                          leitor.onload = () => resolve(String(leitor.result).split(",")[1] ?? "");
+                          leitor.onerror = reject;
+                          leitor.readAsDataURL(arquivo);
+                        });
+                        await dispararMensagem("", "audio", { base64, mime: mime as NonNullable<Parameters<typeof dispararMensagem>[2]>["mime"] });
+                      } catch { toast.error("Não foi possível enviar o áudio."); }
+                    }} />
+                </label>
                 <Textarea
                   ref={composerRef}
                   rows={1}

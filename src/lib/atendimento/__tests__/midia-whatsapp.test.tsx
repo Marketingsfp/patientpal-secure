@@ -223,7 +223,7 @@ describe("bolha do chat", () => {
     expect(textoDaBolha(img)).toBe("");
     expect(textoDaBolha({ ...img, body: "📷 quanto custa?" })).toBe("📷 quanto custa?");
     const audio = { id: "m2", tipo: "audio", body: "🎤 bom dia", media_url: `${CLINICA}/2026-09/a.ogg` };
-    expect(textoDaBolha(audio)).toBe("🎤 bom dia");
+    expect(textoDaBolha(audio)).toBe(""); // transcrição agora fica no player expansível
   });
 
   it("mensagem antiga (sem arquivo) continua como era", () => {

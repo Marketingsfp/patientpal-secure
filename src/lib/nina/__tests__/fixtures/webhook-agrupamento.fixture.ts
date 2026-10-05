@@ -1,3 +1,4 @@
+import { deveResponderEmAudio } from "../../audio";
 /** POST real, persistência e agrupador reais; dependências externas isoladas no subprocesso. */
 import { mock } from "bun:test";
 import { createHmac } from "node:crypto";
@@ -215,7 +216,7 @@ mock.module("@/lib/nina/burst.server", () => ({
       lerMensagens: async (ids) =>
         db
           .whatsapp_mensagens!.filter((m) => ids.includes(m.id))
-          .map((m) => ({ id: m.id, texto: m.body })),
+          .map((m) => ({ id: m.id, texto: m.body, tipo: m.tipo })),
       lerRevisao: async () => revisao,
       iniciar: async () => true,
       concluir: async (id) => {
@@ -275,6 +276,15 @@ mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
   },
 }));
 mock.module("@/lib/nina-audio.server", () => ({
+  guardarAudioMensagem: async () => {},
+  avaliarFala: async () => ({ decisaoId: null, textoHash: "hash-audio", representacao: "audio_integral" }),
+  prepararAudioResposta: async (_clinica: string, texto: string, entrada: { recebeuAudio: boolean; mensagem: string }) => {
+    if (!deveResponderEmAudio(entrada)) return null;
+    tts++;
+    if (cenario === "audio-falha") return null;
+    if (cenario === "reserva-perdida-tts") reservaPerdidaDepois = true;
+    return { bytes: new Uint8Array([1, 2]), mime: "audio/ogg", ext: "ogg", texto, longa: false };
+  },
   respostaAudioDesativada: async () => false,
   prepararParaFala: (s: string) => s,
   pareceLista: () => false,
@@ -307,11 +317,11 @@ const corpo = JSON.stringify({
               {
                 id: "wa-entrada",
                 from: "5511999991111",
-                type: ["reserva-perdida-tts", "reserva-perdida-upload"].includes(cenario)
+                type: ["reserva-perdida-tts", "reserva-perdida-upload", "audio-recebido"].includes(cenario)
                   ? "audio"
                   : "text",
                 audio: { id: "audio-entrada" },
-                text: { body: paridade ? "Vocês tem cardiologista?" : "Bom dia" },
+                text: { body: cenario === "audio-pedido" || cenario === "audio-falha" ? "Me responda em áudio" : paridade ? "Vocês tem cardiologista?" : "Bom dia" },
               },
             ],
           },

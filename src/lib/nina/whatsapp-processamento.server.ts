@@ -83,6 +83,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
     const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } =
       await import("@/lib/whatsapp-midia.server");
     let reply = "";
+    let recebeuAudioNoTurno = ehAudio;
+    let mensagemDoTurno = textoPaciente;
     // FASE 5 — contrato do resultado deste turno. Todo texto
     // passa pela finalização antes de ser avaliado e enviado.
     const { criarResultado } = await import("@/lib/nina/resposta/contrato");
@@ -140,6 +142,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         });
         return { agrupada: true };
       }
+      recebeuAudioNoTurno = turno.recebeuAudio ?? ehAudio;
+      mensagemDoTurno = turno.texto;
       loteId = turno.batchId;
       lockTurno = turno.lock;
       revisaoTurno = turno.revisao;
@@ -304,21 +308,13 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       // clínica não desligou). Qualquer falha cai para texto.
       let audioEnviado = false;
       let precisaTextoCompleto = true;
-      if (ehAudio && cfg.access_token) {
+      if (cfg.access_token) {
         try {
-          const {
-            respostaAudioDesativada,
-            prepararParaFala,
-            pareceLista,
-            resumoFalado,
-            sintetizarFala,
-            LIMITE_FALA_CURTA,
-          } = await import("@/lib/nina-audio.server");
-          if (!(await respostaAudioDesativada(params.clinicaId))) {
-            const longa = reply.length > LIMITE_FALA_CURTA || pareceLista(reply);
-            const falado = longa ? resumoFalado(reply) : prepararParaFala(reply);
-            const audio = await sintetizarFala(falado);
-            if (audio) {
+          const { prepararAudioResposta } = await import("@/lib/nina-audio.server");
+          const audio = await prepararAudioResposta(params.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: mensagemDoTurno });
+          if (audio) {
+            const { longa, texto: falado } = audio;
+            {
               const { metaUploadMedia, metaSendAudio } = await import("@/lib/whatsapp.server");
               await conferirReservaTurno();
               const mediaId = await metaUploadMedia(
@@ -331,25 +327,9 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               // O áudio é OUTRA representação: quando é resumo
               // falado, o conteúdo difere do texto avaliado e
               // recebe o seu próprio registro.
-              const representacaoAudio = longa
-                ? ("audio_resumo" as const)
-                : ("audio_integral" as const);
               const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
-              const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
-              const hashFalado = hashDoTexto(falado);
-              // Conteúdo falado diferente do texto avaliado =>
-              // avaliação PRÓPRIA. Sem ela, o áudio fica sem
-              // nota; nunca herda a nota do texto completo.
-              const { falaPrecisaDeAvaliacaoPropria } =
-                await import("@/lib/nina/confidence/identidade-saida");
-              const precisa = falaPrecisaDeAvaliacaoPropria({
-                textoAvaliadoHash: auditoriaNina.textoFinalHash,
-                conteudoFalado: falado,
-              }).precisa;
-              const decisaoAudio = precisa
-                ? ((await auditoriaNina.avaliarRepresentacao?.(falado, representacaoAudio)) ?? null)
-                : { decisaoId: auditoriaNina.decisaoId ?? null, textoHash: hashFalado };
-              const decisaoIdAudio = decisaoAudio?.decisaoId ?? null;
+              const { avaliarFala } = await import("@/lib/nina-audio.server");
+              const { decisaoId: decisaoIdAudio, textoHash: hashFalado, representacao: representacaoAudio } = await avaliarFala(audio, auditoriaNina);
               await registrarEntregaSaida({
                 clinicaId: params.clinicaId,
                 decisaoId: decisaoIdAudio,

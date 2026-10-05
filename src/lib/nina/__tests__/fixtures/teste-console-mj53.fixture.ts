@@ -1,3 +1,4 @@
+import { deveResponderEmAudio } from "../../audio";
 /**
  * Executa o console REAL em um subprocesso isolado. Somente banco, modelo,
  * transporte, áudio e serviços externos são simulados; não copia a lógica de
@@ -51,6 +52,8 @@ const bd: Record<string, Linha[]> = {
 };
 let sequencia = 0;
 let chamadasRede = 0;
+let transcricoes = 0;
+const arquivos: string[] = [];
 let chamadasModelo = 0;
 let chamadasFinalizacao = 0;
 let chamadasAudio = 0;
@@ -83,12 +86,15 @@ function consulta(tabela: string) {
   let atualizacao: Linha | null = null;
   let singular = false;
   let executada = false;
-  let retorno: { data: Linha | Linha[] | null; error: null; count: number };
+  let retorno: { data: Linha | Linha[] | null; error: { code: string; message: string } | null; count: number };
   const executar = () => {
     if (executada) return retorno;
     executada = true;
     let linhas: Linha[];
     if (insercao) {
+      if (tabela === "whatsapp_mensagens" && bd[tabela].some(m => m.clinica_id === insercao!.clinica_id && m.wa_message_id === insercao!.wa_message_id)) {
+        retorno = { data: null, error: { code: "23505", message: "duplicate key" }, count: 0 }; return retorno;
+      }
       const nova = { id: `mensagem-${++sequencia}`, ...insercao };
       bd[tabela].push(nova);
       linhas = [nova];
@@ -128,6 +134,7 @@ function consulta(tabela: string) {
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: consulta,
+    storage: { from: () => ({ upload: async (caminho: string) => { arquivos.push(caminho); return { error: null }; } }) },
     rpc: (nome: string) => {
       if (nome === "nina_revisao_registrar_entrada")
         return Promise.resolve({ data: 1, error: null });
@@ -145,6 +152,7 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
   ninaPodeResponder: () => !transferidaSfp,
 }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
+  transcreverAudioBase64: async () => { transcricoes++; return { texto: "Quero cardiologista. https://exemplo.com", erro: null }; },
   RESPOSTA_AUDIO_FALHOU: "Não consegui ouvir esse áudio.",
   respostaMidiaNaoSuportada: () => "Envie uma mensagem de texto.",
 }));
@@ -229,6 +237,15 @@ mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
   },
 }));
 mock.module("@/lib/nina-audio.server", () => ({
+  guardarAudioMensagem: async () => {},
+  avaliarFala: async () => ({ decisaoId: null, textoHash: "hash-audio", representacao: "audio_integral" }),
+  prepararAudioResposta: async (_clinica: string, texto: string, entrada: { recebeuAudio: boolean; mensagem: string }) => {
+    if (!deveResponderEmAudio(entrada)) return null;
+    chamadasAudio++;
+    if (cenario === "audio-falha") return null;
+    if (cenario === "reserva-perdida-tts") reservaPerdidaDepois = true;
+    return { bytes: new Uint8Array([1, 2]), mime: "audio/ogg", ext: "ogg", texto, longa: false };
+  },
   respostaAudioDesativada: async () => false,
   prepararParaFala: (texto: string) => texto,
   pareceLista: () => false,
@@ -252,21 +269,22 @@ mock.module("@/lib/nina/rastreio/turno.server", () => ({
 }));
 
 const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server");
-const resultado = await processarMensagemTeste(
-  {
+const entradaTeste = {
     clinicaId: lead.clinica_id,
     leadId: lead.id,
-    tipo: ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts"].includes(cenario) ? "audio" : "text",
-    texto: paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
+    tipo: ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts", "audio-recebido", "audio-arquivo"].includes(cenario) ? "audio" as const : "text" as const,
+    ...(cenario === "audio-arquivo" ? { audioArquivo: { base64: "T2dnUw==", mime: "audio/ogg" } } : {}),
+    texto: cenario === "audio-pedido" || cenario === "audio-falha" ? "Me responda em áudio" : paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
     chave: "entrada-mj53",
-  },
-  "operador-teste",
-);
+};
+const resultado = await processarMensagemTeste(entradaTeste, "operador-teste");
+if (cenario === "audio-arquivo") await processarMensagemTeste(entradaTeste, "operador-teste");
 
 console.log(
   "MJ53_RESULTADO=" +
     JSON.stringify({
       resultado,
+      transcricoes, arquivos,
       saidas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "out"),
       entradas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "in"),
       chamadasModelo,

@@ -1370,6 +1370,9 @@ async function gerarRespostaNinaInterno(
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
   const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
+  const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
+  instrucoesAdicionaisTurno.push({ codigo: "FORMATO_AUDIO", origem: "src/lib/nina/audio.ts",
+    motivo: "O transporte responde em voz a áudio ou pedido explícito.", texto: REGRA_RESPOSTA_AUDIO });
   const { REGRA_FORMATO_MOBILE } = await import("@/lib/nina/resposta/formato-mobile");
   instrucoesAdicionaisTurno.push({ codigo: "FORMATO_MOBILE_OBRIGATORIO",
     origem: "src/lib/nina/resposta/formato-mobile.ts", motivo: "Organizar todas as mensagens para leitura no celular.",

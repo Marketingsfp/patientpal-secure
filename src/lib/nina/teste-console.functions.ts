@@ -214,7 +214,7 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
         blocos.map((bloco) =>
           supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("id, conversa_id, direction, body, tipo, transcricao, status, enviada_por, created_at, execucao_id, wa_message_id")
+            .select("id, conversa_id, direction, body, tipo, transcricao, media_url, media_mime, status, enviada_por, created_at, execucao_id, wa_message_id")
             .eq("clinica_id", data.clinicaId)
             .in("conversa_id", bloco)
             .order("created_at", { ascending: false })
@@ -296,6 +296,10 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         tipo: z.enum(["text", "audio", "image", "document", "sticker"]).default("text"),
         // Em áudio, o texto é a "transcrição": vazio simula transcrição falha.
         texto: z.string().trim().max(2000).default(""),
+        audioArquivo: z.object({
+          base64: z.string().min(4).max(22_369_624).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+          mime: z.enum(["audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "audio/amr", "audio/wav"]),
+        }).optional(),
         chave: z.string().min(6).max(80),
       })
       .parse(input),
