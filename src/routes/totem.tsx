@@ -106,7 +106,9 @@ export function TotemPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   // Status da impressão da senha — ver item 10 (feedback de impressão).
-  const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "falha" | null>(null);
+  const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "incerto" | "falha" | null>(
+    null,
+  );
   const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Aquecimento da impressão: baixa o chunk do jsPDF, abre o websocket do QZ
@@ -188,7 +190,9 @@ export function TotemPage() {
       const avisoImpressao =
         printStatus === "falha"
           ? "Não foi possível imprimir. Anote o número ou procure a recepção."
-          : "Retire sua senha impressa.";
+          : printStatus === "incerto"
+            ? "Se a senha não sair impressa, anote o número ou procure a recepção."
+            : "Retire sua senha impressa.";
       setAnnounce(
         `Senha ${nome}, número ${ticket.codigo}. ${avisoImpressao} Acompanhe o painel de chamada.`,
       );
@@ -348,13 +352,18 @@ export function TotemPage() {
         });
         await imprimirDocumentoSilencioso(pdfBase64);
         setPrintStatus("ok");
-      } catch {
+      } catch (err) {
+        // Fica no console (F12) para quem for ao totem ver em que passo parou:
+        // QZ Tray fechado, assinatura recusada, impressora padrão ausente…
+        console.error("[totem] impressão pelo QZ Tray falhou; tentando pelo navegador", err);
         const agendou = imprimirSenhaTotem({
           codigo: row.codigo,
           tipo: _tipo,
           clinicaNome: clinicaAtual.clinica?.nome ?? null,
         });
-        setPrintStatus(agendou ? "ok" : "falha");
+        // Pelo navegador o sistema não fica sabendo se o papel saiu (num totem
+        // em quiosque quase nunca sai). Não dá para afirmar "retire sua senha".
+        setPrintStatus(agendou ? "incerto" : "falha");
       }
     })();
   }
@@ -845,6 +854,12 @@ export function TotemPage() {
             )}
             {printStatus === "ok" && (
               <div className="text-[clamp(1.25rem,3vw,1.5rem)]">Retire sua senha impressa</div>
+            )}
+            {printStatus === "incerto" && (
+              <div className="flex items-center justify-center gap-2 text-[clamp(1.1rem,2.6vw,1.35rem)] text-amber-600 dark:text-amber-400 font-semibold">
+                <AlertTriangle className="h-6 w-6 shrink-0" /> Se a senha não sair impressa, anote o
+                número ou procure a recepção
+              </div>
             )}
             {printStatus === "falha" && (
               <div className="flex items-center justify-center gap-2 text-[clamp(1.1rem,2.6vw,1.35rem)] text-amber-600 dark:text-amber-400 font-semibold">
