@@ -115,6 +115,14 @@ export function CatalogoNina({
   const [busca, setBusca] = useState("");
   const buscaId = useId();
   const buscaRef = useRef<HTMLInputElement>(null);
+  const totais = useMemo(
+    () => ({
+      publicados: itens.filter((item) => item.status === "PUBLICADO").length,
+      arquivados: itens.filter((item) => item.status === "ARQUIVADO").length,
+      rascunhos: itens.filter((item) => item.status === "RASCUNHO").length,
+    }),
+    [itens],
+  );
   const itensFiltrados = useMemo(() => {
     const termos = normalizarNomeBusca(busca).split(" ").filter(Boolean);
     if (!termos.length) return itens;
@@ -475,12 +483,32 @@ export function CatalogoNina({
             </Button>
           )}
         </div>
-        {!carregando && !erroCarga && (
+        {!carregando && !erroCarga && busca.trim() && (
           <p role="status" className="text-xs text-muted-foreground">
             {itensFiltrados.length} de {itens.length} registros
           </p>
         )}
       </div>
+
+      {!carregando && !erroCarga && (
+        <dl
+          aria-label="Totais de registros desta seção"
+          className="mb-4 flex flex-wrap gap-x-6 gap-y-2 text-sm"
+          aria-live="polite"
+        >
+          {[
+            ["Total", itens.length],
+            ["Publicados", totais.publicados],
+            ["Arquivados", totais.arquivados],
+            ["Rascunhos", totais.rascunhos],
+          ].map(([rotulo, quantidade]) => (
+            <div key={rotulo} className="flex items-baseline gap-2">
+              <dt className="text-muted-foreground">{rotulo}:</dt>
+              <dd className="font-semibold tabular-nums">{quantidade}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       <MapaCamposCatalogo tipo={tipo} />
 
