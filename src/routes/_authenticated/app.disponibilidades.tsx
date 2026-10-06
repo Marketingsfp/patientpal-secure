@@ -238,10 +238,13 @@ function Page() {
   // ali a ficha nova precisa nascer depois do último INÍCIO do dia, inclusive
   // de linhas canceladas, para não renumerar ficha já impressa.
   const [ultimosInicios, setUltimosInicios] = useState<Map<string, string>>(new Map());
-  // Quantas fichas (números distintos) cada (medico|agenda|dataLocal) já tem.
-  // Linhas no MESMO instante dividem o número (encaixe), então contam uma vez.
-  // Usado para completar o dia até o total de "Pacientes/dia" com fichas extras.
-  const [fichasNoDia, setFichasNoDia] = useState<Map<string, number>>(new Map());
+  // Linhas já existentes por (medico|agenda|dataLocal): instante do início e se
+  // o paciente já passou pela recepção (check-in, atendimento) — aí a ficha
+  // dele pode estar impressa e o número não pode mais mudar. Usado para
+  // completar o dia até o total de "Pacientes/dia" com fichas extras.
+  const [linhasNoDia, setLinhasNoDia] = useState<
+    Map<string, Array<{ ms: number; travada: boolean }>>
+  >(new Map());
   const [pisoTick, setPisoTick] = useState(0);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
@@ -370,7 +373,7 @@ function Page() {
       if (!clinicaAtual || !gerar.data_inicio || !gerar.data_fim) {
         setPisos(new Map());
         setUltimosInicios(new Map());
-        setFichasNoDia(new Map());
+        setLinhasNoDia(new Map());
         return;
       }
       const alvoIds =
@@ -382,14 +385,14 @@ function Page() {
       if (alvoIds.length === 0) {
         setPisos(new Map());
         setUltimosInicios(new Map());
-        setFichasNoDia(new Map());
+        setLinhasNoDia(new Map());
         return;
       }
       const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
       const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("medico_id, agenda_id, inicio, fim")
+        .select("medico_id, agenda_id, inicio, fim, status, fluxo_etapa")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .in("medico_id", alvoIds)
         .gte("inicio", iniIso)
@@ -398,12 +401,14 @@ function Page() {
       if (error || cancelled) return;
       const map = new Map<string, string>();
       const mapInicio = new Map<string, string>();
-      const instantes = new Map<string, Set<number>>();
+      const linhas = new Map<string, Array<{ ms: number; travada: boolean }>>();
       for (const r of (data ?? []) as Array<{
         medico_id: string;
         agenda_id: string | null;
         inicio: string;
         fim: string;
+        status?: string | null;
+        fluxo_etapa?: string | null;
       }>) {
         const dLocal = toLocalDate(r.inicio);
         const tFim = toLocalTime(r.fim);
@@ -412,14 +417,19 @@ function Page() {
         if (!prev || tFim > prev) map.set(key, tFim);
         const prevIni = mapInicio.get(key);
         if (!prevIni || r.inicio > prevIni) mapInicio.set(key, r.inicio);
-        const set = instantes.get(key) ?? new Set<number>();
-        set.add(new Date(r.inicio).getTime());
-        instantes.set(key, set);
+        const arr = linhas.get(key) ?? [];
+        arr.push({
+          ms: new Date(r.inicio).getTime(),
+          travada:
+            r.status === "realizado" ||
+            (!!r.fluxo_etapa && r.fluxo_etapa !== "aguardando_recepcao"),
+        });
+        linhas.set(key, arr);
       }
       if (!cancelled) {
         setPisos(map);
         setUltimosInicios(mapInicio);
-        setFichasNoDia(new Map([...instantes].map(([k, s]) => [k, s.size])));
+        setLinhasNoDia(linhas);
       }
     })();
     return () => {
@@ -1197,16 +1207,24 @@ function Page() {
           const fimDoTurno = blocos.reduce((acc, x) => (x.hora_fim > acc ? x.hora_fim : acc), "");
           // FICHAS A MAIS (2026-10-06): quando o dia pede mais fichas do que os
           // horários da grade comportam, as que faltam entram no ÚLTIMO horário
-          // do dia, 1 segundo uma depois da outra, sempre DEPOIS da última
-          // ficha que já existe. Início, fim e intervalo da escala não mudam, e
-          // como a ficha é posicional (ver ficha-numero.ts) nenhuma ficha
-          // existente muda de número — as extras continuam a sequência. O
-          // segundo de diferença evita o unique index de vaga e impede que a
-          // numeração as trate como encaixe (mesmo instante = mesmo número).
-          // Vale também para dia JÁ gerado: completa até o total pedido.
+          // do turno, 1 segundo uma depois da outra, logo depois da última
+          // ficha DENTRO do turno. Início, fim e intervalo da escala não mudam,
+          // e como a ficha é posicional (ver ficha-numero.ts) as fichas do
+          // turno mantêm o número — as extras continuam a sequência. O segundo
+          // de diferença evita o unique index de vaga e impede que a numeração
+          // as trate como encaixe (mesmo instante = mesmo número). Vale também
+          // para dia JÁ gerado: completa até o total pedido.
+          //
+          // Encaixe lançado DEPOIS do fim do turno (ex.: 16:30 de quem termina
+          // às 16:00) não trava mais a geração: as extras entram antes dele e
+          // ele passa para o fim da sequência. Só não pode quando algum desses
+          // pacientes já passou pela recepção — a ficha dele pode estar
+          // impressa — e aí o dia cai no aviso de sempre.
           const acrescentarFichasExtras = (criadosNoDia: number): number => {
             if (!Number.isFinite(alvoDoDia) || !fimDoTurno) return 0;
-            const faltam = alvoDoDia - (fichasNoDia.get(pisoKey) ?? 0) - criadosNoDia;
+            const linhasDoDia = linhasNoDia.get(pisoKey) ?? [];
+            const existentes = new Set(linhasDoDia.map((l) => l.ms)).size;
+            const faltam = alvoDoDia - existentes - criadosNoDia;
             if (faltam <= 0) return 0;
             let baseMs: number;
             let horaIni: string;
@@ -1217,10 +1235,12 @@ function Page() {
               horaIni = ultima.inicio;
               horaFim = ultima.fim;
             } else {
-              const ultimoIso = ultimosInicios.get(pisoKey);
-              if (!ultimoIso) return 0;
-              baseMs = new Date(ultimoIso).getTime();
-              horaIni = toLocalTime(ultimoIso);
+              const fimTurnoMs = new Date(`${diaIso}T${fimDoTurno}:00`).getTime();
+              const dentro = linhasDoDia.filter((l) => l.ms < fimTurnoMs);
+              if (dentro.length === 0) return 0;
+              baseMs = Math.max(...dentro.map((l) => l.ms));
+              if (linhasDoDia.some((l) => l.ms > baseMs && l.travada)) return 0;
+              horaIni = toLocalTime(new Date(baseMs));
               horaFim = fimDoTurno;
             }
             const fimDate = new Date(`${diaIso}T${horaFim}:00`);
@@ -1314,7 +1334,7 @@ function Page() {
     agendas,
     pisos,
     ultimosInicios,
-    fichasNoDia,
+    linhasNoDia,
     medicoFilaAlvo,
     agendaFilaAlvo,
     agendasMistasSemEscolha,
