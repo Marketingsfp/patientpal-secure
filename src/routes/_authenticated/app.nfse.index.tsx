@@ -598,14 +598,16 @@ function NfsePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <h1 className="text-2xl font-semibold flex items-center gap-2 whitespace-nowrap">
             <Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)
           </h1>
           <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
         </div>
-        <div className="flex gap-2">
+        {/* Os botões quebram linha quando não cabem: com o perfil admin são
+            sete, e numa linha só o "Emitir NFS-e" saía cortado da tela. */}
+        <div className="flex flex-wrap justify-end gap-2">
           {/* Exportar não depende de permissão de escrita nem da clínica: é
               leitura do que já está na tela, e a São Francisco também precisa
               fechar o mês. */}
