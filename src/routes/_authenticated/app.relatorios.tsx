@@ -1710,12 +1710,19 @@ function AgendamentosDiarioView({
   const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
   const [setorMap, setSetorMap] = useState<Map<string, string>>(new Map()); // user_id -> setor nome
   const [medMap, setMedMap] = useState<Map<string, string>>(new Map());
+  // Quantas linhas cada atendente está mostrando ("setor|atendente" → limite).
+  const [limites, setLimites] = useState<Map<string, number>>(new Map());
+  const limiteDe = (setor: string, nome: string) =>
+    limites.get(`${setor}|${nome}`) ?? LIMITE_DETALHE;
+  const mostrarMais = (setor: string, nome: string, limite: number) =>
+    setLimites((m) => new Map(m).set(`${setor}|${nome}`, limite));
 
   useEffect(() => {
     if (!clinicaId) return;
     let cancel = false;
     (async () => {
       setLoading(true);
+      setLimites(new Map());
       try {
         // Dia a dia: um mês tem dezenas de milhares de marcações; a consulta
         // simples parava em 1.000 e a paginada do mês inteiro estourava o
@@ -1917,16 +1924,7 @@ function AgendamentosDiarioView({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {a.lista.length > LIMITE_DETALHE && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-xs text-muted-foreground">
-                            Mostrando as {LIMITE_DETALHE} mais recentes de{" "}
-                            {a.lista.length.toLocaleString("pt-BR")}. Use "Exportar Excel" para ver
-                            todas.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {a.lista.slice(0, LIMITE_DETALHE).map((r) => (
+                      {a.lista.slice(0, limiteDe(g.setor, a.nome)).map((r) => (
                         <TableRow key={r.id}>
                           <TableCell className="text-xs">
                             {new Date(r.created_at).toLocaleString("pt-BR")}
@@ -1942,6 +1940,40 @@ function AgendamentosDiarioView({
                           <TableCell className="text-xs">{r.status ?? "—"}</TableCell>
                         </TableRow>
                       ))}
+                      {/* Mais recentes primeiro, em blocos — milhares de linhas de uma vez
+                          travam a tela. Antes parava nas 500 primeiras sem como continuar. */}
+                      {a.lista.length > limiteDe(g.setor, a.nome) && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-3 py-1">
+                              <span>
+                                Mostrando as {limiteDe(g.setor, a.nome).toLocaleString("pt-BR")}{" "}
+                                mais recentes de {a.lista.length.toLocaleString("pt-BR")}.
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  mostrarMais(
+                                    g.setor,
+                                    a.nome,
+                                    limiteDe(g.setor, a.nome) + LIMITE_DETALHE,
+                                  )
+                                }
+                              >
+                                Mostrar mais {LIMITE_DETALHE}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => mostrarMais(g.setor, a.nome, a.lista.length)}
+                              >
+                                Mostrar todos
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
