@@ -42,7 +42,7 @@ import { procedimentoDaSessao, lembrarProcedimentoSolicitado, vagaPreservaProced
 import { agendasDoProcedimento, resolverProcedimentoOperacional, VinculoProcedimentoError } from "./procedimento-agenda.server";
 import { normalizarSelecaoContextual } from "./confidence/selecao-contextual";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
-import { pedidoConsultaComPreventivo } from "./atendimento-consulta";
+import { nomesAmigaveisConsulta, pedidoConsultaComPreventivo } from "./atendimento-consulta";
 import { consultarCadastroConfirmado, alterarTelefoneSolicitado } from "./cadastro-paciente.server";
 import { processamentoWatchdogAtual } from "./watchdog-contexto.server";
 import { confirmacaoDaEscolha, consentimentoDaEscolha, limparEscolhaAgendamento, registrarOpcoesAgendamento, selecionarVagaValidada,
@@ -1102,11 +1102,14 @@ const falhaVinculoAtendimento = () => falha("ACTION_NOT_AUTHORIZED",
 
 function esclarecerAtendimentoConsulta(ctx: CtxNinaPaciente, nomes: string[], filtros: Record<string, unknown>) {
   registrarOpcoesAgendamento(ctx.estado, ctx.clinicaId, []);
+  const unicos = [...new Set(nomes)];
+  // O paciente vê nomes sem a numeração interna; a ferramenta mantém os títulos do cadastro.
+  const apresentacao = nomesAmigaveisConsulta(unicos);
   return falha("ACTION_NOT_AUTHORIZED", "Há mais de um atendimento publicado compatível. Esclareça somente o tipo de consulta, preservando médico, data e período já pedidos.", {
     codigo: "ATENDIMENTO_CONSULTA_PENDENTE", consulta_realizada: false, aguardando_paciente: true,
-    atendimentos: [...new Set(nomes)], filtros,
-    pergunta: `Qual destas consultas você deseja: ${[...new Set(nomes)].join("; ")}?`,
-    instrucao: "Não transfira por essa escolha. Aguarde a resposta, reconsulte consultar_cadastro pelo título escolhido e preserve os filtros. Não afirme vaga nem preço de uma opção ainda não escolhida.",
+    atendimentos: unicos, opcoes_para_o_paciente: apresentacao, filtros,
+    pergunta: `Qual destas consultas você deseja: ${apresentacao.join("; ")}?`,
+    instrucao: "Não transfira por essa escolha. Pergunte usando somente os nomes de opcoes_para_o_paciente, sem os títulos internos de atendimentos. Aguarde a resposta, reconsulte consultar_cadastro pelo título escolhido e preserve os filtros. Não afirme vaga nem preço de uma opção ainda não escolhida.",
   });
 }
 

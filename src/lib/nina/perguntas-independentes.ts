@@ -88,6 +88,33 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
     }
     return aliases.get(k) ?? k;
   }
+  // Pendências de exame/procedimento abertas NESTE turno (não respostas do paciente).
+  const pendentesDoTurno = new Set<string>();
+  /**
+   * Regra confirmada (06/10/2026, opção B): com um exame/procedimento ainda
+   * ambíguo, a Nina não escolhe a variante pelo paciente. Uma busca nova,
+   * no mesmo turno, que confirma uma das opções da dúvida não libera preço
+   * nem detalhes; a dúvida continua sendo perguntada. Se o paciente escreveu
+   * o nome dessa opção, a escolha é dele e a busca vale normalmente.
+   */
+  function escolhaPresumida(k: string, resultado: ResultadoBroker): ResultadoBroker | null {
+    const dados = resultado.dados as ResultadoConhecimento | null;
+    if (!dados || dados.esclarecimento || dados.knowledge_status === "conflict" || !dados.records?.length) return null;
+    const textoPaciente = compacto(mensagem);
+    for (const [chavePendente, pendencia] of pendentes) {
+      if (chavePendente === k || !pendentesDoTurno.has(chavePendente)) continue;
+      const esclarecimento = pendencia.esclarecimento;
+      if (pendencia.consulta.tipo_atendimento !== "exame_procedimento" || !esclarecimento?.opcoes.length) continue;
+      const ids = new Set(esclarecimento.opcoes.map((o) => o.id));
+      const nomes = new Set(esclarecimento.opcoes.map((o) => compacto(o.nome)));
+      const escolhidos = dados.records.filter((r) => (r.id && ids.has(r.id)) || (r.procedimento && nomes.has(compacto(r.procedimento))));
+      if (!escolhidos.length) continue;
+      if (escolhidos.some((r) => r.procedimento && textoPaciente.includes(compacto(r.procedimento)))) continue;
+      return { ...resultado, dados: { ...dados, found: false, procedure: null, price: null, records: [], esclarecimento,
+        instrucao: `Este registro é uma das opções que o paciente ainda não escolheu para o pedido “${pendencia.consulta.termo}”. Não informe preço, profissional, horários nem detalhes de uma opção específica; pergunte qual opção corresponde ao pedido.` } };
+    }
+    return null;
+  }
   function referencia(args: unknown) {
     const p = parametrosPesquisa(args),
       q = consulta(p);
@@ -158,6 +185,8 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
             instrucao: "A releitura não recuperou o registro confirmado. Não substitua por outro exame nem informe seus fatos." } };
         }
       }
+      const presumida = escolhaPresumida(k, resultado);
+      if (presumida) return presumida;
       const anteriorDoTurno = [...aliases.values()].includes(k) ? pendentes.get(k) : null;
       if (!anteriorDoTurno?.esclarecimento) return resultado;
       const dados = resultado.dados as ResultadoConhecimento | null;
@@ -209,6 +238,7 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
         confirmadas.delete(k);
         identificadas.delete(k);
         pendentes.set(k, anteriorDoTurno ? { ...atual, consulta: anteriorDoTurno.consulta } : atual);
+        pendentesDoTurno.add(k);
       }
       else {
         pendentes.delete(k);

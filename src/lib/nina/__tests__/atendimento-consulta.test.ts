@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { atualizarPreferenciaAtendimento, atendePreferenciaConsulta, pedidoPreventivo, pedidoConsultaComPreventivo, selecionarAtendimentosConsulta } from "../atendimento-consulta";
+import { atualizarPreferenciaAtendimento, nomesAmigaveisConsulta, atendePreferenciaConsulta, pedidoPreventivo, pedidoConsultaComPreventivo, selecionarAtendimentosConsulta } from "../atendimento-consulta";
 import { prepararBuscaCatalogo, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";
 import { profissionalParaRegistro } from "../catalogo-conhecimento";
 import { atendimentosEstruturados } from "../catalogo-estrutura";
@@ -76,4 +76,41 @@ test("preferência persiste como referência da sessão, sem preços, e não cru
   const proxima = lembrarConsultaComprovada({ clinicaId: "clinica", sessionId: "sessao", args: { termo: "ginecologia", medico: "outra" }, anterior,
     fatos: [{ fonte: "catalogo_publicado", clinicaId: "clinica", registro: "outra", chave: { procedimento: "Consulta GINECOLOGIA" } }] as never });
   expect(proxima?.atendimentoConsulta).toEqual(com);
+});
+
+// Homologação 06/10/2026 — neurologia travava em "CONSULTA 2 × LAUDO".
+const neuro = atendimentosEstruturados("CONSULTA 2\nEspecialidade: NEUROLOGIA\n\nLAUDO NEUROLOGIA\nEspecialidade: NEUROLOGIA", null);
+const comItens = (itens: ReturnType<typeof atendimentosEstruturados>) =>
+  ({ ...registro, extras: { ...registro.extras, atendimentos_publicados: itens } });
+
+test("pedido genérico de consulta não inclui laudo nem atestado; pedido explícito continua valendo", () => {
+  expect(selecionarAtendimentosConsulta(neuro, { atendimento: "Neurologia" }).map(i => i.atendimento)).toEqual(["CONSULTA 2"]);
+  expect(selecionarAtendimentosConsulta(neuro, { atendimento: "LAUDO NEUROLOGIA" }).map(i => i.atendimento)).toEqual(["LAUDO NEUROLOGIA"]);
+  const pediatria = atendimentosEstruturados(["CONSULTA", "ATESTADO MEDICO", "ATESTADO PARA ATIVIDADE FISICA ESCOLA DE FUTEBOL", "REVISAO"]
+    .map(n => `${n}\nEspecialidade: PEDIATRIA`).join("\n\n"), null);
+  expect(selecionarAtendimentosConsulta(pediatria, { atendimento: "Pediatria" }).map(i => i.atendimento)).toEqual(["CONSULTA"]);
+});
+
+test.each(["consulta normal", "a consulta", "consulta comum mesmo"])("resposta natural escolhe a consulta comum: %s", mensagem => {
+  expect(atualizarPreferenciaAtendimento({ mensagem, registros: [comItens(neuro)] }))
+    .toEqual({ especialidade: "NEUROLOGIA", nome: "CONSULTA 2" });
+});
+
+test("palavra própria da opção escolhe essa opção", () => {
+  expect(atualizarPreferenciaAtendimento({ mensagem: "é o laudo", registros: [comItens(neuro)] }))
+    .toEqual({ especialidade: "NEUROLOGIA", nome: "LAUDO NEUROLOGIA" });
+});
+
+test("datas, período e variantes sem serviço próprio não escolhem por aproximação", () => {
+  expect(atualizarPreferenciaAtendimento({ mensagem: "pode ser dia 2?", registros: [comItens(neuro)] })).toBeNull();
+  expect(atualizarPreferenciaAtendimento({ mensagem: "consulta a noite", registros: [comItens(neuro)] })).toBeNull();
+  const oftalmo = atendimentosEstruturados(["CONSULTA OFTALMO", "CONSULTA NOTURNA"]
+    .map(n => `${n}\nEspecialidade: OFTALMOLOGIA`).join("\n\n"), null);
+  expect(atualizarPreferenciaAtendimento({ mensagem: "consulta normal", registros: [comItens(oftalmo)] })).toBeNull();
+});
+
+test("a pergunta ao paciente usa nomes sem a numeração interna", () => {
+  expect(nomesAmigaveisConsulta(["CONSULTA 2 — NEUROLOGIA", "LAUDO NEUROLOGIA"])).toEqual(["Consulta de Neurologia", "Laudo Neurologia"]);
+  expect(nomesAmigaveisConsulta(["CONSULTA 1 — CLINICO GERAL", "CONSULTA 2 — CLINICO GERAL"]))
+    .toEqual(["CONSULTA 1 — CLINICO GERAL", "CONSULTA 2 — CLINICO GERAL"]);
 });
