@@ -100,6 +100,33 @@ function camposDaConsulta(falha: ReturnType<typeof falhaDeConsultaFocus>) {
  * o último corpo com status que tiver visto; sem nenhum, devolve a falha — e
  * quem chama grava em `consulta_erro_*` sem tocar no status.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ClienteNfse = { from: (t: "nfse") => any };
+
+/**
+ * Grava a nota com o cliente do usuário e, se a RLS barrar, repete com o admin.
+ * A RLS não devolve erro num UPDATE barrado — só afeta 0 linhas —, então a
+ * conferência é pela linha devolvida, não só pelo `error`.
+ */
+async function gravarNfse(
+  usuario: ClienteNfse,
+  admin: ClienteNfse,
+  id: string,
+  campos: Record<string, unknown>,
+  onde: string,
+): Promise<{ ok: true } | { ok: false; erro: string }> {
+  const tentar = async (c: ClienteNfse) => {
+    const { data, error } = await c.from("nfse").update(campos as never).eq("id", id).select("id");
+    return error ? error.message : Array.isArray(data) && data.length > 0 ? null : "nenhuma linha gravada";
+  };
+  const erroUsuario = await tentar(usuario);
+  if (!erroUsuario) return { ok: true };
+  const erroAdmin = await tentar(admin);
+  if (!erroAdmin) return { ok: true };
+  console.error("[nfse] gravação falhou nos dois clientes", { id, onde, erroUsuario, erroAdmin });
+  return { ok: false, erro: erroAdmin };
+}
+
 async function pollFocusTerminal(
   baseUrl: string,
   ref: string,
@@ -663,9 +690,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
     if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
-      await supabase
-        .from("nfse")
-        .update({
+      await gravarNfse(supabase, supabaseAdmin, nota.id, {
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
@@ -675,8 +700,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_envio: payload,
           payload_resposta: body,
-        })
-        .eq("id", nota.id);
+        }, "emissao-erro");
       return {
         ok: false,
         id: nota.id,
@@ -688,9 +712,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
       };
     }
 
-    await supabase
-      .from("nfse")
-      .update({
+    // A nota já foi aceita pela Focus com esta ref; sem gravá-la não há como consultar depois.
+    await gravarNfse(supabase, supabaseAdmin, nota.id, {
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
         // Polling terminou só com falha de consulta (ex.: limite_excedido):
@@ -699,8 +722,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
         observacoes: observacoesComRenumeracao,
         payload_envio: payload,
         payload_resposta: body,
-      })
-      .eq("id", nota.id);
+      }, "emissao");
 
     // Vincula todos os agendamentos selecionados (agrupamento no mesmo dia).
     // Inclui o agendamento principal para que a consulta por nfse_agendamentos
@@ -768,10 +790,10 @@ export const consultarNfse = createServerFn({ method: "POST" })
     // tentativas de limite_excedido esgotadas): preserva focus_status e o
     // status da nota, registra o erro em campo próprio e devolve para a tela.
     if (consultaFocus.falha) {
-      await supabase
-        .from("nfse")
-        .update({ payload_resposta: body, ...camposDaConsulta(consultaFocus.falha) } as never)
-        .eq("id", nota.id);
+      // Mesmo padrão do sucesso: a falha da consulta precisa ficar registrada
+      // mesmo que a RLS barre este usuário.
+      await gravarNfse(supabase, supabaseAdmin, nota.id,
+        { payload_resposta: body, ...camposDaConsulta(consultaFocus.falha) }, "consulta-falha");
       return {
         ok: false,
         status: null,
@@ -817,10 +839,20 @@ export const consultarNfse = createServerFn({ method: "POST" })
         body?.mensagem_sefaz ?? body?.mensagem ?? body?.erros?.[0]?.mensagem ?? null;
     }
 
-    await supabase
-      .from("nfse")
-      .update(updates as never)
-      .eq("id", nota.id);
+    // A nota já foi autorizada (ou recusada) pela prefeitura e não tem volta:
+    // o registro local precisa refletir isso mesmo que a RLS barre este usuário.
+    // A RLS recusa o UPDATE em silêncio (0 linhas, sem erro), por isso
+    // gravarNfse confere a linha devolvida e repete com o cliente admin.
+    const gravou = await gravarNfse(supabase, supabaseAdmin, nota.id, updates, "consulta");
+    if (!gravou.ok) {
+      return {
+        ok: false,
+        status: (body?.status as string | undefined) ?? null,
+        body,
+        erroConsulta: { codigo: "gravacao_falhou", mensagem: `A Focus respondeu, mas o registro local não foi gravado: ${gravou.erro}` },
+        limiteExcedido: false,
+      };
+    }
     return {
       ok: true,
       status: (body?.status as string | undefined) ?? null,
@@ -1283,9 +1315,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
     if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
-      await supabase
-        .from("nfse")
-        .update({
+      await gravarNfse(supabase, supabaseAdmin, nota.id, {
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
@@ -1294,8 +1324,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
             ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_resposta: body,
-        })
-        .eq("id", nota.id);
+        }, "reenvio-erro");
       return {
         ok: false,
         id: nota.id,
@@ -1306,9 +1335,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       };
     }
 
-    await supabase
-      .from("nfse")
-      .update({
+    // A nota já foi aceita pela Focus com esta ref; sem gravá-la não há como consultar depois.
+    await gravarNfse(supabase, supabaseAdmin, nota.id, {
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
         // Polling terminou só com falha de consulta (ex.: limite_excedido):
@@ -1316,8 +1344,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         ...(falhaDeConsultaFocus(body) ? camposDaConsulta(falhaDeConsultaFocus(body)) : {}),
         observacoes: observacoesComRenumeracao,
         payload_resposta: body,
-      })
-      .eq("id", nota.id);
+      }, "reenvio");
 
     return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts, avisoCep };
   });
