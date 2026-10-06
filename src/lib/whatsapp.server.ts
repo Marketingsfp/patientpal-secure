@@ -947,6 +947,14 @@ async function gerarRespostaNinaInterno(
   // Fase 2: sinais acima do limite, ou falha de entendimento em 2 mensagens
   // seguidas SEM avanço do atendimento, encaminham para a recepção. Escolher
   // uma opção já oferecida nunca conta como falha. Erro/demora = fluxo atual.
+  const { perguntaNomeAtendimento, semNomePeloJev, perguntaNomeEntregue, PEDIR_NOME_ATENDIMENTO,
+    MOTIVO_NOME_NAO_INFORMADO, REGRA_SEM_INDICACAO, FERRAMENTA_NOME_ATENDIMENTO } =
+    await import("@/lib/nina/atendimento-sem-indicacao");
+  let nomeAtendimentoAusente = false;
+  let respostaNomeAtendimento = false;
+  const perguntaNomeAnterior = perguntaNomeEntregue(msgsMemoria, { conversaId: estadoId.conversaId,
+    inicioSessao: sessaoNina.estado.session_started_at ?? null, teste: opcoes?.teste === true,
+    entradas: opcoes?.mensagensEntrada ?? [] });
   let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
   let jevPontuacoes: Record<string, number | null> | null = null;
   let orientacaoIntencaoJev: import("@/lib/nina/jev-orientacao-intencao").OrientacaoIntencaoJev | null = null;
@@ -963,6 +971,7 @@ async function gerarRespostaNinaInterno(
       const { respondeEscolhaDeHorarios } = await import("@/lib/nina/horarios-periodo");
       const perguntas = {
         ...perguntaIntencao(),
+        ...perguntaNomeAtendimento(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
       };
       const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
@@ -980,6 +989,7 @@ async function gerarRespostaNinaInterno(
         jev.limitesJev(clinicaId),
       ]);
       const respostas = resultado.ok ? resultado.respostas : null;
+      nomeAtendimentoAusente = semNomePeloJev(respostas?.nome_atendimento);
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
       if (escolhida) {
         intencoesTurno = [escolhida];
@@ -1016,6 +1026,7 @@ async function gerarRespostaNinaInterno(
         : null;
       if (f2 && respostas) {
         jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem, limitesClinica);
+        if (nomeAtendimentoAusente && jevEncaminhamento?.motivo.startsWith("JEV_DUVIDA_REPETIDA")) jevEncaminhamento = null;
         jevPontuacoes = {
           confianca_intencao: respostas["intencao"]?.confidence ?? null,
           entendimento: respostas["entendimento"]?.noul ?? null,
@@ -1033,7 +1044,7 @@ async function gerarRespostaNinaInterno(
       await Promise.all([
         jev.registrarDecisaoJev({
           clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
-          perguntas, resultado, aplicada: escolhida !== null, contagem,
+          perguntas, resultado, aplicada: escolhida !== null || nomeAtendimentoAusente, contagem,
           orientacao: orientacaoIntencaoJev,
           mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
           contexto: f1 ? { observacao_intencao: { versao: "intencoes-v1", modo: "orientacao" },
@@ -1051,6 +1062,13 @@ async function gerarRespostaNinaInterno(
     }
   } catch (e) {
     console.warn("[nina-jev] fases 1/2 ignoradas:", e instanceof Error ? e.message : e);
+  }
+
+  // O Jev já participa da leitura do turno; esta decisão não adiciona chamada de IA.
+  // Pedido humano/urgência continuam prioritários. Não confundir ausência de nome com incompreensão.
+  if (nomeAtendimentoAusente && !jevEncaminhamento) {
+    if (perguntaNomeAnterior) jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
+    else respostaNomeAtendimento = true;
   }
 
   // Fatos de identificação do remetente. Nome/convênio/benefício só entram
@@ -1402,6 +1420,9 @@ async function gerarRespostaNinaInterno(
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
   const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
+  instrucoesAdicionaisTurno.push({ codigo: "SEM_INDICACAO_CLINICA", nivel: "inegociavel",
+    origem: "src/lib/nina/atendimento-sem-indicacao.ts", motivo: "O paciente informa o atendimento; a Nina não faz indicação clínica.",
+    texto: REGRA_SEM_INDICACAO });
   const { REGRA_DUAS_FALHAS_ENTENDIMENTO } = await import("@/lib/nina/jev-encaminhamento");
   instrucoesAdicionaisTurno.push({ codigo: "ENTENDIMENTO_DUAS_FALHAS", nivel: "inegociavel",
     origem: "src/lib/nina/jev-encaminhamento.ts", motivo: "Regra confirmada: duas mensagens do paciente sem entendimento encaminham.",
@@ -1719,7 +1740,7 @@ async function gerarRespostaNinaInterno(
   // Aviso (protocolo) do encaminhamento feito pelo gate: se já saiu, a Nina não
   // manda uma segunda mensagem (mensagem única, 25/09/2026).
   const avisoGate: { atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null } = { atual: null };
-  if (podeAgendar && ctxFerramentas && executar !== null) {
+  if (podeAgendar && ctxFerramentas && executar !== null && !nomeAtendimentoAusente && !perguntaNomeAnterior && !jevEncaminhamento) {
     const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
     // FASE 5 — o texto do gate sai do template publicado (ou do padrão).
     const { carregarTemplatesPublicados } = await import("@/lib/nina/resposta/templates.server");
@@ -1812,7 +1833,7 @@ async function gerarRespostaNinaInterno(
   // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
   const { FERRAMENTA_HANDOFF } = await import("@/lib/nina/handoff-tool.server");
   const { respostaParaModelo, nomeAtualDaFerramenta } = await import("@/lib/nina/tool-broker");
-  ferramentas = [...(ferramentas ?? []), FERRAMENTA_HANDOFF];
+  ferramentas = [...(ferramentas ?? []), FERRAMENTA_HANDOFF, FERRAMENTA_NOME_ATENDIMENTO];
   const ctxHandoff = { clinicaId, conversaId: estadoId.conversaId ?? null };
   // FASE 4 — Tool Broker: ponto único de execução das ferramentas reais.
   const { criarToolBroker } = await import("@/lib/nina/tool-broker.server");
@@ -2247,12 +2268,19 @@ async function gerarRespostaNinaInterno(
     registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação aguardando o novo nome",
       dados: { pergunta: perguntaComplementar, motivo: "recusa ou aceite sem opção única; nenhuma escolha presumida" } });
   }
-  if (jevEncaminhamento && !finalizacaoHandoff && !turnoObsoleto) {
+  async function executarDecisaoEncaminhamento(decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento) {
+    if (finalizacaoHandoff || turnoObsoleto) return;
+    if (opcoes?.revisao?.valor) {
+      const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+      turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone, revisaoProcessada: opcoes.revisao.valor });
+      if (turnoObsoleto) return;
+    }
+    const semNome = decisao.motivo === MOTIVO_NOME_NAO_INFORMADO;
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
-      motivo: jevEncaminhamento.motivo,
-      resumo: `Encaminhado pelo filtro de decisão (Jev): ${motivoLegivel(jevEncaminhamento.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
-      urgencia: jevEncaminhamento.urgencia,
+      motivo: decisao.motivo,
+      resumo: `${semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      urgencia: decisao.urgencia,
     };
     const rh = await broker
       .executar("solicitar_atendente_humano", JSON.stringify(argumentos))
@@ -2266,15 +2294,25 @@ async function gerarRespostaNinaInterno(
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
     };
-    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento pelo Jev (Fase 2)",
+    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo, urgencia: argumentos.urgencia, pontuacoes: jevPontuacoes,
+        pergunta_nome_entregue: semNome ? perguntaNomeAnterior : null,
         handoff_confirmado: confirmado, erro: rh.erro ?? null,
       },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
-    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: "jev", urgencia: argumentos.urgencia,
+    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
   }
+  if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);
+  async function solicitarNomeAtendimento() {
+    if (perguntaNomeAnterior) await executarDecisaoEncaminhamento({ motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" });
+    else respostaNomeAtendimento = true;
+    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Nina não faz indicação clínica",
+      dados: { acao: perguntaNomeAnterior ? "encaminhar" : "pedir_nome", pergunta_entregue: perguntaNomeAnterior,
+        mensagens_entrada: opcoes?.mensagensEntrada ?? [] } });
+  }
+  if (respostaNomeAtendimento) await solicitarNomeAtendimento();
   // Cada aceite reconsulta seu próprio registro; nenhuma confirmação autoriza reserva.
   const reconsultasIdentificacao = profissionalConfirmadoNaResposta ? [{
     registro: profissionalConfirmadoNaResposta.registro,
@@ -2288,7 +2326,7 @@ async function gerarRespostaNinaInterno(
       ...(anterior.consulta.medico ? { medico: anterior.consulta.medico } : {}), nova_solicitacao: false },
   }));
   for (const [indice, confirmacao] of reconsultasIdentificacao.entries()) {
-    if (finalizacaoHandoff || houveHandoff || turnoObsoleto || perguntaComplementar) break;
+    if (finalizacaoHandoff || houveHandoff || turnoObsoleto || perguntaComplementar || respostaNomeAtendimento) break;
     await conferirReserva();
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
@@ -2314,7 +2352,7 @@ async function gerarRespostaNinaInterno(
     .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
     .catch(() => false);
   for (let rodada = 0; ; rodada++) {
-    if (finalizacaoHandoff || turnoObsoleto) break;
+    if (finalizacaoHandoff || turnoObsoleto || respostaNomeAtendimento) break;
     if (perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo) {
       resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
       break;
@@ -2526,6 +2564,12 @@ async function gerarRespostaNinaInterno(
     }
 
 
+    if (chamadas.some(c => c.function?.name === "solicitar_nome_atendimento")) {
+      respostaParcialConfirmada = perguntasDoTurno.temConfirmadas;
+      if (respostaParcialConfirmada) resposta = msg?.content ?? "";
+      await solicitarNomeAtendimento();
+      break;
+    }
     mensagens.push({ role: "assistant", content: msg?.content ?? null, tool_calls: chamadas });
     let houveProgresso = false;
     for (const c of chamadas) {
@@ -2760,7 +2804,7 @@ async function gerarRespostaNinaInterno(
   }
 
   // Uma pergunta determinística também precisa pertencer à revisão atual.
-  if (!turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo && opcoes?.revisao?.valor) {
+  if (!turnoObsoleto && (ctxFerramentas?.esclarecimentoCatalogo || respostaNomeAtendimento) && opcoes?.revisao?.valor) {
     const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
     turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
       revisaoProcessada: opcoes.revisao.valor });
@@ -2887,6 +2931,12 @@ async function gerarRespostaNinaInterno(
     );
     marcarOrigem(respostaParcialConfirmada ? "modelo_transformado" : "codigo", "identificação pendente por pergunta; respostas confirmadas preservadas");
   }
+  if (respostaNomeAtendimento && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto) {
+    const antes = resposta;
+    resposta = [respostaParcialConfirmada ? resposta : "", PEDIR_NOME_ATENDIMENTO].filter(Boolean).join("\n\n");
+    transformar("atendimento.sem_indicacao", "Pedir nome sem recomendar atendimento por sintomas", antes, resposta, "aviso_operacional");
+    marcarOrigem("codigo", "atendimento não informado; pergunta antes do encaminhamento");
+  }
   if (finalizacaoHandoff) {
     const antes = respostaDoModelo;
     resposta = finalizacaoHandoff.texto;
@@ -2899,6 +2949,8 @@ async function gerarRespostaNinaInterno(
           ? "catalogo.limite_esclarecimento"
           : [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO].includes(finalizacaoHandoff.motivo)
             ? "catalogo.sem_registro"
+            : finalizacaoHandoff.motivo === MOTIVO_NOME_NAO_INFORMADO
+              ? "atendimento.nome_nao_informado"
             : finalizacaoHandoff.motivo.startsWith("JEV_")
               ? "jev.encaminhamento"
               : "agenda.sem_vagas",
@@ -3103,7 +3155,7 @@ async function gerarRespostaNinaInterno(
         ((opcoes?.auditoria as { resultado?: unknown } | undefined)?.resultado as
           | import("@/lib/nina/resposta/contrato").ResultadoRespostaNina
           | undefined) ?? criarResultado({
-            origem: finalizacaoHandoff ? (finalizacaoHandoff.handoffConfirmado ? "handoff" : "erro") : "modelo",
+            origem: finalizacaoHandoff ? (finalizacaoHandoff.handoffConfirmado ? "handoff" : "erro") : respostaNomeAtendimento ? "gate" : "modelo",
             texto: resposta,
           });
       if (finalizacaoHandoff && opcoes?.auditoria) opcoes.auditoria.resultado = baseResultado;

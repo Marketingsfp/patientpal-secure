@@ -34,6 +34,7 @@ export const LIMITE_MOTIVO = 0.6;
 
 /** Códigos que já carregam a categoria (não precisam do Jev). */
 const POR_CODIGO: Array<[RegExp, CategoriaMotivo]> = [
+  [/^ATENDIMENTO_NAO_INFORMADO\b/, "outro"],
   [/^JEV_URGENCIA_CLINICA\b/, "urgencia_clinica"],
   [/^JEV_IRRITACAO\b/, "insatisfacao"],
   [/^JEV_PEDIDO_ATENDENTE\b/, "pedido_atendente"],

@@ -4,6 +4,7 @@
  * Publicação e fallback usam as mesmas regras compartilhadas. A identidade
  * publicada é preservada separadamente; o fallback recebe a identidade neutra.
  */
+import { REGRA_SEM_INDICACAO } from "../atendimento-sem-indicacao";
 import { REGRAS_CATALOGO_PROMPT } from "./regras-catalogo";
 import { REGRAS_TEMPORAIS_NINA } from "./regras-temporais";
 import { FORMATACAO_WHATSAPP_NINA } from "./formatacao-whatsapp";
@@ -228,6 +229,8 @@ A simulação reproduz as mesmas regras de conversa, inclusive SFP silencioso e 
 Resultado esperado: teste fiel ao atendimento, sem efeitos externos nem avisos duplicados.
 
 8. LIMITES DO ATENDIMENTO
+
+${REGRA_SEM_INDICACAO}
 
 INSTRUÇÃO ESC-01 — ATUAÇÃO ADMINISTRATIVA
 Tipo: ESSENCIAL.
