@@ -1095,15 +1095,22 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     return rows;
   }, [raw, clima, ini, fim]);
 
+  // Média só sobre dias de expediente já encerrados: dia com 0 agendamentos
+  // (domingo, feriado, clínica fechada) e hoje (parcial) ficam na tabela, mas
+  // fora da média — senão puxam o comparativo para baixo.
   const climaResumo = useMemo(() => {
+    const hojeISO = hoje();
     const comClima = climaRows.filter((r) => r.clima !== null);
-    const chuva = comClima.filter((r) => r.clima!.choveu);
-    const semChuva = comClima.filter((r) => !r.clima!.choveu);
+    const considerados = comClima.filter((r) => r.agend > 0 && r.dia < hojeISO);
+    const chuva = considerados.filter((r) => r.clima!.choveu);
+    const semChuva = considerados.filter((r) => !r.clima!.choveu);
     const media = (l: typeof climaRows) =>
       l.length === 0 ? null : l.reduce((acc, r) => acc + r.agend, 0) / l.length;
     return {
       diasChuva: chuva.length,
       diasSem: semChuva.length,
+      diasSemMovimento: comClima.filter((r) => r.agend === 0 && r.dia < hojeISO).length,
+      hojeNaTabela: comClima.some((r) => r.dia === hojeISO),
       mediaAgendChuva: media(chuva),
       mediaAgendSem: media(semChuva),
     };
@@ -1384,7 +1391,16 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             {clima && climaResumo.diasChuva + climaResumo.diasSem > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 {climaResumo.diasChuva} dia{climaResumo.diasChuva === 1 ? "" : "s"} com chuva e{" "}
-                {climaResumo.diasSem} sem chuva no período.
+                {climaResumo.diasSem} sem chuva no período
+                {(climaResumo.diasSemMovimento > 0 || climaResumo.hojeNaTabela) &&
+                  ` (fora da média: ${[
+                    climaResumo.diasSemMovimento > 0 &&
+                      `${climaResumo.diasSemMovimento} dia${climaResumo.diasSemMovimento === 1 ? "" : "s"} sem agendamento`,
+                    climaResumo.hojeNaTabela && "hoje, ainda em andamento",
+                  ]
+                    .filter(Boolean)
+                    .join(" e ")})`}
+                .
                 {climaResumo.mediaAgendChuva !== null && climaResumo.mediaAgendSem !== null && (
                   <>
                     {" "}
