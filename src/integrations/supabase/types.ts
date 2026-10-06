@@ -17870,6 +17870,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      rel_agendamentos_marcados: {
+        Args: { _clinica_id: string; _marc_fim: string; _marc_ini: string }
+        Returns: {
+          agendamento_id: string
+          inicio: string
+          marcado_em: string
+          medico_id: string
+          paciente_nome: string
+          procedimento: string
+          status: string
+          usuario_id: string
+          usuario_nome: string
+        }[]
+      }
       rel_marcacoes_por_atendente: {
         Args: {
           _atend_fim?: string
