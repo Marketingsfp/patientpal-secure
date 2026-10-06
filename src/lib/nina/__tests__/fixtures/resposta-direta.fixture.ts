@@ -761,8 +761,8 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     conteudo: cenario.endsWith("entendida") ? "Entendi seu pedido." : "Pode explicar de outra forma o que você precisa?" };
   if (progressoLongo) return {
     ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "medium",
-    conteudo: requests.length > 8 ? "Encontrei horários às 10:00 nos dias consultados. Qual data você prefere?" : "",
-    toolCalls: requests.length <= 8 ? [{ id: `progresso-${requests.length}`, type: "function", function: {
+    conteudo: requests.length > 8 || !req.tools ? "Encontrei horários às 10:00 nos dias consultados. Qual data você prefere?" : "",
+    toolCalls: requests.length <= 8 && req.tools ? [{ id: `progresso-${requests.length}`, type: "function", function: {
       name: cenario.endsWith("informativo") ? "consultar_cadastro" : "consultar_disponibilidade",
       arguments: JSON.stringify(cenario.endsWith("informativo") ? { termo: `atendimento-${requests.length}` } : { medico_id: "jorge", data: `2030-01-${10 + requests.length}` }),
     } }] : [],

@@ -7,7 +7,7 @@ function serializar(v: unknown): string {
   return JSON.stringify(v) ?? "null";
 }
 
-/** Sem teto de rodadas: mede novidade dos retornos, não a quantidade de chamadas. */
+/** Mede novidade dos retornos; o teto de segurança fica em `criarLimiteTurno`. */
 export function criarProgressoTurno() {
   const vistos = new Set<string>();
   return {
@@ -27,6 +27,60 @@ export function criarProgressoTurno() {
     },
   };
 }
+
+/**
+ * Teto de segurança do turno (06/10/2026), somado ao controle de progresso.
+ * Calibrado com 7 dias de produção: com o teto antigo (3/6) o máximo foi 6
+ * rodadas; sem teto, 97% dos turnos usaram até 6 e o pedido médico com 19
+ * exames chegou a 30 chamadas e 1,1 milhão de tokens.
+ * - comum: 6 rodadas com ferramentas;
+ * - lista (vários exames do catálogo com resultado novo no mesmo turno): 10;
+ * - tokens: o turno para de consultar ao passar de 400 mil tokens.
+ * Ao atingir o teto, o modelo ainda tem uma rodada só de texto para responder.
+ */
+export const LIMITE_RODADAS_COMUM = 6;
+export const LIMITE_RODADAS_LISTA = 10;
+export const LIMITE_TOKENS_TURNO = 400_000;
+/** Itens distintos do catálogo que caracterizam uma lista (pedido médico etc.). */
+export const ITENS_PARA_LISTA = 4;
+/** Trava final de chamadas ao modelo: rodadas com ferramentas, síntese, correções e uma nova tentativa. */
+export const LIMITE_CHAMADAS_MODELO = LIMITE_RODADAS_LISTA + 5;
+
+const BUSCAS_DE_ITEM = new Set(["consultar_cadastro", "buscar_procedimentos"]);
+
+export type EstouroLimiteTurno = "rodadas" | "tokens";
+
+export function criarLimiteTurno() {
+  let rodadas = 0;
+  let tokens = 0;
+  let itens = 0;
+  const limite = () => (itens >= ITENS_PARA_LISTA ? LIMITE_RODADAS_LISTA : LIMITE_RODADAS_COMUM);
+  return {
+    /** Soma os tokens de cada chamada ao modelo (entrada + saída). */
+    registrarUso(uso: { entrada?: number | null; saida?: number | null } | null | undefined) {
+      tokens += (uso?.entrada ?? 0) + (uso?.saida ?? 0);
+    },
+    /** Uma busca do catálogo que trouxe fato novo conta como um item pedido. */
+    registrarResultadoNovo(nome: string) {
+      if (BUSCAS_DE_ITEM.has(nome)) itens++;
+    },
+    registrarRodadaComFerramentas() {
+      rodadas++;
+    },
+    estouro(): EstouroLimiteTurno | null {
+      if (tokens >= LIMITE_TOKENS_TURNO) return "tokens";
+      if (rodadas >= limite()) return "rodadas";
+      return null;
+    },
+    resumo() {
+      return { rodadas_com_ferramentas: rodadas, limite_rodadas: limite(), itens_catalogo: itens,
+        tokens, limite_tokens: LIMITE_TOKENS_TURNO };
+    },
+  };
+}
+
+export const INSTRUCAO_LIMITE_TURNO = "O limite de consultas desta mensagem foi atingido. Responda agora somente com os resultados já confirmados nas ferramentas deste turno, preservando todas as perguntas do paciente. Para itens que ainda não foram consultados, diga apenas que ainda não foram verificados e ofereça continuar na próxima mensagem; não diga que não existem nem que estão indisponíveis. Não faça novas consultas, não anuncie reserva e não invente fatos ausentes.";
+export const INSTRUCAO_RESPOSTA_EM_TEXTO = "Ferramentas não estão disponíveis nesta etapa. Responda agora ao paciente somente em texto, com os resultados já confirmados neste turno, sem anunciar novas consultas.";
 
 /** Remove somente orientações idênticas já presentes no histórico deste turno. */
 export function criarCompactadorRetornos() {

@@ -18,29 +18,31 @@ function simular(ambiente: string, cenario: string) {
 
 describe("geração real interrompe o turno após agenda sem vagas (serviços externos simulados)", () => {
   for (const ambiente of ["producao", "homologacao"]) {
-    test(`${ambiente}: oito rodadas com fatos novos continuam até a resposta, sem teto de seis`, () => {
+    test(`${ambiente}: consultas com fatos novos param no teto de seis e respondem com o que foi achado`, () => {
       const r = simular(ambiente, "progresso_longo");
-      expect(r.requests).toHaveLength(9);
-      expect(r.requests.every((req: any) => req.tools?.length > 0)).toBe(true);
-      expect(r.ferramentas.filter((n: string) => n === "consultar_disponibilidade")).toHaveLength(8);
+      expect(r.requests).toHaveLength(7);
+      expect(r.requests.slice(0, 6).every((req: any) => req.tools?.length > 0)).toBe(true);
+      expect(r.requests.at(-1).tools).toBeUndefined();
+      expect(r.ferramentas.filter((n: string) => n === "consultar_disponibilidade")).toHaveLength(6);
+      expect(r.etapas.some((e: { titulo: string }) => e.titulo === "Limite de consultas do turno atingido: concluir resposta")).toBe(true);
       expect(r.encaminhamentos).toHaveLength(0);
       expect(r.resposta).toContain("Qual data você prefere?");
       expect(r.rede).toBe(0);
     });
-    test(`${ambiente}: modo informativo também permite oito consultas independentes`, () => {
+    test(`${ambiente}: lista de itens do catálogo ganha o teto ampliado (oito consultas independentes)`, () => {
       const r = simular(ambiente, "progresso_longo_informativo");
       expect(r.requests).toHaveLength(9);
       expect(r.ferramentas.filter((n: string) => n === "consultar_cadastro")).toHaveLength(8);
       expect(r.encaminhamentos).toHaveLength(0);
     });
     for (const desfecho of ["aprovada", "reprovada"]) {
-      test(`${ambiente}: Jev mantém uma correção e reconferência mesmo após oito consultas (${desfecho})`, () => {
+      test(`${ambiente}: Jev mantém uma correção e reconferência mesmo após o teto de consultas (${desfecho})`, () => {
         const r = simular(ambiente, `progresso_longo_jev_${desfecho}`);
-        expect(r.requests).toHaveLength(10);
+        expect(r.requests).toHaveLength(8);
         expect(r.requests.at(-1).tools).toBeUndefined();
         expect(r.conferencias).toHaveLength(2);
         expect(r.conferencias.map((c: any) => c.jaCorrigida)).toEqual([false, true]);
-        expect(r.ferramentas).toHaveLength(8);
+        expect(r.ferramentas).toHaveLength(6);
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.resposta).toContain(desfecho === "aprovada" ? "Qual data você prefere?" : "preciso conferir essa informação");
       });
@@ -48,7 +50,8 @@ describe("geração real interrompe o turno após agenda sem vagas (serviços ex
     for (const cenario of ["resposta_vazia_recuperada", "resposta_vazia_persistente"]) {
       test(`${ambiente}: resposta vazia tenta síntese sem ferramentas e sem transferência (${cenario})`, () => {
         const r = simular(ambiente, cenario);
-        expect(r.requests).toHaveLength(2);
+        // Persistente: síntese vazia ganha uma nova tentativa só em texto antes da pergunta padrão.
+        expect(r.requests).toHaveLength(cenario.endsWith("recuperada") ? 2 : 3);
         expect(r.requests.at(-1).tools).toBeUndefined();
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.resposta).toContain(cenario.endsWith("recuperada") ? "Posso ajudar" : "Você prefere que eu tente novamente");
@@ -67,7 +70,7 @@ describe("geração real interrompe o turno após agenda sem vagas (serviços ex
     for (const cenario of ["loop_alternativas_vazio", "loop_alternativas_ignora"]) {
       test(`${ambiente}: síntese que falha pede escolha sem encaminhar (${cenario})`, () => {
         const r = simular(ambiente, cenario);
-        expect(r.requests).toHaveLength(3);
+        expect(r.requests).toHaveLength(4);
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.resposta).toContain("Você prefere que eu tente novamente ou encaminhe");
         expect(r.ferramentas).not.toContain("agendar");

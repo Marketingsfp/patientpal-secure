@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { criarCompactadorRetornos, criarProgressoTurno, REGRA_MODALIDADES_PAGAMENTO } from "../eficiencia-turno";
+import {
+  criarCompactadorRetornos, criarLimiteTurno, criarProgressoTurno, LIMITE_CHAMADAS_MODELO, LIMITE_RODADAS_COMUM,
+  LIMITE_RODADAS_LISTA, LIMITE_TOKENS_TURNO, REGRA_MODALIDADES_PAGAMENTO,
+} from "../eficiencia-turno";
 import { perguntasConferencia } from "../jev-conferencia";
 import { validarResultado } from "../tool-broker";
 
@@ -42,6 +45,46 @@ describe("progresso e contexto por turno", () => {
     expect(compactar({ instrucao: "Orientação nova", horarios: ["09:00"] })).toEqual({ instrucao: "Orientação nova", horarios: ["09:00"] });
     expect(primeiro).toEqual(original);
     expect(criarCompactadorRetornos()(primeiro)).toEqual(original);
+  });
+  test("mensagem comum para de consultar na 6ª rodada com ferramentas", () => {
+    const limite = criarLimiteTurno();
+    for (let i = 1; i < LIMITE_RODADAS_COMUM; i++) {
+      limite.registrarUso({ entrada: 20_000, saida: 200 });
+      limite.registrarRodadaComFerramentas();
+      expect(limite.estouro()).toBeNull();
+    }
+    limite.registrarRodadaComFerramentas();
+    expect(limite.estouro()).toBe("rodadas");
+    expect(limite.resumo().limite_rodadas).toBe(6);
+  });
+  test("lista com vários exames do catálogo ganha até 10 rodadas, mas não 30", () => {
+    const limite = criarLimiteTurno();
+    for (let i = 0; i < 4; i++) limite.registrarResultadoNovo("buscar_procedimentos");
+    for (let i = 1; i < LIMITE_RODADAS_LISTA; i++) {
+      limite.registrarRodadaComFerramentas();
+      expect(limite.estouro()).toBeNull();
+    }
+    limite.registrarRodadaComFerramentas();
+    expect(limite.estouro()).toBe("rodadas");
+    expect(limite.resumo().limite_rodadas).toBe(10);
+  });
+  test("buscas repetidas de médico não transformam a mensagem em lista", () => {
+    const limite = criarLimiteTurno();
+    for (let i = 0; i < 8; i++) limite.registrarResultadoNovo("buscar_medicos");
+    expect(limite.resumo().limite_rodadas).toBe(LIMITE_RODADAS_COMUM);
+  });
+  test("o orçamento de tokens interrompe antes do teto de rodadas", () => {
+    const limite = criarLimiteTurno();
+    limite.registrarUso({ entrada: LIMITE_TOKENS_TURNO - 1, saida: null });
+    limite.registrarRodadaComFerramentas();
+    expect(limite.estouro()).toBeNull();
+    limite.registrarUso({ entrada: null, saida: 1 });
+    expect(limite.estouro()).toBe("tokens");
+    limite.registrarUso(undefined);
+    expect(limite.resumo().tokens).toBe(LIMITE_TOKENS_TURNO);
+  });
+  test("trava final cobre o teto de lista, a resposta e as correções", () => {
+    expect(LIMITE_CHAMADAS_MODELO).toBeGreaterThan(LIMITE_RODADAS_LISTA + 1);
   });
   test("Jev recebe a mesma regra autorizada de equivalência Pix/cartão, sem dispensar verificação de valores", () => {
     const perguntas = perguntasConferencia({ agendaConsultada: false, agendamentoConfirmado: false,

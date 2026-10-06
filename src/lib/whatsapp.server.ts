@@ -1457,7 +1457,9 @@ async function gerarRespostaNinaInterno(
   instrucoesAdicionaisTurno.push({ codigo: "ENTENDIMENTO_DUAS_FALHAS", nivel: "inegociavel",
     origem: "src/lib/nina/jev-encaminhamento.ts", motivo: "Regra confirmada: duas mensagens do paciente sem entendimento encaminham.",
     texto: REGRA_DUAS_FALHAS_ENTENDIMENTO });
-  const { criarProgressoTurno, criarCompactadorRetornos, REGRA_EFICIENCIA_CONSULTAS, REGRA_MODALIDADES_PAGAMENTO, RESPOSTA_SEM_PROGRESSO } =
+  const { criarProgressoTurno, criarCompactadorRetornos, REGRA_EFICIENCIA_CONSULTAS, REGRA_MODALIDADES_PAGAMENTO, RESPOSTA_SEM_PROGRESSO,
+    criarLimiteTurno, LIMITE_RODADAS_COMUM, LIMITE_RODADAS_LISTA, LIMITE_TOKENS_TURNO, LIMITE_CHAMADAS_MODELO,
+    INSTRUCAO_LIMITE_TURNO, INSTRUCAO_RESPOSTA_EM_TEXTO } =
     await import("@/lib/nina/eficiencia-turno");
   instrucoesAdicionaisTurno.push(
     { codigo: "CONSULTAS_SEM_REDUNDANCIA", origem: "src/lib/nina/eficiencia-turno.ts", motivo: "Reutilizar vínculos oficiais sem repetir pesquisas.", texto: REGRA_EFICIENCIA_CONSULTAS },
@@ -1958,7 +1960,7 @@ async function gerarRespostaNinaInterno(
       modelParameters: {
         perfil: "whatsapp",
         pode_agendar: podeAgendar,
-        max_rodadas: null,
+        max_rodadas: { comum: LIMITE_RODADAS_COMUM, lista: LIMITE_RODADAS_LISTA, tokens: LIMITE_TOKENS_TURNO },
         controle_progresso: "novidade_dos_retornos",
         mensagens_contexto: mensagens.length,
       },
@@ -1995,8 +1997,11 @@ async function gerarRespostaNinaInterno(
   const fatosDoTurno: import("@/lib/nina/confidence/evidencia").FatoRecuperado[] = [];
   const consultasDoTurno: import("@/lib/nina/confidence/evidencia").ConsultaDoTurno[] = [];
   let semRespostaAposSintese = false;
-  let modoSintese: "sem_progresso" | "correcao" | null = null;
+  let modoSintese: "sem_progresso" | "limite" | "correcao" | null = null;
+  // Uma nova tentativa quando a rodada de resposta devolve ferramenta ou texto vazio.
+  let retentativaSintese = false;
   const progressoTurno = criarProgressoTurno();
+  const limiteTurno = criarLimiteTurno();
   const compactarRetorno = criarCompactadorRetornos();
   // Modalidade publicada ("atendimento agendado") não é uma reserva do
   // paciente. Uma afirmação real de reserva continua exigindo confirmação.
@@ -2391,6 +2396,14 @@ async function gerarRespostaNinaInterno(
     .catch(() => false);
   for (let rodada = 0; ; rodada++) {
     if (finalizacaoHandoff || turnoObsoleto || respostaNomeAtendimento) break;
+    // Trava final: nenhum caminho do laço passa deste número de chamadas ao modelo.
+    if (rodada >= LIMITE_CHAMADAS_MODELO) {
+      semRespostaAposSintese = true;
+      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Trava final de chamadas ao modelo",
+        dados: { rodada, ...limiteTurno.resumo() },
+        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "LIMITE_CHAMADAS_MODELO" } });
+      break;
+    }
     if (perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo) {
       resposta = ctxFerramentas.esclarecimentoCatalogo.pergunta;
       break;
@@ -2418,7 +2431,8 @@ async function gerarRespostaNinaInterno(
     // Rodadas com dados novos continuam. Repetição sem novidade pede síntese;
     // correções de texto também não autorizam ferramentas ou escritas extras.
     const sintetizarOpcoes = modoSintese !== null;
-    if (modoSintese === "sem_progresso") mensagens.push({ role: "system", content: agendaComOpcoes
+    if (modoSintese === "limite" && !retentativaSintese) mensagens.push({ role: "system", content: INSTRUCAO_LIMITE_TURNO });
+    if (modoSintese === "sem_progresso" && !retentativaSintese) mensagens.push({ role: "system", content: agendaComOpcoes
       ? "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes."
       : "As últimas consultas não trouxeram informação nova. Conclua com os fatos confirmados deste turno e preserve todas as perguntas independentes. Peça esclarecimento apenas sobre o item incerto. Falha técnica não significa dado ausente ou falta de vaga. Não faça novas consultas, não afirme operação sem gravação confirmada e não invente fatos ausentes." });
     const respostaIA = await ninaAIGateway({
@@ -2439,6 +2453,7 @@ async function gerarRespostaNinaInterno(
       },
     });
     nivelAnteriorTurno = respostaIA.nivel;
+    limiteTurno.registrarUso(respostaIA.uso);
     // Guarda a execução mais recente: é a que produz o texto devolvido.
     if (opcoes?.auditoria && respostaIA.execucaoId) {
       opcoes.auditoria.execucaoId = respostaIA.execucaoId;
@@ -2518,6 +2533,15 @@ async function gerarRespostaNinaInterno(
       if (c.function) c.function.name = nomeAtualDaFerramenta(String(c.function.name ?? ""));
     }
     if (sintetizarOpcoes && (chamadas.length > 0 || !(msg.content ?? "").trim())) {
+      // A chamada pedida nesta etapa é descartada; o modelo tem mais uma chance de responder em texto.
+      if (!retentativaSintese) {
+        retentativaSintese = true;
+        mensagens.push({ role: "system", content: INSTRUCAO_RESPOSTA_EM_TEXTO });
+        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Resposta sem texto na etapa final: nova tentativa",
+          dados: { rodada: rodada + 1, modo: modoSintese, ferramentas_descartadas: chamadas.map(c => c.function?.name ?? null) },
+          codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "INSTRUCAO_RESPOSTA_EM_TEXTO" } });
+        continue;
+      }
       semRespostaAposSintese = true;
       break;
     }
@@ -2685,7 +2709,10 @@ async function gerarRespostaNinaInterno(
 
       rastro?.iniciar("tool.execute", { ferramenta: nome });
       const r = await broker.executar(nome, c.function?.arguments);
-      houveProgresso = progressoTurno.registrar(nome, r) || houveProgresso;
+      if (progressoTurno.registrar(nome, r)) {
+        houveProgresso = true;
+        limiteTurno.registrarResultadoNovo(nome);
+      }
       if (["consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"].includes(nome)) {
         const dados = r.dados as Record<string, unknown> | null;
         agendaComOpcoes = r.success && !r.erro && dados?.ok === true &&
@@ -2852,6 +2879,15 @@ async function gerarRespostaNinaInterno(
       registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Consultas sem informação nova: concluir resposta",
         dados: { rodada: rodada + 1, motivo: "retornos_repetidos_ou_chamadas_bloqueadas" },
         codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarProgressoTurno" } });
+    }
+    limiteTurno.registrarRodadaComFerramentas();
+    const estouro = modoSintese === null ? limiteTurno.estouro() : null;
+    if (estouro) {
+      modoSintese = "limite";
+      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: estouro === "tokens"
+          ? "Limite de tokens do turno atingido: concluir resposta" : "Limite de consultas do turno atingido: concluir resposta",
+        dados: { rodada: rodada + 1, motivo: estouro, ...limiteTurno.resumo() },
+        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarLimiteTurno" } });
     }
   }
 
