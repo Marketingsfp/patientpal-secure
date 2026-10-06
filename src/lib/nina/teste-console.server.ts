@@ -259,7 +259,7 @@ export async function processarMensagemTeste(
       const agora = new Date().toISOString();
       const chamadasIA: import("./auditoria-ia").ChamadaIA[] = [];
       const registrarIA = (c: import("./auditoria-ia").ChamadaIA) => { chamadasIA.push(c); };
-      let leituraImagem: import("./leitura-imagem").LeituraImagem = { tipo: "ilegivel" };
+      let leituraImagem: import("./leitura-imagem").LeituraImagem = { tipo: "falha_tecnica", motivo: "download" };
       let media_url: string | null = null;
       let media_mime: string | null = null;
       if (ehAudio && data.audioArquivo && !retomada) {

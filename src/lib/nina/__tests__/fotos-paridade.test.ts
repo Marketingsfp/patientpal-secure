@@ -1,6 +1,6 @@
 import { expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { PEDIR_NOVA_FOTO } from "../fotos";
+import { PEDIR_NOVA_FOTO, FALHA_TECNICA_FOTO } from "../fotos";
 function executar(arquivo: string, args: string[], prefixo: string) {
   const p = Bun.spawnSync([process.execPath, fileURLToPath(new URL(`./fixtures/${arquivo}`, import.meta.url)), ...args], { stdout: "pipe", stderr: "pipe", timeout: 15000 });
   expect(p.exitCode, p.stderr.toString()).toBe(0);
@@ -10,7 +10,7 @@ function executar(arquivo: string, args: string[], prefixo: string) {
 }
 for (const caso of ["legivel", "ilegivel", "invalida", "indisponivel", "timeout"]) it(`leitura visual: ${caso}`, () => {
   const r = executar("fotos-leitura.fixture.ts", [caso], "FOTO=");
-  expect(r.resultado.tipo).toBe(caso === "legivel" ? "pedido_medico" : "ilegivel");
+  expect(r.resultado.tipo).toBe(caso === "legivel" ? "pedido_medico" : caso === "ilegivel" ? "ilegivel" : "falha_tecnica");
   expect(r.requisicao.model).toBe("google/gemini-2.5-flash");
   expect(r.requisicao.messages[1].content[1].image_url.url).toBe("data:image/jpeg;base64,AQID");
   expect(r.requisicao.temTimeout).toBe(true);
@@ -19,6 +19,13 @@ for (const caso of ["legivel", "ilegivel", "invalida", "indisponivel", "timeout"
   expect(r.auditoria[0].estado).toBe(["indisponivel", "timeout"].includes(caso) ? "falhou" : "concluido");
 });
 for (const ambiente of ["producao", "homologacao"]) {
+  for (const cenario of ["foto_apresentacao_entregue", "foto_apresentacao_falhou", "foto_tecnica"]) it(`${ambiente}: ${cenario}`, () => {
+    const r = executar("resposta-direta.fixture.ts", [ambiente, cenario], "DIRETA_RESULTADO=");
+    expect(r.resposta.replace(/\s+/g, " ")).toContain((cenario === "foto_tecnica" ? FALHA_TECNICA_FOTO : PEDIR_NOVA_FOTO).replace(/\s+/g, " "));
+    expect(r.resposta.includes("Me chamo Aurora")).toBe(cenario !== "foto_apresentacao_entregue");
+    expect(r.encaminhamentos).toHaveLength(0);
+    expect(r.requests).toHaveLength(0);
+  });
   it(`${ambiente}: foto legível segue ao modelo e não aciona limite de leitura`, () => {
     const r = executar("resposta-direta.fixture.ts", [ambiente, "foto_resolvida"], "DIRETA_RESULTADO=");
     expect(r.requests.length).toBeGreaterThan(0);
@@ -30,7 +37,10 @@ for (const ambiente of ["producao", "homologacao"]) {
       expect(r.rede).toBe(0);
       expect(r.requests).toHaveLength(0);
       if (["foto_primeira", "foto_pedido_pendente", "foto_sessao_nova"].includes(cenario)) {
-        expect(r.resposta).toBe(PEDIR_NOVA_FOTO);
+        expect(r.resposta).toContain(PEDIR_NOVA_FOTO);
+        expect(r.resposta).toContain("atendente virtual");
+        expect(r.resposta).toContain("Me chamo Aurora");
+        expect(r.resposta).toContain("Policlínica Vale Verde");
         expect(r.encaminhamentos).toHaveLength(0);
       } else if (cenario === "foto_obsoleto") {
         expect(r.encaminhamentos).toHaveLength(0);

@@ -909,6 +909,150 @@ async function gerarRespostaNinaInterno(
     ...dadosPublicosClinicaGrupo(clinicaId),
   };
 
+  // FASE 3 — BEHAVIOR PROMPT: única fonte comportamental é a versão PUBLICADA
+  // em Arquitetura → Instruções da Nina. Placeholders permitidos: só DADOS.
+  // Snapshot único por execução.
+  const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
+  const { PROMPT_NINA_WHATSAPP_V4 } = await import("@/lib/nina/prompt/behavior-v4");
+  // FASE 2 — IDENTIDADE EFETIVA: nome da assistente, nome e tipo do
+  // estabelecimento saem do bloco publicado NA MESMA versão que gera as
+  // instruções do turno. `clinicas.nome` continua sendo dado ADMINISTRATIVO
+  // (segue em `dadosPublicos`) e nunca substitui a identidade de apresentação.
+  const {
+    resolverIdentidadeEfetiva,
+    valoresIdentidade,
+    fatosIdentidade,
+    nomeCompletoEstabelecimento,
+  } = await import("@/lib/nina/identidade-efetiva");
+  // Prompt de reserva também consome a identidade efetiva: sem identidade
+  // publicada ele fala de forma NEUTRA, sem fixar outra persona.
+  const valoresNeutros = valoresIdentidade(
+    resolverIdentidadeEfetiva({ template: "", origem: "codigo", versao: null, versaoId: null }),
+  );
+  const promptReserva = Object.entries(valoresNeutros).reduce(
+    (texto, [marcador, valor]) => texto.split(marcador).join(valor),
+    PROMPT_NINA_WHATSAPP_V4,
+  );
+  const instrucoesNina = await promptInstrucoes(
+    "whatsapp",
+    // Os valores dependem do PRÓPRIO texto da versão do turno: instruções e
+    // identidade nunca vêm de versões diferentes.
+    (template) =>
+      valoresIdentidade(
+        resolverIdentidadeEfetiva({
+          template,
+          origem: "publicada",
+          versao: null,
+          versaoId: null,
+        }),
+      ),
+    promptReserva,
+    // FASE 2 — versão FIXA por turno: todas as rodadas usam este snapshot,
+    // mesmo que alguém publique no meio da resposta.
+    rastro?.ids.trace_id ?? null,
+  );
+  const behaviorPrompt = instrucoesNina.texto;
+  const identidadeEfetiva = resolverIdentidadeEfetiva({
+    template: instrucoesNina.template,
+    origem: instrucoesNina.origem,
+    versao: instrucoesNina.versao,
+    versaoId: instrucoesNina.versaoId,
+  });
+  const nomeApresentacao = identidadeEfetiva.apresentacao.estabelecimento;
+  // A etapa usa a apresentação realmente entregue na sessão e a identidade
+  // desta publicação. Recupera sessões afetadas pelo antigo detector literal,
+  // sem considerar candidatos não enviados ou mensagens de outros atendentes.
+  const {
+    garantirSessaoAtiva,
+    avaliarSaudacao,
+    marcarSaudacaoConcluida,
+    recuperarSaudacaoEntregue,
+    contemApresentacaoPublicada,
+  } = await import("@/lib/nina/saudacao-sessao");
+  const recuperacaoSaudacao = identidadeEfetiva.ok
+    ? recuperarSaudacaoEntregue(sessaoNina.estado, msgsMemoria, identidadeEfetiva.apresentacao, {
+        conversaId: estadoId.conversaId ?? null,
+        teste: opcoes?.teste === true,
+      })
+    : null;
+  if (recuperacaoSaudacao?.recuperada) {
+    await conferirReserva();
+    sessaoNina.estado = recuperacaoSaudacao.estado;
+    await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
+  }
+  const sessaoSaudacao = garantirSessaoAtiva(sessaoNina.estado);
+  sessaoNina.estado = sessaoSaudacao.estado;
+  if (sessaoSaudacao.novaSessao || sessaoNina.expirou) {
+    // A sessão aberta neste turno começa na 1ª mensagem recebida, não no
+    // processamento: senão os dados dessa mensagem somem do histórico.
+    const { inicioSessaoComEntradas } = await import("@/lib/nina/sessao");
+    sessaoNina.estado = inicioSessaoComEntradas(sessaoNina.estado, msgsMemoria, opcoes?.mensagensEntrada ?? []);
+  }
+  const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
+  const jaSeApresentou = !saudacaoObrigatoria;
+  console.info("[NINA_SESSION]", {
+    conversa_id: estadoId.conversaId,
+    nina_session_id: sessaoNina.estado.session_id,
+    new_session: sessaoSaudacao.novaSessao || sessaoNina.expirou,
+    greeting_required: saudacaoObrigatoria,
+    greeting_completed: sessaoNina.estado.greeting_completed === true,
+    greeting_recovered_from_message_id: recuperacaoSaudacao?.mensagemId ?? null,
+  });
+  if (!identidadeEfetiva.ok) {
+    console.warn("[NINA_IDENTIDADE]", {
+      clinica_id: clinicaId,
+      versao: identidadeEfetiva.versao,
+      origem_prompt: instrucoesNina.origem,
+      motivo: identidadeEfetiva.motivo,
+      detalhe: identidadeEfetiva.detalhe,
+    });
+  }
+
+  rastro?.concluir("instructions.published", {
+    versao: instrucoesNina.versao ?? null,
+    origem: instrucoesNina.origem ?? null,
+    publicado_em: instrucoesNina.publicadoEm ?? null,
+    motivo_origem: instrucoesNina.motivo ?? null,
+    identidade: fatosIdentidade(identidadeEfetiva),
+  });
+
+  // FASE 6 — rastreabilidade: guarda a REFERÊNCIA da versão usada nesta
+  // execução (não o texto). Mensagens antigas continuam mostrando a versão
+  // que valia na época, mesmo depois de novas publicações.
+  {
+    const { registrarPromptDaExecucao } = await import("@/lib/nina/evidencias.server");
+    registrarPromptDaExecucao({
+      escopo: "whatsapp",
+      versaoId: instrucoesNina.versaoId,
+      versao: instrucoesNina.versao,
+      publicadoEm: instrucoesNina.publicadoEm,
+      origem: instrucoesNina.origem,
+      conversaId: estadoId.conversaId ?? null,
+    });
+    // FASE 1 (Rastreabilidade) — SELEÇÃO DA VERSÃO registrada separadamente da
+    // origem da resposta. `cache` aqui é funcionamento normal (TTL); só é
+    // fallback por erro quando não houve versão publicada utilizável.
+    const { hashDoTexto: hashPrompt } = await import("@/lib/nina/confidence/hash");
+    const {
+      registrarVersaoPromptDoTurno,
+      registrarConversaDoTurno,
+    } = await import("@/lib/nina/rastreio/turno.server");
+    registrarConversaDoTurno(estadoId.conversaId ?? null);
+    registrarVersaoPromptDoTurno({
+      escopo: "whatsapp",
+      versaoId: instrucoesNina.versaoId,
+      versao: instrucoesNina.versao,
+      publicadoEm: instrucoesNina.publicadoEm,
+      origem: instrucoesNina.origem,
+      // FASE 2 — o próprio runtime informa se houve falha e por quê; não é
+      // mais deduzido aqui.
+      fallbackPorErro: instrucoesNina.fallbackPorErro,
+      motivo: instrucoesNina.motivo,
+      hash: hashPrompt(behaviorPrompt),
+      carregadoEm: new Date().toISOString(),
+    });
+  }
+
   // Fotos não compreendidas seguem a mesma regra nos dois transportes, antes do Jev/modelo.
   const { resolverFotosDoTurno } = await import("@/lib/nina/fotos.server");
   const fotosOuEntradasNaoLidas = (opcoes?.mensagensEntrada ?? []).some(id =>
@@ -920,6 +1064,16 @@ async function gerarRespostaNinaInterno(
     obsoleta: async () => opcoes?.revisao?.valor ? (await import("@/lib/nina/revisao-conversa.server")).respostaObsoleta({
       clinicaId, telefone: opcoes.revisao.telefone, revisaoProcessada: opcoes.revisao.valor }) : false }) : null;
   if (respostaFoto) {
+    if (respostaFoto.estado === "entregar" && respostaFoto.origem === "midia") {
+      const { apresentarRespostaDeFoto } = await import("@/lib/nina/fotos");
+      respostaFoto.texto = apresentarRespostaDeFoto(respostaFoto.texto, saudacaoObrigatoria,
+        identidadeEfetiva.ok ? { assistente: identidadeEfetiva.apresentacao.assistente,
+          estabelecimento: nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao) } : null);
+      // Persistir a sessão, não uma apresentação ainda não entregue. O próximo turno recupera
+      // a saudação apenas da mensagem enviada, mantendo retries/falhas de entrega seguros.
+      await conferirReserva();
+      await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
+    }
     if (rastro) rastro.ids.conversation_id = estadoId.conversaId;
     (await import("@/lib/nina/rastreio/turno.server")).registrarConversaDoTurno(estadoId.conversaId);
     if (opcoes?.auditoria) opcoes.auditoria.resultado = respostaFoto;
@@ -1093,150 +1247,6 @@ async function gerarRespostaNinaInterno(
   const contextoRemetenteFato = fatosRemetente(identidadePaciente);
 
 
-
-  // FASE 3 — BEHAVIOR PROMPT: única fonte comportamental é a versão PUBLICADA
-  // em Arquitetura → Instruções da Nina. Placeholders permitidos: só DADOS.
-  // Snapshot único por execução.
-  const { promptInstrucoes } = await import("@/lib/nina/instrucoes-runtime.server");
-  const { PROMPT_NINA_WHATSAPP_V4 } = await import("@/lib/nina/prompt/behavior-v4");
-  // FASE 2 — IDENTIDADE EFETIVA: nome da assistente, nome e tipo do
-  // estabelecimento saem do bloco publicado NA MESMA versão que gera as
-  // instruções do turno. `clinicas.nome` continua sendo dado ADMINISTRATIVO
-  // (segue em `dadosPublicos`) e nunca substitui a identidade de apresentação.
-  const {
-    resolverIdentidadeEfetiva,
-    valoresIdentidade,
-    fatosIdentidade,
-    nomeCompletoEstabelecimento,
-  } = await import("@/lib/nina/identidade-efetiva");
-  // Prompt de reserva também consome a identidade efetiva: sem identidade
-  // publicada ele fala de forma NEUTRA, sem fixar outra persona.
-  const valoresNeutros = valoresIdentidade(
-    resolverIdentidadeEfetiva({ template: "", origem: "codigo", versao: null, versaoId: null }),
-  );
-  const promptReserva = Object.entries(valoresNeutros).reduce(
-    (texto, [marcador, valor]) => texto.split(marcador).join(valor),
-    PROMPT_NINA_WHATSAPP_V4,
-  );
-  const instrucoesNina = await promptInstrucoes(
-    "whatsapp",
-    // Os valores dependem do PRÓPRIO texto da versão do turno: instruções e
-    // identidade nunca vêm de versões diferentes.
-    (template) =>
-      valoresIdentidade(
-        resolverIdentidadeEfetiva({
-          template,
-          origem: "publicada",
-          versao: null,
-          versaoId: null,
-        }),
-      ),
-    promptReserva,
-    // FASE 2 — versão FIXA por turno: todas as rodadas usam este snapshot,
-    // mesmo que alguém publique no meio da resposta.
-    rastro?.ids.trace_id ?? null,
-  );
-  const behaviorPrompt = instrucoesNina.texto;
-  const identidadeEfetiva = resolverIdentidadeEfetiva({
-    template: instrucoesNina.template,
-    origem: instrucoesNina.origem,
-    versao: instrucoesNina.versao,
-    versaoId: instrucoesNina.versaoId,
-  });
-  const nomeApresentacao = identidadeEfetiva.apresentacao.estabelecimento;
-  // A etapa usa a apresentação realmente entregue na sessão e a identidade
-  // desta publicação. Recupera sessões afetadas pelo antigo detector literal,
-  // sem considerar candidatos não enviados ou mensagens de outros atendentes.
-  const {
-    garantirSessaoAtiva,
-    avaliarSaudacao,
-    marcarSaudacaoConcluida,
-    recuperarSaudacaoEntregue,
-    contemApresentacaoPublicada,
-  } = await import("@/lib/nina/saudacao-sessao");
-  const recuperacaoSaudacao = identidadeEfetiva.ok
-    ? recuperarSaudacaoEntregue(sessaoNina.estado, msgsMemoria, identidadeEfetiva.apresentacao, {
-        conversaId: estadoId.conversaId ?? null,
-        teste: opcoes?.teste === true,
-      })
-    : null;
-  if (recuperacaoSaudacao?.recuperada) {
-    await conferirReserva();
-    sessaoNina.estado = recuperacaoSaudacao.estado;
-    await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
-  }
-  const sessaoSaudacao = garantirSessaoAtiva(sessaoNina.estado);
-  sessaoNina.estado = sessaoSaudacao.estado;
-  if (sessaoSaudacao.novaSessao || sessaoNina.expirou) {
-    // A sessão aberta neste turno começa na 1ª mensagem recebida, não no
-    // processamento: senão os dados dessa mensagem somem do histórico.
-    const { inicioSessaoComEntradas } = await import("@/lib/nina/sessao");
-    sessaoNina.estado = inicioSessaoComEntradas(sessaoNina.estado, msgsMemoria, opcoes?.mensagensEntrada ?? []);
-  }
-  const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
-  const jaSeApresentou = !saudacaoObrigatoria;
-  console.info("[NINA_SESSION]", {
-    conversa_id: estadoId.conversaId,
-    nina_session_id: sessaoNina.estado.session_id,
-    new_session: sessaoSaudacao.novaSessao || sessaoNina.expirou,
-    greeting_required: saudacaoObrigatoria,
-    greeting_completed: sessaoNina.estado.greeting_completed === true,
-    greeting_recovered_from_message_id: recuperacaoSaudacao?.mensagemId ?? null,
-  });
-  if (!identidadeEfetiva.ok) {
-    console.warn("[NINA_IDENTIDADE]", {
-      clinica_id: clinicaId,
-      versao: identidadeEfetiva.versao,
-      origem_prompt: instrucoesNina.origem,
-      motivo: identidadeEfetiva.motivo,
-      detalhe: identidadeEfetiva.detalhe,
-    });
-  }
-
-  rastro?.concluir("instructions.published", {
-    versao: instrucoesNina.versao ?? null,
-    origem: instrucoesNina.origem ?? null,
-    publicado_em: instrucoesNina.publicadoEm ?? null,
-    motivo_origem: instrucoesNina.motivo ?? null,
-    identidade: fatosIdentidade(identidadeEfetiva),
-  });
-
-  // FASE 6 — rastreabilidade: guarda a REFERÊNCIA da versão usada nesta
-  // execução (não o texto). Mensagens antigas continuam mostrando a versão
-  // que valia na época, mesmo depois de novas publicações.
-  {
-    const { registrarPromptDaExecucao } = await import("@/lib/nina/evidencias.server");
-    registrarPromptDaExecucao({
-      escopo: "whatsapp",
-      versaoId: instrucoesNina.versaoId,
-      versao: instrucoesNina.versao,
-      publicadoEm: instrucoesNina.publicadoEm,
-      origem: instrucoesNina.origem,
-      conversaId: estadoId.conversaId ?? null,
-    });
-    // FASE 1 (Rastreabilidade) — SELEÇÃO DA VERSÃO registrada separadamente da
-    // origem da resposta. `cache` aqui é funcionamento normal (TTL); só é
-    // fallback por erro quando não houve versão publicada utilizável.
-    const { hashDoTexto: hashPrompt } = await import("@/lib/nina/confidence/hash");
-    const {
-      registrarVersaoPromptDoTurno,
-      registrarConversaDoTurno,
-    } = await import("@/lib/nina/rastreio/turno.server");
-    registrarConversaDoTurno(estadoId.conversaId ?? null);
-    registrarVersaoPromptDoTurno({
-      escopo: "whatsapp",
-      versaoId: instrucoesNina.versaoId,
-      versao: instrucoesNina.versao,
-      publicadoEm: instrucoesNina.publicadoEm,
-      origem: instrucoesNina.origem,
-      // FASE 2 — o próprio runtime informa se houve falha e por quê; não é
-      // mais deduzido aqui.
-      fallbackPorErro: instrucoesNina.fallbackPorErro,
-      motivo: instrucoesNina.motivo,
-      hash: hashPrompt(behaviorPrompt),
-      carregadoEm: new Date().toISOString(),
-    });
-  }
 
   // ---------------------------------------------------------------- agendar
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente

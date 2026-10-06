@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { decidirFotos, PEDIR_NOVA_FOTO, type MensagemFoto } from "./fotos";
+import { decidirFotos, PEDIR_NOVA_FOTO, FALHA_TECNICA_FOTO, type MensagemFoto } from "./fotos";
 import { criarResultado, criarResultadoSemNovaMensagem } from "./resposta/contrato";
 
 /** Regra compartilhada antes do Jev, do modelo de conversa e de qualquer agendamento. */
@@ -31,6 +31,8 @@ export async function resolverFotosDoTurno(ctx: {
   registrarOrigemResposta("codigo", "controle das tentativas de leitura de fotos");
   registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Leitura de foto",
     dados: { acao: decisao.acao, motivo: decisao.motivo, mensagens: entradas.map(m => m.id) } });
+  if (decisao.acao === "falha_tecnica") return criarResultado({ origem: "midia", texto: FALHA_TECNICA_FOTO,
+    restricoes: ["falha_tecnica_na_foto", "nao_inferir_conteudo_da_foto"] });
   if (decisao.acao === "nova_foto") return criarResultado({ origem: "midia", texto: PEDIR_NOVA_FOTO,
     restricoes: ["foto_nao_compreendida", "nao_inferir_conteudo_da_foto"] });
   const { criarToolBroker } = await import("./tool-broker.server");

@@ -1,6 +1,6 @@
 import { expect, it } from "bun:test";
-import { decidirFotos, PEDIR_NOVA_FOTO, type MensagemFoto } from "../fotos";
-import { interpretarLeituraImagem, textoDaImagem } from "../leitura-imagem";
+import { decidirFotos, PEDIR_NOVA_FOTO, FALHA_TECNICA_FOTO, apresentarRespostaDeFoto, leituraSalvaDaFoto, type MensagemFoto } from "../fotos";
+import { interpretarLeituraImagem, textoDaImagem, MAX_ITENS_IMAGEM } from "../leitura-imagem";
 import { montarHistoricoJev } from "../jev-contexto";
 const foto = (id: string, segundo: number, tipo = "ilegivel"): MensagemFoto => ({
   id, created_at: `2026-10-04T12:00:${String(segundo).padStart(2, "0")}Z`, direction: "in", tipo: "image",
@@ -29,10 +29,34 @@ it("resultado ou receita de remédio vai à equipe; texto nunca é contado como 
   expect(decidirFotos([{ ...foto("b", 20), tipo: "text" }], [pedido]).acao).toBe("continuar");
 });
 it("leitura parcial ou inválida não libera nomes presumidos", () => {
-  for (const itens of [[], ["ECG", null], Array(16).fill("ECG"), ["x".repeat(81)]])
+  for (const itens of [[], ["ECG", null], ["x".repeat(81)]])
     expect(interpretarLeituraImagem(JSON.stringify({ tipo: "pedido_medico", itens })).tipo).toBe("ilegivel");
   expect(interpretarLeituraImagem('{"tipo":"ilegivel","itens":["talvez ECG"]}').tipo).toBe("ilegivel");
   expect(textoDaImagem({ tipo: "ilegivel" })).not.toContain("pedido médico com");
+});
+it("preserva os 19 exames do pedido fotografado, sem confundir quantidade com ilegibilidade", () => {
+  const itens = ["Hemograma completo", "Uréia", "Creatinina", "Sódio", "Potássio", "Lipidograma completo",
+    "Hepatograma completo", "Glicemia jejum", "Hemoglobina glicada", "Vitamina B12", "Ácido fólico",
+    "25 hidroxi vitamina D", "TSH", "T4 livre", "Ferro", "Ferritina", "Transferrina", "VDRL", "VHS"];
+  const leitura = interpretarLeituraImagem(JSON.stringify({ tipo: "pedido_medico", itens }));
+  expect(leitura).toEqual({ tipo: "pedido_medico", itens });
+  expect(leituraSalvaDaFoto({ nina_leitura_imagem: leitura })).toEqual(leitura);
+  expect(textoDaImagem(leitura)).toContain("VDRL; VHS");
+});
+it("limite de carga e JSON inválido são falhas técnicas, não foto borrada", () => {
+  expect(interpretarLeituraImagem(JSON.stringify({ tipo: "pedido_medico", itens: Array(MAX_ITENS_IMAGEM + 1).fill("ECG") })))
+    .toEqual({ tipo: "falha_tecnica", motivo: "limite_itens" });
+  expect(interpretarLeituraImagem("JSON inválido")).toEqual({ tipo: "falha_tecnica", motivo: "resposta_invalida" });
+  const falha = { ...foto("f", 20), raw: { nina_leitura_imagem: { tipo: "falha_tecnica", motivo: "provedor" } } };
+  expect(decidirFotos([falha], [pedido]).acao).toBe("falha_tecnica");
+  expect(decidirFotos([foto("nova", 30)], [{ ...pedido, body: FALHA_TECNICA_FOTO }]).acao).toBe("nova_foto");
+});
+it("apresentação usa identidade publicada e mantém reconhecimento da segunda tentativa", () => {
+  const texto = apresentarRespostaDeFoto(PEDIR_NOVA_FOTO, true, { assistente: "Ana", estabelecimento: "Clínica Exemplo" });
+  expect(texto).toStartWith("Olá! Me chamo Ana, atendente virtual da Clínica Exemplo.");
+  expect(decidirFotos([foto("b", 20)], [{ ...pedido, body: texto }]).acao).toBe("encaminhar");
+  expect(apresentarRespostaDeFoto(PEDIR_NOVA_FOTO, false, null)).toBe(PEDIR_NOVA_FOTO);
+  expect(apresentarRespostaDeFoto("", true, null)).toBe("");
 });
 it("Jev recebe o texto lido na foto no histórico, não a marcação Imagem", () => {
   const h = montarHistoricoJev([{ id: "f", direction: "in", tipo: "image", body: "Imagem", transcricao: "Pedido de ECG", created_at: "2026-10-04T12:00:00Z" }]);

@@ -205,7 +205,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // Caminho do arquivo no bucket privado (imagem e áudio recebidos).
                 let caminhoMidia: string | null = null;
                 // Classificação persistida: o núcleo controla leitura, nova tentativa e encaminhamento.
-                let leituraImagem: import("@/lib/nina/leitura-imagem").LeituraImagem = { tipo: "ilegivel" };
+                let leituraImagem: import("@/lib/nina/leitura-imagem").LeituraImagem = { tipo: "falha_tecnica", motivo: "download" };
                 const legendaImagem = ehImagem ? bloquearLinksRecebidos(String(msg.image?.caption ?? "").trim()) : "";
 
                 if (ehAudio || ehImagem) {
@@ -221,7 +221,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 if (imagemExistente?.error) throw new Error("Não foi possível conferir a foto recebida anteriormente");
                 if (imagemExistente?.data) {
                   const { leituraSalvaDaFoto } = await import("@/lib/nina/fotos");
-                  leituraImagem = leituraSalvaDaFoto(imagemExistente.data.raw) ?? { tipo: "ilegivel" };
+                  leituraImagem = leituraSalvaDaFoto(imagemExistente.data.raw) ?? { tipo: "falha_tecnica", motivo: "resposta_invalida" };
                   caminhoMidia = imagemExistente.data.media_url;
                   mediaMime = imagemExistente.data.media_mime;
                 }

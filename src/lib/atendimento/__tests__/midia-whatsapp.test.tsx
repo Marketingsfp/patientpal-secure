@@ -74,13 +74,13 @@ describe("leitura da imagem: só identifica pedido", () => {
     }
   });
 
-  it("leitura inválida pede nova foto, não declara conteúdo legível", () => {
-    expect(interpretarLeituraImagem("não sei")).toEqual({ tipo: "ilegivel" });
-    expect(interpretarLeituraImagem("{ quebrado")).toEqual({ tipo: "ilegivel" });
-    expect(interpretarLeituraImagem('{"tipo":"resultado_exame","itens":["Glicose 98"]}')).toEqual({ tipo: "ilegivel" });
+  it("resposta inválida indica falha técnica, sem declarar conteúdo nem julgar a foto", () => {
+    expect(interpretarLeituraImagem("não sei")).toEqual({ tipo: "falha_tecnica", motivo: "resposta_invalida" });
+    expect(interpretarLeituraImagem("{ quebrado")).toEqual({ tipo: "falha_tecnica", motivo: "resposta_invalida" });
+    expect(interpretarLeituraImagem('{"tipo":"resultado_exame","itens":["Glicose 98"]}')).toEqual({ tipo: "falha_tecnica", motivo: "resposta_invalida" });
     expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[]}')).toEqual({ tipo: "ilegivel" });
     expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[1,null,"a"]}')).toEqual({ tipo: "ilegivel" });
-    expect(interpretarLeituraImagem(null)).toEqual({ tipo: "ilegivel" });
+    expect(interpretarLeituraImagem(null)).toEqual({ tipo: "falha_tecnica", motivo: "resposta_invalida" });
   });
 
   it("o texto entregue à Nina vem na voz do paciente, com a legenda se houver", () => {

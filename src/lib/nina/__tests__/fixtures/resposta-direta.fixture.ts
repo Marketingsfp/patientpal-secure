@@ -10,6 +10,7 @@ import { selecionarVagaValidada } from "../../agendamento-escolha";
 import { cenariosContextuais } from "./consulta-contextual-cenarios";
 import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 import { apresentarPerguntaEsclarecimento } from "../../esclarecimento-apresentacao";
+import { montarBlocoIdentidade } from "../../identidade-atendimento";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const fotoCenario = process.argv[3]?.startsWith("foto_");
@@ -202,6 +203,7 @@ const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfe
   : regraCatalogo ? "Técnica" : "Dra. Ana Souza";
 const respostaModelo = "Eletrocardiograma: R$ 80,00 no dinheiro e R$ 95,00 no cartão. Profissional: " + nomeProfissional + ". Segunda a sexta, das 8h às 12h. Sem jejum. Leve o pedido médico.";
 const prompt = "Você é Nina. Consulte a base e informe preço, profissional, horário e preparo solicitados. Não acrescente saudação à resposta sobre exames."
+  + (fotoCenario ? "\n" + montarBlocoIdentidade({ assistente: "Aurora", estabelecimento: "Vale Verde", tipoEstabelecimento: "Policlínica" }) : "")
   + (contextual ? `\n\n${CONTINUIDADE_CONSULTA_AGENDA}` : "");
 const agora = Date.now();
 const estadoContextual = { ...estadoVazio(), session_id: "sessao-contextual",
@@ -314,11 +316,14 @@ const mensagensContextuais = semNomeCenario ? [
   ...(cenario === "catalogo_multiplas_retomada" ? [registroMensagem(estadoContextual.knowledge_context!.esclarecimento!.pergunta, 1)] : []),
   { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
 ] : fotoCenario ? [
-  ...(cenario === "foto_primeira" ? [] : [{ ...registroMensagem(PEDIR_NOVA_FOTO, 1), enviada_por: "nina",
+  ...(cenario.startsWith("foto_apresentacao_") ? [{ ...registroMensagem("Olá! Me chamo Aurora, atendente virtual da Policlínica Vale Verde.", 0),
+    clinica_id: "clinica-simulada", enviada_por: "nina", status: cenario.endsWith("falhou") ? "failed" : "sent" }] : []),
+  ...(cenario === "foto_primeira" || cenario.startsWith("foto_apresentacao_") || cenario === "foto_tecnica" ? [] : [{ ...registroMensagem(PEDIR_NOVA_FOTO, 1), enviada_por: "nina",
     clinica_id: "clinica-simulada", status: cenario === "foto_pedido_pendente" ? "pending" : "sent" }]),
   { ...registroMensagem("Foto", 18, "in", "received"), id: "entrada-simulada", clinica_id: "clinica-simulada", tipo: "image",
     transcricao: cenario === "foto_resolvida" ? "Enviei a foto de um pedido médico com: ECG." : "[Foto recebida: não foi possível ler com segurança.]",
-    raw: { nina_leitura_imagem: cenario === "foto_resolvida" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" } } },
+    raw: { nina_leitura_imagem: cenario === "foto_tecnica" ? { tipo: "falha_tecnica", motivo: "provedor" }
+      : cenario === "foto_resolvida" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" } } },
 ] : unificado ? [
   ...(cenario.endsWith("primeiro") ? [] : [registroMensagem(cenario.includes("fechamento")
     ? apresentarPerguntaEsclarecimento(perguntaEsclarecimento, { tipo: "procedimento", tipoAtendimento: "exame_procedimento" })
