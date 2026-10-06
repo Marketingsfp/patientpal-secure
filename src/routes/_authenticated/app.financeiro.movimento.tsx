@@ -2600,6 +2600,7 @@ function Page() {
           de={fromDate}
           ate={toDate}
           usuario={filterUsuario}
+          recarga={recarga}
         />
       )}
 

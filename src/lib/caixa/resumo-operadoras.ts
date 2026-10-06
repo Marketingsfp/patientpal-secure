@@ -36,6 +36,8 @@ export interface MovOperadora {
   tipo: string;
   valor: number | string | null;
   forma_pagamento: string | null;
+  /** Hora do movimento — só a conta "desde a última sangria" usa. */
+  created_at?: string | null;
 }
 
 /**
@@ -223,4 +225,82 @@ export function resumoOperadoras(
     },
   );
   return { linhas, total };
+}
+
+/** Uma operadora com caixa aberto, no card "Total em espécie (pré-sangria)". */
+export interface LinhaPreSangria {
+  userId: string;
+  nome: string;
+  /** Dinheiro recebido de paciente que ainda não saiu da gaveta por sangria. */
+  especie: number;
+  /** Hora (ISO) da última sangria; null se ainda não houve sangria no caixa. */
+  ultimaSangria: string | null;
+}
+
+export interface ResumoPreSangria {
+  linhas: LinhaPreSangria[];
+  total: number;
+}
+
+/**
+ * Quanto falta recolher de cada gaveta: dinheiro recebido (líquido de estorno
+ * em dinheiro) − sangrias − despesas pagas da gaveta. Pedido do dono em
+ * 06/10/2026, para o financeiro não abrir sessão por sessão.
+ *
+ * NÃO é "o que entrou depois da última sangria": a sangria sai em valor
+ * redondo e deixa resto na gaveta. Mayara, 06/10/2026: às 12:56 tinha
+ * R$ 3.092 em dinheiro e a sangria levou R$ 2.800 — os R$ 292 continuavam lá.
+ * Contar só depois da última sangria dava R$ 1.426 no fim do dia; o que havia
+ * para entregar era R$ 1.663.
+ *
+ * Só caixa aberto entra: o de caixa fechado foi entregue no fechamento
+ * ("Sobra entregue no fechamento"). Troco de abertura e suprimento ficam de
+ * fora — não são dinheiro recebido de paciente. Se a sangria levou também o
+ * troco, o pendente é zero, nunca negativo.
+ */
+export function especiePreSangria(
+  sessoes: SessaoOperadora[],
+  movs: MovOperadora[],
+): ResumoPreSangria {
+  const abertas = new Set(sessoes.filter((s) => s.status !== "fechado").map((s) => s.id));
+  const saldoPorSessao = new Map<string, number>();
+  const ultimaPorSessao = new Map<string, string>();
+  for (const m of movs) {
+    if (!abertas.has(m.sessao_id)) continue;
+    const v = num(m.valor);
+    let delta = 0;
+    if (m.tipo === "recebimento" && ehDinheiro(m.forma_pagamento)) delta = v;
+    else if (m.tipo === "estorno" && ehDinheiro(m.forma_pagamento)) delta = -v;
+    else if (m.tipo === "sangria") delta = -v;
+    else if (m.tipo === "despesa" && saiDaGaveta(m.forma_pagamento)) delta = -v;
+    if (delta) saldoPorSessao.set(m.sessao_id, (saldoPorSessao.get(m.sessao_id) ?? 0) + delta);
+    if (m.tipo === "sangria" && m.created_at) {
+      const atual = ultimaPorSessao.get(m.sessao_id);
+      if (!atual || Date.parse(m.created_at) > Date.parse(atual)) {
+        ultimaPorSessao.set(m.sessao_id, m.created_at);
+      }
+    }
+  }
+
+  const porUsuario = new Map<string, LinhaPreSangria>();
+  for (const s of sessoes) {
+    if (!abertas.has(s.id)) continue;
+    const linha = porUsuario.get(s.user_id) ?? {
+      userId: s.user_id,
+      nome: s.user_nome?.trim() || "Sem nome",
+      especie: 0,
+      ultimaSangria: null,
+    };
+    linha.especie = r2(linha.especie + Math.max(0, saldoPorSessao.get(s.id) ?? 0));
+    const corte = ultimaPorSessao.get(s.id) ?? null;
+    if (corte && (!linha.ultimaSangria || Date.parse(corte) > Date.parse(linha.ultimaSangria))) {
+      linha.ultimaSangria = corte;
+    }
+    porUsuario.set(s.user_id, linha);
+  }
+
+  const linhas = Array.from(porUsuario.values()).sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR"),
+  );
+  return { linhas, total: r2(linhas.reduce((acc, l) => acc + l.especie, 0)) };
 }

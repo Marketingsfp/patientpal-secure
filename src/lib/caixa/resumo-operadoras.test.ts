@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { resumoOperadoras, type MovOperadora, type SessaoOperadora } from "./resumo-operadoras";
+import {
+  especiePreSangria,
+  resumoOperadoras,
+  type MovOperadora,
+  type SessaoOperadora,
+} from "./resumo-operadoras";
 
 const sessao = (
   p: Partial<SessaoOperadora> & { id: string; user_id: string },
@@ -107,5 +112,76 @@ describe("resumoOperadoras", () => {
     const l = resumoOperadoras(s, m).linhas[0];
     expect(l.gaveta).toBe(200);
     expect(l.calculado).toBe(90);
+  });
+});
+
+describe("especiePreSangria", () => {
+  const movH = (
+    sessao_id: string,
+    tipo: string,
+    valor: number,
+    hora: string,
+    forma: string | null = null,
+  ) =>
+    ({
+      sessao_id,
+      tipo,
+      valor,
+      forma_pagamento: forma,
+      created_at: `2026-10-06T${hora}:00Z`,
+    }) as MovOperadora;
+
+  it("guarda o resto que a sangria redonda deixou na gaveta", () => {
+    // Mayara, 06/10/2026: R$ 3.092 na gaveta, sangria de R$ 2.800 às 12:56.
+    const s = [sessao({ id: "a", user_id: "u1", user_nome: "MAYARA", status: "aberto" })];
+    const m = [
+      movH("a", "abertura", 100, "08:00"),
+      movH("a", "recebimento", 3092, "09:00", "dinheiro"),
+      movH("a", "sangria", 2800, "12:56"),
+      movH("a", "recebimento", 150, "13:00", "dinheiro"),
+      movH("a", "recebimento", 200, "13:30", "pix"),
+      movH("a", "estorno", 20, "13:40", "dinheiro"),
+      movH("a", "despesa", 10, "13:50"),
+      movH("a", "suprimento", 50, "14:00"),
+    ];
+    const r = especiePreSangria(s, m);
+    expect(r.linhas).toEqual([
+      { userId: "u1", nome: "MAYARA", especie: 412, ultimaSangria: "2026-10-06T12:56:00Z" },
+    ]);
+    expect(r.total).toBe(412);
+  });
+
+  it("sem sangria ainda, conta todo o dinheiro do caixa", () => {
+    const s = [sessao({ id: "b", user_id: "u2", user_nome: "NICOLE", status: "aberto" })];
+    const m = [movH("b", "recebimento", 120, "09:00", "dinheiro")];
+    const l = especiePreSangria(s, m).linhas[0];
+    expect(l.especie).toBe(120);
+    expect(l.ultimaSangria).toBeNull();
+  });
+
+  it("sangria que levou também o troco não deixa o pendente negativo", () => {
+    const s = [sessao({ id: "t", user_id: "u6", status: "aberto", valor_abertura: 100 })];
+    const m = [
+      movH("t", "abertura", 100, "08:00"),
+      movH("t", "recebimento", 50, "09:00", "dinheiro"),
+      movH("t", "sangria", 150, "10:00"),
+    ];
+    expect(especiePreSangria(s, m).total).toBe(0);
+  });
+
+  it("caixa fechado fica de fora e o total junta as operadoras", () => {
+    const s = [
+      sessao({ id: "f", user_id: "u3", user_nome: "MAYARA" }),
+      sessao({ id: "c", user_id: "u4", user_nome: "CARLA", status: "aberto" }),
+      sessao({ id: "d", user_id: "u5", user_nome: "DANI", status: "aberto" }),
+    ];
+    const m = [
+      movH("f", "recebimento", 999, "09:00", "dinheiro"),
+      movH("c", "recebimento", 40, "09:00", "dinheiro"),
+      movH("d", "recebimento", 35.5, "09:00", "dinheiro"),
+    ];
+    const r = especiePreSangria(s, m);
+    expect(r.linhas.map((l) => l.nome)).toEqual(["CARLA", "DANI"]);
+    expect(r.total).toBe(75.5);
   });
 });
