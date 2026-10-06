@@ -31,6 +31,8 @@ export type Conferencia = {
   conferido_em: string;
   xml_lido: boolean;
   faltando: (keyof CamposAutorizados)[];
+  /** XML autorizado lido e sem vISSQN: a nota não destaca ISS (valor_iss gravado = 0). */
+  sem_iss_destacado?: boolean;
   divergencia_aliquota: null | {
     cadastro_emitente: number;
     autorizada: number;
@@ -92,11 +94,15 @@ export function montarCamposAutorizados(
     rps_numero: num(body.numero_rps) ?? x?.rps_numero ?? null,
     rps_serie: vazio(body.serie_rps) ?? x?.rps_serie ?? null,
     aliquota_iss: x?.aliquota_iss ?? null,
-    valor_iss: x?.valor_iss ?? null,
+    // XML autorizado lido sem vISSQN: a nota autorizada não destaca ISS, então
+    // o ISS dela é zero — zero é o fato, não um palpite. Continua proibido usar
+    // o valor calculado por nós. Sem XML nenhum, não há fato: fica nulo.
+    valor_iss: x ? (x.valor_iss ?? 0) : null,
     chave_acesso: chaveDoJson(body) ?? x?.chave_acesso ?? null,
   };
+  const semIss = !!x && x.valor_iss === null;
   const faltando = (Object.keys(campos) as (keyof CamposAutorizados)[]).filter(
-    (k) => campos[k] === null,
+    (k) => campos[k] === null || (k === "valor_iss" && semIss),
   );
   const divergente =
     campos.aliquota_iss !== null &&
@@ -108,6 +114,7 @@ export function montarCamposAutorizados(
       conferido_em: agora.toISOString(),
       xml_lido: !!x,
       faltando,
+      ...(semIss ? { sem_iss_destacado: true } : {}),
       divergencia_aliquota: divergente
         ? { cadastro_emitente: Number(aliquotaCadastro), autorizada: campos.aliquota_iss! }
         : null,
