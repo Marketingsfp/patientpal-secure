@@ -16932,6 +16932,19 @@ export type Database = {
         Args: { _de: string; _para: string }
         Returns: Json
       }
+      nina_alterar_telefone_paciente: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _data_nascimento: string
+          _nome: string
+          _paciente_id: string
+          _solicitacao: string
+          _telefone_anterior: string
+          _telefone_novo: string
+        }
+        Returns: Json
+      }
       nina_batch_concluir: {
         Args: { _batch_id: string; _execucao_id?: string; _status?: string }
         Returns: undefined
