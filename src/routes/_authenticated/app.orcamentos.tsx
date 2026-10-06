@@ -1162,7 +1162,11 @@ function NovoOrcamentoDialog({
       if (categoria === "laboratorio") {
         q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
       } else if (categoria === "demais") {
-        q = q.not("tipo_procedimento", "eq", "laboratorio").not("grupo", "ilike", "%labor%");
+        // Tipo/grupo em branco é "demais": `not eq` sozinho descarta o NULL e
+        // escondia Ecocardiograma, Doppler de Carótidas, RM de Joelho…
+        q = q
+          .or("tipo_procedimento.is.null,tipo_procedimento.neq.laboratorio")
+          .or("grupo.is.null,grupo.not.ilike.%labor%");
       }
       const { data } = await q.order("nome").limit(20);
       if (!cancel) {
