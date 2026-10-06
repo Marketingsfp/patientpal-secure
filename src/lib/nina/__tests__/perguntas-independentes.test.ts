@@ -245,3 +245,39 @@ it("consulta já confirmada no turno não vira pergunta pela busca de procedimen
   turno.registrar({ termo: "audiometria" }, comOpcoes("audiometria", ["AUDIOMETRIA TONAL", "AUDIOMETRIA VOCAL"]), null, false);
   expect(turno.pendentes).toHaveLength(1);
 });
+
+// Regra confirmada 06/10/2026 (opção B): a Nina não escolhe a variante pelo paciente.
+const resultadoProcedimento = (nome: string): ResultadoBroker => ({
+  ferramenta: "buscar_procedimentos", capacidade: "listCatalog", fonte: "base_conhecimento",
+  success: true, reused: false, appointment_confirmed: false,
+  dados: { found: true, knowledge_status: "found", procedure: nome, price: 200,
+    records: [{ id: nome, procedimento: nome, preco_dinheiro: 200, preco_cartao: 220 }] },
+});
+
+it("opção escolhida pela Nina dentro da dúvida não libera preço e mantém a pergunta", () => {
+  const turno = criarPerguntasDoTurno(null, "o ortopedista passou 10 sessoes de fisioterapia pro meu joelho, quanto fica?");
+  turno.registrar({ termo: "fisioterapia", tipo_atendimento: "exame_procedimento" }, comOpcoes("fisioterapia", FISIO), null, false);
+  const dados = turno.reconciliar({ termo: "FISIOTERAPIA (5 SESSOES)" }, resultadoProcedimento("FISIOTERAPIA (5 SESSOES)"), "buscar_procedimentos")
+    .dados as ResultadoConhecimento;
+  expect(dados.price).toBeNull();
+  expect(dados.records).toEqual([]);
+  expect(dados.esclarecimento?.opcoes.map((o) => o.nome)).toEqual(FISIO);
+  expect(String((dados as { instrucao?: string }).instrucao)).toContain("ainda não escolheu");
+});
+
+it("opção escrita pelo paciente vale normalmente", () => {
+  const turno = criarPerguntasDoTurno(null, "quero saber da fisioterapia ocular");
+  turno.registrar({ termo: "fisioterapia", tipo_atendimento: "exame_procedimento" }, comOpcoes("fisioterapia", FISIO), null, false);
+  const r = resultadoProcedimento("FISIOTERAPIA OCULAR");
+  expect(turno.reconciliar({ termo: "FISIOTERAPIA OCULAR" }, r, "buscar_procedimentos")).toBe(r);
+});
+
+it("dúvida de mensagem anterior e dúvida de consulta não bloqueiam a busca", () => {
+  const anterior = criarPerguntasDoTurno(comOpcoes("fisioterapia", FISIO), "a de 5 sessoes");
+  const r = resultadoProcedimento("FISIOTERAPIA (5 SESSOES)");
+  expect(anterior.reconciliar({ termo: "FISIOTERAPIA (5 SESSOES)" }, r, "buscar_procedimentos")).toBe(r);
+  const consulta = criarPerguntasDoTurno(null, "quero clinico geral");
+  consulta.registrar({ termo: "clinico", tipo_atendimento: "consulta" }, comOpcoes("clinico", ["CLINICO GERAL", "CLINICA MEDICA"], "consulta"), null, false);
+  const c = resultadoProcedimento("CLINICO GERAL");
+  expect(consulta.reconciliar({ termo: "CLINICO GERAL" }, c, "buscar_medicos")).toBe(c);
+});
