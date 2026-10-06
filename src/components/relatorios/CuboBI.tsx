@@ -1528,6 +1528,17 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <MiniLineChart
               labels={topRows.rowLabels}
               values={topRows.totalByRow}
+              // Com "Colunas (séries)" escolhida, uma linha por coluna — como
+              // nas barras. Antes desenhava só o total e ignorava a escolha.
+              series={
+                cfg.colKey
+                  ? piv.colLabels.map((cl, ci) => ({
+                      name: cl,
+                      color: PALETTE[ci % PALETTE.length],
+                      values: topRows.matrix.map((row) => row[ci] ?? 0),
+                    }))
+                  : undefined
+              }
               color={PALETTE[0]}
               formatY={fmt}
             />
