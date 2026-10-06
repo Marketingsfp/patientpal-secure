@@ -23,6 +23,9 @@ export type EscopoAtendimentoConsulta = {
   preferencia?: PreferenciaAtendimentoConsulta | null;
 };
 
+/** Serviços com nome próprio que um pedido genérico de consulta não inclui. */
+const SERVICO_PROPRIO = /\b(revisao|retorno|risco cirurgico|laudos?|atestados?)\b/;
+
 export const chaveConsulta = (nome: string) => normalizar(nome)
   .replace(/^consulta\b\s*[—–:-]?\s*/, "").trim();
 
@@ -47,9 +50,10 @@ export function selecionarAtendimentosConsulta(
   const variantesPreventivo = familia.some(i => /\bpreventivo\b/.test(normalizar(i.atendimento)));
   let escolhidos = exatos.length && !variantesPreventivo ? exatos : familia;
   if (!exatos.length && !escopo.preferencia?.nome) {
-    // Revisão/retorno e risco cirúrgico são atendimentos próprios. Uma busca
-    // genérica pela especialidade não equivale a pedir esses serviços.
-    escolhidos = escolhidos.filter(i => !/\b(revisao|retorno|risco cirurgico)\b/.test(normalizar(i.atendimento)));
+    // Revisão/retorno, risco cirúrgico, laudo e atestado são atendimentos
+    // próprios. Uma busca genérica pela especialidade não equivale a pedir
+    // esses serviços (laudo/atestado: regra confirmada em 06/10/2026).
+    escolhidos = escolhidos.filter(i => !SERVICO_PROPRIO.test(normalizar(i.atendimento)));
   }
   const noturna = (i: AtendimentoPublicado) => /\bnoturn[ao]\b/.test(normalizar(i.atendimento));
   if (escopo.periodo === "manha" || escopo.periodo === "tarde") {
@@ -122,8 +126,63 @@ export function atualizarPreferenciaAtendimento(e: {
   const citados = itens.filter(i => normalizar(i.atendimento).length > 8 && m.includes(normalizar(i.atendimento)));
   const unicos = [...new Map(citados.map(i => [`${normalizar(i.especialidade)}|${normalizar(i.atendimento)}`, i])).values()];
   if (unicos.length === 1) return { especialidade: unicos[0]!.especialidade!, nome: unicos[0]!.atendimento };
+  const especialidadesDosItens = [...new Set(itens.map(i => normalizar(i.especialidade)))];
+  const especialidade = anterior?.especialidade ??
+    (especialidadesCitadas.length === 1 ? especialidadesCitadas[0] : especialidadesDosItens.length === 1 ? itens[0]!.especialidade : null);
+  const escolhido = especialidade ? escolhaPorResposta(m, itens, especialidade) : null;
+  if (escolhido) return { especialidade: escolhido.especialidade!, nome: escolhido.atendimento };
   return anterior;
 }
+
+const PALAVRAS_NEUTRAS = new Set(["consulta", "de", "da", "do", "das", "dos", "com", "e", "a", "o", "para", "medica", "medico"]);
+const palavras = (texto: string) => new Set(normalizar(texto).replace(/[^a-z0-9 ]/g, " ").split(/\s+/)
+  .filter(Boolean).map(p => (p.length > 3 ? p.replace(/s$/, "") : p)));
+
+/**
+ * Resposta natural do paciente às opções de consulta da mesma especialidade
+ * (06/10/2026: "consulta normal" para CONSULTA 2 × LAUDO travava a agenda).
+ * Só a mensagem do paciente decide: uma palavra que distingue uma única opção
+ * ("laudo") escolhe essa opção; "consulta", "normal", "comum" ou "simples"
+ * escolhem a única consulta comum quando as outras são serviços próprios
+ * (laudo, atestado, revisão). Período e preventivo continuam com suas regras.
+ */
+function escolhaPorResposta(m: string, itens: AtendimentoPublicado[], especialidade: string): AtendimentoPublicado | null {
+  const familia = [...new Map(itens.filter(i => normalizar(i.especialidade) === normalizar(especialidade))
+    .map(i => [normalizar(i.atendimento), i])).values()];
+  if (familia.length < 2) return null;
+  const doPaciente = palavras(m);
+  const daEspecialidade = palavras(especialidade);
+  const comuns = [...familia.map(i => palavras(i.atendimento))].reduce((a, b) => new Set([...a].filter(p => b.has(p))));
+  const distintivas = (i: AtendimentoPublicado) => [...palavras(i.atendimento)]
+    // Números (datas, horários) não identificam a opção, como "CONSULTA 2".
+    .filter(p => !/^\d+$/.test(p) && !PALAVRAS_NEUTRAS.has(p) && !daEspecialidade.has(p) && !comuns.has(p));
+  const marcadas = familia.filter(i => distintivas(i).some(p => doPaciente.has(p)));
+  if (marcadas.length === 1) return marcadas[0]!;
+  if (marcadas.length || !/\b(consulta|normal|comum|simples)\b/.test(m) ||
+    /\b(noite|noturn\w*|manha|tarde|preventivo)\b/.test(m)) return null;
+  if (!familia.some(i => SERVICO_PROPRIO.test(normalizar(i.atendimento)))) return null;
+  const consultasComuns = familia.filter(i => !SERVICO_PROPRIO.test(normalizar(i.atendimento)) &&
+    !/\b(noturn[ao]|preventivo)\b/.test(normalizar(i.atendimento)));
+  return consultasComuns.length === 1 ? consultasComuns[0]! : null;
+}
+
+/**
+ * Nomes para a pergunta ao paciente, sem a numeração interna do cadastro
+ * ("CONSULTA 2 — NEUROLOGIA" → "Consulta de Neurologia"). Se dois nomes
+ * ficarem iguais, mantém os originais para a pergunta continuar distinguível.
+ */
+export function nomesAmigaveisConsulta(nomes: readonly string[]): string[] {
+  const amigaveis = nomes.map((nome) => {
+    const [atendimento, especialidade] = nome.split(/\s+[—–]\s+/);
+    const base = (atendimento ?? nome).replace(/\s+\d+\b/g, "").trim();
+    return emTitulo(especialidade ? `${base} de ${especialidade}` : base);
+  });
+  return new Set(amigaveis.map(normalizar)).size === amigaveis.length ? amigaveis : [...nomes];
+}
+
+const MINUSCULAS = new Set(["de", "da", "do", "das", "dos", "e", "com", "para", "a", "o"]);
+const emTitulo = (texto: string) => texto.toLocaleLowerCase("pt-BR").split(/(\s+)/)
+  .map((p, i) => (i > 0 && MINUSCULAS.has(p) ? p : p.charAt(0).toLocaleUpperCase("pt-BR") + p.slice(1))).join("");
 
 export function nomeCompletoConsulta(item: AtendimentoPublicado): string {
   const especialidade = item.especialidade?.trim();
