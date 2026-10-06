@@ -16,7 +16,7 @@ describe("retorno autorizado NFS-e", () => {
   test("sem XML: alíquota e ISS ficam nulos, nunca o calculado", () => {
     const { campos, conferencia } = montarCamposAutorizados(body, null, 0.02);
     expect(campos.aliquota_iss).toBeNull();
-    expect(campos.valor_iss).toBeNull();
+    expect("valor_iss" in campos).toBe(false);
     expect(conferencia.faltando).toEqual(expect.arrayContaining(["aliquota_iss", "valor_iss", "serie"]));
     expect(conferencia.divergencia_aliquota).toBeNull();
   });
