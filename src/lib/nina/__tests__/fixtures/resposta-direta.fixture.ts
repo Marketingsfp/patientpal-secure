@@ -27,6 +27,7 @@ const escopoEscala = ({
   escolhido_sem: ["Clínico Geral", "Nicolas Cesar Alves Nunes", "Claudia Maria Rodrigues dos Santos"],
 } as Record<string, string[]>)[cenario.replace("catalogo_escopo_escala_", "")];
 const progressoLongo = cenario.startsWith("progresso_longo");
+const falsoSucesso = cenario === "falso_sucesso_reserva";
 const conferencias: any[] = [];
 const alteracaoCenario = cenario.startsWith("alteracao_");
 if (alteracaoCenario) mock.module("@/lib/nina/jev.server", () => ({
@@ -421,7 +422,7 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
     return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
 }));
-mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") || (progressoLongo && !cenario.endsWith("informativo")) }));
+mock.module("@/lib/nina/agenda-flag.server", () => ({ ferramentasAgendaAtivas: async () => escolhaHorario || clinicoGeral || cenario.startsWith("loop_alternativas") || (progressoLongo && !cenario.endsWith("informativo")) || falsoSucesso }));
 mock.module("@/lib/nina/atendimento-fase1.server", () => ({ flagFluxoFase1Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase3.server", () => ({ flagFluxoFase3Ativa: async () => false }));
 mock.module("@/lib/nina/atendimento-fase6.server", () => ({ flagFluxoFase6Ativa: async () => false }));
@@ -759,6 +760,12 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: 
     conteudo: "A equipe deve verificar o preparo informado. Você relatou pino na perna." };
   if (duvidaCenario) return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
     conteudo: cenario.endsWith("entendida") ? "Entendi seu pedido." : "Pode explicar de outra forma o que você precisa?" };
+  if (falsoSucesso) return {
+    ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
+    conteudo: requests.length === 1
+      ? "Perfeito, reservei a opção de quinta às 15:30. Me informe o nome completo e a data de nascimento."
+      : "Você escolheu quinta às 15:30. Me informe o nome completo e a data de nascimento.",
+  };
   if (progressoLongo) return {
     ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "medium",
     conteudo: requests.length > 8 || !req.tools ? "Encontrei horários às 10:00 nos dias consultados. Qual data você prefere?" : "",

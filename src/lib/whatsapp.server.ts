@@ -2564,14 +2564,19 @@ async function gerarRespostaNinaInterno(
           conversa_id: estadoId.conversaId,
           texto: texto.slice(0, 200),
         });
-        mensagens.push({ role: "assistant", content: texto });
         // FASE 4 — restrição interna viaja no contrato de sistema, nunca como
-        // uma falsa mensagem do paciente.
-        mensagens.push({
-          role: "system",
-          content:
-            "Não há confirmação de um agendamento gravado para este paciente. Corrija a afirmação de reserva ou promessa sem confirmação, preservando as informações publicadas que respondem ao pedido atual. Descrever a modalidade de atendimento agendado não significa que uma consulta foi marcada. Esta correção não autoriza consultar vagas, agendar nem coletar dados sem a solicitação e as condições exigidas pelo fluxo. Não transforme um pedido de informação em pedido de agendamento.",
-        });
+        // uma falsa mensagem do paciente. O rascunho barrado não entra no
+        // histórico como resposta enviada: o paciente nunca o recebeu.
+        const { confirmacaoDaEscolha } = await import("@/lib/nina/agendamento-escolha");
+        const { mensagemCorrecaoFalsoSucesso } = await import("@/lib/nina/correcao-falso-sucesso");
+        const escolhaAtual = confirmacaoDaEscolha(fluxoEstado, clinicaId);
+        const etapaCorrecao = !escolhaAtual ? "sem_escolha"
+          : fluxoEstado.flow.stage === "COLLECTING_PATIENT_DATA" && !escolhaAtual.cadastro ? "aguardando_dados"
+          : "aguardando_confirmacao";
+        mensagens.push({ role: "system", content: mensagemCorrecaoFalsoSucesso(texto, etapaCorrecao) });
+        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Afirmação de reserva sem gravação: resposta reescrita antes do envio",
+          dados: { rascunho_nao_enviado: texto.slice(0, 500), etapa: etapaCorrecao },
+          codigo: { arquivo: "src/lib/nina/correcao-falso-sucesso.ts", funcao: "mensagemCorrecaoFalsoSucesso" } });
         continue;
       }
       if (podeAgendar && !agendamentoConfirmado && afirmaOuPrometeAgendamento(texto)) {

@@ -57,6 +57,20 @@ describe("geração real interrompe o turno após agenda sem vagas (serviços ex
         expect(r.resposta).toContain(cenario.endsWith("recuperada") ? "Posso ajudar" : "Você prefere que eu tente novamente");
       });
     }
+    test(`${ambiente}: reserva afirmada sem gravação é reescrita sem desculpas e sem parecer enviada`, () => {
+      const r = simular(ambiente, "falso_sucesso_reserva");
+      expect(r.requests).toHaveLength(2);
+      const correcao = r.requests[1].messages;
+      // O rascunho barrado não entra no histórico como resposta enviada.
+      expect(correcao.some((m: any) => m.role === "assistant" && String(m.content ?? "").includes("reservei"))).toBe(false);
+      const instrucao = correcao.filter((m: any) => m.role === "system").at(-1).content;
+      expect(instrucao).toContain("NÃO foi enviado ao paciente");
+      expect(instrucao).toContain("não peça desculpas");
+      expect(r.resposta).toContain("Você escolheu quinta às 15:30");
+      expect(r.resposta).not.toContain("reservei");
+      expect(r.encaminhamentos).toHaveLength(0);
+      expect(r.etapas.some((e: { titulo: string }) => e.titulo === "Afirmação de reserva sem gravação: resposta reescrita antes do envio")).toBe(true);
+    });
     test(`${ambiente}: encerra consultas repetidas com as alternativas confirmadas`, () => {
       const r = simular(ambiente, "loop_alternativas");
       expect(r.requests).toHaveLength(3);
