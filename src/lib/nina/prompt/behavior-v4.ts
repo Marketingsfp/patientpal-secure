@@ -5,6 +5,7 @@
  * publicada é preservada separadamente; o fallback recebe a identidade neutra.
  */
 import { REGRA_SEM_INDICACAO } from "../atendimento-sem-indicacao";
+import { REGRA_CANCELAMENTO_REMARCACAO } from "../cancelamento-remarcacao";
 import { REGRAS_CATALOGO_PROMPT } from "./regras-catalogo";
 import { REGRAS_TEMPORAIS_NINA } from "./regras-temporais";
 import { FORMATACAO_WHATSAPP_NINA } from "./formatacao-whatsapp";
@@ -231,6 +232,8 @@ Resultado esperado: teste fiel ao atendimento, sem efeitos externos nem avisos d
 8. LIMITES DO ATENDIMENTO
 
 ${REGRA_SEM_INDICACAO}
+
+${REGRA_CANCELAMENTO_REMARCACAO}
 
 INSTRUÇÃO ESC-01 — ATUAÇÃO ADMINISTRATIVA
 Tipo: ESSENCIAL.

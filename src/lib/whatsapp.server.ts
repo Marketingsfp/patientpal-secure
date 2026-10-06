@@ -952,6 +952,10 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/atendimento-sem-indicacao");
   let nomeAtendimentoAusente = false;
   let respostaNomeAtendimento = false;
+  const { perguntaAlteracaoAgendamento, alteracaoPeloJev, alteracaoExplicita, motivoAlteracao,
+    REGRA_CANCELAMENTO_REMARCACAO } = await import("@/lib/nina/cancelamento-remarcacao");
+  const reservaAtualParaAlteracao = (await import("@/lib/nina/agendamento-sessao")).reservaDaSessaoAtual(sessaoNina.estado);
+  let alteracaoSolicitada = alteracaoExplicita(mensagemPaciente, reservaAtualParaAlteracao);
   const perguntaNomeAnterior = perguntaNomeEntregue(msgsMemoria, { conversaId: estadoId.conversaId,
     inicioSessao: sessaoNina.estado.session_started_at ?? null, teste: opcoes?.teste === true,
     entradas: opcoes?.mensagensEntrada ?? [] });
@@ -972,6 +976,7 @@ async function gerarRespostaNinaInterno(
       const perguntas = {
         ...perguntaIntencao(),
         ...perguntaNomeAtendimento(),
+        ...perguntaAlteracaoAgendamento(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
       };
       const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
@@ -990,6 +995,7 @@ async function gerarRespostaNinaInterno(
       ]);
       const respostas = resultado.ok ? resultado.respostas : null;
       nomeAtendimentoAusente = semNomePeloJev(respostas?.nome_atendimento);
+      alteracaoSolicitada = alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
       if (escolhida) {
         intencoesTurno = [escolhida];
@@ -1044,7 +1050,7 @@ async function gerarRespostaNinaInterno(
       await Promise.all([
         jev.registrarDecisaoJev({
           clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
-          perguntas, resultado, aplicada: escolhida !== null || nomeAtendimentoAusente, contagem,
+          perguntas, resultado, aplicada: escolhida !== null || nomeAtendimentoAusente || alteracaoPeloJev(respostas?.alteracao_agendamento) !== null, contagem,
           orientacao: orientacaoIntencaoJev,
           mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
           contexto: f1 ? { observacao_intencao: { versao: "intencoes-v1", modo: "orientacao" },
@@ -1066,6 +1072,17 @@ async function gerarRespostaNinaInterno(
 
   // O Jev já participa da leitura do turno; esta decisão não adiciona chamada de IA.
   // Pedido humano/urgência continuam prioritários. Não confundir ausência de nome com incompreensão.
+  if (alteracaoSolicitada) {
+    // A regra administrativa precede cadastro, seleção e criação de reserva.
+    // Possível urgência mantém prioridade, preservando também a causa administrativa.
+    const motivo = motivoAlteracao(alteracaoSolicitada);
+    jevEncaminhamento = jevEncaminhamento?.urgencia === "alta"
+      ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${motivo}` }
+      : { motivo, urgencia: "normal" };
+    nomeAtendimentoAusente = false;
+    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Cancelamento e remarcação exclusivos da equipe",
+      dados: { pedido: alteracaoSolicitada, motivo, mensagens_entrada: opcoes?.mensagensEntrada ?? [] } });
+  }
   if (nomeAtendimentoAusente && !jevEncaminhamento) {
     if (perguntaNomeAnterior) jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
     else respostaNomeAtendimento = true;
@@ -1420,6 +1437,9 @@ async function gerarRespostaNinaInterno(
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
   const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
+  instrucoesAdicionaisTurno.push({ codigo: "CANCELAMENTO_REMARCACAO_HUMANO", nivel: "inegociavel",
+    origem: "src/lib/nina/cancelamento-remarcacao.ts", motivo: "Cancelamentos e remarcações são exclusivos da equipe humana.",
+    texto: REGRA_CANCELAMENTO_REMARCACAO });
   instrucoesAdicionaisTurno.push({ codigo: "SEM_INDICACAO_CLINICA", nivel: "inegociavel",
     origem: "src/lib/nina/atendimento-sem-indicacao.ts", motivo: "O paciente informa o atendimento; a Nina não faz indicação clínica.",
     texto: REGRA_SEM_INDICACAO });
@@ -2279,8 +2299,9 @@ async function gerarRespostaNinaInterno(
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
       motivo: decisao.motivo,
-      resumo: `${semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
       urgencia: decisao.urgencia,
+      ...(alteracaoSolicitada ? { setor: "Agendamento" } : {}),
     };
     const rh = await broker
       .executar("solicitar_atendente_humano", JSON.stringify(argumentos))
@@ -2294,14 +2315,14 @@ async function gerarRespostaNinaInterno(
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
     };
-    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
+    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: alteracaoSolicitada ? "Encaminhamento: cancelamento/remarcação solicitado" : semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo, urgencia: argumentos.urgencia, pontuacoes: jevPontuacoes,
         pergunta_nome_entregue: semNome ? perguntaNomeAnterior : null,
         handoff_confirmado: confirmado, erro: rh.erro ?? null,
       },
-      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "jevFase2" } });
-    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
+      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "executarDecisaoEncaminhamento" } });
+    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: alteracaoSolicitada ? "regra_cancelamento_remarcacao" : semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
   }
   if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);
@@ -2564,6 +2585,20 @@ async function gerarRespostaNinaInterno(
     }
 
 
+    // Reconhecimento pelo modelo quando a leitura inicial não decidiu (ex.: Jev desligado).
+    // O encaminhamento administrativo prevalece sobre todo o lote de ferramentas.
+    for (const chamada of chamadas) {
+      if (chamada.function?.name !== "solicitar_atendente_humano") continue;
+      try {
+        const { motivo } = JSON.parse(chamada.function.arguments ?? "");
+        if (/^CANCELAMENTO_SOLICITADO\b/.test(motivo)) alteracaoSolicitada = "cancelamento";
+        else if (/^REMARCACAO_SOLICITADA\b/.test(motivo)) alteracaoSolicitada = "remarcacao";
+      } catch { /* Argumentos inválidos seguem a validação normal do broker. */ }
+    }
+    if (alteracaoSolicitada) {
+      await executarDecisaoEncaminhamento({ motivo: motivoAlteracao(alteracaoSolicitada), urgencia: "normal" });
+      break;
+    }
     if (chamadas.some(c => c.function?.name === "solicitar_nome_atendimento")) {
       respostaParcialConfirmada = perguntasDoTurno.temConfirmadas;
       if (respostaParcialConfirmada) resposta = msg?.content ?? "";
@@ -2951,6 +2986,8 @@ async function gerarRespostaNinaInterno(
             ? "catalogo.sem_registro"
             : finalizacaoHandoff.motivo === MOTIVO_NOME_NAO_INFORMADO
               ? "atendimento.nome_nao_informado"
+            : alteracaoSolicitada
+              ? "agenda.cancelamento_remarcacao"
             : finalizacaoHandoff.motivo.startsWith("JEV_")
               ? "jev.encaminhamento"
               : "agenda.sem_vagas",
