@@ -1222,6 +1222,34 @@ function Page() {
               criadosNoDia += 1;
             }
           }
+          // FICHAS A MAIS (2026-10-06): quando "Pacientes/dia" pede mais fichas
+          // do que os horários da grade comportam, as que faltam entram no
+          // ÚLTIMO horário do dia, 1 segundo uma depois da outra. Início, fim e
+          // intervalo da escala não mudam, e como a ficha é posicional (ver
+          // ficha-numero.ts) as fichas da grade mantêm o número de sempre — as
+          // extras continuam a sequência (017, 018…). O segundo de diferença
+          // evita o unique index de vaga e impede que a numeração as trate como
+          // encaixe (mesmo instante = mesmo número).
+          const ultimaDaGrade = criadosNoDia > 0 ? out[out.length - 1] : null;
+          if (ultimaDaGrade && Number.isFinite(limiteDia) && criadosNoDia < limiteDia) {
+            const baseMs = new Date(`${ultimaDaGrade.data}T${ultimaDaGrade.inicio}:00`).getTime();
+            const fimDate = new Date(`${ultimaDaGrade.data}T${ultimaDaGrade.fim}:00`);
+            const faltam = limiteDia - criadosNoDia;
+            for (let k = 1; k <= faltam; k++) {
+              const inicioDate = new Date(baseMs + k * 1000);
+              // Nunca passa do fim do último horário (= fim da escala).
+              if (inicioDate.getTime() >= fimDate.getTime()) break;
+              out.push({
+                data: ultimaDaGrade.data,
+                medico_id: ultimaDaGrade.medico_id,
+                agenda_id: ultimaDaGrade.agenda_id,
+                inicio: ultimaDaGrade.inicio,
+                fim: ultimaDaGrade.fim,
+                iniISO: inicioDate.toISOString(),
+                fimISO: fimDate.toISOString(),
+              });
+            }
+          }
         }
       }
     }

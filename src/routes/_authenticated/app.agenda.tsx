@@ -6480,6 +6480,17 @@ function AgendaPage() {
     // as fichas seguintes — inclusive as que a recepção já imprimiu.
     let inicioIsoParaSalvar = new Date(form.inicio).toISOString();
     let fimIsoParaSalvar = new Date(form.fim).toISOString();
+    // Horário não mexido no formulário: grava o EXATO da linha, com segundos.
+    // As fichas a mais do gerador (Pacientes/dia acima da grade) ficam no
+    // último horário separadas por 1 segundo (11:45:01, 11:45:02…); zerar os
+    // segundos ao ocupar uma delas a juntaria com a ficha anterior e puxaria
+    // em -1 o número de todas as seguintes.
+    if (editing && form.inicio === toLocalInput(editing.inicio)) {
+      inicioIsoParaSalvar = new Date(editing.inicio).toISOString();
+    }
+    if (editing && form.fim === toLocalInput(editing.fim)) {
+      fimIsoParaSalvar = new Date(editing.fim).toISOString();
+    }
     const filaNoSalvamento = !editing ? agendaDeFila(form.medico_id) : null;
     if (filaNoSalvamento && form.medico_id) {
       const diaIso = new Date(form.inicio).toLocaleDateString("en-CA", {
