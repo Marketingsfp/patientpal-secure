@@ -7,6 +7,7 @@ import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
 import { periodoCentralSchema, aplicarPeriodoCentral } from "@/lib/atendimento/periodo-central";
 import { z } from "zod";
+import { cursorInboxSchema, filtroAposCursor } from "./atendimento/paginacao-inbox";
 import {
   STATUS_FECHADOS,
   atendenteFiltroEfetivo,
@@ -218,6 +219,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         // banco, antes do LIMIT, para nunca esconder resultado válido.
         visualizacao: z.enum(["recentes", "resolvidas", "espera"]).default("recentes"),
         limit: z.number().int().min(1).max(500).default(100),
+        apos: cursorInboxSchema.nullish(),
       })
       .parse(i),
   )
@@ -370,6 +372,7 @@ export const listarConversas = createServerFn({ method: "POST" })
       }
     }
     // --- Ordenação e limite (sempre por último) ----------------------------
+    if (data.visualizacao === "recentes" && data.apos) q = q.or(filtroAposCursor(data.apos));
     q = q.order(plano.ordenarPor, { ascending: plano.ascendente, nullsFirst: false });
     // Desempate estável: conversa sem a coluna da visualização não embaralha.
     if (plano.ordenarPor !== "inbox_entrada_em") {

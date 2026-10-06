@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { carregarLotesAtivas, TAMANHO_LOTE_ATIVAS, type CursorInbox } from "@/lib/atendimento/paginacao-inbox";
+import { ordenarInbox } from "@/lib/atendimento/ordem-inbox";
 import { ConsultaBaseChat } from "./ConsultaBaseChat";
 import { AssistenteEscritaChat } from "./AssistenteEscritaChat";
 import { acrescentarBaseAoRascunho } from "@/lib/atendimento/consulta-base-chat";
@@ -317,6 +319,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
 
   const [convs, setConvs] = useState<any[]>([]);
   const [carregandoLista, setCarregandoLista] = useState(false);
+  const [temMaisConvs, setTemMaisConvs] = useState(false);
+  const [erroPaginaConvs, setErroPaginaConvs] = useState(false);
+  const listaScrollRef = useRef<HTMLDivElement | null>(null);
+  const maisConvsEmVoo = useRef(false);
+  const paginaConvsRef = useRef<{ cursor: CursorInbox | null; quantidade: number }>({ cursor: null, quantidade: 0 });
   const [sel, setSel] = useState<any>(null);
   const [listaMobile, setListaMobile] = useState(true);
   useEffect(() => { if (sel?.id) setListaMobile(false); }, [sel?.id]);
@@ -1018,13 +1025,20 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   useEffect(() => {
     seqConvs.current++;
     setConvs([]);
+    paginaConvsRef.current = { cursor: null, quantidade: 0 };
+    setTemMaisConvs(false);
+    setErroPaginaConvs(false);
+    if (listaScrollRef.current) listaScrollRef.current.scrollTop = 0;
     setCarregandoLista(!!clinicaId && !modoCentral);
   }, [chaveAtual]);
 
-  const carregarConvs = useCallback(async () => {
+  const carregarConvs = useCallback(async (mais = false) => {
     if (!clinicaId || modoCentral) return;
+    if (mais && (visualizacao !== "recentes" || maisConvsEmVoo.current)) return;
+    if (mais) maisConvsEmVoo.current = true;
     const pedido = ++seqConvs.current;
     setCarregandoLista(true);
+    setErroPaginaConvs(false);
     const chavePedido = chaveInbox({
       clinicaId,
       userId: meuId,
@@ -1033,7 +1047,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       visualizacao,
     });
     try {
-      const brutas = await medirRequest(
+      const buscarPagina = (apos: CursorInbox | null) => medirRequest(
         "listarConversas",
         listarConvs({
           data: {
@@ -1043,10 +1057,27 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
             escopo,
             atendenteId: atendenteSelecionadoId,
             visualizacao,
-            limit: 100,
+            limit: visualizacao === "recentes" ? TAMANHO_LOTE_ATIVAS : 100,
+            apos,
           },
         }),
       );
+      const vigente = () => pedido === seqConvs.current && chavePedido === chaveAtualRef.current;
+      const pagina = visualizacao === "recentes" ? await carregarLotesAtivas({
+        buscar: buscarPagina,
+        cursor: mais ? paginaConvsRef.current.cursor : null,
+        quantidade: mais ? TAMANHO_LOTE_ATIVAS : Math.max(TAMANHO_LOTE_ATIVAS, paginaConvsRef.current.quantidade),
+        vigente,
+      }) : null;
+      const novas = visualizacao === "recentes" ? pagina?.linhas : await buscarPagina(null);
+      if (!novas || !vigente()) return;
+      const idsNovos = new Set(novas.map((c: any) => c.id));
+      const brutas = mais ? ordenarInbox([...convsRef.current.filter(c => !idsNovos.has(c.id)), ...novas]) : novas;
+      if (pagina) {
+        paginaConvsRef.current = { cursor: pagina.cursor,
+          quantidade: mais ? paginaConvsRef.current.quantidade + novas.length : novas.length };
+      }
+      setTemMaisConvs(pagina?.temMais ?? false);
       // Resposta atrasada de uma recarga anterior não pode sobrescrever a
       // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
       if (pedido !== seqConvs.current) return;
@@ -1148,7 +1179,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         // conversa". O motivo continua visível na lista e nos eventos.
         abrirConversa(null);
       }
-      // Os totais vêm da contagem do servidor; esta página pode conter só 100 cards.
+      // Os totais vêm do servidor; Ativas carrega em lotes, demais filtros mantêm 100 cards.
       // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
       // nunca troca sozinha para outra.
       if (
@@ -1168,8 +1199,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       // Os números de cada filtro acompanham a movimentação em tempo real.
       void carregarContadores();
     } catch (e: any) {
+      if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
+      setErroPaginaConvs(true);
       mostrarErro(e);
     } finally {
+      if (mais) maisConvsEmVoo.current = false;
       if (pedido === seqConvs.current && chavePedido === chaveAtualRef.current) setCarregandoLista(false);
     }
   }, [
@@ -3141,7 +3175,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                 )}
                 {soCriticas && souGestor && <button type="button" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" onClick={() => setSoCriticas(false)}>Espera crítica · Limpar filtro ×</button>}
               </CardHeader>
-              <div className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas" aria-busy={carregandoLista}>
+              <div ref={listaScrollRef} className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas" aria-busy={carregandoLista}
+                onScroll={(e) => {
+                  const lista = e.currentTarget;
+                  if (visualizacao === "recentes" && temMaisConvs && !carregandoLista && !erroPaginaConvs &&
+                    lista.scrollHeight - lista.scrollTop - lista.clientHeight <= 80) void carregarConvs(true);
+                }}>
                 {convsVisiveis.length === 0 && (carregandoLista
                   ? <p role="status" className="p-4 text-sm text-muted-foreground">Carregando conversas…</p>
                   : <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>)}
@@ -3228,6 +3267,15 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtData(c.ultima_msg_em)}</div>
                   </button>
                 ))}
+                {visualizacao === "recentes" && (temMaisConvs || erroPaginaConvs) && (
+                  <div className="p-3 text-center text-xs text-muted-foreground">
+                    {carregandoLista ? <span role="status" className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Carregando mais conversas…</span> : (
+                      <button type="button" className="underline" onClick={() => void carregarConvs(paginaConvsRef.current.quantidade > 0)}>
+                        {erroPaginaConvs ? "Não foi possível carregar. Tentar novamente" : "Carregar mais conversas"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </Card>
