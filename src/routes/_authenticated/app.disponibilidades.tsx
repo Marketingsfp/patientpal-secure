@@ -952,7 +952,14 @@ function Page() {
       iniISO?: string;
       fimISO?: string;
     };
-    type BloqueioPiso = { data: string; piso: string; janelaFim: string };
+    type BloqueioPiso = {
+      data: string;
+      piso: string;
+      janelaFim: string;
+      // Fichas que o dia já tem e o total pedido (Infinity = sem total).
+      jaTem: number;
+      alvo: number;
+    };
     type ForaDaGrade = { data: string; gradeIni: string; gradeFim: string };
     type ErroFila = { data: string; erro: string };
     // Dia pulado porque a agenda tem grade, mas nenhuma regra vale nessa data.
@@ -1270,6 +1277,8 @@ function Page() {
               data: diaIso,
               piso,
               janelaFim: blocos.reduce((acc, x) => (x.hora_fim > acc ? x.hora_fim : acc), ""),
+              jaTem: new Set((linhasNoDia.get(pisoKey) ?? []).map((l) => l.ms)).size,
+              alvo: alvoDoDia,
             });
             continue;
           }
@@ -1462,11 +1471,30 @@ function Page() {
     if (bloqueio) {
       const [ano, mes, dia] = bloqueio.data.split("-");
       const outros = geracaoPreview.bloqueiosPorPiso.length - 1;
+      const maisDias = outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "";
+      // O dia já tem o total pedido: não é falta de espaço, não falta nada.
+      if (Number.isFinite(bloqueio.alvo) && bloqueio.jaTem >= bloqueio.alvo) {
+        return (
+          `Em ${dia}/${mes}/${ano} este médico já tem ${bloqueio.jaTem} fichas — o total pedido (${bloqueio.alvo}) já foi atingido, então não há o que gerar.` +
+          ` Para ter mais fichas nesse dia, aumente o "Limite de fichas por dia" (ex.: ${bloqueio.jaTem + 20}).` +
+          maisDias
+        );
+      }
+      // Pedia mais fichas, mas um paciente marcado depois do fim do turno já
+      // passou pela recepção: as extras mudariam o número da ficha dele.
+      if (Number.isFinite(bloqueio.alvo)) {
+        return (
+          `Em ${dia}/${mes}/${ano} há paciente marcado depois das ${bloqueio.janelaFim} (fim do turno) que já passou pela recepção. As fichas a mais entrariam antes dele e mudariam o número da ficha dele, que pode já ter sido impressa — por isso nada foi gerado nesse dia.` +
+          ` Para atender UM paciente a mais, use "+ Adicionar Encaixe" na Agenda.` +
+          maisDias
+        );
+      }
       return (
         `Em ${dia}/${mes}/${ano} já existem horários criados até ${bloqueio.piso}, e os novos só entram depois do último horário do dia. Como o atendimento desse dia termina às ${bloqueio.janelaFim}, não sobra espaço.` +
         ` Para atender UM paciente a mais hoje você não precisa gerar vaga nenhuma: use "+ Adicionar Encaixe" na Agenda, escolha o horário e confirme — o encaixe entra por cima da ficha existente.` +
+        ` Para ter mais fichas no mesmo turno, preencha o "Limite de fichas por dia" com o total desejado — as fichas a mais entram no último horário do turno.` +
         ` Se o médico passou a atender mais tarde TODA semana, aí sim aumente a grade dele na aba Médicos.` +
-        (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
+        maisDias
       );
     }
     if (geracaoPreview.semRegraValida.length > 0) {
