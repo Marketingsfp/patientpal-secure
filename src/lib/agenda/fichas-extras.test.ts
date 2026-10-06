@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { fichasExistentes, posicoesFichasExtras, type LinhaExistente } from "./fichas-extras";
+import {
+  fichasExistentes,
+  montarFichasExtras,
+  posicoesFichasExtras,
+  type LinhaExistente,
+} from "./fichas-extras";
 import { numerarFichas } from "./ficha-numero";
 
 const DIA = "2026-10-07";
@@ -94,5 +99,45 @@ describe("posicoesFichasExtras", () => {
         { ms: 2, travada: false },
       ]),
     ).toBe(2);
+  });
+});
+
+describe("montarFichasExtras", () => {
+  const diaLocal = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const linha = (
+    hhmmss: string,
+    extra: Partial<{ fluxo_etapa: string; agenda_id: string }> = {},
+  ) => ({
+    agenda_id: extra.agenda_id ?? "a",
+    inicio: new Date(`${DIA}T${hhmmss}`).toISOString(),
+    status: "agendado",
+    fluxo_etapa: extra.fluxo_etapa ?? "aguardando_recepcao",
+  });
+
+  it("monta por agenda e separa os dias que ficaram de fora", () => {
+    const r = montarFichasExtras({
+      alvos: [
+        { diaIso: DIA, agendaId: "a", fimTurno: "17:30" },
+        { diaIso: "2026-10-08", agendaId: "a", fimTurno: "17:30" },
+      ],
+      existentes: [linha("17:20:00"), linha("17:20:00", { agenda_id: "outra" })],
+      quantidade: 2,
+      diaLocal,
+    });
+    expect(r.fichas.length).toBe(2);
+    expect(r.fichas.every((f) => f.agendaId === "a")).toBe(true);
+    expect(r.semAgenda).toEqual(["2026-10-08"]);
+  });
+
+  it("paciente com check-in depois do turno trava o dia", () => {
+    const r = montarFichasExtras({
+      alvos: [{ diaIso: DIA, agendaId: "a", fimTurno: "17:30" }],
+      existentes: [linha("17:20:00"), linha("19:00:00", { fluxo_etapa: "recepcao_concluida" })],
+      quantidade: 2,
+      diaLocal,
+    });
+    expect(r.fichas.length).toBe(0);
+    expect(r.naRecepcao).toEqual([DIA]);
   });
 });

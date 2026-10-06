@@ -238,6 +238,11 @@ import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
+import {
+  avisosFichasExtras,
+  montarFichasExtras,
+  type LinhaDoDia,
+} from "@/lib/agenda/fichas-extras";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
 import {
@@ -5592,6 +5597,114 @@ function AgendaPage() {
     }
   };
 
+  // "+ Mais fichas" (agenda de HORA MARCADA): acrescenta N fichas livres no
+  // último horário do turno do dia, depois das que já existem — sem mudar o
+  // horário do médico nem o número de nenhuma ficha (regra em fichas-extras.ts,
+  // a mesma do "Adicionar mais fichas" de Horários médicos). Só para quem pode
+  // gerar horários: aumentar a agenda do médico não é decisão do balcão comum.
+  const podeGerirHorarios =
+    usePodeEscrever("disponibilidades") || !!clinicaAtual?.pode_gerir_horarios;
+  const [maisFichasAberto, setMaisFichasAberto] = useState(false);
+  const [maisFichasQtd, setMaisFichasQtd] = useState("");
+  const [criandoMaisFichas, setCriandoMaisFichas] = useState(false);
+  // Agendas de hora marcada do médico filtrado com grade valendo no dia, cada
+  // uma com o fim do turno. Vazio = o botão não aparece.
+  const agendasParaMaisFichas = useMemo(() => {
+    if (filtroMedico === "todos") return [];
+    const dow = new Date(`${dataRef}T12:00:00`).getDay();
+    return (agendasPorMedico.get(filtroMedico) ?? [])
+      .filter(
+        (a) =>
+          !a.ordem_chegada &&
+          (filtroAgenda === "todos" || filtroAgenda.startsWith("nome:") || a.id === filtroAgenda),
+      )
+      .flatMap((a) => {
+        const vigentes = (faixasDaGrade.get(`${filtroMedico}|${a.id}`) ?? []).filter(
+          (f) =>
+            f.dia_semana === dow &&
+            (!f.vigencia_inicio || f.vigencia_inicio <= dataRef) &&
+            (!f.vigencia_fim || f.vigencia_fim >= dataRef),
+        );
+        if (vigentes.length === 0) return [];
+        const fimTurno = vigentes
+          .map((f) => f.hora_fim.slice(0, 5))
+          .reduce((x, y) => (y > x ? y : x));
+        return [{ id: a.id, nome: a.nome, fimTurno }];
+      });
+  }, [filtroMedico, filtroAgenda, dataRef, agendasPorMedico, faixasDaGrade]);
+  const criarMaisFichas = async () => {
+    if (!clinicaAtual || filtroMedico === "todos") return;
+    const qtd = parseInt(maisFichasQtd || "0", 10);
+    if (!qtd || qtd < 1) {
+      toast.error("Informe quantas fichas a mais.");
+      return;
+    }
+    if (agendasParaMaisFichas.length > 1) {
+      toast.error(
+        `Este médico tem mais de uma agenda nesse dia (${agendasParaMaisFichas.map((a) => a.nome).join(", ")}). Escolha a agenda no filtro "Tipo de agenda" e tente de novo.`,
+        { duration: 10000 },
+      );
+      return;
+    }
+    const ag = agendasParaMaisFichas[0];
+    if (!ag) return;
+    setCriandoMaisFichas(true);
+    try {
+      // Lido AGORA: outra recepcionista pode ter marcado alguém nesse meio tempo.
+      const { data: existentes, error: eLer } = await supabase
+        .from("agendamentos")
+        .select("agenda_id, inicio, status, fluxo_etapa")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", filtroMedico)
+        .eq("agenda_id", ag.id)
+        .gte("inicio", new Date(`${dataRef}T00:00:00`).toISOString())
+        .lte("inicio", new Date(`${dataRef}T23:59:59`).toISOString());
+      if (eLer) {
+        mostrarErro(eLer);
+        return;
+      }
+      const montado = montarFichasExtras({
+        alvos: [{ diaIso: dataRef, agendaId: ag.id, fimTurno: ag.fimTurno }],
+        existentes: (existentes ?? []) as LinhaDoDia[],
+        quantidade: qtd,
+        diaLocal: chaveDiaLocal,
+      });
+      const avisos = avisosFichasExtras(montado, (iso) => iso.split("-").reverse().join("/"));
+      if (montado.fichas.length === 0) {
+        toast.error(avisos.join(" ") || "Nenhuma ficha a acrescentar.", { duration: 10000 });
+        return;
+      }
+      const procedimento = procedimentoPadraoDoMedico(filtroMedico);
+      const { error: erroIns } = await supabase.from("agendamentos").insert(
+        montado.fichas.map((f) => ({
+          clinica_id: clinicaAtual.clinica_id,
+          medico_id: filtroMedico,
+          agenda_id: ag.id,
+          paciente_nome: "DISPONÍVEL",
+          inicio: f.inicio.toISOString(),
+          fim: f.fim.toISOString(),
+          status: "agendado" as const,
+          observacoes: "Ficha extra gerada na Agenda",
+          ...(procedimento ? { procedimento } : {}),
+        })),
+      );
+      if (erroIns) {
+        mostrarErro(erroIns);
+        return;
+      }
+      setMaisFichasAberto(false);
+      setMaisFichasQtd("");
+      await load();
+      toast.success(
+        `${montado.fichas.length} ficha(s) a mais criada(s) às ${toLocalInput(montado.fichas[0].inicio.toISOString()).slice(11)}.` +
+          (avisos.length > 0 ? ` ${avisos.join(" ")}` : ""),
+        { duration: 8000 },
+      );
+    } finally {
+      setCriandoMaisFichas(false);
+    }
+  };
+
   const openNew = async () => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
@@ -9778,6 +9891,56 @@ function AgendaPage() {
                 {criandoFichaExtra ? "Criando..." : "Ficha extra"}
               </Button>
             )}
+          {podeGerirHorarios &&
+            !agendaDeFila(filtroMedico) &&
+            agendasParaMaisFichas.length > 0 &&
+            dataRef >= hojeBR() && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMaisFichasAberto(true)}
+                disabled={criandoMaisFichas || !clinicaAtual}
+                title="Acrescenta fichas livres no último horário do turno, sem mudar o horário do médico nem o número das fichas"
+                className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold"
+              >
+                <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" />
+                Mais fichas
+              </Button>
+            )}
+          <Dialog open={maisFichasAberto} onOpenChange={setMaisFichasAberto}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Mais fichas</DialogTitle>
+                <DialogDescription>
+                  Quantas fichas a mais neste dia? Elas entram no último horário do turno, depois
+                  das que já existem — o horário do médico e o número das fichas atuais não mudam.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1">
+                <Label htmlFor="agenda-mais-fichas-qtd">Fichas a mais</Label>
+                <Input
+                  id="agenda-mais-fichas-qtd"
+                  type="number"
+                  min={1}
+                  placeholder="ex.: 20"
+                  value={maisFichasQtd}
+                  onChange={(e) => setMaisFichasQtd(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void criarMaisFichas();
+                  }}
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setMaisFichasAberto(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => void criarMaisFichas()} disabled={criandoMaisFichas}>
+                  {criandoMaisFichas ? "Criando..." : "Criar fichas"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog
             open={open}
             onOpenChange={(o) => {

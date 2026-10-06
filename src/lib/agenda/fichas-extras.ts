@@ -64,3 +64,79 @@ export function posicoesFichasExtras(input: FichasExtrasInput): FichasExtrasResu
   if (fichas.length === 0) return { ok: false, motivo: "sem_espaco" };
   return { ok: true, fichas, naoCouberam: n - fichas.length };
 }
+
+/** Linha de `agendamentos` como as duas telas leem para montar as extras. */
+export type LinhaDoDia = {
+  agenda_id: string | null;
+  inicio: string;
+  status: string | null;
+  fluxo_etapa: string | null;
+};
+
+/** O paciente já passou pela recepção — a ficha dele pode estar impressa. */
+export const linhaTravada = (r: Pick<LinhaDoDia, "status" | "fluxo_etapa">) =>
+  r.status === "realizado" || (!!r.fluxo_etapa && r.fluxo_etapa !== "aguardando_recepcao");
+
+export type AlvoFichasExtras = {
+  diaIso: string;
+  agendaId: string;
+  /** "HH:MM" — fim do turno da grade vigente nesse dia. */
+  fimTurno: string;
+};
+
+/**
+ * Monta as fichas a mais de vários dias/agendas de um médico ("Adicionar mais
+ * fichas" em Horários médicos e "+ Mais fichas" na Agenda). `diaLocal`
+ * converte o `inicio` gravado no dia civil da clínica.
+ */
+export function montarFichasExtras(input: {
+  alvos: readonly AlvoFichasExtras[];
+  existentes: readonly LinhaDoDia[];
+  quantidade: number;
+  diaLocal: (iso: string) => string;
+}) {
+  const porDia = new Map<string, LinhaExistente[]>();
+  for (const r of input.existentes) {
+    const key = `${r.agenda_id ?? ""}|${input.diaLocal(r.inicio)}`;
+    const arr = porDia.get(key) ?? [];
+    arr.push({ ms: new Date(r.inicio).getTime(), travada: linhaTravada(r) });
+    porDia.set(key, arr);
+  }
+  const fichas: Array<{ agendaId: string; diaIso: string; inicio: Date; fim: Date }> = [];
+  const semAgenda = new Set<string>();
+  const naRecepcao = new Set<string>();
+  let naoCouberam = 0;
+  for (const a of input.alvos) {
+    const r = posicoesFichasExtras({
+      diaIso: a.diaIso,
+      fimTurno: a.fimTurno,
+      linhas: porDia.get(`${a.agendaId}|${a.diaIso}`) ?? [],
+      quantidade: input.quantidade,
+    });
+    if (!r.ok) {
+      if (r.motivo === "paciente_na_recepcao") naRecepcao.add(a.diaIso);
+      else if (r.motivo === "dia_sem_fichas") semAgenda.add(a.diaIso);
+      else naoCouberam += input.quantidade;
+      continue;
+    }
+    naoCouberam += r.naoCouberam;
+    for (const f of r.fichas) fichas.push({ agendaId: a.agendaId, diaIso: a.diaIso, ...f });
+  }
+  return { fichas, semAgenda: [...semAgenda], naRecepcao: [...naRecepcao], naoCouberam };
+}
+
+/** Avisos dos dias que ficaram de fora, em português para a tela. */
+export function avisosFichasExtras(
+  r: Pick<ReturnType<typeof montarFichasExtras>, "semAgenda" | "naRecepcao" | "naoCouberam">,
+  dataBR: (iso: string) => string,
+): string[] {
+  return [
+    r.semAgenda.length > 0
+      ? `Sem agenda gerada nesse dia (gere os horários primeiro): ${r.semAgenda.map(dataBR).join(", ")}.`
+      : "",
+    r.naRecepcao.length > 0
+      ? `Não mexido — tem paciente marcado depois do fim do turno que já passou pela recepção: ${r.naRecepcao.map(dataBR).join(", ")}.`
+      : "",
+    r.naoCouberam > 0 ? `${r.naoCouberam} ficha(s) não couberam antes do fim do turno.` : "",
+  ].filter(Boolean);
+}

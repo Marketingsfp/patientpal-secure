@@ -6,7 +6,14 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { hojeBR } from "@/lib/date-utils";
 import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
-import { fichasExistentes, posicoesFichasExtras } from "@/lib/agenda/fichas-extras";
+import {
+  avisosFichasExtras,
+  fichasExistentes,
+  montarFichasExtras,
+  posicoesFichasExtras,
+  type AlvoFichasExtras,
+  type LinhaDoDia,
+} from "@/lib/agenda/fichas-extras";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -1867,28 +1874,8 @@ function Page() {
         .lte("inicio", new Date(`${gerar.data_fim}T23:59:59`).toISOString())
         .limit(20000);
       if (eLer) throw eLer;
-      const porDia = new Map<string, Array<{ ms: number; travada: boolean }>>();
-      for (const r of (existentes ?? []) as Array<{
-        agenda_id: string | null;
-        inicio: string;
-        status: string | null;
-        fluxo_etapa: string | null;
-      }>) {
-        const key = `${r.agenda_id ?? ""}|${toLocalDate(r.inicio)}`;
-        const arr = porDia.get(key) ?? [];
-        arr.push({
-          ms: new Date(r.inicio).getTime(),
-          travada:
-            r.status === "realizado" ||
-            (!!r.fluxo_etapa && r.fluxo_etapa !== "aguardando_recepcao"),
-        });
-        porDia.set(key, arr);
-      }
       const procedimento = med.procedimento_padrao_nome || med.especialidade_nome || null;
-      const rows: Array<Record<string, unknown>> = [];
-      const semAgenda: string[] = [];
-      const naRecepcao: string[] = [];
-      let naoCouberam = 0;
+      const alvos: AlvoFichasExtras[] = [];
       const ini = new Date(`${gerar.data_inicio}T00:00:00`);
       const fimD = new Date(`${gerar.data_fim}T00:00:00`);
       for (let d = new Date(ini); d <= fimD; d.setDate(d.getDate() + 1)) {
@@ -1908,48 +1895,32 @@ function Page() {
             (acc, x) => (hhmm(x.hora_fim) > acc ? hhmm(x.hora_fim) : acc),
             "",
           );
-          const r = posicoesFichasExtras({
-            diaIso,
-            fimTurno,
-            linhas: porDia.get(`${ag.id}|${diaIso}`) ?? [],
-            quantidade: qtd,
-          });
-          if (!r.ok) {
-            if (r.motivo === "paciente_na_recepcao") naRecepcao.push(dataBR(diaIso));
-            else if (r.motivo === "dia_sem_fichas") semAgenda.push(dataBR(diaIso));
-            else naoCouberam += qtd;
-            continue;
-          }
-          naoCouberam += r.naoCouberam;
-          for (const f of r.fichas) {
-            rows.push({
-              clinica_id: clinicaAtual.clinica_id,
-              medico_id: med.id,
-              agenda_id: ag.id,
-              paciente_nome: "DISPONÍVEL",
-              inicio: f.inicio.toISOString(),
-              fim: f.fim.toISOString(),
-              status: "agendado",
-              observacoes: "Slot gerado automaticamente",
-              ...(procedimento ? { procedimento } : {}),
-            });
-          }
+          alvos.push({ diaIso, agendaId: ag.id, fimTurno });
         }
       }
-      const avisos = [
-        semAgenda.length > 0
-          ? `Sem agenda gerada (gere primeiro com "Gerar Horários na Agenda"): ${[...new Set(semAgenda)].join(", ")}.`
-          : "",
-        naRecepcao.length > 0
-          ? `Não mexido — tem paciente marcado depois do fim do turno que já passou pela recepção: ${[...new Set(naRecepcao)].join(", ")}.`
-          : "",
-        naoCouberam > 0 ? `${naoCouberam} ficha(s) não couberam antes do fim do turno.` : "",
-      ].filter(Boolean);
+      const montado = montarFichasExtras({
+        alvos,
+        existentes: (existentes ?? []) as LinhaDoDia[],
+        quantidade: qtd,
+        diaLocal: toLocalDate,
+      });
+      const rows = montado.fichas.map((f) => ({
+        clinica_id: clinicaAtual.clinica_id,
+        medico_id: med.id,
+        agenda_id: f.agendaId,
+        paciente_nome: "DISPONÍVEL",
+        inicio: f.inicio.toISOString(),
+        fim: f.fim.toISOString(),
+        status: "agendado" as const,
+        observacoes: "Slot gerado automaticamente",
+        ...(procedimento ? { procedimento } : {}),
+      }));
+      const avisos = avisosFichasExtras(montado, dataBR);
       if (rows.length === 0) {
         toast.error(avisos.join(" ") || "Nenhuma ficha a acrescentar.", { duration: 10000 });
         return;
       }
-      const dias = new Set(rows.map((r) => toLocalDate(r.inicio as string))).size;
+      const dias = new Set(montado.fichas.map((x) => x.diaIso)).size;
       const ok = await confirmDialog({
         title: "Adicionar mais fichas",
         confirmText: "Adicionar fichas",
