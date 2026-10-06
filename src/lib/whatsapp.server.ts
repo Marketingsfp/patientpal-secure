@@ -2926,6 +2926,11 @@ async function gerarRespostaNinaInterno(
 
   if (!finalizacaoHandoff && !houveHandoff && !perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo)
     fluxoEstado.knowledge_context = perguntasDoTurno.estado(fluxoEstado.knowledge_context ?? null);
+  // Dúvida descartada neste turno (assunto já respondido) não fica guardada:
+  // um "sim" na próxima mensagem não pode confirmar uma opção nunca perguntada.
+  else if (ctxFerramentas && !perguntaComplementar && !perguntasDoTurno.pendentes.length &&
+    fluxoEstado.knowledge_context?.esclarecimento)
+    fluxoEstado.knowledge_context = { ...fluxoEstado.knowledge_context, esclarecimento: undefined, pendenciasIdentificacao: undefined };
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)

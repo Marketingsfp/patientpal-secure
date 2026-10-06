@@ -189,9 +189,8 @@ const resultadoMedicos = (): ResultadoBroker => ({
 });
 
 it("profissionais da especialidade não viram pergunta sobre o nome do pedido médico", () => {
+  // Ordem do caso da odontologia: procedimento ambíguo antes da busca de médicos.
   const turno = criarPerguntasDoTurno(null, "tem fonoaudiologa pra crianca de 5 anos?");
-  const consultaFono = { ...comOpcoes("fonoaudiologia", [], "consulta"), esclarecimento: undefined };
-  turno.registrar({ termo: "fonoaudiologia", tipo_atendimento: "consulta" }, consultaFono, null, true);
   turno.registrar({ termo: "fonoaudiologia" }, comOpcoes("fonoaudiologia", ["TESTE DA ORELHINHA", "AUDIOMETRIA"]), null, false);
   expect(turno.pendentes).toHaveLength(1);
   const args = { especialidade: "fonoaudiologia" }, r = resultadoMedicos();
@@ -233,4 +232,16 @@ it("pedidos diferentes continuam com uma pergunta cada", () => {
   ]);
   expect(resposta).toContain("“hemograma”");
   expect(resposta).toContain("“tsh”");
+});
+
+it("consulta já confirmada no turno não vira pergunta pela busca de procedimentos com o mesmo nome", () => {
+  const turno = criarPerguntasDoTurno(null, "tem fonoaudiologa pra crianca de 5 anos?");
+  const consultaFono = { ...comOpcoes("fonoaudiologia", [], "consulta"), esclarecimento: undefined };
+  turno.registrar({ termo: "fonoaudiologia", tipo_atendimento: "consulta" }, consultaFono, null, true);
+  turno.registrar({ termo: "fonoaudiologia" }, comOpcoes("fonoaudiologia", ["TESTE DA ORELHINHA", "AUDIOMETRIA"]), null, false);
+  expect(turno.pendentes).toHaveLength(0);
+  expect(turno.temConfirmadas).toBe(true);
+  // Outro assunto do mesmo turno continua podendo virar pergunta.
+  turno.registrar({ termo: "audiometria" }, comOpcoes("audiometria", ["AUDIOMETRIA TONAL", "AUDIOMETRIA VOCAL"]), null, false);
+  expect(turno.pendentes).toHaveLength(1);
 });

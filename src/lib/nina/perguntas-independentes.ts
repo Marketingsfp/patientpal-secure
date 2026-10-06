@@ -73,6 +73,7 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   );
   const pesquisas = new Set<string>();
   const confirmadas = new Set<string>();
+  const tiposConfirmados = new Map<string, string>();
   const identificadas = new Map<string, ConhecimentoSessao>();
   // Apenas pesquisas deste turno. Nunca contam como nova resposta do paciente.
   const aliases = new Map<string, string>();
@@ -198,6 +199,12 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       consultas.set(id, q);
       pesquisas.add(id);
       if (origem) pendentes.delete(chave(origem.consulta));
+      // O mesmo assunto já foi confirmado neste turno como outro tipo de
+      // atendimento (ex.: consulta de fonoaudiologia): a ambiguidade da busca
+      // de procedimentos com o mesmo nome não vira pergunta (06/10/2026).
+      const tipoConfirmado = tiposConfirmados.get(k);
+      const tipoAtual = atual?.consulta.tipo_atendimento;
+      if (atual?.esclarecimento && tipoConfirmado && tipoAtual && tipoConfirmado !== tipoAtual) return;
       if (atual?.esclarecimento) {
         confirmadas.delete(k);
         identificadas.delete(k);
@@ -206,6 +213,7 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       else {
         pendentes.delete(k);
         if (confirmado) confirmadas.add(k);
+        if (confirmado && atual?.consulta.tipo_atendimento) tiposConfirmados.set(k, atual.consulta.tipo_atendimento);
         if (confirmado && atual) identificadas.set(k, atual);
         else identificadas.delete(k);
       }
