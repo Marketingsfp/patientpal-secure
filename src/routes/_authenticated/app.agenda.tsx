@@ -4621,6 +4621,9 @@ function AgendaPage() {
     () => new Set(filtradosOrdenados.map((a) => chaveDiaLocal(a.inicio))).size > 1,
     [filtradosOrdenados],
   );
+  // Colunas Dia/Data da tabela: escondidas abaixo de 1600px de largura quando a
+  // lista é de um dia só (ver comentário no cabeçalho da tabela).
+  const colunaDataSoNoMonitor = listaTemVariosDias ? "" : "hidden min-[1600px]:table-cell";
 
   // ---- "Agora": destaque do horário atual (só hoje). A rolagem acontece apenas
   // quando o usuário clica no botão "Ir para agora" — nunca na abertura da tela.
@@ -13575,10 +13578,18 @@ function AgendaPage() {
                     <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Ficha
                     </TableHead>
-                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {/* Dia e Data saem no notebook quando a lista é de um dia só:
+                    a data já está no filtro e no "Resumo do dia", e as duas
+                    colunas custavam ~150px que faltavam para nome e ações
+                    caberem sem rolagem lateral. Lista de vários dias mantém. */}
+                    <TableHead
+                      className={`h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground ${colunaDataSoNoMonitor}`}
+                    >
                       Dia
                     </TableHead>
-                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead
+                      className={`h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground ${colunaDataSoNoMonitor}`}
+                    >
                       Data
                     </TableHead>
                     <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -13587,7 +13598,10 @@ function AgendaPage() {
                     {/* As três colunas de texto livre dividem a sobra da linha em
                     proporção fixa. Sem isso um nome comprido de médico ou de
                     procedimento estica a coluna e empurra as ações para fora
-                    da tela em notebook. O conteúdo delas trunca com "…". */}
+                    da tela em notebook. O conteúdo delas trunca com "…" — e
+                    para isso as células levam `max-w-0`: sem ele a tabela
+                    automática alarga a coluna até caber o nome inteiro e o
+                    "…" nunca aparece. */}
                     <TableHead className="h-9 tela-alta:h-11 w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Profissional
                     </TableHead>
@@ -13816,12 +13830,16 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Dia da semana */}
-                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-slate-900 dark:text-muted-foreground">
+                            <TableCell
+                              className={`py-0.5 tela-alta:py-1 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-slate-900 dark:text-muted-foreground ${colunaDataSoNoMonitor}`}
+                            >
                               {fmtDiaSemana(a.inicio)}
                             </TableCell>
 
                             {/* Data */}
-                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle whitespace-nowrap text-[12px] font-medium text-slate-900 dark:text-muted-foreground">
+                            <TableCell
+                              className={`py-0.5 tela-alta:py-1 px-1.5 align-middle whitespace-nowrap text-[12px] font-medium text-slate-900 dark:text-muted-foreground ${colunaDataSoNoMonitor}`}
+                            >
                               {fmtData(a.inicio)}
                             </TableCell>
 
@@ -13841,7 +13859,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Profissional */}
-                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
+                            <TableCell className="max-w-0 py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               {(() => {
                                 const label = medicoNomeAgendamento(a);
                                 const m = medicos.find((x) => x.id === a.medico_id);
@@ -13866,7 +13884,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Cliente */}
-                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
+                            <TableCell className="max-w-0 py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               {ocultarPaciente ? (
                                 <span className="block truncate text-sm font-medium italic text-rose-600">
                                   — aguardando estorno —
@@ -13933,7 +13951,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Serviço */}
-                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
+                            <TableCell className="max-w-0 py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               <ProcedimentoCell
                                 valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                                 rotuloExibicao={
