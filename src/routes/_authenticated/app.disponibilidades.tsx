@@ -238,6 +238,10 @@ function Page() {
   // ali a ficha nova precisa nascer depois do último INÍCIO do dia, inclusive
   // de linhas canceladas, para não renumerar ficha já impressa.
   const [ultimosInicios, setUltimosInicios] = useState<Map<string, string>>(new Map());
+  // Quantas fichas (números distintos) cada (medico|agenda|dataLocal) já tem.
+  // Linhas no MESMO instante dividem o número (encaixe), então contam uma vez.
+  // Usado para completar o dia até o total de "Pacientes/dia" com fichas extras.
+  const [fichasNoDia, setFichasNoDia] = useState<Map<string, number>>(new Map());
   const [pisoTick, setPisoTick] = useState(0);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
@@ -366,6 +370,7 @@ function Page() {
       if (!clinicaAtual || !gerar.data_inicio || !gerar.data_fim) {
         setPisos(new Map());
         setUltimosInicios(new Map());
+        setFichasNoDia(new Map());
         return;
       }
       const alvoIds =
@@ -377,6 +382,7 @@ function Page() {
       if (alvoIds.length === 0) {
         setPisos(new Map());
         setUltimosInicios(new Map());
+        setFichasNoDia(new Map());
         return;
       }
       const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
@@ -392,6 +398,7 @@ function Page() {
       if (error || cancelled) return;
       const map = new Map<string, string>();
       const mapInicio = new Map<string, string>();
+      const instantes = new Map<string, Set<number>>();
       for (const r of (data ?? []) as Array<{
         medico_id: string;
         agenda_id: string | null;
@@ -405,10 +412,14 @@ function Page() {
         if (!prev || tFim > prev) map.set(key, tFim);
         const prevIni = mapInicio.get(key);
         if (!prevIni || r.inicio > prevIni) mapInicio.set(key, r.inicio);
+        const set = instantes.get(key) ?? new Set<number>();
+        set.add(new Date(r.inicio).getTime());
+        instantes.set(key, set);
       }
       if (!cancelled) {
         setPisos(map);
         setUltimosInicios(mapInicio);
+        setFichasNoDia(new Map([...instantes].map(([k, s]) => [k, s.size])));
       }
     })();
     return () => {
@@ -1172,7 +1183,69 @@ function Page() {
             });
             continue;
           }
+          const overrideLimiteDia = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
+          // Total de fichas pedido para o DIA ("Pacientes/dia" da grade, ou o
+          // limite digitado na tela). Conta a grade inteira do dia, antes do
+          // piso: é a meta do dia, não do pedaço que ainda falta gerar.
+          const alvoDoDia = (() => {
+            if (overrideLimiteDia > 0) return overrideLimiteDia;
+            const ls = blocos
+              .map((x) => x.limite_pacientes)
+              .filter((n): n is number => typeof n === "number" && n > 0);
+            return ls.length > 0 ? ls.reduce((a, b) => a + b, 0) : Infinity;
+          })();
+          const fimDoTurno = blocos.reduce((acc, x) => (x.hora_fim > acc ? x.hora_fim : acc), "");
+          // FICHAS A MAIS (2026-10-06): quando o dia pede mais fichas do que os
+          // horários da grade comportam, as que faltam entram no ÚLTIMO horário
+          // do dia, 1 segundo uma depois da outra, sempre DEPOIS da última
+          // ficha que já existe. Início, fim e intervalo da escala não mudam, e
+          // como a ficha é posicional (ver ficha-numero.ts) nenhuma ficha
+          // existente muda de número — as extras continuam a sequência. O
+          // segundo de diferença evita o unique index de vaga e impede que a
+          // numeração as trate como encaixe (mesmo instante = mesmo número).
+          // Vale também para dia JÁ gerado: completa até o total pedido.
+          const acrescentarFichasExtras = (criadosNoDia: number): number => {
+            if (!Number.isFinite(alvoDoDia) || !fimDoTurno) return 0;
+            const faltam = alvoDoDia - (fichasNoDia.get(pisoKey) ?? 0) - criadosNoDia;
+            if (faltam <= 0) return 0;
+            let baseMs: number;
+            let horaIni: string;
+            let horaFim: string;
+            if (criadosNoDia > 0) {
+              const ultima = out[out.length - 1];
+              baseMs = new Date(`${ultima.data}T${ultima.inicio}:00`).getTime();
+              horaIni = ultima.inicio;
+              horaFim = ultima.fim;
+            } else {
+              const ultimoIso = ultimosInicios.get(pisoKey);
+              if (!ultimoIso) return 0;
+              baseMs = new Date(ultimoIso).getTime();
+              horaIni = toLocalTime(ultimoIso);
+              horaFim = fimDoTurno;
+            }
+            const fimDate = new Date(`${diaIso}T${horaFim}:00`);
+            let n = 0;
+            for (let k = 1; k <= faltam; k++) {
+              const inicioDate = new Date(baseMs + k * 1000);
+              // Nunca passa do fim do turno: encaixe depois do expediente não
+              // serve de base para ficha extra.
+              if (inicioDate.getTime() >= fimDate.getTime()) break;
+              out.push({
+                data: diaIso,
+                medico_id: m.id,
+                agenda_id: ag.id ?? "",
+                inicio: horaIni,
+                fim: horaFim,
+                iniISO: inicioDate.toISOString(),
+                fimISO: fimDate.toISOString(),
+              });
+              n += 1;
+            }
+            return n;
+          };
           if (blocos.length > 0 && dsEfetivo.length === 0 && piso) {
+            // Grade do dia já toda gerada: só cabem as fichas extras.
+            if (acrescentarFichasExtras(0) > 0) continue;
             bloqueiosPorPiso.push({
               data: diaIso,
               piso,
@@ -1222,34 +1295,7 @@ function Page() {
               criadosNoDia += 1;
             }
           }
-          // FICHAS A MAIS (2026-10-06): quando "Pacientes/dia" pede mais fichas
-          // do que os horários da grade comportam, as que faltam entram no
-          // ÚLTIMO horário do dia, 1 segundo uma depois da outra. Início, fim e
-          // intervalo da escala não mudam, e como a ficha é posicional (ver
-          // ficha-numero.ts) as fichas da grade mantêm o número de sempre — as
-          // extras continuam a sequência (017, 018…). O segundo de diferença
-          // evita o unique index de vaga e impede que a numeração as trate como
-          // encaixe (mesmo instante = mesmo número).
-          const ultimaDaGrade = criadosNoDia > 0 ? out[out.length - 1] : null;
-          if (ultimaDaGrade && Number.isFinite(limiteDia) && criadosNoDia < limiteDia) {
-            const baseMs = new Date(`${ultimaDaGrade.data}T${ultimaDaGrade.inicio}:00`).getTime();
-            const fimDate = new Date(`${ultimaDaGrade.data}T${ultimaDaGrade.fim}:00`);
-            const faltam = limiteDia - criadosNoDia;
-            for (let k = 1; k <= faltam; k++) {
-              const inicioDate = new Date(baseMs + k * 1000);
-              // Nunca passa do fim do último horário (= fim da escala).
-              if (inicioDate.getTime() >= fimDate.getTime()) break;
-              out.push({
-                data: ultimaDaGrade.data,
-                medico_id: ultimaDaGrade.medico_id,
-                agenda_id: ultimaDaGrade.agenda_id,
-                inicio: ultimaDaGrade.inicio,
-                fim: ultimaDaGrade.fim,
-                iniISO: inicioDate.toISOString(),
-                fimISO: fimDate.toISOString(),
-              });
-            }
-          }
+          acrescentarFichasExtras(criadosNoDia);
         }
       }
     }
@@ -1268,6 +1314,7 @@ function Page() {
     agendas,
     pisos,
     ultimosInicios,
+    fichasNoDia,
     medicoFilaAlvo,
     agendaFilaAlvo,
     agendasMistasSemEscolha,
