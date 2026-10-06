@@ -39,9 +39,14 @@ export async function consultarCadastroConfirmado(ctx: CtxNinaPaciente): Promise
 export async function alterarTelefoneSolicitado(ctx: CtxNinaPaciente, dados: { nome: string; data_nascimento: string; telefone: string }): Promise<boolean> {
   const pedido = ctx.estado?.patient.alteracao_telefone;
   if (!pedido) return true;
+  // Homologação nunca altera o contato: descarta o pedido e mantém o número da conversa.
+  const teste = Boolean(ctx.teste || ctx.origem === "homologacao");
+  if (teste) {
+    ctx.estado!.patient.alteracao_telefone = null;
+    return true;
+  }
   if (!pedido.telefone || !ctx.pacienteId || (pedido.paciente_id && pedido.paciente_id !== ctx.pacienteId)) return false;
   // Leia o valor persistido para CAS; o telefone da conversa pode ser secundário.
-  const teste = Boolean(ctx.teste || ctx.origem === "homologacao");
   const { data: atual, error: leitura } = await supabaseAdmin.from("pacientes")
     .select("telefone").eq("id", ctx.pacienteId).eq("clinica_id", ctx.clinicaId)
     .eq("is_mock_data", teste).eq("teste", teste).eq("ativo", true).maybeSingle();

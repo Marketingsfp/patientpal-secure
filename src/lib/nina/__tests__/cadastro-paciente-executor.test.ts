@@ -127,7 +127,16 @@ beforeEach(() => {
 });
 
 describe("executor do cadastro com banco simulado", () => {
-  test.each([false, true])("correção explícita preserva ID e remetente; confirmação seguinte reutiliza telefone corrigido (teste=%s)", async teste => {
+  test("homologação não grava troca de telefone: descarta o pedido sem chamar a RPC", async () => {
+    const ctx = contexto(true); vincular(ctx, { is_mock_data: true, teste: true });
+    registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
+    expect((await executarFerramentaPaciente(ctx, "identificar_paciente", {})).ok).toBe(true);
+    expect(rpcs.map(r => r.nome)).not.toContain("nina_alterar_telefone_paciente");
+    expect(ctx.estado!.patient.alteracao_telefone).toBeNull();
+    expect(banco.pacientes![0]!.telefone).toBe("21999990000");
+  });
+  test("correção explícita preserva ID e remetente; confirmação seguinte reutiliza telefone corrigido", async () => {
+    const teste = false;
     const ctx = contexto(teste); vincular(ctx, { is_mock_data: teste, teste });
     registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
     const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {});

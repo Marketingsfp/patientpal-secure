@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { aplicarGateIdentificacao, extrairDadosIdentificacao } from "../identificacao-gate.server";
+import { aplicarGateIdentificacao, extrairDadosIdentificacao, TEXTO_ENCAMINHADO_FALHA } from "../identificacao-gate.server";
+import { TELEFONE_SIMULADO } from "../telefone-paciente";
 import { cadastroMinimoSchema, camposCadastroFaltantes } from "../cadastro-paciente";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "../paciente-tools.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
-import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO, incluirPacienteNoResumo } from "../agendamento-escolha";
+import { confirmacaoDaEscolha, resumoDaEscolhaEntregue, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO, incluirPacienteNoResumo } from "../agendamento-escolha";
 import { derivarEtapa } from "../atendimento-fase6";
 
 test.each(["O paciente é", "A paciente se chama", "O paciente eh"])("declaração explícita de paciente: %s", prefixo => {
@@ -126,12 +127,50 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
     expect((await t.turno("21988887777"))!.texto).toContain("*Telefone:* 21988887777");
     expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(0);
   });
-  test("pedido de troca com gravação falhando não agenda nem afirma alteração", async () => {
+  test("pedido de troca com gravação falhando encaminha à equipe, sem agendar nem prender o paciente", async () => {
     const t = preparar(); await t.turno("Ana da Silva, 02/01/1990");
     t.falhar({ok:false,erro:"INTERNAL_ERROR",mensagem:"Falha simulada"});
-    expect((await t.turno("troque o telefone para 21988887777"))!.texto).toContain("Não consegui atualizar");
-    await t.turno("confirmo");
+    const r = (await t.turno("troque o telefone para 21988887777"))!;
+    expect(r.texto).toBe(TEXTO_ENCAMINHADO_FALHA);
+    expect(r.texto).not.toContain("Tente novamente");
+    expect(t.encaminhamentos).toHaveLength(1);
+    expect(t.encaminhamentos[0]).toStartWith("TELEFONE_NAO_ATUALIZADO");
+    expect(t.encaminhamentos[0]).toContain("Nenhum agendamento foi gravado");
+    expect(t.estado.patient.alteracao_telefone).toBeNull();
+    expect(t.estado.flow.stage).toBe("HANDOFF");
+    // Encaminhada, a conversa sai do gate: nada é agendado depois.
+    expect(await t.turno("confirmo")).toBeNull();
     expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(0);
+  });
+  test("homologação não troca o telefone: avisa a simulação e reapresenta o resumo", async () => {
+    const t = preparar(); t.ctx.teste = true; t.ctx.origem = "homologacao";
+    await t.turno("Ana da Silva, 02/01/1990");
+    const antes = t.chamadas.length;
+    const r = (await t.turno("troque o telefone para 21988887777"))!;
+    expect(r.texto).toStartWith(TELEFONE_SIMULADO);
+    expect(r.texto).not.toContain("21988887777");
+    expect(t.chamadas.slice(antes).map(c => c.nome)).not.toContain("identificar_paciente");
+    expect(t.estado.patient.alteracao_telefone).toBeNull();
+    expect(t.encaminhamentos).toHaveLength(0);
+    await t.turno("confirmo");
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(1);
+  });
+  test("só o aviso fixo da simulação pode anteceder o resumo entregue", async () => {
+    const t = preparar(); await t.turno("Ana da Silva, 02/01/1990");
+    const resumo = confirmacaoDaEscolha(t.estado, "clinica")!.resumo;
+    expect(resumoDaEscolhaEntregue(t.estado, "clinica", [{ role: "assistant", content: `${TELEFONE_SIMULADO}
+
+${resumo}` }])).toBe(true);
+    expect(resumoDaEscolhaEntregue(t.estado, "clinica", [{ role: "assistant", content: `Seu horário está reservado.
+
+${resumo}` }])).toBe(false);
+  });
+  test("homologação com reserva concluída mantém o agendamento e não troca o telefone", async () => {
+    const t = preparar(); t.ctx.teste = true; t.ctx.origem = "homologacao";
+    await t.turno("Ana da Silva, 02/01/1990"); await t.turno("confirmo");
+    const r = (await t.turno("troque o telefone para 21988887777"))!;
+    expect(r.texto).toBe(`${TELEFONE_SIMULADO} Seu agendamento permanece o mesmo.`);
+    expect(t.chamadas.filter(c=>c.nome==="agendar")).toHaveLength(1);
   });
   test("telefone de reserva já concluída pode mudar sem nova reserva", async () => {
     const t = preparar(); await t.turno("Ana da Silva, 02/01/1990"); await t.turno("confirmo");

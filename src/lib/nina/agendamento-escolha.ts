@@ -1,6 +1,7 @@
 /** Opções consultadas, escolha validada e aceite são evidências distintas. */
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import { permiteReserva, type ModalidadeAtendimento } from "./modalidade-atendimento";
+import { TELEFONE_SIMULADO } from "./telefone-paciente";
 
 export type VagaAgendamento = {
   medico_id: string;
@@ -251,7 +252,8 @@ export function resumoDaEscolhaEntregue(
     const item = historico[i];
     if (item?.role !== "assistant") return false;
     const texto = normalizarEntrega(item.content ?? "");
-    if (texto === normalizarEntrega(c.resumo)) return true;
+    // Único prefixo aceito: o aviso fixo da homologação ao manter o telefone.
+    if (texto === normalizarEntrega(c.resumo) || texto === normalizarEntrega(`${TELEFONE_SIMULADO}\n\n${c.resumo}`)) return true;
     if (texto !== LEMBRETE_CONFIRMACAO || historico[i - 1]?.role !== "user") return false;
   }
   return false;

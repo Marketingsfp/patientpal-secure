@@ -2,6 +2,16 @@ import { normalizarTelefone } from "@/lib/atendimento/telefone";
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 
 export const PEDIR_TELEFONE = "Informe o telefone que deseja usar no cadastro, com DDD.";
+/** Homologação não altera cadastro de contato: o número da conversa virtual continua valendo. */
+export const TELEFONE_SIMULADO = "Nesta simulação o telefone não é alterado; seguimos com o número desta conversa.";
+/** Falha real na troca não prende o paciente: a equipe confere o contato (regra de 26/09/2026). */
+export function motivoTelefoneNaoAtualizado(erro: string | null | undefined, temAgendamento: boolean) {
+  return `TELEFONE_NAO_ATUALIZADO: o paciente pediu para corrigir o telefone e a alteração não foi gravada (${erro ?? "SEM_CODIGO"}). ` +
+    (temAgendamento ? "O agendamento já gravado não foi alterado; a equipe deve atualizar o contato."
+      : "Nenhum agendamento foi gravado; a equipe deve atualizar o contato e concluir o atendimento.");
+}
+export const TELEFONE_FALHA_SEM_ENCAMINHAMENTO =
+  "Não consegui registrar o novo telefone nem confirmar o encaminhamento agora. Por favor, fale com a recepção para atualizar seu contato.";
 const NEGACAO_ALTERACAO = /\bnao\s+(?:(?:quero|precisa|preciso|desejo|pode)\s+)?(?:alter\w*|tro[qc]\w*|mud\w*|corrig\w*|corrija|atualiz\w*)\b/;
 const normalizarTexto = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 

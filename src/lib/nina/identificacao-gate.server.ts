@@ -54,7 +54,8 @@ import { respostaFalhaAgendamento } from "./falha-agendamento";
 export const TEXTO_ENCAMINHADO_FALHA =
   "Vou encaminhar sua conversa para nossa equipe, que continuará o atendimento por aqui.";
 import { reservaDaSessaoAtual } from "./agendamento-sessao";
-import { registrarPedidoTelefone, PEDIR_TELEFONE } from "./telefone-paciente";
+import { registrarPedidoTelefone, PEDIR_TELEFONE, TELEFONE_SIMULADO, TELEFONE_FALHA_SEM_ENCAMINHAMENTO,
+  motivoTelefoneNaoAtualizado } from "./telefone-paciente";
 
 /* ------------------------------------------------------------ confirmações */
 
@@ -284,13 +285,36 @@ export async function aplicarGateIdentificacao(params: {
   const mensagemAceite = aceiteParaPacienteIdentificado(mensagem, ctx);
   if (estado.flow.stage === "HANDOFF") return null;
   const corrigindoTelefone = registrarPedidoTelefone(estado, mensagem);
+  // Homologação não altera o contato do paciente de teste: o pedido é
+  // descartado e a conversa segue com o número virtual (06/10/2026).
+  if (p.alteracao_telefone && (ctx.teste || ctx.origem === "homologacao")) {
+    p.alteracao_telefone = null;
+    const escolhaAtual = confirmacaoDaEscolha(estado, ctx.clinicaId);
+    if (p.validated && p.id && escolhaAtual && !declaracaoDePaciente(mensagem)) {
+      if (!a.appointment_id) estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
+      return criarResultado({ origem: "gate", texto: a.appointment_id
+        ? `${TELEFONE_SIMULADO} Seu agendamento permanece o mesmo.`
+        : `${TELEFONE_SIMULADO}\n\n${escolhaAtual.resumo}`,
+        restricoes: ["nao_afirmar_telefone_alterado", "aguardar_aceite_do_resumo"] });
+    }
+  }
   if (p.alteracao_telefone?.telefone === null)
     return criarResultado({ origem: "gate", texto: PEDIR_TELEFONE, restricoes: ["aguardar_telefone_solicitado", "nao_agendar"] });
   // Corrigir contato não é recusar a vaga nem confirmar o resumo anterior.
   if (p.alteracao_telefone && p.validated && p.id && confirmacaoDaEscolha(estado, ctx.clinicaId) && !declaracaoDePaciente(mensagem)) {
     const etapa = estado.flow.stage;
     const r = await executar(ctx, "identificar_paciente", {});
-    if (!r.ok) return criarResultado({ origem: "erro", texto: "Não consegui atualizar o telefone agora. Seu agendamento não foi alterado. Tente novamente.", restricoes: ["nao_agendar", "nao_afirmar_telefone_alterado"] });
+    if (!r.ok) {
+      // Falha de operação vira encaminhamento: sem "tente novamente" e sem
+      // deixar o pedido pendente prendendo as próximas mensagens.
+      p.alteracao_telefone = null;
+      estado.flow.stage = "HANDOFF";
+      const ok = await params.encaminharVagaIndisponivel?.(motivoTelefoneNaoAtualizado(r.erro, Boolean(a.appointment_id)))
+        .catch(() => false) ?? false;
+      return criarResultado({ origem: ok ? "handoff" : "erro",
+        texto: ok ? TEXTO_ENCAMINHADO_FALHA : TELEFONE_FALHA_SEM_ENCAMINHAMENTO,
+        fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_agendar", "nao_afirmar_telefone_alterado"] });
+    }
     estado.flow.stage = a.appointment_id ? etapa : "WAITING_FINAL_CONFIRMATION";
     return criarResultado({ origem: "gate", texto: a.appointment_id
       ? `Telefone atualizado para ${p.telefone_confirmado?.telefone}. Seu agendamento permanece o mesmo.`
