@@ -1,7 +1,7 @@
 import type { ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 import { apresentarPerguntaEsclarecimento } from "./esclarecimento-apresentacao";
 import type { ResultadoBroker } from "./tool-broker";
-import type { ResultadoConhecimento } from "./knowledge-contract";
+import type { RegistroConhecimento, ResultadoConhecimento } from "./knowledge-contract";
 import { sugerirResultadoJev } from "./identificacao-catalogo";
 import { confirmacaoDaEscolha } from "./agendamento-escolha";
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
@@ -30,6 +30,8 @@ const consulta = (p: Record<string, unknown>) => ({
   medico: String(p.medico ?? p.nome ?? ""),
 });
 const chave = (q: { termo: string; medico?: string }) => normal(q.termo) + "|" + normal(q.medico);
+/** Assunto da pesquisa sem o prefixo "consulta": "CONSULTA ODONTOLOGIA" e "odontologia" coincidem. */
+const assunto = (termo: string) => normal(termo).replace(/^consultas?\s+(?:(?:de|da|do|com)\s+)?/, "").trim();
 export const PESQUISAS_INDEPENDENTES = new Set([
   "consultar_cadastro",
   "buscar_medicos",
@@ -90,6 +92,8 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   }
   // Pendências de exame/procedimento abertas NESTE turno (não respostas do paciente).
   const pendentesDoTurno = new Set<string>();
+  // Assuntos confirmados como consulta neste turno ("odontologia", "fonoaudiologia").
+  const consultasConfirmadas = new Set<string>();
   /**
    * Regra confirmada (06/10/2026, opção B): com um exame/procedimento ainda
    * ambíguo, a Nina não escolhe a variante pelo paciente. Uma busca nova,
@@ -98,8 +102,11 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
    * o nome dessa opção, a escolha é dele e a busca vale normalmente.
    */
   function escolhaPresumida(k: string, resultado: ResultadoBroker): ResultadoBroker | null {
-    const dados = resultado.dados as ResultadoConhecimento | null;
-    if (!dados || dados.esclarecimento || dados.knowledge_status === "conflict" || !dados.records?.length) return null;
+    // consultar_cadastro devolve records/procedure/price; buscar_procedimentos,
+    // registros/procedimento/preco. Os dois formatos chegam aqui.
+    const dados = resultado.dados as (ResultadoConhecimento & { registros?: RegistroConhecimento[] }) | null;
+    const registros = dados?.records?.length ? dados.records : Array.isArray(dados?.registros) ? dados.registros : [];
+    if (!dados || dados.esclarecimento || dados.knowledge_status === "conflict" || !registros.length) return null;
     const textoPaciente = compacto(mensagem);
     for (const [chavePendente, pendencia] of pendentes) {
       if (chavePendente === k || !pendentesDoTurno.has(chavePendente)) continue;
@@ -107,10 +114,11 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       if (pendencia.consulta.tipo_atendimento !== "exame_procedimento" || !esclarecimento?.opcoes.length) continue;
       const ids = new Set(esclarecimento.opcoes.map((o) => o.id));
       const nomes = new Set(esclarecimento.opcoes.map((o) => compacto(o.nome)));
-      const escolhidos = dados.records.filter((r) => (r.id && ids.has(r.id)) || (r.procedimento && nomes.has(compacto(r.procedimento))));
+      const escolhidos = registros.filter((r) => (r.id && ids.has(r.id)) || (r.procedimento && nomes.has(compacto(r.procedimento))));
       if (!escolhidos.length) continue;
       if (escolhidos.some((r) => r.procedimento && textoPaciente.includes(compacto(r.procedimento)))) continue;
-      return { ...resultado, dados: { ...dados, found: false, procedure: null, price: null, records: [], esclarecimento,
+      return { ...resultado, dados: { ...dados, found: false, procedure: null, price: null, records: [],
+        registros: [], procedimento: null, preco: null, observacoes: null, esclarecimento,
         instrucao: `Este registro é uma das opções que o paciente ainda não escolheu para o pedido “${pendencia.consulta.termo}”. Não informe preço, profissional, horários nem detalhes de uma opção específica; pergunte qual opção corresponde ao pedido.` } };
     }
     return null;
@@ -234,6 +242,9 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       const tipoConfirmado = tiposConfirmados.get(k);
       const tipoAtual = atual?.consulta.tipo_atendimento;
       if (atual?.esclarecimento && tipoConfirmado && tipoAtual && tipoConfirmado !== tipoAtual) return;
+      // "CONSULTA ODONTOLOGIA" pesquisada como procedimento é o mesmo assunto
+      // da consulta de odontologia já confirmada no turno.
+      if (atual?.esclarecimento && tipoAtual === "exame_procedimento" && consultasConfirmadas.has(assunto(q.termo))) return;
       if (atual?.esclarecimento) {
         confirmadas.delete(k);
         identificadas.delete(k);
@@ -246,6 +257,15 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
         if (confirmado && atual?.consulta.tipo_atendimento) tiposConfirmados.set(k, atual.consulta.tipo_atendimento);
         if (confirmado && atual) identificadas.set(k, atual);
         else identificadas.delete(k);
+        if (confirmado && atual?.consulta.tipo_atendimento === "consulta") {
+          const assuntoConfirmado = assunto(q.termo);
+          consultasConfirmadas.add(assuntoConfirmado);
+          // Dúvida de procedimento deste turno com o mesmo assunto fica respondida pela consulta.
+          for (const [chavePendente, pendencia] of pendentes) {
+            if (pendentesDoTurno.has(chavePendente) && pendencia.consulta.tipo_atendimento === "exame_procedimento" &&
+              assunto(pendencia.consulta.termo) === assuntoConfirmado) pendentes.delete(chavePendente);
+          }
+        }
       }
     },
     get pendentes() {

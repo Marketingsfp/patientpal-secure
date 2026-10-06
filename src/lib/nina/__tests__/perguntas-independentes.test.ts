@@ -247,8 +247,16 @@ it("consulta já confirmada no turno não vira pergunta pela busca de procedimen
 });
 
 // Regra confirmada 06/10/2026 (opção B): a Nina não escolhe a variante pelo paciente.
+// Formato real de buscar_procedimentos (registros/procedimento/preco), como em produção.
 const resultadoProcedimento = (nome: string): ResultadoBroker => ({
   ferramenta: "buscar_procedimentos", capacidade: "listCatalog", fonte: "base_conhecimento",
+  success: true, reused: false, appointment_confirmed: false,
+  dados: { ok: true, fonte: "catalogo_publicado", knowledge_status: "found", procedimento: nome, preco: 200,
+    registros: [{ id: nome, procedimento: nome, preco_dinheiro: 200, preco_cartao: 220 }] },
+});
+// Formato de consultar_cadastro (records/procedure/price).
+const resultadoCadastro = (nome: string): ResultadoBroker => ({
+  ferramenta: "consultar_cadastro", capacidade: "searchKnowledgeBase", fonte: "base_conhecimento",
   success: true, reused: false, appointment_confirmed: false,
   dados: { found: true, knowledge_status: "found", procedure: nome, price: 200,
     records: [{ id: nome, procedimento: nome, preco_dinheiro: 200, preco_cartao: 220 }] },
@@ -258,11 +266,19 @@ it("opção escolhida pela Nina dentro da dúvida não libera preço e mantém a
   const turno = criarPerguntasDoTurno(null, "o ortopedista passou 10 sessoes de fisioterapia pro meu joelho, quanto fica?");
   turno.registrar({ termo: "fisioterapia", tipo_atendimento: "exame_procedimento" }, comOpcoes("fisioterapia", FISIO), null, false);
   const dados = turno.reconciliar({ termo: "FISIOTERAPIA (5 SESSOES)" }, resultadoProcedimento("FISIOTERAPIA (5 SESSOES)"), "buscar_procedimentos")
-    .dados as ResultadoConhecimento;
-  expect(dados.price).toBeNull();
-  expect(dados.records).toEqual([]);
+    .dados as ResultadoConhecimento & Record<string, unknown>;
+  expect(dados.preco).toBeNull();
+  expect(dados.procedimento).toBeNull();
+  expect(dados.registros).toEqual([]);
   expect(dados.esclarecimento?.opcoes.map((o) => o.nome)).toEqual(FISIO);
-  expect(String((dados as { instrucao?: string }).instrucao)).toContain("ainda não escolheu");
+  expect(String(dados.instrucao)).toContain("ainda não escolheu");
+  // O mesmo vale quando a Nina relê pelo consultar_cadastro.
+  const turno2 = criarPerguntasDoTurno(null, "o ortopedista passou 10 sessoes de fisioterapia pro meu joelho");
+  turno2.registrar({ termo: "fisioterapia", tipo_atendimento: "exame_procedimento" }, comOpcoes("fisioterapia", FISIO), null, false);
+  const cadastro = turno2.reconciliar({ termo: "FISIOTERAPIA (5 SESSOES)" }, resultadoCadastro("FISIOTERAPIA (5 SESSOES)"), "consultar_cadastro")
+    .dados as ResultadoConhecimento;
+  expect(cadastro.price).toBeNull();
+  expect(cadastro.records).toEqual([]);
 });
 
 it("opção escrita pelo paciente vale normalmente", () => {
@@ -280,4 +296,27 @@ it("dúvida de mensagem anterior e dúvida de consulta não bloqueiam a busca", 
   consulta.registrar({ termo: "clinico", tipo_atendimento: "consulta" }, comOpcoes("clinico", ["CLINICO GERAL", "CLINICA MEDICA"], "consulta"), null, false);
   const c = resultadoProcedimento("CLINICO GERAL");
   expect(consulta.reconciliar({ termo: "CLINICO GERAL" }, c, "buscar_medicos")).toBe(c);
+});
+
+it("procedimento 'CONSULTA X' ambíguo não vira pergunta quando a consulta de X já foi confirmada (nas duas ordens)", () => {
+  const confirmar = (turno: ReturnType<typeof criarPerguntasDoTurno>, termo: string) =>
+    turno.registrar({ especialidade: termo }, { ...comOpcoes(termo, [], "consulta"), esclarecimento: undefined }, null, true);
+  const ambiguo = (turno: ReturnType<typeof criarPerguntasDoTurno>, termo: string, nomes: string[]) =>
+    turno.registrar({ termo }, comOpcoes(termo, nomes), null, false);
+  // Ordem real de 06/10 18:26: médicos confirmados e depois "CONSULTA ODONTOLOGIA" como procedimento.
+  const depois = criarPerguntasDoTurno(null, "vcs tem dentista? e fonoaudiologa?");
+  confirmar(depois, "ODONTOLOGIA");
+  confirmar(depois, "FONOAUDIOLOGIA");
+  ambiguo(depois, "CONSULTA ODONTOLOGIA", ["EXTRACAO", "PLACA DE BRUXISMO"]);
+  ambiguo(depois, "CONSULTA FONOAUDIOLOGIA", ["TESTE DA ORELHINHA", "AUDIOMETRIA"]);
+  expect(depois.pendentes).toHaveLength(0);
+  // Ordem inversa: a consulta confirmada depois resolve a dúvida do mesmo assunto.
+  const antes = criarPerguntasDoTurno(null, "vcs tem dentista?");
+  ambiguo(antes, "CONSULTA ODONTOLOGIA", ["EXTRACAO", "PLACA DE BRUXISMO"]);
+  expect(antes.pendentes).toHaveLength(1);
+  confirmar(antes, "ODONTOLOGIA");
+  expect(antes.pendentes).toHaveLength(0);
+  // Outro assunto continua sendo perguntado.
+  ambiguo(antes, "audiometria", ["AUDIOMETRIA TONAL", "AUDIOMETRIA VOCAL"]);
+  expect(antes.pendentes).toHaveLength(1);
 });
