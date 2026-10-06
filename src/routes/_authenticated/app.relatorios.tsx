@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
-import { mostrarErro } from "@/lib/traduzir-erro";
+import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import {
   Download,
   CalendarDays,
@@ -753,7 +753,12 @@ function RelatoriosPage() {
         </TabsContent>
 
         <TabsContent value="agendamentos-diario" className="mt-4">
-          <AgendamentosDiarioView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+          <AgendamentosDiarioView
+            clinicaId={clinicaAtual?.clinica_id}
+            ini={ini}
+            fim={fim}
+            ehSupervisor={ehSupervisor}
+          />
         </TabsContent>
 
         {/* Traz os próprios filtros (período de atendimento x período de
@@ -1684,30 +1689,39 @@ function Kpi({
 }
 
 // ============= AGENDAMENTOS DO DIA (por Atendente / Setor) =============
+// Linha da função `rel_agendamentos_marcados`. Quem marcou e quando vêm da
+// auditoria: `agendamentos.criado_por` nunca foi preenchida e `created_at` é o
+// dia em que a VAGA foi gerada na grade, não o dia em que o paciente foi
+// marcado. `usuario_id`/`usuario_nome` só vêm para a supervisão.
 type AgendDiaRow = {
-  id: string;
-  created_at: string;
-  criado_por: string | null;
+  agendamento_id: string;
+  marcado_em: string;
+  usuario_id: string | null;
+  usuario_nome: string | null;
   paciente_nome: string | null;
-  paciente_id: string | null;
   inicio: string;
   procedimento: string | null;
   status: string | null;
   medico_id: string | null;
 };
 
+const SEM_NOME_SETOR = "Sem usuário";
+const SEM_NOME_ATENDENTE = "Site, integração ou sistema";
+
 function AgendamentosDiarioView({
   clinicaId,
   ini,
   fim,
+  ehSupervisor,
 }: {
   clinicaId?: string;
   ini: string;
   fim: string;
+  ehSupervisor: boolean;
 }) {
   const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const [rows, setRows] = useState<AgendDiaRow[]>([]);
-  const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
   const [setorMap, setSetorMap] = useState<Map<string, string>>(new Map()); // user_id -> setor nome
   const [medMap, setMedMap] = useState<Map<string, string>>(new Map());
   // Quantas linhas cada atendente está mostrando ("setor|atendente" → limite).
@@ -1723,35 +1737,30 @@ function AgendamentosDiarioView({
     (async () => {
       setLoading(true);
       setLimites(new Map());
+      setErro(null);
       try {
-        // Dia a dia: um mês tem dezenas de milhares de marcações; a consulta
-        // simples parava em 1.000 e a paginada do mês inteiro estourava o
-        // tempo do servidor (ver `buscarPorDia`). Mais recente primeiro.
+        // Dia a dia (a função recebe o mesmo dia como início e fim): um mês
+        // passa de 9 mil marcações e o PostgREST devolve no máximo 1.000 por
+        // página. Mais recente primeiro.
         const list = (
-          await buscarPorDia<AgendDiaRow>(ini, fim, (de, ate) =>
-            supabase
-              .from("agendamentos")
-              .select(
-                "id, created_at, criado_por, paciente_nome, paciente_id, inicio, procedimento, status, medico_id",
-              )
-              .eq("clinica_id", clinicaId)
-              .gte("created_at", de)
-              .lt("created_at", ate)
-              .or(FILTRO_SEM_VAGA_LIVRE)
-              .order("created_at")
-              .order("id"),
+          await buscarPorDia<AgendDiaRow>(ini, fim, (de) =>
+            (supabase as any)
+              .rpc("rel_agendamentos_marcados", {
+                _clinica_id: clinicaId,
+                _marc_ini: de,
+                _marc_fim: de,
+              })
+              .order("marcado_em")
+              .order("agendamento_id"),
           )
-        )
-          .filter((r) => !ehVagaLivre(r))
-          .reverse();
+        ).reverse();
         const userIds = Array.from(
-          new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]),
+          new Set(list.map((r) => r.usuario_id).filter(Boolean) as string[]),
         );
         const medIds = Array.from(
           new Set(list.map((r) => r.medico_id).filter(Boolean) as string[]),
         );
-        const [pMap, contratosRes, mMap] = await Promise.all([
-          nomesPorId("profiles", userIds),
+        const [contratosRes, mMap] = await Promise.all([
           userIds.length
             ? supabase
                 .from("hr_contratos")
@@ -1786,10 +1795,17 @@ function AgendamentosDiarioView({
         }
         if (cancel) return;
         setRows(list);
-        setProfMap(pMap);
         setMedMap(mMap);
         setSetorMap(sMap);
       } catch (e: any) {
+        if (cancel) return;
+        setRows([]);
+        // Função ainda não aplicada no banco: avisa em vez de "nenhum agendamento".
+        setErro(
+          e?.code === "PGRST202"
+            ? "Esta aba precisa de uma atualização no banco que ainda não foi aplicada."
+            : traduzirErro(e),
+        );
         mostrarErro(e);
       } finally {
         if (!cancel) setLoading(false);
@@ -1800,12 +1816,26 @@ function AgendamentosDiarioView({
     };
   }, [clinicaId, ini, fim]);
 
+  // Supervisão: setor e atendente. Demais: um grupo só, sem nome de ninguém
+  // (o banco nem devolve o nome para quem não tem a alçada).
+  const setorDe = (r: AgendDiaRow) =>
+    !ehSupervisor
+      ? "Agendamentos marcados"
+      : r.usuario_id
+        ? (setorMap.get(r.usuario_id) ?? "Sem setor")
+        : SEM_NOME_SETOR;
+  const atendenteDe = (r: AgendDiaRow) =>
+    !ehSupervisor
+      ? "Todas as atendentes"
+      : r.usuario_id
+        ? (r.usuario_nome ?? "—")
+        : SEM_NOME_ATENDENTE;
+
   const agrupado = useMemo(() => {
     const bySetor = new Map<string, Map<string, AgendDiaRow[]>>();
     for (const r of rows) {
-      const uid = r.criado_por ?? "";
-      const setor = uid ? (setorMap.get(uid) ?? "Sem setor") : "Sem usuário";
-      const atendente = uid ? (profMap.get(uid) ?? "—") : "Sistema / Sem usuário";
+      const setor = setorDe(r);
+      const atendente = atendenteDe(r);
       if (!bySetor.has(setor)) bySetor.set(setor, new Map());
       const byAt = bySetor.get(setor)!;
       if (!byAt.has(atendente)) byAt.set(atendente, []);
@@ -1820,17 +1850,16 @@ function AgendamentosDiarioView({
           .sort((a, b) => b.lista.length - a.lista.length),
       }))
       .sort((a, b) => b.total - a.total);
-  }, [rows, profMap, setorMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, setorMap, ehSupervisor]);
 
   const totalGeral = rows.length;
 
   function exportar() {
     const flat = rows.map((r) => {
-      const uid = r.criado_por ?? "";
       return {
-        "Data Criação": new Date(r.created_at).toLocaleString("pt-BR"),
-        Setor: uid ? (setorMap.get(uid) ?? "Sem setor") : "Sem usuário",
-        Atendente: uid ? (profMap.get(uid) ?? "—") : "Sistema",
+        "Marcado em": new Date(r.marcado_em).toLocaleString("pt-BR"),
+        ...(ehSupervisor ? { Setor: setorDe(r), Atendente: atendenteDe(r) } : {}),
         Paciente: r.paciente_nome ?? "",
         "Data Consulta": new Date(r.inicio).toLocaleString("pt-BR"),
         Procedimento: r.procedimento ?? "",
@@ -1866,10 +1895,13 @@ function AgendamentosDiarioView({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Agendamentos criados no período</h2>
+          <h2 className="text-xl font-semibold">Agendamentos marcados no período</h2>
           <p className="text-sm text-muted-foreground">
-            Conta pelo dia em que o agendamento foi <b>registrado no sistema</b> (não pela data da
-            consulta). Agrupado por setor e atendente.
+            Conta pelo dia em que o paciente foi <b>marcado no sistema</b> (não pela data da
+            consulta).
+            {ehSupervisor
+              ? " Agrupado por setor e atendente."
+              : " O nome de quem marcou aparece só para a supervisão."}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1883,10 +1915,16 @@ function AgendamentosDiarioView({
         </div>
       </div>
 
-      {agrupado.length === 0 ? (
+      {erro ? (
+        <Card>
+          <CardContent className="py-10 text-center text-destructive">
+            Não foi possível carregar os agendamentos: {erro}
+          </CardContent>
+        </Card>
+      ) : agrupado.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            Nenhum agendamento registrado no período.
+            Nenhum paciente marcado no período.
           </CardContent>
         </Card>
       ) : (
@@ -1915,7 +1953,7 @@ function AgendamentosDiarioView({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-40">Criado em</TableHead>
+                        <TableHead className="w-40">Marcado em</TableHead>
                         <TableHead>Paciente</TableHead>
                         <TableHead className="w-44">Data consulta</TableHead>
                         <TableHead>Procedimento</TableHead>
@@ -1925,9 +1963,9 @@ function AgendamentosDiarioView({
                     </TableHeader>
                     <TableBody>
                       {a.lista.slice(0, limiteDe(g.setor, a.nome)).map((r) => (
-                        <TableRow key={r.id}>
+                        <TableRow key={r.agendamento_id}>
                           <TableCell className="text-xs">
-                            {new Date(r.created_at).toLocaleString("pt-BR")}
+                            {new Date(r.marcado_em).toLocaleString("pt-BR")}
                           </TableCell>
                           <TableCell className="text-sm">{r.paciente_nome ?? "—"}</TableCell>
                           <TableCell className="text-xs">
