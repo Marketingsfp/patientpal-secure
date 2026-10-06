@@ -156,7 +156,8 @@ export function preferePrimeiroDisponivel(ctx?: ContextoConsultaAgenda | null): 
   if (com && !/^(?:primeir[oa]\s+(?:medic[oa]\s+)?disponivel|qualquer|quem|que\s+tiver|medic[oa]\s+que|profissional\s+que)/.test(com)) return false;
   if (ctx.medicoEscolhido?.id && !ofereceComparacao &&
     !/\b(?:qualquer (?:medico|medica|profissional)|entre (?:os|as|todos)|sem preferencia|nao tenho preferencia)\b/.test(atual)) return false;
-  const escolha = /\b(?:primeir[oa]\s+(?:medic[oa]\s+)?disponivel|mais proxim[oa]|mais cedo|(?:quem|o que|a que)\s+(?:tiver|tem|puder|atender)[^.!?]{0,50}(?:vaga|disponibilidade|antes|primeiro)|qualquer (?:um|uma|medico|medica|profissional)|sem preferencia|nao tenho preferencia)\b/.test(atual);
+  const escolha = /\b(?:primeir[oa]\s+(?:(?:medic[oa]|horario|vaga|data)\s+)?disponivel|mais proxim[oa]|mais cedo|(?:quem|o que|a que)\s+(?:tiver|tem|puder|atender)[^.!?]{0,50}(?:vaga|disponibilidade|antes|primeiro)|qualquer (?:um|uma|medico|medica|profissional)|sem preferencia|nao tenho preferencia)\b/.test(atual)
+    || (ofereceComparacao && /^(?:(?:pode ser|quero|prefiro)\s+)?(?:o|a)?\s*primeir[oa]\s+(?:horario|vaga|data)[.!?\s]*$/.test(atual));
   return escolha && (ofereceComparacao || /\b(?:medic[oa]|profissional|consulta|agendar|marcar|vaga|disponivel)\b/.test(atual));
 }
 

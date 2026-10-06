@@ -652,7 +652,7 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
   });
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: compara ambos e devolve a médica mais próxima com seus preços e modalidade`, async () => {
-      const ctx = { ...contexto("o primeiro disponível", oferta), origem, teste: origem === "homologacao" };
+      const ctx = { ...contexto("o primeiro horário", "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?"), origem, teste: origem === "homologacao" };
       const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
       expect(r.ok).toBe(true);
       expect(r.proxima).toMatchObject({ medico_id: OUTRO, medico: "Maria Teste",

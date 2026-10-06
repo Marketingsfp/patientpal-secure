@@ -26,6 +26,16 @@ const ofertaGeral =
   "O Dr. Alex Louza atende às quartas às 13h e o Dr. Antonio Cobucci às quintas às 13:30. Qual médico prefere para verificar vagas?";
 
 describe("escolha entre médico e primeiro disponível", () => {
+  const ofertaCurta = "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?";
+  it.each(["o primeiro horário", "o primeiro horário disponível", "pode ser a primeira vaga", "primeira data disponível"])(
+    "oferta curta sem lista anterior permite comparar agendas: %s", mensagem => {
+      expect(preferePrimeiroDisponivel(contexto(mensagem, ofertaCurta))).toBe(true);
+      expect(interesseEmConsultarAgenda(contexto(mensagem, ofertaCurta))).toBe(true);
+    });
+  it.each(["sim", "quero escolher os profissionais", "mostre a lista", "não quero o primeiro horário", "qual o preço?"])(
+    "oferta curta não presume primeira vaga: %s", mensagem => {
+      expect(preferePrimeiroDisponivel(contexto(mensagem, ofertaCurta))).toBe(false);
+    });
   const oferta = "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
   it.each(["o primeiro disponível", "o mais próximo", "quem tiver antes", "qualquer um",
     "não tenho preferência", "quero quem puder me atender mais cedo", "primeiro disponível pra hoje"])("interpreta %s", mensagem => {

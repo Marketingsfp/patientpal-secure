@@ -1485,8 +1485,8 @@ async function gerarRespostaNinaInterno(
   instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_PROFISSIONAL_NOMINAL", nivel: "inegociavel",
     origem: "src/lib/nina/prompt/regras-catalogo.ts", motivo: "Setores e equipes não são opções de médicos para o paciente escolher.",
     texto: REGRA_ESCOLHA_PROFISSIONAL_NOMINAL });
-  instrucoesAdicionaisTurno.push({ codigo: "ESCALA_ANTES_DAS_VAGAS", nivel: "inegociavel",
-    origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "Apresentar a escala habitual antes de oferecer vagas reais, conforme regra confirmada.",
+  instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_ANTES_DOS_DETALHES", nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "No agendamento, perguntar primeiro pela primeira vaga ou escolha dos profissionais; detalhar conforme a preferência.",
     texto: REGRA_HORARIOS_HABITUAIS_PRIMEIRO });
   instrucoesAdicionaisTurno.push({ codigo: "CADASTRO_PESSOA_ATENDIDA", nivel: "inegociavel",
     origem: "src/lib/nina/cadastro-paciente.ts", motivo: "Dados da pessoa atendida com o WhatsApp do remetente, inclusive responsáveis.",
