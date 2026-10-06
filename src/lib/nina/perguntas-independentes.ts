@@ -6,6 +6,7 @@ import { sugerirResultadoJev } from "./identificacao-catalogo";
 import { confirmacaoDaEscolha } from "./agendamento-escolha";
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import type { ConfirmacaoIdentificacao } from "./confirmacao-identificacao";
+import { preservarFinalidadeVacina, pendenciaAntigaDaVacina } from "./finalidade-vacina";
 
 const normal = (v: unknown) =>
   typeof v === "string"
@@ -115,6 +116,8 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   return {
     referencia,
     prepararContinuidade(ferramenta: string, args: string | undefined): string | undefined {
+      const finalidade = preservarFinalidadeVacina(ferramenta, args, mensagem);
+      if (finalidade !== args) return finalidade;
       if (!["consultar_cadastro", "buscar_procedimentos"].includes(ferramenta)) return args;
       const p = parametrosPesquisa(args);
       if (p.nova_solicitacao === true) return args;
@@ -135,6 +138,14 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
     },
     reconciliar(args: unknown, resultado: ResultadoBroker): ResultadoBroker {
       if (!resultado.success || resultado.erro || !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")) return resultado;
+      const limitacao = (resultado.dados as ResultadoConhecimento | null)?.limitacao_catalogo;
+      if (limitacao) {
+        // Limpeza de pendências antigas incorretas desse pedido, sem afetar DNA etc.
+        for (const [id, pendencia] of pendentes) {
+          if (pendenciaAntigaDaVacina(pendencia.consulta.termo, mensagem || limitacao.pedido)) pendentes.delete(id);
+        }
+        return resultado;
+      }
       const p = parametrosPesquisa(args), k = grupo(p);
       const origem = referencia(args), aceite = aceites.find(a => a.anterior === origem);
       if (aceite) {

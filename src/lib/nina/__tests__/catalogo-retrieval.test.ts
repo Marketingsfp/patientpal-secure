@@ -164,6 +164,36 @@ function profissional(over: Linha): Linha {
   };
 }
 
+describe("vacina da gripe preserva finalidade no catálogo", () => {
+  it("genericamente VACINA e diagnósticos não comprovam a vacina específica", async () => {
+    banco.servicos = [servico({ id: "vacina", nome: "VACINA", descricao_publica: "Confira vacina da gripe com a equipe" }),
+      servico({ id: "pcr", nome: "PCR INFLUENZA", estrutura: { aliases: ["vacina da gripe"] } })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "vacina da gripe" });
+    expect(r.records).toHaveLength(0);
+    expect(r.limitacao_catalogo?.codigo).toBe("VACINA_ESPECIFICA_NAO_CONFIRMADA");
+    expect(r.esclarecimento).toBeUndefined();
+  });
+  for (const nome of ["VACINA DA GRIPE", "VACINA INFLUENZA", "VACINA ANTIGRIPAL"])
+    it(`recupera o cadastro específico ${nome}`, async () => {
+      banco.servicos = [servico({ id: "vacina", nome }), servico({ id: "pcr", nome: "PCR INFLUENZA" })];
+      const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "vacina da gripe" });
+      expect(r.records.map(r => r.id)).toEqual(["vacina"]);
+      expect(r.limitacao_catalogo).toBeUndefined();
+      expect(r.esclarecimento).toBeUndefined();
+    });
+  it("usa alias publicado e mantém qualificadores e diagnóstico independente", async () => {
+    banco.servicos = [servico({ id: "vacina", nome: "VACINA", estrutura: { aliases: ["vacina da gripe"] } }),
+      servico({ id: "pcr", nome: "PCR INFLUENZA" })];
+    expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "vacina da gripe" })).records.map(r => r.id)).toEqual(["vacina"]);
+    expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "vacina da gripe quadrivalente" })).limitacao_catalogo).toBeDefined();
+    expect((await buscarNoCatalogo({ clinicaId: CLINICA, query: "PCR INFLUENZA" })).records.map(r => r.id)).toEqual(["pcr"]);
+  });
+  it("falha na fonte não vira limitação de oferta", async () => {
+    falharAposPrimeiraPagina = true;
+    await expect(buscarNoCatalogo({ clinicaId: CLINICA, query: "vacina da gripe" })).rejects.toThrow();
+  });
+});
+
 beforeEach(() => {
   banco["servicos"] = [];
   banco["profissionais"] = [];

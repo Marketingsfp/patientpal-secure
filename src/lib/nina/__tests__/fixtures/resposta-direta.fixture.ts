@@ -16,6 +16,7 @@ const fotoCenario = process.argv[3]?.startsWith("foto_");
 const { PEDIR_NOVA_FOTO } = await import("../../fotos");
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const vacinaCenario = cenario.startsWith("vacina_");
 const escopoEscala = ({
   clinico: ["Clínico Geral", "Claudia Maria Rodrigues dos Santos", "Nicolas Cesar Alves Nunes"],
   urologia: ["Urologia", "Marcelo Barreto Franco da Silveira", "Adrian Andres Jara Benitez"],
@@ -192,7 +193,7 @@ const pergunta = alteracaoCenario ? process.argv[4] ?? "quero cancelar minha con
     : "Gostaria de marca a pneumologista"
   : escolhaHorario ? "Quero o horário das 10:20 com Dr. Jorge Ribeiro no dia 21/01/2030."
   : pedidoConsulta ? "Quero consulta de cardiologia" : fonteCenario ? "Quero saber do traçado do coração" : agenda ? "Tem vagas com Dr. Jorge Ribeiro?" : "quais são as informações do eletrocardiograma?";
-const entradaPaciente = (escopoEscala ? cenario.endsWith("otorrino") ? "Tem otorrino amanhã?"
+const entradaPaciente = vacinaCenario ? "Faz teste de DNA de paternidade? E vacina da gripe tem? Pix só antes?" : (escopoEscala ? cenario.endsWith("otorrino") ? "Tem otorrino amanhã?"
   : `Quero ${escopoEscala[0]} com Dr. ${escopoEscala[1]} amanhã de manhã` : pergunta) + (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
 const nomeProfissional = sfp ? "SFP" : cenario === "catalogo_enfermagem" ? "Enfermagem"
   : cenario === "catalogo_laboratorio" ? "Laboratório"
@@ -459,6 +460,18 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
     ordem.push(nome);
     argumentosFerramentas.push({ nome, args: typeof args === "string" ? JSON.parse(args) : args });
     ferramentas.push(nome);
+    if (vacinaCenario) {
+      estadoPerguntas = params.ctxPaciente.estado;
+      const a = argumentosFerramentas.at(-1)!.args;
+      const vacina = a.termo === "vacina da gripe";
+      if (!vacina && a.termo !== "DNA paternidade") throw new Error("Finalidade perdida: " + a.termo);
+      const r = { ferramenta: nome, capacidade: nome === "consultar_cadastro" ? "searchKnowledgeBase" : "listCatalog", fonte: "base_conhecimento",
+        success: true, reused: false, dados: vacina ? {
+          ok: true, found: false, knowledge_status: "not_found", records: [],
+          limitacao_catalogo: { codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA", pedido: a.termo, mensagem: "O cadastro não confirma a vacina da gripe." },
+        } : { ok: true, found: true, knowledge_status: "found", records: [{ id: "dna", procedimento: "DNA paternidade", horario: "Segunda a sexta 08:00–12:00" }] } };
+      resultados.push(r); return r;
+    }
     if (confirmacaoPlural) {
       estadoPerguntas = params.ctxPaciente.estado;
       if (nome !== "consultar_cadastro") throw new Error("Confirmação não autoriza operação: " + nome);
@@ -713,6 +726,16 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (vacinaCenario) {
+    const termos = cenario.endsWith("repetida") ? ["vacina da gripe", "VACINA", "gripe", "influenza"] : ["vacina da gripe"];
+    const termo = req.tools ? termos[requests.length - 1] : undefined;
+    return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-vacina", nivel: "low",
+      conteudo: termo ? "" : "Realizamos DNA de paternidade. O cadastro não permite confirmar a vacina da gripe. Pix somente antecipado.",
+      toolCalls: termo ? [
+        ...(requests.length === 1 ? [{ id: "dna", type: "function", function: { name: "consultar_cadastro", arguments: JSON.stringify({ termo: "DNA paternidade", tipo_atendimento: "exame_procedimento", nova_solicitacao: true }) } }] : []),
+        { id: `vacina-${requests.length}`, type: "function", function: { name: requests.length === 1 ? "consultar_cadastro" : "buscar_procedimentos", arguments: JSON.stringify({ termo, nova_solicitacao: true }) } },
+      ] : [] };
+  }
   if (alteracaoCenario) return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-alteracao", nivel: "low",
     conteudo: "Qual horário você prefere?", toolCalls: cenario.endsWith("modelo") ? [
       { id: "handoff", type: "function", function: { name: "solicitar_atendente_humano", arguments: JSON.stringify({ motivo: "REMARCACAO_SOLICITADA: paciente pediu mudar a consulta.", resumo: "Pedido de remarcação." }) } },

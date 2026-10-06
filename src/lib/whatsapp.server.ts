@@ -1504,6 +1504,9 @@ async function gerarRespostaNinaInterno(
     texto: REGRA_IDENTIDADE_ATENDIMENTO,
   });
   const { REGRA_IDENTIFICACAO_UNIFICADA: regraIdentificacao } = await import("@/lib/nina/identificacao-catalogo");
+  const { REGRA_FINALIDADE_VACINA } = await import("@/lib/nina/finalidade-vacina");
+  instrucoesAdicionaisTurno.push({ codigo: "FINALIDADE_VACINA", nivel: "inegociavel", origem: "src/lib/nina/finalidade-vacina.ts",
+    motivo: "Preservar vacinação e distinguir falta de informação de dúvida de identificação.", texto: REGRA_FINALIDADE_VACINA });
   instrucoesAdicionaisTurno.push({ codigo: "IDENTIFICACAO_UNIFICADA", nivel: "inegociavel", origem: "src/lib/nina/identificacao-catalogo.ts",
     motivo: "Confirmação de candidatos e uma releitura inconclusiva antes do encaminhamento.", texto: regraIdentificacao });
   const { REGRA_DICIONARIO_PUBLICADO } = await import("@/lib/nina/dicionario-leitura");

@@ -10,6 +10,7 @@ Conduta:
 - Se a busca não encontrar o atendimento solicitado, chame obrigatoriamente solicitar_atendente_humano e encaminhe a conversa. Esta regra substitui qualquer orientação anterior para afirmar que a clínica não atende a especialidade ou sugerir outro serviço nesse caso.
 - Ausência na base não comprova que a clínica não oferece o serviço. Não diga que não temos, não realizamos ou não oferecemos; não invente informações nem prossiga com agendamento automático. Avise de forma acolhedora que a equipe dará continuidade e só confirme a transferência após sucesso da ferramenta.
 - Pedido sem identificação do atendimento exige uma pergunta breve para identificá-lo; vários resultados possíveis exigem esclarecer qual é o solicitado. Falha na consulta não comprova ausência. Essas situações não devem ser confundidas com um item pesquisado e não encontrado.
+- Exceção explícita: limitacao_catalogo significa pedido compreendido, mas oferta específica não comprovada pelo cadastro. Siga a instrução desse retorno, sem pedir nova escrita nem acionar encaminhamento por falha de identificação.
 - A regra vale para atendimento real e homologação. No ambiente de teste, use o mecanismo de encaminhamento simulado disponibilizado pelo sistema e comunique a simulação conforme AMB-01, sem enviar mensagens ao WhatsApp nem atribuir a uma atendente real.
 Resultado esperado: continuidade humana obrigatória quando o item solicitado não for encontrado na base, sem negar a oferta do serviço nem substituir por outro atendimento.`;
 
@@ -44,7 +45,7 @@ export function encaminhamentoSemRegistro(r: ResultadoBroker, args: unknown, aut
   if (!["consultar_cadastro", "buscar_medicos", "buscar_procedimentos", "listar_especialidades"].includes(r.ferramenta)) return null;
   const d = r.dados as Record<string, unknown> | null;
   if (!d || typeof d !== "object") return null;
-  if (d.esclarecimento) return null;
+  if (d.esclarecimento || d.limitacao_catalogo) return null;
   const ausente = r.success && !r.erro && d.knowledge_status === "not_found" && d.found === false &&
     Array.isArray(d.records) && d.records.length === 0;
   const ausenciaTipada = ["DOCTOR_NOT_FOUND", "PROCEDURE_NOT_FOUND"].includes(r.erro ?? "") &&

@@ -25,6 +25,7 @@ function identificacaoPendente(resultado: ResultadoBroker) {
     dados?.fonte === "catalogo_publicado" &&
     dados.encaminhar_para_humano === true &&
     ["DOCTOR_NOT_FOUND", "PROCEDURE_NOT_FOUND"].includes(resultado.erro ?? "");
+  if (dados?.limitacao_catalogo) return null;
   if ((!resultado.success || resultado.erro) && !ausenciaTipada) return null;
   return dados?.esclarecimento ||
     (dados?.found === false && dados.knowledge_status === "not_found") ||

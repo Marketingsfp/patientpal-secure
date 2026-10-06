@@ -11,6 +11,7 @@ import { COLUNAS_SERVICO, COLUNAS_PROFISSIONAL, TAMANHO_PAGINA, lerPublicados, t
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 import { perguntaCandidatoCatalogo } from "./identificacao-catalogo";
+import { pedidoVacinaGripe, escritaVacinaGripe, registroVacinaGripe, REGRA_FINALIDADE_VACINA } from "./finalidade-vacina";
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,
@@ -101,6 +102,8 @@ async function buscarNaFonteDoTurno(
   const limite = Math.min(Math.max(pedido.limite ?? 6, 1), 12);
   const hojeISO = agoraNaClinica(undefined, agora).iso;
   let tipoAtendimento = pedido.tipo_atendimento ?? "nao_identificado";
+  const vacinaGripe = pedidoVacinaGripe(pedido.query);
+  if (vacinaGripe) tipoAtendimento = "exame_procedimento";
   // Compatibilidade com pesquisas antigas. A categoria explícita do pedido prevalece.
   if (tipoAtendimento === "nao_identificado") {
     if (PALAVRAS_PROCEDIMENTO.test(pedido.query)) tipoAtendimento = "exame_procedimento";
@@ -119,10 +122,11 @@ async function buscarNaFonteDoTurno(
   ]);
   const preventivo = pedidoPreventivo(pedido.query);
   const textosProfissionais = new Map(brutosProfissionais.map(p => [p.id, atendimentosTexto(p, preventivo)]));
-  const busca = prepararBuscaCatalogo(pedido.query, [
+  const escrita = vacinaGripe ? escritaVacinaGripe : (texto: string) => texto;
+  const busca = prepararBuscaCatalogo(escrita(pedido.query), [
     ...brutosServicos.flatMap((s) => [s.nome, ...aliasesDoIndice(s), String(s.descricao_publica ?? "")]),
     ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), ...textosProfissionais.get(p.id)!]),
-  ]);
+  ].map(escrita));
   const pontuarProfissional = (p: IndiceProfissional, nome = "") =>
     Math.max(0, ...textosProfissionais.get(p.id)!.map(texto => busca.pontuar(nome, texto)));
   const termos = busca.termos;
@@ -151,7 +155,8 @@ async function buscarNaFonteDoTurno(
   }
   const perguntaSobreConsulta = tipoAtendimento === "consulta";
   const pontuados = (perguntaSobreConsulta ? [] : brutosServicos)
-    .map((s) => ({ s, score: Math.max(...[s.nome, ...aliasesDoIndice(s)].map(n => busca.pontuar(n, String(s.descricao_publica ?? "")))) }))
+    .filter(s => !vacinaGripe || registroVacinaGripe(s.nome, aliasesDoIndice(s)))
+    .map((s) => ({ s, score: Math.max(...[s.nome, ...aliasesDoIndice(s)].map(n => busca.pontuar(escrita(n), escrita(String(s.descricao_publica ?? ""))))) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
   const termosCorrigidos =
@@ -164,12 +169,12 @@ async function buscarNaFonteDoTurno(
   // O nome publicado prevalece sobre aliases; aliases compartilhados continuam ambíguos.
   const nomesCompletos = familiaGenerica
     ? []
-    : pontuados.filter(({ s }) => busca.correspondeNomeCompleto(s.nome));
+    : pontuados.filter(({ s }) => busca.correspondeNomeCompleto(escrita(s.nome)));
   const aliasesCompletos =
     familiaGenerica || nomesCompletos.length
       ? []
       : pontuados.filter(({ s }) =>
-          aliasesDoIndice(s).some((alias) => busca.correspondeNomeCompleto(alias)),
+          aliasesDoIndice(s).some((alias) => busca.correspondeNomeCompleto(escrita(alias))),
         );
   const completasInterpretadas = nomesCompletos.length ? nomesCompletos : aliasesCompletos;
   // O nome copiado exatamente como publicado seleciona aquele registro.
@@ -258,6 +263,11 @@ async function buscarNaFonteDoTurno(
     atendimentoConsultado: { atendimento: pedido.query },
   });
   resultado.tipo_atendimento = tipoAtendimento;
+  if (vacinaGripe && resultado.knowledge_status === "not_found") {
+    resultado.limitacao_catalogo = { codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA", pedido: pedido.query,
+      mensagem: `Entendi o pedido de ${pedido.query}. O cadastro consultado não permite confirmar se essa vacina está disponível na clínica.` };
+    resultado.instrucao = REGRA_FINALIDADE_VACINA;
+  }
   if (registrosEquivalentes && listaServicos.length > 1) {
     resultado.instrucao = [resultado.instrucao,
       `O cadastro tem ${listaServicos.length} registros com nomes equivalentes ao pedido (${listaServicos.map((s) => s.nome).join("; ")}). Não pergunte qual deles o paciente deseja: informe os dados de cada registro como estão no cadastro, com o nome de cada um, sem escolher, somar ou corrigir valores.`,
@@ -282,7 +292,7 @@ async function buscarNaFonteDoTurno(
   const pedirServico =
     (ambiguo || familiaSemTipo || busca.ajustes.length > 0 && listaServicos.length > 0) && !(perguntaSobreConsulta && listaProfissionais.length);
   if (
-    resultado.knowledge_status !== "conflict" &&
+    !resultado.limitacao_catalogo && resultado.knowledge_status !== "conflict" &&
     (medicosAmbiguos || consultaAproximada || pedirServico || busca.siglasDesconhecidas.length)
   ) {
     const opcoes = medicosAmbiguos
@@ -381,6 +391,7 @@ async function buscarNaFonteDoTurno(
         total_examinado: brutosServicos.length,
         encontrados: snapshot(pontuados.map(({ s }) => s) as never, INDICE_SERVICO.split(", ")),
         selecionados: listaServicos.map((s) => String(s.id ?? "")),
+        limitacao_catalogo: resultado.limitacao_catalogo ?? null,
         camposEnviados: camposServico.filter((c) => c !== "id"),
         knowledgeStatus: resultado.knowledge_status,
       },

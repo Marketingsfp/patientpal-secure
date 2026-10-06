@@ -1464,7 +1464,7 @@ async function executarFerramentaInterna(
         });
         // JEV — Fase 3 (produção e homologação, flag `nina_jev_fase3`): a busca
         // normal não achou nada → o Jev sugere um candidato publicado para o paciente confirmar.
-        if (resultado.knowledge_status === "not_found" && !p.medico) {
+        if (resultado.knowledge_status === "not_found" && !resultado.limitacao_catalogo && !p.medico) {
           try {
             const jev = await import("@/lib/nina/jev.server");
             if (await jev.jevAtivo(ctx.clinicaId, "fase3_especialidade", ctx.teste === true)) {
@@ -1655,6 +1655,7 @@ async function executarFerramentaInterna(
           canal: ctx.origem,
         });
         lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, r, p.nova_solicitacao);
+        if (r.limitacao_catalogo) return { ok: true, ...r };
         if (r.esclarecimento) {
           ctx.esclarecimentoCatalogo = r.esclarecimento;
           return { ok: true, ...r };
