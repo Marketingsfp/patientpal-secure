@@ -1081,6 +1081,7 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+  const [naOutraCategoria, setNaOutraCategoria] = useState(false);
   // Categoria Laboratório é identificada diretamente em `procedimentos`
   // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
   // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
@@ -1146,10 +1147,12 @@ function NovoOrcamentoDialog({
     let cancel = false;
     if (procQuery.trim().length < 2) {
       setProcResults([]);
+      setNaOutraCategoria(false);
       return;
     }
     setSearchingProc(true);
-    const t = setTimeout(async () => {
+    setNaOutraCategoria(false);
+    const buscar = (cat: typeof categoria) => {
       let q = supabase
         .from("procedimentos")
         .select(
@@ -1159,18 +1162,31 @@ function NovoOrcamentoDialog({
         .eq("ativo", true);
       // Palavra por palavra, com as abreviações do cadastro (RM, USG, TC…).
       for (const filtro of filtrosOrNomeServico(procQuery)) q = q.or(filtro);
-      if (categoria === "laboratorio") {
+      if (cat === "laboratorio") {
         q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
-      } else if (categoria === "demais") {
+      } else if (cat === "demais") {
         // Tipo/grupo em branco é "demais": `not eq` sozinho descarta o NULL e
         // escondia Ecocardiograma, Doppler de Carótidas, RM de Joelho…
         q = q
           .or("tipo_procedimento.is.null,tipo_procedimento.neq.laboratorio")
           .or("grupo.is.null,grupo.not.ilike.%labor%");
       }
-      const { data } = await q.order("nome").limit(20);
+      return q;
+    };
+    const t = setTimeout(async () => {
+      const { data } = await buscar(categoria).order("nome").limit(20);
+      // Nada na categoria escolhida: confere a outra para avisar a recepção
+      // (ex.: "RM de Joelho" digitado num orçamento de Laboratório).
+      let outra = false;
+      if (categoria && (data ?? []).length === 0) {
+        const { data: d2 } = await buscar(
+          categoria === "laboratorio" ? "demais" : "laboratorio",
+        ).limit(1);
+        outra = (d2 ?? []).length > 0;
+      }
       if (!cancel) {
         setProcResults((data ?? []) as Procedimento[]);
+        setNaOutraCategoria(outra);
         setSearchingProc(false);
       }
     }, 250);
@@ -1762,6 +1778,25 @@ function NovoOrcamentoDialog({
                   )}
                   {searchingProc && (
                     <div className="text-xs text-muted-foreground mt-1">Buscando…</div>
+                  )}
+                  {!searchingProc && naOutraCategoria && procResults.length === 0 && (
+                    <div className="mt-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span>
+                        Este serviço não é de{" "}
+                        {categoria === "laboratorio" ? "Laboratório" : "Demais Serviços"}: ele está
+                        em <b>{categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"}</b>.
+                      </span>
+                      <button
+                        type="button"
+                        className="font-semibold text-primary underline"
+                        onClick={() =>
+                          escolherCategoria(categoria === "laboratorio" ? "demais" : "laboratorio")
+                        }
+                      >
+                        Trocar para{" "}
+                        {categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"}
+                      </button>
+                    </div>
                   )}
                 </div>
                 <Button
