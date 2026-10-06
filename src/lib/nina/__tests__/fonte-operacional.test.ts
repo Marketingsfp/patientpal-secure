@@ -98,10 +98,10 @@ describe("fonte operacional — exames e procedimentos", () => {
     expect(ecg.preparo).toBeNull();
   });
 
-  test("executante oculto não aparece; o visível sai com horários do cadastro", () => {
+  test("executante oculto não aparece; horário exclusivo de CONSULTAS não vira horário de exame", () => {
     const ecg = servicos[0]!;
     expect((ecg.executantes as any[]).map((e) => e.nome)).toEqual(["ALEX LOUZA MACEDO"]);
-    expect((ecg.executantes as any[])[0].horarios).toContain("Quarta-feira 13:00–18:00");
+    expect((ecg.executantes as any[])[0].horarios).toBe("não informado no cadastro");
   });
 
   test("preço sem forma de pagamento definida fica como valor de referência, com o preparo cadastrado", () => {

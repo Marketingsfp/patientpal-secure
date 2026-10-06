@@ -32,6 +32,7 @@ import { FormasPagamentoEditor, type LinhaPagamento } from "./FormasPagamentoEdi
 import type { OpcoesCatalogo } from "./FormServico";
 
 type LinhaHorario = {
+  tipo_escala?: "consulta" | "exame_procedimento";
   dia: string;
   inicio: string;
   fim: string;
@@ -101,6 +102,7 @@ export function profissionalDoRegistro(r: any): EstadoProfissional {
     })),
     convenios: conv.filter((c) => c?.id).map((c) => String(c.id)),
     horarios: (f.horarios ?? []).map((h: any) => ({
+      ...(h?.tipo_escala ? { tipo_escala: h.tipo_escala } : {}),
       dia: h?.dia ?? DIAS_SEMANA[0],
       inicio: h?.inicio ?? "",
       fim: h?.fim ?? "",

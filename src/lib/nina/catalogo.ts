@@ -136,6 +136,7 @@ export const formaPagamentoSchema = z.object({
 export type FormaPagamento = z.infer<typeof formaPagamentoSchema>;
 
 export const executanteSchema = z.object({
+  tipo_escala: z.enum(["consulta", "exame_procedimento"]).optional(),
   medico_id: z.string().uuid().nullable().optional().default(null),
   nome: z.string().trim().min(1, "Informe quem realiza").max(160),
   // A origem pode reunir vários dias, turnos e exceções. Preserve o texto completo.
@@ -194,6 +195,8 @@ export type Vinculo = z.infer<typeof vinculoSchema>;
 
 export const horarioSchema = z
   .object({
+    // Origem vinculada por procedimento; preserva o escopo mesmo se a agenda tiver nome genérico.
+    tipo_escala: z.enum(["consulta", "exame_procedimento"]).optional(),
     dia: z.enum(DIAS_SEMANA),
     inicio: horaOpcional,
     fim: horaOpcional,

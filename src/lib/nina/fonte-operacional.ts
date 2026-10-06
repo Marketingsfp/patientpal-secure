@@ -16,6 +16,7 @@
  */
 import type { ProfissionalPublicado, ServicoPublicado } from "./catalogo-conhecimento";
 import { paraNumero } from "./catalogo";
+import { tipoDaAgenda, type TipoEscala } from "./horarios-por-atendimento";
 
 export type MedicoOp = {
   id: string;
@@ -41,6 +42,7 @@ export type AgendaOp = {
   medico_id: string;
   nome: string;
   ordem_chegada?: boolean | null;
+  medico_agenda_procedimentos?: { procedimento_id: string }[];
 };
 export type ProcedimentoOp = {
   id: string;
@@ -122,13 +124,27 @@ function vigente(d: DisponibilidadeOp, hojeISO: string): boolean {
 /** Horários do médico, do jeito que estão na aba (repetidos e sobrepostos passam). */
 export function horariosDoMedico(
   medicoId: string,
-  e: Pick<EntradaOperacional, "disponibilidades" | "agendas" | "hojeISO">,
+  e: Pick<EntradaOperacional, "disponibilidades" | "agendas" | "hojeISO" | "procedimentos">,
+  tipo?: TipoEscala,
+  procedimentoId?: string,
 ): Horario[] {
   const agendasDoMedico = e.agendas.filter((a) => a.medico_id === medicoId);
   const porAgenda = new Map(agendasDoMedico.map((a) => [a.id, a]));
   const mostrarAgenda = agendasDoMedico.length > 1;
+  const comVinculo = procedimentoId && agendasDoMedico.some(a => a.medico_agenda_procedimentos?.length);
   return e.disponibilidades
     .filter((d) => d.medico_id === medicoId && vigente(d, e.hojeISO))
+    .filter(d => {
+      if (!tipo) return true;
+      const agenda = d.agenda_id ? porAgenda.get(d.agenda_id) : undefined;
+      if (comVinculo) return !!agenda?.medico_agenda_procedimentos?.some(v => v.procedimento_id === procedimentoId);
+      if (!procedimentoId && agenda?.medico_agenda_procedimentos?.length) {
+        return agenda.medico_agenda_procedimentos.some(v => e.procedimentos.some(p => p.id === v.procedimento_id &&
+          (tipo === "consulta" ? p.tipo === "consulta" : p.tipo === "exame" || p.tipo === "procedimento")));
+      }
+      const categoria = tipoDaAgenda(agenda?.nome);
+      return !categoria || categoria === tipo;
+    })
     .sort((a, b) => a.dia_semana - b.dia_semana || String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? "")))
     .map((d) => {
       const agenda = d.agenda_id ? porAgenda.get(d.agenda_id) : undefined;
@@ -140,6 +156,7 @@ export function horariosDoMedico(
         mostrarAgenda && agenda ? `Agenda: ${agenda.nome}${agenda.ordem_chegada ? " (ordem de chegada)" : ""}` : null,
       ].filter(Boolean);
       return {
+        ...(tipo && agenda?.medico_agenda_procedimentos?.length ? { tipo_escala: tipo } : {}),
         dia: DIAS[d.dia_semana] ?? `Dia ${d.dia_semana}`,
         inicio: hhmm(d.hora_inicio),
         fim: hhmm(d.hora_fim),
@@ -200,7 +217,7 @@ export function mapearProfissionais(e: EntradaOperacional, incluirConsultasSemVa
   const proc = new Map(e.procedimentos.map((p) => [p.id, p]));
   return e.medicos.filter(visivelAoPaciente).map((m) => {
     const agendas = e.agendas.filter((a) => a.medico_id === m.id);
-    const horarios = horariosDoMedico(m.id, e);
+    const horarios = horariosDoMedico(m.id, e, "consulta");
     const vinculos = e.vinculos.filter((v) => v.medico_id === m.id);
     const consultas = vinculos
       .map((v) => ({ v, p: proc.get(v.procedimento_id) }))
@@ -216,7 +233,6 @@ export function mapearProfissionais(e: EntradaOperacional, incluirConsultasSemVa
     const espPadrao = m.especialidades_cadastro !== undefined
       ? m.especialidades_cadastro.map(x => x.nome).join(", ") || null
       : nomeDe(nomesEsp, m.especialidade_id);
-    const resumo = resumoDosHorarios(horarios);
 
     return {
       id: m.id,
@@ -235,7 +251,7 @@ export function mapearProfissionais(e: EntradaOperacional, incluirConsultasSemVa
                 atendimento: p.nome,
                 especialidade: nomeDe(nomesEsp, v.especialidade_id) ?? espPadrao,
                 profissional: m.nome,
-                horarios: resumo,
+                horarios: resumoDosHorarios(horariosDoMedico(m.id, e, "consulta", p.id)),
                 preco: precosDoProcedimento(p),
               }),
             )
@@ -262,11 +278,12 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
     vinculosPorProc.set(v.procedimento_id, lista);
   }
   const resumoPorMedico = new Map<string, string>();
-  const resumoDe = (medicoId: string) => {
-    let r = resumoPorMedico.get(medicoId);
+  const resumoDe = (medicoId: string, procedimentoId: string) => {
+    const chave = `${medicoId}:${procedimentoId}`;
+    let r = resumoPorMedico.get(chave);
     if (r === undefined) {
-      r = resumoDosHorarios(horariosDoMedico(medicoId, e));
-      resumoPorMedico.set(medicoId, r);
+      r = resumoDosHorarios(horariosDoMedico(medicoId, e, "exame_procedimento", procedimentoId));
+      resumoPorMedico.set(chave, r);
     }
     return r;
   };
@@ -289,7 +306,7 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
                   especialidade: nomeDe(nomesEsp, v.especialidade_id) ?? (m.especialidades_cadastro !== undefined
                     ? m.especialidades_cadastro.map(x => x.nome).join(", ") || null : nomeDe(nomesEsp, m.especialidade_id)),
                   profissional: m.nome,
-                  horarios: resumoDe(m.id),
+                  horarios: resumoDe(m.id, p.id),
                   preco,
                 }),
               )
@@ -298,9 +315,10 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
         preparo: limpo(p.preparo),
         restricoes: null,
         executantes: executantes.map(({ m }) => ({
+          tipo_escala: "exame_procedimento" as const,
           nome: m.nome,
           medico_id: m.id,
-          horarios: resumoDe(m.id),
+          horarios: resumoDe(m.id, p.id),
           observacao: null,
         })),
         formas_pagamento: formas(p, null),

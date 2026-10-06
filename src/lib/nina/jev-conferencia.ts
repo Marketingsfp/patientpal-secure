@@ -8,7 +8,6 @@ import type { PerguntaJev, RespostaJev } from "./jev";
 import { REGRA_MODALIDADES_PAGAMENTO } from "./eficiencia-turno";
 
 export const LIMITE_CONFERENCIA = 0.7;
-const LIMITE_DADOS = 12_000;
 
 export type FatosTurno = {
   /** Agenda consultada com opções neste turno ou opções já oferecidas na sessão. */
@@ -22,8 +21,38 @@ export type FatosTurno = {
 export type ProblemaConferencia = "vaga_sem_agenda" | "agendado_sem_confirmacao" | "cancelamento" | "dado_sem_fonte";
 
 export function estadoConferencia(resposta: string, fatos: FatosTurno) {
-  const dados = fatos.dadosConsultados.join("\n").slice(0, LIMITE_DADOS);
+  const dados = [...new Set(fatos.dadosConsultados.map(dadosParaConferencia))].join("\n");
   return { resposta, dados_consultados: dados || null };
+}
+
+/** Mantém preços e condições junto do atendimento, inclusive no fim do retorno.
+ * Cortar os primeiros 12 mil caracteres podia esconder a própria fonte do preço.
+ * Não valida valores por coincidência numérica nem aprova a resposta sem o Jev. */
+export function dadosParaConferencia(dados: string): string {
+  let valor: unknown;
+  try { valor = JSON.parse(dados); } catch { return dados; }
+  const financeiro = /preco|valor|pagamento|dinheiro|cartao|pix|convenio|condicao|endereco|telefone|whatsapp|logradouro|bairro|cep|numero|complemento|cidade|estado/i;
+  const identidade = /^(id|nome|medico|profissional|procedimento|atendimento|especialidade|categoria|tipo|forma|unidade|clinica)$/i;
+  function filtrar(v: unknown): unknown {
+    if (Array.isArray(v)) {
+      const itens = v.map(filtrar).filter(x => x !== undefined);
+      return itens.length ? itens : undefined;
+    }
+    if (!v || typeof v !== "object") return typeof v === "string" && /R\$|endere[cç]o|telefone|whatsapp/i.test(v) ? v : undefined;
+    const objeto = v as Record<string, unknown>;
+    const campos: Record<string, unknown> = {};
+    for (const [chave, item] of Object.entries(objeto)) {
+      if (financeiro.test(chave)) campos[chave] = item;
+      else if (!identidade.test(chave)) {
+        const parte = filtrar(item);
+        if (parte !== undefined) campos[chave] = parte;
+      }
+    }
+    if (!Object.keys(campos).length) return undefined;
+    return { ...Object.fromEntries(Object.entries(objeto).filter(([k]) => identidade.test(k))), ...campos };
+  }
+  // Retorno sem campos reconhecíveis continua literal; ausência de projeção não é ausência de fonte.
+  return JSON.stringify(filtrar(valor) ?? valor);
 }
 
 export function perguntasConferencia(fatos: FatosTurno): Record<string, PerguntaJev> {
@@ -48,7 +77,7 @@ export function perguntasConferencia(fatos: FatosTurno): Record<string, Pergunta
     p.dado_sem_fonte = {
       type: "noul",
       instructions:
-        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. " + REGRA_MODALIDADES_PAGAMENTO,
+        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. Compare valores numéricos equivalentes (120, 120.00 e R$ 120,00), preservando atendimento, profissional, forma de pagamento e condições; o preço de outro atendimento não comprova este. " + REGRA_MODALIDADES_PAGAMENTO,
     };
   return p;
 }

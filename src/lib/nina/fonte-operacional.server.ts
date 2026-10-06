@@ -71,7 +71,7 @@ async function lerCadastro(clinicaId: string): Promise<FonteOperacional> {
         .select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, vigencia_inicio, vigencia_fim")
         .eq("clinica_id", clinicaId).eq("ativo", true).order("id", { ascending: true })),
     todasAsPaginas<AgendaOp>(() =>
-      db.from("medico_agendas").select("id, medico_id, nome, ordem_chegada")
+      db.from("medico_agendas").select("id, medico_id, nome, ordem_chegada, medico_agenda_procedimentos(procedimento_id)")
         .eq("clinica_id", clinicaId).eq("ativo", true).order("id", { ascending: true })),
     todasAsPaginas<ProcedimentoOp>(() =>
       db.from("procedimentos")

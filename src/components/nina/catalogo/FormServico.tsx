@@ -29,7 +29,7 @@ export type OpcoesCatalogo = {
   convenios: Array<{ id: string; nome: string }>;
 };
 
-type Executante = { medico_id: string | null; nome: string; horarios: string; observacao: string };
+type Executante = { medico_id: string | null; nome: string; horarios: string; observacao: string; tipo_escala?: "consulta" | "exame_procedimento" };
 
 export type EstadoServico = {
   estrutura: EstruturaCatalogo;
@@ -77,6 +77,7 @@ export function servicoDoRegistro(r: any): EstadoServico {
     restricoes: fonte.restricoes ?? "",
     nota_interna: fonte.nota_interna ?? "",
     executantes: (fonte.executantes ?? []).map((e: any) => ({
+      ...(e?.tipo_escala ? { tipo_escala: e.tipo_escala } : {}),
       medico_id: e?.medico_id ?? null,
       nome: e?.nome ?? "",
       horarios: e?.horarios ?? "",
@@ -109,6 +110,7 @@ export function servicoParaEnvio(e: EstadoServico) {
     executantes: e.executantes
       .filter((x) => x.nome.trim())
       .map((x) => ({
+        ...(x.tipo_escala ? { tipo_escala: x.tipo_escala } : {}),
         medico_id: x.medico_id,
         nome: x.nome,
         horarios: x.horarios,

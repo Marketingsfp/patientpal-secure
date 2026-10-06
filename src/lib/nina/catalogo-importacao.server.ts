@@ -23,7 +23,7 @@ export async function lerCadastroCompleto(db: any, clinicaId: string): Promise<O
       .eq("clinica_id", clinicaId).order("id")),
     lerPaginasCatalogo<any>(() => db.from("medico_disponibilidades").select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, vigencia_inicio, vigencia_fim")
       .eq("clinica_id", clinicaId).eq("ativo", true).order("id")),
-    lerPaginasCatalogo<any>(() => db.from("medico_agendas").select("id, medico_id, nome, ordem_chegada")
+    lerPaginasCatalogo<any>(() => db.from("medico_agendas").select("id, medico_id, nome, ordem_chegada, medico_agenda_procedimentos(procedimento_id)")
       .eq("clinica_id", clinicaId).eq("ativo", true).order("id")),
     lerPaginasCatalogo<any>(() => db.from("medico_procedimentos").select("id, medico_id, procedimento_id, especialidade_id, medicos!inner(clinica_id)")
       .eq("medicos.clinica_id", clinicaId).order("id")),

@@ -20,6 +20,7 @@ import {
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
 import { separarAtendimentos } from "./catalogo-estrutura";
+import { horariosPorTipo } from "./horarios-por-atendimento";
 import { pedidoPreventivo } from "./atendimento-consulta";
 import { publicacaoDoMedicoAgenda } from "./vinculo-catalogo-agenda.server";
 import {
@@ -76,7 +77,7 @@ function atendimentosTexto(p: IndiceProfissional, preventivo: "com" | "sem" | nu
 /** O profissional atende no dia pedido? Sem horário cadastrado, não exclui. */
 function atendeNoDia(p: IndiceProfissional, dia: string | null): boolean {
   if (!dia) return true;
-  const horarios = Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [];
+  const horarios = horariosPorTipo(Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [], "consulta");
   if (!horarios.length) return true;
   const alvo = semAcento(dia);
   return horarios.some(

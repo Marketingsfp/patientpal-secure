@@ -1,5 +1,6 @@
 import { atendimentosEstruturados, textoAtendimentos, pagamentosJaDescritos, lerEstrutura, modalidadeEstruturada, INSTRUCAO_ESTRUTURA_CATALOGO } from "./catalogo-estrutura";
 import { mapaCamposResultado } from "./catalogo-mapa-campos";
+import { horariosPorTipo, corrigirResumoLegado, escalaLegadaExecutante } from "./horarios-por-atendimento";
 import { selecionarAtendimentosConsulta, nomeCompletoConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
 /**
  * FASE 5 — CATÁLOGO COMO FONTE DE CONHECIMENTO DA NINA (regras puras).
@@ -128,7 +129,17 @@ export function avisoVigente(
 
 /** Serviço publicado → registro no formato que as ferramentas já consomem. */
 export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
-  const executantes = lista(s.executantes);
+  const executantes: Record<string, unknown>[] = lista(s.executantes).map(e => ({ ...e,
+    ...(e.tipo_escala === "exame_procedimento" ? {} : escalaLegadaExecutante(e.horarios, e.observacao, "exame_procedimento")) }));
+  let descricao = s.descricao_publica;
+  for (const [i, anterior] of lista(s.executantes).entries()) {
+    const atual = executantes[i]!;
+    if (anterior.horarios === atual.horarios || !descricao) continue;
+    descricao = descricao.split(/\n\s*\n/).map(bloco =>
+      bloco.split(/\r?\n/).some(l => l.trim() === `Profissional: ${anterior.nome}`)
+        ? corrigirResumoLegado(bloco, String(anterior.horarios ?? ""), String(atual.horarios ?? "Horários não informados"))! : bloco).join("\n\n");
+  }
+  s = { ...s, executantes, descricao_publica: descricao };
   const estrutura = lerEstrutura(s.estrutura);
   const atendimentos = atendimentosEstruturados(s.descricao_publica, s.estrutura, undefined, s.nome);
   const dinheiro = precoPorForma(s.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
@@ -196,6 +207,10 @@ export function profissionalParaRegistro(
   hojeISO: string,
   escopo?: EscopoAtendimentoConsulta,
 ): RegistroConhecimento {
+  const horariosOriginais = lista(p.horarios);
+  const horariosConsulta = horariosPorTipo(horariosOriginais, "consulta");
+  if (horariosConsulta.length !== horariosOriginais.length) p = { ...p, horarios: horariosConsulta,
+    observacao_publica: corrigirResumoLegado(p.observacao_publica, resumoHorarios(horariosOriginais as never), resumoHorarios(horariosConsulta as never)) };
   const especialidades = nomesVinculos(p.especialidades);
   const estrutura = lerEstrutura(p.estrutura);
   const atendimentos = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome, "Consulta");

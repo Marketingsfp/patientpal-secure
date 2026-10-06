@@ -69,7 +69,7 @@ export function adaptarCadastroCompleto(e: CadastroImportacao): OrigemImportacao
       tipo: "servico" as const, somenteRascunho: !p.ativo,
       fonte: { ...s, ...dados,
         executantes: [...s.executantes as Executante[]].sort((a, b) => String(a.medico_id).localeCompare(String(b.medico_id))).map(x => ({ ...x, horarios: x.horarios === "não informado no cadastro" ? null : x.horarios,
-          observacao: horariosDoMedico(x.medico_id!, entrada).filter(h => h.observacao).map(h =>
+          observacao: horariosDoMedico(x.medico_id!, entrada, "exame_procedimento", p.id).filter(h => h.observacao).map(h =>
             `${h.dia}${h.inicio ? ` ${h.inicio}` : ""}${h.fim ? `–${h.fim}` : ""}: ${h.observacao}`).join("\n") || null })),
         estrutura: { ...lerEstrutura(s.estrutura), categoria, grupo: p.grupo ?? null,
           origem_clinica_os: metadados("procedimento", p.id, p.ativo) } },
