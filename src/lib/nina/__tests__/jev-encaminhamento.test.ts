@@ -8,8 +8,9 @@ import {
   type ContagemDuvida,
 } from "../jev-encaminhamento";
 
-const base = { urgencia: { noul: 0.1 }, pedido_atendente: { noul: 0.1 }, irritacao: { noul: 0.1 } };
-const falhas = (n: number, confiancas: number[] = []): ContagemDuvida => ({ falhas: n, marco: "m", confiancas });
+const prova = { mensagemId: "pergunta-enviada", entradaAnteriorId: "m1" };
+const base = { entendimento: { noul: 0.2 }, urgencia: { noul: 0.1 }, pedido_atendente: { noul: 0.1 }, irritacao: { noul: 0.1 } };
+const falhas = (n: number, confiancas: number[] = []): ContagemDuvida => ({ falhas: n, marco: "m", confiancas, esclarecimento: prova });
 
 describe("Jev Fase 2 — encaminhamento", () => {
   test("sinais abaixo do limite não encaminham", () => {
@@ -54,8 +55,8 @@ describe("Jev Fase 2 — contagem de falhas reais", () => {
     expect(decidirEncaminhamento(base, c)).toBeNull();
   });
   test("falhas sem avanço somam; a segunda encaminha sem esperar uma terceira", () => {
-    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null });
-    const c2 = contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: false, marco: "a", anterior: c1 });
+    const c1 = contarDuvida({ entendimento: baixa, selecaoValida: false, marco: "a", anterior: null, mensagensEntrada: ["m1"] });
+    const c2 = contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: false, marco: "a", anterior: c1, mensagensEntrada: ["m2"], esclarecimento: prova });
     expect(c2.falhas).toBe(2);
     expect(decidirEncaminhamento(base, c2)?.motivo).toContain("DUVIDA");
   });
@@ -65,7 +66,7 @@ describe("Jev Fase 2 — contagem de falhas reais", () => {
     const repetida = contarDuvida({ ...parametros, mensagensEntrada: ["m2", "m1"], anterior: c1 });
     expect(repetida.falhas).toBe(1);
     expect(decidirEncaminhamento(base, repetida)).toBeNull();
-    const nova = contarDuvida({ ...parametros, mensagensEntrada: ["m3"], anterior: repetida });
+    const nova = contarDuvida({ ...parametros, mensagensEntrada: ["m3"], anterior: repetida, esclarecimento: prova });
     expect(decidirEncaminhamento(base, nova)?.motivo).toContain("em 2 mensagens");
   });
   test("sem avaliação de entendimento não inventa falha nem entendimento confirmado", () => {

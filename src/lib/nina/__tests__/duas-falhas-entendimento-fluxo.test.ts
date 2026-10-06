@@ -16,13 +16,13 @@ function simular(ambiente: string, caso: string) {
 
 describe("núcleo compartilhado — encaminhar na segunda falha de entendimento", () => {
   for (const ambiente of ["producao", "homologacao"]) {
-    for (const caso of ["primeira", "reprocessamento", "entendida"]) {
+    for (const caso of ["primeira", "reprocessamento", "entendida", "saudacao", "apos_saudacao", "sem_pergunta", "nao_entregue"]) {
       test(`${ambiente}: ${caso} não encaminha`, () => {
         const r = simular(ambiente, caso);
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.requests).toHaveLength(1);
         expect(JSON.stringify(r.requests[0].messages)).toContain(REGRA_DUAS_FALHAS_ENTENDIMENTO);
-        expect(r.decisoesEntendimento.find((d: any) => d.fase === "fase1_intencao").contagem.falhas).toBe(caso === "entendida" ? 0 : 1);
+        expect(r.decisoesEntendimento.find((d: any) => d.fase === "fase1_intencao").contagem.falhas).toBe(["entendida", "saudacao"].includes(caso) ? 0 : 1);
         expect(r.rede).toBe(0);
       });
     }
@@ -33,6 +33,7 @@ describe("núcleo compartilhado — encaminhar na segunda falha de entendimento"
       expect(r.encaminhamentos[0].motivo).toContain("em 2 mensagens seguidas");
       expect(r.requests).toHaveLength(0);
       expect(r.decisoesEntendimento.find((d: any) => d.fase === "fase1_intencao").contagem.mensagensEntrada).toEqual(["entrada-simulada"]);
+      expect(r.decisoesEntendimento.find((d: any) => d.fase === "fase1_intencao").contagem.esclarecimento).toEqual({ mensagemId: "historico-1", entradaAnteriorId: "entrada-anterior" });
       expect(r.ferramentas).not.toContain("agendar");
       expect(r.rede).toBe(0);
       if (ambiente === "homologacao") expect(r.resposta).toContain("simulação");

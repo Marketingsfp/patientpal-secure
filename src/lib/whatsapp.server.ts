@@ -994,6 +994,12 @@ async function gerarRespostaNinaInterno(
           if (orientacaoIntencaoJev.pedidos.length) intencaoAmbiguaTurno = false;
         }
       }
+      const { esclarecerFoiEntregue } = await import("@/lib/nina/jev-esclarecimento-entregue");
+      const provaEsclarecimento = esclarecerFoiEntregue(msgsMemoria, {
+        clinicaId, conversaId: conversaJev, sessionId: sessaoNina.estado.session_id ?? null, desde: inicioCiclo,
+        teste: opcoes?.teste === true, entradasAtuais: opcoes?.mensagensEntrada ?? [],
+        entradasAnteriores: anterior?.mensagensEntrada ?? [], conhecimento: sessaoNina.estado.knowledge_context,
+      });
       const contagem = respostas
         ? enc.contarDuvida({
             // Pergunta própria de entendimento (Fase 2), não a confiança da intenção.
@@ -1004,6 +1010,8 @@ async function gerarRespostaNinaInterno(
             marco: ctxJev.marcoAtendimento(sessaoNina.estado),
             anterior,
             mensagensEntrada: opcoes?.mensagensEntrada,
+            mensagem: mensagemPaciente,
+            esclarecimento: provaEsclarecimento,
           })
         : null;
       if (f2 && respostas) {
@@ -1017,6 +1025,10 @@ async function gerarRespostaNinaInterno(
           falhas_seguidas: contagem?.falhas ?? null,
         };
       }
+      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Contagem de entendimento do Jev conferida",
+        dados: { falhas_seguidas: contagem?.falhas ?? null,
+          esclarecimento_entregue: provaEsclarecimento, mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+          motivo: "Saudação não conta; nova falha exige esclarecimento entregue entre entradas distintas." } });
       // A Fase 1 é sempre registrada: a contagem da mensagem seguinte depende dela.
       await Promise.all([
         jev.registrarDecisaoJev({

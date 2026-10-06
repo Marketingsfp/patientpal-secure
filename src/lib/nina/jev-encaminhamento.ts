@@ -3,6 +3,8 @@
  * Duas falhas de entendimento encaminham (regra confirmada em 05/10/2026).
  */
 import type { PerguntaJev, RespostaJev } from "./jev";
+import { ehSaudacaoPura } from "./confidence/turno-tipo";
+import type { ProvaEsclarecimento } from "./jev-esclarecimento-entregue";
 
 export const LIMITES_ENCAMINHAMENTO = { urgencia: 0.5, pedido_atendente: 0.7, irritacao: 0.8 } as const;
 
@@ -14,7 +16,7 @@ export const LIMITES_ENCAMINHAMENTO = { urgencia: 0.5, pedido_atendente: 0.7, ir
  */
 export const LIMITE_ENTENDIMENTO = 0.5;
 
-export const REGRA_DUAS_FALHAS_ENTENDIMENTO = "ENTENDIMENTO-02 — Na primeira mensagem do paciente que não conseguir compreender, peça esclarecimento objetivo. Se não compreender a nova resposta do paciente, essa é a segunda falha: encaminhe para atendimento humano pela ferramenta disponível, com o motivo e a dúvida restante, sem pedir uma terceira tentativa. Conte mensagens do paciente, nunca chamadas ao modelo, pesquisas de ferramentas ou reprocessamentos da mesma entrada. Entendimento confirmado ou avanço real reinicia a sequência. Falha técnica, dado ausente na fonte e perguntas necessárias de cadastro, data, horário ou confirmação não são falhas de entendimento. Preserve respostas confirmadas às perguntas independentes. Esta regra prevalece sobre instruções antigas de três mensagens ou duas perguntas de esclarecimento. Na homologação use somente o encaminhamento simulado; transferência real só pode ser anunciada após confirmação do sistema.";
+export const REGRA_DUAS_FALHAS_ENTENDIMENTO = "ENTENDIMENTO-02 — Na primeira mensagem do paciente que não conseguir compreender, peça esclarecimento objetivo. Se não compreender a nova resposta do paciente, essa é a segunda falha: encaminhe para atendimento humano pela ferramenta disponível, com o motivo e a dúvida restante, sem pedir uma terceira tentativa. Saudações não são falhas. Só conte a segunda falha quando houver prova de que uma pergunta de esclarecimento foi enviada entre as duas entradas; abertura como Como posso ajudar não é esclarecimento. Conte mensagens do paciente, nunca chamadas ao modelo, pesquisas de ferramentas ou reprocessamentos da mesma entrada. Entendimento confirmado ou avanço real reinicia a sequência. Falha técnica, dado ausente na fonte e perguntas necessárias de cadastro, data, horário ou confirmação não são falhas de entendimento. Preserve respostas confirmadas às perguntas independentes. Esta regra prevalece sobre instruções antigas de três mensagens ou duas perguntas de esclarecimento. Na homologação use somente o encaminhamento simulado; transferência real só pode ser anunciada após confirmação do sistema.";
 
 export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
   return {
@@ -23,7 +25,7 @@ export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
       instructions:
         "Considerando `mensagens_anteriores` e `contexto_atendimento` (etapa atual e opções já oferecidas), dá para entender com segurança o que o paciente quer dizer na `mensagem_atual`, seja um pedido novo, seja a resposta ou a continuação da última pergunta ou oferta da atendente?",
       criteria: {
-        true: "Dá para entender: é um pedido compreensível ou responde/continua a conversa (inclusive respostas curtas como uma especialidade, um nome de médico, um dia ou um sim).",
+        true: "Dá para entender: é um pedido compreensível ou responde/continua a conversa (inclusive saudações como boa noite e respostas curtas como uma especialidade, um nome de médico, um dia ou um sim).",
         false: "Não dá para entender o que o paciente quer: a mensagem é incompreensível ou não tem relação com a conversa.",
       },
     },
@@ -69,6 +71,7 @@ export type ContagemDuvida = {
   confiancas: number[];
   /** IDs da entrada já avaliada, para reprocessamento não contar outra falha. */
   mensagensEntrada?: string[];
+  esclarecimento?: ProvaEsclarecimento;
 };
 
 /** Primeira mensagem incompreendida: esclarecer. Segunda: encaminhar. */
@@ -82,21 +85,28 @@ export function contarDuvida(a: {
   marco: string;
   anterior: ContagemDuvida | null;
   mensagensEntrada?: readonly string[];
+  mensagem?: string;
+  esclarecimento?: ProvaEsclarecimento | null;
 }): ContagemDuvida {
   const ids = [...new Set(a.mensagensEntrada ?? [])];
   const entrada = ids.length ? { mensagensEntrada: ids } : {};
-  if (a.selecaoValida || (typeof a.entendimento?.noul === "number" && !naoEntendeu(a.entendimento)))
+  if (ehSaudacaoPura(a.mensagem ?? "") || a.selecaoValida || (typeof a.entendimento?.noul === "number" && !naoEntendeu(a.entendimento)))
     return { falhas: 0, marco: a.marco, confiancas: [], ...entrada };
   if (a.anterior?.marco === a.marco && (typeof a.entendimento?.noul !== "number" ||
-    (ids.length > 0 && ids.every(id => a.anterior!.mensagensEntrada?.includes(id))))) return a.anterior;
+    (ids.length > 0 && ids.some(id => a.anterior!.mensagensEntrada?.includes(id))))) {
+    const { esclarecimento: _anterior, ...contagem } = a.anterior;
+    return contagem;
+  }
   if (!naoEntendeu(a.entendimento)) return { falhas: 0, marco: a.marco, confiancas: [], ...entrada };
   const confianca = a.entendimento!.noul!;
-  const continua = a.anterior !== null && a.anterior.falhas > 0 && a.anterior.marco === a.marco;
+  const continua = a.anterior !== null && a.anterior.falhas > 0 && a.anterior.marco === a.marco &&
+    !!a.esclarecimento && a.anterior.mensagensEntrada?.includes(a.esclarecimento.entradaAnteriorId) && ids.length > 0;
   return {
-    falhas: continua ? a.anterior!.falhas + 1 : 1,
+    falhas: continua ? FALHAS_PARA_ENCAMINHAR : 1,
     marco: a.marco,
     confiancas: [...(continua ? a.anterior!.confiancas : []), confianca].slice(-FALHAS_PARA_ENCAMINHAR),
     ...entrada,
+    ...(continua ? { esclarecimento: a.esclarecimento! } : {}),
   };
 }
 
@@ -117,7 +127,7 @@ export function decidirEncaminhamento(
   const i = p("irritacao");
   if (typeof i === "number" && i >= limites.irritacao)
     return { motivo: `JEV_IRRITACAO: paciente insatisfeito (pontuação ${numero(i)})`, urgencia: "normal" };
-  if (contagem && contagem.falhas >= FALHAS_PARA_ENCAMINHAR)
+  if (naoEntendeu(respostas?.entendimento) && contagem?.esclarecimento && contagem.falhas >= FALHAS_PARA_ENCAMINHAR)
     return {
       motivo: `JEV_DUVIDA_REPETIDA: pedido não compreendido em ${contagem.falhas} mensagens seguidas, sem avanço do atendimento (entendimento ${contagem.confiancas.map(numero).join(" e ")})`,
       urgencia: "normal",

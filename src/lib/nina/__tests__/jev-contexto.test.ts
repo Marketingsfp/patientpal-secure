@@ -120,7 +120,7 @@ describe("contexto do atendimento e escolha de opção", () => {
 
 describe("regressão da sessão 470", () => {
   test("pedir consulta → neuro → carlos eduardo não encaminha", () => {
-    const base = { urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
+    const base = { entendimento: { noul: 0.12 }, urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
     const semOferta = estadoVazio();
     semOferta.session_id = "s1";
     // "quero marcar uma consulta": entendido (1,00).
@@ -147,11 +147,11 @@ describe("regressão da sessão 470", () => {
   });
 
   test("duas mensagens realmente incompreensíveis, sem avanço, encaminham", () => {
-    const base = { urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
+    const base = { entendimento: { noul: 0.12 }, urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
     const e = estadoComOferta();
     const marco = marcoAtendimento(e);
-    const c1 = contarDuvida({ entendimento: { noul: 0.1 }, selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null, marco, anterior: null });
-    const c2 = contarDuvida({ entendimento: { noul: 0.12 }, selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null, marco, anterior: c1 });
+    const c1 = contarDuvida({ entendimento: { noul: 0.1 }, selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null, marco, anterior: null, mensagensEntrada: ["m1"] });
+    const c2 = contarDuvida({ entendimento: { noul: 0.12 }, selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null, marco, anterior: c1, mensagensEntrada: ["m2"], esclarecimento: { mensagemId: "saida", entradaAnteriorId: "m1" } });
     expect(decidirEncaminhamento(base, c1)).toBeNull();
     expect(decidirEncaminhamento(base, c2)?.motivo).toContain("JEV_DUVIDA_REPETIDA");
   });

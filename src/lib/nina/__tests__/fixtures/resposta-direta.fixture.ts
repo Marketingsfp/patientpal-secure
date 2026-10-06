@@ -160,7 +160,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
-const pergunta = confirmacaoPlural ? (cenario.includes("parcial") ? "só o segundo. precisa de jejum?" : "isso os 2. precisa de jejum pra ressonancia? tenho pino na perna") : continuidadeCatalogo ? "é a primeira, rins e vias urinarias, ele é adulto" : reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
+const pergunta = duvidaCenario ? (cenario === "catalogo_duvida_saudacao" ? "Boa noite" : "Queria saber se vocês fazem usan") : confirmacaoPlural ? (cenario.includes("parcial") ? "só o segundo. precisa de jejum?" : "isso os 2. precisa de jejum pra ressonancia? tenho pino na perna") : continuidadeCatalogo ? "é a primeira, rins e vias urinarias, ele é adulto" : reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
   : cenario.endsWith("novo_pedido") ? "Agora quero outro exame XYZ" : clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
@@ -270,7 +270,13 @@ if (confirmacaoMedico) estadoContextual.knowledge_context = {
     opcoes: [{ id: "medico-0", nome: "Sandro Prinscewal", especialidade: "CARDIOLOGIA, CLINICO GERAL" }] },
 };
 if (cenario === "foto_sessao_nova") estadoContextual.session_started_at = new Date(agora - 3 * 60_000).toISOString();
-const mensagensContextuais = perguntasMultiplas ? [
+const mensagensContextuais = duvidaCenario ? [
+  { ...registroMensagem(cenario.endsWith("apos_saudacao") ? "Boa noite" : "Queria exame xyz", 0, "in", "received"), id: "entrada-anterior" },
+  { ...registroMensagem(cenario.endsWith("apos_saudacao") || cenario.endsWith("sem_pergunta")
+      ? "Boa noite! Como posso te ajudar hoje?" : "Pode explicar de outra forma o que você precisa?", 1),
+    enviada_por: "nina", status: cenario.endsWith("nao_entregue") ? "failed" : "sent" },
+  { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+] : perguntasMultiplas ? [
   ...(confirmacaoPlural && estadoContextual.knowledge_context ? [registroMensagem(estadoContextual.knowledge_context.esclarecimento!.pergunta, 1)] : []),
   ...(cenario === "catalogo_multiplas_retomada" ? [registroMensagem(estadoContextual.knowledge_context!.esclarecimento!.pergunta, 1)] : []),
   { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
@@ -356,8 +362,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
             : fonteCenario && tabela === "nina_cat_servicos" ? baseFonte.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : (interpretacao || escolhaMedico || clinicoGeral) && catalogoInterpretado[tabela] ? catalogoInterpretado[tabela]!.filter(l => filtrosCatalogo.every(f => f(l))).slice(0, limiteCatalogo)
             : tabela === "clinicas" ? { nome: "Clínica simulada", base_importada: false }
-            : (perguntasMultiplas || fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-            : (perguntasMultiplas || fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? (fotoCenario ? mensagensContextuais.filter(l => filtrosCatalogo.every(f => f(l))) : mensagensContextuais)
+            : (duvidaCenario || perguntasMultiplas || fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario || unificado) && tabela === "atend_conversas" ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
+            : (duvidaCenario || perguntasMultiplas || fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? (fotoCenario ? mensagensContextuais.filter(l => filtrosCatalogo.every(f => f(l))) : mensagensContextuais)
             : unica ? null : [], error: null,
           count: (fotoCenario || contextual || confirmacaoMedico || pedidoCenario || linkCenario || unificado) && tabela === "whatsapp_mensagens" ? mensagensContextuais.length : 0,
         })),
@@ -884,7 +890,7 @@ const { gerarRespostaNina } = await import("@/lib/whatsapp.server");
 const auditoria: any = {};
 const ultimaEntrada = mensagensContextuais.at(-1);
 const textoFoto = ultimaEntrada && "transcricao" in ultimaEntrada ? String(ultimaEntrada.transcricao) : "";
-const resposta = await gerarRespostaNina("clinica-simulada", fotoCenario ? textoFoto : procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente, perguntasMultiplas || fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario ? "55000100999" : null, {
+const resposta = await gerarRespostaNina("clinica-simulada", fotoCenario ? textoFoto : procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente, duvidaCenario || perguntasMultiplas || fotoCenario || contextual || esclarecer || escolhaMedico || variantePreventivo || clinicoGeral || procedimentoExecutante || fonteRetomada || pedidoCenario || linkCenario ? "55000100999" : null, {
   teste, ambiente: teste ? "homologacao" : "producao",
   ...(cenario === "escolha_sem_auditoria" ? {} : { auditoria }),
   mensagensEntrada: ["entrada-simulada"],
