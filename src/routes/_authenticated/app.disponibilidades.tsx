@@ -99,6 +99,13 @@ const toLocalTime = (v: Date | string) => fmtTimeLocal.format(new Date(v));
 // HH:MM. Sem isso as comparações de texto entre os dois formatos erram
 // (ex.: "13:00" > "13:00:00" é falso, apesar de serem o mesmo horário).
 const hhmm = (v: string | null | undefined) => (v ? v.slice(0, 5) : "");
+// "2026-08-31" → "31/08/2026".
+const dataBR = (iso: string) => iso.split("-").reverse().join("/");
+// Soma dias a uma data "AAAA-MM-DD" sem passar pelo fuso do navegador.
+const somarDiasIso = (iso: string, n: number) => {
+  const [a, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10);
+};
 
 interface Disp {
   id: string;
@@ -234,6 +241,9 @@ function Page() {
   const [pisoTick, setPisoTick] = useState(0);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
+  // Controlada para o atalho "gerar fichas" depois de estender uma vigência,
+  // que leva a recepção da aba Médicos direto para o gerador.
+  const [aba, setAba] = useState("agendas");
   const [editRow, setEditRow] = useState<{
     dia_semana: string;
     hora_inicio: string;
@@ -771,6 +781,91 @@ function Page() {
     setDispEditando(null);
     setEditRow(null);
     void load();
+    // Vigência estendida (data final apagada ou adiada): as fichas do período
+    // que voltou a valer não aparecem sozinhas. A tela oferece o gerador já
+    // preenchido, mas quem grava as fichas continua sendo a recepção, no botão.
+    const fimAntigo = atual?.vigencia_fim ?? null;
+    const fimNovo = payload.vigencia_fim;
+    if (atual && fimAntigo && (fimNovo === null || (fimNovo > fimAntigo && fimNovo >= hojeIso))) {
+      void oferecerGerarFichas(atual, diaNum, fimAntigo, fimNovo);
+    }
+  };
+
+  const oferecerGerarFichas = async (
+    regra: DispRow,
+    dow: number,
+    fimAntigo: string,
+    fimNovo: string | null,
+  ) => {
+    if (!clinicaAtual) return;
+    const inicioIso = fimAntigo >= hojeIso ? somarDiasIso(fimAntigo, 1) : hojeIso;
+    // O período vai até onde a agenda já tem fichas geradas, para o dia que
+    // voltou a valer ficar alinhado com os outros dias da semana. Agenda sem
+    // fichas futuras: 30 dias. Nunca passa da nova data final da regra.
+    const { data: ultima } = await supabase
+      .from("agendamentos")
+      .select("inicio")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("medico_id", regra.medico_id)
+      .eq("agenda_id", regra.agenda_id)
+      .gte("inicio", new Date(`${inicioIso}T00:00:00`).toISOString())
+      .order("inicio", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ultimoDia = ultima?.inicio ? toLocalDate(ultima.inicio) : null;
+    let fimIso = ultimoDia && ultimoDia >= inicioIso ? ultimoDia : somarDiasIso(inicioIso, 30);
+    if (fimNovo && fimNovo < fimIso) fimIso = fimNovo;
+    const medico = medicos.find((m) => m.id === regra.medico_id);
+    const ok = await confirmDialog({
+      title: "Gerar as fichas do período que voltou a valer?",
+      confirmText: "Abrir o gerador",
+      cancelText: "Agora não",
+      description: (
+        <div className="space-y-2 text-sm">
+          <p>
+            A regra de <strong>{DIAS[dow]}</strong>
+            {medico ? (
+              <>
+                {" "}
+                de <strong className="uppercase">{medico.nome}</strong>
+              </>
+            ) : null}{" "}
+            passou a valer de novo, mas as fichas desses dias ainda não existem na agenda.
+          </p>
+          <p>
+            O gerador abre preenchido com{" "}
+            <strong>
+              {DIAS[dow]}, de {dataBR(inicioIso)} a {dataBR(fimIso)}
+            </strong>
+            . Confira e clique em <strong>Gerar Horários na Agenda</strong> — nada é gravado antes
+            disso.
+          </p>
+        </div>
+      ),
+    });
+    if (!ok) return;
+    const variasAgendas =
+      agendas.filter((a) => a.medico_id === regra.medico_id && a.ativo).length > 1;
+    const agendaId = variasAgendas ? regra.agenda_id : "";
+    // Marca a escolha como já aplicada: senão o efeito que remarca os dias ao
+    // trocar de médico desmarcaria o dia da semana escolhido aqui.
+    medicoAplicadoRef.current = `${regra.medico_id}|${agendaId}`;
+    setGerar((g) => ({
+      ...g,
+      medico_id: regra.medico_id,
+      agenda_id: agendaId,
+      data_inicio: inicioIso,
+      data_fim: fimIso,
+      hora_inicio: "",
+      hora_fim: "",
+      intervalo_min: "",
+      limite_fichas: "",
+      fichas_fila: "",
+    }));
+    setDataFimKey((k) => k + 1);
+    setGerarDias([dow]);
+    setAba("agendas");
+    window.scrollTo({ top: 0 });
   };
 
   const remover = async (id: string) => {
@@ -839,11 +934,16 @@ function Page() {
     type BloqueioPiso = { data: string; piso: string; janelaFim: string };
     type ForaDaGrade = { data: string; gradeIni: string; gradeFim: string };
     type ErroFila = { data: string; erro: string };
+    // Dia pulado porque a agenda tem grade, mas nenhuma regra vale nessa data.
+    // `venceuEm`/`comecaEm` dizem o porquê quando há regra do mesmo dia da
+    // semana fora da vigência; sem eles, o médico só não atende nesse dia.
+    type SemRegra = { data: string; dow: number; venceuEm: string | null; comecaEm: string | null };
     const vazio = {
       slots: [] as Slot[],
       bloqueiosPorPiso: [] as BloqueioPiso[],
       foraDaGrade: [] as ForaDaGrade[],
       errosFila: [] as ErroFila[],
+      semRegraValida: [] as SemRegra[],
     };
     if (!gerar.data_inicio || !gerar.data_fim) return vazio;
     const ini = new Date(`${gerar.data_inicio}T00:00:00`);
@@ -910,7 +1010,7 @@ function Page() {
           });
         }
       }
-      return { slots: out, bloqueiosPorPiso: [], foraDaGrade: [], errosFila };
+      return { slots: out, bloqueiosPorPiso: [], foraDaGrade: [], errosFila, semRegraValida: [] };
     }
 
     const overrideIni = hhmm(gerar.hora_inicio);
@@ -941,6 +1041,7 @@ function Page() {
     const out: Slot[] = [];
     const bloqueiosPorPiso: BloqueioPiso[] = [];
     const foraDaGrade: ForaDaGrade[] = [];
+    const semRegraValida: SemRegra[] = [];
     for (let i = 0; i < dias; i++) {
       const d = new Date(ini);
       d.setDate(d.getDate() + i);
@@ -984,6 +1085,34 @@ function Page() {
           //    digitada na tela;
           // 3) sem grade e sem janela digitada, um bloco padrão 08:00–17:00.
           const temGrade = ds.length > 0;
+          // "Ter grade" para as etapas 2 e 3 olha o cadastro inteiro, não só as
+          // regras vigentes no dia: antes, uma regra vencida fazia o dia cair no
+          // bloco 08:00–17:00 e o médico ganhava fichas num horário inventado
+          // (em 2026, ~900 fichas vazias de sexta e sábado para um ortopedista
+          // cuja regra de sexta tinha vencido em 31/08).
+          const regrasDaAgenda = disps.filter(
+            (x) => x.medico_id === m.id && (ag.id === null || x.agenda_id === ag.id),
+          );
+          const agendaTemGrade = regrasDaAgenda.length > 0;
+          const medicoTemGrade = agendaTemGrade || disps.some((x) => x.medico_id === m.id);
+          if (!temGrade && agendaTemGrade) {
+            const doDia = regrasDaAgenda.filter((x) => x.dia_semana === dow);
+            const vencidas = doDia
+              .map((x) => x.vigencia_fim)
+              .filter((v): v is string => !!v && v < diaIso)
+              .sort();
+            const futuras = doDia
+              .map((x) => x.vigencia_inicio)
+              .filter((v): v is string => !!v && v > diaIso)
+              .sort();
+            semRegraValida.push({
+              data: diaIso,
+              dow,
+              venceuEm: vencidas.length > 0 ? vencidas[vencidas.length - 1] : null,
+              comecaEm: futuras.length > 0 ? futuras[0] : null,
+            });
+            continue;
+          }
           const blocosDaDisp = ds
             .map((x) => {
               const hi0 = hhmm(x.hora_inicio);
@@ -998,8 +1127,11 @@ function Page() {
             : [];
           const padraoIni = overrideIni && overrideIni > "08:00" ? overrideIni : "08:00";
           const padraoFim = overrideFim && overrideFim < "17:00" ? overrideFim : "17:00";
+          // Padrão 08:00–17:00 só para médico sem nenhuma grade cadastrada. Quem
+          // tem grade em outra agenda (ex.: uma agenda nova ainda vazia) não
+          // recebe horário inventado; ali só vale a janela digitada.
           const blocosPadrao =
-            padraoIni < padraoFim
+            !medicoTemGrade && padraoIni < padraoFim
               ? [blocoAvulso(m.id, ag.id ?? "", dow, padraoIni, padraoFim, ds[0])]
               : [];
           // Se já existem slots criados nessa data para esse médico/agenda,
@@ -1093,7 +1225,13 @@ function Page() {
         }
       }
     }
-    return { slots: out, bloqueiosPorPiso, foraDaGrade, errosFila: [] as ErroFila[] };
+    return {
+      slots: out,
+      bloqueiosPorPiso,
+      foraDaGrade,
+      errosFila: [] as ErroFila[],
+      semRegraValida,
+    };
   }, [
     gerar,
     gerarDias,
@@ -1236,6 +1374,12 @@ function Page() {
         (outros > 0 ? ` O mesmo acontece em mais ${outros} dia(s) do período.` : "")
       );
     }
+    if (geracaoPreview.semRegraValida.length > 0) {
+      const comPrazo = geracaoPreview.semRegraValida.some((s) => s.venceuEm || s.comecaEm);
+      return comPrazo
+        ? "Nenhuma ficha será gerada: a regra de horário dos dias marcados está fora da vigência. Veja o aviso abaixo."
+        : "Nenhum dos dias marcados tem horário cadastrado nesta agenda. Cadastre o horário do médico na aba Médicos.";
+    }
     return "Nenhum horário cabe nessa configuração. Confira o recorte de horário e a duração de cada atendimento.";
   }, [
     agendasMistasSemEscolha,
@@ -1251,6 +1395,7 @@ function Page() {
     geracaoPreview.bloqueiosPorPiso,
     geracaoPreview.foraDaGrade,
     geracaoPreview.errosFila,
+    geracaoPreview.semRegraValida,
     modoFila,
     gerar.fichas_fila,
     feriadosNoPeriodo,
@@ -1263,6 +1408,27 @@ function Page() {
   // Dias que a geração vai pular porque o recorte digitado não encosta na
   // grade cadastrada do médico naquele dia.
   const diasForaDaGrade = new Set(geracaoPreview.foraDaGrade.map((b) => b.data)).size;
+
+  // Dias pulados por regra fora da vigência, um aviso por dia da semana. Dia
+  // da semana sem regra nenhuma não entra: o médico só não atende nele.
+  const avisosVigencia = useMemo(() => {
+    const porDow = new Map<
+      number,
+      { dow: number; venceuEm: string | null; comecaEm: string | null; dias: Set<string> }
+    >();
+    for (const s of geracaoPreview.semRegraValida) {
+      if (!s.venceuEm && !s.comecaEm) continue;
+      const atual = porDow.get(s.dow) ?? {
+        dow: s.dow,
+        venceuEm: s.venceuEm,
+        comecaEm: s.comecaEm,
+        dias: new Set<string>(),
+      };
+      atual.dias.add(s.data);
+      porDow.set(s.dow, atual);
+    }
+    return Array.from(porDow.values()).sort((a, b) => a.dow - b.dow);
+  }, [geracaoPreview.semRegraValida]);
 
   // Grade semanal cadastrada do médico escolhido no gerador, agrupada por dia
   // da semana. É exibida na tela para que a recepção veja de onde saem os
@@ -1290,12 +1456,15 @@ function Page() {
             inicio: hhmm(x.hora_inicio),
             fim: hhmm(x.hora_fim),
             intervalo: x.intervalo_min && x.intervalo_min > 0 ? x.intervalo_min : null,
+            venceuEm: x.vigencia_fim && x.vigencia_fim < hojeIso ? x.vigencia_fim : null,
           })),
       }));
-  }, [gerar.medico_id, gerar.agenda_id, disps]);
+  }, [gerar.medico_id, gerar.agenda_id, disps, hojeIso]);
 
   const medicoSelSemGrade =
     Boolean(gerar.medico_id) && gerar.medico_id !== "all" && gradeMedicoSel.length === 0;
+  const medicoSelTemGradeEmOutraAgenda =
+    medicoSelSemGrade && disps.some((d) => d.medico_id === gerar.medico_id);
 
   // Ao escolher o médico, a tela já marca os dias em que ele atende e limpa
   // qualquer recorte de horário que tenha sobrado da geração anterior. O `ref`
@@ -1685,7 +1854,7 @@ function Page() {
         </p>
       </div>
 
-      <Tabs defaultValue="agendas" className="w-full">
+      <Tabs value={aba} onValueChange={setAba} className="w-full">
         <TabsList>
           <TabsTrigger value="agendas">Agendas</TabsTrigger>
           <TabsTrigger value="medicos">Médicos</TabsTrigger>
@@ -1776,12 +1945,20 @@ function Page() {
                           className="rounded border bg-muted/50 px-2 py-1 text-xs whitespace-nowrap"
                         >
                           <strong>{DIAS[g.dia]}</strong>{" "}
-                          {g.blocos
-                            .map(
-                              (b) =>
-                                `${b.inicio}–${b.fim}${b.intervalo ? ` · ${b.intervalo} min` : ""}`,
-                            )
-                            .join("  +  ")}
+                          {g.blocos.map((b, i) => (
+                            <span key={i}>
+                              {i > 0 && "  +  "}
+                              <span className={b.venceuEm ? "text-destructive line-through" : ""}>
+                                {`${b.inicio}–${b.fim}${b.intervalo ? ` · ${b.intervalo} min` : ""}`}
+                              </span>
+                              {b.venceuEm && (
+                                <span className="text-destructive">
+                                  {" "}
+                                  (venceu em {dataBR(b.venceuEm)})
+                                </span>
+                              )}
+                            </span>
+                          ))}
                         </span>
                       ))}
                     </div>
@@ -1795,13 +1972,16 @@ function Page() {
                 {medicoSelSemGrade && (
                   <div className="mt-3 rounded-md border border-amber-500/50 bg-amber-50 p-2 dark:bg-amber-950/20">
                     <p className="text-xs font-semibold text-amber-700 dark:text-amber-500">
-                      Este médico não tem grade semanal cadastrada.
+                      {medicoSelTemGradeEmOutraAgenda
+                        ? "Esta agenda não tem grade semanal cadastrada."
+                        : "Este médico não tem grade semanal cadastrada."}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      A geração vai usar o horário digitado no passo 2 e, se ele ficar em branco, o
-                      padrão das 08:00 às 17:00. Para não digitar tudo de novo toda vez, preencha o
-                      horário e a duração no passo 2, marque os dias no passo 3 e salve como grade
-                      fixa deste médico.
+                      {medicoSelTemGradeEmOutraAgenda
+                        ? "A geração vai usar o horário digitado no passo 2 — em branco, nada é gerado."
+                        : "A geração vai usar o horário digitado no passo 2 e, se ele ficar em branco, o padrão das 08:00 às 17:00."}{" "}
+                      Para não digitar tudo de novo toda vez, preencha o horário e a duração no
+                      passo 2, marque os dias no passo 3 e salve como grade fixa deste médico.
                     </p>
                     {podeGerirHorarios && (
                       <Button
@@ -2053,6 +2233,24 @@ function Page() {
                     digitado está fora da grade do médico nesses dias. Apague o recorte para usar a
                     grade inteira.
                   </p>
+                )}
+                {avisosVigencia.length > 0 && (
+                  <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs dark:bg-amber-950/20">
+                    {avisosVigencia.map((a) => (
+                      <p key={a.dow} className="font-medium text-amber-700 dark:text-amber-500">
+                        {DIAS[a.dow]}:{" "}
+                        {a.venceuEm
+                          ? `a regra deste dia venceu em ${dataBR(a.venceuEm)}`
+                          : `a regra deste dia só começa em ${dataBR(a.comecaEm ?? "")}`}{" "}
+                        — {a.dias.size} dia(s) do período ficam sem fichas.
+                      </p>
+                    ))}
+                    <p className="mt-1 text-muted-foreground">
+                      Se o médico continua atendendo nesse dia, abra a aba <strong>Médicos</strong>,
+                      clique no lápis da linha e apague a data "até" da vigência (fica valendo
+                      sempre). Depois de salvar, a tela oferece gerar as fichas do período.
+                    </p>
+                  </div>
                 )}
               </section>
 
@@ -2631,8 +2829,18 @@ function Page() {
                                     )}
                                   </TableCell>
                                   <TableCell className="text-xs text-muted-foreground">
-                                    {d.vigencia_inicio || d.vigencia_fim ? (
-                                      `${d.vigencia_inicio ? d.vigencia_inicio.split("-").reverse().join("/") : "—"} a ${d.vigencia_fim ? d.vigencia_fim.split("-").reverse().join("/") : "—"}`
+                                    {d.vigencia_fim && d.vigencia_fim < hojeIso ? (
+                                      // Regra vencida continua na tabela, mas não gera
+                                      // ficha: o destaque diz por que o dia sumiu do
+                                      // gerador e onde mexer.
+                                      <span
+                                        className="inline-flex items-center rounded border border-destructive/40 bg-destructive/10 px-1.5 py-0.5 font-semibold text-destructive"
+                                        title="Esta regra não gera mais fichas. Clique no lápis e apague a data final para valer sempre."
+                                      >
+                                        VENCEU EM {dataBR(d.vigencia_fim)}
+                                      </span>
+                                    ) : d.vigencia_inicio || d.vigencia_fim ? (
+                                      `${d.vigencia_inicio ? dataBR(d.vigencia_inicio) : "—"} a ${d.vigencia_fim ? dataBR(d.vigencia_fim) : "—"}`
                                     ) : (
                                       <span className="text-muted-foreground">sempre</span>
                                     )}
