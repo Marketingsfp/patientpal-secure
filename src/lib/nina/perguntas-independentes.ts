@@ -136,7 +136,7 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       aliases.set(chave(consulta(preparado)), k);
       return JSON.stringify(preparado);
     },
-    reconciliar(args: unknown, resultado: ResultadoBroker): ResultadoBroker {
+    reconciliar(args: unknown, resultado: ResultadoBroker, ferramenta?: string): ResultadoBroker {
       if (!resultado.success || resultado.erro || !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")) return resultado;
       const limitacao = (resultado.dados as ResultadoConhecimento | null)?.limitacao_catalogo;
       if (limitacao) {
@@ -161,6 +161,13 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       if (!anteriorDoTurno?.esclarecimento) return resultado;
       const dados = resultado.dados as ResultadoConhecimento | null;
       if (!dados || dados.knowledge_status === "conflict") return resultado;
+      // Consulta (inclusive buscar_medicos) e exame/procedimento são pedidos
+      // diferentes: os profissionais da especialidade não viram uma pergunta
+      // sobre o nome do pedido médico (homologação 06/10/2026, dentista/fono).
+      const tipoAtual = dados.tipo_atendimento ?? p.tipo_atendimento ??
+        (ferramenta === "buscar_medicos" ? "consulta" : ferramenta === "buscar_procedimentos" ? "exame_procedimento" : null);
+      const tipoAnterior = anteriorDoTurno.consulta.tipo_atendimento;
+      if (tipoAtual && tipoAnterior && tipoAtual !== tipoAnterior) return resultado;
       if (dados.esclarecimento && chave(consulta(p)) === k) return resultado;
       // Encontrar o título reformulado não comprova os qualificadores do pedido original.
       const hipotese = dados.esclarecimento || !Array.isArray(dados.records) ? dados : sugerirResultadoJev(dados);
@@ -232,13 +239,45 @@ export function perguntas(lista: readonly ConhecimentoSessao[]): string {
     )
     .join("\n\n");
 }
+const compacto = (v: string) => normal(v).replace(/[^a-z0-9]/g, "");
+const opcoesDe = (p: ConhecimentoSessao) =>
+  [...new Set((p.esclarecimento?.opcoes ?? []).map((o) => compacto(o.nome)).filter(Boolean))];
+
+/**
+ * Pendências que ainda precisam ser perguntadas. Reformulações do mesmo
+ * pedido geram pendências com as mesmas opções; a resposta do modelo pode já
+ * ter listado as opções. Nenhuma das duas situações repete a pergunta
+ * (homologação 06/10/2026: a lista da fisioterapia saiu três vezes).
+ */
+export function pendenciasAPerguntar(
+  textoConfirmado: string,
+  lista: readonly ConhecimentoSessao[],
+): ConhecimentoSessao[] {
+  const texto = compacto(textoConfirmado);
+  const restantes = lista.filter((p) => {
+    const opcoes = opcoesDe(p);
+    return !(opcoes.length && opcoes.every((o) => texto.includes(o)));
+  });
+  // Opções contidas nas de outra pendência mantida já são perguntadas por ela.
+  return restantes.filter((p, i) => {
+    const opcoes = opcoesDe(p);
+    if (!opcoes.length) return true;
+    return !restantes.some((q, j) => {
+      if (j === i) return false;
+      const outras = new Set(opcoesDe(q));
+      const contidas = opcoes.every((o) => outras.has(o));
+      return contidas && (outras.size > opcoes.length || j < i);
+    });
+  });
+}
+
 export function comporRespostaParcial(
   textoConfirmado: string,
   lista: readonly ConhecimentoSessao[],
   apresentacao?: string | null,
 ): string {
   const texto = textoConfirmado.trim();
-  const faltantes = [...new Set(lista.map((p) => perguntas([p])))]
+  const faltantes = [...new Set(pendenciasAPerguntar(texto, lista).map((p) => perguntas([p])))]
     .filter((p) => !normal(texto).includes(normal(p)));
   return [!texto && apresentacao ? apresentacao : "", texto, ...faltantes]
     .filter(Boolean)

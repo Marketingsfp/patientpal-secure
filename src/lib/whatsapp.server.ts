@@ -2097,7 +2097,7 @@ async function gerarRespostaNinaInterno(
       const { confirmarAntesDeEncaminhar } = await import("@/lib/nina/catalogo-sem-registro");
       r = confirmarAntesDeEncaminhar(r, args, referenciaAnterior);
     }
-    r = perguntasDoTurno.reconciliar(parametros, r);
+    r = perguntasDoTurno.reconciliar(parametros, r, nome);
     const ex = incorporarResultadoOficial({
       clinicaId,
       nome,

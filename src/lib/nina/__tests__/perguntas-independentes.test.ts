@@ -174,3 +174,63 @@ it("conflito oficial e falha técnica não viram hipótese de equivalência", ()
   for (const r of [{ ...resultadoExame(), dados: { knowledge_status: "conflict" } },
     { ...resultadoExame(), success: false, erro: "TIMEOUT" }]) expect(turno.reconciliar(args, r)).toBe(r);
 });
+
+// Homologação 06/10/2026 — perguntas coladas no fim da resposta.
+const comOpcoes = (termo: string, nomes: string[], tipo: "consulta" | "exame_procedimento" = "exame_procedimento"): ConhecimentoSessao => ({
+  ...pendente(termo),
+  consulta: { termo, tipo_atendimento: tipo },
+  esclarecimento: { tipo: "procedimento", opcoes: nomes.map((nome) => ({ id: nome, nome })),
+    pergunta: `Para o pedido “${termo}”, pode conferir qual nome corresponde ao pedido médico?\n${nomes.join("\n")}` },
+});
+const resultadoMedicos = (): ResultadoBroker => ({
+  ferramenta: "buscar_medicos", capacidade: "listCatalog", fonte: "base_conhecimento",
+  success: true, reused: false, appointment_confirmed: false,
+  dados: { found: true, knowledge_status: "found", records: [{ id: "aline", procedimento: "FONOAUDIOLOGIA" }] },
+});
+
+it("profissionais da especialidade não viram pergunta sobre o nome do pedido médico", () => {
+  const turno = criarPerguntasDoTurno(null, "tem fonoaudiologa pra crianca de 5 anos?");
+  const consultaFono = { ...comOpcoes("fonoaudiologia", [], "consulta"), esclarecimento: undefined };
+  turno.registrar({ termo: "fonoaudiologia", tipo_atendimento: "consulta" }, consultaFono, null, true);
+  turno.registrar({ termo: "fonoaudiologia" }, comOpcoes("fonoaudiologia", ["TESTE DA ORELHINHA", "AUDIOMETRIA"]), null, false);
+  expect(turno.pendentes).toHaveLength(1);
+  const args = { especialidade: "fonoaudiologia" }, r = resultadoMedicos();
+  expect(turno.reconciliar(args, r, "buscar_medicos")).toBe(r);
+  turno.registrar(args, null, null, false);
+  expect(turno.pendentes).toHaveLength(0);
+});
+
+it("reformulação de procedimento pela busca de procedimentos continua virando pergunta", () => {
+  const turno = criarPerguntasDoTurno(null), original = duvidaExame();
+  turno.registrar(original.consulta, original, null, false);
+  const args = { termo: "Densitometria duo energética", reformula_de: original.consulta.termo };
+  const r = { ...resultadoExame(), ferramenta: "buscar_procedimentos", capacidade: "listCatalog" as const,
+    dados: { ...(resultadoExame().dados as object), tipo_atendimento: undefined } };
+  expect((turno.reconciliar(args, r, "buscar_procedimentos").dados as ResultadoConhecimento).esclarecimento).toBeTruthy();
+});
+
+const FISIO = ["FISIOTERAPIA PELVICA", "FISIOTERAPIA RESPIRATORIA (5 SESSOES)", "FISIOTERAPIA INFANTIL (5 SESSOES)", "FISIOTERAPIA OCULAR", "FISIOTERAPIA (5 SESSOES)"];
+const pendenciasFisio = () => [
+  comOpcoes("fisioterapia", FISIO), comOpcoes("FISIOTERAPIA (5 SESSOES)", FISIO), comOpcoes("sessao de fisioterapia", ["FISIOTERAPIA (5 SESSOES)"]),
+];
+
+it("não repete a lista que o texto da Nina já apresentou", () => {
+  const texto = "Qual destas opções corresponde ao seu pedido médico?\n• " + FISIO.join("\n• ");
+  expect(comporRespostaParcial(texto, pendenciasFisio())).toBe(texto);
+});
+
+it("reformulações com as mesmas opções geram uma única pergunta", () => {
+  const resposta = comporRespostaParcial("Fazemos fisioterapia na clínica.", pendenciasFisio());
+  expect(resposta.match(/FISIOTERAPIA PELVICA/g)).toHaveLength(1);
+  expect(resposta).not.toContain("sessao de fisioterapia");
+  expect(resposta).toContain("Fazemos fisioterapia na clínica.");
+});
+
+it("pedidos diferentes continuam com uma pergunta cada", () => {
+  const resposta = comporRespostaParcial("Glicose: R$ 10,00.", [
+    comOpcoes("hemograma", ["HEMOGRAMA COMPLETO", "HEMOGRAMA COM PLAQUETAS"]),
+    comOpcoes("tsh", ["TSH", "TSH ULTRASSENSIVEL"]),
+  ]);
+  expect(resposta).toContain("“hemograma”");
+  expect(resposta).toContain("“tsh”");
+});
