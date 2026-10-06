@@ -30,3 +30,14 @@ describe("NFS-e autorizada sem ISS destacado", () => {
     expect(conferencia.divergencia_aliquota).toEqual({ cadastro_emitente: 0.03, autorizada: 0.02 });
   });
 });
+
+describe("NFS-e autorizada com XML não lido", () => {
+  it("omite valor_iss, marca não conferido e mantém campos do corpo", () => {
+    const { campos, conferencia } = montarCamposAutorizados(body, null, 0.02);
+    expect("valor_iss" in campos).toBe(false);
+    expect(conferencia.xml_lido).toBe(false);
+    expect(conferencia.faltando).toContain("valor_iss");
+    expect(conferencia.sem_iss_destacado).toBeUndefined();
+    expect(campos).toMatchObject({ numero: "11016", rps_numero: 9001, rps_serie: "1" });
+  });
+});

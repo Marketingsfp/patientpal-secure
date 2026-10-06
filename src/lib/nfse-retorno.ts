@@ -23,7 +23,8 @@ export type CamposAutorizados = {
   rps_numero: number | null;
   rps_serie: string | null;
   aliquota_iss: number | null; // fração: 0.03 = 3%
-  valor_iss: number | null;
+  /** Ausente quando o XML não foi lido: não sobrescreve o que já está gravado. */
+  valor_iss?: number;
   chave_acesso: string | null;
 };
 
@@ -96,14 +97,17 @@ export function montarCamposAutorizados(
     aliquota_iss: x?.aliquota_iss ?? null,
     // XML autorizado lido sem vISSQN: a nota autorizada não destaca ISS, então
     // o ISS dela é zero — zero é o fato, não um palpite. Continua proibido usar
-    // o valor calculado por nós. Sem XML nenhum, não há fato: fica nulo.
-    valor_iss: x ? (x.valor_iss ?? 0) : null,
+    // o valor calculado por nós. Sem XML lido não há fato: a chave é omitida
+    // (ver abaixo), para não sobrescrever o gravado nem derrubar a linha (NOT NULL).
     chave_acesso: chaveDoJson(body) ?? x?.chave_acesso ?? null,
   };
+  if (x) campos.valor_iss = x.valor_iss ?? 0;
   const semIss = !!x && x.valor_iss === null;
   const faltando = (Object.keys(campos) as (keyof CamposAutorizados)[]).filter(
     (k) => campos[k] === null || (k === "valor_iss" && semIss),
   );
+  // Sem XML lido o ISS não foi conferido (marca: xml_lido=false).
+  if (!x) faltando.push("valor_iss");
   const divergente =
     campos.aliquota_iss !== null &&
     aliquotaCadastro !== null &&
