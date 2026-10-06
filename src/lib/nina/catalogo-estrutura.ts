@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { interpretarModalidade } from "./modalidade-atendimento";
-import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
+import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS, REGRA_IDADE_NAO_INFORMADA, idadeNaoInformada } from "./regras-administrativas-confirmadas";
 
 const texto = z.string().trim().max(4000).nullable().optional();
 const hora = z
@@ -290,7 +290,7 @@ export function pendenciasEstrutura(
   const atendimentos = atendimentosEstruturados(conteudo, estrutura, profissional);
   const pendencias: string[] = [];
   for (const a of atendimentos) {
-    if (a.criterio_publicado && a.idade_minima === null && !a.complemento?.criterio_adicional)
+    if (!idadeNaoInformada(a.criterio_publicado) && a.idade_minima === null && !a.complemento?.criterio_adicional)
       pendencias.push(
         `${a.atendimento}: critério “${a.criterio_publicado}” precisa de conferência.`,
       );
@@ -313,6 +313,7 @@ export const INSTRUCAO_DADOS_CATALOGO =
   "Nunca misture preço ou idade de atendimentos diferentes do mesmo profissional. Complementos são informações confirmadas para aquela chave; " +
   "se contradisserem o texto publicado, confirme com a equipe o aspecto conflitante, sem escolher uma versão. " +
   REGRA_MODALIDADES_CONFIRMADAS + " " +
+  REGRA_IDADE_NAO_INFORMADA + " " +
   "Preparo não informado não significa sem preparo; convênios não informados não significam que não aceita. " +
   "Pedido médico: quando obrigatório na base de conhecimento, solicite uma foto legível do pedido para o exame, procedimento ou consulta identificado; " +
   "quando dispensado, informe que não precisa se o paciente perguntar. Não informado não significa dispensado: " +

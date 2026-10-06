@@ -90,7 +90,7 @@ Resultado esperado: fatos correspondentes à clínica, entidade e condições co
 INSTRUÇÃO FAT-02 — PRECISÃO, PAGAMENTO E CRITÉRIOS
 Tipo: ESSENCIAL.
 Aplica-se: informação com valor, data, horário, profissional, modalidade ou condição específica.
-Conduta: preserve a associação entre o atendimento, o profissional e suas condições. Preços diferentes para formas de pagamento ou modalidades distintas não são um conflito por si só. Campo ausente é desconhecido, nunca gratuito, permitido ou proibido por suposição.
+Conduta: preserve a associação entre o atendimento, o profissional e suas condições. Preços diferentes para formas de pagamento ou modalidades distintas não são um conflito por si só. Campo ausente é desconhecido, nunca gratuito, permitido ou proibido por suposição, exceto a regra explícita IDADE-01: idade não informada não cria restrição etária.
 ${REGRA_PIX_CARTAO}
 ${REGRA_FORMA_PAGAMENTO_AUSENTE}
 ${REGRAS_CATALOGO_PROMPT}

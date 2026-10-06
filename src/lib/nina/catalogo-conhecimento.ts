@@ -281,7 +281,7 @@ const INSTRUCAO_FOUND =
   INSTRUCAO_ESTRUTURA_CATALOGO +
   " " +
   "Responda usando SOMENTE os fatos deste retorno (catálogo publicado da clínica). " +
-  "Campo ausente = informação desconhecida: não complete com conhecimento geral, valor médio, " +
+  "Exceto a regra explícita IDADE-01, campo ausente = informação desconhecida: não complete com conhecimento geral, valor médio, " +
   "estimativa ou internet. " +
   '"price" é só um valor de referência: informe cada valor com a forma de pagamento e a condição ' +
   'que vieram em "notes" (nunca apenas o menor). ' +

@@ -1464,6 +1464,10 @@ async function gerarRespostaNinaInterno(
     origem: "src/lib/nina/atendimento-consulta.ts", motivo: "Distinguir consulta, revisão e noturna antes de vincular vagas.",
     texto: REGRA_SELECAO_ATENDIMENTO_CONSULTA });
   const { REGRA_ESCOLHA_PROFISSIONAL_NOMINAL } = await import("@/lib/nina/prompt/regras-catalogo");
+  const { REGRA_IDADE_NAO_INFORMADA } = await import("@/lib/nina/regras-administrativas-confirmadas");
+  instrucoesAdicionaisTurno.push({ codigo: "IDADE_NAO_INFORMADA_SEM_RESTRICAO", nivel: "inegociavel",
+    origem: "src/lib/nina/regras-administrativas-confirmadas.ts", motivo: "Regra confirmada: campo de idade não informado não cria restrição etária.",
+    texto: REGRA_IDADE_NAO_INFORMADA });
   const { REGRA_PRESERVAR_RESERVA } = await import("@/lib/nina/procedimento-sessao");
   instrucoesAdicionaisTurno.push({ codigo: "PEDIDOS_PARALELOS_PRESERVAM_RESERVA", nivel: "inegociavel",
     origem: "src/lib/nina/procedimento-sessao.ts", motivo: "Perguntas sobre outros exames não apagam a escolha ou o aceite do resumo entregue.",
