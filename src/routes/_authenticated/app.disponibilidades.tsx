@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { hojeBR } from "@/lib/date-utils";
 import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
+import { fichasExistentes, posicoesFichasExtras } from "@/lib/agenda/fichas-extras";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -198,6 +199,10 @@ function Page() {
   // Desmarcado por padrão: feriado só recebe horário quando a recepção pede.
   const [liberarFeriados, setLiberarFeriados] = useState(false);
   const [gerando, setGerando] = useState(false);
+  // "Adicionar mais fichas": diálogo que pergunta quantas fichas acrescentar
+  // em cada dia do período, além das que o dia já tem.
+  const [maisFichasAberto, setMaisFichasAberto] = useState(false);
+  const [maisFichasQtd, setMaisFichasQtd] = useState("");
   const [salvandoGrade, setSalvandoGrade] = useState(false);
   // Remontar o campo "Até" força o input mascarado a reexibir o valor do
   // estado. Sem isso, quando a data digitada é recusada e o estado volta para
@@ -1230,26 +1235,33 @@ function Page() {
           const acrescentarFichasExtras = (criadosNoDia: number): number => {
             if (!Number.isFinite(alvoDoDia) || !fimDoTurno) return 0;
             const linhasDoDia = linhasNoDia.get(pisoKey) ?? [];
-            const existentes = new Set(linhasDoDia.map((l) => l.ms)).size;
-            const faltam = alvoDoDia - existentes - criadosNoDia;
+            const faltam = alvoDoDia - fichasExistentes(linhasDoDia) - criadosNoDia;
             if (faltam <= 0) return 0;
-            let baseMs: number;
-            let horaIni: string;
-            let horaFim: string;
-            if (criadosNoDia > 0) {
-              const ultima = out[out.length - 1];
-              baseMs = new Date(`${ultima.data}T${ultima.inicio}:00`).getTime();
-              horaIni = ultima.inicio;
-              horaFim = ultima.fim;
-            } else {
-              const fimTurnoMs = new Date(`${diaIso}T${fimDoTurno}:00`).getTime();
-              const dentro = linhasDoDia.filter((l) => l.ms < fimTurnoMs);
-              if (dentro.length === 0) return 0;
-              baseMs = Math.max(...dentro.map((l) => l.ms));
-              if (linhasDoDia.some((l) => l.ms > baseMs && l.travada)) return 0;
-              horaIni = toLocalTime(new Date(baseMs));
-              horaFim = fimDoTurno;
+            if (criadosNoDia === 0) {
+              const r = posicoesFichasExtras({
+                diaIso,
+                fimTurno: fimDoTurno,
+                linhas: linhasDoDia,
+                quantidade: faltam,
+              });
+              if (!r.ok) return 0;
+              for (const f of r.fichas) {
+                out.push({
+                  data: diaIso,
+                  medico_id: m.id,
+                  agenda_id: ag.id ?? "",
+                  inicio: toLocalTime(f.inicio),
+                  fim: toLocalTime(f.fim),
+                  iniISO: f.inicio.toISOString(),
+                  fimISO: f.fim.toISOString(),
+                });
+              }
+              return r.fichas.length;
             }
+            const ultima = out[out.length - 1];
+            const baseMs = new Date(`${ultima.data}T${ultima.inicio}:00`).getTime();
+            const horaIni = ultima.inicio;
+            const horaFim = ultima.fim;
             const fimDate = new Date(`${diaIso}T${horaFim}:00`);
             let n = 0;
             for (let k = 1; k <= faltam; k++) {
@@ -1277,7 +1289,7 @@ function Page() {
               data: diaIso,
               piso,
               janelaFim: blocos.reduce((acc, x) => (x.hora_fim > acc ? x.hora_fim : acc), ""),
-              jaTem: new Set((linhasNoDia.get(pisoKey) ?? []).map((l) => l.ms)).size,
+              jaTem: fichasExistentes(linhasNoDia.get(pisoKey) ?? []),
               alvo: alvoDoDia,
             });
             continue;
@@ -1809,6 +1821,153 @@ function Page() {
         toast.success(`${inseridos} horários criados (${ignorados} já existiam e foram ignorados)`);
       else toast.success(`${inseridos} horários criados`);
       // Recarrega o piso para refletir os novos slots imediatamente na preview.
+      setPisoTick((t) => t + 1);
+    } catch (e: any) {
+      mostrarErro(e);
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  // ADICIONAR MAIS FICHAS (2026-10-06): acrescenta N fichas em cada dia do
+  // período que já tem agenda gerada, no último horário do turno — sem mexer
+  // em início, fim nem intervalo da escala, e sem mudar o número de nenhuma
+  // ficha existente (regra em fichas-extras.ts). Diferente do "Limite de
+  // fichas por dia", que é o TOTAL do dia: aqui o número é o que se SOMA.
+  const adicionarMaisFichas = async () => {
+    if (!podeGerirHorarios) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if (!clinicaAtual) return;
+    const qtd = parseInt(maisFichasQtd || "0", 10);
+    if (!qtd || qtd < 1) {
+      toast.error("Informe quantas fichas a mais por dia.");
+      return;
+    }
+    const med = medicos.find((x) => x.id === gerar.medico_id);
+    if (!med || !gerar.data_inicio || !gerar.data_fim) return;
+    const agendasAlvo = agendas.filter(
+      (a) =>
+        a.medico_id === med.id &&
+        a.ativo &&
+        !a.ordem_chegada &&
+        (!gerar.agenda_id || a.id === gerar.agenda_id),
+    );
+    setGerando(true);
+    try {
+      // Linhas do período lidas AGORA, não do que a tela carregou antes: outra
+      // recepcionista pode ter marcado alguém nesse meio tempo.
+      const { data: existentes, error: eLer } = await supabase
+        .from("agendamentos")
+        .select("agenda_id, inicio, status, fluxo_etapa")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", med.id)
+        .gte("inicio", new Date(`${gerar.data_inicio}T00:00:00`).toISOString())
+        .lte("inicio", new Date(`${gerar.data_fim}T23:59:59`).toISOString())
+        .limit(20000);
+      if (eLer) throw eLer;
+      const porDia = new Map<string, Array<{ ms: number; travada: boolean }>>();
+      for (const r of (existentes ?? []) as Array<{
+        agenda_id: string | null;
+        inicio: string;
+        status: string | null;
+        fluxo_etapa: string | null;
+      }>) {
+        const key = `${r.agenda_id ?? ""}|${toLocalDate(r.inicio)}`;
+        const arr = porDia.get(key) ?? [];
+        arr.push({
+          ms: new Date(r.inicio).getTime(),
+          travada:
+            r.status === "realizado" ||
+            (!!r.fluxo_etapa && r.fluxo_etapa !== "aguardando_recepcao"),
+        });
+        porDia.set(key, arr);
+      }
+      const procedimento = med.procedimento_padrao_nome || med.especialidade_nome || null;
+      const rows: Array<Record<string, unknown>> = [];
+      const semAgenda: string[] = [];
+      const naRecepcao: string[] = [];
+      let naoCouberam = 0;
+      const ini = new Date(`${gerar.data_inicio}T00:00:00`);
+      const fimD = new Date(`${gerar.data_fim}T00:00:00`);
+      for (let d = new Date(ini); d <= fimD; d.setDate(d.getDate() + 1)) {
+        if (isFeriadoOuDomingo(d, liberarFeriados) || !gerarDias.includes(d.getDay())) continue;
+        const diaIso = fmtDateLocal.format(d);
+        for (const ag of agendasAlvo) {
+          const regras = disps.filter(
+            (x) =>
+              x.medico_id === med.id &&
+              x.agenda_id === ag.id &&
+              x.dia_semana === d.getDay() &&
+              (!x.vigencia_inicio || x.vigencia_inicio <= diaIso) &&
+              (!x.vigencia_fim || x.vigencia_fim >= diaIso),
+          );
+          if (regras.length === 0) continue;
+          const fimTurno = regras.reduce(
+            (acc, x) => (hhmm(x.hora_fim) > acc ? hhmm(x.hora_fim) : acc),
+            "",
+          );
+          const r = posicoesFichasExtras({
+            diaIso,
+            fimTurno,
+            linhas: porDia.get(`${ag.id}|${diaIso}`) ?? [],
+            quantidade: qtd,
+          });
+          if (!r.ok) {
+            if (r.motivo === "paciente_na_recepcao") naRecepcao.push(dataBR(diaIso));
+            else if (r.motivo === "dia_sem_fichas") semAgenda.push(dataBR(diaIso));
+            else naoCouberam += qtd;
+            continue;
+          }
+          naoCouberam += r.naoCouberam;
+          for (const f of r.fichas) {
+            rows.push({
+              clinica_id: clinicaAtual.clinica_id,
+              medico_id: med.id,
+              agenda_id: ag.id,
+              paciente_nome: "DISPONÍVEL",
+              inicio: f.inicio.toISOString(),
+              fim: f.fim.toISOString(),
+              status: "agendado",
+              observacoes: "Slot gerado automaticamente",
+              ...(procedimento ? { procedimento } : {}),
+            });
+          }
+        }
+      }
+      const avisos = [
+        semAgenda.length > 0
+          ? `Sem agenda gerada (gere primeiro com "Gerar Horários na Agenda"): ${[...new Set(semAgenda)].join(", ")}.`
+          : "",
+        naRecepcao.length > 0
+          ? `Não mexido — tem paciente marcado depois do fim do turno que já passou pela recepção: ${[...new Set(naRecepcao)].join(", ")}.`
+          : "",
+        naoCouberam > 0 ? `${naoCouberam} ficha(s) não couberam antes do fim do turno.` : "",
+      ].filter(Boolean);
+      if (rows.length === 0) {
+        toast.error(avisos.join(" ") || "Nenhuma ficha a acrescentar.", { duration: 10000 });
+        return;
+      }
+      const dias = new Set(rows.map((r) => toLocalDate(r.inicio as string))).size;
+      const ok = await confirmDialog({
+        title: "Adicionar mais fichas",
+        confirmText: "Adicionar fichas",
+        description:
+          `Acrescentar ${rows.length} ficha(s) para ${med.nome} em ${dias} dia(s)?\n\n` +
+          `Elas entram no último horário do turno, depois das fichas que já existem. O horário do médico e o número das fichas atuais não mudam.` +
+          (avisos.length > 0 ? `\n\n${avisos.join("\n")}` : ""),
+      });
+      if (!ok) return;
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .insert(rows.slice(i, i + 500) as never);
+        if (error) throw error;
+      }
+      toast.success(`${rows.length} ficha(s) a mais criada(s).`);
+      setMaisFichasAberto(false);
+      setMaisFichasQtd("");
       setPisoTick((t) => t + 1);
     } catch (e: any) {
       mostrarErro(e);
@@ -2387,6 +2546,52 @@ function Page() {
                   {gerando ? "Gerando..." : "Gerar Horários na Agenda"}
                 </Button>
               )}
+              {podeGerirHorarios && !modoFila && gerar.medico_id && gerar.medico_id !== "all" && (
+                <Button
+                  variant="outline"
+                  className="w-full sm:ml-2 sm:w-auto"
+                  onClick={() => setMaisFichasAberto(true)}
+                  disabled={gerando}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar mais fichas
+                </Button>
+              )}
+              <Dialog open={maisFichasAberto} onOpenChange={setMaisFichasAberto}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar mais fichas</DialogTitle>
+                    <DialogDescription>
+                      Quantas fichas a mais em cada dia do período? Elas entram no último horário do
+                      turno, depois das que já existem — o horário do médico e o número das fichas
+                      atuais não mudam.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-1">
+                    <Label htmlFor="mais-fichas-qtd">Fichas a mais por dia</Label>
+                    <Input
+                      id="mais-fichas-qtd"
+                      type="number"
+                      min={1}
+                      placeholder="ex.: 20"
+                      value={maisFichasQtd}
+                      onChange={(e) => setMaisFichasQtd(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void adicionarMaisFichas();
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setMaisFichasAberto(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={() => void adicionarMaisFichas()} disabled={gerando}>
+                      {gerando ? "Adicionando..." : "Adicionar"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               <p className="text-xs text-muted-foreground">
                 {modoFila ? (
                   "As fichas novas entram depois da última ficha do dia, mantendo a numeração das já existentes."
