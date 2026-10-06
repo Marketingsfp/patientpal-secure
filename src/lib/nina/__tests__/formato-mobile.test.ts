@@ -50,3 +50,21 @@ it("mantém protocolo e organização dos avisos de encaminhamento", () => {
   expect(texto).toContain("\n\nProtocolo do atendimento: MJ-123");
   expect(formatarMensagemNina(texto)).toBe(texto);
 });
+
+it("converte negrito Markdown sem alterar fatos, itálico, listas e trechos literais", () => {
+  const entrada = "**Dr. João**\n**A** e **Hemograma completo**\n**Pix/cartão: R$ 145,00**\n*Já correto* e _itálico_\n* item\n2 * 3\n**sem fechamento\n`**literal**`\n```**código**```\nhttps://exemplo.com/**arquivo**";
+  const esperado = "*Dr. João*\n*A* e *Hemograma completo*\n*Pix/cartão: R$ 145,00*\n*Já correto* e _itálico_\n* item\n2 * 3\n**sem fechamento\n`**literal**`\n```**código**```\nhttps://exemplo.com/**arquivo**";
+  expect(formatarMensagemNina(entrada)).toBe(esperado);
+  expect(formatarMensagemNina(esperado)).toBe(esperado);
+});
+
+it.each(["whatsapp", "test-console"] as const)("negrito é corrigido antes do hash em %s", async canal => {
+  limparFinalizacoes();
+  const texto = "**Hemograma completo**\nDinheiro: **R$ 15,00**";
+  const pedido = { clinicaId: "negrito-test", canal, chaveTurno: `negrito-${canal}`, resultado: criarResultado({ origem: "modelo", texto }) };
+  const [a, b] = await Promise.all([finalizarResposta(pedido), finalizarResposta(pedido)]);
+  expect(a.texto).toBe("*Hemograma completo*\nDinheiro: *R$ 15,00*");
+  expect(a.textoOriginal).toBe(texto);
+  expect(a.textoHash).toBe(hashDoTexto(a.texto));
+  expect(b.texto).toBe(a.texto);
+});
