@@ -24,7 +24,7 @@ import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
-import { mostrarErro } from "@/lib/traduzir-erro";
+import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import {
   agruparPagamentosPorAtendimento,
   LABEL_MODALIDADE,
@@ -102,7 +102,7 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const [agendTodas, pagamentos, mapaConvenio] = await Promise.all([
+      const [agendTodas, mapaConvenio] = await Promise.all([
         // Vagas livres da grade ("DISPONIVEL") não são agendamentos — mesma
         // regra do Dashboard Operacional.
         buscarPorDia<any>(ini, fim, (de, ate) =>
@@ -116,30 +116,23 @@ const CUBOS: CubeSpec[] = [
             .order("inicio", { ascending: true })
             .order("id"),
         ),
-        // Modalidade e forma de pagamento vêm do lançamento de receita
-        // confirmado do atendimento, pela mesma regra do Rateio da Receita —
-        // a marcação "Particular/Convênio" da agenda não serve para separar o
-        // Cartão (ver `@/lib/relatorios/modalidade-atendimento`). O recorte é
-        // pela data do ATENDIMENTO, não do lançamento, para casar com as linhas
-        // acima mesmo quando o pagamento foi feito em outro dia. Não traz valor.
-        buscarPorDia<any>(ini, fim, (de, ate) =>
-          supabase
-            .from("fin_lancamentos")
-            .select(
-              "id, agendamento_id, forma_pagamento, convenio_modalidade, descricao, paciente_id, agendamentos!inner(inicio)",
-            )
-            .eq("clinica_id", clinicaId)
-            .eq("tipo", "receita")
-            .eq("status", "confirmado")
-            .gte("agendamentos.inicio", de)
-            .lt("agendamentos.inicio", ate)
-            .order("id", { ascending: true }),
-        ),
         // Contrato ativo de cada paciente: 2ª regra da modalidade, a mesma que
         // o Rateio usa quando o lançamento não tem a marca do cartão.
         carregarMapaConvenioPacientes(clinicaId),
       ]);
       const rows = agendTodas.filter((r) => !ehVagaLivre(r));
+      // Modalidade e forma de pagamento vêm do lançamento de receita
+      // confirmado do atendimento, pela mesma regra do Rateio da Receita —
+      // a marcação "Particular/Convênio" da agenda não serve para separar o
+      // Cartão (ver `@/lib/relatorios/modalidade-atendimento`). Busca pelos
+      // ids dos atendimentos acima (índice em agendamento_id), e não filtrando
+      // pela data da agenda dentro do lançamento: esse cruzamento varria os
+      // lançamentos da clínica a cada dia e estourava o tempo do servidor.
+      // Não traz valor.
+      const pagamentos = await pagamentosDosAtendimentos(
+        clinicaId,
+        rows.map((r) => r.id),
+      );
       const pagPorAtendimento = agruparPagamentosPorAtendimento(pagamentos);
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
         lookupNames(
@@ -425,6 +418,40 @@ async function lookupNames(
   return nomesPorId(table, ids);
 }
 
+// Receitas confirmadas dos atendimentos, em lotes de ids (cabem na URL) e em
+// ondas para não disparar dezenas de requisições juntas.
+async function pagamentosDosAtendimentos(
+  clinicaId: string,
+  agendamentoIds: string[],
+): Promise<any[]> {
+  const ids = Array.from(new Set(agendamentoIds.filter(Boolean)));
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) lotes.push(ids.slice(i, i + 150));
+  const out: any[] = [];
+  for (let i = 0; i < lotes.length; i += 6) {
+    const respostas = await Promise.all(
+      lotes
+        .slice(i, i + 6)
+        .map((lote) =>
+          buscarPaginado<any>(() =>
+            supabase
+              .from("fin_lancamentos")
+              .select(
+                "id, agendamento_id, forma_pagamento, convenio_modalidade, descricao, paciente_id",
+              )
+              .eq("clinica_id", clinicaId)
+              .eq("tipo", "receita")
+              .eq("status", "confirmado")
+              .in("agendamento_id", lote)
+              .order("id", { ascending: true }),
+          ),
+        ),
+    );
+    for (const r of respostas) out.push(...r);
+  }
+  return out;
+}
+
 async function lookupEspecialidadePorMedico(
   medicoIds: Array<string | null | undefined>,
 ): Promise<Map<string, string>> {
@@ -680,6 +707,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   const cube = useMemo(() => CUBOS.find((c) => c.id === cfg.cubeId)!, [cfg.cubeId]);
   const [rawRows, setRawRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedView[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Sort state for the result table. key: "__label__" (row label), "__total__" or one of colLabels
@@ -748,6 +776,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     if (!clinicaId) return;
     let cancel = false;
     setLoading(true);
+    setErroCarga(null);
     setRawRows([]);
     const loadRows =
       cube.id === "financeiro"
@@ -757,7 +786,12 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       .then((rows) => {
         if (!cancel) setRawRows(rows);
       })
-      .catch((e) => mostrarErro(e))
+      .catch((e) => {
+        if (cancel) return;
+        // Sem isto a falha aparecia como "Sem dados no período".
+        setErroCarga(traduzirErro(e));
+        mostrarErro(e);
+      })
       .finally(() => {
         if (!cancel) setLoading(false);
       });
@@ -1290,6 +1324,10 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <p className="text-sm text-muted-foreground py-8 text-center">Selecione uma clínica.</p>
           ) : loading ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Carregando…</p>
+          ) : erroCarga ? (
+            <p className="text-sm text-destructive py-8 text-center">
+              Não foi possível carregar os dados: {erroCarga}
+            </p>
           ) : piv.rowLabels.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Sem dados no período.</p>
           ) : cfg.viz === "tabela" ? (
