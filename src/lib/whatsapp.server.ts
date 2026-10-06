@@ -1495,6 +1495,8 @@ async function gerarRespostaNinaInterno(
   const contextoRespostaProfissional = { mensagem: mensagemPaciente, historico: contextoConsultaAgenda.historico };
   const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
   const itemConfirmadoNaResposta = confirmarItemDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
+  const { confirmarIdentificacoes } = await import("@/lib/nina/confirmacao-identificacao");
+  const identificacoesConfirmadas = confirmarIdentificacoes(conhecimentoAnterior, contextoRespostaProfissional);
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const { lerDicionarioDaMensagem } = await import("@/lib/nina/dicionario-leitura.server");
   const dicionarioDaMensagem = await lerDicionarioDaMensagem(clinicaId, mensagemPaciente);
@@ -1946,7 +1948,7 @@ async function gerarRespostaNinaInterno(
   const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO } =
     await import("@/lib/nina/catalogo-esclarecimento");
   const { criarPerguntasDoTurno, comporRespostaParcial, PESQUISAS_INDEPENDENTES, pendenciaBloqueiaFerramenta } = await import("@/lib/nina/perguntas-independentes");
-  const perguntasDoTurno = criarPerguntasDoTurno(conhecimentoAnterior, mensagemPaciente);
+  const perguntasDoTurno = criarPerguntasDoTurno(conhecimentoAnterior, mensagemPaciente, identificacoesConfirmadas);
   let respostaParcialConfirmada = false;
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
@@ -2261,28 +2263,37 @@ async function gerarRespostaNinaInterno(
     rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: "jev", urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
   }
-  // Um aceite de identificação reconsulta a fonte antes de devolver o controle ao modelo.
-  if (!finalizacaoHandoff && !turnoObsoleto && !ctxFerramentas?.esclarecimentoCatalogo &&
-    (itemConfirmadoNaResposta || profissionalConfirmadoNaResposta)) {
-    const argsOriginais = JSON.stringify(profissionalConfirmadoNaResposta ? {
+  // Cada aceite reconsulta seu próprio registro; nenhuma confirmação autoriza reserva.
+  const reconsultasIdentificacao = profissionalConfirmadoNaResposta ? [{
+    registro: profissionalConfirmadoNaResposta.registro,
+    args: {
       termo: profissionalConfirmadoNaResposta.termo, medico: profissionalConfirmadoNaResposta.registro,
       tipo_atendimento: "consulta", nova_solicitacao: false,
-    } : { termo: itemConfirmadoNaResposta!.nome, tipo_atendimento: conhecimentoAnterior?.consulta.tipo_atendimento,
-      nova_solicitacao: false });
+    },
+  }] : identificacoesConfirmadas.map(({ anterior, opcao }) => ({
+    registro: opcao.id,
+    args: { termo: opcao.nome, tipo_atendimento: anterior.consulta.tipo_atendimento,
+      ...(anterior.consulta.medico ? { medico: anterior.consulta.medico } : {}), nova_solicitacao: false },
+  }));
+  for (const [indice, confirmacao] of reconsultasIdentificacao.entries()) {
+    if (finalizacaoHandoff || houveHandoff || turnoObsoleto || perguntaComplementar) break;
     await conferirReserva();
-    const args = prepararPesquisaAtendimentoDaSessao("consultar_cadastro", argsOriginais, {
-      clinicaId, sessionId: fluxoEstado.session_id ?? null, conhecimento: conhecimentoAnterior,
-      ...contextoRespostaProfissional,
-    }) ?? argsOriginais;
-    const id = "reconsulta_identificacao_confirmada";
+    if (opcoes?.revisao?.valor) {
+      const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+      turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
+        revisaoProcessada: opcoes.revisao.valor });
+    }
+    if (turnoObsoleto) break;
+    const args = JSON.stringify(confirmacao.args);
+    const id = `reconsulta_identificacao_confirmada_${indice}`;
     mensagens.push({ role: "assistant", content: null, tool_calls: [{ id, type: "function",
       function: { name: "consultar_cadastro", arguments: args } }] });
     const r = await broker.executar("consultar_cadastro", args);
     const retorno = await compartilharResultado("consultar_cadastro", args, r);
     mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(retorno) });
     registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação confirmada e reconsultada",
-      dados: { registro: itemConfirmadoNaResposta?.id ?? profissionalConfirmadoNaResposta?.registro,
-        sucesso: r.success && !r.erro, permite_reservar: false } });
+      dados: { registro: confirmacao.registro, sucesso: r.success && !r.erro,
+        pendencias_restantes: perguntasDoTurno.pendentes.map(p => p.consulta.termo), permite_reservar: false } });
   }
   // JEV — Fase 6 (flag `nina_jev_fase6`): confere a resposta antes do envio.
   const inicioMensagensTurno = mensagens.length;

@@ -5,6 +5,7 @@ import type { ResultadoConhecimento } from "./knowledge-contract";
 import { sugerirResultadoJev } from "./identificacao-catalogo";
 import { confirmacaoDaEscolha } from "./agendamento-escolha";
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
+import type { ConfirmacaoIdentificacao } from "./confirmacao-identificacao";
 
 const normal = (v: unknown) =>
   typeof v === "string"
@@ -59,7 +60,8 @@ export function pendenciaBloqueiaFerramenta(nome: string, args: unknown,
 }
 
 /** Uma dúvida pertence à pergunta pesquisada, não ao conjunto da mensagem. */
-export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensagem = "") {
+export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensagem = "",
+  aceites: readonly ConfirmacaoIdentificacao[] = []) {
   const anteriores = anterior?.pendenciasIdentificacao?.length
     ? anterior.pendenciasIdentificacao
     : anterior
@@ -90,6 +92,10 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
     const correcaoExplicita = pesquisas.size === 0 && anteriores.length === 1 &&
       /^nao[,\s]+(?:e |quis dizer )/.test(normal(mensagem));
     if (p.nova_solicitacao === true && !correcaoExplicita) return null;
+    const aceitas = aceites.filter(a => normal(a.opcao.nome) === normal(q.termo) &&
+      normal(a.anterior.consulta.medico) === normal(q.medico) &&
+      (!p.tipo_atendimento || p.tipo_atendimento === a.anterior.consulta.tipo_atendimento));
+    if (aceitas.length === 1) return aceitas[0]!.anterior;
     const exata = anteriores.find((a) => chave(a.consulta) === chave(q));
     if (exata) return exata;
     const mesmoAtendimento = anteriores.filter((a) => normal(a.consulta.termo) === normal(q.termo));
@@ -130,6 +136,16 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
     reconciliar(args: unknown, resultado: ResultadoBroker): ResultadoBroker {
       if (!resultado.success || resultado.erro || !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")) return resultado;
       const p = parametrosPesquisa(args), k = grupo(p);
+      const origem = referencia(args), aceite = aceites.find(a => a.anterior === origem);
+      if (aceite) {
+        const dados = resultado.dados as ResultadoConhecimento | null;
+        if (dados?.knowledge_status === "found" && !dados.esclarecimento &&
+          !dados.records?.some(r => r.id === aceite.opcao.id)) {
+          return { ...resultado, dados: { ...dados, found: false, procedure: null, price: null, records: [],
+            esclarecimento: origem!.esclarecimento,
+            instrucao: "A releitura não recuperou o registro confirmado. Não substitua por outro exame nem informe seus fatos." } };
+        }
+      }
       const anteriorDoTurno = [...aliases.values()].includes(k) ? pendentes.get(k) : null;
       if (!anteriorDoTurno?.esclarecimento) return resultado;
       const dados = resultado.dados as ResultadoConhecimento | null;
@@ -141,10 +157,10 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       const nomes = [...new Map(esclarecimento.opcoes.map(o =>
         [normal(o.nome).replace(/[^a-z0-9]/g, ""), o.nome])).values()];
       const pedido = anteriorDoTurno.consulta.termo;
-      const referencia = anteriorDoTurno.consulta.tipo_atendimento === "exame_procedimento" ? "pedido médico" : "atendimento solicitado";
+      const referenciaPedido = anteriorDoTurno.consulta.tipo_atendimento === "exame_procedimento" ? "pedido médico" : "atendimento solicitado";
       const pergunta = nomes.length
-        ? `Para o pedido “${pedido}”, pode conferir qual nome corresponde ao ${referencia}?\n${nomes.join("\n")}`
-        : `Para o pedido “${pedido}”, pode conferir e escrever o nome completo do ${referencia}?`;
+        ? `Para o pedido “${pedido}”, pode conferir qual nome corresponde ao ${referenciaPedido}?\n${nomes.join("\n")}`
+        : `Para o pedido “${pedido}”, pode conferir e escrever o nome completo do ${referenciaPedido}?`;
       return { ...resultado, dados: { ...hipotese, procedure: null, price: null,
         esclarecimento: { ...esclarecimento, pergunta },
         instrucao: "Reformulação do mesmo pedido, ainda sem correspondência confirmada. Esta pergunta substitui as anteriores deste pedido. Não informe preço nem presuma equivalência clínica." } };
@@ -156,6 +172,9 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       confirmado: boolean,
     ) {
       const p = parametrosPesquisa(args), q = consulta(p), id = chave(q), k = grupo(p);
+      const aceite = aceites.find(a => a.anterior === origem);
+      // Falha técnica não resolve a pendência nem reaproveita fatos do turno anterior.
+      if (aceite && !atual?.esclarecimento && (!confirmado || !atual?.referencias.some(r => r.registro === aceite.opcao.id))) return;
       const anteriorDoTurno = pendentes.get(k);
       aliases.set(id, k);
       consultas.set(id, q);

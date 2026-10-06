@@ -1,7 +1,7 @@
 /** Núcleo real; apenas banco, modelo e catálogo externos são simulados. */
 import { mock } from "bun:test";
 if (!process.argv[3]?.startsWith("fonte_")) mock.module("../../fonte-consulta-config.server", () => ({
-  lerSelecaoFonte: async () => ({ fonte: process.argv[3]?.startsWith("catalogo_continuidade_") ? "base_conhecimento" : "clinica_os", revisao: null }),
+  lerSelecaoFonte: async () => ({ fonte: (process.argv[3]?.startsWith("catalogo_continuidade_") || (process.argv[3]?.startsWith("catalogo_confirmacao_plural") && !process.argv[3]?.endsWith("clinica_os"))) ? "base_conhecimento" : "clinica_os", revisao: null }),
 }));
 import { textoDaChave } from "../../resposta/templates";
 import { CONTINUIDADE_CONSULTA_AGENDA } from "../../prompt/consulta-agenda";
@@ -63,7 +63,8 @@ const continuidadeCatalogo = cenario.startsWith("catalogo_continuidade_");
 const nomeRenal = "ULTRASSONOGRAFIA DE RINS E VIAS URINARIAS";
 const pedidoDensitometria = "densitometria óssea coluna lombar e colo de fêmur";
 const nomeDensitometria = "DENSITOMETRIA / DENSITOMETRIA DUO ENERGETICA";
-const perguntasMultiplas = cenario.startsWith("catalogo_multiplas_") || reformulacoes || continuidadeCatalogo;
+const confirmacaoPlural = cenario.startsWith("catalogo_confirmacao_plural");
+const perguntasMultiplas = confirmacaoPlural || cenario.startsWith("catalogo_multiplas_") || reformulacoes || continuidadeCatalogo;
 const reservaIndependente = cenario.startsWith("catalogo_multiplas_reserva");
 const transferenciaFicticia = cenario === "catalogo_multiplas_transferencia_ficticia";
 let estadoPerguntas: any = null;
@@ -159,7 +160,7 @@ const resumoEscolhido = ["escolha_pre", "escolha_ficha"].includes(cenario)
     { profissional: "Dr. Jorge Ribeiro", procedimento: "Consulta", data: "21/01/2030", horario: "10:20", unidade: "Clínica simulada" }).texto
   : "Confira: Consulta Cardiologia com Dr. Jorge Ribeiro, dia 21/01/2030, às 10:20. Você confirma?";
 const agenda = cenario !== "direta" && !regraCatalogo && !fonteCenario;
-const pergunta = continuidadeCatalogo ? "é a primeira, rins e vias urinarias, ele é adulto" : reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
+const pergunta = confirmacaoPlural ? (cenario.includes("parcial") ? "só o segundo. precisa de jejum?" : "isso os 2. precisa de jejum pra ressonancia? tenho pino na perna") : continuidadeCatalogo ? "é a primeira, rins e vias urinarias, ele é adulto" : reformulacoes ? `Quanto custa ${pedidoDensitometria} (duo energética)?` : perguntasMultiplas ? "O Dr. Adrian atende Urologia? E o Dr. Antonio atende Psiquiatria?" : unificado ? cenario.endsWith("primeiro") ? "Quero eletrcardiograma" : cenario.includes("confirmou") ? "isso" : cenario.endsWith("recusou") ? "não, é outro" : cenario.endsWith("mudou_assunto") ? "Agora quero outra consulta XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "exame ZYX"
   : cenario.endsWith("novo_pedido") ? "Agora quero outro exame XYZ" : clinicoGeral ? `Quero clínico geral com ${medicoClinico} na primeira data disponível.` : confirmacaoMedico ? process.argv[4] ?? "Isso" : escolhaMedico ? cenario.endsWith("resolvido") ? "Quero a Shirley" : "quero a Suellen" : interpretacao ? interpretacao.mensagem : esclarecer ? cenario.endsWith("primeiro") ? "Quero exame XYZ" : cenario.endsWith("resolvido") ? "Eletrocardiograma" : "Não sei explicar" : contextual ? contextual.pergunta : (sfp && cenario.endsWith("modelo")) || (ausente && cenario.includes("modelo")) ? "oi"
   : ausente ? cenario.endsWith("dado_pessoal") ? "Meu nome é João Silva"
     : cenario.endsWith("misto") ? "Qual o valor do eletrocardiograma e da consulta de pneumologia?"
@@ -242,6 +243,20 @@ if (unificado && !cenario.endsWith("primeiro")) estadoContextual.knowledge_conte
   referencias: [{ registro: "ecg", versao: null, procedimento: "Eletrocardiograma", medicoNome: null }],
   esclarecimento: { tipo: "procedimento", pergunta: perguntaEsclarecimento, opcoes: [{ id: "ecg", nome: "Eletrocardiograma" }] }, esclarecimentoTentativas: 1,
 };
+const itensPlural = [
+  { id: "rx", termo: "RX do torax PA e perfil", nome: "RX TORAX AP/PERFIL" },
+  { id: "rm", termo: "RM joelho esquerdo", nome: "RM DE JOELHO (CADA LADO)" },
+];
+if (confirmacaoPlural && !cenario.includes("nova_sessao")) {
+  const pendencias = itensPlural.map(i => ({ versao: 1 as const, clinicaId: "clinica-simulada", sessionId: "sessao-contextual",
+    consulta: { termo: i.termo, tipo_atendimento: "exame_procedimento" as const },
+    referencias: [{ registro: i.id, versao: null, procedimento: i.nome, medicoNome: null }],
+    esclarecimento: { tipo: "procedimento" as const, pergunta: "Você quis dizer " + i.nome + "? Pode confirmar ou escrever o nome novamente.",
+      opcoes: [{ id: i.id, nome: i.nome }] }, esclarecimentoTentativas: 1 }));
+  const { perguntas } = await import("../../perguntas-independentes");
+  estadoContextual.knowledge_context = { ...pendencias[0]!, pendenciasIdentificacao: pendencias,
+    esclarecimento: { tipo: "procedimento", pergunta: perguntas(pendencias), opcoes: [] } };
+}
 const registroMensagem = (body: string, indice: number, direction = "out", status = "sent") => ({
   id: `historico-${indice}`, conversa_id: "conversa-contextual", direction, body, status,
   created_at: new Date(agora - (20 - indice) * 60_000).toISOString(), is_teste: teste,
@@ -256,6 +271,7 @@ if (confirmacaoMedico) estadoContextual.knowledge_context = {
 };
 if (cenario === "foto_sessao_nova") estadoContextual.session_started_at = new Date(agora - 3 * 60_000).toISOString();
 const mensagensContextuais = perguntasMultiplas ? [
+  ...(confirmacaoPlural && estadoContextual.knowledge_context ? [registroMensagem(estadoContextual.knowledge_context.esclarecimento!.pergunta, 1)] : []),
   ...(cenario === "catalogo_multiplas_retomada" ? [registroMensagem(estadoContextual.knowledge_context!.esclarecimento!.pergunta, 1)] : []),
   { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
 ] : fotoCenario ? [
@@ -405,6 +421,19 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
     ordem.push(nome);
     argumentosFerramentas.push({ nome, args: typeof args === "string" ? JSON.parse(args) : args });
     ferramentas.push(nome);
+    if (confirmacaoPlural) {
+      estadoPerguntas = params.ctxPaciente.estado;
+      if (nome !== "consultar_cadastro") throw new Error("Confirmação não autoriza operação: " + nome);
+      const a = argumentosFerramentas.at(-1)!.args;
+      const item = itensPlural.find(i => i.nome === a.termo);
+      if (!item) throw new Error("Reconsulta perdeu o exame: " + a.termo);
+      const falha = cenario.includes("falha") && item.id === "rx";
+      const r = { ferramenta: nome, capacidade: "searchKnowledgeBase", fonte: "base_conhecimento", success: !falha,
+        ...(falha ? { erro: "TIMEOUT" } : {}), reused: false, appointment_confirmed: false,
+        dados: falha ? null : { ok: true, found: true, knowledge_status: "found", tipo_atendimento: "exame_procedimento",
+          records: [{ id: item.id, procedimento: item.nome, preco_dinheiro: item.id === "rx" ? 76 : 480, preparo: "Confirmar com a equipe" }] } };
+      resultados.push(r); return r;
+    }
     if (reservaIndependente && !params.ctxPaciente.estado.appointment.confirmation) {
       const estado = params.ctxPaciente.estado;
       selecionarVagaValidada(estado, "clinica-simulada", {
@@ -641,6 +670,8 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  if (confirmacaoPlural) return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-plural", nivel: "low", toolCalls: [],
+    conteudo: "A equipe deve verificar o preparo informado. Você relatou pino na perna." };
   if (duvidaCenario) return { ok: true, modelo: "modelo-simulado", execucaoId: "execucao-direta", nivel: "low", toolCalls: [],
     conteudo: cenario.endsWith("entendida") ? "Entendi seu pedido." : "Pode explicar de outra forma o que você precisa?" };
   if (progressoLongo) return {
