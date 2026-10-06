@@ -200,6 +200,7 @@ import {
   vaosEntreHorarios,
   vaoCobertoPelasFichas,
   vaosDaGrade,
+  temGradeNoDia,
   rotuloDoVao,
   type FaixaGrade,
 } from "@/lib/agenda/intervalos-grade";
@@ -4589,11 +4590,15 @@ function AgendaPage() {
       // A grade manda: é o horário combinado com o médico. Uma ficha gerada
       // por engano dentro do almoço (foi o caso das vagas que avançaram sobre
       // o meio-dia) encurtaria o intervalo se o cálculo saísse das fichas.
+      // Com grade valendo no dia, só os vãos dela contam — mesmo que não haja
+      // nenhum: antes, sem almoço na grade, o cálculo caía nas fichas e um
+      // encaixe às 19:00 de quem termina às 17:30 virava "INTERVALO 18:00–19:00".
+      // As fichas só servem de referência para quem não tem grade cadastrada.
       const grade = faixasDaGrade.get(`${ctx.medicoId}|${ctx.agendaId}`);
-      const daGrade = grade
-        ? vaosDaGrade(grade, ctx.diaIso, new Date(`${ctx.diaIso}T12:00:00`).getDay())
-        : [];
-      const vaos = (daGrade.length > 0 ? daGrade : vaosEntreHorarios(pedacos)).filter(
+      const dow = new Date(`${ctx.diaIso}T12:00:00`).getDay();
+      const comGrade = !!grade && temGradeNoDia(grade, ctx.diaIso, dow);
+      const daGrade = comGrade ? vaosDaGrade(grade!, ctx.diaIso, dow) : [];
+      const vaos = (comGrade ? daGrade : vaosEntreHorarios(pedacos)).filter(
         (v) => !vaoCobertoPelasFichas(v, pedacos),
       );
       if (vaos.length > 0) out.set(chave, vaos);

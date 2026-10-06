@@ -91,6 +91,15 @@ export function vaosDaGrade(
 }
 
 /**
+ * O médico tem grade cadastrada valendo nesse dia? Com grade, só os vãos DELA
+ * contam como intervalo: um buraco entre fichas que a grade não tem (ex.: um
+ * encaixe às 19:00 de quem termina às 17:30) não é parada do médico.
+ */
+export function temGradeNoDia(faixas: FaixaGrade[], diaIso: string, diaSemana: number): boolean {
+  return faixas.some((f) => f.dia_semana === diaSemana && vigenteEm(f, diaIso));
+}
+
+/**
  * O vão está todo preenchido pelas fichas do dia? Acontece quando a clínica
  * abre vagas avulsas no almoço de uma data específica sem mudar a grade —
  * aí naquele dia não existe almoço e a faixa não deve aparecer. Uma ficha

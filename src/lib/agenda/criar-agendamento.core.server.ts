@@ -234,6 +234,12 @@ export async function criarAgendamentoCore(
   // otimista no UPDATE, fechando a janela entre "validei que está livre" e
   // "gravei o agendamento".
   let slotPacienteNomeNaValidacao: string | null = null;
+  // Linha nova que cai numa vaga livre da grade: a vaga é OCUPADA (UPDATE),
+  // não fica ao lado. Antes a marcação vinda do site/API (sempre sem
+  // `editing_id`) era inserida como linha à parte, sem agenda — a vaga das
+  // 13:30 seguia "DISPONÍVEL" embaixo da paciente e a ficha dela formava uma
+  // fila própria (06/10/2026, Dr. Paulo Roberto).
+  let vagaOcupadaNaCriacao: { id: string; paciente_nome: string } | null = null;
   // A Nina converte exclusivamente a vaga escolhida e confirmada. Mesmo que
   // o intervalo não mude (edição de DISPONIVEL), revalida a ocupação e passa
   // a condição otimista para a RPC: outro atendimento não pode ser sobrescrito.
@@ -372,6 +378,9 @@ export async function criarAgendamentoCore(
       const sFim = new Date(s.fim).getTime();
       return sIni <= inicioMs && sFim >= fimMs;
     });
+    if (!editing_id && slotEscolhido) {
+      vagaOcupadaNaCriacao = { id: slotEscolhido.id, paciente_nome: slotEscolhido.paciente_nome };
+    }
     // ENCAIXE EM AGENDA DE HORA MARCADA (2026-09-09)
     // Sem vaga livre cobrindo o intervalo, isto era um bloqueio duro e a
     // recepção não conseguia colocar um paciente a mais em cima de uma ficha
@@ -537,7 +546,13 @@ export async function criarAgendamentoCore(
   }
 
   // ---------- 6. INSERT ou UPDATE do agendamento ----------
-  let novoId: string | null = editing_id;
+  // Vaga livre encontrada na validação vira o alvo do UPDATE, com a mesma
+  // trava otimista da edição (o nome "DISPONIVEL" tem que continuar lá).
+  const idParaGravar = editing_id ?? vagaOcupadaNaCriacao?.id ?? null;
+  const nomeEsperadoNoSlot = editing_id
+    ? slotPacienteNomeNaValidacao
+    : (vagaOcupadaNaCriacao?.paciente_nome ?? null);
+  let novoId: string | null = idParaGravar;
   let siblingIds: string[] = [];
   const conflitoDeSlot: CriarAgendamentoResult = {
     ok: false,
@@ -551,7 +566,7 @@ export async function criarAgendamentoCore(
       (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.() ??
       Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 10)).join("-");
     const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_multi_imagem", {
-      _editing_id: editing_id,
+      _editing_id: idParaGravar,
       _clinica_id: clinica_id,
       _paciente_id: payload.paciente_id,
       _paciente_nome: payload.paciente_nome,
@@ -567,7 +582,7 @@ export async function criarAgendamentoCore(
       _forma_pagamento_prevista: payload.forma_pagamento_prevista,
       _especialidade_id: payload.especialidade_id ?? null,
       _grupo_id: grupoId,
-      _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+      _paciente_nome_esperado_no_slot: nomeEsperadoNoSlot,
       _orcamento_item_ids: pending_orc_item_ids,
     } as never);
     if (error) {
@@ -587,7 +602,7 @@ export async function criarAgendamentoCore(
     const procedimentoFinal =
       multiModo === "laboratorio" ? procedimentos.join(" + ") : payload.procedimento;
     const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_e_vincular_orcamento", {
-      _editing_id: editing_id,
+      _editing_id: idParaGravar,
       _clinica_id: clinica_id,
       _paciente_id: payload.paciente_id,
       _paciente_nome: payload.paciente_nome,
@@ -603,7 +618,7 @@ export async function criarAgendamentoCore(
       _forma_pagamento_prevista: payload.forma_pagamento_prevista,
       _especialidade_id: payload.especialidade_id ?? null,
       _orcamento_item_ids: pending_orc_item_ids,
-      _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+      _paciente_nome_esperado_no_slot: nomeEsperadoNoSlot,
     } as never);
     if (error) {
       if ((error as { code?: string }).code === "23505") return conflitoDeSlot;
