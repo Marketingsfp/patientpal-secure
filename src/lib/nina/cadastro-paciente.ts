@@ -48,7 +48,7 @@ export const ROTULOS_CADASTRO: Record<CampoCadastro, string> = {
 export const REGRA_CADASTRO_AGENDAMENTO = "Após a escolha de uma vaga real, obtenha nome completo e data de nascimento da pessoa que será atendida; aproveite dados já informados. O telefone de contato usa por padrão o número do remetente, inclusive quando um responsável agenda para filha, filho ou outra pessoa. Apresente o campo apenas como Telefone. Não pergunte se deseja alterá-lo: se o paciente confirmar o resumo, siga normalmente. Somente quando o paciente pedir explicitamente, corrija o telefone no cadastro identificado; se faltar o novo número, peça apenas o telefone com DDD. Use identificar_paciente para efetivar a correção autorizada pelo sistema. Depois mostre o resumo atualizado e aguarde sua confirmação antes de agendar. O telefone corrigido não muda o destinatário das mensagens nem a identidade do paciente. Não peça telefone próprio do dependente nem use nome/nascimento do responsável como dados do paciente. Consulte ou cadastre no Clínica OS cruzando nome, nascimento e WhatsApp do remetente. Depois apresente a conferência do paciente e da consulta/exame. Só agende após o paciente aceitar esse resumo; só afirme sucesso depois da gravação confirmada.";
 
 export const EXEMPLOS_CADASTRO: Record<CampoCadastro, string> = {
-  nome: "João Neves",
-  data_nascimento: "21/10/1999",
-  telefone: "(21) 99999-0000",
+  nome: "Nome completo: Maria da Silva",
+  data_nascimento: "Data de nascimento: 21/10/1999",
+  telefone: "Telefone com DDD: (21) 99999-0000",
 };

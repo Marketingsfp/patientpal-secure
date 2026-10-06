@@ -501,7 +501,7 @@ export async function aplicarGateIdentificacao(params: {
       "fluxo.cadastro.obrigatorios",
       {
         lista: rotularFaltantes(faltando),
-        exemplo: faltando.map((campo) => EXEMPLOS_CADASTRO[campo]).join(" "),
+        exemplo: "\n" + faltando.map((campo) => EXEMPLOS_CADASTRO[campo]).join("\n"),
       },
       { camposPendentes: faltando, restricoes: ["nao_afirmar_agendamento_sem_gravacao"] },
     );
@@ -525,7 +525,7 @@ export async function aplicarGateIdentificacao(params: {
         "fluxo.cadastro.obrigatorios",
         {
           lista: rotularFaltantes(campos),
-          exemplo: campos.map((campo) => EXEMPLOS_CADASTRO[campo]).join(" "),
+          exemplo: "\n" + campos.map((campo) => EXEMPLOS_CADASTRO[campo]).join("\n"),
         },
         { camposPendentes: campos },
       );
