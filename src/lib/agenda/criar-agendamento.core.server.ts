@@ -296,6 +296,17 @@ export async function criarAgendamentoCore(
     // (duas fichas no mesmo horário com o mesmo médico). Com profissional
     // diferente vira aviso: a tela pergunta e, confirmando, reenvia com
     // `confirmacoes.permitir_conflito_paciente`.
+    //
+    // MESMO profissional (revisto em 2026-10-06). O bloqueio duro impedia a
+    // recepção de dar várias fichas ao mesmo paciente no dia quando as vagas
+    // livres eram as fichas extras do "+ Mais fichas" — elas nascem todas no
+    // último horário do turno, 1 segundo uma da outra, e portanto "cruzam" a
+    // ficha que o paciente já tem. Caso real: ADRIANA SOUZA DE PAULA MARTINS,
+    // 4 infiltrações com o Dr. Paulo Roberto em 06/10/2026; a 3ª e a 4ª foram
+    // parar em 07/10 e 08/10. Agora a tela pergunta se é OUTRO procedimento e,
+    // confirmando, reenvia com `permitir_conflito_mesmo_profissional`. Nina e
+    // API não têm como perguntar e não mandam esse flag: para elas o choque
+    // com o mesmo profissional continua bloqueado.
     const conflitos_ = (conflitos ?? []) as Array<{
       id: string;
       inicio: string;
@@ -309,14 +320,20 @@ export async function criarAgendamentoCore(
     if (conflito) {
       const quando = new Date(conflito.inicio).toLocaleString("pt-BR", { timeZone: TZ_CLINICA });
       if (mesmoProfissional) {
-        return {
-          ok: false,
-          validation_error: {
-            message: `Este paciente já tem outro agendamento nesse horário com o mesmo profissional (${quando}). Escolha outro horário ou cancele o conflito primeiro.`,
-          },
-        };
-      }
-      if (!data.confirmacoes?.permitir_conflito_paciente) {
+        if (!data.confirmacoes?.permitir_conflito_mesmo_profissional) {
+          return {
+            ok: false,
+            validation_error: {
+              message:
+                `Este paciente já tem uma ficha com este mesmo profissional nesse horário (${quando}).\n\n` +
+                `É OUTRO procedimento (por exemplo, mais uma infiltração ou outro exame)? ` +
+                `Confirmando, o paciente fica com mais uma ficha no mesmo dia.\n\n` +
+                `Se for a mesma marcação repetida, cancele e abra a ficha que já existe.`,
+              confirmavel: "conflito_mesmo_profissional",
+            },
+          };
+        }
+      } else if (!data.confirmacoes?.permitir_conflito_paciente) {
         return {
           ok: false,
           validation_error: {

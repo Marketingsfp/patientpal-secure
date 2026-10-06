@@ -46,7 +46,13 @@ export type CriarAgendamentoInput = {
   // livre na grade — quer sobrepor um paciente a mais em cima de uma ficha já
   // ocupada. O servidor devolve `confirmavel: "encaixe_sem_vaga"` e a tela
   // pergunta antes de repetir a gravação com o flag ligado.
-  confirmacoes?: { permitir_conflito_paciente?: boolean; permitir_encaixe_sem_vaga?: boolean };
+  // Mesmo paciente com OUTRA ficha do MESMO profissional no horário (2026-10-06):
+  // só a tela da recepção manda — Nina e API continuam bloqueadas.
+  confirmacoes?: {
+    permitir_conflito_paciente?: boolean;
+    permitir_conflito_mesmo_profissional?: boolean;
+    permitir_encaixe_sem_vaga?: boolean;
+  };
   // Agenda que a recepção está olhando na tela (filtro "Agenda"). Só é usada
   // para decidir em qual agenda entra um ENCAIXE que não cai em cima de
   // nenhuma ficha — por exemplo depois do fim da grade, num médico com duas
@@ -92,7 +98,7 @@ export type CriarAgendamentoResult =
       validation_error: {
         message: string;
         toast_duration?: number;
-        confirmavel?: "conflito_paciente" | "encaixe_sem_vaga";
+        confirmavel?: "conflito_paciente" | "conflito_mesmo_profissional" | "encaixe_sem_vaga";
       };
     }
   | {

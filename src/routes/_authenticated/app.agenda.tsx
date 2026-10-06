@@ -6688,6 +6688,7 @@ function AgendaPage() {
     })();
     const enviarAoServidor = (confirmacoes: {
       permitirConflitoPaciente: boolean;
+      permitirConflitoMesmoProfissional: boolean;
       permitirEncaixeSemVaga: boolean;
     }) =>
       fnCriarAgendamento({
@@ -6706,6 +6707,7 @@ function AgendaPage() {
           pending_orc_item_ids: pendingOrcItemIds,
           confirmacoes: {
             permitir_conflito_paciente: confirmacoes.permitirConflitoPaciente,
+            permitir_conflito_mesmo_profissional: confirmacoes.permitirConflitoMesmoProfissional,
             permitir_encaixe_sem_vaga: confirmacoes.permitirEncaixeSemVaga,
           },
           agenda_preferida_id: agendaPreferidaId,
@@ -6715,23 +6717,36 @@ function AgendaPage() {
     // repetições: quando o servidor devolve um segundo aviso, o "sim" que ela
     // já deu ao primeiro não pode ser perdido — senão a tela volta a perguntar
     // a mesma coisa em loop.
-    const confirmado = { permitirConflitoPaciente: false, permitirEncaixeSemVaga: false };
+    const confirmado = {
+      permitirConflitoPaciente: false,
+      permitirConflitoMesmoProfissional: false,
+      permitirEncaixeSemVaga: false,
+    };
     let result = await enviarAoServidor(confirmado);
     // O servidor devolve até dois avisos confirmáveis, um de cada vez:
     //   • conflito_paciente — o paciente já tem outro atendimento nesse
     //     horário, com OUTRO profissional;
+    //   • conflito_mesmo_profissional — o paciente já tem uma ficha com o
+    //     MESMO profissional nesse horário (ex.: várias infiltrações no dia,
+    //     nas fichas extras empilhadas no fim do turno);
     //   • encaixe_sem_vaga — não há vaga livre na grade e a recepção quer
     //     lançar por cima da ficha existente (encaixe).
     // Em ambos, pergunta e, se ela confirmar, grava do mesmo jeito.
     for (let tentativa = 0; tentativa < 2; tentativa++) {
       if (!result.ok && "validation_error" in result) {
         const aviso = result.validation_error.confirmavel;
-        if (aviso === "conflito_paciente" || aviso === "encaixe_sem_vaga") {
+        if (
+          aviso === "conflito_paciente" ||
+          aviso === "conflito_mesmo_profissional" ||
+          aviso === "encaixe_sem_vaga"
+        ) {
           if (!(await confirmDialog(result.validation_error.message))) {
             setSaving(false);
             return;
           }
           if (aviso === "conflito_paciente") confirmado.permitirConflitoPaciente = true;
+          else if (aviso === "conflito_mesmo_profissional")
+            confirmado.permitirConflitoMesmoProfissional = true;
           else confirmado.permitirEncaixeSemVaga = true;
           result = await enviarAoServidor(confirmado);
           continue;
