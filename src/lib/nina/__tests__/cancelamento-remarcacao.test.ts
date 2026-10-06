@@ -85,3 +85,37 @@ for (const ambiente of ["producao", "homologacao"]) {
     expect(r.encaminhamentos[0].motivo).toContain("CANCELAMENTO_SOLICITADO");
   });
 }
+
+// Regra de 06/10/2026: dois ou mais atendimentos na mesma mensagem vão para a equipe.
+for (const ambiente of ["producao", "homologacao"]) {
+  test.each([
+    ["multiplos", "quanto custa hemograma e TSH?"],
+    ["multiplos", "quero marcar cardiologista e dermatologista"],
+    // Foto: a lista lida pelo sistema decide mesmo sem o Jev.
+    ["foto_fallback", "Enviei a foto de um pedido médico com: HEMOGRAMA COMPLETO; TSH; GLICOSE."],
+  ])(`${ambiente}: %s (%s) encaminha antes de catálogo e agenda`, (caso, mensagem) => {
+    const r = simular(ambiente, caso, mensagem);
+    expect(r.encaminhamentos).toHaveLength(1);
+    expect(r.encaminhamentos[0].motivo).toStartWith("MULTIPLOS_ATENDIMENTOS");
+    expect(r.encaminhamentos[0].resumo).toContain("Pedido com dois ou mais atendimentos");
+    if (caso === "foto_fallback") expect(r.encaminhamentos[0].motivo).toContain("3 exames");
+    expect(r.ferramentas).toEqual(["solicitar_atendente_humano"]);
+    expect(r.requests).toHaveLength(0);
+    if (ambiente === "homologacao") expect(r.resposta).toContain("simulação");
+  });
+  test.each([
+    ["nova_fallback", "Enviei a foto de um pedido médico com: HEMOGRAMA COMPLETO."],
+    ["multiplos_incerto", "quanto custa hemograma e TSH?"],
+    ["nova", "quero marcar cardiologista"],
+  ])(`${ambiente}: %s (%s) segue com a Nina`, (caso, mensagem) => {
+    const r = simular(ambiente, caso, mensagem);
+    expect(r.encaminhamentos).toHaveLength(0);
+    expect(r.requests).toHaveLength(1);
+  });
+  test(`${ambiente}: cancelamento junto de outro pedido mantém o motivo de cancelamento`, () => {
+    const r = simular(ambiente, "semantica_multiplos", "aquela reserva vai ter que ficar pra semana que vem");
+    expect(r.encaminhamentos).toHaveLength(1);
+    expect(r.encaminhamentos[0].motivo).toContain("REMARCACAO_SOLICITADA");
+    expect(r.encaminhamentos[0].setor).toBe("Agendamento");
+  });
+}

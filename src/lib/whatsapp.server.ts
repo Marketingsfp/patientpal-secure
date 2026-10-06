@@ -1110,6 +1110,12 @@ async function gerarRespostaNinaInterno(
     REGRA_CANCELAMENTO_REMARCACAO } = await import("@/lib/nina/cancelamento-remarcacao");
   const reservaAtualParaAlteracao = (await import("@/lib/nina/agendamento-sessao")).reservaDaSessaoAtual(sessaoNina.estado);
   let alteracaoSolicitada = alteracaoExplicita(mensagemPaciente, reservaAtualParaAlteracao);
+  // Dois ou mais atendimentos na mesma mensagem vão para a equipe (regra de 06/10/2026).
+  // A foto do pedido médico já chega como lista lida pelo sistema; texto livre é lido pelo Jev.
+  const { perguntaMultiplosAtendimentos, multiplosPeloJev, itensDoPedidoLido, motivoMultiplos } =
+    await import("@/lib/nina/multiplos-atendimentos");
+  const itensPedidoFoto = itensDoPedidoLido(mensagemPaciente);
+  let multiplosAtendimentos = itensPedidoFoto.length >= 2;
   const perguntaNomeAnterior = perguntaNomeEntregue(msgsMemoria, { conversaId: estadoId.conversaId,
     inicioSessao: sessaoNina.estado.session_started_at ?? null, teste: opcoes?.teste === true,
     entradas: opcoes?.mensagensEntrada ?? [] });
@@ -1131,6 +1137,7 @@ async function gerarRespostaNinaInterno(
         ...perguntaIntencao(),
         ...perguntaNomeAtendimento(),
         ...perguntaAlteracaoAgendamento(),
+        ...perguntaMultiplosAtendimentos(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
       };
       const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
@@ -1150,6 +1157,7 @@ async function gerarRespostaNinaInterno(
       const respostas = resultado.ok ? resultado.respostas : null;
       nomeAtendimentoAusente = semNomePeloJev(respostas?.nome_atendimento);
       alteracaoSolicitada = alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
+      multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
       if (escolhida) {
         intencoesTurno = [escolhida];
@@ -1236,6 +1244,17 @@ async function gerarRespostaNinaInterno(
     nomeAtendimentoAusente = false;
     registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Cancelamento e remarcação exclusivos da equipe",
       dados: { pedido: alteracaoSolicitada, motivo, mensagens_entrada: opcoes?.mensagensEntrada ?? [] } });
+  } else if (multiplosAtendimentos) {
+    // Mesma precedência administrativa: antes de catálogo, agenda e cadastro.
+    const motivo = motivoMultiplos(itensPedidoFoto);
+    jevEncaminhamento = jevEncaminhamento?.urgencia === "alta"
+      ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${motivo}` }
+      : { motivo, urgencia: "normal" };
+    nomeAtendimentoAusente = false;
+    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Dois ou mais atendimentos na mesma mensagem: equipe",
+      dados: { origem: itensPedidoFoto.length >= 2 ? "pedido_medico_foto" : "jev", itens_foto: itensPedidoFoto,
+        motivo, mensagens_entrada: opcoes?.mensagensEntrada ?? [] },
+      codigo: { arquivo: "src/lib/nina/multiplos-atendimentos.ts", funcao: "multiplosPeloJev" } });
   }
   if (nomeAtendimentoAusente && !jevEncaminhamento) {
     if (perguntaNomeAnterior) jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
@@ -2318,10 +2337,11 @@ async function gerarRespostaNinaInterno(
       if (turnoObsoleto) return;
     }
     const semNome = decisao.motivo === MOTIVO_NOME_NAO_INFORMADO;
+    const multiplos = !alteracaoSolicitada && multiplosAtendimentos;
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
       motivo: decisao.motivo,
-      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : multiplos ? "Pedido com dois ou mais atendimentos" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
       urgencia: decisao.urgencia,
       ...(alteracaoSolicitada ? { setor: "Agendamento" } : {}),
     };
@@ -2337,14 +2357,14 @@ async function gerarRespostaNinaInterno(
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
     };
-    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: alteracaoSolicitada ? "Encaminhamento: cancelamento/remarcação solicitado" : semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
+    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: alteracaoSolicitada ? "Encaminhamento: cancelamento/remarcação solicitado" : multiplos ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem" : semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo, urgencia: argumentos.urgencia, pontuacoes: jevPontuacoes,
         pergunta_nome_entregue: semNome ? perguntaNomeAnterior : null,
         handoff_confirmado: confirmado, erro: rh.erro ?? null,
       },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "executarDecisaoEncaminhamento" } });
-    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: alteracaoSolicitada ? "regra_cancelamento_remarcacao" : semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
+    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: alteracaoSolicitada ? "regra_cancelamento_remarcacao" : multiplos ? "regra_multiplos_atendimentos" : semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
   }
   if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);

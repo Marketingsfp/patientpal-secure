@@ -34,6 +34,7 @@ if (alteracaoCenario) mock.module("@/lib/nina/jev.server", () => ({
   jevAtivo: async (_c: string, fase: string) => !cenario.includes("fallback") && fase === "fase2_encaminhamento",
   perguntarJev: async () => ({ ok: true, respostas: {
     alteracao_agendamento: { choice: cenario.includes("semantica") ? "remarcacao" : "nenhum", confidence: 0.97 },
+    multiplos_atendimentos: { choice: cenario.includes("multiplos") ? "varios" : "um", confidence: cenario.includes("incerto") ? 0.6 : 0.95 },
     entendimento: { noul: 0.99 }, urgencia: { noul: cenario.endsWith("urgencia") ? 0.99 : 0.01 },
   } }),
   contagemAnteriorFase1: async () => null,
