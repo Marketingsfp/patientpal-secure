@@ -15,7 +15,8 @@ export function totaisAproximadosNaoOptante(args: {
   pctFederais: number | null | undefined;
 }) {
   const pct = args.pctFederais != null ? Number(args.pctFederais) : 0;
-  const federais = Number.isFinite(pct) && pct > 0 ? +((args.valorServicos * pct) / 100).toFixed(2) : 0;
+  const federais =
+    Number.isFinite(pct) && pct > 0 ? +((args.valorServicos * pct) / 100).toFixed(2) : 0;
   return {
     valor_total_tributos_federais: federais,
     valor_total_tributos_estaduais: 0,
