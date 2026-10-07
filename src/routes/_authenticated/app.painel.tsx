@@ -41,6 +41,8 @@ import {
 } from "@/components/painel/medicos-periodo";
 import { formatDatePura } from "@/lib/date-utils";
 import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
+import { separarPorCartao, type CartaoDia } from "@/lib/painel/cards-do-dia";
+import { DetalheCartaoDia } from "@/components/painel/detalhe-cartao-dia";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -242,25 +244,29 @@ function DashboardOperacional() {
   );
 
   const d = q.data;
-  const k = useMemo(() => {
-    const ags = d?.ags ?? [];
-    const naFila = ags.filter((a) =>
-      ["recepcao", "caixa", "triagem"].includes(a.fluxo_etapa ?? ""),
-    );
-    const emAtend = ags.filter((a) => ["atendimento", "exame"].includes(a.fluxo_etapa ?? ""));
-    const checkins = ags.filter((a) => a.fluxo_etapa && a.fluxo_etapa !== "aguardando_recepcao");
-    return {
-      agendados: ags.length,
-      checkins: checkins.length,
-      naFila: naFila.length,
-      emAtend: emAtend.length,
-      concluidos: ags.filter((a) => a.status === "realizado" || a.fluxo_etapa === "finalizado")
-        .length,
-      faltas: ags.filter((a) => a.status === "faltou").length,
-      aguardando: ags.filter((a) => !a.fluxo_etapa || a.fluxo_etapa === "aguardando_recepcao")
-        .length,
-    };
-  }, [d]);
+  // Número do cartão e lista que abre ao clicar saem da mesma separação.
+  const porCartao = useMemo(() => separarPorCartao(d?.ags ?? []), [d]);
+  const k = useMemo(
+    () => ({
+      agendados: porCartao.agendados.length,
+      checkins: porCartao.checkins.length,
+      naFila: porCartao.naFila.length,
+      emAtend: porCartao.emAtend.length,
+      concluidos: porCartao.concluidos.length,
+      faltas: porCartao.agendados.filter((a) => a.status === "faltou").length,
+      aguardando: porCartao.aguardando.length,
+    }),
+    [porCartao],
+  );
+
+  const [cartaoAberto, setCartaoAberto] = useState<CartaoDia | null>(null);
+  const medicoNome = useMemo(() => new Map((d?.medicos ?? []).map((m) => [m.id, m.nome])), [d]);
+  // Contagem por atendente é ferramenta de supervisão: mesma regra de
+  // Relatórios → Marcações por atendente (`pode_autorizar` + admin/gestor).
+  // A função do banco repete a checagem.
+  const ehSupervisor =
+    !!clinicaAtual?.pode_autorizar &&
+    (clinicaAtual.role === "admin" || clinicaAtual.role === "gestor");
 
   const proximos = useMemo(() => {
     const agora = Date.now();
@@ -406,31 +412,70 @@ function DashboardOperacional() {
           </div>
         ) : (
           <HhpKpiRow className="grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
-            <HhpKpiCard label="Agendados hoje" value={k.agendados} icon={Users} tone="info" />
+            <HhpKpiCard
+              label="Agendados hoje"
+              value={k.agendados}
+              icon={Users}
+              tone="info"
+              hint={
+                ehSupervisor
+                  ? "Clique para ver quantos cada atendente marcou"
+                  : "Clique para ver a lista"
+              }
+              onClick={() => setCartaoAberto("agendados")}
+            />
             <HhpKpiCard
               label="Check-ins feitos"
               value={k.checkins}
               icon={UserCheck}
               tone="ok"
-              hint="Pacientes que já chegaram"
+              hint="Pacientes que já chegaram — clique para ver a lista"
+              onClick={() => setCartaoAberto("checkins")}
             />
             <HhpKpiCard
               label="Aguardando chegada"
               value={k.aguardando}
               icon={Clock}
               tone="default"
+              hint="Clique para ver a lista"
+              onClick={() => setCartaoAberto("aguardando")}
             />
             <HhpKpiCard
               label="Na fila"
               value={k.naFila}
               icon={ListChecks}
               tone="warn"
-              hint="Recepção, caixa e triagem"
+              hint="Recepção, caixa e triagem — clique para ver a lista"
+              onClick={() => setCartaoAberto("naFila")}
             />
-            <HhpKpiCard label="Em atendimento" value={k.emAtend} icon={Activity} tone="info" />
-            <HhpKpiCard label="Concluídos" value={k.concluidos} icon={CheckCircle2} tone="ok" />
+            <HhpKpiCard
+              label="Em atendimento"
+              value={k.emAtend}
+              icon={Activity}
+              tone="info"
+              hint="Clique para ver a lista"
+              onClick={() => setCartaoAberto("emAtend")}
+            />
+            <HhpKpiCard
+              label="Concluídos"
+              value={k.concluidos}
+              icon={CheckCircle2}
+              tone="ok"
+              hint="Clique para ver a lista"
+              onClick={() => setCartaoAberto("concluidos")}
+            />
           </HhpKpiRow>
         )}
+
+        <DetalheCartaoDia
+          cartao={cartaoAberto}
+          onClose={() => setCartaoAberto(null)}
+          fichas={cartaoAberto ? porCartao[cartaoAberto] : []}
+          medicoNome={medicoNome}
+          dia={dia}
+          clinicaIds={ids}
+          ehSupervisor={ehSupervisor}
+        />
 
         <InformacoesRapidasCard className="w-full mb-6" />
 
