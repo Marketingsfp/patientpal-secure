@@ -62,3 +62,11 @@ it("Jev recebe o texto lido na foto no histórico, não a marcação Imagem", ()
   const h = montarHistoricoJev([{ id: "f", direction: "in", tipo: "image", body: "Imagem", transcricao: "Pedido de ECG", created_at: "2026-10-04T12:00:00Z" }]);
   expect(JSON.stringify(h)).toContain("Pedido de ECG");
 });
+
+test("falha técnica persistente vai para a equipe em vez de pedir reenvio sem fim", () => {
+  const t = (id: string, s: number, motivo: string) => ({ id, direction: "in", tipo: "image", created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, s)).toISOString(), raw: { nina_leitura_imagem: { tipo: "falha_tecnica", motivo } } }) as MensagemFoto;
+  const aviso = { id: "a", direction: "out", enviada_por: "nina", status: "delivered", body: FALHA_TECNICA_FOTO, created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, 10)).toISOString() } as MensagemFoto;
+  expect(decidirFotos([t("1", 5, "provedor")], []).acao).toBe("falha_tecnica");
+  expect(decidirFotos([t("2", 20, "provedor")], [aviso]).acao).toBe("encaminhar");
+  expect(decidirFotos([t("3", 5, "limite_itens")], []).acao).toBe("encaminhar");
+});
