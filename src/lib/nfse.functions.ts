@@ -10,6 +10,8 @@ import {
   totaisAproximadosNaoOptante,
   totaisAproximadosSimples,
 } from "@/lib/nfse-tributos-aproximados";
+import { codigoServicoDaNota } from "@/lib/nfse-classificacao-servico";
+import { ibsCbsDaNota, pisCofinsDaNota } from "@/lib/nfse-tributos-federais";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -396,12 +398,29 @@ export const emitirNfse = createServerFn({ method: "POST" })
       return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
     })();
 
-    const itemListaServico = only(data.itemListaOverride ?? emitente.item_lista_servico);
+    // NFS-e Nacional: código e NBS pelo tipo de serviço da descrição, como o
+    // portal (ver `nfse-classificacao-servico.ts`). Fora dele, código do cadastro.
+    const servicoNota = emitente.usar_ambiente_nacional
+      ? codigoServicoDaNota({
+          descricao: data.descricaoServicos,
+          codigoForcado: data.itemListaOverride,
+          codigoEmitente: emitente.item_lista_servico,
+          nbsEmitente: emitente.codigo_nbs,
+        })
+      : {
+          codigo: only(data.itemListaOverride ?? emitente.item_lista_servico),
+          nbs: null,
+          codigoMunicipalValido: true,
+        };
+    const itemListaServico = servicoNota.codigo;
+    const codigoNbs = servicoNota.nbs;
     if (!itemListaServico)
       throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
-    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
-      emitente.codigo_tributario_municipio,
-    );
+    // O código municipal do cadastro corresponde ao código do cadastro; com
+    // outro código nacional ele não vale e não é enviado.
+    const codigoTributarioMunicipio = servicoNota.codigoMunicipalValido
+      ? normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio)
+      : undefined;
 
     const imRaw = only(emitente.inscricao_municipal ?? "");
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
@@ -532,6 +551,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       ...(codigoTributarioMunicipio
         ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
         : {}),
+      ...(codigoNbs ? { codigo_nbs: codigoNbs } : {}),
       descricao_servico: data.descricaoServicos,
       valor_servico: data.valorServicos,
       tributacao_iss: 1,
@@ -539,9 +559,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // tpSusp, BM, cPaisResult). Como tribISSQN=1 (tributável), enviamos
       // tipo_retencao_iss=1 (Não Retido).
       tipo_retencao_iss: 1,
-      // <tribFed> exige PIS/COFINS. Para Simples Nacional usamos CST=08
-      // (Operação sem Incidência).
-      situacao_tributaria_pis_cofins: "08",
+      // <tribFed> exige PIS/COFINS. Simples: CST 08 (sem incidência). Não
+      // optante com alíquotas no cadastro: CST e valores, como o portal.
+      ...pisCofinsDaNota(emitente, data.valorServicos),
+      ...ibsCbsDaNota(emitente, cpfCnpjTomador),
       // <totTrib>: ME/EPP optante do SN -> pTotTribSN (E0712 proíbe indTotTrib);
       // com ISS fora do Simples, pTotTrib por esfera, igual ao portal nacional.
       // Para Não Optante (cod=1): pTotTrib por esfera, como o portal emite
@@ -601,6 +622,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
         // Código de tributação efetivamente usado (override ou emitente);
         // o reenvio reaproveita este valor.
         item_lista_servico: itemListaServico,
+        codigo_nbs: codigoNbs,
         descricao_servicos: data.descricaoServicos,
         tomador_nome: data.tomador.nome,
         tomador_documento: data.tomador.cpfCnpj ?? null,
@@ -1052,9 +1074,14 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     // existir têm o campo vazio — só nesse caso cai no código do emitente.
     const itemListaServico = only(nota.item_lista_servico || emitente.item_lista_servico);
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço no emitente.");
-    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
-      emitente.codigo_tributario_municipio,
-    );
+    // NBS gravado na nota; nota antiga sem NBS usa o do cadastro só se o código
+    // for o do cadastro.
+    const codigoDoCadastro = itemListaServico === only(emitente.item_lista_servico);
+    const codigoNbs = only(nota.codigo_nbs) || (codigoDoCadastro ? only(emitente.codigo_nbs) : "");
+    const codigoTributarioMunicipio =
+      codigoDoCadastro || !emitente.usar_ambiente_nacional
+        ? normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio)
+        : undefined;
 
     // Documento do tomador no reenvio.
     //
@@ -1225,11 +1252,13 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       ...(codigoTributarioMunicipio
         ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
         : {}),
+      ...(codigoNbs ? { codigo_nbs: codigoNbs } : {}),
       descricao_servico: nota.descricao_servicos,
       valor_servico: valorServicos,
       tributacao_iss: 1,
       tipo_retencao_iss: 1,
-      situacao_tributaria_pis_cofins: "08",
+      ...pisCofinsDaNota(emitente, valorServicos),
+      ...ibsCbsDaNota(emitente, cpfCnpj),
       // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
       // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
