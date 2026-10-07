@@ -324,6 +324,27 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const { user, session } = useAuth();
   const meuId = user?.id ?? null;
   const podeAtender = usePodeEscrever("nina");
+  // Nome de quem está logado: a bolha otimista já nasce com a assinatura que o
+  // servidor põe no texto. Se ainda não carregou, a bolha sai sem e a
+  // assinatura aparece quando o servidor confirma (como antes).
+  const meuNomeRef = useRef<string | null>(null);
+  useEffect(() => {
+    meuNomeRef.current = null;
+    if (!meuId) return;
+    let cancelado = false;
+    void supabase
+      .from("profiles")
+      .select("nome")
+      .eq("id", meuId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelado)
+          meuNomeRef.current = (data as { nome?: string | null } | null)?.nome ?? null;
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [meuId]);
 
   const [convs, setConvs] = useState<any[]>([]);
   const [carregandoLista, setCarregandoLista] = useState(false);
@@ -2813,7 +2834,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     if (selIdRef.current === origem) setMsgs((prev) => voltarAEnviando(prev));
     const c = cacheConversas.current.obter(origem);
     if (c) cacheConversas.current.guardar(origem, { ...c, msgs: voltarAEnviando(c.msgs) });
-    despacharEnvio(origem, String(m.body ?? ""), String(m.client_message_id));
+    // O servidor assina o texto: reenviar o corpo já assinado duplicaria a assinatura.
+    despacharEnvio(origem, String(m.texto_original ?? m.body ?? ""), String(m.client_message_id));
   };
 
   const enviar = () => {
@@ -2846,6 +2868,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       texto: t,
       usuarioId: meuId,
       perfil: meuPerfilSupervisao,
+      nomeAutor: meuNomeRef.current,
       clientMessageId,
     });
 

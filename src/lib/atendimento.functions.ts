@@ -2202,10 +2202,8 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       .select("nome")
       .eq("id", context.userId)
       .maybeSingle();
-    const nomeAutor = String((perfilAutor as any)?.nome ?? "")
-      .replace(/[*_~`]/g, "")
-      .trim();
-    const textoEnviado = nomeAutor ? `*${nomeAutor}:*\n${data.text}` : data.text;
+    const { assinarTexto } = await import("@/lib/atendimento/envio-otimista");
+    const textoEnviado = assinarTexto((perfilAutor as any)?.nome, data.text);
     trace.marcar("SEND_T6_META_REQUEST_START");
     const { wa_message_id } = await metaSendText(
       cfg.phone_number_id,
