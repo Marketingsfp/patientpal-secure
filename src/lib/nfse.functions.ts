@@ -6,6 +6,7 @@ import { documentoTomadorValido, problemaNoDocumentoDoTomador } from "@/lib/nfse
 import { avancarContadorDps, reservarNumeroDps } from "@/lib/nfse-numeracao";
 import type { Json } from "@/integrations/supabase/types";
 import { resolverEnderecoDoTomador } from "@/lib/nfse-endereco-tomador";
+import { totaisAproximadosNaoOptante } from "@/lib/nfse-tributos-aproximados";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -541,16 +542,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // <totTrib>: ME/EPP optante do SN -> usar pTotTribSN (E0712 proíbe indTotTrib).
       // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
       // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
-      // pTotTribSN). Enviamos zeros quando não há cálculo IBPT disponível.
+      // pTotTribSN). Municipais = ISS da nota; federais = % da contabilidade.
       // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
       // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
-        : {
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+        : totaisAproximadosNaoOptante({
+            valorServicos: data.valorServicos,
+            valorIss,
+            pctFederais: emitente.pct_total_tributos_sn,
+          })),
       // E0166: para optante SN ME/EPP é obrigatório o regApTribSN; vem do cadastro
       // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
       ...(codigoOpcaoSimplesNacional === 3
@@ -1226,11 +1227,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
         ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
-        : {
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
+        : totaisAproximadosNaoOptante({
+            valorServicos,
+            valorIss,
+            pctFederais: emitente.pct_total_tributos_sn,
+          })),
       // regApTribSN: 1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN.
       ...(codigoOpcaoSimplesNacional === 3
         ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
