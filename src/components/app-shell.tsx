@@ -251,7 +251,9 @@ function EstrelaFavorito({
       aria-label={marcado ? `Remover ${rotulo} dos favoritos` : `Adicionar ${rotulo} aos favoritos`}
       aria-pressed={marcado}
       className={cn(
-        "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1",
+        // z-20: o efeito de crescer ao passar o mouse (`menu_hover_scale`) põe o
+        // link em z-10; sem isto o link cobre a estrela e o clique abre a tela.
+        "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded p-1 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1",
         ativo
           ? "text-slate-500 hover:text-slate-900 hover:bg-slate-900/10 focus-visible:ring-slate-500"
           : "text-white/70 hover:text-white hover:bg-white/15 focus-visible:ring-white/70",
