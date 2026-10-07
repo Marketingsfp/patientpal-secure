@@ -43,6 +43,7 @@ import { formatDatePura } from "@/lib/date-utils";
 import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 import { separarPorCartao, type CartaoDia } from "@/lib/painel/cards-do-dia";
 import { DetalheCartaoDia } from "@/components/painel/detalhe-cartao-dia";
+import { AvisoSemDesfecho } from "@/components/painel/aviso-sem-desfecho";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -717,6 +718,7 @@ function DashboardOperacional() {
           <div className="px-4 pt-3">
             <SeletorPeriodoMedicos periodo={periodoMedicos} onChange={setPeriodoMedicos} />
           </div>
+          <AvisoSemDesfecho clinicaIds={ids} medicoNome={medicoNome} />
           {!medicosHoje && periodoMedicos.de > periodoMedicos.ate ? (
             <HhpEmptyState
               icon={Stethoscope}
