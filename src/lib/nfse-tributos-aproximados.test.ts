@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { totaisAproximadosNaoOptante } from "./nfse-tributos-aproximados";
+import { totaisAproximadosNaoOptante, totaisAproximadosSimples } from "./nfse-tributos-aproximados";
 
 describe("totaisAproximadosNaoOptante", () => {
   it("municipais = ISS da nota, mesmo sem percentual federal cadastrado", () => {
@@ -24,5 +24,23 @@ describe("totaisAproximadosNaoOptante", () => {
       totaisAproximadosNaoOptante({ valorServicos: 100, valorIss: 3, pctFederais: 0 })
         .valor_total_tributos_federais,
     ).toBe(0);
+  });
+});
+
+describe("totaisAproximadosSimples", () => {
+  it("ISS fora do Simples: federais, estaduais e municipais em %, como no portal", () => {
+    expect(
+      totaisAproximadosSimples({ regimeApuracaoSn: 2, pctTotTribSN: 15.45, aliquotaIss: 0.05 }),
+    ).toEqual({
+      percentual_total_tributos_federais: 15.45,
+      percentual_total_tributos_estaduais: 0,
+      percentual_total_tributos_municipais: 5,
+    });
+  });
+
+  it("tudo no Simples: segue o percentual único (pTotTribSN)", () => {
+    expect(
+      totaisAproximadosSimples({ regimeApuracaoSn: 1, pctTotTribSN: 6, aliquotaIss: 0.02 }),
+    ).toEqual({ percentual_total_tributos_simples_nacional: 6 });
   });
 });
