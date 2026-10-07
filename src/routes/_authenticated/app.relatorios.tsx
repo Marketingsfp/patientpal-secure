@@ -18,6 +18,7 @@ import {
   Download,
   CalendarDays,
   Users,
+  UserCheck,
   ClipboardList,
   FileText,
   DollarSign,
@@ -48,6 +49,7 @@ import {
   Sun,
 } from "lucide-react";
 import { MarcacoesPorAtendente } from "@/components/relatorios/marcacoes-por-atendente";
+import { AgendamentosPorUsuario } from "@/components/relatorios/agendamentos-por-usuario";
 import { getClimaPeriodo, type ClimaDia } from "@/lib/clima";
 import { CuboBI } from "@/components/relatorios/CuboBI";
 import {
@@ -714,6 +716,11 @@ function RelatoriosPage() {
                 <Users className="h-4 w-4" /> Marcações por atendente
               </TabsTrigger>
             )}
+            {ehSupervisor && (
+              <TabsTrigger value="agendamentos-por-usuario" className="gap-2">
+                <UserCheck className="h-4 w-4" /> Agendamentos por usuário
+              </TabsTrigger>
+            )}
             <TabsTrigger value="downloads" className="gap-2">
               <Download className="h-4 w-4" /> Baixar planilhas
             </TabsTrigger>
@@ -768,6 +775,14 @@ function RelatoriosPage() {
         {ehSupervisor && (
           <TabsContent value="marcacoes-atendente" className="mt-4">
             <MarcacoesPorAtendente />
+          </TabsContent>
+        )}
+
+        {/* Ações de cada usuário na agenda (marcou, confirmou, cancelou,
+            remarcou) pela data da ação — usa o "De/Até" do topo. */}
+        {ehSupervisor && (
+          <TabsContent value="agendamentos-por-usuario" className="mt-4">
+            <AgendamentosPorUsuario ini={ini} fim={fim} />
           </TabsContent>
         )}
 
