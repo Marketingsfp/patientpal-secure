@@ -172,29 +172,29 @@ function traduzirFocusNfe(msg: string): string | null {
 }
 
 /**
- * Respostas cruas de gateway/HTTP (sem corpo JSON), ex.: "Bad Request" quando a
- * URL de uma consulta fica grande demais. Só casa mensagens curtas, para não
- * capturar texto do banco que por acaso contenha essas palavras.
+ * Respostas cruas de gateway/HTTP ("Bad Request", "503"...). Só casa mensagem
+ * curta, para não capturar texto do banco. Números só contam como status HTTP
+ * quando são a mensagem inteira ou vêm após "http", "status", "erro" ou "error"
+ * — "Nota 414 já emitida" passa intacta.
  */
-function traduzirHttpCru(msg: string): string | null {
-  const m = msg.trim().toLowerCase();
+export function traduzirHttpCru(msg: string): string | null {
+  const m = (msg ?? "").trim();
   if (!m || m.length > 60) return null;
-  const tem = (padroes: RegExp[]) => padroes.some((r) => r.test(m));
+  const status = (codigos: string) =>
+    new RegExp(
+      `^(?:(?:http|status|erro|error)\\s*:?\\s*)?(?:${codigos})$|\\b(?:http|status|erro|error)\\s*:?\\s*(?:${codigos})\\b`,
+      "i",
+    ).test(m);
   if (
-    tem([
-      /bad request/,
-      /request entity too large/,
-      /payload too large/,
-      /uri too long/,
-      /request-uri too large/,
-      /request header fields too large/,
-      /\b(431|414|413)\b/,
-    ])
+    /bad request|request entity too large|payload too large|uri too long|request-uri too large|request header fields too large/i.test(
+      m,
+    ) ||
+    status("413|414|431")
   )
     return "A operação enviou dados demais de uma vez. Selecione menos itens e tente de novo.";
-  if (tem([/service unavailable/, /bad gateway/, /gateway timeout/, /\b(502|503|504)\b/]))
+  if (/service unavailable|bad gateway|gateway timeout/i.test(m) || status("502|503|504"))
     return "O servidor está indisponível no momento. Tente de novo em alguns instantes.";
-  if (tem([/too many requests/, /\b429\b/]))
+  if (/too many requests/i.test(m) || status("429"))
     return "Muitas operações seguidas. Aguarde alguns segundos e tente de novo.";
   return null;
 }
