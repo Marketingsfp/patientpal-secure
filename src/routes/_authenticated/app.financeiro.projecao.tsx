@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Target, TrendingUp, TrendingDown, Wallet, Stethoscope, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProjecaoInteligencia } from "@/components/financeiro/projecao-inteligencia";
+import { ProjecaoPergunta } from "@/components/financeiro/projecao-pergunta";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card, CardContent } from "@/components/ui/card";
@@ -586,6 +587,17 @@ function Page() {
             )}
           </CardContent>
         </Card>
+
+        <ProjecaoPergunta
+          carregando={aguardando}
+          r={r}
+          historico={historico ?? []}
+          hoje={hojeIso}
+          fimMes={fim}
+          mesAnterior={{ nome: mesAnterior.nome, receita: baseMesAnterior }}
+          metaTela={meta}
+          simulacoes={metas}
+        />
 
         <Card>
           <CardContent className="pt-6 space-y-4">
