@@ -544,9 +544,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
       situacao_tributaria_pis_cofins: "08",
       // <totTrib>: ME/EPP optante do SN -> pTotTribSN (E0712 proíbe indTotTrib);
       // com ISS fora do Simples, pTotTrib por esfera, igual ao portal nacional.
-      // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
-      // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
-      // pTotTribSN). Municipais = ISS da nota; federais = % da contabilidade.
+      // Para Não Optante (cod=1): pTotTrib por esfera, como o portal emite
+      // (E0713 rejeita indTotTrib e pTotTribSN). Federais = % da contabilidade;
+      // municipais = alíquota do ISS.
       // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
       // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
@@ -556,9 +556,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
             aliquotaIss: aliquota,
           })
         : totaisAproximadosNaoOptante({
-            valorServicos: data.valorServicos,
-            valorIss,
             pctFederais: emitente.pct_total_tributos_sn,
+            aliquotaIss: aliquota,
           })),
       // E0166: para optante SN ME/EPP é obrigatório o regApTribSN; vem do cadastro
       // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
@@ -1240,9 +1239,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
             aliquotaIss: aliquota,
           })
         : totaisAproximadosNaoOptante({
-            valorServicos,
-            valorIss,
             pctFederais: emitente.pct_total_tributos_sn,
+            aliquotaIss: aliquota,
           })),
       // regApTribSN: 1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN.
       ...(codigoOpcaoSimplesNacional === 3

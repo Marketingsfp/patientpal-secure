@@ -2,28 +2,20 @@ import { describe, expect, it } from "bun:test";
 import { totaisAproximadosNaoOptante, totaisAproximadosSimples } from "./nfse-tributos-aproximados";
 
 describe("totaisAproximadosNaoOptante", () => {
-  it("municipais = ISS da nota, mesmo sem percentual federal cadastrado", () => {
-    expect(
-      totaisAproximadosNaoOptante({ valorServicos: 363, valorIss: 10.89, pctFederais: null }),
-    ).toEqual({
-      valor_total_tributos_federais: 0,
-      valor_total_tributos_estaduais: 0,
-      valor_total_tributos_municipais: 10.89,
+  it("percentuais por esfera, como a nota da MA emitida no portal", () => {
+    expect(totaisAproximadosNaoOptante({ pctFederais: 3.65, aliquotaIss: 0.03 })).toEqual({
+      percentual_total_tributos_federais: 3.65,
+      percentual_total_tributos_estaduais: 0,
+      percentual_total_tributos_municipais: 3,
     });
   });
 
-  it("federais usam o percentual da contabilidade", () => {
-    expect(
-      totaisAproximadosNaoOptante({ valorServicos: 363, valorIss: 10.89, pctFederais: 11.33 })
-        .valor_total_tributos_federais,
-    ).toBe(41.13);
-  });
-
-  it("percentual inválido ou zero não gera valor federal", () => {
-    expect(
-      totaisAproximadosNaoOptante({ valorServicos: 100, valorIss: 3, pctFederais: 0 })
-        .valor_total_tributos_federais,
-    ).toBe(0);
+  it("sem percentual federal cadastrado, federais saem 0 e municipais seguem o ISS", () => {
+    expect(totaisAproximadosNaoOptante({ pctFederais: null, aliquotaIss: 0.03 })).toEqual({
+      percentual_total_tributos_federais: 0,
+      percentual_total_tributos_estaduais: 0,
+      percentual_total_tributos_municipais: 3,
+    });
   });
 });
 
