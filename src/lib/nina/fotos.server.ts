@@ -41,6 +41,7 @@ export async function resolverFotosDoTurno(ctx: {
   const r = await broker.executar("solicitar_atendente_humano", JSON.stringify({
     motivo: decisao.motivo,
     resumo: decisao.motivo === "FOTO_REQUER_AVALIACAO_HUMANA" ? "Foto recebida fora da leitura administrativa de pedidos. A equipe precisa avaliar o anexo."
+      : decisao.motivo === "FOTO_FALHA_TECNICA_PERSISTENTE" ? "O sistema não conseguiu processar a foto enviada mesmo após nova tentativa (falha técnica ou pedido com itens demais). Conferir as fotos anexadas à conversa."
       : "Não foi possível ler a nova foto enviada após a solicitação de uma imagem mais nítida. Conferir as fotos anexadas à conversa.",
     urgencia: "normal",
   }));
