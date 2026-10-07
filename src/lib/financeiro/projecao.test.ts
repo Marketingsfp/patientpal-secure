@@ -37,15 +37,17 @@ describe("projetarMes", () => {
     expect(r.realizado.receita).toBe(8000);
     expect(r.realizado.despesa).toBe(1600);
     expect(r.realizado.saldo).toBe(6400);
-    expect(r.realizado.diasComMovimento).toBe(8);
-    expect(r.diasCorridos).toBe(10);
-    expect(r.diasRestantes).toBe(20);
+    // Hoje (10) está em andamento: o ritmo sai dos 9 dias fechados, 7 com movimento.
+    expect(r.realizado.diasComMovimento).toBe(7);
+    expect(r.realizado.receitaFechada).toBe(7000);
+    expect(r.diasCorridos).toBe(9);
+    expect(r.diasRestantes).toBe(21);
     expect(r.mediaDiaria).toBe(1000);
-    // 20 dias restantes × 80% de dias produtivos = 16 dias × R$ 1.000.
-    expect(r.projetado.receita).toBe(24000);
-    expect(r.projetado.despesa).toBe(4800);
-    expect(r.projetado.saldo).toBe(19200);
-    expect(r.projetado.atendimentos).toBe(240);
+    // Fechado R$ 7.000 + 21 dias restantes × 7/9 produtivos (16,33 dias) × R$ 1.000.
+    expect(r.projetado.receita).toBe(23333.33);
+    expect(r.projetado.despesa).toBe(4666.67);
+    expect(r.projetado.saldo).toBe(18666.66);
+    expect(r.projetado.atendimentos).toBe(233);
     expect(r.confianca).toBe("media");
   });
 
@@ -72,9 +74,10 @@ describe("projetarMes", () => {
       ),
       meta: 40000,
     });
+    // Falta conta o que já entrou hoje; o ritmo parte do fechado até ontem
+    // (R$ 9.000) e divide pelos 21 dias que faltam, hoje inclusive.
     expect(r.meta?.falta).toBe(30000);
-    // 20 dias restantes, todos produtivos.
-    expect(r.meta?.porDiaRestante).toBe(1500);
+    expect(r.meta?.porDiaRestante).toBe(1476.19);
     expect(r.meta?.atendimentosPorDia).toBe(15);
     expect(r.meta?.alcancavel).toBe(false);
   });
@@ -98,6 +101,52 @@ describe("projetarMes", () => {
     // Dia fraco agora é medido contra o mesmo dia da semana (projecao-melhorias).
     expect(ids).not.toContain("dias-fracos");
     expect(ids).toContain("despesa-alta");
+  });
+
+  it("o dia de hoje pela metade não derruba o ritmo (média só até ontem)", () => {
+    const r = projetarMes({
+      inicio: "2026-09-01",
+      fim: "2026-09-30",
+      hoje: "2026-09-05",
+      dias: [
+        dia("2026-09-01", 1000, 0, 10),
+        dia("2026-09-02", 1000, 0, 10),
+        dia("2026-09-03", 1000, 0, 10),
+        dia("2026-09-04", 1000, 0, 10),
+        // Manhã de hoje: só R$ 100 até agora.
+        dia("2026-09-05", 100, 0, 1),
+      ],
+    });
+    expect(r.mediaDiaria).toBe(1000);
+    expect(r.mediaAtendimentosDia).toBe(10);
+    expect(r.realizado.receita).toBe(4100);
+    expect(r.realizado.ticket).toBe(100);
+    // 4.000 fechados + 26 dias (hoje inclusive) × R$ 1.000.
+    expect(r.projetado.receita).toBe(30000);
+  });
+
+  it("hoje acima do ritmo nunca deixa a projeção abaixo do realizado", () => {
+    const r = projetarMes({
+      inicio: "2026-09-01",
+      fim: "2026-09-02",
+      hoje: "2026-09-02",
+      dias: [dia("2026-09-01", 1000, 0, 10), dia("2026-09-02", 5000, 0, 50)],
+    });
+    expect(r.projetado.receita).toBe(6000);
+    expect(r.projetado.atendimentos).toBe(60);
+  });
+
+  it("primeiro dia do mês: sem dia fechado, projeção é o realizado", () => {
+    const r = projetarMes({
+      inicio: "2026-09-01",
+      fim: "2026-09-30",
+      hoje: "2026-09-01",
+      dias: [dia("2026-09-01", 800, 0, 8)],
+    });
+    expect(r.diasCorridos).toBe(0);
+    expect(r.mediaDiaria).toBe(0);
+    expect(r.projetado.receita).toBe(800);
+    expect(r.confianca).toBe("baixa");
   });
 
   it("ignora lançamentos fora do período", () => {
@@ -138,11 +187,12 @@ describe("simularCrescimento", () => {
   it("divide o que falta pelos dias de movimento que ainda vêm", () => {
     const r = projetarMes(entradaBase);
     const [cinco] = simularCrescimento(r, { baseMesAnterior: 20000 });
-    // Faltam 11.000 para 21.000, em 20 dias restantes todos produtivos.
+    // Faltam 11.000 para 21.000; o ritmo parte do fechado até ontem (9.000)
+    // e divide os 12.000 pelos 21 dias que faltam, hoje inclusive.
     expect(cinco.falta).toBe(11000);
-    expect(cinco.porDiaRestante).toBe(550);
-    // Ritmo pedido (550) abaixo do atual (1.000): dá para ir mais devagar.
-    expect(cinco.esforcoPercentual).toBe(-45);
+    expect(cinco.porDiaRestante).toBe(571.43);
+    // Ritmo pedido abaixo do atual (1.000): dá para ir mais devagar.
+    expect(cinco.esforcoPercentual).toBe(-43);
     expect(cinco.alcancavel).toBe(true);
   });
 
@@ -188,11 +238,11 @@ describe("serieTendencia", () => {
     expect(s[29].realizado).toBeNull();
   });
 
-  it("as duas linhas se encontram no dia de hoje e a projeção segue o ritmo", () => {
+  it("as duas linhas se encontram em ontem e a projeção segue o ritmo", () => {
     const r = projetarMes(entradaBase);
     const s = serieTendencia(entradaBase, r);
-    expect(s[9].projetado).toBe(s[9].realizado ?? 0);
-    expect(s[29].projetado).toBe(30000); // 10 dias feitos + 20 no mesmo ritmo
+    expect(s[8].projetado).toBe(s[8].realizado ?? 0);
+    expect(s[29].projetado).toBe(30000); // 9 dias fechados + 21 no mesmo ritmo
     expect(s[29].projetado).toBe(r.projetado.receita);
   });
 

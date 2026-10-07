@@ -16,6 +16,11 @@ import {
   type EntradaProjecao,
   type ResultadoProjecao,
 } from "@/lib/financeiro/projecao";
+import {
+  atendimentosPorDiaDaSemana,
+  interpretarMeta,
+  type DiaReceita,
+} from "@/lib/financeiro/projecao-meta-semana";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/projecao")({
@@ -25,6 +30,12 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/projecao")(
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const iso = (d: Date) => d.toLocaleDateString("en-CA");
+
+/**
+ * 6 semanas fechadas: seis de cada dia da semana para a média, recentes o
+ * bastante para refletir o movimento atual da clínica.
+ */
+const SEMANAS_HISTORICO = 6;
 
 /** O banco devolve no máximo 1.000 linhas por consulta. */
 const PAGINA = 1000;
@@ -49,7 +60,10 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const [loading, setLoading] = useState(true);
   const [dias, setDias] = useState<DiaCaixa[]>([]);
-  const [meta, setMeta] = useState<number>(0);
+  /** Meta como foi escrita na caixa de texto ("600 mil", "10% acima"…). */
+  const [metaTexto, setMetaTexto] = useState("");
+  /** Receita e pagamentos por dia, das últimas semanas até ontem. */
+  const [historico, setHistorico] = useState<DiaReceita[] | null>(null);
   /** Receita confirmada do mês anterior fechado — base das metas de crescimento. */
   const [baseMesAnterior, setBaseMesAnterior] = useState(0);
 
@@ -57,6 +71,15 @@ function Page() {
   const inicio = useMemo(() => iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), [hoje]);
   const fim = useMemo(() => iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)), [hoje]);
   const hojeIso = useMemo(() => iso(hoje), [hoje]);
+  const ontemIso = useMemo(
+    () => iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1)),
+    [hoje],
+  );
+  const historicoDe = useMemo(
+    () =>
+      iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - SEMANAS_HISTORICO * 7)),
+    [hoje],
+  );
 
   const mesAnterior = useMemo(() => {
     const ini = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
@@ -68,12 +91,23 @@ function Page() {
   }, [hoje]);
 
   const chaveMeta = clinicaAtual ? `fin-meta-${clinicaAtual.clinica_id}-${inicio}` : "";
+  const chaveMetaTexto = chaveMeta ? `${chaveMeta}-texto` : "";
 
   useEffect(() => {
-    if (!chaveMeta) return;
-    const salvo = Number(localStorage.getItem(chaveMeta) ?? 0);
-    setMeta(Number.isFinite(salvo) ? salvo : 0);
-  }, [chaveMeta]);
+    if (!chaveMetaTexto) return;
+    try {
+      const texto = localStorage.getItem(chaveMetaTexto);
+      if (texto != null) {
+        setMetaTexto(texto);
+        return;
+      }
+      // Meta guardada antes, quando o campo era só número.
+      const antigo = Number(localStorage.getItem(chaveMeta) ?? 0);
+      setMetaTexto(Number.isFinite(antigo) && antigo > 0 ? antigo.toLocaleString("pt-BR") : "");
+    } catch {
+      setMetaTexto("");
+    }
+  }, [chaveMeta, chaveMetaTexto]);
 
   useEffect(() => {
     (async () => {
@@ -159,6 +193,51 @@ function Page() {
     })();
   }, [clinicaAtual?.clinica_id, mesAnterior.de, mesAnterior.ate]);
 
+  // Peso de cada dia da semana: receita e pagamentos das últimas semanas,
+  // só dias fechados (até ontem).
+  useEffect(() => {
+    let cancelado = false;
+    setHistorico(null);
+    (async () => {
+      if (!clinicaAtual) return;
+      try {
+        const linhas = await paginado<{ dia: string; pagamentos: number; receita: number }>(() =>
+          // Função fora dos tipos gerados do Supabase.
+          (supabase as any).rpc("fin_receita_resumo_dia", {
+            p_clinica: clinicaAtual.clinica_id,
+            p_ini: historicoDe,
+            p_fim: ontemIso,
+          }),
+        );
+        const porDia = new Map<string, DiaReceita>();
+        for (const l of linhas) {
+          const dia = String(l.dia).slice(0, 10);
+          const d = porDia.get(dia) ?? { dia, receita: 0, pagamentos: 0 };
+          d.receita += Number(l.receita) || 0;
+          d.pagamentos += Number(l.pagamentos) || 0;
+          porDia.set(dia, d);
+        }
+        if (!cancelado) setHistorico([...porDia.values()]);
+      } catch (e) {
+        console.error("projeção: falha ao ler receita por dia", e);
+        if (!cancelado) setHistorico([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaAtual?.clinica_id, historicoDe, ontemIso]);
+
+  const metaLida = useMemo(
+    () =>
+      interpretarMeta(metaTexto, {
+        mesAnterior: baseMesAnterior,
+        nomeMesAnterior: mesAnterior.nome,
+      }),
+    [metaTexto, baseMesAnterior, mesAnterior.nome],
+  );
+  const meta = metaLida.ok ? metaLida.valor : 0;
+
   const entrada: EntradaProjecao = useMemo(
     () => ({ inicio, fim, hoje: hojeIso, dias, meta: meta || undefined }),
     [inicio, fim, hojeIso, dias, meta],
@@ -188,9 +267,27 @@ function Page() {
     [tendencia],
   );
 
-  const salvarMeta = (valor: number) => {
-    setMeta(valor);
-    if (chaveMeta) localStorage.setItem(chaveMeta, String(valor));
+  const metaSemana = useMemo(
+    () =>
+      meta > 0 && historico
+        ? atendimentosPorDiaDaSemana({
+            meta,
+            realizadoAteOntem: r.realizado.receitaFechada,
+            historico,
+            hoje: hojeIso,
+            fimMes: fim,
+          })
+        : null,
+    [meta, historico, r.realizado.receitaFechada, hojeIso, fim],
+  );
+
+  const salvarMetaTexto = (texto: string) => {
+    setMetaTexto(texto);
+    try {
+      if (chaveMetaTexto) localStorage.setItem(chaveMetaTexto, texto);
+    } catch {
+      // Navegador sem armazenamento: a meta vale só enquanto a tela está aberta.
+    }
   };
 
   const confiancaTexto =
@@ -266,8 +363,8 @@ function Page() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Fechamento estimado de {inicio.slice(8)}/{inicio.slice(5, 7)} a {fim.slice(8)}/
-            {fim.slice(5, 7)} · {r.diasCorridos} dia(s) corridos, {r.diasRestantes} pela frente ·{" "}
-            {confiancaTexto}
+            {fim.slice(5, 7)} · {r.diasCorridos} dia(s) fechados (até ontem), {r.diasRestantes} pela
+            frente com hoje · {confiancaTexto}
           </p>
         </div>
 
@@ -299,7 +396,7 @@ function Page() {
             realizado={String(r.realizado.atendimentos)}
             icon={Stethoscope}
             color="bg-blue-500/10 text-blue-600"
-            explicacao={`É uma estimativa do total do mês inteiro, não de atendimentos já concluídos: soma o que já foi atendido de 01/${inicio.slice(5, 7)} até hoje com uma previsão para os dias que faltam até ${fim.slice(8)}/${fim.slice(5, 7)}, no ritmo médio dos dias de movimento deste mês.`}
+            explicacao={`É uma estimativa do total do mês inteiro, não de atendimentos já concluídos: soma o que foi atendido de 01/${inicio.slice(5, 7)} até ontem com uma previsão para os dias que faltam até ${fim.slice(8)}/${fim.slice(5, 7)} (hoje inclusive), no ritmo médio dos dias de movimento já fechados deste mês. O dia de hoje ainda está em andamento e não entra na média.`}
             nota={`Estimativa do mês: ${r.realizado.atendimentos} já atendidos + ~${atendimentosFaltantes} previstos em ${r.diasRestantes} dia(s) restantes.`}
           />
         </div>
@@ -311,8 +408,8 @@ function Page() {
               <p className="text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Realizado</span> — o que já entrou,
                 somado dia a dia · <span className="font-medium text-foreground">Projetado</span>{" "}
-                (tracejado) — o mesmo acumulado seguindo no ritmo atual até {fim.slice(8)}/
-                {fim.slice(5, 7)}.
+                (tracejado) — o acumulado até ontem seguindo no ritmo dos dias fechados até{" "}
+                {fim.slice(8)}/{fim.slice(5, 7)}.
               </p>
             </div>
             {loading ? (
@@ -331,25 +428,26 @@ function Page() {
         <Card>
           <CardContent className="pt-6 space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div className="space-y-1">
+              <div className="space-y-1 w-full md:max-w-xl">
                 <Label htmlFor="meta">Meta de receita do mês</Label>
                 <Input
                   id="meta"
-                  type="number"
-                  min={0}
-                  step={1000}
-                  className="w-56"
-                  value={meta || ""}
-                  placeholder="Ex.: 500000"
-                  onChange={(ev) => salvarMeta(Number(ev.target.value) || 0)}
+                  type="text"
+                  value={metaTexto}
+                  placeholder='Ex.: "600 mil", "R$ 650.000" ou "10% acima do mês passado"'
+                  onChange={(ev) => salvarMetaTexto(ev.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Fica guardada neste navegador, por clínica e por mês.
+                  {metaTexto.trim() === ""
+                    ? "Escreva a meta do jeito que preferir. Fica guardada neste navegador, por clínica e por mês."
+                    : metaLida.ok
+                      ? `Entendido: ${metaLida.explicacao}`
+                      : metaLida.motivo}
                 </p>
               </div>
               <div className="text-sm">
                 <p className="text-muted-foreground">
-                  Ritmo atual:{" "}
+                  Ritmo atual (até ontem):{" "}
                   <span className="font-medium text-foreground">{fmt(r.mediaDiaria)}</span> e{" "}
                   {r.mediaAtendimentosDia} atendimento(s) por dia de movimento.
                 </p>
@@ -371,6 +469,86 @@ function Page() {
                   de {r.meta.atendimentosPorDia} atendimento(s) por dia no ticket atual de{" "}
                   {fmt(r.realizado.ticket)}.
                 </p>
+              </div>
+            ) : null}
+
+            {r.meta ? (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">
+                  Atendimentos necessários por dia da semana
+                </h3>
+                {!metaSemana ? (
+                  <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+                ) : metaSemana.linhas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {metaSemana.diasRestantes === 0
+                      ? "Não há mais dias de funcionamento neste mês."
+                      : "Sem histórico de receita nas últimas semanas para estimar."}
+                  </p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50 text-xs text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium">Dia</th>
+                            <th className="px-3 py-2 text-right font-medium">Faltam</th>
+                            <th className="px-3 py-2 text-right font-medium">Costuma fazer</th>
+                            <th className="px-3 py-2 text-right font-medium">Precisa fazer</th>
+                            <th className="px-3 py-2 text-right font-medium">Diferença</th>
+                            <th className="px-3 py-2 text-right font-medium">Receita/dia</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {metaSemana.linhas.map((l) => {
+                            const dif = l.atendimentosNecessarios - l.atendimentosHoje;
+                            return (
+                              <tr key={l.diaSemana} className="border-t">
+                                <td className="px-3 py-2 font-medium">{l.nome}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {l.diasRestantes}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {l.atendimentosHoje}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                                  {l.atendimentosNecessarios}
+                                </td>
+                                <td
+                                  className={`px-3 py-2 text-right tabular-nums ${
+                                    dif > 0 ? "text-amber-600" : "text-green-600"
+                                  }`}
+                                >
+                                  {dif > 0 ? `+${dif}` : dif}
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {fmt(l.receitaNecessaria)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {metaSemana.falta <= 0
+                        ? "A meta já foi alcançada com o que entrou até ontem."
+                        : `Até ontem entraram ${fmt(metaSemana.realizadoAteOntem)}; faltam ${fmt(metaSemana.falta)} em ${metaSemana.diasRestantes} dia(s) de funcionamento (hoje inclusive). No ritmo normal de cada dia da semana esses dias rendem ${fmt(metaSemana.rendeNoRitmo)} — ${
+                            metaSemana.esforcoPercentual > 0
+                              ? `é preciso ${metaSemana.esforcoPercentual}% a mais em cada dia`
+                              : "o ritmo normal já basta"
+                          }.`}{" "}
+                      "Costuma fazer" é a média de pagamentos de cada dia da semana nas últimas{" "}
+                      {SEMANAS_HISTORICO} semanas (até ontem); domingo não entra.
+                    </p>
+                    {metaSemana.semHistorico.length > 0 && (
+                      <p className="text-xs text-amber-600">
+                        Sem histórico para {metaSemana.semHistorico.join(", ")}: a conta acima supõe
+                        que esses dias não terão movimento.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
