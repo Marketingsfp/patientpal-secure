@@ -6,7 +6,10 @@ import { documentoTomadorValido, problemaNoDocumentoDoTomador } from "@/lib/nfse
 import { avancarContadorDps, reservarNumeroDps } from "@/lib/nfse-numeracao";
 import type { Json } from "@/integrations/supabase/types";
 import { resolverEnderecoDoTomador } from "@/lib/nfse-endereco-tomador";
-import { totaisAproximadosNaoOptante } from "@/lib/nfse-tributos-aproximados";
+import {
+  totaisAproximadosNaoOptante,
+  totaisAproximadosSimples,
+} from "@/lib/nfse-tributos-aproximados";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -539,14 +542,19 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // <tribFed> exige PIS/COFINS. Para Simples Nacional usamos CST=08
       // (Operação sem Incidência).
       situacao_tributaria_pis_cofins: "08",
-      // <totTrib>: ME/EPP optante do SN -> usar pTotTribSN (E0712 proíbe indTotTrib).
+      // <totTrib>: ME/EPP optante do SN -> pTotTribSN (E0712 proíbe indTotTrib);
+      // com ISS fora do Simples, pTotTrib por esfera, igual ao portal nacional.
       // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
       // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
       // pTotTribSN). Municipais = ISS da nota; federais = % da contabilidade.
       // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
       // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
+        ? totaisAproximadosSimples({
+            regimeApuracaoSn: codigoOpcaoSimplesNacional === 3 ? emitente.regime_apuracao_sn : 1,
+            pctTotTribSN,
+            aliquotaIss: aliquota,
+          })
         : totaisAproximadosNaoOptante({
             valorServicos: data.valorServicos,
             valorIss,
@@ -1226,7 +1234,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
       // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
+        ? totaisAproximadosSimples({
+            regimeApuracaoSn: codigoOpcaoSimplesNacional === 3 ? emitente.regime_apuracao_sn : 1,
+            pctTotTribSN,
+            aliquotaIss: aliquota,
+          })
         : totaisAproximadosNaoOptante({
             valorServicos,
             valorIss,
