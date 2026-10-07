@@ -74,6 +74,7 @@ import {
   Pin,
   PinOff,
   Copy,
+  AlertTriangle,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -254,6 +255,13 @@ import {
   revalidarChatSelecionado,
   type ContadoresInbox,
 } from "@/lib/atendimento/inbox-cache";
+
+/**
+ * Regra da Meta (WhatsApp Business): resposta livre só até 24h depois da
+ * última mensagem do paciente; fora disso, só template aprovado.
+ */
+const MSG_JANELA_24H_META =
+  "Bloqueio da Meta: já se passaram mais de 24 horas desde a última mensagem do paciente. Fora dessa janela o WhatsApp só permite enviar modelos (templates) aprovados pela Meta. A conversa é liberada de novo assim que o paciente enviar uma nova mensagem.";
 
 /**
  * Copia apenas o número visível da conversa (ex.: "#1342").
@@ -2696,7 +2704,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                 ? // Só o Offline (ou a falta de escolha) bloqueia o envio; as duas pausas podem responder.
                   "Você está offline. Fique online para enviar mensagens."
                 : janela24hExpirada
-                  ? "Janela de 24h do WhatsApp expirada. Envie um template para reabrir."
+                  ? MSG_JANELA_24H_META
                   : null;
 
   /**
@@ -3642,6 +3650,20 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                 </div>
 
                 <div className="oszap-composer border-t p-2">
+                  {motivoBloqueio && !carregandoConversa && (
+                    <div
+                      role="status"
+                      data-testid="aviso-bloqueio-envio"
+                      className={`mb-2 flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
+                        motivoBloqueio === MSG_JANELA_24H_META
+                          ? "border-atd-warn/40 bg-atd-warn-bg text-atd-warn-ink"
+                          : "border-atd-border bg-atd-bg text-atd-ink-soft"
+                      }`}
+                    >
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span>{motivoBloqueio}</span>
+                    </div>
+                  )}
                   <div className="relative flex gap-2">
                     {slash && (
                       <ListaRespostasRapidas
@@ -3702,7 +3724,15 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                           enviar();
                         }
                       }}
-                      placeholder={motivoBloqueio ? "Envio bloqueado" : "Mensagem… (digite / para respostas rápidas)"}
+                      placeholder={
+                        !motivoBloqueio
+                          ? "Mensagem… (digite / para respostas rápidas)"
+                          : carregandoConversa
+                            ? motivoBloqueio
+                            : motivoBloqueio === MSG_JANELA_24H_META
+                              ? "Envio bloqueado pela Meta (janela de 24h encerrada)"
+                              : "Envio bloqueado (veja o motivo acima)"
+                      }
                       rows={1}
                       title={prefsAcessibilidade.oszap.enterEnvia ? "Enter envia; Shift+Enter quebra a linha" : "Ctrl+Enter envia; Enter quebra a linha"}
                       className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
