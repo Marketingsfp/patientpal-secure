@@ -17528,6 +17528,17 @@ export type Database = {
           recorrentes: number
         }[]
       }
+      painel_medicos_periodo: {
+        Args: { p_ate: string; p_clinicas: string[]; p_de: string }
+        Returns: {
+          atendidos: number
+          faltas: number
+          medico_id: string
+          novos: number
+          pagos: number
+          total: number
+        }[]
+      }
       painel_origem_pacientes: {
         Args: { p_clinica: string; p_fim: string; p_ini: string }
         Returns: Json
