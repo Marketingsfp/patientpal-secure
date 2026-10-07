@@ -63,7 +63,7 @@ it("Jev recebe o texto lido na foto no histórico, não a marcação Imagem", ()
   expect(JSON.stringify(h)).toContain("Pedido de ECG");
 });
 
-test("falha técnica persistente vai para a equipe em vez de pedir reenvio sem fim", () => {
+it("falha técnica persistente vai para a equipe em vez de pedir reenvio sem fim", () => {
   const t = (id: string, s: number, motivo: string) => ({ id, direction: "in", tipo: "image", created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, s)).toISOString(), raw: { nina_leitura_imagem: { tipo: "falha_tecnica", motivo } } }) as MensagemFoto;
   const aviso = { id: "a", direction: "out", enviada_por: "nina", status: "delivered", body: FALHA_TECNICA_FOTO, created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, 10)).toISOString() } as MensagemFoto;
   expect(decidirFotos([t("1", 5, "provedor")], []).acao).toBe("falha_tecnica");
