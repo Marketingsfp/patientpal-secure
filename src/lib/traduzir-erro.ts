@@ -171,6 +171,34 @@ function traduzirFocusNfe(msg: string): string | null {
   return null;
 }
 
+/**
+ * Respostas cruas de gateway/HTTP (sem corpo JSON), ex.: "Bad Request" quando a
+ * URL de uma consulta fica grande demais. Só casa mensagens curtas, para não
+ * capturar texto do banco que por acaso contenha essas palavras.
+ */
+function traduzirHttpCru(msg: string): string | null {
+  const m = msg.trim().toLowerCase();
+  if (!m || m.length > 60) return null;
+  const tem = (padroes: RegExp[]) => padroes.some((r) => r.test(m));
+  if (
+    tem([
+      /bad request/,
+      /request entity too large/,
+      /payload too large/,
+      /uri too long/,
+      /request-uri too large/,
+      /request header fields too large/,
+      /\b(431|414|413)\b/,
+    ])
+  )
+    return "A operação enviou dados demais de uma vez. Selecione menos itens e tente de novo.";
+  if (tem([/service unavailable/, /bad gateway/, /gateway timeout/, /\b(502|503|504)\b/]))
+    return "O servidor está indisponível no momento. Tente de novo em alguns instantes.";
+  if (tem([/too many requests/, /\b429\b/]))
+    return "Muitas operações seguidas. Aguarde alguns segundos e tente de novo.";
+  return null;
+}
+
 function pareceTecnico(msg: string): boolean {
   if (!msg) return true;
   return (
@@ -192,6 +220,7 @@ export function traduzirErro(err: QualquerErro, contexto?: string): string {
     traduzirRede(msg),
     traduzirStorage(msg),
     traduzirFocusNfe(msg),
+    traduzirHttpCru(msg),
   ];
   let amigavel = traducoes.find((t): t is string => Boolean(t));
 
@@ -238,7 +267,7 @@ export function mostrarErro(err: QualquerErro, contexto?: string) {
     return;
   }
 
-  if (original && original !== amigavel && pareceTecnico(msg)) {
+  if (original && original !== amigavel && (pareceTecnico(msg) || traduzirHttpCru(msg))) {
     toast.error(amigavel, {
       duration: 8000,
       action: {

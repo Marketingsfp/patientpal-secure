@@ -119,6 +119,9 @@ import {
 const ehDataIso = (v: unknown): v is string =>
   typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
+/** Máximo de ids por consulta `.in()` montada com a seleção (os ids vão na URL). */
+const IN_BLOCO = 200;
+
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
   head: () => ({ meta: [{ title: "Atendimentos — Financeiro" }] }),
@@ -2486,21 +2489,22 @@ function AtendimentosPage() {
         .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
         .map((a) => a.agendamento_id as string);
       const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
-      if (agIds.length) {
+      // Em blocos de IN_BLOCO ids (vão na URL); para no primeiro erro.
+      for (let i = 0; i < agIds.length; i += IN_BLOCO) {
         const { error } = await supabase
           .from("agendamentos")
           .update({ status: "realizado" })
-          .in("id", agIds);
+          .in("id", agIds.slice(i, i + IN_BLOCO));
         if (error) {
           mostrarErro(error);
           return;
         }
       }
-      if (manualIds.length) {
+      for (let i = 0; i < manualIds.length; i += IN_BLOCO) {
         const { error } = await supabase
           .from("fin_atendimentos")
           .update({ status: "realizado" })
-          .in("id", manualIds);
+          .in("id", manualIds.slice(i, i + IN_BLOCO));
         if (error) {
           mostrarErro(error);
           return;
@@ -2914,13 +2918,19 @@ function AtendimentosPage() {
         .filter((x) => x.origem === "agenda" && !x.mensalidade_ct)
         .map((x) => x.id);
       if (agendaIdsCheck.length) {
-        const { data: lancs, error: eChk } = await supabase
-          .from("fin_lancamentos")
-          .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
-          .in("id", agendaIdsCheck);
-        if (eChk) throw eChk;
+        // Em blocos: cada id vai na URL; o mês inteiro de um médico estoura o
+        // limite do gateway e volta um "Bad Request" sem corpo.
+        const lancs: unknown[] = [];
+        for (let i = 0; i < agendaIdsCheck.length; i += IN_BLOCO) {
+          const { data: parte, error: eChk } = await supabase
+            .from("fin_lancamentos")
+            .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
+            .in("id", agendaIdsCheck.slice(i, i + IN_BLOCO));
+          if (eChk) throw eChk;
+          lancs.push(...(parte ?? []));
+        }
         const bloq: string[] = [];
-        for (const l of (lancs ?? []) as Array<{
+        for (const l of lancs as Array<{
           id: string;
           status: string | null;
           agendamento_id: string | null;
