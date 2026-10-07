@@ -8598,8 +8598,8 @@ export type Database = {
       }
       nfse_emitentes: {
         Row: {
-          aliquota_iss: number
           aliquota_cofins: number | null
+          aliquota_iss: number
           aliquota_pis: number | null
           ativo: boolean
           bairro: string
@@ -8620,10 +8620,10 @@ export type Database = {
           focus_ambiente: string
           focus_token_homologacao: string | null
           focus_token_producao: string | null
-          id: string
           ibs_cbs_classificacao: string | null
           ibs_cbs_cst: string | null
           ibs_cbs_indicador_operacao: string | null
+          id: string
           incentivador_cultural: boolean
           inscricao_estadual: string | null
           inscricao_municipal: string
@@ -8648,8 +8648,8 @@ export type Database = {
           usar_ambiente_nacional: boolean
         }
         Insert: {
-          aliquota_iss?: number
           aliquota_cofins?: number | null
+          aliquota_iss?: number
           aliquota_pis?: number | null
           ativo?: boolean
           bairro: string
@@ -8670,10 +8670,10 @@ export type Database = {
           focus_ambiente?: string
           focus_token_homologacao?: string | null
           focus_token_producao?: string | null
-          id?: string
           ibs_cbs_classificacao?: string | null
           ibs_cbs_cst?: string | null
           ibs_cbs_indicador_operacao?: string | null
+          id?: string
           incentivador_cultural?: boolean
           inscricao_estadual?: string | null
           inscricao_municipal: string
@@ -8698,8 +8698,8 @@ export type Database = {
           usar_ambiente_nacional?: boolean
         }
         Update: {
-          aliquota_iss?: number
           aliquota_cofins?: number | null
+          aliquota_iss?: number
           aliquota_pis?: number | null
           ativo?: boolean
           bairro?: string
@@ -8720,10 +8720,10 @@ export type Database = {
           focus_ambiente?: string
           focus_token_homologacao?: string | null
           focus_token_producao?: string | null
-          id?: string
           ibs_cbs_classificacao?: string | null
           ibs_cbs_cst?: string | null
           ibs_cbs_indicador_operacao?: string | null
+          id?: string
           incentivador_cultural?: boolean
           inscricao_estadual?: string | null
           inscricao_municipal?: string
