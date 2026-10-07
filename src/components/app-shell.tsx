@@ -51,6 +51,7 @@ import {
   Wallet,
   ChevronDown,
   Search,
+  Star,
   Monitor,
   X,
   HeartPulse,
@@ -122,6 +123,7 @@ import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { TTSToggle } from "@/components/tts/tts-toggle";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useMenuOrdem } from "@/hooks/use-menu-ordem";
+import { useMenuFavoritos } from "@/hooks/use-menu-favoritos";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { garantirContrasteTextoBranco } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
@@ -218,6 +220,53 @@ const textoBuscavel = (it: NavLeaf): string => [it.label, ...(it.busca ?? [])].j
 // (leaf = rota + hash; grupo expansível = prefixo com o rótulo).
 const navItemKey = (it: NavItem): string =>
   isParent(it) ? `grupo:${it.label}` : `${it.to}${it.hash ? `#${it.hash}` : ""}`;
+
+/**
+ * Estrela de "Meus Favoritos" ao lado de um item do menu lateral. Fica fora do
+ * link (botão dentro de <a> não é HTML válido), posicionada sobre a borda
+ * direita do item. Marcada: sempre visível e amarela; desmarcada: aparece ao
+ * passar o mouse ou focar o item, e fica sempre visível em tela de toque.
+ */
+function EstrelaFavorito({
+  marcado,
+  rotulo,
+  ativo,
+  onAlternar,
+}: {
+  marcado: boolean;
+  rotulo: string;
+  /** Item da tela atual: fundo claro, então a estrela usa tom escuro. */
+  ativo: boolean;
+  onAlternar: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onAlternar();
+      }}
+      title={marcado ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+      aria-label={marcado ? `Remover ${rotulo} dos favoritos` : `Adicionar ${rotulo} aos favoritos`}
+      aria-pressed={marcado}
+      className={cn(
+        "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1",
+        ativo
+          ? "text-slate-500 hover:text-slate-900 hover:bg-slate-900/10 focus-visible:ring-slate-500"
+          : "text-white/70 hover:text-white hover:bg-white/15 focus-visible:ring-white/70",
+        marcado
+          ? "opacity-100"
+          : "opacity-0 group-hover/fav:opacity-100 group-focus-within/fav:opacity-100 [@media(hover:none)]:opacity-60",
+      )}
+    >
+      <Star
+        className={cn("h-3.5 w-3.5", marcado && "fill-amber-400 text-amber-400")}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
 
 // Rotas que só ficam ativas em correspondência exata. "/app/clientes" tem
 // sub-rotas com item próprio no menu (ex.: "/app/clientes/duplicados"), então
@@ -761,6 +810,8 @@ function AppShellInner() {
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   // Ordem personalizada dos itens do menu (arrastar e soltar) — por usuário.
   const { ordem: menuOrdem, salvar: salvarMenuOrdem } = useMenuOrdem(uxMelhorias);
+  // Telas fixadas pelo usuário em "Meus Favoritos" (estrela ao lado do item).
+  const { favoritos: menuFavoritos, alternar: alternarFavorito } = useMenuFavoritos();
   const [dragMenu, setDragMenu] = useState<{ row: string; key: string } | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const location = useLocation();
@@ -1193,6 +1244,21 @@ function AppShellInner() {
       return { ...row, items };
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
+
+  // "Meus Favoritos": só entram as telas que o menu já está mostrando (mesmo
+  // filtro de permissão, portal e flags). Favorito de tela que deixou de ser
+  // liberada, ou que é de outro portal, simplesmente não aparece aqui.
+  const favoritosVisiveis = useMemo(() => {
+    const porChave = new Map<string, NavLeaf>();
+    for (const row of flagFilteredRows) {
+      for (const it of row.items) {
+        const folhas = isParent(it) ? it.children : [it];
+        for (const f of folhas) porChave.set(navItemKey(f), f);
+      }
+    }
+    return menuFavoritos.map((k) => porChave.get(k)).filter((f): f is NavLeaf => f !== undefined);
+  }, [flagFilteredRows, menuFavoritos]);
+  const favoritosSet = useMemo(() => new Set(menuFavoritos), [menuFavoritos]);
 
   // Barra inferior do celular: só entram as telas que o perfil realmente pode
   // abrir. Sem esse filtro uma recepcionista veria "Início" e "Caixa" fixos no
@@ -1778,6 +1844,95 @@ function AppShellInner() {
                 {buscandoMenu && searchedNavRows.length === 0 && (
                   <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
                 )}
+                {/* "Meus Favoritos": telas fixadas pelo usuário com a estrela,
+                    na ordem em que foram marcadas. Some durante a busca (o
+                    resultado já mostra os itens). */}
+                {!buscandoMenu &&
+                  (() => {
+                    const rotulo = "Meus Favoritos";
+                    const open = openGroups[rotulo] ?? true;
+                    return (
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenGroups((prev) => ({
+                              ...prev,
+                              [rotulo]: !(prev[rotulo] ?? true),
+                            }));
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-white/70 hover:text-white transition-colors rounded-md"
+                          aria-expanded={open}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            {rotulo}
+                          </span>
+                          <ChevronDown
+                            className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+                          />
+                        </button>
+                        {open && favoritosVisiveis.length === 0 && (
+                          <p className="px-3 py-1 text-xs leading-snug text-white/60">
+                            Clique na estrela ao lado de uma tela para fixá-la aqui.
+                          </p>
+                        )}
+                        {open &&
+                          favoritosVisiveis.map((fav) => {
+                            const aliases = fav.aliases ?? [];
+                            const active =
+                              navLeafAtivo(
+                                itemDeMenuAtivo(location.pathname, fav.to),
+                                location.hash,
+                                fav.hash,
+                              ) ||
+                              (!fav.hash &&
+                                aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
+                            const href = hrefDoNavLeaf(fav);
+                            const key = navItemKey(fav);
+                            return (
+                              <div key={key} className="group/fav relative">
+                                <a
+                                  href={href}
+                                  data-nav-active={active ? "true" : undefined}
+                                  aria-current={uxMelhorias && active ? "page" : undefined}
+                                  onMouseEnter={() => preCarregar(fav.to)}
+                                  onClick={(event) => {
+                                    if (
+                                      event.metaKey ||
+                                      event.ctrlKey ||
+                                      event.shiftKey ||
+                                      event.altKey ||
+                                      event.button !== 0
+                                    )
+                                      return;
+                                    event.preventDefault();
+                                    fecharSidebar();
+                                    irPara(href);
+                                  }}
+                                  className={`relative flex items-center gap-2.5 rounded-lg pl-3 pr-8 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                    active
+                                      ? "bg-card text-slate-900 shadow-sm"
+                                      : "text-white hover:bg-white/10 hover:text-white"
+                                  }${hoverScaleCls}`}
+                                >
+                                  <fav.icon className="h-[18px] w-[18px] shrink-0" />
+                                  <span className="leading-snug break-words">{fav.label}</span>
+                                </a>
+                                <EstrelaFavorito
+                                  marcado
+                                  rotulo={fav.label}
+                                  ativo={active}
+                                  onAlternar={() => void alternarFavorito(key)}
+                                />
+                              </div>
+                            );
+                          })}
+                      </div>
+                    );
+                  })()}
                 {searchedNavRows.map((row) => {
                   const leafIsActive = (to: string, hash?: string) =>
                     navLeafAtivo(itemDeMenuAtivo(location.pathname, to), location.hash, hash);
@@ -1868,37 +2023,46 @@ function AppShellInner() {
                                       );
                                     }
                                     return (
-                                      <a
-                                        key={linkKey}
-                                        href={href}
-                                        data-nav-to={child.to}
-                                        data-nav-active={active ? "true" : undefined}
-                                        aria-current={uxMelhorias && active ? "page" : undefined}
-                                        onMouseEnter={() => preCarregar(child.to)}
-                                        onClick={(event) => {
-                                          if (
-                                            event.metaKey ||
-                                            event.ctrlKey ||
-                                            event.shiftKey ||
-                                            event.altKey ||
-                                            event.button !== 0
-                                          )
-                                            return;
-                                          event.preventDefault();
-                                          fecharSidebar();
-                                          irPara(href);
-                                        }}
-                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
-                                          active
-                                            ? "bg-card text-slate-900 shadow-sm"
-                                            : "text-white hover:bg-white/10 hover:text-white"
-                                        }${hoverScaleCls}`}
-                                      >
-                                        <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                        <span className="leading-snug break-words">
-                                          {child.label}
-                                        </span>
-                                      </a>
+                                      <div key={linkKey} className="group/fav relative">
+                                        <a
+                                          href={href}
+                                          data-nav-to={child.to}
+                                          data-nav-active={active ? "true" : undefined}
+                                          aria-current={uxMelhorias && active ? "page" : undefined}
+                                          onMouseEnter={() => preCarregar(child.to)}
+                                          onClick={(event) => {
+                                            if (
+                                              event.metaKey ||
+                                              event.ctrlKey ||
+                                              event.shiftKey ||
+                                              event.altKey ||
+                                              event.button !== 0
+                                            )
+                                              return;
+                                            event.preventDefault();
+                                            fecharSidebar();
+                                            irPara(href);
+                                          }}
+                                          className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-8 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                            active
+                                              ? "bg-card text-slate-900 shadow-sm"
+                                              : "text-white hover:bg-white/10 hover:text-white"
+                                          }${hoverScaleCls}`}
+                                        >
+                                          <child.icon className="h-[18px] w-[18px] shrink-0" />
+                                          <span className="leading-snug break-words">
+                                            {child.label}
+                                          </span>
+                                        </a>
+                                        <EstrelaFavorito
+                                          marcado={favoritosSet.has(navItemKey(child))}
+                                          rotulo={child.label}
+                                          ativo={active}
+                                          onAlternar={() =>
+                                            void alternarFavorito(navItemKey(child))
+                                          }
+                                        />
+                                      </div>
                                     );
                                   })}
                               </div>
@@ -1911,39 +2075,46 @@ function AppShellInner() {
                               aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
                           const href = hrefDoNavLeaf(item);
                           return (
-                            <a
-                              key={navItemKey(item)}
-                              href={href}
-                              data-nav-to={item.to}
-                              data-nav-active={active ? "true" : undefined}
-                              aria-current={uxMelhorias && active ? "page" : undefined}
-                              onMouseEnter={() => preCarregar(item.to)}
-                              onClick={(event) => {
-                                if (
-                                  event.metaKey ||
-                                  event.ctrlKey ||
-                                  event.shiftKey ||
-                                  event.altKey ||
-                                  event.button !== 0
-                                )
-                                  return;
-                                event.preventDefault();
-                                fecharSidebar();
-                                irPara(href);
-                              }}
-                              {...dragProps(row.label, navItemKey(item))}
-                              className={cn(
-                                `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
-                                  active
-                                    ? "bg-card text-slate-900 shadow-sm"
-                                    : "text-white hover:bg-white/10 hover:text-white"
-                                }${hoverScaleCls}`,
-                                dragCls(navItemKey(item)),
-                              )}
-                            >
-                              <item.icon className="h-[18px] w-[18px] shrink-0" />
-                              <span className="leading-snug break-words">{item.label}</span>
-                            </a>
+                            <div key={navItemKey(item)} className="group/fav relative">
+                              <a
+                                href={href}
+                                data-nav-to={item.to}
+                                data-nav-active={active ? "true" : undefined}
+                                aria-current={uxMelhorias && active ? "page" : undefined}
+                                onMouseEnter={() => preCarregar(item.to)}
+                                onClick={(event) => {
+                                  if (
+                                    event.metaKey ||
+                                    event.ctrlKey ||
+                                    event.shiftKey ||
+                                    event.altKey ||
+                                    event.button !== 0
+                                  )
+                                    return;
+                                  event.preventDefault();
+                                  fecharSidebar();
+                                  irPara(href);
+                                }}
+                                {...dragProps(row.label, navItemKey(item))}
+                                className={cn(
+                                  `relative flex items-center gap-2.5 rounded-lg pl-3 pr-8 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                    active
+                                      ? "bg-card text-slate-900 shadow-sm"
+                                      : "text-white hover:bg-white/10 hover:text-white"
+                                  }${hoverScaleCls}`,
+                                  dragCls(navItemKey(item)),
+                                )}
+                              >
+                                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                                <span className="leading-snug break-words">{item.label}</span>
+                              </a>
+                              <EstrelaFavorito
+                                marcado={favoritosSet.has(navItemKey(item))}
+                                rotulo={item.label}
+                                ativo={active}
+                                onAlternar={() => void alternarFavorito(navItemKey(item))}
+                              />
+                            </div>
                           );
                         })}
                     </div>
