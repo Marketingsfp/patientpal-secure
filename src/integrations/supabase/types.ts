@@ -15582,6 +15582,20 @@ export type Database = {
           valor: number
         }[]
       }
+      _rel_agendamentos_acoes: {
+        Args: { _clinica_id: string; _fim: string; _ini: string }
+        Returns: {
+          feito_em: string
+          inicio: string
+          medico_id: string
+          paciente_nome: string
+          procedimento: string
+          record_id: string
+          tipo: string
+          user_email: string
+          user_id: string
+        }[]
+      }
       agenda_slot_lock: { Args: { _id: string }; Returns: Json }
       agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
       agendamento_historico: {
@@ -17941,6 +17955,30 @@ export type Database = {
           remarcados: number
           usuario_id: string
           usuario_nome: string
+        }[]
+      }
+      rel_agendamentos_por_usuario_dia: {
+        Args: { _clinica_id: string; _fim: string; _ini: string }
+        Returns: {
+          cancelados: number
+          confirmados: number
+          dia: string
+          marcados: number
+          remarcados: number
+          usuario_id: string
+          usuario_nome: string
+        }[]
+      }
+      rel_agendamentos_por_usuario_lista: {
+        Args: { _clinica_id: string; _dia: string; _usuario_id: string }
+        Returns: {
+          agendamento_id: string
+          feito_em: string
+          inicio: string
+          medico_nome: string
+          paciente_nome: string
+          procedimento: string
+          tipo: string
         }[]
       }
       rel_marcacoes_por_atendente: {

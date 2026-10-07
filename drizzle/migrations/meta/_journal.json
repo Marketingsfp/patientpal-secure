@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791393265459,
+      "tag": "0000_rel_agendamentos_por_usuario_dia_lista",
+      "breakpoints": true
+    }
+  ]
+}
