@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Button } from "@/components/ui/button";
 import { hojeBR } from "@/lib/date-utils";
-import { cn } from "@/lib/utils";
 
 /** Período da seção de médicos do Dashboard (datas puras YYYY-MM-DD). */
 export type PeriodoMedicos = { de: string; ate: string };
@@ -59,19 +58,28 @@ export function SeletorPeriodoMedicos({
           </Button>
         );
       })}
-      <DateInputBR
-        value={periodo.de}
-        onChange={(e) => e.target.value && onChange({ ...periodo, de: e.target.value })}
-        className={cn("h-8 w-36 text-xs")}
-        aria-label="Data inicial"
-      />
-      <span className="text-xs text-slate-500">até</span>
-      <DateInputBR
-        value={periodo.ate}
-        onChange={(e) => e.target.value && onChange({ ...periodo, ate: e.target.value })}
-        className={cn("h-8 w-36 text-xs")}
-        aria-label="Data final"
-      />
+      {/* O DateInputBR ocupa a largura toda do pai e ancora o calendário à
+          direita dele — a caixa de largura fixa mantém o ícone colado ao campo. */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-slate-500">De</span>
+        <div className="w-36 shrink-0">
+          <DateInputBR
+            value={periodo.de}
+            onChange={(e) => e.target.value && onChange({ ...periodo, de: e.target.value })}
+            className="h-8 text-xs"
+            aria-label="Data inicial"
+          />
+        </div>
+        <span className="text-xs text-slate-500">até</span>
+        <div className="w-36 shrink-0">
+          <DateInputBR
+            value={periodo.ate}
+            onChange={(e) => e.target.value && onChange({ ...periodo, ate: e.target.value })}
+            className="h-8 text-xs"
+            aria-label="Data final"
+          />
+        </div>
+      </div>
     </div>
   );
 }
