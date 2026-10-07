@@ -167,4 +167,8 @@ COMMENT ON FUNCTION public.rel_agendamentos_por_usuario IS
   'Produtividade da recepção: marcados, confirmados, cancelados e remarcados por usuário, pela data da ação, lidos da auditoria. Exige pode_autorizar + perfil de gestão.';
 
 REVOKE ALL ON FUNCTION public.rel_agendamentos_por_usuario(uuid, date, date) FROM PUBLIC;
+-- O privilégio padrão do projeto concede EXECUTE a `anon` explicitamente; o
+-- REVOKE de PUBLIC não o remove. A checagem de alçada já recusaria, mas quem
+-- não está logado não tem por que chamar a função.
+REVOKE EXECUTE ON FUNCTION public.rel_agendamentos_por_usuario(uuid, date, date) FROM anon;
 GRANT EXECUTE ON FUNCTION public.rel_agendamentos_por_usuario(uuid, date, date) TO authenticated;
