@@ -100,3 +100,111 @@ export const COLUNAS_PRODUTIVIDADE: { chave: keyof TotaisProdutividade; rotulo: 
   { chave: "remarcados", rotulo: "Remarcados" },
   { chave: "total", rotulo: "Total de ações" },
 ];
+
+// ── Dia a dia ───────────────────────────────────────────────────────────────
+// Função `rel_agendamentos_por_usuario_dia` (migração 20261007180000): mesma
+// contagem, quebrada pelo dia da ação. Somando os dias de um usuário dá o
+// número do período inteiro.
+
+/** Linha crua: um usuário num dia (`dia` em AAAA-MM-DD). */
+export type LinhaAgendamentosUsuarioDia = LinhaAgendamentosUsuario & { dia: string };
+
+export type DiaProdutividade = TotaisProdutividade & { dia: string };
+
+export type LinhaProdutividadeComDias = LinhaProdutividade & { dias: DiaProdutividade[] };
+
+export type RelatorioProdutividadeDiario = {
+  linhas: LinhaProdutividadeComDias[];
+  totais: TotaisProdutividade;
+};
+
+/**
+ * Agrupa as linhas por usuário (ordem, filtro e totais iguais aos de
+ * `montarRelatorioProdutividade`) e pendura em cada um os seus dias, do mais
+ * antigo para o mais recente.
+ */
+export function montarRelatorioPorDia(
+  cruas: readonly LinhaAgendamentosUsuarioDia[],
+  usuario = "todos",
+): RelatorioProdutividadeDiario {
+  const somadas = new Map<string, LinhaAgendamentosUsuario>();
+  const dias = new Map<string, DiaProdutividade[]>();
+  for (const c of cruas) {
+    const chave = c.usuario_id ?? USUARIO_SISTEMA;
+    const s = somadas.get(chave) ?? {
+      usuario_id: c.usuario_id,
+      usuario_nome: null,
+      marcados: 0,
+      confirmados: 0,
+      cancelados: 0,
+      remarcados: 0,
+    };
+    const dia: DiaProdutividade = {
+      dia: c.dia,
+      marcados: n(c.marcados),
+      confirmados: n(c.confirmados),
+      cancelados: n(c.cancelados),
+      remarcados: n(c.remarcados),
+      total: 0,
+    };
+    dia.total = dia.marcados + dia.confirmados + dia.cancelados + dia.remarcados;
+    s.usuario_nome = s.usuario_nome?.trim() ? s.usuario_nome : c.usuario_nome;
+    s.marcados += dia.marcados;
+    s.confirmados += dia.confirmados;
+    s.cancelados += dia.cancelados;
+    s.remarcados += dia.remarcados;
+    somadas.set(chave, s);
+    dias.set(chave, [...(dias.get(chave) ?? []), dia]);
+  }
+  const base = montarRelatorioProdutividade([...somadas.values()], usuario);
+  return {
+    totais: base.totais,
+    linhas: base.linhas.map((l) => ({
+      ...l,
+      dias: [...(dias.get(chaveUsuario(l)) ?? [])].sort((a, b) => a.dia.localeCompare(b.dia)),
+    })),
+  };
+}
+
+// ── Lista do dia ────────────────────────────────────────────────────────────
+// Função `rel_agendamentos_por_usuario_lista`: as ações de um usuário num dia.
+
+export type TipoAcaoAgenda = "marcado" | "confirmado" | "cancelado" | "remarcado";
+
+export type AcaoAgenda = {
+  agendamento_id: string | null;
+  /** Quando a ação foi feita. */
+  feito_em: string;
+  tipo: TipoAcaoAgenda;
+  paciente_nome: string | null;
+  /** Data e hora do atendimento marcado. */
+  inicio: string | null;
+  medico_nome: string | null;
+  procedimento: string | null;
+};
+
+export const ROTULO_ACAO: Record<TipoAcaoAgenda, string> = {
+  marcado: "Marcado",
+  confirmado: "Confirmado",
+  cancelado: "Cancelado",
+  remarcado: "Remarcado",
+};
+
+const FUSO = "America/Sao_Paulo";
+
+/** "14:32" no horário de Brasília. */
+export function horaBR(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("pt-BR", { timeZone: FUSO, hour: "2-digit", minute: "2-digit" });
+}
+
+/** "07/10/2026 14:30" no horário de Brasília. */
+export function dataHoraBR(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const data = d.toLocaleDateString("pt-BR", { timeZone: FUSO });
+  return `${data} ${horaBR(iso)}`;
+}

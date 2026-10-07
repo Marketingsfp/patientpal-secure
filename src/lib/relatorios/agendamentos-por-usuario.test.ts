@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  dataHoraBR,
+  horaBR,
+  montarRelatorioPorDia,
   montarRelatorioProdutividade,
   USUARIO_SISTEMA,
   type LinhaAgendamentosUsuario,
@@ -69,5 +72,46 @@ describe("montarRelatorioProdutividade", () => {
       { ...linha("u1", "A", 0, 0, 0, 0), marcados: "7" as unknown as number },
     ]);
     expect(r.linhas[0].marcados).toBe(7);
+  });
+});
+
+describe("montarRelatorioPorDia", () => {
+  const dia = (id: string | null, nome: string | null, d: string, m: number, co = 0) => ({
+    ...linha(id, nome, m, co, 0, 0),
+    dia: d,
+  });
+
+  it("soma os dias de cada usuário e mantém os dias em ordem", () => {
+    const r = montarRelatorioPorDia([
+      dia("u1", "ALESSANDRA", "2026-10-07", 45),
+      dia("u2", "NICOLE", "2026-10-06", 10, 2),
+      dia("u1", "ALESSANDRA", "2026-10-06", 30, 1),
+    ]);
+    expect(r.linhas.map((l) => l.nome)).toEqual(["ALESSANDRA", "NICOLE"]);
+    expect(r.linhas[0]).toMatchObject({ marcados: 75, confirmados: 1, total: 76 });
+    expect(r.linhas[0].dias.map((d) => [d.dia, d.marcados, d.total])).toEqual([
+      ["2026-10-06", 30, 31],
+      ["2026-10-07", 45, 45],
+    ]);
+    expect(r.totais.total).toBe(88);
+  });
+
+  it("filtra pelo usuário e trata a linha do sistema", () => {
+    const cruas = [
+      dia("u1", "ALESSANDRA", "2026-10-07", 45),
+      dia(null, "sistema", "2026-10-07", 3),
+    ];
+    const so = montarRelatorioPorDia(cruas, USUARIO_SISTEMA);
+    expect(so.linhas).toHaveLength(1);
+    expect(so.linhas[0]).toMatchObject({ ehSistema: true, total: 3 });
+    expect(so.linhas[0].dias).toHaveLength(1);
+  });
+});
+
+describe("hora e data no fuso de Brasília", () => {
+  it("converte do UTC", () => {
+    expect(horaBR("2026-10-07T17:32:00Z")).toBe("14:32");
+    expect(dataHoraBR("2026-10-08T01:30:00Z")).toBe("07/10/2026 22:30");
+    expect(horaBR(null)).toBe("");
   });
 });

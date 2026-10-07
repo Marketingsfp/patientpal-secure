@@ -2,14 +2,17 @@
 //
 // Quantas fichas cada usuário marcou, confirmou, cancelou e remarcou no
 // período — pela data em que a AÇÃO foi feita. Usa o "De/Até" do topo da tela
-// Relatórios. O número vem da função `rel_agendamentos_por_usuario`, que lê a
-// auditoria; as regras de contagem estão comentadas na migração
-// 20261007150000_rel_agendamentos_por_usuario.sql.
+// Relatórios. Cada usuário abre nos dias do período, e cada dia abre na lista
+// das ações feitas nele.
 //
-// Mesma alçada de "Marcações por atendente": a função confere
+// Os números vêm de `rel_agendamentos_por_usuario_dia` e a lista do dia de
+// `rel_agendamentos_por_usuario_lista`, que leem a auditoria; as regras de
+// contagem estão comentadas nas migrações 20261007150000 e 20261007180000.
+//
+// Mesma alçada de "Marcações por atendente": as funções conferem
 // `pode_autorizar` + perfil de gestão; a aba só aparece para quem passa.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Label } from "@/components/ui/label";
@@ -29,47 +32,64 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, Printer, UserCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Printer, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { exportarRelatorioXlsx } from "@/lib/exportar-xlsx";
+import { exportarPastaXlsx } from "@/lib/exportar-xlsx";
 import { imprimirRelatorio } from "@/lib/print-relatorio-financeiro";
 import { dataBR } from "@/lib/relatorios/marcacoes-por-atendente";
 import {
   chaveUsuario,
   COLUNAS_PRODUTIVIDADE,
-  montarRelatorioProdutividade,
-  type LinhaAgendamentosUsuario,
+  dataHoraBR,
+  horaBR,
+  montarRelatorioPorDia,
+  ROTULO_ACAO,
+  USUARIO_SISTEMA,
+  type AcaoAgenda,
+  type LinhaAgendamentosUsuarioDia,
 } from "@/lib/relatorios/agendamentos-por-usuario";
+
+const ehRecusaDeAlcada = (error: { code?: string; message: string }) =>
+  error.code === "42501" || /permiss/i.test(error.message);
+
+/** Chave da lista de um dia: usuário + dia. */
+const chaveDia = (usuario: string, dia: string) => `${usuario}|${dia}`;
 
 export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string }) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
 
   const [usuario, setUsuario] = useState("todos");
-  const [cruas, setCruas] = useState<LinhaAgendamentosUsuario[] | null>(null);
+  const [cruas, setCruas] = useState<LinhaAgendamentosUsuarioDia[] | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [semPermissao, setSemPermissao] = useState(false);
+  // Usuários abertos nos dias e dias abertos na lista (chave usuário|dia).
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
+  const [diasAbertos, setDiasAbertos] = useState<Set<string>>(new Set());
+  // Listas já buscadas; `null` enquanto carrega.
+  const [listas, setListas] = useState<Record<string, AcaoAgenda[] | null>>({});
 
   const buscar = useCallback(async () => {
     if (!clinicaId || !ini || !fim) return;
     setCarregando(true);
     setSemPermissao(false);
+    setDiasAbertos(new Set());
+    setListas({});
     try {
       const { data, error } = await supabase.rpc(
-        "rel_agendamentos_por_usuario" as never,
+        "rel_agendamentos_por_usuario_dia" as never,
         { _clinica_id: clinicaId, _ini: ini, _fim: fim } as never,
       );
       if (error) {
-        // 42501 é a recusa de alçada levantada pela própria função.
-        if (error.code === "42501" || /permiss/i.test(error.message)) {
+        if (ehRecusaDeAlcada(error)) {
           setSemPermissao(true);
           setCruas([]);
           return;
         }
         throw error;
       }
-      setCruas((data ?? []) as unknown as LinhaAgendamentosUsuario[]);
+      setCruas((data ?? []) as unknown as LinhaAgendamentosUsuarioDia[]);
     } catch (e) {
       mostrarErro(e);
     } finally {
@@ -86,16 +106,74 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
   // feito aqui, sem nova consulta ao banco.
   const opcoes = useMemo(
     () =>
-      montarRelatorioProdutividade(cruas ?? [])
+      montarRelatorioPorDia(cruas ?? [])
         .linhas.map((l) => ({ valor: chaveUsuario(l), nome: l.nome }))
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })),
     [cruas],
   );
   const usuarioEfetivo = opcoes.some((o) => o.valor === usuario) ? usuario : "todos";
   const relatorio = useMemo(
-    () => montarRelatorioProdutividade(cruas ?? [], usuarioEfetivo),
+    () => montarRelatorioPorDia(cruas ?? [], usuarioEfetivo),
     [cruas, usuarioEfetivo],
   );
+
+  // Com um usuário só na tela, os dias dele já vêm abertos.
+  const usuarioAberto = (chave: string) => usuarioEfetivo !== "todos" || abertos.has(chave);
+
+  function alternarUsuario(chave: string) {
+    setAbertos((s) => {
+      const novo = new Set(s);
+      if (novo.has(chave)) novo.delete(chave);
+      else novo.add(chave);
+      return novo;
+    });
+  }
+
+  const todosAbertos =
+    relatorio.linhas.length > 0 && relatorio.linhas.every((l) => usuarioAberto(chaveUsuario(l)));
+
+  function alternarTodos() {
+    setAbertos(todosAbertos ? new Set() : new Set(relatorio.linhas.map(chaveUsuario)));
+  }
+
+  async function alternarDia(usuarioChave: string, dia: string) {
+    const chave = chaveDia(usuarioChave, dia);
+    if (diasAbertos.has(chave)) {
+      setDiasAbertos((s) => {
+        const novo = new Set(s);
+        novo.delete(chave);
+        return novo;
+      });
+      return;
+    }
+    setDiasAbertos((s) => new Set(s).add(chave));
+    if (listas[chave] !== undefined || !clinicaId) return;
+    setListas((l) => ({ ...l, [chave]: null }));
+    try {
+      const { data, error } = await supabase.rpc(
+        "rel_agendamentos_por_usuario_lista" as never,
+        {
+          _clinica_id: clinicaId,
+          _dia: dia,
+          _usuario_id: usuarioChave === USUARIO_SISTEMA ? null : usuarioChave,
+        } as never,
+      );
+      if (error) throw error;
+      setListas((l) => ({ ...l, [chave]: (data ?? []) as unknown as AcaoAgenda[] }));
+    } catch (e) {
+      mostrarErro(e);
+      // Deixa tentar de novo ao clicar outra vez.
+      setListas((l) => {
+        const { [chave]: _, ...resto } = l;
+        return resto;
+      });
+      setDiasAbertos((s) => {
+        const novo = new Set(s);
+        novo.delete(chave);
+        return novo;
+      });
+    }
+  }
 
   const periodo = `${dataBR(ini)} a ${dataBR(fim)}`;
   const usuarioRotulo =
@@ -109,25 +187,44 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
       toast.info("Sem ações na agenda no período selecionado.");
       return;
     }
+    const titulo = `${clinicaAtual?.clinica.nome ?? ""} — Agendamentos por usuário`;
+    const numericas = COLUNAS_PRODUTIVIDADE.map((c) => ({
+      rotulo: c.rotulo,
+      tipo: "numero" as const,
+      largura: 14,
+    }));
     try {
-      await exportarRelatorioXlsx({
-        arquivo: `agendamentos-por-usuario-${ini}-a-${fim}`,
-        aba: "Agendamentos por usuário",
-        cabecalho: [`${clinicaAtual?.clinica.nome ?? ""} — Agendamentos por usuário`, ...contexto],
-        colunas: [
-          { rotulo: "Usuário", tipo: "texto", largura: 42 },
-          ...COLUNAS_PRODUTIVIDADE.map((c) => ({
-            rotulo: c.rotulo,
-            tipo: "numero" as const,
-            largura: 14,
-          })),
-        ],
-        linhas: relatorio.linhas.map((l) => [
-          l.nome,
-          ...COLUNAS_PRODUTIVIDADE.map((c) => l[c.chave]),
-        ]),
-        totais: ["TOTAL", ...COLUNAS_PRODUTIVIDADE.map((c) => relatorio.totais[c.chave])],
-      });
+      await exportarPastaXlsx(`agendamentos-por-usuario-${ini}-a-${fim}`, [
+        {
+          arquivo: "",
+          aba: "Por usuário",
+          cabecalho: [titulo, ...contexto],
+          colunas: [{ rotulo: "Usuário", tipo: "texto", largura: 42 }, ...numericas],
+          linhas: relatorio.linhas.map((l) => [
+            l.nome,
+            ...COLUNAS_PRODUTIVIDADE.map((c) => l[c.chave]),
+          ]),
+          totais: ["TOTAL", ...COLUNAS_PRODUTIVIDADE.map((c) => relatorio.totais[c.chave])],
+        },
+        {
+          arquivo: "",
+          aba: "Por dia",
+          cabecalho: [titulo, ...contexto],
+          colunas: [
+            { rotulo: "Usuário", tipo: "texto", largura: 42 },
+            { rotulo: "Dia", tipo: "texto", largura: 12 },
+            ...numericas,
+          ],
+          linhas: relatorio.linhas.flatMap((l) =>
+            l.dias.map((d) => [
+              l.nome,
+              dataBR(d.dia),
+              ...COLUNAS_PRODUTIVIDADE.map((c) => d[c.chave]),
+            ]),
+          ),
+          totais: ["TOTAL", "", ...COLUNAS_PRODUTIVIDADE.map((c) => relatorio.totais[c.chave])],
+        },
+      ]);
       toast.success("Planilha gerada.");
     } catch (e) {
       mostrarErro(e);
@@ -145,13 +242,19 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
       periodo,
       colunas: [
         { rotulo: "Usuário" },
+        { rotulo: "Dia" },
         ...COLUNAS_PRODUTIVIDADE.map((c) => ({ rotulo: c.rotulo, numerica: true })),
       ],
-      linhas: relatorio.linhas.map((l) => [
-        l.nome,
-        ...COLUNAS_PRODUTIVIDADE.map((c) => String(l[c.chave])),
+      // Os dias de cada usuário e, logo abaixo, o total dele no período.
+      linhas: relatorio.linhas.flatMap((l) => [
+        ...l.dias.map((d) => [
+          l.nome,
+          dataBR(d.dia),
+          ...COLUNAS_PRODUTIVIDADE.map((c) => String(d[c.chave])),
+        ]),
+        [l.nome, "Total do período", ...COLUNAS_PRODUTIVIDADE.map((c) => String(l[c.chave]))],
       ]),
-      totais: ["TOTAL", ...COLUNAS_PRODUTIVIDADE.map((c) => String(relatorio.totais[c.chave]))],
+      totais: ["TOTAL", "", ...COLUNAS_PRODUTIVIDADE.map((c) => String(relatorio.totais[c.chave]))],
       resumo: contexto.map((t) => {
         const i = t.indexOf(":");
         return { rotulo: t.slice(0, i), valor: t.slice(i + 1).trim() };
@@ -210,13 +313,20 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
               <UserCheck className="h-4 w-4 text-muted-foreground" />
               Agendamentos por usuário
             </div>
-            <div className="text-xs text-muted-foreground">{contexto.join(" · ")}</div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="text-xs text-muted-foreground">{contexto.join(" · ")}</div>
+              {usuarioEfetivo === "todos" && relatorio.linhas.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={alternarTodos}>
+                  {todosAbertos ? "Fechar todos" : "Abrir dia a dia de todos"}
+                </Button>
+              )}
+            </div>
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Usuário</TableHead>
+                <TableHead>Usuário / dia</TableHead>
                 {COLUNAS_PRODUTIVIDADE.map((c) => (
                   <TableHead key={c.chave} className="w-28 text-right">
                     {c.rotulo}
@@ -244,23 +354,76 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
                   </TableCell>
                 </TableRow>
               ) : (
-                relatorio.linhas.map((l) => (
-                  <TableRow key={chaveUsuario(l)}>
-                    <TableCell
-                      className={l.ehSistema ? "italic text-muted-foreground" : "font-medium"}
-                    >
-                      {l.nome}
-                    </TableCell>
-                    {COLUNAS_PRODUTIVIDADE.map((c) => (
-                      <TableCell
-                        key={c.chave}
-                        className={`text-right tabular-nums${c.chave === "total" ? " font-semibold" : ""}`}
+                relatorio.linhas.map((l) => {
+                  const chave = chaveUsuario(l);
+                  const aberto = usuarioAberto(chave);
+                  return (
+                    <Fragment key={chave}>
+                      <TableRow
+                        className={usuarioEfetivo === "todos" ? "cursor-pointer" : undefined}
+                        onClick={() => usuarioEfetivo === "todos" && alternarUsuario(chave)}
                       >
-                        {l[c.chave]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                        <TableCell
+                          className={l.ehSistema ? "italic text-muted-foreground" : "font-medium"}
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            {aberto ? (
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            )}
+                            {l.nome}
+                          </span>
+                        </TableCell>
+                        {COLUNAS_PRODUTIVIDADE.map((c) => (
+                          <TableCell
+                            key={c.chave}
+                            className={`text-right tabular-nums${c.chave === "total" ? " font-semibold" : ""}`}
+                          >
+                            {l[c.chave]}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                      {aberto &&
+                        l.dias.map((d) => {
+                          const kDia = chaveDia(chave, d.dia);
+                          const diaAberto = diasAbertos.has(kDia);
+                          return (
+                            <Fragment key={kDia}>
+                              <TableRow
+                                className="cursor-pointer bg-muted/30 text-sm"
+                                onClick={() => void alternarDia(chave, d.dia)}
+                                title="Ver as ações feitas neste dia"
+                              >
+                                <TableCell className="pl-10">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    {diaAberto ? (
+                                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    )}
+                                    {dataBR(d.dia)}
+                                  </span>
+                                </TableCell>
+                                {COLUNAS_PRODUTIVIDADE.map((c) => (
+                                  <TableCell key={c.chave} className="text-right tabular-nums">
+                                    {d[c.chave]}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              {diaAberto && (
+                                <TableRow className="hover:bg-transparent">
+                                  <TableCell colSpan={colSpan} className="bg-muted/10 py-2 pl-16">
+                                    <ListaDoDia acoes={listas[kDia]} />
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                    </Fragment>
+                  );
+                })
               )}
               {relatorio.linhas.length > 0 && (
                 <TableRow className="font-bold">
@@ -277,7 +440,8 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
 
           <div className="border-t px-4 py-2 text-[11px] leading-snug text-muted-foreground">
             Conta as ações feitas no período, pela data em que foram feitas (não pela data do
-            atendimento). <strong>Marcados</strong>: paciente colocado numa vaga ou encaixe.{" "}
+            atendimento). Clique no nome para ver dia a dia e no dia para ver a lista.{" "}
+            <strong>Marcados</strong>: paciente colocado numa vaga ou encaixe.{" "}
             <strong>Confirmados</strong>: ficha passada para confirmado. <strong>Cancelados</strong>
             : paciente retirado da vaga, ficha excluída ou cancelada. <strong>Remarcados</strong>:
             paciente movido para outro horário (não conta como cancelado nem como marcado).
@@ -287,5 +451,41 @@ export function AgendamentosPorUsuario({ ini, fim }: { ini: string; fim: string 
         </div>
       )}
     </div>
+  );
+}
+
+/** Ações de um usuário num dia: hora da ação, tipo, paciente e o que foi marcado. */
+function ListaDoDia({ acoes }: { acoes: AcaoAgenda[] | null | undefined }) {
+  if (!acoes) {
+    return <div className="py-2 text-xs text-muted-foreground">Carregando a lista…</div>;
+  }
+  if (acoes.length === 0) {
+    return <div className="py-2 text-xs text-muted-foreground">Nenhuma ação neste dia.</div>;
+  }
+  return (
+    <table className="w-full text-xs">
+      <thead className="text-muted-foreground">
+        <tr className="text-left">
+          <th className="w-14 py-1 pr-3 font-medium">Hora</th>
+          <th className="w-24 py-1 pr-3 font-medium">Ação</th>
+          <th className="py-1 pr-3 font-medium">Paciente</th>
+          <th className="w-32 py-1 pr-3 font-medium">Atendimento em</th>
+          <th className="py-1 pr-3 font-medium">Profissional</th>
+          <th className="py-1 font-medium">Procedimento</th>
+        </tr>
+      </thead>
+      <tbody>
+        {acoes.map((a, i) => (
+          <tr key={`${a.agendamento_id ?? ""}-${a.feito_em}-${a.tipo}-${i}`} className="border-t">
+            <td className="py-1 pr-3 tabular-nums">{horaBR(a.feito_em)}</td>
+            <td className="py-1 pr-3">{ROTULO_ACAO[a.tipo] ?? a.tipo}</td>
+            <td className="py-1 pr-3">{a.paciente_nome}</td>
+            <td className="py-1 pr-3 tabular-nums">{dataHoraBR(a.inicio)}</td>
+            <td className="py-1 pr-3">{a.medico_nome}</td>
+            <td className="py-1">{a.procedimento}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
