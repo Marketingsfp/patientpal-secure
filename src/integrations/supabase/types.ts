@@ -8389,6 +8389,7 @@ export type Database = {
           cancelada_motivo: string | null
           chave_acesso: string | null
           clinica_id: string
+          codigo_nbs: string | null
           codigo_verificacao: string | null
           consulta_erro_codigo: string | null
           consulta_erro_em: string | null
@@ -8436,6 +8437,7 @@ export type Database = {
           cancelada_motivo?: string | null
           chave_acesso?: string | null
           clinica_id: string
+          codigo_nbs?: string | null
           codigo_verificacao?: string | null
           consulta_erro_codigo?: string | null
           consulta_erro_em?: string | null
@@ -8483,6 +8485,7 @@ export type Database = {
           cancelada_motivo?: string | null
           chave_acesso?: string | null
           clinica_id?: string
+          codigo_nbs?: string | null
           codigo_verificacao?: string | null
           consulta_erro_codigo?: string | null
           consulta_erro_em?: string | null
@@ -8596,6 +8599,8 @@ export type Database = {
       nfse_emitentes: {
         Row: {
           aliquota_iss: number
+          aliquota_cofins: number | null
+          aliquota_pis: number | null
           ativo: boolean
           bairro: string
           cep: string
@@ -8606,6 +8611,7 @@ export type Database = {
           cnpj: string
           codigo_cnae: string | null
           codigo_municipio: string
+          codigo_nbs: string | null
           codigo_tributario_municipio: string | null
           complemento: string | null
           created_at: string
@@ -8615,6 +8621,9 @@ export type Database = {
           focus_token_homologacao: string | null
           focus_token_producao: string | null
           id: string
+          ibs_cbs_classificacao: string | null
+          ibs_cbs_cst: string | null
+          ibs_cbs_indicador_operacao: string | null
           incentivador_cultural: boolean
           inscricao_estadual: string | null
           inscricao_municipal: string
@@ -8627,6 +8636,7 @@ export type Database = {
           optante_simples: boolean
           padrao: boolean
           pct_total_tributos_sn: number | null
+          pis_cofins_cst: string | null
           razao_social: string
           regime_apuracao_sn: number
           regime_tributario: string
@@ -8639,6 +8649,8 @@ export type Database = {
         }
         Insert: {
           aliquota_iss?: number
+          aliquota_cofins?: number | null
+          aliquota_pis?: number | null
           ativo?: boolean
           bairro: string
           cep: string
@@ -8649,6 +8661,7 @@ export type Database = {
           cnpj: string
           codigo_cnae?: string | null
           codigo_municipio: string
+          codigo_nbs?: string | null
           codigo_tributario_municipio?: string | null
           complemento?: string | null
           created_at?: string
@@ -8658,6 +8671,9 @@ export type Database = {
           focus_token_homologacao?: string | null
           focus_token_producao?: string | null
           id?: string
+          ibs_cbs_classificacao?: string | null
+          ibs_cbs_cst?: string | null
+          ibs_cbs_indicador_operacao?: string | null
           incentivador_cultural?: boolean
           inscricao_estadual?: string | null
           inscricao_municipal: string
@@ -8670,6 +8686,7 @@ export type Database = {
           optante_simples?: boolean
           padrao?: boolean
           pct_total_tributos_sn?: number | null
+          pis_cofins_cst?: string | null
           razao_social: string
           regime_apuracao_sn?: number
           regime_tributario?: string
@@ -8682,6 +8699,8 @@ export type Database = {
         }
         Update: {
           aliquota_iss?: number
+          aliquota_cofins?: number | null
+          aliquota_pis?: number | null
           ativo?: boolean
           bairro?: string
           cep?: string
@@ -8692,6 +8711,7 @@ export type Database = {
           cnpj?: string
           codigo_cnae?: string | null
           codigo_municipio?: string
+          codigo_nbs?: string | null
           codigo_tributario_municipio?: string | null
           complemento?: string | null
           created_at?: string
@@ -8701,6 +8721,9 @@ export type Database = {
           focus_token_homologacao?: string | null
           focus_token_producao?: string | null
           id?: string
+          ibs_cbs_classificacao?: string | null
+          ibs_cbs_cst?: string | null
+          ibs_cbs_indicador_operacao?: string | null
           incentivador_cultural?: boolean
           inscricao_estadual?: string | null
           inscricao_municipal?: string
@@ -8713,6 +8736,7 @@ export type Database = {
           optante_simples?: boolean
           padrao?: boolean
           pct_total_tributos_sn?: number | null
+          pis_cofins_cst?: string | null
           razao_social?: string
           regime_apuracao_sn?: number
           regime_tributario?: string

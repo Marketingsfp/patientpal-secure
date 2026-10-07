@@ -56,6 +56,13 @@ interface Row {
   usar_ambiente_nacional: boolean | null;
   regime_apuracao_sn: number | null;
   pct_total_tributos_sn: number | null;
+  codigo_nbs: string | null;
+  pis_cofins_cst: string | null;
+  aliquota_pis: number | null;
+  aliquota_cofins: number | null;
+  ibs_cbs_cst: string | null;
+  ibs_cbs_classificacao: string | null;
+  ibs_cbs_indicador_operacao: string | null;
 }
 
 interface Form {
@@ -89,7 +96,17 @@ interface Form {
   usar_ambiente_nacional: boolean;
   regime_apuracao_sn: string;
   pct_total_tributos_sn: string;
+  codigo_nbs: string;
+  pis_cofins_cst: string;
+  aliquota_pis: string;
+  aliquota_cofins: string;
+  ibs_cbs_cst: string;
+  ibs_cbs_classificacao: string;
+  ibs_cbs_indicador_operacao: string;
 }
+
+/** Percentual digitado ("0,65") para número; vazio = null. */
+const pctOuNull = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
 
 const REGIMES = [
   { v: "simples_nacional", l: "Simples Nacional" },
@@ -105,7 +122,7 @@ function NfseConfigPage() {
       <ClinicaNfseModoCard />
       <SimpleCrud<Row, Form>
         table="nfse_emitentes"
-        selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional, regime_apuracao_sn, pct_total_tributos_sn"
+        selectColumns="id, nome, cnpj, razao_social, nome_fantasia, inscricao_municipal, cep, logradouro, numero, complemento, bairro, municipio, uf, codigo_municipio, telefone, email, regime_tributario, optante_simples, item_lista_servico, codigo_tributario_municipio, codigo_cnae, aliquota_iss, descricao_servico_padrao, focus_ambiente, rps_serie, rps_proximo_numero, ativo, padrao, usar_ambiente_nacional, regime_apuracao_sn, pct_total_tributos_sn, codigo_nbs, pis_cofins_cst, aliquota_pis, aliquota_cofins, ibs_cbs_cst, ibs_cbs_classificacao, ibs_cbs_indicador_operacao"
         title="Emitentes NFS-e"
         subtitle="CNPJs cadastrados para emissão de notas fiscais via Focus NFe."
         icon={<Building2 className="h-5 w-5" />}
@@ -202,6 +219,13 @@ function NfseConfigPage() {
           usar_ambiente_nacional: false,
           regime_apuracao_sn: "1",
           pct_total_tributos_sn: "",
+          codigo_nbs: "",
+          pis_cofins_cst: "",
+          aliquota_pis: "",
+          aliquota_cofins: "",
+          ibs_cbs_cst: "",
+          ibs_cbs_classificacao: "",
+          ibs_cbs_indicador_operacao: "",
         }}
         toForm={(r) => ({
           nome: r.nome,
@@ -235,6 +259,13 @@ function NfseConfigPage() {
           regime_apuracao_sn: String(r.regime_apuracao_sn ?? 1),
           pct_total_tributos_sn:
             r.pct_total_tributos_sn == null ? "" : String(r.pct_total_tributos_sn),
+          codigo_nbs: r.codigo_nbs ?? "",
+          pis_cofins_cst: r.pis_cofins_cst ?? "",
+          aliquota_pis: r.aliquota_pis == null ? "" : String(r.aliquota_pis),
+          aliquota_cofins: r.aliquota_cofins == null ? "" : String(r.aliquota_cofins),
+          ibs_cbs_cst: r.ibs_cbs_cst ?? "",
+          ibs_cbs_classificacao: r.ibs_cbs_classificacao ?? "",
+          ibs_cbs_indicador_operacao: r.ibs_cbs_indicador_operacao ?? "",
         })}
         toPayload={(f) => ({
           nome: f.nome,
@@ -270,6 +301,13 @@ function NfseConfigPage() {
             f.pct_total_tributos_sn.trim() === ""
               ? null
               : Number(f.pct_total_tributos_sn.replace(",", ".")),
+          codigo_nbs: f.codigo_nbs.replace(/\D/g, "") || null,
+          pis_cofins_cst: f.pis_cofins_cst.replace(/\D/g, "") || null,
+          aliquota_pis: pctOuNull(f.aliquota_pis),
+          aliquota_cofins: pctOuNull(f.aliquota_cofins),
+          ibs_cbs_cst: f.ibs_cbs_cst.replace(/\D/g, "") || null,
+          ibs_cbs_classificacao: f.ibs_cbs_classificacao.replace(/\D/g, "") || null,
+          ibs_cbs_indicador_operacao: f.ibs_cbs_indicador_operacao.replace(/\D/g, "") || null,
         })}
         validate={(f) => {
           if (!f.nome.trim()) return "Informe o apelido do emitente.";
@@ -292,6 +330,12 @@ function NfseConfigPage() {
           ) {
             return "O Cód. Tributário Município deve ter 3 dígitos; código IBGE fica no campo Cód. IBGE Município.";
           }
+          if (f.codigo_nbs.trim() && !/^\d{9}$/.test(f.codigo_nbs.replace(/\D/g, "")))
+            return "O NBS deve ter 9 dígitos (ex.: 1.2301.94.00).";
+          if (!f.aliquota_pis.trim() !== !f.aliquota_cofins.trim())
+            return "Preencha as alíquotas de PIS e COFINS juntas, ou deixe as duas vazias.";
+          if (!f.ibs_cbs_cst.trim() !== !f.ibs_cbs_classificacao.trim())
+            return "Preencha o CST e a classificação do IBS/CBS juntos, ou deixe os dois vazios.";
           return null;
         }}
         renderForm={(f, set) => (
@@ -488,6 +532,72 @@ function NfseConfigPage() {
                   <Input
                     value={f.codigo_cnae}
                     onChange={(e) => set({ ...f, codigo_cnae: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label>NBS padrão</Label>
+                  <Input
+                    value={f.codigo_nbs}
+                    onChange={(e) => set({ ...f, codigo_nbs: e.target.value })}
+                    placeholder="Ex.: 1.2301.94.00 (opcional)"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Consulta, exame de imagem, laboratório, procedimento e prótese já saem com o
+                    código e o NBS do portal; este vale para os demais serviços.
+                  </p>
+                </div>
+              </div>
+              {!f.optante_simples && (
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <div className="space-y-1">
+                    <Label>CST PIS/COFINS</Label>
+                    <Input
+                      value={f.pis_cofins_cst}
+                      onChange={(e) => set({ ...f, pis_cofins_cst: e.target.value })}
+                      placeholder="01"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Alíquota PIS (%)</Label>
+                    <Input
+                      value={f.aliquota_pis}
+                      onChange={(e) => set({ ...f, aliquota_pis: e.target.value })}
+                      placeholder="0,65"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Alíquota COFINS (%)</Label>
+                    <Input
+                      value={f.aliquota_cofins}
+                      onChange={(e) => set({ ...f, aliquota_cofins: e.target.value })}
+                      placeholder="3"
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="space-y-1">
+                  <Label>CST IBS/CBS</Label>
+                  <Input
+                    value={f.ibs_cbs_cst}
+                    onChange={(e) => set({ ...f, ibs_cbs_cst: e.target.value })}
+                    placeholder="200 (opcional)"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Classificação IBS/CBS</Label>
+                  <Input
+                    value={f.ibs_cbs_classificacao}
+                    onChange={(e) => set({ ...f, ibs_cbs_classificacao: e.target.value })}
+                    placeholder="200029"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Indicador de operação</Label>
+                  <Input
+                    value={f.ibs_cbs_indicador_operacao}
+                    onChange={(e) => set({ ...f, ibs_cbs_indicador_operacao: e.target.value })}
+                    placeholder="030101"
                   />
                 </div>
               </div>
