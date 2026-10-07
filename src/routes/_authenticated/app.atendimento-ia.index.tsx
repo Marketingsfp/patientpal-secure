@@ -561,20 +561,28 @@ function AtendimentoIaPage() {
     [listaVisivel],
   );
 
-  // Rascunho do editor na fila: carrega o prontuário já gravado do agendamento.
+  // Rascunho do editor na fila: carrega o prontuário já gravado do agendamento
+  // exibido (aberto ou o primeiro da lista) e do que está em baixa, para que
+  // salvar/baixar nunca sobrescreva o texto já gravado com um editor vazio.
+  const idEditor = (emAtendimento.find((x) => x.id === aberto) ?? emAtendimento[0])?.id ?? null;
   useEffect(() => {
-    if (!aberto || rascunho[aberto] !== undefined) return;
-    void (async () => {
-      const { data } = await supabase
-        .from("prontuarios")
-        .select("historia_doenca")
-        .eq("agendamento_id", aberto)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      setRascunho((r) => ({ ...r, [aberto]: (data?.historia_doenca as string | null) ?? "" }));
-    })();
-  }, [aberto]);
+    for (const id of [idEditor, baixa?.id ?? null]) {
+      if (!id || rascunho[id] !== undefined) continue;
+      void (async () => {
+        const { data, error } = await supabase
+          .from("prontuarios")
+          .select("historia_doenca")
+          .eq("agendamento_id", id)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (error) return; // sem confirmar o texto gravado, o editor segue bloqueado
+        setRascunho((r) =>
+          r[id] !== undefined ? r : { ...r, [id]: (data?.historia_doenca as string | null) ?? "" },
+        );
+      })();
+    }
+  }, [idEditor, baixa?.id]);
 
   async function chamar(item: FilaItem) {
     if (!clinicaAtual || chamandoId) return;

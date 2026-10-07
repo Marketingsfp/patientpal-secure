@@ -32,8 +32,20 @@ export function apresentarRespostaDeFoto(texto: string, obrigatoria: boolean,
 /** Só uma nova imagem DEPOIS do pedido entregue vale como segunda tentativa. */
 export function decidirFotos(entradas: MensagemFoto[], historico: MensagemFoto[]) {
   const fotos = entradas.filter(m => m.direction === "in" && m.tipo === "image");
-  if (fotos.some(m => leituraSalvaDaFoto(m.raw)?.tipo === "falha_tecnica" || !leituraSalvaDaFoto(m.raw)))
+  const tecnicas = fotos.filter(m => leituraSalvaDaFoto(m.raw)?.tipo === "falha_tecnica" || !leituraSalvaDaFoto(m.raw));
+  if (tecnicas.length) {
+    // Limite de itens se repete em qualquer reenvio: vai direto para a equipe.
+    if (tecnicas.some(m => (leituraSalvaDaFoto(m.raw) as { motivo?: string } | null)?.motivo === "limite_itens"))
+      return { acao: "encaminhar", motivo: "FOTO_FALHA_TECNICA_PERSISTENTE" } as const;
+    // Falha técnica depois de um pedido de reenvio já entregue: não repetir o pedido.
+    const ids = new Set(entradas.map(m => m.id));
+    const aviso = historico.filter(m => !ids.has(m.id) && m.direction === "out" && m.enviada_por === "nina" &&
+      ["sent", "delivered", "read"].includes(m.status ?? "") && compacto(m.body ?? "").endsWith(compacto(FALHA_TECNICA_FOTO)))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    if (aviso && tecnicas.some(m => Date.parse(m.created_at) > Date.parse(aviso.created_at)))
+      return { acao: "encaminhar", motivo: "FOTO_FALHA_TECNICA_PERSISTENTE" } as const;
     return { acao: "falha_tecnica", motivo: "FOTO_FALHA_TECNICA" } as const;
+  }
   const falhas = fotos.filter(m => leituraSalvaDaFoto(m.raw)?.tipo === "ilegivel");
   if (falhas.length) {
     const ids = new Set(entradas.map(m => m.id));
