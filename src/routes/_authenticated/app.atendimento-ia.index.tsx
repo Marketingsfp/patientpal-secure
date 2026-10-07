@@ -943,10 +943,14 @@ function AtendimentoIaPage() {
                   </Card>
                   <div className="space-y-1">
                     <div className="text-sm font-medium">Prontuário</div>
+                    {rascunho[it.id] === undefined ? (
+                      <div className="text-sm text-muted-foreground">Carregando prontuário…</div>
+                    ) : (
                     <EditorProntuario
                       value={rascunho[it.id] ?? ""}
                       onChange={(v) => setRascunho((r) => ({ ...r, [it.id]: v }))}
                     />
+                    )}
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
@@ -1106,7 +1110,7 @@ function AtendimentoIaPage() {
         </Tabs>
       </Card>
 
-      {baixa && clinicaAtual && baixa.paciente_id && (
+      {baixa && clinicaAtual && baixa.paciente_id && rascunho[baixa.id] !== undefined && (
         <BaixaAgendamentoDialog
           open
           onOpenChange={(v) => !v && setBaixa(null)}
