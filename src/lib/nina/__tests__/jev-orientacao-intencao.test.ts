@@ -32,6 +32,12 @@ describe("Jev: orientação ativa da resposta", () => {
     expect(orientar({})).toBeNull();
     expect(orientarIntencaoJev(null, ["valor"])).toBeNull();
   });
+  test("perguntar se tem o atendimento leva à escolha antes da lista", () => {
+    const o = orientar({ obs_pedido_profissionais: { noul: 0.95 } })!;
+    const texto = o.instrucoes.join("\n");
+    expect(texto).toContain("ESCOLHA_ANTES_DOS_DETALHES");
+    expect(texto).toContain("sem listar nomes, escalas nem preços");
+  });
   test("dias habituais orientam a base e oferta de consulta, sem virar disponibilidade", () => {
     const o = orientar({ obs_pedido_horario_habitual: { noul: 0.98 } })!;
     expect(o.intencoes).not.toContain("disponibilidade");
