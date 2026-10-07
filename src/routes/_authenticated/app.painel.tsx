@@ -31,7 +31,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
 import { BannerBoasVindas } from "@/components/painel/banner-boas-vindas";
-import { MedicosDoDiaTv } from "@/components/painel/medicos-do-dia-tv";
+import { MedicosDoDiaTv, type MedicoDoDia } from "@/components/painel/medicos-do-dia-tv";
+import {
+  ehPeriodoHoje,
+  periodoHoje,
+  SeletorPeriodoMedicos,
+  useMedicosPeriodo,
+  type PeriodoMedicos,
+} from "@/components/painel/medicos-periodo";
+import { formatDatePura } from "@/lib/date-utils";
 import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
@@ -284,17 +292,7 @@ function DashboardOperacional() {
     const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
     const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
     const novos = d?.pacientesNovos ?? new Set<string>();
-    const mapa = new Map<
-      string,
-      {
-        id: string;
-        nome: string;
-        especialidade: string | null;
-        total: number;
-        pagos: number;
-        novos: number;
-      }
-    >();
+    const mapa = new Map<string, MedicoDoDia>();
     for (const a of ags) {
       const id = a.medico_id as string;
       const info = medInfo.get(id);
@@ -303,10 +301,14 @@ function DashboardOperacional() {
         nome: info?.nome ?? "Médico",
         especialidade: info?.especialidade_id ? (espNome.get(info.especialidade_id) ?? null) : null,
         total: 0,
+        atendidos: 0,
+        faltas: 0,
         pagos: 0,
         novos: 0,
       };
       item.total += 1;
+      if (a.status === "realizado" || a.fluxo_etapa === "finalizado") item.atendidos += 1;
+      if (a.status === "faltou") item.faltas += 1;
       if (a.data_pagamento) item.pagos += 1;
       if (a.paciente_id && novos.has(a.paciente_id)) item.novos += 1;
       mapa.set(id, item);
@@ -314,7 +316,36 @@ function DashboardOperacional() {
     return [...mapa.values()].sort((a, b) => b.total - a.total);
   }, [d]);
 
+  // Seção de médicos com período: "Hoje" usa os dados ao vivo já carregados;
+  // outros períodos vêm prontos do banco. O Modo TV continua sempre no dia.
+  const [periodoMedicos, setPeriodoMedicos] = useState<PeriodoMedicos>(periodoHoje);
+  const medicosHoje = ehPeriodoHoje(periodoMedicos);
+  const qPeriodo = useMedicosPeriodo(ids, periodoMedicos, !medicosHoje);
+  const medicosSecao = useMemo<MedicoDoDia[]>(() => {
+    if (medicosHoje) return medicosDoDia;
+    const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
+    const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
+    return (qPeriodo.data ?? [])
+      .map((r) => {
+        const info = medInfo.get(r.medico_id);
+        return {
+          id: r.medico_id,
+          nome: info?.nome ?? "Médico",
+          especialidade: info?.especialidade_id
+            ? (espNome.get(info.especialidade_id) ?? null)
+            : null,
+          total: r.total,
+          atendidos: r.atendidos,
+          faltas: r.faltas,
+          pagos: r.pagos,
+          novos: r.novos,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [medicosHoje, medicosDoDia, qPeriodo.data, d]);
+
   const carregando = loading || q.isLoading;
+  const carregandoMedicos = carregando || (!medicosHoje && qPeriodo.isLoading);
   const sairModoTv = useCallback(() => setModoTv(false), []);
 
   return (
@@ -627,28 +658,55 @@ function DashboardOperacional() {
 
         {/* Médicos do dia */}
         <Painel
-          title="Médicos do dia — Total de atendimentos"
-          subtitle="Agendamentos de hoje por profissional"
+          title={medicosHoje ? "Médicos do dia — Total de atendimentos" : "Médicos no período"}
+          subtitle={
+            medicosHoje
+              ? "Agendamentos de hoje por profissional"
+              : periodoMedicos.de === periodoMedicos.ate
+                ? `Agendamentos de ${formatDatePura(periodoMedicos.de)} por profissional`
+                : `Agendamentos de ${formatDatePura(periodoMedicos.de)} a ${formatDatePura(periodoMedicos.ate)} por profissional`
+          }
           action={<LinkMais to="/app/agenda-medicos" />}
           className="mb-6"
         >
-          {carregando ? (
+          <div className="px-4 pt-3">
+            <SeletorPeriodoMedicos periodo={periodoMedicos} onChange={setPeriodoMedicos} />
+          </div>
+          {!medicosHoje && periodoMedicos.de > periodoMedicos.ate ? (
+            <HhpEmptyState
+              icon={Stethoscope}
+              title="Período inválido"
+              description="A data inicial precisa ser anterior ou igual à data final."
+              className="min-h-[180px]"
+            />
+          ) : !medicosHoje && qPeriodo.isError ? (
+            <HhpEmptyState
+              icon={AlertTriangle}
+              title="Não foi possível carregar o período"
+              description="Tente de novo em instantes pelo botão Atualizar."
+              className="min-h-[180px]"
+            />
+          ) : carregandoMedicos ? (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-28 rounded-xl" />
               ))}
             </div>
-          ) : medicosDoDia.length === 0 ? (
+          ) : medicosSecao.length === 0 ? (
             <HhpEmptyState
               icon={Stethoscope}
-              title="Nenhum médico com atendimentos hoje"
+              title={
+                medicosHoje
+                  ? "Nenhum médico com atendimentos hoje"
+                  : "Nenhum médico com atendimentos no período"
+              }
               description="Assim que houver agendamentos vinculados a profissionais, eles aparecem aqui."
               className="min-h-[180px]"
             />
           ) : (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {medicosDoDia.map((m) => {
-                const pct = m.total > 0 ? Math.round((m.pagos / m.total) * 100) : 0;
+              {medicosSecao.map((m) => {
+                const naoPagos = m.total - m.pagos;
                 return (
                   <div
                     key={m.id}
@@ -678,23 +736,22 @@ function DashboardOperacional() {
                         </Link>
                       </Button>
                     </div>
-                    <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">
-                      {m.total}
+                    <div className="mt-2 flex items-baseline justify-between gap-2 border-b border-slate-100 pb-2">
+                      <span className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
+                        Agendamentos
+                      </span>
+                      <span className="text-3xl font-bold tabular-nums text-slate-900 leading-none">
+                        {m.total}
+                      </span>
                     </div>
-                    <div className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
-                      Atendimentos
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                      <MetricaMedico rotulo="Atendidos" qtd={m.atendidos} total={m.total} />
+                      <MetricaMedico rotulo="Faltas" qtd={m.faltas} total={m.total} />
+                      <MetricaMedico rotulo="Pagos" qtd={m.pagos} total={m.total} />
+                      <MetricaMedico rotulo="Não pagos" qtd={naoPagos} total={m.total} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
-                        <div className="text-[11px] font-semibold text-emerald-700">Pagos</div>
-                        <div className="text-sm font-bold tabular-nums text-emerald-800">
-                          {pct}%
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-sky-50 px-2 py-1.5">
-                        <div className="text-[11px] font-semibold text-sky-700">Clientes novos</div>
-                        <div className="text-sm font-bold tabular-nums text-sky-800">{m.novos}</div>
-                      </div>
+                    <div className="mt-2 text-[11px] text-slate-500">
+                      {m.novos} cliente(s) novo(s)
                     </div>
                   </div>
                 );
@@ -792,6 +849,22 @@ function MiniStat({
         {label}
       </div>
       <div className="text-lg font-bold tabular-nums text-slate-800 truncate">{value}</div>
+    </div>
+  );
+}
+
+/** Quantidade + % sobre o total de agendamentos do médico (formato do sistema antigo). */
+function MetricaMedico({ rotulo, qtd, total }: { rotulo: string; qtd: number; total: number }) {
+  const pct = total > 0 ? (qtd / total) * 100 : 0;
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">{rotulo}</div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-lg font-bold tabular-nums text-slate-800 leading-tight">{qtd}</span>
+        <span className="text-[11px] tabular-nums text-slate-500">
+          {pct.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+        </span>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,9 @@ export type MedicoDoDia = {
   nome: string;
   especialidade: string | null;
   total: number;
+  /** Status "realizado" ou ficha finalizada — mesmo critério do card "Concluídos". */
+  atendidos: number;
+  faltas: number;
   pagos: number;
   novos: number;
 };
