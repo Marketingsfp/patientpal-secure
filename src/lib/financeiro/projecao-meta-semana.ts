@@ -9,7 +9,7 @@
  * A distribuição por dia da semana respeita o peso que cada dia já tem: o
  * sábado (meio expediente) faz bem menos que a segunda, então o esforço extra
  * é repartido na mesma proporção, e não como um número igual para todo dia.
- * Domingo fica fora. Hoje conta como dia que falta; o que já entrou conta só
+ * Domingo e feriado nacional ficam fora. Hoje conta como dia que falta; o que já entrou conta só
  * até ontem (o dia de hoje ainda está acontecendo).
  */
 
@@ -117,7 +117,7 @@ export function interpretarMeta(
 }
 
 // ---------------------------------------------------------------------------
-// 2. ATENDIMENTOS NECESSÁRIOS POR DIA DA SEMANA
+// 2. TIPOS DA TABELA POR DIA DA SEMANA
 // ---------------------------------------------------------------------------
 
 /** Receita de um dia já fechado (para o histórico de cada dia da semana). */
@@ -156,11 +156,135 @@ export interface ResultadoMetaSemana {
   /** Quanto o ritmo precisa subir, em % (negativo: dá para ir mais devagar). */
   esforcoPercentual: number;
   linhas: LinhaDiaSemana[];
-  /** Dias da semana que faltam no mês mas não têm histórico para estimar. */
+  /** Dias da semana sem histórico — estimados pela média do mês. */
   semHistorico: string[];
-  /** Total de dias de funcionamento que faltam (hoje inclusive). */
+  /** Total de dias de funcionamento que faltam (hoje inclusive, sem feriado). */
   diasRestantes: number;
+  /** Feriados nacionais em dia de semana no que falta do mês (AAAA-MM-DD). */
+  feriados: string[];
 }
+
+// ---------------------------------------------------------------------------
+// 3. CALENDÁRIO E RITMO — base comum do card, do gráfico e da tabela
+// ---------------------------------------------------------------------------
+
+/**
+ * Feriados nacionais fixos (MM-DD) — a mesma lista em que a Agenda não abre
+ * horário (`app.disponibilidades.tsx`). Em 07/09/2026 a clínica não teve
+ * movimento, então esses dias não contam como dia de atendimento que falta.
+ */
+const FERIADOS_FIXOS = new Set<string>([
+  "01-01", // Confraternização Universal
+  "04-21", // Tiradentes
+  "05-01", // Dia do Trabalho
+  "09-07", // Independência
+  "10-12", // Nossa Senhora Aparecida
+  "11-02", // Finados
+  "11-15", // Proclamação da República
+  "11-20", // Consciência Negra
+  "12-25", // Natal
+]);
+
+export function ehFeriadoNacional(iso: string): boolean {
+  return FERIADOS_FIXOS.has(iso.slice(5, 10));
+}
+
+export interface DiasQueFaltam {
+  /** Dias de funcionamento (seg–sáb, sem feriado) de hoje até o fim do mês. */
+  total: number;
+  /** Quantos de cada dia da semana (1 = segunda … 6 = sábado). */
+  porDiaSemana: Map<number, number>;
+  /** As datas, em ordem — para a curva do gráfico. */
+  datas: string[];
+  /** Feriados que caem em dia de semana no que falta do mês (AAAA-MM-DD). */
+  feriados: string[];
+}
+
+/** Dias de atendimento que faltam no mês, hoje inclusive. */
+export function diasQueFaltam(hoje: string, fimMes: string): DiasQueFaltam {
+  const porDiaSemana = new Map<number, number>();
+  const datas: string[] = [];
+  const feriados: string[] = [];
+  const cursor = new Date(`${hoje}T00:00:00Z`);
+  const fim = new Date(`${fimMes}T00:00:00Z`);
+  while (cursor <= fim) {
+    const iso = cursor.toISOString().slice(0, 10);
+    const w = cursor.getUTCDay();
+    if (w !== 0) {
+      if (ehFeriadoNacional(iso)) {
+        feriados.push(iso);
+      } else {
+        porDiaSemana.set(w, (porDiaSemana.get(w) ?? 0) + 1);
+        datas.push(iso);
+      }
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return { total: datas.length, porDiaSemana, datas, feriados };
+}
+
+export interface RitmoDia {
+  /** Dias do histórico usados na média. */
+  dias: number;
+  /** Receita média desse dia da semana. */
+  receita: number;
+  /** Pagamentos médios desse dia da semana. */
+  pagamentos: number;
+}
+
+/**
+ * O que cada dia da semana costuma fazer, a partir dos dias fechados (antes
+ * de hoje). Domingo e feriado ficam de fora.
+ *
+ * Dia muito abaixo do normal do próprio dia da semana (menos de 30% da
+ * mediana) também fica fora: é meio feriado ou semana de implantação do
+ * sistema (agosto/2026 teve semanas de R$ 3 mil contra ~R$ 230 mil das
+ * normais), e puxaria o "costuma fazer" para baixo.
+ */
+export function ritmoPorDiaDaSemana(historico: DiaReceita[], hoje: string): Map<number, RitmoDia> {
+  const porSemana = new Map<number, DiaReceita[]>();
+  for (const d of historico) {
+    if (d.dia >= hoje || d.receita <= 0 || ehFeriadoNacional(d.dia)) continue;
+    const w = diaDaSemana(d.dia);
+    if (w === 0) continue;
+    porSemana.set(w, [...(porSemana.get(w) ?? []), d]);
+  }
+
+  const ritmo = new Map<number, RitmoDia>();
+  for (const [w, lista] of porSemana) {
+    const ordenadas = lista.map((d) => d.receita).sort((a, b) => a - b);
+    const meio = Math.floor(ordenadas.length / 2);
+    const mediana =
+      ordenadas.length % 2 ? ordenadas[meio] : (ordenadas[meio - 1] + ordenadas[meio]) / 2;
+    const normais = lista.filter((d) => d.receita >= mediana * PISO_DIA_NORMAL);
+    ritmo.set(w, {
+      dias: normais.length,
+      receita: normais.reduce((s, d) => s + d.receita, 0) / normais.length,
+      pagamentos: normais.reduce((s, d) => s + d.pagamentos, 0) / normais.length,
+    });
+  }
+  return ritmo;
+}
+
+/**
+ * Receita e pagamentos esperados num dia da semana. Sem histórico daquele
+ * dia (clínica nova), usa a média do mês — nunca zero, que faria a projeção
+ * fingir que o dia não vai ter movimento.
+ */
+export function esperadoNoDia(
+  w: number,
+  ritmo: Map<number, RitmoDia>,
+  reserva: { receita: number; pagamentos: number },
+): { receita: number; pagamentos: number; temHistorico: boolean } {
+  const r = ritmo.get(w);
+  return r
+    ? { receita: r.receita, pagamentos: r.pagamentos, temHistorico: true }
+    : { ...reserva, temHistorico: false };
+}
+
+// ---------------------------------------------------------------------------
+// 4. A TABELA
+// ---------------------------------------------------------------------------
 
 /**
  * Reparte o que falta da meta pelos dias de funcionamento que restam, no peso
@@ -169,12 +293,7 @@ export interface ResultadoMetaSemana {
  * Cada dia da semana mantém o próprio ticket médio (o sábado costuma ter
  * outro perfil de atendimento), e o fator de esforço é o mesmo para todos:
  * se o mês precisa render 20% a mais, cada dia precisa render 20% a mais do
- * que costuma.
- *
- * Dia muito abaixo do normal do próprio dia da semana (menos de 30% da
- * mediana) fica fora da média: é feriado com meio expediente ou semana de
- * implantação do sistema (agosto/2026 teve semanas de R$ 3 mil contra
- * ~R$ 230 mil das normais), e puxaria o "costuma fazer" para baixo.
+ * que costuma. "Rende no ritmo" é a mesma conta do card de receita projetada.
  */
 export function atendimentosPorDiaDaSemana(p: {
   meta: number;
@@ -182,74 +301,36 @@ export function atendimentosPorDiaDaSemana(p: {
   historico: DiaReceita[];
   hoje: string;
   fimMes: string;
+  /** Média do mês por dia de movimento, para dia da semana sem histórico. */
+  reserva?: { receita: number; pagamentos: number };
 }): ResultadoMetaSemana {
-  const porSemana = new Map<number, DiaReceita[]>();
-  for (const d of p.historico) {
-    if (d.dia >= p.hoje) continue;
-    const w = diaDaSemana(d.dia);
-    if (w === 0 || d.receita <= 0) continue;
-    porSemana.set(w, [...(porSemana.get(w) ?? []), d]);
-  }
-
-  const somas = new Map<number, { dias: number; receita: number; pagamentos: number }>();
-  for (const [w, lista] of porSemana) {
-    const ordenadas = lista.map((d) => d.receita).sort((a, b) => a - b);
-    const meio = Math.floor(ordenadas.length / 2);
-    const mediana =
-      ordenadas.length % 2 ? ordenadas[meio] : (ordenadas[meio - 1] + ordenadas[meio]) / 2;
-    for (const d of lista) {
-      if (d.receita < mediana * PISO_DIA_NORMAL) continue;
-      const s = somas.get(w) ?? { dias: 0, receita: 0, pagamentos: 0 };
-      s.dias += 1;
-      s.receita += d.receita;
-      s.pagamentos += d.pagamentos;
-      somas.set(w, s);
-    }
-  }
-
-  const restantes = new Map<number, number>();
-  const cursor = new Date(`${p.hoje}T00:00:00Z`);
-  const fim = new Date(`${p.fimMes}T00:00:00Z`);
-  let diasRestantes = 0;
-  while (cursor <= fim) {
-    const w = cursor.getUTCDay();
-    if (w !== 0) {
-      restantes.set(w, (restantes.get(w) ?? 0) + 1);
-      diasRestantes += 1;
-    }
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
+  const ritmo = ritmoPorDiaDaSemana(p.historico, p.hoje);
+  const faltam = diasQueFaltam(p.hoje, p.fimMes);
+  const reserva = p.reserva ?? { receita: 0, pagamentos: 0 };
 
   const falta = cent(Math.max(p.meta - p.realizadoAteOntem, 0));
-  const semHistorico: string[] = [];
-  let rendeNoRitmo = 0;
-  for (const [w, n] of restantes) {
-    const s = somas.get(w);
-    if (!s) {
-      semHistorico.push(NOME_DIA_SEMANA[w]);
-      continue;
-    }
-    rendeNoRitmo += n * (s.receita / s.dias);
-  }
-  rendeNoRitmo = cent(rendeNoRitmo);
+  let rende = 0;
+  for (const [w, n] of faltam.porDiaSemana) rende += n * esperadoNoDia(w, ritmo, reserva).receita;
+  const rendeNoRitmo = cent(rende);
   const fator = rendeNoRitmo > 0 ? falta / rendeNoRitmo : 0;
 
   const linhas: LinhaDiaSemana[] = [];
+  const semHistorico: string[] = [];
   for (let w = 1; w <= 6; w++) {
-    const s = somas.get(w);
-    const n = restantes.get(w) ?? 0;
-    if (!s || n === 0) continue;
-    const mediaReceita = s.receita / s.dias;
-    const mediaPagamentos = s.pagamentos / s.dias;
+    const n = faltam.porDiaSemana.get(w) ?? 0;
+    if (n === 0) continue;
+    const e = esperadoNoDia(w, ritmo, reserva);
+    if (!e.temHistorico) semHistorico.push(NOME_DIA_SEMANA[w]);
+    if (e.receita <= 0) continue;
     linhas.push({
       diaSemana: w,
       nome: NOME_DIA_SEMANA[w],
       diasRestantes: n,
-      amostra: s.dias,
-      atendimentosHoje: Math.round(mediaPagamentos),
-      atendimentosNecessarios: Math.ceil(mediaPagamentos * fator),
-      receitaNecessaria: cent(mediaReceita * fator),
-      ticket: s.pagamentos > 0 ? cent(s.receita / s.pagamentos) : 0,
+      amostra: ritmo.get(w)?.dias ?? 0,
+      atendimentosHoje: Math.round(e.pagamentos),
+      atendimentosNecessarios: Math.ceil(e.pagamentos * fator),
+      receitaNecessaria: cent(e.receita * fator),
+      ticket: e.pagamentos > 0 ? cent(e.receita / e.pagamentos) : 0,
     });
   }
 
@@ -261,6 +342,7 @@ export function atendimentosPorDiaDaSemana(p: {
     esforcoPercentual: rendeNoRitmo > 0 ? Math.round((fator - 1) * 100) : 0,
     linhas,
     semHistorico,
-    diasRestantes,
+    diasRestantes: faltam.total,
+    feriados: faltam.feriados,
   };
 }

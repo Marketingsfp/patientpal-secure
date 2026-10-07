@@ -11,9 +11,21 @@
  * média — senão toda manhã pareceria um dia fraco e puxaria a projeção para
  * baixo. Hoje conta como um dos dias que ainda faltam.
  *
+ * Os dias que faltam saem do CALENDÁRIO: segunda a sábado, sem os feriados
+ * nacionais em que a Agenda não abre. Cada um rende o que aquele dia da
+ * semana costuma fazer (quarta não é sábado), a mesma conta da tabela de
+ * atendimentos por dia da semana — card, gráfico e tabela dizem o mesmo.
+ *
  * Nada aqui inventa dado: se o mês ainda não tem movimento, a projeção é igual
  * ao realizado e a confiança é "baixa".
  */
+
+import {
+  diasQueFaltam,
+  esperadoNoDia,
+  ritmoPorDiaDaSemana,
+  type DiaReceita,
+} from "./projecao-meta-semana";
 
 export interface DiaCaixa {
   /** AAAA-MM-DD */
@@ -33,6 +45,11 @@ export interface EntradaProjecao {
   dias: DiaCaixa[];
   /** Meta de receita do mês, se a clínica definiu uma. */
   meta?: number;
+  /**
+   * Receita e pagamentos por dia das últimas semanas (até ontem) — dá o peso
+   * de cada dia da semana. Sem ele, todo dia que falta vale a média do mês.
+   */
+  historico?: DiaReceita[];
 }
 
 export interface Realizado {
@@ -77,9 +94,16 @@ export interface MetaProjecao {
 export interface ResultadoProjecao {
   realizado: Realizado;
   projetado: Projetado;
-  /** Dias do mês já fechados (até ontem) e dias que ainda faltam (inclui hoje). */
+  /** Dias do mês já fechados (até ontem). */
   diasCorridos: number;
+  /** Dias de atendimento que faltam: seg–sáb, sem feriado, hoje inclusive. */
   diasRestantes: number;
+  /** Feriados nacionais em dia de semana no que falta do mês (AAAA-MM-DD). */
+  feriados: string[];
+  /** Quanto os dias que faltam rendem, cada um no ritmo do seu dia da semana. */
+  rendeNoRitmo: number;
+  /** Receita prevista de cada dia que falta — a curva do gráfico. */
+  previsaoPorDia: { data: string; receita: number }[];
   mediaDiaria: number;
   mediaAtendimentosDia: number;
   confianca: Confianca;
@@ -90,6 +114,8 @@ export interface ResultadoProjecao {
 const cent = (v: number) => Math.round(v * 100) / 100;
 
 const diaDoMes = (iso: string) => Number(iso.slice(8, 10)) || 0;
+
+const diaDaSemanaIso = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
 
 const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -126,38 +152,41 @@ export function projetarMes(e: EntradaProjecao): ResultadoProjecao {
 
   const totalDias = diaDoMes(e.fim);
   const diasCorridos = Math.min(Math.max(diaDoMes(e.hoje) - 1, 0), totalDias);
-  const diasRestantes = Math.max(totalDias - diasCorridos, 0);
-
-  // Proporção de dias com movimento observada até aqui, aplicada ao que falta.
-  const proporcao = diasCorridos > 0 ? comMovimento.length / diasCorridos : 0;
-  const diasProdutivosRestantes = diasRestantes * proporcao;
+  const faltam = diasQueFaltam(e.hoje, e.fim);
+  const diasRestantes = faltam.total;
 
   const mediaDiaria = comMovimento.length > 0 ? cent(receitaFechada / comMovimento.length) : 0;
   const mediaDespesaDia = comMovimento.length > 0 ? cent(despesaFechada / comMovimento.length) : 0;
   const mediaAtendimentosDia =
     comMovimento.length > 0 ? Math.round(atendimentosFechados / comMovimento.length) : 0;
 
-  // Fechado até ontem + ritmo nos dias que faltam (hoje inclusive). Se hoje
-  // já passou do ritmo, a projeção nunca fica abaixo do que de fato entrou.
-  const projReceita = cent(
-    Math.max(receitaFechada + mediaDiaria * diasProdutivosRestantes, receita),
-  );
-  const projDespesa = cent(
-    Math.max(despesaFechada + mediaDespesaDia * diasProdutivosRestantes, despesa),
-  );
+  // Cada dia que falta rende o que o seu dia da semana costuma fazer; sem
+  // histórico daquele dia, a média dos dias fechados do mês.
+  const ritmo = ritmoPorDiaDaSemana(e.historico ?? [], e.hoje);
+  const reserva = {
+    receita: mediaDiaria,
+    pagamentos: comMovimento.length > 0 ? atendimentosFechados / comMovimento.length : 0,
+  };
+  const previsaoPorDia: { data: string; receita: number }[] = [];
+  let rende = 0;
+  let rendeAtendimentos = 0;
+  for (const data of faltam.datas) {
+    const esperado = esperadoNoDia(diaDaSemanaIso(data), ritmo, reserva);
+    previsaoPorDia.push({ data, receita: cent(esperado.receita) });
+    rende += esperado.receita;
+    rendeAtendimentos += esperado.pagamentos;
+  }
+  const rendeNoRitmo = cent(rende);
+
+  // Fechado até ontem + o que os dias que faltam rendem (hoje inclusive). Se
+  // hoje já passou do ritmo, a projeção nunca fica abaixo do que entrou.
+  const projReceita = cent(Math.max(receitaFechada + rendeNoRitmo, receita));
+  const projDespesa = cent(Math.max(despesaFechada + mediaDespesaDia * diasRestantes, despesa));
   const projetado: Projetado = {
     receita: projReceita,
     despesa: projDespesa,
     saldo: cent(projReceita - projDespesa),
-    atendimentos: Math.max(
-      Math.round(
-        atendimentosFechados +
-          (comMovimento.length > 0
-            ? (atendimentosFechados / comMovimento.length) * diasProdutivosRestantes
-            : 0),
-      ),
-      atendimentos,
-    ),
+    atendimentos: Math.max(Math.round(atendimentosFechados + rendeAtendimentos), atendimentos),
   };
 
   const confianca: Confianca =
@@ -170,7 +199,6 @@ export function projetarMes(e: EntradaProjecao): ResultadoProjecao {
     receitaFechada,
     diasRestantes,
     realizado.ticket,
-    proporcao,
   );
 
   return {
@@ -178,6 +206,9 @@ export function projetarMes(e: EntradaProjecao): ResultadoProjecao {
     projetado,
     diasCorridos,
     diasRestantes,
+    feriados: faltam.feriados,
+    rendeNoRitmo,
+    previsaoPorDia,
     mediaDiaria,
     mediaAtendimentosDia,
     confianca,
@@ -194,14 +225,12 @@ function montarMeta(
   realizadoFechado: number,
   diasRestantes: number,
   ticket: number,
-  proporcao: number,
 ): MetaProjecao | null {
   if (!meta || meta <= 0) return null;
   const falta = cent(Math.max(meta - realizado, 0));
   // O ritmo pedido conta hoje como dia inteiro, então parte do fechado até ontem.
   const faltaDesdeHoje = Math.max(meta - realizadoFechado, 0);
-  const diasProdutivos = Math.max(diasRestantes * proporcao, 0);
-  const porDia = diasProdutivos > 0 ? cent(faltaDesdeHoje / diasProdutivos) : falta;
+  const porDia = diasRestantes > 0 ? cent(faltaDesdeHoje / diasRestantes) : falta;
   return {
     meta: cent(meta),
     falta,
@@ -329,16 +358,13 @@ export interface EntradaSimulacao {
  * houver). Devolve lista vazia quando não há base de comparação.
  */
 export function simularCrescimento(r: ResultadoProjecao, e: EntradaSimulacao): MetaCrescimento[] {
-  const diasProdutivos =
-    r.diasCorridos > 0 ? (r.diasRestantes * r.realizado.diasComMovimento) / r.diasCorridos : 0;
   const ticket = r.realizado.ticket;
-  const media = r.mediaDiaria;
 
   const montar = (alvoBruto: number, percentual: number, rotulo: string): MetaCrescimento => {
     const alvo = cent(alvoBruto);
     const falta = cent(Math.max(alvo - r.realizado.receita, 0));
     const faltaDesdeHoje = Math.max(alvo - r.realizado.receitaFechada, 0);
-    const porDia = diasProdutivos > 0 ? cent(faltaDesdeHoje / diasProdutivos) : falta;
+    const porDia = r.diasRestantes > 0 ? cent(faltaDesdeHoje / r.diasRestantes) : falta;
     return {
       percentual,
       rotulo,
@@ -347,7 +373,10 @@ export function simularCrescimento(r: ResultadoProjecao, e: EntradaSimulacao): M
       porDiaRestante: porDia,
       atendimentosPorDia: ticket > 0 ? Math.ceil(porDia / ticket) : 0,
       alcancavel: r.projetado.receita >= alvo,
-      esforcoPercentual: media > 0 ? Math.round(((porDia - media) / media) * 100) : 0,
+      // Mesma régua da tabela por dia da semana: quanto o que falta passa do
+      // que os dias restantes rendem no ritmo normal.
+      esforcoPercentual:
+        r.rendeNoRitmo > 0 ? Math.round((faltaDesdeHoje / r.rendeNoRitmo - 1) * 100) : 0,
     };
   };
 
@@ -384,10 +413,9 @@ export interface PontoTendencia {
  */
 export function serieTendencia(e: EntradaProjecao, r: ResultadoProjecao): PontoTendencia[] {
   const porDia = new Map(e.dias.map((d) => [d.data, d.receita]));
+  const previsao = new Map(r.previsaoPorDia.map((p) => [p.data, p.receita]));
   const totalDias = diaDoMes(e.fim);
   const hojeDia = Math.min(diaDoMes(e.hoje), totalDias);
-  const diasProdutivosRestantes =
-    r.diasCorridos > 0 ? r.realizado.diasComMovimento / r.diasCorridos : 0;
 
   const pontos: PontoTendencia[] = [];
   let acumulado = 0;
@@ -400,12 +428,11 @@ export function serieTendencia(e: EntradaProjecao, r: ResultadoProjecao): PontoT
       pontos.push({ data, rotulo: fmtDia(data), realizado: acumulado, projetado });
     } else if (dia === hojeDia) {
       acumulado = cent(acumulado + (porDia.get(data) ?? 0));
-      projetado = cent(projetado + r.mediaDiaria * diasProdutivosRestantes);
+      projetado = cent(projetado + (previsao.get(data) ?? 0));
       pontos.push({ data, rotulo: fmtDia(data), realizado: acumulado, projetado });
     } else {
-      // Cada dia futuro rende a média diária, descontada pela chance de o dia
-      // não ter movimento (domingo, feriado) observada no próprio mês.
-      projetado = cent(projetado + r.mediaDiaria * diasProdutivosRestantes);
+      // Domingo e feriado não estão na previsão: a curva fica reta nesses dias.
+      projetado = cent(projetado + (previsao.get(data) ?? 0));
       pontos.push({ data, rotulo: fmtDia(data), realizado: null, projetado });
     }
   }

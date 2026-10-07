@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   atendimentosPorDiaDaSemana,
+  diasQueFaltam,
   interpretarMeta,
   type DiaReceita,
 } from "./projecao-meta-semana";
@@ -42,6 +43,17 @@ describe("interpretarMeta", () => {
     expect(interpretarMeta("bater a meta", base).ok).toBe(false);
     expect(interpretarMeta("dia 30", base).ok).toBe(false);
     expect(interpretarMeta("", base).ok).toBe(false);
+  });
+});
+
+describe("diasQueFaltam", () => {
+  it("outubro/2026 a partir de 07/10: sem domingos e sem o feriado de 12/10", () => {
+    const f = diasQueFaltam("2026-10-07", "2026-10-31");
+    // 25 dias − 3 domingos − 12/10 (segunda).
+    expect(f.total).toBe(21);
+    expect(f.feriados).toEqual(["2026-10-12"]);
+    expect(f.porDiaSemana.get(1)).toBe(2);
+    expect(f.porDiaSemana.get(3)).toBe(4);
   });
 });
 
@@ -108,14 +120,28 @@ describe("atendimentosPorDiaDaSemana", () => {
       realizadoAteOntem: 100000,
     });
     expect(r.semHistorico).toEqual(["Quarta"]);
+    // Sem reserva (média do mês), a quarta não tem como ser estimada.
     expect(r.linhas.map((l) => l.nome)).toEqual(["Segunda", "Terça"]);
+  });
+
+  it("dia sem histórico usa a média do mês, e não zero", () => {
+    const r = atendimentosPorDiaDaSemana({
+      historico: historico.filter((d) => d.dia !== "2026-09-16"),
+      hoje: "2026-09-28",
+      fimMes: "2026-09-30",
+      meta: 130000,
+      realizadoAteOntem: 100000,
+      reserva: { receita: 10000, pagamentos: 100 },
+    });
+    expect(r.rendeNoRitmo).toBe(30000);
+    expect(r.linhas.map((l) => l.nome)).toEqual(["Segunda", "Terça", "Quarta"]);
   });
 
   it("dia muito abaixo do normal (implantação, meio feriado) não entra na média", () => {
     const r = atendimentosPorDiaDaSemana({
       historico: [
         ...historico,
-        { dia: "2026-09-07", receita: 10000, pagamentos: 100 },
+        { dia: "2026-09-21", receita: 10000, pagamentos: 100 },
         { dia: "2026-08-31", receita: 500, pagamentos: 5 }, // segunda de implantação
       ],
       ...{ hoje: "2026-09-28", fimMes: "2026-09-30" },

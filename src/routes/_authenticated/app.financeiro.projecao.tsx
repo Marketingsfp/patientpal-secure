@@ -239,9 +239,19 @@ function Page() {
   const meta = metaLida.ok ? metaLida.valor : 0;
 
   const entrada: EntradaProjecao = useMemo(
-    () => ({ inicio, fim, hoje: hojeIso, dias, meta: meta || undefined }),
-    [inicio, fim, hojeIso, dias, meta],
+    () => ({
+      inicio,
+      fim,
+      hoje: hojeIso,
+      dias,
+      meta: meta || undefined,
+      historico: historico ?? undefined,
+    }),
+    [inicio, fim, hojeIso, dias, meta, historico],
   );
+  // A projeção usa o peso de cada dia da semana: só mostra número quando o
+  // histórico chegou, para o card não pular de valor na frente da equipe.
+  const aguardando = loading || historico === null;
   const r: ResultadoProjecao = useMemo(() => projetarMes(entrada), [entrada]);
 
   const metas = useMemo(
@@ -276,9 +286,22 @@ function Page() {
             historico,
             hoje: hojeIso,
             fimMes: fim,
+            reserva: {
+              receita: r.mediaDiaria,
+              pagamentos: r.realizado.diasComMovimento > 0 ? r.mediaAtendimentosDia : 0,
+            },
           })
         : null,
-    [meta, historico, r.realizado.receitaFechada, hojeIso, fim],
+    [
+      meta,
+      historico,
+      r.realizado.receitaFechada,
+      r.mediaDiaria,
+      r.mediaAtendimentosDia,
+      r.realizado.diasComMovimento,
+      hojeIso,
+      fim,
+    ],
   );
 
   const salvarMetaTexto = (texto: string) => {
@@ -335,11 +358,11 @@ function Page() {
                 </Tooltip>
               )}
             </p>
-            <p className="text-2xl font-semibold mt-1">{loading ? "..." : projetado}</p>
+            <p className="text-2xl font-semibold mt-1">{aguardando ? "..." : projetado}</p>
             <p className="text-xs text-muted-foreground mt-2">
               Já realizado: <span className="font-medium text-foreground">{realizado}</span>
             </p>
-            {nota && !loading && <p className="text-xs text-muted-foreground mt-1">{nota}</p>}
+            {nota && !aguardando && <p className="text-xs text-muted-foreground mt-1">{nota}</p>}
           </div>
           <div
             className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${color}`}
@@ -363,8 +386,12 @@ function Page() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Fechamento estimado de {inicio.slice(8)}/{inicio.slice(5, 7)} a {fim.slice(8)}/
-            {fim.slice(5, 7)} · {r.diasCorridos} dia(s) fechados (até ontem), {r.diasRestantes} pela
-            frente com hoje · {confiancaTexto}
+            {fim.slice(5, 7)} · {r.diasCorridos} dia(s) fechados (até ontem), {r.diasRestantes}{" "}
+            dia(s) de atendimento pela frente com hoje
+            {r.feriados.length > 0
+              ? ` (sem o feriado de ${r.feriados.map((d) => `${d.slice(8)}/${d.slice(5, 7)}`).join(", ")})`
+              : ""}{" "}
+            · {confiancaTexto}
           </p>
         </div>
 
@@ -396,7 +423,7 @@ function Page() {
             realizado={String(r.realizado.atendimentos)}
             icon={Stethoscope}
             color="bg-blue-500/10 text-blue-600"
-            explicacao={`É uma estimativa do total do mês inteiro, não de atendimentos já concluídos: soma o que foi atendido de 01/${inicio.slice(5, 7)} até ontem com uma previsão para os dias que faltam até ${fim.slice(8)}/${fim.slice(5, 7)} (hoje inclusive), no ritmo médio dos dias de movimento já fechados deste mês. O dia de hoje ainda está em andamento e não entra na média.`}
+            explicacao={`É uma estimativa do total do mês inteiro, não de atendimentos já concluídos: soma o que foi atendido de 01/${inicio.slice(5, 7)} até ontem com uma previsão para os dias que faltam até ${fim.slice(8)}/${fim.slice(5, 7)} (hoje inclusive, sem domingo e feriado), cada dia no ritmo que o seu dia da semana costuma ter. O dia de hoje ainda está em andamento e não entra na média.`}
             nota={`Estimativa do mês: ${r.realizado.atendimentos} já atendidos + ~${atendimentosFaltantes} previstos em ${r.diasRestantes} dia(s) restantes.`}
           />
         </div>
@@ -412,7 +439,7 @@ function Page() {
                 {fim.slice(8)}/{fim.slice(5, 7)}.
               </p>
             </div>
-            {loading ? (
+            {aguardando ? (
               <p className="text-sm text-muted-foreground">Carregando...</p>
             ) : (
               <MiniLineChart
@@ -539,12 +566,13 @@ function Page() {
                               : "o ritmo normal já basta"
                           }.`}{" "}
                       "Costuma fazer" é a média de pagamentos de cada dia da semana nas últimas{" "}
-                      {SEMANAS_HISTORICO} semanas (até ontem); domingo não entra.
+                      {SEMANAS_HISTORICO} semanas (até ontem); domingo e feriado não entram. A soma
+                      é a mesma do card "Receita projetada".
                     </p>
                     {metaSemana.semHistorico.length > 0 && (
                       <p className="text-xs text-amber-600">
-                        Sem histórico para {metaSemana.semHistorico.join(", ")}: a conta acima supõe
-                        que esses dias não terão movimento.
+                        Sem histórico para {metaSemana.semHistorico.join(", ")}: esses dias foram
+                        estimados pela média dos dias fechados deste mês.
                       </p>
                     )}
                   </>
@@ -620,8 +648,8 @@ function Page() {
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              "Dia de movimento" é dia com caixa aberto — a clínica atende de segunda a sábado, e o
-              domingo não entra na conta.
+              "Dia de movimento" é dia de atendimento — de segunda a sábado, sem os feriados
+              nacionais. "Ritmo x hoje" usa a mesma régua da tabela por dia da semana.
             </p>
           </CardContent>
         </Card>
@@ -632,7 +660,7 @@ function Page() {
             inicioMes={inicio}
             fimMes={fim}
             hoje={hojeIso}
-            pontosCaixa={loading ? [] : r.pontos}
+            pontosCaixa={aguardando ? [] : r.pontos}
           />
         )}
       </div>
