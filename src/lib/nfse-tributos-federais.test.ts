@@ -40,6 +40,7 @@ describe("ibsCbsDaNota", () => {
       finalidade_emissao: 0,
       consumidor_final: 1,
       codigo_indicador_operacao: "030101",
+      indicador_destinatario: 0,
       ibs_cbs_situacao_tributaria: "200",
       ibs_cbs_classificacao_tributaria: "200029",
     });

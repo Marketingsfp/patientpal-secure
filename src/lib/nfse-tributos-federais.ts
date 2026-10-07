@@ -54,6 +54,9 @@ export function ibsCbsDaNota(emitente: EmitenteTributosFederais, cpfCnpjTomador:
     // Paciente pessoa física é consumidor final; empresa tomadora, não.
     consumidor_final: cpfCnpjTomador.replace(/\D/g, "").length === 14 ? 0 : 1,
     ...(indOp ? { codigo_indicador_operacao: indOp } : {}),
+    // indDest é obrigatório no grupo IBSCBS; sem ele a DPS volta com "Element
+    // 'valores': This element is not expected". 0 = o destinatário é o tomador.
+    indicador_destinatario: 0,
     ibs_cbs_situacao_tributaria: cst,
     ibs_cbs_classificacao_tributaria: classificacao,
   };
