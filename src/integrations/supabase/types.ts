@@ -17908,6 +17908,17 @@ export type Database = {
           usuario_nome: string
         }[]
       }
+      rel_agendamentos_por_usuario: {
+        Args: { _clinica_id: string; _fim: string; _ini: string }
+        Returns: {
+          cancelados: number
+          confirmados: number
+          marcados: number
+          remarcados: number
+          usuario_id: string
+          usuario_nome: string
+        }[]
+      }
       rel_marcacoes_por_atendente: {
         Args: {
           _atend_fim?: string
