@@ -610,6 +610,19 @@ describe("pesquisa com atendimento e objetivos separados", () => {
     await executarFerramentaPaciente(contexto("Informações"), nome, args);
     expect(pesquisas[0]).toMatchObject({ tipo_atendimento });
   });
+  test.each(["buscar_procedimentos", "consultar_cadastro"] as const)("%s: reformulação do modelo não vira o procedimento da sessão", async nome => {
+    // Homologação 06/10/2026: "quero tirar uma pinta" virou "biopsia de pele" por
+    // reformulação; o registro bloqueou depois a agenda da consulta de dermatologia.
+    resultadoCatalogo = { ...resultadoCatalogo, tipo_atendimento: "exame_procedimento", procedure: "BIOPSIA DE PELE",
+      records: [{ id: CATALOGO, tipo: "servico", procedimento: "BIOPSIA DE PELE" }], doctors: [] };
+    const ctx = contexto("Tem dermatologista? Quero tirar uma pinta");
+    const extra = nome === "consultar_cadastro" ? { tipo_atendimento: "exame_procedimento" } : {};
+    await executarFerramentaPaciente(ctx, nome, { termo: "biopsia de pele", reformula_de: "retirada de sinal", ...extra });
+    expect(ctx.estado.appointment.procedimento_solicitado).toBeFalsy();
+    // O mesmo termo pesquisado sem reformulação (pedido direto ou confirmado) continua sendo lembrado.
+    await executarFerramentaPaciente(ctx, nome, { termo: "biopsia de pele", ...extra });
+    expect(ctx.estado.appointment.procedimento_solicitado?.catalogo_id).toBe(CATALOGO);
+  });
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: valor, horários e médicos não viram termos de busca nem intenção de agendar`, async () => {
       const ctx = { ...contexto("Qual o valor de cardiologia, quais médicos atendem e em quais dias?"), origem };

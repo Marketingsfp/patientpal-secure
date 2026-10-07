@@ -1096,6 +1096,14 @@ async function orientarSemPreAgendamento(ctx: CtxNinaPaciente, profissional: str
 const modalidadePendente = () => falha("MODALIDADE_NAO_DEFINIDA",
   "A modalidade precisa ser conferida pela equipe. Ordem de chegada sem indicação de pré-agendamento não permite presumir uma reserva.");
 
+/** Reformulação feita pelo modelo ("pinta" → "biopsia de pele") é uma pesquisa,
+ * não o pedido do paciente: o registro encontrado não vira procedimento da sessão.
+ * Sem isso, a hipótese não confirmada bloqueava a agenda da consulta pedida depois. */
+function reformulacaoDoModelo(args: Record<string, unknown>, termo: string, novaSolicitacao?: boolean) {
+  return novaSolicitacao !== true && typeof args.reformula_de === "string" &&
+    normalizar(args.reformula_de) !== normalizar(termo);
+}
+
 const falhaVinculoAtendimento = () => falha("ACTION_NOT_AUTHORIZED",
   "Não foi possível preservar o vínculo entre o procedimento solicitado e a agenda. A equipe deve conferir; não substitua por consulta nem informe falta de vagas.",
   { codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO", encaminhar_para_humano: true });
@@ -1518,7 +1526,8 @@ async function executarFerramentaInterna(
           }
         }
         if (resultado.esclarecimento) ctx.esclarecimentoCatalogo = resultado.esclarecimento;
-        lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, resultado, p.nova_solicitacao);
+        if (!reformulacaoDoModelo(args, p.termo, p.nova_solicitacao))
+          lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, resultado, p.nova_solicitacao);
         // O retorno já foi filtrado por atendimento, médico e dia. Resolver
         // somente estes vínculos evita outra rodada de busca ampla pelo modelo.
         let vinculos: Awaited<ReturnType<typeof vincularProfissionaisCatalogo>> = [];
@@ -1657,7 +1666,8 @@ async function executarFerramentaInterna(
           tipo_atendimento: "exame_procedimento",
           canal: ctx.origem,
         });
-        lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, r, p.nova_solicitacao);
+        if (!reformulacaoDoModelo(args, p.termo, p.nova_solicitacao))
+          lembrarProcedimentoSolicitado(ctx.estado, ctx.clinicaId, r, p.nova_solicitacao);
         if (r.limitacao_catalogo) return { ok: true, ...r };
         if (r.esclarecimento) {
           ctx.esclarecimentoCatalogo = r.esclarecimento;
