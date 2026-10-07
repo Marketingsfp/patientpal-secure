@@ -338,7 +338,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       .eq("id", meuId)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelado) meuNomeRef.current = (data as { nome?: string | null } | null)?.nome ?? null;
+        if (!cancelado)
+          meuNomeRef.current = (data as { nome?: string | null } | null)?.nome ?? null;
       });
     return () => {
       cancelado = true;
