@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
 import { CONTRATO_SF_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/sao-francisco-cartao-consulta-seguros";
+import { CONTRATO_SF_CARTAO_DESCONTO_SEGUROS } from "./contract-templates/sao-francisco-cartao-desconto-seguros";
 
 const soDig = (s?: string | null) => (s ?? "").replace(/\D/g, "");
 
@@ -67,11 +68,16 @@ export const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
   "4fdce541-5b2b-4816-ba7d-911b36741b7d": CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS,
   // POLICLINICA SAO FRANCISCO DE PAULA — CARTÃO CONSULTA + SEGUROS
   "55cc3be3-6102-4917-ac2f-ff18e0b27917": CONTRATO_SF_CARTAO_CONSULTA_SEGUROS,
+  // POLICLINICA SAO FRANCISCO DE PAULA — CARTÃO DESCONTO + SEGUROS
+  "f38c0ad5-796f-43a4-aff4-5b44ab0f97a6": CONTRATO_SF_CARTAO_DESCONTO_SEGUROS,
 };
 
 // Modelos com layout em fluxo (tabelas normais): os valores longos quebram
 // linha dentro da célula, então não precisam ser encolhidos.
-const OVERRIDES_SEM_REDUCAO = new Set(["55cc3be3-6102-4917-ac2f-ff18e0b27917"]);
+const OVERRIDES_SEM_REDUCAO = new Set([
+  "55cc3be3-6102-4917-ac2f-ff18e0b27917",
+  "f38c0ad5-796f-43a4-aff4-5b44ab0f97a6",
+]);
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));

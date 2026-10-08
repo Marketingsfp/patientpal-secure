@@ -74,7 +74,7 @@ export interface CbRegra {
   prioridade: number;
   ativo?: boolean;
   limite_qtd?: number | null;
-  limite_periodo?: string | null; // "dia" | "semana" | "mes" | "ano" | "contrato"
+  limite_periodo?: string | null; // "dia" | "semana" | "mes" | "ano" | "12m_uso" | "contrato"
   limite_escopo?: string | null; // "contrato" | "paciente"
   excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear" | "regra_padrao_convenio"
   excedente_percentual?: number | null;

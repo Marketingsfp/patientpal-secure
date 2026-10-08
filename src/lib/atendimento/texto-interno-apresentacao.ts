@@ -37,6 +37,7 @@ export function motivoParaAtendimento(valor: unknown): string | null {
   const motivos: Array<[RegExp, string]> = [
     [/^\s*(?:\[[^\]]+\]\s*)?CANCELAMENTO_SOLICITADO\b/i, "O paciente solicitou cancelamento. A Nina encaminhou para a equipe humana realizar o atendimento; não executou o cancelamento."],
     [/^\s*(?:\[[^\]]+\]\s*)?REMARCACAO_SOLICITADA\b/i, "O paciente solicitou remarcação. A Nina encaminhou para a equipe humana realizar a alteração; não remarcou nem cancelou a reserva anterior."],
+    [/\bLISTA_PROFISSIONAIS_EXTENSA\b/i, "A especialidade pedida tem mais de 8 profissionais para apresentar. Pela regra da clínica, a equipe apresenta as opções ao paciente."],
     [/\bATENDIMENTO_NAO_INFORMADO\b/i, "O paciente não informou qual consulta, exame, procedimento ou profissional deseja após a Nina perguntar. A equipe continuará o atendimento sem indicação clínica pela IA."],
     [
       /\bHORARIOS_HABITUAIS_NAO_INFORMADOS\b/i,

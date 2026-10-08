@@ -36,6 +36,7 @@ export const LIMITE_MOTIVO = 0.6;
 const POR_CODIGO: Array<[RegExp, CategoriaMotivo]> = [
   [/^(?:CANCELAMENTO_SOLICITADO|REMARCACAO_SOLICITADA)\b/, "cancelamento_remarcacao"],
   [/^ATENDIMENTO_NAO_INFORMADO\b/, "outro"],
+  [/^LISTA_PROFISSIONAIS_EXTENSA\b/, "agendamento"],
   [/^JEV_URGENCIA_CLINICA\b/, "urgencia_clinica"],
   [/^JEV_IRRITACAO\b/, "insatisfacao"],
   [/^JEV_PEDIDO_ATENDENTE\b/, "pedido_atendente"],
