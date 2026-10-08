@@ -46,7 +46,7 @@ transporte de síntese compartilhado. Não se envia áudio ativo nesta versão.
 
 ## Banco e segurança
 
-Migração aditiva `20261008190000_francisco_orcamentos.sql`:
+Migração aditiva `20261008193000_francisco_orcamentos.sql`:
 
 | Tabela | Finalidade |
 | --- | --- |
@@ -120,7 +120,7 @@ conectar ao banco real ou enviar WhatsApp. Prévia visual local em
 `/dev/francisco`, bloqueada em produção. Serviços reais de IA/voz/Meta e entrega
 final exigem homologação na implantação com credenciais já configuradas.
 
-Validação local: 60 testes do escopo e de regressão passaram, incluindo execução
+Validação local: 63 testes do escopo e de regressão passaram, incluindo execução
 da migração, pagamentos, concorrência de configuração, opt-out e encaminhamento
 humano. TypeScript e build de produção passaram. Lint do módulo sem erros, com
 nove avisos de tipagem das novas tabelas e linhas dinâmicas. A matriz geral de

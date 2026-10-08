@@ -30,7 +30,7 @@ beforeAll(async () => {
     CREATE TABLE atend_conversas(clinica_id uuid,contato_telefone text,status text,owner_type text,janela_24h_em timestamptz);
   `);
   await db.exec(
-    readFileSync("supabase/migrations/20261008190000_francisco_orcamentos.sql", "utf8"),
+    readFileSync("supabase/migrations/20261008193000_francisco_orcamentos.sql", "utf8"),
   );
 }, 30000);
 afterAll(async () => {
