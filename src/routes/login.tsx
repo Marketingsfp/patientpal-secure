@@ -24,8 +24,7 @@ export const Route = createFileRoute("/login")({
       { title: "Entrar — ClinicaOS" },
       {
         name: "description",
-        content:
-          "Acesse sua conta ClinicaOS para gerenciar agenda, prontuários e financeiro da sua clínica.",
+        content: "Acesse sua conta ClinicaOS para gerenciar agenda, prontuários e financeiro da sua clínica.",
       },
       { property: "og:title", content: "Entrar — ClinicaOS" },
       {
@@ -152,12 +151,9 @@ function LoginPage() {
         </div>
 
         <div className="space-y-6 max-w-md">
-          <h2 className="text-5xl font-bold leading-tight tracking-tight">
-            Gerencie sua clínica com leveza.
-          </h2>
+          <h2 className="text-5xl font-bold leading-tight tracking-tight">Gerencie sua clínica com leveza.</h2>
           <p className="text-white/85 text-lg leading-relaxed">
-            Agenda, prontuário, financeiro e equipe em um só lugar — pensado para o dia a dia da sua
-            operação.
+            Agenda, prontuário, financeiro e equipe em um só lugar — pensado para o dia a dia da sua operação.
           </p>
           <ul className="space-y-3 pt-4">
             <li className="flex items-center gap-3">
@@ -181,9 +177,7 @@ function LoginPage() {
           </ul>
         </div>
 
-        <p className="text-xs text-white/70">
-          © {new Date().getFullYear()} ClinicaOS — todos os direitos reservados.
-        </p>
+        <p className="text-xs text-white/70">© {new Date().getFullYear()} ClinicaOS — todos os direitos reservados.</p>
       </div>
 
       {/* Form panel */}
@@ -193,14 +187,12 @@ function LoginPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Activity className="h-5 w-5" />
             </div>
-            <span className="text-xl font-semibold">Clinica Total</span>
+            <span className="text-xl font-semibold">ClinicaOS</span>
           </Link>
           <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
             <div className="mb-6">
               <h1 className="text-3xl font-semibold tracking-tight">Bem-vindo de volta</h1>
-              <p className="text-sm text-muted-foreground mt-1.5">
-                Acesse sua clínica com seu e-mail e senha
-              </p>
+              <p className="text-sm text-muted-foreground mt-1.5">Acesse sua clínica com seu e-mail e senha</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -254,11 +246,7 @@ function LoginPage() {
                   </button>
                 </div>
               </div>
-              <Button
-                type="submit"
-                className="w-full h-11 text-base font-medium"
-                disabled={loading}
-              >
+              <Button type="submit" className="w-full h-11 text-base font-medium" disabled={loading}>
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
