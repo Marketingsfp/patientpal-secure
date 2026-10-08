@@ -119,10 +119,12 @@ function NfsePage() {
   const nomeClinica = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
   const ehSaoFrancisco = nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
   // Quem emitiu cada nota é informação de gestão, não de operação: só Admin,
-  // Gestor e Supervisor enxergam. Para os demais a coluna some da tela, sai da
+  // Gestor, Financeiro e Supervisor enxergam. Para os demais a coluna some da tela, sai da
   // planilha e deixa de ser pesquisável — senão daria para descobrir o emissor
   // filtrando pelo nome mesmo sem a coluna à vista.
-  const podeVerQuemEmitiu = ["admin", "gestor", "supervisor"].includes((clinicaAtual?.role ?? "").toLowerCase());
+  const podeVerQuemEmitiu = ["admin", "gestor", "financeiro", "supervisor"].includes(
+    (clinicaAtual?.role ?? "").toLowerCase(),
+  );
   const consulta = useServerFn(consultarNfse);
   // NFS-e parte 1b: correção manual (admin) de alíquota/ISS pelo XML oficial.
   const corrigirLote = useServerFn(corrigirIssLote);
@@ -632,7 +634,7 @@ function NfsePage() {
                 : "Reconsultar notas presas"}
             </Button>
           )}
-          {clinicaAtual?.role?.toLowerCase() === "admin" && (
+          {["admin", "financeiro"].includes(clinicaAtual?.role?.toLowerCase() ?? "") && (
             <>
               <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(20)}>
                 {corrigindo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

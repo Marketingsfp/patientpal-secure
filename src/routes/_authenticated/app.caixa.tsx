@@ -301,7 +301,8 @@ function CaixaRouteDispatcher() {
   // O aviso de versão nova vale para todo o sistema, no layout
   // `_authenticated` — não precisa mais ser ligado tela a tela.
   const role = clinicaAtual?.role ?? null;
-  const v2Allowed = role === "admin" || role === "gestor";
+  // Financeiro opera o caixa como a gestão (Beth e Zenilda, 08/10/2026).
+  const v2Allowed = role === "admin" || role === "gestor" || role === "financeiro";
   if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
   return <Page />;
 }
@@ -620,7 +621,12 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever("caixa");
-  const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+  // Aba "Todos (Financeiro)" — o caixa de todas as operadoras. O perfil
+  // Financeiro ficava de fora e não conseguia conferir o caixa das outras.
+  const isManager =
+    clinicaAtual?.role === "admin" ||
+    clinicaAtual?.role === "gestor" ||
+    clinicaAtual?.role === "financeiro";
   const podeLancarRecebDespesa =
     clinicaAtual?.role === "admin" ||
     clinicaAtual?.role === "gestor" ||

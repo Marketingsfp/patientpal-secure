@@ -20,7 +20,8 @@ export const corrigirIssLote = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("ativo", true)
       .maybeSingle();
-    if (String(m?.role ?? "").toLowerCase() !== "admin") throw new Error("Apenas administrador");
+    if (!["admin", "financeiro"].includes(String(m?.role ?? "").toLowerCase()))
+      throw new Error("Apenas administrador ou financeiro");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { executarLoteBackfill } = await import("./nfse-backfill.server");
