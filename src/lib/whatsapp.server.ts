@@ -2340,10 +2340,11 @@ async function gerarRespostaNinaInterno(
     }
     const semNome = decisao.motivo === MOTIVO_NOME_NAO_INFORMADO;
     const multiplos = !alteracaoSolicitada && multiplosAtendimentos;
+    const listaExtensa = decisao.motivo.startsWith("LISTA_PROFISSIONAIS_EXTENSA");
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
       motivo: decisao.motivo,
-      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : multiplos ? "Pedido com dois ou mais atendimentos" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : multiplos ? "Pedido com dois ou mais atendimentos" : listaExtensa ? "Lista com mais de 8 profissionais" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
       urgencia: decisao.urgencia,
       ...(alteracaoSolicitada ? { setor: "Agendamento" } : {}),
     };
@@ -2359,14 +2360,14 @@ async function gerarRespostaNinaInterno(
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
     };
-    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: alteracaoSolicitada ? "Encaminhamento: cancelamento/remarcação solicitado" : multiplos ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem" : semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
+    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: alteracaoSolicitada ? "Encaminhamento: cancelamento/remarcação solicitado" : multiplos ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem" : listaExtensa ? "Encaminhamento: lista com mais de 8 profissionais" : semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo, urgencia: argumentos.urgencia, pontuacoes: jevPontuacoes,
         pergunta_nome_entregue: semNome ? perguntaNomeAnterior : null,
         handoff_confirmado: confirmado, erro: rh.erro ?? null,
       },
       codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "executarDecisaoEncaminhamento" } });
-    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: alteracaoSolicitada ? "regra_cancelamento_remarcacao" : multiplos ? "regra_multiplos_atendimentos" : semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
+    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: alteracaoSolicitada ? "regra_cancelamento_remarcacao" : multiplos ? "regra_multiplos_atendimentos" : listaExtensa ? "regra_lista_extensa" : semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
   }
   if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);
@@ -2790,6 +2791,19 @@ async function gerarRespostaNinaInterno(
           error_code: r.erro ?? null,
           reused: r.reused,
         });
+      }
+      const listaExtensa = r.success
+        ? (await import("@/lib/nina/lista-profissionais-extensa")).listaProfissionaisExtensa(
+            nome, c.function?.arguments ?? null, r.dados as never)
+        : null;
+      if (listaExtensa) {
+        // Regra de 08/10/2026: mais de 8 profissionais na lista → a equipe apresenta as opções.
+        const { motivoListaExtensa } = await import("@/lib/nina/lista-profissionais-extensa");
+        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Lista com mais de 8 profissionais: equipe",
+          dados: { total: listaExtensa.total, termo: listaExtensa.especialidade },
+          codigo: { arquivo: "src/lib/nina/lista-profissionais-extensa.ts", funcao: "listaProfissionaisExtensa" } });
+        await executarDecisaoEncaminhamento({ motivo: motivoListaExtensa(listaExtensa), urgencia: "normal" });
+        break;
       }
       const resultadoCompartilhado = await compartilharResultado(nome, c.function?.arguments ?? null, r);
       mensagens.push({

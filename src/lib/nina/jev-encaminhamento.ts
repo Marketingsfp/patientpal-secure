@@ -149,5 +149,5 @@ export function decidirEncaminhamento(
 
 /** Texto legível do motivo, sem o código técnico (ex.: para o resumo da equipe). */
 export function motivoLegivel(motivo: string): string {
-  return motivo.replace(/^JEV_[A-Z_]+:\s*/, "");
+  return motivo.replace(/^(?:JEV_[A-Z_]+|LISTA_PROFISSIONAIS_EXTENSA):\s*/, "");
 }
