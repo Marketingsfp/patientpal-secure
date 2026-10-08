@@ -122,6 +122,10 @@ const ehDataIso = (v: unknown): v is string =>
 /** Máximo de ids por `.in()`: a lista vai na URL e seleções grandes estouram o limite (400). */
 const IN_BLOCO = 200;
 
+/** Baixa recusada pelo banco (perfil sem permissão de alterar a agenda). */
+const BAIXA_NAO_GRAVADA =
+  "A baixa não foi gravada: seu perfil não tem permissão para alterar este atendimento. Chame o administrador.";
+
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
   head: () => ({ meta: [{ title: "Atendimentos — Financeiro" }] }),
@@ -2366,28 +2370,42 @@ function AtendimentosPage() {
           toast.error("Atendimento sem agendamento vinculado.");
           return;
         }
-        const { error } = await supabase
+        // `.select` devolve as linhas gravadas: quando a regra do banco recusa
+        // a alteração, o update volta SEM erro e sem linha nenhuma. Sem esta
+        // conferência a tela dizia "Baixa realizada" e nada mudava (foi o que
+        // aconteceu com o perfil Financeiro em 08/10/2026).
+        const { data: gravadas, error } = await supabase
           .from("agendamentos")
           .update({ status: "realizado" })
-          .eq("id", a.agendamento_id);
+          .eq("id", a.agendamento_id)
+          .select("id");
         if (error) {
           mostrarErro(error);
+          return;
+        }
+        if (!gravadas || gravadas.length === 0) {
+          toast.error(BAIXA_NAO_GRAVADA);
           return;
         }
       } else {
         // Sem faturamento: o repasse é calculado na tela (tabela do serviço).
         // Gravá-lo na baixa faz os demais relatórios, que leem o valor
         // guardado, enxergarem o mesmo número que o setor de repasse vê aqui.
-        const { error } = await supabase
+        const { data: gravadas, error } = await supabase
           .from("fin_atendimentos")
           .update(
             ehLinhaSemFaturamento(a.forma_pagamento)
               ? { status: "realizado", valor_medico: Number(a.valor_medico) || 0 }
               : { status: "realizado" },
           )
-          .eq("id", a.id);
+          .eq("id", a.id)
+          .select("id");
         if (error) {
           mostrarErro(error);
+          return;
+        }
+        if (!gravadas || gravadas.length === 0) {
+          toast.error(BAIXA_NAO_GRAVADA);
           return;
         }
       }
@@ -2490,26 +2508,34 @@ function AtendimentosPage() {
         .map((a) => a.agendamento_id as string);
       const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
       // Em blocos: a lista de ids vai na URL e, com seleções grandes, estoura o limite (400).
+      // Conta as linhas realmente gravadas (ver `darBaixa`): recusa da regra
+      // do banco não vem como erro.
+      let gravados = 0;
       for (let i = 0; i < agIds.length; i += IN_BLOCO) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("agendamentos")
           .update({ status: "realizado" })
-          .in("id", agIds.slice(i, i + IN_BLOCO));
+          .in("id", agIds.slice(i, i + IN_BLOCO))
+          .select("id");
         if (error) {
           mostrarErro(error);
           return;
         }
+        gravados += data?.length ?? 0;
       }
       for (let i = 0; i < manualIds.length; i += IN_BLOCO) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("fin_atendimentos")
           .update({ status: "realizado" })
-          .in("id", manualIds.slice(i, i + IN_BLOCO));
+          .in("id", manualIds.slice(i, i + IN_BLOCO))
+          .select("id");
         if (error) {
           mostrarErro(error);
           return;
         }
+        gravados += data?.length ?? 0;
       }
+      const esperados = agIds.length + manualIds.length;
       // Sem faturamento: grava o repasse calculado na tela (ver `darBaixa`).
       for (const a of alvos) {
         if (a.origem !== "manual" || !ehLinhaSemFaturamento(a.forma_pagamento)) continue;
@@ -2522,7 +2548,15 @@ function AtendimentosPage() {
           return;
         }
       }
-      toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      if (gravados < esperados) {
+        toast.error(
+          gravados === 0
+            ? BAIXA_NAO_GRAVADA
+            : `Só ${gravados} de ${esperados} baixa(s) foram gravadas. ` + BAIXA_NAO_GRAVADA,
+        );
+      } else {
+        toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      }
       await load();
     } catch (err) {
       mostrarErro(err);
