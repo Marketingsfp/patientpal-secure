@@ -6235,6 +6235,183 @@ export type Database = {
           },
         ]
       }
+      francisco_config: {
+        Row: {
+          clinica_id: string
+          cursor_job: Json | null
+          inicio_campanha: string | null
+          publicado: Json | null
+          rascunho: Json
+          revisao: number
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          cursor_job?: Json | null
+          inicio_campanha?: string | null
+          publicado?: Json | null
+          rascunho: Json
+          revisao?: number
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          cursor_job?: Json | null
+          inicio_campanha?: string | null
+          publicado?: Json | null
+          rascunho?: Json
+          revisao?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "francisco_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      francisco_contatos: {
+        Row: {
+          atualizado_por: string | null
+          clinica_id: string
+          estado: string
+          evidencia: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          clinica_id: string
+          estado: string
+          evidencia: string
+          telefone: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          clinica_id?: string
+          estado?: string
+          evidencia?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "francisco_contatos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      francisco_envios: {
+        Row: {
+          clinica_id: string
+          configuracao: Json
+          created_at: string
+          entrega: string | null
+          etapa: string
+          id: string
+          motivo: string | null
+          orcamento_id: string
+          respondido_em: string | null
+          status: string
+          telefone: string
+          template_nome: string
+          texto: string
+          updated_at: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          configuracao: Json
+          created_at?: string
+          entrega?: string | null
+          etapa: string
+          id?: string
+          motivo?: string | null
+          orcamento_id: string
+          respondido_em?: string | null
+          status?: string
+          telefone: string
+          template_nome: string
+          texto: string
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          configuracao?: Json
+          created_at?: string
+          entrega?: string | null
+          etapa?: string
+          id?: string
+          motivo?: string | null
+          orcamento_id?: string
+          respondido_em?: string | null
+          status?: string
+          telefone?: string
+          template_nome?: string
+          texto?: string
+          updated_at?: string
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "francisco_envios_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "francisco_envios_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      francisco_eventos: {
+        Row: {
+          ator: string | null
+          clinica_id: string
+          created_at: string
+          dados: Json
+          id: string
+          tipo: string
+        }
+        Insert: {
+          ator?: string | null
+          clinica_id: string
+          created_at?: string
+          dados?: Json
+          id?: string
+          tipo: string
+        }
+        Update: {
+          ator?: string | null
+          clinica_id?: string
+          created_at?: string
+          dados?: Json
+          id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "francisco_eventos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gr_impressoes: {
         Row: {
           agendamento_id: string | null
@@ -16598,6 +16775,66 @@ export type Database = {
           valor_contratado: number
           valor_pago: number
         }[]
+      }
+      francisco_autorizar_contato: {
+        Args: {
+          p_ator: string
+          p_clinica: string
+          p_estado: string
+          p_evidencia: string
+          p_telefone: string
+        }
+        Returns: undefined
+      }
+      francisco_avaliar: {
+        Args: {
+          p_agora?: string
+          p_clinica: string
+          p_config: Json
+          p_inicio: string
+          p_orcamento: string
+          p_reserva?: string
+        }
+        Returns: Json
+      }
+      francisco_conferir_reserva: { Args: { p_id: string }; Returns: boolean }
+      francisco_listar_candidatos: {
+        Args: {
+          p_clinica: string
+          p_config: Json
+          p_cursor_em?: string
+          p_cursor_id?: string
+          p_inicio: string
+        }
+        Returns: Json[]
+      }
+      francisco_registrar_resposta: {
+        Args: {
+          p_clinica: string
+          p_mensagem: string
+          p_saida: boolean
+          p_telefone: string
+        }
+        Returns: undefined
+      }
+      francisco_reservar: {
+        Args: {
+          p_clinica: string
+          p_etapa: string
+          p_orcamento: string
+          p_texto: string
+        }
+        Returns: Json
+      }
+      francisco_salvar_config: {
+        Args: {
+          p_ator: string
+          p_clinica: string
+          p_config: Json
+          p_publicar: boolean
+          p_revisao: number
+        }
+        Returns: Json
       }
       get_horarios_disponiveis: {
         Args: {
