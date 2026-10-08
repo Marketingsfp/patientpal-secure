@@ -260,6 +260,56 @@ describe("filtrarRateio", () => {
   });
 });
 
+/**
+ * Desde 05/10/2026 o orçamento grava "LABORATÓRIO (2 EXAMES): TSH, T4 LIVRE",
+ * e cada combinação de exames virava uma linha nas Estatísticas, separada de
+ * EXAMES LABORATORIAIS.
+ */
+describe("filtrarRateio — laboratorio", () => {
+  const ctx = {
+    grupoPorServico: new Map([
+      ["exames laboratoriais", chaveGrupo("LABORATORIO")!],
+      ["eletrocardiograma", chaveGrupo("CARDIOLOGIA")!],
+    ]),
+    nomeServicoPorChave: new Map([
+      ["exames laboratoriais", "EXAMES LABORATORIAIS"],
+      ["laboratorio", "LABORATORIO"],
+      ["eletrocardiograma", "ELETROCARDIOGRAMA"],
+    ]),
+    medicosLaboratorio: new Set(["lab"]),
+  } as unknown as RateioContexto;
+  const base = { clinicaId: "c1", de: "2026-10-01", ate: "2026-10-31" };
+  const ids = (linhas: RateioLinha[], servico: string) =>
+    filtrarRateio(ctx, linhas, { ...base, servico }).map((l) => l.id);
+
+  it("conta todo atendimento da agenda de laboratorio como EXAMES LABORATORIAIS", () => {
+    const linhas = [
+      linha({ id: "1", medico_id: "lab", procedimento: "EXAMES LABORATORIAIS (LABORATORIO)" }),
+      linha({ id: "2", medico_id: "lab", procedimento: "LABORATÓRIO (2 EXAMES): TSH, T4 LIVRE" }),
+      linha({ id: "3", medico_id: "lab", procedimento: "LABORATORIO" }),
+      linha({ id: "4", medico_id: "lab", procedimento: "HEMOGRAMA COMPLETO (LABORATORIO)" }),
+    ];
+    expect(ids(linhas, "exames laboratoriais")).toEqual(["1", "2", "3", "4"]);
+  });
+
+  it("fora da agenda de laboratorio, orcamento de um item vale o servico do item", () => {
+    const linhas = [
+      linha({
+        id: "1",
+        medico_id: "ecg",
+        procedimento: "LABORATÓRIO (1 EXAMES): ELETROCARDIOGRAMA",
+      }),
+      linha({
+        id: "2",
+        medico_id: "outro",
+        procedimento: "LABORATÓRIO (2 EXAMES): HEMOGRAMA, PSA",
+      }),
+    ];
+    expect(ids(linhas, "eletrocardiograma")).toEqual(["1"]);
+    expect(ids(linhas, "exames laboratoriais")).toEqual(["2"]);
+  });
+});
+
 describe("compararRateio", () => {
   const grupo = (over: Partial<RateioGrupo>): RateioGrupo => ({
     chave: "med-1",
