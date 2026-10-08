@@ -1042,6 +1042,7 @@ function LimiteDialog({
                   <SelectItem value="semana">Por semana</SelectItem>
                   <SelectItem value="mes">Por mês</SelectItem>
                   <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
+                  <SelectItem value="12m_uso">12 meses entre usos</SelectItem>
                   <SelectItem value="contrato">Por contrato</SelectItem>
                 </SelectContent>
               </Select>
@@ -1609,6 +1610,7 @@ function NovaRegraDialog({
                     <SelectItem value="semana">Por semana</SelectItem>
                     <SelectItem value="mes">Por mês</SelectItem>
                     <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
+                    <SelectItem value="12m_uso">12 meses entre usos</SelectItem>
                     <SelectItem value="contrato">Por contrato</SelectItem>
                   </SelectContent>
                 </Select>

@@ -591,6 +591,20 @@ export async function obterInfoConvenioPaciente(params: {
         janelaInicio = cicloInicio;
         janelaFim = new Date(proxCiclo.getTime() - 1);
       }
+    } else if (periodo === "12m_uso") {
+      // Intervalo mínimo de 12 meses entre um uso e outro: qualquer uso pago
+      // nos 12 meses antes ou depois da data conta. Conta pelos atendimentos
+      // do paciente, então a renovação do contrato não zera a contagem.
+      janelaInicio = new Date(dataBase.getFullYear() - 1, dataBase.getMonth(), dataBase.getDate() + 1);
+      janelaFim = new Date(
+        dataBase.getFullYear() + 1,
+        dataBase.getMonth(),
+        dataBase.getDate() - 1,
+        23,
+        59,
+        59,
+        999,
+      );
     } else if (periodo === "contrato") {
       janelaInicio = null;
       janelaFim = null;
@@ -996,7 +1010,9 @@ export async function obterInfoConvenioPaciente(params: {
               ? "mês"
               : periodo === "ano"
                 ? "ano"
-                : periodo === "contrato"
+                : periodo === "12m_uso"
+                  ? "12 meses"
+                  : periodo === "contrato"
                   ? "contrato"
                   : "dia";
         // Se a regra é gratuita e o limite já foi consumido, monta um texto
