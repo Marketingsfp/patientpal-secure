@@ -17539,6 +17539,20 @@ export type Database = {
         }
         Returns: Json
       }
+      pagar_repasse_terceiro: {
+        Args: {
+          _clinica_id: string
+          _conta_id: string
+          _criado_por: string
+          _data: string
+          _forma_pagamento: string
+          _itens: Json
+          _terceiro_id: string
+          _terceiro_nome: string
+          _total: number
+        }
+        Returns: Json
+      }
       painel_aniversariantes_hoje: {
         Args: { _clinica_id: string; _limite?: number }
         Returns: {
