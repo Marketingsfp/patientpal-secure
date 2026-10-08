@@ -2933,6 +2933,7 @@ export type Database = {
           beneficios: string | null
           clinica_id: string
           created_at: string
+          credito_limite_inicial: number | null
           descricao: string | null
           fidelidade_meses: number
           id: string
@@ -2961,6 +2962,7 @@ export type Database = {
           beneficios?: string | null
           clinica_id: string
           created_at?: string
+          credito_limite_inicial?: number | null
           descricao?: string | null
           fidelidade_meses?: number
           id?: string
@@ -2989,6 +2991,7 @@ export type Database = {
           beneficios?: string | null
           clinica_id?: string
           created_at?: string
+          credito_limite_inicial?: number | null
           descricao?: string | null
           fidelidade_meses?: number
           id?: string
@@ -3943,6 +3946,7 @@ export type Database = {
           multa: number | null
           numero_parcela: number
           observacoes: string | null
+          origem: string | null
           pago_em: string | null
           status: string
           taxa_adesao: number
@@ -3962,6 +3966,7 @@ export type Database = {
           multa?: number | null
           numero_parcela: number
           observacoes?: string | null
+          origem?: string | null
           pago_em?: string | null
           status?: string
           taxa_adesao?: number
@@ -3981,6 +3986,7 @@ export type Database = {
           multa?: number | null
           numero_parcela?: number
           observacoes?: string | null
+          origem?: string | null
           pago_em?: string | null
           status?: string
           taxa_adesao?: number
@@ -4103,6 +4109,8 @@ export type Database = {
           contrato_origem_id: string | null
           convenio_id: string | null
           created_at: string
+          credito_limite: number | null
+          credito_revisado_em: string | null
           criado_por: string | null
           data_fim: string | null
           data_inicio: string
@@ -4142,6 +4150,8 @@ export type Database = {
           contrato_origem_id?: string | null
           convenio_id?: string | null
           created_at?: string
+          credito_limite?: number | null
+          credito_revisado_em?: string | null
           criado_por?: string | null
           data_fim?: string | null
           data_inicio?: string
@@ -4181,6 +4191,8 @@ export type Database = {
           contrato_origem_id?: string | null
           convenio_id?: string | null
           created_at?: string
+          credito_limite?: number | null
+          credito_revisado_em?: string | null
           criado_por?: string | null
           data_fim?: string | null
           data_inicio?: string
@@ -4323,6 +4335,54 @@ export type Database = {
           vencimento?: string | null
         }
         Relationships: []
+      }
+      credito_clinica_revisoes: {
+        Row: {
+          clinica_id: string
+          contrato_id: string
+          created_at: string
+          id: string
+          limite_anterior: number | null
+          limite_novo: number
+          observacao: string
+          revisado_por: string
+        }
+        Insert: {
+          clinica_id: string
+          contrato_id: string
+          created_at?: string
+          id?: string
+          limite_anterior?: number | null
+          limite_novo: number
+          observacao: string
+          revisado_por: string
+        }
+        Update: {
+          clinica_id?: string
+          contrato_id?: string
+          created_at?: string
+          id?: string
+          limite_anterior?: number | null
+          limite_novo?: number
+          observacao?: string
+          revisado_por?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credito_clinica_revisoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credito_clinica_revisoes_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crm_etapas: {
         Row: {
@@ -5407,6 +5467,7 @@ export type Database = {
           convenio_id: string | null
           convenio_modalidade: string | null
           created_at: string
+          credito_mensalidade_id: string | null
           criado_por: string | null
           data: string
           data_cartao: string | null
@@ -5454,6 +5515,7 @@ export type Database = {
           convenio_id?: string | null
           convenio_modalidade?: string | null
           created_at?: string
+          credito_mensalidade_id?: string | null
           criado_por?: string | null
           data?: string
           data_cartao?: string | null
@@ -5501,6 +5563,7 @@ export type Database = {
           convenio_id?: string | null
           convenio_modalidade?: string | null
           created_at?: string
+          credito_mensalidade_id?: string | null
           criado_por?: string | null
           data?: string
           data_cartao?: string | null
@@ -5570,6 +5633,13 @@ export type Database = {
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_credito_mensalidade_id_fkey"
+            columns: ["credito_mensalidade_id"]
+            isOneToOne: false
+            referencedRelation: "contrato_mensalidades"
             referencedColumns: ["id"]
           },
           {
@@ -15551,6 +15621,10 @@ export type Database = {
           valor: number
         }[]
       }
+      _credito_clinica_situacao: {
+        Args: { _clinica_id: string; _paciente_id: string }
+        Returns: Json
+      }
       _do_fix_phones_prontuarios_mj: {
         Args: never
         Returns: {
@@ -16121,6 +16195,14 @@ export type Database = {
           p_item_id: string
         }
         Returns: Json
+      }
+      credito_clinica_situacao: {
+        Args: { _clinica_id: string; _paciente_id: string }
+        Returns: Json
+      }
+      credito_clinica_valor_do_lancamento: {
+        Args: { _composicao: Json; _forma: string; _valor: number }
+        Returns: number
       }
       criar_clinica_com_admin: {
         Args: {
@@ -18055,6 +18137,10 @@ export type Database = {
           id: string
           nome: string
         }[]
+      }
+      revisar_limite_credito_clinica: {
+        Args: { _contrato_id: string; _limite: number; _observacao: string }
+        Returns: undefined
       }
       salvar_agendamento_e_vincular_orcamento: {
         Args: {
