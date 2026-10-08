@@ -211,6 +211,9 @@ export function FaturamentoRapidoMensalidadeDialog({
         )
         .in("contrato_id", Array.from(contratos.keys()))
         .in("status", ["pendente", "aberto"])
+        // Cobrança do Crédito na clínica é recebida na tela do contrato, sem
+        // virar receita de novo — aqui ela seria lançada como mensalidade.
+        .is("origem" as never, null)
         .order("numero_parcela")
         .order("vencimento");
       if (error) throw error;

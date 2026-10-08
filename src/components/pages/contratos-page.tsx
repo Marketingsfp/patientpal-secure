@@ -34,6 +34,11 @@ import {
 import { toast } from "sonner";
 import { IsencaoCarenciaLoteDialog } from "@/components/contratos/isencao-carencia-lote-dialog";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { ehCobrancaCredito } from "@/lib/cartao/credito-clinica";
+import {
+  CreditoClinicaPainel,
+  PagarCobrancaCreditoDialog,
+} from "@/components/cartao/credito-clinica-painel";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -406,6 +411,9 @@ type Mens = {
   taxa_adesao?: number | null;
   lancamento_id?: string | null;
   valor_pago?: number | null;
+  /** 'credito_clinica' = cobrança do Crédito na clínica; null = parcela/taxa. */
+  origem?: string | null;
+  observacoes?: string | null;
 };
 
 const isAdesao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) === 0;
@@ -422,8 +430,14 @@ const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_par
 /** Taxa cobrada no balcão para reimprimir o carnê/cartão do contrato. */
 const VALOR_TAXA_SEGUNDA_VIA = 10;
 
-const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
-  isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa inclusão" : `Mensalidade ${m.numero_parcela}`;
+const cobrancaLabel = (m: Pick<Mens, "numero_parcela" | "origem">) =>
+  ehCobrancaCredito(m)
+    ? "Crédito na clínica"
+    : isAdesao(m)
+      ? "Adesão"
+      : isTaxaInclusao(m)
+        ? "Taxa inclusão"
+        : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
   id: string;
   paciente_id: string;
@@ -4011,6 +4025,8 @@ function DetalheContrato({
 
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
+  /** Cobrança do Crédito na clínica sendo recebida (diálogo próprio). */
+  const [pagCredito, setPagCredito] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   /** Etapa do QR Code, entre escolher "Pix" e dar a baixa de fato. */
   const [pixOpen, setPixOpen] = useState(false);
@@ -5423,7 +5439,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
       .select("id, observacoes")
       .eq("contrato_id", contrato.id)
       .eq("status", "pendente")
-      .lt("numero_parcela", 0);
+      .lt("numero_parcela", 0)
+      // Cobrança do Crédito na clínica cita o nome no texto do atendimento,
+      // mas não é taxa do dependente: nunca sai junto com ele.
+      .is("origem" as never, null);
     const idsRemover = ((taxasPend ?? []) as Array<{ id: string; observacoes: string | null }>)
       .filter((r) => (r.observacoes ?? "").includes(alvoNome))
       .map((r) => r.id);
@@ -5633,6 +5652,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <ProntuarioBadge codigo={prontuarioExibicao(pacienteFull)} />
                 </div>
               ) : null}
+              {contrato.paciente_id && contrato.clinica_id && !cancelado ? (
+                <CreditoClinicaPainel
+                  pacienteId={contrato.paciente_id}
+                  clinicaId={contrato.clinica_id}
+                  contratoId={contrato.id}
+                  versao={mens
+                    .filter(ehCobrancaCredito)
+                    .map((m) => `${m.id}:${m.status}:${m.valor}`)
+                    .join("|")}
+                />
+              ) : null}
+              <PagarCobrancaCreditoDialog
+                cobranca={
+                  pagCredito
+                    ? {
+                        id: pagCredito.id,
+                        valor: Number(pagCredito.valor),
+                        vencimento: pagCredito.vencimento,
+                      }
+                    : null
+                }
+                onOpenChange={(v) => {
+                  if (!v) setPagCredito(null);
+                }}
+                onPago={() => void load()}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <button
                   type="button"
@@ -5894,7 +5939,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 {podeEscrever
                   ? (() => {
-                      const selecionaveis = mens.filter((m) => !(isAdesao(m) && adesaoEmbutida));
+                      // Cobrança do crédito tem recebimento e regra próprios:
+                      // fica fora do pagamento e da NFS-e em lote.
+                      const selecionaveis = mens.filter(
+                        (m) => !(isAdesao(m) && adesaoEmbutida) && !ehCobrancaCredito(m),
+                      );
                       const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
                       const total = selecionadas.reduce(
                         (s, m) =>
@@ -6085,7 +6134,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 </TableCell>
                               ) : null}
                               <TableCell>
-                                {isAdesao(m) ? (
+                                {ehCobrancaCredito(m) ? (
+                                  <Badge
+                                    className="bg-rose-600"
+                                    title={m.observacoes ?? "Crédito na clínica"}
+                                  >
+                                    Crédito na clínica
+                                  </Badge>
+                                ) : isAdesao(m) ? (
                                   <Badge variant="secondary">Adesão</Badge>
                                 ) : isTaxaInclusao(m) ? (
                                   <Badge
@@ -6177,7 +6233,28 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1 justify-end">
-                                  {m.status === "pago" ? (
+                                  {ehCobrancaCredito(m) ? (
+                                    // Crédito na clínica: recebimento próprio (vai para a
+                                    // gaveta, não fatura de novo). Paga não tem NFS-e (os
+                                    // atendimentos já foram faturados) nem "Reverter".
+                                    m.status === "pago" ? (
+                                      <span
+                                        className="text-xs text-muted-foreground"
+                                        title="Cobrança do crédito recebida — os atendimentos já foram faturados no dia do uso"
+                                      >
+                                        Recebida
+                                      </span>
+                                    ) : m.status === "cancelado" ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        Estornada
+                                      </span>
+                                    ) : (
+                                      <Button size="sm" onClick={() => setPagCredito(m)}>
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Receber
+                                      </Button>
+                                    )
+                                  ) : m.status === "pago" ? (
                                     <>
                                       {podeEmitirNfse && m.lancamento_id ? (
                                         nfsePorLancamento[m.lancamento_id] ? (

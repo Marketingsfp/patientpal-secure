@@ -34,6 +34,8 @@ export const gerarBoletosContrato = createServerFn({ method: "POST" })
       .from("contrato_mensalidades")
       .select("id, numero_parcela, valor, vencimento, status")
       .eq("contrato_id", contrato.id)
+      // Cobrança do Crédito na clínica é recebida no contrato, fora do boleto.
+      .is("origem" as never, null)
       .order("numero_parcela");
     if (errP) {
       return { pendentes: 0, emitidos: 0, mensagem: errP.message, erro: true };

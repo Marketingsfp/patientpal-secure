@@ -659,7 +659,8 @@ const GRUPOS_BASE: Grupo[] = [
       {
         key: "francisco",
         nome: "Francisco",
-        descricao: "Acompanhamento de orçamentos, configuração e homologação; publicação exclusiva de administrador",
+        descricao:
+          "Acompanhamento de orçamentos, configuração e homologação; publicação exclusiva de administrador",
         menu: "OS ZAP › Francisco",
       },
     ],
@@ -761,6 +762,12 @@ const ALCADAS: ReadonlyArray<{ escopo: EscopoAutorizacao; nome: string; descrica
     escopo: "alerta_critico",
     nome: "Alerta crítico do paciente",
     descricao: "Marcar ou retirar aviso jurídico no cadastro do paciente.",
+  },
+  {
+    escopo: "credito_clinica",
+    nome: "Revisar Crédito na clínica",
+    descricao:
+      "Definir o novo limite do Crédito na clínica do titular na revisão de 6 meses (só por pessoa).",
   },
 ];
 

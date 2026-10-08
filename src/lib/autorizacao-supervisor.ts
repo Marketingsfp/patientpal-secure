@@ -37,6 +37,12 @@ export const ESCOPOS_AUTORIZACAO = {
    * conferência de valores.
    */
   alerta_critico: ["admin", "gestor", "supervisor"],
+  /**
+   * Revisar o limite do Crédito na clínica do titular (a cada 6 meses).
+   * Nenhum cargo autoriza: só quem recebeu a alçada NOMINAL em Perfis → Por
+   * pessoa. O banco confere a mesma coisa (`revisar_limite_credito_clinica`).
+   */
+  credito_clinica: [] as readonly string[],
 } as const;
 
 export type EscopoAutorizacao = keyof typeof ESCOPOS_AUTORIZACAO;

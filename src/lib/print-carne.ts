@@ -114,6 +114,9 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       .from("contrato_mensalidades")
       .select("id, numero_parcela, vencimento, valor, status, pago_em, forma_pagamento")
       .eq("contrato_id", contratoId)
+      // A cobrança do Crédito na clínica é separada e muda a cada uso: não
+      // entra no carnê impresso.
+      .is("origem" as never, null)
       .order("numero_parcela"),
     supabase
       .from("pacientes")
