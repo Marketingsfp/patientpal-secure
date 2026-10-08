@@ -108,6 +108,13 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     padrao: "Para conferir seu cadastro e concluir o agendamento, preciso de {lista}.\n\nExemplo: {exemplo}.",
   }),
   D({
+    chave: "fluxo.cadastro.nao_entendido",
+    categoria: "fluxo",
+    descricao: "Resposta ao pedido de dados em que nenhum dado do paciente foi reconhecido.",
+    variaveis: ["lista", "exemplo"],
+    padrao: "Não consegui entender os dados na sua mensagem. Para continuar, preciso de {lista}. Pode enviar do jeito do exemplo, por favor?\n\nExemplo: {exemplo}.",
+  }),
+  D({
     chave: "fluxo.coleta.completa",
     categoria: "fluxo",
     descricao: "Pedido dos três dados após o paciente aceitar a vaga.",

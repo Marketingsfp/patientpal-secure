@@ -34,10 +34,17 @@ export type ConfirmacaoAgendamento = {
   resumo_sem_paciente?: string;
 };
 
+/** Mesmo paciente: o cadastro grava o nome sem acento ("MOURAO" × "Mourão"). */
+function mesmoCadastro(a: ConfirmacaoAgendamento["cadastro"], b: NonNullable<ConfirmacaoAgendamento["cadastro"]>) {
+  const nome = (v: string) => normalizar(v).replace(/\s+/g, " ");
+  return Boolean(a && a.id === b.id && a.data_nascimento === b.data_nascimento &&
+    a.telefone === b.telefone && nome(a.nome) === nome(b.nome));
+}
+
 /** Vincula o aceite ao paciente conferido, além da vaga. Mudança exige novo resumo. */
 export function incluirPacienteNoResumo(estado: EstadoFluxoNina, clinicaId: string, cadastro: NonNullable<ConfirmacaoAgendamento["cadastro"]>) {
   const c = confirmacaoDaEscolha(estado, clinicaId);
-  if (!c || JSON.stringify(c.cadastro) === JSON.stringify(cadastro)) return;
+  if (!c || mesmoCadastro(c.cadastro, cadastro)) return;
   c.resumo_sem_paciente ??= c.resumo;
   c.cadastro = { ...cadastro };
   c.resumo = `*Paciente:* ${cadastro.nome}\n*Data de nascimento:* ${cadastro.data_nascimento.split("-").reverse().join("/")}\n*Telefone:* ${cadastro.telefone}\n\n${c.resumo_sem_paciente}`;

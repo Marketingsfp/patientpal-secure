@@ -18,6 +18,22 @@ test("a pergunta sobre quem é o paciente não vira um nome", () => {
   expect(extrairDadosIdentificacao("O paciente é meu filho, posso agendar?").nome).toBeNull();
 });
 
+test.each([
+  ["sebastiao alves de lima 1950 dia 20 de julho", "Sebastiao Alves De Lima", "1950-07-20"],
+  ["sebastiao alves de lima 20/07/1950", "Sebastiao Alves De Lima", "1950-07-20"],
+  ["davi lucas pereira nasceu 14/06/2017", "Davi Lucas Pereira", "2017-06-14"],
+  ["jose carlos da silva nacimento 5 de marco de 1960", "Jose Carlos Da Silva", "1960-03-05"],
+  ["jessica oliveira santos 02 04 2001", "Jessica Oliveira Santos", "2001-04-02"],
+  ["maria dias souza data de nascimento 01/02/1980", "Maria Dias Souza", "1980-02-01"],
+  ["meu nome e geraldo pereira da cruz nasci 03/03/1958", "Geraldo Pereira Da Cruz", "1958-03-03"],
+  ["geraldo pereira da cruz nascido 03/03/1958", "Geraldo Pereira Da Cruz", "1958-03-03"],
+  ["ela chama ana julia moreira campos tem 6 ano nasceu 11/09/2019", "Ana Julia Moreira Campos", "2019-09-11"],
+  ["dona benedita alves de souza 1939 dia 3 de maio", "Benedita Alves De Souza", "1939-05-03"],
+  ["seu jose da silva 01/01/1940", "Jose Da Silva", "1940-01-01"],
+])("dados escritos sem pontuação (07/10/2026): %s", (texto, nome, data) => {
+  expect(extrairDadosIdentificacao(texto)).toMatchObject({ nome, data_nascimento: data });
+});
+
 function preparar(faltantes = ["nome", "data_nascimento"]) {
   const estado = estadoVazio();
   Object.assign(estado.appointment, {
@@ -519,6 +535,24 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     ]);
   });
 
+  test("resposta sem nenhum dado reconhecido diz que não entendeu, em vez de repetir o pedido", async () => {
+    const t = preparar();
+    expect((await t.turno("sim"))?.chaveTemplate).toBe("fluxo.cadastro.obrigatorios");
+    const r = await t.turno("sebastiao");
+    expect(r?.chaveTemplate).toBe("fluxo.cadastro.nao_entendido");
+    expect(r?.texto).toMatch(/^Não consegui entender os dados na sua mensagem\. Para continuar, preciso de \*nome completo\*.*\*data de nascimento\*/);
+    await t.turno("sebastiao alves de lima 1950 dia 20 de julho");
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toEqual({
+      nome: "Sebastiao Alves De Lima", data_nascimento: "1950-07-20",
+    });
+  });
+  test("só o nome, sem a data, pede a data normalmente", async () => {
+    const t = preparar();
+    await t.turno("sim");
+    const r = await t.turno("Ana da Silva");
+    expect(r?.chaveTemplate).toBe("fluxo.cadastro.obrigatorios");
+    expect(r?.camposPendentes).toEqual(["data_nascimento"]);
+  });
   test("frase de nascimento não substitui nome já coletado", async () => {
     const t = preparar();
     await t.turno("sim");

@@ -27,6 +27,18 @@ describe("Jev Fase 2 — encaminhamento", () => {
     expect(decidirEncaminhamento({ ...base, irritacao: { noul: 0.79 } }, null)).toBeNull();
     expect(decidirEncaminhamento({ ...base, irritacao: { noul: 0.8 } }, null)?.motivo).toContain("IRRITACAO");
   });
+  test("escolher médico pelo nome não é pedido de atendente (07/10/2026)", () => {
+    const alto = { ...base, pedido_atendente: { noul: 0.78 } };
+    for (const m of ["qria cm a dra andrea de lucca", "com o Dr. Jorge", "quero a doutora Iara", "o primeiro com o dr alex"])
+      expect(decidirEncaminhamento(alto, null, undefined, m)).toBeNull();
+    for (const m of ["quero falar com uma atendente", "me passa pra recepção", "nao quero a dra quero falar com alguem"])
+      expect(decidirEncaminhamento(alto, null, undefined, m)?.motivo).toContain("PEDIDO_ATENDENTE");
+    // Urgência continua valendo mesmo citando o médico.
+    expect(decidirEncaminhamento({ ...alto, urgencia: { noul: 0.9 } }, null, undefined, "dra andrea, to com muita dor")?.urgencia).toBe("alta");
+    const p = perguntasEncaminhamento().pedido_atendente!;
+    expect(p.instructions).toContain("NÃO pedido de atendente");
+    expect(JSON.stringify(p.criteria)).toContain("qria cm a dra andrea");
+  });
   test("dúvida encaminha na segunda mensagem sem entendimento, com as confianças no motivo", () => {
     expect(decidirEncaminhamento(base, falhas(1, [0.39]))).toBeNull();
     const e = decidirEncaminhamento(base, falhas(2, [0.39, 0.37]));

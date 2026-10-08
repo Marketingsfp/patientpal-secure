@@ -95,7 +95,7 @@ export type DadosIdentificacao = {
 
 /** Abertura que antecede o nome ("meu nome é", "o nome dele é", "se chama"). */
 const ABERTURA_NOME =
-  /^(?:(?:e\s+)?(?:o\s+|a\s+)?(?:meu|minha|seu|sua)?\s*nome(?:\s+completo)?(?:\s+(?:dele|dela|do\s+paciente|da\s+paciente))?(?:\s+(?:é|eh|e))?|sou|me\s+chamo|(?:ele|ela)\s+se\s+chama|se\s+chama|chama\s+se|chama-se)\s+/i;
+  /^(?:(?:e\s+)?(?:o\s+|a\s+)?(?:meu|minha|seu|sua)?\s*nome(?:\s+completo)?(?:\s+(?:dele|dela|do\s+paciente|da\s+paciente))?(?:\s+(?:é|eh|e))?|sou|me\s+chamo|(?:ele|ela)\s+(?:se\s+)?chama|se\s+chama|chama\s+se|chama-se)\s+/i;
 
 /** Palavras que não aparecem num nome de pessoa ("da", "de", "do" continuam válidas). */
 const NAO_E_NOME =
@@ -181,9 +181,11 @@ function extrairNome(semData: string): string | null {
   const partes = semData
     .replace(/\d[\d.\- ]{9,17}\d/g, " ")
     .replace(/\d/g, " ")
-    .split(/[,;:|.!?\n]+|\s+e\s+(?=(?:nasci|nascid[oa]|que\s+nasceu|data)\b)|\b(?:nascid[oa]|nasci|que\s+nasceu)\s+(?:em|no\s+dia)?\b/i);
+    .split(/[,;:|.!?\n]+|\s+e\s+(?=(?:nasci|nascid[oa]|que\s+nasceu|data)\b)|\b(?:nascid[oa]|nasci|que\s+nasceu)\s+(?:em|no\s+dia)?\b|\b(?:nasci|nascid[oa]|nasceu|nascimento|nacimento|nasimento|nascimeto|nacimeto|data|dia|tem|anos?|meses|idade)\b/i);
   const candidatos = partes
-    .map((p) => p.replace(/\s+/g, " ").trim().replace(ABERTURA_NOME, "").trim().replace(PARENTESCO_ANTES, "").trim())
+    .map((p) => p.replace(/\s+/g, " ").trim().replace(ABERTURA_NOME, "").trim().replace(PARENTESCO_ANTES, "").trim()
+      // "dona Benedita", "seu José": tratamento não é parte do nome (07/10/2026).
+      .replace(/^(?:dona|dna|seu|sr|sra|senhor|senhora)\.?\s+/i, ""))
     .map((p) => p.split(" ").filter((w) => /^[A-Za-zÀ-ÿ'´`^~-]{2,}$/.test(w)))
     .filter(pareceNome);
   const melhor = candidatos.sort((a, b) => b.length - a.length)[0];
@@ -520,9 +522,14 @@ export async function aplicarGateIdentificacao(params: {
   );
   if (faltando.length) {
     estado.flow.stage = "AWAITING_PATIENT_DATA";
+    // Resposta ao pedido de dados sem nenhum campo reconhecido: dizer que não
+    // entendeu, em vez de repetir o mesmo pedido (07/10/2026).
+    const respondeuPedido = ultimaMensagem?.role === "assistant" &&
+      /nome completo|data de nascimento/i.test(ultimaMensagem.content ?? "");
+    const naoEntendeu = respondeuPedido && !novo?.nome && !novo?.data_nascimento && !novo?.cpf;
     return resultadoGate(
       textos,
-      "fluxo.cadastro.obrigatorios",
+      naoEntendeu ? "fluxo.cadastro.nao_entendido" : "fluxo.cadastro.obrigatorios",
       {
         lista: rotularFaltantes(faltando),
         exemplo: "\n" + faltando.map((campo) => EXEMPLOS_CADASTRO[campo]).join("\n"),

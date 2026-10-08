@@ -1101,9 +1101,11 @@ async function gerarRespostaNinaInterno(
   // Fase 2: sinais acima do limite, ou falha de entendimento em 2 mensagens
   // seguidas SEM avanço do atendimento, encaminham para a recepção. Escolher
   // uma opção já oferecida nunca conta como falha. Erro/demora = fluxo atual.
-  const { perguntaNomeAtendimento, semNomePeloJev, perguntaNomeEntregue, PEDIR_NOME_ATENDIMENTO,
+  const { perguntaNomeAtendimento, semNomePeloJev, perguntaNomeEntregue, textoPedirNomeAtendimento,
     MOTIVO_NOME_NAO_INFORMADO, REGRA_SEM_INDICACAO, FERRAMENTA_NOME_ATENDIMENTO } =
     await import("@/lib/nina/atendimento-sem-indicacao");
+  // "consulta do coração" já diz qual atendimento: não é sintoma (07/10/2026).
+  const nomePopular = (await import("@/lib/nina/nome-popular-especialidade")).especialidadePorNomePopular(mensagemPaciente);
   let nomeAtendimentoAusente = false;
   let respostaNomeAtendimento = false;
   const { perguntaAlteracaoAgendamento, alteracaoPeloJev, alteracaoExplicita, motivoAlteracao,
@@ -1155,7 +1157,7 @@ async function gerarRespostaNinaInterno(
         jev.limitesJev(clinicaId),
       ]);
       const respostas = resultado.ok ? resultado.respostas : null;
-      nomeAtendimentoAusente = semNomePeloJev(respostas?.nome_atendimento);
+      nomeAtendimentoAusente = semNomePeloJev(respostas?.nome_atendimento) && !nomePopular;
       alteracaoSolicitada = alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
@@ -1193,7 +1195,7 @@ async function gerarRespostaNinaInterno(
           })
         : null;
       if (f2 && respostas) {
-        jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem, limitesClinica);
+        jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem, limitesClinica, mensagemPaciente);
         if (nomeAtendimentoAusente && jevEncaminhamento?.motivo.startsWith("JEV_DUVIDA_REPETIDA")) jevEncaminhamento = null;
         jevPontuacoes = {
           confianca_intencao: respostas["intencao"]?.confidence ?? null,
@@ -2665,7 +2667,7 @@ async function gerarRespostaNinaInterno(
       await executarDecisaoEncaminhamento({ motivo: motivoAlteracao(alteracaoSolicitada), urgencia: "normal" });
       break;
     }
-    if (chamadas.some(c => c.function?.name === "solicitar_nome_atendimento")) {
+    if (!nomePopular && chamadas.some(c => c.function?.name === "solicitar_nome_atendimento")) {
       respostaParcialConfirmada = perguntasDoTurno.temConfirmadas;
       if (respostaParcialConfirmada) resposta = msg?.content ?? "";
       await solicitarNomeAtendimento();
@@ -2688,6 +2690,16 @@ async function gerarRespostaNinaInterno(
           dados: { ferramenta: nome, argumentos_originais: originais, argumentos_efetivos: c.function.arguments },
           codigo: { arquivo: "src/lib/nina/pesquisa-atendimento-sessao.ts", funcao: "prepararPesquisaAtendimentoDaSessao" },
         });
+      }
+      if (nome === "solicitar_nome_atendimento" && nomePopular) {
+        mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
+          ok: false, executada: false, erro: "ATENDIMENTO_INFORMADO",
+          mensagem: `O paciente informou o atendimento pelo nome popular "${nomePopular.termo}" = ${nomePopular.especialidade}. Isso não é sintoma. Pesquise ${nomePopular.especialidade} no catálogo e siga o atendimento normalmente.`,
+        }) });
+        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Nome popular de especialidade não é sintoma",
+          dados: { termo: nomePopular.termo, especialidade: nomePopular.especialidade },
+          codigo: { arquivo: "src/lib/nina/nome-popular-especialidade.ts", funcao: "especialidadePorNomePopular" } });
+        continue;
       }
       if (reservaComPerguntas && !PESQUISAS_INDEPENDENTES.has(nome)) {
         mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
@@ -3051,7 +3063,11 @@ async function gerarRespostaNinaInterno(
   }
   if (respostaNomeAtendimento && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto) {
     const antes = resposta;
-    resposta = [respostaParcialConfirmada ? resposta : "", PEDIR_NOME_ATENDIMENTO].filter(Boolean).join("\n\n");
+    // Primeira resposta da conversa: a apresentação vem junto (07/10/2026).
+    const apresentacao = !respostaParcialConfirmada && saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
+      ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
+      : "";
+    resposta = [apresentacao, respostaParcialConfirmada ? resposta : "", textoPedirNomeAtendimento(mensagemPaciente)].filter(Boolean).join("\n\n");
     transformar("atendimento.sem_indicacao", "Pedir nome sem recomendar atendimento por sintomas", antes, resposta, "aviso_operacional");
     marcarOrigem("codigo", "atendimento não informado; pergunta antes do encaminhamento");
   }

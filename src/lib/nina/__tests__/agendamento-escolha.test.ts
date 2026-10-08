@@ -52,6 +52,19 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
     expect(e.appointment.confirmation!.aceita).toBe(false);
     expect(e.appointment.confirmation!.resumo).not.toContain("SOFIA");
   });
+  test("nome do cadastro sem acento não refaz o resumo nem apaga o aceite", () => {
+    const e = preparar();
+    e.patient.id = "paciente"; e.patient.validated = true;
+    const digitado = { id: "paciente", nome: "REINALDO TAVARES MOURÃO", data_nascimento: "1968-02-14", telefone: "55000100754" };
+    incluirPacienteNoResumo(e, "clinica", digitado);
+    const entregue = e.appointment.confirmation!.resumo;
+    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: entregue }])).toBe(true);
+    incluirPacienteNoResumo(e, "clinica", { ...digitado, nome: "REINALDO  TAVARES MOURAO" });
+    expect(e.appointment.confirmation!.resumo).toBe(entregue);
+    expect(consentimentoDaEscolha(e, "clinica")).not.toBeNull();
+    incluirPacienteNoResumo(e, "clinica", { ...digitado, data_nascimento: "1968-02-15" });
+    expect(e.appointment.confirmation!.aceita).toBe(false);
+  });
   test("reconsultar ou selecionar a mesma vaga preserva o resumo e o aceite", () => {
     const e = preparar();
     const resumo = e.appointment.confirmation!;

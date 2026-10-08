@@ -36,8 +36,11 @@ export function perguntasEncaminhamento(): Record<string, PerguntaJev> {
     },
     pedido_atendente: {
       type: "noul",
-      instructions: "Na `mensagem_atual`, o paciente pede explicitamente para falar com uma pessoa, atendente ou recepção?",
-      criteria: { true: "Pede uma pessoa/atendente.", false: "Não pede; apenas conversa com a assistente." },
+      instructions: "Na `mensagem_atual`, o paciente pede explicitamente para falar com uma atendente, a recepção ou uma pessoa da equipe, em vez da assistente? Pedir um médico, uma médica ou outro profissional de saúde para ser atendido (\"com a dra Andrea\", \"com o Dr. Jorge\", \"quero o ortopedista\") é escolha de profissional, NÃO pedido de atendente.",
+      criteria: {
+        true: "Pede atendente, recepção ou uma pessoa da equipe: 'quero falar com uma atendente', 'me passa pra recepção', 'quero falar com alguém', 'tem alguém aí?'.",
+        false: "Não pede: conversa com a assistente ou escolhe um profissional de saúde ('qria cm a dra andrea', 'com o Dr. Jorge', 'o primeiro com o dr alex').",
+      },
     },
     irritacao: {
       type: "noul",
@@ -112,17 +115,26 @@ export function contarDuvida(a: {
 
 const numero = (n: number) => n.toFixed(2).replace(".", ",");
 
+const CITA_PROFISSIONAL = /\b(?:dr|dra|doutor|doutora|dotor|dotora|m[eé]dic[oa])\b/i;
+const CITA_ATENDIMENTO = /\b(?:atendente|recep[cç][aã]o|recepcionista|pessoa|algu[eé]m|humano|secret[aá]ri[oa])\b/i;
+
+/** "qria cm a dra andrea" escolhe a médica; não é pedido de atendente (07/10/2026). */
+export function escolheProfissionalSemPedirAtendente(mensagem: string | undefined): boolean {
+  return Boolean(mensagem && CITA_PROFISSIONAL.test(mensagem) && !CITA_ATENDIMENTO.test(mensagem));
+}
+
 export function decidirEncaminhamento(
   respostas: Record<string, RespostaJev> | null,
   contagem: ContagemDuvida | null,
   limites: { urgencia: number; pedido_atendente: number; irritacao: number } = LIMITES_ENCAMINHAMENTO,
+  mensagem?: string,
 ): Encaminhamento | null {
   const p = (id: keyof typeof LIMITES_ENCAMINHAMENTO) => respostas?.[id]?.noul;
   const u = p("urgencia");
   if (typeof u === "number" && u >= limites.urgencia)
     return { motivo: `JEV_URGENCIA_CLINICA: possível urgência clínica (pontuação ${numero(u)})`, urgencia: "alta" };
   const a = p("pedido_atendente");
-  if (typeof a === "number" && a >= limites.pedido_atendente)
+  if (typeof a === "number" && a >= limites.pedido_atendente && !escolheProfissionalSemPedirAtendente(mensagem))
     return { motivo: `JEV_PEDIDO_ATENDENTE: paciente pediu atendente (pontuação ${numero(a)})`, urgencia: "normal" };
   const i = p("irritacao");
   if (typeof i === "number" && i >= limites.irritacao)
