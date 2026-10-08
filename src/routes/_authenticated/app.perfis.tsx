@@ -104,6 +104,13 @@ const PERFIS: Array<{
       "Gestão financeira completa: contas a pagar/receber, conciliação bancária, relatórios e BI.",
   },
   {
+    key: "supervisor",
+    nome: "SUPERVISOR",
+    icon: UserCog,
+    descricao:
+      "Gestão operacional e supervisão da unidade: acompanha equipe, indicadores, agendas e filas, sem acesso a dados financeiros e configurações do sistema.",
+  },
+  {
     key: "enfermeiro",
     nome: "ENFERMEIRO",
     icon: HeartPulse,

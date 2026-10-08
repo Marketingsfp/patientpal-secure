@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePermissoes } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +86,11 @@ type Relatorio = {
   icon: React.ComponentType<any>;
   cor: string;
   usaPeriodo?: boolean;
+  /**
+   * Planilha com valores em dinheiro (preço, receita, mensalidade). Só aparece
+   * para quem tem acesso ao módulo Financeiro — o Supervisor não vê.
+   */
+  financeiro?: boolean;
   carregar: (ctx: {
     clinicaId: string;
     ini?: string;
@@ -174,6 +180,7 @@ const RELATORIOS: Relatorio[] = [
   },
   {
     id: "procedimentos",
+    financeiro: true,
     titulo: "Serviços",
     descricao: "Catálogo de serviços e valores.",
     icon: ClipboardList,
@@ -205,6 +212,7 @@ const RELATORIOS: Relatorio[] = [
   },
   {
     id: "orcamentos",
+    financeiro: true,
     titulo: "Orçamentos",
     descricao: "Orçamentos emitidos no período.",
     icon: FileText,
@@ -235,6 +243,7 @@ const RELATORIOS: Relatorio[] = [
   },
   {
     id: "financeiro",
+    financeiro: true,
     titulo: "Financeiro — Lançamentos",
     descricao: "Receitas e despesas no período.",
     icon: DollarSign,
@@ -273,6 +282,7 @@ const RELATORIOS: Relatorio[] = [
   },
   {
     id: "contratos",
+    financeiro: true,
     titulo: "Cartão Benefícios / Contratos",
     descricao: "Contratos de assinatura e mensalidades.",
     icon: CreditCard,
@@ -301,6 +311,7 @@ const RELATORIOS: Relatorio[] = [
   },
   {
     id: "crm",
+    financeiro: true,
     titulo: "CRM — Oportunidades",
     descricao: "Funil de vendas e oportunidades.",
     icon: Target,
@@ -669,7 +680,17 @@ function RelatoriosPage() {
   // do banco repete a mesma checagem — esconder a aba não é permissão.
   const ehSupervisor =
     !!clinicaAtual?.pode_autorizar &&
-    (clinicaAtual.role === "admin" || clinicaAtual.role === "gestor");
+    (clinicaAtual.role === "admin" ||
+      clinicaAtual.role === "gestor" ||
+      clinicaAtual.role === "supervisor");
+  // Valores em dinheiro seguem o módulo Financeiro da tela de Perfis: o perfil
+  // Supervisor abre Relatórios para acompanhar a operação, mas não vê receita,
+  // saldo, preço nem mensalidade.
+  // Espera as permissões chegarem: decidir antes disso montaria o dashboard
+  // sem dinheiro e logo depois de novo com dinheiro (duas cargas do período).
+  const { allowed, nivel, loading: permissoesCarregando } = usePermissoes();
+  const veFinanceiro = allowed === null || (nivel?.get("financeiro") ?? "none") !== "none";
+  const relatoriosVisiveis = veFinanceiro ? RELATORIOS : RELATORIOS.filter((r) => !r.financeiro);
 
   async function baixar(r: Relatorio) {
     if (!clinicaAtual?.clinica_id) {
@@ -752,11 +773,31 @@ function RelatoriosPage() {
         </div>
 
         <TabsContent value="dashboard" className="mt-4">
-          <DashboardView clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+          {permissoesCarregando ? (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                Carregando dados…
+              </CardContent>
+            </Card>
+          ) : (
+            <DashboardView
+              clinicaId={clinicaAtual?.clinica_id}
+              ini={ini}
+              fim={fim}
+              veFinanceiro={veFinanceiro}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="cubo" className="mt-4">
-          <CuboBI clinicaId={clinicaAtual?.clinica_id} ini={ini} fim={fim} />
+          {!permissoesCarregando && (
+            <CuboBI
+              clinicaId={clinicaAtual?.clinica_id}
+              ini={ini}
+              fim={fim}
+              veFinanceiro={veFinanceiro}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="agendamentos-diario" className="mt-4">
@@ -788,7 +829,7 @@ function RelatoriosPage() {
 
         <TabsContent value="downloads" className="mt-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {RELATORIOS.map((r) => {
+            {relatoriosVisiveis.map((r) => {
               const Icon = r.icon;
               return (
                 <Card key={r.id}>
@@ -867,7 +908,30 @@ interface RawData {
 // janela travam o navegador. A planilha completa sai em "Baixar planilhas".
 const LIMITE_DETALHE = 500;
 
-function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
+/**
+ * Indicadores e gráficos em dinheiro. Quem não tem acesso ao Financeiro
+ * (perfil Supervisor) vê o resto do dashboard, mas estes nem são montados — e
+ * os lançamentos não chegam a ser pedidos ao banco.
+ */
+const WIDGETS_FINANCEIROS = new Set([
+  "kpi_saldo",
+  "kpi_rec",
+  "kpi_desp",
+  "ch_fin_dia",
+  "ch_fin_cat",
+]);
+
+function DashboardView({
+  clinicaId,
+  ini,
+  fim,
+  veFinanceiro,
+}: {
+  clinicaId?: string;
+  ini: string;
+  fim: string;
+  veFinanceiro: boolean;
+}) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [raw, setRaw] = useState<RawData | null>(null);
@@ -928,16 +992,18 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
               .order("inicio")
               .order("id"),
           ),
-          buscarPorDia<any>(ini, fim, (de, ate) =>
-            supabase
-              .from("fin_lancamentos")
-              .select("id, data, tipo, valor, status, descricao, categoria_id")
-              .eq("clinica_id", clinicaId)
-              .gte("data", de)
-              .lt("data", ate)
-              .order("data")
-              .order("id"),
-          ),
+          veFinanceiro
+            ? buscarPorDia<any>(ini, fim, (de, ate) =>
+                supabase
+                  .from("fin_lancamentos")
+                  .select("id, data, tipo, valor, status, descricao, categoria_id")
+                  .eq("clinica_id", clinicaId)
+                  .gte("data", de)
+                  .lt("data", ate)
+                  .order("data")
+                  .order("id"),
+              )
+            : Promise.resolve([] as any[]),
           buscarPorDia<any>(ini, fim, (de, ate) =>
             supabase
               .from("pacientes")
@@ -1078,7 +1144,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     return () => {
       cancel = true;
     };
-  }, [clinicaId, ini, fim]);
+  }, [clinicaId, ini, fim, veFinanceiro]);
 
   const saldo = useMemo(() => (data ? data.receitas - data.despesas : 0), [data]);
 
@@ -1144,7 +1210,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       "Temp. mín (°C)": r.clima?.temp_min ?? "",
       "Temp. máx (°C)": r.clima?.temp_max ?? "",
       Agendamentos: r.agend,
-      Receita: r.receita,
+      ...(veFinanceiro ? { Receita: r.receita } : {}),
     }));
     if (!flat.length) {
       toast.info("Nada para exportar.");
@@ -1154,7 +1220,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   }
 
   // ---------- widgets editáveis ----------
-  const ALL_WIDGETS: { id: string; label: string; group: "kpi" | "chart" }[] = [
+  const TODOS_WIDGETS: { id: string; label: string; group: "kpi" | "chart" }[] = [
     { id: "kpi_agend", label: "KPI — Agendamentos", group: "kpi" },
     { id: "kpi_novos", label: "KPI — Novos pacientes", group: "kpi" },
     { id: "kpi_pront", label: "KPI — Prontuários", group: "kpi" },
@@ -1167,6 +1233,9 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     { id: "ch_agend_medico", label: "Gráfico — Agendamentos por médico", group: "chart" },
     { id: "ch_fin_cat", label: "Gráfico — Financeiro por categoria", group: "chart" },
   ];
+  const ALL_WIDGETS = veFinanceiro
+    ? TODOS_WIDGETS
+    : TODOS_WIDGETS.filter((w) => !WIDGETS_FINANCEIROS.has(w.id));
   const STORAGE_KEY = `relatorios.dashboard.widgets.${clinicaId ?? "default"}`;
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined")
@@ -1208,7 +1277,8 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       // Persistência best-effort; o reset já valeu no estado do React.
     }
   }
-  const on = (id: string) => enabled[id] !== false;
+  const on = (id: string) =>
+    (veFinanceiro || !WIDGETS_FINANCEIROS.has(id)) && enabled[id] !== false;
 
   if (!clinicaId) {
     return (
@@ -1458,7 +1528,7 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                       <TableHead className="w-28 text-right">Chuva (mm)</TableHead>
                       <TableHead className="w-32 text-right">Temp. mín/máx</TableHead>
                       <TableHead className="text-right">Agendamentos</TableHead>
-                      <TableHead className="text-right">Receita</TableHead>
+                      {veFinanceiro && <TableHead className="text-right">Receita</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1496,7 +1566,9 @@ function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                             : "—"}
                         </TableCell>
                         <TableCell className="text-right font-semibold">{r.agend}</TableCell>
-                        <TableCell className="text-right text-xs">{fmtBRL(r.receita)}</TableCell>
+                        {veFinanceiro && (
+                          <TableCell className="text-right text-xs">{fmtBRL(r.receita)}</TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

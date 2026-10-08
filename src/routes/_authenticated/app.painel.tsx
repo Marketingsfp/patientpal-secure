@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAcessoModulo } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { HhpPageHeader, HhpKpiCard, HhpKpiRow, HhpEmptyState } from "@/design-system/hhp";
 import { Button } from "@/components/ui/button";
@@ -140,7 +141,6 @@ type CaixaSessao = {
   id: string;
   user_nome: string | null;
   aberto_em: string;
-  valor_abertura: number | null;
 };
 
 const ETAPA_LABEL: Record<string, string> = {
@@ -203,7 +203,9 @@ function DashboardOperacional() {
           .limit(8),
         supabase
           .from("caixa_sessoes")
-          .select("id,user_nome,aberto_em,valor_abertura")
+          // Só quem abriu e quando: o valor de abertura não é pedido ao banco,
+          // porque o Dashboard abre também para perfis sem acesso a dinheiro.
+          .select("id,user_nome,aberto_em")
           .in("clinica_id", ids)
           .eq("status", "aberto")
           .order("aberto_em", { ascending: false }),
@@ -264,11 +266,17 @@ function DashboardOperacional() {
   const [cartaoAberto, setCartaoAberto] = useState<CartaoDia | null>(null);
   const medicoNome = useMemo(() => new Map((d?.medicos ?? []).map((m) => [m.id, m.nome])), [d]);
   // Contagem por atendente é ferramenta de supervisão: mesma regra de
-  // Relatórios → Marcações por atendente (`pode_autorizar` + admin/gestor).
+  // Relatórios → Marcações por atendente (`pode_autorizar` + admin, gestor ou
+  // supervisor).
   // A função do banco repete a checagem.
+  // Atalho e "ver todos" do caixa só para quem abre a tela do Caixa — o perfil
+  // Supervisor vê quem está em turno, mas não entra no caixa.
+  const abreCaixa = useAcessoModulo("caixa") !== "none";
   const ehSupervisor =
     !!clinicaAtual?.pode_autorizar &&
-    (clinicaAtual.role === "admin" || clinicaAtual.role === "gestor");
+    (clinicaAtual.role === "admin" ||
+      clinicaAtual.role === "gestor" ||
+      clinicaAtual.role === "supervisor");
 
   const proximos = useMemo(() => {
     const agora = Date.now();
@@ -402,7 +410,7 @@ function DashboardOperacional() {
           <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
           <Atalho to="/app/checkin" icon={UserCheck} label="Check-in" />
           <Atalho to="/app/recepcao" icon={Ticket} label="Recepção / Filas" />
-          <Atalho to="/app/caixa" icon={Banknote} label="Caixa" />
+          {abreCaixa && <Atalho to="/app/caixa" icon={Banknote} label="Caixa" />}
           <Atalho to="/app/clientes" icon={Search} label="Buscar paciente" />
           <Atalho to="/app/fluxo" icon={Stethoscope} label="Fluxo do paciente" />
         </div>
@@ -660,7 +668,7 @@ function DashboardOperacional() {
             <Painel
               title="Caixas abertos"
               subtitle="Operadores em turno"
-              action={<LinkMais to="/app/caixa" />}
+              action={abreCaixa ? <LinkMais to="/app/caixa" /> : undefined}
             >
               <div className="p-4 space-y-2">
                 {carregando ? (
@@ -690,7 +698,7 @@ function DashboardOperacional() {
                           </span>
                         </div>
                       ))}
-                    {(d?.caixas ?? []).length > 5 && (
+                    {abreCaixa && (d?.caixas ?? []).length > 5 && (
                       <Link
                         to="/app/caixa"
                         className="block pt-1 text-[12px] font-medium text-slate-500 hover:text-slate-800"

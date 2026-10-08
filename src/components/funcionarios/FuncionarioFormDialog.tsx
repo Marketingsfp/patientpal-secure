@@ -30,11 +30,9 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { PERFIS_SISTEMA, perfilCanonico } from "@/lib/permissoes-presets";
 
-// "Supervisor" foi removido: não correspondia a nenhum perfil configurável em
-// Perfis de Acesso (sem preset definido, travava o usuário sem acesso algum),
-// e o conceito real de "supervisor" usado no sistema (autorizar desconto/
-// estorno) já é calculado a partir de admin/gestor/financeiro, não de um
-// perfil próprio.
+// "Supervisor" voltou em 08/10/2026 como perfil configurável (preset próprio
+// em permissoes-presets.ts): gestão operacional sem acesso a dinheiro. Poder
+// de autorizar desconto/isenção continua sendo a marcação pessoa a pessoa.
 const PERFIS = PERFIS_SISTEMA;
 
 interface Ref {

@@ -690,7 +690,23 @@ interface SavedView {
   config: CubeConfig;
 }
 
-export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
+/**
+ * Cubos que somam dinheiro (lançamentos e orçamentos). Ficam fora da lista de
+ * quem não tem acesso ao módulo Financeiro — o perfil Supervisor.
+ */
+const CUBOS_FINANCEIROS = new Set(["financeiro", "orcamentos"]);
+
+export function CuboBI({
+  clinicaId,
+  ini,
+  fim,
+  veFinanceiro,
+}: {
+  clinicaId?: string;
+  ini: string;
+  fim: string;
+  veFinanceiro: boolean;
+}) {
   const STORAGE_KEY = `relatorios.cubo.views.${clinicaId ?? "default"}`;
 
   const [cfg, setCfg] = useState<CubeConfig>({
@@ -704,7 +720,16 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     viz: "barras",
     topN: 10,
   });
-  const cube = useMemo(() => CUBOS.find((c) => c.id === cfg.cubeId)!, [cfg.cubeId]);
+  const cubosVisiveis = useMemo(
+    () => (veFinanceiro ? CUBOS : CUBOS.filter((c) => !CUBOS_FINANCEIROS.has(c.id))),
+    [veFinanceiro],
+  );
+  // Visão salva apontando para um cubo de dinheiro cai no primeiro permitido:
+  // a trava é aqui, não só na lista do seletor.
+  const cube = useMemo(
+    () => cubosVisiveis.find((c) => c.id === cfg.cubeId) ?? cubosVisiveis[0],
+    [cfg.cubeId, cubosVisiveis],
+  );
   const [rawRows, setRawRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
@@ -1051,12 +1076,12 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Fonte de dados</Label>
-              <Select value={cfg.cubeId} onValueChange={(v) => setField("cubeId", v)}>
+              <Select value={cube.id} onValueChange={(v) => setField("cubeId", v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CUBOS.map((c) => (
+                  {cubosVisiveis.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.label}
                     </SelectItem>

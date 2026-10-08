@@ -17,6 +17,19 @@ function nivelDoPreset(role: string): Map<string, "read" | "write"> {
 }
 
 /**
+ * Módulos que o preset fecha DE PROPÓSITO (acesso "none"). Contam como
+ * configurados: sem isso um submódulo fechado no preset herdaria o pai em
+ * `moduloPermitido` — a tabela de preços do Supervisor, por exemplo, viria
+ * junto com "Informações rápidas".
+ */
+function negadosNoPreset(role: string): string[] {
+  const preset = (PRESETS as Record<string, Partial<Record<string, Acesso>>>)[role] ?? {};
+  return Object.entries(preset)
+    .filter(([, v]) => v === "none")
+    .map(([k]) => k);
+}
+
+/**
  * Retorna o conjunto de módulos visíveis para o usuário atual na clínica atual.
  *
  * - `null` significa "sem filtro" (admin ou ainda carregando) — mostre tudo.
@@ -127,7 +140,7 @@ export function usePermissoes(): {
         if (!perfil) {
           const set = presetAllowedSet(role);
           const nvl = nivelDoPreset(role);
-          const cfg = new Set<string>();
+          const cfg = new Set<string>(negadosNoPreset(role));
           await aplicarExcecoesDaPessoa(set, nvl, cfg);
           if (cancelled) return;
           setAllowed(set);
@@ -146,7 +159,7 @@ export function usePermissoes(): {
         if (!perms || perms.length === 0) {
           const set = presetAllowedSet(role);
           const nvl = nivelDoPreset(role);
-          const cfg = new Set<string>();
+          const cfg = new Set<string>(negadosNoPreset(role));
           await aplicarExcecoesDaPessoa(set, nvl, cfg);
           if (cancelled) return;
           setAllowed(set);
@@ -178,6 +191,7 @@ export function usePermissoes(): {
           set.add(modulo);
           nvl.set(modulo, acesso);
         }
+        for (const modulo of negadosNoPreset(role)) cfg.add(modulo);
         // Por último, e por cima de tudo, as exceções desta pessoa.
         await aplicarExcecoesDaPessoa(set, nvl, cfg);
         if (cancelled) return;
