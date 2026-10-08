@@ -46,6 +46,32 @@ transporte de síntese compartilhado. Não se envia áudio ativo nesta versão.
 
 ## Banco e segurança
 
+### Homologação por conversa
+
+A aba Homologação começa com **Iniciar com template** (D1 ou D4). O template
+é renderizado exatamente a partir do rascunho com o nome da clínica, sem Meta,
+IA, número real ou criação de orçamento. Depois, o operador escreve como
+Paciente Teste. Qualquer resposta interrompe a sequência e mostra o destino
+humano; SAIR usa o mesmo reconhecimento de saída do atendimento real. Não
+há resposta automática gerada depois do encaminhamento.
+
+**Avançar para D4** simula a passagem para 96 horas sem resposta/pagamento;
+**Simular pagamento** interrompe os próximos templates, sem alterar o financeiro.
+Um novo teste preserva o anterior. Cada conversa mantém uma cópia do rascunho
+usado no início; mudanças posteriores só entram em novos testes. Templates de
+etapas desativadas não iniciam teste. A homologação não exige publicação nem
+aprovação da Meta e não valida entrega, aprovação ou elegibilidade financeira real.
+
+O histórico reaproveita `francisco_eventos`, com eventos aditivos
+`homologacao_chat_inicio` e `homologacao_chat_acao`. Não exige migração.
+Consultas e ações são autorizadas por clínica, módulo e usuário; o teste de um
+operador não é retomado por outro. Conversas são paginadas de 20 em 20 e ações
+são relidas em páginas sem truncamento. Comandos têm UUID para retomada sem
+duplicar mensagens. Testes não escrevem em contatos, envios reais ou filas
+humanas. Na prévia local, ficam somente em memória até sair da aba.
+
+O teste auxiliar de propostas do modelo permanece separado e recolhido.
+
 Migração aditiva `20261008193000_francisco_orcamentos.sql`:
 
 | Tabela | Finalidade |
