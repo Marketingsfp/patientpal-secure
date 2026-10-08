@@ -656,6 +656,12 @@ const GRUPOS_BASE: Grupo[] = [
         descricao: "Treinamento de atendentes (ver = só o próprio; editar = painel da gestora)",
         menu: "Treinamento › Coach WhatsApp",
       },
+      {
+        key: "francisco",
+        nome: "Francisco",
+        descricao: "Acompanhamento de orçamentos, configuração e homologação; publicação exclusiva de administrador",
+        menu: "OS ZAP › Francisco",
+      },
     ],
   },
   {

@@ -9,6 +9,7 @@ const ABAS_RESTRITAS = new Set([
   "templates",
 ]);
 const ROTAS_RESTRITAS = [
+  "/app/francisco",
   "/app/nina-aprendizado",
   "/app/nina-metricas",
   "/app/nina-arquitetura",

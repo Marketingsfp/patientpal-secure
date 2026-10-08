@@ -9,6 +9,7 @@ import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadePro
 import { deveEnviarPorTecla } from "@/lib/atendimento/teclado-envio";
 import { ListaRespostasRapidas, useRespostasFiltradas, useRespostasRapidas } from "@/components/nina/RespostasRapidas";
 import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
+import { mensagemDoFrancisco } from "@/lib/francisco/autoria";
 import {
   aplicarVariaveis,
   detectarComandoNoTexto,
@@ -2402,7 +2403,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
             mensagem: {
               id: String(i.msg.id),
               direction: i.msg.direction,
-              sistema: i.msg.status === "system" || i.msg.enviada_por === "sistema",
+              sistema: i.msg.status === "system" || (i.msg.enviada_por === "sistema" && !mensagemDoFrancisco(i.msg.raw)),
             },
           }
         : i.item.tipo === "EVENTO"
@@ -3639,7 +3640,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                               {/* Envio otimista: durante o envio normal a bolha não
                               exibe nenhum status — só a hora. Falha aparece acima. */}
                               <span className="min-w-0 break-words">
-                                {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
+                                {fmtHora(m.recebida_em)} {mensagemDoFrancisco(m.raw) ? "· Francisco" : m.enviada_por === "nina" && "· Nina"}
                                 {autorSupervisao && (
                                   <span
                                     data-testid="autor-supervisao"

@@ -24,8 +24,8 @@ const PORTAIS: Array<{
   {
     id: "os-zap",
     icon: MessageCircle,
-    descricao: "Conversas de WhatsApp, mensagens prontas e tudo da Nina.",
-    itens: ["Conversas", "Mensagens prontas", "Informações da clínica", "Métricas"],
+    descricao: "Conversas de WhatsApp, Nina e acompanhamento com Francisco.",
+    itens: ["Conversas", "Nina", "Francisco", "Métricas"],
   },
   {
     id: "coach",
