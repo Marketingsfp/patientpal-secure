@@ -96,4 +96,29 @@ describe("POST WhatsApp real com serviços simulados", () => {
       expect(r.reaberturas).toBe(1);
     });
   }
+  for (const [cenario, motivo] of [
+    ["assinatura-invalida", "não confere"],
+    ["assinatura-sem-secret", "App Secret não configurado"],
+  ] as const) {
+    it(`${cenario}: aviso recusado com 401 antes de gravar, reabrir ou chamar a Nina`, () => {
+      const r = executar(cenario);
+      expect([r.primeira, r.segunda]).toEqual([401, 401]);
+      expect(r.entradas).toHaveLength(0);
+      expect(r.saidas).toHaveLength(0);
+      expect(r.modelo).toBe(0);
+      expect(r.transporte).toBe(0);
+      expect(r.reaberturas).toBe(0);
+      expect(r.revisao).toBe(0);
+      expect(r.logs).toHaveLength(2);
+      for (const l of r.logs) expect(l).toContain(motivo);
+    });
+  }
+  it("assinatura-registrar: reversão global volta a registrar e processar", () => {
+    const r = executar("assinatura-registrar");
+    expect([r.primeira, r.segunda]).toEqual([200, 200]);
+    expect(r.entradas).toHaveLength(1);
+    expect(r.modelo).toBe(1);
+    expect(r.transporte).toBe(1);
+    expect(r.logs[0]).toBe("assinatura_invalida");
+  });
 });

@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { normalizarTelefone } from "@/lib/atendimento/telefone";
+import { normalizarTelefone, telefoneParaFiltro } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
@@ -667,6 +667,10 @@ async function gerarRespostaNinaInterno(
 
   const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const telefoneNorm = normalizarTelefoneRemetente(telefoneRemetente ?? null);
+  // O telefone entra em um filtro de texto do banco: só o formato da Meta é aceito.
+  const telefoneHistorico = telefoneParaFiltro(telefoneRemetente);
+  if (telefoneRemetente && !telefoneHistorico)
+    console.warn("[nina] telefone do remetente fora do formato esperado; histórico não consultado");
 
   const [medR, dispR, procR, cliR, pacienteInfo, medEspR, espR, estadoId, histR] =
     await Promise.all([
@@ -688,7 +692,7 @@ async function gerarRespostaNinaInterno(
       Promise.resolve({ data: [] as any[] }),
       Promise.resolve({ data: [] as any[] }),
       carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null, opcoes?.conversaId),
-      telefoneRemetente
+      telefoneHistorico
         ? supabaseAdmin
             .from("whatsapp_mensagens")
             .select("id, direction, body, created_at, conversa_id, status, is_teste, enviada_por, tipo, transcricao")
@@ -696,7 +700,7 @@ async function gerarRespostaNinaInterno(
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
             .neq("status", "system")
-            .or(`from_number.eq.${telefoneRemetente},to_number.eq.${telefoneRemetente}`)
+            .or(`from_number.eq.${telefoneHistorico},to_number.eq.${telefoneHistorico}`)
             .order("created_at", { ascending: false })
             .limit(10)
 

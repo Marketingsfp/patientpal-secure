@@ -114,7 +114,7 @@ export const ETAPAS_CAMINHO: EtapaCaminho[] = [
     explicacao: "Compara a assinatura enviada pela Meta com a chave secreta da clínica.",
     faixa: "chegada", tipo: "passo", coluna: 0, linha: 4,
     arquivo: WEBHOOK, funcao: "verifySignature", componente: "message.validate",
-    atencao: "Hoje, se a assinatura não confere, o sistema só anota \"assinatura_invalida\" no registro e continua processando a mensagem.",
+    atencao: "Se a assinatura não confere (ou falta a chave secreta), o aviso é recusado antes de gravar qualquer coisa e a Meta tenta de novo. Chave secreta errada na configuração faz as mensagens da clínica pararem de chegar até ser corrigida.",
   },
   {
     id: "recibo",

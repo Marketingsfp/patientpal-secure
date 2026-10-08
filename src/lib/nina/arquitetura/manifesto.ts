@@ -102,7 +102,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Validação de assinatura",
     categoria: "VALIDACAO",
     descricao:
-      "Confere a assinatura HMAC-SHA256 do corpo com o app secret. Assinatura ausente ou inválida fica registrada no log do webhook como assinatura_invalida, mas a mensagem do paciente nunca é descartada.",
+      "Confere a assinatura HMAC-SHA256 do corpo com o app secret. Assinatura ausente ou inválida (ou app secret não configurado) faz o aviso ser recusado com 401 antes de qualquer gravação ou chamada da Nina; o log do webhook registra a recusa e a Meta repete o aviso. Reversão global: WHATSAPP_WEBHOOK_ASSINATURA=registrar.",
     arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
     funcao: "verifySignature",
     entrada: "Corpo bruto + cabeçalho de assinatura",
@@ -110,8 +110,8 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["message.log_raw"],
     seguintes: ["message.deduplicate", "status.update", "audio.transcribe"],
     erros: [
-      "assinatura inválida (registrada; a mensagem segue)",
-      "app secret ausente (registrado; a mensagem segue)",
+      "assinatura inválida (aviso recusado com 401; registrado no log)",
+      "app secret ausente (aviso recusado com 401; registrado no log)",
     ],
   },
   {
