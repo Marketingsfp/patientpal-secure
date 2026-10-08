@@ -221,6 +221,8 @@ import {
 import {
   MSG_ADMIN_NAO_RESPONDE_AQUI,
   motivoAdminNaoResponde,
+  conversaComNina,
+  MSG_CONVERSA_DA_NINA,
   MSG_DESTINO_EM_PAUSA,
   ROTULO_PERFIL_SUPERVISAO,
   ROTULO_PRESENCA,
@@ -2706,6 +2708,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     !!meuPerfilSupervisao && !!sel && !souResponsavel && !conversaEncerrada && (!!responsavelId || conversaLivre);
   const motivoBloqueio = !sel
     ? null
+    : !carregandoConversa && conversaComNina({ owner_type: sel.owner_type, status: sel.status })
+      ? // Conversa com a Nina: ninguém envia; para responder, atribui-se a conversa.
+        MSG_CONVERSA_DA_NINA
     : souAdmin &&
         !carregandoConversa &&
         !adminPodeResponder({

@@ -27,6 +27,8 @@ import {
   MSG_ADMIN_NAO_ATENDE,
   MSG_ADMIN_NAO_RESPONDE_AQUI,
   motivoAdminNaoResponde,
+  conversaComNina,
+  MSG_CONVERSA_DA_NINA,
   MSG_DESTINO_EM_PAUSA,
   adminPodeResponder,
   apenasDestinatariosValidos,
@@ -2142,6 +2144,8 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
       throw new Error("Conversa encerrada. Reabra o atendimento para responder.");
+    // Conversa com a Nina: ninguém envia (admin, supervisão ou atendente); atribuir tira a Nina.
+    if (conversaComNina(conv)) throw new Error(MSG_CONVERSA_DA_NINA);
     if (ehAdmin && !adminPodeResponder(conv)) throw new Error(motivoAdminNaoResponde(conv));
     // Supervisão responde conversa sem responsável (fila global) SEM virar responsável:
     // só assume se clicar em "Assumir conversa". A da Nina segue a regra de antes.

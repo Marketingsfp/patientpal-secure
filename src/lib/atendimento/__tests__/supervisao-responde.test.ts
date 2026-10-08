@@ -85,3 +85,11 @@ it("conversa da Nina mostra o aviso próprio de bloqueio; as demais seguem o avi
   expect(motivoAdminNaoResponde({ owner_type: "AI", status: "closed" })).toBe(MSG_ADMIN_NAO_RESPONDE_AQUI);
   expect(motivoAdminNaoResponde({ owner_type: "HUMAN", status: "finished" })).toBe(MSG_ADMIN_NAO_RESPONDE_AQUI);
 });
+
+it("ninguém envia em conversa aberta com a Nina; encerrada ou humana não entra na regra (08/10/2026)", async () => {
+  const { conversaComNina, MSG_CONVERSA_DA_NINA } = await import("@/lib/atendimento/perfil-atendimento");
+  expect(conversaComNina({ owner_type: "AI", status: "active" })).toBe(true);
+  expect(conversaComNina({ owner_type: "AI", status: "closed" })).toBe(false);
+  expect(conversaComNina({ owner_type: "HUMAN", status: "active" })).toBe(false);
+  expect(MSG_CONVERSA_DA_NINA).toMatch(/^Conversas atribuídas à Nina são bloqueadas/);
+});
