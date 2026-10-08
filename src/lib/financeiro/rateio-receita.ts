@@ -29,6 +29,7 @@
  * de especialidade, mas ele está vazio em toda a base de produção, e usá-lo
  * jogaria o relatório inteiro para "Sem especialidade".
  */
+import { unificarServicoLaboratorio } from "@/lib/financeiro/servico-laboratorio";
 import { supabase } from "@/integrations/supabase/client";
 import {
   formaDoAtendimento,
@@ -871,11 +872,13 @@ function reparte(
     procedimento: params.procedimento,
     servico_nome: params.laudo
       ? rotuloDoLaudo(params.procedimento)
-      : chaveServico
-      ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
-      : // Serviço que não está (mais) no cadastro continua aparecendo com o
-        // texto que a agenda gravou; some do relatório seria pior.
-        params.procedimento?.trim() || SEM_SERVICO,
+      : unificarServicoLaboratorio(
+          chaveServico
+            ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
+            : // Serviço que não está (mais) no cadastro continua aparecendo com o
+              // texto que a agenda gravou; some do relatório seria pior.
+              params.procedimento?.trim() || SEM_SERVICO,
+        ),
     condicao: ROTULO_CONDICAO[forma] ?? "PARTICULAR",
     // Mesma chave de serviço que resolve o grupo e a grade de repasse: o
     // atendimento gravado como "CONSULTA OFTALMO (OFTALMOLOGIA)" acha o tipo
