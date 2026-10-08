@@ -2,10 +2,12 @@
 // número da barra.
 //
 // Regra de ouro: a lista de cada contador tem de bater com o número que o
-// contador mostra. Por isso a separação usa o mesmo `ehLivre` e os mesmos
-// status de `resumirDia` (ver `resumo-do-dia.ts`), e não um critério novo.
+// contador mostra. Por isso a separação usa o mesmo `ehLivre` e a mesma
+// `situacaoDaFicha` de `resumirDia` (ver `resumo-do-dia.ts`), e não um
+// critério novo.
 
-import { ehLivre, type LinhaResumo } from "./resumo-do-dia";
+import { ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
+import { ehLivre, situacaoDaFicha, type LinhaResumo, type SituacaoFicha } from "./resumo-do-dia";
 import { detectarCheckupRosa, itemCheckupRosa } from "./checkup-rosa";
 
 export type CategoriaResumo =
@@ -32,16 +34,6 @@ export const ROTULO_CATEGORIA: Record<CategoriaResumo, string> = {
   faltas: "Faltas",
   encaixes: "Encaixes",
 };
-
-const STATUS_DA_CATEGORIA: Partial<Record<CategoriaResumo, string>> = {
-  confirmados: "confirmado",
-  emAtendimento: "em_atendimento",
-  atendidos: "realizado",
-  cancelados: "cancelado",
-  faltas: "faltou",
-};
-
-const STATUS_COM_CONTADOR = new Set(Object.values(STATUS_DA_CATEGORIA));
 
 function diaLocal(inicio: string): string {
   return new Date(inicio).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -73,6 +65,7 @@ function linhasDeHorarioDividido<T extends LinhaResumo>(linhas: readonly T[]): T
 export function linhasDaCategoria<T extends LinhaResumo>(
   linhas: readonly T[],
   categoria: CategoriaResumo,
+  ateDia: string = ultimoDiaEncerrado(),
 ): T[] {
   switch (categoria) {
     case "fichasGeradas":
@@ -83,15 +76,12 @@ export function linhasDaCategoria<T extends LinhaResumo>(
       return linhas.filter((a) => !ehLivre(a.paciente_nome));
     case "encaixes":
       return linhasDeHorarioDividido(linhas);
-    case "aguardando":
-      // Mesmo `default` de `resumirDia`: qualquer status sem contador próprio.
+    default:
       return linhas.filter(
-        (a) => !ehLivre(a.paciente_nome) && !STATUS_COM_CONTADOR.has(a.status ?? ""),
+        (a) =>
+          !ehLivre(a.paciente_nome) &&
+          situacaoDaFicha(a, ateDia) === (categoria satisfies SituacaoFicha),
       );
-    default: {
-      const st = STATUS_DA_CATEGORIA[categoria];
-      return linhas.filter((a) => !ehLivre(a.paciente_nome) && a.status === st);
-    }
   }
 }
 

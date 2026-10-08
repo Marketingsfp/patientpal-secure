@@ -104,7 +104,7 @@ export function ResumoDoDiaBar({
       const fim = new Date(`${dataRef}T23:59:59`).toISOString();
       let q = supabase
         .from("agendamentos")
-        .select("id,inicio,status,paciente_nome,paciente_id,medico_id,agenda_id")
+        .select("id,inicio,status,fluxo_etapa,paciente_nome,paciente_id,medico_id,agenda_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", inicio)
         .lte("inicio", fim);
@@ -191,28 +191,28 @@ export function ResumoDoDiaBar({
               onClick={abrir("aguardando")}
               valor={r.aguardando}
               cor="border-slate-200 bg-slate-50 text-slate-700"
-              titulo="Marcados que ainda não tiveram a chegada registrada na recepção."
+              titulo="Marcados que ainda não fizeram check-in na recepção. Quando a clínica fecha (19h), quem continua sem check-in passa para Faltas."
             />
             <Contador
               rotulo="Presentes"
               onClick={abrir("confirmados")}
               valor={r.confirmados}
               cor="border-blue-200 bg-blue-50 text-blue-800"
-              titulo="Confirmados na clínica — a recepção registrou a chegada."
+              titulo="Check-in feito na recepção e ainda sem atendimento (recepção, caixa ou triagem). Confirmação pelo WhatsApp não conta como presença."
             />
             <Contador
               rotulo="Em atendimento"
               onClick={abrir("emAtendimento")}
               valor={r.emAtendimento}
               cor="border-amber-200 bg-amber-50 text-amber-800"
-              titulo="Pacientes que já entraram na sala."
+              titulo="Pacientes na sala do profissional ou no exame."
             />
             <Contador
               rotulo="Atendidos"
               onClick={abrir("atendidos")}
               valor={r.atendidos}
               cor="border-emerald-200 bg-emerald-50 text-emerald-800"
-              titulo="Atendimentos concluídos (situação Realizado)."
+              titulo="Atendimentos concluídos (Realizado ou finalizado na fila)."
             />
             <Contador
               rotulo="Cancelados"
@@ -226,7 +226,7 @@ export function ResumoDoDiaBar({
               onClick={abrir("faltas")}
               valor={r.faltas}
               cor="border-rose-200 bg-rose-50 text-rose-800"
-              titulo="Pacientes marcados que não compareceram."
+              titulo="Marcados como Não compareceu e, depois que a clínica fecha (19h), quem não passou pelo balcão."
             />
             <Contador
               rotulo="Encaixes"

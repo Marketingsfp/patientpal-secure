@@ -56,7 +56,7 @@ import {
 import { useBuscaDebounced } from "@/hooks/use-debounced-value";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
-import { dataClinicaDe, formatarIdadeCurta, hojeBR } from "@/lib/date-utils";
+import { dataClinicaDe, formatarIdadeCurta, hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,6 +271,7 @@ import { ClienteForm, type Paciente as PacienteFull } from "@/components/cliente
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { AgendaEmptyState } from "@/components/agenda/agenda-empty-state";
+import { ficouSemDesfecho, ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 
 // Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
 // em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
@@ -2957,7 +2958,17 @@ function AgendaPage() {
       filtroStatus !== "agendado" &&
       filtroStatus !== "pago" &&
       filtroStatus !== "parcial";
-    if (statusEspecifico) {
+    if (filtroStatus === "faltou") {
+      // "Não compareceu" = marcado "faltou" + quem não passou pelo balcão em
+      // dia já encerrado (a clínica fecha às 19h). Regra em sem-desfecho.ts;
+      // o filtro em memória abaixo aplica o resto (vaga livre, bloqueio).
+      const corte = janelaDiaClinica(ultimoDiaEncerrado()).fimExclusivo;
+      q = q
+        .or(
+          `status.eq.faltou,and(status.in.(agendado,confirmado),inicio.lt."${corte}",or(fluxo_etapa.is.null,fluxo_etapa.eq.aguardando_recepcao))`,
+        )
+        .limit(1000);
+    } else if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
     // Empurra o filtro de profissional para o servidor quando definido.
@@ -4455,6 +4466,17 @@ function AgendaPage() {
     void recarregarExpedientes();
   }, [recarregarExpedientes]);
 
+  // Dia encerrado e o paciente não passou pelo balcão: conta como "Não
+  // compareceu" no filtro e ganha a etiqueta "sem desfecho" — só leitura.
+  const semDesfecho = useCallback(
+    (a: Agendamento) =>
+      ficouSemDesfecho(
+        { ...a, fluxo_etapa: etapaMap.get(a.id) ?? "aguardando_recepcao" },
+        ultimoDiaEncerrado(),
+      ),
+    [etapaMap],
+  );
+
   const { filtrados, ocultosPorExpediente } = useMemo(() => {
     // Livres escondidos por expediente encerrado, já com TODOS os outros
     // filtros aplicados — é o que alimenta o aviso no topo da lista.
@@ -4474,6 +4496,9 @@ function AgendaPage() {
         // "Falta receber": já recebeu alguma coisa e ainda tem saldo aberto.
         if (ehLivre) return false;
         if (!parciaisSet.has(a.id)) return false;
+      } else if (filtroStatus === "faltou") {
+        if (ehLivre) return false;
+        if (a.status !== "faltou" && !semDesfecho(a)) return false;
       } else if (filtroStatus !== "todos") {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
@@ -4547,6 +4572,7 @@ function AgendaPage() {
     medicoEspec,
     fichaPorId,
     parciaisSet,
+    semDesfecho,
   ]);
 
   const totais = useMemo(
@@ -7362,12 +7388,21 @@ function AgendaPage() {
         <title>{infoWa.texto}</title>
       </MessageCircle>
     ) : null;
+    const etiquetaSemDesfecho = semDesfecho(a) ? (
+      <span
+        className="shrink-0 rounded border border-rose-200 bg-rose-50 px-1 text-[10px] font-semibold text-rose-700"
+        title="O dia acabou e o paciente não passou pelo balcão: conta como Não compareceu. Dê o desfecho: check-in, Não compareceu, cancelar ou reagendar."
+      >
+        sem desfecho
+      </span>
+    ) : null;
     const badge = (
       <span className="inline-flex max-w-full items-center gap-1" title={infoWa?.texto}>
         <Badge className={`${STATUS_COR[a.status]} ${className}`} title={STATUS_LABEL[a.status]}>
           {STATUS_LABEL[a.status]}
         </Badge>
         {iconeWa}
+        {etiquetaSemDesfecho}
       </span>
     );
     if (!podeEscrever) return badge;
@@ -7451,6 +7486,7 @@ function AgendaPage() {
           </DropdownMenuContent>
         </DropdownMenu>
         {iconeWa}
+        {etiquetaSemDesfecho}
       </span>
     );
   };

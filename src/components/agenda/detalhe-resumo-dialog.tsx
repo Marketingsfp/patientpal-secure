@@ -22,7 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ehLivre } from "@/lib/agenda/resumo-do-dia";
+import { ehLivre, situacaoDaFicha, type SituacaoFicha } from "@/lib/agenda/resumo-do-dia";
+import { ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 import { checkupRosaVigente } from "@/lib/agenda/checkup-rosa";
 import {
   ROTULO_CATEGORIA,
@@ -49,13 +50,14 @@ type Props = {
   onAbrirFicha?: (agendamentoId: string) => void;
 };
 
-const STATUS_PT: Record<string, string> = {
-  agendado: "Aguardando",
-  confirmado: "Presente",
-  em_atendimento: "Em atendimento",
-  realizado: "Atendido",
-  cancelado: "Cancelado",
-  faltou: "Faltou",
+// Situação pela mesma regra dos contadores (check-in, não o status).
+const SITUACAO_PT: Record<SituacaoFicha, string> = {
+  aguardando: "Aguardando",
+  confirmados: "Presente",
+  emAtendimento: "Em atendimento",
+  atendidos: "Atendido",
+  cancelados: "Cancelado",
+  faltas: "Faltou",
 };
 
 const COR_FINANCEIRO: Record<SituacaoFinanceira, string> = {
@@ -117,7 +119,7 @@ export function DetalheResumoDialog({
       const { data: ags, error } = await supabase
         .from("agendamentos")
         .select(
-          "id,inicio,status,paciente_nome,paciente_id,medico_id,agenda_id,procedimento,tipo_atendimento,data_pagamento,origem_externa,sem_faturamento",
+          "id,inicio,status,fluxo_etapa,paciente_nome,paciente_id,medico_id,agenda_id,procedimento,tipo_atendimento,data_pagamento,origem_externa,sem_faturamento",
         )
         .eq("clinica_id", clinicaId)
         .gte("inicio", inicio)
@@ -158,7 +160,8 @@ export function DetalheResumoDialog({
       filtroMedico === "todos"
         ? data.linhas
         : data.linhas.filter((a) => a.medico_id === filtroMedico);
-    return linhasDaCategoria(doProfissional, categoria)
+    const ateDia = ultimoDiaEncerrado();
+    return linhasDaCategoria(doProfissional, categoria, ateDia)
       .map((a) => {
         const m = a.medico_id ? medicoPorId.get(a.medico_id) : undefined;
         const livre = ehLivre(a.paciente_nome);
@@ -170,7 +173,11 @@ export function DetalheResumoDialog({
           paciente: livre ? "— horário livre —" : (a.paciente_nome ?? "").trim(),
           profissional: m?.nome ?? "Sem profissional",
           especialidade: m?.especialidade_nome ?? "",
-          status: livre ? "Livre" : (STATUS_PT[a.status ?? ""] ?? a.status ?? "—"),
+          status: livre
+            ? "Livre"
+            : a.status !== "faltou" && situacaoDaFicha(a, ateDia) === "faltas"
+              ? "Sem desfecho"
+              : SITUACAO_PT[situacaoDaFicha(a, ateDia)],
           fin: situacaoFinanceira(a, data.pagos),
           rosa: rosa.has(a.id),
         };

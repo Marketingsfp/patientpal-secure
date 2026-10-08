@@ -34,21 +34,28 @@ describe("ehLivre", () => {
   });
 });
 
+// As linhas são de 09/09/2026: até 08/09 o dia está aberto; até 09/09, encerrado.
+const ABERTO = "2026-09-08";
+const ENCERRADO = "2026-09-09";
+
 describe("resumirDia", () => {
-  it("separa livres de agendadas e soma os status", () => {
-    const r = resumirDia([
-      linha("a", "08:00", "DISPONÍVEL"),
-      linha("b", "08:10", "MARIA", "agendado"),
-      linha("c", "08:20", "JOAO", "confirmado"),
-      linha("d", "08:30", "ANA", "em_atendimento"),
-      linha("e", "08:40", "PEDRO", "realizado"),
-      linha("f", "08:50", "LUCAS", "cancelado"),
-      linha("g", "09:00", "CARLA", "faltou"),
-    ]);
-    expect(r.fichasGeradas).toBe(7);
+  const dia = [
+    linha("a", "08:00", "DISPONÍVEL"),
+    linha("b", "08:10", "MARIA", "agendado"),
+    linha("c", "08:20", "JOAO", "confirmado"), // confirmou no WhatsApp, não chegou
+    linha("t", "08:25", "BETO", "agendado", { fluxo_etapa: "triagem" }), // check-in feito
+    linha("d", "08:30", "ANA", "confirmado", { fluxo_etapa: "atendimento" }),
+    linha("e", "08:40", "PEDRO", "realizado", { fluxo_etapa: "triagem" }),
+    linha("f", "08:50", "LUCAS", "cancelado"),
+    linha("g", "09:00", "CARLA", "faltou"),
+  ];
+
+  it("presença vem do check-in, não do status; dia aberto ainda espera", () => {
+    const r = resumirDia(dia, ABERTO);
+    expect(r.fichasGeradas).toBe(8);
     expect(r.livres).toBe(1);
-    expect(r.agendados).toBe(6);
-    expect(r.aguardando).toBe(1);
+    expect(r.agendados).toBe(7);
+    expect(r.aguardando).toBe(2);
     expect(r.confirmados).toBe(1);
     expect(r.emAtendimento).toBe(1);
     expect(r.atendidos).toBe(1);
@@ -56,19 +63,24 @@ describe("resumirDia", () => {
     expect(r.faltas).toBe(1);
   });
 
-  it("os status de ficha ocupada sempre somam o total de agendadas", () => {
-    const r = resumirDia([
-      linha("a", "08:00", "DISPONÍVEL"),
-      linha("b", "08:10", "MARIA", "confirmado"),
-      linha("c", "08:20", "JOAO", "status_novo_do_banco"),
-    ]);
-    expect(
-      r.aguardando + r.confirmados + r.emAtendimento + r.atendidos + r.cancelados + r.faltas,
-    ).toBe(r.agendados);
+  it("dia encerrado: quem não fez check-in vira falta; quem fez continua presente", () => {
+    const r = resumirDia(dia, ENCERRADO);
+    expect(r.aguardando).toBe(0);
+    expect(r.faltas).toBe(3);
+    expect(r.confirmados).toBe(1);
+  });
+
+  it("as situações de ficha ocupada sempre somam o total de agendadas", () => {
+    for (const ate of [ABERTO, ENCERRADO]) {
+      const r = resumirDia([...dia, linha("z", "09:10", "ZE", "status_novo_do_banco")], ate);
+      expect(
+        r.aguardando + r.confirmados + r.emAtendimento + r.atendidos + r.cancelados + r.faltas,
+      ).toBe(r.agendados);
+    }
   });
 
   it("status desconhecido não some da conta — cai em aguardando", () => {
-    const r = resumirDia([linha("c", "08:20", "JOAO", "status_novo_do_banco")]);
+    const r = resumirDia([linha("c", "08:20", "JOAO", "status_novo_do_banco")], ENCERRADO);
     expect(r.aguardando).toBe(1);
   });
 });

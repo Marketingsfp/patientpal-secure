@@ -33,7 +33,8 @@ const DIA: LinhaDetalhe[] = [
   linha("a1", "08:20", "ANA"),
   linha("a2", "08:20", "BIA"), // encaixe por cima da ANA
   linha("c1", "08:30", "CAIO", "confirmado"),
-  linha("e1", "08:40", "EVA", "em_atendimento"),
+  linha("e1", "08:40", "EVA", "confirmado", { fluxo_etapa: "atendimento" }),
+  linha("t1", "08:45", "TETE", "agendado", { fluxo_etapa: "triagem" }),
   linha("r1", "08:50", "RUI", "realizado"),
   linha("x1", "09:00", "XICO", "cancelado"),
   linha("f1", "09:10", "FABI", "faltou"),
@@ -42,19 +43,21 @@ const DIA: LinhaDetalhe[] = [
 
 describe("linhasDaCategoria", () => {
   it("cada lista tem o tamanho do número do contador", () => {
-    const r = resumirDia(DIA);
-    const casos: Array<[CategoriaResumo, number]> = [
-      ["fichasGeradas", r.fichasGeradas],
-      ["livres", r.livres],
-      ["agendados", r.agendados],
-      ["aguardando", r.aguardando],
-      ["confirmados", r.confirmados],
-      ["emAtendimento", r.emAtendimento],
-      ["atendidos", r.atendidos],
-      ["cancelados", r.cancelados],
-      ["faltas", r.faltas],
-    ];
-    for (const [cat, n] of casos) expect(linhasDaCategoria(DIA, cat).length).toBe(n);
+    for (const ate of ["2026-10-01", "2026-10-02"]) {
+      const r = resumirDia(DIA, ate);
+      const casos: Array<[CategoriaResumo, number]> = [
+        ["fichasGeradas", r.fichasGeradas],
+        ["livres", r.livres],
+        ["agendados", r.agendados],
+        ["aguardando", r.aguardando],
+        ["confirmados", r.confirmados],
+        ["emAtendimento", r.emAtendimento],
+        ["atendidos", r.atendidos],
+        ["cancelados", r.cancelados],
+        ["faltas", r.faltas],
+      ];
+      for (const [cat, n] of casos) expect(linhasDaCategoria(DIA, cat, ate).length).toBe(n);
+    }
   });
 
   it("encaixes listam as duas fichas do horário dividido", () => {
