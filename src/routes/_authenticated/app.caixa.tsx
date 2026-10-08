@@ -93,9 +93,12 @@ import {
   STATUS_CAIXA_CLASS,
 } from "@/lib/caixa/fechamento";
 import {
+  FORMA_CREDITO_CLINICA,
   FORMA_PAGO_SISTEMA_ANTERIOR,
+  LABEL_CREDITO_CLINICA,
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
+import { carregarCreditoClinica, type CreditoClinica } from "@/lib/cartao/credito-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
@@ -978,6 +981,8 @@ function Page() {
    */
   const [precoCobranca, setPrecoCobranca] = useState<PrecoCaixa | null>(null);
   const [calculandoPreco, setCalculandoPreco] = useState(false);
+  /** Crédito na clínica do paciente da cobrança aberta (null = não tem). */
+  const [creditoCobranca, setCreditoCobranca] = useState<CreditoClinica | null>(null);
   /** Guarda qual cobrança está sendo calculada, para descartar resposta atrasada. */
   const precoPedidoRef = useRef<string | null>(null);
 
@@ -1873,8 +1878,12 @@ function Page() {
         { forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" },
       ]);
       setPrecoCobranca(null);
+      setCreditoCobranca(null);
       if (!clinicaAtual || !f.paciente_id) return;
       precoPedidoRef.current = f.id;
+      void carregarCreditoClinica(f.paciente_id, clinicaAtual.clinica_id).then((c) => {
+        if (precoPedidoRef.current === f.id) setCreditoCobranca(c);
+      });
       setCalculandoPreco(true);
       try {
         // O nome do serviço vem do próprio agendamento, e não do texto montado
@@ -2059,6 +2068,21 @@ function Page() {
       toast.error("Adicione ao menos uma forma de pagamento");
       return;
     }
+    // Crédito na clínica: confere aqui para avisar cedo; quem garante a regra
+    // é o banco (gatilho fn_credito_clinica_usar).
+    const totalCredito = linhasValidadas
+      .filter((l) => l.forma === FORMA_CREDITO_CLINICA)
+      .reduce((acc, l) => acc + l.valor, 0);
+    if (totalCredito > 0) {
+      if (!creditoCobranca?.apto) {
+        toast.error("Este paciente não pode usar Crédito na clínica agora.");
+        return;
+      }
+      if (totalCredito > creditoCobranca.disponivel + 0.005) {
+        toast.error(`Crédito na clínica insuficiente: disponível ${fmt(creditoCobranca.disponivel)}.`);
+        return;
+      }
+    }
     setSaving(true);
     // Escopo externo ao try para permitir rollback inter-linhas no catch.
     // Cada par (lançamento + movimento) é atômico via RPC no banco
@@ -2157,7 +2181,9 @@ function Page() {
               ? null
               : {
                   user_id: user.id,
-                  tipo: "recebimento",
+                  // Crédito na clínica não é dinheiro na gaveta: a linha aparece
+                  // no extrato do dia, mas pesa zero no fechamento.
+                  tipo: l.forma === FORMA_CREDITO_CLINICA ? "registro" : "recebimento",
                   valor: l.valor,
                   descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}${sufixoConvenio}`,
                   forma_pagamento: l.forma,
@@ -6493,6 +6519,12 @@ function Page() {
                           <SelectItem value="debito">Débito</SelectItem>
                           <SelectItem value="credito">Crédito</SelectItem>
                           <SelectItem value="boleto">Boleto</SelectItem>
+                          {creditoCobranca?.apto && (
+                            <SelectItem value={FORMA_CREDITO_CLINICA}>
+                              {LABEL_CREDITO_CLINICA} (disponível{" "}
+                              {fmt(creditoCobranca.disponivel)})
+                            </SelectItem>
+                          )}
                           {/* Transição de sistemas: paciente já pagou na
                               Clínica Total. Por último porque é exceção — e
                               porque tira o valor do fechamento do dia. */}
@@ -6514,6 +6546,14 @@ function Page() {
                       />
                     </div>
                   </div>
+                  {l.forma === FORMA_CREDITO_CLINICA && creditoCobranca && (
+                    <div className="rounded-md border border-rose-200 bg-rose-50 p-2 text-[12px] text-rose-900">
+                      <strong>{LABEL_CREDITO_CLINICA}</strong> do titular · disponível{" "}
+                      {fmt(creditoCobranca.disponivel)} de {fmt(creditoCobranca.limite)}. O valor
+                      vira uma cobrança no contrato, com o vencimento da próxima mensalidade, e{" "}
+                      <strong>não entra na gaveta de hoje</strong>.
+                    </div>
+                  )}
                   {l.forma === FORMA_PAGO_SISTEMA_ANTERIOR && (
                     <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-2">
                       <p className="text-[12px] text-amber-900">
