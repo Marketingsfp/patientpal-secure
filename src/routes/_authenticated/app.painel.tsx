@@ -44,6 +44,7 @@ import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 import { separarPorCartao, type CartaoDia } from "@/lib/painel/cards-do-dia";
 import { DetalheCartaoDia } from "@/components/painel/detalhe-cartao-dia";
 import { AvisoSemDesfecho } from "@/components/painel/aviso-sem-desfecho";
+import { ficouSemDesfecho, ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -299,6 +300,8 @@ function DashboardOperacional() {
     const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
     const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
     const novos = d?.pacientesNovos ?? new Set<string>();
+    // Depois das 19h quem não passou pelo balcão já conta como falta (sem-desfecho.ts).
+    const ateDia = ultimoDiaEncerrado();
     const mapa = new Map<string, MedicoDoDia>();
     for (const a of ags) {
       const id = a.medico_id as string;
@@ -315,7 +318,7 @@ function DashboardOperacional() {
       };
       item.total += 1;
       if (a.status === "realizado" || a.fluxo_etapa === "finalizado") item.atendidos += 1;
-      if (a.status === "faltou") item.faltas += 1;
+      if (a.status === "faltou" || ficouSemDesfecho(a, ateDia)) item.faltas += 1;
       if (a.data_pagamento) item.pagos += 1;
       if (a.paciente_id && novos.has(a.paciente_id)) item.novos += 1;
       mapa.set(id, item);

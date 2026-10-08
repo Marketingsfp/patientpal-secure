@@ -13,8 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { dataClinicaDe, formatDatePura, hojeBR, janelaDiaClinica } from "@/lib/date-utils";
-import { DIAS_AVISO_SEM_DESFECHO, ficouSemDesfecho } from "@/lib/painel/sem-desfecho";
+import { dataClinicaDe, formatDatePura, janelaDiaClinica } from "@/lib/date-utils";
+import {
+  DIAS_AVISO_SEM_DESFECHO,
+  ficouSemDesfecho,
+  ultimoDiaEncerrado,
+} from "@/lib/painel/sem-desfecho";
 
 type Ficha = {
   id: string;
@@ -44,17 +48,18 @@ export function AvisoSemDesfecho({
   medicoNome: Map<string, string>;
 }) {
   const [aberto, setAberto] = useState(false);
-  const hoje = hojeBR();
-  const desde = addDays(hoje, -DIAS_AVISO_SEM_DESFECHO);
+  // Muda às 19h (a clínica fechou) e à meia-noite; a busca acompanha pela chave.
+  const ate = ultimoDiaEncerrado();
+  const desde = addDays(ate, -(DIAS_AVISO_SEM_DESFECHO - 1));
 
   // A chave começa com "dashboard-operacional": Atualizar e o tempo real refazem.
   const q = useQuery({
-    queryKey: ["dashboard-operacional", "sem-desfecho", clinicaIds.join("|"), hoje],
+    queryKey: ["dashboard-operacional", "sem-desfecho", clinicaIds.join("|"), ate],
     enabled: clinicaIds.length > 0,
     refetchInterval: 60_000,
     queryFn: async () => {
       const ini = janelaDiaClinica(desde).inicio;
-      const fim = janelaDiaClinica(hoje).inicio;
+      const fim = janelaDiaClinica(ate).fimExclusivo;
       const linhas: Ficha[] = [];
       for (let de = 0; ; de += PAGINA) {
         const { data, error } = await supabase
@@ -73,7 +78,7 @@ export function AvisoSemDesfecho({
         linhas.push(...((data ?? []) as Ficha[]));
         if ((data ?? []).length < PAGINA) break;
       }
-      return linhas.filter((a) => ficouSemDesfecho(a, hoje));
+      return linhas.filter((a) => ficouSemDesfecho(a, ate));
     },
   });
 
@@ -107,11 +112,11 @@ export function AvisoSemDesfecho({
           Por que isso aparece?
         </summary>
         <p className="mt-1 leading-relaxed">
-          Quando o dia termina e o agendamento continua "agendado" ou "confirmado", sem check-in, o
-          Dashboard conta como falta, mesmo que esteja pago. Nada é alterado na agenda, no caixa ou
-          no repasse. Para o número ficar certo nos relatórios, a recepção deve dar o desfecho no
-          próprio dia: check-in quando o paciente chega, "Faltou" quando não vem, ou cancelar ou
-          reagendar.
+          Quando a clínica fecha (19h) e o agendamento continua "agendado" ou "confirmado", sem
+          check-in, o Dashboard conta como falta, mesmo que esteja pago. Nada é alterado na agenda,
+          no caixa ou no repasse. Para o número ficar certo nos relatórios, a recepção deve dar o
+          desfecho no próprio dia: check-in quando o paciente chega, "Faltou" quando não vem, ou
+          cancelar ou reagendar.
         </p>
       </details>
 
@@ -120,8 +125,8 @@ export function AvisoSemDesfecho({
           <DialogHeader>
             <DialogTitle>Agendamentos sem desfecho</DialogTitle>
             <DialogDescription>
-              {qtd.toLocaleString("pt-BR")} de {formatDatePura(desde)} a{" "}
-              {formatDatePura(addDays(hoje, -1))} — paciente não passou pelo balcão
+              {qtd.toLocaleString("pt-BR")} de {formatDatePura(desde)} a {formatDatePura(ate)} —
+              paciente não passou pelo balcão
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto min-h-0 flex-1 space-y-3">
