@@ -448,6 +448,25 @@ describe("separação entre consultas e exames", () => {
     expect(chamadas.some(c => c.tabela === "servicos")).toBe(false);
   });
 
+  it("lista da especialidade traz todos com horário e deixa de fora quem não tem (08/10/2026)", async () => {
+    const escala = [{ dia: "Segunda-feira", inicio: "08:00", fim: "12:00" }];
+    banco.profissionais = [
+      ...Array.from({ length: 9 }, (_, i) => profissional({ nome: `Dr. Silva ${String.fromCharCode(65 + i)}`, especialidades: [{ nome: "Cardiologia" }], horarios: escala })),
+      profissional({ nome: "Dra. Sem Escala", especialidades: [{ nome: "Cardiologia" }] }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta" });
+    expect(r.doctors).toHaveLength(9);
+    expect(r.doctors).not.toContain("Dra. Sem Escala");
+    const porNome = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", medico: "Dra. Sem Escala", tipo_atendimento: "consulta" });
+    expect(porNome.doctors).toContain("Dra. Sem Escala");
+  });
+
+  it("especialidade em que ninguém tem horário continua devolvendo o profissional", async () => {
+    banco.profissionais = [profissional({ nome: "Dra. Pneumo", especialidades: [{ nome: "Pneumologia" }] })];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "pneumologia", tipo_atendimento: "consulta" });
+    expect(r.doctors).toEqual(["Dra. Pneumo"]);
+  });
+
   it("consulta ausente não é substituída por exames da especialidade", async () => {
     banco.profissionais = [];
     const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta" });

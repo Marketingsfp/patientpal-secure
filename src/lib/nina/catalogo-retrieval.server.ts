@@ -223,8 +223,18 @@ async function buscarNaFonteDoTurno(
   // O dia não filtra a correção do nome: escala não comprova identidade.
   const profissionaisRelevantes = escolhaMedicoPendente ? (profissionaisPorNome.length ? profissionaisPorNome : profissionaisDaConsulta)
     : profissionaisPorNome.filter((p) => atendeNoDia(p, pedido.dia ?? null));
-  const idsProfissionais = profissionaisRelevantes
-    .slice(0, escolhaMedicoPendente ? 40 : medico ? Math.max(6, limite) : limite)
+  // Lista da especialidade (sem nome de médico): todos os profissionais com
+  // horário publicado, sem o corte de 6; quem não tem horário fica fora da
+  // lista (decisão do usuário em 08/10/2026). Pedido pelo nome segue igual.
+  // Se ninguém da especialidade tiver horário, mantém o resultado para a
+  // regra de encaminhamento por falta de escala.
+  const listaDaEspecialidade = !medico && !escolhaMedicoPendente &&
+    !profissionaisRelevantes.some((p) => busca.pontuar(p.nome, "") > 0);
+  const comHorario = profissionaisRelevantes.filter((p) =>
+    horariosPorTipo(Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [], "consulta").length > 0);
+  const profissionaisListados = listaDaEspecialidade && comHorario.length ? comHorario : profissionaisRelevantes;
+  const idsProfissionais = profissionaisListados
+    .slice(0, escolhaMedicoPendente || listaDaEspecialidade ? 40 : medico ? Math.max(6, limite) : limite)
     .map((p) => p.id);
   const [detalhesServicos, detalhesProfissionais] = await Promise.all([
     lerPublicados<ServicoPublicado>(
