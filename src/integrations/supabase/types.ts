@@ -17827,6 +17827,10 @@ export type Database = {
           nome: string
         }[]
       }
+      pagar_cobranca_credito_clinica: {
+        Args: { _bandeira?: string; _forma: string; _mensalidade_id: string }
+        Returns: string
+      }
       pagar_repasse_medico: {
         Args: {
           _agenda_ids: string[]
