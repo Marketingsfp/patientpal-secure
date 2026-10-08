@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public._credito_clinica_situacao(uuid, uuid) FROM PUBLIC, anon, authenticated;
