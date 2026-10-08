@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { loadWhatsAppConfig, metaSendText } from "@/lib/whatsapp.server";
 import { bloquearLinksRecebidos } from "@/lib/atendimento/links-entrada";
+import { decidirAssinaturaWebhook, modoAssinaturaWebhook } from "@/lib/whatsapp-assinatura";
 
 function verifySignature(
   appSecret: string,
@@ -145,12 +146,25 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
           }
 
           const sigHeader = request.headers.get("x-hub-signature-256");
-          // Assinatura não confere (ou App Secret vazio/errado): registramos, mas
-          // NUNCA descartamos a mensagem do paciente.
+          // Assinatura que não confere (ou App Secret vazio/errado): o aviso é
+          // recusado antes de gravar ou acionar a Nina. A Meta repete avisos
+          // recusados. Reversão global: WHATSAPP_WEBHOOK_ASSINATURA=registrar.
           const assinaturaOk = Boolean(
             cfg.app_secret && verifySignature(cfg.app_secret, rawBody, sigHeader),
           );
-          if (!assinaturaOk) resultado = "assinatura_invalida";
+          const decisaoAssinatura = decidirAssinaturaWebhook({
+            appSecretConfigurado: Boolean(cfg.app_secret),
+            assinaturaOk,
+            modo: modoAssinaturaWebhook(),
+          });
+          if (!decisaoAssinatura.processar) {
+            resultado = decisaoAssinatura.resultado ?? "erro:aviso recusado";
+            console.error("[whatsapp] aviso recusado: assinatura da Meta não confere", {
+              clinica_id: params.clinicaId,
+            });
+            return new Response("Invalid signature", { status: 401 });
+          }
+          if (decisaoAssinatura.resultado) resultado = decisaoAssinatura.resultado;
           trace.marcar("RECV_T1_SIGNATURE_VALIDATED");
           trace.marcar("RECV_T2_CONFIG_READY");
 

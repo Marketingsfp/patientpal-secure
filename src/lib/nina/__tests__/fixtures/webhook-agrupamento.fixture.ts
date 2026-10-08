@@ -13,6 +13,10 @@ import { entradaPermiteReabertura } from "../../reabertura-entrada";
 type Linha = Record<string, any>;
 const cenario = process.argv[2]!;
 const paridade = cenario === "paridade-cardiologia";
+// R2 — cenários de assinatura: chave errada no aviso, clínica sem chave e modo de reversão.
+const assinaturaErrada = cenario.startsWith("assinatura-");
+if (cenario === "assinatura-registrar") process.env.WHATSAPP_WEBHOOK_ASSINATURA = "registrar";
+else delete process.env.WHATSAPP_WEBHOOK_ASSINATURA;
 const respostaCardiologia =
   "Olá! Temos Cardiologia. Dinheiro: R$ 120,00 Cartão: R$ 145,00. Quer consultar os horários?";
 const entradasGerador: Linha[] = [];
@@ -245,7 +249,7 @@ mock.module("@/lib/whatsapp.server", () => ({
   },
   loadWhatsAppConfig: async () => ({
     access_token: "token-ficticio",
-    app_secret: "segredo-ficticio",
+    app_secret: cenario === "assinatura-sem-secret" ? null : "segredo-ficticio",
     phone_number_id: "telefone-clinica",
     display_phone_number: "5511999990000",
   }),
@@ -339,7 +343,12 @@ const enviar = async () =>
       method: "POST",
       body: corpo,
       headers: {
-        "x-hub-signature-256": `sha256=${createHmac("sha256", "segredo-ficticio").update(corpo).digest("hex")}`,
+        "x-hub-signature-256": `sha256=${createHmac(
+          "sha256",
+          assinaturaErrada ? "segredo-errado" : "segredo-ficticio",
+        )
+          .update(corpo)
+          .digest("hex")}`,
       },
     }),
   });
