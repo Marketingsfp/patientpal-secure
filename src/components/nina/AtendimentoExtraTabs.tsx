@@ -220,6 +220,7 @@ import {
 } from "@/lib/atendimento/cronometro-pausa";
 import {
   MSG_ADMIN_NAO_RESPONDE_AQUI,
+  motivoAdminNaoResponde,
   MSG_DESTINO_EM_PAUSA,
   ROTULO_PERFIL_SUPERVISAO,
   ROTULO_PRESENCA,
@@ -2712,7 +2713,7 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           owner_type: sel.owner_type,
           status: sel.status,
         })
-      ? MSG_ADMIN_NAO_RESPONDE_AQUI
+      ? motivoAdminNaoResponde({ owner_type: sel.owner_type, status: sel.status })
       : carregandoConversa
         ? "Carregando conversa…"
         : conversaEncerrada

@@ -26,6 +26,7 @@ import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
   MSG_ADMIN_NAO_RESPONDE_AQUI,
+  motivoAdminNaoResponde,
   MSG_DESTINO_EM_PAUSA,
   adminPodeResponder,
   apenasDestinatariosValidos,
@@ -2141,7 +2142,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
       throw new Error("Conversa encerrada. Reabra o atendimento para responder.");
-    if (ehAdmin && !adminPodeResponder(conv)) throw new Error(MSG_ADMIN_NAO_RESPONDE_AQUI);
+    if (ehAdmin && !adminPodeResponder(conv)) throw new Error(motivoAdminNaoResponde(conv));
     // Supervisão responde conversa sem responsável (fila global) SEM virar responsável:
     // só assume se clicar em "Assumir conversa". A da Nina segue a regra de antes.
     const respondeSemAssumir = !!perfilSup && conversaSemResponsavel(conv);

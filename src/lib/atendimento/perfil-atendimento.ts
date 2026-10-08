@@ -99,6 +99,16 @@ export const ROTULO_PERFIL_SUPERVISAO: Record<PerfilSupervisao, string> = {
 export const MSG_ADMIN_NAO_RESPONDE_AQUI =
   "Administrador responde apenas conversas abertas que estão com uma atendente ou sem responsável.";
 
+/** Conversa aberta com a Nina: ninguém envia mensagem (aviso pedido em 08/10/2026). */
+export const MSG_CONVERSA_DA_NINA =
+  "Conversas atribuídas à Nina são bloqueadas: não é possível enviar mensagem enquanto a Nina estiver atendendo.";
+
+/** Motivo exibido ao admin: conversa da Nina tem aviso próprio; os demais casos seguem o geral. */
+export function motivoAdminNaoResponde(conversa: { owner_type?: string | null; status?: string | null }): string {
+  const aberta = conversa.status !== "closed" && conversa.status !== "finished";
+  return conversa.owner_type === "AI" && aberta ? MSG_CONVERSA_DA_NINA : MSG_ADMIN_NAO_RESPONDE_AQUI;
+}
+
 /** Perfil exato de supervisão: admin tem precedência sobre gestor. */
 export function perfilSupervisao(args: { admin: boolean; gestor: boolean }): PerfilSupervisao | null {
   if (args.admin) return "admin";
