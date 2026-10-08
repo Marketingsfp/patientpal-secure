@@ -57,6 +57,7 @@ import {
   homologarFrancisco,
 } from "@/lib/francisco/functions";
 import type { ConfigRegistro, CursorFrancisco } from "@/lib/francisco/service.server";
+import { HomologacaoFrancisco } from "./HomologacaoFrancisco";
 
 const ICONES = [Bot, Network, Mic, MessageCircle, Clock3, FlaskConical, History];
 const MOTIVOS: Record<string, string> = {
@@ -137,9 +138,12 @@ export function FranciscoWorkspace({
   preview?: boolean;
 }) {
   const hash = useRouterState({ select: (s) => s.location.hash });
-  const aba: AbaFrancisco = ABAS_FRANCISCO.some((a) => a[0] === hash)
-    ? (hash as AbaFrancisco)
-    : "visao-geral";
+  // O fragmento não chega ao SSR. Hidratar primeiro com a mesma aba do servidor
+  // evita manter o destaque de Visão geral ao abrir um link direto de homologação.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+  const aba: AbaFrancisco =
+    montado && ABAS_FRANCISCO.some((a) => a[0] === hash) ? (hash as AbaFrancisco) : "visao-geral";
   const carregar = useServerFn(carregarFrancisco),
     salvar = useServerFn(salvarFrancisco),
     listar = useServerFn(listarFrancisco);
@@ -1030,71 +1034,86 @@ export function FranciscoWorkspace({
               </div>
             )}
             {aba === "homologacao" && (
-              <div className="grid gap-5 lg:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Testar o Francisco</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Use um cenário fictício. O teste chama o modelo com o rascunho atual, sem
-                      enviar WhatsApp.
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Textarea
-                      aria-label="Cenário de homologação"
-                      className="min-h-40 normal-case"
-                      value={cenario}
-                      onChange={(e) => setCenario(e.target.value)}
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        disabled={ocupado || !podeEditar}
-                        onClick={() => void testar("modelo")}
-                      >
-                        {ocupado ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <FlaskConical className="size-4" />
-                        )}
-                        Testar resposta do modelo
-                      </Button>
-                      {botaoAba("acompanhamento", "Conferir elegibilidade")}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Modelo: {config.modelo} · temperatura: {config.temperatura.toFixed(1)}
-                      <br />
-                      As mensagens reais continuam usando os templates aprovados.
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Resultado da homologação</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p role="status" className="whitespace-pre-wrap text-sm leading-relaxed">
-                      {resultado ||
-                        "Execute um cenário para conferir apresentação, tom e encaminhamento para a equipe humana."}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Critérios para ativar</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-4 text-sm md:grid-cols-3">
-                    {[
-                      "D1 e D4 respeitam a data do orçamento e o horário de envio.",
-                      "Pagamento, entrada ou resposta interrompem a sequência.",
-                      "Templates aprovados, contato autorizado e destino humano conferidos.",
-                    ].map((t) => (
-                      <p key={t} className="flex gap-2 text-muted-foreground">
-                        <ShieldCheck className="size-5 shrink-0 text-emerald-600" />
-                        {t}
-                      </p>
-                    ))}
-                  </CardContent>
-                </Card>
+              <div className="space-y-5">
+                <HomologacaoFrancisco
+                  key={clinicaId}
+                  clinicaId={clinicaId}
+                  clinicaNome={clinicaNome}
+                  config={config}
+                  podeEditar={podeEditar}
+                  preview={preview}
+                />
+                <details className="rounded-xl border p-4">
+                  <summary className="cursor-pointer font-medium">
+                    Testes auxiliares de modelo e critérios de ativação
+                  </summary>
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Testar proposta do modelo</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Este teste separado avalia o tom de uma proposta. Não representa uma
+                          resposta automática após o paciente responder ao template.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <Textarea
+                          aria-label="Cenário de homologação"
+                          className="min-h-40 normal-case"
+                          value={cenario}
+                          onChange={(e) => setCenario(e.target.value)}
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            disabled={ocupado || !podeEditar}
+                            onClick={() => void testar("modelo")}
+                          >
+                            {ocupado ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <FlaskConical className="size-4" />
+                            )}
+                            Testar resposta do modelo
+                          </Button>
+                          {botaoAba("acompanhamento", "Conferir elegibilidade")}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Modelo: {config.modelo} · temperatura: {config.temperatura.toFixed(1)}
+                          <br />
+                          As mensagens reais continuam usando os templates aprovados.
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Resultado da homologação</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p role="status" className="whitespace-pre-wrap text-sm leading-relaxed">
+                          {resultado ||
+                            "Execute um cenário para conferir apresentação, tom e encaminhamento para a equipe humana."}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="lg:col-span-2">
+                      <CardHeader>
+                        <CardTitle>Critérios para ativar</CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid gap-4 text-sm md:grid-cols-3">
+                        {[
+                          "D1 e D4 respeitam a data do orçamento e o horário de envio.",
+                          "Pagamento, entrada ou resposta interrompem a sequência.",
+                          "Templates aprovados, contato autorizado e destino humano conferidos.",
+                        ].map((t) => (
+                          <p key={t} className="flex gap-2 text-muted-foreground">
+                            <ShieldCheck className="size-5 shrink-0 text-emerald-600" />
+                            {t}
+                          </p>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </details>
               </div>
             )}
             {aba === "historico" && (
