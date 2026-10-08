@@ -178,6 +178,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
               // Nunca interrompe o processamento das mensagens.
               const statuses: any[] = value?.statuses ?? [];
               if (statuses.length > 0) {
+                if (assinaturaOk) {
+                  try {
+                    const { registrarEntregaFrancisco } = await import("@/lib/francisco/replies.server");
+                    await registrarEntregaFrancisco(params.clinicaId, statuses);
+                  } catch { console.error("[francisco] Falha ao registrar recibo de entrega."); }
+                }
                 try {
                   const { registrarStatusEntregaConfirmacao } =
                     await import("@/lib/agenda/confirmacao-whatsapp.server");
@@ -352,6 +358,27 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   telefone: String(from ?? "").replace(/\D/g, "") || from,
                   mensagemId: msgInserida.id,
                 });
+
+                // Francisco trata respostas antes de qualquer automação da Nina.
+                if (assinaturaOk) {
+                  try {
+                    const { processarRespostaFrancisco } = await import("@/lib/francisco/replies.server");
+                    const tratada = await processarRespostaFrancisco({
+                      clinicaId: params.clinicaId, from, mensagemId: msgInserida.id,
+                      waMessageId: wa_message_id, contextoId: (msgInserida.raw as any)?.context?.id,
+                      texto: textoPaciente, recebidaEm: msgInserida.recebida_em,
+                    });
+                    if (tratada) {
+                      const marcada = await supabaseAdmin.from("whatsapp_mensagens")
+                        .update({ nina_status: "handoff" }).eq("id", msgInserida.id).eq("clinica_id", params.clinicaId);
+                      if (marcada.error) throw marcada.error;
+                      continue;
+                    }
+                  } catch {
+                    const { ErroAgrupamentoNina } = await import("@/lib/nina/agrupamento-turno");
+                    throw new ErroAgrupamentoNina("Resposta ao Francisco aguarda encaminhamento seguro para a equipe.");
+                  }
+                }
 
                 // ---------------------------------------------------------
                 // Resposta ao lembrete automático de consulta ("1"/"2" ou

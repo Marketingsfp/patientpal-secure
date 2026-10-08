@@ -699,9 +699,22 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
   // ---------------------------------------------------------------------
-  // Portal "Coach WhatsApp" (treinamento e avaliação de atendentes).
+  // Francisco: acompanhamento independente de orçamentos.
   // ---------------------------------------------------------------------
   {
+    label: "Francisco",
+    items: [
+      { to: "/app/francisco", hash: "visao-geral", label: "Visão geral", icon: LayoutDashboard },
+      { to: "/app/francisco", hash: "arquitetura", label: "Arquitetura", icon: Network },
+      { to: "/app/francisco", hash: "voz", label: "Voz do Francisco", icon: Mic },
+      { to: "/app/francisco", hash: "mensagens", label: "Mensagens", icon: MessageCircle },
+      { to: "/app/francisco", hash: "acompanhamento", label: "Acompanhamento", icon: Clock },
+      { to: "/app/francisco", hash: "homologacao", label: "Homologação", icon: FlaskConical },
+      { to: "/app/francisco", hash: "historico", label: "Histórico", icon: FileText },
+    ],
+  },
+  {
+    // Portal "Coach WhatsApp" (treinamento e avaliação de atendentes).
     label: "Treinamento",
     items: [
       { to: "/app/coach", label: "Coach WhatsApp", icon: GraduationCap },
@@ -1271,10 +1284,10 @@ function AppShellInner() {
   );
 
   // Portal sem nenhuma tela liberada não aparece no hub nem no seletor.
-  // O OS ZAP depende do módulo "nina", o mesmo de sempre — nenhum módulo novo.
+  // Nina e Francisco têm permissões independentes dentro do OS ZAP.
   const portaisOcultos = useMemo<SubsystemId[]>(() => {
     const ocultos: SubsystemId[] = [];
-    if (!leafAllowed("/app/nina", allowedModules, configuredModules)) ocultos.push("os-zap");
+    if (!leafAllowed("/app/nina", allowedModules, configuredModules) && !leafAllowed("/app/francisco", allowedModules, configuredModules)) ocultos.push("os-zap");
     // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
     if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
     return ocultos;
@@ -1386,7 +1399,7 @@ function AppShellInner() {
         label: "OS ZAP / Central de Atendimento",
         icon: MessageCircle,
         portal: "os-zap",
-        candidatas: ["/app/nina"],
+        candidatas: ["/app/nina", "/app/francisco"],
       },
       {
         key: "coach",

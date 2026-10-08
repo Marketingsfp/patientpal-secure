@@ -28,6 +28,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as ApiNinaFalaRouteImport } from './routes/api/nina-fala'
 import { Route as ApiNinaVozRouteImport } from './routes/api/nina-voz'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as DevFranciscoRouteImport } from './routes/dev.francisco'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
@@ -77,6 +78,7 @@ import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
+import { Route as AuthenticatedAppFranciscoRouteImport } from './routes/_authenticated/app.francisco'
 import { Route as AuthenticatedAppHiperdiaRouteImport } from './routes/_authenticated/app.hiperdia'
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
@@ -186,6 +188,7 @@ import { Route as ApiIntegrationsV1SplatRouteImport } from './routes/api/integra
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicHooksConfirmacaoConsultasRouteImport } from './routes/api/public/hooks/confirmacao-consultas'
+import { Route as ApiPublicHooksFranciscoRouteImport } from './routes/api/public/hooks/francisco'
 import { Route as ApiPublicNinaCargaRouteImport } from './routes/api/public/nina.carga'
 import { Route as ApiPublicNinaEsperaTimeoutRouteImport } from './routes/api/public/nina.espera-timeout'
 import { Route as ApiPublicNinaWatchdogRouteImport } from './routes/api/public/nina.watchdog'
@@ -291,6 +294,11 @@ const ApiNinaVozRoute = ApiNinaVozRouteImport.update({
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
   id: '/checkin/$token',
   path: '/checkin/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevFranciscoRoute = DevFranciscoRouteImport.update({
+  id: '/dev/francisco',
+  path: '/dev/francisco',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LpSlugRoute = LpSlugRouteImport.update({
@@ -563,6 +571,12 @@ const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
   path: '/fluxo',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppFranciscoRoute =
+  AuthenticatedAppFranciscoRouteImport.update({
+    id: '/francisco',
+    path: '/francisco',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppHiperdiaRoute =
   AuthenticatedAppHiperdiaRouteImport.update({
     id: '/hiperdia',
@@ -1199,6 +1213,11 @@ const ApiPublicHooksConfirmacaoConsultasRoute =
     path: '/api/public/hooks/confirmacao-consultas',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksFranciscoRoute = ApiPublicHooksFranciscoRouteImport.update({
+  id: '/api/public/hooks/francisco',
+  path: '/api/public/hooks/francisco',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicNinaCargaRoute = ApiPublicNinaCargaRouteImport.update({
   id: '/api/public/nina/carga',
   path: '/api/public/nina/carga',
@@ -1277,6 +1296,7 @@ export interface FileRoutesByFullPath {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/francisco': typeof DevFranciscoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1325,6 +1345,7 @@ export interface FileRoutesByFullPath {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/francisco': typeof AuthenticatedAppFranciscoRoute
   '/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
@@ -1426,6 +1447,7 @@ export interface FileRoutesByFullPath {
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
+  '/api/public/hooks/francisco': typeof ApiPublicHooksFranciscoRoute
   '/api/public/nina/carga': typeof ApiPublicNinaCargaRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
   '/api/public/nina/watchdog': typeof ApiPublicNinaWatchdogRoute
@@ -1464,6 +1486,7 @@ export interface FileRoutesByTo {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/francisco': typeof DevFranciscoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1509,6 +1532,7 @@ export interface FileRoutesByTo {
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/francisco': typeof AuthenticatedAppFranciscoRoute
   '/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
@@ -1610,6 +1634,7 @@ export interface FileRoutesByTo {
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
+  '/api/public/hooks/francisco': typeof ApiPublicHooksFranciscoRoute
   '/api/public/nina/carga': typeof ApiPublicNinaCargaRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
   '/api/public/nina/watchdog': typeof ApiPublicNinaWatchdogRoute
@@ -1651,6 +1676,7 @@ export interface FileRoutesById {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/francisco': typeof DevFranciscoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1699,6 +1725,7 @@ export interface FileRoutesById {
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/_authenticated/app/francisco': typeof AuthenticatedAppFranciscoRoute
   '/_authenticated/app/hiperdia': typeof AuthenticatedAppHiperdiaRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
@@ -1800,6 +1827,7 @@ export interface FileRoutesById {
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/hooks/confirmacao-consultas': typeof ApiPublicHooksConfirmacaoConsultasRoute
+  '/api/public/hooks/francisco': typeof ApiPublicHooksFranciscoRoute
   '/api/public/nina/carga': typeof ApiPublicNinaCargaRoute
   '/api/public/nina/espera-timeout': typeof ApiPublicNinaEsperaTimeoutRoute
   '/api/public/nina/watchdog': typeof ApiPublicNinaWatchdogRoute
@@ -1841,6 +1869,7 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/francisco'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -1889,6 +1918,7 @@ export interface FileRouteTypes {
     | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
+    | '/app/francisco'
     | '/app/hiperdia'
     | '/app/hr-ferias'
     | '/app/hr-holerites'
@@ -1990,6 +2020,7 @@ export interface FileRouteTypes {
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/hooks/confirmacao-consultas'
+    | '/api/public/hooks/francisco'
     | '/api/public/nina/carga'
     | '/api/public/nina/espera-timeout'
     | '/api/public/nina/watchdog'
@@ -2028,6 +2059,7 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/francisco'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2073,6 +2105,7 @@ export interface FileRouteTypes {
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/fluxo'
+    | '/app/francisco'
     | '/app/hiperdia'
     | '/app/hr-ferias'
     | '/app/hr-holerites'
@@ -2174,6 +2207,7 @@ export interface FileRouteTypes {
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/hooks/confirmacao-consultas'
+    | '/api/public/hooks/francisco'
     | '/api/public/nina/carga'
     | '/api/public/nina/espera-timeout'
     | '/api/public/nina/watchdog'
@@ -2214,6 +2248,7 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/francisco'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2262,6 +2297,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
+    | '/_authenticated/app/francisco'
     | '/_authenticated/app/hiperdia'
     | '/_authenticated/app/hr-ferias'
     | '/_authenticated/app/hr-holerites'
@@ -2363,6 +2399,7 @@ export interface FileRouteTypes {
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
     | '/api/public/hooks/confirmacao-consultas'
+    | '/api/public/hooks/francisco'
     | '/api/public/nina/carga'
     | '/api/public/nina/espera-timeout'
     | '/api/public/nina/watchdog'
@@ -2403,6 +2440,7 @@ export interface RootRouteChildren {
   ApiNinaFalaRoute: typeof ApiNinaFalaRoute
   ApiNinaVozRoute: typeof ApiNinaVozRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
+  DevFranciscoRoute: typeof DevFranciscoRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
@@ -2427,6 +2465,7 @@ export interface RootRouteChildren {
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicHooksConfirmacaoConsultasRoute: typeof ApiPublicHooksConfirmacaoConsultasRoute
+  ApiPublicHooksFranciscoRoute: typeof ApiPublicHooksFranciscoRoute
   ApiPublicNinaCargaRoute: typeof ApiPublicNinaCargaRoute
   ApiPublicNinaEsperaTimeoutRoute: typeof ApiPublicNinaEsperaTimeoutRoute
   ApiPublicNinaWatchdogRoute: typeof ApiPublicNinaWatchdogRoute
@@ -2567,6 +2606,13 @@ declare module '@tanstack/react-router' {
       path: '/checkin/$token'
       fullPath: '/checkin/$token'
       preLoaderRoute: typeof CheckinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/francisco': {
+      id: '/dev/francisco'
+      path: '/dev/francisco'
+      fullPath: '/dev/francisco'
+      preLoaderRoute: typeof DevFranciscoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lp/$slug': {
@@ -2910,6 +2956,13 @@ declare module '@tanstack/react-router' {
       path: '/fluxo'
       fullPath: '/app/fluxo'
       preLoaderRoute: typeof AuthenticatedAppFluxoRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/francisco': {
+      id: '/_authenticated/app/francisco'
+      path: '/francisco'
+      fullPath: '/app/francisco'
+      preLoaderRoute: typeof AuthenticatedAppFranciscoRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/hiperdia': {
@@ -3675,6 +3728,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksConfirmacaoConsultasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/francisco': {
+      id: '/api/public/hooks/francisco'
+      path: '/api/public/hooks/francisco'
+      fullPath: '/api/public/hooks/francisco'
+      preLoaderRoute: typeof ApiPublicHooksFranciscoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/nina/carga': {
       id: '/api/public/nina/carga'
       path: '/api/public/nina/carga'
@@ -3969,6 +4029,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
+  AuthenticatedAppFranciscoRoute: typeof AuthenticatedAppFranciscoRoute
   AuthenticatedAppHiperdiaRoute: typeof AuthenticatedAppHiperdiaRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
@@ -4076,6 +4137,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
+  AuthenticatedAppFranciscoRoute: AuthenticatedAppFranciscoRoute,
   AuthenticatedAppHiperdiaRoute: AuthenticatedAppHiperdiaRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
@@ -4204,6 +4266,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNinaFalaRoute: ApiNinaFalaRoute,
   ApiNinaVozRoute: ApiNinaVozRoute,
   CheckinTokenRoute: CheckinTokenRoute,
+  DevFranciscoRoute: DevFranciscoRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
@@ -4229,6 +4292,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicHooksConfirmacaoConsultasRoute:
     ApiPublicHooksConfirmacaoConsultasRoute,
+  ApiPublicHooksFranciscoRoute: ApiPublicHooksFranciscoRoute,
   ApiPublicNinaCargaRoute: ApiPublicNinaCargaRoute,
   ApiPublicNinaEsperaTimeoutRoute: ApiPublicNinaEsperaTimeoutRoute,
   ApiPublicNinaWatchdogRoute: ApiPublicNinaWatchdogRoute,

@@ -63,6 +63,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "alertas-enfermagem",
   "consulta-rapida",
   "nina",
+  "francisco",
   "odontologia",
   "fisioterapia",
   "prontuarios",

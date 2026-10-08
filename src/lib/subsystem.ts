@@ -25,7 +25,7 @@ export const SUBSYSTEMS: Record<SubsystemId, { label: string; home: string; grou
   "os-zap": {
     label: "OS ZAP",
     home: "/app/nina",
-    groups: ["Atendimento", "Nina", "Configurações do WhatsApp"],
+    groups: ["Atendimento", "Nina", "Configurações do WhatsApp", "Francisco"],
   },
   coach: {
     label: "Coach WhatsApp",
