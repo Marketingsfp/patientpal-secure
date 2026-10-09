@@ -15097,6 +15097,24 @@ export type Database = {
         }
         Relationships: []
       }
+      totem_checkin_tentativas: {
+        Row: {
+          clinica_id: string
+          falhas: number
+          minuto: string
+        }
+        Insert: {
+          clinica_id: string
+          falhas?: number
+          minuto: string
+        }
+        Update: {
+          clinica_id?: string
+          falhas?: number
+          minuto?: string
+        }
+        Relationships: []
+      }
       triagens_enfermagem: {
         Row: {
           agendamento_id: string | null
@@ -15846,6 +15864,14 @@ export type Database = {
           user_email: string
           user_id: string
         }[]
+      }
+      _totem_autorizado: {
+        Args: { _clinica_id: string; _token: string }
+        Returns: boolean
+      }
+      _totem_checkin_executar: {
+        Args: { _clinica_id: string; _origem: string; _paciente_id: string }
+        Returns: Json
       }
       agenda_slot_lock: { Args: { _id: string }; Returns: Json }
       agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
@@ -18467,15 +18493,29 @@ export type Database = {
         }[]
       }
       totem_checkin_cpf: {
-        Args: { _clinica_id: string; _cpf: string }
+        Args: { _clinica_id: string; _cpf: string; _token: string }
+        Returns: Json
+      }
+      totem_checkin_facial: {
+        Args: {
+          _clinica_id: string
+          _descriptor: Json
+          _threshold: number
+          _token: string
+        }
         Returns: Json
       }
       totem_checkin_paciente: {
-        Args: { _clinica_id: string; _paciente_id: string }
+        Args: { _clinica_id: string; _paciente_id: string; _token: string }
         Returns: Json
       }
       totem_match_biometria: {
-        Args: { _clinica_id: string; _descriptor: Json; _threshold?: number }
+        Args: {
+          _clinica_id: string
+          _descriptor: Json
+          _threshold: number
+          _token: string
+        }
         Returns: {
           distancia: number
           nome: string

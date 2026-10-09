@@ -19,6 +19,10 @@ let tokenTotem: string | null = null;
 export function definirTokenTotem(token: string | null): void {
   tokenTotem = token;
 }
+/** Token do totem público (rota /totem/t/$token); null nas rotas com login. */
+export function obterTokenTotem(): string | null {
+  return tokenTotem;
+}
 
 // O pacote qz-tray faz `require("node:path")` no topo do módulo. Com import
 // estático, o Vite arrastava esse polyfill para o bundle do browser (aviso

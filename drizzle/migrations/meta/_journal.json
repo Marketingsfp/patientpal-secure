@@ -15,6 +15,13 @@
       "when": 1791494917329,
       "tag": "0001_revoke_credito_clinica_situacao_interna",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791544068376,
+      "tag": "0002_totem_exige_token",
+      "breakpoints": true
     }
   ]
 }
