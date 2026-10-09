@@ -72,10 +72,7 @@ const admin = {
         filtros.push((l) =>
           op === "is"
             ? campo(l, k) !== v
-            : !v
-                .replace(/[()\\"]/g, "")
-                .split(",")
-                .includes(campo(l, k)),
+            : !v.replace(/[()"]/g, "").split(",").includes(campo(l, k)),
         );
         return q;
       },
