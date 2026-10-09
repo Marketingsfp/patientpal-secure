@@ -15,7 +15,7 @@ const db = {from(tabela) {
   const linhas = () => tabela === 'procedimentos' ? [{id, nome:'Exame de teste', tipo:'exame', valor_padrao:100, valor_dinheiro:100, valor_cartao:120, preparo:'Preparo oficial'}] : [];
   const q = {select(){return q}, eq(k,v){filtros[k]=v;return q}, order(){return q},
     update(v){escrita=v;return q},
-    range: async () => {leituras.push({origem,tabela});return {data:linhas(),error:null}},
+    range: async () => {leituras.push({origem,tabela});return ausente ? {data:null,error:{code:'42P01',message:'relation missing'}} : {data:linhas(),error:null}},
     maybeSingle: async () => {
       if(tabela === 'clinica_memberships') return {data:{role:'admin'},error:null};
       leituras.push({origem,tabela});
@@ -40,7 +40,7 @@ origem='administracao';
 const resultado=await salvarServicoCatalogo({data:{clinicaId:clinica,id,publicar:true,dados:{nome:'Exame de teste',valor:999}}});
 limparCacheFonteOperacional();
 origem='atendimento'; const depois=await lerFonteOperacional(clinica);
-ausente=true; let erro='';
+origem='administracao'; ausente=true; let erro='';
 try { await listarCatalogoNina({data:{clinicaId:clinica}}); } catch(e) {erro=e.message;}
 console.log(JSON.stringify({antes,depois,resultado,editorial,leituras,escritas,erro}));
 `;

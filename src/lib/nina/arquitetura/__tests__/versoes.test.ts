@@ -98,7 +98,10 @@ describe("comparação entre versões", () => {
   });
 
   it("revisão de 25/09 (v5 → v6): tira a caixa fantasma e inclui as etapas reais", () => {
-    const c = comparacaoRecente()!;
+    const c = compararVersoes(
+      HISTORICO_ARQUITETURA.find((v) => v.versao === 5)!,
+      HISTORICO_ARQUITETURA.find((v) => v.versao === 6)!,
+    );
     expect(c.de.versao).toBe(5);
     expect(c.para.versao).toBe(6);
     expect(c.nodes.removidos).toEqual(["offer.complete"]);
@@ -119,6 +122,14 @@ describe("comparação entre versões", () => {
     const v5 = HISTORICO_ARQUITETURA.find((v) => v.versao === 5)!;
     expect(v5.snapshot.some((n) => n.id === "offer.complete")).toBe(true);
     expect(v4.snapshot.some((n) => n.id === "turn.watchdog")).toBe(false);
+  });
+  it("revisão de 09/10 preserva v6 e inclui o motivo de encaminhamento em v7", () => {
+    const c = comparacaoRecente()!;
+    expect(c.de.versao).toBe(6);
+    expect(c.para.versao).toBe(7);
+    expect(c.nodes.adicionados).toEqual(["handoff.reason"]);
+    expect(c.nodes.removidos).toEqual([]);
+    expect(c.de.snapshot.some((n) => n.id === "handoff.reason")).toBe(false);
   });
 });
 

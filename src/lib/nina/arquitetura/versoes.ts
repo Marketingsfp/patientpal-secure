@@ -11,6 +11,7 @@
  */
 import { MANIFESTO_ARQUITETURA, NODES_ARQUITETURA, nodePorId } from "./manifesto";
 import { SNAPSHOT_V5 } from "./snapshot-v5";
+import { SNAPSHOT_V6 } from "./snapshot-v6";
 import {
   SNAPSHOT_ANTERIOR,
   assinaturaAtual,
@@ -197,14 +198,14 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
     snapshot: SNAPSHOT_V5,
   },
   {
-    versao: MANIFESTO_ARQUITETURA.versao,
+    versao: 6,
     data: "2026-09-25",
     deploy: null,
     commit: null,
     versaoPrompt: "Instruções da Nina (versão publicada)",
-    modelo: MANIFESTO_ARQUITETURA.modelo,
-    quantidadeNodes: SNAPSHOT_ATUAL.length,
-    quantidadeTools: contarTools(SNAPSHOT_ATUAL),
+    modelo: "google/gemini-3.8-flash",
+    quantidadeNodes: SNAPSHOT_V6.length,
+    quantidadeTools: contarTools(SNAPSHOT_V6),
     alteracoes: [
       "Revisão completa do mapa contra o código de 25/09/2026: modelo único Gemini 3.8 Flash, sem escolha por clínica.",
       "Entraram no mapa etapas que já existiam no código: transcrição de áudio, resposta a lembrete de consulta, código de verificação do site, agrupamento e trava do turno, vigia do turno, descarte de resposta obsoleta, correção de agendamento não confirmado, escolha do horário, filtro de decisão (Jev) e limpeza automática de registros.",
@@ -212,6 +213,20 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
       "Mesma conduta nos dois ambientes: Jev em produção e homologação, uma única mensagem de transferência (na homologação, com aviso de simulação e sem atendente real), sem busca de paciente por telefone e sem CPF no cadastro.",
       "Saiu do mapa a Oferta completa de horários, que não era usada pelo atendimento.",
       "O aviso do topo passou a conferir o mapa com o código (ferramentas e modelo) em vez de comparar números de versão.",
+    ],
+    snapshot: SNAPSHOT_V6,
+  },
+  {
+    versao: MANIFESTO_ARQUITETURA.versao,
+    data: "2026-10-09",
+    deploy: null,
+    commit: null,
+    versaoPrompt: "Instruções da Nina (versão publicada)",
+    modelo: MANIFESTO_ARQUITETURA.modelo,
+    quantidadeNodes: SNAPSHOT_ATUAL.length,
+    quantidadeTools: contarTools(SNAPSHOT_ATUAL),
+    alteracoes: [
+      "O motivo do encaminhamento registrado pelo núcleo passou a ter sua própria caixa no mapa, preservando a versão anterior.",
     ],
     snapshot: SNAPSHOT_ATUAL,
   },

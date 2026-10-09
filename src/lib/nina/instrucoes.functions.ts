@@ -17,6 +17,7 @@ import { z } from "zod";
 import { capacidadesDoPapel, type CapacidadeArquitetura } from "./arquitetura/permissoes";
 import { validarTemplateInstrucoes } from "./instrucoes-template";
 import { validarIdentidadeParaPublicacao } from "./identidade-atendimento";
+import { conteudoInstrucoesSchema } from "./instrucoes-limites";
 
 const TAB = "nina_instrucoes_versoes";
 
@@ -149,7 +150,7 @@ export const salvarRascunhoInstrucoes = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         escopo: z.enum(ESCOPOS),
-        conteudo: z.string().min(1).max(60000),
+        conteudo: conteudoInstrucoesSchema,
         comentario: z.string().trim().max(500).optional(),
       })
       .parse(input),
@@ -270,7 +271,7 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         escopo: z.enum(ESCOPOS),
-        conteudo: z.string().min(1).max(60000),
+        conteudo: conteudoInstrucoesSchema,
         comentario: z.string().trim().max(500).optional(),
         /** Número da versão restaurada, quando a publicação vier do histórico. */
         restauradaDe: z.number().int().positive().nullable().optional(),

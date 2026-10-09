@@ -130,6 +130,10 @@ function funcaoReal(nome: string, contexto: Record<string, unknown>) {
     perguntasObservacaoIntencao,
     separarRetornoJev,
     perguntasComAuditoriaJev,
+    registrarEventoIATurno: async () => {},
+    registrarChamadaIATurno: async () => {},
+    fetchComAuditoriaIA: (...args: unknown[]) =>
+      (contexto.fetch as (...params: unknown[]) => unknown)(...args),
     ...contexto,
   });
 }

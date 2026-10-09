@@ -170,7 +170,7 @@ describe("cenário 2 — administrador vê, transfere, mas nunca atende", () => 
  * CENÁRIO 3 — TRANSFERÊNCIAS E PRESENÇA
  * ------------------------------------------------------------------ */
 describe("cenário 3 — presença e elegibilidade na transferência", () => {
-  test("online, pausa e offline são calculados pelo heartbeat e pela pausa", () => {
+  test("online, pausa e offline respeitam o estado manual e a pausa", () => {
     expect(statusPresenca(presenca.online)).toBe("ONLINE");
     expect(statusPresenca(presenca.pausa)).toBe("PAUSA");
     expect(statusPresenca(presenca.offline)).toBe("OFFLINE");
@@ -207,6 +207,13 @@ describe("cenário 3 — presença e elegibilidade na transferência", () => {
         escopo: "nao_atribuidas",
         gestor: false,
         userId: ATENDENTE_ONLINE,
+      }),
+    ).toBe(false);
+    expect(
+      conversaVisivelNoEscopo(aguardando, {
+        escopo: "nao_atribuidas",
+        gestor: true,
+        userId: ADMIN,
       }),
     ).toBe(true);
   });
@@ -261,7 +268,8 @@ describe("cenário 4 — catálogo publicado alimenta a Nina", () => {
     expect(vazio.found).toBe(false);
     expect(vazio.knowledge_status).toBe("not_found");
     expect(vazio.price).toBeNull();
-    expect(vazio.instrucao).toMatch(/NÃO tem essa informação/i);
+    expect(vazio.instrucao).toMatch(/Nenhum registro publicado foi encontrado/i);
+    expect(vazio.instrucao).toContain("Isso NÃO comprova que a clínica não oferece esse serviço");
     expect(vazio.instrucao).toMatch(/proibido deduzir|verificar com a equipe/i);
   });
 

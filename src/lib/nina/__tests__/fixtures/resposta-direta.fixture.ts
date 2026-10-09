@@ -330,9 +330,9 @@ if (clinicoGeral) {
       nome: medicoClinico,
       especialidades: [{ nome: "CLINICO GERAL" }],
       formas_pagamento: [],
-      horarios: [],
+      horarios: [{ dia: "segunda-feira", inicio: "08:00", fim: "12:00" }],
       convenios: [],
-      observacao_publica: `CONSULTA CLINICO GERAL\nEspecialidade: CLINICO GERAL\nDinheiro: R$ 120,00\nObservação: ${cenario.endsWith("carlos") ? "Ficha — 15 vagas" : "Agendado"}`,
+      observacao_publica: `CONSULTA CLINICO GERAL\nEspecialidade: CLINICO GERAL\nHorário de atendimento: Segunda-feira, das 08:00 às 12:00\nDinheiro: R$ 120,00\nObservação: ${cenario.endsWith("carlos") ? "Ficha — 15 vagas" : "Agendado"}`,
     },
   ];
   catalogoInterpretado.medicos = [
@@ -371,7 +371,7 @@ if (escolhaMedico)
     nome,
     especialidades: [{ nome: "DERMATOLOGIA" }],
     formas_pagamento: [],
-    horarios: [],
+    horarios: [{ dia: "segunda-feira", inicio: "08:00", fim: "12:00" }],
     convenios: [],
   }));
 if (confirmacaoMedico)
@@ -383,7 +383,7 @@ if (confirmacaoMedico)
       nome: "Sandro Prinscewal",
       especialidades: [{ nome: "CARDIOLOGIA" }, { nome: "CLINICO GERAL" }],
       formas_pagamento: [],
-      horarios: [],
+      horarios: [{ dia: "segunda-feira", inicio: "08:00", fim: "12:00" }],
       convenios: [],
     },
   ];
@@ -500,11 +500,14 @@ const pergunta = alteracaoCenario
                                           : "quais são as informações do eletrocardiograma?";
 const entradaPaciente = vacinaCenario
   ? "Faz teste de DNA de paternidade? E vacina da gripe tem? Pix só antes?"
-  : (escopoEscala
-      ? cenario.endsWith("otorrino")
-        ? "Tem otorrino amanhã?"
-        : `Quero ${escopoEscala[0]} com Dr. ${escopoEscala[1]} amanhã de manhã`
-      : pergunta) + (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
+  : modoConfirmacao
+    ? "Sim, pode confirmar."
+    : (escopoEscala
+        ? cenario.endsWith("otorrino")
+          ? "Tem otorrino amanhã?"
+          : `Quero ${escopoEscala[0]} com Dr. ${escopoEscala[1]} amanhã de manhã`
+        : pergunta) +
+      (linkCenario ? " Veja https://externo-paciente.com/pedido e bit.ly/laudo" : "");
 const nomeProfissional = sfp
   ? "SFP"
   : cenario === "catalogo_enfermagem"
@@ -1014,7 +1017,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
                           especialidades: [{ nome: "CARDIOLOGIA" }],
                           estrutura: { pedido_medico: "obrigatorio" },
                           formas_pagamento: [],
-                          horarios: [],
+                          horarios: [{ dia: "segunda-feira", inicio: "08:00", fim: "12:00" }],
                           convenios: [],
                         },
                       ]
@@ -1101,6 +1104,7 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
 mock.module("@/lib/nina/agenda-flag.server", () => ({
   ferramentasAgendaAtivas: async () =>
     escolhaHorario ||
+    Boolean(modoConfirmacao) ||
     clinicoGeral ||
     cenario.startsWith("loop_alternativas") ||
     (progressoLongo && !cenario.endsWith("informativo")) ||
@@ -1632,7 +1636,12 @@ mock.module("@/lib/nina/tool-broker.server", () => ({
               "CATALOGO_ATENDIMENTO_HUMANO / PROFISSIONAL_SFP: Eletrocardiograma. Encaminhamento obrigatório no cadastro.",
           },
         };
-      if (nome === "agendar" && (modoConfirmacao || reservaIndependente))
+      if (nome === "agendar" && (modoConfirmacao || reservaIndependente)) {
+        // O executor real persiste a reserva na sessão antes de devolver sucesso.
+        params.ctxPaciente.estado.appointment.appointment_id = "ag-simulada";
+        params.ctxPaciente.estado.appointment.confirmed_in_session =
+          params.ctxPaciente.estado.session_id;
+        params.ctxPaciente.estado.flow.stage = "APPOINTMENT_CONFIRMED";
         return {
           ferramenta: nome,
           capacidade: "createAppointment",
@@ -1644,6 +1653,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({
             ok: true,
             verificado_no_banco: true,
             appointment_id: "ag-simulada",
+            estado_acao: "CREATED",
             modalidade_atendimento: modoConfirmacao ?? "hora_marcada",
             date: "21/01/2030",
             time: reservaIndependente ? "08:00" : "10:20",
@@ -1651,6 +1661,7 @@ mock.module("@/lib/nina/tool-broker.server", () => ({
             ficha_numero: "007",
           },
         };
+      }
       if (nome === "consultar_disponibilidade" && cenario === "sem_pre")
         return {
           ferramenta: nome,
@@ -2329,7 +2340,10 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({
               arguments: JSON.stringify({ termo: "Clínica Médica", tipo_atendimento: "consulta" }),
             }
           : requests.length === 2
-            ? { name: "buscar_medicos", arguments: JSON.stringify({ nome: medicoClinico }) }
+            ? {
+                name: "buscar_medicos",
+                arguments: JSON.stringify({ nome: medicoClinico, especialidade: "Clínico Geral" }),
+              }
             : requests.length === 3
               ? {
                   name: "proxima_vaga",

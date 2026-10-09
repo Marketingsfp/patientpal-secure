@@ -109,7 +109,7 @@ describe("leitura da imagem: só identifica pedido", () => {
       "Enviei a foto de um pedido médico com: Hemograma; TSH.",
     );
     expect(textoDoPedidoLido(["TSH"], "quanto custa?")).toBe(
-      "Enviei a foto de um pedido médico com: TSH. quanto custa?",
+      "Enviei a foto de um pedido médico com: TSH.\nLegenda do paciente: quanto custa?",
     );
   });
 });

@@ -635,12 +635,26 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     entrada: "Motivo da transferência",
     saida: "Transferência solicitada",
     anteriores: ["tool.execute"],
-    seguintes: ["handoff.queue"],
+    seguintes: ["handoff.queue", "handoff.reason"],
     erros: ["conversa já atendida por humano"],
     ferramentas: ["solicitar_atendente_humano"],
   },
 
   // ───────────────────────── HANDOFF ─────────────────────────
+  {
+    id: "handoff.reason",
+    nome: "Motivo do encaminhamento",
+    categoria: "OBSERVABILIDADE",
+    descricao:
+      "Registra a causa concreta do encaminhamento e sua origem, preservando o diagnóstico para a equipe.",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "executarDecisaoEncaminhamento",
+    entrada: "Motivo e origem da decisão",
+    saida: "Causa registrada no rastreio do turno",
+    erros: ["falha ao gravar o motivo no rastreio"],
+    anteriores: ["tool.handoff"],
+    seguintes: ["handoff.queue"],
+  },
   {
     id: "handoff.queue",
     nome: "Transferência e fila",
@@ -651,7 +665,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     funcao: "encaminharParaHumano",
     entrada: "Conversa e motivo",
     saida: "Conversa aguardando atendimento humano",
-    anteriores: ["tool.handoff", "wait.timeout", "turn.watchdog", "jev.filtro"],
+    anteriores: ["tool.handoff", "handoff.reason", "wait.timeout", "turn.watchdog", "jev.filtro"],
     seguintes: ["handoff.assign", "handoff.summary"],
     tabelas: ["atend_conversas", "atend_conversa_eventos"],
     erros: ["nenhum atendente disponível"],
@@ -1302,13 +1316,13 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
 ];
 
 export const MANIFESTO_ARQUITETURA = {
-  versao: 6,
+  versao: 7,
   descricao:
     "Descrição estruturada da arquitetura real da Nina. Não executa nada e não substitui o código.",
   /** Modelo que o mapa declara para a Nina; a conferência compara com o código. */
   modelo: "google/gemini-3.8-flash",
   /** Última revisão completa do mapa contra o código (data ISO). */
-  revisadoEm: "2026-09-25",
+  revisadoEm: "2026-10-09",
   categorias: CATEGORIAS_ARQUITETURA,
   nodes: NODES_ARQUITETURA,
 } as const;
