@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { planejarPrefetch } from "../prefetch-cadastro";
 
 const cat = {
@@ -18,7 +18,7 @@ describe("pré-busca do cadastro", () => {
       args: { termo: "CLÍNICA GERAL", objetivos: ["horarios", "agendamento"], tipo_atendimento: "consulta" } });
   });
   it("exame usa o nome mais específico", () => {
-    expect(planejarPrefetch("quanto custa ultrassom de tireoide", "valor", cat)?.plano ?? planejarPrefetch("quanto custa ultrassom de tireoide", "valor", cat)?.termo)
+    expect(planejarPrefetch("quanto custa ultrassom de tireoide", "valor", cat)?.termo)
       .toBe("Ultrassom de tireoide");
   });
   it("profissional com nome único chama buscar_medicos", () => {
