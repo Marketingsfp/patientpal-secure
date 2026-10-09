@@ -6,7 +6,12 @@
  * a montagem dos prompts — nada aqui pode ser chamado pelo cliente.
  */
 import { contextoDataAtual } from "./data-atual";
-import type { RoleplayScenario, RoleplayFeedback, RoleplayTurn, TurnoAvaliacao } from "./roleplay-tipos";
+import type {
+  RoleplayScenario,
+  RoleplayFeedback,
+  RoleplayTurn,
+  TurnoAvaliacao,
+} from "./roleplay-tipos";
 
 export type { RoleplayScenario, RoleplayFeedback, RoleplayTurn, TurnoAvaliacao };
 
@@ -37,9 +42,18 @@ export const START_TOOL = {
     parameters: {
       type: "object",
       properties: {
-        cenario: { type: "string", description: "Descrição curta do contexto do atendimento (1-2 frases)." },
-        perfil_cliente: { type: "string", description: "Perfil do cliente simulado: humor, estilo, urgência, gatilhos." },
-        objetivo: { type: "string", description: "O que o atendente precisa demonstrar nesta simulação." },
+        cenario: {
+          type: "string",
+          description: "Descrição curta do contexto do atendimento (1-2 frases).",
+        },
+        perfil_cliente: {
+          type: "string",
+          description: "Perfil do cliente simulado: humor, estilo, urgência, gatilhos.",
+        },
+        objetivo: {
+          type: "string",
+          description: "O que o atendente precisa demonstrar nesta simulação.",
+        },
         primeira_mensagem: {
           type: "string",
           description:
@@ -56,7 +70,6 @@ export const START_TOOL = {
     },
   },
 };
-
 
 /** Instruções de comportamento do paciente conforme o nível de dificuldade escolhido. */
 function instrucaoDificuldade(nivel?: "facil" | "medio" | "dificil") {
@@ -104,7 +117,10 @@ export const REPLY_TOOL = {
               description:
                 "0 a 100: aderência aos scripts padrão de agendamento. Use 0 se nenhum script foi fornecido.",
             },
-            resumo: { type: "string", description: "1-2 frases de como foi o atendimento simulado." },
+            resumo: {
+              type: "string",
+              description: "1-2 frases de como foi o atendimento simulado.",
+            },
             acertos: {
               type: "array",
               items: { type: "string" },
@@ -156,7 +172,6 @@ export const REPLY_TOOL = {
   },
 };
 
-
 export type StartPrompt = {
   atendente: string;
   pontos_fracos: string[];
@@ -173,7 +188,7 @@ export type StartPrompt = {
 export function buildStartMessages(data: StartPrompt) {
   const scriptsTexto = data.scriptsTexto;
   const tabelaTexto = data.tabelaTexto;
-    const system = `${contextoDataAtual()}
+  const system = `${contextoDataAtual()}
 
 Você é um treinador de CONVERSÃO DE AGENDAMENTOS de uma clínica. Sua tarefa é criar uma simulação realista de atendimento (WhatsApp/ligação) para treinar uma atendente a converter o contato em AGENDAMENTO, focando exatamente nos pontos fracos dela.
 
@@ -191,44 +206,44 @@ Regras:
 ${instrucaoDificuldade(data.dificuldade)}
 O perfil_cliente e a primeira mensagem devem refletir esse nível de dificuldade.`;
 
-    const exemplosTxt = (data.exemplos ?? [])
-      .map((ex, i) => {
-        const partes: string[] = [`Exemplo ${i + 1}:`];
-        if (ex.resumo) partes.push(`Resumo: ${ex.resumo}`);
-        if (ex.pontos_negativos?.length)
-          partes.push(`Falhas observadas: ${ex.pontos_negativos.join("; ")}`);
-        if (ex.frases_negativas?.length)
-          partes.push(`Trechos problemáticos: ${ex.frases_negativas.join(" | ")}`);
-        if (ex.transcricao) partes.push(`Transcrição:\n${ex.transcricao}`);
-        return partes.join("\n");
-      })
-      .join("\n\n---\n\n");
+  const exemplosTxt = (data.exemplos ?? [])
+    .map((ex, i) => {
+      const partes: string[] = [`Exemplo ${i + 1}:`];
+      if (ex.resumo) partes.push(`Resumo: ${ex.resumo}`);
+      if (ex.pontos_negativos?.length)
+        partes.push(`Falhas observadas: ${ex.pontos_negativos.join("; ")}`);
+      if (ex.frases_negativas?.length)
+        partes.push(`Trechos problemáticos: ${ex.frases_negativas.join(" | ")}`);
+      if (ex.transcricao) partes.push(`Transcrição:\n${ex.transcricao}`);
+      return partes.join("\n");
+    })
+    .join("\n\n---\n\n");
 
-    const user = `Atendente: ${data.atendente}\n\nPontos fracos recorrentes que precisamos treinar:\n- ${data.pontos_fracos.join("\n- ")}\n\n${
-      scriptsTexto
-        ? `Scripts padrão de agendamento da clínica (o treino deve exigir esses passos):\n\n${scriptsTexto}\n\n`
-        : ""
-    }${
-      exemplosTxt
-        ? `Atendimentos anteriores REAIS dela (use como base do cenário):\n\n${exemplosTxt}\n\n`
-        : ""
-    }${
-      tabelaTexto.trim()
-        ? `Serviços, valores, dias, médicos e horários da clínica — o cenário deve pedir um serviço que exista aqui, com dados reais. Nunca mencione tabela, planilha ou "TAP":\n\n${tabelaTexto.trim()}\n\n`
-        : ""
-    }Crie o cenário e a primeira mensagem do cliente, inspirando-se nos atendimentos reais acima.`;
+  const user = `Atendente: ${data.atendente}\n\nPontos fracos recorrentes que precisamos treinar:\n- ${data.pontos_fracos.join("\n- ")}\n\n${
+    scriptsTexto
+      ? `Scripts padrão de agendamento da clínica (o treino deve exigir esses passos):\n\n${scriptsTexto}\n\n`
+      : ""
+  }${
+    exemplosTxt
+      ? `Atendimentos anteriores REAIS dela (use como base do cenário):\n\n${exemplosTxt}\n\n`
+      : ""
+  }${
+    tabelaTexto.trim()
+      ? `Serviços, valores, dias, médicos e horários da clínica — o cenário deve pedir um serviço que exista aqui, com dados reais. Nunca mencione tabela, planilha ou "TAP":\n\n${tabelaTexto.trim()}\n\n`
+      : ""
+  }Crie o cenário e a primeira mensagem do cliente, inspirando-se nos atendimentos reais acima.`;
 
-    const evitarTxt = data.evitar?.length
-      ? `\n\nPROIBIDO REPETIR — já foram usados nesta trilha (nomes de pacientes, serviços e perguntas de abertura). Escolha itens completamente diferentes de todos estes:\n- ${data.evitar
-          .slice(0, 60)
-          .join("\n- ")}`
-      : "";
+  const evitarTxt = data.evitar?.length
+    ? `\n\nPROIBIDO REPETIR — já foram usados nesta trilha (nomes de pacientes, serviços e perguntas de abertura). Escolha itens completamente diferentes de todos estes:\n- ${data.evitar
+        .slice(0, 60)
+        .join("\n- ")}`
+    : "";
 
-    const userFinal = `${user}${
-      data.contexto?.trim()
-        ? `\n\nCONTEXTO OBRIGATÓRIO desta simulação (precisa ser totalmente diferente de outras simulações): ${data.contexto.trim()}`
-        : ""
-    }${evitarTxt}
+  const userFinal = `${user}${
+    data.contexto?.trim()
+      ? `\n\nCONTEXTO OBRIGATÓRIO desta simulação (precisa ser totalmente diferente de outras simulações): ${data.contexto.trim()}`
+      : ""
+  }${evitarTxt}
 
 REGRAS DE UNICIDADE (obrigatórias):
 - Paciente NOVO: nome e sobrenome brasileiros diferentes dos já usados; evite nomes clichê de IA (Maria Silva, João Silva, Ana Souza, Carlos Oliveira).
@@ -237,10 +252,10 @@ REGRAS DE UNICIDADE (obrigatórias):
 - Nenhuma pergunta ou objeção pode repetir literalmente as anteriores.
 - Variação obrigatória (seed ${data.seed ?? Math.random().toString(36).slice(2, 8)}): use essa semente para diversificar as escolhas.`;
 
-    return [
-      { role: "system" as const, content: system },
-      { role: "user" as const, content: userFinal },
-    ];
+  return [
+    { role: "system" as const, content: system },
+    { role: "user" as const, content: userFinal },
+  ];
 }
 
 export type ReplyPrompt = {
@@ -259,7 +274,7 @@ export type ReplyPrompt = {
 export function buildReplyMessages(data: ReplyPrompt) {
   const scriptsTexto = data.scriptsTexto;
   const tabelaTexto = data.tabelaTexto;
-    const system = `${contextoDataAtual()}
+  const system = `${contextoDataAtual()}
 
 Você está conduzindo uma simulação de treinamento de CONVERSÃO DE AGENDAMENTO de uma clínica.
 
@@ -288,37 +303,38 @@ Regras de interpretação:
 
 ${instrucaoDificuldade(data.dificuldade)}`;
 
+  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: system },
+  ];
+  // Só os últimos 20 turnos vão na íntegra; o começo da conversa entra como
+  // resumo curto, para o custo do turno não crescer sem limite.
+  const historico = data.history;
+  const recentes = historico.slice(-20);
+  const anteriores = historico.slice(0, Math.max(0, historico.length - 20));
+  if (anteriores.length) {
+    messages.push({
+      role: "user",
+      content: `[RESUMO DO INÍCIO DA CONVERSA (${anteriores.length} mensagens): ${anteriores
+        .map(
+          (m) => `${m.role === "cliente" ? "Paciente" : "Atendente"}: ${m.content.slice(0, 160)}`,
+        )
+        .join(" | ")
+        .slice(0, 3000)}]`,
+    });
+  }
+  for (const m of recentes) {
+    messages.push({
+      role: m.role === "cliente" ? "assistant" : "user",
+      content: m.content,
+    });
+  }
+  if (data.encerrar) {
+    messages.push({
+      role: "user",
+      content:
+        "[INSTRUÇÃO DO SISTEMA: a atendente solicitou encerrar a simulação agora. Chame responder_cliente com finalizar=true e o feedback completo.]",
+    });
+  }
 
-    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-      { role: "system", content: system },
-    ];
-    // Só os últimos 20 turnos vão na íntegra; o começo da conversa entra como
-    // resumo curto, para o custo do turno não crescer sem limite.
-    const historico = data.history;
-    const recentes = historico.slice(-20);
-    const anteriores = historico.slice(0, Math.max(0, historico.length - 20));
-    if (anteriores.length) {
-      messages.push({
-        role: "user",
-        content: `[RESUMO DO INÍCIO DA CONVERSA (${anteriores.length} mensagens): ${anteriores
-          .map((m) => `${m.role === "cliente" ? "Paciente" : "Atendente"}: ${m.content.slice(0, 160)}`)
-          .join(" | ")
-          .slice(0, 3000)}]`,
-      });
-    }
-    for (const m of recentes) {
-      messages.push({
-        role: m.role === "cliente" ? "assistant" : "user",
-        content: m.content,
-      });
-    }
-    if (data.encerrar) {
-      messages.push({
-        role: "user",
-        content:
-          "[INSTRUÇÃO DO SISTEMA: a atendente solicitou encerrar a simulação agora. Chame responder_cliente com finalizar=true e o feedback completo.]",
-      });
-    }
-
-    return messages;
+  return messages;
 }

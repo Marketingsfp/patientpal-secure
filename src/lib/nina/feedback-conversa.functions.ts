@@ -78,9 +78,7 @@ export const lerConversaAuditoria = createServerFn({ method: "POST" })
     const [msgs, evs] = await Promise.all([
       context.supabase
         .from("whatsapp_mensagens")
-        .select(
-          "id, direction, body, tipo, enviada_por, recebida_em, media_url, media_mime",
-        )
+        .select("id, direction, body, tipo, enviada_por, recebida_em, media_url, media_mime")
         .eq("clinica_id", data.clinicaId)
         .eq("conversa_id", data.conversaId)
         .order("recebida_em", { ascending: true })
@@ -101,17 +99,17 @@ export const lerConversaAuditoria = createServerFn({ method: "POST" })
 
     // Nomes de quem agiu nos eventos (banner da timeline).
     const responsavelId =
-      ((conversa as unknown as Record<string, unknown>)["atribuida_user_id"] as
-        | string
-        | null) ?? null;
+      ((conversa as unknown as Record<string, unknown>)["atribuida_user_id"] as string | null) ??
+      null;
     const ids = Array.from(
       new Set(
         [
           responsavelId,
           ...eventos.flatMap((r) => {
-            const det = (r.detalhes ?? null) as
-              | { para_user_id?: string | null; de_user_id?: string | null }
-              | null;
+            const det = (r.detalhes ?? null) as {
+              para_user_id?: string | null;
+              de_user_id?: string | null;
+            } | null;
             return [r.user_id, det?.para_user_id ?? null, det?.de_user_id ?? null];
           }),
         ].filter((v): v is string => typeof v === "string" && v.length > 0),
@@ -152,13 +150,12 @@ export const lerConversaAuditoria = createServerFn({ method: "POST" })
       mensagens: lista,
       // A mensagem reportada pode ter sido apagada ou ficar fora do limite:
       // nesse caso avisamos em vez de destacar outra parecida.
-      mensagemEncontrada: data.mensagemId
-        ? lista.some((m) => m.id === data.mensagemId)
-        : null,
+      mensagemEncontrada: data.mensagemId ? lista.some((m) => m.id === data.mensagemId) : null,
       eventos: eventos.map((r) => {
-        const det = (r.detalhes ?? null) as
-          | { para_user_id?: string | null; de_user_id?: string | null }
-          | null;
+        const det = (r.detalhes ?? null) as {
+          para_user_id?: string | null;
+          de_user_id?: string | null;
+        } | null;
         return {
           ...r,
           user_nome: r.user_id ? (nomes.get(r.user_id) ?? null) : null,

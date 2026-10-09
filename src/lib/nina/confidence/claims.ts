@@ -352,7 +352,10 @@ const PADROES: Array<{ tipo: TipoClaim; re: RegExp }> = [
     tipo: "endereco",
     // Rejeitar a leitura clínica antes de consumir o texto permite encontrar
     // outra oração de localização, como "... e ficamos no bairro Centro".
-    re: new RegExp(`\\b(?!${PREFIXO_OFERTA_ESPECIALIDADE})(?:ficamos|estamos|atendemos|fica|funcionamos)\\s+(?:na|no|em)\\s+[^.!?\\n]{6,90}`, "giu"),
+    re: new RegExp(
+      `\\b(?!${PREFIXO_OFERTA_ESPECIALIDADE})(?:ficamos|estamos|atendemos|fica|funcionamos)\\s+(?:na|no|em)\\s+[^.!?\\n]{6,90}`,
+      "giu",
+    ),
   },
   {
     tipo: "endereco",
@@ -457,10 +460,24 @@ export function extrairClaimsDoTexto(texto: string, contextoCompleto = texto): C
         const anterior = segmentos[indiceSegmento - 1];
         // Continuação explícita de pagamento no mesmo parágrafo conserva o
         // assunto da frase imediatamente anterior, nunca de uma frase futura.
-        const continuaPagamento = /^\s*(?:as?\s+)?(?:formas?\s+de\s+pagamento|valores?|pre[cç]os?)\b/iu.test(frase.replace(/[*_]/g, ""));
-        const mesmoParagrafo = anterior && inicioSegmento && !/\n\s*\n/.test(t.slice(anterior.inicio + anterior.texto.length, inicioSegmento.inicio));
-        const escopoAnterior = continuaPagamento && mesmoParagrafo ? qualificadoresDaAfirmacao(anterior.texto.replace(/[*_]/g, "")) : {};
-        for (const chaveMonetaria of chavesDaAfirmacaoMonetaria(frase, trecho, deslocamento, escopoAnterior)) {
+        const continuaPagamento =
+          /^\s*(?:as?\s+)?(?:formas?\s+de\s+pagamento|valores?|pre[cç]os?)\b/iu.test(
+            frase.replace(/[*_]/g, ""),
+          );
+        const mesmoParagrafo =
+          anterior &&
+          inicioSegmento &&
+          !/\n\s*\n/.test(t.slice(anterior.inicio + anterior.texto.length, inicioSegmento.inicio));
+        const escopoAnterior =
+          continuaPagamento && mesmoParagrafo
+            ? qualificadoresDaAfirmacao(anterior.texto.replace(/[*_]/g, ""))
+            : {};
+        for (const chaveMonetaria of chavesDaAfirmacaoMonetaria(
+          frase,
+          trecho,
+          deslocamento,
+          escopoAnterior,
+        )) {
           achados.push({
             tipo,
             trecho,
@@ -514,9 +531,15 @@ export function extrairClaimsDoTexto(texto: string, contextoCompleto = texto): C
       }
       if (tipo === "servico") {
         const oferta = String(m[0])
-          .replace(/^(atendemos)\s+(?:(?:em|na|no)\s+)?(?:(?:[áa]rea|especialidade)\s+(?:de|da|do)\s+)?/iu, "$1 ")
+          .replace(
+            /^(atendemos)\s+(?:(?:em|na|no)\s+)?(?:(?:[áa]rea|especialidade)\s+(?:de|da|do)\s+)?/iu,
+            "$1 ",
+          )
           .replace(/\s+(?:e\s+)?(?:ficamos|estamos|fica|funcionamos)\s+(?:na|no|em)\b.*$/iu, "")
-          .replace(/\s+(?:na|no|em)\s+(?:rua|av\.?|avenida|travessa|rodovia|bairro|cidade|munic[ií]pio|distrito)\b.*$/iu, "");
+          .replace(
+            /\s+(?:na|no|em)\s+(?:rua|av\.?|avenida|travessa|rodovia|bairro|cidade|munic[ií]pio|distrito)\b.*$/iu,
+            "",
+          );
         const itens = itensDeOferta(oferta);
         if (itens.length) {
           for (const item of itens) {
@@ -1218,10 +1241,18 @@ export function avaliarGrounding(
   const claimsComplementares = extrairClaimsDoTexto(vinculo.textoRestante, textoFinal);
   for (const c of claimsComplementares) {
     if (c.escopoIndeterminado && c.modalidade !== "pergunta") {
-      if (claims.length >= LIMITE_CLAIMS) { truncado = true; break; }
+      if (claims.length >= LIMITE_CLAIMS) {
+        truncado = true;
+        break;
+      }
       push({
-        tipo: c.tipo, trecho: c.trecho, origem: "texto", modalidade: c.modalidade,
-        situacao: "nao_verificado", suportado: false, fonte: null,
+        tipo: c.tipo,
+        trecho: c.trecho,
+        origem: "texto",
+        modalidade: c.modalidade,
+        situacao: "nao_verificado",
+        suportado: false,
+        fonte: null,
         motivo: c.escopoIndeterminado,
       });
       continue;
@@ -1261,12 +1292,17 @@ export function avaliarGrounding(
   // esconda um dado afirmado antes dela, inclusive no mesmo parágrafo.
   if (vinculo.confirmados.length > 0) {
     for (const segmento of segmentosDaResposta(vinculo.textoRestante)) {
-      const separador = vinculo.textoRestante.slice(segmento.inicio + segmento.texto.length).match(/^[.!?;\n]+/)?.[0] ?? "";
+      const separador =
+        vinculo.textoRestante
+          .slice(segmento.inicio + segmento.texto.length)
+          .match(/^[.!?;\n]+/)?.[0] ?? "";
       const sentenca = segmento.texto + (separador.includes("?") ? "?" : "");
       const normalizada = normalizarTexto(sentenca);
-      const duracao = /\b(?:duracao|dura|demora|leva|tempo\s+(?:de|previsto|estimado))\b/.test(normalizada) &&
+      const duracao =
+        /\b(?:duracao|dura|demora|leva|tempo\s+(?:de|previsto|estimado))\b/.test(normalizada) &&
         /\b\d+(?:[.,]\d+)?\s*(?:minutos?|min\b|horas?|h\b)/.test(normalizada);
-      const garantiaClinica = /\b(?:cura|resultado|tratamento|exame|diagnostico|cirurgia)\b/.test(normalizada) &&
+      const garantiaClinica =
+        /\b(?:cura|resultado|tratamento|exame|diagnostico|cirurgia)\b/.test(normalizada) &&
         /\bgarant\w*\b|\b\d+(?:[.,]\d+)?\s*%/.test(normalizada);
       if (
         !NATUREZAS_NAO_FACTUAIS.has(classificarNatureza(sentenca)) &&

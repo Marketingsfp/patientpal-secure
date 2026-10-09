@@ -46,8 +46,7 @@ export const REGRA_GERAL_APRESENTACAO: RestricaoEstruturada = {
   nivel: "regra_geral",
   origem: "comportamento publicado",
   descricao: "apresentação obrigatória na primeira resposta da sessão",
-  texto:
-    "Na primeira resposta desta sessão, apresente-se conforme o comportamento publicado.",
+  texto: "Na primeira resposta desta sessão, apresente-se conforme o comportamento publicado.",
 };
 
 /**
@@ -139,8 +138,7 @@ export function resolverPrecedenciaDoTurno(e: EntradaPrecedenciaTurno): Preceden
     versaoId: e.versaoId ?? null,
   });
 
-  const ambiente =
-    e.ambiente === "producao" || e.ambiente === "homologacao" ? e.ambiente : null;
+  const ambiente = e.ambiente === "producao" || e.ambiente === "homologacao" ? e.ambiente : null;
   const aplicaveis = extracao.regras.filter((r) =>
     regraSeAplica(r, { mensagemPaciente: e.mensagemPaciente ?? null, ambiente }),
   );
@@ -148,7 +146,10 @@ export function resolverPrecedenciaDoTurno(e: EntradaPrecedenciaTurno): Preceden
   // Regra não interpretada não vira exceção: só limitação registrada.
   const interpretadas = aplicaveis.filter((r) => r.interpretada);
   const limitacoes = [...extracao.limitacoes];
-  if (aplicaveis.some((r) => !r.interpretada) && !limitacoes.includes("REGRA_APLICAVEL_NAO_INTERPRETADA")) {
+  if (
+    aplicaveis.some((r) => !r.interpretada) &&
+    !limitacoes.includes("REGRA_APLICAVEL_NAO_INTERPRETADA")
+  ) {
     limitacoes.push("REGRA_APLICAVEL_NAO_INTERPRETADA");
   }
 
@@ -195,7 +196,9 @@ export function resolverPrecedenciaDoTurno(e: EntradaPrecedenciaTurno): Preceden
     resultado,
     saudacaoObrigatoria: obrigatoria,
     saudacaoDispensadaPor:
-      e.saudacaoObrigatoria && !obrigatoria && dispensa ? `REGRA_PUBLICADA_${dispensa.ordem}` : null,
+      e.saudacaoObrigatoria && !obrigatoria && dispensa
+        ? `REGRA_PUBLICADA_${dispensa.ordem}`
+        : null,
     contrato: textoContratoPrecedencia(resultado, {
       regrasPublicadasNoPrompt: e.regrasPublicadasNoPrompt === true,
     }),

@@ -34,12 +34,17 @@ export const obterResumoHandoff = createServerFn({ method: "POST" })
 /** Resumos da conversa (um por conclusão da Nina), para aparecerem dentro do chat. */
 export const listarResumosNaConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(d),
+  )
   .handler(async ({ data, context }) => {
     {
       const { assertAcessoConversa } = await import("./acesso-conversa.server");
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
     const { listarResumosDaConversa } = await import("./handoff-resumo.server");
-    return await listarResumosDaConversa({ clinicaId: data.clinicaId, conversaId: data.conversaId });
+    return await listarResumosDaConversa({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+    });
   });

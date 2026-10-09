@@ -19,11 +19,7 @@ import {
   type QuestaoSegura,
 } from "./sessao-calculo";
 import type { FeedbackProva } from "./prova.server";
-import type {
-  RoleplayFeedback,
-  RoleplayScenario,
-  TurnoAvaliacao,
-} from "./roleplay-tipos";
+import type { RoleplayFeedback, RoleplayScenario, TurnoAvaliacao } from "./roleplay-tipos";
 
 export type { ProvaQuestao, FeedbackProva, FeedbackItem } from "./prova.server";
 export type {
@@ -176,7 +172,8 @@ export const responderQuestao = createServerFn({ method: "POST" })
       const a = await s.admin();
       const prova = await s.lerProva(a, data.provaId);
       await s.conferirDono(db, prova, context.userId, data.clinicaId);
-      if (!prova || prova.status !== "em_andamento") throw new Error("Esta prova já foi encerrada.");
+      if (!prova || prova.status !== "em_andamento")
+        throw new Error("Esta prova já foi encerrada.");
 
       const questoes = prova.questoes ?? [];
       const q = questoes[data.indice];
@@ -201,9 +198,7 @@ export const responderQuestao = createServerFn({ method: "POST" })
 /** Corrige, dá a nota, gera o feedback e fecha a prova — tudo no servidor. */
 export const finalizarProva = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) =>
-    z.object({ clinicaId: uuid, provaId: uuid }).parse(data),
-  )
+  .inputValidator((data: unknown) => z.object({ clinicaId: uuid, provaId: uuid }).parse(data))
   .handler(async ({ data, context }): Promise<ResultadoFinalProva> => {
     const guard = await import("./guard.server");
     const s = await import("./sessao.server");
@@ -502,9 +497,7 @@ export const responderTreino = createServerFn({ method: "POST" })
 export const encerrarTreino = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
-    z
-      .object({ clinicaId: uuid, sessionId: uuid, dificuldade: dificuldadeSchema })
-      .parse(data),
+    z.object({ clinicaId: uuid, sessionId: uuid, dificuldade: dificuldadeSchema }).parse(data),
   )
   .handler(async ({ data, context }): Promise<TreinoEncerrado> => {
     const guard = await import("./guard.server");

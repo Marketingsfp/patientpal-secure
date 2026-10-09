@@ -76,12 +76,21 @@ describe("FASE 3 — autorização prévia", () => {
   });
 
   it("vaga de outro profissional, outra data ou outro intervalo não autoriza", () => {
-    expect(vagaCorresponde([{ medicoId: "med-2", inicio: INICIO, fim: FIM }], "med-1", INICIO, FIM)).toBe(false);
     expect(
-      vagaCorresponde([{ medicoId: "med-1", inicio: "2026-09-16T13:00:00.000Z", fim: FIM }], "med-1", INICIO, FIM),
+      vagaCorresponde([{ medicoId: "med-2", inicio: INICIO, fim: FIM }], "med-1", INICIO, FIM),
+    ).toBe(false);
+    expect(
+      vagaCorresponde(
+        [{ medicoId: "med-1", inicio: "2026-09-16T13:00:00.000Z", fim: FIM }],
+        "med-1",
+        INICIO,
+        FIM,
+      ),
     ).toBe(false);
     const r = autorizarAcao(
-      entradaValida({ vagasConsultadas: [{ medicoId: "med-1", inicio: INICIO, fim: "2026-09-15T14:00:00.000Z" }] }),
+      entradaValida({
+        vagasConsultadas: [{ medicoId: "med-1", inicio: INICIO, fim: "2026-09-15T14:00:00.000Z" }],
+      }),
     );
     expect(r.autorizado).toBe(false);
     if (!r.autorizado) expect(r.motivos).toContain("VAGA_NAO_CORRESPONDENTE");
@@ -113,9 +122,17 @@ describe("FASE 3 — autorização prévia", () => {
   });
 
   it("identificar_paciente não exige CPF opcional", () => {
-    expect(autorizarAcao({ operacao: "identificar_paciente", clinicaId: "clinica",
-      dadosIdentificacao: { nome: "Ana Souza", telefone: "21999990000", data_nascimento: "1990-01-01" },
-    }).autorizado).toBe(true);
+    expect(
+      autorizarAcao({
+        operacao: "identificar_paciente",
+        clinicaId: "clinica",
+        dadosIdentificacao: {
+          nome: "Ana Souza",
+          telefone: "21999990000",
+          data_nascimento: "1990-01-01",
+        },
+      }).autorizado,
+    ).toBe(true);
   });
 
   it("consultar reserva anterior não exige criar de novo", () => {
@@ -139,7 +156,13 @@ describe("FASE 3 — autorização prévia", () => {
 });
 
 describe("FASE 3 — prova do resultado", () => {
-  const esperado = { clinicaId: "cli-1", pacienteId: "pac-1", medicoId: "med-1", inicio: INICIO, fim: FIM };
+  const esperado = {
+    clinicaId: "cli-1",
+    pacienteId: "pac-1",
+    medicoId: "med-1",
+    inicio: INICIO,
+    fim: FIM,
+  };
   const registro = {
     id: "ag-1",
     clinica_id: "cli-1",
@@ -165,14 +188,21 @@ describe("FASE 3 — prova do resultado", () => {
   });
 
   it("duplicado sem registro lido não é prova: resultado incerto", () => {
-    expect(verificarResultadoAgendamento(esperado, null, { jaExistia: true }).estado).toBe("UNCERTAIN");
+    expect(verificarResultadoAgendamento(esperado, null, { jaExistia: true }).estado).toBe(
+      "UNCERTAIN",
+    );
   });
 
   it("divergência de paciente/profissional/horário vira UNCERTAIN", () => {
-    expect(verificarResultadoAgendamento(esperado, { ...registro, medico_id: "med-9" }).estado).toBe("UNCERTAIN");
-    expect(verificarResultadoAgendamento(esperado, { ...registro, paciente_id: "pac-9" }).estado).toBe("UNCERTAIN");
     expect(
-      verificarResultadoAgendamento(esperado, { ...registro, inicio: "2026-09-15T15:00:00.000Z" }).estado,
+      verificarResultadoAgendamento(esperado, { ...registro, medico_id: "med-9" }).estado,
+    ).toBe("UNCERTAIN");
+    expect(
+      verificarResultadoAgendamento(esperado, { ...registro, paciente_id: "pac-9" }).estado,
+    ).toBe("UNCERTAIN");
+    expect(
+      verificarResultadoAgendamento(esperado, { ...registro, inicio: "2026-09-15T15:00:00.000Z" })
+        .estado,
     ).toBe("UNCERTAIN");
   });
 

@@ -2,7 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ETAPAS_CAMINHO, LIGACOES_CAMINHO } from "../caminho-producao";
-import { ALTURA_ETAPA, LARGURA_ETAPA, calcularLayoutCaminho, escalaParaCaber, melhorLayoutCaminho } from "../caminho-producao-layout";
+import {
+  ALTURA_ETAPA,
+  LARGURA_ETAPA,
+  calcularLayoutCaminho,
+  escalaParaCaber,
+  melhorLayoutCaminho,
+} from "../caminho-producao-layout";
 import { NODES_ARQUITETURA } from "../manifesto";
 
 const RAIZ = join(import.meta.dir, "../../../../..");
@@ -24,7 +30,10 @@ describe("caminho da mensagem em produção", () => {
       expect(existsSync(caminho), `${etapa.id}: ${etapa.arquivo}`).toBe(true);
       if (etapa.funcao) {
         const fonte = readFileSync(caminho, "utf8");
-        expect(new RegExp(`\\b${etapa.funcao}\\b`).test(fonte), `${etapa.id}: ${etapa.funcao}`).toBe(true);
+        expect(
+          new RegExp(`\\b${etapa.funcao}\\b`).test(fonte),
+          `${etapa.id}: ${etapa.funcao}`,
+        ).toBe(true);
       }
     }
   });
@@ -60,10 +69,13 @@ describe("caminho da mensagem em produção", () => {
     const { etapas } = calcularLayoutCaminho(ETAPAS_CAMINHO, LIGACOES_CAMINHO);
     for (let i = 0; i < etapas.length; i++)
       for (let j = i + 1; j < etapas.length; j++) {
-        const a = etapas[i]!, b = etapas[j]!;
+        const a = etapas[i]!,
+          b = etapas[j]!;
         const sobrepoe =
-          a.x < b.x + LARGURA_ETAPA && b.x < a.x + LARGURA_ETAPA &&
-          a.y < b.y + ALTURA_ETAPA && b.y < a.y + ALTURA_ETAPA;
+          a.x < b.x + LARGURA_ETAPA &&
+          b.x < a.x + LARGURA_ETAPA &&
+          a.y < b.y + ALTURA_ETAPA &&
+          b.y < a.y + ALTURA_ETAPA;
         expect(sobrepoe, `${a.etapa.id} × ${b.etapa.id}`).toBe(false);
       }
   });
@@ -74,9 +86,13 @@ describe("tela cheia: arrumação que cabe na tela", () => {
     const l = calcularLayoutCaminho(ETAPAS_CAMINHO, LIGACOES_CAMINHO, 2);
     for (let i = 0; i < l.etapas.length; i++)
       for (let j = i + 1; j < l.etapas.length; j++) {
-        const a = l.etapas[i]!, b = l.etapas[j]!;
+        const a = l.etapas[i]!,
+          b = l.etapas[j]!;
         expect(
-          a.x < b.x + LARGURA_ETAPA && b.x < a.x + LARGURA_ETAPA && a.y < b.y + ALTURA_ETAPA && b.y < a.y + ALTURA_ETAPA,
+          a.x < b.x + LARGURA_ETAPA &&
+            b.x < a.x + LARGURA_ETAPA &&
+            a.y < b.y + ALTURA_ETAPA &&
+            b.y < a.y + ALTURA_ETAPA,
           `${a.etapa.id} × ${b.etapa.id}`,
         ).toBe(false);
       }
@@ -85,8 +101,13 @@ describe("tela cheia: arrumação que cabe na tela", () => {
   });
 
   it("tela larga escolhe 2 colunas; tela em pé escolhe empilhado", () => {
-    expect(melhorLayoutCaminho(ETAPAS_CAMINHO, LIGACOES_CAMINHO, { largura: 1920, altura: 1000 }).colunas).toBe(2);
-    expect(melhorLayoutCaminho(ETAPAS_CAMINHO, LIGACOES_CAMINHO, { largura: 390, altura: 800 }).colunas).toBe(1);
+    expect(
+      melhorLayoutCaminho(ETAPAS_CAMINHO, LIGACOES_CAMINHO, { largura: 1920, altura: 1000 })
+        .colunas,
+    ).toBe(2);
+    expect(
+      melhorLayoutCaminho(ETAPAS_CAMINHO, LIGACOES_CAMINHO, { largura: 390, altura: 800 }).colunas,
+    ).toBe(1);
   });
 
   it("em tela larga o desenho inteiro fica maior que empilhado", () => {

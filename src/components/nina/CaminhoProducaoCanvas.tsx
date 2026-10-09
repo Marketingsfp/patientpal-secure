@@ -81,7 +81,9 @@ export function CaminhoProducaoCanvas({ clinicaId, nivelAcesso = "operacional" }
   const [tecnico, setTecnico] = useState<string | null>(null);
   const [telaCheia, setTelaCheia] = useState(false);
 
-  const componenteTecnico = tecnico ? NODES_ARQUITETURA.find((n) => n.id === tecnico) ?? null : null;
+  const componenteTecnico = tecnico
+    ? (NODES_ARQUITETURA.find((n) => n.id === tecnico) ?? null)
+    : null;
 
   const sairTelaCheia = useCallback(() => {
     setTelaCheia(false);
@@ -258,7 +260,12 @@ function Desenho({
   const areaRef = useRef<HTMLDivElement | null>(null);
   const [tamanho, setTamanho] = useState({ largura: 0, altura: 0 });
   const [view, setView] = useState({ escala: 0.7, x: 0, y: 0 });
-  const arrasto = useRef<{ startX: number; startY: number; origemX: number; origemY: number } | null>(null);
+  const arrasto = useRef<{
+    startX: number;
+    startY: number;
+    origemX: number;
+    origemY: number;
+  } | null>(null);
 
   useLayoutEffect(() => {
     const area = areaRef.current;
@@ -286,7 +293,10 @@ function Desenho({
       ESCALA_MAX,
       Math.max(
         ESCALA_MIN,
-        escalaParaCaber(layout, { largura: tamanho.largura - folga * 2, altura: tamanho.altura - folga * 2 }),
+        escalaParaCaber(layout, {
+          largura: tamanho.largura - folga * 2,
+          altura: tamanho.altura - folga * 2,
+        }),
       ),
     );
     setView({
@@ -327,10 +337,22 @@ function Desenho({
         <Button type="button" variant="outline" size="sm" onClick={verTudo}>
           <Maximize2 className="mr-2 h-4 w-4" /> Ver tudo
         </Button>
-        <Button type="button" variant="outline" size="icon" aria-label="Aproximar" onClick={() => aplicarZoom(1.2)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="Aproximar"
+          onClick={() => aplicarZoom(1.2)}
+        >
           <ZoomIn className="h-4 w-4" />
         </Button>
-        <Button type="button" variant="outline" size="icon" aria-label="Afastar" onClick={() => aplicarZoom(1 / 1.2)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="Afastar"
+          onClick={() => aplicarZoom(1 / 1.2)}
+        >
           <ZoomOut className="h-4 w-4" />
         </Button>
         <span className="text-xs text-muted-foreground">
@@ -354,7 +376,12 @@ function Desenho({
         }}
         onPointerDown={(evento) => {
           if (evento.button !== 0) return;
-          arrasto.current = { startX: evento.clientX, startY: evento.clientY, origemX: view.x, origemY: view.y };
+          arrasto.current = {
+            startX: evento.clientX,
+            startY: evento.clientY,
+            origemX: view.x,
+            origemY: view.y,
+          };
         }}
         onPointerMove={(evento) => {
           const atual = arrasto.current;
@@ -400,7 +427,11 @@ function Desenho({
             </div>
           ))}
 
-          <svg width={layout.largura} height={layout.altura} className="pointer-events-none absolute left-0 top-0">
+          <svg
+            width={layout.largura}
+            height={layout.altura}
+            className="pointer-events-none absolute left-0 top-0"
+          >
             <defs>
               {[
                 ["seta-caminho-principal", "var(--primary)"],
@@ -507,13 +538,18 @@ function Desenho({
                   borderLeft: `5px solid ${cor}`,
                   borderStyle: etapa.tipo === "condicional" ? "dashed" : undefined,
                   borderLeftStyle: "solid",
-                  backgroundColor: lateral ? `color-mix(in oklch, ${cor} 8%, var(--card))` : undefined,
+                  backgroundColor: lateral
+                    ? `color-mix(in oklch, ${cor} 8%, var(--card))`
+                    : undefined,
                 }}
               >
                 <span className="flex items-start gap-1 text-[13px] font-medium leading-tight text-foreground">
                   <span className="line-clamp-2">{etapa.titulo}</span>
                   {etapa.atencao ? (
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" aria-label="Atenção" />
+                    <AlertTriangle
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive"
+                      aria-label="Atenção"
+                    />
                   ) : null}
                 </span>
                 <span className="line-clamp-1 text-[11px] text-muted-foreground">

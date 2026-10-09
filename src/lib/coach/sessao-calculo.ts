@@ -34,10 +34,7 @@ export function sanitizarQuestoes(questoes: QuestaoCompleta[]): QuestaoSegura[] 
 export type ResultadoProva = { acertos: number; total: number; nota: number };
 
 /** Correção da prova: acertos, total e nota de 0 a 10 com uma casa. */
-export function corrigirProva(
-  questoes: QuestaoCompleta[],
-  respostas: number[],
-): ResultadoProva {
+export function corrigirProva(questoes: QuestaoCompleta[], respostas: number[]): ResultadoProva {
   const total = questoes.length;
   const acertos = questoes.reduce(
     (n, q, i) => (Number(respostas[i]) === Number(q.correta) ? n + 1 : n),

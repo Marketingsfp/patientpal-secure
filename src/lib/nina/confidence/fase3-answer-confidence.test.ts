@@ -8,11 +8,7 @@
 import { describe, expect, it } from "bun:test";
 import { detectarIntencoes, intencaoAmbigua } from "../atendimento-fase1";
 import { montarContextoCanonicoTurno } from "./contexto-turno";
-import {
-  decidirNoTurno,
-  verificarRespostaFinalDoTurno,
-  type EstadoDoTurno,
-} from "./runtime";
+import { decidirNoTurno, verificarRespostaFinalDoTurno, type EstadoDoTurno } from "./runtime";
 import type { EtapaFluxoNina } from "../fluxo-estado-normalizar";
 
 const deps = { detectarIntencoes, intencaoAmbigua };

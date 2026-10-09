@@ -24,9 +24,54 @@ export interface AprendizadoLinha {
 }
 
 const PARADAS = new Set([
-  "a","o","as","os","de","da","do","das","dos","e","em","no","na","nos","nas","um","uma","para",
-  "por","com","que","qual","quais","quanto","quanta","tem","ter","voce","vocês","voces","eu","meu",
-  "minha","ola","olá","oi","bom","boa","dia","tarde","noite","sim","nao","não","ai","aí","pra","pro",
+  "a",
+  "o",
+  "as",
+  "os",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "e",
+  "em",
+  "no",
+  "na",
+  "nos",
+  "nas",
+  "um",
+  "uma",
+  "para",
+  "por",
+  "com",
+  "que",
+  "qual",
+  "quais",
+  "quanto",
+  "quanta",
+  "tem",
+  "ter",
+  "voce",
+  "vocês",
+  "voces",
+  "eu",
+  "meu",
+  "minha",
+  "ola",
+  "olá",
+  "oi",
+  "bom",
+  "boa",
+  "dia",
+  "tarde",
+  "noite",
+  "sim",
+  "nao",
+  "não",
+  "ai",
+  "aí",
+  "pra",
+  "pro",
 ]);
 
 function normalizar(texto: string): string {
@@ -94,7 +139,10 @@ export async function recuperarAprendizados(
         .from("nina_aprendizados")
         .update({ usos: (x.r.usos ?? 0) + 1 })
         .eq("id", x.r.id)
-        .then(() => undefined, () => undefined);
+        .then(
+          () => undefined,
+          () => undefined,
+        );
     }
   }
 
@@ -114,9 +162,7 @@ export async function recuperarAprendizados(
  */
 export function blocoPromptAprendizados(itens: AprendizadoLinha[]): string {
   if (!itens.length) return "";
-  const linhas = itens
-    .map((i) => `- [${i.tipo}] ${i.titulo}: ${i.conteudo}`)
-    .join("\n");
+  const linhas = itens.map((i) => `- [${i.tipo}] ${i.titulo}: ${i.conteudo}`).join("\n");
   return `APRENDIZADOS DESTA CLÍNICA (validados pela equipe):
 ${linhas}
 

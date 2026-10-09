@@ -41,9 +41,9 @@ function normalizar(payload: unknown): string[] {
       typeof v === "string"
         ? v
         : typeof (v as { id?: unknown })?.id === "string"
-          ? ((v as { id: string }).id)
+          ? (v as { id: string }).id
           : typeof (v as { name?: unknown })?.name === "string"
-            ? ((v as { name: string }).name)
+            ? (v as { name: string }).name
             : "",
     )
     .map((s) => s.trim())

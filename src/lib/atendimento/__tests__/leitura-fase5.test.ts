@@ -32,7 +32,12 @@ describe("Fase 5 — leitura não é resposta", () => {
     // Nenhuma escrita: a função só lê a conversa e grava o marcador individual.
     expect(marcarLida.includes(".update(")).toBe(false);
     expect(marcarLida.includes(".insert(")).toBe(false);
-    for (const campo of ["aguardando_desde", "primeiro_resp_em", "closed_at", "nina_fluxo_estado"]) {
+    for (const campo of [
+      "aguardando_desde",
+      "primeiro_resp_em",
+      "closed_at",
+      "nina_fluxo_estado",
+    ]) {
       expect(marcarLida.includes(campo)).toBe(false);
     }
   });
@@ -102,14 +107,13 @@ describe("Fase 5 — cenários obrigatórios", () => {
 
   it("transferência muda quem pode registrar a próxima leitura autorizada", () => {
     // A ex-responsável perde o acesso; a próxima pode avançar o limite da equipe.
-    expect(
-      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "maria" }),
-    ).toBe(false);
-    expect(
-      deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "jean" }),
-    ).toBe(true);
+    expect(deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "maria" })).toBe(
+      false,
+    );
+    expect(deveRegistrarLeituraAoAbrir({ ...base, userId: "jean", atribuidaUserId: "jean" })).toBe(
+      true,
+    );
   });
-
 
   it("mensagem que chega durante a gravação não é zerada por resposta antiga", () => {
     const r = aplicarReconciliacao({

@@ -29,29 +29,44 @@ const REGRAS_CATEGORIA: { termos: string[]; categoria: string }[] = [
   { termos: ["preco", "preço", "valor", "tabela"], categoria: "valor_incorreto" },
   { termos: ["medico", "médico", "profissional"], categoria: "medico_incorreto" },
   { termos: ["unidade", "endereco", "endereço"], categoria: "unidade_incorreta" },
-  { termos: ["horario", "horário", "agenda", "disponibilidade", "vaga"], categoria: "horario_incorreto" },
-  { termos: ["procedimento", "exame", "catalogo", "catálogo"], categoria: "procedimento_incorreto" },
+  {
+    termos: ["horario", "horário", "agenda", "disponibilidade", "vaga"],
+    categoria: "horario_incorreto",
+  },
+  {
+    termos: ["procedimento", "exame", "catalogo", "catálogo"],
+    categoria: "procedimento_incorreto",
+  },
   { termos: ["preparo", "jejum", "orientacao", "orientação"], categoria: "preparo_incorreto" },
-  { termos: ["alucin", "inventad", "sem respaldo", "sem embasamento"], categoria: "informacao_inventada" },
-  { termos: ["nao encontrou", "não encontrou", "rag", "conhecimento", "base de conhecimento"], categoria: "informacao_nao_encontrada" },
+  {
+    termos: ["alucin", "inventad", "sem respaldo", "sem embasamento"],
+    categoria: "informacao_inventada",
+  },
+  {
+    termos: ["nao encontrou", "não encontrou", "rag", "conhecimento", "base de conhecimento"],
+    categoria: "informacao_nao_encontrada",
+  },
   { termos: ["transferencia", "transferência", "handoff"], categoria: "handoff_deveria_ocorrer" },
   { termos: ["incompleta", "faltou responder"], categoria: "resposta_incompleta" },
-  { termos: ["interpret", "entendimento", "memoria", "memória"], categoria: "interpretacao_incorreta" },
+  {
+    termos: ["interpret", "entendimento", "memoria", "memória"],
+    categoria: "interpretacao_incorreta",
+  },
 ];
 
 /** Categoria neutra: o humano classifica na Revisão. */
 export const CATEGORIA_PADRAO_ACHADO = "nao_classificado";
 
-export function categoriaDoAchado(achado: Pick<Achado, "componente" | "observado" | "dimensao">): string {
+export function categoriaDoAchado(
+  achado: Pick<Achado, "componente" | "observado" | "dimensao">,
+): string {
   const texto = `${achado.componente ?? ""} ${achado.observado ?? ""}`
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   for (const regra of REGRAS_CATEGORIA) {
     if (
-      regra.termos.some((t) =>
-        texto.includes(t.normalize("NFD").replace(/[\u0300-\u036f]/g, "")),
-      )
+      regra.termos.some((t) => texto.includes(t.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))
     ) {
       return regra.categoria;
     }
@@ -63,7 +78,9 @@ export function categoriaDoAchado(achado: Pick<Achado, "componente" | "observado
 }
 
 /** Prioridade da fila a partir da gravidade atribuída pelo avaliador. */
-export function prioridadeDoAchado(gravidade: Gravidade | null | undefined): "critico" | "alto" | "normal" {
+export function prioridadeDoAchado(
+  gravidade: Gravidade | null | undefined,
+): "critico" | "alto" | "normal" {
   if (gravidade === "critica") return "critico";
   if (gravidade === "alta") return "alto";
   return "normal";
@@ -73,25 +90,31 @@ export function prioridadeDoAchado(gravidade: Gravidade | null | undefined): "cr
  * Causa provável (root cause) sugerida. É só uma sugestão de triagem: o campo
  * continua editável pelo humano na Revisão.
  */
-export function rootCauseDoAchado(
-  achado: Pick<Achado, "componente" | "dimensao">,
-): string | null {
+export function rootCauseDoAchado(achado: Pick<Achado, "componente" | "dimensao">): string | null {
   const comp = (achado.componente ?? "").toLowerCase();
-  if (comp.includes("ferramenta") || comp.includes("tool") || comp.includes("integra")) return "tool_error";
+  if (comp.includes("ferramenta") || comp.includes("tool") || comp.includes("integra"))
+    return "tool_error";
   if (comp.includes("agenda") || comp.includes("disponibilidade")) return "tool_error";
   if (comp.includes("catálogo") || comp.includes("catalogo") || comp.includes("conhecimento")) {
     return "knowledge_error";
   }
   if (comp.includes("busca") || comp.includes("recupera")) return "retrieval_error";
   if (achado.dimensao === "nao_alucinacao") return "hallucination";
-  if (achado.dimensao === "coerencia" || achado.dimensao === "qualidade_resposta") return "reasoning_error";
+  if (achado.dimensao === "coerencia" || achado.dimensao === "qualidade_resposta")
+    return "reasoning_error";
   if (achado.dimensao === "aderencia_instrucoes") return "workflow_error";
   return null;
 }
 
 /** Confiança em texto curto para o histórico da Revisão. */
 export function rotuloConfianca(c: Confianca | null | undefined): string {
-  return c === "alta" ? "alta" : c === "media" ? "média" : c === "baixa" ? "baixa" : "não informada";
+  return c === "alta"
+    ? "alta"
+    : c === "media"
+      ? "média"
+      : c === "baixa"
+        ? "baixa"
+        : "não informada";
 }
 
 export type ContextoAchado = {

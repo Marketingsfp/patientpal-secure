@@ -190,8 +190,7 @@ export async function executarCadeiaDeEnvio(e: EntradaCadeia): Promise<Resultado
     ambiente: e.ambiente,
     saudacao: {
       turnoSocial:
-        tipoTurno === "SAUDACAO" ||
-        (tipoTurno === "ESCLARECIMENTO" && (e.acao ?? null) === null),
+        tipoTurno === "SAUDACAO" || (tipoTurno === "ESCLARECIMENTO" && (e.acao ?? null) === null),
       acaoOperacional: (e.acao ?? null) !== null,
       afirmacaoSemFonte: afirmacaoSemLastro(avaliacao),
       pedidoDeHumano,

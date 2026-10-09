@@ -9,7 +9,9 @@ type Body = RetornoFocus & {
 async function baixarXml(body: Body, token: string | undefined): Promise<string | null> {
   const url =
     body.url_xml_nota_fiscal ??
-    (body.caminho_xml_nota_fiscal ? `https://api.focusnfe.com.br${body.caminho_xml_nota_fiscal}` : null);
+    (body.caminho_xml_nota_fiscal
+      ? `https://api.focusnfe.com.br${body.caminho_xml_nota_fiscal}`
+      : null);
   if (!url) return null;
   try {
     const headers: Record<string, string> = {};

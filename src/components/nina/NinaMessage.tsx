@@ -15,7 +15,9 @@ type Props = {
  */
 export function NinaMessage({ content, variant, className }: Props) {
   if (variant === "user") {
-    return <div className={cn("whitespace-pre-wrap", className)}>{bloquearLinksRecebidos(content)}</div>;
+    return (
+      <div className={cn("whitespace-pre-wrap", className)}>{bloquearLinksRecebidos(content)}</div>
+    );
   }
 
   return (

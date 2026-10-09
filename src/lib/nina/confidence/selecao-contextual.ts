@@ -340,9 +340,13 @@ export function resolverSelecaoContextual(e: EntradaSelecaoContextual): Resultad
   const nomeSozinho =
     citacoes.length === 1 &&
     tokensNome(m.replace(/^(?:o|a)\s+/, "")).join(" ") === citacoes[0]!.tokens.join(" ");
-  const confirmados = e.profissionalConfirmado ? candidatos.filter(c =>
-    nomeNormalizado(c.medicoNome) === nomeNormalizado(e.profissionalConfirmado!.nome) &&
-    c.raizesFonte.some(r => r.registro === e.profissionalConfirmado!.registro)) : [];
+  const confirmados = e.profissionalConfirmado
+    ? candidatos.filter(
+        (c) =>
+          nomeNormalizado(c.medicoNome) === nomeNormalizado(e.profissionalConfirmado!.nome) &&
+          c.raizesFonte.some((r) => r.registro === e.profissionalConfirmado!.registro),
+      )
+    : [];
   const confirmado = confirmados.length === 1 ? confirmados[0]! : null;
   const escolha =
     !informacao &&
@@ -432,7 +436,8 @@ export function resolverSelecaoContextual(e: EntradaSelecaoContextual): Resultad
   if (!modalidade && escolhido.modalidades.length === 1 && !modNegativas.length)
     modalidade = escolhido.modalidades[0]!;
   const selecao = snapshot(e, escolhido, modalidade);
-  const turnoDeSelecao = Boolean(confirmado) || (escolha && positivas.length > 0) || escolhaModalidade;
+  const turnoDeSelecao =
+    Boolean(confirmado) || (escolha && positivas.length > 0) || escolhaModalidade;
   if (!modalidade && escolhido.modalidades.length > 1)
     return responder({
       estado: "esclarecer_modalidade",

@@ -6,10 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  capacidadesDoPapel,
-  type CapacidadeArquitetura,
-} from "./permissoes";
+import { capacidadesDoPapel, type CapacidadeArquitetura } from "./permissoes";
 
 export type RespostaCapacidades = {
   papel: string | null;

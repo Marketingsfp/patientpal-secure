@@ -11,11 +11,7 @@
 
 export const VERSAO_REVISAO_AMOSTRA = "revisao-amostra-5";
 
-export type RotuloQualidade =
-  | "ADEQUADA"
-  | "INADEQUADA"
-  | "EVIDENCIA_INSUFICIENTE"
-  | "NAO_REVISADA";
+export type RotuloQualidade = "ADEQUADA" | "INADEQUADA" | "EVIDENCIA_INSUFICIENTE" | "NAO_REVISADA";
 
 export type RotuloEncaminhamento = "NECESSARIO" | "DESNECESSARIO" | "INDETERMINADO";
 

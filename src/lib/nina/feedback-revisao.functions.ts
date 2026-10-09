@@ -17,19 +17,11 @@ import { MSG_CONFLITO } from "@/lib/nina/decisoes";
 import { registrarDecisao } from "@/lib/nina/decisoes.functions";
 import { INICIO_CICLO_APRENDIZADO } from "./ciclo-aprendizado";
 
-const STATUS = [
-  "pending",
-  "under_review",
-  "approved",
-  "rejected",
-  "applied",
-  "reverted",
-] as const;
+const STATUS = ["pending", "under_review", "approved", "rejected", "applied", "reverted"] as const;
 export type StatusFeedbackNina = (typeof STATUS)[number];
 
 const COLUNAS =
   "id, clinica_id, conversa_id, mensagem_id, mensagem_texto, pergunta_texto, categoria, origem, correcao, correcao_original, observacao, motivo_rejeicao, status, reportado_por, revisado_por, revisado_em, unidade_id, created_at, updated_at, root_cause, prioridade, knowledge_status, knowledge_snapshot, knowledge_consultado_em, grupo_chave, grupo_titulo, diagnosticado_por, diagnosticado_em, execucao_id, auditoria_status, decisao_humana, decidido_por, decidido_em, ambiente, nina_session_id, teste_ciclo_id";
-
 
 type ClienteSupabase = {
   rpc: (
@@ -73,7 +65,6 @@ const filtros = z.object({
   limite: z.number().int().min(1).max(500).default(200),
 });
 
-
 export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => filtros.parse(i))
@@ -101,9 +92,7 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
 
     // Nomes de quem reportou/revisou, para a tela.
     const ids = Array.from(
-      new Set(
-        itens.flatMap((l) => [l.reportado_por, l.revisado_por]).filter(Boolean) as string[],
-      ),
+      new Set(itens.flatMap((l) => [l.reportado_por, l.revisado_por]).filter(Boolean) as string[]),
     );
     let pessoas: Record<string, string> = {};
     if (ids.length) {
@@ -145,9 +134,6 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
       for (const m of msgs ?? []) mensagens[m.id] = { enviada_em: m.recebida_em ?? null };
     }
 
-
-
-
     // Contagem por situação (para as abas), respeitando os demais filtros.
     const contagens: Record<string, number> = {};
     for (const s of STATUS) contagens[s] = 0;
@@ -187,10 +173,24 @@ export const listarRevisaoFeedbackNina = createServerFn({ method: "POST" })
     const { estadoAuditoria } = await import("@/lib/nina/erro-rapido");
     const execucoes: Record<
       string,
-      { id: string; model: string | null; latency_ms: number | null; created_at: string | null; success: boolean | null; knowledge_status: string | null; thinking_level: string | null; route_reason: string | null; tool_calls: string[] | null }
+      {
+        id: string;
+        model: string | null;
+        latency_ms: number | null;
+        created_at: string | null;
+        success: boolean | null;
+        knowledge_status: string | null;
+        thinking_level: string | null;
+        route_reason: string | null;
+        tool_calls: string[] | null;
+      }
     > = {};
     const idsExec = Array.from(
-      new Set(itens.map((l) => (l as { execucao_id?: string | null }).execucao_id).filter(Boolean) as string[]),
+      new Set(
+        itens
+          .map((l) => (l as { execucao_id?: string | null }).execucao_id)
+          .filter(Boolean) as string[],
+      ),
     );
     if (idsExec.length) {
       const { data: execs } = await context.supabase

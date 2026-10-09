@@ -108,7 +108,11 @@ export function calcularLayoutCaminho(
           y: a.y + ALTURA_ETAPA,
           texto: `continua em ${tituloFaixa.get(b.etapa.faixa)}`,
         },
-        chegada: { x: b.x + LARGURA_ETAPA / 2, y: b.y, texto: `vem de ${tituloFaixa.get(a.etapa.faixa)}` },
+        chegada: {
+          x: b.x + LARGURA_ETAPA / 2,
+          y: b.y,
+          texto: `vem de ${tituloFaixa.get(a.etapa.faixa)}`,
+        },
       });
       continue;
     }
@@ -137,7 +141,9 @@ export function calcularLayoutCaminho(
       id,
       ligacao,
       d,
-      rotulo: ligacao.rotulo ? { x: (x1 + x2) / 2, y: (y1 + y2) / 2, texto: ligacao.rotulo } : undefined,
+      rotulo: ligacao.rotulo
+        ? { x: (x1 + x2) / 2, y: (y1 + y2) / 2, texto: ligacao.rotulo }
+        : undefined,
     });
   }
 

@@ -38,9 +38,14 @@ export type RespostaJev = {
 
 /** "sem decisão": a Nina segue o fluxo atual. Nunca inventa certeza. */
 export type ResultadoJev = { chamadaId?: string } & (
-  | { ok: true; respostas: Record<string, RespostaJev>; latencyMs: number;
-      observacaoIntencao?: import("./jev-observacao-intencao").ObservacaoIntencaoJev }
-  | { ok: false; motivo: string; status?: number; latencyMs: number });
+  | {
+      ok: true;
+      respostas: Record<string, RespostaJev>;
+      latencyMs: number;
+      observacaoIntencao?: import("./jev-observacao-intencao").ObservacaoIntencaoJev;
+    }
+  | { ok: false; motivo: string; status?: number; latencyMs: number }
+);
 
 /** Valida que cada pergunta voltou com o campo do seu tipo. */
 export function validarRespostas(
@@ -52,7 +57,8 @@ export function validarRespostas(
   for (const [id, p] of Object.entries(perguntas)) {
     const r = answers[id];
     if (!r) return null;
-    if (p.type === "choice" && (typeof r.choice !== "string" || !(r.choice in p.criteria))) return null;
+    if (p.type === "choice" && (typeof r.choice !== "string" || !(r.choice in p.criteria)))
+      return null;
     if (p.type === "noul" && typeof r.noul !== "number") return null;
     if (p.type === "score" && typeof r.score !== "number") return null;
   }

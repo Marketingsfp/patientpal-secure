@@ -83,7 +83,15 @@ describe("FASE 8 — calibração por faixa de score", () => {
     linha({ id: execucao_id, execucao_id, score, nivel: null });
 
   it("agrupa mensagens e erros nas faixas definidas e calcula a taxa", () => {
-    const linhas = [l(50, "a"), l(65, "b"), l(75, "c"), l(85, "d"), l(92, "e"), l(97, "f"), l(98, "g")];
+    const linhas = [
+      l(50, "a"),
+      l(65, "b"),
+      l(75, "c"),
+      l(85, "d"),
+      l(92, "e"),
+      l(97, "f"),
+      l(98, "g"),
+    ];
     const r = calcularCalibracaoPorFaixaScore(linhas, [erro("a"), erro("e")]);
 
     expect(r.faixas.map((f) => f.rotulo)).toEqual([
@@ -94,9 +102,21 @@ describe("FASE 8 — calibração por faixa de score", () => {
       "90–94%",
       "95–100%",
     ]);
-    expect(r.faixas.find((f) => f.id === "0-59")).toMatchObject({ mensagens: 1, erros: 1, taxaErro: 100 });
-    expect(r.faixas.find((f) => f.id === "90-94")).toMatchObject({ mensagens: 1, erros: 1, taxaErro: 100 });
-    expect(r.faixas.find((f) => f.id === "95-100")).toMatchObject({ mensagens: 2, erros: 0, taxaErro: 0 });
+    expect(r.faixas.find((f) => f.id === "0-59")).toMatchObject({
+      mensagens: 1,
+      erros: 1,
+      taxaErro: 100,
+    });
+    expect(r.faixas.find((f) => f.id === "90-94")).toMatchObject({
+      mensagens: 1,
+      erros: 1,
+      taxaErro: 100,
+    });
+    expect(r.faixas.find((f) => f.id === "95-100")).toMatchObject({
+      mensagens: 2,
+      erros: 0,
+      taxaErro: 0,
+    });
     expect(r.faixasComDados).toBe(6);
   });
 

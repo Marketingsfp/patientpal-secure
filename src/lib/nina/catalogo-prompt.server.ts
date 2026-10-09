@@ -9,12 +9,18 @@ import { contagemCatalogoDoTurno } from "./catalogo-turno.server";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { REGRA_INTERPRETACAO_CATALOGO } from "./catalogo-busca";
 import { REGRA_INFORMACOES_GRUPO } from "./clinicas-grupo";
-import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
+import {
+  REGRA_ANESTESIA_ADICIONAL,
+  REGRA_HORARIOS_PUBLICADOS,
+  REGRA_MODALIDADES_CONFIRMADAS,
+} from "./regras-administrativas-confirmadas";
 
 /** Quantos registros publicados a clínica tem hoje (serviços + profissionais). */
-export async function contarCatalogoPublicado(
-  clinicaId: string,
-): Promise<{ servicos: number; profissionais: number; selecao?: import("./fonte-consulta").SelecaoFonte }> {
+export async function contarCatalogoPublicado(clinicaId: string): Promise<{
+  servicos: number;
+  profissionais: number;
+  selecao?: import("./fonte-consulta").SelecaoFonte;
+}> {
   return contagemCatalogoDoTurno(clinicaId);
 }
 

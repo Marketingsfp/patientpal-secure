@@ -9,9 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Gauge, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  metricasConfiabilidadeNina,
-} from "@/lib/nina/confianca.functions";
+import { metricasConfiabilidadeNina } from "@/lib/nina/confianca.functions";
 import type { MetricasConfiabilidade as Dados } from "@/lib/nina/confidence/metricas";
 
 const ROTULO_PERIODO: Record<string, string> = {
@@ -131,7 +129,12 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
         </CardTitle>
         <div className="flex flex-wrap items-center gap-1">
           {([7, 30, 90] as const).map((d) => (
-            <Button key={d} size="sm" variant={dias === d ? "default" : "outline"} onClick={() => setDias(d)}>
+            <Button
+              key={d}
+              size="sm"
+              variant={dias === d ? "default" : "outline"}
+              onClick={() => setDias(d)}
+            >
               {d}d
             </Button>
           ))}
@@ -203,7 +206,9 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 <p className="text-sm">Não revisadas: {dados?.revisao.NAO_REVISADA ?? 0}</p>
                 <p className="text-sm">Erro confirmado: {dados?.revisao.ERRO_CONFIRMADO ?? 0}</p>
                 <p className="text-sm">Em análise: {dados?.revisao.ERRO_REPORTADO ?? 0}</p>
-                <p className="text-sm">Reporte descartado: {dados?.revisao.REPORTE_DESCARTADO ?? 0}</p>
+                <p className="text-sm">
+                  Reporte descartado: {dados?.revisao.REPORTE_DESCARTADO ?? 0}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Reportes antigos sem vínculo exato: {dados?.revisao.LEGADO_SEM_VINCULO ?? 0}
                 </p>
@@ -245,9 +250,15 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 )}
               </Bloco>
               <Bloco titulo="Distribuição">
-                <p className="text-sm">Alta: {dados?.distribuicao.HIGH} ({pct(dados?.distribuicao.HIGH ?? 0)}%)</p>
-                <p className="text-sm">Média: {dados?.distribuicao.MEDIUM} ({pct(dados?.distribuicao.MEDIUM ?? 0)}%)</p>
-                <p className="text-sm">Baixa: {dados?.distribuicao.LOW} ({pct(dados?.distribuicao.LOW ?? 0)}%)</p>
+                <p className="text-sm">
+                  Alta: {dados?.distribuicao.HIGH} ({pct(dados?.distribuicao.HIGH ?? 0)}%)
+                </p>
+                <p className="text-sm">
+                  Média: {dados?.distribuicao.MEDIUM} ({pct(dados?.distribuicao.MEDIUM ?? 0)}%)
+                </p>
+                <p className="text-sm">
+                  Baixa: {dados?.distribuicao.LOW} ({pct(dados?.distribuicao.LOW ?? 0)}%)
+                </p>
               </Bloco>
               <Bloco titulo="Encaminhamentos">
                 <p className="text-sm">
@@ -258,7 +269,9 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
               </Bloco>
               <Bloco titulo="Bloqueios">
                 <p className="text-2xl font-semibold tabular-nums">{dados?.bloqueadores}</p>
-                <p className="text-xs text-muted-foreground">{dados?.acoesBloqueadas} ações bloqueadas</p>
+                <p className="text-xs text-muted-foreground">
+                  {dados?.acoesBloqueadas} ações bloqueadas
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Segurança da ação: {formatarNumero(dados?.seguranca.avaliadas ?? 0)} ações
                   avaliadas
@@ -330,8 +343,12 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
               <div className="grid gap-3 sm:grid-cols-3">
                 {(dados?.calibracaoPorNivel ?? []).map((c) => (
                   <div key={c.nivel} className="rounded-md bg-muted/40 p-3">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">{c.rotulo}</p>
-                    <p className="text-2xl font-semibold tabular-nums">{formatarNumero(c.mensagens)}</p>
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      {c.rotulo}
+                    </p>
+                    <p className="text-2xl font-semibold tabular-nums">
+                      {formatarNumero(c.mensagens)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {c.mensagens === 1 ? "mensagem" : "mensagens"}
                     </p>
@@ -339,14 +356,16 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                       {formatarNumero(c.erros)} {c.erros === 1 ? "erro" : "erros"}
                     </p>
                     <p className="text-sm tabular-nums text-muted-foreground">
-                      {c.mensagens === 0 ? "sem base para cálculo" : `${formatarPercentual(c.taxaErro)} de erro`}
+                      {c.mensagens === 0
+                        ? "sem base para cálculo"
+                        : `${formatarPercentual(c.taxaErro)} de erro`}
                     </p>
                   </div>
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Erro reportado é vinculado à própria resposta avaliada; quando o reporte não guardou esse
-                vínculo, considera-se o reporte da mesma conversa em até 48h.
+                Erro reportado é vinculado à própria resposta avaliada; quando o reporte não guardou
+                esse vínculo, considera-se o reporte da mesma conversa em até 48h.
               </p>
             </div>
 
@@ -358,7 +377,9 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 {(dados?.calibracaoPorFaixaScore?.faixas ?? []).map((f) => (
                   <div key={f.id} className="rounded-md bg-muted/40 p-3">
                     <p className="text-xs font-medium text-muted-foreground">{f.rotulo}</p>
-                    <p className="text-xl font-semibold tabular-nums">{formatarNumero(f.mensagens)}</p>
+                    <p className="text-xl font-semibold tabular-nums">
+                      {formatarNumero(f.mensagens)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {f.mensagens === 1 ? "mensagem" : "mensagens"}
                     </p>
@@ -377,24 +398,30 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 </p>
               ) : dados?.calibracaoPorFaixaScore?.monotonica ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  No recorte atual, a taxa de erro não sobe conforme a confiança aumenta — comportamento
-                  esperado de um motor calibrado.
+                  No recorte atual, a taxa de erro não sobe conforme a confiança aumenta —
+                  comportamento esperado de um motor calibrado.
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                  Há faixas de confiança maior com taxa de erro maior — possível excesso de confiança em:{" "}
+                  Há faixas de confiança maior com taxa de erro maior — possível excesso de
+                  confiança em:{" "}
                   {(dados?.calibracaoPorFaixaScore?.inversoes ?? [])
-                    .map((i) => `${i.para} (${formatarPercentual(i.taxaPara)}) acima de ${i.de} (${formatarPercentual(i.taxaDe)})`)
+                    .map(
+                      (i) =>
+                        `${i.para} (${formatarPercentual(i.taxaPara)}) acima de ${i.de} (${formatarPercentual(i.taxaDe)})`,
+                    )
                     .join("; ")}
                   .
                 </p>
               )}
             </div>
 
-
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Bloco titulo="Principais motivos de baixa confiança">
-                <ListaContagem itens={dados?.motivosBaixaConfianca ?? []} vazio="Nenhum motivo registrado." />
+                <ListaContagem
+                  itens={dados?.motivosBaixaConfianca ?? []}
+                  vazio="Nenhum motivo registrado."
+                />
               </Bloco>
               <Bloco titulo="Validador que mais provoca transferência">
                 <ListaContagem
@@ -403,13 +430,23 @@ export function MetricasConfiabilidade({ clinicaId }: { clinicaId: string | null
                 />
               </Bloco>
               <Bloco titulo="Ferramentas que mais falham">
-                <ListaContagem itens={dados?.ferramentasComFalha ?? []} vazio="Nenhuma falha de consulta." />
+                <ListaContagem
+                  itens={dados?.ferramentasComFalha ?? []}
+                  vazio="Nenhuma falha de consulta."
+                />
               </Bloco>
               <Bloco titulo="Informações que mais faltam">
-                <ListaContagem itens={dados?.informacoesAusentes ?? []} vazio="Nenhuma ausência registrada." />
+                <ListaContagem
+                  itens={dados?.informacoesAusentes ?? []}
+                  vazio="Nenhuma ausência registrada."
+                />
               </Bloco>
               <Bloco titulo="Confiança por tipo de atendimento">
-                <ListaMedia itens={dados?.porTipoAtendimento ?? []} vazio="Sem dados." rotulos={ROTULO_TIPO} />
+                <ListaMedia
+                  itens={dados?.porTipoAtendimento ?? []}
+                  vazio="Sem dados."
+                  rotulos={ROTULO_TIPO}
+                />
               </Bloco>
               <Bloco titulo="Confiança dentro e fora do horário">
                 <ListaMedia

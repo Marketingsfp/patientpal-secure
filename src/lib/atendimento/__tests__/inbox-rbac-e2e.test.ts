@@ -36,20 +36,21 @@ function cenario(): Conv[] {
   return lista;
 }
 
-const conta = (
-  lista: Conv[],
-  escopo: EscopoInbox,
-  userId: string,
-  gestor = false,
-): number => lista.filter((c) => conversaVisivelNoEscopo(c, { escopo, userId, gestor })).length;
+const conta = (lista: Conv[], escopo: EscopoInbox, userId: string, gestor = false): number =>
+  lista.filter((c) => conversaVisivelNoEscopo(c, { escopo, userId, gestor })).length;
 
 describe("FASE 5 — RBAC e cenário completo da Inbox individual", () => {
   it("cada conta tem a sua Inbox: Jean não vê as conversas de Maria", () => {
     const l = cenario();
     expect(conta(l, "minhas", JEAN)).toBe(5);
     expect(conta(l, "minhas", MARIA)).toBe(4);
-    expect(l.filter((c) => conversaVisivelNoEscopo(c, { escopo: "minhas", userId: JEAN, gestor: false }))
-      .every((c) => c.atribuida_user_id === JEAN)).toBe(true);
+    expect(
+      l
+        .filter((c) =>
+          conversaVisivelNoEscopo(c, { escopo: "minhas", userId: JEAN, gestor: false }),
+        )
+        .every((c) => c.atribuida_user_id === JEAN),
+    ).toBe(true);
   });
 
   it("Nina e Não atribuídas ficam em visões separadas", () => {
@@ -57,8 +58,13 @@ describe("FASE 5 — RBAC e cenário completo da Inbox individual", () => {
     expect(conta(l, "nina", JEAN)).toBe(10);
     // A fila global sem responsável é só da gestão: atendente comum cai em Minhas e não vê nenhuma dela.
     const idsGlobais = new Set(l.filter((c) => c.id.startsWith("f")).map((c) => c.id));
-    expect(l.filter((c) => conversaVisivelNoEscopo(c, { escopo: "nao_atribuidas", userId: JEAN, gestor: false }))
-      .some((c) => idsGlobais.has(c.id))).toBe(false);
+    expect(
+      l
+        .filter((c) =>
+          conversaVisivelNoEscopo(c, { escopo: "nao_atribuidas", userId: JEAN, gestor: false }),
+        )
+        .some((c) => idsGlobais.has(c.id)),
+    ).toBe(false);
     expect(conta(l, "nao_atribuidas", JEAN, true)).toBe(3);
     // Nenhuma conversa da Nina aparece na Inbox pessoal.
     expect(conta(l, "minhas", JEAN)).toBe(5);

@@ -74,7 +74,11 @@ export function ProtecaoTela({
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (tecla === "s" || tecla === "4" || tecla === "5")) {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        (tecla === "s" || tecla === "4" || tecla === "5")
+      ) {
         registrar("print_screen");
       }
     };

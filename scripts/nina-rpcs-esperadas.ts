@@ -19,8 +19,10 @@ function listar(dir: string): string[] {
 }
 
 function fonte(caminho: string): boolean {
-  return /\.(?:ts|tsx)$/.test(caminho) &&
-    !/(?:^|\/)(?:__tests__|fixtures)\/|\.(?:test|spec|fixture)\./.test(caminho);
+  return (
+    /\.(?:ts|tsx)$/.test(caminho) &&
+    !/(?:^|\/)(?:__tests__|fixtures)\/|\.(?:test|spec|fixture)\./.test(caminho)
+  );
 }
 
 /** Nomes passados literalmente a `.rpc("nome"`. */
@@ -28,11 +30,16 @@ export function rpcsDoCodigo(raiz: string): string[] {
   const arquivos = [
     ...DIRETORIOS.flatMap((d) => listar(join(raiz, d))),
     ...readdirSync(join(raiz, "src/lib")).map((n) => join(raiz, "src/lib", n)),
-  ].map((c) => relative(raiz, c).replaceAll("\\", "/"))
-    .filter((c) => fonte(c) && (DIRETORIOS.some((d) => c.startsWith(`${d}/`)) || ARQUIVOS_RAIZ.test(c)));
+  ]
+    .map((c) => relative(raiz, c).replaceAll("\\", "/"))
+    .filter(
+      (c) => fonte(c) && (DIRETORIOS.some((d) => c.startsWith(`${d}/`)) || ARQUIVOS_RAIZ.test(c)),
+    );
   const nomes = new Set<string>();
   for (const arquivo of new Set(arquivos)) {
-    for (const m of readFileSync(join(raiz, arquivo), "utf8").matchAll(/\.rpc\(\s*["']([a-z0-9_]+)["']/g))
+    for (const m of readFileSync(join(raiz, arquivo), "utf8").matchAll(
+      /\.rpc\(\s*["']([a-z0-9_]+)["']/g,
+    ))
       nomes.add(m[1]!);
   }
   return [...nomes].sort();
@@ -40,9 +47,11 @@ export function rpcsDoCodigo(raiz: string): string[] {
 
 export function consultaRpcsAusentes(nomes: readonly string[]): string {
   const valores = nomes.map((n) => `('${n}')`).join(", ");
-  return `select e.nome as rpc_ausente from (values ${valores}) as e(nome) ` +
+  return (
+    `select e.nome as rpc_ausente from (values ${valores}) as e(nome) ` +
     "where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace " +
-    "where n.nspname = 'public' and p.proname = e.nome) order by 1;";
+    "where n.nspname = 'public' and p.proname = e.nome) order by 1;"
+  );
 }
 
 if (import.meta.main) {

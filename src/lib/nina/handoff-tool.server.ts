@@ -20,11 +20,13 @@ export const FERRAMENTA_HANDOFF = {
       properties: {
         avisar_paciente: {
           type: "boolean",
-          description: "Padrão true. Use false somente quando as instruções publicadas determinarem encaminhamento silencioso, sem aviso ao paciente. A decisão vem das instruções, não do nome do profissional nem do motivo.",
+          description:
+            "Padrão true. Use false somente quando as instruções publicadas determinarem encaminhamento silencioso, sem aviso ao paciente. A decisão vem das instruções, não do nome do profissional nem do motivo.",
         },
         motivo: {
           type: "string",
-          description: "Informe a causa concreta da transferência e o atendimento ou profissional envolvido. Se decorrer da regra SFP das instruções publicadas, identifique com PROFISSIONAL_SFP e descreva o item. Não atribua o pedido ao paciente se ele não pediu atendente.",
+          description:
+            "Informe a causa concreta da transferência e o atendimento ou profissional envolvido. Se decorrer da regra SFP das instruções publicadas, identifique com PROFISSIONAL_SFP e descreva o item. Não atribua o pedido ao paciente se ele não pediu atendente.",
         },
         resumo: {
           type: "string",
@@ -58,17 +60,28 @@ export async function executarHandoffTool(
   let args: Record<string, unknown> = {};
   try {
     const lido: unknown = argumentosJson ? JSON.parse(argumentosJson) : {};
-    args = lido && typeof lido === "object" && !Array.isArray(lido) ? lido as Record<string, unknown> : {};
+    args =
+      lido && typeof lido === "object" && !Array.isArray(lido)
+        ? (lido as Record<string, unknown>)
+        : {};
   } catch {
     args = {};
   }
-  const motivoMaria = (typeof args.motivo === "string" && args.motivo.trim()
-    ? args.motivo.trim()
-    : "MOTIVO_NAO_INFORMADO: Nina solicitou transferência sem detalhar a causa").slice(0, 500);
+  const motivoMaria = (
+    typeof args.motivo === "string" && args.motivo.trim()
+      ? args.motivo.trim()
+      : "MOTIVO_NAO_INFORMADO: Nina solicitou transferência sem detalhar a causa"
+  ).slice(0, 500);
   const resumo = args.resumo ? String(args.resumo).slice(0, 2000) : null;
   // Jev Fase 8: categoria fixa como prefixo "[Rótulo]"; sem decisão = motivo da Maria.
-  const motivo = await (await import("./jev.server")).categorizarMotivoJev({
-    clinicaId: ctx.clinicaId, conversaId: ctx.conversaId, teste: ctx.teste === true, motivo: motivoMaria, resumo,
+  const motivo = await (
+    await import("./jev.server")
+  ).categorizarMotivoJev({
+    clinicaId: ctx.clinicaId,
+    conversaId: ctx.conversaId,
+    teste: ctx.teste === true,
+    motivo: motivoMaria,
+    resumo,
   });
   const urgencia = ["baixa", "normal", "alta"].includes(String(args.urgencia))
     ? (String(args.urgencia) as "baixa" | "normal" | "alta")

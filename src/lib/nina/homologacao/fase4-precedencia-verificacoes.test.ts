@@ -118,9 +118,10 @@ describe("verificação de fonte", () => {
   it("aderência separa presença no payload de cumprimento da resposta", () => {
     const par = PARES_MARCADOR_PADRAO[0]!;
     const payload = regraPublicavelDoPar(par);
-    expect(
-      avaliarAderenciaFonte({ par, payload, primeiraResposta: par.marcador }),
-    ).toMatchObject({ regraChegouAoPayload: true, primeiraRespostaCumpriu: true });
+    expect(avaliarAderenciaFonte({ par, payload, primeiraResposta: par.marcador })).toMatchObject({
+      regraChegouAoPayload: true,
+      primeiraRespostaCumpriu: true,
+    });
     expect(
       avaliarAderenciaFonte({ par, payload, primeiraResposta: "Olá! Como posso ajudar?" }),
     ).toMatchObject({ regraChegouAoPayload: true, primeiraRespostaCumpriu: false });

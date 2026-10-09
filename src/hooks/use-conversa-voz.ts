@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { corrigirFala, melhorAlternativa } from "@/lib/voz-correcoes";
 
-
 /**
  * Escuta contínua do microfone para conversar por voz sem apertar botões.
  *
@@ -30,7 +29,6 @@ type Reconhecimento = {
   onerror: ((e: any) => void) | null;
   onend: (() => void) | null;
 };
-
 
 function criarReconhecimento(): Reconhecimento | null {
   if (typeof window === "undefined") return null;

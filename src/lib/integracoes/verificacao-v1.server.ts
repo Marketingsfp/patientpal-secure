@@ -42,7 +42,6 @@ function tabela(db: Db) {
   return (db as unknown as SupabaseClient<any>).from("integracao_verificacoes");
 }
 
-
 function aleatorio(tamanho: number): Uint8Array {
   const bytes = new Uint8Array(tamanho);
   crypto.getRandomValues(bytes);
@@ -109,7 +108,9 @@ async function handleStart(
     .select("display_phone_number")
     .eq("clinica_id", ctx.clinica_id)
     .maybeSingle();
-  const numero = String((cfg as { display_phone_number?: string } | null)?.display_phone_number ?? "").trim();
+  const numero = String(
+    (cfg as { display_phone_number?: string } | null)?.display_phone_number ?? "",
+  ).trim();
   if (!numero) {
     throw new ApiError({
       status: 503,
@@ -286,7 +287,6 @@ async function derivarToken(desafioId: string, expiraEm: string): Promise<string
   );
   return `vt_${hex(new Uint8Array(assinatura))}`;
 }
-
 
 // ------------------------------------------------------------------ select
 

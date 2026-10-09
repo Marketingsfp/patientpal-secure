@@ -217,23 +217,35 @@ for (const teste of [false, true]) {
       conv().is_teste = teste;
       online = disponivel;
       const antes = tabelas.whatsapp_mensagens!.length;
-      const r = await executarHandoffTool({ clinicaId: "cl1", conversaId: "c1" }, JSON.stringify({
-        motivo: "Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia",
-        resumo: "Paciente pediu informações sobre a anestesia.",
-      }));
+      const r = await executarHandoffTool(
+        { clinicaId: "cl1", conversaId: "c1" },
+        JSON.stringify({
+          motivo: "Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia",
+          resumo: "Paciente pediu informações sobre a anestesia.",
+        }),
+      );
       expect(r.ok).toBe(true);
       expect(r).toMatchObject({ sem_mensagem_paciente: true });
       expect(protocolos).toHaveLength(1);
       expect(protocolos[0]!.anunciar).toBe(false);
       expect(avisos).toBe(0);
-      expect(tabelas.whatsapp_mensagens!.filter(m => m.direction === "out" && m.status !== "system")).toHaveLength(antes);
-      expect(tabelas.whatsapp_mensagens!.some(m => m.status === "system" && m.body.includes("Motivo: Profissional SFP"))).toBe(true);
+      expect(
+        tabelas.whatsapp_mensagens!.filter((m) => m.direction === "out" && m.status !== "system"),
+      ).toHaveLength(antes);
+      expect(
+        tabelas.whatsapp_mensagens!.some(
+          (m) => m.status === "system" && m.body.includes("Motivo: Profissional SFP"),
+        ),
+      ).toBe(true);
       expect(conv().ai_enabled).toBe(false);
       expect(conv().owner_type).toBe(!teste && disponivel ? "HUMAN" : "NONE");
       expect(atribuicoes).toBe(teste ? 0 : 1);
       expect(conv().patient_response_deadline).toBeNull();
       expect(conv().handoff_motivo).toContain("Profissional SFP");
-      await executarHandoffTool({ clinicaId: "cl1", conversaId: "c1" }, '{"motivo":"PROFISSIONAL_SFP"}');
+      await executarHandoffTool(
+        { clinicaId: "cl1", conversaId: "c1" },
+        '{"motivo":"PROFISSIONAL_SFP"}',
+      );
       expect(protocolos).toHaveLength(1);
       expect(avisos).toBe(0);
     });

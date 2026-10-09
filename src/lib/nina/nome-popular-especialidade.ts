@@ -25,11 +25,15 @@ const LIGA = String.raw`(?:d[oa]s?|de|pr[oa]|pra|para|em)`;
 
 export type NomePopular = { termo: string; especialidade: string };
 
-export function especialidadePorNomePopular(mensagem: string | null | undefined): NomePopular | null {
+export function especialidadePorNomePopular(
+  mensagem: string | null | undefined,
+): NomePopular | null {
   const texto = (mensagem ?? "").toLowerCase();
   if (/\bdentista\b/.test(texto)) return { termo: "dentista", especialidade: "ODONTOLOGIA" };
   for (const [alvo, especialidade] of TABELA) {
-    const m = texto.match(new RegExp(String.raw`\b${QUEM}\s+${LIGA}\s+(?:(?:o|a|os|as)\s+)?(?:${alvo.source})\b`));
+    const m = texto.match(
+      new RegExp(String.raw`\b${QUEM}\s+${LIGA}\s+(?:(?:o|a|os|as)\s+)?(?:${alvo.source})\b`),
+    );
     if (m) return { termo: m[0], especialidade };
   }
   return null;

@@ -84,25 +84,19 @@ export function alvoDoEsclarecimento(r: ResultadoConfianca): string {
  * A pergunta que VAI ao paciente. Curta, em uma frase, sem jargão interno e
  * sem repetir a afirmação que o motor reprovou.
  */
-export function perguntaParaPaciente(
-  r: ResultadoConfianca,
-  tipoTurno?: TipoTurno | null,
-): string {
+export function perguntaParaPaciente(r: ResultadoConfianca, tipoTurno?: TipoTurno | null): string {
   const nomes = (r.validators ?? [])
     .filter((v) => v.status !== "PASS" && v.status !== "NOT_APPLICABLE")
     .map((v) => v.validator);
 
   if (nomes.includes("RequiredDataValidator")) {
     const faltam = (r.evidence?.camposFaltantes ?? []).filter(Boolean);
-    if (faltam.length === 1)
-      return `Para eu continuar, pode me informar ${String(faltam[0])}?`;
-    if (faltam.length > 1)
-      return `Para eu continuar, pode me informar ${String(faltam[0])}?`;
+    if (faltam.length === 1) return `Para eu continuar, pode me informar ${String(faltam[0])}?`;
+    if (faltam.length > 1) return `Para eu continuar, pode me informar ${String(faltam[0])}?`;
   }
   if (nomes.includes("EntityResolutionValidator"))
     return "Para eu confirmar certinho: qual exatamente você precisa?";
-  if (tipoTurno === "SAUDACAO")
-    return "Oi! Como posso te ajudar hoje?";
+  if (tipoTurno === "SAUDACAO") return "Oi! Como posso te ajudar hoje?";
   return "Só para eu te responder com segurança: pode me dizer o que você precisa exatamente?";
 }
 
@@ -124,8 +118,7 @@ export function reavaliarPendencia(entrada: {
 
   const mudouDeAssunto =
     Boolean(a.intent) && Boolean(entrada.intentAtual) && a.intent !== entrada.intentAtual;
-  if (mudouDeAssunto)
-    return { pendencia: pendenciaVazia(), tentativas: 0, mudouDeAssunto: true };
+  if (mudouDeAssunto) return { pendencia: pendenciaVazia(), tentativas: 0, mudouDeAssunto: true };
 
   // Mesma mensagem sendo reavaliada: reinício, lote agrupado ou retomada.
   // Nada foi respondido, logo nada é consumido.

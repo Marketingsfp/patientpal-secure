@@ -9,12 +9,7 @@
 import type { Criterio, CriterioAvaliado, ResultadoItem } from "./cenarios";
 import type { MotivoFimCiclo } from "./ciclo-teste";
 
-export type DesfechoCenario =
-  | "handoff"
-  | "concluido"
-  | "limite_turnos"
-  | "erro"
-  | "interrompido";
+export type DesfechoCenario = "handoff" | "concluido" | "limite_turnos" | "erro" | "interrompido";
 
 export const ROTULO_DESFECHO: Record<DesfechoCenario, string> = {
   handoff: "Transferido para humano",

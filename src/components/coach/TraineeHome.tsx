@@ -18,11 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { HistoricoAtendente } from "@/components/coach/HistoricoAtendente";
 import { MinhaMeta } from "@/components/coach/MinhaMeta";
 import { BotaoCertificado } from "@/components/coach/Certificado";
@@ -353,8 +349,8 @@ export function TraineeHome({
         <div className="rounded-2xl border bg-secondary/40 p-5 text-sm text-muted-foreground flex gap-3">
           <Target className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <span>
-            Foco do curso: transformar cada conversa em agendamento. Siga os scripts, confirme
-            data e horário e nunca encerre sem oferecer uma opção de agenda.
+            Foco do curso: transformar cada conversa em agendamento. Siga os scripts, confirme data
+            e horário e nunca encerre sem oferecer uma opção de agenda.
           </span>
         </div>
       </main>
@@ -423,15 +419,7 @@ function Bloco({
   );
 }
 
-function Modulo({
-  done,
-  titulo,
-  detalhe,
-}: {
-  done: boolean;
-  titulo: string;
-  detalhe: string;
-}) {
+function Modulo({ done, titulo, detalhe }: { done: boolean; titulo: string; detalhe: string }) {
   return (
     <div
       className={`rounded-xl border p-3 flex items-start gap-3 ${done ? "border-success/40 bg-success/5" : ""}`}

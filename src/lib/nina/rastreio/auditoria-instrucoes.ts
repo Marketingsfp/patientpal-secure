@@ -32,11 +32,7 @@ function truncar(valor: string, max: number): string {
 }
 
 /** Estado auditável de UMA exigência publicada nesta rodada. */
-export type EstadoExigencia =
-  | "cumprida"
-  | "descumprida"
-  | "nao_aplicavel"
-  | "indeterminada";
+export type EstadoExigencia = "cumprida" | "descumprida" | "nao_aplicavel" | "indeterminada";
 
 /** Estado agregado das exigências da rodada. */
 export type EstadoAuditoria =
@@ -314,4 +310,3 @@ export function auditoriaParaTrace(a: AuditoriaInstrucoesRodada): Record<string,
     em: a.em,
   };
 }
-

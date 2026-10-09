@@ -31,19 +31,23 @@ export function opcoesCatalogo(
   const nomes = new Map<string, string>();
   const add = (n: unknown) => {
     const t = String(n ?? "").trim();
-    if (t && chaveNome(t) !== chaveNome(NENHUMA) && !nomes.has(chaveNome(t))) nomes.set(chaveNome(t), t);
+    if (t && chaveNome(t) !== chaveNome(NENHUMA) && !nomes.has(chaveNome(t)))
+      nomes.set(chaveNome(t), t);
   };
   if (tipo !== "exame_procedimento")
     for (const p of profissionais)
-      if (Array.isArray(p.especialidades)) for (const e of p.especialidades) add((e as { nome?: unknown })?.nome ?? e);
+      if (Array.isArray(p.especialidades))
+        for (const e of p.especialidades) add((e as { nome?: unknown })?.nome ?? e);
   if (tipo !== "consulta") for (const s of servicos) add(s.nome);
   const termos = new Set(termosItemCatalogo(pedido));
-  const relevantes = [...nomes.values()].map(nome => ({ nome,
-    pontos: termosItemCatalogo(nome).filter(t => termos.has(t)).length,
-  })).filter(o => o.pontos > 0).sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome));
+  const relevantes = [...nomes.values()]
+    .map((nome) => ({ nome, pontos: termosItemCatalogo(nome).filter((t) => termos.has(t)).length }))
+    .filter((o) => o.pontos > 0)
+    .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome));
   // Ordenar antes de limitar: o exame procurado pode estar no fim do catálogo.
   // Sem pista lexical, preservar o fallback semântico (ex.: pulmão → pneumologia).
-  return relevantes.length ? relevantes.slice(0, LIMITE_RELEVANTES).map(o => o.nome)
+  return relevantes.length
+    ? relevantes.slice(0, LIMITE_RELEVANTES).map((o) => o.nome)
     : [...nomes.values()].slice(0, LIMITE_OPCOES);
 }
 
@@ -75,8 +79,12 @@ export function perguntaEspecialidade(opcoes: string[]): Record<string, Pergunta
 }
 
 /** Nome escolhido, ou null (nenhuma, confiança baixa, fora da lista). */
-export function especialidadeAplicavel(r: RespostaJev | undefined, opcoes: string[]): string | null {
+export function especialidadeAplicavel(
+  r: RespostaJev | undefined,
+  opcoes: string[],
+): string | null {
   if (!r?.choice || r.choice === NENHUMA) return null;
-  if (typeof r.confidence !== "number" || r.confidence < CONFIANCA_MINIMA_ESPECIALIDADE) return null;
+  if (typeof r.confidence !== "number" || r.confidence < CONFIANCA_MINIMA_ESPECIALIDADE)
+    return null;
   return opcoes.includes(r.choice) ? r.choice : null;
 }

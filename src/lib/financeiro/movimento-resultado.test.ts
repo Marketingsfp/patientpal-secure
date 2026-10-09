@@ -389,11 +389,7 @@ describe("resumoPorProfissional", () => {
   const quadro = resumoPorProfissional(base);
 
   it("uma linha por profissional, maior total primeiro e sem profissional no fim", () => {
-    expect(quadro.map((x) => x.profissional)).toEqual([
-      "DR JOAO",
-      "DRA MARINA",
-      SEM_PROFISSIONAL,
-    ]);
+    expect(quadro.map((x) => x.profissional)).toEqual(["DR JOAO", "DRA MARINA", SEM_PROFISSIONAL]);
   });
 
   it("a coluna vem do tipo do serviço, nunca do nome da agenda", () => {
@@ -408,7 +404,8 @@ describe("resumoPorProfissional", () => {
 
   it("os totais das colunas fecham com os cards Consultas e Exames", () => {
     const r = resumoMovimento(base);
-    const soma = (f: (x: (typeof quadro)[number]) => number) => quadro.reduce((s, x) => s + f(x), 0);
+    const soma = (f: (x: (typeof quadro)[number]) => number) =>
+      quadro.reduce((s, x) => s + f(x), 0);
     expect(soma((x) => x.consulta.total)).toBe(
       r.atendimentos.porCondicao.particular.consulta.total +
         r.atendimentos.porCondicao.cartao.consulta.total +

@@ -56,9 +56,7 @@ export const registrarFeedbackErroNina = createServerFn({ method: "POST" })
 export const listarFeedbacksErroNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z
-      .object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid().nullish() })
-      .parse(i),
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid().nullish() }).parse(i),
   )
   .handler(async ({ data, context }) => {
     let q = context.supabase
@@ -108,7 +106,6 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
       ORIGEM_ERRO_RAPIDO,
     } = await import("@/lib/nina/erro-rapido");
 
-
     const { data: membro, error: erroMembro } = await context.supabase.rpc("is_member", {
       _user_id: context.userId,
       _clinica_id: data.clinicaId,
@@ -130,7 +127,6 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     if (erroConversa) throw new Error(erroConversa.message);
     if (!conversa) throw new Error("Conversa não encontrada ou sem permissão de acesso.");
 
-
     const { data: mensagem, error: erroMensagem } = await context.supabase
       .from("whatsapp_mensagens")
       .select(
@@ -145,11 +141,14 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     const { data: avisos, error: erroAvisos } = await context.supabase
       .from("atend_aviso_encaminhamento")
       .select("clinica_id, conversa_id, mensagem_id, execucao_id, turno_id")
-      .eq("clinica_id", data.clinicaId).eq("conversa_id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .eq("conversa_id", data.conversaId)
       .eq("mensagem_id", data.mensagemId);
-    if (erroAvisos) throw new Error("Não foi possível conferir o vínculo da mensagem. Tente novamente.");
+    if (erroAvisos)
+      throw new Error("Não foi possível conferir o vínculo da mensagem. Tente novamente.");
     const validacao = validarMensagemNina(mensagem as never, data.conversaId, {
-      clinicaId: data.clinicaId, avisos: avisos ?? [],
+      clinicaId: data.clinicaId,
+      avisos: avisos ?? [],
     });
     if (!validacao.ok) throw new Error(validacao.mensagem);
 
@@ -221,7 +220,6 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
     const colunas =
       "id, status, categoria, origem, created_at, mensagem_id, conversa_id, execucao_id, auditoria_status, contato_paciente_id, contato_telefone, protocolo_atendimento, protocolo_sessao_id, prompt_versao_id, prompt_versao, teste_ciclo_id, trace_id, ambiente, nina_session_id";
 
-
     // 1ª barreira: já existe reporte rápido pendente para esta mensagem.
     const { data: existente } = await context.supabase
       .from("nina_feedback_erros")
@@ -259,12 +257,10 @@ export const reportarErroRapidoMensagemNina = createServerFn({ method: "POST" })
 
             traceId,
           },
-
         }) as never,
       )
       .select(colunas)
       .single();
-
 
     if (error) {
       // 2ª barreira (concorrência / duplo clique): índice único parcial no banco.

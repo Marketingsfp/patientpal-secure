@@ -182,8 +182,6 @@ export function categoriaDaOutraReceita(
   return "avulso";
 }
 
-
-
 export type CategoriaAtendimento = "cartao" | "particular" | "exame" | "outro";
 
 /**
@@ -346,7 +344,6 @@ export function resumoPainel(params: {
     adesoes,
   };
 
-
   // O atendimento entra pelas partes REAIS do pagamento (`formas_pagas`), não
   // pelo rateio proporcional de `formas`: é o que faz a quebra por forma do
   // Dashboard bater com a do Movimento de Caixa e com a maquininha.
@@ -389,7 +386,6 @@ export function resumoPainel(params: {
     // Ticket médio da entrada de caixa: receita total ÷ pagamentos recebidos.
     ticketMedio:
       producao.total > 0 ? round2(round2(receitaBruta + outrasReceitas) / producao.total) : 0,
-
   };
 }
 

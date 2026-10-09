@@ -35,18 +35,34 @@ const mocks = {
 };
 const js = await build({
   stdin: { contents: fixture, resolveDir: process.cwd(), loader: "tsx" },
-  bundle: true, write: false, format: "iife", jsx: "automatic",
+  bundle: true,
+  write: false,
+  format: "iife",
+  jsx: "automatic",
   define: { "process.env.NODE_ENV": '"production"' },
-  plugins: [{ name: "fixtures", setup(b) {
-    b.onResolve({ filter: /.*/ }, (a) => a.path in mocks ? { path: a.path, namespace: "fixture" } : undefined);
-    b.onLoad({ filter: /.*/, namespace: "fixture" }, (a) => ({ contents: mocks[a.path] }));
-  } }],
+  plugins: [
+    {
+      name: "fixtures",
+      setup(b) {
+        b.onResolve({ filter: /.*/ }, (a) =>
+          a.path in mocks ? { path: a.path, namespace: "fixture" } : undefined,
+        );
+        b.onLoad({ filter: /.*/, namespace: "fixture" }, (a) => ({ contents: mocks[a.path] }));
+      },
+    },
+  ],
 });
-const css = await compile(await readFile("src/styles.css", "utf8"), { base: path.resolve("src"), onDependency() {} });
+const css = await compile(await readFile("src/styles.css", "utf8"), {
+  base: path.resolve("src"),
+  onDependency() {},
+});
 const styles = css.build(new Scanner({ sources: css.sources }).scan());
 const html = `<!doctype html><html lang="pt-BR" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${styles}</style></head><body><div id="root"></div><script>${js.outputFiles[0].text.replaceAll("</script>", "<\\/script>")}</script></body></html>`;
 await writeFile(path.join(out, "jev-auditoria.html"), html);
-const server = createServer((req, res) => { res.writeHead(200, { "Content-Type": "text/html;charset=utf-8" }); res.end(html); });
+const server = createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/html;charset=utf-8" });
+  res.end(html);
+});
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const browser = await chromium.launch({ channel: "chrome", headless: true });
 try {
@@ -64,16 +80,25 @@ try {
   await primeira.getByText("Ver texto registrado", { exact: true }).click();
   await expect(primeira.locator("details[open]").last()).toContainText("<script>alert(1)</script>");
   await primeira.getByText("Leitura ampliada · orienta a resposta", { exact: true }).click();
-  await expect(primeira.getByText("Orientação preparada para a Nina neste turno.", { exact: true })).toBeVisible();
+  await expect(
+    primeira.getByText("Orientação preparada para a Nina neste turno.", { exact: true }),
+  ).toBeVisible();
   await primeira.getByText("Ver orientação do turno", { exact: true }).click();
   await expect(primeira.getByText(/Responda a cada pedido na mesma resposta/)).toBeVisible();
   await primeira.getByText("Ver orientação do turno", { exact: true }).click();
   const antiga = tabela.locator("tbody tr").nth(2);
   await antiga.getByText("Leitura ampliada · em observação", { exact: true }).click();
   await expect(antiga.getByText("Não aplicada ao atendimento.", { exact: true })).toBeVisible();
-  await expect(primeira.getByText("2 pedido(s) indicado(s): Preço; Dias / horários habituais do profissional.", { exact: true })).toBeVisible();
+  await expect(
+    primeira.getByText(
+      "2 pedido(s) indicado(s): Preço; Dias / horários habituais do profissional.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await expect(primeira.getByText("Não indicado · 1%", { exact: true })).toBeVisible();
-  await expect(primeira.getByText("Correção da especialidade · 65% · Incerto", { exact: true })).toHaveCount(1);
+  await expect(
+    primeira.getByText("Correção da especialidade · 65% · Incerto", { exact: true }),
+  ).toHaveCount(1);
   await expect(primeira.getByText(/Leitura incompleta:/)).toBeVisible();
   const ultima = tabela.locator("tbody tr").last();
   await ultima.getByText("Ver texto registrado", { exact: true }).click();
@@ -90,7 +115,9 @@ try {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(392);
   await page.screenshot({ path: path.join(out, "jev-auditoria-mobile.png"), fullPage: true });
   expect(errors).toEqual([]);
-  console.log("OK: tela real, orientação ativa, registro antigo em observação, conversa/UUID, mensagem, múltiplos pedidos, habitual/vagas, incerteza, leitura incompleta, consulta em lote e mobile.");
+  console.log(
+    "OK: tela real, orientação ativa, registro antigo em observação, conversa/UUID, mensagem, múltiplos pedidos, habitual/vagas, incerteza, leitura incompleta, consulta em lote e mobile.",
+  );
 } finally {
   await browser.close();
   await new Promise((r) => server.close(r));

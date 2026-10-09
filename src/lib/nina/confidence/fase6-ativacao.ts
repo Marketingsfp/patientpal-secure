@@ -89,8 +89,7 @@ export function resolverMotorAtivo(e: EntradaAtivacao): ResolucaoAtivacao {
   const querNovo = e.motorConfigurado === "novo";
 
   const publicacaoDuranteOTurno =
-    (e.versaoPromptVigenteAgora != null &&
-      e.versaoPromptVigenteAgora !== e.versaoPromptDoTurno) ||
+    (e.versaoPromptVigenteAgora != null && e.versaoPromptVigenteAgora !== e.versaoPromptDoTurno) ||
     (e.configIdVigenteAgora != null &&
       e.configIdDoTurno != null &&
       e.configIdVigenteAgora !== e.configIdDoTurno);
@@ -185,9 +184,7 @@ export type Reconciliacao = {
  * (conversa|turno|motivo) é a única identidade — trocar de motor não pode
  * gerar segunda entrada em fila nem segundo aviso.
  */
-export function reconciliarEncaminhamentos(
-  registros: RegistroEncaminhamento[],
-): Reconciliacao {
+export function reconciliarEncaminhamentos(registros: RegistroEncaminhamento[]): Reconciliacao {
   const vistos = new Set<string>();
   const r: Reconciliacao = {
     concluidos: [],

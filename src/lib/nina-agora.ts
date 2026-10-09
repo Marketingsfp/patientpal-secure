@@ -57,10 +57,23 @@ export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date(
   const mapa: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   const diaSemana = mapa[nomeDia] ?? 0;
   const horaNumero = Number(hora.slice(0, 2));
-  const periodo = horaNumero >= 5 && horaNumero < 12 ? "manha" : horaNumero >= 12 && horaNumero < 18 ? "tarde" : "noite";
+  const periodo =
+    horaNumero >= 5 && horaNumero < 12
+      ? "manha"
+      : horaNumero >= 12 && horaNumero < 18
+        ? "tarde"
+        : "noite";
   // Semana civil de segunda a domingo; não confundir com "daqui a 7 dias".
   const inicioSemana = somarDiasIso(partes, -((diaSemana + 6) % 7));
-  const dias = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+  const dias = [
+    "domingo",
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado",
+  ];
   return {
     iso: partes,
     extenso,
@@ -69,13 +82,17 @@ export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date(
     fuso,
     instante_utc: now.toISOString(),
     periodo_do_dia: periodo,
-    saudacao_do_periodo: periodo === "manha" ? "Bom dia" : periodo === "tarde" ? "Boa tarde" : "Boa noite",
+    saudacao_do_periodo:
+      periodo === "manha" ? "Bom dia" : periodo === "tarde" ? "Boa tarde" : "Boa noite",
     datas_referencia: {
       hoje: partes,
       amanha: somarDiasIso(partes, 1),
       depois_de_amanha: somarDiasIso(partes, 2),
       semana_atual: { inicio: inicioSemana, fim: somarDiasIso(inicioSemana, 6) },
-      proxima_semana: { inicio: somarDiasIso(inicioSemana, 7), fim: somarDiasIso(inicioSemana, 13) },
+      proxima_semana: {
+        inicio: somarDiasIso(inicioSemana, 7),
+        fim: somarDiasIso(inicioSemana, 13),
+      },
       proximos_dias: Array.from({ length: 14 }, (_, i) => ({
         data: somarDiasIso(partes, i),
         dia_semana: (diaSemana + i) % 7,

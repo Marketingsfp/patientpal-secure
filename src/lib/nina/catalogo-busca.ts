@@ -6,7 +6,19 @@ import { REGRA_IDENTIDADE_ATENDIMENTO } from "./prompt/identidade-atendimento";
 // Equivalências de busca, não equivalências de preço, preparo ou modalidade.
 // Qualificadores (órgão, total/superior, infantil etc.) continuam obrigatórios.
 const GRUPOS = [
-  ["ultrassonografia", "ultra", "usg", "us", "ultrassom", "ultrassons", "ultrasom", "utrassom", "usam", "ultrasonografia", "ultrassonografias"],
+  [
+    "ultrassonografia",
+    "ultra",
+    "usg",
+    "us",
+    "ultrassom",
+    "ultrassons",
+    "ultrasom",
+    "utrassom",
+    "usam",
+    "ultrasonografia",
+    "ultrassonografias",
+  ],
   ["abdome", "abdominal", "abdomen", "barriga"],
   ["ecocardiograma", "ecocardio"],
   ["radiografia", "rx", "raio"],

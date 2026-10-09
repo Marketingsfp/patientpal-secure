@@ -130,7 +130,7 @@ export async function agruparTurnoPersistido(
       batchId: registro.batchId,
       mensagens: ids,
       texto: montarTurnoPaciente(ids.map((id) => porId.get(id)!)),
-      recebeuAudio: mensagens.some(m => m.tipo === "audio"),
+      recebeuAudio: mensagens.some((m) => m.tipo === "audio"),
       lock,
       revisao,
     };

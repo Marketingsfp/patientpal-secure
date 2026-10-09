@@ -197,10 +197,7 @@ export type DetalheIA = {
   resultadoEstruturado: string | null;
 };
 
-export function lerDetalheIA(
-  metadata: Record<string, unknown>,
-  nivel: NivelAcesso,
-): DetalheIA {
+export function lerDetalheIA(metadata: Record<string, unknown>, nivel: NivelAcesso): DetalheIA {
   const m = metadataSegura(metadata);
   // Contadores de tokens são números puros: lidos do original porque a
   // sanitização remove qualquer chave que contenha "token".
@@ -246,10 +243,7 @@ export type DetalheTool = {
   erro: string | null;
 };
 
-export function lerDetalheTool(
-  metadata: Record<string, unknown>,
-  nivel: NivelAcesso,
-): DetalheTool {
+export function lerDetalheTool(metadata: Record<string, unknown>, nivel: NivelAcesso): DetalheTool {
   const m = metadataSegura(metadata);
   const args =
     m["argumentos"] && typeof m["argumentos"] === "object" && !Array.isArray(m["argumentos"])

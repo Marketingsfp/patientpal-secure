@@ -12,7 +12,6 @@
  * Módulo PURO: sem banco, sem rede.
  */
 
-
 /** Envelope técnico: só requisitos de formato/segurança da chamada. */
 export const ENVELOPE_TECNICO = `ENVELOPE TÉCNICO (regras da API, não são regras de atendimento):
 - Só é possível chamar ferramentas que estejam declaradas nesta requisição. Nunca invente nome, parâmetro ou retorno de ferramenta.

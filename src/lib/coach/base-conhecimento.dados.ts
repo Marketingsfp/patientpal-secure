@@ -27,10 +27,7 @@ const COLUNAS_PROC =
   "nome,tipo,grupo,valor_padrao,valor_dinheiro,valor_pix,valor_dinheiro_pix,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_cartao_consulta,valor_cartao_desconto,preparo,observacoes,duracao_minutos,requer_laudo,requer_medico";
 
 /** Lê os procedimentos ativos em páginas — a MJ passa de 4.600 linhas. */
-async function lerProcedimentos(
-  db: ClienteBase,
-  clinicaId: string,
-): Promise<ProcedimentoBase[]> {
+async function lerProcedimentos(db: ClienteBase, clinicaId: string): Promise<ProcedimentoBase[]> {
   const todos: ProcedimentoBase[] = [];
   for (let inicio = 0; inicio < TETO_PROCEDIMENTOS; inicio += PAGINA) {
     const { data, error } = await db
@@ -75,7 +72,11 @@ export async function gerarBaseDoSistema(
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .limit(50),
-    db.from("clinicas").select("nome,endereco,cidade,estado,telefone").eq("id", clinicaId).maybeSingle(),
+    db
+      .from("clinicas")
+      .select("nome,endereco,cidade,estado,telefone")
+      .eq("id", clinicaId)
+      .maybeSingle(),
   ]);
 
   const listaUnidades = ((unidades.data ?? []) as unknown as UnidadeBase[]).slice();
@@ -94,10 +95,12 @@ export async function gerarBaseDoSistema(
     // A Nina não tem mais catálogo próprio: a base do Coach vem só do cadastro do sistema.
     catalogoServicos: [] as CatServicoBase[],
     catalogoProfissionais: [] as CatProfissionalBase[],
-    medicos: ((medicos.data ?? []) as unknown as Array<{
-      nome: string;
-      especialidades: { nome: string } | null;
-    }>).map<MedicoBase>((m) => ({ nome: m.nome, especialidade: m.especialidades?.nome ?? null })),
+    medicos: (
+      (medicos.data ?? []) as unknown as Array<{
+        nome: string;
+        especialidades: { nome: string } | null;
+      }>
+    ).map<MedicoBase>((m) => ({ nome: m.nome, especialidade: m.especialidades?.nome ?? null })),
     unidades: listaUnidades,
   });
 

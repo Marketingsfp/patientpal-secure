@@ -57,7 +57,7 @@ export function orientarIntencaoJev(
     );
   if (pedidos.includes("profissionais"))
     instrucoes.push(
-      "Se o paciente só pergunta se a clínica tem o atendimento (\"vocês têm psicólogo?\"), confirme que tem e, havendo dois ou mais médicos com nomes próprios, siga ESCOLHA_ANTES_DOS_DETALHES: pergunte se prefere o primeiro horário disponível ou escolher entre os profissionais, sem listar nomes, escalas nem preços. Apresente a lista somente quando ele pedir quais são, quem atende ou escolher ver os profissionais.",
+      'Se o paciente só pergunta se a clínica tem o atendimento ("vocês têm psicólogo?"), confirme que tem e, havendo dois ou mais médicos com nomes próprios, siga ESCOLHA_ANTES_DOS_DETALHES: pergunte se prefere o primeiro horário disponível ou escolher entre os profissionais, sem listar nomes, escalas nem preços. Apresente a lista somente quando ele pedir quais são, quem atende ou escolher ver os profissionais.',
     );
   if (pedidos.includes("horario_habitual"))
     instrucoes.push(

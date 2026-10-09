@@ -31,7 +31,10 @@ const consulta = (p: Record<string, unknown>) => ({
 });
 const chave = (q: { termo: string; medico?: string }) => normal(q.termo) + "|" + normal(q.medico);
 /** Assunto da pesquisa sem o prefixo "consulta": "CONSULTA ODONTOLOGIA" e "odontologia" coincidem. */
-const assunto = (termo: string) => normal(termo).replace(/^consultas?\s+(?:(?:de|da|do|com)\s+)?/, "").trim();
+const assunto = (termo: string) =>
+  normal(termo)
+    .replace(/^consultas?\s+(?:(?:de|da|do|com)\s+)?/, "")
+    .trim();
 export const PESQUISAS_INDEPENDENTES = new Set([
   "consultar_cadastro",
   "buscar_medicos",
@@ -42,29 +45,58 @@ export const PESQUISAS_INDEPENDENTES = new Set([
 /** Só libera a escolha já validada e inequívoca. IDs de catálogo distintos
  * comprovam que a pendência pertence a outro pedido; ausência de prova bloqueia.
  * Isso não autoriza reserva: o executor ainda exige paciente, aceite e vaga. */
-export function pendenciaBloqueiaFerramenta(nome: string, args: unknown,
-  pendentes: readonly ConhecimentoSessao[], estado: EstadoFluxoNina, clinicaId: string): boolean {
+export function pendenciaBloqueiaFerramenta(
+  nome: string,
+  args: unknown,
+  pendentes: readonly ConhecimentoSessao[],
+  estado: EstadoFluxoNina,
+  clinicaId: string,
+): boolean {
   if (!pendentes.length || PESQUISAS_INDEPENDENTES.has(nome)) return false;
-  if (!["agendar", "verificar_horario", "selecionar_horario", "consultar_cadastro_paciente", "identificar_paciente"].includes(nome)) return true;
-  const c = confirmacaoDaEscolha(estado, clinicaId), p = parametrosPesquisa(args);
+  if (
+    ![
+      "agendar",
+      "verificar_horario",
+      "selecionar_horario",
+      "consultar_cadastro_paciente",
+      "identificar_paciente",
+    ].includes(nome)
+  )
+    return true;
+  const c = confirmacaoDaEscolha(estado, clinicaId),
+    p = parametrosPesquisa(args);
   if (!c?.vaga.catalogo_id) return true;
   const v = c.vaga;
-  if ((p.medico_id != null && p.medico_id !== v.medico_id) ||
-      (p.procedimento != null && normal(p.procedimento) !== normal(v.procedimento)) ||
-      (p.data != null && p.data !== v.data) || (p.hora != null && p.hora !== v.hora) ||
-      (p.inicio != null && Date.parse(String(p.inicio)) !== Date.parse(v.inicio)) ||
-      (p.fim != null && Date.parse(String(p.fim)) !== Date.parse(v.fim))) return true;
-  return pendentes.some(q => {
-    if (q.clinicaId !== clinicaId || q.sessionId !== estado.session_id ||
-        normal(q.consulta.termo) === normal(v.procedimento)) return true;
-    const ids = [...q.referencias.map(r => r.registro), ...(q.esclarecimento?.opcoes.map(o => o.id) ?? [])].filter(Boolean);
+  if (
+    (p.medico_id != null && p.medico_id !== v.medico_id) ||
+    (p.procedimento != null && normal(p.procedimento) !== normal(v.procedimento)) ||
+    (p.data != null && p.data !== v.data) ||
+    (p.hora != null && p.hora !== v.hora) ||
+    (p.inicio != null && Date.parse(String(p.inicio)) !== Date.parse(v.inicio)) ||
+    (p.fim != null && Date.parse(String(p.fim)) !== Date.parse(v.fim))
+  )
+    return true;
+  return pendentes.some((q) => {
+    if (
+      q.clinicaId !== clinicaId ||
+      q.sessionId !== estado.session_id ||
+      normal(q.consulta.termo) === normal(v.procedimento)
+    )
+      return true;
+    const ids = [
+      ...q.referencias.map((r) => r.registro),
+      ...(q.esclarecimento?.opcoes.map((o) => o.id) ?? []),
+    ].filter(Boolean);
     return !ids.length || ids.includes(v.catalogo_id!);
   });
 }
 
 /** Uma dúvida pertence à pergunta pesquisada, não ao conjunto da mensagem. */
-export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensagem = "",
-  aceites: readonly ConfirmacaoIdentificacao[] = []) {
+export function criarPerguntasDoTurno(
+  anterior: ConhecimentoSessao | null,
+  mensagem = "",
+  aceites: readonly ConfirmacaoIdentificacao[] = [],
+) {
   const anteriores = anterior?.pendenciasIdentificacao?.length
     ? anterior.pendenciasIdentificacao
     : anterior
@@ -81,10 +113,13 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   const aliases = new Map<string, string>();
   const consultas = new Map<string, ReturnType<typeof consulta>>();
   function grupo(p: Record<string, unknown>) {
-    const q = consulta(p), k = chave(q);
+    const q = consulta(p),
+      k = chave(q);
     if (p.nova_solicitacao !== true && typeof p.reformula_de === "string") {
-      const candidatos = [...consultas.entries()].filter(([, a]) =>
-        normal(a.termo) === normal(p.reformula_de) && normal(a.medico) === normal(q.medico));
+      const candidatos = [...consultas.entries()].filter(
+        ([, a]) =>
+          normal(a.termo) === normal(p.reformula_de) && normal(a.medico) === normal(q.medico),
+      );
       const raizes = [...new Set(candidatos.map(([id]) => aliases.get(id) ?? id))];
       if (raizes.length === 1) return raizes[0]!;
     }
@@ -104,34 +139,73 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
   function escolhaPresumida(k: string, resultado: ResultadoBroker): ResultadoBroker | null {
     // consultar_cadastro devolve records/procedure/price; buscar_procedimentos,
     // registros/procedimento/preco. Os dois formatos chegam aqui.
-    const dados = resultado.dados as (ResultadoConhecimento & { registros?: RegistroConhecimento[] }) | null;
-    const registros = dados?.records?.length ? dados.records : Array.isArray(dados?.registros) ? dados.registros : [];
-    if (!dados || dados.esclarecimento || dados.knowledge_status === "conflict" || !registros.length) return null;
+    const dados = resultado.dados as
+      | (ResultadoConhecimento & { registros?: RegistroConhecimento[] })
+      | null;
+    const registros = dados?.records?.length
+      ? dados.records
+      : Array.isArray(dados?.registros)
+        ? dados.registros
+        : [];
+    if (
+      !dados ||
+      dados.esclarecimento ||
+      dados.knowledge_status === "conflict" ||
+      !registros.length
+    )
+      return null;
     const textoPaciente = compacto(mensagem);
     for (const [chavePendente, pendencia] of pendentes) {
       if (chavePendente === k || !pendentesDoTurno.has(chavePendente)) continue;
       const esclarecimento = pendencia.esclarecimento;
-      if (pendencia.consulta.tipo_atendimento !== "exame_procedimento" || !esclarecimento?.opcoes.length) continue;
+      if (
+        pendencia.consulta.tipo_atendimento !== "exame_procedimento" ||
+        !esclarecimento?.opcoes.length
+      )
+        continue;
       const ids = new Set(esclarecimento.opcoes.map((o) => o.id));
       const nomes = new Set(esclarecimento.opcoes.map((o) => compacto(o.nome)));
-      const escolhidos = registros.filter((r) => (r.id && ids.has(r.id)) || (r.procedimento && nomes.has(compacto(r.procedimento))));
+      const escolhidos = registros.filter(
+        (r) => (r.id && ids.has(r.id)) || (r.procedimento && nomes.has(compacto(r.procedimento))),
+      );
       if (!escolhidos.length) continue;
-      if (escolhidos.some((r) => r.procedimento && textoPaciente.includes(compacto(r.procedimento)))) continue;
-      return { ...resultado, dados: { ...dados, found: false, procedure: null, price: null, records: [],
-        registros: [], procedimento: null, preco: null, observacoes: null, esclarecimento,
-        instrucao: `Este registro é uma das opções que o paciente ainda não escolheu para o pedido “${pendencia.consulta.termo}”. Não informe preço, profissional, horários nem detalhes de uma opção específica; pergunte qual opção corresponde ao pedido.` } };
+      if (
+        escolhidos.some((r) => r.procedimento && textoPaciente.includes(compacto(r.procedimento)))
+      )
+        continue;
+      return {
+        ...resultado,
+        dados: {
+          ...dados,
+          found: false,
+          procedure: null,
+          price: null,
+          records: [],
+          registros: [],
+          procedimento: null,
+          preco: null,
+          observacoes: null,
+          esclarecimento,
+          instrucao: `Este registro é uma das opções que o paciente ainda não escolheu para o pedido “${pendencia.consulta.termo}”. Não informe preço, profissional, horários nem detalhes de uma opção específica; pergunte qual opção corresponde ao pedido.`,
+        },
+      };
     }
     return null;
   }
   function referencia(args: unknown) {
     const p = parametrosPesquisa(args),
       q = consulta(p);
-    const correcaoExplicita = pesquisas.size === 0 && anteriores.length === 1 &&
+    const correcaoExplicita =
+      pesquisas.size === 0 &&
+      anteriores.length === 1 &&
       /^nao[,\s]+(?:e |quis dizer )/.test(normal(mensagem));
     if (p.nova_solicitacao === true && !correcaoExplicita) return null;
-    const aceitas = aceites.filter(a => normal(a.opcao.nome) === normal(q.termo) &&
-      normal(a.anterior.consulta.medico) === normal(q.medico) &&
-      (!p.tipo_atendimento || p.tipo_atendimento === a.anterior.consulta.tipo_atendimento));
+    const aceitas = aceites.filter(
+      (a) =>
+        normal(a.opcao.nome) === normal(q.termo) &&
+        normal(a.anterior.consulta.medico) === normal(q.medico) &&
+        (!p.tipo_atendimento || p.tipo_atendimento === a.anterior.consulta.tipo_atendimento),
+    );
     if (aceitas.length === 1) return aceitas[0]!.anterior;
     const exata = anteriores.find((a) => chave(a.consulta) === chave(q));
     if (exata) return exata;
@@ -157,8 +231,13 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       if (!["consultar_cadastro", "buscar_procedimentos"].includes(ferramenta)) return args;
       const p = parametrosPesquisa(args);
       if (p.nova_solicitacao === true) return args;
-      const k = grupo(p), identificada = identificadas.get(k);
-      if (!identificada || (p.tipo_atendimento && p.tipo_atendimento !== identificada.consulta.tipo_atendimento)) return args;
+      const k = grupo(p),
+        identificada = identificadas.get(k);
+      if (
+        !identificada ||
+        (p.tipo_atendimento && p.tipo_atendimento !== identificada.consulta.tipo_atendimento)
+      )
+        return args;
       // Só um registro identificado neste turno. Nunca unir exames por semelhança
       // nem reutilizar preço/preparo: a ferramenta relê o catálogo normalmente.
       if (identificada.referencias.length !== 1) return args;
@@ -167,30 +246,56 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       const id = chave(consulta(p));
       aliases.set(id, k);
       consultas.set(id, consulta(p));
-      const preparado = { ...p, termo: nome,
-        ...(identificada.consulta.tipo_atendimento ? { tipo_atendimento: identificada.consulta.tipo_atendimento } : {}) };
+      const preparado = {
+        ...p,
+        termo: nome,
+        ...(identificada.consulta.tipo_atendimento
+          ? { tipo_atendimento: identificada.consulta.tipo_atendimento }
+          : {}),
+      };
       aliases.set(chave(consulta(preparado)), k);
       return JSON.stringify(preparado);
     },
     reconciliar(args: unknown, resultado: ResultadoBroker, ferramenta?: string): ResultadoBroker {
-      if (!resultado.success || resultado.erro || !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")) return resultado;
+      if (
+        !resultado.success ||
+        resultado.erro ||
+        !["searchKnowledgeBase", "listCatalog"].includes(resultado.capacidade ?? "")
+      )
+        return resultado;
       const limitacao = (resultado.dados as ResultadoConhecimento | null)?.limitacao_catalogo;
       if (limitacao) {
         // Limpeza de pendências antigas incorretas desse pedido, sem afetar DNA etc.
         for (const [id, pendencia] of pendentes) {
-          if (pendenciaAntigaDaVacina(pendencia.consulta.termo, mensagem || limitacao.pedido)) pendentes.delete(id);
+          if (pendenciaAntigaDaVacina(pendencia.consulta.termo, mensagem || limitacao.pedido))
+            pendentes.delete(id);
         }
         return resultado;
       }
-      const p = parametrosPesquisa(args), k = grupo(p);
-      const origem = referencia(args), aceite = aceites.find(a => a.anterior === origem);
+      const p = parametrosPesquisa(args),
+        k = grupo(p);
+      const origem = referencia(args),
+        aceite = aceites.find((a) => a.anterior === origem);
       if (aceite) {
         const dados = resultado.dados as ResultadoConhecimento | null;
-        if (dados?.knowledge_status === "found" && !dados.esclarecimento &&
-          !dados.records?.some(r => r.id === aceite.opcao.id)) {
-          return { ...resultado, dados: { ...dados, found: false, procedure: null, price: null, records: [],
-            esclarecimento: origem!.esclarecimento,
-            instrucao: "A releitura não recuperou o registro confirmado. Não substitua por outro exame nem informe seus fatos." } };
+        if (
+          dados?.knowledge_status === "found" &&
+          !dados.esclarecimento &&
+          !dados.records?.some((r) => r.id === aceite.opcao.id)
+        ) {
+          return {
+            ...resultado,
+            dados: {
+              ...dados,
+              found: false,
+              procedure: null,
+              price: null,
+              records: [],
+              esclarecimento: origem!.esclarecimento,
+              instrucao:
+                "A releitura não recuperou o registro confirmado. Não substitua por outro exame nem informe seus fatos.",
+            },
+          };
         }
       }
       const presumida = escolhaPresumida(k, resultado);
@@ -202,24 +307,45 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       // Consulta (inclusive buscar_medicos) e exame/procedimento são pedidos
       // diferentes: os profissionais da especialidade não viram uma pergunta
       // sobre o nome do pedido médico (homologação 06/10/2026, dentista/fono).
-      const tipoAtual = dados.tipo_atendimento ?? p.tipo_atendimento ??
-        (ferramenta === "buscar_medicos" ? "consulta" : ferramenta === "buscar_procedimentos" ? "exame_procedimento" : null);
+      const tipoAtual =
+        dados.tipo_atendimento ??
+        p.tipo_atendimento ??
+        (ferramenta === "buscar_medicos"
+          ? "consulta"
+          : ferramenta === "buscar_procedimentos"
+            ? "exame_procedimento"
+            : null);
       const tipoAnterior = anteriorDoTurno.consulta.tipo_atendimento;
       if (tipoAtual && tipoAnterior && tipoAtual !== tipoAnterior) return resultado;
       if (dados.esclarecimento && chave(consulta(p)) === k) return resultado;
       // Encontrar o título reformulado não comprova os qualificadores do pedido original.
-      const hipotese = dados.esclarecimento || !Array.isArray(dados.records) ? dados : sugerirResultadoJev(dados);
+      const hipotese =
+        dados.esclarecimento || !Array.isArray(dados.records) ? dados : sugerirResultadoJev(dados);
       const esclarecimento = hipotese.esclarecimento ?? anteriorDoTurno.esclarecimento;
-      const nomes = [...new Map(esclarecimento.opcoes.map(o =>
-        [normal(o.nome).replace(/[^a-z0-9]/g, ""), o.nome])).values()];
+      const nomes = [
+        ...new Map(
+          esclarecimento.opcoes.map((o) => [normal(o.nome).replace(/[^a-z0-9]/g, ""), o.nome]),
+        ).values(),
+      ];
       const pedido = anteriorDoTurno.consulta.termo;
-      const referenciaPedido = anteriorDoTurno.consulta.tipo_atendimento === "exame_procedimento" ? "pedido médico" : "atendimento solicitado";
+      const referenciaPedido =
+        anteriorDoTurno.consulta.tipo_atendimento === "exame_procedimento"
+          ? "pedido médico"
+          : "atendimento solicitado";
       const pergunta = nomes.length
         ? `Para o pedido “${pedido}”, pode conferir qual nome corresponde ao ${referenciaPedido}?\n${nomes.join("\n")}`
         : `Para o pedido “${pedido}”, pode conferir e escrever o nome completo do ${referenciaPedido}?`;
-      return { ...resultado, dados: { ...hipotese, procedure: null, price: null,
-        esclarecimento: { ...esclarecimento, pergunta },
-        instrucao: "Reformulação do mesmo pedido, ainda sem correspondência confirmada. Esta pergunta substitui as anteriores deste pedido. Não informe preço nem presuma equivalência clínica." } };
+      return {
+        ...resultado,
+        dados: {
+          ...hipotese,
+          procedure: null,
+          price: null,
+          esclarecimento: { ...esclarecimento, pergunta },
+          instrucao:
+            "Reformulação do mesmo pedido, ainda sem correspondência confirmada. Esta pergunta substitui as anteriores deste pedido. Não informe preço nem presuma equivalência clínica.",
+        },
+      };
     },
     registrar(
       args: unknown,
@@ -227,10 +353,18 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       origem: ConhecimentoSessao | null,
       confirmado: boolean,
     ) {
-      const p = parametrosPesquisa(args), q = consulta(p), id = chave(q), k = grupo(p);
-      const aceite = aceites.find(a => a.anterior === origem);
+      const p = parametrosPesquisa(args),
+        q = consulta(p),
+        id = chave(q),
+        k = grupo(p);
+      const aceite = aceites.find((a) => a.anterior === origem);
       // Falha técnica não resolve a pendência nem reaproveita fatos do turno anterior.
-      if (aceite && !atual?.esclarecimento && (!confirmado || !atual?.referencias.some(r => r.registro === aceite.opcao.id))) return;
+      if (
+        aceite &&
+        !atual?.esclarecimento &&
+        (!confirmado || !atual?.referencias.some((r) => r.registro === aceite.opcao.id))
+      )
+        return;
       const anteriorDoTurno = pendentes.get(k);
       aliases.set(id, k);
       consultas.set(id, q);
@@ -241,20 +375,29 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
       // de procedimentos com o mesmo nome não vira pergunta (06/10/2026).
       const tipoConfirmado = tiposConfirmados.get(k);
       const tipoAtual = atual?.consulta.tipo_atendimento;
-      if (atual?.esclarecimento && tipoConfirmado && tipoAtual && tipoConfirmado !== tipoAtual) return;
+      if (atual?.esclarecimento && tipoConfirmado && tipoAtual && tipoConfirmado !== tipoAtual)
+        return;
       // "CONSULTA ODONTOLOGIA" pesquisada como procedimento é o mesmo assunto
       // da consulta de odontologia já confirmada no turno.
-      if (atual?.esclarecimento && tipoAtual === "exame_procedimento" && consultasConfirmadas.has(assunto(q.termo))) return;
+      if (
+        atual?.esclarecimento &&
+        tipoAtual === "exame_procedimento" &&
+        consultasConfirmadas.has(assunto(q.termo))
+      )
+        return;
       if (atual?.esclarecimento) {
         confirmadas.delete(k);
         identificadas.delete(k);
-        pendentes.set(k, anteriorDoTurno ? { ...atual, consulta: anteriorDoTurno.consulta } : atual);
+        pendentes.set(
+          k,
+          anteriorDoTurno ? { ...atual, consulta: anteriorDoTurno.consulta } : atual,
+        );
         pendentesDoTurno.add(k);
-      }
-      else {
+      } else {
         pendentes.delete(k);
         if (confirmado) confirmadas.add(k);
-        if (confirmado && atual?.consulta.tipo_atendimento) tiposConfirmados.set(k, atual.consulta.tipo_atendimento);
+        if (confirmado && atual?.consulta.tipo_atendimento)
+          tiposConfirmados.set(k, atual.consulta.tipo_atendimento);
         if (confirmado && atual) identificadas.set(k, atual);
         else identificadas.delete(k);
         if (confirmado && atual?.consulta.tipo_atendimento === "consulta") {
@@ -262,8 +405,12 @@ export function criarPerguntasDoTurno(anterior: ConhecimentoSessao | null, mensa
           consultasConfirmadas.add(assuntoConfirmado);
           // Dúvida de procedimento deste turno com o mesmo assunto fica respondida pela consulta.
           for (const [chavePendente, pendencia] of pendentes) {
-            if (pendentesDoTurno.has(chavePendente) && pendencia.consulta.tipo_atendimento === "exame_procedimento" &&
-              assunto(pendencia.consulta.termo) === assuntoConfirmado) pendentes.delete(chavePendente);
+            if (
+              pendentesDoTurno.has(chavePendente) &&
+              pendencia.consulta.tipo_atendimento === "exame_procedimento" &&
+              assunto(pendencia.consulta.termo) === assuntoConfirmado
+            )
+              pendentes.delete(chavePendente);
           }
         }
       }
@@ -298,8 +445,9 @@ export function perguntas(lista: readonly ConhecimentoSessao[]): string {
     .join("\n\n");
 }
 const compacto = (v: string) => normal(v).replace(/[^a-z0-9]/g, "");
-const opcoesDe = (p: ConhecimentoSessao) =>
-  [...new Set((p.esclarecimento?.opcoes ?? []).map((o) => compacto(o.nome)).filter(Boolean))];
+const opcoesDe = (p: ConhecimentoSessao) => [
+  ...new Set((p.esclarecimento?.opcoes ?? []).map((o) => compacto(o.nome)).filter(Boolean)),
+];
 
 /**
  * Pendências que ainda precisam ser perguntadas. Reformulações do mesmo
@@ -335,8 +483,9 @@ export function comporRespostaParcial(
   apresentacao?: string | null,
 ): string {
   const texto = textoConfirmado.trim();
-  const faltantes = [...new Set(pendenciasAPerguntar(texto, lista).map((p) => perguntas([p])))]
-    .filter((p) => !normal(texto).includes(normal(p)));
+  const faltantes = [
+    ...new Set(pendenciasAPerguntar(texto, lista).map((p) => perguntas([p]))),
+  ].filter((p) => !normal(texto).includes(normal(p)));
   return [!texto && apresentacao ? apresentacao : "", texto, ...faltantes]
     .filter(Boolean)
     .join("\n\n");

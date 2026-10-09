@@ -914,10 +914,10 @@ function reparte(
     servico_nome: params.laudo
       ? rotuloDoLaudo(params.procedimento)
       : chaveServico
-      ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
-      : // Serviço que não está (mais) no cadastro continua aparecendo com o
-        // texto que a agenda gravou; some do relatório seria pior.
-        params.procedimento?.trim() || SEM_SERVICO,
+        ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
+        : // Serviço que não está (mais) no cadastro continua aparecendo com o
+          // texto que a agenda gravou; some do relatório seria pior.
+          params.procedimento?.trim() || SEM_SERVICO,
     condicao: ROTULO_CONDICAO[forma] ?? "PARTICULAR",
     // Mesma chave de serviço que resolve o grupo e a grade de repasse: o
     // atendimento gravado como "CONSULTA OFTALMO (OFTALMOLOGIA)" acha o tipo
@@ -1057,8 +1057,6 @@ async function enriquecerPacientes(clinicaId: string, linhas: RateioLinha[]): Pr
   }
 }
 
-
-
 /**
  * Busca os recebimentos do período e devolve cada um já rateado.
  *
@@ -1146,7 +1144,6 @@ async function lerRateioDoBanco(
         .order("data"),
     ),
   ]);
-
 
   // Um atendimento manual criado a partir de um pagamento da agenda espelha o
   // mesmo dinheiro do lançamento — contar os dois dobraria a receita.

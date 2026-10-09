@@ -9,7 +9,9 @@ const PAGINA = 1000;
 /** Mesmo perfil de telefonia do pool; administrador prevalece em vínculo duplo. */
 export function idsTelefoniaTv(membros: readonly { user_id: string; role: string }[]) {
   const admins = new Set(membros.filter((m) => ehPerfilAdmin(m.role)).map((m) => m.user_id));
-  return new Set(membros.filter((m) => m.role === "telefonia" && !admins.has(m.user_id)).map((m) => m.user_id));
+  return new Set(
+    membros.filter((m) => m.role === "telefonia" && !admins.has(m.user_id)).map((m) => m.user_id),
+  );
 }
 
 export type EstadoTv = "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE";
@@ -42,7 +44,8 @@ export async function carregarPainelTv(
     _user_id: userId,
   });
   if (erroGestao) throw new Error(erroGestao.message);
-  if (gestao !== true) throw new Error("Somente administração e supervisão podem abrir o painel da TV.");
+  if (gestao !== true)
+    throw new Error("Somente administração e supervisão podem abrir o painel da TV.");
 
   // Conversas abertas (todas as páginas).
   const abertas: { id: string; atribuida_user_id: string | null; owner_type: string | null }[] = [];
@@ -71,7 +74,13 @@ export async function carregarPainelTv(
   // "conversas hoje", tempo médio de resposta das atendentes, volume por hora
   // e de quem foram as respostas.
   const doDia = new Set<string>();
-  const msgs: { conversa_id: string | null; direction: string | null; enviada_por: string | null; enviada_por_user_id: string | null; created_at: string }[] = [];
+  const msgs: {
+    conversa_id: string | null;
+    direction: string | null;
+    enviada_por: string | null;
+    enviada_por_user_id: string | null;
+    created_at: string;
+  }[] = [];
   let desde = 0;
   while (true) {
     const { data, error } = await supabase
@@ -91,7 +100,11 @@ export async function carregarPainelTv(
   }
 
   // Volume: mensagens recebidas de pacientes por hora (fuso de São Paulo).
-  const horaBR = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" });
+  const horaBR = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
   const volumePorHora = Array.from({ length: 24 }, () => 0);
   // Tempo de resposta: da primeira mensagem do paciente ainda sem retorno até a
   // próxima mensagem de uma atendente. Resposta da Nina encerra o intervalo sem
@@ -147,7 +160,8 @@ export async function carregarPainelTv(
   if (resolvidasHoje.error) throw new Error(resolvidasHoje.error.message);
   const resolvidasPor = new Map<string, number>();
   for (const r of resolvidasHoje.data ?? []) {
-    if (r.resolved_by) resolvidasPor.set(r.resolved_by, (resolvidasPor.get(r.resolved_by) ?? 0) + 1);
+    if (r.resolved_by)
+      resolvidasPor.set(r.resolved_by, (resolvidasPor.get(r.resolved_by) ?? 0) + 1);
   }
 
   const [esperas, presencas, membros] = await Promise.all([
@@ -176,7 +190,11 @@ export async function carregarPainelTv(
     if (idsHumanas.has(t.conversa_id) && t.aguardando_desde) {
       espera.push(t.aguardando_desde);
       const dono = donoDe.get(t.conversa_id);
-      if (dono) esperasPorAtendente.set(dono, [...(esperasPorAtendente.get(dono) ?? []), t.aguardando_desde]);
+      if (dono)
+        esperasPorAtendente.set(dono, [
+          ...(esperasPorAtendente.get(dono) ?? []),
+          t.aguardando_desde,
+        ]);
     }
   }
 
@@ -190,8 +208,7 @@ export async function carregarPainelTv(
   for (const p of presencas.data ?? []) {
     if (!ativos.has(p.user_id)) continue;
     const e = p.estado_manual;
-    const estado: EstadoTv =
-      e === "ONLINE" || e === "PAUSA" || e === "PAUSA_SAIDA" ? e : "OFFLINE";
+    const estado: EstadoTv = e === "ONLINE" || e === "PAUSA" || e === "PAUSA_SAIDA" ? e : "OFFLINE";
     estados.set(p.user_id, { estado, versao: p.estado_manual_versao });
   }
 

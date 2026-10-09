@@ -28,7 +28,7 @@ describe("ocultação de conteúdo sensível", () => {
   const casos = [
     'const key = "sb_secret_abc123";',
     "const token = process.env['SUPABASE_SERVICE_ROLE_KEY'];",
-    'headers: { Authorization: `Bearer ${jwt}` }',
+    "headers: { Authorization: `Bearer ${jwt}` }",
     'const senha = "12345";',
     "const apiKey = import.meta.env.VITE_ALGO;",
     'const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc";',

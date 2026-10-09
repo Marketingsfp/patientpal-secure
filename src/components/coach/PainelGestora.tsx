@@ -104,9 +104,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   const kpis = useMemo(() => {
     const total = history.length;
     const pessoas = new Set(history.map((h) => h.atendente).filter(Boolean)).size;
-    const media = total
-      ? history.reduce((s, h) => s + (Number(h.pontuacao) || 0), 0) / total
-      : 0;
+    const media = total ? history.reduce((s, h) => s + (Number(h.pontuacao) || 0), 0) / total : 0;
     const hojeStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
     const hoje = history.filter(
       (h) =>
@@ -206,7 +204,8 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
         await saveToHistory(r, "texto", text, nome, atendenteSelecionada.userId);
       } else {
         if (!audioFile) throw new Error("Selecione um arquivo de áudio.");
-        if (audioFile.size > 25 * 1024 * 1024) throw new Error("Arquivo muito grande. Máximo 25MB.");
+        if (audioFile.size > 25 * 1024 * 1024)
+          throw new Error("Arquivo muito grande. Máximo 25MB.");
         const caminho = await enviarAudio(audioFile, clinicaId);
         const r = await analyze({
           data: {
@@ -248,8 +247,6 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
         <div className="min-w-0 space-y-5">
           {/* As abas agora vivem no menu lateral (/app/coach#progresso etc.). */}
           <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)}>
-
-
             <TabsContent value="progresso" className="mt-5 space-y-5">
               <UsoIA clinicaId={clinicaId} />
               <CourseView

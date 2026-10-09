@@ -42,8 +42,14 @@ async function assertRevisor(supabase: unknown, userId: string, clinicaId: strin
 }
 
 function contem(alvo: string | null | undefined, trecho: string | null | undefined) {
-  const a = String(alvo ?? "").toLowerCase().replace(/\s+/g, " ").trim();
-  const b = String(trecho ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const a = String(alvo ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  const b = String(trecho ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
   if (!a || !b) return false;
   return a.includes(b) || b.includes(a);
 }

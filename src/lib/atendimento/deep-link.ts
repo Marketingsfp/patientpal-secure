@@ -5,11 +5,7 @@
  * ser mostrada e impedem que a tela troque sozinha a conversa pedida por
  * outro ponto do sistema (busca por número, alerta, Central de Atenção).
  */
-import {
-  conversaVisivelNoEscopo,
-  type ConversaEscopo,
-  type EscopoInbox,
-} from "./escopo-inbox";
+import { conversaVisivelNoEscopo, type ConversaEscopo, type EscopoInbox } from "./escopo-inbox";
 
 /**
  * Quando já existe uma conversa escolhida, a Inbox NÃO pode trocar por outra

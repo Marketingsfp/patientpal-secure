@@ -63,7 +63,11 @@ describe("controle de pré-carregamento das conversas", () => {
 
   it("depois de concluir, uma nova tentativa é permitida (falha não trava)", () => {
     const store = criarPrefetchStore<string[]>();
-    const e = store.registrar("A", CH, Promise.reject(new Error("falhou")).catch(() => []));
+    const e = store.registrar(
+      "A",
+      CH,
+      Promise.reject(new Error("falhou")).catch(() => []),
+    );
     store.concluir("A", e);
     expect(store.obter("A", CH)).toBeUndefined();
     const nova = store.registrar("A", CH, Promise.resolve([]));

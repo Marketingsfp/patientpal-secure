@@ -29,8 +29,17 @@ function evento(p: Partial<EventoTrace> & { node_id: string }): EventoTrace {
 describe("timeline", () => {
   it("ordena os marcos e usa apenas timestamps registrados", () => {
     const marcos = montarTimeline([
-      evento({ node_id: "message.outbound", started_at: "2026-09-06T19:32:03.810Z", finished_at: "2026-09-06T19:32:03.900Z" }),
-      evento({ node_id: "message.inbound", event_type: "started", started_at: "2026-09-06T19:32:01.102Z", finished_at: null }),
+      evento({
+        node_id: "message.outbound",
+        started_at: "2026-09-06T19:32:03.810Z",
+        finished_at: "2026-09-06T19:32:03.900Z",
+      }),
+      evento({
+        node_id: "message.inbound",
+        event_type: "started",
+        started_at: "2026-09-06T19:32:01.102Z",
+        finished_at: null,
+      }),
     ]);
     expect(marcos.map((m) => m.nodeId)).toEqual(["message.inbound", "message.outbound"]);
     expect(marcos[0]!.horaExibida).toBe("19:32:01.102");
@@ -66,10 +75,16 @@ describe("entrada e saída", () => {
 
 describe("classificação de erros", () => {
   it("separa os tipos de falha", () => {
-    expect(classificarFalha("tool.schedule.availability", "error", "Timeout ao consultar")).toBe("timeout");
+    expect(classificarFalha("tool.schedule.availability", "error", "Timeout ao consultar")).toBe(
+      "timeout",
+    );
     expect(classificarFalha("message.outbound", "error", "HTTP 502 na Meta")).toBe("integracao");
-    expect(classificarFalha("llm.generate", "error", "modelo indisponível no gateway")).toBe("modelo");
-    expect(classificarFalha("tool.schedule.book", "error", "Sem vaga para o horário")).toBe("negocio");
+    expect(classificarFalha("llm.generate", "error", "modelo indisponível no gateway")).toBe(
+      "modelo",
+    );
+    expect(classificarFalha("tool.schedule.book", "error", "Sem vaga para o horário")).toBe(
+      "negocio",
+    );
     expect(classificarFalha("context.load", "cancelled", null)).toBe("cancelamento");
     expect(classificarFalha("context.load", "error", "TypeError inesperado")).toBe("tecnico");
   });
@@ -121,7 +136,11 @@ describe("falhas e tentativas", () => {
 
   it("registra fallback acionado", () => {
     const falhas = levantarFalhas([
-      evento({ node_id: "message.outbound", status: "error", metadata: { erro: "falha no envio de áudio" } }),
+      evento({
+        node_id: "message.outbound",
+        status: "error",
+        metadata: { erro: "falha no envio de áudio" },
+      }),
       evento({ node_id: "audio.fallback", started_at: "2026-09-06T19:32:04.000Z" }),
     ]);
     expect(falhas[0]!.fallback).toBeTruthy();
@@ -130,7 +149,12 @@ describe("falhas e tentativas", () => {
   it("classifica execução cancelada", () => {
     const d = diagnosticarExecucao([
       evento({ node_id: "message.inbound" }),
-      evento({ node_id: "llm.generate", event_type: "cancelled", status: "cancelled", started_at: "2026-09-06T19:32:02.000Z" }),
+      evento({
+        node_id: "llm.generate",
+        event_type: "cancelled",
+        status: "cancelled",
+        started_at: "2026-09-06T19:32:02.000Z",
+      }),
     ]);
     expect(d.resultadoFinal).toBe("cancelado");
     expect(d.falhas[0]!.tipo).toBe("cancelamento");

@@ -166,7 +166,11 @@ export async function registrarMarcadorSistema(args: {
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId)
     .maybeSingle();
-  const conv = data as { contato_telefone?: string | null; canal?: string | null; is_teste?: boolean | null } | null;
+  const conv = data as {
+    contato_telefone?: string | null;
+    canal?: string | null;
+    is_teste?: boolean | null;
+  } | null;
   // O trigger `atend_ensure_conversa` escolhe a conversa pelo telefone e pelo
   // canal da mensagem (sem canal, "whatsapp"). Sem copiar canal e marca de
   // teste, o aviso de uma conversa da homologação criava uma conversa "real"

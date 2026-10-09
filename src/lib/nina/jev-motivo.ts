@@ -69,10 +69,12 @@ export function perguntaMotivo(): Record<string, PerguntaJev> {
       instructions:
         "A assistente vai transferir o paciente para a recepção. Considerando `motivo`, `resumo` e `mensagem_atual`, qual é a categoria principal do motivo da transferência?",
       criteria: {
-        urgencia_clinica: "Possível urgência clínica: dor forte, falta de ar, sangramento, desmaio, piora rápida.",
+        urgencia_clinica:
+          "Possível urgência clínica: dor forte, falta de ar, sangramento, desmaio, piora rápida.",
         insatisfacao: "Reclamação ou insatisfação com o atendimento ou com a clínica.",
         pedido_atendente: "O paciente pediu para falar com uma pessoa, sem outro assunto claro.",
-        agendamento: "Marcar consulta/exame: sem vaga, profissional ou serviço não encontrado, dúvida de agenda.",
+        agendamento:
+          "Marcar consulta/exame: sem vaga, profissional ou serviço não encontrado, dúvida de agenda.",
         cancelamento_remarcacao: "Cancelar ou remarcar um agendamento existente.",
         financeiro: "Valores, pagamento, PIX, boleto, cobrança, convênio ou cartão benefício.",
         resultado_documento: "Resultado de exame, laudo, receita, atestado ou outro documento.",

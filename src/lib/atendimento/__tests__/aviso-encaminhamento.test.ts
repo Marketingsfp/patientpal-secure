@@ -118,9 +118,9 @@ describe("quem avisa o paciente", () => {
   });
 
   it("entrega em andamento: a finalização também não duplica", () => {
-    expect(
-      precisaAvisoDoChamador(resultado({ estado: "envio_pendente", entregue: false })),
-    ).toBe(false);
+    expect(precisaAvisoDoChamador(resultado({ estado: "envio_pendente", entregue: false }))).toBe(
+      false,
+    );
   });
 
   it("falha no aviso do encaminhamento: a finalização volta a ser responsável", () => {

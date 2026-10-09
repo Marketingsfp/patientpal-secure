@@ -97,15 +97,30 @@ describe("FASE 4 — finalização e transporte", () => {
   });
 
   it("preserva respostas paralelas no template e invalida cache quando elas mudam", async () => {
-    const resultado = criarResultado({ origem: "gate", texto: "Confirmação da reserva",
-      chaveTemplate: "fluxo.agendamento.confirmado", complementoTexto: "O hemograma é por ordem de chegada.",
-      variaveis: { profissional: "Isis", procedimento: "USG ABDOMINAL TOTAL", data: "06/10/2026", horario: "08:00", unidade: "Clínica" },
-      acoesConcluidas: [{ acao: "agendar", idempotencia: "reserva-1", confirmada: true, evidencia: "ag-1" }] });
+    const resultado = criarResultado({
+      origem: "gate",
+      texto: "Confirmação da reserva",
+      chaveTemplate: "fluxo.agendamento.confirmado",
+      complementoTexto: "O hemograma é por ordem de chegada.",
+      variaveis: {
+        profissional: "Isis",
+        procedimento: "USG ABDOMINAL TOTAL",
+        data: "06/10/2026",
+        horario: "08:00",
+        unidade: "Clínica",
+      },
+      acoesConcluidas: [
+        { acao: "agendar", idempotencia: "reserva-1", confirmada: true, evidencia: "ag-1" },
+      ],
+    });
     const pedido = { ...base, chaveTurno: "reserva-com-perguntas", resultado };
     const primeira = await finalizarResposta(pedido);
     expect(primeira.texto).toContain("USG ABDOMINAL TOTAL");
     expect(primeira.texto).toContain(resultado.complementoTexto!);
-    const segunda = await finalizarResposta({ ...pedido, resultado: { ...resultado, complementoTexto: "O TSH também é por ordem de chegada." } });
+    const segunda = await finalizarResposta({
+      ...pedido,
+      resultado: { ...resultado, complementoTexto: "O TSH também é por ordem de chegada." },
+    });
     expect(segunda.reaproveitada).toBe(false);
     expect(segunda.texto).not.toContain("hemograma");
     expect(segunda.texto).toContain("O TSH também é por ordem de chegada.");

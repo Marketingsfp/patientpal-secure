@@ -86,10 +86,7 @@ describe("FASE 5 — claim-level grounding", () => {
   });
 
   it("catálogo respondido NÃO valida uma afirmação de agenda", () => {
-    const r = avaliarGrounding(
-      ctxDe(),
-      "Cardiologia custa R$ 150 e há vaga sábado 14h.",
-    );
+    const r = avaliarGrounding(ctxDe(), "Cardiologia custa R$ 150 e há vaga sábado 14h.");
     const valor = r.claims.find((c) => c.tipo === "valor");
     const agenda = r.claims.find((c) => c.tipo === "disponibilidade");
     expect(valor?.suportado).toBe(true);

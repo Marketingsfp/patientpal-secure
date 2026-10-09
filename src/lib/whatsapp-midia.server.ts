@@ -11,7 +11,11 @@ import {
   tipoMimeAceito,
   type TipoMidiaGuardada,
 } from "@/lib/whatsapp-midia-armazenamento";
-import { PROMPT_LEITURA_IMAGEM, interpretarLeituraImagem, type LeituraImagem } from "@/lib/nina/leitura-imagem";
+import {
+  PROMPT_LEITURA_IMAGEM,
+  interpretarLeituraImagem,
+  type LeituraImagem,
+} from "@/lib/nina/leitura-imagem";
 
 const META_VERSION_MEDIA = "v26.0";
 
@@ -55,7 +59,11 @@ export async function metaDownloadMedia(
 /** Pontos de saída (rede e bucket) trocáveis nos testes. */
 export type DependenciasMidia = {
   fetchFn?: typeof fetch;
-  armazenar?: (caminho: string, bytes: Uint8Array, mime: string) => Promise<{ message: string } | null>;
+  armazenar?: (
+    caminho: string,
+    bytes: Uint8Array,
+    mime: string,
+  ) => Promise<{ message: string } | null>;
 };
 
 async function armazenarNoBucket(caminho: string, bytes: Uint8Array, mime: string) {
@@ -78,29 +86,58 @@ export type MidiaRecebida = {
  * Baixa a mídia da Meta UMA vez e guarda no bucket privado. Falha em guardar nunca derruba o
  * atendimento: o conteúdo ainda segue para a transcrição/leitura e a mensagem fica sem anexo.
  */
-export async function receberMidiaWhatsapp(entrada: {
-  clinicaId: string;
-  waMessageId: string;
-  tipo: TipoMidiaGuardada;
-  mediaId: string;
-  accessToken: string;
-}, deps: DependenciasMidia = {}): Promise<MidiaRecebida> {
+export async function receberMidiaWhatsapp(
+  entrada: {
+    clinicaId: string;
+    waMessageId: string;
+    tipo: TipoMidiaGuardada;
+    mediaId: string;
+    accessToken: string;
+  },
+  deps: DependenciasMidia = {},
+): Promise<MidiaRecebida> {
   const fetchFn = deps.fetchFn ?? fetch;
   try {
-    const { url, mime: mimeMeta } = await metaFetchMediaUrl(entrada.mediaId, entrada.accessToken, fetchFn);
-    if (!url) return { base64: null, mime: mimeMeta, caminho: null, erro: "URL da mídia não retornada pela Meta" };
+    const { url, mime: mimeMeta } = await metaFetchMediaUrl(
+      entrada.mediaId,
+      entrada.accessToken,
+      fetchFn,
+    );
+    if (!url)
+      return {
+        base64: null,
+        mime: mimeMeta,
+        caminho: null,
+        erro: "URL da mídia não retornada pela Meta",
+      };
     const res = await fetchFn(url, { headers: { Authorization: `Bearer ${entrada.accessToken}` } });
     if (!res.ok) throw new Error(`Falha ao baixar mídia (${res.status})`);
     const mimeBruto = res.headers.get("content-type") ?? mimeMeta;
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length === 0) return { base64: null, mime: mimeBruto, caminho: null, erro: "Mídia vazia" };
+    if (bytes.length === 0)
+      return { base64: null, mime: mimeBruto, caminho: null, erro: "Mídia vazia" };
     if (bytes.length > limiteDeBytes(entrada.tipo)) {
-      return { base64: null, mime: mimeBruto, caminho: null, erro: "Mídia acima do limite de tamanho" };
+      return {
+        base64: null,
+        mime: mimeBruto,
+        caminho: null,
+        erro: "Mídia acima do limite de tamanho",
+      };
     }
     const base64 = bytesParaBase64(bytes);
     const mime = tipoMimeAceito(entrada.tipo, mimeBruto) ?? tipoMimeAceito(entrada.tipo, mimeMeta);
-    if (!mime) return { base64, mime: mimeBruto, caminho: null, erro: `Tipo de mídia não guardado: ${mimeBruto ?? "?"}` };
-    const caminho = caminhoDaMidia({ clinicaId: entrada.clinicaId, waMessageId: entrada.waMessageId, mime });
+    if (!mime)
+      return {
+        base64,
+        mime: mimeBruto,
+        caminho: null,
+        erro: `Tipo de mídia não guardado: ${mimeBruto ?? "?"}`,
+      };
+    const caminho = caminhoDaMidia({
+      clinicaId: entrada.clinicaId,
+      waMessageId: entrada.waMessageId,
+      mime,
+    });
     const falha = await (deps.armazenar ?? armazenarNoBucket)(caminho, bytes, mime);
     if (falha) {
       console.error("[whatsapp-midia] guardar mídia falhou", falha.message);
@@ -113,28 +150,37 @@ export async function receberMidiaWhatsapp(entrada: {
 }
 
 /** Lê o pedido sem confundir indisponibilidade/retorno inválido com qualidade da foto. */
-export async function lerPedidoNaImagem(base64: string, mime: string, registrar?: RegistrarChamadaIA): Promise<LeituraImagem> {
+export async function lerPedidoNaImagem(
+  base64: string,
+  mime: string,
+  registrar?: RegistrarChamadaIA,
+): Promise<LeituraImagem> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) return { tipo: "falha_tecnica", motivo: "configuracao" };
   try {
-    const res = await fetchComAuditoriaIA("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(30_000),
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: PROMPT_LEITURA_IMAGEM },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Leia esta imagem:" },
-              { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
-            ],
-          },
-        ],
-      }),
-    }, { finalidade: "leitura_imagem", modelo: "google/gemini-2.5-flash" }, registrar);
+    const res = await fetchComAuditoriaIA(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: PROMPT_LEITURA_IMAGEM },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Leia esta imagem:" },
+                { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
+              ],
+            },
+          ],
+        }),
+      },
+      { finalidade: "leitura_imagem", modelo: "google/gemini-2.5-flash" },
+      registrar,
+    );
     if (!res.ok) {
       console.error("[whatsapp-midia] leitura de imagem falhou", res.status);
       return { tipo: "falha_tecnica", motivo: "provedor" };
@@ -175,7 +221,10 @@ export async function limparMidiasExpiradas(
   await admin
     .from("whatsapp_mensagens")
     .update({ media_url: null })
-    .in("id", data.map((m) => m.id));
+    .in(
+      "id",
+      data.map((m) => m.id),
+    );
   return data.length;
 }
 
@@ -203,27 +252,32 @@ VOCABULÁRIO ESPERADO (prefira estas grafias quando o som for parecido): ${VOCAB
 Se o áudio estiver inaudível ou vazio, responda exatamente: (inaudível)`;
 
   try {
-    const res = await fetchComAuditoriaIA("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(30_000),
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Transcreva este áudio:" },
-              {
-                type: "input_audio",
-                input_audio: { data: base64, format: formatoDeMime(mime) },
-              },
-            ],
-          },
-        ],
-      }),
-    }, { finalidade: "transcricao_audio", modelo: "google/gemini-2.5-flash" }, registrar);
+    const res = await fetchComAuditoriaIA(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: sys },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Transcreva este áudio:" },
+                {
+                  type: "input_audio",
+                  input_audio: { data: base64, format: formatoDeMime(mime) },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      { finalidade: "transcricao_audio", modelo: "google/gemini-2.5-flash" },
+      registrar,
+    );
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("transcrever audio whatsapp erro", res.status, body);

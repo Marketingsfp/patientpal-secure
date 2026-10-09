@@ -116,160 +116,164 @@ function ProntuariosPage() {
             : "Sem paciente escolhido: mostra os prontuários mais recentes da clínica."}
         </p>
       </div>
-    <SimpleCrud<Prontuario, Form>
-      filtroEq={filtroPaciente ? { column: "paciente_id", value: filtroPaciente.id } : null}
-      table="prontuarios"
-      selectColumns="id, data, paciente_id, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes"
-      title="Prontuários"
-      subtitle="Histórico clínico dos pacientes."
-      icon={<FileHeart className="h-6 w-6 text-primary" />}
-      orderBy={{ column: "data", ascending: false }}
-      readOnly={!podeEscrever}
-      columns={[
-        { key: "data", header: "Data", render: (r) => new Date(r.data).toLocaleString("pt-BR") },
-        { key: "pac", header: "Paciente", render: (r) => <PacienteNomeCell id={r.paciente_id} /> },
-        { key: "med", header: "Profissional", render: (r) => medNome(r.medico_id) },
-        {
-          key: "queixa",
-          header: "Queixa principal",
-          render: (r) => (
-            <span className="text-sm text-muted-foreground line-clamp-1">
-              {r.queixa_principal ?? "—"}
-            </span>
-          ),
-        },
-      ]}
-      emptyForm={formVazio}
-      toForm={(r) => ({
-        data: paraCampoLocal(r.data),
-        paciente_id: r.paciente_id,
-        medico_id: r.medico_id,
-        queixa_principal: r.queixa_principal ?? "",
-        hipotese_diagnostica: r.hipotese_diagnostica ?? "",
-        conduta: r.conduta ?? "",
-        prescricao: r.prescricao ?? "",
-        historia_doenca: r.historia_doenca ?? "",
-        exame_fisico: r.exame_fisico ?? "",
-        observacoes: r.observacoes ?? "",
-      })}
-      validate={(f) => {
-        // O campo Data pode ser apagado na tela, e sem data `toPayload` estoura
-        // ao converter. Barrar aqui dá a mensagem certa em vez de um erro genérico.
-        if (!f.data || Number.isNaN(new Date(f.data).getTime()))
-          return "Informe a data e a hora do atendimento.";
-        if (!f.paciente_id) return "Selecione o paciente.";
-        return null;
-      }}
-      toPayload={(f) => ({
-        data: new Date(f.data).toISOString(),
-        paciente_id: f.paciente_id,
-        medico_id: f.medico_id || null,
-        queixa_principal: f.queixa_principal || null,
-        hipotese_diagnostica: f.hipotese_diagnostica || null,
-        conduta: f.conduta || null,
-        prescricao: f.prescricao || null,
-        historia_doenca: f.historia_doenca || null,
-        exame_fisico: f.exame_fisico || null,
-        observacoes: f.observacoes || null,
-      })}
-      renderForm={(f, set) => (
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1 sm:col-span-2">
-              <Label>Paciente *</Label>
-              <PatientSearchInput
-                value={
-                  pacienteSel && pacienteSel.id === f.paciente_id
-                    ? pacienteSel
-                    : f.paciente_id
-                      ? {
-                          id: f.paciente_id,
-                          nome: "",
-                          cpf: null,
-                          telefone: null,
-                          data_nascimento: null,
-                          clinica_id: clinicaAtual?.clinica_id ?? "",
-                        }
-                      : null
-                }
-                onSelect={(p) => {
-                  setPacienteSel(p);
-                  if (p) cachePacienteNome(p.id, p.nome);
-                  set({ ...f, paciente_id: p?.id ?? "" });
-                }}
-                placeholder="Digite nome, CPF, pasta ou nascimento…"
-              />
+      <SimpleCrud<Prontuario, Form>
+        filtroEq={filtroPaciente ? { column: "paciente_id", value: filtroPaciente.id } : null}
+        table="prontuarios"
+        selectColumns="id, data, paciente_id, medico_id, queixa_principal, hipotese_diagnostica, conduta, prescricao, historia_doenca, exame_fisico, observacoes"
+        title="Prontuários"
+        subtitle="Histórico clínico dos pacientes."
+        icon={<FileHeart className="h-6 w-6 text-primary" />}
+        orderBy={{ column: "data", ascending: false }}
+        readOnly={!podeEscrever}
+        columns={[
+          { key: "data", header: "Data", render: (r) => new Date(r.data).toLocaleString("pt-BR") },
+          {
+            key: "pac",
+            header: "Paciente",
+            render: (r) => <PacienteNomeCell id={r.paciente_id} />,
+          },
+          { key: "med", header: "Profissional", render: (r) => medNome(r.medico_id) },
+          {
+            key: "queixa",
+            header: "Queixa principal",
+            render: (r) => (
+              <span className="text-sm text-muted-foreground line-clamp-1">
+                {r.queixa_principal ?? "—"}
+              </span>
+            ),
+          },
+        ]}
+        emptyForm={formVazio}
+        toForm={(r) => ({
+          data: paraCampoLocal(r.data),
+          paciente_id: r.paciente_id,
+          medico_id: r.medico_id,
+          queixa_principal: r.queixa_principal ?? "",
+          hipotese_diagnostica: r.hipotese_diagnostica ?? "",
+          conduta: r.conduta ?? "",
+          prescricao: r.prescricao ?? "",
+          historia_doenca: r.historia_doenca ?? "",
+          exame_fisico: r.exame_fisico ?? "",
+          observacoes: r.observacoes ?? "",
+        })}
+        validate={(f) => {
+          // O campo Data pode ser apagado na tela, e sem data `toPayload` estoura
+          // ao converter. Barrar aqui dá a mensagem certa em vez de um erro genérico.
+          if (!f.data || Number.isNaN(new Date(f.data).getTime()))
+            return "Informe a data e a hora do atendimento.";
+          if (!f.paciente_id) return "Selecione o paciente.";
+          return null;
+        }}
+        toPayload={(f) => ({
+          data: new Date(f.data).toISOString(),
+          paciente_id: f.paciente_id,
+          medico_id: f.medico_id || null,
+          queixa_principal: f.queixa_principal || null,
+          hipotese_diagnostica: f.hipotese_diagnostica || null,
+          conduta: f.conduta || null,
+          prescricao: f.prescricao || null,
+          historia_doenca: f.historia_doenca || null,
+          exame_fisico: f.exame_fisico || null,
+          observacoes: f.observacoes || null,
+        })}
+        renderForm={(f, set) => (
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Paciente *</Label>
+                <PatientSearchInput
+                  value={
+                    pacienteSel && pacienteSel.id === f.paciente_id
+                      ? pacienteSel
+                      : f.paciente_id
+                        ? {
+                            id: f.paciente_id,
+                            nome: "",
+                            cpf: null,
+                            telefone: null,
+                            data_nascimento: null,
+                            clinica_id: clinicaAtual?.clinica_id ?? "",
+                          }
+                        : null
+                  }
+                  onSelect={(p) => {
+                    setPacienteSel(p);
+                    if (p) cachePacienteNome(p.id, p.nome);
+                    set({ ...f, paciente_id: p?.id ?? "" });
+                  }}
+                  placeholder="Digite nome, CPF, pasta ou nascimento…"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Data</Label>
+                <Input
+                  type="datetime-local"
+                  value={f.data}
+                  onChange={(e) => set({ ...f, data: e.target.value })}
+                />
+              </div>
             </div>
             <div className="space-y-1">
-              <Label>Data</Label>
-              <Input
-                type="datetime-local"
-                value={f.data}
-                onChange={(e) => set({ ...f, data: e.target.value })}
-              />
+              <Label>Profissional</Label>
+              <Select
+                value={f.medico_id ?? ""}
+                onValueChange={(v) => set({ ...f, medico_id: v || null })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {medicos.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="uppercase">
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Profissional</Label>
-            <Select
-              value={f.medico_id ?? ""}
-              onValueChange={(v) => set({ ...f, medico_id: v || null })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione…" />
-              </SelectTrigger>
-              <SelectContent>
-                {medicos.map((m) => (
-                  <SelectItem key={m.id} value={m.id} className="uppercase">
-                    {m.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {(
-            [
-              ["queixa_principal", "Queixa principal", 2],
-              ["historia_doenca", "História da doença", 2],
-              ["exame_fisico", "Exame físico", 2],
-              ["hipotese_diagnostica", "Hipótese diagnóstica", 2],
-              ["conduta", "Conduta", 2],
-              ["prescricao", "Prescrição", 3],
-              ["observacoes", "Observações", 2],
-            ] as const
-          ).map(([key, label, rows]) => (
-            <div key={key} className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label>{label}</Label>
-                <div className="flex items-center gap-1">
-                  {key === "hipotese_diagnostica" && (
-                    <Cid10Picker
-                      onPick={(texto) => {
-                        const atual = ((f[key] ?? "") as string).trim();
-                        const novo = atual ? `${atual} ${texto}` : texto;
-                        set({ ...f, [key]: novo });
-                      }}
+            {(
+              [
+                ["queixa_principal", "Queixa principal", 2],
+                ["historia_doenca", "História da doença", 2],
+                ["exame_fisico", "Exame físico", 2],
+                ["hipotese_diagnostica", "Hipótese diagnóstica", 2],
+                ["conduta", "Conduta", 2],
+                ["prescricao", "Prescrição", 3],
+                ["observacoes", "Observações", 2],
+              ] as const
+            ).map(([key, label, rows]) => (
+              <div key={key} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label>{label}</Label>
+                  <div className="flex items-center gap-1">
+                    {key === "hipotese_diagnostica" && (
+                      <Cid10Picker
+                        onPick={(texto) => {
+                          const atual = ((f[key] ?? "") as string).trim();
+                          const novo = atual ? `${atual} ${texto}` : texto;
+                          set({ ...f, [key]: novo });
+                        }}
+                      />
+                    )}
+                    <VoiceInput
+                      size="sm"
+                      currentValue={(f[key] ?? "") as string}
+                      onTranscript={(t) => set({ ...f, [key]: t })}
+                      prompt={`Transcreva o áudio em português do Brasil como anotação médica do campo "${label}". Retorne apenas o texto.`}
+                      title={`Ditar ${label}`}
                     />
-                  )}
-                  <VoiceInput
-                    size="sm"
-                    currentValue={(f[key] ?? "") as string}
-                    onTranscript={(t) => set({ ...f, [key]: t })}
-                    prompt={`Transcreva o áudio em português do Brasil como anotação médica do campo "${label}". Retorne apenas o texto.`}
-                    title={`Ditar ${label}`}
-                  />
+                  </div>
                 </div>
+                <Textarea
+                  rows={rows}
+                  value={(f[key] ?? "") as string}
+                  onChange={(e) => set({ ...f, [key]: e.target.value })}
+                />
               </div>
-              <Textarea
-                rows={rows}
-                value={(f[key] ?? "") as string}
-                onChange={(e) => set({ ...f, [key]: e.target.value })}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-    />
+            ))}
+          </div>
+        )}
+      />
     </div>
   );
 }

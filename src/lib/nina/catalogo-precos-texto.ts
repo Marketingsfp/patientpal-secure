@@ -10,7 +10,15 @@ const norm = (v: string) =>
     .replace(/\s+/g, " ")
     .trim();
 const forma = (v: string) =>
-  /dinheiro/i.test(v) ? "dinheiro" : /pix/i.test(v) && /cart[aã]o/i.test(v) ? "pix_cartao" : /pix/i.test(v) ? "pix" : /cart[aã]o/i.test(v) ? "cartao" : null;
+  /dinheiro/i.test(v)
+    ? "dinheiro"
+    : /pix/i.test(v) && /cart[aã]o/i.test(v)
+      ? "pix_cartao"
+      : /pix/i.test(v)
+        ? "pix"
+        : /cart[aã]o/i.test(v)
+          ? "cartao"
+          : null;
 
 /** Sincroniza somente linhas de preços rotuladas, sem substituir números na prosa clínica. */
 export function sincronizarPrecosPublicados(
@@ -58,9 +66,20 @@ export function sincronizarPrecosPublicados(
         );
         if (itens.length === 1) aplicaveis = candidatas;
         const valores = [...new Set(aplicaveis.map((p: any) => p.valor))];
-        const rotulo = { dinheiro: "Dinheiro", cartao: "Cartão", pix: "Pix", pix_cartao: "Pix/cartão" }[grupo];
+        const rotulo = {
+          dinheiro: "Dinheiro",
+          cartao: "Cartão",
+          pix: "Pix",
+          pix_cartao: "Pix/cartão",
+        }[grupo];
         const regex =
-          grupo === "dinheiro" ? /^Dinheiro\s*:.*$/im : grupo === "pix" ? /^Pix\s*:.*$/im : grupo === "pix_cartao" ? /^Pix\s*\/\s*Cart[aã]o\s*:.*$/im : /^Cart[aã]o\s*:.*$/im;
+          grupo === "dinheiro"
+            ? /^Dinheiro\s*:.*$/im
+            : grupo === "pix"
+              ? /^Pix\s*:.*$/im
+              : grupo === "pix_cartao"
+                ? /^Pix\s*\/\s*Cart[aã]o\s*:.*$/im
+                : /^Cart[aã]o\s*:.*$/im;
         if (!valores.length && !regex.test(bloco)) continue;
         if (valores.length !== 1)
           throw new Error(

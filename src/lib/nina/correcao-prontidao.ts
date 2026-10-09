@@ -37,8 +37,7 @@ const MOTIVOS: Record<CodigoProntidao, string> = {
   informacao_insuficiente:
     "Falta informação essencial na proposta: sem a mudança escrita não há o que aplicar.",
   sem_permissao: "Você não tem permissão para aplicar correções desta clínica.",
-  proposta_desatualizada:
-    "A análise foi refeita. Confira a proposta atualizada antes de aplicar.",
+  proposta_desatualizada: "A análise foi refeita. Confira a proposta atualizada antes de aplicar.",
   executor_indisponivel: "Executor de correção indisponível neste ambiente.",
   execucao_em_curso: "Já existe uma aplicação em andamento para este erro.",
 };

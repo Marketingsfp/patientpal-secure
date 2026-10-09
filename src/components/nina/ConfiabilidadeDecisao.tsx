@@ -82,9 +82,7 @@ export function ConfiabilidadeDecisao({
             </ul>
           )}
           {dados.bloqueadores.length > 0 && (
-            <p className="text-destructive">
-              Bloqueios: {dados.bloqueadores.join(", ")}
-            </p>
+            <p className="text-destructive">Bloqueios: {dados.bloqueadores.join(", ")}</p>
           )}
           <p className="text-muted-foreground">
             Decisão: {dados.resultado}

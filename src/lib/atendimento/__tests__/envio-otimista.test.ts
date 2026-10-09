@@ -12,7 +12,13 @@ import {
 const agora = new Date("2026-09-09T12:00:00.000Z");
 
 const otim = (texto: string, conversaId = "A") =>
-  criarMensagemOtimista({ conversaId, texto, usuarioId: "u1", clientMessageId: `c-${texto}`, agora });
+  criarMensagemOtimista({
+    conversaId,
+    texto,
+    usuarioId: "u1",
+    clientMessageId: `c-${texto}`,
+    agora,
+  });
 
 const real = (texto: string, quando = "2026-09-09T12:00:02.000Z") => ({
   id: `real-${texto}`,

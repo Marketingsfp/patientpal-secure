@@ -96,15 +96,19 @@ describe("FASE 4 — Realtime por eixo de visualização", () => {
       { id: "a", ultima_msg_em: "2026-09-09T10:00:00Z" },
       { id: "b", ultima_msg_em: "2026-09-09T09:00:00Z" },
     ];
-    const r = patchListaPorConversa(lista, { id: "c", status: "active", atribuida_user_id: JEAN }, {
-      ...ctxGestor,
-      visualizacao: "espera",
-      espera: {
-        a: "2026-09-09T08:00:00Z",
-        b: "2026-09-09T07:00:00Z",
-        c: "2026-09-09T06:00:00Z",
+    const r = patchListaPorConversa(
+      lista,
+      { id: "c", status: "active", atribuida_user_id: JEAN },
+      {
+        ...ctxGestor,
+        visualizacao: "espera",
+        espera: {
+          a: "2026-09-09T08:00:00Z",
+          b: "2026-09-09T07:00:00Z",
+          c: "2026-09-09T06:00:00Z",
+        },
       },
-    });
+    );
     expect(r.lista.map((c) => c.id)).toEqual(["c", "b", "a"]);
   });
 

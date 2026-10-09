@@ -119,8 +119,7 @@ export async function aguardarTurnoNina(entrada: EntradaAgrupamento): Promise<Tu
       return (data ?? []).map((m) => ({
         id: m.id,
         tipo: m.tipo ?? undefined,
-        texto:
-          m.tipo === "audio" || m.tipo === "image" ? (m.transcricao ?? "") : (m.body ?? ""),
+        texto: m.tipo === "audio" || m.tipo === "image" ? (m.transcricao ?? "") : (m.body ?? ""),
       }));
     },
     lerRevisao: async () =>

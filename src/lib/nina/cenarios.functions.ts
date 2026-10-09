@@ -11,11 +11,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  avaliarCenario,
-  distribuirCenarios,
-  type Criterio,
-} from "@/lib/nina/cenarios";
+import { avaliarCenario, distribuirCenarios, type Criterio } from "@/lib/nina/cenarios";
 import { criteriosDeHandoff, verificarHandoff } from "./handoff-assertions";
 import {
   aplicarRegraHandoff,
@@ -340,10 +336,7 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
     // "Resolver / Reiniciar teste". O cenário nunca reinicia o lead: quando
     // precisa de sessão limpa, apenas sinaliza a necessidade ao operador e
     // segue com a sessão existente.
-    const precisaResetManual =
-      data.reiniciarSessao === true && Boolean((lead as any).conversa_id);
-
-
+    const precisaResetManual = data.reiniciarSessao === true && Boolean((lead as any).conversa_id);
 
     // Simulação de paciente ligada a este item (mesmo motor da Fase 4).
     const cenario = (item as any).cenario_snapshot ?? {};
@@ -400,7 +393,6 @@ export const iniciarItemExecucao = createServerFn({ method: "POST" })
       maxTurnos,
       precisaResetManual,
     };
-
   });
 
 /**
@@ -420,7 +412,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         turnosUsados: z.number().int().min(0).max(100).nullish(),
         /** Só reinicia a sessão quando pedido explicitamente (padrão: não). */
         reiniciarSessao: z.boolean().optional(),
-
       })
       .parse(input),
   )
@@ -462,8 +453,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       cicloId = (ciclo as any)?.id ?? cicloId;
     }
 
-
-
     let respostasNina: string[] = [];
     let mensagens = 0;
     // FASE 8 — a verificação parte das SAÍDAS reais, não dos snapshots.
@@ -490,7 +479,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         texto_hash: hashDoTexto(String(m.body)),
       }));
     }
-
 
     let ferramentas: string[] = [];
     let transferida = false;
@@ -626,9 +614,8 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       resumoConfianca = resumirConfiancaExecucao((snaps ?? []) as any[]);
 
       if (saidasEsperadas.length > 0 || (snaps ?? []).length > 0) {
-        const { verificarConfiancaRunner, criteriosDeConfianca } = await import(
-          "@/lib/nina/confidence/gate-v2"
-        );
+        const { verificarConfiancaRunner, criteriosDeConfianca } =
+          await import("@/lib/nina/confidence/gate-v2");
         const criteriosConfianca = criteriosDeConfianca(
           verificarConfiancaRunner((snaps ?? []) as any[], saidasEsperadas, {
             clinicaId: data.clinicaId,
@@ -641,7 +628,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         }
       }
     }
-
 
     const agora = new Date().toISOString();
     await supabaseAdmin
@@ -683,17 +669,18 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       Boolean(lead) && data.reiniciarSessao === true && Boolean((lead as any).conversa_id);
 
     if (lead) {
-
-
       // Nenhuma simulação de paciente pode continuar viva após o cenário.
       await supabaseAdmin
         .from("nina_teste_simulacoes")
-        .update({ status: "parada", finalizado_em: agora, motivo_fim: desfecho === "handoff" ? "transferencia" : "operador" })
+        .update({
+          status: "parada",
+          finalizado_em: agora,
+          motivo_fim: desfecho === "handoff" ? "transferencia" : "operador",
+        })
         .eq("clinica_id", data.clinicaId)
         .eq("lead_id", (lead as any).id)
         .in("status", ["executando", "pausada"]);
     }
-
 
     // Atualiza os totais da execução e fecha quando não sobra item pendente.
     const { data: irmaos } = await supabaseAdmin

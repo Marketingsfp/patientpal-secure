@@ -125,10 +125,7 @@ export function useAtendentesCoach(clinicaId: string | null) {
       const ids = elegiveis.map((m) => m.user_id);
       const nomes = new Map<string, string>();
       if (ids.length > 0) {
-        const { data: perfis } = await supabase
-          .from("profiles")
-          .select("id,nome")
-          .in("id", ids);
+        const { data: perfis } = await supabase.from("profiles").select("id,nome").in("id", ids);
         (perfis ?? []).forEach((p) => nomes.set(p.id, p.nome));
       }
       if (cancelado) return;

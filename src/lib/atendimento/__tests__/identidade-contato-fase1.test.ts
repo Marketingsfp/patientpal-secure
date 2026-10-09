@@ -20,7 +20,11 @@ describe("FASE 1 — identidade do contato x paciente cadastrado", () => {
 
   it("o paciente vinculado continua disponível separadamente", () => {
     const id = identidadeConversa(conversa);
-    expect(id.contato).toEqual({ nome: "Tuane", telefone: "5521971589468", fonte: "contato_legacy" });
+    expect(id.contato).toEqual({
+      nome: "Tuane",
+      telefone: "5521971589468",
+      fonte: "contato_legacy",
+    });
     expect(id.paciente).toEqual({ nome: "Aparecida de Souza", vinculado: true });
     expect(id.origem).toBe("contato_whatsapp");
     expect(id.divergente).toBe(true);

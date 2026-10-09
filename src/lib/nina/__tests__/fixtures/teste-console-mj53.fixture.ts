@@ -87,14 +87,25 @@ function consulta(tabela: string) {
   let atualizacao: Linha | null = null;
   let singular = false;
   let executada = false;
-  let retorno: { data: Linha | Linha[] | null; error: { code: string; message: string } | null; count: number };
+  let retorno: {
+    data: Linha | Linha[] | null;
+    error: { code: string; message: string } | null;
+    count: number;
+  };
   const executar = () => {
     if (executada) return retorno;
     executada = true;
     let linhas: Linha[];
     if (insercao) {
-      if (tabela === "whatsapp_mensagens" && bd[tabela].some(m => m.clinica_id === insercao!.clinica_id && m.wa_message_id === insercao!.wa_message_id)) {
-        retorno = { data: null, error: { code: "23505", message: "duplicate key" }, count: 0 }; return retorno;
+      if (
+        tabela === "whatsapp_mensagens" &&
+        bd[tabela].some(
+          (m) =>
+            m.clinica_id === insercao!.clinica_id && m.wa_message_id === insercao!.wa_message_id,
+        )
+      ) {
+        retorno = { data: null, error: { code: "23505", message: "duplicate key" }, count: 0 };
+        return retorno;
       }
       const nova = { id: `mensagem-${++sequencia}`, ...insercao };
       bd[tabela].push(nova);
@@ -135,7 +146,14 @@ function consulta(tabela: string) {
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: consulta,
-    storage: { from: () => ({ upload: async (caminho: string) => { arquivos.push(caminho); return { error: null }; } }) },
+    storage: {
+      from: () => ({
+        upload: async (caminho: string) => {
+          arquivos.push(caminho);
+          return { error: null };
+        },
+      }),
+    },
     rpc: (nome: string) => {
       if (nome === "nina_revisao_registrar_entrada")
         return Promise.resolve({ data: 1, error: null });
@@ -153,8 +171,16 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
   ninaPodeResponder: () => !transferidaSfp,
 }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
-  lerPedidoNaImagem: async () => { leiturasFoto++; return cenario === "foto-legivel" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" }; },
-  transcreverAudioBase64: async () => { transcricoes++; return { texto: "Quero cardiologista. https://exemplo.com", erro: null }; },
+  lerPedidoNaImagem: async () => {
+    leiturasFoto++;
+    return cenario === "foto-legivel"
+      ? { tipo: "pedido_medico", itens: ["ECG"] }
+      : { tipo: "ilegivel" };
+  },
+  transcreverAudioBase64: async () => {
+    transcricoes++;
+    return { texto: "Quero cardiologista. https://exemplo.com", erro: null };
+  },
   RESPOSTA_AUDIO_FALHOU: "Não consegui ouvir esse áudio.",
   respostaMidiaNaoSuportada: () => "Envie uma mensagem de texto.",
 }));
@@ -225,7 +251,10 @@ mock.module("@/lib/whatsapp.server", () => ({
     }
     if (cenario === "vazio-real") return "";
     // Núcleo atual já finaliza; cenário legado exercita a defesa do transporte.
-    const resposta = cenario === "resposta-antiga-sem-formatacao" || paridade ? RESPOSTA : formatarMensagemNina(RESPOSTA);
+    const resposta =
+      cenario === "resposta-antiga-sem-formatacao" || paridade
+        ? RESPOSTA
+        : formatarMensagemNina(RESPOSTA);
     opcoes.auditoria.textoFinalHash = hashDoTexto(resposta);
     opcoes.auditoria.decisaoId = "avaliacao-resposta";
     return resposta;
@@ -240,8 +269,16 @@ mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
 }));
 mock.module("@/lib/nina-audio.server", () => ({
   guardarAudioMensagem: async () => {},
-  avaliarFala: async () => ({ decisaoId: null, textoHash: "hash-audio", representacao: "audio_integral" }),
-  prepararAudioResposta: async (_clinica: string, texto: string, entrada: { recebeuAudio: boolean; mensagem: string }) => {
+  avaliarFala: async () => ({
+    decisaoId: null,
+    textoHash: "hash-audio",
+    representacao: "audio_integral",
+  }),
+  prepararAudioResposta: async (
+    _clinica: string,
+    texto: string,
+    entrada: { recebeuAudio: boolean; mensagem: string },
+  ) => {
     if (!deveResponderEmAudio(entrada)) return null;
     chamadasAudio++;
     if (cenario === "audio-falha") return null;
@@ -272,22 +309,42 @@ mock.module("@/lib/nina/rastreio/turno.server", () => ({
 
 const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server");
 const entradaTeste = {
-    clinicaId: lead.clinica_id,
-    leadId: lead.id,
-    tipo: cenario.startsWith("foto-") ? "image" as const : ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts", "audio-recebido", "audio-arquivo"].includes(cenario) ? "audio" as const : "text" as const,
-    ...(cenario.startsWith("foto-") ? { imagemArquivo: { base64: "AQID", mime: "image/jpeg" } } : {}),
-    ...(cenario === "audio-arquivo" ? { audioArquivo: { base64: "T2dnUw==", mime: "audio/ogg" } } : {}),
-    texto: cenario === "audio-pedido" || cenario === "audio-falha" ? "Me responda em áudio" : paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
-    chave: "entrada-mj53",
+  clinicaId: lead.clinica_id,
+  leadId: lead.id,
+  tipo: cenario.startsWith("foto-")
+    ? ("image" as const)
+    : [
+          "handoff-audio",
+          "handoff-sfp-audio",
+          "reserva-perdida-tts",
+          "audio-recebido",
+          "audio-arquivo",
+        ].includes(cenario)
+      ? ("audio" as const)
+      : ("text" as const),
+  ...(cenario.startsWith("foto-") ? { imagemArquivo: { base64: "AQID", mime: "image/jpeg" } } : {}),
+  ...(cenario === "audio-arquivo"
+    ? { audioArquivo: { base64: "T2dnUw==", mime: "audio/ogg" } }
+    : {}),
+  texto:
+    cenario === "audio-pedido" || cenario === "audio-falha"
+      ? "Me responda em áudio"
+      : paridade
+        ? "Vocês tem cardiologista?"
+        : "vcs tem cardiologista?",
+  chave: "entrada-mj53",
 };
 const resultado = await processarMensagemTeste(entradaTeste, "operador-teste");
-if (cenario === "audio-arquivo" || cenario.startsWith("foto-")) await processarMensagemTeste(entradaTeste, "operador-teste");
+if (cenario === "audio-arquivo" || cenario.startsWith("foto-"))
+  await processarMensagemTeste(entradaTeste, "operador-teste");
 
 console.log(
   "MJ53_RESULTADO=" +
     JSON.stringify({
       resultado,
-      transcricoes, arquivos, leiturasFoto,
+      transcricoes,
+      arquivos,
+      leiturasFoto,
       saidas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "out"),
       entradas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "in"),
       chamadasModelo,

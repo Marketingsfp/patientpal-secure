@@ -156,7 +156,15 @@ class BancoSimulado {
 
 type Evento =
   | { t: number; ordem: number; tipo: "chegada"; msg: MensagemSimulada }
-  | { t: number; ordem: number; tipo: "acorda"; conversa: string; batchId: string; revision: number; forcar: boolean }
+  | {
+      t: number;
+      ordem: number;
+      tipo: "acorda";
+      conversa: string;
+      batchId: string;
+      revision: number;
+      forcar: boolean;
+    }
   | { t: number; ordem: number; tipo: "fim"; execucao: ExecucaoNina };
 
 /** Omit distributivo: preserva as variantes da união. */
@@ -223,7 +231,14 @@ export function simularConversas(
       if (!lote) continue; // mensagem mais nova assume o turno
       if (!banco.adquirirLock(ev.conversa, ev.batchId)) {
         // Conversa ocupada: reprograma em vez de rodar em paralelo.
-        empilhar({ t: ev.t + 100, tipo: "acorda", conversa: ev.conversa, batchId: ev.batchId, revision: lote.revision, forcar: true });
+        empilhar({
+          t: ev.t + 100,
+          tipo: "acorda",
+          conversa: ev.conversa,
+          batchId: ev.batchId,
+          revision: lote.revision,
+          forcar: true,
+        });
         lote.status = "COLLECTING";
         continue;
       }

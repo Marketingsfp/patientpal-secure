@@ -71,15 +71,8 @@ export const gerarProva = createServerFn({ method: "POST" })
     const config = await guard.configDaClinica(db, data.clinicaId);
     const scriptsTexto = guard.scriptsEmTexto(config.scripts);
     const tabelaTexto = guard.baseParaPrompt(config, "", 20_000);
-    const {
-      GATEWAY,
-      MODEL,
-      SYSTEM_PROMPT,
-      PROVA_TOOL,
-      authHeaders,
-      buildUserPrompt,
-      normalize,
-    } = await import("./prova.server");
+    const { GATEWAY, MODEL, SYSTEM_PROMPT, PROVA_TOOL, authHeaders, buildUserPrompt, normalize } =
+      await import("./prova.server");
 
     const quantidade = data.quantidade ?? 8;
 

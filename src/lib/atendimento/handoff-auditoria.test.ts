@@ -123,7 +123,9 @@ describe("registro de auditoria do handoff", () => {
   });
 
   it("handoff sem protocolo é apontado como incompleto", () => {
-    const c = auditoriaCompleta(montarRegistroAuditoriaHandoff({ ...baseProducao, protocolo: null }));
+    const c = auditoriaCompleta(
+      montarRegistroAuditoriaHandoff({ ...baseProducao, protocolo: null }),
+    );
     expect(c.ok).toBe(false);
     expect(c.faltando).toContain("protocol_number");
   });

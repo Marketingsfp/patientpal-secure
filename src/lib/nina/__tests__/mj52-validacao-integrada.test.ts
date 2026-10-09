@@ -119,10 +119,7 @@ import {
 } from "@/lib/atendimento/aviso-encaminhamento.server";
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
 import { selecionarAvaliacaoDaSaida } from "@/lib/nina/confidence/identidade-saida";
-import {
-  classificarSaida,
-  podeExibirPorcentagem,
-} from "@/lib/nina/confidence/classificacao-saida";
+import { classificarSaida, podeExibirPorcentagem } from "@/lib/nina/confidence/classificacao-saida";
 
 // ------------------------------------------------------------- apoio do teste
 

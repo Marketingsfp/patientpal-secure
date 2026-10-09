@@ -27,7 +27,10 @@ export function FiltrosAtendente({
             onClick={() => onChange(opcao.valor)}
           >
             {opcao.rotulo}
-            <span aria-hidden="true" className="absolute -top-1.5 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold leading-none text-background tabular-nums ring-2 ring-card">
+            <span
+              aria-hidden="true"
+              className="absolute -top-1.5 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold leading-none text-background tabular-nums ring-2 ring-card"
+            >
               {quantidade.toLocaleString("pt-BR")}
             </span>
           </Button>

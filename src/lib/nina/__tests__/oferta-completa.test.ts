@@ -130,7 +130,13 @@ describe("resumo final", () => {
 
   it("resumo da Fase 4 também traz o valor quando existe", () => {
     const comValor = textoResumo(
-      estado({ procedure: "Ortopedia", doctor_name: "Dr. Paulo", date: "05/09/2026", time: "14:30", price: "R$ 150,00" }) as never,
+      estado({
+        procedure: "Ortopedia",
+        doctor_name: "Dr. Paulo",
+        date: "05/09/2026",
+        time: "14:30",
+        price: "R$ 150,00",
+      }) as never,
       "Policlínica Menino Jesus",
     );
     expect(comValor).toContain("Valor: R$ 150,00");

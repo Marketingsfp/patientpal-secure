@@ -54,7 +54,6 @@ import {
 import { apenasMudancas, compararTextos, resumoDiff } from "@/lib/nina/instrucoes-diff";
 import { previewRequestNina } from "@/lib/nina/prompt-preview.functions";
 
-
 const ROTULO_STATUS: Record<string, string> = {
   publicada: "Atual",
   rascunho: "Rascunho",
@@ -214,7 +213,6 @@ function Editor({
   );
   const identidadeInvalida = !identidade.ok;
 
-
   return (
     <div className="space-y-3">
       {bloco.escopo === "whatsapp" ? (
@@ -260,7 +258,6 @@ function Editor({
         ) : null}
       </div>
 
-
       {bloco.escopo === "whatsapp" ? (
         <IdentidadeAtendimentoCampos
           texto={texto}
@@ -276,7 +273,6 @@ function Editor({
         onChange={setTexto}
         readOnly={!podeEditar}
       />
-
 
       <Input
         value={comentario}
@@ -325,7 +321,6 @@ function Editor({
         />
       ) : null}
 
-
       {!podePublicar ? (
         <p className="text-xs text-muted-foreground">
           {podeEditar
@@ -350,7 +345,9 @@ function Editor({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => publicar.mutate({ conteudo: texto, comentario: comentario || undefined })}
+              onClick={() =>
+                publicar.mutate({ conteudo: texto, comentario: comentario || undefined })
+              }
             >
               Publicar
             </AlertDialogAction>
@@ -436,7 +433,8 @@ function HistoricoVersoes({
                     {ROTULO_STATUS[v.status] ?? v.status}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {dataBr(v.publicado_em ?? v.created_at)} · {v.autor ?? "responsável não registrado"}
+                    {dataBr(v.publicado_em ?? v.created_at)} ·{" "}
+                    {v.autor ?? "responsável não registrado"}
                   </span>
                 </div>
                 {v.comentario ? <p className="mt-1 text-muted-foreground">{v.comentario}</p> : null}
@@ -563,7 +561,10 @@ function Comparacao({ antes, depois }: { antes: string; depois: string }) {
           }
           if (l.tipo === "alterada") {
             return (
-              <div key={i} className="border-l-2 border-l-[var(--chart-4)] bg-[color-mix(in_oklch,var(--chart-4)_14%,transparent)] px-3 py-0.5">
+              <div
+                key={i}
+                className="border-l-2 border-l-[var(--chart-4)] bg-[color-mix(in_oklch,var(--chart-4)_14%,transparent)] px-3 py-0.5"
+              >
                 <div className="whitespace-pre-wrap line-through opacity-70">{l.antes}</div>
                 <div className="whitespace-pre-wrap">{l.depois}</div>
               </div>
@@ -651,9 +652,7 @@ function AuditoriaPrompt({
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="secondary">
-                Comportamento: Arquitetura v{data.versao ?? "—"}
-              </Badge>
+              <Badge variant="secondary">Comportamento: Arquitetura v{data.versao ?? "—"}</Badge>
               {data.alcanceGlobal ? (
                 <Badge variant="outline">Vale para todas as clínicas</Badge>
               ) : null}
@@ -705,8 +704,7 @@ function AuditoriaPrompt({
                 <p className="text-muted-foreground">
                   Atendente <strong>{data.identidade.assistente}</strong> ·{" "}
                   {data.identidade.tipoEstabelecimento}{" "}
-                  <strong>{data.identidade.estabelecimento}</strong> · origem:{" "}
-                  {data.fonteConteudo}
+                  <strong>{data.identidade.estabelecimento}</strong> · origem: {data.fonteConteudo}
                 </p>
               ) : (
                 <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs">
@@ -727,9 +725,7 @@ function AuditoriaPrompt({
                     }`
                   : "nenhuma regra publicada aplicável a este exemplo"
               }
-              conteudo={
-                data.contratoPrecedencia || "(nenhuma restrição adicional neste exemplo)"
-              }
+              conteudo={data.contratoPrecedencia || "(nenhuma restrição adicional neste exemplo)"}
             />
             <BlocoLeitura
               titulo="Prompt de comportamento"

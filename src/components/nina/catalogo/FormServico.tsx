@@ -29,7 +29,13 @@ export type OpcoesCatalogo = {
   convenios: Array<{ id: string; nome: string }>;
 };
 
-type Executante = { medico_id: string | null; nome: string; horarios: string; observacao: string; tipo_escala?: "consulta" | "exame_procedimento" };
+type Executante = {
+  medico_id: string | null;
+  nome: string;
+  horarios: string;
+  observacao: string;
+  tipo_escala?: "consulta" | "exame_procedimento";
+};
 
 export type EstadoServico = {
   estrutura: EstruturaCatalogo;

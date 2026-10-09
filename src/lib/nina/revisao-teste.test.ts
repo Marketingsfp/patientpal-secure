@@ -51,9 +51,9 @@ describe("classificação do achado", () => {
   });
 
   it("cai em categoria neutra quando não há pista", () => {
-    expect(
-      categoriaDoAchado({ componente: "algo novo", observado: "xyz", dimensao: null }),
-    ).toBe(CATEGORIA_PADRAO_ACHADO);
+    expect(categoriaDoAchado({ componente: "algo novo", observado: "xyz", dimensao: null })).toBe(
+      CATEGORIA_PADRAO_ACHADO,
+    );
   });
 
   it("traduz gravidade em prioridade", () => {

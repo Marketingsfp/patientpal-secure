@@ -70,7 +70,10 @@ describe("posicoesFichasExtras", () => {
   it("dia esticado além da grade com paciente na recepção: extras depois da última ficha do dia", () => {
     // Caso real (09/10/2026): grade 08:00–11:00, fichas até 15:10–15:20.
     const linhas: LinhaExistente[] = [
-      ...Array.from({ length: 18 }, (_, i) => ({ ms: ms("08:00:00") + i * 600000, travada: false })),
+      ...Array.from({ length: 18 }, (_, i) => ({
+        ms: ms("08:00:00") + i * 600000,
+        travada: false,
+      })),
       { ms: ms("11:00:00"), travada: true, fimMs: ms("11:10:00") },
       { ms: ms("15:10:00"), travada: false, fimMs: ms("15:20:00") },
     ];

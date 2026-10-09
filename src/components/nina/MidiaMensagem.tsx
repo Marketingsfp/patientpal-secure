@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ImagemMensagemAmpliada } from "./ImagemMensagemAmpliada";
 import { urlMidiaMensagem } from "@/lib/atendimento/midia-mensagem.functions";
 import { ehCaminhoGuardado } from "@/lib/whatsapp-midia-armazenamento";
@@ -41,7 +47,9 @@ function useLinkDaMidia(clinicaId: string, mensagemId: string, ativo: boolean) {
     const c = cacheLinks.get(mensagemId);
     return c && Date.now() - c.em < CACHE_MS ? c.url : null;
   });
-  const [estado, setEstado] = useState<"carregando" | "pronto" | "indisponivel">(url ? "pronto" : "carregando");
+  const [estado, setEstado] = useState<"carregando" | "pronto" | "indisponivel">(
+    url ? "pronto" : "carregando",
+  );
   useEffect(() => {
     if (!ativo || url) return;
     let cancelado = false;
@@ -89,21 +97,39 @@ function useNaTela() {
 }
 
 /** Imagem (clique para ampliar) ou player de áudio da mensagem, no próprio chat. */
-export function MidiaMensagem({ clinicaId, mensagem }: { clinicaId: string; mensagem: MensagemComMidia }) {
+export function MidiaMensagem({
+  clinicaId,
+  mensagem,
+}: {
+  clinicaId: string;
+  mensagem: MensagemComMidia;
+}) {
   const { ref, visivel } = useNaTela();
-  const { url, estado } = useLinkDaMidia(clinicaId, mensagem.id, visivel && temMidiaVisivel(mensagem));
+  const { url, estado } = useLinkDaMidia(
+    clinicaId,
+    mensagem.id,
+    visivel && temMidiaVisivel(mensagem),
+  );
   const [ampliada, setAmpliada] = useState(false);
-  if (mensagem.tipo === "audio") return <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo="audio">
-    <AudioMensagem mensagem={mensagem} url={temMidiaVisivel(mensagem) ? url : null}
-      carregando={temMidiaVisivel(mensagem) && estado === "carregando"} />
-  </div>;
+  if (mensagem.tipo === "audio")
+    return (
+      <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo="audio">
+        <AudioMensagem
+          mensagem={mensagem}
+          url={temMidiaVisivel(mensagem) ? url : null}
+          carregando={temMidiaVisivel(mensagem) && estado === "carregando"}
+        />
+      </div>
+    );
   if (!temMidiaVisivel(mensagem)) return null;
   const ehImagem = mensagem.tipo === "image";
 
   return (
     <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo={mensagem.tipo}>
       {estado === "indisponivel" ? (
-        <p className="text-xs opacity-70">{ehImagem ? "Imagem indisponível." : "Áudio indisponível."}</p>
+        <p className="text-xs opacity-70">
+          {ehImagem ? "Imagem indisponível." : "Áudio indisponível."}
+        </p>
       ) : !url ? (
         <div
           className={`animate-pulse rounded-lg bg-black/10 dark:bg-white/10 ${ehImagem ? "h-28 w-44" : "h-9 w-56"}`}
@@ -118,20 +144,35 @@ export function MidiaMensagem({ clinicaId, mensagem }: { clinicaId: string; mens
             className="block overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             aria-label="Ampliar imagem enviada pelo paciente"
           >
-            <img src={url} alt="Imagem enviada pelo paciente" loading="lazy" className="max-h-60 max-w-full object-cover" />
+            <img
+              src={url}
+              alt="Imagem enviada pelo paciente"
+              loading="lazy"
+              className="max-h-60 max-w-full object-cover"
+            />
           </button>
           <Dialog open={ampliada} onOpenChange={setAmpliada}>
-            {ampliada && <DialogContent className="max-w-6xl overflow-hidden" onEscapeKeyDown={() => {}}>
-              <DialogHeader>
-                <DialogTitle>Imagem enviada pelo paciente</DialogTitle>
-                <DialogDescription className="sr-only">Visualize a imagem e amplie para ler os detalhes.</DialogDescription>
-              </DialogHeader>
-              <ImagemMensagemAmpliada key={mensagem.id} url={url} />
-            </DialogContent>}
+            {ampliada && (
+              <DialogContent className="max-w-6xl overflow-hidden" onEscapeKeyDown={() => {}}>
+                <DialogHeader>
+                  <DialogTitle>Imagem enviada pelo paciente</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Visualize a imagem e amplie para ler os detalhes.
+                  </DialogDescription>
+                </DialogHeader>
+                <ImagemMensagemAmpliada key={mensagem.id} url={url} />
+              </DialogContent>
+            )}
           </Dialog>
         </>
       ) : (
-        <audio controls preload="none" src={url} className="h-9 w-56 max-w-full" aria-label="Áudio enviado pelo paciente" />
+        <audio
+          controls
+          preload="none"
+          src={url}
+          className="h-9 w-56 max-w-full"
+          aria-label="Áudio enviado pelo paciente"
+        />
       )}
     </div>
   );

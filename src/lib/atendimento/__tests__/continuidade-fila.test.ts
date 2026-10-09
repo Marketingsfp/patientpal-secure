@@ -11,16 +11,29 @@ import { patchListaPorConversa } from "../patch-inbox";
 import { estadoFiltroAtendente, type FiltroAtendente } from "../filtros-atendente";
 import { escopoConsulta } from "../filtros-inbox";
 
-const ctx: ContextoEscopo = { clinicaId: "clinica-a", userId: "ana", gestor: false, escopo: "minhas" };
+const ctx: ContextoEscopo = {
+  clinicaId: "clinica-a",
+  userId: "ana",
+  gestor: false,
+  escopo: "minhas",
+};
 // Conversa da própria atendente que aguarda resposta (aparece em Ativas e em Pendentes).
 const fila = {
-  id: "conversa-a", clinica_id: "clinica-a", is_teste: false,
-  atribuida_user_id: "ana", owner_type: "HUMAN", status: "waiting",
+  id: "conversa-a",
+  clinica_id: "clinica-a",
+  is_teste: false,
+  atribuida_user_id: "ana",
+  owner_type: "HUMAN",
+  status: "waiting",
 };
 const ativa = { ...fila, status: "active" };
 const fechada = {
-  ...ativa, status: "closed", owner_type: "NONE", atribuida_user_id: null,
-  last_assigned_user_id: "ana", resolved_by: "ana",
+  ...ativa,
+  status: "closed",
+  owner_type: "NONE",
+  atribuida_user_id: null,
+  last_assigned_user_id: "ana",
+  resolved_by: "ana",
 };
 const filtros: FiltroAtendente[] = ["ativas", "pendentes", "fechadas"];
 const contextoFiltro = (filtro: FiltroAtendente): ContextoEscopo => ({
@@ -33,16 +46,34 @@ describe("continuidade da própria conversa após responder", () => {
     const lista = patchListaPorConversa([fila], ativa, { ...ctx, userId: "ana" }).lista;
     expect(lista).toEqual([ativa]);
     expect(filtrarPorEscopo([ativa], { ...ctx, escopo: "minhas" })).toEqual([ativa]);
-    expect(selecaoDeveSair({ selecionada: fila, linhas: lista, buscando: false, ctx, confirmadaForaLista: ativa })).toBe(false);
+    expect(
+      selecaoDeveSair({
+        selecionada: fila,
+        linhas: lista,
+        buscando: false,
+        ctx,
+        confirmadaForaLista: ativa,
+      }),
+    ).toBe(false);
   });
 
   it("continua aberta nas reconciliações seguintes, mesmo sem card na lista atual", () => {
     expect(chatContinuaEntreFiltros({ selecionada: fila, confirmada: ativa, ctx })).toBe(true);
-    expect(selecaoDeveSair({ selecionada: ativa, linhas: [], buscando: false, ctx, confirmadaForaLista: ativa })).toBe(false);
+    expect(
+      selecaoDeveSair({
+        selecionada: ativa,
+        linhas: [],
+        buscando: false,
+        ctx,
+        confirmadaForaLista: ativa,
+      }),
+    ).toBe(false);
   });
 
   it("conversa ainda pendente permanece aberta mesmo ausente da lista filtrada", () => {
-    expect(selecaoDeveSair({ selecionada: fila, linhas: [fila], buscando: false, ctx })).toBe(false);
+    expect(selecaoDeveSair({ selecionada: fila, linhas: [fila], buscando: false, ctx })).toBe(
+      false,
+    );
     expect(filtrarPorEscopo([fila], ctx)).toEqual([fila]);
     expect(chatContinuaEntreFiltros({ selecionada: fila, confirmada: fila, ctx })).toBe(true);
     expect(selecaoDeveSair({ selecionada: fila, linhas: [], buscando: false, ctx })).toBe(false);
@@ -56,7 +87,15 @@ describe("continuidade da própria conversa após responder", () => {
     ["homologação", { ...ativa, is_teste: true }],
     ["acesso negado ou inexistente", null],
   ])("%s não mantém uma seleção fora do filtro", (_motivo, confirmada) => {
-    expect(selecaoDeveSair({ selecionada: fila, linhas: [], buscando: false, ctx, confirmadaForaLista: confirmada })).toBe(true);
+    expect(
+      selecaoDeveSair({
+        selecionada: fila,
+        linhas: [],
+        buscando: false,
+        ctx,
+        confirmadaForaLista: confirmada,
+      }),
+    ).toBe(true);
   });
 
   it.each([
@@ -64,58 +103,79 @@ describe("continuidade da própria conversa após responder", () => {
     { ...ctx, clinicaId: "clinica-b" },
     { ...ctx, clinicaId: null },
   ])("perda de contexto ou autorização não reaproveita a continuidade: %j", (contexto) => {
-    expect(chatContinuaEntreFiltros({ selecionada: fila, confirmada: ativa, ctx: contexto })).toBe(false);
+    expect(chatContinuaEntreFiltros({ selecionada: fila, confirmada: ativa, ctx: contexto })).toBe(
+      false,
+    );
   });
 });
 
 describe("continuidade do chat nas três abas das atendentes", () => {
   for (const selecionada of [ativa, fila, fechada]) {
     for (const origem of filtros) {
-      for (const destino of filtros.filter(filtro => filtro !== origem)) {
+      for (const destino of filtros.filter((filtro) => filtro !== origem)) {
         it(`mantém a conversa ${selecionada.status} ao trocar ${origem} por ${destino}, mesmo com a lista vazia`, () => {
           for (const filtro of [origem, destino]) {
             const contexto = contextoFiltro(filtro);
             expect(podeRevalidarChatEntreFiltros(selecionada, contexto)).toBe(true);
-            expect(selecaoDeveSair({
-              selecionada, linhas: [], buscando: false, ctx: contexto,
-              confirmadaForaLista: { ...selecionada },
-            })).toBe(false);
+            expect(
+              selecaoDeveSair({
+                selecionada,
+                linhas: [],
+                buscando: false,
+                ctx: contexto,
+                confirmadaForaLista: { ...selecionada },
+              }),
+            ).toBe(false);
           }
         });
       }
     }
   }
 
-  it.each(filtros)("mantém só os cards da aba %s, sem inserir o chat preservado", filtro => {
+  it.each(filtros)("mantém só os cards da aba %s, sem inserir o chat preservado", (filtro) => {
     const contexto = contextoFiltro(filtro);
     const conversas = [
-      { ...ativa, id: "ativa" }, { ...fila, id: "fila" }, { ...fechada, id: "fechada" },
+      { ...ativa, id: "ativa" },
+      { ...fila, id: "fila" },
+      { ...fechada, id: "fechada" },
     ];
     const linhas = filtrarPorEscopo(conversas, contexto);
     // Ativas e Pendentes partem de "Minhas" (as duas conversas abertas dela); Fechadas traz só a encerrada.
     expect(linhas).toEqual(filtro === "fechadas" ? [conversas[2]] : [conversas[0], conversas[1]]);
     for (const selecionada of conversas) {
-      expect(selecaoDeveSair({
-        selecionada, linhas, buscando: false, ctx: contexto, confirmadaForaLista: selecionada,
-      })).toBe(false);
+      expect(
+        selecaoDeveSair({
+          selecionada,
+          linhas,
+          buscando: false,
+          ctx: contexto,
+          confirmadaForaLista: selecionada,
+        }),
+      ).toBe(false);
     }
   });
 
-  it.each(filtros)("lista vazia de %s não é prova de perda de acesso", filtro => {
+  it.each(filtros)("lista vazia de %s não é prova de perda de acesso", (filtro) => {
     const contexto = contextoFiltro(filtro);
     for (const selecionada of [ativa, fila, fechada]) {
-      expect(selecaoDeveSair({ selecionada, linhas: [], buscando: false, ctx: contexto })).toBe(false);
+      expect(selecaoDeveSair({ selecionada, linhas: [], buscando: false, ctx: contexto })).toBe(
+        false,
+      );
     }
   });
 
   it("continua exibindo uma finalizada vinculada à atendente que resolveu", () => {
     const finalizada = { ...fechada, status: "finished", last_assigned_user_id: null };
-    expect(chatContinuaEntreFiltros({
-      selecionada: finalizada, confirmada: finalizada, ctx: contextoFiltro("ativas"),
-    })).toBe(true);
+    expect(
+      chatContinuaEntreFiltros({
+        selecionada: finalizada,
+        confirmada: finalizada,
+        ctx: contextoFiltro("ativas"),
+      }),
+    ).toBe(true);
   });
 
-  it.each(filtros)("perda de vínculo não preserva uma fechada fora de %s", filtro => {
+  it.each(filtros)("perda de vínculo não preserva uma fechada fora de %s", (filtro) => {
     for (const confirmada of [
       { ...fechada, last_assigned_user_id: "bia", resolved_by: "bia" },
       { ...fechada, last_assigned_user_id: null, resolved_by: null },
@@ -123,21 +183,37 @@ describe("continuidade do chat nas três abas das atendentes", () => {
       { ...fechada, is_teste: true },
       { ...ativa, atribuida_user_id: "bia", last_assigned_user_id: "ana", resolved_by: "ana" },
     ]) {
-      expect(selecaoDeveSair({
-        selecionada: fechada, linhas: [], buscando: false, ctx: contextoFiltro(filtro), confirmadaForaLista: confirmada,
-      })).toBe(true);
+      expect(
+        selecaoDeveSair({
+          selecionada: fechada,
+          linhas: [],
+          buscando: false,
+          ctx: contextoFiltro(filtro),
+          confirmadaForaLista: confirmada,
+        }),
+      ).toBe(true);
     }
   });
 
   it("confere a transferência mesmo com o card já fora da lista de Fechadas", () => {
     const contexto = contextoFiltro("fechadas");
     const transferida = { ...ativa, atribuida_user_id: "bia" };
-    expect(patchListaPorConversa([], transferida, { ...contexto, userId: "ana" }).lista).toEqual([]);
+    expect(patchListaPorConversa([], transferida, { ...contexto, userId: "ana" }).lista).toEqual(
+      [],
+    );
     expect(podeRevalidarChatEntreFiltros(ativa, contexto)).toBe(true);
-    expect(chatContinuaEntreFiltros({ selecionada: ativa, confirmada: transferida, ctx: contexto })).toBe(false);
-    expect(selecaoDeveSair({
-      selecionada: ativa, linhas: [], buscando: false, ctx: contexto, confirmadaForaLista: transferida,
-    })).toBe(true);
+    expect(
+      chatContinuaEntreFiltros({ selecionada: ativa, confirmada: transferida, ctx: contexto }),
+    ).toBe(false);
+    expect(
+      selecaoDeveSair({
+        selecionada: ativa,
+        linhas: [],
+        buscando: false,
+        ctx: contexto,
+        confirmadaForaLista: transferida,
+      }),
+    ).toBe(true);
   });
 
   it.each([
@@ -146,8 +222,10 @@ describe("continuidade do chat nas três abas das atendentes", () => {
     fechada,
     { ...fechada, status: "finished" },
     { ...ativa, atribuida_user_id: null, owner_type: "AI" },
-  ])("preserva estados acessíveis sem exigir o estado especial anterior: %j", confirmada => {
-    expect(chatContinuaEntreFiltros({ selecionada: fila, confirmada, ctx: contextoFiltro("ativas") })).toBe(true);
+  ])("preserva estados acessíveis sem exigir o estado especial anterior: %j", (confirmada) => {
+    expect(
+      chatContinuaEntreFiltros({ selecionada: fila, confirmada, ctx: contextoFiltro("ativas") }),
+    ).toBe(true);
   });
 
   it("reabrir uma conversa da própria atendente mantém o chat", () => {
@@ -159,15 +237,33 @@ describe("continuidade do chat nas três abas das atendentes", () => {
     for (const escopo of ["minhas", "nao_atribuidas", "fechadas", "nina", "equipe"] as const) {
       const contexto = { ...ctx, gestor: true, escopo, atendenteId: "carla" };
       expect(podeRevalidarChatEntreFiltros(outra, contexto)).toBe(true);
-      expect(selecaoDeveSair({ selecionada: outra, linhas: [], buscando: false, ctx: contexto, confirmadaForaLista: outra })).toBe(false);
+      expect(
+        selecaoDeveSair({
+          selecionada: outra,
+          linhas: [],
+          buscando: false,
+          ctx: contexto,
+          confirmadaForaLista: outra,
+        }),
+      ).toBe(false);
     }
   });
 
   it("falha de rede ao sair de Não atribuídas para Ativas não limpa a conversa", async () => {
     const contexto = contextoFiltro("ativas");
-    const confirmada = await revalidarChatSelecionado(() => Promise.reject(new Error("Failed to fetch")));
+    const confirmada = await revalidarChatSelecionado(() =>
+      Promise.reject(new Error("Failed to fetch")),
+    );
     expect(confirmada).toBeUndefined();
-    expect(selecaoDeveSair({ selecionada: fila, linhas: [], buscando: false, ctx: contexto, confirmadaForaLista: confirmada })).toBe(false);
+    expect(
+      selecaoDeveSair({
+        selecionada: fila,
+        linhas: [],
+        buscando: false,
+        ctx: contexto,
+        confirmadaForaLista: confirmada,
+      }),
+    ).toBe(false);
     expect(await revalidarChatSelecionado(() => Promise.resolve(ativa))).toEqual(ativa);
   });
 
@@ -175,9 +271,17 @@ describe("continuidade do chat nas três abas das atendentes", () => {
     new Error("Você não possui permissão para visualizar esta conversa."),
     new Error("Conversa não encontrada."),
     { motivo: "CONVERSA_SEM_PERMISSAO", message: "Acesso negado" },
-  ])("negativa explícita do servidor continua protegendo o acesso: %j", async erro => {
+  ])("negativa explícita do servidor continua protegendo o acesso: %j", async (erro) => {
     const confirmada = await revalidarChatSelecionado(() => Promise.reject(erro));
     expect(confirmada).toBeNull();
-    expect(selecaoDeveSair({ selecionada: fila, linhas: [], buscando: false, ctx, confirmadaForaLista: confirmada })).toBe(true);
+    expect(
+      selecaoDeveSair({
+        selecionada: fila,
+        linhas: [],
+        buscando: false,
+        ctx,
+        confirmadaForaLista: confirmada,
+      }),
+    ).toBe(true);
   });
 });

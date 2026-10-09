@@ -18,11 +18,7 @@ import type { TipoTurno } from "./turno-tipo";
 import type { ResultadoConfianca } from "./types";
 
 /** O que o pipeline deve fazer neste turno. */
-export type DecisaoDeHandoff =
-  | "CONTINUE"
-  | "CLARIFY"
-  | "BLOCK_ACTION"
-  | "HANDOFF";
+export type DecisaoDeHandoff = "CONTINUE" | "CLARIFY" | "BLOCK_ACTION" | "HANDOFF";
 
 /** Por que essa decisão foi tomada — vai para a auditoria, sem PII. */
 export type MotivoDecisaoHandoff =
@@ -117,10 +113,7 @@ function faltaDadoDoPaciente(r: ResultadoConfianca): boolean {
  * Falta de fonte oficial nunca é recuperável por pergunta: o dado não existe
  * publicado, e inventar está fora de questão.
  */
-export function situacaoRecuperavel(
-  r: ResultadoConfianca,
-  tipoTurno?: TipoTurno | null,
-): boolean {
+export function situacaoRecuperavel(r: ResultadoConfianca, tipoTurno?: TipoTurno | null): boolean {
   const bloqueios = (r.hardBlockers ?? []).map(String);
   if (bloqueios.some((b) => BLOQUEIOS_SEM_FONTE.has(b))) return false;
   if (bloqueios.some((b) => BLOQUEIOS_RECUPERAVEIS.has(b))) return true;

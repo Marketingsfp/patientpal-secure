@@ -68,10 +68,16 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
   const { estado } = ctx;
   const a = estado.appointment;
 
-  if (pediuAtendenteHumano(ctx.mensagem) || ctx.falhaSemRecuperacao || estado.flow.stage === "HANDOFF") return "HANDOFF";
+  if (
+    pediuAtendenteHumano(ctx.mensagem) ||
+    ctx.falhaSemRecuperacao ||
+    estado.flow.stage === "HANDOFF"
+  )
+    return "HANDOFF";
   if (reservaDaSessaoAtual(estado)) return "APPOINTMENT_CONFIRMED";
   if (confirmacaoDaEscolha(estado)) {
-    if (!estado.patient.identified || !estado.patient.validated || !estado.patient.id) return "COLLECTING_PATIENT_DATA";
+    if (!estado.patient.identified || !estado.patient.validated || !estado.patient.id)
+      return "COLLECTING_PATIENT_DATA";
     if (!a.confirmation?.aceita) return "WAITING_FINAL_CONFIRMATION";
     return "CREATING_APPOINTMENT";
   }
@@ -86,7 +92,8 @@ export function derivarEtapa(ctx: ContextoFase6): EtapaFluxoNina {
     return "CHECKING_AVAILABILITY";
   }
 
-  if (a.slot_inicio || (a.date && a.time) || a.slot_options?.vagas.length) return "WAITING_SLOT_SELECTION";
+  if (a.slot_inicio || (a.date && a.time) || a.slot_options?.vagas.length)
+    return "WAITING_SLOT_SELECTION";
   if (ctx.intencoes.includes("agendamento")) return "BOOKING_INTENT_PENDING";
   if (ctx.primeiraMensagem) return "GREETING";
   if (ctx.intencoes.length > 0) return "INFORMATION_RESPONSE";

@@ -20,10 +20,14 @@ export async function lerMensagensExportacao(
   const tamanho = 500;
   const ids = new Set<string>();
   for (let inicio = 0; ; inicio += tamanho) {
-    const { data, error } = await admin.from("atend_conversas")
-      .select("id").eq("clinica_id", clinicaId).eq("is_teste", true)
+    const { data, error } = await admin
+      .from("atend_conversas")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .eq("is_teste", true)
       .like("contato_telefone", `5500${String(lead.indice).padStart(2, "0")}%`)
-      .order("id").range(inicio, inicio + tamanho - 1);
+      .order("id")
+      .range(inicio, inicio + tamanho - 1);
     if (error) throw new Error(error.message);
     for (const c of data ?? []) ids.add(c.id);
     if ((data ?? []).length < tamanho) break;
@@ -33,10 +37,14 @@ export async function lerMensagensExportacao(
   const mensagens = new Map<string, MensagemExportacao>();
   for (let bloco = 0; bloco < conversas.length; bloco += 100) {
     for (let inicio = 0; ; inicio += tamanho) {
-      const { data, error } = await admin.from("whatsapp_mensagens")
+      const { data, error } = await admin
+        .from("whatsapp_mensagens")
         .select("id, created_at, direction, body, enviada_por, status")
-        .eq("clinica_id", clinicaId).in("conversa_id", conversas.slice(bloco, bloco + 100))
-        .lte("created_at", ate).order("created_at").order("id")
+        .eq("clinica_id", clinicaId)
+        .in("conversa_id", conversas.slice(bloco, bloco + 100))
+        .lte("created_at", ate)
+        .order("created_at")
+        .order("id")
         .range(inicio, inicio + tamanho - 1);
       if (error) throw new Error(error.message);
       // O calendário usa o mesmo fuso da conversa, inclusive nos limites do dia.
@@ -46,6 +54,7 @@ export async function lerMensagensExportacao(
       if ((data ?? []).length < tamanho) break;
     }
   }
-  return [...mensagens.values()].sort((a, b) =>
-    a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  return [...mensagens.values()].sort(
+    (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+  );
 }

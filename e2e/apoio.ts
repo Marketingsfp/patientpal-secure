@@ -15,9 +15,15 @@ export function credencial(prefixo: "E2E" | "E2E_ADMIN"): Credencial | null {
 /** Entra pela tela de login do próprio sistema. */
 export async function entrar(page: Page, cred: Credencial) {
   await page.goto("/auth", { waitUntil: "domcontentloaded" });
-  await page.getByLabel(/e-?mail/i).first().fill(cred.email);
+  await page
+    .getByLabel(/e-?mail/i)
+    .first()
+    .fill(cred.email);
   await page.getByLabel(/senha/i).first().fill(cred.senha);
-  await page.getByRole("button", { name: /entrar|acessar|login/i }).first().click();
+  await page
+    .getByRole("button", { name: /entrar|acessar|login/i })
+    .first()
+    .click();
   await expect(page).not.toHaveURL(/\/auth/, { timeout: 30_000 });
 }
 

@@ -22,9 +22,9 @@ export function filtroAtendenteAtual(
 }
 
 /** Cada opção define a consulta inteira, sem herdar filtros ocultos antigos. */
-export function estadoFiltroAtendente(filtro: FiltroAtendente): Pick<
-  EstadoFiltrosInbox, "base" | "atendenteId" | "visualizacao" | "naoAtribuidas"
-> {
+export function estadoFiltroAtendente(
+  filtro: FiltroAtendente,
+): Pick<EstadoFiltrosInbox, "base" | "atendenteId" | "visualizacao" | "naoAtribuidas"> {
   return {
     base: "minhas",
     atendenteId: null,

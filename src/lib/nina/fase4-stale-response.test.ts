@@ -98,7 +98,12 @@ describe("FASE 4 — outros cenários", () => {
 
 describe("FASE 4 — ferramentas críticas", () => {
   test("ações mutáveis são reconhecidas como críticas", () => {
-    for (const nome of ["agendar", "cancelar_agendamento", "remarcar", "solicitar_atendente_humano"]) {
+    for (const nome of [
+      "agendar",
+      "cancelar_agendamento",
+      "remarcar",
+      "solicitar_atendente_humano",
+    ]) {
       expect(ehFerramentaCritica(nome)).toBe(true);
     }
   });

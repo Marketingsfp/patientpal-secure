@@ -290,7 +290,10 @@ const CATEGORIAS: Array<[CategoriaProibida, RegExp]> = [
   ["pergunta", /\bperguntas?\b/],
   ["despedida", /\bdespedidas?\b/],
   ["explicacao", /\b(explicacao|explicacoes|justificativa|comentario)\b/],
-  ["texto_adicional", /\b(qualquer outro texto|texto adicional|nada alem|mais nada|outro conteudo)\b/],
+  [
+    "texto_adicional",
+    /\b(qualquer outro texto|texto adicional|nada alem|mais nada|outro conteudo)\b/,
+  ],
 ];
 
 function categoriasProibidas(plano: string): CategoriaProibida[] {
@@ -522,15 +525,22 @@ function classeDoBloco(tipo: string | null): ClasseRegra | null {
 
 /** Situações da conversa reconhecíveis no campo "Aplica-se", por forma. */
 const SITUACOES_DO_BLOCO: Array<[SituacaoRegra, RegExp]> = [
-  ["primeira_mensagem", /\b(primeira\s+(resposta|mensagem)|apresentacao\s+ainda\s+nao\s+entregue|primeiro\s+contato)\b/],
+  [
+    "primeira_mensagem",
+    /\b(primeira\s+(resposta|mensagem)|apresentacao\s+ainda\s+nao\s+entregue|primeiro\s+contato)\b/,
+  ],
   ["apresentacao_ja_feita", /\b(apresentacao\s+ja\s+(entregue|feita)|sessao\s+em\s+andamento)\b/],
   ["saudacao_pura", /\b(somente\s+por\s+saudacao|apenas\s+saudacao|so\s+saudacao)\b/],
-  ["pedido_concreto", /\b(pergunta\s+ou\s+solicitacao\s+concreta|pedido\s+concreto|solicitacao\s+concreta)\b/],
+  [
+    "pedido_concreto",
+    /\b(pergunta\s+ou\s+solicitacao\s+concreta|pedido\s+concreto|solicitacao\s+concreta)\b/,
+  ],
 ];
 
-function condicaoDoBloco(
-  campos: CamposBloco,
-): { condicao: CondicaoRegra; ambiente: AmbienteRegra } {
+function condicaoDoBloco(campos: CamposBloco): {
+  condicao: CondicaoRegra;
+  ambiente: AmbienteRegra;
+} {
   const texto = campos.aplicaSeLinha ?? campos.aplicaSe ?? "";
   const k = chave(texto);
   const ambiente = ambienteDoTexto(texto) ?? "qualquer";
@@ -538,9 +548,7 @@ function condicaoDoBloco(
   // Mensagem exata do paciente ("… for exatamente:" com o valor abaixo).
   if (/\bexatamente\b/.test(k)) {
     const valor =
-      campos.aplicaSeValor ??
-      texto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim() ??
-      "";
+      campos.aplicaSeValor ?? texto.replace(/.*\bexatamente\b\s*:?\s*/i, "").trim() ?? "";
     if (valor !== "") return { condicao: { tipo: "mensagem_exata", valor }, ambiente };
   }
 
@@ -665,7 +673,6 @@ export function extrairRegrasPublicadas(
   const emBlocos = extrairRegrasEmBlocos(texto, meta);
   if (emBlocos) return emBlocos;
 
-
   const unidades = unidadesDoTexto(texto);
   const regras: RegraPublicada[] = [];
   const limitacoes: string[] = [];
@@ -679,7 +686,15 @@ export function extrairRegrasPublicadas(
     u: Unidade,
     dados: Omit<
       RegraPublicada,
-      "id" | "ordem" | "trecho" | "linhaInicio" | "linhaFim" | "versao" | "versaoId" | "hash" | "escopo"
+      | "id"
+      | "ordem"
+      | "trecho"
+      | "linhaInicio"
+      | "linhaFim"
+      | "versao"
+      | "versaoId"
+      | "hash"
+      | "escopo"
     >,
     trechoExtra?: Unidade,
   ) => {

@@ -92,7 +92,11 @@ export async function resolverContatoConversa(
   }
 
   const status: StatusContato =
-    candidatos.length === 0 ? "NO_MATCH" : candidatos.length === 1 ? "UNIQUE_CANDIDATE" : "AMBIGUOUS";
+    candidatos.length === 0
+      ? "NO_MATCH"
+      : candidatos.length === 1
+        ? "UNIQUE_CANDIDATE"
+        : "AMBIGUOUS";
 
   return {
     status,
@@ -159,4 +163,3 @@ export async function vincularPacienteConversa(
     return false;
   }
 }
-

@@ -72,9 +72,7 @@ describe("layout incremental", () => {
     expect(Math.abs(posNovo.y - posAgenda.y)).toBeLessThanOrEqual(600);
 
     // Componentes distantes do novo mantêm exatamente a posição anterior.
-    const distantes = Object.keys(antes.canonical).filter(
-      (id) => !resultado.afetados.includes(id),
-    );
+    const distantes = Object.keys(antes.canonical).filter((id) => !resultado.afetados.includes(id));
     expect(distantes.length).toBeGreaterThan(0);
     for (const id of distantes) expect(resultado.canonical[id]).toEqual(antes.canonical[id]!);
   });
@@ -152,11 +150,7 @@ describe("layout incremental", () => {
       Array.from({ length: total }, (_, i) => {
         const seguintes = i < total - 1 ? [`n${i + 1}`] : [];
         if (extra && i === 5) seguintes.push("n8");
-        return criar(
-          `n${i}`,
-          i > 0 ? [`n${i - 1}`] : [],
-          seguintes,
-        );
+        return criar(`n${i}`, i > 0 ? [`n${i - 1}`] : [], seguintes);
       }).map((node, i, lista) => {
         if (extra && node.id === "n8" && !node.anteriores.includes("n5")) {
           return { ...node, anteriores: [...node.anteriores, "n5"] };

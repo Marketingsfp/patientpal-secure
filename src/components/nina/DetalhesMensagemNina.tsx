@@ -336,7 +336,9 @@ export function DetalhesMensagemNina({
             <div key={i} className="space-y-1">
               <p className="font-medium">
                 {motivoParaAtendimento(e.motivo)}
-                <span className="block text-xs text-muted-foreground">Registro original: {e.motivo}</span>
+                <span className="block text-xs text-muted-foreground">
+                  Registro original: {e.motivo}
+                </span>
               </p>
               {e.ferramenta && <p>Ferramenta de origem: {e.ferramenta}</p>}
               {e.registros.map((r, j) => (

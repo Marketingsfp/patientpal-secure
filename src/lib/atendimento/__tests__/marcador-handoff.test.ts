@@ -6,9 +6,17 @@ const MARCADOR =
 
 describe("marcador de handoff na timeline", () => {
   it("oculta o aviso azul de reserva mesmo antes de carregar os eventos antigos", () => {
-    expect(textoMarcadorSistema("Conversa reservada na fila individual de JEAN TELEFONE.")).toBe("");
-    expect(textoMarcadorSistema("Conversa reservada na fila individual de Ana. A IA parou de responder.")).toBe("");
-    expect(textoMarcadorSistema("Conversa reservada na fila individual de Ana. Verificar documento.")).toContain("Verificar documento");
+    expect(textoMarcadorSistema("Conversa reservada na fila individual de JEAN TELEFONE.")).toBe(
+      "",
+    );
+    expect(
+      textoMarcadorSistema(
+        "Conversa reservada na fila individual de Ana. A IA parou de responder.",
+      ),
+    ).toBe("");
+    expect(
+      textoMarcadorSistema("Conversa reservada na fila individual de Ana. Verificar documento."),
+    ).toContain("Verificar documento");
   });
   it("reconhece o marcador extenso", () => {
     expect(ehMarcadorHandoff(MARCADOR)).toBe(true);
@@ -18,7 +26,9 @@ describe("marcador de handoff na timeline", () => {
 
   it("mantém o motivo legível sem fila nem resumo", () => {
     const t = textoMarcadorSistema(MARCADOR);
-    expect(t).toBe("Transferida para atendimento humano · Recepção · Motivo: O paciente pediu atendimento humano.");
+    expect(t).toBe(
+      "Transferida para atendimento humano · Recepção · Motivo: O paciente pediu atendimento humano.",
+    );
     expect(t).not.toMatch(/Resumo:/);
     expect(t).not.toMatch(/Posição na fila/);
     expect(t).toMatch(/Motivo:/);
@@ -34,6 +44,8 @@ describe("marcador de handoff na timeline", () => {
 
   it("apresenta protocolo e destino sem o nome técnico handoff", () => {
     const protocolo = "🧾 Handoff realizado pela Nina · Protocolo: MJ-4 · Destino: Recepção";
-    expect(textoMarcadorSistema(protocolo)).toBe("Encaminhamento para atendimento humano · Protocolo MJ-4 · Destino: Recepção · Motivo: Motivo não registrado neste atendimento.");
+    expect(textoMarcadorSistema(protocolo)).toBe(
+      "Encaminhamento para atendimento humano · Protocolo MJ-4 · Destino: Recepção · Motivo: Motivo não registrado neste atendimento.",
+    );
   });
 });

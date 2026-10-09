@@ -38,8 +38,12 @@ export function ehRespostaAfirmativaCurta(texto: string): boolean {
  * Frases sobre documentos, pagamento ou outras dúvidas ficam para o contexto. */
 export function ehRespostaNegativaCurta(texto: string): boolean {
   if (!texto || texto.length > 160 || /[?¿]/.test(texto)) return false;
-  const t = normalizarRespostaInformal(texto)
-    .replace(/\s+(?:por favor|por gentileza|obrigad[oa])$/, "");
+  const t = normalizarRespostaInformal(texto).replace(
+    /\s+(?:por favor|por gentileza|obrigad[oa])$/,
+    "",
+  );
   if (/^nao (?:confirmo|quero|posso|vou|agende|marque)(?: mais)?$/.test(t)) return true;
-  return /^(?:nao(?: nao| mesmo)?|negativo|nem pensar|de jeito nenhum|de forma alguma|agora nao|ainda nao|melhor nao|hoje nao|deixa (?:pra|para) la|deixa quieto|(?:esse|essa|este|esta|ele|ela)(?: mesmo| mesma)? nao|isso nao|(?:eu )?(?:nao )?(?:quero|posso|vou|confirmo)(?: mais)? nao|nao (?:vai rolar|rola|da)(?: nao)?|(?:vai rolar|rola|da) nao)$/.test(t);
+  return /^(?:nao(?: nao| mesmo)?|negativo|nem pensar|de jeito nenhum|de forma alguma|agora nao|ainda nao|melhor nao|hoje nao|deixa (?:pra|para) la|deixa quieto|(?:esse|essa|este|esta|ele|ela)(?: mesmo| mesma)? nao|isso nao|(?:eu )?(?:nao )?(?:quero|posso|vou|confirmo)(?: mais)? nao|nao (?:vai rolar|rola|da)(?: nao)?|(?:vai rolar|rola|da) nao)$/.test(
+    t,
+  );
 }

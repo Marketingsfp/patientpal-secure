@@ -6,7 +6,13 @@ import { validarResultado } from "../tool-broker";
 import { selectThinkingLevel } from "../reasoning-router";
 
 // Nomes fictícios no formato do cadastro publicado da MJ.
-const SERVICOS = ["USG ABDOMINAL TOTAL", "USG TIREOIDE", "USG TRANSVAGINAL COM DOPPLER", "ECOCARDIOGRAMA (ADULTO)", "ELETROCARDIOGRAMA"];
+const SERVICOS = [
+  "USG ABDOMINAL TOTAL",
+  "USG TIREOIDE",
+  "USG TRANSVAGINAL COM DOPPLER",
+  "ECOCARDIOGRAMA (ADULTO)",
+  "ELETROCARDIOGRAMA",
+];
 const ESPECIALIDADES = ["CARDIOLOGIA", "UROLOGIA", "CLINICO GERAL", "NUTRICAO", "PEDIATRIA"];
 const todos = [...SERVICOS, ...ESPECIALIDADES];
 const acha = (q: string, nome: string) => prepararBuscaCatalogo(q, todos).pontuar(nome, "") > 0;
@@ -31,7 +37,9 @@ describe("termos populares, siglas e erros de digitação", () => {
   });
 
   it("registra o termo interpretado", () => {
-    expect(expansoesDeEscrita("usam")).toEqual([{ original: "usam", interpretado: "ultrassonografia" }]);
+    expect(expansoesDeEscrita("usam")).toEqual([
+      { original: "usam", interpretado: "ultrassonografia" },
+    ]);
   });
 
   it("citar exame/sigla não usa raciocínio LOW", () => {
@@ -40,19 +48,37 @@ describe("termos populares, siglas e erros de digitação", () => {
 });
 
 describe("sem resultado: pergunta antes de transferir", () => {
-  const vazio = validarResultado("buscar_procedimentos", { ok: true, source: "nina_catalogo", knowledge_status: "not_found", found: false, records: [] });
+  const vazio = validarResultado("buscar_procedimentos", {
+    ok: true,
+    source: "nina_catalogo",
+    knowledge_status: "not_found",
+    found: false,
+    records: [],
+  });
   it("primeira falha vira pergunta, sem transferência", () => {
     const r = confirmarAntesDeEncaminhar(vazio, { termo: "xyzexame" }, null);
-    const e = (r.dados as { esclarecimento?: { motivo?: string; pergunta: string } }).esclarecimento;
+    const e = (r.dados as { esclarecimento?: { motivo?: string; pergunta: string } })
+      .esclarecimento;
     expect(e?.motivo).toBe("sem_registro_confirmar");
     expect(e?.pergunta).toContain("xyzexame");
   });
   it("segunda falha encaminha", () => {
     const anterior = {
-      versao: 1 as const, clinicaId: "c", sessionId: "s", consulta: { termo: "xyzexame" }, referencias: [],
-      esclarecimento: { tipo: "sigla" as const, motivo: "sem_registro_confirmar" as const, pergunta: "Você quis dizer?", opcoes: [] },
+      versao: 1 as const,
+      clinicaId: "c",
+      sessionId: "s",
+      consulta: { termo: "xyzexame" },
+      referencias: [],
+      esclarecimento: {
+        tipo: "sigla" as const,
+        motivo: "sem_registro_confirmar" as const,
+        pergunta: "Você quis dizer?",
+        opcoes: [],
+      },
     };
     expect(confirmarAntesDeEncaminhar(vazio, { termo: "xyz" }, anterior)).toBe(vazio);
-    expect(encaminharAposEsclarecimento(anterior as never, vazio, "xyz")?.motivo).toContain("CATALOGO_SEM_REGISTRO");
+    expect(encaminharAposEsclarecimento(anterior as never, vazio, "xyz")?.motivo).toContain(
+      "CATALOGO_SEM_REGISTRO",
+    );
   });
 });

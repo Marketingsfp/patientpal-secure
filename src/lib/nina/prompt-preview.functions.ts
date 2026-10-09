@@ -129,8 +129,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     const publicado = versao?.conteudo as string | undefined;
     const rascunho = entrada.conteudoRascunho?.trim() ? entrada.conteudoRascunho : null;
     const template = rascunho ?? publicado ?? PROMPT_NINA_WHATSAPP_V4;
-    const origemTemplate: "publicada" | "codigo" =
-      rascunho || publicado ? "publicada" : "codigo";
+    const origemTemplate: "publicada" | "codigo" = rascunho || publicado ? "publicada" : "codigo";
     const fonteConteudo: "rascunho" | "publicada" | "codigo" = rascunho
       ? "rascunho"
       : publicado
@@ -227,9 +226,8 @@ export const previewRequestNina = createServerFn({ method: "POST" })
     // MESMO registro de ferramentas do atendimento: consulta sempre, agenda
     // conforme a habilitação da clínica e transferência para atendente
     // sempre — é assim que o runtime monta a lista.
-    const { FERRAMENTAS_NINA_CONSULTA, FERRAMENTAS_NINA_AGENDAMENTO } = await import(
-      "./paciente-tools.server"
-    );
+    const { FERRAMENTAS_NINA_CONSULTA, FERRAMENTAS_NINA_AGENDAMENTO } =
+      await import("./paciente-tools.server");
     const { FERRAMENTA_HANDOFF } = await import("./handoff-tool.server");
     const { semFerramentasDeVaga } = await import("./consulta-agenda");
     const lista: any[] = [

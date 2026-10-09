@@ -15,13 +15,24 @@ const q = async <T = Record<string, any>>(sql: string, p: unknown[] = []) =>
 const como = (uid: string | null) => q("SELECT set_config('test.uid', $1, false)", [uid ?? ""]);
 const nova = async (owner: string, atrib: string | null = null) => {
   const id = crypto.randomUUID();
-  await q("INSERT INTO atend_conversas(id, clinica_id, owner_type, atribuida_user_id, status) VALUES ($1,$2,$3,$4,'waiting')", [id, clinica, owner, atrib]);
+  await q(
+    "INSERT INTO atend_conversas(id, clinica_id, owner_type, atribuida_user_id, status) VALUES ($1,$2,$3,$4,'waiting')",
+    [id, clinica, owner, atrib],
+  );
   return id;
 };
 const claim = async (conv: string, user: string) =>
-  (await q<{ r: boolean }>("SELECT public.atend_claim_conversa($1,$2,$3) AS r", [conv, clinica, user]))[0]!.r;
+  (
+    await q<{ r: boolean }>("SELECT public.atend_claim_conversa($1,$2,$3) AS r", [
+      conv,
+      clinica,
+      user,
+    ])
+  )[0]!.r;
 const dono = async (conv: string) =>
-  (await q("SELECT atribuida_user_id, owner_type, status FROM atend_conversas WHERE id=$1", [conv]))[0]!;
+  (
+    await q("SELECT atribuida_user_id, owner_type, status FROM atend_conversas WHERE id=$1", [conv])
+  )[0]!;
 
 beforeAll(async () => {
   db = new PGlite();
@@ -34,7 +45,13 @@ beforeAll(async () => {
       ai_enabled boolean DEFAULT true, status text, assigned_at timestamptz, updated_at timestamptz);
   `);
   await db.exec(
-    await readFile(new URL("../../../../supabase/migrations/20260930160000_atend_claim_admin_por_clique.sql", import.meta.url), "utf8"),
+    await readFile(
+      new URL(
+        "../../../../supabase/migrations/20260930160000_atend_claim_admin_por_clique.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   );
 }, 60_000);
 
@@ -47,7 +64,11 @@ describe("assumir conversa — admin por clique", () => {
     await como(admin);
     const c = await nova("NONE");
     expect(await claim(c, admin)).toBe(true);
-    expect(await dono(c)).toMatchObject({ atribuida_user_id: admin, owner_type: "HUMAN", status: "active" });
+    expect(await dono(c)).toMatchObject({
+      atribuida_user_id: admin,
+      owner_type: "HUMAN",
+      status: "active",
+    });
   });
 
   test("nenhuma rotina automática atribui conversa ao admin (sem usuário logado ou outro usuário)", async () => {

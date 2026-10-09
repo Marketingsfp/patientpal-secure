@@ -88,14 +88,20 @@ const ECG: Registro = {
 
 describe("FASE 5 — cenários obrigatórios de aceite", () => {
   it("1. dois preços corretos: nenhuma reprovação monetária", () => {
-    const r = monetarias([ECG], "O eletrocardiograma custa R$ 51,00 no dinheiro e R$ 60,00 no cartão.");
+    const r = monetarias(
+      [ECG],
+      "O eletrocardiograma custa R$ 51,00 no dinheiro e R$ 60,00 no cartão.",
+    );
     expect(r).toHaveLength(2);
     expect(r.every((c) => c.situacao === "confirmado" && c.suportado)).toBe(true);
     expect(r.map((c) => c.diagnostico?.resultado)).toEqual(["valor_correto", "valor_correto"]);
   });
 
   it("2. preços trocados: divergência em cada condição", () => {
-    const r = monetarias([ECG], "O eletrocardiograma custa R$ 60,00 no dinheiro e R$ 51,00 no cartão.");
+    const r = monetarias(
+      [ECG],
+      "O eletrocardiograma custa R$ 60,00 no dinheiro e R$ 51,00 no cartão.",
+    );
     expect(r.map((c) => c.situacao)).toEqual(["divergente", "divergente"]);
     expect(r.map((c) => c.diagnostico?.forma)).toEqual(["dinheiro", "cartao"]);
     expect(r.map((c) => c.diagnostico?.valorEsperado)).toEqual(["51", "60"]);

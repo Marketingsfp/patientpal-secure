@@ -212,7 +212,9 @@ export function mesmaCondicaoPagamento(afirmada: unknown, doFato: unknown): bool
  * "custa R$ 51,00 no dinheiro e R$ 60,00 no cartão" tem duas afirmações no
  * mesmo segmento; cada valor precisa ser lido com a SUA condição.
  */
-function recortesMonetarios(f: string): Array<{ inicio: number; fim: number; texto: string; iniciaCaso: boolean }> {
+function recortesMonetarios(
+  f: string,
+): Array<{ inicio: number; fim: number; texto: string; iniciaCaso: boolean }> {
   const valores = [
     ...f.matchAll(/R\$\s?\d[\d.,]*|custa\s+\d[\d.,]*|valor\s+(?:é|de)\s+\d[\d.,]*/gi),
   ];
@@ -235,7 +237,9 @@ function recortesMonetarios(f: string): Array<{ inicio: number; fim: number; tex
       );
       return Boolean(
         (q.procedimento && !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(q.procedimento))) ||
-          q.medicoNome || q.unidadeId || q.convenio,
+        q.medicoNome ||
+        q.unidadeId ||
+        q.convenio,
       );
     });
     const separador = novoCaso ?? separadores.at(-1);
@@ -288,8 +292,18 @@ export function chavesDaAfirmacaoMonetaria(
     delete local.condicoes;
     // Um assunto explicitamente novo não herda o médico/unidade de outro
     // procedimento. Formas do mesmo caso continuam herdando seu assunto.
-    if (local.procedimento && PROCEDIMENTOS_GENERICOS.has(normalizarTexto(local.procedimento)) && chave.procedimento) delete local.procedimento;
-    if (local.procedimento && !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(local.procedimento)) && local.procedimento !== chave.procedimento) chave = {};
+    if (
+      local.procedimento &&
+      PROCEDIMENTOS_GENERICOS.has(normalizarTexto(local.procedimento)) &&
+      chave.procedimento
+    )
+      delete local.procedimento;
+    if (
+      local.procedimento &&
+      !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(local.procedimento)) &&
+      local.procedimento !== chave.procedimento
+    )
+      chave = {};
     chave = { ...chave, ...local };
     if (pos >= parte.inicio && pos < parte.fim) {
       recorte = parte.texto;
@@ -300,7 +314,10 @@ export function chavesDaAfirmacaoMonetaria(
         for (const proxima of partes.slice(indice + 1)) {
           if (proxima.iniciaCaso) break;
           const posterior = qualificadoresDaAfirmacao(proxima.texto.replace(/[*_]/g, ""));
-          if (posterior.procedimento && !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(posterior.procedimento))) {
+          if (
+            posterior.procedimento &&
+            !PROCEDIMENTOS_GENERICOS.has(normalizarTexto(posterior.procedimento))
+          ) {
             delete posterior.condicoes;
             chave = { ...posterior, ...chave, procedimento: posterior.procedimento };
             break;

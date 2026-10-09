@@ -6,11 +6,74 @@ import { filtroDoAtendente } from "@/lib/coach/identidade";
 type Row = { nota: number; created_at: string; melhorias: string[] | null; modo: string | null };
 
 const STOP = new Set([
-  "a","o","as","os","de","da","do","das","dos","e","em","no","na","nos","nas","um","uma","para",
-  "por","com","que","se","ao","aos","à","às","mais","menos","não","nao","sem","ou","the","você",
-  "voce","seu","sua","seus","suas","foi","ser","est","este","esta","isso","como","ainda","muito",
-  "deve","precisa","faltou","falta","pouco","sempre","nunca","apenas","durante","sobre","antes",
-  "depois","quando","cliente","paciente","atendente","atendimento","conversa","ligacao","ligação",
+  "a",
+  "o",
+  "as",
+  "os",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "e",
+  "em",
+  "no",
+  "na",
+  "nos",
+  "nas",
+  "um",
+  "uma",
+  "para",
+  "por",
+  "com",
+  "que",
+  "se",
+  "ao",
+  "aos",
+  "à",
+  "às",
+  "mais",
+  "menos",
+  "não",
+  "nao",
+  "sem",
+  "ou",
+  "the",
+  "você",
+  "voce",
+  "seu",
+  "sua",
+  "seus",
+  "suas",
+  "foi",
+  "ser",
+  "est",
+  "este",
+  "esta",
+  "isso",
+  "como",
+  "ainda",
+  "muito",
+  "deve",
+  "precisa",
+  "faltou",
+  "falta",
+  "pouco",
+  "sempre",
+  "nunca",
+  "apenas",
+  "durante",
+  "sobre",
+  "antes",
+  "depois",
+  "quando",
+  "cliente",
+  "paciente",
+  "atendente",
+  "atendimento",
+  "conversa",
+  "ligacao",
+  "ligação",
 ]);
 
 const norm = (s: string) =>
@@ -184,11 +247,7 @@ export function EvolucaoAtendente({
               subindo ? "text-[color:var(--success)]" : "text-destructive"
             }`}
           >
-            {subindo ? (
-              <TrendingUp className="h-3 w-3" />
-            ) : (
-              <TrendingDown className="h-3 w-3" />
-            )}
+            {subindo ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
             {dados.delta === 0
               ? "média atual"
               : `${subindo ? "+" : ""}${dados.delta.toFixed(1)} vs. anteriores`}

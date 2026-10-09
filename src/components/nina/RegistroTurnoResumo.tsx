@@ -87,9 +87,7 @@ function texto(v: unknown, vazio = "—") {
  * antigos (sem o campo) são reclassificados pelos próprios hashes gravados —
  * nunca por suposição.
  */
-export function situacaoDasTransformacoes(
-  resumo: Record<string, unknown>,
-): SituacaoTransformacoes {
+export function situacaoDasTransformacoes(resumo: Record<string, unknown>): SituacaoTransformacoes {
   const gravada = resumo["situacao_transformacoes"];
   if (typeof gravada === "string" && gravada in ROTULO_SITUACAO_TRANSFORMACAO) {
     return gravada as SituacaoTransformacoes;
@@ -177,7 +175,9 @@ export function RegistroTurnoResumo({
         </p>
         <p>
           <span className="text-muted-foreground">Origem do texto: </span>
-          {origem ? (ROTULO_ORIGEM[origem as keyof typeof ROTULO_ORIGEM] ?? origem) : "não registrada"}
+          {origem
+            ? (ROTULO_ORIGEM[origem as keyof typeof ROTULO_ORIGEM] ?? origem)
+            : "não registrada"}
           {resumo["motivo_origem"] ? ` — ${texto(resumo["motivo_origem"])}` : ""}
         </p>
         <p>
@@ -251,9 +251,7 @@ export function RegistroTurnoResumo({
             ? `Mensagem vinculada a este turno: ${saida.mensagemId}`
             : "Mensagem gravada ainda não vinculada a este turno"}
         </p>
-        {saida.faltando ? (
-          <p className="text-muted-foreground">Falta: {saida.faltando}</p>
-        ) : null}
+        {saida.faltando ? <p className="text-muted-foreground">Falta: {saida.faltando}</p> : null}
       </div>
 
       {lacunasVisiveis.length > 0 && (

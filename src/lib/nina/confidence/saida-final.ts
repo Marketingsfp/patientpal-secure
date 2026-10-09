@@ -236,7 +236,8 @@ async function encaminharComRecuperacao(
     let r: ResultadoFila;
     if (existente && existente.etapa === "encaminhamento_pendente") {
       r = await portas.consultarFila({ conversaId: e.conversaId, chave });
-      if (!r.confirmado) r = await portas.entrarNaFilaHumana({ conversaId: e.conversaId, motivo, chave });
+      if (!r.confirmado)
+        r = await portas.entrarNaFilaHumana({ conversaId: e.conversaId, motivo, chave });
     } else {
       try {
         r = await portas.entrarNaFilaHumana({ conversaId: e.conversaId, motivo, chave });
@@ -314,11 +315,7 @@ export async function decidirSaidaFinal(e: EntradaSaidaFinal): Promise<SaidaFina
   };
 
   // 1. Texto mudou depois da avaliação → reavaliar, nunca entregar no escuro.
-  if (
-    e.hashAvaliado != null &&
-    e.hashTextoFinal != null &&
-    e.hashAvaliado !== e.hashTextoFinal
-  ) {
+  if (e.hashAvaliado != null && e.hashTextoFinal != null && e.hashAvaliado !== e.hashTextoFinal) {
     await emitir("saida_final.reavaliar", { conversaId: e.conversaId, turnoId: e.turnoId });
     return {
       ...base,
@@ -355,7 +352,9 @@ export async function decidirSaidaFinal(e: EntradaSaidaFinal): Promise<SaidaFina
       // Só marca apresentação quando o candidato REALMENTE saiu.
       apresentacaoConcluida: entrega && e.candidatoTemApresentacao === true,
       divergenciaComRecomendacao: false,
-      motivo: entrega ? e.pontuacao!.motivoDecisao : `decisao_intermediaria:${e.pontuacao!.decisao}`,
+      motivo: entrega
+        ? e.pontuacao!.motivoDecisao
+        : `decisao_intermediaria:${e.pontuacao!.decisao}`,
       erroTelemetria,
     };
   }

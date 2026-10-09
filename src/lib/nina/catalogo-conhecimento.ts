@@ -1,7 +1,22 @@
-import { atendimentosEstruturados, textoAtendimentos, pagamentosJaDescritos, lerEstrutura, modalidadeEstruturada, INSTRUCAO_ESTRUTURA_CATALOGO } from "./catalogo-estrutura";
+import {
+  atendimentosEstruturados,
+  textoAtendimentos,
+  pagamentosJaDescritos,
+  lerEstrutura,
+  modalidadeEstruturada,
+  INSTRUCAO_ESTRUTURA_CATALOGO,
+} from "./catalogo-estrutura";
 import { mapaCamposResultado } from "./catalogo-mapa-campos";
-import { horariosPorTipo, corrigirResumoLegado, escalaLegadaExecutante } from "./horarios-por-atendimento";
-import { selecionarAtendimentosConsulta, nomeCompletoConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
+import {
+  horariosPorTipo,
+  corrigirResumoLegado,
+  escalaLegadaExecutante,
+} from "./horarios-por-atendimento";
+import {
+  selecionarAtendimentosConsulta,
+  nomeCompletoConsulta,
+  type EscopoAtendimentoConsulta,
+} from "./atendimento-consulta";
 /**
  * FASE 5 — CATÁLOGO COMO FONTE DE CONHECIMENTO DA NINA (regras puras).
  *
@@ -68,7 +83,9 @@ export function unidadeDoProfissional(p: ProfissionalPublicado): string | null {
 }
 
 function lista(v: unknown): Array<Record<string, unknown>> {
-  return Array.isArray(v) ? (v.filter((i) => i && typeof i === "object") as Array<Record<string, unknown>>) : [];
+  return Array.isArray(v)
+    ? (v.filter((i) => i && typeof i === "object") as Array<Record<string, unknown>>)
+    : [];
 }
 
 function texto(v: unknown): string | null {
@@ -129,19 +146,37 @@ export function avisoVigente(
 
 /** Serviço publicado → registro no formato que as ferramentas já consomem. */
 export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
-  const executantes: Record<string, unknown>[] = lista(s.executantes).map(e => ({ ...e,
-    ...(e.tipo_escala === "exame_procedimento" ? {} : escalaLegadaExecutante(e.horarios, e.observacao, "exame_procedimento")) }));
+  const executantes: Record<string, unknown>[] = lista(s.executantes).map((e) => ({
+    ...e,
+    ...(e.tipo_escala === "exame_procedimento"
+      ? {}
+      : escalaLegadaExecutante(e.horarios, e.observacao, "exame_procedimento")),
+  }));
   let descricao = s.descricao_publica;
   for (const [i, anterior] of lista(s.executantes).entries()) {
     const atual = executantes[i]!;
     if (anterior.horarios === atual.horarios || !descricao) continue;
-    descricao = descricao.split(/\n\s*\n/).map(bloco =>
-      bloco.split(/\r?\n/).some(l => l.trim() === `Profissional: ${anterior.nome}`)
-        ? corrigirResumoLegado(bloco, String(anterior.horarios ?? ""), String(atual.horarios ?? "Horários não informados"))! : bloco).join("\n\n");
+    descricao = descricao
+      .split(/\n\s*\n/)
+      .map((bloco) =>
+        bloco.split(/\r?\n/).some((l) => l.trim() === `Profissional: ${anterior.nome}`)
+          ? corrigirResumoLegado(
+              bloco,
+              String(anterior.horarios ?? ""),
+              String(atual.horarios ?? "Horários não informados"),
+            )!
+          : bloco,
+      )
+      .join("\n\n");
   }
   s = { ...s, executantes, descricao_publica: descricao };
   const estrutura = lerEstrutura(s.estrutura);
-  const atendimentos = atendimentosEstruturados(s.descricao_publica, s.estrutura, undefined, s.nome);
+  const atendimentos = atendimentosEstruturados(
+    s.descricao_publica,
+    s.estrutura,
+    undefined,
+    s.nome,
+  );
   const dinheiro = precoPorForma(s.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(s.formas_pagamento, /cart/i);
   const resumo = valorResumo({
@@ -154,8 +189,16 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
     categoria: "EXAME_PROCEDIMENTO",
     tipo: "servico",
     procedimento: s.nome,
-    medico: executantes.map((e) => texto(e["nome"])).filter(Boolean).join(", ") || null,
-    dia: executantes.map((e) => texto(e["horarios"])).filter(Boolean).join(" | ") || null,
+    medico:
+      executantes
+        .map((e) => texto(e["nome"]))
+        .filter(Boolean)
+        .join(", ") || null,
+    dia:
+      executantes
+        .map((e) => texto(e["horarios"]))
+        .filter(Boolean)
+        .join(" | ") || null,
     horario: null,
     // Valor genérico ou preço PIX não comprova pagamento em dinheiro.
     preco_dinheiro: dinheiro,
@@ -168,13 +211,22 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
           ? `Valor de referência: R$ ${resumo.toFixed(2).replace(".", ",")} (forma de pagamento não informada)`
           : null,
         texto(s.restricoes) ? `Requisitos: ${texto(s.restricoes)}` : null,
-        estrutura.pedido_medico === "obrigatorio" ? "Pedido médico: obrigatório para realizar este exame/procedimento."
-          : estrutura.pedido_medico === "dispensado" ? "Pedido médico: dispensado para este exame/procedimento." : null,
-        pagamentosJaDescritos(s.formas_pagamento, atendimentos) ? null : descricaoPagamentos(s.formas_pagamento),
+        estrutura.pedido_medico === "obrigatorio"
+          ? "Pedido médico: obrigatório para realizar este exame/procedimento."
+          : estrutura.pedido_medico === "dispensado"
+            ? "Pedido médico: dispensado para este exame/procedimento."
+            : null,
+        pagamentosJaDescritos(s.formas_pagamento, atendimentos)
+          ? null
+          : descricaoPagamentos(s.formas_pagamento),
       ]
         .filter(Boolean)
         .join(" | ") || null,
-    preparo: texto(s.preparo) ?? (estrutura.preparo_status === "sem_preparo" ? "A clínica confirmou que não exige preparo." : null),
+    preparo:
+      texto(s.preparo) ??
+      (estrutura.preparo_status === "sem_preparo"
+        ? "A clínica confirmou que não exige preparo."
+        : null),
     linha_origem: null,
     aba_origem: "Catálogo — exames e procedimentos",
     extras: {
@@ -209,27 +261,43 @@ export function profissionalParaRegistro(
 ): RegistroConhecimento {
   const horariosOriginais = lista(p.horarios);
   const horariosConsulta = horariosPorTipo(horariosOriginais, "consulta");
-  if (horariosConsulta.length !== horariosOriginais.length) p = { ...p, horarios: horariosConsulta,
-    observacao_publica: corrigirResumoLegado(p.observacao_publica, resumoHorarios(horariosOriginais as never), resumoHorarios(horariosConsulta as never)) };
+  if (horariosConsulta.length !== horariosOriginais.length)
+    p = {
+      ...p,
+      horarios: horariosConsulta,
+      observacao_publica: corrigirResumoLegado(
+        p.observacao_publica,
+        resumoHorarios(horariosOriginais as never),
+        resumoHorarios(horariosConsulta as never),
+      ),
+    };
   const especialidades = nomesVinculos(p.especialidades);
   const estrutura = lerEstrutura(p.estrutura);
-  const atendimentos = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome, "Consulta");
+  const atendimentos = atendimentosEstruturados(
+    p.observacao_publica,
+    p.estrutura,
+    p.nome,
+    "Consulta",
+  );
   const convenios = nomesVinculos(p.convenios);
   const horarios = lista(p.horarios) as Array<Record<string, unknown>>;
   const dinheiro = precoPorForma(p.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(p.formas_pagamento, /cart/i);
   const aviso = avisoVigente(p, hojeISO);
   const selecionados = escopo ? selecionarAtendimentosConsulta(atendimentos, escopo) : [];
-  const modalidade = modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento,
-    selecionados.length ? selecionados : undefined);
+  const modalidade = modalidadeEstruturada(
+    p.observacao_publica,
+    p.estrutura,
+    p.nome,
+    p.tipo_atendimento,
+    selecionados.length ? selecionados : undefined,
+  );
 
   return {
     id: p.id,
     categoria: "CONSULTA",
     tipo: "profissional",
-    procedimento: especialidades.length
-      ? `Consulta — ${especialidades.join(", ")}`
-      : "Consulta",
+    procedimento: especialidades.length ? `Consulta — ${especialidades.join(", ")}` : "Consulta",
     medico: p.nome,
     dia: horarios.length
       ? [
@@ -245,19 +313,30 @@ export function profissionalParaRegistro(
     preco_cartao: cartao,
     observacoes:
       [
-        texto(p.tipo_atendimento) ? `${interpretarModalidade(p.tipo_atendimento) ? "Modalidade" : "Classificação do cadastro (não define modalidade)"}: ${texto(p.tipo_atendimento)}` : null,
+        texto(p.tipo_atendimento)
+          ? `${interpretarModalidade(p.tipo_atendimento) ? "Modalidade" : "Classificação do cadastro (não define modalidade)"}: ${texto(p.tipo_atendimento)}`
+          : null,
         p.atende_consultorio === null
           ? null
           : p.atende_consultorio
             ? "Atende no consultório."
             : "Não atende no consultório.",
-        convenios.length ? `Convênios: ${convenios.join(", ")}` : estrutura.convenios_status === "nao_aceita" ? "A clínica confirmou que não aceita convênios neste atendimento." : null,
+        convenios.length
+          ? `Convênios: ${convenios.join(", ")}`
+          : estrutura.convenios_status === "nao_aceita"
+            ? "A clínica confirmou que não aceita convênios neste atendimento."
+            : null,
         unidadeDoProfissional(p) ? `Unidade: ${unidadeDoProfissional(p)}` : null,
         texto(atendimentos.length ? textoAtendimentos(atendimentos) : p.observacao_publica),
-        estrutura.pedido_medico === "obrigatorio" ? "Pedido médico: obrigatório para este atendimento."
-          : estrutura.pedido_medico === "dispensado" ? "Pedido médico: dispensado para este atendimento." : null,
+        estrutura.pedido_medico === "obrigatorio"
+          ? "Pedido médico: obrigatório para este atendimento."
+          : estrutura.pedido_medico === "dispensado"
+            ? "Pedido médico: dispensado para este atendimento."
+            : null,
         aviso ? `Aviso vigente: ${aviso}` : null,
-        pagamentosJaDescritos(p.formas_pagamento, atendimentos) ? null : descricaoPagamentos(p.formas_pagamento),
+        pagamentosJaDescritos(p.formas_pagamento, atendimentos)
+          ? null
+          : descricaoPagamentos(p.formas_pagamento),
       ]
         .filter(Boolean)
         .join(" | ") || null,
@@ -280,7 +359,9 @@ export function profissionalParaRegistro(
       pedido_medico: estrutura.pedido_medico,
       atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true,
       modalidade_atendimento: modalidade,
-      ...(selecionados.length ? { atendimentos_da_modalidade: selecionados.map(nomeCompletoConsulta) } : {}),
+      ...(selecionados.length
+        ? { atendimentos_da_modalidade: selecionados.map(nomeCompletoConsulta) }
+        : {}),
       orientacao_atendimento: modalidade ? orientacaoModalidade(modalidade) : null,
       especialidades,
       unidade: unidadeDoProfissional(p),
@@ -339,7 +420,6 @@ export function montarResultadoCatalogo(entrada: {
     entrada.priorizar === "profissional"
       ? [...deProfissionais, ...deServicos]
       : [...deServicos, ...deProfissionais];
-
 
   const traces = registros.map((r) => ({
     record_id: r.id ?? null,
@@ -406,9 +486,7 @@ export function montarResultadoCatalogo(entrada: {
     ],
     units: [
       ...new Set(
-        entrada.profissionais
-          .map(unidadeDoProfissional)
-          .filter((u): u is string => Boolean(u)),
+        entrada.profissionais.map(unidadeDoProfissional).filter((u): u is string => Boolean(u)),
       ),
     ],
     days: [...new Set(registros.map((r) => String(r.dia ?? "").trim()).filter(Boolean))],

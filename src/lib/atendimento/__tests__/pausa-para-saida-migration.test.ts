@@ -50,7 +50,11 @@ const novaConversaNaFila = async () => {
   return id;
 };
 const donoDe = async (id: string) =>
-  (await q("SELECT atribuida_user_id, status, fila_pendente FROM atend_conversas WHERE id=$1", [id]))[0];
+  (
+    await q("SELECT atribuida_user_id, status, fila_pendente FROM atend_conversas WHERE id=$1", [
+      id,
+    ])
+  )[0];
 
 const ESQUEMA = `
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
@@ -113,7 +117,11 @@ describe("Etapa 1 — pausa para almoço (migration)", () => {
     const r = await definir(ana, "PAUSA_SAIDA");
     expect(r.ok).toBe(true);
     expect(r.estado).toBe("PAUSA_SAIDA");
-    expect(await estadoDe(ana)).toEqual({ estado_manual: "PAUSA_SAIDA", status: "BUSY", aceita_novas: false });
+    expect(await estadoDe(ana)).toEqual({
+      estado_manual: "PAUSA_SAIDA",
+      status: "BUSY",
+      aceita_novas: false,
+    });
   });
 
   test("estado inválido continua recusado", async () => {
@@ -154,7 +162,10 @@ describe("Etapa 1 — pausa para almoço (migration)", () => {
 
   test("quem já tem conversa a mantém ao entrar em pausa; Bia em pausa não recebe as novas", async () => {
     await definir(ana, "PAUSA_SAIDA");
-    const antes = await q("SELECT count(*)::int AS n FROM atend_conversas WHERE atribuida_user_id=$1", [ana]);
+    const antes = await q(
+      "SELECT count(*)::int AS n FROM atend_conversas WHERE atribuida_user_id=$1",
+      [ana],
+    );
     expect(antes[0]!.n).toBe(15);
     const nova = await novaConversaNaFila();
     await q("SELECT public.atend_distribuir_fila_seguro($1, 200, 'teste', NULL)", [clinica]);
@@ -176,14 +187,20 @@ describe("Etapa 1 — pausa para almoço (migration)", () => {
     expect(await q("SELECT 1 FROM atend_pausas_log WHERE finalizada_em IS NULL")).toHaveLength(1);
     await definir(ana, "PAUSA_SAIDA");
     expect(await q("SELECT 1 FROM atend_pausas_log WHERE finalizada_em IS NULL")).toHaveLength(0);
-    const log = await q("SELECT estado FROM atend_presenca_manual_log WHERE user_id=$1 ORDER BY created_at DESC LIMIT 2", [ana]);
+    const log = await q(
+      "SELECT estado FROM atend_presenca_manual_log WHERE user_id=$1 ORDER BY created_at DESC LIMIT 2",
+      [ana],
+    );
     expect(log.map((l) => l.estado)).toEqual(["PAUSA_SAIDA", "PAUSA"]);
   });
 
   test("Pausa para almoço não aceita motivo de pausa", async () => {
     await como(ana);
     await expect(
-      q("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, $2)", [clinica, motivo]),
+      q("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, $2)", [
+        clinica,
+        motivo,
+      ]),
     ).rejects.toThrow();
   });
 });
@@ -220,28 +237,62 @@ describe("Etapa 2 — fim da fila individual (migration)", () => {
   });
 
   test("reservas existentes viram conversas normais da mesma pessoa, sem redistribuir", async () => {
-    const r = await q2("SELECT id, atribuida_user_id, status, fila_pendente FROM atend_conversas ORDER BY id");
+    const r = await q2(
+      "SELECT id, atribuida_user_id, status, fila_pendente FROM atend_conversas ORDER BY id",
+    );
     const por = Object.fromEntries(r.map((x) => [x.id, x]));
-    expect(por[reservada]).toMatchObject({ atribuida_user_id: ana, status: "active", fila_pendente: false });
-    expect(por[normal]).toMatchObject({ atribuida_user_id: ana, status: "active", fila_pendente: false });
+    expect(por[reservada]).toMatchObject({
+      atribuida_user_id: ana,
+      status: "active",
+      fila_pendente: false,
+    });
+    expect(por[normal]).toMatchObject({
+      atribuida_user_id: ana,
+      status: "active",
+      fila_pendente: false,
+    });
     expect(por[semDono]).toMatchObject({ atribuida_user_id: null, status: "waiting" });
   });
 
   test("gatilhos, política, índice e função de limite da reserva foram removidos", async () => {
     const nomes = async (sql: string) => (await q2(sql)).map((x) => x.n);
-    expect(await nomes("SELECT tgname AS n FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE '%fila_individual%'")).toEqual([]);
-    expect(await nomes("SELECT policyname AS n FROM pg_policies WHERE policyname = 'atend_fila_individual_privada'")).toEqual([]);
-    expect(await nomes("SELECT proname AS n FROM pg_proc WHERE proname IN ('atend_configurar_capacidade','atend_normalizar_fila_individual','atend_resposta_inicia_fila_individual')")).toEqual([]);
-    expect(await nomes("SELECT indexname AS n FROM pg_indexes WHERE indexname = 'atend_fila_individual_idx'")).toEqual([]);
+    expect(
+      await nomes(
+        "SELECT tgname AS n FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE '%fila_individual%'",
+      ),
+    ).toEqual([]);
+    expect(
+      await nomes(
+        "SELECT policyname AS n FROM pg_policies WHERE policyname = 'atend_fila_individual_privada'",
+      ),
+    ).toEqual([]);
+    expect(
+      await nomes(
+        "SELECT proname AS n FROM pg_proc WHERE proname IN ('atend_configurar_capacidade','atend_normalizar_fila_individual','atend_resposta_inicia_fila_individual')",
+      ),
+    ).toEqual([]);
+    expect(
+      await nomes(
+        "SELECT indexname AS n FROM pg_indexes WHERE indexname = 'atend_fila_individual_idx'",
+      ),
+    ).toEqual([]);
   });
 
   test("a conversa sem dono só é distribuída a quem fica Online, direto em Ativas", async () => {
     await q2("SELECT set_config('test.uid', $1, false)", [bia]);
-    await q2("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, NULL)", [clinica]);
+    await q2("SELECT public.atend_definir_presenca_manual($1, 'PAUSA_SAIDA', NULL, NULL)", [
+      clinica,
+    ]);
     await q2("SELECT public.atend_distribuir_fila_seguro($1, 200, 'teste', NULL)", [clinica]);
-    expect((await q2("SELECT atribuida_user_id FROM atend_conversas WHERE id=$1", [semDono]))[0]!.atribuida_user_id).toBeNull();
+    expect(
+      (await q2("SELECT atribuida_user_id FROM atend_conversas WHERE id=$1", [semDono]))[0]!
+        .atribuida_user_id,
+    ).toBeNull();
     await q2("SELECT public.atend_definir_presenca_manual($1, 'ONLINE', NULL, NULL)", [clinica]);
-    const [c] = await q2("SELECT atribuida_user_id, status, fila_pendente FROM atend_conversas WHERE id=$1", [semDono]);
+    const [c] = await q2(
+      "SELECT atribuida_user_id, status, fila_pendente FROM atend_conversas WHERE id=$1",
+      [semDono],
+    );
     expect(c).toMatchObject({ atribuida_user_id: bia, status: "active", fila_pendente: false });
   });
 });

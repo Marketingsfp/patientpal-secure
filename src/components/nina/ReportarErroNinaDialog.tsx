@@ -69,24 +69,24 @@ export function ReportarErroNinaBotao({
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={ROTULO_REPORTE}
-          title={ROTULO_REPORTE}
-          disabled={enviando}
-          aria-busy={enviando}
-          data-reportado={reportado ? "true" : undefined}
-          onClick={(e) => void clicar(e)}
-          className={
-            className ??
-            "mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-destructive text-destructive-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          }
-        >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="left">{ROTULO_REPORTE}</TooltipContent>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={ROTULO_REPORTE}
+            title={ROTULO_REPORTE}
+            disabled={enviando}
+            aria-busy={enviando}
+            data-reportado={reportado ? "true" : undefined}
+            onClick={(e) => void clicar(e)}
+            className={
+              className ??
+              "mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-destructive text-destructive-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            }
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">{ROTULO_REPORTE}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

@@ -111,9 +111,17 @@ describe("elegibilidade do perfil Telefonia", () => {
 
   it("H — sem nenhum Telefonia Online, ninguém é escolhido e a conversa aguarda", () => {
     const candidatos = [
-      cand("u1", { perfil_telefonia: false, elegivel: false, motivo_exclusao: "sem_perfil_telefonia" }),
+      cand("u1", {
+        perfil_telefonia: false,
+        elegivel: false,
+        motivo_exclusao: "sem_perfil_telefonia",
+      }),
       cand("u2", { em_pausa: true, elegivel: false, motivo_exclusao: "em_pausa" }),
-      cand("u3", { presence_status: "OFFLINE", elegivel: false, motivo_exclusao: "status_offline" }),
+      cand("u3", {
+        presence_status: "OFFLINE",
+        elegivel: false,
+        motivo_exclusao: "status_offline",
+      }),
       cand("u4", { admin: true, elegivel: false, motivo_exclusao: "admin_excluido" }),
     ];
     expect(candidatos.some((c) => c.elegivel)).toBe(false);

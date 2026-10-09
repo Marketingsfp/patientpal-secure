@@ -46,7 +46,10 @@ function fatosDe(registros: Registro[]): FatoRecuperado[] {
   return extrairEvidencia(retorno(registros)).fatos;
 }
 
-function contexto(fatos: FatoRecuperado[], ambiente: "producao" | "homologacao"): ContextoConfianca {
+function contexto(
+  fatos: FatoRecuperado[],
+  ambiente: "producao" | "homologacao",
+): ContextoConfianca {
   return {
     requestedAction: null,
     fatos,

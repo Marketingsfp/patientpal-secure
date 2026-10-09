@@ -32,7 +32,11 @@ export const LOTE_MAXIMO = 300;
 const invalidadas = new Map<string, number>();
 const ouvintes = new Set<() => void>();
 
-export function invalidarConfianca(clinicaId: string, execucaoId: string, agora = Date.now()): void {
+export function invalidarConfianca(
+  clinicaId: string,
+  execucaoId: string,
+  agora = Date.now(),
+): void {
   if (!clinicaId || !execucaoId) return;
   invalidadas.set(chaveCache(clinicaId, execucaoId), agora);
   for (const fn of ouvintes) fn();

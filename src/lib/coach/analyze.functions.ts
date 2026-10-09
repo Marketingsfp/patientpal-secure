@@ -101,8 +101,7 @@ const TOOL = {
         pontos_positivos: {
           type: "array",
           items: { type: "string" },
-          description:
-            "3 a 6 comportamentos que aproximaram o paciente do agendamento.",
+          description: "3 a 6 comportamentos que aproximaram o paciente do agendamento.",
         },
         pontos_negativos: {
           type: "array",
@@ -135,7 +134,8 @@ const TOOL = {
             },
             motivo: {
               type: "string",
-              description: "Por que agendou ou por que não agendou (1-2 frases, baseado na conversa).",
+              description:
+                "Por que agendou ou por que não agendou (1-2 frases, baseado na conversa).",
             },
             oportunidades_perdidas: {
               type: "array",
@@ -153,7 +153,13 @@ const TOOL = {
               description: "A próxima ação concreta para converter ou confirmar este agendamento.",
             },
           },
-          required: ["status", "motivo", "oportunidades_perdidas", "aderencia_script", "proxima_acao"],
+          required: [
+            "status",
+            "motivo",
+            "oportunidades_perdidas",
+            "aderencia_script",
+            "proxima_acao",
+          ],
           additionalProperties: false,
         },
         frases_destaque: {
@@ -200,7 +206,8 @@ const TOOL = {
             properties: {
               momento: {
                 type: "string",
-                description: "Etapa do atendimento (ex.: Abertura, Objeção de preço, Oferta de horário).",
+                description:
+                  "Etapa do atendimento (ex.: Abertura, Objeção de preço, Oferta de horário).",
               },
               dito: {
                 type: "string",
@@ -225,8 +232,14 @@ const TOOL = {
           description:
             "Uma curiosidade / detalhe pouco lembrado da TAP para a atendente memorizar. Varie o tema a cada análise.",
           properties: {
-            titulo: { type: "string", description: "Título curto (ex.: 'Bota de Unna soma dois valores')." },
-            conteudo: { type: "string", description: "A informação exata da tabela, em 1-2 frases." },
+            titulo: {
+              type: "string",
+              description: "Título curto (ex.: 'Bota de Unna soma dois valores').",
+            },
+            conteudo: {
+              type: "string",
+              description: "A informação exata da tabela, em 1-2 frases.",
+            },
             por_que_importa: {
               type: "string",
               description: "Em 1 frase, como isso ajuda a agendar sem erro.",

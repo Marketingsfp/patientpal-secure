@@ -145,7 +145,9 @@ describe("níveis e decisões graduais", () => {
     const r = decidirConfianca(
       ctx({
         draftText: "Seu cadastro está atualizado",
-        toolResults: [tool({ nome: "identificar_paciente", capacidade: "getPatient", fonte: "crm" })],
+        toolResults: [
+          tool({ nome: "identificar_paciente", capacidade: "getPatient", fonte: "crm" }),
+        ],
       }),
     );
     expect(r.level).toBe("MEDIUM");
@@ -156,7 +158,9 @@ describe("níveis e decisões graduais", () => {
     const r = decidirConfianca(
       ctx({
         draftText: "Seu cadastro está atualizado",
-        toolResults: [tool({ nome: "identificar_paciente", capacidade: "getPatient", fonte: "crm" })],
+        toolResults: [
+          tool({ nome: "identificar_paciente", capacidade: "getPatient", fonte: "crm" }),
+        ],
         businessContext: { ...negocio, esclarecimentoUsado: true },
       }),
     );

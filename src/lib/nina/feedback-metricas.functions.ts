@@ -14,21 +14,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { VALORES_CATEGORIA_FEEDBACK } from "@/lib/nina/feedback-erros";
+import { baldeLocal, dentroDoRecorte, descricaoRecorte } from "@/lib/nina/metricas-filtros";
 import {
-  baldeLocal,
-  dentroDoRecorte,
-  descricaoRecorte,
-} from "@/lib/nina/metricas-filtros";
-import { resolverRecorteNoCiclo as resolverRecorte, AVISO_CICLO_APRENDIZADO } from "./ciclo-aprendizado";
+  resolverRecorteNoCiclo as resolverRecorte,
+  AVISO_CICLO_APRENDIZADO,
+} from "./ciclo-aprendizado";
 
-const STATUS = [
-  "pending",
-  "under_review",
-  "approved",
-  "rejected",
-  "applied",
-  "reverted",
-] as const;
+const STATUS = ["pending", "under_review", "approved", "rejected", "applied", "reverted"] as const;
 
 const CAUSAS = [
   "knowledge_error",
@@ -92,7 +84,6 @@ type Linha = {
   created_at: string;
 };
 
-
 function contar<T extends string>(valores: readonly T[], linhas: string[]) {
   const mapa = Object.fromEntries(valores.map((v) => [v, 0])) as Record<T, number>;
   for (const v of linhas) if (v in mapa) mapa[v as T] += 1;
@@ -139,9 +130,7 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
 
     const { data: linhas, error } = await q;
     if (error) throw new Error(error.message);
-    const itens = ((linhas ?? []) as Linha[]).filter((l) =>
-      dentroDoRecorte(l.created_at, recorte),
-    );
+    const itens = ((linhas ?? []) as Linha[]).filter((l) => dentroDoRecorte(l.created_at, recorte));
 
     // Volume de respostas da Nina no mesmo recorte, para a taxa de erro.
     // Filtros específicos de erro NÃO reduzem este denominador.
@@ -203,11 +192,12 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
       taxaErroSistema: mensagensTotais ? (errosSistema / mensagensTotais) * 100 : null,
       ambiente: data.ambiente,
     };
-    const serieOperacional = new Map(
-      (op?.serie ?? []).map((p) => [p.periodo, p] as const),
-    );
+    const serieOperacional = new Map((op?.serie ?? []).map((p) => [p.periodo, p] as const));
 
-    const porStatus = contar(STATUS, itens.map((i) => i.status));
+    const porStatus = contar(
+      STATUS,
+      itens.map((i) => i.status),
+    );
     const porCausa = contar(
       CAUSAS,
       itens.map((i) => i.root_cause ?? ""),
@@ -239,7 +229,13 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
     // considerando apenas a faixa selecionada em cada dia.
     const serie = new Map<
       string,
-      { periodo: string; reportados: number; aplicados: number; revertidos: number; execucoes: number }
+      {
+        periodo: string;
+        reportados: number;
+        aplicados: number;
+        revertidos: number;
+        execucoes: number;
+      }
     >();
     const garantir = (chave: string) => {
       const atual = serie.get(chave);
@@ -256,7 +252,6 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
     }
     for (const e of execucoes)
       garantir(baldeLocal(e.created_at, data.granularidade, recorte.fuso)).execucoes += 1;
-
 
     for (const p of serieOperacional.values()) garantir(p.periodo);
 
@@ -319,7 +314,6 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
         filtrosErroAtivos,
       },
     };
-
   });
 
 /**

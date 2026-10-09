@@ -1,11 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { estadoVazio, type EstadoFluxoNina } from "../fluxo-estado.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
-import {
-  avaliarIntencaoAgendar,
-  blocoPromptFase3,
-  dadosFaltantes,
-} from "../atendimento-fase3";
+import { avaliarIntencaoAgendar, blocoPromptFase3, dadosFaltantes } from "../atendimento-fase3";
 
 function estado(mod: (e: EstadoFluxoNina) => void = () => {}): EstadoFluxoNina {
   const e = estadoVazio();
@@ -14,9 +10,14 @@ function estado(mod: (e: EstadoFluxoNina) => void = () => {}): EstadoFluxoNina {
 }
 
 function confirmarAtendimento(e: EstadoFluxoNina) {
-  Object.assign(e.appointment, { procedure: "Consulta", doctor_id: "medico",
-    slot_inicio: "2030-01-01T14:00:00Z", slot_fim: "2030-01-01T14:30:00Z",
-    slot_confirmed_by_patient: true, intent_confirmed: true });
+  Object.assign(e.appointment, {
+    procedure: "Consulta",
+    doctor_id: "medico",
+    slot_inicio: "2030-01-01T14:00:00Z",
+    slot_fim: "2030-01-01T14:30:00Z",
+    slot_confirmed_by_patient: true,
+    intent_confirmed: true,
+  });
   resumoEntregueFixture(e, "clinica", false);
   e.appointment.intent_confirmed = true;
 }
@@ -35,7 +36,9 @@ describe("confirmação de intenção de agendar", () => {
     expect(avaliarIntencaoAgendar("Quero esse horário", estado()).confirmado).toBe(true);
   });
   it('"gostaria de fazer o agendamento" confirma', () => {
-    expect(avaliarIntencaoAgendar("Gostaria de fazer o agendamento", estado()).confirmado).toBe(true);
+    expect(avaliarIntencaoAgendar("Gostaria de fazer o agendamento", estado()).confirmado).toBe(
+      true,
+    );
   });
   it('"sim" só confirma quando existe vaga na mesa', () => {
     expect(avaliarIntencaoAgendar("sim", estado()).confirmado).toBe(false);
@@ -70,7 +73,9 @@ describe("coleta de dados", () => {
   });
 
   it("intenção sem vaga definida não inicia coleta", () => {
-    expect(blocoPromptFase3({ mensagem: "Quero agendar", estado: estado() })).toContain("Ainda NÃO colete dados cadastrais");
+    expect(blocoPromptFase3({ mensagem: "Quero agendar", estado: estado() })).toContain(
+      "Ainda NÃO colete dados cadastrais",
+    );
   });
 
   it("nome já informado → pede só o que falta", () => {

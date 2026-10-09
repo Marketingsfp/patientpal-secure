@@ -33,12 +33,17 @@ test.describe("administrador — supervisão", () => {
     if (await enviar.count()) await expect(enviar.first()).toBeDisabled();
   });
 
-  test("a lista de destinos da transferência mostra presença e exclui administradores", async ({ page }) => {
+  test("a lista de destinos da transferência mostra presença e exclui administradores", async ({
+    page,
+  }) => {
     await entrar(page, admin!);
     await abrirAtendimento(page);
     await listaConversas(page).first().click();
 
-    await page.getByRole("button", { name: /transferir/i }).first().click();
+    await page
+      .getByRole("button", { name: /transferir/i })
+      .first()
+      .click();
     const painel = page.getByRole("dialog");
     await expect(painel).toBeVisible();
 

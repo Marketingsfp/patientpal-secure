@@ -51,15 +51,17 @@ export function AnaliseErroIAResultado({
   if (analise.status === "failed") {
     return (
       <p className="text-xs text-destructive">
-        A análise falhou (versão {analise.versao}): {analise.erro ?? "motivo não registrado"}. Nenhum
-        resultado foi gerado.
+        A análise falhou (versão {analise.versao}): {analise.erro ?? "motivo não registrado"}.
+        Nenhum resultado foi gerado.
       </p>
     );
   }
 
   const r = analise.resultado;
   if (!r) {
-    return <p className="text-xs text-muted-foreground">Análise concluída sem resultado legível.</p>;
+    return (
+      <p className="text-xs text-muted-foreground">Análise concluída sem resultado legível.</p>
+    );
   }
 
   return (
@@ -166,8 +168,8 @@ export function AnaliseErroIAResultado({
             </p>
           )}
           <p className="text-xs text-muted-foreground">
-            <span className="font-medium">Ambiente:</span> {r.proposta.ambiente ?? "não informado"} ·{" "}
-            <span className="font-medium">Alcance:</span>{" "}
+            <span className="font-medium">Ambiente:</span> {r.proposta.ambiente ?? "não informado"}{" "}
+            · <span className="font-medium">Alcance:</span>{" "}
             {r.proposta.escopo === "global"
               ? "todas as clínicas"
               : r.proposta.escopo === "local"

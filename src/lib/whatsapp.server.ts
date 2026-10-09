@@ -2,8 +2,18 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone, telefoneParaFiltro } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraNaClinica } from "@/lib/nina-agora";
-import { encaminhamentoSemRegistro, MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO, respostaSemRegistro, AVISO_SIMULACAO_ENCAMINHAMENTO } from "@/lib/nina/catalogo-sem-registro";
-import { resultadoExigeHumano, evidenciaRegraHumano, motivoRegraHumano } from "@/lib/nina/regras-catalogo";
+import {
+  encaminhamentoSemRegistro,
+  MOTIVO_SEM_REGISTRO,
+  MOTIVO_MEDICO_SEM_REGISTRO,
+  respostaSemRegistro,
+  AVISO_SIMULACAO_ENCAMINHAMENTO,
+} from "@/lib/nina/catalogo-sem-registro";
+import {
+  resultadoExigeHumano,
+  evidenciaRegraHumano,
+  motivoRegraHumano,
+} from "@/lib/nina/regras-catalogo";
 import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 
 import { normalizar } from "@/lib/nina-especialidade";
@@ -357,7 +367,6 @@ function normalizarTelefoneRemetente(from: string | null | undefined): string | 
   return normalizarTelefone(from);
 }
 
-
 /**
  * Estado de identidade da conversa (por telefone), para a Nina não repetir a
  * confirmação de identidade a cada resposta.
@@ -442,7 +451,6 @@ export async function carregarEstadoIdentidade(
       memoriaDesde: fim ?? null,
     };
   }
-
 
   const { data: nova } = await supabaseAdmin
     .from("atend_conversas")
@@ -569,20 +577,27 @@ export async function gerarRespostaNina(
         const { resultado, coletor } = await comColetor(async (c) => {
           await conferirReserva();
           if (opcoes?.mensagensEntrada?.length) c.mensagensEntrada(opcoes.mensagensEntrada);
-          const texto = await comCatalogoDoTurno(clinicaId, () => gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
-            ...opcoes,
-            auditoria,
-            rastro,
-            validarReservaTurno: conferirReserva,
-          }));
+          const texto = await comCatalogoDoTurno(clinicaId, () =>
+            gerarRespostaNinaInterno(clinicaId, mensagemPaciente, telefoneRemetente, {
+              ...opcoes,
+              auditoria,
+              rastro,
+              validarReservaTurno: conferirReserva,
+            }),
+          );
           // Inclui saídas antecipadas do gate e chamadores sem transporte.
           const { formatarMensagemNina } = await import("@/lib/nina/resposta/formato-mobile");
           const formatado = formatarMensagemNina(texto);
           if (formatado !== texto) {
-            const { registrarTransformacaoResposta } = await import("@/lib/nina/rastreio/turno.server");
+            const { registrarTransformacaoResposta } =
+              await import("@/lib/nina/rastreio/turno.server");
             const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
-            registrarTransformacaoResposta({ etapa: "formato.mobile", motivo: "Organização para celular e remoção de emojis",
-              antesHash: hashDoTexto(texto), depoisHash: hashDoTexto(formatado) });
+            registrarTransformacaoResposta({
+              etapa: "formato.mobile",
+              motivo: "Organização para celular e remoção de emojis",
+              antesHash: hashDoTexto(texto),
+              depoisHash: hashDoTexto(formatado),
+            });
           }
           return formatado;
         });
@@ -624,9 +639,7 @@ export async function gerarRespostaNina(
 
   // Gravação AGUARDADA: nada depende de tarefa que o runtime possa abandonar.
   await gravarResumoTurno(registro);
-  const { descarregarRastroAguardando } = await import(
-    "@/lib/nina/arquitetura/tracing.server"
-  );
+  const { descarregarRastroAguardando } = await import("@/lib/nina/arquitetura/tracing.server");
   await descarregarRastroAguardando(clinicaId, rastro);
 
   if (!saida.ok) throw saida.erro;
@@ -691,11 +704,17 @@ async function gerarRespostaNinaInterno(
       Promise.resolve(null as import("@/lib/nina/identidade-paciente").BuscaIdentidade | null),
       Promise.resolve({ data: [] as any[] }),
       Promise.resolve({ data: [] as any[] }),
-      carregarEstadoIdentidade(clinicaId, telefoneRemetente ? String(telefoneRemetente) : null, opcoes?.conversaId),
+      carregarEstadoIdentidade(
+        clinicaId,
+        telefoneRemetente ? String(telefoneRemetente) : null,
+        opcoes?.conversaId,
+      ),
       telefoneHistorico
         ? supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("id, direction, body, created_at, conversa_id, status, is_teste, enviada_por, tipo, transcricao")
+            .select(
+              "id, direction, body, created_at, conversa_id, status, is_teste, enviada_por, tipo, transcricao",
+            )
             .eq("clinica_id", clinicaId)
             // Marcadores de sistema (divisores de ciclo, avisos internos) são
             // só para leitura humana: nunca entram no contexto do modelo.
@@ -703,7 +722,6 @@ async function gerarRespostaNinaInterno(
             .or(`from_number.eq.${telefoneHistorico},to_number.eq.${telefoneHistorico}`)
             .order("created_at", { ascending: false })
             .limit(10)
-
         : Promise.resolve({ data: [] as any[] }),
     ]);
 
@@ -856,9 +874,8 @@ async function gerarRespostaNinaInterno(
     await salvarEstadoIdentidade(estadoId, { identidade_confirmada: true });
   }
 
-  const { resolverIdentidadePaciente, fatosRemetente, primeiroNomeSeguro } = await import(
-    "@/lib/nina/identidade-paciente"
-  );
+  const { resolverIdentidadePaciente, fatosRemetente, primeiroNomeSeguro } =
+    await import("@/lib/nina/identidade-paciente");
   const identidadePaciente = resolverIdentidadePaciente(
     candidatoPeloNome
       ? { candidates: [candidatoPeloNome], viaCpf: pacienteInfo?.viaCpf ?? false }
@@ -879,7 +896,6 @@ async function gerarRespostaNinaInterno(
           ? `IDENTIDADE: existe um cadastro compatível com este número, mas NÃO está confirmado. Não trate a pessoa por esse nome nem use dados desse cadastro. Se for necessário para a ação pedida, peça a confirmação do nome em uma linha, no fim da resposta.`
           : `IDENTIDADE: ainda não identificada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
 
-
   // SESSÃO DA NINA (memória transitória com TTL deslizante, padrão 4h).
   // Encerrar a conversa NÃO apaga histórico, CRM, agendamentos nem Base: o que
   // vence é a MEMÓRIA de sessão. Dentro da janela, a Nina continua entendendo o
@@ -894,10 +910,12 @@ async function gerarRespostaNinaInterno(
   }
   const corteMemoria = Date.now() - ttlSessaoMinutos() * 60_000;
   const { protegerMensagemRecebida } = await import("@/lib/atendimento/links-entrada");
-  const msgsMemoria = (((histR as any)?.data ?? []) as any[]).map(protegerMensagemRecebida).filter((m: any) => {
-    const t = Date.parse(String(m?.created_at ?? ""));
-    return !Number.isFinite(t) || t >= corteMemoria;
-  });
+  const msgsMemoria = (((histR as any)?.data ?? []) as any[])
+    .map(protegerMensagemRecebida)
+    .filter((m: any) => {
+      const t = Date.parse(String(m?.created_at ?? ""));
+      return !Number.isFinite(t) || t >= corteMemoria;
+    });
 
   // Nome curto para a apresentação (o cadastro costuma trazer a unidade após um travessão).
   const nomeCurtoUnidade =
@@ -990,7 +1008,11 @@ async function gerarRespostaNinaInterno(
     // A sessão aberta neste turno começa na 1ª mensagem recebida, não no
     // processamento: senão os dados dessa mensagem somem do histórico.
     const { inicioSessaoComEntradas } = await import("@/lib/nina/sessao");
-    sessaoNina.estado = inicioSessaoComEntradas(sessaoNina.estado, msgsMemoria, opcoes?.mensagensEntrada ?? []);
+    sessaoNina.estado = inicioSessaoComEntradas(
+      sessaoNina.estado,
+      msgsMemoria,
+      opcoes?.mensagensEntrada ?? [],
+    );
   }
   const saudacaoObrigatoria = sessaoSaudacao.saudacaoObrigatoria;
   const jaSeApresentou = !saudacaoObrigatoria;
@@ -1037,10 +1059,8 @@ async function gerarRespostaNinaInterno(
     // origem da resposta. `cache` aqui é funcionamento normal (TTL); só é
     // fallback por erro quando não houve versão publicada utilizável.
     const { hashDoTexto: hashPrompt } = await import("@/lib/nina/confidence/hash");
-    const {
-      registrarVersaoPromptDoTurno,
-      registrarConversaDoTurno,
-    } = await import("@/lib/nina/rastreio/turno.server");
+    const { registrarVersaoPromptDoTurno, registrarConversaDoTurno } =
+      await import("@/lib/nina/rastreio/turno.server");
     registrarConversaDoTurno(estadoId.conversaId ?? null);
     registrarVersaoPromptDoTurno({
       escopo: "whatsapp",
@@ -1059,27 +1079,52 @@ async function gerarRespostaNinaInterno(
 
   // Fotos não compreendidas seguem a mesma regra nos dois transportes, antes do Jev/modelo.
   const { resolverFotosDoTurno } = await import("@/lib/nina/fotos.server");
-  const fotosOuEntradasNaoLidas = (opcoes?.mensagensEntrada ?? []).some(id =>
-    !msgsMemoria.some(m => m.id === id && m.tipo !== "image"));
-  const respostaFoto = fotosOuEntradasNaoLidas ? await resolverFotosDoTurno({ clinicaId, conversaId: estadoId.conversaId,
-    mensagensEntrada: opcoes?.mensagensEntrada ?? [], teste: opcoes?.teste === true,
-    desde: (sessaoNina.expirou || sessaoNina.saneouEncerramento) ? new Date().toISOString()
-      : sessaoNina.estado.session_started_at ?? new Date(corteMemoria).toISOString(), validar: conferirReserva,
-    obsoleta: async () => opcoes?.revisao?.valor ? (await import("@/lib/nina/revisao-conversa.server")).respostaObsoleta({
-      clinicaId, telefone: opcoes.revisao.telefone, revisaoProcessada: opcoes.revisao.valor }) : false }) : null;
+  const fotosOuEntradasNaoLidas = (opcoes?.mensagensEntrada ?? []).some(
+    (id) => !msgsMemoria.some((m) => m.id === id && m.tipo !== "image"),
+  );
+  const respostaFoto = fotosOuEntradasNaoLidas
+    ? await resolverFotosDoTurno({
+        clinicaId,
+        conversaId: estadoId.conversaId,
+        mensagensEntrada: opcoes?.mensagensEntrada ?? [],
+        teste: opcoes?.teste === true,
+        desde:
+          sessaoNina.expirou || sessaoNina.saneouEncerramento
+            ? new Date().toISOString()
+            : (sessaoNina.estado.session_started_at ?? new Date(corteMemoria).toISOString()),
+        validar: conferirReserva,
+        obsoleta: async () =>
+          opcoes?.revisao?.valor
+            ? (await import("@/lib/nina/revisao-conversa.server")).respostaObsoleta({
+                clinicaId,
+                telefone: opcoes.revisao.telefone,
+                revisaoProcessada: opcoes.revisao.valor,
+              })
+            : false,
+      })
+    : null;
   if (respostaFoto) {
     if (respostaFoto.estado === "entregar" && respostaFoto.origem === "midia") {
       const { apresentarRespostaDeFoto } = await import("@/lib/nina/fotos");
-      respostaFoto.texto = apresentarRespostaDeFoto(respostaFoto.texto, saudacaoObrigatoria,
-        identidadeEfetiva.ok ? { assistente: identidadeEfetiva.apresentacao.assistente,
-          estabelecimento: nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao) } : null);
+      respostaFoto.texto = apresentarRespostaDeFoto(
+        respostaFoto.texto,
+        saudacaoObrigatoria,
+        identidadeEfetiva.ok
+          ? {
+              assistente: identidadeEfetiva.apresentacao.assistente,
+              estabelecimento: nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao),
+            }
+          : null,
+      );
       // Persistir a sessão, não uma apresentação ainda não entregue. O próximo turno recupera
       // a saudação apenas da mensagem enviada, mantendo retries/falhas de entrega seguros.
       await conferirReserva();
       await persistirEstadoSessao(clinicaId, estadoId.conversaId, sessaoNina.estado);
     }
     if (rastro) rastro.ids.conversation_id = estadoId.conversaId;
-    (await import("@/lib/nina/rastreio/turno.server")).registrarConversaDoTurno(estadoId.conversaId);
+    (await import("@/lib/nina/rastreio/turno.server")).registrarConversaDoTurno(
+      estadoId.conversaId,
+    );
     if (opcoes?.auditoria) opcoes.auditoria.resultado = respostaFoto;
     rastro?.pular("llm.generate", "controle da leitura de fotos respondeu antes do modelo");
     return respostaFoto.texto;
@@ -1105,16 +1150,31 @@ async function gerarRespostaNinaInterno(
   // Fase 2: sinais acima do limite, ou falha de entendimento em 2 mensagens
   // seguidas SEM avanço do atendimento, encaminham para a recepção. Escolher
   // uma opção já oferecida nunca conta como falha. Erro/demora = fluxo atual.
-  const { perguntaNomeAtendimento, semNomePeloJev, perguntaNomeEntregue, textoPedirNomeAtendimento,
-    MOTIVO_NOME_NAO_INFORMADO, REGRA_SEM_INDICACAO, FERRAMENTA_NOME_ATENDIMENTO } =
-    await import("@/lib/nina/atendimento-sem-indicacao");
+  const {
+    perguntaNomeAtendimento,
+    semNomePeloJev,
+    perguntaNomeEntregue,
+    textoPedirNomeAtendimento,
+    MOTIVO_NOME_NAO_INFORMADO,
+    REGRA_SEM_INDICACAO,
+    FERRAMENTA_NOME_ATENDIMENTO,
+  } = await import("@/lib/nina/atendimento-sem-indicacao");
   // "consulta do coração" já diz qual atendimento: não é sintoma (07/10/2026).
-  const nomePopular = (await import("@/lib/nina/nome-popular-especialidade")).especialidadePorNomePopular(mensagemPaciente);
+  const nomePopular = (
+    await import("@/lib/nina/nome-popular-especialidade")
+  ).especialidadePorNomePopular(mensagemPaciente);
   let nomeAtendimentoAusente = false;
   let respostaNomeAtendimento = false;
-  const { perguntaAlteracaoAgendamento, alteracaoPeloJev, alteracaoExplicita, motivoAlteracao,
-    REGRA_CANCELAMENTO_REMARCACAO } = await import("@/lib/nina/cancelamento-remarcacao");
-  const reservaAtualParaAlteracao = (await import("@/lib/nina/agendamento-sessao")).reservaDaSessaoAtual(sessaoNina.estado);
+  const {
+    perguntaAlteracaoAgendamento,
+    alteracaoPeloJev,
+    alteracaoExplicita,
+    motivoAlteracao,
+    REGRA_CANCELAMENTO_REMARCACAO,
+  } = await import("@/lib/nina/cancelamento-remarcacao");
+  const reservaAtualParaAlteracao = (
+    await import("@/lib/nina/agendamento-sessao")
+  ).reservaDaSessaoAtual(sessaoNina.estado);
   let alteracaoSolicitada = alteracaoExplicita(mensagemPaciente, reservaAtualParaAlteracao);
   // Dois ou mais atendimentos na mesma mensagem vão para a equipe (regra de 06/10/2026).
   // A foto do pedido médico já chega como lista lida pelo sistema; texto livre é lido pelo Jev.
@@ -1122,12 +1182,17 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/multiplos-atendimentos");
   const itensPedidoFoto = itensDoPedidoLido(mensagemPaciente);
   let multiplosAtendimentos = itensPedidoFoto.length >= 2;
-  const perguntaNomeAnterior = perguntaNomeEntregue(msgsMemoria, { conversaId: estadoId.conversaId,
-    inicioSessao: sessaoNina.estado.session_started_at ?? null, teste: opcoes?.teste === true,
-    entradas: opcoes?.mensagensEntrada ?? [] });
+  const perguntaNomeAnterior = perguntaNomeEntregue(msgsMemoria, {
+    conversaId: estadoId.conversaId,
+    inicioSessao: sessaoNina.estado.session_started_at ?? null,
+    teste: opcoes?.teste === true,
+    entradas: opcoes?.mensagensEntrada ?? [],
+  });
   let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
   let jevPontuacoes: Record<string, number | null> | null = null;
-  let orientacaoIntencaoJev: import("@/lib/nina/jev-orientacao-intencao").OrientacaoIntencaoJev | null = null;
+  let orientacaoIntencaoJev:
+    | import("@/lib/nina/jev-orientacao-intencao").OrientacaoIntencaoJev
+    | null = null;
   /** Intenção do Jev com confiança alta (usada só para decidir a pré-busca). */
   let intencaoJevSegura: import("@/lib/nina/atendimento-fase1").IntencaoNina[] = [];
   try {
@@ -1137,7 +1202,8 @@ async function gerarRespostaNinaInterno(
       jev.jevAtivo(clinicaId, "fase2_encaminhamento", opcoes?.teste === true),
     ]);
     if (f1 || f2) {
-      const { perguntaIntencao, estadoIntencao, intencaoAplicavel } = await import("@/lib/nina/jev-intencao");
+      const { perguntaIntencao, estadoIntencao, intencaoAplicavel } =
+        await import("@/lib/nina/jev-intencao");
       const enc = await import("@/lib/nina/jev-encaminhamento");
       const ctxJev = await import("@/lib/nina/jev-contexto");
       const { respondeEscolhaDeHorarios } = await import("@/lib/nina/horarios-periodo");
@@ -1158,13 +1224,19 @@ async function gerarRespostaNinaInterno(
       const conversaJev = estadoId.conversaId ?? null;
       const [resultado, anterior, limitesClinica] = await Promise.all([
         // A leitura ampliada orienta a resposta; permissões de ferramentas seguem no fluxo.
-        jev.perguntarJev(estadoIntencao(mensagemPaciente, anteriores, contextoJev), perguntas, undefined, f1),
+        jev.perguntarJev(
+          estadoIntencao(mensagemPaciente, anteriores, contextoJev),
+          perguntas,
+          undefined,
+          f1,
+        ),
         jev.contagemAnteriorFase1(clinicaId, conversaJev, inicioCiclo),
         jev.limitesJev(clinicaId),
       ]);
       const respostas = resultado.ok ? resultado.respostas : null;
       nomeAtendimentoAusente = semNomePeloJev(respostas?.nome_atendimento) && !nomePopular;
-      alteracaoSolicitada = alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
+      alteracaoSolicitada =
+        alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
       // Pré-busca: aceita também o pedido dividido entre intenções compatíveis.
@@ -1178,8 +1250,9 @@ async function gerarRespostaNinaInterno(
       }
       if (f1 && resultado.ok) {
         const { orientarIntencaoJev } = await import("@/lib/nina/jev-orientacao-intencao");
-        orientacaoIntencaoJev = orientarIntencaoJev(resultado.observacaoIntencao,
-          [...new Set([...intencoesDetectadasTurno, ...intencoesTurno])]);
+        orientacaoIntencaoJev = orientarIntencaoJev(resultado.observacaoIntencao, [
+          ...new Set([...intencoesDetectadasTurno, ...intencoesTurno]),
+        ]);
         if (orientacaoIntencaoJev) {
           intencoesTurno = orientacaoIntencaoJev.intencoes;
           if (orientacaoIntencaoJev.pedidos.length) intencaoAmbiguaTurno = false;
@@ -1187,16 +1260,22 @@ async function gerarRespostaNinaInterno(
       }
       const { esclarecerFoiEntregue } = await import("@/lib/nina/jev-esclarecimento-entregue");
       const provaEsclarecimento = esclarecerFoiEntregue(msgsMemoria, {
-        clinicaId, conversaId: conversaJev, sessionId: sessaoNina.estado.session_id ?? null, desde: inicioCiclo,
-        teste: opcoes?.teste === true, entradasAtuais: opcoes?.mensagensEntrada ?? [],
-        entradasAnteriores: anterior?.mensagensEntrada ?? [], conhecimento: sessaoNina.estado.knowledge_context,
+        clinicaId,
+        conversaId: conversaJev,
+        sessionId: sessaoNina.estado.session_id ?? null,
+        desde: inicioCiclo,
+        teste: opcoes?.teste === true,
+        entradasAtuais: opcoes?.mensagensEntrada ?? [],
+        entradasAnteriores: anterior?.mensagensEntrada ?? [],
+        conhecimento: sessaoNina.estado.knowledge_context,
       });
       const contagem = respostas
         ? enc.contarDuvida({
             // Pergunta própria de entendimento (Fase 2), não a confiança da intenção.
             entendimento: respostas["entendimento"],
             // Escolha de uma opção, do período ou pedido de mais horários não é falta de entendimento.
-            selecaoValida: ctxJev.opcaoEscolhidaJev(mensagemPaciente, contextoJev.opcoes_oferecidas) !== null ||
+            selecaoValida:
+              ctxJev.opcaoEscolhidaJev(mensagemPaciente, contextoJev.opcoes_oferecidas) !== null ||
               respondeEscolhaDeHorarios(sessaoNina.estado, mensagemPaciente),
             marco: ctxJev.marcoAtendimento(sessaoNina.estado),
             anterior,
@@ -1206,8 +1285,14 @@ async function gerarRespostaNinaInterno(
           })
         : null;
       if (f2 && respostas) {
-        jevEncaminhamento = enc.decidirEncaminhamento(respostas, contagem, limitesClinica, mensagemPaciente);
-        if (nomeAtendimentoAusente && jevEncaminhamento?.motivo.startsWith("JEV_DUVIDA_REPETIDA")) jevEncaminhamento = null;
+        jevEncaminhamento = enc.decidirEncaminhamento(
+          respostas,
+          contagem,
+          limitesClinica,
+          mensagemPaciente,
+        );
+        if (nomeAtendimentoAusente && jevEncaminhamento?.motivo.startsWith("JEV_DUVIDA_REPETIDA"))
+          jevEncaminhamento = null;
         jevPontuacoes = {
           confianca_intencao: respostas["intencao"]?.confidence ?? null,
           entendimento: respostas["entendimento"]?.noul ?? null,
@@ -1217,26 +1302,64 @@ async function gerarRespostaNinaInterno(
           falhas_seguidas: contagem?.falhas ?? null,
         };
       }
-      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Contagem de entendimento do Jev conferida",
-        dados: { falhas_seguidas: contagem?.falhas ?? null,
-          esclarecimento_entregue: provaEsclarecimento, mensagens_entrada: opcoes?.mensagensEntrada ?? [],
-          motivo: "Saudação não conta; nova falha exige esclarecimento entregue entre entradas distintas." } });
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Contagem de entendimento do Jev conferida",
+        dados: {
+          falhas_seguidas: contagem?.falhas ?? null,
+          esclarecimento_entregue: provaEsclarecimento,
+          mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+          motivo:
+            "Saudação não conta; nova falha exige esclarecimento entregue entre entradas distintas.",
+        },
+      });
       // A Fase 1 é sempre registrada: a contagem da mensagem seguinte depende dela.
       await Promise.all([
         jev.registrarDecisaoJev({
-          clinicaId, conversationId: conversaJev, fase: "fase1_intencao", teste: opcoes?.teste === true,
-          perguntas, resultado, aplicada: escolhida !== null || nomeAtendimentoAusente || alteracaoPeloJev(respostas?.alteracao_agendamento) !== null, contagem,
+          clinicaId,
+          conversationId: conversaJev,
+          fase: "fase1_intencao",
+          teste: opcoes?.teste === true,
+          perguntas,
+          resultado,
+          aplicada:
+            escolhida !== null ||
+            nomeAtendimentoAusente ||
+            alteracaoPeloJev(respostas?.alteracao_agendamento) !== null,
+          contagem,
           orientacao: orientacaoIntencaoJev,
-          mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
-          contexto: f1 ? { observacao_intencao: { versao: "intencoes-v1", modo: "orientacao" },
-            contexto_interpretacao: { mensagens_anteriores: anteriores, contexto_atendimento: contextoJev,
-              inicio_ciclo: inicioCiclo, intencao_aplicada: escolhida } } : undefined,
+          mensagem: {
+            origem: "paciente",
+            texto: mensagemPaciente,
+            mensagensEntrada: opcoes?.mensagensEntrada,
+          },
+          contexto: f1
+            ? {
+                observacao_intencao: { versao: "intencoes-v1", modo: "orientacao" },
+                contexto_interpretacao: {
+                  mensagens_anteriores: anteriores,
+                  contexto_atendimento: contextoJev,
+                  inicio_ciclo: inicioCiclo,
+                  intencao_aplicada: escolhida,
+                },
+              }
+            : undefined,
         }),
         f2
           ? jev.registrarDecisaoJev({
-              clinicaId, conversationId: conversaJev, fase: "fase2_encaminhamento", teste: opcoes?.teste === true,
-              perguntas, resultado, aplicada: jevEncaminhamento !== null,
-              mensagem: { origem: "paciente", texto: mensagemPaciente, mensagensEntrada: opcoes?.mensagensEntrada },
+              clinicaId,
+              conversationId: conversaJev,
+              fase: "fase2_encaminhamento",
+              teste: opcoes?.teste === true,
+              perguntas,
+              resultado,
+              aplicada: jevEncaminhamento !== null,
+              mensagem: {
+                origem: "paciente",
+                texto: mensagemPaciente,
+                mensagensEntrada: opcoes?.mensagensEntrada,
+              },
             })
           : Promise.resolve(),
       ]);
@@ -1251,34 +1374,51 @@ async function gerarRespostaNinaInterno(
     // A regra administrativa precede cadastro, seleção e criação de reserva.
     // Possível urgência mantém prioridade, preservando também a causa administrativa.
     const motivo = motivoAlteracao(alteracaoSolicitada);
-    jevEncaminhamento = jevEncaminhamento?.urgencia === "alta"
-      ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${motivo}` }
-      : { motivo, urgencia: "normal" };
+    jevEncaminhamento =
+      jevEncaminhamento?.urgencia === "alta"
+        ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${motivo}` }
+        : { motivo, urgencia: "normal" };
     nomeAtendimentoAusente = false;
-    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Cancelamento e remarcação exclusivos da equipe",
-      dados: { pedido: alteracaoSolicitada, motivo, mensagens_entrada: opcoes?.mensagensEntrada ?? [] } });
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Cancelamento e remarcação exclusivos da equipe",
+      dados: {
+        pedido: alteracaoSolicitada,
+        motivo,
+        mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+      },
+    });
   } else if (multiplosAtendimentos) {
     // Mesma precedência administrativa: antes de catálogo, agenda e cadastro.
     const motivo = motivoMultiplos(itensPedidoFoto);
-    jevEncaminhamento = jevEncaminhamento?.urgencia === "alta"
-      ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${motivo}` }
-      : { motivo, urgencia: "normal" };
+    jevEncaminhamento =
+      jevEncaminhamento?.urgencia === "alta"
+        ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${motivo}` }
+        : { motivo, urgencia: "normal" };
     nomeAtendimentoAusente = false;
-    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Dois ou mais atendimentos na mesma mensagem: equipe",
-      dados: { origem: itensPedidoFoto.length >= 2 ? "pedido_medico_foto" : "jev", itens_foto: itensPedidoFoto,
-        motivo, mensagens_entrada: opcoes?.mensagensEntrada ?? [] },
-      codigo: { arquivo: "src/lib/nina/multiplos-atendimentos.ts", funcao: "multiplosPeloJev" } });
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Dois ou mais atendimentos na mesma mensagem: equipe",
+      dados: {
+        origem: itensPedidoFoto.length >= 2 ? "pedido_medico_foto" : "jev",
+        itens_foto: itensPedidoFoto,
+        motivo,
+        mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+      },
+      codigo: { arquivo: "src/lib/nina/multiplos-atendimentos.ts", funcao: "multiplosPeloJev" },
+    });
   }
   if (nomeAtendimentoAusente && !jevEncaminhamento) {
-    if (perguntaNomeAnterior) jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
+    if (perguntaNomeAnterior)
+      jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
     else respostaNomeAtendimento = true;
   }
 
   // Fatos de identificação do remetente. Nome/convênio/benefício só entram
   // quando a identidade está CONFIRMADA (FASE 4).
   const contextoRemetenteFato = fatosRemetente(identidadePaciente);
-
-
 
   // ---------------------------------------------------------------- agendar
   // Quando a flag está ligada nesta clínica, a Nina deixa de ser somente
@@ -1297,7 +1437,8 @@ async function gerarRespostaNinaInterno(
   // ------------------------------------------- estado estruturado do fluxo
   // Recarregado da própria conversa. É isto que faz o paciente já
   // identificado continuar identificado na mensagem seguinte.
-  const { normalizarEstado, salvarFluxoEstado: salvarFluxoSemGuarda } = await import("@/lib/nina/fluxo-estado.server");
+  const { normalizarEstado, salvarFluxoEstado: salvarFluxoSemGuarda } =
+    await import("@/lib/nina/fluxo-estado.server");
   const salvarFluxoEstado: typeof salvarFluxoSemGuarda = async (...args) => {
     await conferirReserva();
     return salvarFluxoSemGuarda(...args);
@@ -1309,7 +1450,10 @@ async function gerarRespostaNinaInterno(
   // paciente já vinculado à conversa → identidade CONFIRMADA nesta execução.
   // FASE 4: candidato compatível por telefone NÃO entra aqui.
   let pacienteIdEfetivo =
-    fluxoEstado.patient.id ?? estadoId.pacienteIdConversa ?? identidadePaciente.paciente?.id ?? null;
+    fluxoEstado.patient.id ??
+    estadoId.pacienteIdConversa ??
+    identidadePaciente.paciente?.id ??
+    null;
   let pacienteNomeEfetivo = identidadePaciente.paciente?.nome ?? null;
   if (pacienteIdEfetivo && !pacienteNomeEfetivo) {
     const { data: pRow } = await supabaseAdmin
@@ -1324,7 +1468,12 @@ async function gerarRespostaNinaInterno(
   // FASE 3: o vínculo só é gravado quando a identidade foi CONFIRMADA pelo
   // fluxo (identificação da Nina), nunca por coincidência de telefone.
   const vinculoConfirmado = Boolean(fluxoEstado.patient.id && fluxoEstado.patient.validated);
-  if (vinculoConfirmado && pacienteIdEfetivo && estadoId.conversaId && !estadoId.pacienteIdConversa) {
+  if (
+    vinculoConfirmado &&
+    pacienteIdEfetivo &&
+    estadoId.conversaId &&
+    !estadoId.pacienteIdConversa
+  ) {
     const { vincularPacienteConversa } = await import("@/lib/atendimento/vinculo-contato.server");
     await vincularPacienteConversa(supabaseAdmin as never, {
       clinicaId,
@@ -1341,7 +1490,6 @@ async function gerarRespostaNinaInterno(
       identified: true,
       validated: true,
     };
-
   }
 
   if (rastro && estadoId?.conversaId) rastro.ids.conversation_id = estadoId.conversaId;
@@ -1358,7 +1506,9 @@ async function gerarRespostaNinaInterno(
   })();
   const baseAtiva = catalogoPublicado.servicos > 0 || catalogoPublicado.profissionais > 0;
   const { alinharFonteDaSessao } = await import("@/lib/nina/fonte-consulta-sessao");
-  const fonteAlterada = catalogoPublicado.selecao ? alinharFonteDaSessao(fluxoEstado, catalogoPublicado.selecao) : false;
+  const fonteAlterada = catalogoPublicado.selecao
+    ? alinharFonteDaSessao(fluxoEstado, catalogoPublicado.selecao)
+    : false;
   rastro?.concluir("tool.knowledge.lookup", {
     base_ativa: baseAtiva,
     fonte_consulta: catalogoPublicado.selecao?.fonte ?? null,
@@ -1415,29 +1565,38 @@ async function gerarRespostaNinaInterno(
     }
   })();
 
-  const { consultaAgendaAguardandoPaciente } =
-    await import("@/lib/nina/consulta-agenda");
+  const { consultaAgendaAguardandoPaciente } = await import("@/lib/nina/consulta-agenda");
   const { historicoParaConsultaAgenda } = await import("@/lib/nina/consulta-agenda-historico");
   const idsDoTurno = new Set(opcoes?.mensagensEntrada ?? []);
   // A verificação da continuidade não pode usar o resumo truncado do modelo.
   // O count permite declarar explicitamente se o histórico da sessão veio completo.
   let historicoFluxoCompleto = false;
   let mensagensFluxo: Array<{
-    id: string; conversa_id: string | null; direction: string; body: string | null;
-    created_at: string; status: string | null; is_teste: boolean | null;
-    tipo?: string | null; transcricao?: string | null;
+    id: string;
+    conversa_id: string | null;
+    direction: string;
+    body: string | null;
+    created_at: string;
+    status: string | null;
+    is_teste: boolean | null;
+    tipo?: string | null;
+    transcricao?: string | null;
   }> = [];
   const inicioFluxo = sessaoNina.estado.session_started_at;
   if (estadoId.conversaId && inicioFluxo && Number.isFinite(Date.parse(inicioFluxo))) {
     const corteFluxo = new Date(Date.parse(inicioFluxo)).toISOString();
-    let consultaHistorico = supabaseAdmin.from("whatsapp_mensagens")
-      .select("id, conversa_id, direction, body, created_at, status, is_teste, tipo, transcricao", { count: "exact" })
+    let consultaHistorico = supabaseAdmin
+      .from("whatsapp_mensagens")
+      .select("id, conversa_id, direction, body, created_at, status, is_teste, tipo, transcricao", {
+        count: "exact",
+      })
       .eq("clinica_id", clinicaId)
       .eq("conversa_id", estadoId.conversaId)
       .gte("created_at", corteFluxo);
-    consultaHistorico = opcoes?.teste === true
-      ? consultaHistorico.eq("is_teste", true)
-      : consultaHistorico.or("is_teste.eq.false,is_teste.is.null");
+    consultaHistorico =
+      opcoes?.teste === true
+        ? consultaHistorico.eq("is_teste", true)
+        : consultaHistorico.or("is_teste.eq.false,is_teste.is.null");
     const h = await consultaHistorico.order("created_at", { ascending: true }).limit(1000);
     mensagensFluxo = (h.data ?? []).map(protegerMensagemRecebida);
     historicoFluxoCompleto = !h.error && h.count !== null && h.count === mensagensFluxo.length;
@@ -1478,59 +1637,131 @@ async function gerarRespostaNinaInterno(
   const { hashDoTexto: hashPrecedencia } = await import("@/lib/nina/confidence/hash");
   // Instruções adicionais do turno (esclarecimento, correção de rota) entram
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
-  const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
-  instrucoesAdicionaisTurno.push({ codigo: "CANCELAMENTO_REMARCACAO_HUMANO", nivel: "inegociavel",
-    origem: "src/lib/nina/cancelamento-remarcacao.ts", motivo: "Cancelamentos e remarcações são exclusivos da equipe humana.",
-    texto: REGRA_CANCELAMENTO_REMARCACAO });
-  instrucoesAdicionaisTurno.push({ codigo: "SEM_INDICACAO_CLINICA", nivel: "inegociavel",
-    origem: "src/lib/nina/atendimento-sem-indicacao.ts", motivo: "O paciente informa o atendimento; a Nina não faz indicação clínica.",
-    texto: REGRA_SEM_INDICACAO });
+  const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] =
+    [];
+  instrucoesAdicionaisTurno.push({
+    codigo: "CANCELAMENTO_REMARCACAO_HUMANO",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/cancelamento-remarcacao.ts",
+    motivo: "Cancelamentos e remarcações são exclusivos da equipe humana.",
+    texto: REGRA_CANCELAMENTO_REMARCACAO,
+  });
+  instrucoesAdicionaisTurno.push({
+    codigo: "SEM_INDICACAO_CLINICA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/atendimento-sem-indicacao.ts",
+    motivo: "O paciente informa o atendimento; a Nina não faz indicação clínica.",
+    texto: REGRA_SEM_INDICACAO,
+  });
   const { REGRA_DUAS_FALHAS_ENTENDIMENTO } = await import("@/lib/nina/jev-encaminhamento");
-  instrucoesAdicionaisTurno.push({ codigo: "ENTENDIMENTO_DUAS_FALHAS", nivel: "inegociavel",
-    origem: "src/lib/nina/jev-encaminhamento.ts", motivo: "Regra confirmada: duas mensagens do paciente sem entendimento encaminham.",
-    texto: REGRA_DUAS_FALHAS_ENTENDIMENTO });
-  const { criarProgressoTurno, criarCompactadorRetornos, REGRA_EFICIENCIA_CONSULTAS, REGRA_MODALIDADES_PAGAMENTO, RESPOSTA_SEM_PROGRESSO,
-    criarLimiteTurno, LIMITE_RODADAS_COMUM, LIMITE_RODADAS_LISTA, LIMITE_TOKENS_TURNO, LIMITE_CHAMADAS_MODELO,
-    INSTRUCAO_LIMITE_TURNO, INSTRUCAO_RESPOSTA_EM_TEXTO } =
-    await import("@/lib/nina/eficiencia-turno");
+  instrucoesAdicionaisTurno.push({
+    codigo: "ENTENDIMENTO_DUAS_FALHAS",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/jev-encaminhamento.ts",
+    motivo: "Regra confirmada: duas mensagens do paciente sem entendimento encaminham.",
+    texto: REGRA_DUAS_FALHAS_ENTENDIMENTO,
+  });
+  const {
+    criarProgressoTurno,
+    criarCompactadorRetornos,
+    REGRA_EFICIENCIA_CONSULTAS,
+    REGRA_MODALIDADES_PAGAMENTO,
+    RESPOSTA_SEM_PROGRESSO,
+    criarLimiteTurno,
+    LIMITE_RODADAS_COMUM,
+    LIMITE_RODADAS_LISTA,
+    LIMITE_TOKENS_TURNO,
+    LIMITE_CHAMADAS_MODELO,
+    INSTRUCAO_LIMITE_TURNO,
+    INSTRUCAO_RESPOSTA_EM_TEXTO,
+  } = await import("@/lib/nina/eficiencia-turno");
   instrucoesAdicionaisTurno.push(
-    { codigo: "CONSULTAS_SEM_REDUNDANCIA", origem: "src/lib/nina/eficiencia-turno.ts", motivo: "Reutilizar vínculos oficiais sem repetir pesquisas.", texto: REGRA_EFICIENCIA_CONSULTAS },
-    { codigo: "PAGAMENTO_COMPROVADO", nivel: "inegociavel", origem: "src/lib/nina/eficiencia-turno.ts", motivo: "Regra confirmada pelo responsável: Pix e cartão têm sempre o mesmo valor.", texto: REGRA_MODALIDADES_PAGAMENTO },
+    {
+      codigo: "CONSULTAS_SEM_REDUNDANCIA",
+      origem: "src/lib/nina/eficiencia-turno.ts",
+      motivo: "Reutilizar vínculos oficiais sem repetir pesquisas.",
+      texto: REGRA_EFICIENCIA_CONSULTAS,
+    },
+    {
+      codigo: "PAGAMENTO_COMPROVADO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/eficiencia-turno.ts",
+      motivo: "Regra confirmada pelo responsável: Pix e cartão têm sempre o mesmo valor.",
+      texto: REGRA_MODALIDADES_PAGAMENTO,
+    },
   );
   const { REGRA_RESPOSTA_AUDIO } = await import("@/lib/nina/audio");
   const { REGRA_CADASTRO_AGENDAMENTO } = await import("@/lib/nina/cadastro-paciente");
-  const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO, REGRA_SOMENTE_PRIMEIRO_HORARIO } = await import("@/lib/nina/prompt/consulta-agenda");
-  instrucoesAdicionaisTurno.push({ codigo: "SOMENTE_PRIMEIRO_HORARIO", nivel: "inegociavel",
-    origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "Pedido pela primeira vaga não solicita uma lista de alternativas.",
-    texto: REGRA_SOMENTE_PRIMEIRO_HORARIO });
+  const { REGRA_HORARIOS_HABITUAIS_PRIMEIRO, REGRA_SOMENTE_PRIMEIRO_HORARIO } =
+    await import("@/lib/nina/prompt/consulta-agenda");
+  instrucoesAdicionaisTurno.push({
+    codigo: "SOMENTE_PRIMEIRO_HORARIO",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/consulta-agenda.ts",
+    motivo: "Pedido pela primeira vaga não solicita uma lista de alternativas.",
+    texto: REGRA_SOMENTE_PRIMEIRO_HORARIO,
+  });
   const { REGRA_SELECAO_ATENDIMENTO_CONSULTA } = await import("@/lib/nina/atendimento-consulta");
-  instrucoesAdicionaisTurno.push({ codigo: "TIPO_CONSULTA_ANTES_AGENDA", nivel: "inegociavel",
-    origem: "src/lib/nina/atendimento-consulta.ts", motivo: "Distinguir consulta, revisão e noturna antes de vincular vagas.",
-    texto: REGRA_SELECAO_ATENDIMENTO_CONSULTA });
+  instrucoesAdicionaisTurno.push({
+    codigo: "TIPO_CONSULTA_ANTES_AGENDA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/atendimento-consulta.ts",
+    motivo: "Distinguir consulta, revisão e noturna antes de vincular vagas.",
+    texto: REGRA_SELECAO_ATENDIMENTO_CONSULTA,
+  });
   const { REGRA_ESCOLHA_PROFISSIONAL_NOMINAL } = await import("@/lib/nina/prompt/regras-catalogo");
-  const { REGRA_IDADE_NAO_INFORMADA } = await import("@/lib/nina/regras-administrativas-confirmadas");
-  instrucoesAdicionaisTurno.push({ codigo: "IDADE_NAO_INFORMADA_SEM_RESTRICAO", nivel: "inegociavel",
-    origem: "src/lib/nina/regras-administrativas-confirmadas.ts", motivo: "Regra confirmada: campo de idade não informado não cria restrição etária.",
-    texto: REGRA_IDADE_NAO_INFORMADA });
+  const { REGRA_IDADE_NAO_INFORMADA } =
+    await import("@/lib/nina/regras-administrativas-confirmadas");
+  instrucoesAdicionaisTurno.push({
+    codigo: "IDADE_NAO_INFORMADA_SEM_RESTRICAO",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+    motivo: "Regra confirmada: campo de idade não informado não cria restrição etária.",
+    texto: REGRA_IDADE_NAO_INFORMADA,
+  });
   const { REGRA_PRESERVAR_RESERVA } = await import("@/lib/nina/procedimento-sessao");
-  instrucoesAdicionaisTurno.push({ codigo: "PEDIDOS_PARALELOS_PRESERVAM_RESERVA", nivel: "inegociavel",
-    origem: "src/lib/nina/procedimento-sessao.ts", motivo: "Perguntas sobre outros exames não apagam a escolha ou o aceite do resumo entregue.",
-    texto: REGRA_PRESERVAR_RESERVA });
-  instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_PROFISSIONAL_NOMINAL", nivel: "inegociavel",
-    origem: "src/lib/nina/prompt/regras-catalogo.ts", motivo: "Setores e equipes não são opções de médicos para o paciente escolher.",
-    texto: REGRA_ESCOLHA_PROFISSIONAL_NOMINAL });
-  instrucoesAdicionaisTurno.push({ codigo: "ESCOLHA_ANTES_DOS_DETALHES", nivel: "inegociavel",
-    origem: "src/lib/nina/prompt/consulta-agenda.ts", motivo: "No agendamento, perguntar primeiro pela primeira vaga ou escolha dos profissionais; detalhar conforme a preferência.",
-    texto: REGRA_HORARIOS_HABITUAIS_PRIMEIRO });
-  instrucoesAdicionaisTurno.push({ codigo: "CADASTRO_PESSOA_ATENDIDA", nivel: "inegociavel",
-    origem: "src/lib/nina/cadastro-paciente.ts", motivo: "Dados da pessoa atendida com o WhatsApp do remetente, inclusive responsáveis.",
-    texto: REGRA_CADASTRO_AGENDAMENTO });
-  instrucoesAdicionaisTurno.push({ codigo: "FORMATO_AUDIO", origem: "src/lib/nina/audio.ts",
-    motivo: "O transporte responde em voz a áudio ou pedido explícito.", texto: REGRA_RESPOSTA_AUDIO });
+  instrucoesAdicionaisTurno.push({
+    codigo: "PEDIDOS_PARALELOS_PRESERVAM_RESERVA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/procedimento-sessao.ts",
+    motivo: "Perguntas sobre outros exames não apagam a escolha ou o aceite do resumo entregue.",
+    texto: REGRA_PRESERVAR_RESERVA,
+  });
+  instrucoesAdicionaisTurno.push({
+    codigo: "ESCOLHA_PROFISSIONAL_NOMINAL",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/regras-catalogo.ts",
+    motivo: "Setores e equipes não são opções de médicos para o paciente escolher.",
+    texto: REGRA_ESCOLHA_PROFISSIONAL_NOMINAL,
+  });
+  instrucoesAdicionaisTurno.push({
+    codigo: "ESCOLHA_ANTES_DOS_DETALHES",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/prompt/consulta-agenda.ts",
+    motivo:
+      "No agendamento, perguntar primeiro pela primeira vaga ou escolha dos profissionais; detalhar conforme a preferência.",
+    texto: REGRA_HORARIOS_HABITUAIS_PRIMEIRO,
+  });
+  instrucoesAdicionaisTurno.push({
+    codigo: "CADASTRO_PESSOA_ATENDIDA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/cadastro-paciente.ts",
+    motivo: "Dados da pessoa atendida com o WhatsApp do remetente, inclusive responsáveis.",
+    texto: REGRA_CADASTRO_AGENDAMENTO,
+  });
+  instrucoesAdicionaisTurno.push({
+    codigo: "FORMATO_AUDIO",
+    origem: "src/lib/nina/audio.ts",
+    motivo: "O transporte responde em voz a áudio ou pedido explícito.",
+    texto: REGRA_RESPOSTA_AUDIO,
+  });
   const { REGRA_FORMATO_MOBILE } = await import("@/lib/nina/resposta/formato-mobile");
-  instrucoesAdicionaisTurno.push({ codigo: "FORMATO_MOBILE_OBRIGATORIO",
-    origem: "src/lib/nina/resposta/formato-mobile.ts", motivo: "Organizar todas as mensagens para leitura no celular.",
-    texto: REGRA_FORMATO_MOBILE });
+  instrucoesAdicionaisTurno.push({
+    codigo: "FORMATO_MOBILE_OBRIGATORIO",
+    origem: "src/lib/nina/resposta/formato-mobile.ts",
+    motivo: "Organizar todas as mensagens para leitura no celular.",
+    texto: REGRA_FORMATO_MOBILE,
+  });
   const { instrucaoJevDoTurno } = await import("@/lib/nina/jev-orientacao-intencao");
   instrucoesAdicionaisTurno.push(...instrucaoJevDoTurno(orientacaoIntencaoJev));
   const { REGRA_CONSULTA_CATALOGO } = await import("@/lib/nina/catalogo-busca");
@@ -1544,27 +1775,45 @@ async function gerarRespostaNinaInterno(
   instrucoesAdicionaisTurno.push({
     codigo: "PRESERVAR_IDENTIDADE_ATENDIMENTO",
     origem: "src/lib/nina/prompt/identidade-atendimento.ts",
-    motivo: "Preservar Clínico Geral e separar a consulta da escolha do profissional nas pesquisas.",
+    motivo:
+      "Preservar Clínico Geral e separar a consulta da escolha do profissional nas pesquisas.",
     texto: REGRA_IDENTIDADE_ATENDIMENTO,
   });
-  const { REGRA_IDENTIFICACAO_UNIFICADA: regraIdentificacao } = await import("@/lib/nina/identificacao-catalogo");
+  const { REGRA_IDENTIFICACAO_UNIFICADA: regraIdentificacao } =
+    await import("@/lib/nina/identificacao-catalogo");
   const { REGRA_FINALIDADE_VACINA } = await import("@/lib/nina/finalidade-vacina");
-  instrucoesAdicionaisTurno.push({ codigo: "FINALIDADE_VACINA", nivel: "inegociavel", origem: "src/lib/nina/finalidade-vacina.ts",
-    motivo: "Preservar vacinação e distinguir falta de informação de dúvida de identificação.", texto: REGRA_FINALIDADE_VACINA });
-  instrucoesAdicionaisTurno.push({ codigo: "IDENTIFICACAO_UNIFICADA", nivel: "inegociavel", origem: "src/lib/nina/identificacao-catalogo.ts",
-    motivo: "Confirmação de candidatos e uma releitura inconclusiva antes do encaminhamento.", texto: regraIdentificacao });
+  instrucoesAdicionaisTurno.push({
+    codigo: "FINALIDADE_VACINA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/finalidade-vacina.ts",
+    motivo: "Preservar vacinação e distinguir falta de informação de dúvida de identificação.",
+    texto: REGRA_FINALIDADE_VACINA,
+  });
+  instrucoesAdicionaisTurno.push({
+    codigo: "IDENTIFICACAO_UNIFICADA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/identificacao-catalogo.ts",
+    motivo: "Confirmação de candidatos e uma releitura inconclusiva antes do encaminhamento.",
+    texto: regraIdentificacao,
+  });
   const { REGRA_DICIONARIO_PUBLICADO } = await import("@/lib/nina/dicionario-leitura");
-  const { REGRA_FOTO_PEDIDO_MEDICO, atualizarSolicitacoesPedido, acrescentarSolicitacaoPedido } = await import("@/lib/nina/pedido-medico");
-  if (catalogoPublicado.selecao?.fonte === "base_conhecimento") instrucoesAdicionaisTurno.push({
-    codigo: "SOLICITAR_FOTO_PEDIDO_MEDICO", origem: "src/lib/nina/pedido-medico.ts",
-    motivo: "Solicitar foto quando o atendimento identificado exige pedido na base publicada.", texto: REGRA_FOTO_PEDIDO_MEDICO,
-  });
-  if (catalogoPublicado.selecao?.fonte === "base_conhecimento") instrucoesAdicionaisTurno.push({
-    codigo: "CONSULTAR_DICIONARIO_PUBLICADO",
-    origem: "src/lib/nina/dicionario-leitura.ts",
-    motivo: "Consultar as variações publicadas antes de interpretar consultas, exames e procedimentos.",
-    texto: REGRA_DICIONARIO_PUBLICADO,
-  });
+  const { REGRA_FOTO_PEDIDO_MEDICO, atualizarSolicitacoesPedido, acrescentarSolicitacaoPedido } =
+    await import("@/lib/nina/pedido-medico");
+  if (catalogoPublicado.selecao?.fonte === "base_conhecimento")
+    instrucoesAdicionaisTurno.push({
+      codigo: "SOLICITAR_FOTO_PEDIDO_MEDICO",
+      origem: "src/lib/nina/pedido-medico.ts",
+      motivo: "Solicitar foto quando o atendimento identificado exige pedido na base publicada.",
+      texto: REGRA_FOTO_PEDIDO_MEDICO,
+    });
+  if (catalogoPublicado.selecao?.fonte === "base_conhecimento")
+    instrucoesAdicionaisTurno.push({
+      codigo: "CONSULTAR_DICIONARIO_PUBLICADO",
+      origem: "src/lib/nina/dicionario-leitura.ts",
+      motivo:
+        "Consultar as variações publicadas antes de interpretar consultas, exames e procedimentos.",
+      texto: REGRA_DICIONARIO_PUBLICADO,
+    });
   // O motor antigo não impõe pendências aos novos turnos.
   fluxoEstado.clarification = undefined;
   const precedenciaTurno = resolverPrecedenciaDoTurno({
@@ -1591,16 +1840,38 @@ async function gerarRespostaNinaInterno(
   // FASE 3 — RUNTIME CONTEXT: só FATOS. Nenhuma regra conversacional aqui.
   // ------------------------------------------------------------------
   const { conhecimentoDaMesmaSessao } = await import("@/lib/nina/confidence/conhecimento-sessao");
-  const { mudouSolicitacaoExplicitamente, perguntaParaCompletarIdentificacao, confirmarItemDaPergunta } = await import("@/lib/nina/identificacao-catalogo");
-  const conhecimentoAnterior = mudouSolicitacaoExplicitamente(mensagemPaciente) ? null
-    : conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
+  const {
+    mudouSolicitacaoExplicitamente,
+    perguntaParaCompletarIdentificacao,
+    confirmarItemDaPergunta,
+  } = await import("@/lib/nina/identificacao-catalogo");
+  const conhecimentoAnterior = mudouSolicitacaoExplicitamente(mensagemPaciente)
+    ? null
+    : conhecimentoDaMesmaSessao(
+        fluxoEstado.knowledge_context,
+        clinicaId,
+        fluxoEstado.session_id ?? null,
+      );
   const { confirmarProfissionalDaPergunta } = await import("@/lib/nina/pesquisa-medico-sessao");
-  const { prepararPesquisaAtendimentoDaSessao } = await import("@/lib/nina/pesquisa-atendimento-sessao");
-  const contextoRespostaProfissional = { mensagem: mensagemPaciente, historico: contextoConsultaAgenda.historico };
-  const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
-  const itemConfirmadoNaResposta = confirmarItemDaPergunta(conhecimentoAnterior, contextoRespostaProfissional);
+  const { prepararPesquisaAtendimentoDaSessao } =
+    await import("@/lib/nina/pesquisa-atendimento-sessao");
+  const contextoRespostaProfissional = {
+    mensagem: mensagemPaciente,
+    historico: contextoConsultaAgenda.historico,
+  };
+  const profissionalConfirmadoNaResposta = confirmarProfissionalDaPergunta(
+    conhecimentoAnterior,
+    contextoRespostaProfissional,
+  );
+  const itemConfirmadoNaResposta = confirmarItemDaPergunta(
+    conhecimentoAnterior,
+    contextoRespostaProfissional,
+  );
   const { confirmarIdentificacoes } = await import("@/lib/nina/confirmacao-identificacao");
-  const identificacoesConfirmadas = confirmarIdentificacoes(conhecimentoAnterior, contextoRespostaProfissional);
+  const identificacoesConfirmadas = confirmarIdentificacoes(
+    conhecimentoAnterior,
+    contextoRespostaProfissional,
+  );
   fluxoEstado.knowledge_context = conhecimentoAnterior;
   const { lerDicionarioDaMensagem } = await import("@/lib/nina/dicionario-leitura.server");
   const dicionarioDaMensagem = await lerDicionarioDaMensagem(clinicaId, mensagemPaciente);
@@ -1657,8 +1928,10 @@ async function gerarRespostaNinaInterno(
       slot_inicio: fluxoEstado.appointment.slot_inicio ?? null,
       slot_fim: fluxoEstado.appointment.slot_fim ?? null,
       agendamento_id: fluxoEstado.appointment.appointment_id ?? null,
-      opcoes_consultadas: fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id
-        ? fluxoEstado.appointment.slot_options?.vagas ?? [] : [],
+      opcoes_consultadas:
+        fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id
+          ? (fluxoEstado.appointment.slot_options?.vagas ?? [])
+          : [],
       confirmacao_final: fluxoEstado.appointment.confirmation ?? null,
     },
     catalogo: {
@@ -1693,12 +1966,13 @@ async function gerarRespostaNinaInterno(
       fonte_horarios_habituais: "catalogo_publicado",
       fonte_vagas: "agenda",
     },
-    aprendizados: (aprendizados as Array<{ tipo?: string; titulo?: string; conteudo?: string }>)
-      .map((a) => ({
-        tipo: a.tipo ?? null,
-        titulo: a.titulo ?? null,
-        conteudo: a.conteudo ?? null,
-      })),
+    aprendizados: (
+      aprendizados as Array<{ tipo?: string; titulo?: string; conteudo?: string }>
+    ).map((a) => ({
+      tipo: a.tipo ?? null,
+      titulo: a.titulo ?? null,
+      conteudo: a.conteudo ?? null,
+    })),
   };
 
   // COMPOSER — ponto único de montagem. Depois daqui nada mais é concatenado
@@ -1715,9 +1989,7 @@ async function gerarRespostaNinaInterno(
   // turno. Aplicáveis vêm da precedência já resolvida; as demais ficam
   // registradas como NÃO aplicáveis, e as sem interpretação como limitação.
   const auditoriaRegrasTurno = await (async () => {
-    const { extrairRegrasPublicadas } = await import(
-      "@/lib/nina/confidence/regras-publicadas"
-    );
+    const { extrairRegrasPublicadas } = await import("@/lib/nina/confidence/regras-publicadas");
     const extracao = extrairRegrasPublicadas(behaviorPrompt, {
       escopo: "whatsapp",
       hash: hashPrecedencia(behaviorPrompt) ?? null,
@@ -1761,7 +2033,6 @@ async function gerarRespostaNinaInterno(
     };
   })();
 
-
   let ctxFerramentas: import("@/lib/nina/paciente-tools.server").CtxNinaPaciente | null = null;
   let ferramentas: unknown[] | undefined;
   let executar:
@@ -1795,10 +2066,13 @@ async function gerarRespostaNinaInterno(
       estado: fluxoEstado,
       teste: opcoes?.teste === true,
       consultaAgenda: contextoConsultaAgenda,
-      nomeUnidade: identidadeEfetiva.ok ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao) : "nossa clínica",
+      nomeUnidade: identidadeEfetiva.ok
+        ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
+        : "nossa clínica",
       opcoesAgendamentoInicioTurno: Boolean(
         fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id &&
-        fluxoEstado.appointment.slot_options?.vagas.length),
+        fluxoEstado.appointment.slot_options?.vagas.length,
+      ),
     };
   }
 
@@ -1807,11 +2081,24 @@ async function gerarRespostaNinaInterno(
   // resumo -> revalidar -> gravar -> informar a conclusão. A ordem é
   // decidida aqui, em código, antes de qualquer chamada ao modelo.
   // ---------------------------------------------------------------------
-  let continuarAgendamento: ((aposSelecao?: boolean) => Promise<import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null>) | null = null;
+  let continuarAgendamento:
+    | ((
+        aposSelecao?: boolean,
+      ) => Promise<import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null>)
+    | null = null;
   // Aviso (protocolo) do encaminhamento feito pelo gate: se já saiu, a Nina não
   // manda uma segunda mensagem (mensagem única, 25/09/2026).
-  const avisoGate: { atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null } = { atual: null };
-  if (podeAgendar && ctxFerramentas && executar !== null && !nomeAtendimentoAusente && !perguntaNomeAnterior && !jevEncaminhamento) {
+  const avisoGate: {
+    atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null;
+  } = { atual: null };
+  if (
+    podeAgendar &&
+    ctxFerramentas &&
+    executar !== null &&
+    !nomeAtendimentoAusente &&
+    !perguntaNomeAnterior &&
+    !jevEncaminhamento
+  ) {
     const { aplicarGateIdentificacao } = await import("@/lib/nina/identificacao-gate.server");
     // FASE 5 — o texto do gate sai do template publicado (ou do padrão).
     const { carregarTemplatesPublicados } = await import("@/lib/nina/resposta/templates.server");
@@ -1821,47 +2108,71 @@ async function gerarRespostaNinaInterno(
     }).catch(() => ({ textos: {}, versaoInstrucoes: null, recusadas: [] }));
     const contextoGate = ctxFerramentas;
     const executarGate = executar;
-    continuarAgendamento = (aposSelecao = false) => aplicarGateIdentificacao({
-      mensagem: mensagemPaciente,
-      estado: fluxoEstado,
-      ctx: contextoGate,
-      executar: executarGate,
-      aposSelecao,
-      textos: templatesGate.textos,
-      nomeUnidade: identidadeEfetiva.ok
-        ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
-        : "nossa clínica",
-      encaminharVagaIndisponivel: async (motivo) => {
-        await conferirReserva();
-        if (opcoes?.revisao?.valor) {
-          const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
-          if (await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
-            revisaoProcessada: opcoes.revisao.valor })) return false;
-        }
-        const { executarHandoffTool } = await import("@/lib/nina/handoff-tool.server");
-        const r = await executarHandoffTool({ clinicaId, conversaId: estadoId.conversaId ?? null },
-          JSON.stringify({ motivo, resumo: motivo, setor: "Agendamento" }));
-        avisoGate.atual = (r as { aviso?: typeof avisoGate.atual }).aviso ?? null;
-        registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento para conferir o agendamento",
-          dados: { motivo, handoff_confirmado: r.ok, resultado: r },
-          codigo: { arquivo: "src/lib/nina/identificacao-gate.server.ts", funcao: "aplicarGateIdentificacao" } });
-        return r.ok;
-      },
-    }).catch((e) => {
-      console.error("[NINA_BOOKING_FLOW] gate falhou", e);
-      return null;
-    });
+    continuarAgendamento = (aposSelecao = false) =>
+      aplicarGateIdentificacao({
+        mensagem: mensagemPaciente,
+        estado: fluxoEstado,
+        ctx: contextoGate,
+        executar: executarGate,
+        aposSelecao,
+        textos: templatesGate.textos,
+        nomeUnidade: identidadeEfetiva.ok
+          ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
+          : "nossa clínica",
+        encaminharVagaIndisponivel: async (motivo) => {
+          await conferirReserva();
+          if (opcoes?.revisao?.valor) {
+            const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
+            if (
+              await respostaObsoleta({
+                clinicaId,
+                telefone: opcoes.revisao.telefone,
+                revisaoProcessada: opcoes.revisao.valor,
+              })
+            )
+              return false;
+          }
+          const { executarHandoffTool } = await import("@/lib/nina/handoff-tool.server");
+          const r = await executarHandoffTool(
+            { clinicaId, conversaId: estadoId.conversaId ?? null },
+            JSON.stringify({ motivo, resumo: motivo, setor: "Agendamento" }),
+          );
+          avisoGate.atual = (r as { aviso?: typeof avisoGate.atual }).aviso ?? null;
+          registrarEtapa({
+            tipo: "ferramenta",
+            fonte: "atendimento",
+            titulo: "Encaminhamento para conferir o agendamento",
+            dados: { motivo, handoff_confirmado: r.ok, resultado: r },
+            codigo: {
+              arquivo: "src/lib/nina/identificacao-gate.server.ts",
+              funcao: "aplicarGateIdentificacao",
+            },
+          });
+          return r.ok;
+        },
+      }).catch((e) => {
+        console.error("[NINA_BOOKING_FLOW] gate falhou", e);
+        return null;
+      });
     const respostaGate = await continuarAgendamento();
     if (respostaGate?.origem === "handoff" && avisoGate.atual) {
       const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
       if (!precisaAvisoDoChamador(avisoGate.atual)) {
         const aviso = avisoGate.atual;
-        await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+        await salvarFluxoEstado(
+          supabaseAdmin as never,
+          clinicaId,
+          estadoId.conversaId,
+          fluxoEstado,
+        );
         const { criarResultadoSemNovaMensagem } = await import("@/lib/nina/resposta/contrato");
         if (opcoes?.auditoria)
           opcoes.auditoria.resultado = criarResultadoSemNovaMensagem({
             estado: aviso.entregue ? "confirmado" : "envio_pendente",
-            chaveOperacao: aviso.chave, mensagemId: aviso.mensagemId, protocolo: aviso.protocolo, texto: aviso.texto,
+            chaveOperacao: aviso.chave,
+            mensagemId: aviso.mensagemId,
+            protocolo: aviso.protocolo,
+            texto: aviso.texto,
           });
         return "";
       }
@@ -1891,15 +2202,11 @@ async function gerarRespostaNinaInterno(
       });
       // O contrato completo viaja na auditoria: quem envia precisa saber o
       // que já está comprovado e o que é proibido afirmar.
-      if (opcoes?.auditoria)
-        (opcoes.auditoria as { resultado?: unknown }).resultado = respostaGate;
+      if (opcoes?.auditoria) (opcoes.auditoria as { resultado?: unknown }).resultado = respostaGate;
       return respostaGate.texto;
     }
     runtimeContext.etapa = fluxoEstado.flow.stage;
   }
-
-
-
 
   // Handoff humano: disponível SEMPRE, mesmo sem a flag de agenda.
   const { FERRAMENTA_HANDOFF } = await import("@/lib/nina/handoff-tool.server");
@@ -1911,13 +2218,13 @@ async function gerarRespostaNinaInterno(
   const brokerSemGuarda = criarToolBroker({
     ctxPaciente: ctxFerramentas,
     ctxHandoff,
-    executarPaciente: executar
-      ? (ctx, nome, args) => executar!(ctx, nome, args as never)
-      : null,
+    executarPaciente: executar ? (ctx, nome, args) => executar!(ctx, nome, args as never) : null,
   });
   // Aviso ao paciente que o próprio encaminhamento (protocolo) produziu neste
   // turno. Quando ele já saiu, a Nina não manda uma segunda mensagem.
-  const avisoDoTurno: { atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null } = { atual: null };
+  const avisoDoTurno: {
+    atual: import("@/lib/atendimento/aviso-encaminhamento").ResultadoAvisoEncaminhamento | null;
+  } = { atual: null };
   const broker = {
     ...brokerSemGuarda,
     executar: async (...args: Parameters<typeof brokerSemGuarda.executar>) => {
@@ -1931,29 +2238,42 @@ async function gerarRespostaNinaInterno(
   // PRÉ-BUSCA DO CADASTRO (flag `nina_prefetch_cadastro`, padrão ligada):
   // roda em paralelo com a montagem do contexto, pelo mesmo broker.
   const nomesFerramentas = (ferramentas as Array<{ function?: { name?: string } }>)
-    .map(f => f.function?.name ?? "").filter(Boolean);
-  const motivoSemPrefetch = !ctxFerramentas ? "ferramentas do paciente indisponíveis"
-    : !intencaoJevSegura.length ? "Jev sem intenção segura"
-    : nomeAtendimentoAusente || alteracaoSolicitada || multiplosAtendimentos || jevEncaminhamento
-      ? "turno com encaminhamento, alteração ou pedido múltiplo" : null;
+    .map((f) => f.function?.name ?? "")
+    .filter(Boolean);
+  const motivoSemPrefetch = !ctxFerramentas
+    ? "ferramentas do paciente indisponíveis"
+    : !intencaoJevSegura.length
+      ? "Jev sem intenção segura"
+      : nomeAtendimentoAusente || alteracaoSolicitada || multiplosAtendimentos || jevEncaminhamento
+        ? "turno com encaminhamento, alteração ou pedido múltiplo"
+        : null;
   if (motivoSemPrefetch) rastro?.pular("tool.prefetch", motivoSemPrefetch);
   else rastro?.iniciar("tool.prefetch", {});
-  const prefetchPromessa = motivoSemPrefetch ? Promise.resolve(null)
-    : import("@/lib/nina/prefetch-cadastro.server").then(m => m.executarPrefetchCadastro({
-        clinicaId, mensagem: mensagemPaciente, intencao: intencaoJevSegura, nomePopular,
-        ferramentasDisponiveis: nomesFerramentas,
-        executar: (nome, args) => broker.executar(nome, args),
-      })).catch(() => null);
+  const prefetchPromessa = motivoSemPrefetch
+    ? Promise.resolve(null)
+    : import("@/lib/nina/prefetch-cadastro.server")
+        .then((m) =>
+          m.executarPrefetchCadastro({
+            clinicaId,
+            mensagem: mensagemPaciente,
+            intencao: intencaoJevSegura,
+            nomePopular,
+            ferramentasDisponiveis: nomesFerramentas,
+            executar: (nome, args) => broker.executar(nome, args),
+          }),
+        )
+        .catch(() => null);
   // FASE 3 — as regras de handoff vivem no prompt publicado. Aqui não se
   // concatena mais nenhum comportamento ao system prompt.
-
-
-
 
   type MsgIA = {
     role: string;
     content: string | null;
-    tool_calls?: Array<{ id: string; type?: "function"; function?: { name?: string; arguments?: string } }>;
+    tool_calls?: Array<{
+      id: string;
+      type?: "function";
+      function?: { name?: string; arguments?: string };
+    }>;
     tool_call_id?: string;
   };
   // FASE 4 — Context Builder: só o necessário vai ao modelo (instruções,
@@ -2008,7 +2328,11 @@ async function gerarRespostaNinaInterno(
       modelParameters: {
         perfil: "whatsapp",
         pode_agendar: podeAgendar,
-        max_rodadas: { comum: LIMITE_RODADAS_COMUM, lista: LIMITE_RODADAS_LISTA, tokens: LIMITE_TOKENS_TURNO },
+        max_rodadas: {
+          comum: LIMITE_RODADAS_COMUM,
+          lista: LIMITE_RODADAS_LISTA,
+          tokens: LIMITE_TOKENS_TURNO,
+        },
         controle_progresso: "novidade_dos_retornos",
         mensagens_contexto: mensagens.length,
       },
@@ -2019,12 +2343,15 @@ async function gerarRespostaNinaInterno(
     });
   }
 
-
-
   let resposta = "";
   let textoModeloAtual = "";
   let houveHandoff = false;
-  let finalizacaoHandoff: { texto: string; textoModelo: string; handoffConfirmado: boolean; motivo: string } | null = null;
+  let finalizacaoHandoff: {
+    texto: string;
+    textoModelo: string;
+    handoffConfirmado: boolean;
+    motivo: string;
+  } | null = null;
   let resumoEscolha: import("@/lib/nina/resposta/contrato").ResultadoRespostaNina | null = null;
   let reservaComPerguntas = false;
   const { encaminhamentoSemVagas, respostaSemVagas } = await import("@/lib/nina/agenda-sem-vagas");
@@ -2068,10 +2395,23 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/confidence/evidencias-turno");
   const { resolverSelecaoContextual, normalizarSelecaoContextual } =
     await import("@/lib/nina/confidence/selecao-contextual");
-  const { encaminharAposEsclarecimento, prepararSegundaPergunta, MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO } =
-    await import("@/lib/nina/catalogo-esclarecimento");
-  const { criarPerguntasDoTurno, comporRespostaParcial, PESQUISAS_INDEPENDENTES, pendenciaBloqueiaFerramenta } = await import("@/lib/nina/perguntas-independentes");
-  const perguntasDoTurno = criarPerguntasDoTurno(conhecimentoAnterior, mensagemPaciente, identificacoesConfirmadas);
+  const {
+    encaminharAposEsclarecimento,
+    prepararSegundaPergunta,
+    MOTIVO_IDENTIFICACAO_PENDENTE,
+    MOTIVO_MEDICO_NAO_IDENTIFICADO,
+  } = await import("@/lib/nina/catalogo-esclarecimento");
+  const {
+    criarPerguntasDoTurno,
+    comporRespostaParcial,
+    PESQUISAS_INDEPENDENTES,
+    pendenciaBloqueiaFerramenta,
+  } = await import("@/lib/nina/perguntas-independentes");
+  const perguntasDoTurno = criarPerguntasDoTurno(
+    conhecimentoAnterior,
+    mensagemPaciente,
+    identificacoesConfirmadas,
+  );
   let respostaParcialConfirmada = false;
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
@@ -2085,20 +2425,29 @@ async function gerarRespostaNinaInterno(
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
-      if (await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
-        revisaoProcessada: opcoes.revisao.valor })) {
+      if (
+        await respostaObsoleta({
+          clinicaId,
+          telefone: opcoes.revisao.telefone,
+          revisaoProcessada: opcoes.revisao.valor,
+        })
+      ) {
         turnoObsoleto = true;
         return;
       }
     }
     const argumentos = ausencia ?? {
-      motivo: typeof motivoRegistrado === "string" && motivoRegistrado.trim() ? motivoRegistrado : motivoRegraHumano(evidencia),
+      motivo:
+        typeof motivoRegistrado === "string" && motivoRegistrado.trim()
+          ? motivoRegistrado
+          : motivoRegraHumano(evidencia),
       resumo:
         "O cadastro exige atendimento humano para este item. A equipe deve continuar o atendimento.",
       urgencia: "normal",
     };
     const origem =
-      ausencia && [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(ausencia.motivo)
+      ausencia &&
+      [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(ausencia.motivo)
         ? "regra_catalogo_limite_esclarecimento"
         : ausencia
           ? "regra_catalogo_sem_registro"
@@ -2115,16 +2464,40 @@ async function gerarRespostaNinaInterno(
     limparEscolhaAgendamento(fluxoEstado);
     fluxoEstado.appointment.slot_options = null;
     fluxoEstado.flow.stage = "HANDOFF";
-    finalizacaoHandoff = { texto: respostaSemRegistro(confirmado, opcoes?.teste === true), textoModelo: textoModeloAtual,
-      handoffConfirmado: confirmado, motivo: argumentos.motivo };
-    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: "Encaminhamento obrigatório pelo catálogo",
-      dados: { origem_solicitacao: "servidor", motivo: argumentos.motivo, ferramenta_origem: ferramentaOrigem,
-        registros: evidencia ?? [], handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
-      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "encaminharRegraCatalogo" } });
-    if (confirmado) rastro?.concluir("tool.execute", { ferramenta: "solicitar_atendente_humano", origem_solicitacao: origem,
-      motivo: argumentos.motivo, registros: evidencia ?? [] });
-    else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", { ferramenta: "solicitar_atendente_humano",
-      motivo: argumentos.motivo, registros: evidencia ?? [] });
+    finalizacaoHandoff = {
+      texto: respostaSemRegistro(confirmado, opcoes?.teste === true),
+      textoModelo: textoModeloAtual,
+      handoffConfirmado: confirmado,
+      motivo: argumentos.motivo,
+    };
+    registrarEtapa({
+      tipo: "ferramenta",
+      fonte: "atendimento",
+      titulo: "Encaminhamento obrigatório pelo catálogo",
+      dados: {
+        origem_solicitacao: "servidor",
+        motivo: argumentos.motivo,
+        ferramenta_origem: ferramentaOrigem,
+        registros: evidencia ?? [],
+        handoff_confirmado: confirmado,
+        erro: rh.erro ?? null,
+        resultado: rh.dados,
+      },
+      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "encaminharRegraCatalogo" },
+    });
+    if (confirmado)
+      rastro?.concluir("tool.execute", {
+        ferramenta: "solicitar_atendente_humano",
+        origem_solicitacao: origem,
+        motivo: argumentos.motivo,
+        registros: evidencia ?? [],
+      });
+    else
+      rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", {
+        ferramenta: "solicitar_atendente_humano",
+        motivo: argumentos.motivo,
+        registros: evidencia ?? [],
+      });
   }
   async function compartilharResultado(
     nome: string,
@@ -2156,14 +2529,31 @@ async function gerarRespostaNinaInterno(
     });
     if (!r.reused) nomesFerramentasTurno.push(nome);
     if (!r.success || r.erro) conflitoFerramenta = true;
-    if (r.success && !r.erro && ["searchKnowledgeBase", "listCatalog"].includes(r.capacidade ?? "")) {
-      const pedidos = atualizarSolicitacoesPedido(runtimeContext.pedido_medico_do_turno, (r.dados ?? {}) as import("@/lib/nina/knowledge-contract").ResultadoConhecimento, {
-        conversaId: estadoId.conversaId ?? null, inicioSessao: fluxoEstado.session_started_at ?? null,
-        teste: opcoes?.teste === true, mensagens: historicoFluxoCompleto ? mensagensFluxo : msgsMemoria,
-      }, parametros.nova_solicitacao === true);
+    if (
+      r.success &&
+      !r.erro &&
+      ["searchKnowledgeBase", "listCatalog"].includes(r.capacidade ?? "")
+    ) {
+      const pedidos = atualizarSolicitacoesPedido(
+        runtimeContext.pedido_medico_do_turno,
+        (r.dados ?? {}) as import("@/lib/nina/knowledge-contract").ResultadoConhecimento,
+        {
+          conversaId: estadoId.conversaId ?? null,
+          inicioSessao: fluxoEstado.session_started_at ?? null,
+          teste: opcoes?.teste === true,
+          mensagens: historicoFluxoCompleto ? mensagensFluxo : msgsMemoria,
+        },
+        parametros.nova_solicitacao === true,
+      );
       runtimeContext.pedido_medico_do_turno = pedidos;
-      if (pedidos.length) registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Exigência de foto do pedido médico",
-        dados: { solicitacoes: pedidos }, codigo: { arquivo: "src/lib/nina/pedido-medico.ts", funcao: "avaliarPedidoMedico" } });
+      if (pedidos.length)
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Exigência de foto do pedido médico",
+          dados: { solicitacoes: pedidos },
+          codigo: { arquivo: "src/lib/nina/pedido-medico.ts", funcao: "avaliarPedidoMedico" },
+        });
     }
     const payload = respostaParaModelo(r);
     // Pesquisa bloqueada não apaga o atendimento já identificado. O modelo
@@ -2181,7 +2571,8 @@ async function gerarRespostaNinaInterno(
     }
     if (
       r.capacidade === "requestHumanHandoff" &&
-      r.success && !r.erro &&
+      r.success &&
+      !r.erro &&
       (r.dados as { sem_mensagem_paciente?: boolean } | null)?.sem_mensagem_paciente === true
     ) {
       houveHandoff = true;
@@ -2197,7 +2588,13 @@ async function gerarRespostaNinaInterno(
       };
     }
     if (r.capacidade !== "searchKnowledgeBase" && r.capacidade !== "listCatalog") {
-      if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO") await encaminharRegraCatalogo(nome, undefined, undefined, (r.dados as { motivo_transferencia?: unknown } | null)?.motivo_transferencia);
+      if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO")
+        await encaminharRegraCatalogo(
+          nome,
+          undefined,
+          undefined,
+          (r.dados as { motivo_transferencia?: unknown } | null)?.motivo_transferencia,
+        );
       return limitarRetornoParaModelo(payload);
     }
     const esclarecimentoAtual = (
@@ -2206,8 +2603,13 @@ async function gerarRespostaNinaInterno(
     const { normalizarTipoAtendimentoCatalogo } = await import("@/lib/nina/catalogo-pesquisa");
     const tipoAtendimento = normalizarTipoAtendimentoCatalogo(
       (r.dados as import("@/lib/nina/knowledge-contract").ResultadoConhecimento | null)
-        ?.tipo_atendimento ?? parametros.tipo_atendimento ??
-        (nome === "buscar_medicos" ? "consulta" : nome === "buscar_procedimentos" ? "exame_procedimento" : undefined),
+        ?.tipo_atendimento ??
+        parametros.tipo_atendimento ??
+        (nome === "buscar_medicos"
+          ? "consulta"
+          : nome === "buscar_procedimentos"
+            ? "exame_procedimento"
+            : undefined),
     );
     if (esclarecimentoAtual) {
       if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = esclarecimentoAtual;
@@ -2226,11 +2628,22 @@ async function gerarRespostaNinaInterno(
         esclarecimento: esclarecimentoAtual,
       });
     }
-    const pedidoInterpretado = (r.dados as { pedido_interpretado?: { atendimento?: string } } | null)?.pedido_interpretado;
-    const termoPesquisado = nome === "buscar_medicos" && tipoAtendimento === "exame_procedimento" && pedidoInterpretado?.atendimento
-      ? pedidoInterpretado.atendimento : nome === "consultar_cadastro" || nome === "buscar_procedimentos"
-      ? parametros.termo : nome === "buscar_medicos" ? parametros.especialidade ??
-        (referenciaAnterior?.consulta.tipo_atendimento === "consulta" ? referenciaAnterior.consulta.termo : parametros.nome) : null;
+    const pedidoInterpretado = (
+      r.dados as { pedido_interpretado?: { atendimento?: string } } | null
+    )?.pedido_interpretado;
+    const termoPesquisado =
+      nome === "buscar_medicos" &&
+      tipoAtendimento === "exame_procedimento" &&
+      pedidoInterpretado?.atendimento
+        ? pedidoInterpretado.atendimento
+        : nome === "consultar_cadastro" || nome === "buscar_procedimentos"
+          ? parametros.termo
+          : nome === "buscar_medicos"
+            ? (parametros.especialidade ??
+              (referenciaAnterior?.consulta.tipo_atendimento === "consulta"
+                ? referenciaAnterior.consulta.termo
+                : parametros.nome))
+            : null;
     const medicoPesquisado = nome === "buscar_medicos" ? parametros.nome : parametros.medico;
     if (typeof termoPesquisado === "string") {
       const esclarecimento = (
@@ -2254,15 +2667,30 @@ async function gerarRespostaNinaInterno(
       if (referencia && tipoAtendimento === "consulta") {
         const { atualizarPreferenciaAtendimento } = await import("@/lib/nina/atendimento-consulta");
         const { registrosDoRetorno } = await import("@/lib/nina/confidence/evidencia-extrator");
-        const atual = conhecimentoDaMesmaSessao(fluxoEstado.knowledge_context, clinicaId, fluxoEstado.session_id ?? null);
-        const anterior = nome === "consultar_cadastro" && parametros.nova_solicitacao === true
-          ? null : atual?.atendimentoConsulta ?? referenciaAnterior?.atendimentoConsulta;
-        const preferencia = atualizarPreferenciaAtendimento({ mensagem: mensagemPaciente, anterior,
-          registros: registrosDoRetorno((r.dados ?? {}) as Record<string, unknown>) as import("@/lib/nina/knowledge-contract").RegistroConhecimento[] });
+        const atual = conhecimentoDaMesmaSessao(
+          fluxoEstado.knowledge_context,
+          clinicaId,
+          fluxoEstado.session_id ?? null,
+        );
+        const anterior =
+          nome === "consultar_cadastro" && parametros.nova_solicitacao === true
+            ? null
+            : (atual?.atendimentoConsulta ?? referenciaAnterior?.atendimentoConsulta);
+        const preferencia = atualizarPreferenciaAtendimento({
+          mensagem: mensagemPaciente,
+          anterior,
+          registros: registrosDoRetorno(
+            (r.dados ?? {}) as Record<string, unknown>,
+          ) as import("@/lib/nina/knowledge-contract").RegistroConhecimento[],
+        });
         if (preferencia) referencia.atendimentoConsulta = preferencia;
         else delete referencia.atendimentoConsulta;
-        if (JSON.stringify(anterior ?? null) !== JSON.stringify(preferencia) && !fluxoEstado.appointment.appointment_id &&
-          !fluxoEstado.appointment.confirmation && !fluxoEstado.appointment.slot_options?.vagas.length) {
+        if (
+          JSON.stringify(anterior ?? null) !== JSON.stringify(preferencia) &&
+          !fluxoEstado.appointment.appointment_id &&
+          !fluxoEstado.appointment.confirmation &&
+          !fluxoEstado.appointment.slot_options?.vagas.length
+        ) {
           const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
           limparEscolhaAgendamento(fluxoEstado);
           fluxoEstado.appointment.slot_options = null;
@@ -2306,9 +2734,14 @@ async function gerarRespostaNinaInterno(
         },
       });
     }
-    perguntasDoTurno.registrar(parametros, fluxoEstado.knowledge_context ?? null, referenciaAnterior,
-      !esclarecimentoAtual && ex.consulta.status === "com_itens");
-    if (ctxFerramentas) ctxFerramentas.esclarecimentoCatalogo = perguntasDoTurno.pendentes[0]?.esclarecimento;
+    perguntasDoTurno.registrar(
+      parametros,
+      fluxoEstado.knowledge_context ?? null,
+      referenciaAnterior,
+      !esclarecimentoAtual && ex.consulta.status === "com_itens",
+    );
+    if (ctxFerramentas)
+      ctxFerramentas.esclarecimentoCatalogo = perguntasDoTurno.pendentes[0]?.esclarecimento;
     const ausencia =
       encaminharAposEsclarecimento(referenciaAnterior, r, mensagemPaciente) ??
       encaminhamentoSemRegistro(r, args);
@@ -2320,18 +2753,37 @@ async function gerarRespostaNinaInterno(
         selecaoDoTurno?.selecao?.raizesFonte.map((r) => r.registro),
       )
     )
-      await encaminharRegraCatalogo(nome, undefined, evidenciaRegraHumano(r.dados, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro)));
+      await encaminharRegraCatalogo(
+        nome,
+        undefined,
+        evidenciaRegraHumano(
+          r.dados,
+          selecaoDoTurno?.selecao?.raizesFonte.map((r) => r.registro),
+        ),
+      );
     else {
       const { motivoSemHorariosHabituais } = await import("@/lib/nina/horarios-habituais");
-      const motivo = motivoSemHorariosHabituais(r, selecaoDoTurno?.selecao?.raizesFonte.map(r => r.registro));
+      const motivo = motivoSemHorariosHabituais(
+        r,
+        selecaoDoTurno?.selecao?.raizesFonte.map((r) => r.registro),
+      );
       if (motivo) await encaminharRegraCatalogo(nome, undefined, undefined, motivo);
     }
     return {
-      ...(esclarecimentoAtual ? {
-        ok: true, precisa_esclarecer: true, consulta: parametros, esclarecimento: esclarecimentoAtual,
-        pendencias_atuais: perguntasDoTurno.pendentes.map(p => ({ pedido: p.consulta.termo, pergunta: p.esclarecimento!.pergunta })),
-        instrucao: "Identificação pendente apenas nesta pergunta. As opções são hipóteses, não fatos confirmados. Use somente pendencias_atuais: reformulações substituem perguntas anteriores do mesmo pedido. Continue pesquisando as outras perguntas independentes; responda o que estiver confirmado e inclua uma pergunta por pedido pendente.",
-      } : limitarRetornoParaModelo(payload) as Record<string, unknown>),
+      ...(esclarecimentoAtual
+        ? {
+            ok: true,
+            precisa_esclarecer: true,
+            consulta: parametros,
+            esclarecimento: esclarecimentoAtual,
+            pendencias_atuais: perguntasDoTurno.pendentes.map((p) => ({
+              pedido: p.consulta.termo,
+              pergunta: p.esclarecimento!.pergunta,
+            })),
+            instrucao:
+              "Identificação pendente apenas nesta pergunta. As opções são hipóteses, não fatos confirmados. Use somente pendencias_atuais: reformulações substituem perguntas anteriores do mesmo pedido. Continue pesquisando as outras perguntas independentes; responda o que estiver confirmado e inclua uma pergunta por pedido pendente.",
+          }
+        : (limitarRetornoParaModelo(payload) as Record<string, unknown>)),
       // A seleção legada auxilia referências internas; não é uma declaração
       // de intenção do paciente. Essa interpretação cabe ao modelo no histórico.
       consulta_agenda: {
@@ -2340,29 +2792,61 @@ async function gerarRespostaNinaInterno(
         permite_reservar: false,
         fonte_vagas: "agenda",
         fonte_horarios_habituais: "catalogo_publicado",
-        ...(!esclarecimentoAtual ? {
-          apresentacao_profissionais: (await import("@/lib/nina/horarios-habituais")).orientacaoHorariosHabituais(r),
-        } : {}),
+        ...(!esclarecimentoAtual
+          ? {
+              apresentacao_profissionais: (
+                await import("@/lib/nina/horarios-habituais")
+              ).orientacaoHorariosHabituais(r),
+            }
+          : {}),
       },
     };
   }
   // JEV — Fase 2: encaminhamento decidido pelo Jev, pelo fluxo de handoff
   // existente, igual em produção e homologação.
   // Duas falhas reais de entendimento também encaminham com identificação pendente.
-  const perguntaComplementar = perguntaParaCompletarIdentificacao(conhecimentoAnterior, contextoRespostaProfissional);
+  const perguntaComplementar = perguntaParaCompletarIdentificacao(
+    conhecimentoAnterior,
+    contextoRespostaProfissional,
+  );
   if (perguntaComplementar && ctxFerramentas && conhecimentoAnterior) {
-    ctxFerramentas.esclarecimentoCatalogo = { ...conhecimentoAnterior.esclarecimento!, pergunta: perguntaComplementar, opcoes: [] };
-    fluxoEstado.knowledge_context = { ...conhecimentoAnterior,
-      esclarecimento: ctxFerramentas.esclarecimentoCatalogo, esclarecimentoTentativas: 2,
-      esclarecimentoPerguntas: [...(conhecimentoAnterior.esclarecimentoPerguntas ?? [conhecimentoAnterior.esclarecimento!.pergunta]), perguntaComplementar].slice(-2) };
-    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação aguardando o novo nome",
-      dados: { pergunta: perguntaComplementar, motivo: "recusa ou aceite sem opção única; nenhuma escolha presumida" } });
+    ctxFerramentas.esclarecimentoCatalogo = {
+      ...conhecimentoAnterior.esclarecimento!,
+      pergunta: perguntaComplementar,
+      opcoes: [],
+    };
+    fluxoEstado.knowledge_context = {
+      ...conhecimentoAnterior,
+      esclarecimento: ctxFerramentas.esclarecimentoCatalogo,
+      esclarecimentoTentativas: 2,
+      esclarecimentoPerguntas: [
+        ...(conhecimentoAnterior.esclarecimentoPerguntas ?? [
+          conhecimentoAnterior.esclarecimento!.pergunta,
+        ]),
+        perguntaComplementar,
+      ].slice(-2),
+    };
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Identificação aguardando o novo nome",
+      dados: {
+        pergunta: perguntaComplementar,
+        motivo: "recusa ou aceite sem opção única; nenhuma escolha presumida",
+      },
+    });
   }
-  async function executarDecisaoEncaminhamento(decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento) {
+  async function executarDecisaoEncaminhamento(
+    decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento,
+  ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
-      turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone, revisaoProcessada: opcoes.revisao.valor });
+      turnoObsoleto = await respostaObsoleta({
+        clinicaId,
+        telefone: opcoes.revisao.telefone,
+        revisaoProcessada: opcoes.revisao.valor,
+      });
       if (turnoObsoleto) return;
     }
     const semNome = decisao.motivo === MOTIVO_NOME_NAO_INFORMADO;
@@ -2377,7 +2861,14 @@ async function gerarRespostaNinaInterno(
     };
     const rh = await broker
       .executar("solicitar_atendente_humano", JSON.stringify(argumentos))
-      .catch(() => ({ success: false, erro: "handoff_indisponivel" }) as { success: boolean; erro?: string; dados?: unknown });
+      .catch(
+        () =>
+          ({ success: false, erro: "handoff_indisponivel" }) as {
+            success: boolean;
+            erro?: string;
+            dados?: unknown;
+          },
+      );
     const confirmado = rh.success && !rh.erro;
     houveHandoff ||= confirmado;
     fluxoEstado.flow.stage = "HANDOFF";
@@ -2387,79 +2878,175 @@ async function gerarRespostaNinaInterno(
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
     };
-    registrarEtapa({ tipo: "ferramenta", fonte: "atendimento", titulo: alteracaoSolicitada ? "Encaminhamento: cancelamento/remarcação solicitado" : multiplos ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem" : listaExtensa ? "Encaminhamento: lista com mais de 8 profissionais" : semNome ? "Encaminhamento: atendimento não informado após pergunta" : "Encaminhamento pelo Jev (Fase 2)",
+    registrarEtapa({
+      tipo: "ferramenta",
+      fonte: "atendimento",
+      titulo: alteracaoSolicitada
+        ? "Encaminhamento: cancelamento/remarcação solicitado"
+        : multiplos
+          ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
+          : listaExtensa
+            ? "Encaminhamento: lista com mais de 8 profissionais"
+            : semNome
+              ? "Encaminhamento: atendimento não informado após pergunta"
+              : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
-        motivo: argumentos.motivo, urgencia: argumentos.urgencia, pontuacoes: jevPontuacoes,
+        motivo: argumentos.motivo,
+        urgencia: argumentos.urgencia,
+        pontuacoes: jevPontuacoes,
         pergunta_nome_entregue: semNome ? perguntaNomeAnterior : null,
-        handoff_confirmado: confirmado, erro: rh.erro ?? null,
+        handoff_confirmado: confirmado,
+        erro: rh.erro ?? null,
       },
-      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "executarDecisaoEncaminhamento" } });
-    rastro?.concluir("handoff.reason", { motivo: argumentos.motivo, origem: alteracaoSolicitada ? "regra_cancelamento_remarcacao" : multiplos ? "regra_multiplos_atendimentos" : listaExtensa ? "regra_lista_extensa" : semNome ? "regra_sem_indicacao" : "jev", urgencia: argumentos.urgencia,
-      pontuacoes: jevPontuacoes, handoff_confirmado: confirmado });
+      codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "executarDecisaoEncaminhamento" },
+    });
+    rastro?.concluir("handoff.reason", {
+      motivo: argumentos.motivo,
+      origem: alteracaoSolicitada
+        ? "regra_cancelamento_remarcacao"
+        : multiplos
+          ? "regra_multiplos_atendimentos"
+          : listaExtensa
+            ? "regra_lista_extensa"
+            : semNome
+              ? "regra_sem_indicacao"
+              : "jev",
+      urgencia: argumentos.urgencia,
+      pontuacoes: jevPontuacoes,
+      handoff_confirmado: confirmado,
+    });
   }
   if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);
   async function solicitarNomeAtendimento() {
-    if (perguntaNomeAnterior) await executarDecisaoEncaminhamento({ motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" });
+    if (perguntaNomeAnterior)
+      await executarDecisaoEncaminhamento({
+        motivo: MOTIVO_NOME_NAO_INFORMADO,
+        urgencia: "normal",
+      });
     else respostaNomeAtendimento = true;
-    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Nina não faz indicação clínica",
-      dados: { acao: perguntaNomeAnterior ? "encaminhar" : "pedir_nome", pergunta_entregue: perguntaNomeAnterior,
-        mensagens_entrada: opcoes?.mensagensEntrada ?? [] } });
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Nina não faz indicação clínica",
+      dados: {
+        acao: perguntaNomeAnterior ? "encaminhar" : "pedir_nome",
+        pergunta_entregue: perguntaNomeAnterior,
+        mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+      },
+    });
   }
   if (respostaNomeAtendimento) await solicitarNomeAtendimento();
   // Cada aceite reconsulta seu próprio registro; nenhuma confirmação autoriza reserva.
-  const reconsultasIdentificacao = profissionalConfirmadoNaResposta ? [{
-    registro: profissionalConfirmadoNaResposta.registro,
-    args: {
-      termo: profissionalConfirmadoNaResposta.termo, medico: profissionalConfirmadoNaResposta.registro,
-      tipo_atendimento: "consulta", nova_solicitacao: false,
-    },
-  }] : identificacoesConfirmadas.map(({ anterior, opcao }) => ({
-    registro: opcao.id,
-    args: { termo: opcao.nome, tipo_atendimento: anterior.consulta.tipo_atendimento,
-      ...(anterior.consulta.medico ? { medico: anterior.consulta.medico } : {}), nova_solicitacao: false },
-  }));
+  const reconsultasIdentificacao = profissionalConfirmadoNaResposta
+    ? [
+        {
+          registro: profissionalConfirmadoNaResposta.registro,
+          args: {
+            termo: profissionalConfirmadoNaResposta.termo,
+            medico: profissionalConfirmadoNaResposta.registro,
+            tipo_atendimento: "consulta",
+            nova_solicitacao: false,
+          },
+        },
+      ]
+    : identificacoesConfirmadas.map(({ anterior, opcao }) => ({
+        registro: opcao.id,
+        args: {
+          termo: opcao.nome,
+          tipo_atendimento: anterior.consulta.tipo_atendimento,
+          ...(anterior.consulta.medico ? { medico: anterior.consulta.medico } : {}),
+          nova_solicitacao: false,
+        },
+      }));
   for (const [indice, confirmacao] of reconsultasIdentificacao.entries()) {
-    if (finalizacaoHandoff || houveHandoff || turnoObsoleto || perguntaComplementar || respostaNomeAtendimento) break;
+    if (
+      finalizacaoHandoff ||
+      houveHandoff ||
+      turnoObsoleto ||
+      perguntaComplementar ||
+      respostaNomeAtendimento
+    )
+      break;
     await conferirReserva();
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
-      turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
-        revisaoProcessada: opcoes.revisao.valor });
+      turnoObsoleto = await respostaObsoleta({
+        clinicaId,
+        telefone: opcoes.revisao.telefone,
+        revisaoProcessada: opcoes.revisao.valor,
+      });
     }
     if (turnoObsoleto) break;
     const args = JSON.stringify(confirmacao.args);
     const id = `reconsulta_identificacao_confirmada_${indice}`;
-    mensagens.push({ role: "assistant", content: null, tool_calls: [{ id, type: "function",
-      function: { name: "consultar_cadastro", arguments: args } }] });
+    mensagens.push({
+      role: "assistant",
+      content: null,
+      tool_calls: [
+        { id, type: "function", function: { name: "consultar_cadastro", arguments: args } },
+      ],
+    });
     const r = await broker.executar("consultar_cadastro", args);
     const retorno = await compartilharResultado("consultar_cadastro", args, r);
     mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(retorno) });
-    registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação confirmada e reconsultada",
-      dados: { registro: confirmacao.registro, sucesso: r.success && !r.erro,
-        pendencias_restantes: perguntasDoTurno.pendentes.map(p => p.consulta.termo), permite_reservar: false } });
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Identificação confirmada e reconsultada",
+      dados: {
+        registro: confirmacao.registro,
+        sucesso: r.success && !r.erro,
+        pendencias_restantes: perguntasDoTurno.pendentes.map((p) => p.consulta.termo),
+        permite_reservar: false,
+      },
+    });
   }
   // PRÉ-BUSCA DO CADASTRO: resultados entram como chamadas de ferramenta já
   // executadas, no mesmo formato que o modelo recebe. Fallback silencioso.
   {
     const r = await prefetchPromessa;
-    const aproveitar = r && "plano" in r && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto &&
-      !perguntaComplementar && !respostaNomeAtendimento && reconsultasIdentificacao.length === 0;
+    const aproveitar =
+      r &&
+      "plano" in r &&
+      !finalizacaoHandoff &&
+      !houveHandoff &&
+      !turnoObsoleto &&
+      !perguntaComplementar &&
+      !respostaNomeAtendimento &&
+      reconsultasIdentificacao.length === 0;
     if (r && "plano" in r) {
       if (aproveitar) {
         for (const [i, x] of r.resultados.entries()) {
           const id = `prefetch_${x.nome}_${i}`;
-          mensagens.push({ role: "assistant", content: null, tool_calls: [{ id, type: "function",
-            function: { name: x.nome, arguments: x.args } }] });
+          mensagens.push({
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id, type: "function", function: { name: x.nome, arguments: x.args } }],
+          });
           const retorno = await compartilharResultado(x.nome, x.args, x.r);
-          mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(compactarRetorno(retorno)) });
+          mensagens.push({
+            role: "tool",
+            tool_call_id: id,
+            content: JSON.stringify(compactarRetorno(retorno)),
+          });
         }
       }
-      rastro?.concluir("tool.prefetch", { duracao_ms: r.duracaoMs, termo: r.plano.termo, tipo: r.plano.tipo,
-        ferramentas: r.resultados.map(x => x.nome), aproveitado: Boolean(aproveitar),
-        ...(aproveitar ? {} : { motivo: "turno seguiu outro caminho antes do modelo" }) });
+      rastro?.concluir("tool.prefetch", {
+        duracao_ms: r.duracaoMs,
+        termo: r.plano.termo,
+        tipo: r.plano.tipo,
+        ferramentas: r.resultados.map((x) => x.nome),
+        aproveitado: Boolean(aproveitar),
+        ...(aproveitar ? {} : { motivo: "turno seguiu outro caminho antes do modelo" }),
+      });
     } else if (r) {
-      rastro?.concluir("tool.prefetch", { duracao_ms: r.duracaoMs, termo: r.termo ?? null, ferramentas: [],
-        aproveitado: false, motivo: r.motivo });
+      rastro?.concluir("tool.prefetch", {
+        duracao_ms: r.duracaoMs,
+        termo: r.termo ?? null,
+        ferramentas: [],
+        aproveitado: false,
+        motivo: r.motivo,
+      });
     }
   }
   // JEV — Fase 6 (flag `nina_jev_fase6`): confere a resposta antes do envio.
@@ -2473,9 +3060,13 @@ async function gerarRespostaNinaInterno(
     // Trava final: nenhum caminho do laço passa deste número de chamadas ao modelo.
     if (rodada >= LIMITE_CHAMADAS_MODELO) {
       semRespostaAposSintese = true;
-      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Trava final de chamadas ao modelo",
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Trava final de chamadas ao modelo",
         dados: { rodada, ...limiteTurno.resumo() },
-        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "LIMITE_CHAMADAS_MODELO" } });
+        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "LIMITE_CHAMADAS_MODELO" },
+      });
       break;
     }
     if (perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo) {
@@ -2486,15 +3077,21 @@ async function gerarRespostaNinaInterno(
     // pelo modelo sobre as mesmas opções oficiais guardadas pelo executor.
     runtimeContext.agendamento.opcoes_consultadas =
       fluxoEstado.appointment.slot_options?.session_id === fluxoEstado.session_id
-        ? fluxoEstado.appointment.slot_options?.vagas ?? [] : [];
+        ? (fluxoEstado.appointment.slot_options?.vagas ?? [])
+        : [];
     runtimeContext.agendamento.confirmacao_final = fluxoEstado.appointment.confirmation ?? null;
     // Atualiza somente os fatos de execução no composer oficial. O texto
     // publicado permanece idêntico e a auditoria captura a requisição usada.
-    const requestEfetivo = comporRequestNina({ behaviorPrompt, runtimeContext,
-      contratoPrecedencia: precedenciaTurno.contrato });
-    const systemMessage = mensagens.find(m => m.role === "system");
+    const requestEfetivo = comporRequestNina({
+      behaviorPrompt,
+      runtimeContext,
+      contratoPrecedencia: precedenciaTurno.contrato,
+    });
+    const systemMessage = mensagens.find((m) => m.role === "system");
     if (systemMessage) systemMessage.content = requestEfetivo.systemPrompt;
-    const blocoRuntime = auditoriaRegrasTurno.blocos.find(b => b.rotulo === "contexto de execução");
+    const blocoRuntime = auditoriaRegrasTurno.blocos.find(
+      (b) => b.rotulo === "contexto de execução",
+    );
     if (blocoRuntime) blocoRuntime.texto = JSON.stringify(requestEfetivo.runtimeContext);
     await registrarPromptEfetivo(requestEfetivo);
     // Toda chamada de modelo da Nina passa pelo Nina AI Gateway.
@@ -2505,10 +3102,15 @@ async function gerarRespostaNinaInterno(
     // Rodadas com dados novos continuam. Repetição sem novidade pede síntese;
     // correções de texto também não autorizam ferramentas ou escritas extras.
     const sintetizarOpcoes = modoSintese !== null;
-    if (modoSintese === "limite" && !retentativaSintese) mensagens.push({ role: "system", content: INSTRUCAO_LIMITE_TURNO });
-    if (modoSintese === "sem_progresso" && !retentativaSintese) mensagens.push({ role: "system", content: agendaComOpcoes
-      ? "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes."
-      : "As últimas consultas não trouxeram informação nova. Conclua com os fatos confirmados deste turno e preserve todas as perguntas independentes. Peça esclarecimento apenas sobre o item incerto. Falha técnica não significa dado ausente ou falta de vaga. Não faça novas consultas, não afirme operação sem gravação confirmada e não invente fatos ausentes." });
+    if (modoSintese === "limite" && !retentativaSintese)
+      mensagens.push({ role: "system", content: INSTRUCAO_LIMITE_TURNO });
+    if (modoSintese === "sem_progresso" && !retentativaSintese)
+      mensagens.push({
+        role: "system",
+        content: agendaComOpcoes
+          ? "Conclua esta resposta com os resultados já confirmados nas ferramentas. Não faça novas consultas nem anuncie reserva. Preserve médico, atendimento, data e período pedidos; alternativas fora desses critérios devem ser apresentadas como alternativas, nunca como se atendessem ao pedido. Explique a modalidade e os valores publicados quando perguntados. Apresente no máximo dez horários ou pergunte o período que ainda faltar. Se o período já foi informado, não o pergunte novamente. Não invente fatos ausentes."
+          : "As últimas consultas não trouxeram informação nova. Conclua com os fatos confirmados deste turno e preserve todas as perguntas independentes. Peça esclarecimento apenas sobre o item incerto. Falha técnica não significa dado ausente ou falta de vaga. Não faça novas consultas, não afirme operação sem gravação confirmada e não invente fatos ausentes.",
+      });
     const respostaIA = await ninaAIGateway({
       clinicaId,
       perfil: "whatsapp",
@@ -2536,9 +3138,8 @@ async function gerarRespostaNinaInterno(
     if (rastro && respostaIA.execucaoId) rastro.ids.execution_id = respostaIA.execucaoId;
     // FASE 1 — contagem explícita de rodadas do modelo neste turno.
     {
-      const { registrarRodadaModelo, registroTurnoAtual } = await import(
-        "@/lib/nina/rastreio/turno.server"
-      );
+      const { registrarRodadaModelo, registroTurnoAtual } =
+        await import("@/lib/nina/rastreio/turno.server");
       registrarRodadaModelo({
         execucaoId: respostaIA.execucaoId ?? null,
         modelo: respostaIA.modelo ?? null,
@@ -2546,9 +3147,7 @@ async function gerarRespostaNinaInterno(
       // AUDITORIA — como as instruções publicadas foram aplicadas NESTA rodada,
       // com a resposta ORIGINAL do modelo, antes de qualquer intervenção.
       {
-        const { registrarAuditoriaInstrucoes } = await import(
-          "@/lib/nina/rastreio/turno.server"
-        );
+        const { registrarAuditoriaInstrucoes } = await import("@/lib/nina/rastreio/turno.server");
         registrarAuditoriaInstrucoes({
           rodada: rodada + 1,
           execucaoId: respostaIA.execucaoId ?? null,
@@ -2611,9 +3210,20 @@ async function gerarRespostaNinaInterno(
       if (!retentativaSintese) {
         retentativaSintese = true;
         mensagens.push({ role: "system", content: INSTRUCAO_RESPOSTA_EM_TEXTO });
-        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Resposta sem texto na etapa final: nova tentativa",
-          dados: { rodada: rodada + 1, modo: modoSintese, ferramentas_descartadas: chamadas.map(c => c.function?.name ?? null) },
-          codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "INSTRUCAO_RESPOSTA_EM_TEXTO" } });
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Resposta sem texto na etapa final: nova tentativa",
+          dados: {
+            rodada: rodada + 1,
+            modo: modoSintese,
+            ferramentas_descartadas: chamadas.map((c) => c.function?.name ?? null),
+          },
+          codigo: {
+            arquivo: "src/lib/nina/eficiencia-turno.ts",
+            funcao: "INSTRUCAO_RESPOSTA_EM_TEXTO",
+          },
+        });
         continue;
       }
       semRespostaAposSintese = true;
@@ -2622,7 +3232,10 @@ async function gerarRespostaNinaInterno(
 
     if (chamadas.length === 0) {
       const texto = (msg?.content ?? "").trim();
-      if (!texto) { modoSintese = "sem_progresso"; continue; }
+      if (!texto) {
+        modoSintese = "sem_progresso";
+        continue;
+      }
       // ---------------- defesa contra falso sucesso ----------------
       // O modelo afirmou uma reserva sem gravação confirmada. A tentativa
       // de correção não constitui autorização para criar um agendamento.
@@ -2644,13 +3257,25 @@ async function gerarRespostaNinaInterno(
         const { confirmacaoDaEscolha } = await import("@/lib/nina/agendamento-escolha");
         const { mensagemCorrecaoFalsoSucesso } = await import("@/lib/nina/correcao-falso-sucesso");
         const escolhaAtual = confirmacaoDaEscolha(fluxoEstado, clinicaId);
-        const etapaCorrecao = !escolhaAtual ? "sem_escolha"
-          : fluxoEstado.flow.stage === "COLLECTING_PATIENT_DATA" && !escolhaAtual.cadastro ? "aguardando_dados"
-          : "aguardando_confirmacao";
-        mensagens.push({ role: "system", content: mensagemCorrecaoFalsoSucesso(texto, etapaCorrecao) });
-        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Afirmação de reserva sem gravação: resposta reescrita antes do envio",
+        const etapaCorrecao = !escolhaAtual
+          ? "sem_escolha"
+          : fluxoEstado.flow.stage === "COLLECTING_PATIENT_DATA" && !escolhaAtual.cadastro
+            ? "aguardando_dados"
+            : "aguardando_confirmacao";
+        mensagens.push({
+          role: "system",
+          content: mensagemCorrecaoFalsoSucesso(texto, etapaCorrecao),
+        });
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Afirmação de reserva sem gravação: resposta reescrita antes do envio",
           dados: { rascunho_nao_enviado: texto.slice(0, 500), etapa: etapaCorrecao },
-          codigo: { arquivo: "src/lib/nina/correcao-falso-sucesso.ts", funcao: "mensagemCorrecaoFalsoSucesso" } });
+          codigo: {
+            arquivo: "src/lib/nina/correcao-falso-sucesso.ts",
+            funcao: "mensagemCorrecaoFalsoSucesso",
+          },
+        });
         continue;
       }
       if (podeAgendar && !agendamentoConfirmado && afirmaOuPrometeAgendamento(texto)) {
@@ -2665,16 +3290,21 @@ async function gerarRespostaNinaInterno(
         break;
       }
       if (conferenciaJevAtiva && texto) {
-        const decisao = await (await import("@/lib/nina/jev.server")).conferirRespostaJev({
+        const decisao = await (
+          await import("@/lib/nina/jev.server")
+        ).conferirRespostaJev({
           clinicaId,
           conversaId: estadoId.conversaId ?? null,
           teste: opcoes?.teste === true,
           texto,
           fatos: {
-            agendaConsultada: agendaComOpcoes ||
-              (await import("@/lib/nina/jev-contexto")).opcoesOferecidasJev(sessaoNina.estado).length > 0,
+            agendaConsultada:
+              agendaComOpcoes ||
+              (await import("@/lib/nina/jev-contexto")).opcoesOferecidasJev(sessaoNina.estado)
+                .length > 0,
             agendamentoConfirmado: Boolean(agendamentoConfirmado),
-            dadosConsultados: mensagens.slice(inicioMensagensTurno)
+            dadosConsultados: mensagens
+              .slice(inicioMensagensTurno)
               .filter((m) => m.role === "tool" && typeof m.content === "string")
               .map((m) => String(m.content)),
           },
@@ -2691,7 +3321,10 @@ async function gerarRespostaNinaInterno(
           const { RESPOSTA_SEGURA_CONFERENCIA } = await import("@/lib/nina/jev-conferencia");
           resposta = RESPOSTA_SEGURA_CONFERENCIA;
           const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
-          registrarOrigemResposta("codigo", "texto do modelo substituído: conferência do Jev (Fase 6) reprovou após correção");
+          registrarOrigemResposta(
+            "codigo",
+            "texto do modelo substituído: conferência do Jev (Fase 6) reprovou após correção",
+          );
           break;
         }
       }
@@ -2704,7 +3337,6 @@ async function gerarRespostaNinaInterno(
       break;
     }
 
-
     // Reconhecimento pelo modelo quando a leitura inicial não decidiu (ex.: Jev desligado).
     // O encaminhamento administrativo prevalece sobre todo o lote de ferramentas.
     for (const chamada of chamadas) {
@@ -2713,13 +3345,18 @@ async function gerarRespostaNinaInterno(
         const { motivo } = JSON.parse(chamada.function.arguments ?? "");
         if (/^CANCELAMENTO_SOLICITADO\b/.test(motivo)) alteracaoSolicitada = "cancelamento";
         else if (/^REMARCACAO_SOLICITADA\b/.test(motivo)) alteracaoSolicitada = "remarcacao";
-      } catch { /* Argumentos inválidos seguem a validação normal do broker. */ }
+      } catch {
+        /* Argumentos inválidos seguem a validação normal do broker. */
+      }
     }
     if (alteracaoSolicitada) {
-      await executarDecisaoEncaminhamento({ motivo: motivoAlteracao(alteracaoSolicitada), urgencia: "normal" });
+      await executarDecisaoEncaminhamento({
+        motivo: motivoAlteracao(alteracaoSolicitada),
+        urgencia: "normal",
+      });
       break;
     }
-    if (!nomePopular && chamadas.some(c => c.function?.name === "solicitar_nome_atendimento")) {
+    if (!nomePopular && chamadas.some((c) => c.function?.name === "solicitar_nome_atendimento")) {
       respostaParcialConfirmada = perguntasDoTurno.temConfirmadas;
       if (respostaParcialConfirmada) resposta = msg?.content ?? "";
       await solicitarNomeAtendimento();
@@ -2731,49 +3368,104 @@ async function gerarRespostaNinaInterno(
       const nome = String(c.function?.name ?? "");
       if (c.function) {
         const originais = c.function.arguments;
-        c.function.arguments = prepararPesquisaAtendimentoDaSessao(nome, originais, {
-          clinicaId, sessionId: fluxoEstado.session_id ?? null,
-          conhecimento: itemConfirmadoNaResposta || profissionalConfirmadoNaResposta ? conhecimentoAnterior : PESQUISAS_INDEPENDENTES.has(nome) ? perguntasDoTurno.referencia(originais) : fluxoEstado.knowledge_context,
-          ...contextoRespostaProfissional,
-        }) ?? originais;
+        c.function.arguments =
+          prepararPesquisaAtendimentoDaSessao(nome, originais, {
+            clinicaId,
+            sessionId: fluxoEstado.session_id ?? null,
+            conhecimento:
+              itemConfirmadoNaResposta || profissionalConfirmadoNaResposta
+                ? conhecimentoAnterior
+                : PESQUISAS_INDEPENDENTES.has(nome)
+                  ? perguntasDoTurno.referencia(originais)
+                  : fluxoEstado.knowledge_context,
+            ...contextoRespostaProfissional,
+          }) ?? originais;
         c.function.arguments = perguntasDoTurno.prepararContinuidade(nome, c.function.arguments);
-        if (c.function.arguments !== originais) registrarEtapa({
-          tipo: "consulta", fonte: "sistema", titulo: "Pesquisa preservou o atendimento identificado",
-          dados: { ferramenta: nome, argumentos_originais: originais, argumentos_efetivos: c.function.arguments },
-          codigo: { arquivo: "src/lib/nina/pesquisa-atendimento-sessao.ts", funcao: "prepararPesquisaAtendimentoDaSessao" },
-        });
+        if (c.function.arguments !== originais)
+          registrarEtapa({
+            tipo: "consulta",
+            fonte: "sistema",
+            titulo: "Pesquisa preservou o atendimento identificado",
+            dados: {
+              ferramenta: nome,
+              argumentos_originais: originais,
+              argumentos_efetivos: c.function.arguments,
+            },
+            codigo: {
+              arquivo: "src/lib/nina/pesquisa-atendimento-sessao.ts",
+              funcao: "prepararPesquisaAtendimentoDaSessao",
+            },
+          });
       }
       if (nome === "solicitar_nome_atendimento" && nomePopular) {
-        mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
-          ok: false, executada: false, erro: "ATENDIMENTO_INFORMADO",
-          mensagem: `O paciente informou o atendimento pelo nome popular "${nomePopular.termo}" = ${nomePopular.especialidade}. Isso não é sintoma. Pesquise ${nomePopular.especialidade} no catálogo e siga o atendimento normalmente.`,
-        }) });
-        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Nome popular de especialidade não é sintoma",
+        mensagens.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify({
+            ok: false,
+            executada: false,
+            erro: "ATENDIMENTO_INFORMADO",
+            mensagem: `O paciente informou o atendimento pelo nome popular "${nomePopular.termo}" = ${nomePopular.especialidade}. Isso não é sintoma. Pesquise ${nomePopular.especialidade} no catálogo e siga o atendimento normalmente.`,
+          }),
+        });
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Nome popular de especialidade não é sintoma",
           dados: { termo: nomePopular.termo, especialidade: nomePopular.especialidade },
-          codigo: { arquivo: "src/lib/nina/nome-popular-especialidade.ts", funcao: "especialidadePorNomePopular" } });
+          codigo: {
+            arquivo: "src/lib/nina/nome-popular-especialidade.ts",
+            funcao: "especialidadePorNomePopular",
+          },
+        });
         continue;
       }
       if (reservaComPerguntas && !PESQUISAS_INDEPENDENTES.has(nome)) {
-        mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
-          ok: false, executada: false, erro: "RESERVA_JA_CONCLUIDA_NO_TURNO",
-          mensagem: "A reserva foi concluída. Responda às perguntas informativas restantes com as pesquisas do catálogo. Não repita a reserva nem inicie outra operação neste turno.",
-        }) });
+        mensagens.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify({
+            ok: false,
+            executada: false,
+            erro: "RESERVA_JA_CONCLUIDA_NO_TURNO",
+            mensagem:
+              "A reserva foi concluída. Responda às perguntas informativas restantes com as pesquisas do catálogo. Não repita a reserva nem inicie outra operação neste turno.",
+          }),
+        });
         continue;
       }
-      if (ctxFerramentas?.esclarecimentoCatalogo && pendenciaBloqueiaFerramenta(nome, c.function?.arguments,
-        perguntasDoTurno.pendentes, fluxoEstado, clinicaId)) {
+      if (
+        ctxFerramentas?.esclarecimentoCatalogo &&
+        pendenciaBloqueiaFerramenta(
+          nome,
+          c.function?.arguments,
+          perguntasDoTurno.pendentes,
+          fluxoEstado,
+          clinicaId,
+        )
+      ) {
         bloqueioIdentificacaoNoTurno = true;
-        mensagens.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify({
-          ok: false, executada: false, erro: "IDENTIFICACAO_PENDENTE",
-          mensagem: "Esta operação ainda não está vinculada a um pedido identificado sem ambiguidade. Continue as pesquisas independentes e esclareça somente esse pedido. Isto é um bloqueio de identificação, não instabilidade técnica nem falta de vaga. Nenhuma transferência foi realizada.",
-        }) });
+        mensagens.push({
+          role: "tool",
+          tool_call_id: c.id,
+          content: JSON.stringify({
+            ok: false,
+            executada: false,
+            erro: "IDENTIFICACAO_PENDENTE",
+            mensagem:
+              "Esta operação ainda não está vinculada a um pedido identificado sem ambiguidade. Continue as pesquisas independentes e esclareça somente esse pedido. Isto é um bloqueio de identificação, não instabilidade técnica nem falta de vaga. Nenhuma transferência foi realizada.",
+          }),
+        });
         continue;
       }
       // Toda execução passa pelo broker: ele valida o retorno, aplica
       // idempotência de turno e nunca transforma erro em sucesso.
       // Abortar também pesquisas de catálogo evita rodadas extras de um pedido
       // já substituído. A proteção de escrita continua valendo para ações críticas.
-      if (opcoes?.revisao?.valor && (ehFerramentaCritica(nome) || PESQUISAS_INDEPENDENTES.has(nome))) {
+      if (
+        opcoes?.revisao?.valor &&
+        (ehFerramentaCritica(nome) || PESQUISAS_INDEPENDENTES.has(nome))
+      ) {
         const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
         const obsoleta = await respostaObsoleta({
           clinicaId,
@@ -2802,16 +3494,30 @@ async function gerarRespostaNinaInterno(
         houveProgresso = true;
         limiteTurno.registrarResultadoNovo(nome);
       }
-      if (["consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"].includes(nome)) {
+      if (
+        [
+          "consultar_disponibilidade",
+          "verificar_horario",
+          "proxima_vaga",
+          "consultar_primeiro_disponivel",
+        ].includes(nome)
+      ) {
         const dados = r.dados as Record<string, unknown> | null;
-        agendaComOpcoes = r.success && !r.erro && dados?.ok === true &&
-          ["slots", "horarios", "proximos", "periodos_com_vagas"].some(chave =>
-            Array.isArray(dados[chave]) && dados[chave].length > 0);
+        agendaComOpcoes =
+          r.success &&
+          !r.erro &&
+          dados?.ok === true &&
+          ["slots", "horarios", "proximos", "periodos_com_vagas"].some(
+            (chave) => Array.isArray(dados[chave]) && dados[chave].length > 0,
+          );
       }
       if (consultaAgendaAguardandoPaciente(r.dados)) {
         // Médico ou atendimento ambíguo não é agenda vazia nem falha técnica.
         // Registra a tentativa, sem produzir evidência de consulta à agenda.
-        rastro?.pular("tool.execute", "consulta de vagas aguardando identificação inequívoca do médico ou atendimento");
+        rastro?.pular(
+          "tool.execute",
+          "consulta de vagas aguardando identificação inequívoca do médico ou atendimento",
+        );
         registrarEtapa({
           tipo: "consulta",
           fonte: "sistema",
@@ -2836,8 +3542,7 @@ async function gerarRespostaNinaInterno(
         console.info("[NINA_APPOINTMENT]", {
           conversation_id: estadoId.conversaId,
           create_appointment_called: true,
-          appointment_id:
-            (r.dados as { appointment_id?: string } | null)?.appointment_id ?? null,
+          appointment_id: (r.dados as { appointment_id?: string } | null)?.appointment_id ?? null,
           final_result: r.success ? "SUCCESS" : "FAILED",
           error_code: r.erro ?? null,
           reused: r.reused,
@@ -2845,18 +3550,35 @@ async function gerarRespostaNinaInterno(
       }
       const listaExtensa = r.success
         ? (await import("@/lib/nina/lista-profissionais-extensa")).listaProfissionaisExtensa(
-            nome, c.function?.arguments ?? null, r.dados as never)
+            nome,
+            c.function?.arguments ?? null,
+            r.dados as never,
+          )
         : null;
       if (listaExtensa) {
         // Regra de 08/10/2026: mais de 8 profissionais na lista → a equipe apresenta as opções.
         const { motivoListaExtensa } = await import("@/lib/nina/lista-profissionais-extensa");
-        registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Lista com mais de 8 profissionais: equipe",
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Lista com mais de 8 profissionais: equipe",
           dados: { total: listaExtensa.total, termo: listaExtensa.especialidade },
-          codigo: { arquivo: "src/lib/nina/lista-profissionais-extensa.ts", funcao: "listaProfissionaisExtensa" } });
-        await executarDecisaoEncaminhamento({ motivo: motivoListaExtensa(listaExtensa), urgencia: "normal" });
+          codigo: {
+            arquivo: "src/lib/nina/lista-profissionais-extensa.ts",
+            funcao: "listaProfissionaisExtensa",
+          },
+        });
+        await executarDecisaoEncaminhamento({
+          motivo: motivoListaExtensa(listaExtensa),
+          urgencia: "normal",
+        });
         break;
       }
-      const resultadoCompartilhado = await compartilharResultado(nome, c.function?.arguments ?? null, r);
+      const resultadoCompartilhado = await compartilharResultado(
+        nome,
+        c.function?.arguments ?? null,
+        r,
+      );
       mensagens.push({
         role: "tool",
         tool_call_id: c.id,
@@ -2866,73 +3588,127 @@ async function gerarRespostaNinaInterno(
         // Uma pesquisa recusada não é "não encontrado". Devolve ao modelo
         // para reformular antes de executar outras decisões do mesmo lote.
         for (const pendente of chamadas.slice(chamadas.indexOf(c) + 1)) {
-          mensagens.push({ role: "tool", tool_call_id: pendente.id, content: JSON.stringify({
-            ok: false, erro: "PESQUISA_PENDENTE_DE_INTERPRETACAO", executada: false,
-            mensagem: "Chamada não executada: primeiro reformule a pesquisa recusada com o atendimento identificado e seus objetivos.",
-          }) });
+          mensagens.push({
+            role: "tool",
+            tool_call_id: pendente.id,
+            content: JSON.stringify({
+              ok: false,
+              erro: "PESQUISA_PENDENTE_DE_INTERPRETACAO",
+              executada: false,
+              mensagem:
+                "Chamada não executada: primeiro reformule a pesquisa recusada com o atendimento identificado e seus objetivos.",
+            }),
+          });
         }
         break;
       }
       // A dúvida de um item não interrompe as consultas restantes do lote.
       if (finalizacaoHandoff || turnoObsoleto) break;
       const dadosAgendamento = r.dados as Record<string, unknown> | null;
-      if (r.success && dadosAgendamento?.sem_agendamento === true &&
+      if (
+        r.success &&
+        dadosAgendamento?.sem_agendamento === true &&
         dadosAgendamento.modalidade_atendimento === "chegada_sem_pre_agendamento" &&
-        typeof dadosAgendamento.orientacao_atendimento === "string") {
+        typeof dadosAgendamento.orientacao_atendimento === "string"
+      ) {
         const { criarResultado } = await import("@/lib/nina/resposta/contrato");
-        resumoEscolha = criarResultado({ origem: "gate", texto: dadosAgendamento.orientacao_atendimento,
-          fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"], restricoes: ["sem_reserva_individual"] });
+        resumoEscolha = criarResultado({
+          origem: "gate",
+          texto: dadosAgendamento.orientacao_atendimento,
+          fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"],
+          restricoes: ["sem_reserva_individual"],
+        });
         break;
       }
-      if (nome === "agendar" && r.success && dadosAgendamento?.verificado_no_banco === true && dadosAgendamento.appointment_id) {
+      if (
+        nome === "agendar" &&
+        r.success &&
+        dadosAgendamento?.verificado_no_banco === true &&
+        dadosAgendamento.appointment_id
+      ) {
         const { resultadoAgendamentoConfirmado } = await import("@/lib/nina/resposta/agendamento");
-        resumoEscolha = resultadoAgendamentoConfirmado(dadosAgendamento, fluxoEstado,
-          ctxFerramentas?.nomeUnidade || "nossa clínica", null, estadoId.conversaId);
+        resumoEscolha = resultadoAgendamentoConfirmado(
+          dadosAgendamento,
+          fluxoEstado,
+          ctxFerramentas?.nomeUnidade || "nossa clínica",
+          null,
+          estadoId.conversaId,
+        );
         const { separarAceiteComPergunta } = await import("@/lib/nina/confirmacao-agendamento");
-        reservaComPerguntas = !!resumoEscolha && (!!separarAceiteComPergunta(mensagemPaciente) || mensagemPaciente.includes("?") ||
-          perguntasDoTurno.temConfirmadas || perguntasDoTurno.pendentes.length > 0 ||
-          chamadas.slice(chamadas.indexOf(c) + 1).some(p => PESQUISAS_INDEPENDENTES.has(p.function?.name ?? "")));
+        reservaComPerguntas =
+          !!resumoEscolha &&
+          (!!separarAceiteComPergunta(mensagemPaciente) ||
+            mensagemPaciente.includes("?") ||
+            perguntasDoTurno.temConfirmadas ||
+            perguntasDoTurno.pendentes.length > 0 ||
+            chamadas
+              .slice(chamadas.indexOf(c) + 1)
+              .some((p) => PESQUISAS_INDEPENDENTES.has(p.function?.name ?? "")));
         if (resumoEscolha && !reservaComPerguntas) break;
       }
-      if (nome === "selecionar_horario" && r.success &&
+      if (
+        nome === "selecionar_horario" &&
+        r.success &&
         (typeof dadosAgendamento?.resumo_confirmacao === "string" ||
-          (dadosAgendamento?.selecao_preservada === true && dadosAgendamento.confirmacao_recebida !== true))) {
-        resumoEscolha = await continuarAgendamento?.(true) ?? null;
+          (dadosAgendamento?.selecao_preservada === true &&
+            dadosAgendamento.confirmacao_recebida !== true))
+      ) {
+        resumoEscolha = (await continuarAgendamento?.(true)) ?? null;
         // Nenhuma ferramenta do mesmo lote pode gravar antes do novo aceite.
         if (resumoEscolha) break;
         // A coleta ficou para a próxima mensagem (ex.: "Prefiro 12:20. Quanto
         // fica em dinheiro?"). A vaga já está escolhida: o modelo responde e
         // pede os dados, sem o aviso falso de falha no cadastro (26/09/2026).
         for (const pendente of chamadas.slice(chamadas.indexOf(c) + 1)) {
-          mensagens.push({ role: "tool", tool_call_id: pendente.id, content: JSON.stringify({
-            ok: false, erro: "CHAMADA_NAO_EXECUTADA", executada: false,
-            mensagem: "A vaga acabou de ser escolhida. Responda o paciente e colete os dados antes de qualquer outra operação.",
-          }) });
+          mensagens.push({
+            role: "tool",
+            tool_call_id: pendente.id,
+            content: JSON.stringify({
+              ok: false,
+              erro: "CHAMADA_NAO_EXECUTADA",
+              executada: false,
+              mensagem:
+                "A vaga acabou de ser escolhida. Responda o paciente e colete os dados antes de qualquer outra operação.",
+            }),
+          });
         }
         break;
       }
-      const { encaminhamentoFalhaAgendamento, respostaFalhaAgendamento } = await import("@/lib/nina/falha-agendamento");
+      const { encaminhamentoFalhaAgendamento, respostaFalhaAgendamento } =
+        await import("@/lib/nina/falha-agendamento");
       const falhaAgendamento = encaminhamentoFalhaAgendamento(r);
       const encaminhamento = falhaAgendamento ?? encaminhamentoSemVagas(r, c.function?.arguments);
       if (encaminhamento) {
-        const origemEncaminhamento = falhaAgendamento ? "falha_operacional_agendamento" : "agenda_sem_vagas";
+        const origemEncaminhamento = falhaAgendamento
+          ? "falha_operacional_agendamento"
+          : "agenda_sem_vagas";
         // A consulta é leitura, mas o encaminhamento é escrita: conferir de
         // novo a revisão antes de silenciar a Nina ou atribuir a conversa.
         if (opcoes?.revisao?.valor) {
           const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
-          if (await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
-            revisaoProcessada: opcoes.revisao.valor })) {
+          if (
+            await respostaObsoleta({
+              clinicaId,
+              telefone: opcoes.revisao.telefone,
+              revisaoProcessada: opcoes.revisao.valor,
+            })
+          ) {
             turnoObsoleto = true;
             rastro?.falhar("tool.execute", "STALE_CONVERSATION_REVISION", {
-              ferramenta: "solicitar_atendente_humano", origem_solicitacao: origemEncaminhamento,
+              ferramenta: "solicitar_atendente_humano",
+              origem_solicitacao: origemEncaminhamento,
             });
             break;
           }
         }
         rastro?.iniciar("tool.execute", {
-          ferramenta: "solicitar_atendente_humano", origem_solicitacao: origemEncaminhamento,
+          ferramenta: "solicitar_atendente_humano",
+          origem_solicitacao: origemEncaminhamento,
         });
-        const rh = await broker.executar("solicitar_atendente_humano", JSON.stringify(encaminhamento));
+        const rh = await broker.executar(
+          "solicitar_atendente_humano",
+          JSON.stringify(encaminhamento),
+        );
         await compartilharResultado("solicitar_atendente_humano", encaminhamento, rh);
         const confirmado = rh.success && !rh.erro;
         houveHandoff ||= confirmado;
@@ -2941,24 +3717,46 @@ async function gerarRespostaNinaInterno(
         fluxoEstado.appointment.slot_options = null;
         fluxoEstado.flow.stage = "HANDOFF";
         finalizacaoHandoff = {
-          texto: falhaAgendamento ? respostaFalhaAgendamento(confirmado)
-            : respostaSemVagas(confirmado, encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL"), encaminhamento.motivo.startsWith("MODALIDADE_")),
-          textoModelo: msg.content ?? "", handoffConfirmado: confirmado, motivo: encaminhamento.motivo,
+          texto: falhaAgendamento
+            ? respostaFalhaAgendamento(confirmado)
+            : respostaSemVagas(
+                confirmado,
+                encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL"),
+                encaminhamento.motivo.startsWith("MODALIDADE_"),
+              ),
+          textoModelo: msg.content ?? "",
+          handoffConfirmado: confirmado,
+          motivo: encaminhamento.motivo,
         };
         registrarEtapa({
-          tipo: "ferramenta", fonte: "atendimento", titulo: falhaAgendamento ? "Encaminhamento por falha operacional no agendamento" : encaminhamento.motivo.startsWith("MODALIDADE_")
-            ? "Encaminhamento para conferir a modalidade" : "Encaminhamento por ausência de vagas",
-          dados: { origem_solicitacao: "servidor", motivo: encaminhamento.motivo,
-            ferramenta_origem: nome, consulta: r.dados, argumentos: encaminhamento,
-            handoff_confirmado: confirmado, erro: rh.erro ?? null, resultado: rh.dados },
+          tipo: "ferramenta",
+          fonte: "atendimento",
+          titulo: falhaAgendamento
+            ? "Encaminhamento por falha operacional no agendamento"
+            : encaminhamento.motivo.startsWith("MODALIDADE_")
+              ? "Encaminhamento para conferir a modalidade"
+              : "Encaminhamento por ausência de vagas",
+          dados: {
+            origem_solicitacao: "servidor",
+            motivo: encaminhamento.motivo,
+            ferramenta_origem: nome,
+            consulta: r.dados,
+            argumentos: encaminhamento,
+            handoff_confirmado: confirmado,
+            erro: rh.erro ?? null,
+            resultado: rh.dados,
+          },
           codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" },
         });
-        if (confirmado) rastro?.concluir("tool.execute", {
-          ferramenta: "solicitar_atendente_humano", origem_solicitacao: origemEncaminhamento,
-        });
-        else rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", {
-          ferramenta: "solicitar_atendente_humano",
-        });
+        if (confirmado)
+          rastro?.concluir("tool.execute", {
+            ferramenta: "solicitar_atendente_humano",
+            origem_solicitacao: origemEncaminhamento,
+          });
+        else
+          rastro?.falhar("tool.execute", rh.erro ?? "handoff não confirmado", {
+            ferramenta: "solicitar_atendente_humano",
+          });
         // Encerra também o lote: não procura outro médico, não agenda e não
         // consome rodadas adicionais do modelo depois de decidir transferir.
         break;
@@ -2974,30 +3772,51 @@ async function gerarRespostaNinaInterno(
       break;
     }
     if (finalizacaoHandoff || (resumoEscolha && !reservaComPerguntas)) break;
-    if (reservaComPerguntas) mensagens.push({ role: "system", content:
-      "A reserva acabou de ser comprovada. Sua confirmação será incluída pelo sistema. Continue as pesquisas informativas restantes e redija somente a resposta às outras perguntas, com esclarecimento específico do que ainda estiver incerto. Não repita o resumo, não peça novo aceite e não execute outra reserva ou transferência neste turno." });
+    if (reservaComPerguntas)
+      mensagens.push({
+        role: "system",
+        content:
+          "A reserva acabou de ser comprovada. Sua confirmação será incluída pelo sistema. Continue as pesquisas informativas restantes e redija somente a resposta às outras perguntas, com esclarecimento específico do que ainda estiver incerto. Não repita o resumo, não peça novo aceite e não execute outra reserva ou transferência neste turno.",
+      });
     if (!houveProgresso) {
       modoSintese = "sem_progresso";
-      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Consultas sem informação nova: concluir resposta",
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Consultas sem informação nova: concluir resposta",
         dados: { rodada: rodada + 1, motivo: "retornos_repetidos_ou_chamadas_bloqueadas" },
-        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarProgressoTurno" } });
+        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarProgressoTurno" },
+      });
     }
     limiteTurno.registrarRodadaComFerramentas();
     const estouro = modoSintese === null ? limiteTurno.estouro() : null;
     if (estouro) {
       modoSintese = "limite";
-      registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: estouro === "tokens"
-          ? "Limite de tokens do turno atingido: concluir resposta" : "Limite de consultas do turno atingido: concluir resposta",
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo:
+          estouro === "tokens"
+            ? "Limite de tokens do turno atingido: concluir resposta"
+            : "Limite de consultas do turno atingido: concluir resposta",
         dados: { rodada: rodada + 1, motivo: estouro, ...limiteTurno.resumo() },
-        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarLimiteTurno" } });
+        codigo: { arquivo: "src/lib/nina/eficiencia-turno.ts", funcao: "criarLimiteTurno" },
+      });
     }
   }
 
   // Uma pergunta determinística também precisa pertencer à revisão atual.
-  if (!turnoObsoleto && (ctxFerramentas?.esclarecimentoCatalogo || respostaNomeAtendimento) && opcoes?.revisao?.valor) {
+  if (
+    !turnoObsoleto &&
+    (ctxFerramentas?.esclarecimentoCatalogo || respostaNomeAtendimento) &&
+    opcoes?.revisao?.valor
+  ) {
     const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
-    turnoObsoleto = await respostaObsoleta({ clinicaId, telefone: opcoes.revisao.telefone,
-      revisaoProcessada: opcoes.revisao.valor });
+    turnoObsoleto = await respostaObsoleta({
+      clinicaId,
+      telefone: opcoes.revisao.telefone,
+      revisaoProcessada: opcoes.revisao.valor,
+    });
   }
   // Ausência de progresso não autoriza transferência nem sucesso fictício.
   if (turnoObsoleto) {
@@ -3013,21 +3832,38 @@ async function gerarRespostaNinaInterno(
     resposta = RESPOSTA_SEM_PROGRESSO;
     {
       const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
-      registrarOrigemResposta("codigo", "SEM_PROGRESSO: síntese sem resposta; aguarda escolha do paciente sem transferência automática");
+      registrarOrigemResposta(
+        "codigo",
+        "SEM_PROGRESSO: síntese sem resposta; aguarda escolha do paciente sem transferência automática",
+      );
     }
   }
 
-
   // Texto tal como saiu do modelo, antes dos ajustes obrigatórios abaixo.
-  const respostaDoModelo = finalizacaoHandoff?.textoModelo ?? (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
+  const respostaDoModelo =
+    finalizacaoHandoff?.textoModelo ??
+    (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
 
-  if (!finalizacaoHandoff && !houveHandoff && !perguntaComplementar && ctxFerramentas?.esclarecimentoCatalogo)
+  if (
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !perguntaComplementar &&
+    ctxFerramentas?.esclarecimentoCatalogo
+  )
     fluxoEstado.knowledge_context = perguntasDoTurno.estado(fluxoEstado.knowledge_context ?? null);
   // Dúvida descartada neste turno (assunto já respondido) não fica guardada:
   // um "sim" na próxima mensagem não pode confirmar uma opção nunca perguntada.
-  else if (ctxFerramentas && !perguntaComplementar && !perguntasDoTurno.pendentes.length &&
-    fluxoEstado.knowledge_context?.esclarecimento)
-    fluxoEstado.knowledge_context = { ...fluxoEstado.knowledge_context, esclarecimento: undefined, pendenciasIdentificacao: undefined };
+  else if (
+    ctxFerramentas &&
+    !perguntaComplementar &&
+    !perguntasDoTurno.pendentes.length &&
+    fluxoEstado.knowledge_context?.esclarecimento
+  )
+    fluxoEstado.knowledge_context = {
+      ...fluxoEstado.knowledge_context,
+      esclarecimento: undefined,
+      pendenciasIdentificacao: undefined,
+    };
 
   // Persiste o estado estruturado: o que as ferramentas descobriram nesta
   // rodada (paciente identificado, horário oferecido, agendamento criado)
@@ -3038,22 +3874,16 @@ async function gerarRespostaNinaInterno(
   // refletir o sucesso; o resumo anterior (tentativa/falha) vira histórico.
   if (agendamentoConfirmado && !jaTinhaAgendamento && estadoId.conversaId) {
     try {
-      const { registrarDesfechoResumo } = await import(
-        "@/lib/atendimento/handoff-resumo.server"
-      );
+      const { registrarDesfechoResumo } = await import("@/lib/atendimento/handoff-resumo.server");
       await registrarDesfechoResumo({
         clinicaId,
         conversaId: estadoId.conversaId,
         desfecho: "agendamento_concluido",
       });
-
     } catch (e) {
       console.error("[nina] falha ao atualizar resumo pós-agendamento", e);
     }
   }
-
-
-
 
   // FASE 1 — daqui para baixo TODA alteração do texto é registrada como
   // transformação, para responder "quem mudou a resposta do modelo".
@@ -3100,23 +3930,43 @@ async function gerarRespostaNinaInterno(
   if (!finalizacaoHandoff && !houveHandoff) {
     const { protegerEfeitosDaResposta } = await import("@/lib/nina/resposta/efeitos-confirmados");
     const protegida = protegerEfeitosDaResposta(resposta, {
-      handoffConfirmado: false, bloqueioIdentificacao: bloqueioIdentificacaoNoTurno,
+      handoffConfirmado: false,
+      bloqueioIdentificacao: bloqueioIdentificacaoNoTurno,
     });
     if (protegida.alterado) {
-      transformar("resposta.efeitos_confirmados", "não anunciar transferência sem execução nem identificação pendente como instabilidade", resposta, protegida.texto);
+      transformar(
+        "resposta.efeitos_confirmados",
+        "não anunciar transferência sem execução nem identificação pendente como instabilidade",
+        resposta,
+        protegida.texto,
+      );
       resposta = protegida.texto;
     }
   }
-  if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && ctxFerramentas?.esclarecimentoCatalogo) {
-    const { apresentarPerguntaEsclarecimento } = await import("@/lib/nina/esclarecimento-apresentacao");
+  if (
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    ctxFerramentas?.esclarecimentoCatalogo
+  ) {
+    const { apresentarPerguntaEsclarecimento } =
+      await import("@/lib/nina/esclarecimento-apresentacao");
     // Sem fatos independentes confirmados, entrega apenas o esclarecimento.
     // Com resposta parcial, preserva o texto e acrescenta as pendências.
-    const apresentacao = saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
-      ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
-      : null;
+    const apresentacao =
+      saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
+        ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
+        : null;
     resposta = perguntaComplementar
-      ? apresentarPerguntaEsclarecimento(ctxFerramentas.esclarecimentoCatalogo.pergunta, { tipo: ctxFerramentas.esclarecimentoCatalogo.tipo, apresentacao })
-      : comporRespostaParcial(respostaParcialConfirmada ? resposta : "", perguntasDoTurno.pendentes, apresentacao);
+      ? apresentarPerguntaEsclarecimento(ctxFerramentas.esclarecimentoCatalogo.pergunta, {
+          tipo: ctxFerramentas.esclarecimentoCatalogo.tipo,
+          apresentacao,
+        })
+      : comporRespostaParcial(
+          respostaParcialConfirmada ? resposta : "",
+          perguntasDoTurno.pendentes,
+          apresentacao,
+        );
     transformar(
       "catalogo.esclarecimento",
       "confirmar o candidato ou pedir nova escrita antes de encaminhar",
@@ -3124,16 +3974,32 @@ async function gerarRespostaNinaInterno(
       resposta,
       "aviso_operacional",
     );
-    marcarOrigem(respostaParcialConfirmada ? "modelo_transformado" : "codigo", "identificação pendente por pergunta; respostas confirmadas preservadas");
+    marcarOrigem(
+      respostaParcialConfirmada ? "modelo_transformado" : "codigo",
+      "identificação pendente por pergunta; respostas confirmadas preservadas",
+    );
   }
   if (respostaNomeAtendimento && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto) {
     const antes = resposta;
     // Primeira resposta da conversa: a apresentação vem junto (07/10/2026).
-    const apresentacao = !respostaParcialConfirmada && saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
-      ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
-      : "";
-    resposta = [apresentacao, respostaParcialConfirmada ? resposta : "", textoPedirNomeAtendimento(mensagemPaciente)].filter(Boolean).join("\n\n");
-    transformar("atendimento.sem_indicacao", "Pedir nome sem recomendar atendimento por sintomas", antes, resposta, "aviso_operacional");
+    const apresentacao =
+      !respostaParcialConfirmada && saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
+        ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
+        : "";
+    resposta = [
+      apresentacao,
+      respostaParcialConfirmada ? resposta : "",
+      textoPedirNomeAtendimento(mensagemPaciente),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    transformar(
+      "atendimento.sem_indicacao",
+      "Pedir nome sem recomendar atendimento por sintomas",
+      antes,
+      resposta,
+      "aviso_operacional",
+    );
     marcarOrigem("codigo", "atendimento não informado; pergunta antes do encaminhamento");
   }
   if (finalizacaoHandoff) {
@@ -3144,17 +4010,19 @@ async function gerarRespostaNinaInterno(
         ? "handoff.silencioso"
         : finalizacaoHandoff.motivo === "HANDOFF_FALHOU"
           ? "handoff.falha"
-        : [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(finalizacaoHandoff.motivo)
-          ? "catalogo.limite_esclarecimento"
-          : [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO].includes(finalizacaoHandoff.motivo)
-            ? "catalogo.sem_registro"
-            : finalizacaoHandoff.motivo === MOTIVO_NOME_NAO_INFORMADO
-              ? "atendimento.nome_nao_informado"
-            : alteracaoSolicitada
-              ? "agenda.cancelamento_remarcacao"
-            : finalizacaoHandoff.motivo.startsWith("JEV_")
-              ? "jev.encaminhamento"
-              : "agenda.sem_vagas",
+          : [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(
+                finalizacaoHandoff.motivo,
+              )
+            ? "catalogo.limite_esclarecimento"
+            : [MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO].includes(finalizacaoHandoff.motivo)
+              ? "catalogo.sem_registro"
+              : finalizacaoHandoff.motivo === MOTIVO_NOME_NAO_INFORMADO
+                ? "atendimento.nome_nao_informado"
+                : alteracaoSolicitada
+                  ? "agenda.cancelamento_remarcacao"
+                  : finalizacaoHandoff.motivo.startsWith("JEV_")
+                    ? "jev.encaminhamento"
+                    : "agenda.sem_vagas",
       finalizacaoHandoff.motivo,
       antes,
       resposta,
@@ -3164,33 +4032,56 @@ async function gerarRespostaNinaInterno(
       "codigo",
       `${finalizacaoHandoff.motivo}; transferência ${finalizacaoHandoff.handoffConfirmado ? "confirmada" : "não confirmada"}`,
     );
-    if (finalizacaoHandoff.motivo === "HANDOFF_SILENCIOSO" && finalizacaoHandoff.handoffConfirmado) {
+    if (
+      finalizacaoHandoff.motivo === "HANDOFF_SILENCIOSO" &&
+      finalizacaoHandoff.handoffConfirmado
+    ) {
       // Não deixar o fallback de texto vazio, o rodapé ou o transporte recriar
       // uma mensagem depois da atribuição silenciosa solicitada pela clínica.
       if (opcoes?.auditoria) opcoes.auditoria.resultado = resultadoHandoffSilencioso();
-      marcarOrigem("nenhuma", "encaminhamento solicitado sem aviso: encaminhamento silencioso confirmado");
-      registrarEtapa({ tipo: "mensagem_final", fonte: "sistema",
+      marcarOrigem(
+        "nenhuma",
+        "encaminhamento solicitado sem aviso: encaminhamento silencioso confirmado",
+      );
+      registrarEtapa({
+        tipo: "mensagem_final",
+        fonte: "sistema",
         titulo: "Encaminhamento sem mensagem ao paciente",
         dados: { texto: "", handoff_confirmado: true, sem_mensagem_paciente: true },
-        codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" } });
+        codigo: { arquivo: "src/lib/whatsapp.server.ts", funcao: "gerarRespostaNina" },
+      });
       const { fecharAuditoriaInstrucoesDoTurno } = await import("@/lib/nina/rastreio/turno.server");
       fecharAuditoriaInstrucoesDoTurno({ textoEntregue: "" });
       rastro?.concluir("response.validate", { handoff: true, sem_mensagem_paciente: true });
-      rastro?.pular("message.outbound", "encaminhamento solicitado sem aviso: apenas encaminhar para a equipe");
+      rastro?.pular(
+        "message.outbound",
+        "encaminhamento solicitado sem aviso: apenas encaminhar para a equipe",
+      );
       return "";
     }
   }
 
   if (resumoEscolha) {
     if (reservaComPerguntas && resposta.trim()) resumoEscolha.complementoTexto = resposta.trim();
-    const composta = [resumoEscolha.texto, resumoEscolha.complementoTexto].filter(Boolean).join("\n\n");
-    transformar("agenda.resposta_modalidade", "orientação, resumo ou confirmação com a modalidade oficial do atendimento, preservando perguntas independentes", resposta, composta);
+    const composta = [resumoEscolha.texto, resumoEscolha.complementoTexto]
+      .filter(Boolean)
+      .join("\n\n");
+    transformar(
+      "agenda.resposta_modalidade",
+      "orientação, resumo ou confirmação com a modalidade oficial do atendimento, preservando perguntas independentes",
+      resposta,
+      composta,
+    );
     resposta = composta;
     resumoEscolha.texto = composta;
-    marcarOrigem("gate", resumoEscolha.restricoes.includes("aguardar_aceite_do_resumo")
-      ? "resumo final vinculado à vaga escolhida, aguardando aceite do paciente"
-      : resumoEscolha.acoesConcluidas.length ? "confirmação da reserva comprovada com a modalidade oficial"
-      : "orientação da modalidade sem reserva individual");
+    marcarOrigem(
+      "gate",
+      resumoEscolha.restricoes.includes("aguardar_aceite_do_resumo")
+        ? "resumo final vinculado à vaga escolhida, aguardando aceite do paciente"
+        : resumoEscolha.acoesConcluidas.length
+          ? "confirmação da reserva comprovada com a modalidade oficial"
+          : "orientação da modalidade sem reserva individual",
+    );
     if (opcoes?.auditoria) opcoes.auditoria.resultado = resumoEscolha;
   }
 
@@ -3208,7 +4099,12 @@ async function gerarRespostaNinaInterno(
     const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
     if (!precisaAvisoDoChamador(avisoDoTurno.atual)) {
       const aviso = avisoDoTurno.atual;
-      transformar("handoff.aviso_unico", "aviso do encaminhamento já entregue pelo protocolo", resposta, "");
+      transformar(
+        "handoff.aviso_unico",
+        "aviso do encaminhamento já entregue pelo protocolo",
+        resposta,
+        "",
+      );
       resposta = "";
       semNovaMensagem = true;
       marcarOrigem("nenhuma", "aviso de encaminhamento já entregue pelo protocolo neste turno");
@@ -3224,9 +4120,22 @@ async function gerarRespostaNinaInterno(
     }
   }
 
-  if (!semNovaMensagem && !turnoObsoleto && !houveHandoff && !finalizacaoHandoff && !ctxFerramentas?.esclarecimentoCatalogo && resposta.trim()) {
+  if (
+    !semNovaMensagem &&
+    !turnoObsoleto &&
+    !houveHandoff &&
+    !finalizacaoHandoff &&
+    !ctxFerramentas?.esclarecimentoCatalogo &&
+    resposta.trim()
+  ) {
     const comPedido = acrescentarSolicitacaoPedido(resposta, runtimeContext.pedido_medico_do_turno);
-    if (comPedido !== resposta) transformar("pedido_medico.solicitar_foto", "Pedido médico obrigatório na base publicada", resposta, comPedido);
+    if (comPedido !== resposta)
+      transformar(
+        "pedido_medico.solicitar_foto",
+        "Pedido médico obrigatório na base publicada",
+        resposta,
+        comPedido,
+      );
     resposta = comPedido;
   }
 
@@ -3352,19 +4261,30 @@ async function gerarRespostaNinaInterno(
         import("@/lib/nina/resposta/finalizacao.server"),
         import("@/lib/nina/resposta/contrato"),
       ]);
-      const baseResultado = resumoEscolha ??
+      const baseResultado =
+        resumoEscolha ??
         ((opcoes?.auditoria as { resultado?: unknown } | undefined)?.resultado as
           | import("@/lib/nina/resposta/contrato").ResultadoRespostaNina
-          | undefined) ?? criarResultado({
-            origem: finalizacaoHandoff ? (finalizacaoHandoff.handoffConfirmado ? "handoff" : "erro") : respostaNomeAtendimento ? "gate" : "modelo",
-            texto: resposta,
-          });
+          | undefined) ??
+        criarResultado({
+          origem: finalizacaoHandoff
+            ? finalizacaoHandoff.handoffConfirmado
+              ? "handoff"
+              : "erro"
+            : respostaNomeAtendimento
+              ? "gate"
+              : "modelo",
+          texto: resposta,
+        });
       if (finalizacaoHandoff && opcoes?.auditoria) opcoes.auditoria.resultado = baseResultado;
       // Somente uma reserva comprovada neste turno recebe o aviso de presença
       // e a despedida; citar um agendamento antigo não dispara esse bloco.
       if (
-        agendamentoConfirmado && !jaTinhaAgendamento && !houveHandoff &&
-        !finalizacaoHandoff && fluxoEstado.appointment.appointment_id
+        agendamentoConfirmado &&
+        !jaTinhaAgendamento &&
+        !houveHandoff &&
+        !finalizacaoHandoff &&
+        fluxoEstado.appointment.appointment_id
       ) {
         baseResultado.variaveis.unidade = identidadeEfetiva.ok
           ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
@@ -3400,9 +4320,7 @@ async function gerarRespostaNinaInterno(
         handoffPendente: houveHandoff || finalizacaoHandoff !== null,
         // Encerramento automático só no caminho real de atendimento e SÓ no
         // primeiro passe: correção de texto não repete efeito externo.
-        avaliarEncerramento:
-          opcoes?.teste !== true &&
-          Boolean(mensagemPaciente),
+        avaliarEncerramento: opcoes?.teste !== true && Boolean(mensagemPaciente),
       });
       resposta = finalizada.texto;
       if (finalizada.resultado.estado === "descartar" && opcoes?.auditoria) {
@@ -3467,9 +4385,7 @@ async function gerarRespostaNinaInterno(
     // Fecha a auditoria com o texto REALMENTE entregue (inclusive quando a
     // entrega é encaminhamento ou aviso controlado) e suas intervenções.
     {
-      const { fecharAuditoriaInstrucoesDoTurno } = await import(
-        "@/lib/nina/rastreio/turno.server"
-      );
+      const { fecharAuditoriaInstrucoesDoTurno } = await import("@/lib/nina/rastreio/turno.server");
       fecharAuditoriaInstrucoesDoTurno({
         textoEntregue: resposta,
       });

@@ -26,10 +26,34 @@ const OPCOES: {
   /** Cor do ícone na lista. */
   cor: string;
 }[] = [
-  { alvo: "online", estado: "ONLINE", icone: <Circle className="h-3 w-3 fill-current" />, ativo: "bg-atd-ok hover:bg-atd-ok/90 text-atd-on-strong", cor: "text-atd-ok" },
-  { alvo: "pausa", estado: "PAUSA", icone: <Coffee className="h-3.5 w-3.5" />, ativo: "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink", cor: "text-atd-warn-ink" },
-  { alvo: "pausa_saida", estado: "PAUSA_SAIDA", icone: <DoorOpen className="h-3.5 w-3.5" />, ativo: "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink", cor: "text-atd-warn-ink" },
-  { alvo: "offline", estado: "OFFLINE", icone: <PowerOff className="h-3.5 w-3.5" />, ativo: "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong", cor: "text-atd-idle-ink" },
+  {
+    alvo: "online",
+    estado: "ONLINE",
+    icone: <Circle className="h-3 w-3 fill-current" />,
+    ativo: "bg-atd-ok hover:bg-atd-ok/90 text-atd-on-strong",
+    cor: "text-atd-ok",
+  },
+  {
+    alvo: "pausa",
+    estado: "PAUSA",
+    icone: <Coffee className="h-3.5 w-3.5" />,
+    ativo: "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink",
+    cor: "text-atd-warn-ink",
+  },
+  {
+    alvo: "pausa_saida",
+    estado: "PAUSA_SAIDA",
+    icone: <DoorOpen className="h-3.5 w-3.5" />,
+    ativo: "bg-atd-warn hover:bg-atd-warn/90 text-atd-warn-ink",
+    cor: "text-atd-warn-ink",
+  },
+  {
+    alvo: "offline",
+    estado: "OFFLINE",
+    icone: <PowerOff className="h-3.5 w-3.5" />,
+    ativo: "bg-atd-idle hover:bg-atd-idle/90 text-atd-on-strong",
+    cor: "text-atd-idle-ink",
+  },
 ];
 
 export function SeletorStatusPresenca({
@@ -64,11 +88,17 @@ export function SeletorStatusPresenca({
             size="sm"
             aria-label={`Meu status: ${rotulo}. Clique para alterar.`}
             className={`h-8 min-w-0 flex-1 justify-between gap-2 px-2 text-xs font-medium ${
-              atual ? atual.ativo : "border border-atd-warn/60 bg-atd-warn-bg text-atd-warn-ink hover:bg-atd-warn-bg/90"
+              atual
+                ? atual.ativo
+                : "border border-atd-warn/60 bg-atd-warn-bg text-atd-warn-ink hover:bg-atd-warn-bg/90"
             }`}
           >
             <span className="flex min-w-0 items-center gap-1.5">
-              {salvando ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : atual ? atual.icone : null}
+              {salvando ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              ) : atual ? (
+                atual.icone
+              ) : null}
               <span className="truncate">{rotulo}</span>
             </span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
@@ -84,8 +114,12 @@ export function SeletorStatusPresenca({
                 aria-label={ROTULO_ESTADO_MANUAL[o.estado] + (ehAtual ? " (selecionado)" : "")}
                 className="gap-2 text-sm"
               >
-                <span className={`flex h-4 w-4 shrink-0 items-center justify-center ${o.cor}`}>{o.icone}</span>
-                <span className={ehAtual ? "font-semibold" : ""}>{ROTULO_ESTADO_MANUAL[o.estado]}</span>
+                <span className={`flex h-4 w-4 shrink-0 items-center justify-center ${o.cor}`}>
+                  {o.icone}
+                </span>
+                <span className={ehAtual ? "font-semibold" : ""}>
+                  {ROTULO_ESTADO_MANUAL[o.estado]}
+                </span>
                 {ehAtual && <Check className="ml-auto h-4 w-4" aria-hidden="true" />}
               </DropdownMenuItem>
             );

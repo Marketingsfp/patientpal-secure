@@ -89,27 +89,50 @@ export type AvaliacaoJev = {
 export function interpretarAvaliacao(respostas: Record<string, RespostaJev>): AvaliacaoJev {
   const dimensoes: NotaDimensao[] = DIMENSOES.map((d) => {
     const r = respostas[`dim_${d.valor}`];
-    const confianca = typeof r?.confidence === "number" ? ` (confiança ${Math.round(r.confidence * 100)}%)` : "";
+    const confianca =
+      typeof r?.confidence === "number" ? ` (confiança ${Math.round(r.confidence * 100)}%)` : "";
     if (!r?.choice) {
-      return { dimensao: d.valor as Dimensao, situacao: "nao_verificavel", nota: null, justificativa: "Jev não respondeu." };
+      return {
+        dimensao: d.valor as Dimensao,
+        situacao: "nao_verificavel",
+        nota: null,
+        justificativa: "Jev não respondeu.",
+      };
     }
     if (r.choice === "nao_aplicavel" || r.choice === "nao_verificavel") {
-      return { dimensao: d.valor as Dimensao, situacao: r.choice, nota: null, justificativa: `Jev: ${r.choice}${confianca}.` };
+      return {
+        dimensao: d.valor as Dimensao,
+        situacao: r.choice,
+        nota: null,
+        justificativa: `Jev: ${r.choice}${confianca}.`,
+      };
     }
     const nota = notaDe(r);
     return nota === null
-      ? { dimensao: d.valor as Dimensao, situacao: "nao_verificavel", nota: null, justificativa: "Jev sem nota." }
-      : { dimensao: d.valor as Dimensao, situacao: "avaliada", nota, justificativa: `Nota do Jev: ${r.choice}${confianca}.` };
+      ? {
+          dimensao: d.valor as Dimensao,
+          situacao: "nao_verificavel",
+          nota: null,
+          justificativa: "Jev sem nota.",
+        }
+      : {
+          dimensao: d.valor as Dimensao,
+          situacao: "avaliada",
+          nota,
+          justificativa: `Nota do Jev: ${r.choice}${confianca}.`,
+        };
   });
   const sinais = {
-    erro_critico: typeof respostas.erro_critico?.noul === "number" ? respostas.erro_critico.noul : 1,
+    erro_critico:
+      typeof respostas.erro_critico?.noul === "number" ? respostas.erro_critico.noul : 1,
     erro_alto: typeof respostas.erro_alto?.noul === "number" ? respostas.erro_alto.noul : 1,
   };
   const score = calcularScore(dimensoes);
   const avaliadas = dimensoes.filter((d) => d.situacao === "avaliada").length;
   let resultado: Resultado;
   if (sinais.erro_critico >= LIMITE_SINAL_GRAVE) resultado = "erro_critico";
-  else if (avaliadas === 0 || score < 70 || sinais.erro_alto >= LIMITE_SINAL_GRAVE) resultado = "reprovado";
+  else if (avaliadas === 0 || score < 70 || sinais.erro_alto >= LIMITE_SINAL_GRAVE)
+    resultado = "reprovado";
   else if (score < 85) resultado = "aprovado_observacao";
   else resultado = "aprovado";
   return { dimensoes, score, resultado, sinais };
@@ -126,7 +149,11 @@ export function resumoJev(a: AvaliacaoJev): string {
     .filter((d) => d.situacao === "avaliada" && (d.nota ?? 10) < 7)
     .map((d) => DIMENSOES.find((x) => x.valor === d.dimensao)?.rotulo)
     .filter(Boolean);
-  return `Avaliação pelo Jev: conversa ${r}, nota ${a.score}.` +
-    (fracas.length ? ` Pontos a observar: ${fracas.join(", ")}.` : " Nenhum ponto fraco apontado.") +
-    " O Jev dá notas, sem escrever justificativas detalhadas.";
+  return (
+    `Avaliação pelo Jev: conversa ${r}, nota ${a.score}.` +
+    (fracas.length
+      ? ` Pontos a observar: ${fracas.join(", ")}.`
+      : " Nenhum ponto fraco apontado.") +
+    " O Jev dá notas, sem escrever justificativas detalhadas."
+  );
 }

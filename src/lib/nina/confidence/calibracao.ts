@@ -225,9 +225,8 @@ export function calibrar(
   // FASE 7 — a calibração dos limites de confiança olha a avaliação da
   // RESPOSTA. Segurança da ação tem outra escala e não entra aqui. A mesma
   // saída conta uma vez só.
-  const semDuplicadas = separarAvaliacoes(
-    decisoesEntrada.map((l) => ({ ...l, id: l.id })),
-  ).respostas as LinhaCalibracao[];
+  const semDuplicadas = separarAvaliacoes(decisoesEntrada.map((l) => ({ ...l, id: l.id })))
+    .respostas as LinhaCalibracao[];
   const elegiveis = semDuplicadas.filter(
     (l) =>
       String(l.modo ?? "").toLowerCase() !== "shadow" &&
@@ -511,7 +510,8 @@ export function mesclarPolitica(
     const [grupo, chave] = a.alvo.split(".");
     if (!Number.isFinite(a.valor)) throw new AjusteRecusado(`Valor inválido para ${a.alvo}`);
     if (grupo === "limites" && (chave === "HIGH" || chave === "MEDIUM")) {
-      if (a.valor < 50 || a.valor > 100) throw new AjusteRecusado(`Limite fora da faixa: ${a.alvo}`);
+      if (a.valor < 50 || a.valor > 100)
+        throw new AjusteRecusado(`Limite fora da faixa: ${a.alvo}`);
       nova.limites[chave] = a.valor;
       continue;
     }

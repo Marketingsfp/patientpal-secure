@@ -64,7 +64,8 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
       { title: "Autorizar acesso — Health Hub Pro" },
       {
         name: "description",
-        content: "Aprove ou recuse o acesso de um assistente externo à sua conta do Health Hub Pro.",
+        content:
+          "Aprove ou recuse o acesso de um assistente externo à sua conta do Health Hub Pro.",
       },
       { property: "og:title", content: "Autorizar acesso — Health Hub Pro" },
       {

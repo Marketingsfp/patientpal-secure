@@ -96,7 +96,13 @@ describe("prefetch por intenção (hover) + clique", () => {
             emVoo.set(id, p);
             void p.then((m) => {
               if (!cache.obter(id)) {
-                cache.guardar(id, { msgs: m, contato: null, notas: [], eventos: [], parcial: true });
+                cache.guardar(id, {
+                  msgs: m,
+                  contato: null,
+                  notas: [],
+                  eventos: [],
+                  parcial: true,
+                });
               }
             });
           }, 150),

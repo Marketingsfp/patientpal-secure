@@ -13,11 +13,7 @@ import type { EtapaFluxoNina } from "../fluxo-estado-normalizar";
 
 const deps = { detectarIntencoes, intencaoAmbigua };
 
-function turno(
-  mensagem: string,
-  extra: Partial<EstadoDoTurno> = {},
-  stage?: EtapaFluxoNina,
-) {
+function turno(mensagem: string, extra: Partial<EstadoDoTurno> = {}, stage?: EtapaFluxoNina) {
   const c = montarContextoCanonicoTurno(
     { mensagemPaciente: mensagem, podeAgendar: true, ...(stage ? { stage } : {}) },
     deps,

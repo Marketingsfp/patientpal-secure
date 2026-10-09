@@ -8,7 +8,11 @@ export const REGRA_IDADE_NAO_INFORMADA =
 
 /** Reconhece somente marcadores de ausência; não apaga critérios clínicos ou numéricos. */
 export function idadeNaoInformada(valor: string | null | undefined): boolean {
-  const texto = (valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  const texto = (valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
   return !texto || /^[-–—]+$/.test(texto) || /^nao informad[ao]$/.test(texto);
 }
 

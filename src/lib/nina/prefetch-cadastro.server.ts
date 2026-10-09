@@ -7,7 +7,12 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ResultadoBroker } from "./tool-broker";
-import { FLAG_PREFETCH_CADASTRO, PRAZO_PREFETCH_MS, planejarPrefetch, type PlanoPrefetch } from "./prefetch-cadastro";
+import {
+  FLAG_PREFETCH_CADASTRO,
+  PRAZO_PREFETCH_MS,
+  planejarPrefetch,
+  type PlanoPrefetch,
+} from "./prefetch-cadastro";
 import type { IntencaoNina } from "./atendimento-fase1";
 
 /** Sem linha gravada = ligada. Erro de leitura = desligada (não arrisca o turno). */
@@ -40,7 +45,11 @@ export async function executarPrefetchCadastro(p: {
   executar: (nome: string, args: string) => Promise<ResultadoBroker>;
 }): Promise<ResultadoPrefetch | MotivoSemPrefetch> {
   const inicio = Date.now();
-  const fim = (motivo: string, termo?: string): MotivoSemPrefetch => ({ motivo, duracaoMs: Date.now() - inicio, termo });
+  const fim = (motivo: string, termo?: string): MotivoSemPrefetch => ({
+    motivo,
+    duracaoMs: Date.now() - inicio,
+    termo,
+  });
   const trabalho = (async (): Promise<ResultadoPrefetch | MotivoSemPrefetch> => {
     if (!(await prefetchAtivoNaClinica(p.clinicaId))) return fim("flag desligada");
     const { catalogoDoTurno } = await import("./catalogo-turno.server");
@@ -49,11 +58,14 @@ export async function executarPrefetchCadastro(p: {
     if (!plano) return fim("termo não identificado com segurança");
     if (!plano.chamadas.every((c) => p.ferramentasDisponiveis.includes(c.nome)))
       return fim("ferramenta indisponível no turno", plano.termo);
-    const resultados = await Promise.all(plano.chamadas.map(async (c) => {
-      const args = JSON.stringify(c.args);
-      return { nome: c.nome, args, r: await p.executar(c.nome, args) };
-    }));
-    if (resultados.some((x) => !x.r.success || x.r.erro)) return fim("ferramenta falhou", plano.termo);
+    const resultados = await Promise.all(
+      plano.chamadas.map(async (c) => {
+        const args = JSON.stringify(c.args);
+        return { nome: c.nome, args, r: await p.executar(c.nome, args) };
+      }),
+    );
+    if (resultados.some((x) => !x.r.success || x.r.erro))
+      return fim("ferramenta falhou", plano.termo);
     return { plano, resultados, duracaoMs: Date.now() - inicio };
   })().catch((e) => fim(`erro: ${e instanceof Error ? e.message : String(e)}`));
   let timer: ReturnType<typeof setTimeout> | undefined;

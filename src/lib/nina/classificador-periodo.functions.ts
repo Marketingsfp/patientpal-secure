@@ -32,7 +32,9 @@ export async function carregarCalendariosPublicados(
 ): Promise<CalendarioPublicado[]> {
   const { data: versoes, error } = await supabase
     .from("nina_calendario_versoes")
-    .select("id, versao, status, publicado_em, vigencia_inicio, vigencia_fim, fuso, clinica_id, unidade_id")
+    .select(
+      "id, versao, status, publicado_em, vigencia_inicio, vigencia_fim, fuso, clinica_id, unidade_id",
+    )
     .eq("clinica_id", clinicaId)
     .in("status", ["publicado", "substituido"])
     .not("publicado_em", "is", null);
@@ -55,7 +57,14 @@ export async function carregarCalendariosPublicados(
 
   return (versoes ?? []).map((v: any) => {
     const linhas = (dias.data ?? []).filter((d: any) => d.versao_id === v.id && d.ativo !== false);
-    const porDia = new Map<number, { dia_semana: number; fechado: boolean; faixas: Array<{ hora_inicio: string; hora_fim: string }> }>();
+    const porDia = new Map<
+      number,
+      {
+        dia_semana: number;
+        fechado: boolean;
+        faixas: Array<{ hora_inicio: string; hora_fim: string }>;
+      }
+    >();
     for (const l of linhas) {
       const atual = porDia.get(l.dia_semana) ?? {
         dia_semana: l.dia_semana as number,
@@ -64,7 +73,10 @@ export async function carregarCalendariosPublicados(
       };
       if (l.fechado) atual.fechado = true;
       else if (l.hora_inicio && l.hora_fim)
-        atual.faixas.push({ hora_inicio: String(l.hora_inicio).slice(0, 5), hora_fim: String(l.hora_fim).slice(0, 5) });
+        atual.faixas.push({
+          hora_inicio: String(l.hora_inicio).slice(0, 5),
+          hora_fim: String(l.hora_fim).slice(0, 5),
+        });
       porDia.set(l.dia_semana, atual);
     }
     return {
@@ -134,8 +146,6 @@ export async function carregarCalendariosPublicadosCache(
 export function limparCacheCalendarios() {
   cacheCalendarios.clear();
 }
-
-
 
 /** Classifica um ou vários instantes de uma mesma clínica. */
 export const classificarPeriodoEventos = createServerFn({ method: "POST" })

@@ -250,7 +250,10 @@ describe("FASE 4 — contexto limpo entre testes de carga", () => {
     expect(lead.telefone_sessao).not.toBe("5511900000 1-s1".replace(" ", ""));
 
     // nada de "neurologista/João/sexta-feira" sobra em estado ativo
-    const ativos = JSON.stringify({ leads, batchesAtivos: batches.filter((b) => b.status !== "SUPERSEDED") });
+    const ativos = JSON.stringify({
+      leads,
+      batchesAtivos: batches.filter((b) => b.status !== "SUPERSEDED"),
+    });
     expect(ativos).not.toContain("neurologista");
     expect(ativos).not.toContain("João");
     expect(ativos).not.toContain("sexta-feira");
@@ -273,7 +276,9 @@ describe("FASE 4 — contexto limpo entre testes de carga", () => {
     expect(resumo.pronto).toBe(true);
     expect(resumo.prontos).toBe(10);
     expect(leads.every((l) => l.conversa_id === null && l.ciclo_id === null)).toBe(true);
-    expect(conversas.every((c) => c.nina_fluxo_estado === null && c.status === "finished")).toBe(true);
+    expect(conversas.every((c) => c.nina_fluxo_estado === null && c.status === "finished")).toBe(
+      true,
+    );
     expect(batches.every((b) => b.status === "SUPERSEDED")).toBe(true);
     expect(ciclos.every((c) => c.end_reason === "resolvido_manual")).toBe(true);
   });
@@ -295,7 +300,9 @@ describe("FASE 4 — contexto limpo entre testes de carga", () => {
     const resumo = await prepararLeads({ leads, resetar });
     expect(resumo.pronto).toBe(false);
     expect(resumo.falhas.length).toBeGreaterThan(0);
-    expect(descreverPreparacaoParcial(resumo.prontos, resumo.total)).toContain("O teste não foi iniciado");
+    expect(descreverPreparacaoParcial(resumo.prontos, resumo.total)).toContain(
+      "O teste não foi iniciado",
+    );
   });
 
   it("nova tentativa: corrigido o problema, o preflight completa e libera o teste", async () => {

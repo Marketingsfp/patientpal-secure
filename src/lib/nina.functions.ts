@@ -32,7 +32,6 @@ const ChatSchema = z.object({
   modoVoz: z.boolean().optional(),
 });
 
-
 /**
  * Carrega contexto da clínica (médicos com horários + procedimentos) para
  * tanto a Nina (IA) quanto a página de Consulta Rápida.
@@ -146,9 +145,8 @@ export const chatNina = createServerFn({ method: "POST" })
     if (await ninaDesativadaNaClinica(data.clinicaId)) {
       return { reply: "", error: "A Nina está desativada nesta clínica." };
     }
-    const { assertMembership, contextoClinicaTexto, systemPromptNinaRuntime } = await import(
-      "@/lib/nina-contexto.server"
-    );
+    const { assertMembership, contextoClinicaTexto, systemPromptNinaRuntime } =
+      await import("@/lib/nina-contexto.server");
     await assertMembership(supabase, userId, data.clinicaId);
 
     // Janela do dia civil da CLÍNICA (America/Sao_Paulo). No Worker (UTC), o
@@ -159,10 +157,10 @@ export const chatNina = createServerFn({ method: "POST" })
     let systemPrompt = await systemPromptNinaRuntime(contextoTexto, data.modoVoz);
 
     // Aprendizados aprovados pela equipe (memória de longo prazo da clínica).
-    const ultimaPergunta = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    const { recuperarAprendizados, blocoPromptAprendizados } = await import(
-      "@/lib/nina/aprendizado.server"
-    );
+    const ultimaPergunta =
+      [...data.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const { recuperarAprendizados, blocoPromptAprendizados } =
+      await import("@/lib/nina/aprendizado.server");
     const aprendizados = await recuperarAprendizados(
       data.clinicaId,
       "interno",
@@ -177,10 +175,8 @@ export const chatNina = createServerFn({ method: "POST" })
     const blocoKb = await blocoPromptCatalogo(data.clinicaId).catch(() => "");
     if (blocoKb) systemPrompt = `${systemPrompt}\n\n${blocoKb}`;
 
-
-    const { FERRAMENTAS_NINA, executarFerramentaNina } = await import(
-      "@/lib/nina-ferramentas.server"
-    );
+    const { FERRAMENTAS_NINA, executarFerramentaNina } =
+      await import("@/lib/nina-ferramentas.server");
 
     type Msg = { role: string; content: string | null; tool_calls?: any[]; tool_call_id?: string };
     const historico: Msg[] = [
@@ -228,7 +224,11 @@ export const chatNina = createServerFn({ method: "POST" })
         return { reply: removerEmojisNina(resposta.conteudo ?? ""), error: null as string | null };
       }
 
-      historico.push({ role: "assistant", content: resposta.conteudo || null, tool_calls: chamadas });
+      historico.push({
+        role: "assistant",
+        content: resposta.conteudo || null,
+        tool_calls: chamadas,
+      });
       for (const c of chamadas) {
         let resultado: unknown;
         try {
@@ -257,6 +257,7 @@ export const chatNina = createServerFn({ method: "POST" })
 
     return {
       reply: "",
-      error: "A Nina não conseguiu concluir a tarefa em poucas etapas. Tente pedir de forma mais direta.",
+      error:
+        "A Nina não conseguiu concluir a tarefa em poucas etapas. Tente pedir de forma mais direta.",
     };
   });

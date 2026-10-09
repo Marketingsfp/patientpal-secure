@@ -1,4 +1,8 @@
-import { categoriaDoMotivo, pesoCategoriaMotivo, type CategoriaMotivo } from "@/lib/nina/jev-motivo";
+import {
+  categoriaDoMotivo,
+  pesoCategoriaMotivo,
+  type CategoriaMotivo,
+} from "@/lib/nina/jev-motivo";
 import { nomeContato } from "./rotulo-conversa";
 /**
  * Central de Atenção — regras puras.
@@ -42,11 +46,7 @@ export function pedirAbrirConversa(pedido: { conversaId: string; mensagemId?: st
   );
 }
 
-export type CategoriaAtencao =
-  | "nao_atribuida"
-  | "nao_atribuida_global"
-  | "critica"
-  | "aguardando";
+export type CategoriaAtencao = "nao_atribuida" | "nao_atribuida_global" | "critica" | "aguardando";
 
 /** Estado da conversa usado para reconhecer a fila global (sem responsável). */
 export interface LinhaFila {

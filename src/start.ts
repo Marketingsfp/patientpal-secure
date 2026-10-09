@@ -50,10 +50,7 @@ const recoverStaleServerFunction = createMiddleware({ type: "function" }).client
       return await next();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (
-        typeof window !== "undefined" &&
-        message.includes(SERVER_FN_VERSION_MISMATCH)
-      ) {
+      if (typeof window !== "undefined" && message.includes(SERVER_FN_VERSION_MISMATCH)) {
         const lastReload = Number(window.sessionStorage.getItem(SERVER_FN_RELOAD_KEY) ?? 0);
         const now = Date.now();
         if (!Number.isFinite(lastReload) || now - lastReload > 30_000) {

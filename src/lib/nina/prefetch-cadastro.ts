@@ -45,9 +45,15 @@ const PROB_MINIMA_INTENCAO = 0.1;
  * das elegíveis passa do limiar, a pré-busca usa todas elas. Só serve à
  * pré-busca: não muda a intenção aplicada ao turno.
  */
-export function intencoesParaPrefetch(r: {
-  choice?: unknown; confidence?: unknown; probabilities?: Record<string, number>;
-} | undefined): IntencaoNina[] {
+export function intencoesParaPrefetch(
+  r:
+    | {
+        choice?: unknown;
+        confidence?: unknown;
+        probabilities?: Record<string, number>;
+      }
+    | undefined,
+): IntencaoNina[] {
   if (!r) return [];
   const probs = r.probabilities ?? {};
   const todas = Object.entries(probs)
@@ -55,9 +61,14 @@ export function intencoesParaPrefetch(r: {
     .sort((a, b) => b[1] - a[1]);
   const soma = todas.reduce((s, [, p]) => s + p, 0);
   const elegiveis = todas.filter(([, p]) => p >= PROB_MINIMA_INTENCAO);
-  if (elegiveis.length && soma >= CONFIANCA_MINIMA_PREFETCH) return elegiveis.map(([k]) => k as IntencaoNina);
-  if (typeof r.choice === "string" && r.choice in OBJETIVOS_POR_INTENCAO &&
-      typeof r.confidence === "number" && r.confidence >= CONFIANCA_MINIMA_PREFETCH)
+  if (elegiveis.length && soma >= CONFIANCA_MINIMA_PREFETCH)
+    return elegiveis.map(([k]) => k as IntencaoNina);
+  if (
+    typeof r.choice === "string" &&
+    r.choice in OBJETIVOS_POR_INTENCAO &&
+    typeof r.confidence === "number" &&
+    r.confidence >= CONFIANCA_MINIMA_PREFETCH
+  )
     return [r.choice as IntencaoNina];
   return [];
 }
@@ -67,33 +78,83 @@ export type CatalogoPrefetch = {
   profissionais: Array<{ nome: string; especialidades: unknown }>;
 };
 
-export type ChamadaPrefetch = { nome: "consultar_cadastro" | "buscar_medicos"; args: Record<string, unknown> };
-export type PlanoPrefetch = { termo: string; tipo: "especialidade" | "servico" | "profissional"; chamadas: ChamadaPrefetch[] };
+export type ChamadaPrefetch = {
+  nome: "consultar_cadastro" | "buscar_medicos";
+  args: Record<string, unknown>;
+};
+export type PlanoPrefetch = {
+  termo: string;
+  tipo: "especialidade" | "servico" | "profissional";
+  chamadas: ChamadaPrefetch[];
+};
 
 /** Palavras de nome muito comuns: sozinhas não identificam um profissional. */
 const NOMES_COMUNS = new Set([
-  "maria", "jose", "joao", "ana", "silva", "santos", "souza", "sousa", "oliveira", "pereira", "lima",
-  "costa", "rodrigues", "ferreira", "alves", "gomes", "ribeiro", "carvalho", "almeida", "dias",
-  "neves", "paula", "luiz", "luis", "carlos", "antonio", "francisco", "clinica", "clinico",
+  "maria",
+  "jose",
+  "joao",
+  "ana",
+  "silva",
+  "santos",
+  "souza",
+  "sousa",
+  "oliveira",
+  "pereira",
+  "lima",
+  "costa",
+  "rodrigues",
+  "ferreira",
+  "alves",
+  "gomes",
+  "ribeiro",
+  "carvalho",
+  "almeida",
+  "dias",
+  "neves",
+  "paula",
+  "luiz",
+  "luis",
+  "carlos",
+  "antonio",
+  "francisco",
+  "clinica",
+  "clinico",
 ]);
 
 function listaEspecialidades(v: unknown): string[] {
   // O cadastro publicado guarda [{ id, nome }]; versões antigas, só o texto.
   if (Array.isArray(v))
-    return v.map((e) => typeof e === "string" ? e
-      : e && typeof e === "object" && typeof (e as { nome?: unknown }).nome === "string" ? (e as { nome: string }).nome : "")
-      .map((e) => e.trim()).filter(Boolean);
-  if (typeof v === "string") return v.split(/[,;/]/).map((s) => s.trim()).filter(Boolean);
+    return v
+      .map((e) =>
+        typeof e === "string"
+          ? e
+          : e && typeof e === "object" && typeof (e as { nome?: unknown }).nome === "string"
+            ? (e as { nome: string }).nome
+            : "",
+      )
+      .map((e) => e.trim())
+      .filter(Boolean);
+  if (typeof v === "string")
+    return v
+      .split(/[,;/]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   return [];
 }
 
 function palavras(texto: string): string[] {
-  return normalizar(texto).replace(/[^a-z0-9 ]/g, " ").split(" ").filter(Boolean);
+  return normalizar(texto)
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(" ")
+    .filter(Boolean);
 }
 
 /** A especialidade aparece na mensagem? Aceita raiz ("cardio") e 1ª palavra ("clinico" ~ "clinica geral"). */
 function citaEspecialidade(texto: string, nome: string): boolean {
-  const n = normalizar(nome).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const n = normalizar(nome)
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (n.length >= 4 && texto.includes(n)) return true;
   const raiz = raizEspecialidade(nome);
   if (raiz.length >= 5 && texto.includes(raiz)) return true;
@@ -115,23 +176,37 @@ export function planejarPrefetch(
   catalogo: CatalogoPrefetch,
   nomePopular?: { especialidade: string } | null,
 ): PlanoPrefetch | null {
-  const lista = (Array.isArray(intencao) ? intencao : [intencao]).filter(intencaoPermitePrefetch) as IntencaoNina[];
+  const lista = (Array.isArray(intencao) ? intencao : [intencao]).filter(
+    intencaoPermitePrefetch,
+  ) as IntencaoNina[];
   if (!lista.length) return null;
   const objetivos = [...new Set(lista.flatMap((i) => OBJETIVOS_POR_INTENCAO[i]!))];
   const texto = palavras(mensagem).join(" ");
   if (!texto) return null;
 
   // 1) Serviços (exame/procedimento) com nome completo na mensagem.
-  const servicos = [...new Set(catalogo.servicos.map((s) => s.nome).filter((n) => {
-    const nn = palavras(n).join(" ");
-    return nn.length >= 4 && new RegExp(`\\b${nn}\\b`).test(texto);
-  }))];
+  const servicos = [
+    ...new Set(
+      catalogo.servicos
+        .map((s) => s.nome)
+        .filter((n) => {
+          const nn = palavras(n).join(" ");
+          return nn.length >= 4 && new RegExp(`\\b${nn}\\b`).test(texto);
+        }),
+    ),
+  ];
   // Nomes contidos em outro achado ("ultrassom" dentro de "ultrassom de tireoide") não contam.
-  const servicosMax = servicos.filter((a) => !servicos.some((b) => b !== a && normalizar(b).includes(normalizar(a))));
+  const servicosMax = servicos.filter(
+    (a) => !servicos.some((b) => b !== a && normalizar(b).includes(normalizar(a))),
+  );
 
   // 2) Especialidades distintas publicadas.
-  const todas = [...new Set(catalogo.profissionais.flatMap((p) => listaEspecialidades(p.especialidades)))];
-  const especs = new Set(todas.filter((e) => citaEspecialidade(texto, e)).map((e) => normalizar(e)));
+  const todas = [
+    ...new Set(catalogo.profissionais.flatMap((p) => listaEspecialidades(p.especialidades))),
+  ];
+  const especs = new Set(
+    todas.filter((e) => citaEspecialidade(texto, e)).map((e) => normalizar(e)),
+  );
   if (nomePopular) especs.add(normalizar(nomePopular.especialidade));
 
   // 3) Profissional por palavra distintiva do nome, com um único dono.
@@ -140,8 +215,10 @@ export function planejarPrefetch(
   for (const t of palavras(mensagem)) {
     if (t.length < 4 || NOMES_COMUNS.has(t)) continue;
     const donos = catalogo.profissionais.filter((p) => palavras(p.nome).includes(t));
-    if (donos.length === 1) { profs.add(donos[0]!.nome); tokenProf = t; }
-    else if (donos.length > 1) return null; // nome ambíguo: o modelo pergunta
+    if (donos.length === 1) {
+      profs.add(donos[0]!.nome);
+      tokenProf = t;
+    } else if (donos.length > 1) return null; // nome ambíguo: o modelo pergunta
   }
 
   const achados = servicosMax.length + especs.size + profs.size;
@@ -149,15 +226,32 @@ export function planejarPrefetch(
 
   if (servicosMax.length === 1) {
     const termo = servicosMax[0]!;
-    return { termo, tipo: "servico", chamadas: [{ nome: "consultar_cadastro",
-      args: { termo, objetivos, tipo_atendimento: "exame_procedimento" } }] };
+    return {
+      termo,
+      tipo: "servico",
+      chamadas: [
+        {
+          nome: "consultar_cadastro",
+          args: { termo, objetivos, tipo_atendimento: "exame_procedimento" },
+        },
+      ],
+    };
   }
   if (especs.size === 1) {
     const chave = [...especs][0]!;
     const termo = todas.find((e) => normalizar(e) === chave) ?? nomePopular?.especialidade ?? chave;
-    return { termo, tipo: "especialidade", chamadas: [{ nome: "consultar_cadastro",
-      args: { termo, objetivos, tipo_atendimento: "consulta" } }] };
+    return {
+      termo,
+      tipo: "especialidade",
+      chamadas: [
+        { nome: "consultar_cadastro", args: { termo, objetivos, tipo_atendimento: "consulta" } },
+      ],
+    };
   }
   const nome = [...profs][0]!;
-  return { termo: nome, tipo: "profissional", chamadas: [{ nome: "buscar_medicos", args: { nome: tokenProf } }] };
+  return {
+    termo: nome,
+    tipo: "profissional",
+    chamadas: [{ nome: "buscar_medicos", args: { nome: tokenProf } }],
+  };
 }

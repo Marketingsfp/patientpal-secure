@@ -101,7 +101,14 @@ describe("FASE 9 — calibração", () => {
     const r = calibrar(
       [decisao(1, { acao_solicitada: "criar_agendamento" })],
       [],
-      [{ conversa_id: "c1", status: "resolvido", houveHandoff: false, agendamentoConfirmado: true }],
+      [
+        {
+          conversa_id: "c1",
+          status: "resolvido",
+          houveHandoff: false,
+          agendamentoConfirmado: true,
+        },
+      ],
     );
     const alta = r.porFaixa.find((f) => f.faixa === "90_100")!;
     expect(alta.agendamentosConfirmados).toBe(1);
@@ -116,14 +123,16 @@ describe("FASE 9 — calibração", () => {
 
   it("recusa ajustes que enfraquecem a segurança", () => {
     expect(() =>
-      mesclarPolitica(POLITICA_PADRAO, [{ alvo: "bloqueadoresAbsolutos.CONFLITO_DE_FONTE", valor: 0 }]),
+      mesclarPolitica(POLITICA_PADRAO, [
+        { alvo: "bloqueadoresAbsolutos.CONFLITO_DE_FONTE", valor: 0 },
+      ]),
     ).toThrow(AjusteRecusado);
     expect(() => mesclarPolitica(POLITICA_PADRAO, [{ alvo: "limites.MEDIUM", valor: 95 }])).toThrow(
       AjusteRecusado,
     );
-    expect(() => mesclarPolitica(POLITICA_PADRAO, [{ alvo: "pesos.Inexistente", valor: 10 }])).toThrow(
-      AjusteRecusado,
-    );
+    expect(() =>
+      mesclarPolitica(POLITICA_PADRAO, [{ alvo: "pesos.Inexistente", valor: 10 }]),
+    ).toThrow(AjusteRecusado);
   });
 
   it("toda proposta nasce pendente — nada é aplicado automaticamente", () => {

@@ -84,9 +84,12 @@ export function conversaEstaFechada(conversa: ConversaEscopo): boolean {
 
 /** Mesmo vínculo usado pela consulta, pelo acesso direto e pelo tempo real. */
 export function conversaResolvidaDoAtendente(conversa: ConversaEscopo, userId: string): boolean {
-  return conversa.last_assigned_user_id === userId || conversa.resolved_by === userId || (
-    conversa.last_assigned_user_id == null && conversa.resolved_by == null &&
-    conversa.atribuida_user_id === userId
+  return (
+    conversa.last_assigned_user_id === userId ||
+    conversa.resolved_by === userId ||
+    (conversa.last_assigned_user_id == null &&
+      conversa.resolved_by == null &&
+      conversa.atribuida_user_id === userId)
   );
 }
 
@@ -171,10 +174,7 @@ export function atendenteFiltroEfetivo(
 }
 
 /** A conversa está sob responsabilidade deste atendente agora? */
-export function conversaDoAtendente(
-  conversa: ConversaEscopo,
-  atendenteId: string | null,
-): boolean {
+export function conversaDoAtendente(conversa: ConversaEscopo, atendenteId: string | null): boolean {
   if (!atendenteId) return true;
   if (conversaEstaFechada(conversa)) return conversaResolvidaDoAtendente(conversa, atendenteId);
   return conversa.atribuida_user_id === atendenteId;

@@ -1,11 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { criarCacheConversas, respostaAindaVale } from "../conversa-cache";
-import {
-  acaoPermitida,
-  gravarRascunho,
-  lerRascunho,
-  limparRascunho,
-} from "../rascunhos-conversa";
+import { acaoPermitida, gravarRascunho, lerRascunho, limparRascunho } from "../rascunhos-conversa";
 import { mesclarListaConversas, ordenarPorRecentes } from "../inbox-merge";
 
 /**
@@ -27,9 +22,9 @@ function criarTela() {
       return {
         selecionada,
         carregando: !!selecionada && !visivel,
-        msgs: visivel ? conteudo?.msgs ?? [] : [],
-        contato: visivel ? conteudo?.contato ?? null : null,
-        resumo: visivel ? conteudo?.resumo ?? null : null,
+        msgs: visivel ? (conteudo?.msgs ?? []) : [],
+        contato: visivel ? (conteudo?.contato ?? null) : null,
+        resumo: visivel ? (conteudo?.resumo ?? null) : null,
       };
     },
     selecionar(id: string) {
@@ -44,11 +39,20 @@ function criarTela() {
       }
       return ++pedidoAtual;
     },
-    responder(alvo: string, pedido: number, dados: { msgs: string[]; contato: string; resumo: string }) {
+    responder(
+      alvo: string,
+      pedido: number,
+      dados: { msgs: string[]; contato: string; resumo: string },
+    ) {
       if (!respostaAindaVale({ alvo, selecionadaAgora: selecionada, pedido, pedidoAtual })) {
         return false;
       }
-      cache.guardar(alvo, { msgs: dados.msgs, contato: dados.contato, notas: [], eventos: [] } as any);
+      cache.guardar(alvo, {
+        msgs: dados.msgs,
+        contato: dados.contato,
+        notas: [],
+        eventos: [],
+      } as any);
       (cache.obter(alvo) as any).resumo = dados.resumo;
       conteudo = dados;
       carregadaId = alvo;
@@ -167,8 +171,12 @@ describe("rascunhos por conversa", () => {
 
 describe("lista de conversas durante a troca", () => {
   it("realtime atualiza a lista sem apagar dados do cartão", () => {
-    const antes = [{ id: "A", nome: "Ana", ultima_mensagem: "oi", atualizada_em: "2026-01-01T10:00:00Z" }];
-    const depois = [{ id: "A", ultima_mensagem: "tudo bem?", atualizada_em: "2026-01-01T10:05:00Z" }];
+    const antes = [
+      { id: "A", nome: "Ana", ultima_mensagem: "oi", atualizada_em: "2026-01-01T10:00:00Z" },
+    ];
+    const depois = [
+      { id: "A", ultima_mensagem: "tudo bem?", atualizada_em: "2026-01-01T10:05:00Z" },
+    ];
     const r = ordenarPorRecentes(mesclarListaConversas(antes as any, depois as any)) as any[];
     expect(r[0].nome).toBe("Ana");
     expect(r[0].ultima_mensagem).toBe("tudo bem?");

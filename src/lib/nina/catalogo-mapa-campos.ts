@@ -40,7 +40,8 @@ const comuns: CampoCatalogo[] = [
     rotulo: "Idade e critérios por atendimento",
     caminho: "extras.atendimentos_publicados[].criterio_publicado",
     orientacao:
-      "Conferir também idade_minima, unidade_idade e complemento do mesmo bloco. " + REGRA_IDADE_NAO_INFORMADA,
+      "Conferir também idade_minima, unidade_idade e complemento do mesmo bloco. " +
+      REGRA_IDADE_NAO_INFORMADA,
   },
   {
     campo: "complementos_atendimento",

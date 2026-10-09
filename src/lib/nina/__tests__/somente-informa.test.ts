@@ -7,8 +7,13 @@ import { FERRAMENTAS_DE_VAGAS, semFerramentasDeVaga } from "../consulta-agenda";
 
 describe("semFerramentasDeVaga", () => {
   const lista = [
-    "consultar_cadastro", "buscar_medicos", "consultar_disponibilidade", "verificar_horario",
-    "proxima_vaga", "consultar_primeiro_disponivel", "dados_da_clinica",
+    "consultar_cadastro",
+    "buscar_medicos",
+    "consultar_disponibilidade",
+    "verificar_horario",
+    "proxima_vaga",
+    "consultar_primeiro_disponivel",
+    "dados_da_clinica",
   ].map((name) => ({ type: "function", function: { name } }));
 
   test("remove só as 4 ferramentas de vaga livre", () => {
@@ -38,25 +43,39 @@ console.log("RESULTADO=" + JSON.stringify(r));
 async function executar(ferramenta: string): Promise<Record<string, unknown>> {
   const p = Bun.spawn([process.execPath, "--eval", codigo], {
     cwd: fileURLToPath(new URL("../../../../", import.meta.url)),
-    stdin: "pipe", stdout: "pipe", stderr: "pipe",
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
   });
   p.stdin.write(ferramenta);
   await p.stdin.end();
-  const [saida, erro] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  const [saida, erro] = await Promise.all([
+    new Response(p.stdout).text(),
+    new Response(p.stderr).text(),
+  ]);
   expect(await p.exited, erro).toBe(0);
-  return JSON.parse(saida.split(/\r?\n/).find((l) => l.startsWith("RESULTADO="))!.slice("RESULTADO=".length));
+  return JSON.parse(
+    saida
+      .split(/\r?\n/)
+      .find((l) => l.startsWith("RESULTADO="))!
+      .slice("RESULTADO=".length),
+  );
 }
 
 describe("defesa na execução com a flag desligada", () => {
   test.each([...FERRAMENTAS_DE_VAGAS, "agendar", "selecionar_horario", "identificar_paciente"])(
-    "%s é negada e orienta encaminhar à recepção", async (nome) => {
+    "%s é negada e orienta encaminhar à recepção",
+    async (nome) => {
       const r = await executar(nome);
       expect(r["ok"]).toBe(false);
       expect(r["erro"]).toBe("PERMISSION_DENIED");
-    });
+    },
+  );
 
   test("a mensagem das ferramentas de vaga manda encaminhar à recepção", async () => {
     const r = await executar("proxima_vaga");
-    expect(String(r["mensagem"] ?? r["message"] ?? JSON.stringify(r))).toContain("solicitar_atendente_humano");
+    expect(String(r["mensagem"] ?? r["message"] ?? JSON.stringify(r))).toContain(
+      "solicitar_atendente_humano",
+    );
   });
 });

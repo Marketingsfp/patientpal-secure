@@ -29,12 +29,18 @@ const renderizar = (ev: ConversaEvento) =>
 
 describe("Apresentação dos registros internos para atendimento real e homologação", () => {
   test("falta de horários mostra causa e profissional no evento, grupo e marcador sem reescrever histórico", () => {
-    const motivo = "HORARIOS_HABITUAIS_NAO_INFORMADOS: Dr. Nicolas. A equipe deve conferir a escala; não consultar vagas nem substituir o profissional.";
+    const motivo =
+      "HORARIOS_HABITUAIS_NAO_INFORMADOS: Dr. Nicolas. A equipe deve conferir a escala; não consultar vagas nem substituir o profissional.";
     const ev = evento({ motivo });
     const antes = structuredClone(ev);
     const grupo = agruparTimeline({ eventos: [ev] }).itens[0] as GrupoHandoff;
-    for (const texto of [renderizar(ev), renderToStaticMarkup(<HandoffGroupCard grupo={grupo} />),
-      textoMarcadorSistema(`🔁 Conversa transferida da Nina para atendimento humano · Motivo: ${motivo}`)]) {
+    for (const texto of [
+      renderizar(ev),
+      renderToStaticMarkup(<HandoffGroupCard grupo={grupo} />),
+      textoMarcadorSistema(
+        `🔁 Conversa transferida da Nina para atendimento humano · Motivo: ${motivo}`,
+      ),
+    ]) {
       expect(texto).toContain("Faltam dias e horários habituais cadastrados");
       expect(texto).toContain("Dr. Nicolas");
       expect(texto).not.toContain("contém informações técnicas");
@@ -42,8 +48,12 @@ describe("Apresentação dos registros internos para atendimento real e homologa
     }
     expect(ev).toEqual(antes);
     expect(grupo.motivo).toBe(motivo);
-    expect(motivoParaAtendimento("HORARIOS_HABITUAIS_NAO_INFORMADOS")).toContain("confirmar esses horários");
-    expect(motivoParaAtendimento("HORARIOS_HABITUAIS_NAO_INFORMADOS: {\"trace_id\":42}" )).not.toContain("trace_id");
+    expect(motivoParaAtendimento("HORARIOS_HABITUAIS_NAO_INFORMADOS")).toContain(
+      "confirmar esses horários",
+    );
+    expect(
+      motivoParaAtendimento('HORARIOS_HABITUAIS_NAO_INFORMADOS: {"trace_id":42}'),
+    ).not.toContain("trace_id");
   });
   test("um único cartão mostra encaminhamento e reserva sem aviso azul repetido", () => {
     const reserva = {
@@ -99,7 +109,9 @@ describe("Apresentação dos registros internos para atendimento real e homologa
   });
   test("ausência registrada prevalece sobre código genérico, sem inventar ausência em falhas técnicas", () => {
     expect(motivoParaAtendimento(`TOOL_ERROR: ${MOTIVO_SEM_REGISTRO}`)).toContain("não encontrou");
-    expect(motivoParaAtendimento("MODALIDADE_NAO_DEFINIDA")).toContain("modalidade de agendamento não está definida");
+    expect(motivoParaAtendimento("MODALIDADE_NAO_DEFINIDA")).toContain(
+      "modalidade de agendamento não está definida",
+    );
     expect(motivoParaAtendimento("MODALIDADE_ALTERADA")).toContain("mudou após a escolha");
     expect(motivoParaAtendimento("MODALIDADE_NAO_DEFINIDA")).not.toContain("vagas");
     expect(motivoParaAtendimento("LLM_ERROR: consulta indisponível")).not.toContain(

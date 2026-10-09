@@ -102,8 +102,11 @@ export function podeRevalidarChatEntreFiltros(
   ctx: ContextoEscopo,
 ): boolean {
   return Boolean(
-    selecionada && ctx.clinicaId && ctx.userId &&
-    selecionada.clinica_id === ctx.clinicaId && selecionada.is_teste !== true,
+    selecionada &&
+    ctx.clinicaId &&
+    ctx.userId &&
+    selecionada.clinica_id === ctx.clinicaId &&
+    selecionada.is_teste !== true,
   );
 }
 
@@ -115,14 +118,19 @@ export function chatContinuaEntreFiltros(args: {
 }): boolean {
   const { selecionada, confirmada, ctx } = args;
   return Boolean(
-    selecionada && confirmada && podeRevalidarChatEntreFiltros(selecionada, ctx) &&
-    confirmada.id === selecionada.id && podeRevalidarChatEntreFiltros(confirmada, ctx) &&
+    selecionada &&
+    confirmada &&
+    podeRevalidarChatEntreFiltros(selecionada, ctx) &&
+    confirmada.id === selecionada.id &&
+    podeRevalidarChatEntreFiltros(confirmada, ctx) &&
     usuarioPodeVerConversa(confirmada, { userId: ctx.userId!, gestor: ctx.gestor }),
   );
 }
 
 /** null confirma indisponibilidade; undefined preserva o chat durante uma falha transitória. */
-export async function revalidarChatSelecionado<T>(ler: () => Promise<T | null>): Promise<T | null | undefined> {
+export async function revalidarChatSelecionado<T>(
+  ler: () => Promise<T | null>,
+): Promise<T | null | undefined> {
   try {
     return await ler();
   } catch (erro) {
@@ -142,8 +150,9 @@ export function selecaoDeveSair(args: {
   const { selecionada, linhas, ctx, confirmadaForaLista } = args;
   if (!selecionada) return false;
   if (!podeRevalidarChatEntreFiltros(selecionada, ctx)) return true;
-  const atual = linhas?.find(l => l.id === selecionada.id) ?? confirmadaForaLista;
-  if (atual !== undefined) return !chatContinuaEntreFiltros({ selecionada, confirmada: atual, ctx });
+  const atual = linhas?.find((l) => l.id === selecionada.id) ?? confirmadaForaLista;
+  if (atual !== undefined)
+    return !chatContinuaEntreFiltros({ selecionada, confirmada: atual, ctx });
   return !usuarioPodeVerConversa(selecionada, { userId: ctx.userId!, gestor: ctx.gestor });
 }
 

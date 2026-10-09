@@ -85,14 +85,17 @@ export async function carregarDadosCentralAtencao(
       if (data.length < TAMANHO_PAGINA) break;
       depoisDe = data[data.length - 1].user_id;
     }
-    const pausas: { atendenteId: string; inicio: string | null; tipo: "PAUSA" | "PAUSA_SAIDA" }[] = [];
+    const pausas: { atendenteId: string; inicio: string | null; tipo: "PAUSA" | "PAUSA_SAIDA" }[] =
+      [];
     // Reutiliza a mesma leitura da sidebar, com concorrência limitada por clínica.
     for (let i = 0; i < presencas.length; i += 8) {
       pausas.push(
         ...(await Promise.all(
           presencas.slice(i, i + 8).map(async (p) => ({
             atendenteId: p.user_id,
-            tipo: (p.estado_manual === "PAUSA_SAIDA" ? "PAUSA_SAIDA" : "PAUSA") as "PAUSA" | "PAUSA_SAIDA",
+            tipo: (p.estado_manual === "PAUSA_SAIDA" ? "PAUSA_SAIDA" : "PAUSA") as
+              | "PAUSA"
+              | "PAUSA_SAIDA",
             // Gestor pode acompanhar a equipe, mas o log bruto é restrito a admin/próprio.
             // Após can_manage_clinica, lê apenas o início das presenças já autorizadas
             // pela consulta autenticada. Nunca retorna o histórico ou remove seu RLS.

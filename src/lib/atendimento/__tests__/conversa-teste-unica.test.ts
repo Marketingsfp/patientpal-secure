@@ -22,12 +22,23 @@ function gatilhoConversa(msg: Linha) {
   if (tel.length < 5) return;
   const canal = msg.canal ?? "whatsapp";
   let conv = conversas
-    .filter((c) => c.clinica_id === msg.clinica_id && c.canal === canal && digitos(c.contato_telefone) === tel)
+    .filter(
+      (c) =>
+        c.clinica_id === msg.clinica_id && c.canal === canal && digitos(c.contato_telefone) === tel,
+    )
     .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
   const momento = agora();
   if (!conv) {
-    conv = { id: `criada-${conversas.length}`, clinica_id: msg.clinica_id, canal, contato_telefone: tel,
-      is_teste: false, created_at: momento, ultima_msg_em: momento, nina_fluxo_estado: null };
+    conv = {
+      id: `criada-${conversas.length}`,
+      clinica_id: msg.clinica_id,
+      canal,
+      contato_telefone: tel,
+      is_teste: false,
+      created_at: momento,
+      ultima_msg_em: momento,
+      nina_fluxo_estado: null,
+    };
     conversas.push(conv);
   } else conv.ultima_msg_em = momento;
   msg.conversa_id = conv.id;
@@ -37,10 +48,14 @@ function consulta(tabela: string) {
   const filtros: Array<(r: Linha) => boolean> = [];
   let ordem: { campo: string; asc: boolean } | null = null;
   const linhas = () => {
-    const base = (tabela === "atend_conversas" ? conversas : mensagens).filter((r) => filtros.every((f) => f(r)));
+    const base = (tabela === "atend_conversas" ? conversas : mensagens).filter((r) =>
+      filtros.every((f) => f(r)),
+    );
     if (ordem) {
       const { campo, asc } = ordem;
-      base.sort((a, b) => (asc ? 1 : -1) * String(a[campo] ?? "").localeCompare(String(b[campo] ?? "")));
+      base.sort(
+        (a, b) => (asc ? 1 : -1) * String(a[campo] ?? "").localeCompare(String(b[campo] ?? "")),
+      );
     }
     return base;
   };
@@ -48,7 +63,10 @@ function consulta(tabela: string) {
     select: () => q,
     eq: (k: string, v: unknown) => (filtros.push((r) => r[k] === v), q),
     in: (k: string, v: unknown[]) => (filtros.push((r) => v.includes(r[k])), q),
-    order: (campo: string, o?: { ascending?: boolean }) => ((ordem = { campo, asc: o?.ascending !== false }), q),
+    order: (campo: string, o?: { ascending?: boolean }) => (
+      (ordem = { campo, asc: o?.ascending !== false }),
+      q
+    ),
     limit: () => q,
     maybeSingle: async () => ({ data: linhas()[0] ?? null, error: null }),
     insert: (row: Linha) => {
@@ -73,36 +91,77 @@ mock.module("@/integrations/supabase/client.server", () => ({
 // Outros arquivos da suíte substituem estes módulos por versões falsas; o
 // sufixo carrega uma instância própria, ligada ao banco simulado acima.
 const SUFIXO = "?conversa-teste-unica";
-const { registrarMarcadorSistema } = (await import(`../handoff.server.ts${SUFIXO}`)) as typeof import("../handoff.server");
-const { carregarEstadoIdentidade } = (await import(`../../whatsapp.server.ts${SUFIXO}`)) as typeof import("../../whatsapp.server");
+const { registrarMarcadorSistema } = (await import(
+  `../handoff.server.ts${SUFIXO}`
+)) as typeof import("../handoff.server");
+const { carregarEstadoIdentidade } = (await import(
+  `../../whatsapp.server.ts${SUFIXO}`
+)) as typeof import("../../whatsapp.server");
 
 beforeEach(() => {
   relogio = 0;
   mensagens = [];
   const criada = agora();
-  conversas = [{ id: "conversa-teste", clinica_id: CLINICA, canal: "test-console", is_teste: true,
-    contato_telefone: TELEFONE, created_at: criada, ultima_msg_em: criada,
-    nina_fluxo_estado: { greeting_completed: true, knowledge_context: { consulta: { termo: "cardiologia" } } } }];
+  conversas = [
+    {
+      id: "conversa-teste",
+      clinica_id: CLINICA,
+      canal: "test-console",
+      is_teste: true,
+      contato_telefone: TELEFONE,
+      created_at: criada,
+      ultima_msg_em: criada,
+      nina_fluxo_estado: {
+        greeting_completed: true,
+        knowledge_context: { consulta: { termo: "cardiologia" } },
+      },
+    },
+  ];
 });
 
 describe("aviso interno fica na conversa de teste", () => {
   test("início de ciclo não cria conversa de WhatsApp para o número virtual", async () => {
-    await registrarMarcadorSistema({ clinicaId: CLINICA, conversaId: "conversa-teste", texto: "Ciclo 473 iniciado" });
+    await registrarMarcadorSistema({
+      clinicaId: CLINICA,
+      conversaId: "conversa-teste",
+      texto: "Ciclo 473 iniciado",
+    });
     expect(conversas).toHaveLength(1);
-    expect(mensagens[0]).toMatchObject({ conversa_id: "conversa-teste", canal: "test-console", is_teste: true });
+    expect(mensagens[0]).toMatchObject({
+      conversa_id: "conversa-teste",
+      canal: "test-console",
+      is_teste: true,
+    });
   });
 
   test("conversa real de WhatsApp recebe o aviso como antes", async () => {
-    conversas = [{ id: "conversa-real", clinica_id: CLINICA, canal: "whatsapp", is_teste: false,
-      contato_telefone: "5521999990000", created_at: agora(), ultima_msg_em: agora() }];
-    await registrarMarcadorSistema({ clinicaId: CLINICA, conversaId: "conversa-real", texto: "Handoff realizado" });
+    conversas = [
+      {
+        id: "conversa-real",
+        clinica_id: CLINICA,
+        canal: "whatsapp",
+        is_teste: false,
+        contato_telefone: "5521999990000",
+        created_at: agora(),
+        ultima_msg_em: agora(),
+      },
+    ];
+    await registrarMarcadorSistema({
+      clinicaId: CLINICA,
+      conversaId: "conversa-real",
+      texto: "Handoff realizado",
+    });
     expect(conversas).toHaveLength(1);
     expect(mensagens[0]).toMatchObject({ conversa_id: "conversa-real", canal: "whatsapp" });
     expect(mensagens[0]!.is_teste).toBeUndefined();
   });
 
   test("depois do aviso, o turno pelo telefone continua na conversa de teste", async () => {
-    await registrarMarcadorSistema({ clinicaId: CLINICA, conversaId: "conversa-teste", texto: "Ciclo 473 iniciado" });
+    await registrarMarcadorSistema({
+      clinicaId: CLINICA,
+      conversaId: "conversa-teste",
+      texto: "Ciclo 473 iniciado",
+    });
     const turno = await carregarEstadoIdentidade(CLINICA, TELEFONE);
     expect(turno.conversaId).toBe("conversa-teste");
   });
@@ -112,8 +171,16 @@ describe("a Nina usa a conversa informada pelo teste", () => {
   function comConversaFantasma() {
     // Situação criada pelo defeito antigo: outra conversa mais recente no mesmo número.
     const depois = agora();
-    conversas.push({ id: "conversa-fantasma", clinica_id: CLINICA, canal: "whatsapp", is_teste: false,
-      contato_telefone: TELEFONE, created_at: depois, ultima_msg_em: depois, nina_fluxo_estado: null });
+    conversas.push({
+      id: "conversa-fantasma",
+      clinica_id: CLINICA,
+      canal: "whatsapp",
+      is_teste: false,
+      contato_telefone: TELEFONE,
+      created_at: depois,
+      ultima_msg_em: depois,
+      nina_fluxo_estado: null,
+    });
   }
 
   test("1º e 2º turno leem a mesma memória, mesmo com outra conversa no número", async () => {

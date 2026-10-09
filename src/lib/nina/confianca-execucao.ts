@@ -108,10 +108,7 @@ export function cruzarResultadoConfianca(
 }
 
 /** Ambiente da execução da Nina — nunca inferido no cliente. */
-export function ambienteDaExecucao(e: {
-  teste: boolean;
-  simulacaoAtiva?: boolean;
-}): AmbienteQA {
+export function ambienteDaExecucao(e: { teste: boolean; simulacaoAtiva?: boolean }): AmbienteQA {
   if (!e.teste) return "producao";
   return e.simulacaoAtiva ? "teste_automatizado" : "homologacao";
 }

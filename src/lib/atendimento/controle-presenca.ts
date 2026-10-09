@@ -67,10 +67,7 @@ export function aoFalhar(estado: ControlePresenca, mensagem: string): ControlePr
 }
 
 /** Uma opção só aparece selecionada quando o servidor confirmou. */
-export function opcaoSelecionada(
-  estado: ControlePresenca,
-  opcao: EstadoManualPresenca,
-): boolean {
+export function opcaoSelecionada(estado: ControlePresenca, opcao: EstadoManualPresenca): boolean {
   return estado.carregado && estado.confirmado === opcao;
 }
 

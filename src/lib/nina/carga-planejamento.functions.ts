@@ -17,7 +17,12 @@ async function solicitar(body: ReturnType<typeof montarRequisicaoPlanejamento>):
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LIMITES_PLANEJAMENTO.timeoutMs);
   try {
-    const resposta = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({ ...body, model: garantirPapel("planejador_carga", body.model) }, { signal: controller.signal });
+    const resposta = await (
+      await import("@/lib/nina/claude-messages.server")
+    ).chamarClaudeComoResponses(
+      { ...body, model: garantirPapel("planejador_carga", body.model) },
+      { signal: controller.signal },
+    );
     if (!resposta.ok) {
       const erros: Record<number, string> = {
         401: "Integração de IA não configurada corretamente.",

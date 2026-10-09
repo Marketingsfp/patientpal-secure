@@ -37,9 +37,7 @@ describe("manifesto da arquitetura da Nina", () => {
     for (const node of NODES_ARQUITETURA) {
       if (!node.funcao || !node.arquivo) continue;
       const texto = conteudo(node.arquivo);
-      const achou = new RegExp(
-        `(function|const)\\s+${node.funcao}\\b`,
-      ).test(texto);
+      const achou = new RegExp(`(function|const)\\s+${node.funcao}\\b`).test(texto);
       expect(achou, `${node.id}: ${node.funcao} em ${node.arquivo}`).toBe(true);
     }
   });

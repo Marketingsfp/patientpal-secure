@@ -142,7 +142,12 @@ describe("agrupamento semântico da timeline", () => {
 
   it("não mistura eventos de handoffs diferentes", () => {
     const eventos: EventoTimeline[] = [
-      { id: "h1", evento: "HANDOFF_SOLICITADO", created_at: em(0), detalhes: { solicitado_por: "IA" } },
+      {
+        id: "h1",
+        evento: "HANDOFF_SOLICITADO",
+        created_at: em(0),
+        detalhes: { solicitado_por: "IA" },
+      },
       {
         id: "p1",
         evento: "HANDOFF_SOLICITADO",
@@ -150,7 +155,12 @@ describe("agrupamento semântico da timeline", () => {
         motivo: "Protocolo MJ-1 gerado (handoff)",
         detalhes: { handoff_event_id: "h1", protocol_number: "MJ-1" },
       },
-      { id: "h2", evento: "HANDOFF_SOLICITADO", created_at: em(600), detalhes: { solicitado_por: "IA" } },
+      {
+        id: "h2",
+        evento: "HANDOFF_SOLICITADO",
+        created_at: em(600),
+        detalhes: { solicitado_por: "IA" },
+      },
       { id: "f2", evento: "ENTROU_NA_FILA", created_at: em(600.5), detalhes: { posicao: 2 } },
       {
         id: "au2",
@@ -205,7 +215,12 @@ describe("agrupamento semântico da timeline", () => {
         de_nome: "ANA",
         para_nome: "BRUNO",
         motivo: "Caso financeiro",
-        detalhes: { manual: true, de_user_id: "u-ana", para_user_id: "u-bruno", setor_nome: "Financeiro" },
+        detalhes: {
+          manual: true,
+          de_user_id: "u-ana",
+          para_user_id: "u-bruno",
+          setor_nome: "Financeiro",
+        },
       },
     ];
     const { itens } = agruparTimeline({ eventos });
@@ -285,19 +300,103 @@ describe("FASE 3 — espera por atendente", () => {
 // sete registros internos + três marcadores devem virar um card de encaminhamento.
 describe("FASE 5 — sequência real de handoff", () => {
   const eventos = [
-    { id: "e1", evento: "REABERTA", user_id: null, motivo: "Conversa reaberta", detalhes: null, created_at: "2026-09-09T18:17:02.212Z" },
-    { id: "h1", evento: "HANDOFF_SOLICITADO", user_id: null, motivo: "Paciente solicitou falar com atendente humana.", detalhes: { urgencia: "normal", solicitado_por: "IA" }, created_at: "2026-09-09T18:17:38.469Z" },
-    { id: "f1", evento: "ENTROU_NA_FILA", user_id: null, motivo: null, detalhes: { posicao: 4 }, created_at: "2026-09-09T18:17:38.593Z" },
-    { id: "p1", evento: "HANDOFF_SOLICITADO", user_id: null, motivo: "Protocolo MJ-3 gerado (handoff)", detalhes: { protocol_number: "MJ-3", handoff_event_id: "h1" }, created_at: "2026-09-09T18:17:38.948Z" },
-    { id: "p2", evento: "ASSUMIDA", user_id: null, motivo: "Protocolo MJ-3 informado ao paciente", detalhes: { protocol_number: "MJ-3", protocolo_informado: true }, created_at: "2026-09-09T18:17:41.715Z" },
-    { id: "a1", evento: "ASSUMIDA", user_id: "u1", motivo: "Atribuição automática (menor carga)", detalhes: { metodo: "distribuicao_automatica", perfil: "telefonia", presence_status: "ONLINE", atendente_user_id: "u1" }, created_at: "2026-09-09T18:17:43.922Z", user_nome: "JEAN TELEFONE" },
-    { id: "x1", evento: "HANDOFF_AUDITORIA", user_id: null, motivo: "Handoff auditado · Protocolo MJ-3", detalhes: { protocol_number: "MJ-3", handoff_event_id: "h1", auditoria_completa: true, auditoria_faltando: [] }, created_at: "2026-09-09T18:17:46.112Z" },
+    {
+      id: "e1",
+      evento: "REABERTA",
+      user_id: null,
+      motivo: "Conversa reaberta",
+      detalhes: null,
+      created_at: "2026-09-09T18:17:02.212Z",
+    },
+    {
+      id: "h1",
+      evento: "HANDOFF_SOLICITADO",
+      user_id: null,
+      motivo: "Paciente solicitou falar com atendente humana.",
+      detalhes: { urgencia: "normal", solicitado_por: "IA" },
+      created_at: "2026-09-09T18:17:38.469Z",
+    },
+    {
+      id: "f1",
+      evento: "ENTROU_NA_FILA",
+      user_id: null,
+      motivo: null,
+      detalhes: { posicao: 4 },
+      created_at: "2026-09-09T18:17:38.593Z",
+    },
+    {
+      id: "p1",
+      evento: "HANDOFF_SOLICITADO",
+      user_id: null,
+      motivo: "Protocolo MJ-3 gerado (handoff)",
+      detalhes: { protocol_number: "MJ-3", handoff_event_id: "h1" },
+      created_at: "2026-09-09T18:17:38.948Z",
+    },
+    {
+      id: "p2",
+      evento: "ASSUMIDA",
+      user_id: null,
+      motivo: "Protocolo MJ-3 informado ao paciente",
+      detalhes: { protocol_number: "MJ-3", protocolo_informado: true },
+      created_at: "2026-09-09T18:17:41.715Z",
+    },
+    {
+      id: "a1",
+      evento: "ASSUMIDA",
+      user_id: "u1",
+      motivo: "Atribuição automática (menor carga)",
+      detalhes: {
+        metodo: "distribuicao_automatica",
+        perfil: "telefonia",
+        presence_status: "ONLINE",
+        atendente_user_id: "u1",
+      },
+      created_at: "2026-09-09T18:17:43.922Z",
+      user_nome: "JEAN TELEFONE",
+    },
+    {
+      id: "x1",
+      evento: "HANDOFF_AUDITORIA",
+      user_id: null,
+      motivo: "Handoff auditado · Protocolo MJ-3",
+      detalhes: {
+        protocol_number: "MJ-3",
+        handoff_event_id: "h1",
+        auditoria_completa: true,
+        auditoria_faltando: [],
+      },
+      created_at: "2026-09-09T18:17:46.112Z",
+    },
   ];
   const marcadores = [
-    { id: "m1", body: "Vou encaminhar seu atendimento…\nProtocolo do atendimento: MJ-3", created_at: "2026-09-09T18:17:41.617Z", enviada_por: "sistema", status: "sent" },
-    { id: "m2", body: "🧾 Handoff realizado pela Nina · Protocolo: MJ-3 · Destino: Não atribuídas", created_at: "2026-09-09T18:17:41.921Z", enviada_por: "sistema", status: "system" },
-    { id: "m3", body: "🔁 Conversa transferida da Nina para atendimento humano · Motivo: x · Posição 4", created_at: "2026-09-09T18:17:43.680Z", enviada_por: "sistema", status: "system" },
-    { id: "m4", body: "👤 Atribuída automaticamente a JEAN TELEFONE (online).", created_at: "2026-09-09T18:17:44.220Z", enviada_por: "sistema", status: "system" },
+    {
+      id: "m1",
+      body: "Vou encaminhar seu atendimento…\nProtocolo do atendimento: MJ-3",
+      created_at: "2026-09-09T18:17:41.617Z",
+      enviada_por: "sistema",
+      status: "sent",
+    },
+    {
+      id: "m2",
+      body: "🧾 Handoff realizado pela Nina · Protocolo: MJ-3 · Destino: Não atribuídas",
+      created_at: "2026-09-09T18:17:41.921Z",
+      enviada_por: "sistema",
+      status: "system",
+    },
+    {
+      id: "m3",
+      body: "🔁 Conversa transferida da Nina para atendimento humano · Motivo: x · Posição 4",
+      created_at: "2026-09-09T18:17:43.680Z",
+      enviada_por: "sistema",
+      status: "system",
+    },
+    {
+      id: "m4",
+      body: "👤 Atribuída automaticamente a JEAN TELEFONE (online).",
+      created_at: "2026-09-09T18:17:44.220Z",
+      enviada_por: "sistema",
+      status: "system",
+    },
   ];
 
   it("gera um card com handoff e atribuição, sem eventos soltos redundantes", () => {
@@ -329,16 +428,26 @@ describe("FASE 5 — sequência real de handoff", () => {
 
 describe("encaminhamento e reserva em um único registro interno", () => {
   const handoff = (id = "h1", segundo = 0): EventoTimeline => ({
-    id, evento: "HANDOFF_SOLICITADO", created_at: em(segundo),
-    motivo: "Paciente solicitou atendente humano", detalhes: { solicitado_por: "IA" },
+    id,
+    evento: "HANDOFF_SOLICITADO",
+    created_at: em(segundo),
+    motivo: "Paciente solicitou atendente humano",
+    detalhes: { solicitado_por: "IA" },
   });
   const atribuicao = (id = "a1", segundo = 1): EventoTimeline => ({
-    id, evento: "ASSUMIDA", created_at: em(segundo), user_id: "u-jean", user_nome: "JEAN TELEFONE",
+    id,
+    evento: "ASSUMIDA",
+    created_at: em(segundo),
+    user_id: "u-jean",
+    user_nome: "JEAN TELEFONE",
     motivo: "Conversa reservada na fila individual",
     detalhes: { metodo: "distribuicao_automatica", presence_status: "BUSY" },
   });
   const reserva = (id = "s1", segundo = 1.1): MarcadorSistemaTimeline => ({
-    id, created_at: em(segundo), enviada_por: "sistema", status: "system",
+    id,
+    created_at: em(segundo),
+    enviada_por: "sistema",
+    status: "system",
     body: "Conversa reservada na fila individual de JEAN TELEFONE.",
   });
 
@@ -362,15 +471,22 @@ describe("encaminhamento e reserva em um único registro interno", () => {
     expect(r.marcadorParaItem.get("s1")).toBe("a1");
   });
 
-  it.each(["paciente", "ia", "humano", "sistema"])("não absorve mensagem real de %s com texto igual", (autor) => {
-    const r = agruparTimeline({ eventos: [handoff(), atribuicao()],
-      marcadores: [{ ...reserva(), enviada_por: autor, status: "sent" }] });
-    expect(r.marcadorParaItem.has("s1")).toBe(false);
-  });
+  it.each(["paciente", "ia", "humano", "sistema"])(
+    "não absorve mensagem real de %s com texto igual",
+    (autor) => {
+      const r = agruparTimeline({
+        eventos: [handoff(), atribuicao()],
+        marcadores: [{ ...reserva(), enviada_por: autor, status: "sent" }],
+      });
+      expect(r.marcadorParaItem.has("s1")).toBe(false);
+    },
+  );
 
   it("não reúne ciclos próximos atribuídos à mesma pessoa", () => {
-    const r = agruparTimeline({ eventos: [handoff(), atribuicao(), handoff("h2", 10), atribuicao("a2", 11)],
-      marcadores: [reserva(), reserva("s2", 11.1)] });
+    const r = agruparTimeline({
+      eventos: [handoff(), atribuicao(), handoff("h2", 10), atribuicao("a2", 11)],
+      marcadores: [reserva(), reserva("s2", 11.1)],
+    });
     expect(r.itens.map((i) => i.chave)).toEqual(["h1", "h2"]);
     expect(r.eventoParaItem.get("a1")).toBe("h1");
     expect(r.eventoParaItem.get("a2")).toBe("h2");
@@ -379,14 +495,21 @@ describe("encaminhamento e reserva em um único registro interno", () => {
   });
 
   it.each(["FINALIZADA", "REABERTA", "DEVOLVIDA_PARA_IA", "IA_MEMORIA_RESETADA", "DESATRIBUIDA"])(
-    "não une atribuição depois de %s ao encaminhamento anterior", (evento) => {
-      const r = agruparTimeline({ eventos: [handoff(), { id: "barreira", evento, created_at: em(1) }, atribuicao("a1", 2)] });
+    "não une atribuição depois de %s ao encaminhamento anterior",
+    (evento) => {
+      const r = agruparTimeline({
+        eventos: [handoff(), { id: "barreira", evento, created_at: em(1) }, atribuicao("a1", 2)],
+      });
       expect(r.eventoParaItem.get("a1")).toBe("a1");
     },
   );
 
   it("mantém transferência manual e reatribuição como operações distintas", () => {
-    const manual = { ...atribuicao("manual", 2), evento: "TRANSFERIDA", detalhes: { manual: true } };
+    const manual = {
+      ...atribuicao("manual", 2),
+      evento: "TRANSFERIDA",
+      detalhes: { manual: true },
+    };
     const r = agruparTimeline({ eventos: [handoff(), atribuicao(), manual, atribuicao("a2", 3)] });
     expect(r.itens.map((i) => i.chave)).toEqual(["h1", "manual", "a2"]);
   });

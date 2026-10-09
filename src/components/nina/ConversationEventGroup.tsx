@@ -63,7 +63,13 @@ function Card({
  * conclusão da Nina tem o seu e ele não muda depois. Resumos novos vêm em texto corrido; os antigos,
  * em campos "rótulo: valor".
  */
-function ResumoDaNina({ resumo, omitirProtocolo }: { resumo: ResumoNaConversa; omitirProtocolo: boolean }) {
+function ResumoDaNina({
+  resumo,
+  omitirProtocolo,
+}: {
+  resumo: ResumoNaConversa;
+  omitirProtocolo: boolean;
+}) {
   const r = resumo.payload;
   const conteudo = conteudoDoResumo(r, { omitirProtocolo });
   const agendamento = r.agendamento_confirmado;
@@ -77,9 +83,13 @@ function ResumoDaNina({ resumo, omitirProtocolo }: { resumo: ResumoNaConversa; o
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-2">
         <span className="font-medium text-foreground">
-          Resumo da Nina{desfecho ? <span className="font-normal opacity-70"> · {desfecho}</span> : null}
+          Resumo da Nina
+          {desfecho ? <span className="font-normal opacity-70"> · {desfecho}</span> : null}
         </span>
-        <span className="whitespace-nowrap opacity-60" title="Resumo interno, guardado por sete dias">
+        <span
+          className="whitespace-nowrap opacity-60"
+          title="Resumo interno, guardado por sete dias"
+        >
           uso interno
         </span>
       </div>
@@ -100,7 +110,9 @@ function ResumoDaNina({ resumo, omitirProtocolo }: { resumo: ResumoNaConversa; o
           <div>
             <span className="opacity-70">Agendamento confirmado: </span>
             <span className="font-medium text-foreground/90">
-              {[agendamento.servico, agendamento.medico, agendamento.data, agendamento.hora].filter(Boolean).join(" · ")}
+              {[agendamento.servico, agendamento.medico, agendamento.data, agendamento.hora]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           </div>
         )}
@@ -131,7 +143,13 @@ const STATUS_HANDOFF: Record<GrupoHandoff["status"], string> = {
   PROTOCOLO_INFORMADO: "Protocolo informado ao paciente",
 };
 
-export function HandoffGroupCard({ grupo, resumo }: { grupo: GrupoHandoff; resumo?: ResumoNaConversa }) {
+export function HandoffGroupCard({
+  grupo,
+  resumo,
+}: {
+  grupo: GrupoHandoff;
+  resumo?: ResumoNaConversa;
+}) {
   const motivo = motivoParaAtendimento(grupo.motivo) ?? MOTIVO_TRANSFERENCIA_AUSENTE;
 
   const linha2: Array<{ rotulo?: string; valor: string }> = [];

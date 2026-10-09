@@ -9,11 +9,7 @@
  * Nada aqui envia mensagem, publica, chama modelo ou toca dado clínico.
  */
 import { describe, it, expect, beforeEach } from "bun:test";
-import {
-  assinaturaProposta,
-  avaliarProntidao,
-  type EntradaProntidao,
-} from "../correcao-prontidao";
+import { assinaturaProposta, avaliarProntidao, type EntradaProntidao } from "../correcao-prontidao";
 import { chaveIdempotencia, MAX_TENTATIVAS, TEMPO_MAXIMO_MS } from "../correcao-limites";
 import { montarRelatorio, type EntradaRelatorio } from "../correcao-relatorio";
 import { montarPacoteInvestigacao } from "../evidencias-pacote.server";
@@ -162,7 +158,9 @@ describe("FASE 6 — habilitação do botão", () => {
 
   it("2. análise concluída com proposta aplicável: disponível para autorizado", () => {
     const p = proposta();
-    const r = avaliarProntidao(prontidao({ proposta: p, assinaturaExibida: assinaturaProposta(p) }));
+    const r = avaliarProntidao(
+      prontidao({ proposta: p, assinaturaExibida: assinaturaProposta(p) }),
+    );
     expect(r).toMatchObject({ habilitado: true, codigo: "pronto" });
   });
 
@@ -173,9 +171,7 @@ describe("FASE 6 — habilitação do botão", () => {
   });
 
   it("4. hipótese sem evidência suficiente não habilita alteração especulativa", () => {
-    const semMudanca = avaliarProntidao(
-      prontidao({ proposta: proposta({ valorNovo: "  " }) }),
-    );
+    const semMudanca = avaliarProntidao(prontidao({ proposta: proposta({ valorNovo: "  " }) }));
     expect(semMudanca).toMatchObject({ habilitado: false, codigo: "informacao_insuficiente" });
 
     const semPatch = avaliarProntidao(
@@ -214,7 +210,10 @@ describe("FASE 6 — habilitação do botão", () => {
     };
     expect(chaveIdempotencia(arg)).toBe(chaveIdempotencia({ ...arg }));
     expect(chaveIdempotencia(arg)).not.toBe(
-      chaveIdempotencia({ ...arg, assinaturaProposta: assinaturaProposta(proposta({ valorNovo: "9" })) }),
+      chaveIdempotencia({
+        ...arg,
+        assinaturaProposta: assinaturaProposta(proposta({ valorNovo: "9" })),
+      }),
     );
     // Uma execução em curso barra a segunda aplicação.
     expect(avaliarProntidao(prontidao({ execucaoEmCurso: true })).codigo).toBe("execucao_em_curso");
@@ -461,7 +460,10 @@ describe("FASE 6 — resultado do executor", () => {
     expect(catalogo.reversao.instrucao).toContain("150,00");
 
     const prompt = montarRelatorio(
-      relatorio({ proposta: proposta({ camada: "modelo" }), versaoPrompt: { anterior: "9", nova: "10" } }),
+      relatorio({
+        proposta: proposta({ camada: "modelo" }),
+        versaoPrompt: { anterior: "9", nova: "10" },
+      }),
     );
     expect(prompt.reversao.instrucao).toContain("versão anterior");
 
@@ -469,7 +471,14 @@ describe("FASE 6 — resultado do executor", () => {
     const comPassos = montarRelatorio(
       relatorio({
         passos: [
-          { ordem: 1, ferramenta: "publicar_prompt", titulo: "Publicou prompt", detalhe: "ok", ok: true, em: "x" },
+          {
+            ordem: 1,
+            ferramenta: "publicar_prompt",
+            titulo: "Publicou prompt",
+            detalhe: "ok",
+            ok: true,
+            em: "x",
+          },
         ],
       }),
     );

@@ -47,7 +47,12 @@ export type AvaliacaoDash = {
   quando: string;
   resultado: string | null;
   score: number | null;
-  achados: Array<{ gravidade?: string | null; componente?: string | null; observado?: string | null; esperado?: string | null }>;
+  achados: Array<{
+    gravidade?: string | null;
+    componente?: string | null;
+    observado?: string | null;
+    esperado?: string | null;
+  }>;
 };
 
 export type EntradaDashboard = {
@@ -147,7 +152,8 @@ export function agregarPorConversa(entrada: EntradaDashboard): TesteAgregado[] {
       for (const achado of a.achados ?? []) {
         const gravidade = String(achado?.gravidade ?? "").toLowerCase();
         if (gravidade === "informativa") continue;
-        if (gravidade === "critica" || gravidade === "crítica" || gravidade === "grave") criticos += 1;
+        if (gravidade === "critica" || gravidade === "crítica" || gravidade === "grave")
+          criticos += 1;
         erros.push({
           categoria: classificarErroRelatorio({
             componente: achado?.componente ?? null,
@@ -161,7 +167,9 @@ export function agregarPorConversa(entrada: EntradaDashboard): TesteAgregado[] {
       }
     }
 
-    const promptVersoes = execs.map((e) => e.promptVersao).filter((v): v is number => typeof v === "number");
+    const promptVersoes = execs
+      .map((e) => e.promptVersao)
+      .filter((v): v is number => typeof v === "number");
     const modelos = [...new Set(execs.map((e) => e.modelo).filter((m): m is string => !!m))];
     const custo = entrada.custoPorConversa?.[conversaId];
 
@@ -194,7 +202,8 @@ export function agregarPorConversa(entrada: EntradaDashboard): TesteAgregado[] {
 export function filtrarTestes(testes: TesteAgregado[], filtro: FiltroDashboard): TesteAgregado[] {
   return testes.filter((t) => {
     if (filtro.tipos?.length && !filtro.tipos.includes(t.tipo)) return false;
-    if (typeof filtro.promptVersao === "number" && t.promptVersao !== filtro.promptVersao) return false;
+    if (typeof filtro.promptVersao === "number" && t.promptVersao !== filtro.promptVersao)
+      return false;
     if (filtro.modelo && !t.modelos.includes(filtro.modelo)) return false;
     if (filtro.resultado && t.resultado !== filtro.resultado) return false;
     return true;
@@ -204,7 +213,10 @@ export function filtrarTestes(testes: TesteAgregado[], filtro: FiltroDashboard):
 function percentil(valores: number[], p: number): number | null {
   if (!valores.length) return null;
   const ordenado = [...valores].sort((a, b) => a - b);
-  const idx = Math.min(ordenado.length - 1, Math.max(0, Math.ceil((p / 100) * ordenado.length) - 1));
+  const idx = Math.min(
+    ordenado.length - 1,
+    Math.max(0, Math.ceil((p / 100) * ordenado.length) - 1),
+  );
   return ordenado[idx]!;
 }
 
@@ -242,7 +254,8 @@ export function resumirTestes(testes: TesteAgregado[]): ResumoDashboard {
   const avaliados = testes.length - semAvaliacao;
 
   const mapa = new Map<CategoriaErroRelatorio, number>();
-  for (const t of testes) for (const e of t.erros) mapa.set(e.categoria, (mapa.get(e.categoria) ?? 0) + 1);
+  for (const t of testes)
+    for (const e of t.erros) mapa.set(e.categoria, (mapa.get(e.categoria) ?? 0) + 1);
 
   const custos = testes.map((t) => t.custo).filter((c): c is number => typeof c === "number");
 
@@ -253,9 +266,13 @@ export function resumirTestes(testes: TesteAgregado[]): ResumoDashboard {
     aprovadosObservacao,
     reprovados,
     semAvaliacao,
-    taxaAprovacao: avaliados ? Math.round(((aprovados + aprovadosObservacao) / avaliados) * 100) : null,
+    taxaAprovacao: avaliados
+      ? Math.round(((aprovados + aprovadosObservacao) / avaliados) * 100)
+      : null,
     errosCriticos: testes.reduce((s, t) => s + t.errosCriticos, 0),
-    scoreMedio: scores.length ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : null,
+    scoreMedio: scores.length
+      ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+      : null,
     mensagens: testes.reduce((s, t) => s + t.mensagens, 0),
     tools: testes.reduce((s, t) => s + t.tools, 0),
     rag: testes.reduce((s, t) => s + t.rag, 0),

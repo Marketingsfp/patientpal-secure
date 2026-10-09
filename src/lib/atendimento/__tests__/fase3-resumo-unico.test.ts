@@ -58,9 +58,7 @@ describe("FASE 3 — resumo detalhado único", () => {
   for (const [nome, itens] of CENARIOS) {
     it(`cenário ${nome}: timeline sem resumo detalhado`, () => {
       expect(resumosDetalhadosNaTimeline(itens)).toBe(0);
-      expect(textoMarcadorSistema(itens[0]!.body)).toContain(
-        "Transferida para atendimento humano",
-      );
+      expect(textoMarcadorSistema(itens[0]!.body)).toContain("Transferida para atendimento humano");
     });
   }
 
@@ -75,10 +73,7 @@ describe("FASE 3 — resumo detalhado único", () => {
   });
 
   it("eventos operacionais da timeline continuam intactos", () => {
-    const operacionais = [
-      "Conversa atribuída a Tuane",
-      "Conversa encerrada e resolvida por Tuane",
-    ];
+    const operacionais = ["Conversa atribuída a Tuane", "Conversa encerrada e resolvida por Tuane"];
     for (const t of operacionais) expect(textoMarcadorSistema(t)).toBe(t);
   });
 });

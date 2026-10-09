@@ -1,17 +1,33 @@
 import { describe, expect, it } from "bun:test";
-import { apresentarPerguntaEsclarecimento, FECHAMENTO_CORRECAO_EXAME } from "../esclarecimento-apresentacao";
+import {
+  apresentarPerguntaEsclarecimento,
+  FECHAMENTO_CORRECAO_EXAME,
+} from "../esclarecimento-apresentacao";
 
 describe("pergunta de identificação entregue ao paciente (bateria 02/10, testes 04 e 05)", () => {
   it("hipótese única de exame termina com convite para corrigir sem repetir confirmação", () => {
-    const texto = apresentarPerguntaEsclarecimento("Você quis dizer USG MORFOLOGICA? Pode confirmar ou escrever o nome novamente.",
-      { tipo: "procedimento", tipoAtendimento: "exame_procedimento", apresentacao: "Olá! Sou a Maria." });
-    expect(texto).toBe(`Olá! Sou a Maria.\n\nVocê se refere a USG MORFOLOGICA?\n\n${FECHAMENTO_CORRECAO_EXAME}`);
+    const texto = apresentarPerguntaEsclarecimento(
+      "Você quis dizer USG MORFOLOGICA? Pode confirmar ou escrever o nome novamente.",
+      {
+        tipo: "procedimento",
+        tipoAtendimento: "exame_procedimento",
+        apresentacao: "Olá! Sou a Maria.",
+      },
+    );
+    expect(texto).toBe(
+      `Olá! Sou a Maria.\n\nVocê se refere a USG MORFOLOGICA?\n\n${FECHAMENTO_CORRECAO_EXAME}`,
+    );
     expect(texto.match(/\?/g)).toHaveLength(1);
   });
 
   it("não aplica linguagem de exame a consultas ou profissionais", () => {
     const pergunta = "Você quis dizer Cardiologia? Pode confirmar ou escrever o nome novamente.";
-    expect(apresentarPerguntaEsclarecimento(pergunta, { tipo: "procedimento", tipoAtendimento: "consulta" })).toBe(pergunta);
+    expect(
+      apresentarPerguntaEsclarecimento(pergunta, {
+        tipo: "procedimento",
+        tipoAtendimento: "consulta",
+      }),
+    ).toBe(pergunta);
     expect(apresentarPerguntaEsclarecimento(pergunta, { tipo: "profissional" })).toBe(pergunta);
   });
   it("profissional: frase de conversa, nomes em lista e sem MAIÚSCULAS", () => {
@@ -25,8 +41,13 @@ describe("pergunta de identificação entregue ao paciente (bateria 02/10, teste
   });
 
   it("exame: mantém os nomes publicados como estão, um por linha", () => {
-    const texto = apresentarPerguntaEsclarecimento("Qual exame ou procedimento você deseja?\nRX TORAX PA\nRX COLUNA LOMBAR", { tipo: "procedimento" });
-    expect(texto).toBe("Encontrei mais de uma opção no cadastro para esse pedido. Qual destas você deseja?\n\n• RX TORAX PA\n• RX COLUNA LOMBAR");
+    const texto = apresentarPerguntaEsclarecimento(
+      "Qual exame ou procedimento você deseja?\nRX TORAX PA\nRX COLUNA LOMBAR",
+      { tipo: "procedimento" },
+    );
+    expect(texto).toBe(
+      "Encontrei mais de uma opção no cadastro para esse pedido. Qual destas você deseja?\n\n• RX TORAX PA\n• RX COLUNA LOMBAR",
+    );
   });
 
   it("segunda pergunta: o cabeçalho com dois-pontos não vira opção", () => {
@@ -38,15 +59,18 @@ describe("pergunta de identificação entregue ao paciente (bateria 02/10, teste
   });
 
   it("primeira resposta da sessão leva a apresentação", () => {
-    const texto = apresentarPerguntaEsclarecimento("Qual exame ou procedimento você deseja?\nA\nB", {
-      apresentacao: "Olá! Me chamo Maria, atendente virtual da Policlínica Menino Jesus.",
-    });
+    const texto = apresentarPerguntaEsclarecimento(
+      "Qual exame ou procedimento você deseja?\nA\nB",
+      {
+        apresentacao: "Olá! Me chamo Maria, atendente virtual da Policlínica Menino Jesus.",
+      },
+    );
     expect(texto.startsWith("Olá! Me chamo Maria")).toBe(true);
   });
 
   it("pergunta sem opções fica igual", () => {
-    expect(apresentarPerguntaEsclarecimento("Pode informar por extenso o nome do atendimento?")).toBe(
-      "Pode informar por extenso o nome do atendimento?",
-    );
+    expect(
+      apresentarPerguntaEsclarecimento("Pode informar por extenso o nome do atendimento?"),
+    ).toBe("Pode informar por extenso o nome do atendimento?");
   });
 });

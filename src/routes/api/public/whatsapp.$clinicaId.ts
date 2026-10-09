@@ -194,9 +194,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
               if (statuses.length > 0) {
                 if (assinaturaOk) {
                   try {
-                    const { registrarEntregaFrancisco } = await import("@/lib/francisco/replies.server");
+                    const { registrarEntregaFrancisco } =
+                      await import("@/lib/francisco/replies.server");
                     await registrarEntregaFrancisco(params.clinicaId, statuses);
-                  } catch { console.error("[francisco] Falha ao registrar recibo de entrega."); }
+                  } catch {
+                    console.error("[francisco] Falha ao registrar recibo de entrega.");
+                  }
                 }
                 try {
                   const { registrarStatusEntregaConfirmacao } =
@@ -215,7 +218,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 const ehAudio = tipo === "audio";
                 const ehImagem = tipo === "image";
                 const chamadasIA: import("@/lib/nina/auditoria-ia").ChamadaIA[] = [];
-                const registrarIA = (c: import("@/lib/nina/auditoria-ia").ChamadaIA) => { chamadasIA.push(c); };
+                const registrarIA = (c: import("@/lib/nina/auditoria-ia").ChamadaIA) => {
+                  chamadasIA.push(c);
+                };
 
                 // Texto do paciente que a Nina vai processar (áudio vira transcrição).
                 let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
@@ -225,8 +230,13 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // Caminho do arquivo no bucket privado (imagem e áudio recebidos).
                 let caminhoMidia: string | null = null;
                 // Classificação persistida: o núcleo controla leitura, nova tentativa e encaminhamento.
-                let leituraImagem: import("@/lib/nina/leitura-imagem").LeituraImagem = { tipo: "falha_tecnica", motivo: "download" };
-                const legendaImagem = ehImagem ? bloquearLinksRecebidos(String(msg.image?.caption ?? "").trim()) : "";
+                let leituraImagem: import("@/lib/nina/leitura-imagem").LeituraImagem = {
+                  tipo: "falha_tecnica",
+                  motivo: "download",
+                };
+                const legendaImagem = ehImagem
+                  ? bloquearLinksRecebidos(String(msg.image?.caption ?? "").trim())
+                  : "";
 
                 if (ehAudio || ehImagem) {
                   // Mantém o armazenamento em dia: apaga mídias com mais de 30 dias (no máx. a cada 10 min).
@@ -235,13 +245,22 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   await limparMidiasExpiradasSeChegouAHora(params.clinicaId);
                 }
 
-                const imagemExistente = ehImagem ? await supabaseAdmin.from("whatsapp_mensagens")
-                  .select("id,transcricao,media_url,media_mime,raw").eq("clinica_id", params.clinicaId)
-                  .eq("wa_message_id", wa_message_id).maybeSingle() : null;
-                if (imagemExistente?.error) throw new Error("Não foi possível conferir a foto recebida anteriormente");
+                const imagemExistente = ehImagem
+                  ? await supabaseAdmin
+                      .from("whatsapp_mensagens")
+                      .select("id,transcricao,media_url,media_mime,raw")
+                      .eq("clinica_id", params.clinicaId)
+                      .eq("wa_message_id", wa_message_id)
+                      .maybeSingle()
+                  : null;
+                if (imagemExistente?.error)
+                  throw new Error("Não foi possível conferir a foto recebida anteriormente");
                 if (imagemExistente?.data) {
                   const { leituraSalvaDaFoto } = await import("@/lib/nina/fotos");
-                  leituraImagem = leituraSalvaDaFoto(imagemExistente.data.raw) ?? { tipo: "falha_tecnica", motivo: "resposta_invalida" };
+                  leituraImagem = leituraSalvaDaFoto(imagemExistente.data.raw) ?? {
+                    tipo: "falha_tecnica",
+                    motivo: "resposta_invalida",
+                  };
                   caminhoMidia = imagemExistente.data.media_url;
                   mediaMime = imagemExistente.data.media_mime;
                 }
@@ -263,13 +282,19 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // A IA só lê a imagem quando a Nina vai mesmo responder (conversa de gente
                     // ou Nina desligada: a imagem não sai do sistema).
                     if (recebida.base64 && recebida.mime?.startsWith("image/")) {
-                      const { estadoConversaPorTelefone: estadoAntes, ninaPodeResponder: podeAntes } =
-                        await import("@/lib/atendimento/handoff.server");
+                      const {
+                        estadoConversaPorTelefone: estadoAntes,
+                        ninaPodeResponder: podeAntes,
+                      } = await import("@/lib/atendimento/handoff.server");
                       const { ninaDesativadaNaClinica: desligadaAntes } =
                         await import("@/lib/nina-desligada.server");
                       const estado = from ? await estadoAntes(params.clinicaId, from) : null;
                       if (podeAntes(estado) && !(await desligadaAntes(params.clinicaId))) {
-                        leituraImagem = await lerPedidoNaImagem(recebida.base64, recebida.mime, registrarIA);
+                        leituraImagem = await lerPedidoNaImagem(
+                          recebida.base64,
+                          recebida.mime,
+                          registrarIA,
+                        );
                       }
                     }
                   }
@@ -342,7 +367,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   media_url: caminhoMidia,
                   status: "received",
                   enviada_por: "paciente",
-                  raw: { ...msg, ...(ehImagem ? { nina_leitura_imagem: leituraImagem } : {}), nina_chamadas_ia: chamadasIA },
+                  raw: {
+                    ...msg,
+                    ...(ehImagem ? { nina_leitura_imagem: leituraImagem } : {}),
+                    nina_chamadas_ia: chamadasIA,
+                  },
                 });
                 const msgInserida = entradaPersistida.mensagem;
                 trace.marcar("RECV_T5_DB_INSERT_DONE");
@@ -376,21 +405,31 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 // Francisco trata respostas antes de qualquer automação da Nina.
                 if (assinaturaOk) {
                   try {
-                    const { processarRespostaFrancisco } = await import("@/lib/francisco/replies.server");
+                    const { processarRespostaFrancisco } =
+                      await import("@/lib/francisco/replies.server");
                     const tratada = await processarRespostaFrancisco({
-                      clinicaId: params.clinicaId, from, mensagemId: msgInserida.id,
-                      waMessageId: wa_message_id, contextoId: (msgInserida.raw as any)?.context?.id,
-                      texto: textoPaciente, recebidaEm: msgInserida.recebida_em,
+                      clinicaId: params.clinicaId,
+                      from,
+                      mensagemId: msgInserida.id,
+                      waMessageId: wa_message_id,
+                      contextoId: (msgInserida.raw as any)?.context?.id,
+                      texto: textoPaciente,
+                      recebidaEm: msgInserida.recebida_em,
                     });
                     if (tratada) {
-                      const marcada = await supabaseAdmin.from("whatsapp_mensagens")
-                        .update({ nina_status: "handoff" }).eq("id", msgInserida.id).eq("clinica_id", params.clinicaId);
+                      const marcada = await supabaseAdmin
+                        .from("whatsapp_mensagens")
+                        .update({ nina_status: "handoff" })
+                        .eq("id", msgInserida.id)
+                        .eq("clinica_id", params.clinicaId);
                       if (marcada.error) throw marcada.error;
                       continue;
                     }
                   } catch {
                     const { ErroAgrupamentoNina } = await import("@/lib/nina/agrupamento-turno");
-                    throw new ErroAgrupamentoNina("Resposta ao Francisco aguarda encaminhamento seguro para a equipe.");
+                    throw new ErroAgrupamentoNina(
+                      "Resposta ao Francisco aguarda encaminhamento seguro para a equipe.",
+                    );
                   }
                 }
 

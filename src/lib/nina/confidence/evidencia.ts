@@ -208,7 +208,9 @@ export function corresponder(
   }
 
   const igual = (f: FatoRecuperado) =>
-    pedido.monetario ? mesmoValorMonetario(f.valor, pedido.valor) : mesmoTexto(f.valor, pedido.valor);
+    pedido.monetario
+      ? mesmoValorMonetario(f.valor, pedido.valor)
+      : mesmoTexto(f.valor, pedido.valor);
 
   const batendo = noEscopo.find(igual);
   if (batendo) return { situacao: "confirmado", fato: batendo };
@@ -255,7 +257,13 @@ export function houveTruncamento(consultas: ConsultaDoTurno[]): boolean {
  * Dia de atendimento, horário e vaga são listas: valores diferentes ali são
  * opções, não contradição.
  */
-const CAMPOS_UNIVALORADOS = new Set(["preco", "endereco", "preparo", "cobertura", "appointment_id"]);
+const CAMPOS_UNIVALORADOS = new Set([
+  "preco",
+  "endereco",
+  "preparo",
+  "cobertura",
+  "appointment_id",
+]);
 
 function escopoDoFato(f: FatoRecuperado): string {
   const c = f.chave ?? {};

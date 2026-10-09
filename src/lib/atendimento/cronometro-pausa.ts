@@ -47,8 +47,10 @@ export function atualizarCronometroPausa(
 
 export function formatarTempoPausa(inicio: string, agora: number): string {
   const timestamp = Date.parse(inicio);
-  const segundos = Number.isFinite(timestamp) ? Math.max(0, Math.floor((agora - timestamp) / 1000)) : 0;
+  const segundos = Number.isFinite(timestamp)
+    ? Math.max(0, Math.floor((agora - timestamp) / 1000))
+    : 0;
   const horas = Math.floor(segundos / 3600);
   const minutos = Math.floor((segundos % 3600) / 60);
-  return [horas, minutos, segundos % 60].map(n => String(n).padStart(2, "0")).join(":");
+  return [horas, minutos, segundos % 60].map((n) => String(n).padStart(2, "0")).join(":");
 }

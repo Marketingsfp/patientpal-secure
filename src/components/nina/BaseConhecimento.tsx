@@ -31,7 +31,13 @@ export function BaseConhecimento() {
         </div>
       </header>
       <FonteConsultaMaria key={clinicaId} clinicaId={clinicaId} podeEditar={podeEditar} />
-      {podeEditar && clinicaId && <ImportacaoCompleta key={clinicaId} clinicaId={clinicaId} onConcluido={() => setRevisao(v => v + 1)} />}
+      {podeEditar && clinicaId && (
+        <ImportacaoCompleta
+          key={clinicaId}
+          clinicaId={clinicaId}
+          onConcluido={() => setRevisao((v) => v + 1)}
+        />
+      )}
       <Tabs defaultValue="servicos" className="oszap-base-tabs">
         <TabsList className="oszap-base-tab-list" aria-label="Categorias da base">
           <TabsTrigger value="servicos">
@@ -48,15 +54,26 @@ export function BaseConhecimento() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="servicos">
-          <CatalogoNina key={`${clinicaId}:${revisao}:servico`} clinicaId={clinicaId} podeEditar={podeEditar} tipo="servico" />
+          <CatalogoNina
+            key={`${clinicaId}:${revisao}:servico`}
+            clinicaId={clinicaId}
+            podeEditar={podeEditar}
+            tipo="servico"
+          />
         </TabsContent>
         <TabsContent value="profissionais">
-          <CatalogoNina key={`${clinicaId}:${revisao}:profissional`} clinicaId={clinicaId} podeEditar={podeEditar} tipo="profissional" />
+          <CatalogoNina
+            key={`${clinicaId}:${revisao}:profissional`}
+            clinicaId={clinicaId}
+            podeEditar={podeEditar}
+            tipo="profissional"
+          />
         </TabsContent>
         <TabsContent value="clinica" className="oszap-base-clinic">
           <DadosClinicaBase clinicaId={clinicaId} />
           <p className="mb-4 text-sm text-muted-foreground">
-            O horário de funcionamento é compartilhado pelas duas fontes e aparece aqui para consulta.
+            O horário de funcionamento é compartilhado pelas duas fontes e aparece aqui para
+            consulta.
           </p>
           <HorarioFuncionamento clinicaId={clinicaId} podeEditar={false} />
         </TabsContent>

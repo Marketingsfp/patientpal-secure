@@ -96,7 +96,8 @@ export function RevisarVinculoDialog(props: {
         <DialogHeader>
           <DialogTitle>Revisar cadastro vinculado</DialogTitle>
           <DialogDescription>
-            Contato do WhatsApp: <strong>{props.contatoNome ?? props.contatoTelefone ?? "—"}</strong>
+            Contato do WhatsApp:{" "}
+            <strong>{props.contatoNome ?? props.contatoTelefone ?? "—"}</strong>
             {props.pacienteVinculadoNome ? (
               <>
                 {" · "}cadastro vinculado hoje: <strong>{props.pacienteVinculadoNome}</strong>
@@ -138,7 +139,9 @@ export function RevisarVinculoDialog(props: {
             Cancelar
           </Button>
           <Button disabled={!escolhido || salvando} onClick={() => void confirmar()}>
-            {escolhido ? `Confirmar vínculo com ${escolhido.nome.split(" ")[0]}` : "Confirmar vínculo"}
+            {escolhido
+              ? `Confirmar vínculo com ${escolhido.nome.split(" ")[0]}`
+              : "Confirmar vínculo"}
           </Button>
         </DialogFooter>
       </DialogContent>

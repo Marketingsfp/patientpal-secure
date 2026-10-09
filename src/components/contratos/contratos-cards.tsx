@@ -120,7 +120,6 @@ const MAX_PAGINAS_TOTAIS = 50;
 // olhando a lista inteira; isto é só o recorte de exibição).
 const POR_PAGINA_CARDS = 50;
 
-
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -437,7 +436,6 @@ export function ContratosCards({
     [visiveisPagina],
   );
 
-
   useEffect(() => {
     const lista = idsPagina ? idsPagina.split(",") : [];
     if (lista.length === 0) {
@@ -463,7 +461,6 @@ export function ContratosCards({
       cancelado = true;
     };
   }, [idsPagina]);
-
 
   // CPF do titular: o contrato guarda só o nome, o documento vem do paciente.
   useEffect(() => {
@@ -513,13 +510,15 @@ export function ContratosCards({
       for (let i = 0; i < lotes.length; i += CONCORRENCIA) {
         if (cancelado) return;
         const bloco = await Promise.all(
-          lotes.slice(i, i + CONCORRENCIA).map((slice) =>
-            supabase
-              .from("contrato_mensalidades")
-              .select("contrato_id, vencimento, status, pago_em, numero_parcela")
-              .in("contrato_id", slice)
-              .gt("numero_parcela", 0),
-          ),
+          lotes
+            .slice(i, i + CONCORRENCIA)
+            .map((slice) =>
+              supabase
+                .from("contrato_mensalidades")
+                .select("contrato_id, vencimento, status, pago_em, numero_parcela")
+                .in("contrato_id", slice)
+                .gt("numero_parcela", 0),
+            ),
         );
         respostas.push(...bloco);
       }
@@ -644,8 +643,6 @@ export function ContratosCards({
     setPagina(1);
   }, [filtro, ids]);
 
-
-
   const imprimirCartao = async (id: string) => {
     if (!onCartao) return;
     setImprimindo(id);
@@ -753,7 +750,6 @@ export function ContratosCards({
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {visiveisPagina.map((c) => {
-
             const lista = deps[c.id] ?? [];
             const expandido = Boolean(aberto[c.id]);
             const cobranca = cobrancas[c.id];
@@ -984,6 +980,5 @@ export function ContratosCards({
         </div>
       )}
     </div>
-
   );
 }

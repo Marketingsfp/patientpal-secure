@@ -114,9 +114,7 @@ describe("FASE 2 — burst aggregation", () => {
   });
 
   it("TESTE B: mensagem isolada gera 1 lote e 1 execução após a quiet window", () => {
-    const { execucoes, lotes } = simular([
-      { chave: "A", id: "m1", texto: "Bom dia", emMs: 0 },
-    ]);
+    const { execucoes, lotes } = simular([{ chave: "A", id: "m1", texto: "Bom dia", emMs: 0 }]);
     expect(lotes).toBe(1);
     expect(execucoes).toHaveLength(1);
     expect(execucoes[0]!.texto).toBe("Bom dia");

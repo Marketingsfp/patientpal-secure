@@ -1,8 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  aplicarReconciliacao,
-  deveRegistrarLeituraDeNovas,
-} from "../leitura-inbox";
+import { aplicarReconciliacao, deveRegistrarLeituraDeNovas } from "../leitura-inbox";
 
 const base = {
   userId: "u-maria",

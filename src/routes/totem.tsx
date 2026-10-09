@@ -21,7 +21,11 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64, precarregarGeradorPdf } from "@/lib/print-senha";
-import { imprimirDocumentoSilencioso, prepararImpressao, obterTokenTotem } from "@/utils/printService";
+import {
+  imprimirDocumentoSilencioso,
+  prepararImpressao,
+  obterTokenTotem,
+} from "@/utils/printService";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 

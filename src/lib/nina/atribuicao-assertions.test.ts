@@ -7,10 +7,7 @@ import {
   type CandidatoAvaliado,
 } from "./atribuicao-assertions";
 
-const cand = (
-  user_id: string,
-  extra: Partial<CandidatoAvaliado> = {},
-): CandidatoAvaliado => ({
+const cand = (user_id: string, extra: Partial<CandidatoAvaliado> = {}): CandidatoAvaliado => ({
   user_id,
   permission_telefonia: true,
   presence_status: "ONLINE",

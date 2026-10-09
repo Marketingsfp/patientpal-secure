@@ -194,7 +194,8 @@ export function conferirCorrespondencia(i: IdentidadeMaterial): CorrespondenciaT
   if (!i.hashAvaliado || !i.hashTextoFinal) {
     return {
       confere: false,
-      explicacao: "Não dá para afirmar que a nota se refere ao texto enviado: falta o registro do texto.",
+      explicacao:
+        "Não dá para afirmar que a nota se refere ao texto enviado: falta o registro do texto.",
     };
   }
   if (i.hashAvaliado !== i.hashTextoFinal) {
@@ -289,7 +290,10 @@ export function explicarResposta(e: EntradaExplicacao): ExplicacaoResposta {
     hashTextoFinal: e.identidade?.hashTextoFinal ?? null,
   };
 
-  const regrasBrutas = [...(e.avaliacao?.resultados ?? []), ...(e.avaliacao?.guardasPosteriores ?? [])];
+  const regrasBrutas = [
+    ...(e.avaliacao?.resultados ?? []),
+    ...(e.avaliacao?.guardasPosteriores ?? []),
+  ];
   const regras = regrasBrutas.map((r) => explicarRegra(r, p));
 
   const enc = s?.encaminhamento ?? null;
@@ -327,7 +331,11 @@ export function explicarResposta(e: EntradaExplicacao): ExplicacaoResposta {
       texto: textoIndice(p ? p.notaFinal : null),
       nota: p ? p.notaFinal : null,
       nivel: p ? p.nivel : null,
-      observacao: p ? NOTA_INDICE_TECNICO : e.falhaDeAvaliacao ? `Avaliação indisponível: ${e.falhaDeAvaliacao}` : OBS_SEM_NOTA,
+      observacao: p
+        ? NOTA_INDICE_TECNICO
+        : e.falhaDeAvaliacao
+          ? `Avaliação indisponível: ${e.falhaDeAvaliacao}`
+          : OBS_SEM_NOTA,
     },
     cobertura: porcentagem(
       p ? Math.round(p.denominadorAvaliado * 10) / 10 : 0,

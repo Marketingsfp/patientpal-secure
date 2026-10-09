@@ -7,11 +7,14 @@
 export const LIMITE_LISTA_PROFISSIONAIS = 8;
 export const MOTIVO_LISTA_EXTENSA = "LISTA_PROFISSIONAIS_EXTENSA";
 
-type Dados = {
-  doctors?: unknown;
-  esclarecimento?: unknown;
-  tipo_atendimento?: unknown;
-} | null | undefined;
+type Dados =
+  | {
+      doctors?: unknown;
+      esclarecimento?: unknown;
+      tipo_atendimento?: unknown;
+    }
+  | null
+  | undefined;
 
 export function listaProfissionaisExtensa(
   ferramenta: string,
@@ -21,11 +24,20 @@ export function listaProfissionaisExtensa(
   if (ferramenta !== "consultar_cadastro" || !dados || dados.esclarecimento) return null;
   if (dados.tipo_atendimento === "exame_procedimento") return null;
   let args: { medico?: unknown; termo?: unknown } = {};
-  try { args = JSON.parse(argumentos ?? "{}") ?? {}; } catch { /* argumentos inválidos: sem regra */ }
+  try {
+    args = JSON.parse(argumentos ?? "{}") ?? {};
+  } catch {
+    /* argumentos inválidos: sem regra */
+  }
   if (typeof args.medico === "string" && args.medico.trim()) return null;
-  const medicos = Array.isArray(dados.doctors) ? dados.doctors.filter((m) => typeof m === "string" && m.trim()) : [];
+  const medicos = Array.isArray(dados.doctors)
+    ? dados.doctors.filter((m) => typeof m === "string" && m.trim())
+    : [];
   if (medicos.length <= LIMITE_LISTA_PROFISSIONAIS) return null;
-  return { total: medicos.length, especialidade: typeof args.termo === "string" ? args.termo.trim() : "" };
+  return {
+    total: medicos.length,
+    especialidade: typeof args.termo === "string" ? args.termo.trim() : "",
+  };
 }
 
 export function motivoListaExtensa(a: { total: number; especialidade: string }): string {

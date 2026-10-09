@@ -2079,7 +2079,9 @@ function Page() {
         return;
       }
       if (totalCredito > creditoCobranca.disponivel + 0.005) {
-        toast.error(`Crédito na clínica insuficiente: disponível ${fmt(creditoCobranca.disponivel)}.`);
+        toast.error(
+          `Crédito na clínica insuficiente: disponível ${fmt(creditoCobranca.disponivel)}.`,
+        );
         return;
       }
     }
@@ -6521,8 +6523,7 @@ function Page() {
                           <SelectItem value="boleto">Boleto</SelectItem>
                           {creditoCobranca?.apto && (
                             <SelectItem value={FORMA_CREDITO_CLINICA}>
-                              {LABEL_CREDITO_CLINICA} (disponível{" "}
-                              {fmt(creditoCobranca.disponivel)})
+                              {LABEL_CREDITO_CLINICA} (disponível {fmt(creditoCobranca.disponivel)})
                             </SelectItem>
                           )}
                           {/* Transição de sistemas: paciente já pagou na

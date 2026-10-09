@@ -15,10 +15,16 @@ describe("orientação após encaminhamento", () => {
   });
   it("executa encaminhamento silencioso quando solicitado e uma conversa já com humano sem nova orientação de aviso", async () => {
     retorno = { ok: true, ja_estava_com_humano: true };
-    const sfp = await executarHandoffTool(contexto, JSON.stringify({ motivo: "PROFISSIONAL_SFP", avisar_paciente: false }));
+    const sfp = await executarHandoffTool(
+      contexto,
+      JSON.stringify({ motivo: "PROFISSIONAL_SFP", avisar_paciente: false }),
+    );
     expect(sfp.sem_mensagem_paciente).toBe(true);
     expect(encaminhar.mock.calls.at(-1)?.[0]).toMatchObject({ avisarPaciente: false });
-    const semOpcao = await executarHandoffTool(contexto, JSON.stringify({ motivo: "PROFISSIONAL_SFP" }));
+    const semOpcao = await executarHandoffTool(
+      contexto,
+      JSON.stringify({ motivo: "PROFISSIONAL_SFP" }),
+    );
     expect(semOpcao.sem_mensagem_paciente).toBe(false);
     const comum = await executarHandoffTool(
       contexto,

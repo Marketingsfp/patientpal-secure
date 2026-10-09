@@ -22,7 +22,14 @@
  * Módulo puro: sem banco, sem rede, sem modelo (o revisor semântico é
  * injetado por quem chama).
  */
-import { avaliarAplicabilidade, type CategoriaContrato, type ContratoRegras, type MomentoAplicacao, type RegraContrato, type ResultadoCondicao } from "./contrato-regras";
+import {
+  avaliarAplicabilidade,
+  type CategoriaContrato,
+  type ContratoRegras,
+  type MomentoAplicacao,
+  type RegraContrato,
+  type ResultadoCondicao,
+} from "./contrato-regras";
 import { categoriasVioladas } from "./obrigacoes";
 import { normalizarTexto } from "./evidencia";
 import {
@@ -138,7 +145,10 @@ function espacos(t: string): string {
 export function mencionaNome(texto: string, nome: string): boolean {
   const n = chave(nome);
   if (!n) return false;
-  const re = new RegExp(`(^|[^\\p{L}\\p{N}])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}\\p{N}]|$)`, "u");
+  const re = new RegExp(
+    `(^|[^\\p{L}\\p{N}])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}\\p{N}]|$)`,
+    "u",
+  );
   return re.test(chave(texto));
 }
 
@@ -153,7 +163,10 @@ export function entidadeAfirmada(texto: string): string | null {
 
 const SINAIS_PROIBIDOS: Array<[string, RegExp]> = [
   ["dados_de_terceiros", /\bcpf\s*[:\s]?\d|prontuario d[eo] |paciente [a-z]+ (tem|esta|fez)\b/],
-  ["vazamento_de_instrucoes", /\b(minhas instrucoes|system prompt|prompt do sistema|regra interna)\b/],
+  [
+    "vazamento_de_instrucoes",
+    /\b(minhas instrucoes|system prompt|prompt do sistema|regra interna)\b/,
+  ],
 ];
 
 function violacoesObservaveis(texto: string): string[] {
@@ -249,7 +262,11 @@ function verificarIdentidade(r: RegraContrato, c: ContextoCanonico): Veredito {
   const id = c.identidadePublicada;
   if (!id) return { status: "UNKNOWN", motivo: "IDENTIDADE_PUBLICADA_AUSENTE", nota: null };
   const afirmada = entidadeAfirmada(c.candidato);
-  if (afirmada && !mencionaNome(id.assistente, afirmada) && !mencionaNome(afirmada, id.assistente)) {
+  if (
+    afirmada &&
+    !mencionaNome(id.assistente, afirmada) &&
+    !mencionaNome(afirmada, id.assistente)
+  ) {
     return {
       status: "FAIL",
       motivo: "IDENTIDADE_TROCADA",
@@ -417,7 +434,10 @@ function verificarEncaminhamento(r: RegraContrato, c: ContextoCanonico): Veredit
   const op = c.operacao;
   if (r.natureza === "proibicao") {
     const efeitoReal =
-      op != null && op.executada && op.simulada !== true && /transfer|fila|atendente/.test(chave(op.tipo));
+      op != null &&
+      op.executada &&
+      op.simulada !== true &&
+      /transfer|fila|atendente/.test(chave(op.tipo));
     return efeitoReal
       ? {
           status: "FAIL",
@@ -449,10 +469,7 @@ function verificarAtendimento(r: RegraContrato, c: ContextoCanonico): Veredito |
   const exigencias: Array<[string, boolean]> = [];
   if (/\bpergunte\b/.test(k)) exigencias.push(["pergunta", c.candidato.includes("?")]);
   if (/\bsaudacao\b/.test(k)) {
-    exigencias.push([
-      "saudacao",
-      /\b(oi|ola|bom dia|boa tarde|boa noite)\b/.test(n),
-    ]);
+    exigencias.push(["saudacao", /\b(oi|ola|bom dia|boa tarde|boa noite)\b/.test(n)]);
   }
   if (exigencias.length === 0) return null;
   const faltando = exigencias.filter(([, ok]) => !ok).map(([nome]) => nome);
@@ -532,7 +549,11 @@ function verificarSemantica(
 
 // ------------------------------------------------------------- avaliação
 
-function descreverCondicao(r: RegraContrato, resultado: ResultadoCondicao, c: ContextoCanonico): string {
+function descreverCondicao(
+  r: RegraContrato,
+  resultado: ResultadoCondicao,
+  c: ContextoCanonico,
+): string {
   const partes = r.condicoes.map((x) => `${x.negada ? "não " : ""}${x.tipo}`);
   const sinais = [
     `ambiente=${c.ambiente ?? "desconhecido"}`,
@@ -587,7 +608,11 @@ export function avaliarRegra(
     });
   }
   if (aplicabilidade === "falsa") {
-    return monta({ status: "NOT_APPLICABLE", motivo: "CONDICAO_COMPROVADAMENTE_FALSA", nota: null });
+    return monta({
+      status: "NOT_APPLICABLE",
+      motivo: "CONDICAO_COMPROVADAMENTE_FALSA",
+      nota: null,
+    });
   }
   if (aplicabilidade === "indeterminada") {
     return monta({ status: "UNKNOWN", motivo: "CONDICAO_INDETERMINADA", nota: null });

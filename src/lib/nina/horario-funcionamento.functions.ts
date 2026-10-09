@@ -16,7 +16,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { validarDia, validarExcecao, validarVigencia, normalizarHora } from "./horario-funcionamento";
+import {
+  validarDia,
+  validarExcecao,
+  validarVigencia,
+  normalizarHora,
+} from "./horario-funcionamento";
 
 const TAB_VER = "nina_calendario_versoes";
 const TAB_DIAS = "nina_calendario_atendimento";
@@ -108,7 +113,13 @@ export const listarHorarioFuncionamento = createServerFn({ method: "POST" })
             v.vigencia_inicio <= hoje &&
             (!v.vigencia_fim || v.vigencia_fim >= hoje),
         )
-        .sort((a: any, b: any) => (a.vigencia_inicio === b.vigencia_inicio ? b.versao - a.versao : a.vigencia_inicio < b.vigencia_inicio ? 1 : -1))[0] ?? null;
+        .sort((a: any, b: any) =>
+          a.vigencia_inicio === b.vigencia_inicio
+            ? b.versao - a.versao
+            : a.vigencia_inicio < b.vigencia_inicio
+              ? 1
+              : -1,
+        )[0] ?? null;
 
     const ids = [rascunho?.id, vigente?.id].filter(Boolean) as string[];
     let dias: any[] = [];
@@ -159,7 +170,9 @@ export const consultarHorarioNaData = createServerFn({ method: "POST" })
 
     let q = context.supabase
       .from(TAB_VER)
-      .select("id, versao, status, vigencia_inicio, vigencia_fim, publicado_em, publicado_por, fuso, retroativa")
+      .select(
+        "id, versao, status, vigencia_inicio, vigencia_fim, publicado_em, publicado_por, fuso, retroativa",
+      )
       .eq("clinica_id", data.clinicaId)
       .neq("status", "rascunho")
       .lte("vigencia_inicio", data.data)
@@ -170,9 +183,16 @@ export const consultarHorarioNaData = createServerFn({ method: "POST" })
     const { data: versoes, error } = await q;
     if (error) throw new Error(error.message);
 
-    const v = (versoes ?? []).find((x: any) => !x.vigencia_fim || x.vigencia_fim >= data.data) ?? null;
+    const v =
+      (versoes ?? []).find((x: any) => !x.vigencia_fim || x.vigencia_fim >= data.data) ?? null;
     // Calendário histórico desconhecido: não presumir que o atual sempre valeu.
-    if (!v) return { versao: null, dias: [], excecoes: [], observacao: "Não havia horário oficial publicado para esta data." };
+    if (!v)
+      return {
+        versao: null,
+        dias: [],
+        excecoes: [],
+        observacao: "Não havia horário oficial publicado para esta data.",
+      };
 
     const [rd, re] = await Promise.all([
       context.supabase
@@ -181,11 +201,20 @@ export const consultarHorarioNaData = createServerFn({ method: "POST" })
         .eq("versao_id", v.id)
         .eq("ativo", true)
         .order("dia_semana"),
-      context.supabase.from(TAB_EXC).select("data, tipo, hora_inicio, hora_fim, descricao").eq("versao_id", v.id).eq("data", data.data),
+      context.supabase
+        .from(TAB_EXC)
+        .select("data, tipo, hora_inicio, hora_fim, descricao")
+        .eq("versao_id", v.id)
+        .eq("data", data.data),
     ]);
     if (rd.error) throw new Error(rd.error.message);
     if (re.error) throw new Error(re.error.message);
-    return { versao: v, dias: mapaHora(rd.data ?? []), excecoes: mapaHora(re.data ?? []), observacao: null };
+    return {
+      versao: v,
+      dias: mapaHora(rd.data ?? []),
+      excecoes: mapaHora(re.data ?? []),
+      observacao: null,
+    };
   });
 
 /* ------------------------------------------------------------------ */
@@ -217,7 +246,10 @@ export const criarRascunhoHorario = createServerFn({ method: "POST" })
     qEx = unidade ? qEx.eq("unidade_id", unidade) : qEx.is("unidade_id", null);
     const { data: jaTem, error: eEx } = await qEx.maybeSingle();
     if (eEx) throw new Error(eEx.message);
-    if (jaTem) throw new Error("Já existe um rascunho aberto para este escopo. Edite ou descarte o rascunho atual.");
+    if (jaTem)
+      throw new Error(
+        "Já existe um rascunho aberto para este escopo. Edite ou descarte o rascunho atual.",
+      );
 
     let qMax = context.supabase
       .from(TAB_VER)
@@ -320,7 +352,10 @@ export const atualizarRascunhoHorario = createServerFn({ method: "POST" })
       .eq("id", v.id);
     if (error) throw new Error(error.message);
     // Mantém a vigência das linhas do rascunho alinhada com a versão.
-    await context.supabase.from(TAB_DIAS).update({ vigencia_inicio: data.vigenciaInicio }).eq("versao_id", v.id);
+    await context.supabase
+      .from(TAB_DIAS)
+      .update({ vigencia_inicio: data.vigenciaInicio })
+      .eq("versao_id", v.id);
     return { ok: true };
   });
 
@@ -342,7 +377,10 @@ const diaInput = z.object({
   versaoId: z.string().uuid(),
   diaSemana: z.number().int().min(0).max(6),
   fechado: z.boolean(),
-  faixas: z.array(z.object({ hora_inicio: z.string(), hora_fim: z.string() })).max(6).default([]),
+  faixas: z
+    .array(z.object({ hora_inicio: z.string(), hora_fim: z.string() }))
+    .max(6)
+    .default([]),
 });
 
 export const salvarDiaHorario = createServerFn({ method: "POST" })
@@ -351,7 +389,11 @@ export const salvarDiaHorario = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const v = await versaoEditavel(context.supabase, context.userId, data.versaoId);
 
-    const erros = validarDia({ dia_semana: data.diaSemana, fechado: data.fechado, faixas: data.faixas });
+    const erros = validarDia({
+      dia_semana: data.diaSemana,
+      fechado: data.fechado,
+      faixas: data.faixas,
+    });
     if (erros.length) throw new Error(erros.join(" "));
 
     const rDel = await context.supabase
@@ -434,10 +476,16 @@ export const salvarExcecaoHorario = createServerFn({ method: "POST" })
 
 export const removerExcecaoHorario = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ versaoId: z.string().uuid(), id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) =>
+    z.object({ versaoId: z.string().uuid(), id: z.string().uuid() }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     const v = await versaoEditavel(context.supabase, context.userId, data.versaoId);
-    const { error } = await context.supabase.from(TAB_EXC).delete().eq("versao_id", v.id).eq("id", data.id);
+    const { error } = await context.supabase
+      .from(TAB_EXC)
+      .delete()
+      .eq("versao_id", v.id)
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

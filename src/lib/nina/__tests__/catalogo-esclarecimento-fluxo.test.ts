@@ -45,7 +45,8 @@ describe("Nina: confirmação e encaminhamento após reformulação inconclusiva
           expect(r.requests).toHaveLength(1);
         } else expect(r.requests).toHaveLength(2);
         expect(r.ordem[0]).toBe("modelo");
-        if (etapa !== "primeiro" && etapa !== "novo_pedido") expect(JSON.stringify(r.requests[0].messages)).toContain("esclarecimento");
+        if (etapa !== "primeiro" && etapa !== "novo_pedido")
+          expect(JSON.stringify(r.requests[0].messages)).toContain("esclarecimento");
       });
     }
 });

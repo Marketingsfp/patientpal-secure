@@ -141,7 +141,11 @@ describe("Central de Atenção", () => {
 
   it("só a fila global (sem responsável) conta como não atribuída; conversas com dono não", () => {
     const filas = [
-      ...Array.from({ length: 10 }, (_, i) => ({ id: `a${i}`, atribuida_user_id: "ana", atendente_nome: "Ana" })),
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: `a${i}`,
+        atribuida_user_id: "ana",
+        atendente_nome: "Ana",
+      })),
       { id: "b", atribuida_user_id: "bia", atendente_nome: "Bia" },
       { id: "global1" },
       { id: "global2" },
@@ -204,10 +208,7 @@ describe("Central de Atenção", () => {
 
   it("não atribuídas recentes só viram prioridade quando ultrapassam dez minutos", () => {
     const entrada = {
-      naoAtribuidas: [
-        { id: "global" },
-        { id: "individual", atribuida_user_id: "ana" },
-      ],
+      naoAtribuidas: [{ id: "global" }, { id: "individual", atribuida_user_id: "ana" }],
       espera: { global: haMin(9), individual: haMin(2) },
     };
     const antes = calcularAtencao({ ...entrada, agora: AGORA });

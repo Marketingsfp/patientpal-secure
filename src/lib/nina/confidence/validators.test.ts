@@ -49,7 +49,15 @@ describe("contrato comum dos validadores", () => {
     expect(rs.length).toBe(12);
     for (const r of rs) {
       expect(typeof r.validator).toBe("string");
-      expect(["PASS", "WARNING", "FAIL", "BLOCK", "UNKNOWN", "PENDING", "NOT_APPLICABLE"]).toContain(r.status);
+      expect([
+        "PASS",
+        "WARNING",
+        "FAIL",
+        "BLOCK",
+        "UNKNOWN",
+        "PENDING",
+        "NOT_APPLICABLE",
+      ]).toContain(r.status);
       expect(r.score).toBeGreaterThanOrEqual(0);
       expect(r.score).toBeLessThanOrEqual(100);
       expect(typeof r.reasonCode).toBe("string");
@@ -99,7 +107,9 @@ describe("IntentClarityValidator", () => {
   });
 
   it("aprova intenção definida", () => {
-    const r = IntentClarityValidator(ctx({ intent: "preco_exame", requestedAction: "informar_valor" }));
+    const r = IntentClarityValidator(
+      ctx({ intent: "preco_exame", requestedAction: "informar_valor" }),
+    );
     expect(r.status).toBe("PASS");
   });
 });
@@ -114,7 +124,9 @@ describe("EntityResolutionValidator", () => {
   });
 
   it("aprova quando há candidato único", () => {
-    const r = EntityResolutionValidator(ctx({ entityCandidates: { procedimento: ["USG abdome"] } }));
+    const r = EntityResolutionValidator(
+      ctx({ entityCandidates: { procedimento: ["USG abdome"] } }),
+    );
     expect(r.status).toBe("PASS");
   });
 
@@ -156,7 +168,11 @@ describe("OfficialSourceValidator", () => {
 
   it("nota interna nunca serve de fonte para o paciente", () => {
     const r = OfficialSourceValidator(
-      ctx({ retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true, interna: true }] }),
+      ctx({
+        retrievedSources: [
+          { tipo: "catalogo_publicado", temConteudo: true, publicado: true, interna: true },
+        ],
+      }),
       ["preparo"],
     );
     expect(r.blocker).toBe("NOTA_INTERNA_COMO_FONTE");
@@ -166,7 +182,16 @@ describe("OfficialSourceValidator", () => {
 describe("SourceFreshnessValidator", () => {
   it("bloqueia fonte expirada", () => {
     const r = SourceFreshnessValidator(
-      ctx({ retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true, expiraEm: "2020-01-01" }] }),
+      ctx({
+        retrievedSources: [
+          {
+            tipo: "catalogo_publicado",
+            temConteudo: true,
+            publicado: true,
+            expiraEm: "2020-01-01",
+          },
+        ],
+      }),
       new Date("2026-01-01"),
     );
     expect(r.blocker).toBe("FONTE_NAO_VIGENTE");
@@ -175,19 +200,27 @@ describe("SourceFreshnessValidator", () => {
   it("bloqueia fonte substituída ou desativada", () => {
     expect(
       SourceFreshnessValidator(
-        ctx({ retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, substituidoPor: "v2" }] }),
+        ctx({
+          retrievedSources: [
+            { tipo: "catalogo_publicado", temConteudo: true, substituidoPor: "v2" },
+          ],
+        }),
       ).status,
     ).toBe("BLOCK");
     expect(
       SourceFreshnessValidator(
-        ctx({ retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, ativo: false }] }),
+        ctx({
+          retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, ativo: false }],
+        }),
       ).status,
     ).toBe("BLOCK");
   });
 
   it("aprova fonte vigente", () => {
     const r = SourceFreshnessValidator(
-      ctx({ retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true }] }),
+      ctx({
+        retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true }],
+      }),
     );
     expect(r.status).toBe("PASS");
   });
@@ -195,7 +228,9 @@ describe("SourceFreshnessValidator", () => {
 
 describe("ToolIntegrityValidator", () => {
   it("falha técnica bloqueia e não vira 'não temos'", () => {
-    const r = ToolIntegrityValidator(ctx({ toolResults: [tool({ success: false, erro: "timeout" })] }));
+    const r = ToolIntegrityValidator(
+      ctx({ toolResults: [tool({ success: false, erro: "timeout" })] }),
+    );
     expect(r.status).toBe("BLOCK");
     expect(r.blocker).toBe("FERRAMENTA_FALHOU");
   });
@@ -215,7 +250,13 @@ describe("ConflictValidator", () => {
     const r = ConflictValidator(
       ctx({
         conflitos: [
-          { campo: "preco_consulta", valores: [{ origem: "catalogo", valor: "150" }, { origem: "legado", valor: "180" }] },
+          {
+            campo: "preco_consulta",
+            valores: [
+              { origem: "catalogo", valor: "150" },
+              { origem: "legado", valor: "180" },
+            ],
+          },
         ],
       }),
     );
@@ -226,7 +267,13 @@ describe("ConflictValidator", () => {
     const r = ConflictValidator(
       ctx({
         conflitos: [
-          { campo: "preco_consulta", valores: [{ origem: "catalogo", valor: "150" }, { origem: "agenda", valor: "150" }] },
+          {
+            campo: "preco_consulta",
+            valores: [
+              { origem: "catalogo", valor: "150" },
+              { origem: "agenda", valor: "150" },
+            ],
+          },
         ],
       }),
     );
@@ -237,13 +284,17 @@ describe("ConflictValidator", () => {
 describe("BusinessRulesValidator", () => {
   it("regra que exige humano bloqueia", () => {
     const r = BusinessRulesValidator(
-      ctx({ regrasNegocio: [{ id: "procedimento_exige_humano", satisfeita: true, exigeHumano: true }] }),
+      ctx({
+        regrasNegocio: [{ id: "procedimento_exige_humano", satisfeita: true, exigeHumano: true }],
+      }),
     );
     expect(r.blocker).toBe("REGRA_EXIGE_HUMANO");
   });
 
   it("regra determinística não atendida bloqueia", () => {
-    const r = BusinessRulesValidator(ctx({ regrasNegocio: [{ id: "agenda_restrita", satisfeita: false }] }));
+    const r = BusinessRulesValidator(
+      ctx({ regrasNegocio: [{ id: "agenda_restrita", satisfeita: false }] }),
+    );
     expect(r.blocker).toBe("REGRA_DE_NEGOCIO_NAO_ATENDIDA");
   });
 
@@ -255,8 +306,12 @@ describe("BusinessRulesValidator", () => {
 describe("ActionRiskValidator", () => {
   it("classifica risco e exigência por ação", () => {
     expect(ActionRiskValidator(ctx()).evidence["risco"]).toBe("LOW");
-    expect(ActionRiskValidator(ctx({ requestedAction: "informar_valor" })).evidence["risco"]).toBe("MEDIUM");
-    expect(ActionRiskValidator(ctx({ requestedAction: "informar_horario" })).evidence["risco"]).toBe("HIGH");
+    expect(ActionRiskValidator(ctx({ requestedAction: "informar_valor" })).evidence["risco"]).toBe(
+      "MEDIUM",
+    );
+    expect(
+      ActionRiskValidator(ctx({ requestedAction: "informar_horario" })).evidence["risco"],
+    ).toBe("HIGH");
     const critico = ActionRiskValidator(ctx({ requestedAction: "criar_agendamento" }));
     expect(critico.evidence["risco"]).toBe("CRITICAL");
     expect(critico.evidence["minimoExigido"]).toBe(90);

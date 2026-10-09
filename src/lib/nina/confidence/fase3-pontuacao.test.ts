@@ -133,7 +133,12 @@ describe("4. só linguagem indeterminada não derruba a nota substantiva", () =>
         ...a,
         resultados: a.resultados.map((r) =>
           r.categoria === "LINGUAGEM"
-            ? { ...r, status: "UNKNOWN" as const, nota: null, motivo: "VERIFICACAO_SEMANTICA_INDISPONIVEL" }
+            ? {
+                ...r,
+                status: "UNKNOWN" as const,
+                nota: null,
+                motivo: "VERIFICACAO_SEMANTICA_INDISPONIVEL",
+              }
             : r,
         ),
         apenasLinguagemIndeterminada: ling.length > 0,
@@ -212,7 +217,13 @@ describe("7. falha de verificador não conta como evidência avaliada", () => {
     ...base,
     resultados: base.resultados.map((r) =>
       r.identificador === alvo.identificador
-        ? { ...r, status: "UNKNOWN" as const, nota: null, falhaTecnica: true, motivo: "VERIFICADOR_FALHOU" }
+        ? {
+            ...r,
+            status: "UNKNOWN" as const,
+            nota: null,
+            falhaTecnica: true,
+            motivo: "VERIFICADOR_FALHOU",
+          }
         : r,
     ),
   };

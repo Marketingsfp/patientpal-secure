@@ -35,14 +35,26 @@ export type ConfirmacaoAgendamento = {
 };
 
 /** Mesmo paciente: o cadastro grava o nome sem acento ("MOURAO" × "Mourão"). */
-function mesmoCadastro(a: ConfirmacaoAgendamento["cadastro"], b: NonNullable<ConfirmacaoAgendamento["cadastro"]>) {
+function mesmoCadastro(
+  a: ConfirmacaoAgendamento["cadastro"],
+  b: NonNullable<ConfirmacaoAgendamento["cadastro"]>,
+) {
   const nome = (v: string) => normalizar(v).replace(/\s+/g, " ");
-  return Boolean(a && a.id === b.id && a.data_nascimento === b.data_nascimento &&
-    a.telefone === b.telefone && nome(a.nome) === nome(b.nome));
+  return Boolean(
+    a &&
+    a.id === b.id &&
+    a.data_nascimento === b.data_nascimento &&
+    a.telefone === b.telefone &&
+    nome(a.nome) === nome(b.nome),
+  );
 }
 
 /** Vincula o aceite ao paciente conferido, além da vaga. Mudança exige novo resumo. */
-export function incluirPacienteNoResumo(estado: EstadoFluxoNina, clinicaId: string, cadastro: NonNullable<ConfirmacaoAgendamento["cadastro"]>) {
+export function incluirPacienteNoResumo(
+  estado: EstadoFluxoNina,
+  clinicaId: string,
+  cadastro: NonNullable<ConfirmacaoAgendamento["cadastro"]>,
+) {
   const c = confirmacaoDaEscolha(estado, clinicaId);
   if (!c || mesmoCadastro(c.cadastro, cadastro)) return;
   c.resumo_sem_paciente ??= c.resumo;
@@ -76,7 +88,7 @@ export function registrarOpcoesAgendamento(
   if (!estado || estado.appointment.appointment_id || estado.appointment.confirmation?.aceita)
     return;
   const escolha = confirmacaoDaEscolha(estado, clinicaId);
-  const preservar = escolha && vagas.some(v => mesmaVaga(v, escolha.vaga));
+  const preservar = escolha && vagas.some((v) => mesmaVaga(v, escolha.vaga));
   if (!preservar) limparEscolhaAgendamento(estado);
   estado.appointment.slot_options = estado.session_id
     ? { clinica_id: clinicaId, session_id: estado.session_id, vagas }
@@ -113,8 +125,13 @@ const PARTE_PARALELA =
  * era recusada e a Nina encaminhava sem motivo.
  */
 export function lerEscolhaHorario(texto: string): { hora: string; data: string | null } | null {
-  const partes = normalizar(texto).split(/[.!?;\n]+|,\s+|\s+e\s+(?=(?:se|meu|minha|nasci|o valor|quanto|em dinheiro|no pix|pelo pix)\b)/);
-  const t = partes.filter((p) => !PARTE_PARALELA.test(p)).join(" , ").trim();
+  const partes = normalizar(texto).split(
+    /[.!?;\n]+|,\s+|\s+e\s+(?=(?:se|meu|minha|nasci|o valor|quanto|em dinheiro|no pix|pelo pix)\b)/,
+  );
+  const t = partes
+    .filter((p) => !PARTE_PARALELA.test(p))
+    .join(" , ")
+    .trim();
   if (!t || /\b(nao|nem|talvez)\b/.test(t)) return null;
   const horas = [
     ...t.matchAll(/\b([01]?\d|2[0-3])(?:\s*:\s*([0-5]\d)|\s*h(?:\s*([0-5]\d))?)(?!\d)/g),
@@ -123,11 +140,12 @@ export function lerEscolhaHorario(texto: string): { hora: string; data: string |
   const h = horas[0]!;
   const resto = t.replace(h[0], " ");
   // Data com ano passado (ex.: nascimento sem a palavra "nasci") não é a data da consulta.
-  const data = [...resto.matchAll(/\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/(\d{4}))?)\b/g)]
-    .find((m) => {
+  const data = [...resto.matchAll(/\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/(\d{4}))?)\b/g)].find(
+    (m) => {
       const ano = m[1]!.includes("-") ? Number(m[1]!.slice(0, 4)) : m[2] ? Number(m[2]) : null;
       return ano === null || ano >= new Date().getFullYear();
-    });
+    },
+  );
   // Extrai de linguagem livre. Qualificadores que exigem interpretação
   // seguem para a ferramenta de escolha do modelo e seu resumo validado.
   if (
@@ -195,18 +213,29 @@ export function selecionarVagaValidada(
       aceita: false,
     },
   });
-  estado.flow.stage = estado.patient.identified && estado.patient.validated && estado.patient.id
-    ? "WAITING_FINAL_CONFIRMATION" : "COLLECTING_PATIENT_DATA";
+  estado.flow.stage =
+    estado.patient.identified && estado.patient.validated && estado.patient.id
+      ? "WAITING_FINAL_CONFIRMATION"
+      : "COLLECTING_PATIENT_DATA";
 }
 
 const mesmoInstante = (a: string | null | undefined, b: string) =>
   Boolean(a) && Number.isFinite(Date.parse(b)) && Date.parse(a!) === Date.parse(b);
 
 function mesmaVaga(a: VagaAgendamento, b: VagaAgendamento) {
-  return a.medico_id === b.medico_id && a.procedimento === b.procedimento &&
-    a.catalogo_id === b.catalogo_id && a.procedimento_id === b.procedimento_id && a.tipo_atendimento === b.tipo_atendimento &&
-    a.data === b.data && a.hora === b.hora && a.modalidade === b.modalidade &&
-    a.agenda_id === b.agenda_id && mesmoInstante(a.inicio, b.inicio) && mesmoInstante(a.fim, b.fim);
+  return (
+    a.medico_id === b.medico_id &&
+    a.procedimento === b.procedimento &&
+    a.catalogo_id === b.catalogo_id &&
+    a.procedimento_id === b.procedimento_id &&
+    a.tipo_atendimento === b.tipo_atendimento &&
+    a.data === b.data &&
+    a.hora === b.hora &&
+    a.modalidade === b.modalidade &&
+    a.agenda_id === b.agenda_id &&
+    mesmoInstante(a.inicio, b.inicio) &&
+    mesmoInstante(a.fim, b.fim)
+  );
 }
 
 /** A prova independente do resumo impede que um campo mutado reutilize o aceite. */
@@ -226,7 +255,12 @@ export function confirmacaoDaEscolha(
   )
     return null;
   const v = c.vaga;
-  if (!permiteReserva(v.modalidade) || a.modalidade_atendimento !== v.modalidade || a.agenda_id !== v.agenda_id) return null;
+  if (
+    !permiteReserva(v.modalidade) ||
+    a.modalidade_atendimento !== v.modalidade ||
+    a.agenda_id !== v.agenda_id
+  )
+    return null;
   return a.doctor_id === v.medico_id &&
     a.procedure === v.procedimento &&
     a.date === v.data &&
@@ -239,11 +273,13 @@ export function confirmacaoDaEscolha(
 
 export function consentimentoDaEscolha(estado: EstadoFluxoNina | undefined, clinicaId?: string) {
   const c = confirmacaoDaEscolha(estado, clinicaId);
-  if (c?.cadastro && (c.cadastro.id !== estado?.patient.id || !estado.patient.validated)) return null;
+  if (c?.cadastro && (c.cadastro.id !== estado?.patient.id || !estado.patient.validated))
+    return null;
   return c?.aceita && estado?.appointment.slot_confirmed_by_patient === true ? c : null;
 }
 
-export const LEMBRETE_CONFIRMACAO = "Você confirma os dados do resumo acima? Se estiver tudo certo, pode responder “sim, confirmo”.";
+export const LEMBRETE_CONFIRMACAO =
+  "Você confirma os dados do resumo acima? Se estiver tudo certo, pode responder “sim, confirmo”.";
 
 /** Um lembrete não substitui a prova de entrega do resumo da mesma escolha.
  * Outra resposta da Nina interrompe a sequência e exige novo resumo. */
@@ -260,7 +296,11 @@ export function resumoDaEscolhaEntregue(
     if (item?.role !== "assistant") return false;
     const texto = normalizarEntrega(item.content ?? "");
     // Único prefixo aceito: o aviso fixo da homologação ao manter o telefone.
-    if (texto === normalizarEntrega(c.resumo) || texto === normalizarEntrega(`${TELEFONE_SIMULADO}\n\n${c.resumo}`)) return true;
+    if (
+      texto === normalizarEntrega(c.resumo) ||
+      texto === normalizarEntrega(`${TELEFONE_SIMULADO}\n\n${c.resumo}`)
+    )
+      return true;
     if (texto !== LEMBRETE_CONFIRMACAO || historico[i - 1]?.role !== "user") return false;
   }
   return false;

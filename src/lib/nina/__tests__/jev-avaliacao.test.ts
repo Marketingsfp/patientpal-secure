@@ -5,7 +5,8 @@ import type { RespostaJev } from "../jev";
 
 function respostas(nivel: string, critico = 0.02, alto = 0.03): Record<string, RespostaJev> {
   const r: Record<string, RespostaJev> = {};
-  for (const d of DIMENSOES) r[`dim_${d.valor}`] = { choice: nivel, probabilities: { [nivel]: 1 }, confidence: 0.9 };
+  for (const d of DIMENSOES)
+    r[`dim_${d.valor}`] = { choice: nivel, probabilities: { [nivel]: 1 }, confidence: 0.9 };
   r.erro_critico = { noul: critico };
   r.erro_alto = { noul: alto };
   return r;

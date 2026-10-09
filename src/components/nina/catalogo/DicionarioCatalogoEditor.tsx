@@ -119,8 +119,9 @@ export function DicionarioCatalogoEditor({
         exames diferentes equivalentes.
       </p>
       <p className="text-xs text-muted-foreground">
-        Pesquisa na web ao gerar, sem teto de chamadas definido pelo sistema e com cobrança de IA/pesquisa. A internet ajuda a
-        descobrir nomes; valores, preparo e regras continuam vindo do cadastro da clínica.
+        Pesquisa na web ao gerar, sem teto de chamadas definido pelo sistema e com cobrança de
+        IA/pesquisa. A internet ajuda a descobrir nomes; valores, preparo e regras continuam vindo
+        do cadastro da clínica.
       </p>
       <div className="space-y-1">
         <Label htmlFor={id}>Variações revisadas · uma por linha</Label>
@@ -256,8 +257,8 @@ export function DicionarioCatalogoEditor({
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        As sugestões não são salvas automaticamente. A Maria consulta as variações revisadas
-        dos registros publicados quando a fonte selecionada é a Base de conhecimento.
+        As sugestões não são salvas automaticamente. A Maria consulta as variações revisadas dos
+        registros publicados quando a fonte selecionada é a Base de conhecimento.
       </p>
     </section>
   );

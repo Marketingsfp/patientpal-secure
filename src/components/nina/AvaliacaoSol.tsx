@@ -84,29 +84,50 @@ function Relatorio({ r }: { r: RelatorioAuditoria }) {
       <Lista titulo="Perguntas desnecessárias" itens={r.perguntas_desnecessarias ?? []} />
       <Lista
         titulo="Perguntas repetidas"
-        itens={(r.perguntas_repetidas ?? []).map((p) => `${p.pergunta} — já informado: ${p.ja_informado || "—"}`)}
+        itens={(r.perguntas_repetidas ?? []).map(
+          (p) => `${p.pergunta} — já informado: ${p.ja_informado || "—"}`,
+        )}
       />
-      {r.seguranca_medica ? <p className="text-xs"><strong>Segurança médica:</strong> {r.seguranca_medica}</p> : null}
+      {r.seguranca_medica ? (
+        <p className="text-xs">
+          <strong>Segurança médica:</strong> {r.seguranca_medica}
+        </p>
+      ) : null}
       {ef && (ef.mensagens != null || ef.comentario) ? (
         <p className="text-xs">
-          <strong>Eficiência:</strong>{" "}
-          {ef.mensagens != null ? `${ef.mensagens} mensagens` : ""}
+          <strong>Eficiência:</strong> {ef.mensagens != null ? `${ef.mensagens} mensagens` : ""}
           {ef.ideal != null ? `, poderia ser ~${ef.ideal}` : ""}
           {ef.comentario ? `. ${ef.comentario}` : ""}
         </p>
       ) : null}
       {r.resultado_contato ? (
-        <p className="text-xs"><strong>Resultado do contato:</strong> {ROTULO_RESULTADO_CONTATO[r.resultado_contato] ?? r.resultado_contato}</p>
+        <p className="text-xs">
+          <strong>Resultado do contato:</strong>{" "}
+          {ROTULO_RESULTADO_CONTATO[r.resultado_contato] ?? r.resultado_contato}
+        </p>
       ) : null}
-      {r.possivel_abandono ? <p className="text-xs"><strong>Possível causa de abandono:</strong> {r.possivel_abandono}</p> : null}
+      {r.possivel_abandono ? (
+        <p className="text-xs">
+          <strong>Possível causa de abandono:</strong> {r.possivel_abandono}
+        </p>
+      ) : null}
       {r.melhor_resposta ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Melhor resposta possível</h4>
+          <h4 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+            Melhor resposta possível
+          </h4>
           <p className="whitespace-pre-wrap rounded bg-muted p-2 text-xs">{r.melhor_resposta}</p>
         </div>
       ) : null}
-      {r.aprendizado ? <p className="text-xs"><strong>Aprendizado:</strong> {r.aprendizado}</p> : null}
-      <Lista titulo="Novas regras sugeridas (aguardam aprovação)" itens={r.regras_sugeridas ?? []} />
+      {r.aprendizado ? (
+        <p className="text-xs">
+          <strong>Aprendizado:</strong> {r.aprendizado}
+        </p>
+      ) : null}
+      <Lista
+        titulo="Novas regras sugeridas (aguardam aprovação)"
+        itens={r.regras_sugeridas ?? []}
+      />
     </div>
   );
 }
@@ -159,7 +180,9 @@ function Avaliacao({ a }: { a: any }) {
           Achados com evidência
         </h4>
         {achados.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Nenhum problema com evidência foi apontado.</p>
+          <p className="text-xs text-muted-foreground">
+            Nenhum problema com evidência foi apontado.
+          </p>
         ) : (
           <ul className="space-y-2">
             {achados.map((c, i) => (
@@ -196,7 +219,9 @@ function Avaliacao({ a }: { a: any }) {
         )}
       </div>
 
-      {a.evidencias?.auditoria ? <Relatorio r={a.evidencias.auditoria as RelatorioAuditoria} /> : null}
+      {a.evidencias?.auditoria ? (
+        <Relatorio r={a.evidencias.auditoria as RelatorioAuditoria} />
+      ) : null}
 
       {lacunas.length > 0 && (
         <div>
@@ -267,12 +292,7 @@ export function AvaliacaoSol({ clinicaId, leadId, podeAvaliar }: Props) {
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={!leadId}
-        onClick={() => setAberto(true)}
-      >
+      <Button size="sm" variant="outline" disabled={!leadId} onClick={() => setAberto(true)}>
         <Gavel className="mr-1 h-3.5 w-3.5" /> Avaliar com Opus 5.5
       </Button>
 
@@ -316,7 +336,9 @@ export function AvaliacaoSol({ clinicaId, leadId, podeAvaliar }: Props) {
           </div>
 
           {rodando && (
-            <p className="text-sm text-muted-foreground">Analisando as evidências desta conversa…</p>
+            <p className="text-sm text-muted-foreground">
+              Analisando as evidências desta conversa…
+            </p>
           )}
 
           {atual ? (
@@ -343,7 +365,8 @@ export function AvaliacaoSol({ clinicaId, leadId, podeAvaliar }: Props) {
                       className="w-full rounded border p-2 text-left text-xs hover:bg-muted"
                     >
                       {new Date(h.created_at).toLocaleString("pt-BR")} ·{" "}
-                      {ROTULO_RESULTADO[h.resultado as Resultado] ?? h.status} · {h.score ?? "—"}/100
+                      {ROTULO_RESULTADO[h.resultado as Resultado] ?? h.status} · {h.score ?? "—"}
+                      /100
                     </button>
                   </li>
                 ))}

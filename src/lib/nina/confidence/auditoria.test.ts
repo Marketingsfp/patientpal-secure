@@ -54,10 +54,23 @@ describe("auditoria da confiabilidade", () => {
       intencao: "preco",
       acaoSolicitada: "informar_valor",
       ferramentas: [
-        { nome: "buscar_procedimentos", capacidade: "searchKnowledgeBase", fonte: "catalogo", success: true },
-        { nome: "consultar_disponibilidade", capacidade: "checkAvailability", fonte: "agenda", success: false, erro: "timeout" },
+        {
+          nome: "buscar_procedimentos",
+          capacidade: "searchKnowledgeBase",
+          fonte: "catalogo",
+          success: true,
+        },
+        {
+          nome: "consultar_disponibilidade",
+          capacidade: "checkAvailability",
+          fonte: "agenda",
+          success: false,
+          erro: "timeout",
+        },
       ],
-      fontes: [{ tipo: "catalogo_publicado", referencia: "873", publicado: true, temConteudo: true }],
+      fontes: [
+        { tipo: "catalogo_publicado", referencia: "873", publicado: true, temConteudo: true },
+      ],
     });
 
     expect(r.conversationId).toBe("c1");
@@ -102,7 +115,9 @@ describe("auditoria da confiabilidade", () => {
   it("gera linhas ✓/✕ legíveis para o painel", () => {
     const r = montarRegistroAuditoria(base, {
       ferramentas: [{ nome: "consultar_disponibilidade", success: false, erro: "timeout" }],
-      fontes: [{ tipo: "catalogo_publicado", referencia: "873", publicado: true, temConteudo: true }],
+      fontes: [
+        { tipo: "catalogo_publicado", referencia: "873", publicado: true, temConteudo: true },
+      ],
     });
     const linhas = linhasConfiabilidade(r);
     const oficial = linhas.find((l) => l.rotulo === "Fonte oficial encontrada");
@@ -115,7 +130,12 @@ describe("auditoria da confiabilidade", () => {
 
   it("mantém os bloqueadores encontrados", () => {
     const r = montarRegistroAuditoria(
-      { ...base, decision: "HANDOFF", hardBlockers: ["SOURCE_CONFLICT"], blockers: ["CONFLITO_DE_FONTE"] },
+      {
+        ...base,
+        decision: "HANDOFF",
+        hardBlockers: ["SOURCE_CONFLICT"],
+        blockers: ["CONFLITO_DE_FONTE"],
+      },
       {},
     );
     expect(r.bloqueadores).toContain("SOURCE_CONFLICT");

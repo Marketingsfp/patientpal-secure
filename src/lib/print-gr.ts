@@ -1216,8 +1216,7 @@ async function printGuiaAtendimentoCore({
       // que zero), não o Repasse Padrão — mesma regra de @/lib/repasse-calc.
       if (colValor == null && colPercentual == null) {
         const pv = conv?.tipo_repasse === "valor" ? valorCelulaRepasse(conv.valor) : null;
-        const pp =
-          conv?.tipo_repasse === "percentual" ? valorCelulaRepasse(conv.percentual) : null;
+        const pp = conv?.tipo_repasse === "percentual" ? valorCelulaRepasse(conv.percentual) : null;
         if (pv != null && pv > 0) colValor = pv;
         else if (pp != null && pp > 0) colPercentual = pp;
       }

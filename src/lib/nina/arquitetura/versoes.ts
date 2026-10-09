@@ -55,24 +55,23 @@ const SNAPSHOT_ATUAL = assinaturaAtual();
 const IDS_FINALIZACAO = new Set(["response.templates", "response.finalize"]);
 
 /** Foto estrutural da versão 4 (antes da finalização única entrar no mapa). */
-const SNAPSHOT_V4: AssinaturaNode[] = SNAPSHOT_V5.filter(
-  (n) => !IDS_FINALIZACAO.has(n.id),
-).map((n) =>
-  n.id === "llm.generate"
-    ? {
-        ...n,
-        anteriores: n.anteriores.filter((a) => !IDS_FINALIZACAO.has(a)),
-        seguintes: n.seguintes
-          .filter((sg) => !IDS_FINALIZACAO.has(sg))
-          .concat("response.validate"),
-      }
-    : n.id === "response.validate"
-      ? { ...n, anteriores: ["llm.generate"] }
-      : {
+const SNAPSHOT_V4: AssinaturaNode[] = SNAPSHOT_V5.filter((n) => !IDS_FINALIZACAO.has(n.id)).map(
+  (n) =>
+    n.id === "llm.generate"
+      ? {
           ...n,
           anteriores: n.anteriores.filter((a) => !IDS_FINALIZACAO.has(a)),
-          seguintes: n.seguintes.filter((sg) => !IDS_FINALIZACAO.has(sg)),
-        },
+          seguintes: n.seguintes
+            .filter((sg) => !IDS_FINALIZACAO.has(sg))
+            .concat("response.validate"),
+        }
+      : n.id === "response.validate"
+        ? { ...n, anteriores: ["llm.generate"] }
+        : {
+            ...n,
+            anteriores: n.anteriores.filter((a) => !IDS_FINALIZACAO.has(a)),
+            seguintes: n.seguintes.filter((sg) => !IDS_FINALIZACAO.has(sg)),
+          },
 );
 
 /** IDs acrescentados na versão 4 (infraestrutura de homologação). */
@@ -89,13 +88,13 @@ const IDS_HOMOLOGACAO = new Set([
 ]);
 
 /** Foto estrutural da versão 3 (antes de a homologação entrar no mapa). */
-const SNAPSHOT_V3: AssinaturaNode[] = SNAPSHOT_V4.filter(
-  (n) => !IDS_HOMOLOGACAO.has(n.id),
-).map((n) => ({
-  ...n,
-  anteriores: n.anteriores.filter((a) => !IDS_HOMOLOGACAO.has(a)),
-  seguintes: n.seguintes.filter((s) => !IDS_HOMOLOGACAO.has(s)),
-}));
+const SNAPSHOT_V3: AssinaturaNode[] = SNAPSHOT_V4.filter((n) => !IDS_HOMOLOGACAO.has(n.id)).map(
+  (n) => ({
+    ...n,
+    anteriores: n.anteriores.filter((a) => !IDS_HOMOLOGACAO.has(a)),
+    seguintes: n.seguintes.filter((s) => !IDS_HOMOLOGACAO.has(s)),
+  }),
+);
 
 /**
  * Foto estrutural da versão 2 (antes de a montagem do prompt passar a ler as
@@ -115,7 +114,6 @@ const SNAPSHOT_V2: AssinaturaNode[] = SNAPSHOT_V3.filter(
       ? { ...n, seguintes: n.seguintes.filter((s) => s !== "instructions.published") }
       : n,
 );
-
 
 /**
  * Versões já registradas, da mais antiga para a mais recente.
@@ -219,7 +217,6 @@ export const HISTORICO_ARQUITETURA: VersaoArquitetura[] = [
   },
 ];
 
-
 export function versaoPorNumero(versao: number): VersaoArquitetura | undefined {
   return HISTORICO_ARQUITETURA.find((v) => v.versao === versao);
 }
@@ -249,10 +246,7 @@ export function conexoesDe(snapshot: AssinaturaNode[]): Conexao[] {
   return saida;
 }
 
-export function diffConexoes(
-  anterior: AssinaturaNode[],
-  atual: AssinaturaNode[],
-): DiffConexoes {
+export function diffConexoes(anterior: AssinaturaNode[], atual: AssinaturaNode[]): DiffConexoes {
   const antes = new Set(conexoesDe(anterior).map((c) => `${c.de}→${c.para}`));
   const depois = new Set(conexoesDe(atual).map((c) => `${c.de}→${c.para}`));
   const parse = (chave: string): Conexao => {
@@ -281,10 +275,7 @@ function nomeDe(id: string): string {
   return nodePorId(id)?.nome ?? id;
 }
 
-export function compararVersoes(
-  de: VersaoArquitetura,
-  para: VersaoArquitetura,
-): ComparacaoVersoes {
+export function compararVersoes(de: VersaoArquitetura, para: VersaoArquitetura): ComparacaoVersoes {
   const nodes = calcularDiffArquitetura(de.snapshot, para.snapshot);
   const conexoes = diffConexoes(de.snapshot, para.snapshot);
   const ids = new Set<string>([

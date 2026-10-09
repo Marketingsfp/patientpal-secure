@@ -6,10 +6,13 @@ let motivo = "Encaminhamento solicitado";
 let teste = false;
 let geracoes = 0;
 let rede = 0;
-globalThis.fetch = Object.assign(async () => {
-  rede++;
-  throw new Error("Rede proibida nesta simulação");
-}, { preconnect: () => {} });
+globalThis.fetch = Object.assign(
+  async () => {
+    rede++;
+    throw new Error("Rede proibida nesta simulação");
+  },
+  { preconnect: () => {} },
+);
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from(tabela: string) {
@@ -17,15 +20,24 @@ mock.module("@/integrations/supabase/client.server", () => ({
       const filtros: Record<string, unknown> = {};
       const q = {
         select: () => q,
-        eq: (campo: string, valor: unknown) => { filtros[campo] = valor; return q; },
+        eq: (campo: string, valor: unknown) => {
+          filtros[campo] = valor;
+          return q;
+        },
         maybeSingle: async () => {
           assert.deepEqual(filtros, { id: "conversa", clinica_id: "clinica" });
-          return { error: null, data: {
-            handoff_em: "2026-09-19T12:00:00Z", handoff_motivo: motivo,
-            handoff_resumo: { avisar_paciente: false },
-            nina_fluxo_estado: { session_id: "sessao" },
-            is_teste: teste, departamento_id: null, contato_nome: "Paciente fictício",
-          } };
+          return {
+            error: null,
+            data: {
+              handoff_em: "2026-09-19T12:00:00Z",
+              handoff_motivo: motivo,
+              handoff_resumo: { avisar_paciente: false },
+              nina_fluxo_estado: { session_id: "sessao" },
+              is_teste: teste,
+              departamento_id: null,
+              contato_nome: "Paciente fictício",
+            },
+          };
         },
       };
       return q;
@@ -39,10 +51,17 @@ mock.module("@/integrations/supabase/client.server", () => ({
   },
 }));
 mock.module("@/lib/atendimento/mensagem-handoff.server", () => ({
-  gerarMensagemHandoff: async () => { geracoes++; throw new Error("Encaminhamento silencioso não deve gerar aviso"); },
+  gerarMensagemHandoff: async () => {
+    geracoes++;
+    throw new Error("Encaminhamento silencioso não deve gerar aviso");
+  },
 }));
-const { protocoloAoIniciarHandoff, protocoloAoAtribuirHumano, anunciarHandoffAoPaciente, prepararAvisoHandoff } =
-  await import("@/lib/atendimento/protocolo-atendimento.server");
+const {
+  protocoloAoIniciarHandoff,
+  protocoloAoAtribuirHumano,
+  anunciarHandoffAoPaciente,
+  prepararAvisoHandoff,
+} = await import("@/lib/atendimento/protocolo-atendimento.server");
 const args = { clinicaId: "clinica", conversaId: "conversa", protocolo: "TESTE-1" };
 let cenarios = 0;
 for (teste of [false, true]) {

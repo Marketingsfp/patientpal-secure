@@ -132,9 +132,24 @@ describe("Fase 5 — métricas", () => {
   it("calcula percentuais, latência, tokens e contagens", () => {
     const m = agregarMetricas([
       registro(),
-      registro({ thinking_level: "medium", latency_ms: 300, knowledge_status: "found", tool_calls: ["agendar"] }),
-      registro({ thinking_level: "high", latency_ms: 900, knowledge_status: "not_found", handoff: true }),
-      registro({ success: false, error_category: "timeout", retries: 2, knowledge_status: "conflict" }),
+      registro({
+        thinking_level: "medium",
+        latency_ms: 300,
+        knowledge_status: "found",
+        tool_calls: ["agendar"],
+      }),
+      registro({
+        thinking_level: "high",
+        latency_ms: 900,
+        knowledge_status: "not_found",
+        handoff: true,
+      }),
+      registro({
+        success: false,
+        error_category: "timeout",
+        retries: 2,
+        knowledge_status: "conflict",
+      }),
     ]);
     expect(m.total).toBe(4);
     expect(m.pct_low).toBe(50);

@@ -79,7 +79,13 @@ describe("métricas de confiabilidade", () => {
   it("agrupa por tipo, dia da semana e período de operação", () => {
     const m = calcularMetricasConfiabilidade([
       linha({ categorias: ["exame"], score: 90, dia_semana: 6, periodo: "FORA_DO_HORARIO" }),
-      linha({ categorias: ["exame"], score: 70, dia_semana: 6, periodo: "FORA_DO_HORARIO", nivel: "LOW" }),
+      linha({
+        categorias: ["exame"],
+        score: 70,
+        dia_semana: 6,
+        periodo: "FORA_DO_HORARIO",
+        nivel: "LOW",
+      }),
       linha({ categorias: ["consulta"], score: 100, dia_semana: 1, periodo: "DENTRO_DO_HORARIO" }),
     ]);
     const exame = m.porTipoAtendimento.find((t) => t.chave === "exame");
@@ -92,7 +98,12 @@ describe("métricas de confiabilidade", () => {
     const m = calcularMetricasConfiabilidade(
       [
         linha({ score: 95, conversation_id: "c1", created_at: "2026-09-01T10:00:00.000Z" }),
-        linha({ score: 60, conversation_id: "c2", created_at: "2026-09-01T10:00:00.000Z", nivel: "LOW" }),
+        linha({
+          score: 60,
+          conversation_id: "c2",
+          created_at: "2026-09-01T10:00:00.000Z",
+          nivel: "LOW",
+        }),
       ],
       [
         { id: "e1", conversa_id: "c2", created_at: "2026-09-01T12:00:00.000Z", categoria: "valor" },

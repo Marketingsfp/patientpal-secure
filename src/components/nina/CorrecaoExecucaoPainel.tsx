@@ -6,10 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { ResumoExecucao } from "@/lib/nina/correcao-executor";
 import { ETAPAS_EXECUCAO, ROTULO_ETAPA, type EtapaExecucao } from "@/lib/nina/correcao-prontidao";
-import {
-  ROTULO_RESULTADO_FINAL,
-  type ResultadoFinalExecucao,
-} from "@/lib/nina/correcao-limites";
+import { ROTULO_RESULTADO_FINAL, type ResultadoFinalExecucao } from "@/lib/nina/correcao-limites";
 import type { RelatorioCorrecao } from "@/lib/nina/correcao-relatorio";
 import { CorrecaoRelatorioCard } from "./CorrecaoRelatorioCard";
 
@@ -96,7 +93,8 @@ export function CorrecaoExecucaoPainel({
 
       {verificacao && (
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Conferência:</span> {verificacao.alvo} — {verificacao.motivo}
+          <span className="font-medium">Conferência:</span> {verificacao.alvo} —{" "}
+          {verificacao.motivo}
         </p>
       )}
 

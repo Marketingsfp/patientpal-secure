@@ -7,7 +7,10 @@ export function handoffSemAviso(resumo: unknown, motivoLegado = ""): boolean {
   // Compatibilidade somente para ciclos já gravados antes desta opção existir.
   // Todo novo handoff grava true/false e nunca passa por esta interpretação.
   return /\bprofissional[_\s]+(?:e\s+)?sfp\b/.test(
-    motivoLegado.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+    motivoLegado
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""),
   );
 }
 

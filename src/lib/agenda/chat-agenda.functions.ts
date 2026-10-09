@@ -83,11 +83,13 @@ export const catalogoAgendaChat = createServerFn({ method: "POST" })
         tipo: string | null;
         duracao_minutos: number | null;
       }>,
-      medicos: ((med.data ?? []) as Array<{
-        id: string;
-        nome: string;
-        especialidade_id: string | null;
-      }>).map((m) => ({ ...m, ordem_chegada: ordemChegada.has(m.id) })),
+      medicos: (
+        (med.data ?? []) as Array<{
+          id: string;
+          nome: string;
+          especialidade_id: string | null;
+        }>
+      ).map((m) => ({ ...m, ordem_chegada: ordemChegada.has(m.id) })),
       especialidades: (esp.data ?? []) as Array<{ id: string; nome: string }>,
     };
   });
@@ -233,23 +235,31 @@ export const proximaVagaChat = createServerFn({ method: "POST" })
       .limit(2000);
     if (data.medicoId) q = q.eq("medico_id", data.medicoId);
     const { data: rows } = await q;
-    const livres = ((rows ?? []) as Array<{
-      medico_id: string | null;
-      inicio: string;
-      fim: string;
-      paciente_nome: string | null;
-    }>).filter((r) => normalizar(r.paciente_nome ?? "") === "disponivel");
+    const livres = (
+      (rows ?? []) as Array<{
+        medico_id: string | null;
+        inicio: string;
+        fim: string;
+        paciente_nome: string | null;
+      }>
+    ).filter((r) => normalizar(r.paciente_nome ?? "") === "disponivel");
 
     if (data.medicoId) {
       const p = livres[0];
       return p
-        ? { data: dataBRISO(p.inicio), hora: horaBR(p.inicio), inicio: p.inicio, medico_id: p.medico_id }
+        ? {
+            data: dataBRISO(p.inicio),
+            hora: horaBR(p.inicio),
+            inicio: p.inicio,
+            medico_id: p.medico_id,
+          }
         : null;
     }
     // Sem médico definido: primeira vaga de cada profissional (para "ver outros").
     const porMedico = new Map<string, { inicio: string }>();
     for (const l of livres) {
-      if (l.medico_id && !porMedico.has(l.medico_id)) porMedico.set(l.medico_id, { inicio: l.inicio });
+      if (l.medico_id && !porMedico.has(l.medico_id))
+        porMedico.set(l.medico_id, { inicio: l.inicio });
     }
     const ids = [...porMedico.keys()];
     const { data: meds } = await context.supabase
@@ -276,9 +286,7 @@ export const proximaVagaChat = createServerFn({ method: "POST" })
 export const buscarPacientesChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z
-      .object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(2).max(120) })
-      .parse(d),
+    z.object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(2).max(120) }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const digitos = data.termo.replace(/\D/g, "");

@@ -10,9 +10,7 @@ import { normalizarEstado } from "./fluxo-estado-normalizar";
 
 export const FLAG_NINA_ENCERRAMENTO_AUTOMATICO = "nina_encerramento_automatico_enabled";
 
-export async function flagEncerramentoAutomaticoAtiva(
-  clinicaId: string | null,
-): Promise<boolean> {
+export async function flagEncerramentoAutomaticoAtiva(clinicaId: string | null): Promise<boolean> {
   if (!clinicaId) return false;
   const { data, error } = await supabaseAdmin
     .from("clinica_feature_flags")
@@ -67,7 +65,9 @@ export async function avaliarEncerramentoAutomatico(args: {
     .eq("id", conv.id)
     .eq("clinica_id", args.clinicaId)
     .maybeSingle();
-  const estado = normalizarEstado((data as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null);
+  const estado = normalizarEstado(
+    (data as { nina_fluxo_estado?: unknown } | null)?.nina_fluxo_estado ?? null,
+  );
 
   const decisao = decidirEncerramento({
     mensagemPaciente: args.mensagemPaciente,

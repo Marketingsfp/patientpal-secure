@@ -4,7 +4,11 @@
  * Sem publicação: usa a versão publicada vigente (conteúdo da v6 restaurado).
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { garantirLeads, processarMensagemTeste, resetarLeadTeste } from "@/lib/nina/teste-console.server";
+import {
+  garantirLeads,
+  processarMensagemTeste,
+  resetarLeadTeste,
+} from "@/lib/nina/teste-console.server";
 
 const clinicaId = process.argv[2] ?? "";
 const admin = supabaseAdmin as any;

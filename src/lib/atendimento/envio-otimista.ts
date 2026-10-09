@@ -143,7 +143,10 @@ function temEquivalenteReal(otimista: any, lista: any[]): boolean {
     if (iguais.length === 0) {
       // Continua valendo a comparação antiga apenas para linhas SEM
       // identificador (mensagens gravadas antes desta fase).
-      return paridadePorTexto(otimista, lista.filter((m) => !m?.client_message_id));
+      return paridadePorTexto(
+        otimista,
+        lista.filter((m) => !m?.client_message_id),
+      );
     }
   }
   return paridadePorTexto(otimista, lista);

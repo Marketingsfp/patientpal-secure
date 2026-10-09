@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  decidirScroll,
-  pertoDoFim,
-  type PosicaoScroll,
-} from "@/lib/atendimento/scroll-chat";
+import { decidirScroll, pertoDoFim, type PosicaoScroll } from "@/lib/atendimento/scroll-chat";
 
 /**
  * Mantém o chat de atendimento no comportamento de app de mensagens:
@@ -146,4 +142,3 @@ export function useChatScroll(args: {
 
   return { containerRef, ancoraRef, novas, irParaFim, encerrarAbertura };
 }
-

@@ -23,17 +23,11 @@ describe("carnê da São Francisco de Paula", () => {
       parcela(1, "pago"),
       ...Array.from({ length: 11 }, (_, i) => parcela(i + 2)),
     ]);
-    expect(itens.map((p) => p.rotulo)).toEqual(
-      Array.from({ length: 12 }, (_, i) => `${i + 1}/12`),
-    );
+    expect(itens.map((p) => p.rotulo)).toEqual(Array.from({ length: 12 }, (_, i) => `${i + 1}/12`));
   });
 
   it("mantém N pelo maior número quando uma parcela foi cancelada", () => {
-    const itens = parcelasCarneSaoFrancisco([
-      parcela(1, "cancelado"),
-      parcela(2),
-      parcela(3),
-    ]);
+    const itens = parcelasCarneSaoFrancisco([parcela(1, "cancelado"), parcela(2), parcela(3)]);
     expect(itens.map((p) => p.rotulo)).toEqual(["2/3", "3/3"]);
   });
 

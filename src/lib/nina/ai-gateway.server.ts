@@ -97,7 +97,8 @@ export async function ninaAIGateway(pedido: PedidoNina): Promise<RespostaNina> {
   const nivel =
     pedido.nivelForcado ?? nivelNaoRegride(decisao.nivel, pedido.raciocinio?.nivelAnterior);
 
-  const temperatura = pedido.perfil === "whatsapp" ? await lerTemperaturaNina(pedido.clinicaId) : null;
+  const temperatura =
+    pedido.perfil === "whatsapp" ? await lerTemperaturaNina(pedido.clinicaId) : null;
   const opcoes: OpcoesChamada = {
     ...(temperatura ? { temperature: temperatura.temperatura } : {}),
     timeoutMs:

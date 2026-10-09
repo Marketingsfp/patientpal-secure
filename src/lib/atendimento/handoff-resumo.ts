@@ -134,7 +134,11 @@ export function textoCorrido(v: unknown, max = 6000): string | null {
  */
 export function paragrafosDoResumo(r: ResumoHandoff): string[] {
   const corrido = textoCorrido(r.texto_resumo);
-  if (corrido) return corrido.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (corrido)
+    return corrido
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
   return blocosVisiveis(r).map((b) => `${b.titulo}: ${b.itens.join("; ")}`);
 }
 
@@ -238,10 +242,19 @@ export type ConteudoDoResumo =
  * O que o cartão mostra: texto corrido nos resumos novos; campos "rotulo: valor" (compactos, como
  * o restante do cartao) nos resumos antigos. O protocolo pode ser omitido quando o cartao ja o mostra.
  */
-export function conteudoDoResumo(r: ResumoHandoff, opcoes?: { omitirProtocolo?: boolean }): ConteudoDoResumo {
+export function conteudoDoResumo(
+  r: ResumoHandoff,
+  opcoes?: { omitirProtocolo?: boolean },
+): ConteudoDoResumo {
   const corrido = textoCorrido(r.texto_resumo);
   if (corrido) {
-    return { tipo: "texto", paragrafos: corrido.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) };
+    return {
+      tipo: "texto",
+      paragrafos: corrido
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    };
   }
   return {
     tipo: "campos",

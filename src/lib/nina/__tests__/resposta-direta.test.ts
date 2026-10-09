@@ -7,7 +7,9 @@ describe("Nina sem motor — geração real com dependências externas simuladas
     it(`${ambiente}: interpreta, consulta a base e responde sem avaliador adicional`, () => {
       const p = Bun.spawnSync([process.execPath, fixture, ambiente], {
         cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
-        stdout: "pipe", stderr: "pipe", timeout: 15_000,
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 15_000,
       });
       const output = p.stdout.toString();
       expect(p.exitCode, output + p.stderr.toString()).toBe(0);

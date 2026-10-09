@@ -22,7 +22,14 @@ const cal = (o: Partial<CalendarioPublicado> = {}): CalendarioPublicado => ({
   unidade_id: o.unidade_id ?? null,
   dias: o.dias ?? [
     // segunda: manhã + tarde (intervalo de almoço entre as faixas)
-    { dia_semana: 1, fechado: false, faixas: [{ hora_inicio: "08:00", hora_fim: "12:00" }, { hora_inicio: "13:00", hora_fim: "18:00" }] },
+    {
+      dia_semana: 1,
+      fechado: false,
+      faixas: [
+        { hora_inicio: "08:00", hora_fim: "12:00" },
+        { hora_inicio: "13:00", hora_fim: "18:00" },
+      ],
+    },
     // terça: fechado explicitamente
     { dia_semana: 2, fechado: true, faixas: [] },
     // quarta: contínuo
@@ -31,7 +38,10 @@ const cal = (o: Partial<CalendarioPublicado> = {}): CalendarioPublicado => ({
   excecoes: o.excecoes ?? [],
 });
 
-const classificar = (em: string | null, extra: Partial<Parameters<typeof classificarPeriodo>[0]> = {}) =>
+const classificar = (
+  em: string | null,
+  extra: Partial<Parameters<typeof classificarPeriodo>[0]> = {},
+) =>
   classificarPeriodo({
     em,
     escopo: { clinica_id: "clinica-A", unidade_id: null },
@@ -90,19 +100,33 @@ describe("Classificador de período — exceções e vigência", () => {
   });
 
   it("exceção especial define o horário daquela data", () => {
-    const c = cal({ excecoes: [{ data: "2026-03-02", tipo: "especial", hora_inicio: "09:00", hora_fim: "11:00" }] });
+    const c = cal({
+      excecoes: [{ data: "2026-03-02", tipo: "especial", hora_inicio: "09:00", hora_fim: "11:00" }],
+    });
     const base = { escopo: { clinica_id: "clinica-A" }, calendarios: [c] };
-    expect(classificarPeriodo({ em: "2026-03-02T13:00:00Z", ...base }).classificacao).toBe("DENTRO_DO_HORARIO"); // 10:00
-    expect(classificarPeriodo({ em: "2026-03-02T18:00:00Z", ...base }).motivo).toBe("excecao_especial_fora"); // 15:00
+    expect(classificarPeriodo({ em: "2026-03-02T13:00:00Z", ...base }).classificacao).toBe(
+      "DENTRO_DO_HORARIO",
+    ); // 10:00
+    expect(classificarPeriodo({ em: "2026-03-02T18:00:00Z", ...base }).motivo).toBe(
+      "excecao_especial_fora",
+    ); // 15:00
   });
 
   it("usa a versão que valia na data do evento", () => {
-    const v1 = cal({ versao_id: "v1", versao: 1, status: "substituido", vigencia_inicio: "2026-01-01", vigencia_fim: "2026-05-31" });
+    const v1 = cal({
+      versao_id: "v1",
+      versao: 1,
+      status: "substituido",
+      vigencia_inicio: "2026-01-01",
+      vigencia_fim: "2026-05-31",
+    });
     const v2 = cal({
       versao_id: "v2",
       versao: 2,
       vigencia_inicio: "2026-06-01",
-      dias: [{ dia_semana: 1, fechado: false, faixas: [{ hora_inicio: "13:00", hora_fim: "19:00" }] }],
+      dias: [
+        { dia_semana: 1, fechado: false, faixas: [{ hora_inicio: "13:00", hora_fim: "19:00" }] },
+      ],
     });
     const base = { escopo: { clinica_id: "clinica-A" }, calendarios: [v1, v2] };
     const antigo = classificarPeriodo({ em: "2026-03-02T13:00:00Z", ...base }); // 10:00, segunda
@@ -115,19 +139,31 @@ describe("Classificador de período — exceções e vigência", () => {
 
   it("evento anterior a qualquer versão não é classificável", () => {
     const c = cal({ vigencia_inicio: "2026-06-01" });
-    const r = classificarPeriodo({ em: "2026-03-02T13:00:00Z", escopo: { clinica_id: "clinica-A" }, calendarios: [c] });
+    const r = classificarPeriodo({
+      em: "2026-03-02T13:00:00Z",
+      escopo: { clinica_id: "clinica-A" },
+      calendarios: [c],
+    });
     expect(r.motivo).toBe("sem_versao_para_a_data");
     expect(r.classificacao).toBe("NAO_CLASSIFICAVEL");
   });
 
   it("sem calendário publicado é não classificável", () => {
-    const r = classificarPeriodo({ em: "2026-03-02T13:00:00Z", escopo: { clinica_id: "clinica-A" }, calendarios: [] });
+    const r = classificarPeriodo({
+      em: "2026-03-02T13:00:00Z",
+      escopo: { clinica_id: "clinica-A" },
+      calendarios: [],
+    });
     expect(r.motivo).toBe("sem_calendario_publicado");
   });
 
   it("rascunho (sem publicação) não classifica", () => {
     const rascunho = cal({ publicado_em: null });
-    const r = classificarPeriodo({ em: "2026-03-02T13:00:00Z", escopo: { clinica_id: "clinica-A" }, calendarios: [rascunho] });
+    const r = classificarPeriodo({
+      em: "2026-03-02T13:00:00Z",
+      escopo: { clinica_id: "clinica-A" },
+      calendarios: [rascunho],
+    });
     expect(r.motivo).toBe("sem_calendario_publicado");
   });
 });
@@ -137,11 +173,19 @@ describe("Classificador de período — fuso e escopo", () => {
     const local = instanteLocal("2026-03-02T02:00:00Z", "America/Sao_Paulo");
     expect(local).toEqual({ data: "2026-03-01", hora: "23:00", dow: 0 });
     // mesmo instante, outro fuso
-    expect(instanteLocal("2026-03-02T02:00:00Z", "UTC")).toEqual({ data: "2026-03-02", hora: "02:00", dow: 1 });
+    expect(instanteLocal("2026-03-02T02:00:00Z", "UTC")).toEqual({
+      data: "2026-03-02",
+      hora: "02:00",
+      dow: 1,
+    });
   });
 
   it("meia-noite local cai no dia correto", () => {
-    expect(instanteLocal("2026-03-02T03:00:00Z", "America/Sao_Paulo")).toEqual({ data: "2026-03-02", hora: "00:00", dow: 1 });
+    expect(instanteLocal("2026-03-02T03:00:00Z", "America/Sao_Paulo")).toEqual({
+      data: "2026-03-02",
+      hora: "00:00",
+      dow: 1,
+    });
   });
 
   it("timestamp ausente ou inválido não vira fora do horário", () => {
@@ -150,7 +194,11 @@ describe("Classificador de período — fuso e escopo", () => {
   });
 
   it("escopo desconhecido é não classificável", () => {
-    const r = classificarPeriodo({ em: "2026-03-02T13:00:00Z", escopo: { clinica_id: null }, calendarios: [cal()] });
+    const r = classificarPeriodo({
+      em: "2026-03-02T13:00:00Z",
+      escopo: { clinica_id: null },
+      calendarios: [cal()],
+    });
     expect(r.motivo).toBe("escopo_nao_identificavel");
   });
 
@@ -181,8 +229,14 @@ describe("Classificador de período — fuso e escopo", () => {
       dias: [{ dia_semana: 1, fechado: true, faixas: [] }],
     });
     const base = { em: "2026-03-02T13:00:00Z", calendarios: [geral, daUnidade] };
-    expect(classificarPeriodo({ ...base, escopo: { clinica_id: "clinica-A", unidade_id: "unidade-2" } }).versao_id).toBe("geral");
-    const r = classificarPeriodo({ ...base, escopo: { clinica_id: "clinica-A", unidade_id: "unidade-1" } });
+    expect(
+      classificarPeriodo({ ...base, escopo: { clinica_id: "clinica-A", unidade_id: "unidade-2" } })
+        .versao_id,
+    ).toBe("geral");
+    const r = classificarPeriodo({
+      ...base,
+      escopo: { clinica_id: "clinica-A", unidade_id: "unidade-1" },
+    });
     expect(r.versao_id).toBe("un1");
     expect(r.motivo).toBe("dia_fechado");
   });
@@ -190,7 +244,11 @@ describe("Classificador de período — fuso e escopo", () => {
   it("dois calendários iguais aplicáveis = conflito não resolvido", () => {
     const a = cal({ versao_id: "a", versao: 1 });
     const b = cal({ versao_id: "b", versao: 2 });
-    const r = classificarPeriodo({ em: "2026-03-02T13:00:00Z", escopo: { clinica_id: "clinica-A" }, calendarios: [a, b] });
+    const r = classificarPeriodo({
+      em: "2026-03-02T13:00:00Z",
+      escopo: { clinica_id: "clinica-A" },
+      calendarios: [a, b],
+    });
     expect(r.motivo).toBe("conflito_de_configuracao");
     expect(r.classificacao).toBe("NAO_CLASSIFICAVEL");
   });
@@ -203,7 +261,10 @@ describe("Classificador de período — fuso e escopo", () => {
 
 describe("Classificador de período — não altera atendimento nem usa IA", () => {
   const src = readFileSync(resolve(process.cwd(), "src/lib/nina/classificador-periodo.ts"), "utf8");
-  const srcFn = readFileSync(resolve(process.cwd(), "src/lib/nina/classificador-periodo.functions.ts"), "utf8");
+  const srcFn = readFileSync(
+    resolve(process.cwd(), "src/lib/nina/classificador-periodo.functions.ts"),
+    "utf8",
+  );
 
   it("não chama modelos de IA para comparar datas", () => {
     expect(/gemini|openai|gpt-|ai_gateway|lovable\/ai/i.test(src + srcFn)).toBe(false);

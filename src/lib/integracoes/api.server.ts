@@ -55,7 +55,6 @@ export const ESCOPOS_CONHECIDOS = [
   // v1.2: verificação do paciente pelo WhatsApp (desafio + token de uso único).
   // Não dá acesso a nenhum dado de paciente.
   "patients:verify",
-
 ] as const;
 
 export class ApiError extends Error {
@@ -200,8 +199,8 @@ export async function autenticarApiKey(
     escopos: (data.escopos ?? []) as string[],
     limite_por_minuto: data.limite_por_minuto,
     limite_por_dia: data.limite_por_dia,
-    limite_pacientes_por_minuto: Number(bruto['limite_pacientes_por_minuto'] ?? 20),
-    limite_pacientes_por_dia: Number(bruto['limite_pacientes_por_dia'] ?? 200),
+    limite_pacientes_por_minuto: Number(bruto["limite_pacientes_por_minuto"] ?? 20),
+    limite_pacientes_por_dia: Number(bruto["limite_pacientes_por_dia"] ?? 200),
   };
 }
 
@@ -355,9 +354,6 @@ export async function consumirRateLimitCustom(
   }
 }
 
-
-
-
 // ---------------------------------------------------------------- idempotência
 
 export type ReplayIdempotente = { status: number; body: unknown };
@@ -375,9 +371,11 @@ export async function iniciarIdempotencia(
   if (!idempotencyKey) return null;
   const bodyHash = await sha256Hex(bodyTexto);
 
-  const { error } = await db
-    .from("integracao_idempotencia")
-    .insert({ api_key_id: apiKeyId, idempotency_key: idempotencyKey, body_hash: bodyHash } as never);
+  const { error } = await db.from("integracao_idempotencia").insert({
+    api_key_id: apiKeyId,
+    idempotency_key: idempotencyKey,
+    body_hash: bodyHash,
+  } as never);
   if (!error) return null; // primeira vez
 
   if ((error as { code?: string }).code !== "23505") {

@@ -35,15 +35,25 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
   test("resumo identifica filha com WhatsApp do responsável e exige novo aceite se mudar paciente", () => {
     const e = preparar();
     const anterior = e.appointment.confirmation!.resumo;
-    e.patient.id = "filha"; e.patient.validated = true;
-    const filha = { id: "filha", nome: "SOFIA LIMA ROCHA", data_nascimento: "2023-02-14", telefone: "21999990000" };
+    e.patient.id = "filha";
+    e.patient.validated = true;
+    const filha = {
+      id: "filha",
+      nome: "SOFIA LIMA ROCHA",
+      data_nascimento: "2023-02-14",
+      telefone: "21999990000",
+    };
     incluirPacienteNoResumo(e, "clinica", filha);
     const resumo = e.appointment.confirmation!.resumo;
     expect(resumo).toContain("SOFIA LIMA ROCHA");
     expect(resumo).toContain("14/02/2023");
     expect(resumo).toContain("Telefone:* 21999990000");
-    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: anterior }])).toBe(false);
-    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: resumo }])).toBe(true);
+    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: anterior }])).toBe(
+      false,
+    );
+    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: resumo }])).toBe(
+      true,
+    );
     incluirPacienteNoResumo(e, "clinica", filha);
     expect(consentimentoDaEscolha(e, "clinica")).not.toBeNull();
     e.patient.id = "outra-pessoa";
@@ -54,11 +64,19 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
   });
   test("nome do cadastro sem acento não refaz o resumo nem apaga o aceite", () => {
     const e = preparar();
-    e.patient.id = "paciente"; e.patient.validated = true;
-    const digitado = { id: "paciente", nome: "REINALDO TAVARES MOURÃO", data_nascimento: "1968-02-14", telefone: "55000100754" };
+    e.patient.id = "paciente";
+    e.patient.validated = true;
+    const digitado = {
+      id: "paciente",
+      nome: "REINALDO TAVARES MOURÃO",
+      data_nascimento: "1968-02-14",
+      telefone: "55000100754",
+    };
     incluirPacienteNoResumo(e, "clinica", digitado);
     const entregue = e.appointment.confirmation!.resumo;
-    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: entregue }])).toBe(true);
+    expect(aceitarResumoEntregue(e, "clinica", [{ role: "assistant", content: entregue }])).toBe(
+      true,
+    );
     incluirPacienteNoResumo(e, "clinica", { ...digitado, nome: "REINALDO  TAVARES MOURAO" });
     expect(e.appointment.confirmation!.resumo).toBe(entregue);
     expect(consentimentoDaEscolha(e, "clinica")).not.toBeNull();
@@ -168,9 +186,13 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
     for (const historico of [
       [lembrete],
       [{ role: "user", content: resumo.content }, lembrete],
-      [resumo, { role: "user", content: "qual médico?" },
+      [
+        resumo,
+        { role: "user", content: "qual médico?" },
         { role: "assistant", content: "Você se refere à Dra. Ana?" },
-        { role: "user", content: "entendi" }, lembrete],
+        { role: "user", content: "entendi" },
+        lembrete,
+      ],
     ]) {
       expect(aceitarResumoEntregue(e, "clinica", historico)).toBe(false);
       expect(consentimentoDaEscolha(e)).toBeNull();
@@ -199,7 +221,9 @@ describe("escolha de horário e consentimento do resumo entregue", () => {
     ]);
     registrarOpcoesAgendamento(e, "clinica", []);
     expect(consentimentoDaEscolha(e)?.vaga.hora).toBe("10:20");
-    expect(() => selecionarVagaValidada(e, "clinica", { ...vaga, hora: "08:00" }, "Outro resumo")).toThrow();
+    expect(() =>
+      selecionarVagaValidada(e, "clinica", { ...vaga, hora: "08:00" }, "Outro resumo"),
+    ).toThrow();
   });
   test("modalidade e agenda também ficam vinculadas ao consentimento", () => {
     const e = preparar();
@@ -220,7 +244,10 @@ describe("escolha de horário junto com dados pessoais ou pergunta de pagamento"
   test.each([
     ["De manhã, às 08:00. Meu nome é Simulação Teste Três e nasci em 22/07/1975.", "08:00"],
     ["Prefiro o das 12:20. E se eu pagar em dinheiro fica quanto mesmo?", "12:20"],
-    ["Prefiro o horário das 08:00. Pode me confirmar o valor da consulta e se pagando em dinheiro fica R$ 120,00?", "08:00"],
+    [
+      "Prefiro o horário das 08:00. Pode me confirmar o valor da consulta e se pagando em dinheiro fica R$ 120,00?",
+      "08:00",
+    ],
     ["Simulação Teste Quatro 03/11/1962, 08:00", "08:00"],
   ])("%s", async (texto, hora) => {
     const { lerEscolhaHorario } = await import("../agendamento-escolha");
@@ -228,8 +255,10 @@ describe("escolha de horário junto com dados pessoais ou pergunta de pagamento"
   });
 
   test.each(["Quanto custa a consulta das 10h?", "não posso 08:00", "08:00 ou 09:00"])(
-    "%s continua sem escolha", async (texto) => {
+    "%s continua sem escolha",
+    async (texto) => {
       const { lerEscolhaHorario } = await import("../agendamento-escolha");
       expect(lerEscolhaHorario(texto)).toBeNull();
-    });
+    },
+  );
 });

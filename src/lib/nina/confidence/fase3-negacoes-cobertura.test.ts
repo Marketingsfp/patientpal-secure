@@ -105,7 +105,10 @@ describe("negativas factuais", () => {
   });
 
   it("consulta vazia no escopo correto sustenta a ausência", () => {
-    const r = avaliarGrounding(ctx([], [consulta({ status: "vazio" })]), "Não temos vaga disponível");
+    const r = avaliarGrounding(
+      ctx([], [consulta({ status: "vazio" })]),
+      "Não temos vaga disponível",
+    );
     const neg = r.claims.find((c) => c.modalidade === "negacao");
     expect(neg?.situacao).toBe("confirmado");
     expect(neg?.suportado).toBe(true);
@@ -139,7 +142,16 @@ describe("negativas factuais", () => {
 describe("orações mistas e naturezas não factuais", () => {
   it("preço divergente é pego mesmo com negativa na oração anterior", () => {
     const r = avaliarGrounding(
-      ctx([fatoPreco], [consulta({ consulta: "buscar_conhecimento", capacidade: "searchKnowledgeBase", status: "com_itens" })]),
+      ctx(
+        [fatoPreco],
+        [
+          consulta({
+            consulta: "buscar_conhecimento",
+            capacidade: "searchKnowledgeBase",
+            status: "com_itens",
+          }),
+        ],
+      ),
       "Não precisa de encaminhamento, a consulta custa R$ 999",
     );
     const preco = r.claims.find((c) => c.tipo === "valor");

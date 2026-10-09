@@ -14,12 +14,16 @@ import type { Database } from "@/integrations/supabase/types";
 import { usuarioPodeVerConversa, type ConversaEscopo } from "./escopo-inbox";
 
 import {
-  ERRO_CONVERSA_NAO_ENCONTRADA, ERRO_CONVERSA_SEM_PERMISSAO,
-  MSG_CONVERSA_NAO_ENCONTRADA, MSG_CONVERSA_SEM_PERMISSAO,
+  ERRO_CONVERSA_NAO_ENCONTRADA,
+  ERRO_CONVERSA_SEM_PERMISSAO,
+  MSG_CONVERSA_NAO_ENCONTRADA,
+  MSG_CONVERSA_SEM_PERMISSAO,
 } from "./acesso-conversa-erros";
 export {
-  ERRO_CONVERSA_NAO_ENCONTRADA, ERRO_CONVERSA_SEM_PERMISSAO,
-  MSG_CONVERSA_NAO_ENCONTRADA, MSG_CONVERSA_SEM_PERMISSAO,
+  ERRO_CONVERSA_NAO_ENCONTRADA,
+  ERRO_CONVERSA_SEM_PERMISSAO,
+  MSG_CONVERSA_NAO_ENCONTRADA,
+  MSG_CONVERSA_SEM_PERMISSAO,
 } from "./acesso-conversa-erros";
 
 export type MotivoAcessoNegado =
@@ -96,7 +100,9 @@ export async function assertAcessoConversa(
 ): Promise<ConversaEscopo & { id: string; is_teste?: boolean | null }> {
   const { data: conv, error } = await supabase
     .from("atend_conversas")
-    .select("id, atribuida_user_id, last_assigned_user_id, resolved_by, owner_type, status, is_teste")
+    .select(
+      "id, atribuida_user_id, last_assigned_user_id, resolved_by, owner_type, status, is_teste",
+    )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
     .maybeSingle();

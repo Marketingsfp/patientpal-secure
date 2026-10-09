@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  classificarParcela,
-  DIAS_TOLERANCIA_MENSALIDADE,
-  type SituacaoParcela,
-} from "./cb-regras";
+import { classificarParcela, DIAS_TOLERANCIA_MENSALIDADE, type SituacaoParcela } from "./cb-regras";
 
 /**
  * Regra dos indicadores do topo da tela de Vendas. Vale dinheiro: se a

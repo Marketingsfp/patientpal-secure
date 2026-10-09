@@ -833,7 +833,7 @@ export function ClienteForm({
         .from("agendamentos")
         .select("id, inicio, procedimento, medico_id, status")
         .eq("paciente_id", editing.id)
-        
+
         .order("inicio", { ascending: false });
       if (error) {
         toast.error("Não foi possível carregar o histórico.");

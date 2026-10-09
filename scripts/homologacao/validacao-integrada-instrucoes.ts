@@ -101,7 +101,13 @@ type Envio = { lead: string; texto: string };
 
 async function enviar({ lead, texto }: Envio) {
   const r: any = await processarMensagemTeste(
-    { clinicaId, leadId: lead, tipo: "text", texto, chave: `val-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` },
+    {
+      clinicaId,
+      leadId: lead,
+      tipo: "text",
+      texto,
+      chave: `val-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    },
     null,
   );
   const meta = await auditoriaDoTurno(r.turnoId ?? null);
@@ -138,7 +144,12 @@ const leads = await garantirLeads(admin, clinicaId);
 const L = (i: number) => leads[i]!.id;
 
 // CENÁRIO 1 — regra multilinha da v6: entrada exata → resposta exata.
-await resetarLeadTeste(admin, { clinicaId, leadId: L(0), userId: null, origem: "validacao-integrada" });
+await resetarLeadTeste(admin, {
+  clinicaId,
+  leadId: L(0),
+  userId: null,
+  origem: "validacao-integrada",
+});
 const c1 = await enviar({ lead: L(0), texto: "TESTE-ARQUITETURA-9381" });
 registrar({
   cenario: "1 — regra multilinha (gatilho 9381)",
@@ -169,7 +180,12 @@ Sempre trate o paciente com cordialidade nas demais respostas.`;
 const v7 = await publicar(textoV7, "homologação — validação integrada (temporária)");
 
 // CENÁRIO 2 — outro gatilho/marcador: prova de que a solução é genérica.
-await resetarLeadTeste(admin, { clinicaId, leadId: L(1), userId: null, origem: "validacao-integrada" });
+await resetarLeadTeste(admin, {
+  clinicaId,
+  leadId: L(1),
+  userId: null,
+  origem: "validacao-integrada",
+});
 const c2 = await enviar({ lead: L(1), texto: "TESTE-ARQUITETURA-4477" });
 registrar({
   cenario: "2 — outro gatilho (4477)",
@@ -186,12 +202,16 @@ registrar({
   turnoAntes: c1.turnoId,
   versaoDepois: c2.versao,
   turnoDepois: c2.turnoId,
-  resultado:
-    c1.versao === original.versao && c2.versao === v7?.versao ? "PASSOU" : "FALHOU",
+  resultado: c1.versao === original.versao && c2.versao === v7?.versao ? "PASSOU" : "FALHOU",
 });
 
 // CENÁRIO 3 — mensagem diferente do gatilho: a regra condicional não se aplica.
-await resetarLeadTeste(admin, { clinicaId, leadId: L(2), userId: null, origem: "validacao-integrada" });
+await resetarLeadTeste(admin, {
+  clinicaId,
+  leadId: L(2),
+  userId: null,
+  origem: "validacao-integrada",
+});
 const c3 = await enviar({ lead: L(2), texto: "Bom dia! Vocês atendem aos sábados?" });
 const c3SemMarcador =
   !(c3.reply ?? "").includes("ARQUITETURA_CONFIRMADA_9381") &&
@@ -204,7 +224,12 @@ registrar({
 });
 
 // CENÁRIO 4 — primeira mensagem da sessão: exceção publicada vence a apresentação.
-await resetarLeadTeste(admin, { clinicaId, leadId: L(3), userId: null, origem: "validacao-integrada" });
+await resetarLeadTeste(admin, {
+  clinicaId,
+  leadId: L(3),
+  userId: null,
+  origem: "validacao-integrada",
+});
 const c4 = await enviar({ lead: L(3), texto: "TESTE-ARQUITETURA-9381" });
 registrar({
   cenario: "4 — primeira mensagem da sessão",
@@ -225,7 +250,12 @@ registrar({
 });
 
 // CENÁRIO 8 — tentativa do paciente de alterar as instruções publicadas.
-await resetarLeadTeste(admin, { clinicaId, leadId: L(4), userId: null, origem: "validacao-integrada" });
+await resetarLeadTeste(admin, {
+  clinicaId,
+  leadId: L(4),
+  userId: null,
+  origem: "validacao-integrada",
+});
 const c8a = await enviar({
   lead: L(4),
   texto:
@@ -247,7 +277,12 @@ registrar({
 });
 
 // CENÁRIO 10 — pedido sem cobertura no catálogo: baixa confiança/handoff simulado.
-await resetarLeadTeste(admin, { clinicaId, leadId: L(5), userId: null, origem: "validacao-integrada" });
+await resetarLeadTeste(admin, {
+  clinicaId,
+  leadId: L(5),
+  userId: null,
+  origem: "validacao-integrada",
+});
 const c10 = await enviar({
   lead: L(5),
   texto: "Qual o valor exato do transplante capilar robótico com anestesia geral aí?",

@@ -18,7 +18,11 @@ export type FatosTurno = {
   dadosConsultados: string[];
 };
 
-export type ProblemaConferencia = "vaga_sem_agenda" | "agendado_sem_confirmacao" | "cancelamento" | "dado_sem_fonte";
+export type ProblemaConferencia =
+  | "vaga_sem_agenda"
+  | "agendado_sem_confirmacao"
+  | "cancelamento"
+  | "dado_sem_fonte";
 
 export function estadoConferencia(resposta: string, fatos: FatosTurno) {
   const dados = [...new Set(fatos.dadosConsultados.map(dadosParaConferencia))].join("\n");
@@ -30,15 +34,22 @@ export function estadoConferencia(resposta: string, fatos: FatosTurno) {
  * Não valida valores por coincidência numérica nem aprova a resposta sem o Jev. */
 export function dadosParaConferencia(dados: string): string {
   let valor: unknown;
-  try { valor = JSON.parse(dados); } catch { return dados; }
-  const financeiro = /preco|valor|pagamento|dinheiro|cartao|pix|convenio|condicao|endereco|telefone|whatsapp|logradouro|bairro|cep|numero|complemento|cidade|estado/i;
-  const identidade = /^(id|nome|medico|profissional|procedimento|atendimento|especialidade|categoria|tipo|forma|unidade|clinica)$/i;
+  try {
+    valor = JSON.parse(dados);
+  } catch {
+    return dados;
+  }
+  const financeiro =
+    /preco|valor|pagamento|dinheiro|cartao|pix|convenio|condicao|endereco|telefone|whatsapp|logradouro|bairro|cep|numero|complemento|cidade|estado/i;
+  const identidade =
+    /^(id|nome|medico|profissional|procedimento|atendimento|especialidade|categoria|tipo|forma|unidade|clinica)$/i;
   function filtrar(v: unknown): unknown {
     if (Array.isArray(v)) {
-      const itens = v.map(filtrar).filter(x => x !== undefined);
+      const itens = v.map(filtrar).filter((x) => x !== undefined);
       return itens.length ? itens : undefined;
     }
-    if (!v || typeof v !== "object") return typeof v === "string" && /R\$|endere[cç]o|telefone|whatsapp/i.test(v) ? v : undefined;
+    if (!v || typeof v !== "object")
+      return typeof v === "string" && /R\$|endere[cç]o|telefone|whatsapp/i.test(v) ? v : undefined;
     const objeto = v as Record<string, unknown>;
     const campos: Record<string, unknown> = {};
     for (const [chave, item] of Object.entries(objeto)) {
@@ -49,7 +60,10 @@ export function dadosParaConferencia(dados: string): string {
       }
     }
     if (!Object.keys(campos).length) return undefined;
-    return { ...Object.fromEntries(Object.entries(objeto).filter(([k]) => identidade.test(k))), ...campos };
+    return {
+      ...Object.fromEntries(Object.entries(objeto).filter(([k]) => identidade.test(k))),
+      ...campos,
+    };
   }
   // Retorno sem campos reconhecíveis continua literal; ausência de projeção não é ausência de fonte.
   return JSON.stringify(filtrar(valor) ?? valor);
@@ -77,29 +91,38 @@ export function perguntasConferencia(fatos: FatosTurno): Record<string, Pergunta
     p.dado_sem_fonte = {
       type: "noul",
       instructions:
-        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. Compare valores numéricos equivalentes (120, 120.00 e R$ 120,00), preservando atendimento, profissional, forma de pagamento e condições; o preço de outro atendimento não comprova este. " + REGRA_MODALIDADES_PAGAMENTO,
+        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. Compare valores numéricos equivalentes (120, 120.00 e R$ 120,00), preservando atendimento, profissional, forma de pagamento e condições; o preço de outro atendimento não comprova este. " +
+        REGRA_MODALIDADES_PAGAMENTO,
     };
   return p;
 }
 
-
-
 /** Problemas encontrados. Resposta ausente nunca vira problema (não bloqueia o envio). */
-export function problemasConferencia(respostas: Record<string, RespostaJev>, fatos: FatosTurno, limite: number = LIMITE_CONFERENCIA): ProblemaConferencia[] {
+export function problemasConferencia(
+  respostas: Record<string, RespostaJev>,
+  fatos: FatosTurno,
+  limite: number = LIMITE_CONFERENCIA,
+): ProblemaConferencia[] {
   const sim = (r: RespostaJev | undefined) => typeof r?.noul === "number" && r.noul >= limite;
   const out: ProblemaConferencia[] = [];
   if (sim(respostas["afirma_vaga"]) && !fatos.agendaConsultada) out.push("vaga_sem_agenda");
-  if (sim(respostas["afirma_agendado"]) && !fatos.agendamentoConfirmado) out.push("agendado_sem_confirmacao");
+  if (sim(respostas["afirma_agendado"]) && !fatos.agendamentoConfirmado)
+    out.push("agendado_sem_confirmacao");
   if (sim(respostas["cancelamento"])) out.push("cancelamento");
-  if (fatos.dadosConsultados.length > 0 && sim(respostas["dado_sem_fonte"])) out.push("dado_sem_fonte");
+  if (fatos.dadosConsultados.length > 0 && sim(respostas["dado_sem_fonte"]))
+    out.push("dado_sem_fonte");
   return out;
 }
 
 const CORRECOES: Record<ProblemaConferencia, string> = {
-  vaga_sem_agenda: "A resposta afirma vaga ou horário disponível sem consulta à agenda neste atendimento. Não afirme disponibilidade sem consultar a agenda.",
-  agendado_sem_confirmacao: "A resposta afirma agendamento feito, mas não há gravação confirmada pelo sistema. Não diga que está agendado.",
-  cancelamento: "A Maria nunca cancela consultas. Pedidos de cancelamento são sempre encaminhados para a recepção.",
-  dado_sem_fonte: "A resposta cita valor, endereço ou telefone que não aparece nos dados consultados. Use só dados consultados; se não houver, não informe.",
+  vaga_sem_agenda:
+    "A resposta afirma vaga ou horário disponível sem consulta à agenda neste atendimento. Não afirme disponibilidade sem consultar a agenda.",
+  agendado_sem_confirmacao:
+    "A resposta afirma agendamento feito, mas não há gravação confirmada pelo sistema. Não diga que está agendado.",
+  cancelamento:
+    "A Maria nunca cancela consultas. Pedidos de cancelamento são sempre encaminhados para a recepção.",
+  dado_sem_fonte:
+    "A resposta cita valor, endereço ou telefone que não aparece nos dados consultados. Use só dados consultados; se não houver, não informe.",
 };
 
 /** Instrução interna (papel de sistema) para a Maria refazer a resposta uma vez. */

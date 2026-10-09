@@ -285,7 +285,9 @@ describe("consulta da Central de Atenção", () => {
     db.presenca("ana", "PAUSA");
     db.presenca("bia", "PAUSA");
     const dados = await db.carregar();
-    expect(dados.pausas).toEqual([{ atendenteId: "ana", nome: "Ana", inicio: null, tipo: "PAUSA" }]);
+    expect(dados.pausas).toEqual([
+      { atendenteId: "ana", nome: "Ana", inicio: null, tipo: "PAUSA" },
+    ]);
     expect(dados.filas).toEqual([]);
     expect(db.leiturasGestao).toEqual([]);
   });

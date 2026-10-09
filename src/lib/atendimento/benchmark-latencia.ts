@@ -13,12 +13,7 @@
  * clínico. Só identificadores técnicos, nomes de etapa e milissegundos.
  */
 
-import {
-  estatistica,
-  type Estatistica,
-  type Metrica,
-  type ResumoTrace,
-} from "./latencia";
+import { estatistica, type Estatistica, type Metrica, type ResumoTrace } from "./latencia";
 
 // ---------------------------------------------------------------------------
 // Alvos de aceite (p95, em ms).
@@ -141,9 +136,7 @@ export const CAMPOS_OUTLIER_PERMITIDOS = [
 ] as const;
 
 export function validarOutlierSemDadosSensiveis(o: Record<string, unknown>): boolean {
-  return Object.keys(o).every((k) =>
-    (CAMPOS_OUTLIER_PERMITIDOS as readonly string[]).includes(k),
-  );
+  return Object.keys(o).every((k) => (CAMPOS_OUTLIER_PERMITIDOS as readonly string[]).includes(k));
 }
 
 // ---------------------------------------------------------------------------

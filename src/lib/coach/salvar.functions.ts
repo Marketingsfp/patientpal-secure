@@ -32,7 +32,12 @@ export const salvarSessaoRoleplay = createServerFn({ method: "POST" })
         perfilCliente: z.string().max(2000).nullish(),
         pontosFracos: json,
         mensagens: z.array(json).max(400),
-        duracaoSeg: z.number().int().min(0).max(24 * 3600).nullish(),
+        duracaoSeg: z
+          .number()
+          .int()
+          .min(0)
+          .max(24 * 3600)
+          .nullish(),
         modo: z.enum(["texto", "voz"]),
       })
       .parse(data),

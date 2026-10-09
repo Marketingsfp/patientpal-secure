@@ -116,7 +116,12 @@ describe("FASE 2 — ausência de ação não é mais PASS 100", () => {
         acao: "desconhecida",
         intent: null,
         ferramentas: [
-          { nome: "buscar_medicos", capacidade: "listProfessionals", fonte: "agenda", success: true },
+          {
+            nome: "buscar_medicos",
+            capacidade: "listProfessionals",
+            fonte: "agenda",
+            success: true,
+          },
         ],
       }),
     );

@@ -40,8 +40,14 @@ const EXTENSOES: Record<string, string> = {
 };
 
 /** Tipos aceitos para guardar; qualquer outro (ex.: SVG, HTML) é recusado. */
-export function tipoMimeAceito(tipo: TipoMidiaGuardada, mime: string | null | undefined): string | null {
-  const limpo = String(mime ?? "").split(";")[0]!.trim().toLowerCase();
+export function tipoMimeAceito(
+  tipo: TipoMidiaGuardada,
+  mime: string | null | undefined,
+): string | null {
+  const limpo = String(mime ?? "")
+    .split(";")[0]!
+    .trim()
+    .toLowerCase();
   if (!limpo || !(limpo in EXTENSOES)) return null;
   return limpo.startsWith(tipo === "image" ? "image/" : "audio/") ? limpo : null;
 }

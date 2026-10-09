@@ -58,13 +58,20 @@ export function CargaAgregada({ clinicaId }: { clinicaId: string | null }) {
             Uma execução agregada por teste: leads envolvidos e mensagens processadas.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => lista.mutate()} disabled={lista.isPending}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => lista.mutate()}
+          disabled={lista.isPending}
+        >
           {lista.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Carregar execuções"}
         </Button>
       </div>
 
       {testes?.length === 0 && (
-        <p className="text-xs text-muted-foreground">Nenhum teste de carga registrado nesta clínica.</p>
+        <p className="text-xs text-muted-foreground">
+          Nenhum teste de carga registrado nesta clínica.
+        </p>
       )}
 
       <ul className="space-y-2">
@@ -108,7 +115,9 @@ export function CargaAgregada({ clinicaId }: { clinicaId: string | null }) {
                           <ChevronRight className="h-3.5 w-3.5" />
                         )}
                         Lead {String(lead.leadIndice).padStart(2, "0")} · {lead.mensagens} mensagens
-                        {lead.erros > 0 && <Badge variant="destructive">{lead.erros} erro(s)</Badge>}
+                        {lead.erros > 0 && (
+                          <Badge variant="destructive">{lead.erros} erro(s)</Badge>
+                        )}
                         {lead.latenciaMediaMs !== null && (
                           <span className="text-muted-foreground">
                             média {lead.latenciaMediaMs} ms
@@ -121,9 +130,7 @@ export function CargaAgregada({ clinicaId }: { clinicaId: string | null }) {
                             <li key={a.indice} className="flex flex-wrap gap-2">
                               <span className="text-muted-foreground">#{a.indice}</span>
                               <span className="flex-1">{a.mensagem ?? a.cenario ?? "—"}</span>
-                              <span
-                                className={a.status === "ok" ? "" : "text-destructive"}
-                              >
+                              <span className={a.status === "ok" ? "" : "text-destructive"}>
                                 {a.status}
                               </span>
                               {typeof a.latencia_ms === "number" && (

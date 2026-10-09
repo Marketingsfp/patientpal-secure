@@ -1,6 +1,9 @@
 /** Guarda referências de pesquisa, nunca copia fatos antigos para a próxima avaliação. */
 import { ehSaudacaoPura } from "./turno-tipo";
-import { normalizarPreferenciaAtendimento, type PreferenciaAtendimentoConsulta } from "../atendimento-consulta";
+import {
+  normalizarPreferenciaAtendimento,
+  type PreferenciaAtendimentoConsulta,
+} from "../atendimento-consulta";
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { lerEscolhaHorario } from "../agendamento-escolha";
 import { ehRespostaAfirmativaCurta } from "../resposta-afirmativa";
@@ -22,7 +25,12 @@ export type ConhecimentoSessao = {
   versao: 1;
   clinicaId: string;
   sessionId: string;
-  consulta: { termo: string; tipo_atendimento?: TipoAtendimentoCatalogo; medico?: string; dia?: string };
+  consulta: {
+    termo: string;
+    tipo_atendimento?: TipoAtendimentoCatalogo;
+    medico?: string;
+    dia?: string;
+  };
   referencias: ReferenciaConhecimento[];
   atendimentoConsulta?: PreferenciaAtendimentoConsulta;
   /** Preferência conversacional; sempre revalidada contra o catálogo do turno. */
@@ -38,7 +46,10 @@ export type ConhecimentoSessao = {
 };
 
 const texto = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-export function normalizarConhecimentoSessao(v: unknown, incluirPendencias = true): ConhecimentoSessao | null {
+export function normalizarConhecimentoSessao(
+  v: unknown,
+  incluirPendencias = true,
+): ConhecimentoSessao | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   if (o.versao !== 1 || !texto(o.clinicaId, 80) || !texto(o.sessionId, 80)) return null;
@@ -67,10 +78,17 @@ export function normalizarConhecimentoSessao(v: unknown, incluirPendencias = tru
       ? {
           tipo: bruto.tipo as NonNullable<ResultadoConhecimento["esclarecimento"]>["tipo"],
           pergunta: texto(bruto.pergunta, 1600),
-          ...(bruto.tipo === "profissional" && bruto.motivo === "medico_nao_identificado" && texto(bruto.atendimento, 200)
-            ? { motivo: "medico_nao_identificado" as const, atendimento: texto(bruto.atendimento, 200) } : {}),
+          ...(bruto.tipo === "profissional" &&
+          bruto.motivo === "medico_nao_identificado" &&
+          texto(bruto.atendimento, 200)
+            ? {
+                motivo: "medico_nao_identificado" as const,
+                atendimento: texto(bruto.atendimento, 200),
+              }
+            : {}),
           ...(bruto.motivo === "sem_registro_confirmar"
-            ? { motivo: "sem_registro_confirmar" as const } : {}),
+            ? { motivo: "sem_registro_confirmar" as const }
+            : {}),
           opcoes: bruto.opcoes.slice(0, 40).flatMap((v: unknown) => {
             if (!v || typeof v !== "object") return [];
             const p = v as Record<string, unknown>,
@@ -97,18 +115,26 @@ export function normalizarConhecimentoSessao(v: unknown, incluirPendencias = tru
     consulta: {
       termo: texto(q.termo, 200),
       ...(normalizarTipoAtendimentoCatalogo(q.tipo_atendimento)
-        ? { tipo_atendimento: normalizarTipoAtendimentoCatalogo(q.tipo_atendimento) } : {}),
+        ? { tipo_atendimento: normalizarTipoAtendimentoCatalogo(q.tipo_atendimento) }
+        : {}),
       ...(texto(q.medico, 160) ? { medico: texto(q.medico, 160) } : {}),
       ...(texto(q.dia, 40) ? { dia: texto(q.dia, 40) } : {}),
     },
     referencias,
-    ...(incluirPendencias && Array.isArray(o.pendenciasIdentificacao) ? {
-      pendenciasIdentificacao: o.pendenciasIdentificacao.slice(0, 20)
-        .map(p => normalizarConhecimentoSessao(p, false))
-        .filter((p): p is ConhecimentoSessao => !!p?.esclarecimento && p.clinicaId === o.clinicaId && p.sessionId === o.sessionId),
-    } : {}),
+    ...(incluirPendencias && Array.isArray(o.pendenciasIdentificacao)
+      ? {
+          pendenciasIdentificacao: o.pendenciasIdentificacao
+            .slice(0, 20)
+            .map((p) => normalizarConhecimentoSessao(p, false))
+            .filter(
+              (p): p is ConhecimentoSessao =>
+                !!p?.esclarecimento && p.clinicaId === o.clinicaId && p.sessionId === o.sessionId,
+            ),
+        }
+      : {}),
     ...(normalizarPreferenciaAtendimento(o.atendimentoConsulta)
-      ? { atendimentoConsulta: normalizarPreferenciaAtendimento(o.atendimentoConsulta)! } : {}),
+      ? { atendimentoConsulta: normalizarPreferenciaAtendimento(o.atendimentoConsulta)! }
+      : {}),
     ...(esclarecer
       ? {
           esclarecimento: esclarecer,
@@ -254,8 +280,12 @@ export function lembrarConsultaComprovada(e: {
   const referencias = [...porRegistro.values()].slice(0, 40);
   if (!referencias.length && !e.esclarecimento) return null;
   const anterior =
-    e.anterior?.clinicaId === e.clinicaId && e.anterior.sessionId === e.sessionId &&
-    !(e.esclarecimento?.motivo === "medico_nao_identificado" && e.anterior.esclarecimento?.motivo !== "medico_nao_identificado")
+    e.anterior?.clinicaId === e.clinicaId &&
+    e.anterior.sessionId === e.sessionId &&
+    !(
+      e.esclarecimento?.motivo === "medico_nao_identificado" &&
+      e.anterior.esclarecimento?.motivo !== "medico_nao_identificado"
+    )
       ? e.anterior
       : null;
   const perguntas = anterior?.esclarecimento

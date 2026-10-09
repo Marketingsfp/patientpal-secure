@@ -447,7 +447,11 @@ function NfseConfigPage() {
               </div>
               <div className="space-y-1">
                 <Label>E-mail</Label>
-                <Input uppercase={false} value={f.email} onChange={(e) => set({ ...f, email: e.target.value })} />
+                <Input
+                  uppercase={false}
+                  value={f.email}
+                  onChange={(e) => set({ ...f, email: e.target.value })}
+                />
               </div>
             </div>
 
@@ -498,7 +502,9 @@ function NfseConfigPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">Tributos federais e ISS pagos pelo Simples</SelectItem>
+                        <SelectItem value="1">
+                          Tributos federais e ISS pagos pelo Simples
+                        </SelectItem>
                         <SelectItem value="2">Federais pelo Simples e ISS pago por fora</SelectItem>
                         <SelectItem value="3">Federais e ISS pagos fora do Simples</SelectItem>
                       </SelectContent>

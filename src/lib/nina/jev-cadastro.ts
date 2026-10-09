@@ -42,8 +42,16 @@ export function estadoCadastro(
     cadastros_possiveis: Object.fromEntries(
       r.map((rot, i) => {
         const c = candidatos[i]!;
-        return [rot, { nome: c.nome, data_nascimento: c.data_nascimento, telefone: c.telefone,
-          telefone2: c.telefone2 ?? null, cadastrado_em: c.created_at?.slice(0, 10) ?? null }];
+        return [
+          rot,
+          {
+            nome: c.nome,
+            data_nascimento: c.data_nascimento,
+            telefone: c.telefone,
+            telefone2: c.telefone2 ?? null,
+            cadastrado_em: c.created_at?.slice(0, 10) ?? null,
+          },
+        ];
       }),
     ),
   };
@@ -52,7 +60,8 @@ export function estadoCadastro(
 export function perguntaCadastro(candidatos: CandidatoCadastro[]): Record<string, PerguntaJev> {
   const criteria: Record<string, unknown> = {};
   for (const rot of rotulos(candidatos))
-    criteria[rot] = `\`cadastros_possiveis.${rot}\` é claramente o cadastro da pessoa descrita em \`dados_informados_na_conversa\`.`;
+    criteria[rot] =
+      `\`cadastros_possiveis.${rot}\` é claramente o cadastro da pessoa descrita em \`dados_informados_na_conversa\`.`;
   criteria[EMPATE] = "Os dados não permitem distinguir com segurança qual cadastro é o da pessoa.";
   return {
     cadastro: {
@@ -65,7 +74,10 @@ export function perguntaCadastro(candidatos: CandidatoCadastro[]): Record<string
 }
 
 /** Id sugerido para a recepção, ou null (empate, confiança baixa, rótulo inválido). */
-export function sugestaoCadastro(r: RespostaJev | undefined, candidatos: CandidatoCadastro[]): string | null {
+export function sugestaoCadastro(
+  r: RespostaJev | undefined,
+  candidatos: CandidatoCadastro[],
+): string | null {
   if (!r?.choice || r.choice === EMPATE) return null;
   if (typeof r.confidence !== "number" || r.confidence < CONFIANCA_MINIMA_CADASTRO) return null;
   const i = rotulos(candidatos).indexOf(r.choice);

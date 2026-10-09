@@ -106,17 +106,28 @@ export const MSG_ADMIN_NAO_RESPONDE_AQUI =
 export const MSG_CONVERSA_DA_NINA =
   "Conversas atribuídas à Nina são bloqueadas: não é possível enviar mensagem enquanto a Nina estiver atendendo. Para responder, atribua a conversa a uma atendente.";
 
-export function conversaComNina(conversa: { owner_type?: string | null; status?: string | null }): boolean {
-  return conversa.owner_type === "AI" && conversa.status !== "closed" && conversa.status !== "finished";
+export function conversaComNina(conversa: {
+  owner_type?: string | null;
+  status?: string | null;
+}): boolean {
+  return (
+    conversa.owner_type === "AI" && conversa.status !== "closed" && conversa.status !== "finished"
+  );
 }
 
 /** Motivo exibido ao admin: conversa da Nina tem aviso próprio; os demais casos seguem o geral. */
-export function motivoAdminNaoResponde(conversa: { owner_type?: string | null; status?: string | null }): string {
+export function motivoAdminNaoResponde(conversa: {
+  owner_type?: string | null;
+  status?: string | null;
+}): string {
   return conversaComNina(conversa) ? MSG_CONVERSA_DA_NINA : MSG_ADMIN_NAO_RESPONDE_AQUI;
 }
 
 /** Perfil exato de supervisão: admin tem precedência sobre gestor. */
-export function perfilSupervisao(args: { admin: boolean; gestor: boolean }): PerfilSupervisao | null {
+export function perfilSupervisao(args: {
+  admin: boolean;
+  gestor: boolean;
+}): PerfilSupervisao | null {
   if (args.admin) return "admin";
   return args.gestor ? "gestor" : null;
 }

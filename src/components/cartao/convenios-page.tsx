@@ -451,9 +451,7 @@ export function ConveniosPage({ produto }: { produto: ProdutoCartao }) {
       taxa_adesao: taxaAdesao,
       adesao_no_ato: cobrarAdesaoNoAto,
       // Vazio = notas de mensalidade usam o código do emitente.
-      ...(produto !== "terapeutico"
-        ? { item_lista_servico: itemListaServico.trim() || null }
-        : {}),
+      ...(produto !== "terapeutico" ? { item_lista_servico: itemListaServico.trim() || null } : {}),
       taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,

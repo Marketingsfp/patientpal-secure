@@ -91,7 +91,10 @@ export const enviarAchadoParaRevisao = createServerFn({ method: "POST" })
     }));
 
     // Localiza o turno citado pelo achado pelo trecho da mensagem.
-    const trecho = String(achado.mensagem ?? "").trim().slice(0, 60).toLowerCase();
+    const trecho = String(achado.mensagem ?? "")
+      .trim()
+      .slice(0, 60)
+      .toLowerCase();
     let idxNina = -1;
     if (trecho) {
       idxNina = lista.findIndex(
@@ -101,15 +104,14 @@ export const enviarAchadoParaRevisao = createServerFn({ method: "POST" })
         const idxPac = lista.findIndex(
           (m) => m.autor === "paciente" && m.texto.toLowerCase().includes(trecho),
         );
-        if (idxPac >= 0)
-          idxNina = lista.findIndex((m, k) => k > idxPac && m.autor === "nina");
+        if (idxPac >= 0) idxNina = lista.findIndex((m, k) => k > idxPac && m.autor === "nina");
       }
     }
     if (idxNina < 0) idxNina = lista.map((m) => m.autor).lastIndexOf("nina");
     const respostaNina = idxNina >= 0 ? lista[idxNina] : null;
     const mensagemPaciente =
       idxNina >= 0
-        ? [...lista.slice(0, idxNina)].reverse().find((m) => m.autor === "paciente") ?? null
+        ? ([...lista.slice(0, idxNina)].reverse().find((m) => m.autor === "paciente") ?? null)
         : (lista.filter((m) => m.autor === "paciente").at(-1) ?? null);
 
     const { data: execs } = await supabaseAdmin
@@ -129,9 +131,13 @@ export const enviarAchadoParaRevisao = createServerFn({ method: "POST" })
       .order("started_at", { ascending: false })
       .limit(200);
     const traceIds = Array.from(
-      new Set(((traces ?? []) as any[]).map((t) => t.trace_id).filter(Boolean).map(String)),
+      new Set(
+        ((traces ?? []) as any[])
+          .map((t) => t.trace_id)
+          .filter(Boolean)
+          .map(String),
+      ),
     ).slice(0, 10);
-
 
     const { data: linhasTool } = await supabaseAdmin
       .from("audit_log")
@@ -252,7 +258,9 @@ export const listarAchadosEnviados = createServerFn({ method: "POST" })
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const { data: linhas, error } = await context.supabase
       .from("nina_feedback_erros")
-      .select("id, status, categoria, decisao_humana, regressao_cenario_id, teste_evidencia, created_at")
+      .select(
+        "id, status, categoria, decisao_humana, regressao_cenario_id, teste_evidencia, created_at",
+      )
       .eq("clinica_id", data.clinicaId)
       .eq("avaliacao_id", data.avaliacaoId)
       .order("created_at", { ascending: true })

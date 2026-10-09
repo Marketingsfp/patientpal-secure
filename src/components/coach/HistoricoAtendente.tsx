@@ -248,9 +248,13 @@ export function HistoricoAtendente({
 }
 
 function nota(item: Item) {
-  return Number(
-    item.kind === "analise" ? (item.data as AnaliseRow).pontuacao : (item.data as RoleplayRow).nota,
-  ) || 0;
+  return (
+    Number(
+      item.kind === "analise"
+        ? (item.data as AnaliseRow).pontuacao
+        : (item.data as RoleplayRow).nota,
+    ) || 0
+  );
 }
 
 function titulo(item: Item) {
@@ -274,15 +278,7 @@ function subtitulo(item: Item) {
   return r.duracao_seg ? `${modo} · ${formatDuracao(r.duracao_seg)}` : modo;
 }
 
-function Lista({
-  titulo,
-  itens,
-  tom,
-}: {
-  titulo: string;
-  itens: string[];
-  tom: "bom" | "ruim";
-}) {
+function Lista({ titulo, itens, tom }: { titulo: string; itens: string[]; tom: "bom" | "ruim" }) {
   if (!itens.length) return null;
   return (
     <div className="mt-3">

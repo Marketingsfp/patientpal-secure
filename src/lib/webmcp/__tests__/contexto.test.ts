@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  classificarAmbiente,
-  escritaPermitida,
-  montarContextoWebmcp,
-} from "../contexto";
+import { classificarAmbiente, escritaPermitida, montarContextoWebmcp } from "../contexto";
 
 describe("classificarAmbiente", () => {
   it("reconhece preview, produção e local", () => {

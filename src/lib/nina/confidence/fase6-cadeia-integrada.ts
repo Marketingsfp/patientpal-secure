@@ -28,11 +28,7 @@ import {
   type ContextoCanonico,
   type EntradaContextoCanonico,
 } from "./contexto-canonico";
-import {
-  avaliarContrato,
-  type AvaliacaoContrato,
-  type OpcoesAvaliacao,
-} from "./avaliacao-regras";
+import { avaliarContrato, type AvaliacaoContrato, type OpcoesAvaliacao } from "./avaliacao-regras";
 import { pontuarContrato, type PontuacaoContrato } from "./pontuacao-contrato";
 import { configuracaoPadrao, type ConfiguracaoEfetiva } from "./configuracao";
 import {
@@ -43,11 +39,7 @@ import {
   type Telemetria,
 } from "./saida-final";
 import { explicarResposta, type ExplicacaoResposta } from "./fase5-explicacao";
-import {
-  trilhaEmMemoria,
-  type EventoAuditoria,
-  type Trilha,
-} from "./fase5-eventos";
+import { trilhaEmMemoria, type EventoAuditoria, type Trilha } from "./fase5-eventos";
 import { hashDoTexto } from "./hash";
 import { extrairIdentidade } from "../identidade-atendimento";
 import type { IdentidadeAtendimento } from "../identidade-atendimento";
@@ -139,7 +131,7 @@ export async function executarTurnoIntegrado(
   });
 
   // 3) Texto final: é ele que vale para a entrega.
-  const textoFinal = (e.textoFinal ?? e.candidato) ?? "";
+  const textoFinal = e.textoFinal ?? e.candidato ?? "";
   // O motor avalia o CANDIDATO; a saída confere se o final é o mesmo texto.
   const textoAvaliado = e.candidato;
   const hashAvaliado = hashDoTexto(textoAvaliado);

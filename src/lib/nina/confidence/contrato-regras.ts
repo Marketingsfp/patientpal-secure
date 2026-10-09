@@ -206,7 +206,10 @@ const DETECTORES: Detector[] = [
     tipo: "apresentacao_entregue",
     re: /\b(apresentacao ja (foi )?(entregue|feita)|ja se apresentou|mensagens seguintes|proximas mensagens)\b/,
   },
-  { tipo: "saudacao_simples", re: /\b(apenas uma saudacao|saudacao simples|so (um )?cumprimento)\b/ },
+  {
+    tipo: "saudacao_simples",
+    re: /\b(apenas uma saudacao|saudacao simples|so (um )?cumprimento)\b/,
+  },
   {
     tipo: "pedido_concreto",
     re: /\b(ja explicou|ja disse|ja informou|pedido concreto|pediu algo|demanda declarada)\b/,
@@ -538,7 +541,10 @@ export function compilarContratoRegras(
     if (!regra.conduta) faltando.push("Conduta");
     if (!regra.resultadoEsperado) faltando.push("Resultado esperado");
     if (faltando.length > 0) {
-      base.diagnostico.camposFaltando.push({ identificador: regra.identificador, campos: faltando });
+      base.diagnostico.camposFaltando.push({
+        identificador: regra.identificador,
+        campos: faltando,
+      });
     }
     if (!regra.interpretada) {
       base.diagnostico.naoInterpretadas.push({

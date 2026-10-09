@@ -27,7 +27,9 @@ function Preview() {
     [list, setList] = useState(true),
     [dark, setDark] = useState(false),
     [attention, setAttention] = useState(false);
-  useEffect(() => { document.documentElement.classList.toggle("dark", dark); }, [dark]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
   return (
     <div className={dark ? "dark" : ""}>
       <div data-os-zap="true" className="flex h-dvh flex-col bg-background text-foreground">
@@ -142,10 +144,10 @@ function Preview() {
                         <h2 className="text-sm font-semibold">{patients[selected][0]}</h2>
                         <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                           Conversa de exemplo · Em atendimento
-                        <BadgeEspera
-                          desde={new Date(Date.now() - 14 * 60000).toISOString()}
-                          prefixo="Aguardando resposta há"
-                        />
+                          <BadgeEspera
+                            desde={new Date(Date.now() - 14 * 60000).toISOString()}
+                            prefixo="Aguardando resposta há"
+                          />
                         </p>
                       </div>
                       <div className="flex gap-2 shrink-0">

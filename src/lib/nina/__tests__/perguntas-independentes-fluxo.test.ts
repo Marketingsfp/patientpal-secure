@@ -3,7 +3,19 @@ import { fileURLToPath } from "node:url";
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
 describe("perguntas independentes no núcleo compartilhado (serviços simulados)", () => {
   for (const ambiente of ["producao", "homologacao"])
-    for (const caso of ["normal", "invertida", "sequencial", "repetida", "duas_duvidas", "retomada", "obsoleto", "reserva", "reserva_primeiro", "reserva_repetida", "transferencia_ficticia"])
+    for (const caso of [
+      "normal",
+      "invertida",
+      "sequencial",
+      "repetida",
+      "duas_duvidas",
+      "retomada",
+      "obsoleto",
+      "reserva",
+      "reserva_primeiro",
+      "reserva_repetida",
+      "transferencia_ficticia",
+    ])
       it(ambiente + ": " + caso, () => {
         const p = Bun.spawnSync(
           [process.execPath, fixture, ambiente, "catalogo_multiplas_" + caso],
@@ -34,7 +46,9 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
           expect(r.resposta).toBe("");
           return;
         }
-        const salvo = r.gravacoes.filter((g: any) => g.tabela === "atend_conversas" && g.valor.nina_fluxo_estado).at(-1)?.valor.nina_fluxo_estado;
+        const salvo = r.gravacoes
+          .filter((g: any) => g.tabela === "atend_conversas" && g.valor.nina_fluxo_estado)
+          .at(-1)?.valor.nina_fluxo_estado;
         // Contato é capturado mesmo antes de o paciente escolher um horário.
         expect(salvo?.whatsapp_remetente).toBe("55000100999");
         expect(r.estadoPerguntas.whatsapp_remetente).toBe("55000100999");
@@ -57,6 +71,8 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         const chamadas = r.requests[0].messages;
         expect(JSON.stringify(chamadas)).toContain("Perguntas independentes");
         expect(JSON.stringify(chamadas)).toContain("PEDIDOS PARALELOS");
-        expect(JSON.stringify(chamadas)).toContain("telefone de contato usa por padrão o número do remetente");
+        expect(JSON.stringify(chamadas)).toContain(
+          "telefone de contato usa por padrão o número do remetente",
+        );
       });
 });

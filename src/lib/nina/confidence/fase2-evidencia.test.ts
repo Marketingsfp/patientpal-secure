@@ -102,8 +102,23 @@ describe("FASE 2 — status da consulta", () => {
 
   it("retry recuperado consolida em uma consulta bem-sucedida", () => {
     const consultas = consolidarTentativas([
-      { id: "c1", consulta: "agenda", capacidade: "checkAvailability", status: "falha", tentativas: 1, falhasAnteriores: [], erro: "timeout" },
-      { id: "c1", consulta: "agenda", capacidade: "checkAvailability", status: "com_itens", tentativas: 1, falhasAnteriores: [] },
+      {
+        id: "c1",
+        consulta: "agenda",
+        capacidade: "checkAvailability",
+        status: "falha",
+        tentativas: 1,
+        falhasAnteriores: [],
+        erro: "timeout",
+      },
+      {
+        id: "c1",
+        consulta: "agenda",
+        capacidade: "checkAvailability",
+        status: "com_itens",
+        tentativas: 1,
+        falhasAnteriores: [],
+      },
     ]);
     expect(consultas).toHaveLength(1);
     expect(consultas[0]?.status).toBe("com_itens");
@@ -113,7 +128,15 @@ describe("FASE 2 — status da consulta", () => {
   it("retorno truncado é avaliação incompleta", () => {
     expect(
       houveTruncamento([
-        { id: "c1", consulta: "catalogo", capacidade: "listCatalog", status: "com_itens", tentativas: 1, falhasAnteriores: [], truncado: true },
+        {
+          id: "c1",
+          consulta: "catalogo",
+          capacidade: "listCatalog",
+          status: "com_itens",
+          tentativas: 1,
+          falhasAnteriores: [],
+          truncado: true,
+        },
       ]),
     ).toBe(true);
   });
