@@ -14,21 +14,51 @@ function executar(arquivo: string, args: string[], prefixo: string) {
   expect(linha, p.stdout.toString()).toBeDefined();
   return JSON.parse(linha!.slice(prefixo.length));
 }
-for (const caso of ["legivel", "ilegivel", "invalida", "indisponivel", "timeout"])
+for (const caso of [
+  "legivel",
+  "ilegivel",
+  "invalida",
+  "indisponivel",
+  "timeout",
+  "truncada",
+  "recusa",
+  "sem_texto",
+  "sem_motivo",
+])
   it(`leitura visual: ${caso}`, () => {
     const r = executar("fotos-leitura.fixture.ts", [caso], "FOTO=");
     expect(r.resultado.tipo).toBe(
       caso === "legivel" ? "pedido_medico" : caso === "ilegivel" ? "ilegivel" : "falha_tecnica",
     );
-    expect(r.requisicao.model).toBe("google/gemini-2.5-flash");
-    expect(r.requisicao.messages[1].content[1].image_url.url).toBe("data:image/jpeg;base64,AQID");
+    expect(r.requisicao.url).toBe("https://ai.gateway.lovable.dev/v1/messages");
+    expect(r.requisicao.model).toBe("anthropic/claude-opus-5-5");
+    expect(r.requisicao.messages[0].content[0]).toEqual({
+      type: "image",
+      source: { type: "base64", media_type: "image/jpeg", data: "AQID" },
+    });
+    expect(r.requisicao.messages[0].role).toBe("user");
+    expect(r.requisicao.stream).toBe(false);
+    expect(r.requisicao.thinking).toEqual({ type: "adaptive" });
+    expect(r.requisicao.max_tokens).toBeGreaterThanOrEqual(16000);
     expect(r.requisicao.temTimeout).toBe(true);
     expect(r.auditoria).toHaveLength(1);
     expect(r.auditoria[0].finalidade).toBe("leitura_imagem");
+    expect(r.auditoria[0].modelo).toBe("anthropic/claude-opus-5-5");
+    if (!["indisponivel", "timeout"].includes(caso)) {
+      expect(r.auditoria[0].consumoEntrada).toBe(123);
+      expect(r.auditoria[0].consumoSaida).toBe(45);
+    }
+    expect(JSON.stringify(r.auditoria)).not.toContain("AQID");
     expect(r.auditoria[0].estado).toBe(
       ["indisponivel", "timeout"].includes(caso) ? "falhou" : "concluido",
     );
   });
+it("sem credencial não chama o provedor nem julga a foto", () => {
+  const r = executar("fotos-leitura.fixture.ts", ["sem_chave"], "FOTO=");
+  expect(r.resultado).toEqual({ tipo: "falha_tecnica", motivo: "configuracao" });
+  expect(r.requisicao).toBeUndefined();
+  expect(r.auditoria).toHaveLength(0);
+});
 for (const caso of ["um_marcado", "varios_marcados", "marcacao_incerta"])
   it(`contrato do leitor para seleção: ${caso}`, () => {
     const r = executar("fotos-leitura.fixture.ts", [caso], "FOTO=");
@@ -43,7 +73,7 @@ for (const caso of ["um_marcado", "varios_marcados", "marcacao_incerta"])
                 : ["Doppler de Carótidas e Vértebrais", "ECG"],
           },
     );
-    const prompt = r.requisicao.messages[0].content;
+    const prompt = r.requisicao.system;
     expect(prompt).toContain("Opções com quadrinhos vazios NÃO são exames solicitados");
     expect(prompt).toContain('tipo "marcacao_incerta"');
     expect(prompt).toContain("não precisa de quadrinhos");

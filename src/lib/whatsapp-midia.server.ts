@@ -18,6 +18,7 @@ import {
 } from "@/lib/nina/leitura-imagem";
 
 const META_VERSION_MEDIA = "v26.0";
+const MODELO_LEITURA_IMAGEM = "anthropic/claude-opus-5-5";
 
 /** Metadados da mídia (URL temporária assinada pela Meta). */
 export async function metaFetchMediaUrl(
@@ -159,34 +160,52 @@ export async function lerPedidoNaImagem(
   if (!key) return { tipo: "falha_tecnica", motivo: "configuracao" };
   try {
     const res = await fetchComAuditoriaIA(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      "https://ai.gateway.lovable.dev/v1/messages",
       {
         method: "POST",
-        signal: AbortSignal.timeout(30_000),
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(90_000),
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "X-Lovable-AIG-SDK": "fetch",
+        },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: MODELO_LEITURA_IMAGEM,
+          max_tokens: 16000,
+          stream: false,
+          thinking: { type: "adaptive" },
+          output_config: { effort: "medium" },
+          system: PROMPT_LEITURA_IMAGEM,
           messages: [
-            { role: "system", content: PROMPT_LEITURA_IMAGEM },
             {
               role: "user",
               content: [
+                { type: "image", source: { type: "base64", media_type: mime, data: base64 } },
                 { type: "text", text: "Leia esta imagem:" },
-                { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
               ],
             },
           ],
         }),
       },
-      { finalidade: "leitura_imagem", modelo: "google/gemini-2.5-flash" },
+      { finalidade: "leitura_imagem", modelo: MODELO_LEITURA_IMAGEM },
       registrar,
     );
     if (!res.ok) {
       console.error("[whatsapp-midia] leitura de imagem falhou", res.status);
       return { tipo: "falha_tecnica", motivo: "provedor" };
     }
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    return interpretarLeituraImagem(json.choices?.[0]?.message?.content);
+    const json = (await res.json()) as {
+      content?: Array<{ type?: string; text?: string }>;
+      stop_reason?: string;
+    };
+    // Recusa, truncamento e blocos de raciocínio não comprovam leitura completa.
+    if (json.stop_reason !== "end_turn" || !Array.isArray(json.content))
+      return { tipo: "falha_tecnica", motivo: "resposta_invalida" };
+    const texto = json.content
+      .filter((bloco) => bloco?.type === "text" && typeof bloco.text === "string")
+      .map((bloco) => bloco.text)
+      .join("");
+    return interpretarLeituraImagem(texto);
   } catch (e) {
     console.error("[whatsapp-midia] leitura de imagem exception", e);
     return { tipo: "falha_tecnica", motivo: "provedor" };
