@@ -4,6 +4,8 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { presetAllowedSet, PRESETS } from "@/lib/permissoes-presets";
 import { aplicarExcecoesDaPessoa as aplicarExcecoes } from "@/lib/permissoes-pessoa";
+import { nivelDoModulo } from "@/lib/permissoes-rotas";
+import { PAIS_OSZAP } from "@/lib/permissoes-oszap";
 
 export type Acesso = "none" | "read" | "write";
 
@@ -225,11 +227,10 @@ export function usePermissoes(): {
  * - Sem entrada no mapa → "none".
  */
 export function useAcessoModulo(modulo: string): Acesso {
-  const { nivel, allowed } = usePermissoes();
-  if (allowed === null) return "write"; // admin
-  const n = nivel?.get(modulo);
-  if (n) return n;
-  return "none";
+  const { nivel, allowed, configured } = usePermissoes();
+  if (modulo in PAIS_OSZAP) return nivelDoModulo(modulo, allowed, nivel, configured);
+  if (allowed === null) return "write";
+  return nivel?.get(modulo) ?? "none";
 }
 
 /** Atalho: usuário pode gravar/editar/excluir neste módulo? */

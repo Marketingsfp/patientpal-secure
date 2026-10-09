@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { assertAcessoModulo } from "@/lib/permissoes.server";
+import { carregarAcessosOsZap } from "@/lib/permissoes-oszap.server";
+import { acessosFrancisco } from "./permissoes";
+import type { AbaFrancisco } from "./config";
 import { celularParaEnvio } from "@/lib/agenda/confirmacao-whatsapp";
 import {
   configPadraoFrancisco,
@@ -79,14 +81,12 @@ export async function autorizarFrancisco(
   clinicaId: string,
   editar = false,
   publicar = false,
+  aba?: AbaFrancisco,
 ) {
-  await assertAcessoModulo(
-    ctx.supabase,
-    ctx.userId,
-    clinicaId,
-    "francisco",
-    editar ? "write" : "read",
-  );
+  const acessos = acessosFrancisco(await carregarAcessosOsZap(ctx.supabase, ctx.userId, clinicaId));
+  const niveis = aba ? [acessos[aba]] : Object.values(acessos);
+  if (!niveis.some((nivel) => (editar ? nivel === "write" : nivel !== "none")))
+    throw new Error("Sem permissão para esta tela do Francisco nesta clínica.");
   const { data, error } = await ctx.supabase
     .from("user_roles")
     .select("role")
@@ -96,15 +96,9 @@ export async function autorizarFrancisco(
   const admin = data?.some((v) => v.role === "admin") ?? false;
   if (publicar && !admin)
     throw new Error("Somente um administrador pode publicar a configuração do Francisco.");
-  const { data: escrita, error: erroEscrita } = await ctx.supabase.rpc("has_module_access", {
-    _user_id: ctx.userId,
-    _clinica_id: clinicaId,
-    _modulo: "francisco",
-    _nivel: "write",
-  });
-  conferirErro(erroEscrita);
   return {
-    podeEditar: escrita === true,
+    acessos,
+    podeEditar: niveis.includes("write"),
     podePublicar: admin,
     envioRealLiberado: envioRealLiberado(),
   };

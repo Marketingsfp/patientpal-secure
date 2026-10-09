@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
+import { GRUPOS_PERMISSOES_OSZAP } from "./permissoes-oszap";
 import {
   ADMIN_ONLY_ROUTES,
   moduloDaRota,
@@ -62,15 +63,19 @@ describe("guarda de rotas privadas", () => {
 // admin tenha onde liberar. Foi exatamente o que ocorreu com "hiperdia" e
 // "consulta-ia".
 const PERFIS_TSX = readFileSync("src/routes/_authenticated/app.perfis.tsx", "utf8");
-const MODULOS_DA_TELA = new Set(
-  [...PERFIS_TSX.matchAll(/key:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]!),
-);
+const MODULOS_DA_TELA = new Set([
+  ...[...PERFIS_TSX.matchAll(/key:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]!),
+  ...GRUPOS_PERMISSOES_OSZAP.flatMap((g) => g.modulos.map((m) => m.key)),
+]);
 
 const MODULOS_DAS_ROTAS = [
   ...new Set(Object.values(ROUTE_TO_MODULE).filter((m): m is string => typeof m === "string")),
 ];
 
 describe("tela Perfis de Acesso cobre os módulos usados nas rotas", () => {
+  it("a tela inclui os grupos compartilhados do OS ZAP", () => {
+    expect(PERFIS_TSX).toContain("...GRUPOS_PERMISSOES_OSZAP");
+  });
   it("leu a lista de módulos da tela", () => {
     expect(MODULOS_DA_TELA.size).toBeGreaterThan(50);
   });
@@ -136,8 +141,7 @@ describe("menu lateral está coberto pela matriz de permissões", () => {
 // "Numeração de Prontuário", "NFS-e" com "Configuração NFS-e"…), o gestor
 // não tem como esconder um sem esconder o outro — foi exatamente a falha
 // relatada. Itens que apontam para a MESMA rota com âncoras diferentes
-// (ex.: as abas da Nina) continuam podendo dividir a chave, porque são a
-// mesma tela.
+// As abas do OS ZAP também têm chaves separadas (cobertas em permissoes-oszap.test.ts).
 describe("cada item do menu tem uma permissão própria", () => {
   it("nenhum módulo governa dois itens de menu diferentes", () => {
     const porModulo = new Map<string, string[]>();

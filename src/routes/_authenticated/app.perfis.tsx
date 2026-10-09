@@ -48,6 +48,11 @@ import { diffDaPessoa } from "@/lib/permissoes-pessoa";
 import { ESCOPOS_AUTORIZACAO, type EscopoAutorizacao } from "@/lib/autorizacao-supervisor";
 import { Switch } from "@/components/ui/switch";
 import { SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
+import {
+  GRUPOS_PERMISSOES_OSZAP,
+  herdarAcessosOsZap,
+  padraoOsZapDaPessoa,
+} from "@/lib/permissoes-oszap";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
@@ -616,52 +621,15 @@ const GRUPOS_BASE: Grupo[] = [
       },
     ],
   },
+  ...GRUPOS_PERMISSOES_OSZAP,
   {
-    // Portal OS ZAP (atendimento por WhatsApp) e portal Coach. No menu lateral
-    // essas telas ficam nas seções Atendimento, Nina, Configurações do
-    // WhatsApp e Treinamento, que só aparecem dentro desses portais.
-    label: "WhatsApp — OS ZAP e Coach",
+    label: "Coach WhatsApp",
     modulos: [
-      {
-        key: "nina",
-        nome: "Nina — WhatsApp",
-        descricao:
-          "Conversas, mensagens prontas, informações da clínica, homologação e configuração do WhatsApp",
-        menu: "OS ZAP › Atendimento, Nina e Configurações do WhatsApp",
-      },
-      {
-        key: "nina-aprendizado",
-        nome: "Nina › Revisão de Aprendizados",
-        descricao: "Fila de aprendizados reportados, para aprovar ou recusar",
-        menu: "OS ZAP › Nina › Revisão de Aprendizados",
-        sub: true,
-      },
-      {
-        key: "nina-metricas",
-        nome: "Nina › Métricas de Aprendizado",
-        descricao: "Indicadores de acerto e evolução da Nina",
-        menu: "OS ZAP › Nina › Métricas de Aprendizado",
-        sub: true,
-      },
-      {
-        key: "nina-arquitetura",
-        nome: "Nina › Arquitetura",
-        descricao: "Mapa interno das funções e instruções da Nina",
-        menu: "OS ZAP › Nina › Arquitetura",
-        sub: true,
-      },
       {
         key: "coach",
         nome: "Coach WhatsApp",
         descricao: "Treinamento de atendentes (ver = só o próprio; editar = painel da gestora)",
         menu: "Treinamento › Coach WhatsApp",
-      },
-      {
-        key: "francisco",
-        nome: "Francisco",
-        descricao:
-          "Acompanhamento de orçamentos, configuração e homologação; publicação exclusiva de administrador",
-        menu: "OS ZAP › Francisco",
       },
     ],
   },
@@ -825,6 +793,9 @@ function PerfisPage() {
   const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>(
     {} as Record<PerfilKey, string>,
   );
+  const [configuradosPorPerfil, setConfiguradosPorPerfil] = useState(
+    new Map<PerfilKey, Set<string>>(),
+  );
   // --- Aba "Por pessoa" -------------------------------------------------
   // `modo` escolhe o que a grade está editando: a regra do cargo (que vale
   // para todo mundo daquele perfil) ou a exceção de UMA pessoa.
@@ -885,6 +856,15 @@ function PerfisPage() {
 
           const idToChave: Record<string, PerfilKey> = {};
           for (const p of perfis ?? []) idToChave[p.id] = p.chave as PerfilKey;
+          const configurados = new Map<PerfilKey, Set<string>>();
+          for (const row of perms ?? []) {
+            const chave = idToChave[row.perfil_id];
+            if (!chave) continue;
+            const keys = configurados.get(chave) ?? new Set<string>();
+            keys.add(row.modulo);
+            configurados.set(chave, keys);
+          }
+          setConfiguradosPorPerfil(configurados);
 
           setMatriz((prev) => {
             const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
@@ -907,6 +887,9 @@ function PerfisPage() {
                 seen[chave] = true;
               }
               next[chave][row.modulo] = row.acesso as Acesso;
+            }
+            for (const p of PERFIS) {
+              herdarAcessosOsZap(next[p.key], configurados.get(p.key) ?? new Set(), PRESETS[p.key]);
             }
             return next;
           });
@@ -1036,6 +1019,7 @@ function PerfisPage() {
         .upsert(rows, { onConflict: "perfil_id,modulo" });
       if (error) throw error;
       toast.success("Permissões salvas");
+      setConfiguradosPorPerfil((prev) => new Map(prev).set(perfilSel, new Set(TODOS_MODULOS)));
 
       // FASE 3 — quem recebe handoff da Nina é o PERFIL Telefonia. Ao salvar
       // esse perfil, quem já está Online pode ter virado elegível: reavaliamos
@@ -1088,10 +1072,16 @@ function PerfisPage() {
   }, [pessoa, matriz, TODOS_MODULOS]);
 
   // O que a pessoa realmente enxerga: o cargo, com as exceções por cima.
-  const efetivoPessoa = useMemo<Record<string, Acesso>>(
-    () => ({ ...basePessoa, ...overridesPessoa }),
-    [basePessoa, overridesPessoa],
-  );
+  const padraoPessoa = useMemo<Record<string, Acesso>>(() => {
+    if (!pessoa?.role) return basePessoa;
+    return padraoOsZapDaPessoa(
+      basePessoa,
+      configuradosPorPerfil.get(pessoa.role) ?? new Set(),
+      PRESETS[pessoa.role],
+      overridesPessoa,
+    );
+  }, [basePessoa, overridesPessoa, pessoa, configuradosPorPerfil]);
+  const efetivoPessoa = { ...padraoPessoa, ...overridesPessoa };
 
   const editandoPessoa = modo === "pessoa";
   const bloqueado =
@@ -1109,16 +1099,20 @@ function PerfisPage() {
       setOverridesPessoa((prev) => {
         const proximo = { ...prev };
         // Voltou a valer o mesmo que o cargo: deixa de ser exceção.
-        if (valor === (basePessoa[modulo] ?? "none")) delete proximo[modulo];
+        if (valor === (padraoPessoa[modulo] ?? "none")) delete proximo[modulo];
         else proximo[modulo] = valor;
         return proximo;
       });
       return;
     }
-    setMatriz((prev) => ({
-      ...prev,
-      [perfilSel]: { ...prev[perfilSel], [modulo]: valor },
-    }));
+    const configurados = new Set(configuradosPorPerfil.get(perfilSel));
+    configurados.add(modulo);
+    setConfiguradosPorPerfil((prev) => new Map(prev).set(perfilSel, configurados));
+    setMatriz((prev) => {
+      const valores = { ...prev[perfilSel], [modulo]: valor };
+      herdarAcessosOsZap(valores, configurados, PRESETS[perfilSel]);
+      return { ...prev, [perfilSel]: valores };
+    });
   };
 
   /** Devolve um módulo ao que o cargo da pessoa manda. */
@@ -1134,11 +1128,12 @@ function PerfisPage() {
     if (editandoPessoa) {
       setOverridesPessoa(
         Object.fromEntries(
-          TODOS_MODULOS.filter((k) => valor !== (basePessoa[k] ?? "none")).map((k) => [k, valor]),
+          TODOS_MODULOS.filter((k) => valor !== (padraoPessoa[k] ?? "none")).map((k) => [k, valor]),
         ),
       );
       return;
     }
+    setConfiguradosPorPerfil((prev) => new Map(prev).set(perfilSel, new Set(TODOS_MODULOS)));
     setMatriz((prev) => ({
       ...prev,
       [perfilSel]: Object.fromEntries(TODOS_MODULOS.map((k) => [k, valor])),
@@ -1210,7 +1205,7 @@ function PerfisPage() {
       // APAGADO — gravar o valor igual congelaria a pessoa se o cargo mudasse.
       const { gravar, apagar: paraApagar } = diffDaPessoa(
         TODOS_MODULOS,
-        basePessoa,
+        padraoPessoa,
         efetivoPessoa,
         overridesSalvos,
       );

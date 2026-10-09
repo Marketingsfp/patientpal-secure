@@ -1,4 +1,5 @@
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { HorarioFuncionamento } from "@/components/nina/catalogo/HorarioFuncionamento";
 
 /**
@@ -11,7 +12,8 @@ import { HorarioFuncionamento } from "@/components/nina/catalogo/HorarioFunciona
 export function InformacoesClinica() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
-  const podeEditar = ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
+  const podeEscrever = usePodeEscrever("nina-informacoes-clinica");
+  const podeEditar = podeEscrever && ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
 
   return <HorarioFuncionamento clinicaId={clinicaId} podeEditar={podeEditar} />;
 }

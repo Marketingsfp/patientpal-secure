@@ -60,6 +60,8 @@ import {
 } from "@/lib/francisco/functions";
 import type { ConfigRegistro, CursorFrancisco } from "@/lib/francisco/service.server";
 import { HomologacaoFrancisco } from "./HomologacaoFrancisco";
+import { acessosFrancisco } from "@/lib/francisco/permissoes";
+import { TELAS_OSZAP } from "@/lib/permissoes-oszap";
 
 const ICONES = [Bot, Network, Mic, MessageCircle, Clock3, FlaskConical, History];
 const MOTIVOS: Record<string, string> = {
@@ -134,10 +136,12 @@ export function FranciscoWorkspace({
   clinicaId,
   clinicaNome,
   preview = false,
+  chaveAcesso,
 }: {
   clinicaId: string;
   clinicaNome: string;
   preview?: boolean;
+  chaveAcesso?: string;
 }) {
   const hash = useRouterState({ select: (s) => s.location.hash });
   // O fragmento não chega ao SSR. Hidratar primeiro com a mesma aba do servidor
@@ -173,10 +177,16 @@ export function FranciscoWorkspace({
   const [resultado, setResultado] = useState("");
   const [audio, setAudio] = useState<string | null>(null);
   const consulta = useQuery({
-    queryKey: ["francisco-config", clinicaId, preview],
+    queryKey: ["francisco-config", clinicaId, chaveAcesso, preview],
     queryFn: async () =>
       preview
-        ? { registro: null, podeEditar: true, podePublicar: true, envioRealLiberado: false }
+        ? {
+            registro: null,
+            podeEditar: true,
+            podePublicar: true,
+            envioRealLiberado: false,
+            acessos: acessosFrancisco(Object.fromEntries(TELAS_OSZAP.map((t) => [t.key, "write"]))),
+          }
         : carregar({ data: { clinicaId } }),
     retry: false,
     refetchOnWindowFocus: false,
@@ -189,7 +199,9 @@ export function FranciscoWorkspace({
     setConfig(c);
     setOriginal(c);
   }, [consulta.data]);
-  const podeEditar = !!consulta.data?.podeEditar && !consulta.isError;
+  const podeAbrirAba = (id: AbaFrancisco) =>
+    consulta.data?.acessos[id] !== undefined && consulta.data.acessos[id] !== "none";
+  const podeEditar = consulta.data?.acessos[aba] === "write" && !consulta.isError;
   const alterado = JSON.stringify(config) !== JSON.stringify(original);
   const publicado = registro?.publicado;
   const envioRealAtivo =
@@ -208,6 +220,7 @@ export function FranciscoWorkspace({
   };
   const gravar = (publicar: boolean) =>
     acao(async () => {
+      if (!podeEditar || (publicar && !consulta.data?.podePublicar)) return;
       const c = franciscoConfigSchema.parse(config);
       if (preview) {
         setOriginal(c);
@@ -257,6 +270,7 @@ export function FranciscoWorkspace({
   const linhas = paginas.flatMap((p) => p.itens),
     proximo = paginas.at(-1)?.proximo;
   async function testar(tipo: "modelo" | "voz" | "templates") {
+    if (!podeEditar) return;
     await acao(async () => {
       if (preview) {
         setResultado(
@@ -281,14 +295,15 @@ export function FranciscoWorkspace({
       {input}
     </CampoFrancisco>
   );
-  const botaoAba = (destino: AbaFrancisco, texto: string) => (
-    <Button variant="outline" asChild>
-      <Link to={preview ? "/dev/francisco" : "/app/francisco"} hash={destino}>
-        {texto}
-        <ArrowRight className="size-4" />
-      </Link>
-    </Button>
-  );
+  const botaoAba = (destino: AbaFrancisco, texto: string) =>
+    podeAbrirAba(destino) ? (
+      <Button variant="outline" asChild>
+        <Link to={preview ? "/dev/francisco" : "/app/francisco"} hash={destino}>
+          {texto}
+          <ArrowRight className="size-4" />
+        </Link>
+      </Button>
+    ) : null;
   function editorNode() {
     if (node === "identidade")
       return (
@@ -521,7 +536,7 @@ export function FranciscoWorkspace({
             <Button
               size="sm"
               onClick={() => void gravar(true)}
-              disabled={ocupado || !consulta.data?.podePublicar || consulta.isError}
+              disabled={ocupado || !podeEditar || !consulta.data?.podePublicar || consulta.isError}
             >
               <CheckCircle2 className="size-4" />
               Publicar configuração
@@ -530,6 +545,7 @@ export function FranciscoWorkspace({
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b pb-2" aria-label="Abas do Francisco">
           {ABAS_FRANCISCO.map(([id, label], i) => {
+            if (!podeAbrirAba(id)) return null;
             const Icon = ICONES[i];
             return (
               <Button
@@ -546,7 +562,7 @@ export function FranciscoWorkspace({
             );
           })}
         </nav>
-        {consulta.isPending ? (
+        {!montado || consulta.isPending ? (
           <div className="flex items-center gap-2 py-10 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
             Carregando Francisco…
@@ -561,6 +577,10 @@ export function FranciscoWorkspace({
               Tentar novamente
             </Button>
           </div>
+        ) : !podeAbrirAba(aba) ? (
+          <p role="alert" className="py-10 text-muted-foreground">
+            Sem permissão para esta aba do Francisco.
+          </p>
         ) : (
           <>
             {aba === "visao-geral" && (

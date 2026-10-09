@@ -32,6 +32,7 @@ import {
 import { confirmDialog } from "@/lib/confirm";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import {
   notificarRespostasAtualizadas,
   useRespostasRapidas,
@@ -71,6 +72,7 @@ const VAZIO: Form = {
 };
 
 export function RespostasRapidasManager() {
+  const podeEscrever = usePodeEscrever("oszap-mensagens-prontas");
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const dados = useRespostasRapidas(clinicaId);
@@ -91,13 +93,16 @@ export function RespostasRapidasManager() {
     );
   }, [dados.respostas, busca]);
 
-  const podeEditar = (r: RespostaRapida) => (r.escopo === "pessoal" ? true : dados.podeGerenciar);
+  const podeEditar = (r: RespostaRapida) =>
+    podeEscrever && (r.escopo === "pessoal" || dados.podeGerenciar);
 
   function abrirNovo() {
+    if (!podeEscrever) return;
     setForm({ ...VAZIO, escopo: dados.podeGerenciar ? "clinica" : "pessoal" });
     setAberto(true);
   }
   function abrirEdicao(r: RespostaRapida) {
+    if (!podeEditar(r)) return;
     setForm({
       id: r.id,
       nome: r.nome,
@@ -111,7 +116,7 @@ export function RespostasRapidasManager() {
   }
 
   async function salvar() {
-    if (!clinicaId) return;
+    if (!clinicaId || !podeEscrever) return;
     const erro = validarComando(form.comando);
     if (erro) {
       toast.error(erro);
@@ -151,7 +156,7 @@ export function RespostasRapidasManager() {
   }
 
   async function excluir(r: RespostaRapida) {
-    if (!clinicaId) return;
+    if (!clinicaId || !podeEditar(r)) return;
     const ok = await confirmDialog({
       title: `Excluir /${r.comando}?`,
       description: "A mensagem rápida deixará de aparecer no atendimento.",
@@ -169,7 +174,7 @@ export function RespostasRapidasManager() {
   }
 
   async function alternarAtivo(r: RespostaRapida, ativo: boolean) {
-    if (!clinicaId) return;
+    if (!clinicaId || !podeEditar(r)) return;
     try {
       await salvarFn({
         data: {
@@ -196,7 +201,7 @@ export function RespostasRapidasManager() {
         <Zap className="h-5 w-5 text-primary" aria-hidden="true" />
         <h1 className="text-xl font-semibold">Mensagens rápidas</h1>
         <Badge variant="outline">Atalhos internos</Badge>
-        <Button className="ml-auto" onClick={abrirNovo}>
+        <Button className="ml-auto" onClick={abrirNovo} disabled={!podeEscrever}>
           <Plus className="mr-1 h-4 w-4" /> Nova mensagem
         </Button>
       </div>
@@ -412,7 +417,7 @@ export function RespostasRapidasManager() {
             <Button variant="outline" onClick={() => setAberto(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => void salvar()} disabled={salvando}>
+            <Button onClick={() => void salvar()} disabled={salvando || !podeEscrever}>
               {salvando && <Loader2 className="mr-1 h-4 w-4 animate-spin" />} Salvar
             </Button>
           </DialogFooter>

@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { CATEGORIAS_FEEDBACK_NINA, rotuloCategoriaFeedback } from "@/lib/nina/feedback-erros";
 import {
@@ -341,7 +342,9 @@ function Pagina() {
 
   const [autores, setAutores] = useState<{ id: string; nome: string }[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [podeRevisar, setPodeRevisar] = useState(false);
+  const [podeRevisarNoServidor, setPodeRevisar] = useState(false);
+  const podeEscrever = usePodeEscrever("nina-aprendizado");
+  const podeRevisar = podeRevisarNoServidor && podeEscrever;
 
   const [rejeitando, setRejeitando] = useState<Item | null>(null);
   const [motivo, setMotivo] = useState("");

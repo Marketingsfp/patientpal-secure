@@ -1,7 +1,8 @@
 import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   FileText,
   Plus,
@@ -16,6 +17,9 @@ import {
   Download,
   History,
   Workflow,
+  Camera,
+  Loader2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -56,6 +60,11 @@ import { DateInputBR } from "@/components/ui/date-input-br";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { ReactNode } from "react";
 import { primeiroValorValido } from "@/lib/convenio/info-convenio-paciente";
+import { comprimirImagem } from "@/lib/odonto-imagens";
+import { lerPedidoMedicoParaOrcamento } from "@/lib/orcamentos/ler-pedido-medico.functions";
+import { medicosComNomeLido } from "@/lib/orcamentos/leitura-pedido";
+import { escolhaSegura, ordenarServicosDoPedido } from "@/lib/orcamentos/correspondencia-servico";
+import { normalizarBusca } from "@/lib/busca/relevancia";
 
 const ICON_BTN =
   "p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center";
@@ -327,6 +336,46 @@ type MedicoOpt = {
   crm: string | null;
   crm_uf: string | null;
 };
+
+/** Cada exame lido na foto do pedido e o que aconteceu com ele no orçamento. */
+type ItemDoPedido = {
+  lido: string;
+  situacao: "adicionado" | "escolher" | "outra_categoria" | "nao_encontrado";
+  servico?: Procedimento;
+  /** Melhores cadastros da tabela, do mais provável ao menos. */
+  sugestoes: { servico: Procedimento; usos: number }[];
+  /** Mostrando as outras opções para trocar o que entrou sozinho. */
+  trocando?: boolean;
+};
+
+type PedidoLido = {
+  pacienteNome: string | null;
+  pacientes: PatientOption[];
+  medicoNome: string | null;
+  /** null = nome do médico não lido; "mantido" = o campo já estava preenchido. */
+  medicoSituacao: "cadastrado" | "varios" | "externo" | "mantido" | null;
+  medicoOpcoes: MedicoOpt[];
+  marcacaoIncerta: boolean;
+  itens: ItemDoPedido[];
+};
+
+const MENSAGEM_LEITURA_FALHOU: Record<string, string> = {
+  receita_remedio: "A foto parece ser uma receita de remédios, não um pedido de exames.",
+  outro: "A foto não parece ser um pedido médico.",
+  ilegivel:
+    "Não foi possível ler o pedido com segurança. Tire outra foto com boa luz e o papel inteiro, ou preencha manualmente.",
+  falha_tecnica:
+    "A leitura automática não está disponível agora. Tente de novo em instantes ou preencha manualmente.",
+};
+
+function blobParaDataUrl(blob: Blob, mime: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result).replace(/^data:[^;]*;/, `data:${mime};`));
+    leitor.onerror = () => reject(leitor.error);
+    leitor.readAsDataURL(blob);
+  });
+}
 
 const FORMAS = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto", "Outro"];
 // Laboratório usa só as formas do balcão, para o modal caber na tela.
@@ -1144,6 +1193,28 @@ function NovoOrcamentoDialog({
     }
   };
 
+  const buscarServicos = (cat: typeof categoria, termo: string) => {
+    let q = supabase
+      .from("procedimentos")
+      .select(
+        "id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel",
+      )
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true);
+    // Palavra por palavra, com as abreviações do cadastro (RM, USG, TC…).
+    for (const filtro of filtrosOrNomeServico(termo)) q = q.or(filtro);
+    if (cat === "laboratorio") {
+      q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
+    } else if (cat === "demais") {
+      // Tipo/grupo em branco é "demais": `not eq` sozinho descarta o NULL e
+      // escondia Ecocardiograma, Doppler de Carótidas, RM de Joelho…
+      q = q
+        .or("tipo_procedimento.is.null,tipo_procedimento.neq.laboratorio")
+        .or("grupo.is.null,grupo.not.ilike.%labor%");
+    }
+    return q;
+  };
+
   useEffect(() => {
     let cancel = false;
     if (procQuery.trim().length < 2) {
@@ -1153,27 +1224,7 @@ function NovoOrcamentoDialog({
     }
     setSearchingProc(true);
     setNaOutraCategoria(false);
-    const buscar = (cat: typeof categoria) => {
-      let q = supabase
-        .from("procedimentos")
-        .select(
-          "id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel",
-        )
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true);
-      // Palavra por palavra, com as abreviações do cadastro (RM, USG, TC…).
-      for (const filtro of filtrosOrNomeServico(procQuery)) q = q.or(filtro);
-      if (cat === "laboratorio") {
-        q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
-      } else if (cat === "demais") {
-        // Tipo/grupo em branco é "demais": `not eq` sozinho descarta o NULL e
-        // escondia Ecocardiograma, Doppler de Carótidas, RM de Joelho…
-        q = q
-          .or("tipo_procedimento.is.null,tipo_procedimento.neq.laboratorio")
-          .or("grupo.is.null,grupo.not.ilike.%labor%");
-      }
-      return q;
-    };
+    const buscar = (cat: typeof categoria) => buscarServicos(cat, procQuery);
     const t = setTimeout(async () => {
       const { data } = await buscar(categoria).order("nome").limit(20);
       // Nada na categoria escolhida: confere a outra para avisar a recepção
@@ -1195,6 +1246,8 @@ function NovoOrcamentoDialog({
       cancel = true;
       clearTimeout(t);
     };
+    // `buscarServicos` só depende de clinicaId, que já está na lista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [procQuery, clinicaId, categoria]);
 
   // Preço do serviço em cada forma. Pula coluna zerada (mesma regra da
@@ -1315,7 +1368,9 @@ function NovoOrcamentoDialog({
     });
   }, [formaPrincipal, assinaturaPrecos]);
 
-  const adicionarProc = (p: Procedimento) => {
+  // `silencioso`: entrada em lote pela foto do pedido, sem um aviso por exame
+  // (o quadro de preparo e a conferência do pedido já mostram tudo).
+  const adicionarProc = (p: Procedimento, { silencioso = false } = {}) => {
     if (itens.some((it) => it.procedimento_id === p.id)) {
       toast.warning(`${p.nome} já foi adicionado ao orçamento`);
       setProcQuery("");
@@ -1338,10 +1393,11 @@ function NovoOrcamentoDialog({
       const valoresDasFormas = FORMAS_LAB.map((f) => valorPorForma(p, f));
       if (valoresDasFormas.some((v) => v !== valoresDasFormas[0])) {
         setPagamentoUnificado(false);
-        toast.warning(`${p.nome} tem valor diferente por forma de pagamento`, {
-          description: "Escolha a forma de pagamento deste orçamento.",
-          duration: 8000,
-        });
+        if (!silencioso)
+          toast.warning(`${p.nome} tem valor diferente por forma de pagamento`, {
+            description: "Escolha a forma de pagamento deste orçamento.",
+            duration: 8000,
+          });
       }
     }
     if (categoria === "laboratorio") {
@@ -1351,10 +1407,10 @@ function NovoOrcamentoDialog({
           sugeridos.reduce((t, id) => alternarPreparoNoTexto(t, id, true), txt).slice(0, 1000),
         );
     }
-    if (p.preparo && p.preparo.trim()) {
+    if (!silencioso && p.preparo && p.preparo.trim()) {
       toast.warning(`⚠ ${p.nome} exige preparo`, { description: p.preparo, duration: 6000 });
     }
-    if (p.valor_variavel) {
+    if (!silencioso && p.valor_variavel) {
       toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`, { duration: 6000 });
     }
     setProcQuery("");
@@ -1384,6 +1440,186 @@ function NovoOrcamentoDialog({
       { descricao: "", quantidade: 1, valor_unitario: 0, procedimento_id: null, preparo: null },
     ]);
   };
+
+  // ── Leitura do pedido médico por foto ──
+  // A IA só sugere: a recepção escolhe o paciente e confere médico e exames.
+  // Preço e preparo vêm do catálogo, como na busca manual. A foto não é guardada.
+  const { clinicaIds } = useClinica();
+  const lerPedido = useServerFn(lerPedidoMedicoParaOrcamento);
+  const fotoRef = useRef<HTMLInputElement>(null);
+  const [lendoPedido, setLendoPedido] = useState(false);
+  const [pedidoLido, setPedidoLido] = useState<PedidoLido | null>(null);
+
+  const lerFotoDoPedido = async (arquivo: File) => {
+    if (!categoria) return;
+    setLendoPedido(true);
+    try {
+      const { blob, mime } = await comprimirImagem(arquivo);
+      if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/i.test(mime)) {
+        return toast.error("Envie uma foto (JPG ou PNG) ou um PDF do pedido.");
+      }
+      if (blob.size > 8_000_000) {
+        return toast.error("Arquivo grande demais. Tire uma foto só do pedido.");
+      }
+      const r = await lerPedido({ data: { arquivo: await blobParaDataUrl(blob, mime) } });
+      const { leitura } = r;
+      if (leitura.tipo !== "pedido_medico" && leitura.tipo !== "marcacao_incerta") {
+        return toast.error(MENSAGEM_LEITURA_FALHOU[leitura.tipo], { duration: 8000 });
+      }
+
+      // Paciente: nunca escolhido sozinho; a recepção confirma entre os parecidos.
+      let pacientes: PatientOption[] = [];
+      if (r.pacienteNome) {
+        if (!pacienteSelecionado && !pacienteNome.trim()) setPacienteNome(r.pacienteNome);
+        const { data } = await supabase.rpc("buscar_pacientes_global", {
+          _clinica_ids: clinicaIds.length > 0 ? clinicaIds : [clinicaId],
+          _termo: r.pacienteNome,
+          _limite: 5,
+        });
+        pacientes = (data ?? []) as PatientOption[];
+      }
+
+      // Médico: preenche só se o campo ainda está vazio.
+      let medicoSituacao: PedidoLido["medicoSituacao"] = "mantido";
+      let medicoOpcoes: MedicoOpt[] = [];
+      const medicoVazio = !medicoParticular && !medicoId && !(medicoExterno && medicoNome.trim());
+      if (!r.medicoNome) medicoSituacao = null;
+      else if (medicoVazio) {
+        medicoOpcoes = medicosComNomeLido(r.medicoNome, medicos);
+        if (medicoOpcoes.length === 1) {
+          alternarMedicoExterno(false);
+          selecionarMedico(medicoOpcoes[0].id);
+          medicoSituacao = "cadastrado";
+        } else if (medicoOpcoes.length > 1) {
+          alternarMedicoExterno(false);
+          medicoSituacao = "varios";
+        } else {
+          alternarMedicoExterno(true);
+          setMedicoNome(r.medicoNome);
+          medicoSituacao = "externo";
+        }
+      }
+
+      // Exames: compara com a tabela inteira da categoria e com o que a recepção
+      // já escolheu antes. Entra sozinho só o cadastro claramente à frente.
+      const lidos = leitura.tipo === "pedido_medico" ? leitura.itens : [];
+      const outra = categoria === "laboratorio" ? "demais" : "laboratorio";
+      const [catalogo, usos] = lidos.length
+        ? await Promise.all([carregarCatalogo(categoria), carregarUsos()])
+        : [[], new Map<string, number>()];
+      const usosDe = (p: Procedimento) =>
+        (usos.get(p.id) ?? 0) + (usos.get(normalizarBusca(p.nome)) ?? 0);
+      const resultado: ItemDoPedido[] = [];
+      for (const lido of lidos) {
+        const ordenados = ordenarServicosDoPedido(lido, catalogo, usosDe, valorDoProc);
+        const sugestoes = ordenados.slice(0, 4).map((o) => ({ servico: o.servico, usos: o.usos }));
+        if (sugestoes.length === 0) {
+          const { data: d2 } = await buscarServicos(outra, lido).limit(1);
+          resultado.push({
+            lido,
+            situacao: (d2 ?? []).length ? "outra_categoria" : "nao_encontrado",
+            sugestoes,
+          });
+          continue;
+        }
+        const escolhido = escolhaSegura(ordenados, valorDoProc);
+        resultado.push(
+          escolhido
+            ? { lido, situacao: "adicionado", servico: escolhido, sugestoes }
+            : { lido, situacao: "escolher", sugestoes },
+        );
+      }
+      const noOrcamento = new Set(itens.map((it) => it.procedimento_id));
+      let adicionados = 0;
+      for (const it of resultado) {
+        if (it.situacao !== "adicionado" || !it.servico || noOrcamento.has(it.servico.id)) continue;
+        noOrcamento.add(it.servico.id);
+        adicionarProc(it.servico, { silencioso: true });
+        adicionados++;
+      }
+
+      setPedidoLido({
+        pacienteNome: r.pacienteNome,
+        pacientes,
+        medicoNome: r.medicoNome,
+        medicoSituacao,
+        medicoOpcoes,
+        marcacaoIncerta: leitura.tipo === "marcacao_incerta",
+        itens: resultado,
+      });
+      toast.success(
+        adicionados > 0
+          ? `${adicionados} exame(s) adicionado(s) pelo pedido. Confira antes de gerar.`
+          : "Pedido lido. Confira os dados antes de gerar.",
+      );
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLendoPedido(false);
+    }
+  };
+
+  // Tabela inteira da categoria (o PostgREST entrega 1000 linhas por vez).
+  const carregarCatalogo = async (cat: typeof categoria) => {
+    const todos: Procedimento[] = [];
+    for (let de = 0; de < 10_000; de += 1000) {
+      const { data, error } = await buscarServicos(cat, "")
+        .order("nome")
+        .range(de, de + 999);
+      if (error) throw error;
+      todos.push(...((data ?? []) as Procedimento[]));
+      if ((data ?? []).length < 1000) break;
+    }
+    return todos;
+  };
+
+  // Quantas vezes a recepção já escolheu cada serviço em orçamentos da clínica
+  // (pelo vínculo com a tabela ou, nos itens antigos, pelo nome).
+  const carregarUsos = async () => {
+    const usos = new Map<string, number>();
+    for (let de = 0; de < 5000; de += 1000) {
+      const { data } = await supabase
+        .from("orcamento_itens")
+        .select("descricao, procedimento_id, orcamentos!inner(clinica_id)")
+        .eq("orcamentos.clinica_id", clinicaId)
+        .order("created_at", { ascending: false })
+        .range(de, de + 999);
+      for (const it of data ?? []) {
+        const chave = it.procedimento_id ?? normalizarBusca(it.descricao ?? "");
+        if (chave) usos.set(chave, (usos.get(chave) ?? 0) + 1);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
+    return usos;
+  };
+
+  const escolherServicoDoPedido = (idx: number, p: Procedimento) => {
+    const anterior = pedidoLido?.itens[idx]?.servico;
+    // Trocar a sugestão: sai o cadastro que tinha entrado pela foto.
+    if (anterior && anterior.id !== p.id)
+      setItens((arr) => arr.filter((it) => it.procedimento_id !== anterior.id));
+    adicionarProc(p);
+    setPedidoLido((atual) =>
+      atual
+        ? {
+            ...atual,
+            itens: atual.itens.map((it, i) =>
+              i === idx ? { ...it, situacao: "adicionado", servico: p, trocando: false } : it,
+            ),
+          }
+        : atual,
+    );
+  };
+
+  const alternarTrocaDoPedido = (idx: number) =>
+    setPedidoLido((atual) =>
+      atual
+        ? {
+            ...atual,
+            itens: atual.itens.map((it, i) => (i === idx ? { ...it, trocando: !it.trocando } : it)),
+          }
+        : atual,
+    );
 
   const subtotal = itens.reduce(
     (s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0),
@@ -1562,6 +1798,226 @@ function NovoOrcamentoDialog({
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-dashed p-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  disabled={lendoPedido}
+                  onClick={() => fotoRef.current?.click()}
+                >
+                  {lendoPedido ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  {lendoPedido ? "Lendo o pedido…" : "Ler pedido médico (foto)"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Tire ou escolha a foto do pedido: paciente, médico e exames são preenchidos para
+                  você conferir.
+                </span>
+                <input
+                  ref={fotoRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const arquivo = e.target.files?.[0];
+                    e.target.value = "";
+                    if (arquivo) void lerFotoDoPedido(arquivo);
+                  }}
+                />
+              </div>
+
+              {pedidoLido && (
+                <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">Lido do pedido — confira antes de gerar</span>
+                    <button
+                      type="button"
+                      onClick={() => setPedidoLido(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Fechar conferência do pedido"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div>
+                    <b>Paciente:</b>{" "}
+                    {pedidoLido.pacienteNome ?? (
+                      <span className="text-muted-foreground">não lido — preencha abaixo</span>
+                    )}
+                    {pedidoLido.pacienteNome && !pacienteSelecionado && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {pedidoLido.pacientes.length > 0 ? (
+                          <>
+                            <span className="text-xs text-muted-foreground">É um destes?</span>
+                            {pedidoLido.pacientes.map((p) => (
+                              <Button
+                                key={p.id}
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => selecionarPaciente(p)}
+                              >
+                                {p.nome}
+                                {p.data_nascimento &&
+                                  ` · ${p.data_nascimento.split("-").reverse().join("/")}`}
+                              </Button>
+                            ))}
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Nenhum cadastro parecido — confira se é paciente novo.
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <b>Médico:</b>{" "}
+                    {!pedidoLido.medicoNome ? (
+                      <span className="text-muted-foreground">não lido — preencha abaixo</span>
+                    ) : (
+                      <>
+                        {pedidoLido.medicoNome}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          {pedidoLido.medicoSituacao === "cadastrado" &&
+                            "(encontrado no cadastro da clínica)"}
+                          {pedidoLido.medicoSituacao === "externo" &&
+                            "(não está no cadastro — preenchido como de outro local; informe a clínica solicitante)"}
+                          {pedidoLido.medicoSituacao === "mantido" &&
+                            "(mantido o médico que já estava preenchido)"}
+                        </span>
+                        {pedidoLido.medicoSituacao === "varios" && !medicoId && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className="text-xs text-muted-foreground">Qual deles?</span>
+                            {pedidoLido.medicoOpcoes.map((m) => (
+                              <Button
+                                key={m.id}
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => selecionarMedico(m.id)}
+                              >
+                                {m.nome}
+                                {m.crm && ` · CRM ${m.crm}`}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <b>Exames:</b>
+                    {pedidoLido.marcacaoIncerta && (
+                      <p className="text-xs rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1">
+                        Não deu para saber com segurança quais exames estão marcados no pedido.
+                        Adicione os exames manualmente pela busca abaixo.
+                      </p>
+                    )}
+                    <ul className="space-y-1">
+                      {pedidoLido.itens.map((it, idx) => (
+                        <li key={idx} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          {it.situacao === "adicionado" ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          )}
+                          <span>{it.lido}</span>
+                          {it.situacao === "adicionado" && it.servico && (
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                → <b className="text-foreground">{it.servico.nome}</b>{" "}
+                                {BRL(valorDoProc(it.servico))}
+                                {it.servico.valor_variavel && " (valor variável: informe o valor)"}
+                              </span>
+                              {it.sugestoes.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-primary underline"
+                                  onClick={() => alternarTrocaDoPedido(idx)}
+                                >
+                                  {it.trocando ? "manter" : "trocar"}
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {it.situacao === "escolher" && (
+                            <span className="text-xs text-muted-foreground">
+                              qual destes? (o primeiro é o mais provável)
+                            </span>
+                          )}
+                          {(it.situacao === "escolher" ||
+                            (it.situacao === "adicionado" && it.trocando)) && (
+                            <div className="basis-full flex flex-wrap gap-1 pl-5">
+                              {it.sugestoes
+                                .filter((sg) => sg.servico.id !== it.servico?.id)
+                                .map((sg, i) => (
+                                  <Button
+                                    key={sg.servico.id}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className={`h-auto min-h-6 px-2 py-0.5 text-[11px] text-left whitespace-normal ${
+                                      i === 0 && it.situacao === "escolher"
+                                        ? "border-primary bg-primary/10"
+                                        : ""
+                                    }`}
+                                    onClick={() => escolherServicoDoPedido(idx, sg.servico)}
+                                  >
+                                    {i === 0 && it.situacao === "escolher" && "★ "}
+                                    {sg.servico.nome} · {BRL(valorDoProc(sg.servico))}
+                                    {sg.usos > 0 && (
+                                      <span className="ml-1 text-muted-foreground">
+                                        · usado {sg.usos}× em orçamentos
+                                      </span>
+                                    )}
+                                  </Button>
+                                ))}
+                              <button
+                                type="button"
+                                className="text-[11px] font-semibold text-primary underline"
+                                onClick={() => setProcQuery(it.lido)}
+                              >
+                                outro…
+                              </button>
+                            </div>
+                          )}
+                          {(it.situacao === "nao_encontrado" ||
+                            it.situacao === "outra_categoria") && (
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                {it.situacao === "outra_categoria"
+                                  ? `está em ${categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"} — faça outro orçamento para ele`
+                                  : "não encontrado na tabela"}
+                              </span>
+                              {it.situacao === "nao_encontrado" && (
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-primary underline"
+                                  onClick={() => setProcQuery(it.lido)}
+                                >
+                                  procurar
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <Label>Buscar paciente cadastrado</Label>
                 <PatientSearchInput
