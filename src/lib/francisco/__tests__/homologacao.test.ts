@@ -25,7 +25,7 @@ describe("conversa de homologação do Francisco", () => {
     );
     expect(s.mensagens[1].texto).not.toContain("{{1}}");
   });
-  it("qualquer resposta pausa D4 e encaminha ao destino humano do teste", () => {
+  it("interesse pausa D4 e encaminha ao destino humano do teste", () => {
     const s = aplicarAcaoTesteFrancisco(sessao(), "resposta", em, {
       tipo: "paciente",
       texto: "Quero ajuda para pagar",
@@ -39,14 +39,20 @@ describe("conversa de homologação do Francisco", () => {
     });
     expect(posterior.mensagens.filter((m) => m.autor === "francisco")).toHaveLength(1);
   });
-  it.each(["SAIR", "não quero receber mensagens", "pare de enviar mensagens"])(
-    "reconhece saída: %s",
-    (texto) => {
-      const s = aplicarAcaoTesteFrancisco(sessao(), "saida", em, { tipo: "paciente", texto });
-      expect(s.estado).toBe("recusado");
-      expect(() => aplicarAcaoTesteFrancisco(s, "d4", em, { tipo: "d4" })).toThrow();
-    },
-  );
+  it.each([
+    "SAIR",
+    "não quero receber mensagens",
+    "pare de enviar mensagens",
+    "não quero pagar",
+    "não tenho interesse",
+    "Não",
+  ])("reconhece saída: %s", (texto) => {
+    const s = aplicarAcaoTesteFrancisco(sessao(), "saida", em, { tipo: "paciente", texto });
+    expect(s.estado).toBe("recusado");
+    expect(s.mensagens.at(-1)?.texto).toContain("sem encaminhamento humano");
+    expect(s.mensagens.filter((m) => m.autor === "francisco")).toHaveLength(1);
+    expect(() => aplicarAcaoTesteFrancisco(s, "d4", em, { tipo: "d4" })).toThrow();
+  });
   it("avança de D1 para D4 apenas uma vez enquanto não há resposta ou pagamento", () => {
     const s = aplicarAcaoTesteFrancisco(sessao(), "d4", em, { tipo: "d4" });
     expect(s.d4Enviado).toBe(true);
@@ -154,6 +160,20 @@ function banco() {
 }
 
 describe("persistência isolada dos testes", () => {
+  it("preserva o resultado dos eventos de homologação antigos", async () => {
+    const { db, linhas } = banco();
+    await iniciarConversaTesteFrancisco(db, "clinica", "ator", "sessao", inicio());
+    linhas.push({
+      id: "antiga",
+      clinica_id: "clinica",
+      ator: "ator",
+      tipo: "homologacao_chat_acao",
+      created_at: em,
+      dados: { sessao: "sessao", acao: { tipo: "paciente", texto: "Não quero pagar" } },
+    });
+    expect((await carregarTesteFrancisco(db, "clinica", "ator", "sessao")).estado).toBe("humano");
+    expect(linhas[1].dados).not.toHaveProperty("decisao");
+  });
   it("não aceita um identificador de comando que já pertence a outra conversa", async () => {
     const { db } = banco();
     await iniciarConversaTesteFrancisco(db, "clinica", "ator", "primeira", inicio());
@@ -175,12 +195,54 @@ describe("persistência isolada dos testes", () => {
     await iniciarConversaTesteFrancisco(db, "clinica", "ator", "sessao", inicio());
     await iniciarConversaTesteFrancisco(db, "clinica", "ator", "sessao", inicio());
     const acao = { tipo: "paciente" as const, texto: "Quero ajuda" };
-    await agirConversaTesteFrancisco(db, "clinica", "ator", "resposta", "sessao", acao);
-    const s = await agirConversaTesteFrancisco(db, "clinica", "ator", "resposta", "sessao", acao);
+    let chamadas = 0;
+    const classificar = async () => {
+      chamadas++;
+      return { intencao: "interesse" as const, origem: "gemini" as const };
+    };
+    await agirConversaTesteFrancisco(
+      db,
+      "clinica",
+      "ator",
+      "resposta",
+      "sessao",
+      acao,
+      classificar,
+    );
+    const s = await agirConversaTesteFrancisco(
+      db,
+      "clinica",
+      "ator",
+      "resposta",
+      "sessao",
+      acao,
+      classificar,
+    );
     expect(linhas).toHaveLength(2);
     expect(s.estado).toBe("humano");
     expect(s.mensagens.filter((m) => m.autor === "paciente")).toHaveLength(1);
     expect(new Set(tabelas)).toEqual(new Set(["francisco_eventos"]));
+    expect(chamadas).toBe(1);
+  });
+  it("persiste a recusa interpretada e reabre o teste sem nova chamada ao modelo", async () => {
+    const { db, linhas } = banco();
+    await iniciarConversaTesteFrancisco(db, "clinica", "ator", "sessao", inicio());
+    const s = await agirConversaTesteFrancisco(
+      db,
+      "clinica",
+      "ator",
+      "recusa",
+      "sessao",
+      {
+        tipo: "paciente",
+        texto: "Prefiro deixar o orçamento para lá.",
+      },
+      async () => ({ intencao: "recusa", origem: "gemini" }),
+    );
+    expect(s.estado).toBe("recusado");
+    expect(linhas[1].dados.decisao).toMatchObject({ intencao: "recusa", origem: "gemini" });
+    expect((await carregarTesteFrancisco(db, "clinica", "ator", "sessao")).estado).toBe("recusado");
+    expect(s.mensagens.at(-1)?.texto).toContain("sem encaminhamento humano");
   });
   it("recusa sessões de outra clínica ou usuário e não as lista", async () => {
     const { db } = banco();

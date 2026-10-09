@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { franciscoConfigSchema, pediuSaidaFrancisco, textoTemplateFrancisco } from "./config";
+import { decisaoLocalFrancisco, type DecisaoFrancisco } from "./intencao";
 
 export const inicioTesteFranciscoSchema = z.object({
   config: franciscoConfigSchema,
@@ -63,6 +64,8 @@ export function aplicarAcaoTesteFrancisco(
   id: string,
   em: string,
   valor: AcaoTesteFrancisco,
+  decisao?: DecisaoFrancisco,
+  legado = false,
 ): SessaoTesteFrancisco {
   const acao = acaoTesteFranciscoSchema.parse(valor);
   const proxima = { ...sessao, mensagens: [...sessao.mensagens] };
@@ -90,17 +93,27 @@ export function aplicarAcaoTesteFrancisco(
     );
   } else {
     mensagem("paciente", acao.texto);
-    if (pediuSaidaFrancisco(acao.texto)) {
+    const interpretacao = legado
+      ? { intencao: pediuSaidaFrancisco(acao.texto) ? "recusa" : "duvida" }
+      : (decisao ?? decisaoLocalFrancisco(acao.texto));
+    if (interpretacao.intencao === "recusa") {
       proxima.estado = "recusado";
       mensagem(
         "sistema",
-        "Pedido de saída reconhecido. Contato bloqueado neste teste e sequência interrompida. Encaminhamento humano simulado.",
+        legado
+          ? "Pedido de saída reconhecido. Contato bloqueado neste teste e sequência interrompida. Encaminhamento humano simulado."
+          : "Recusa reconhecida. Sequência encerrada em silêncio, sem resposta ao paciente e sem encaminhamento humano (simulação).",
       );
     } else if (sessao.estado === "aguardando") {
       proxima.estado = "humano";
       mensagem(
         "sistema",
         `Resposta recebida. Sequência interrompida e atendimento encaminhado para ${sessao.inicio.config.departamento} (simulação). Pagamento será tratado pela equipe humana.`,
+      );
+    } else if (sessao.estado === "recusado" && !legado) {
+      mensagem(
+        "sistema",
+        "Teste já encerrado por recusa. Nenhuma resposta ou encaminhamento automático.",
       );
     } else {
       mensagem(

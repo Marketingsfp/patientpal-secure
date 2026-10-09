@@ -29,9 +29,27 @@ paciente, preço, item, agenda ou financeiro. Pagamento permanece com a equipe.
 - No máximo um contato por telefone a cada 24 horas, inclusive entre orçamentos.
 - Reserva única por orçamento/etapa; checagem financeira novamente na reserva
   e imediatamente antes de chamar a Meta. Erro de leitura bloqueia o envio.
-- Qualquer resposta reconhecida interrompe os próximos contatos e usa o broker
-  existente para encaminhar à equipe humana, preservando responsável humano.
-  `SAIR` também registra recusa. Não inicia uma conversa com a Nina.
+- Qualquer resposta reconhecida interrompe os próximos contatos. Interesse em
+  pagar/continuar e dúvidas usam o broker existente para encaminhar à equipe
+  humana, preservando responsável humano, sem aviso automático ao paciente.
+- Recusa explícita, como “não quero pagar”, “não tenho interesse” e `SAIR`,
+  encerra em silêncio: não reabre conversa, não encaminha ao humano e não
+  envia mensagem. A recusa bloqueia o acompanhamento por telefone na clínica,
+  usando a RPC existente; uma nova autorização precisa ser registrada para
+  acompanhamentos futuros. Conversas humanas existentes não são encerradas.
+- Gemini 3.8 Flash (`google/gemini-3.8-flash`) interpreta respostas, com o
+  template efetivamente enviado e as regras obrigatórias do system prompt.
+  Recusas completas e inequívocas dispensam IA. Negações com continuidade,
+  dúvidas, mídia sem transcrição e erro/saída inválida do modelo seguem ao
+  humano. Recusa interpretada exige evidência literal no texto recebido.
+  Não inicia uma conversa com a Nina e nunca envia texto produzido pelo modelo.
+- A decisão é registrada de forma aditiva em `francisco_eventos`, por ID
+  determinístico de clínica/mensagem. Retry reutiliza a mesma interpretação.
+  O evento registra intenção, origem, modelo e uso quando informado pelo provedor.
+  A RPC pausa os próximos contatos antes de aguardar IA; se o modelo reconhecer
+  recusa, o contato também passa a recusado. O evento `resposta_classificada`
+  registra o destino efetivo; o evento legado de registro da resposta não é
+  comprovação de encaminhamento humano concluído.
 - Resposta sem citação só é vinculada se não houve outro envio posterior ao
   Francisco. Uma citação explícita precisa corresponder ao remetente e à clínica.
 - Envio sem confirmação completa fica `incerto`; sem reenvio automático.
@@ -39,8 +57,9 @@ paciente, preço, item, agenda ou financeiro. Pagamento permanece com a equipe.
 - Estados de entrega são atualizados por webhook assinado, sem regredir
   mensagem lida/entregue por recibo atrasado.
 
-Os contatos ativos são templates de texto. Prompt, modelo e temperatura são
-independentes e usados na homologação/elaboração de propostas; não reescrevem
+Os contatos ativos são templates de texto. System prompt e temperatura são
+próprios do Francisco; o modelo é Gemini 3.8 Flash. Personalizações ficam
+subordinadas às regras obrigatórias de interpretação; não reescrevem
 o template aprovado. Voz tem configuração e prévia próprias, usando somente o
 transporte de síntese compartilhado. Não se envia áudio ativo nesta versão.
 
@@ -50,10 +69,14 @@ transporte de síntese compartilhado. Não se envia áudio ativo nesta versão.
 
 A aba Homologação começa com **Iniciar com template** (D1 ou D4). O template
 é renderizado exatamente a partir do rascunho com o nome da clínica, sem Meta,
-IA, número real ou criação de orçamento. Depois, o operador escreve como
-Paciente Teste. Qualquer resposta interrompe a sequência e mostra o destino
-humano; SAIR usa o mesmo reconhecimento de saída do atendimento real. Não
-há resposta automática gerada depois do encaminhamento.
+número real ou criação de orçamento. Depois, o operador escreve como
+Paciente Teste. A homologação autenticada usa o mesmo interpretador do
+atendimento real e pode consumir IA. A decisão fica no evento da ação para
+que retomadas não chamem o modelo novamente. Interesse e dúvidas mostram o
+destino humano; recusa mostra encerramento silencioso. Os avisos de sistema
+do teste são internos: nenhuma mensagem de fechamento é enviada ao paciente.
+Eventos antigos preservam o resultado da regra anterior; novas ações registram
+a versão das regras, sem reescrever o histórico.
 
 **Avançar para D4** simula a passagem para 96 horas sem resposta/pagamento;
 **Simular pagamento** interrompe os próximos templates, sem alterar o financeiro.
@@ -68,18 +91,20 @@ Consultas e ações são autorizadas por clínica, módulo e usuário; o teste d
 operador não é retomado por outro. Conversas são paginadas de 20 em 20 e ações
 são relidas em páginas sem truncamento. Comandos têm UUID para retomada sem
 duplicar mensagens. Testes não escrevem em contatos, envios reais ou filas
-humanas. Na prévia local, ficam somente em memória até sair da aba.
+humanas. Na prévia local, ficam somente em memória até sair da aba, sem IA;
+apenas recusas diretas são reconhecidas e as demais respostas simulam o humano.
 
-O teste auxiliar de propostas do modelo permanece separado e recolhido.
+O teste auxiliar de interpretação permanece separado e recolhido, exibindo a
+decisão do mesmo classificador em vez de gerar propostas de mensagem.
 
 Migração aditiva `20261008193000_francisco_orcamentos.sql`:
 
-| Tabela | Finalidade |
-| --- | --- |
-| `francisco_config` | Rascunho, publicado, revisão, início e cursor da rotina |
-| `francisco_eventos` | Versões, autorização, homologação e respostas |
-| `francisco_contatos` | Autorização/recusa/interrupção por clínica e telefone |
-| `francisco_envios` | Reserva, texto/configuração usados, ID Meta, entrega e resposta |
+| Tabela               | Finalidade                                                      |
+| -------------------- | --------------------------------------------------------------- |
+| `francisco_config`   | Rascunho, publicado, revisão, início e cursor da rotina         |
+| `francisco_eventos`  | Versões, autorização, homologação e respostas                   |
+| `francisco_contatos` | Autorização/recusa/interrupção por clínica e telefone           |
+| `francisco_envios`   | Reserva, texto/configuração usados, ID Meta, entrega e resposta |
 
 Leitura exige vínculo ativo e permissão do módulo. Escrita/RPCs somente pelo
 servidor com autorização. O navegador não recebe credenciais da Meta, chave de
@@ -146,12 +171,16 @@ conectar ao banco real ou enviar WhatsApp. Prévia visual local em
 `/dev/francisco`, bloqueada em produção. Serviços reais de IA/voz/Meta e entrega
 final exigem homologação na implantação com credenciais já configuradas.
 
-Validação local: 63 testes do escopo e de regressão passaram, incluindo execução
-da migração, pagamentos, concorrência de configuração, opt-out e encaminhamento
-humano. TypeScript e build de produção passaram. Lint do módulo sem erros, com
-nove avisos de tipagem das novas tabelas e linhas dinâmicas. A matriz geral de
-permissões tem três falhas preexistentes, reproduzidas também no código original
-(`nina-jev` e `painel-tv-atendimento`); não foram alteradas neste trabalho.
+Validação anterior da entrega inicial: 63 testes, TypeScript e build passaram.
+Na atualização de recusa silenciosa, 130 testes distintos do escopo e regressão
+passaram, cobrindo interpretação, preservação do histórico, decisões concorrentes
+e consumo da entrada sem chamar Nina ou enviar fechamento. TypeScript e build
+de produção passaram; lint do escopo sem erros, com avisos de tipagem existentes.
+Playwright local verificou recusa, SAIR, interesse, negação
+com continuidade, D4, pagamento, modelo/prompt e tela móvel. Esses testes usam
+serviços simulados; não comprovam classificação pelo Gemini real, aprovação
+dos templates ou implantação. A matriz geral de permissões tinha três falhas
+preexistentes (`nina-jev` e `painel-tv-atendimento`), fora deste escopo.
 
 O envio externo e um pagamento que ocorre simultaneamente não podem formar
 uma única transação. A checagem final reduz essa janela; aceite pela Meta

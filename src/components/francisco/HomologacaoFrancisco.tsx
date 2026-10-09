@@ -168,7 +168,15 @@ export function HomologacaoFrancisco({
         <strong>Conversa de homologação.</strong> O Francisco inicia pelo template. Nenhuma mensagem
         sai para o WhatsApp e nenhum orçamento ou pagamento real é alterado.
         {preview && (
-          <p>Prévia local: o histórico permanece apenas enquanto esta aba estiver aberta.</p>
+          <p>
+            Prévia local sem IA: reconhece recusas diretas. O histórico permanece apenas enquanto
+            esta aba estiver aberta.
+          </p>
+        )}
+        {!preview && (
+          <p>
+            Respostas usam o Gemini 3.8 Flash quando necessário e podem consumir créditos de IA.
+          </p>
         )}
       </div>
       <div className="grid overflow-hidden rounded-xl border bg-card lg:grid-cols-[260px_1fr]">
@@ -372,8 +380,9 @@ export function HomologacaoFrancisco({
               </Button>
             </form>
             <p className="text-xs text-muted-foreground">
-              Qualquer resposta interrompe a sequência e segue para a equipe humana. Teste também
-              “SAIR”. O Francisco não responde automaticamente após o encaminhamento.
+              Qualquer resposta interrompe a sequência. Interesse e dúvidas seguem ao humano;
+              recusas encerram em silêncio. Teste também “SAIR”. O Francisco não responde
+              automaticamente após o encaminhamento.
             </p>
           </div>
         </div>

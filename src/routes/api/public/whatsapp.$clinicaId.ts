@@ -451,7 +451,12 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     if (tratada) {
                       const marcada = await supabaseAdmin
                         .from("whatsapp_mensagens")
-                        .update({ nina_status: "handoff" })
+                        .update({
+                          nina_status: tratada.destino === "encerrado" ? "completed" : "handoff",
+                          ...(tratada.destino === "encerrado"
+                            ? { tratada_internamente: true }
+                            : {}),
+                        })
                         .eq("id", msgInserida.id)
                         .eq("clinica_id", params.clinicaId);
                       if (marcada.error) throw marcada.error;
