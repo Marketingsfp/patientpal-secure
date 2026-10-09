@@ -86,6 +86,8 @@ describe("dicionário por cadastro", () => {
     expect(r.tool_choice).toBe("required");
     expect(r).not.toHaveProperty("max_tool_calls");
     expect(r.include).toContain("web_search_call.action.sources");
+    expect(r.instructions).toContain("de 1 a 350 caracteres");
+    expect(r.text.format.schema.properties.duvidas.items.description).toContain("350");
   });
   test("rejeita SSE interrompido mesmo contendo JSON válido no delta", async () => {
     await expect(
@@ -130,10 +132,10 @@ describe("dicionário por cadastro", () => {
     let enviado: Record<string, unknown> = {};
     const r = await gerarDicionarioComIA(contexto, {
       chave: "fixture",
-      fetch: (async (_url, init) => {
+      fetch: (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
         enviado = JSON.parse(String(init?.body));
         return resposta(saida);
-      }) as typeof fetch,
+      }) as unknown as typeof fetch,
     });
     expect(enviado.model).toBe("openai/gpt-6-astra");
     expect(r.variacoes).toEqual(saida.variacoes);
@@ -152,6 +154,191 @@ describe("dicionário por cadastro", () => {
       }),
     ).rejects.toThrow("Nenhum outro modelo");
     expect(chamadas).toBe(1);
+  });
+  test("reformula dúvida de 351 caracteres uma vez, sem pesquisar ou mudar termos e fontes", async () => {
+    const original = "x".repeat(351);
+    const variacao = {
+      ...sugestao("mamografia das duas mamas"),
+      origem: "web" as const,
+      fontes: [fonte.url],
+    };
+    const pedidos: ReturnType<typeof requisicaoDicionario>[] = [];
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      fetch: (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        pedidos.push(JSON.parse(String(init?.body)));
+        return pedidos.length === 1
+          ? resposta({ variacoes: [variacao], duvidas: [original, "Outra ressalva."] })
+          : resposta(
+              { textos: [{ id: "duvidas.0", texto: "Dúvida reformulada com ressalva." }] },
+              [],
+            );
+      }) as unknown as typeof fetch,
+    });
+    expect(pedidos).toHaveLength(2);
+    expect(pedidos[1].model).toBe(pedidos[0].model);
+    expect(pedidos[1].store).toBe(false);
+    expect(pedidos[1].tools).toEqual([]);
+    expect(pedidos[1].tool_choice).toBe("none");
+    expect(pedidos[1]).not.toHaveProperty("previous_response_id");
+    expect(pedidos[1]).not.toHaveProperty("include");
+    expect(JSON.parse(pedidos[1].input[0].content[0].text)).toEqual([
+      { id: "duvidas.0", texto: original },
+    ]);
+    expect(r.variacoes).toEqual([variacao]);
+    expect(r.duvidas).toEqual(["Dúvida reformulada com ressalva.", "Outra ressalva."]);
+    expect(r.observacoesOriginais).toEqual([
+      { id: "duvidas.0", rotulo: "Dúvida 1", texto: original },
+    ]);
+    expect(r.pesquisa).toEqual({ chamadas: 1, fontes: [{ url: fonte.url, titulo: fonte.title }] });
+    expect(contexto.aliases).toEqual(["mamo bilateral"]);
+  });
+  test("reformula explicação longa sem retirar qualificadores do termo", async () => {
+    let chamadas = 0;
+    const explicacao = "Ressalva sobre ambos os lados. ".repeat(20);
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      fetch: (async () =>
+        ++chamadas === 1
+          ? resposta({ variacoes: [{ ...saida.variacoes[0], explicacao }], duvidas: [] })
+          : resposta(
+              { textos: [{ id: "variacoes.0.explicacao", texto: "Preservar ambos os lados." }] },
+              [],
+            )) as unknown as typeof fetch,
+    });
+    expect(r.variacoes[0].termo).toBe(saida.variacoes[0].termo);
+    expect(r.variacoes[0].explicacao).toBe("Preservar ambos os lados.");
+    expect(r.observacoesOriginais?.[0].texto).toBe(explicacao.trim());
+  });
+  test.each([
+    "indisponivel",
+    "longo",
+    "ids_duplicados",
+    "id_inventado",
+    "incompleto",
+    "recusa",
+    "pesquisa",
+    "json",
+  ])("preserva texto completo e sugestões quando a reformulação falha: %s", async (caso) => {
+    let chamadas = 0;
+    const original = "Não confundir os procedimentos. ".repeat(20).trim();
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      fetch: (async () => {
+        if (++chamadas === 1) return resposta({ ...saida, duvidas: [original] });
+        if (caso === "indisponivel") return new Response("erro", { status: 429 });
+        if (caso === "json") return new Response("data: {quebrado}\n");
+        if (caso === "incompleto") return new Response('data: {"type":"response.incomplete"}\n');
+        if (caso === "recusa")
+          return new Response(
+            'data: {"type":"response.completed","response":{"status":"completed","output":[{"content":[{"type":"refusal"}]}]}}\n',
+          );
+        const item = {
+          id: caso === "id_inventado" ? "duvidas.9" : "duvidas.0",
+          texto: caso === "longo" ? original : "Curta.",
+        };
+        return resposta(
+          { textos: caso === "ids_duplicados" ? [item, item] : [item] },
+          caso === "pesquisa" ? [pesquisa] : [],
+        );
+      }) as unknown as typeof fetch,
+    });
+    expect(chamadas).toBe(2);
+    expect(r.duvidas).toEqual([original]);
+    expect(r.variacoes).toEqual(saida.variacoes);
+    expect(r.aviso).toContain("textos completos foram preservados");
+    expect(r.aviso).not.toContain("too_big");
+  });
+  test("falha de prazo na reformulação preserva a pesquisa já concluída", async () => {
+    let chamadas = 0;
+    const original = "x".repeat(351);
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      timeoutMs: 20,
+      fetch: ((_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        if (++chamadas === 1) return Promise.resolve(resposta({ ...saida, duvidas: [original] }));
+        return new Promise((_resolve, reject) =>
+          init!.signal!.addEventListener("abort", () => reject(Error("abort")), { once: true }),
+        );
+      }) as unknown as typeof fetch,
+    });
+    expect(chamadas).toBe(2);
+    expect(r.duvidas).toEqual([original]);
+  });
+  test.each([
+    { ...saida, variacoes: [{ ...saida.variacoes[0], termo: "x".repeat(161) }] },
+    { ...saida, duvidas: Array.from({ length: 21 }, () => "Dúvida") },
+    { ...saida, campo_inventado: true },
+  ])("erros estruturais não geram outra cobrança nem erro técnico na tela", async (dados) => {
+    let chamadas = 0;
+    await expect(
+      gerarDicionarioComIA(contexto, {
+        chave: "fixture",
+        fetch: (async () => {
+          chamadas++;
+          return resposta(dados);
+        }) as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow("formato inválido");
+    expect(chamadas).toBe(1);
+  });
+  test("texto com 350 caracteres dispensa reformulação", async () => {
+    let chamadas = 0;
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      fetch: (async () => {
+        chamadas++;
+        return resposta({ ...saida, duvidas: ["x".repeat(350)] });
+      }) as unknown as typeof fetch,
+    });
+    expect(chamadas).toBe(1);
+    expect(r.observacoesOriginais).toBeUndefined();
+  });
+  test("retorno parcial de vários textos não aplica nenhuma substituição", async () => {
+    const duvidas = [
+      "Primeira ressalva. ".repeat(30).trim(),
+      "Segunda ressalva. ".repeat(30).trim(),
+    ];
+    let chamadas = 0;
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      fetch: (async () =>
+        ++chamadas === 1
+          ? resposta({ ...saida, duvidas })
+          : resposta(
+              { textos: [{ id: "duvidas.0", texto: "Texto curto." }] },
+              [],
+            )) as unknown as typeof fetch,
+    });
+    expect(r.duvidas).toEqual(duvidas);
+    expect(r.observacoesOriginais?.map((o) => o.texto)).toEqual(duvidas);
+    expect(chamadas).toBe(2);
+  });
+  test("reformulação não torna selecionável um termo sem fonte consultada", async () => {
+    let chamadas = 0;
+    const r = await gerarDicionarioComIA(contexto, {
+      chave: "fixture",
+      fetch: (async () =>
+        ++chamadas === 1
+          ? resposta({
+              variacoes: [
+                {
+                  ...sugestao("US bilateral"),
+                  categoria: "sigla",
+                  origem: "web",
+                  fontes: ["https://inventada.example/exame"],
+                },
+              ],
+              duvidas: ["x".repeat(351)],
+            })
+          : resposta(
+              { textos: [{ id: "duvidas.0", texto: "Dúvida preservada." }] },
+              [],
+            )) as unknown as typeof fetch,
+    });
+    expect(r.variacoes).toEqual([]);
+    expect(r.duvidas).toContain("Dúvida preservada.");
+    expect(r.duvidas.some((d) => d.includes("não foi retornada uma fonte consultada"))).toBe(true);
   });
   test("preserva sigla do grupo com referência e distingue hipótese de escrita", async () => {
     const grupo: ContextoDicionario = {
@@ -220,7 +407,12 @@ describe("dicionário por cadastro", () => {
     }
   });
   test("aceita mais de três buscas e deduplica fontes reais", async () => {
-    const r = await lerRespostaDicionario(resposta(saida, Array.from({ length: 10 }, () => pesquisa)));
+    const r = await lerRespostaDicionario(
+      resposta(
+        saida,
+        Array.from({ length: 10 }, () => pesquisa),
+      ),
+    );
     expect(r.pesquisa.chamadas).toBe(10);
     expect(r.pesquisa.fontes).toHaveLength(1);
   });
@@ -258,12 +450,12 @@ describe("dicionário por cadastro", () => {
       gerarDicionarioComIA(contexto, {
         chave: "fixture",
         timeoutMs: 5,
-        fetch: ((_url, init) =>
+        fetch: ((_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
           new Promise((_resolve, reject) => {
             init!.signal!.addEventListener("abort", () => reject(new Error("abort")), {
               once: true,
             });
-          })) as typeof fetch,
+          })) as unknown as typeof fetch,
       }),
     ).rejects.toThrow("tempo de geração");
   });

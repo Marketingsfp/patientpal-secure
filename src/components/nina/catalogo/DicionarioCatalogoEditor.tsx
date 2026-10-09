@@ -119,8 +119,10 @@ export function DicionarioCatalogoEditor({
         exames diferentes equivalentes.
       </p>
       <p className="text-xs text-muted-foreground">
-        Pesquisa na web ao gerar, sem teto de chamadas definido pelo sistema e com cobrança de IA/pesquisa. A internet ajuda a
-        descobrir nomes; valores, preparo e regras continuam vindo do cadastro da clínica.
+        Pesquisa na web ao gerar, sem teto de chamadas definido pelo sistema e com cobrança de
+        IA/pesquisa. A internet ajuda a descobrir nomes; valores, preparo e regras continuam vindo
+        do cadastro da clínica. Se houver observações longas, poderá ocorrer uma chamada adicional
+        de IA para reformulá-las, sem repetir a pesquisa.
       </p>
       <div className="space-y-1">
         <Label htmlFor={id}>Variações revisadas · uma por linha</Label>
@@ -148,6 +150,25 @@ export function DicionarioCatalogoEditor({
           <p className="text-sm font-medium">
             {previa.variacoes.length} sugestões para revisar e selecionar.
           </p>
+          {previa.aviso && (
+            <p role="status" className="text-sm text-muted-foreground">
+              {previa.aviso}
+            </p>
+          )}
+          {!!previa.observacoesOriginais?.length && (
+            <details open className="rounded-md border p-3 text-sm">
+              <summary className="cursor-pointer font-medium">
+                Observações originais completas
+              </summary>
+              <ul className="mt-2 space-y-2 break-words">
+                {previa.observacoesOriginais.map((o) => (
+                  <li key={o.id}>
+                    <strong>{o.rotulo}:</strong> {o.texto}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           <div className="flex flex-wrap gap-2 text-xs">
             {Object.entries(rotulos).map(([categoria, rotulo]) => (
               <span key={categoria} className="rounded-md border px-2 py-1">
@@ -256,8 +277,8 @@ export function DicionarioCatalogoEditor({
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        As sugestões não são salvas automaticamente. A Maria consulta as variações revisadas
-        dos registros publicados quando a fonte selecionada é a Base de conhecimento.
+        As sugestões não são salvas automaticamente. A Maria consulta as variações revisadas dos
+        registros publicados quando a fonte selecionada é a Base de conhecimento.
       </p>
     </section>
   );
