@@ -63,18 +63,18 @@ export function InspecaoMensagemNina({ clinicaId, conversaId, mensagem, saida, p
     <span className="flex items-center gap-2" data-inspecao-nina={mensagemId}>
       {saida === "falha" && (
         <>
-        <span className="text-muted-foreground">Falha ao carregar</span>
-        <button
-          type="button"
-          className="underline underline-offset-2"
-          onClick={() =>
-            void queryClient.invalidateQueries({
-              queryKey: ["nina-saidas-mensagens", clinicaId, conversaId],
-            })
-          }
-        >
-          Tentar novamente
-        </button>
+          <span className="text-muted-foreground">Falha ao carregar</span>
+          <button
+            type="button"
+            className="underline underline-offset-2"
+            onClick={() =>
+              void queryClient.invalidateQueries({
+                queryKey: ["nina-saidas-mensagens", clinicaId, conversaId],
+              })
+            }
+          >
+            Tentar novamente
+          </button>
         </>
       )}
       {elegivel && (

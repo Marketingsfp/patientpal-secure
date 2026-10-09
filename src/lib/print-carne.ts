@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { printHtmlViaIframe } from "@/lib/print-html";
 
 /**
  * Gera um carnê interno em HTML a partir das parcelas de um contrato
@@ -114,6 +115,9 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       .from("contrato_mensalidades")
       .select("id, numero_parcela, vencimento, valor, status, pago_em, forma_pagamento")
       .eq("contrato_id", contratoId)
+      // A cobrança do Crédito na clínica é separada e muda a cada uso: não
+      // entra no carnê impresso.
+      .is("origem" as never, null)
       .order("numero_parcela"),
     supabase
       .from("pacientes")
@@ -122,7 +126,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       .maybeSingle(),
     supabase
       .from("clinicas")
-      .select("nome, cnpj, telefone, endereco, cidade, estado")
+      .select("nome, cnpj, telefone, endereco, cidade, estado, branding")
       .eq("id", contrato.clinica_id as string)
       .maybeSingle(),
     contrato.convenio_id
@@ -166,16 +170,19 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`).join("")
       : "");
 
-  if (isSaoFranciscoDePaula(clinica?.nome)) {
-    abrirJanelaCarne(
+  if (layoutCarne(clinica?.nome) === "a4") {
+    // A4 via iframe oculto (sem pop-up), esperando o logo carregar.
+    printHtmlViaIframe(
       htmlCarneSaoFrancisco({
         contrato,
         parcelas: parcelas ?? [],
+        clinica,
         cpf: paciente?.cpf ?? null,
         prontuario: prontuarioExibicao(paciente) ?? "—",
         convenioNome,
         dependentes,
       }),
+      { esperarImagens: true },
     );
     return;
   }
@@ -428,13 +435,216 @@ export function parcelasCarneSaoFrancisco(parcelas: ParcelaCarne[]) {
   ];
 }
 
+/**
+ * Reserva da São Francisco de Paula: só entra quando o campo correspondente
+ * do cadastro (`clinicas`) estiver vazio. A marca não tem campo no cadastro.
+ */
 const SFP = {
   marca: "POLICARDMED",
   nome: "Policlínica São Francisco de Paula",
   endereco: "Av. Comendador Telles 2414, Vilar dos Teles, São João de Meriti RJ",
   whatsapp: "(21) 96736-5396",
+  cnpj: "",
   rodape: "O PAGAMENTO DO CARNÊ SÓ PODE SER EFETUADO NA NOSSA UNIDADE",
 };
+
+/** Logo de reserva do Cartão Benefícios, usado quando a clínica não tem `branding.logo_url`. */
+const LOGO_RESERVA_SFP = "/cartao-beneficios/logo-policardmed.png";
+
+/**
+ * Taxa da 2ª via do carnê. Espelha `VALOR_TAXA_SEGUNDA_VIA` de
+ * `contratos-page.tsx`, que não é exportada (vive dentro da tela) — mudar lá
+ * exige mudar aqui.
+ */
+const VALOR_TAXA_SEGUNDA_VIA = 10;
+
+export type ClinicaCarne = {
+  nome?: string | null;
+  cnpj?: string | null;
+  telefone?: string | null;
+  endereco?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  branding?: unknown;
+};
+
+/** Qual papel o carnê usa: A4 só na São Francisco; o resto segue na bobina de 80mm. */
+export const layoutCarne = (clinicaNome: string | null | undefined) =>
+  isSaoFranciscoDePaula(clinicaNome) ? ("a4" as const) : ("bobina-80mm" as const);
+
+const preenchido = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+/** Dados da clínica no carnê da SFP: cadastro primeiro, constante `SFP` em cada campo vazio. */
+export function dadosClinicaSfp(c: ClinicaCarne | null | undefined) {
+  const branding = (c?.branding ?? null) as Record<string, unknown> | null;
+  const endBase = preenchido(c?.endereco);
+  const local = [preenchido(c?.cidade), preenchido(c?.estado)].filter(Boolean).join(" ");
+  const endereco = endBase ? [endBase, local].filter(Boolean).join(", ") : SFP.endereco;
+  return {
+    marca: SFP.marca,
+    nome: preenchido(c?.nome) || SFP.nome,
+    endereco,
+    whatsapp: preenchido(c?.telefone) || SFP.whatsapp,
+    cnpj: preenchido(c?.cnpj) || SFP.cnpj,
+    logo: (branding && preenchido(branding.logo_url)) || LOGO_RESERVA_SFP,
+  };
+}
+
+/** Agrupa as fichas em folhas A4 de até 3. */
+export function folhasDeFichas<T>(itens: T[], porFolha = 3): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < itens.length; i += porFolha) out.push(itens.slice(i, i + porFolha));
+  return out;
+}
+
+/** Slot do logo: se a imagem falhar, some e o slot fica vazio no mesmo tamanho. */
+const logoSlot = (cls: string, src: string) =>
+  `<div class="${cls}"><img src="${esc(src)}" alt="" onerror="this.remove()" /></div>`;
+
+const CSS_CARNE_SFP_A4 = `
+  @page { size: A4 portrait; margin: 8mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 9pt; line-height: 1.2; }
+  .lab { display: block; font-size: 7.5pt; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+  .val { display: block; font-size: 11pt; font-weight: 700; }
+  .verde { color: #1f8a3b; }
+  .logo-capa, .logo-ficha { flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .logo-capa { width: 34mm; height: 22mm; }
+  .logo-ficha { width: 22mm; height: 13mm; }
+  .logo-capa img, .logo-ficha img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+  /* Capa */
+  .folha-capa { height: 281mm; display: flex; flex-direction: column; gap: 5mm; break-after: page; }
+  .capa-topo { display: flex; align-items: center; gap: 5mm; border-bottom: 3px solid #1f8a3b; padding-bottom: 3mm; }
+  .capa-ident { flex: 1; min-width: 0; }
+  .capa-marca { font-size: 23pt; font-weight: 900; letter-spacing: .05em; color: #1f8a3b; line-height: 1; }
+  .capa-nome { font-size: 12pt; font-weight: 700; margin-top: 1.5mm; }
+  .capa-info { font-size: 8.5pt; color: #555; margin-top: .8mm; }
+  .capa-codigo { border: 2px solid #000; border-radius: 2mm; padding: 2mm 4mm; text-align: center; min-width: 40mm; }
+  .capa-codigo .val { font-size: 19pt; font-weight: 900; }
+  .capa-titulo { font-size: 14pt; font-weight: 800; }
+  .capa-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; }
+  .capa-campos .campo { border-bottom: 1px solid #000; padding-bottom: 1mm; }
+  .capa-campos .inteira { grid-column: span 2; }
+  .capa-resumo { display: grid; grid-template-columns: repeat(4, 1fr); border: 1.5px solid #000; border-radius: 2mm; }
+  .capa-resumo > div { padding: 3mm; border-right: 1px solid #000; }
+  .capa-resumo > div:last-child { border-right: none; }
+  .capa-resumo .destaque { font-size: 17pt; font-weight: 900; color: #1f8a3b; }
+  .como-pagar { border-left: 4px solid #c8922a; padding: 2mm 0 2mm 4mm; }
+  .como-pagar h2 { font-size: 11pt; margin: 0 0 2mm; }
+  .como-pagar ul { margin: 0; padding-left: 5mm; font-size: 10pt; }
+  .como-pagar li { margin-bottom: 1.2mm; }
+  .capa-rodape {
+    margin-top: auto; background: #000; color: #fff; text-align: center; font-weight: 800;
+    font-size: 11pt; letter-spacing: .04em; padding: 3mm; border-radius: 1.5mm;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
+  /* Folhas de fichas: 3 por folha, picote horizontal entre elas */
+  .folha-fichas { break-after: page; }
+  .folha-fichas:last-child { break-after: auto; }
+  .ficha {
+    height: 92mm; break-inside: avoid; page-break-inside: avoid;
+    display: grid; grid-template-columns: 56mm 1fr;
+    border-bottom: 1px dashed #000;
+  }
+  .ficha:last-child { border-bottom: none; }
+
+  /* Canhoto — via da clínica */
+  .canhoto { border-right: 1px dashed #000; padding: 3mm 3mm 3mm 0; display: flex; flex-direction: column; gap: 1mm; }
+  .canhoto .via { font-size: 7pt; letter-spacing: .15em; font-weight: 700; }
+  .canhoto .marca { font-size: 11pt; font-weight: 900; color: #1f8a3b; letter-spacing: .04em; }
+  .linha { display: flex; justify-content: space-between; gap: 2mm; border-bottom: 1px dotted #777; padding: .6mm 0; font-size: 8pt; }
+  .linha .l { color: #555; text-transform: uppercase; font-size: 7pt; }
+  .linha .v { font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+  .canhoto .valor { border: 1.2px solid #000; border-radius: 1.5mm; padding: 1.5mm; text-align: center; margin-top: 1mm; }
+  .canhoto .valor .v { font-size: 14pt; font-weight: 900; }
+  .canhoto .pgto { margin-top: auto; border-top: 1px solid #000; padding-top: 1mm; font-size: 7.5pt; text-align: center; }
+
+  /* Via do cliente */
+  .cliente { padding: 3mm 0 3mm 4mm; display: flex; flex-direction: column; gap: 2mm; min-width: 0; }
+  .cli-topo { display: flex; align-items: center; gap: 3mm; border-bottom: 2px solid #1f8a3b; padding-bottom: 1.5mm; }
+  .cli-ident { flex: 1; min-width: 0; }
+  .cli-ident .marca { font-size: 11pt; font-weight: 900; color: #1f8a3b; letter-spacing: .04em; }
+  .cli-ident .nome { font-size: 9pt; font-weight: 700; }
+  .cli-ident .end { font-size: 7pt; color: #555; }
+  .cli-parcela { text-align: right; }
+  .cli-parcela .doc { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .cli-parcela .n { font-size: 16pt; font-weight: 900; }
+  .cli-corpo { flex: 1; display: grid; grid-template-columns: 1fr 32mm; gap: 4mm; min-height: 0; }
+  .cli-dados { display: flex; flex-direction: column; }
+  .cli-dados .aviso { font-size: 7pt; margin-top: 1.5mm; color: #333; }
+  .cli-lado { display: flex; flex-direction: column; gap: 2mm; }
+  .cli-valor { border: 2px solid #000; border-radius: 1.5mm; padding: 1.5mm; text-align: center; }
+  .cli-valor .v { font-size: 18pt; font-weight: 900; }
+  .pix { flex: 1; border: 1.2px dashed #000; border-radius: 1.5mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2mm; }
+  .pix .t { font-size: 12pt; font-weight: 900; letter-spacing: .15em; }
+  .pix .s { font-size: 6.5pt; color: #555; margin-top: 1mm; }
+  .cli-assin { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .cli-assin > div { border-top: 1px solid #000; padding-top: 1mm; font-size: 7.5pt; text-align: center; }
+`;
+
+type ItemCarne = ReturnType<typeof parcelasCarneSaoFrancisco>[number];
+type DadosClinicaSfp = ReturnType<typeof dadosClinicaSfp>;
+
+/** Monta uma ficha: canhoto de 56mm (via da clínica) + via do cliente. */
+function fichaSfp(
+  p: ItemCarne,
+  ctx: { clinica: DadosClinicaSfp; contratoNumero: unknown; titular: string | null; prontuario: string },
+): string {
+  const { clinica, contratoNumero, titular, prontuario } = ctx;
+  const pago = p.status === "pago";
+  const linha = (l: string, v: string) => `<div class="linha"><span class="l">${l}</span><span class="v">${v}</span></div>`;
+  return `
+    <div class="ficha">
+      <div class="canhoto">
+        <div class="via">VIA DA CLÍNICA</div>
+        <div class="marca">${esc(clinica.marca)}</div>
+        ${linha("Contrato", `nº ${esc(contratoNumero)}`)}
+        ${linha("Prontuário", esc(prontuario))}
+        ${linha("Parcela", esc(p.rotulo))}
+        ${linha("Mês ref.", fmtMesAno(p.vencimento))}
+        ${linha("Vencimento", fmtD(p.vencimento))}
+        <div class="valor"><span class="lab">Valor</span><span class="v">${BRL(Number(p.valor))}</span></div>
+        <div class="pgto">${pago ? `Pago em ${fmtD(p.pago_em)}` : "Data do pagamento / carimbo"}</div>
+      </div>
+      <div class="cliente">
+        <div class="cli-topo">
+          ${logoSlot("logo-ficha", clinica.logo)}
+          <div class="cli-ident">
+            <div class="marca">${esc(clinica.marca)}</div>
+            <div class="nome">${esc(clinica.nome)}</div>
+            <div class="end">${esc(clinica.endereco)}</div>
+          </div>
+          <div class="cli-parcela"><div class="doc">${esc(p.doc)}</div><div class="n">${esc(p.rotulo)}</div></div>
+        </div>
+        <div class="cli-corpo">
+          <div class="cli-dados">
+            ${linha("Titular", esc(titular))}
+            ${linha("Contrato", `nº ${esc(contratoNumero)}`)}
+            ${linha("Prontuário", esc(prontuario))}
+            ${linha("Mês ref.", fmtMesAno(p.vencimento))}
+            ${linha("Vencimento", fmtD(p.vencimento))}
+            <div class="aviso">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia. ${esc(SFP.rodape.charAt(0) + SFP.rodape.slice(1).toLowerCase())}.</div>
+          </div>
+          <div class="cli-lado">
+            <div class="cli-valor"><span class="lab">Valor</span><span class="v">${BRL(Number(p.valor))}</span></div>
+            <!--
+              Espaço reservado do Pix. NÃO há QR Code aqui de propósito: não
+              chamamos montarPayloadPix nem a lib qrcode. Ligar só depois que a
+              chave Pix da clínica estiver cadastrada (clinicas.pix_chave).
+            -->
+            <div class="pix"><div class="t">PIX</div><div class="s">Espaço reservado para o QR Code de pagamento</div></div>
+          </div>
+        </div>
+        <div class="cli-assin">
+          <div>${pago ? `Pago em ${fmtD(p.pago_em)}` : "Data do pagamento"}</div>
+          <div>Assinatura / carimbo do recebedor</div>
+        </div>
+      </div>
+    </div>`;
+}
 
 function htmlCarneSaoFrancisco(args: {
   contrato: {
@@ -445,6 +655,7 @@ function htmlCarneSaoFrancisco(args: {
     dia_vencimento: unknown;
   };
   parcelas: ParcelaCarne[];
+  clinica: ClinicaCarne | null;
   cpf: string | null;
   prontuario: string;
   convenioNome: string;
@@ -455,171 +666,75 @@ function htmlCarneSaoFrancisco(args: {
   if (itens.length === 0) {
     throw new Error("Contrato sem parcelas para gerar carnê.");
   }
+  const clinica = dadosClinicaSfp(args.clinica);
   const totalMensalidades = itens.reduce((mx, p) => Math.max(mx, Number(p.numero_parcela)), 0);
   const pessoasConvenio = 1 + dependentes.length;
+  const mens = itens.filter((p) => Number(p.numero_parcela) >= 1);
 
   const vigencia = (() => {
-    const mens = itens.filter((p) => Number(p.numero_parcela) >= 1);
     const ini = contrato.data_inicio ?? mens[0]?.vencimento ?? null;
     const fim = mens[mens.length - 1]?.vencimento ?? null;
     return ini ? `${fmtD(ini)} a ${fmtD(fim)}` : "—";
   })();
+  const depTexto = dependentes.length
+    ? dependentes.map((d) => `${esc(d.nome)} — CPF ${esc(d.cpf ?? "—")}`).join("<br/>")
+    : "Nenhum";
+  const infoClinica = [
+    clinica.endereco,
+    clinica.whatsapp ? `WhatsApp: ${clinica.whatsapp}` : "",
+    clinica.cnpj ? `CNPJ: ${clinica.cnpj}` : "",
+  ].filter(Boolean);
 
-  const buildFicha = (p: (typeof itens)[number], viaLabel: string) => `
-      <div class="ficha">
-        <div class="via-label">${viaLabel}</div>
-        <div class="ficha-header">
-          <div class="ficha-titulo">
-            <div class="ficha-marca">${SFP.marca}</div>
-            <div class="ficha-clinica">${esc(SFP.nome)}</div>
-            <div class="ficha-doc">${p.doc}</div>
-          </div>
-          <div class="ficha-parcelas">
-            <div class="ficha-parcela"><div class="lab">Parcela</div><div class="val">${p.rotulo}</div></div>
-            <div class="ficha-parcela"><div class="lab">Vencimento</div><div class="val">${fmtD(p.vencimento)}</div></div>
-          </div>
-        </div>
-        <div class="ficha-grid">
-          <div><span class="lab">Contrato</span><span class="val">#${esc(contrato.numero)}</span></div>
-          <div><span class="lab">Prontuário</span><span class="val">${esc(prontuario)}</span></div>
-          <div class="span2"><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
-          <div><span class="lab">Mês Ref.</span><span class="val">${fmtMesAno(p.vencimento)}</span></div>
-          <div><span class="lab">Valor</span><span class="val destaque">${BRL(Number(p.valor))}</span></div>
-          <div class="span2"><span class="val obs">Após o vencimento será cobrado 10% de multa e juros de 0,33% ao dia.</span></div>
-        </div>
-        <div class="ficha-rodape">
-          <div class="campo-manual">
-            ${
-              p.status === "pago"
-                ? `<span class="val pago">${fmtD(p.pago_em)}</span>`
-                : `<span class="linha-assin"></span>`
-            }
-            <span class="lab">Data de pagamento</span>
-          </div>
-          <div class="campo-manual">
-            <span class="linha-assin"></span>
-            <span class="lab">Assinatura / Carimbo do recebedor</span>
-          </div>
-        </div>
-      </div>`;
-
-  const fichas = itens.map(
-    (p) => `
-      <div class="ficha-par">
-        <div class="ficha-via">${buildFicha(p, "Via do cliente")}</div>
-        <div class="ficha-via">${buildFicha(p, "Via da clínica")}</div>
-      </div>`,
+  const ctx = { clinica, contratoNumero: contrato.numero, titular: contrato.paciente_nome, prontuario };
+  const folhas = folhasDeFichas(itens).map(
+    (grupo) => `<div class="folha-fichas">${grupo.map((p) => fichaSfp(p, ctx)).join("")}</div>`,
   );
 
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<title>Carnê — Contrato #${esc(contrato.numero)} — ${esc(contrato.paciente_nome)}</title>
-<style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; margin: 0; }
-  .lab { display: block; font-size: 8px; color: #555; text-transform: uppercase; letter-spacing: .04em; }
-  .val { display: block; font-weight: 600; }
-
-  .capa {
-    border: 1px dashed #111; border-radius: 6px; padding: 12px 14px; margin-bottom: -1px;
-    height: 88mm; display: flex; flex-direction: column; gap: 8px; page-break-inside: avoid;
-  }
-  .capa-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #111; padding-bottom: 6px; }
-  .capa-marca { font-size: 22px; font-weight: 900; letter-spacing: .06em; line-height: 1; }
-  .capa-nome { font-size: 13px; font-weight: 700; margin-top: 3px; }
-  .capa-end { font-size: 10px; color: #333; margin-top: 2px; }
-  .capa-whats { font-size: 11px; font-weight: 700; margin-top: 2px; }
-  .capa-codigo { border: 2px solid #111; border-radius: 6px; padding: 6px 10px; text-align: center; min-width: 45mm; }
-  .capa-codigo .lab { font-size: 10px; color: #111; font-weight: 700; }
-  .capa-codigo .val { font-size: 20px; font-weight: 900; }
-  .capa-titulo { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
-  .capa-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px 14px; font-size: 11px; }
-  .capa-grid .lab { font-size: 9px; }
-  .capa-rodape {
-    margin-top: auto; background: #111; color: #fff; text-align: center; font-weight: 800;
-    font-size: 11px; letter-spacing: .04em; padding: 6px; border-radius: 4px;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
-
-  .ficha {
-    border: 1px dashed #111; border-radius: 6px; padding: 8px 10px; page-break-inside: avoid;
-    height: 89mm; display: flex; flex-direction: column; gap: 6px;
-  }
-  .ficha-par { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: -1px; page-break-inside: avoid; }
-  .ficha-via { display: flex; flex-direction: column; }
-  .ficha-via:first-child .ficha { border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0; }
-  .ficha-via:last-child .ficha { border-top-left-radius: 0; border-bottom-left-radius: 0; }
-  .via-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-  .ficha-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-  .ficha-marca { font-size: 12px; font-weight: 900; letter-spacing: .06em; }
-  .ficha-clinica { font-weight: 700; font-size: 10px; }
-  .ficha-doc { font-size: 8px; color: #555; letter-spacing: .04em; text-transform: uppercase; }
-  .ficha-parcelas { display: flex; gap: 10px; }
-  .ficha-parcela { text-align: right; }
-  .ficha-parcela .val { font-size: 12px; font-weight: 800; }
-  .ficha-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; font-size: 10px; }
-  .ficha-grid .span2 { grid-column: span 2; }
-  .ficha-grid .val.destaque { font-size: 13px; font-weight: 800; }
-  .ficha-grid .val.obs { font-weight: 500; font-size: 9px; }
-  .ficha-rodape { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
-  .campo-manual { display: flex; flex-direction: column; justify-content: flex-end; }
-  .campo-manual .lab { text-align: center; margin-top: 2px; }
-  .campo-manual .linha-assin { display: block; border-bottom: 1px solid #111; height: 20px; }
-  .campo-manual .val.pago { font-size: 11px; text-align: center; }
-
-  .footer-imprime { text-align: center; margin: 8px 0 0; }
-  .footer-imprime button { padding: 8px 14px; font-size: 14px; cursor: pointer; }
-  @media print { .footer-imprime { display: none; } }
-  ${CSS_BOBINA_80MM}
-</style>
+<title>Carnê — Contrato nº ${esc(contrato.numero)} — ${esc(contrato.paciente_nome)}</title>
+<style>${CSS_CARNE_SFP_A4}</style>
 </head>
 <body>
-  <div class="capa">
+  <div class="folha-capa">
     <div class="capa-topo">
-      <div>
-        <div class="capa-marca">${SFP.marca}</div>
-        <div class="capa-nome">${esc(SFP.nome)}</div>
-        <div class="capa-end">${esc(SFP.endereco)}</div>
-        <div class="capa-whats">WhatsApp: ${esc(SFP.whatsapp)}</div>
+      ${logoSlot("logo-capa", clinica.logo)}
+      <div class="capa-ident">
+        <div class="capa-marca">${esc(clinica.marca)}</div>
+        <div class="capa-nome">${esc(clinica.nome)}</div>
+        ${infoClinica.map((t) => `<div class="capa-info">${esc(t)}</div>`).join("")}
       </div>
       <div class="capa-codigo"><span class="lab">Código</span><span class="val">${esc(prontuario)}</span></div>
     </div>
-    <div class="capa-titulo">Carnê de pagamento — Contrato #${esc(contrato.numero)}</div>
-    <div class="capa-grid">
-      <div>
-        <span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span>
-        ${
-          dependentes.length
-            ? `<span class="lab" style="margin-top:4px;">Dependentes</span>` +
-              dependentes.map((d) => `<span class="val">${esc(d.nome)}</span>`).join("")
-            : ""
-        }
-      </div>
-      <div><span class="lab">CPF</span><span class="val">${esc(cpf ?? "—")}</span></div>
-      <div>
-        <span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span>
-        <span class="lab" style="margin-top:4px;">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span>
-      </div>
-      <div><span class="lab">Vigência</span><span class="val">${vigencia}</span></div>
-      <div><span class="lab">Dia de vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
-      <div>
-        <span class="lab">Parcelas</span><span class="val">${totalMensalidades}</span>
-        <span class="lab" style="margin-top:4px;">Valor mensal</span><span class="val">${BRL(Number(contrato.valor_mensal))}</span>
-      </div>
+    <div class="capa-titulo">Carnê de pagamento — Contrato nº ${esc(contrato.numero)}</div>
+    <div class="capa-campos">
+      <div class="campo inteira"><span class="lab">Titular</span><span class="val">${esc(contrato.paciente_nome)}</span></div>
+      <div class="campo"><span class="lab">CPF</span><span class="val">${esc(cpf ?? "—")}</span></div>
+      <div class="campo"><span class="lab">Convênio</span><span class="val">${esc(convenioNome)}</span></div>
+      <div class="campo inteira"><span class="lab">Dependentes com CPF</span><span class="val">${depTexto}</span></div>
+      <div class="campo"><span class="lab">Vigência</span><span class="val">${vigencia}</span></div>
+      <div class="campo"><span class="lab">Pessoas no convênio</span><span class="val">${pessoasConvenio}</span></div>
+    </div>
+    <div class="capa-resumo">
+      <div><span class="lab">Parcelas</span><span class="val">${totalMensalidades}</span></div>
+      <div><span class="lab">Dia do vencimento</span><span class="val">${esc(contrato.dia_vencimento ?? "—")}</span></div>
+      <div><span class="lab">Valor mensal</span><span class="destaque">${BRL(Number(contrato.valor_mensal))}</span></div>
+      <div><span class="lab">1ª parcela</span><span class="val">${fmtD(mens[0]?.vencimento)}</span></div>
+    </div>
+    <div class="como-pagar">
+      <h2>Como pagar</h2>
+      <ul>
+        <li>Apresente a ficha do mês no balcão da unidade e guarde a via carimbada.</li>
+        <li>Após o vencimento, multa de 10% e juros de 0,33% ao dia.</li>
+        <li>2ª via do carnê é emitida na recepção, com taxa de ${BRL(VALOR_TAXA_SEGUNDA_VIA)}.</li>
+        <li>Dúvidas pelo WhatsApp da clínica: ${esc(clinica.whatsapp)}.</li>
+      </ul>
     </div>
     <div class="capa-rodape">${esc(SFP.rodape)}</div>
   </div>
-
-  ${fichas.join("\n")}
-
-  <div class="footer-imprime">
-    <button onclick="window.print()">Imprimir / Salvar PDF</button>
-  </div>
-
-  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 400));</script>
+  ${folhas.join("\n")}
 </body>
 </html>`;
 }

@@ -21,7 +21,11 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64, precarregarGeradorPdf } from "@/lib/print-senha";
-import { imprimirDocumentoSilencioso, prepararImpressao } from "@/utils/printService";
+import {
+  imprimirDocumentoSilencioso,
+  prepararImpressao,
+  obterTokenTotem,
+} from "@/utils/printService";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 
@@ -106,7 +110,9 @@ export function TotemPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   // Status da impressão da senha — ver item 10 (feedback de impressão).
-  const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "falha" | null>(null);
+  const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "incerto" | "falha" | null>(
+    null,
+  );
   const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Aquecimento da impressão: baixa o chunk do jsPDF, abre o websocket do QZ
@@ -188,7 +194,9 @@ export function TotemPage() {
       const avisoImpressao =
         printStatus === "falha"
           ? "Não foi possível imprimir. Anote o número ou procure a recepção."
-          : "Retire sua senha impressa.";
+          : printStatus === "incerto"
+            ? "Se a senha não sair impressa, anote o número ou procure a recepção."
+            : "Retire sua senha impressa.";
       setAnnounce(
         `Senha ${nome}, número ${ticket.codigo}. ${avisoImpressao} Acompanhe o painel de chamada.`,
       );
@@ -348,13 +356,18 @@ export function TotemPage() {
         });
         await imprimirDocumentoSilencioso(pdfBase64);
         setPrintStatus("ok");
-      } catch {
+      } catch (err) {
+        // Fica no console (F12) para quem for ao totem ver em que passo parou:
+        // QZ Tray fechado, assinatura recusada, impressora padrão ausente…
+        console.error("[totem] impressão pelo QZ Tray falhou; tentando pelo navegador", err);
         const agendou = imprimirSenhaTotem({
           codigo: row.codigo,
           tipo: _tipo,
           clinicaNome: clinicaAtual.clinica?.nome ?? null,
         });
-        setPrintStatus(agendou ? "ok" : "falha");
+        // Pelo navegador o sistema não fica sabendo se o papel saiu (num totem
+        // em quiosque quase nunca sai). Não dá para afirmar "retire sua senha".
+        setPrintStatus(agendou ? "incerto" : "falha");
       }
     })();
   }
@@ -377,6 +390,7 @@ export function TotemPage() {
     )("totem_checkin_cpf", {
       _clinica_id: clinicaAtual.clinica_id,
       _cpf: cpf,
+      _token: obterTokenTotem(),
     });
     setBusy(false);
     if (error) {
@@ -410,6 +424,7 @@ export function TotemPage() {
     )("totem_checkin_paciente", {
       _clinica_id: clinicaAtual.clinica_id,
       _paciente_id: pacienteId,
+      _token: obterTokenTotem(),
     });
     setBusy(false);
     if (error) {
@@ -468,15 +483,18 @@ export function TotemPage() {
       }
 
       setScanMsg("Verificando…");
-      const { data: matchData, error } = await (
+      // Reconhecimento e check-in numa etapa só no servidor: o id do
+      // paciente nunca chega ao navegador do totem.
+      const { data, error } = await (
         supabase.rpc as unknown as (
           fn: string,
           args: Record<string, unknown>,
         ) => Promise<{ data: unknown; error: unknown }>
-      )("totem_match_biometria", {
+      )("totem_checkin_facial", {
         _clinica_id: clinicaAtual.clinica_id,
         _descriptor: Array.from(descritor),
         _threshold: FACE_MATCH_THRESHOLD,
+        _token: obterTokenTotem(),
       });
       stopCamera();
       if (error) {
@@ -484,16 +502,19 @@ export function TotemPage() {
         setStep("checkin");
         return;
       }
-      const match = (Array.isArray(matchData) ? matchData[0] : matchData) as
-        | { paciente_id: string; nome: string }
-        | undefined;
-      if (!match?.paciente_id) {
-        toast.error("Não reconhecemos seu rosto. Digite o CPF.");
+      const r = (data ?? {}) as { ok?: boolean; erro?: string } & CheckinInfo;
+      if (!r.ok) {
+        toast.error(r.erro ?? "Não foi possível fazer o check-in. Procure a recepção.");
         setStep("checkin");
         return;
       }
-      setScanMsg(`Olá, ${match.nome}!`);
-      await fazerCheckinPaciente(match.paciente_id);
+      setCheckinInfo({
+        paciente_nome: r.paciente_nome,
+        inicio: r.inicio ?? null,
+        medico: r.medico ?? null,
+        procedimento: r.procedimento ?? null,
+      });
+      setStep("checkin-ok");
     } catch {
       stopCamera();
       toast.error("Não foi possível acessar a câmera. Digite o CPF.");
@@ -845,6 +866,12 @@ export function TotemPage() {
             )}
             {printStatus === "ok" && (
               <div className="text-[clamp(1.25rem,3vw,1.5rem)]">Retire sua senha impressa</div>
+            )}
+            {printStatus === "incerto" && (
+              <div className="flex items-center justify-center gap-2 text-[clamp(1.1rem,2.6vw,1.35rem)] text-amber-600 dark:text-amber-400 font-semibold">
+                <AlertTriangle className="h-6 w-6 shrink-0" /> Se a senha não sair impressa, anote o
+                número ou procure a recepção
+              </div>
             )}
             {printStatus === "falha" && (
               <div className="flex items-center justify-center gap-2 text-[clamp(1.1rem,2.6vw,1.35rem)] text-amber-600 dark:text-amber-400 font-semibold">

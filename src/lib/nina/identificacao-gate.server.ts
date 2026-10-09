@@ -19,9 +19,9 @@
  */
 
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
-import { MOTIVO_SFP, resultadoEncaminhamentoSfp } from "./regras-catalogo";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "./paciente-tools.server";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { encontrarDataNascimento } from "./data-nascimento";
 import { autorizarAcao } from "./acoes/autorizacao";
 import { resultadoAgendamentoConfirmado } from "./resposta/agendamento";
 import {
@@ -33,20 +33,49 @@ import {
 } from "./cadastro-paciente";
 import { criarResultado, type ResultadoRespostaNina } from "./resposta/contrato";
 import { textoDaChave, type TextosTemplates } from "./resposta/templates";
-import { aceitarResumoEntregue, confirmacaoDaEscolha, consentimentoDaEscolha,
-  limparEscolhaAgendamento, lerEscolhaHorario, vagasDaEscolha, vagasDaSessao,
-  resumoDaEscolhaEntregue, LEMBRETE_CONFIRMACAO } from "./agendamento-escolha";
-import { respostaSemVagas } from "./agenda-sem-vagas";
+import {
+  aceitarResumoEntregue,
+  confirmacaoDaEscolha,
+  consentimentoDaEscolha,
+  limparEscolhaAgendamento,
+  lerEscolhaHorario,
+  vagasDaEscolha,
+  vagasDaSessao,
+  resumoDaEscolhaEntregue,
+  LEMBRETE_CONFIRMACAO,
+} from "./agendamento-escolha";
+import { respostaSemVagas, RESPOSTA_VAGA_OCUPADA } from "./agenda-sem-vagas";
+
+/**
+ * Decisão do dono (02/10/2026): horário ocupado entre a escolha e a gravação
+ * não transfere mais. Limpa a escolha (nada reservado) e oferece buscar novas
+ * opções reais; só um novo "sim" grava.
+ */
+function vagaOcupada(estado: EstadoFluxoNina) {
+  limparEscolhaAgendamento(estado);
+  return criarResultado({
+    origem: "gate",
+    texto: RESPOSTA_VAGA_OCUPADA,
+    restricoes: ["vaga_escolhida_indisponivel", "nenhuma_reserva_feita"],
+  });
+}
 import { respostaFalhaAgendamento } from "./falha-agendamento";
 
 /** Só é enviado se o anúncio do encaminhamento (com protocolo) não saiu. */
 export const TEXTO_ENCAMINHADO_FALHA =
   "Vou encaminhar sua conversa para nossa equipe, que continuará o atendimento por aqui.";
 import { reservaDaSessaoAtual } from "./agendamento-sessao";
+import {
+  registrarPedidoTelefone,
+  PEDIR_TELEFONE,
+  TELEFONE_SIMULADO,
+  TELEFONE_FALHA_SEM_ENCAMINHAMENTO,
+  motivoTelefoneNaoAtualizado,
+} from "./telefone-paciente";
 
 /* ------------------------------------------------------------ confirmações */
 
-import { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
+import { ehConfirmacaoDeAgendamento, separarAceiteComPergunta } from "./confirmacao-agendamento";
 import { ehRespostaNegativaCurta } from "./resposta-afirmativa";
 export { ehConfirmacaoDeAgendamento } from "./confirmacao-agendamento";
 
@@ -54,8 +83,11 @@ const NEGACAO =
   /^\s*(n[ãa]o\s+(quero|posso|vou|desejo|dá|da|pode|prefiro|é|eh|serve)|n[ãa]o,|nao,|outro\s+(hor[áa]rio|dia|m[ée]dico)|outra\s+(data|hora|op[cç][ãa]o)|prefiro\b|ainda\s*n[ãa]o\b|cancela\w*)(?=\s|$|[,.!?])/i;
 export function ehNegacao(texto: string): boolean {
   const t = (texto ?? "").trim();
-  const recusaExplicita = !t.includes("?") &&
-    /(?:^|[.!;]\s*)(?:na\s+verdade\s+n[ãa]o(?=\s*[,.;!]|$)|n[ãa]o\s+(?:confirma|confirme|confirmo|agende|agenda|marque|marca)(?=\s|$|[,.!]))/i.test(t);
+  const recusaExplicita =
+    !t.includes("?") &&
+    /(?:^|[.!;]\s*)(?:na\s+verdade\s+n[ãa]o(?=\s*[,.;!]|$)|n[ãa]o\s+(?:confirma|confirme|confirmo|agende|agenda|marque|marca)(?=\s|$|[,.!]))/i.test(
+      t,
+    );
   return ehRespostaNegativaCurta(t) || NEGACAO.test(t) || recusaExplicita;
 }
 
@@ -80,24 +112,9 @@ export type DadosIdentificacao = {
   telefone: string | null;
 };
 
-function normalizarData(bruto: string): string | null {
-  const iso = bruto.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const br = bruto.match(/\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b/);
-  if (!br) return null;
-  const d = Number(br[1]);
-  const m = Number(br[2]);
-  let a = Number(br[3]);
-  if (a < 100) a += a > 30 ? 1900 : 2000;
-  if (d < 1 || d > 31 || m < 1 || m > 12) return null;
-  const hoje = new Date();
-  if (a < 1900 || a > hoje.getFullYear()) return null;
-  return `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
-
 /** Abertura que antecede o nome ("meu nome é", "o nome dele é", "se chama"). */
 const ABERTURA_NOME =
-  /^(?:(?:e\s+)?(?:o\s+|a\s+)?(?:meu|minha|seu|sua)?\s*nome(?:\s+completo)?(?:\s+(?:dele|dela|do\s+paciente|da\s+paciente))?(?:\s+(?:é|eh|e))?|sou|me\s+chamo|(?:ele|ela)\s+se\s+chama|se\s+chama|chama\s+se|chama-se)\s+/i;
+  /^(?:(?:e\s+)?(?:o\s+|a\s+)?(?:meu|minha|seu|sua)?\s*nome(?:\s+completo)?(?:\s+(?:dele|dela|do\s+paciente|da\s+paciente))?(?:\s+(?:é|eh|e))?|sou|me\s+chamo|(?:ele|ela)\s+(?:se\s+)?chama|se\s+chama|chama\s+se|chama-se)\s+/i;
 
 /** Palavras que não aparecem num nome de pessoa ("da", "de", "do" continuam válidas). */
 const NAO_E_NOME =
@@ -115,23 +132,30 @@ function pareceNome(palavras: string[]): boolean {
   if (semConectivo(palavras) < 2) return false;
   const ultima = palavras.at(-1) ?? "";
   const antes = palavras.slice(0, -1);
-  if (SOBRENOME_FAMILIA.test(ultima) && semConectivo(antes) >= 2) return !NAO_E_NOME.test(antes.join(" "));
+  if (SOBRENOME_FAMILIA.test(ultima) && semConectivo(antes) >= 2)
+    return !NAO_E_NOME.test(antes.join(" "));
   return !NAO_E_NOME.test(palavras.join(" "));
 }
 
 /** Só recorta uma declaração explícita, sem confundir o médico com o paciente. */
 function declaracaoDePaciente(texto: string): string | null {
-  const paciente = texto.match(/(?:^|[.!?]\s*)(?:o|a)\s+paciente\s+(?:é|eh|e|se\s+chama)\s+(.+)/i)?.[1];
+  const paciente = texto.match(
+    /(?:^|[.!?]\s*)(?:o|a)\s+paciente\s+(?:é|eh|e|se\s+chama)\s+(.+)/i,
+  )?.[1];
   if (paciente) return paciente;
   const propria = texto.match(/\b(?:meu nome(?: completo)? (?:é|eh)|me chamo)\s+.+/i)?.[0];
   if (propria) return propria;
-  const nomeDependente = texto.match(/\b(?:(?:o\s+)?nome(?:\s+completo)?\s+(?:dele|dela|do\s+paciente|da\s+paciente)\s+(?:é|eh|e)|(?:ele|ela)\s+se\s+chama)\s+.+/i)?.[0];
+  const nomeDependente = texto.match(
+    /\b(?:(?:o\s+)?nome(?:\s+completo)?\s+(?:dele|dela|do\s+paciente|da\s+paciente)\s+(?:é|eh|e)|(?:ele|ela)\s+se\s+chama)\s+.+/i,
+  )?.[0];
   if (nomeDependente) return nomeDependente;
   // Apresentação na mesma mensagem da escolha: "14:30. Sou Ana Silva...".
   // O extrator continua rejeitando idade, médico e relação familiar como nome.
   const apresentacao = texto.match(/(?:^|[.,;!?]\s*)(sou\s+.+)/i)?.[1];
   if (apresentacao) return apresentacao;
-  const dependente = texto.match(/(?:^|[.!?]\s*)(?:(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])|(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(?:é|eh|e|se\s+chama))\s+(.+)/i)?.[1];
+  const dependente = texto.match(
+    /(?:^|[.!?]\s*)(?:(?:é|eh|e)\s+(?:para|pra|pro)\s+(?:(?:o|a)\s+)?(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])|(?:meu|minha)\s+(?:filh[oa]|mãe|mae|pai|espos[oa])\s+(?:é|eh|e|se\s+chama))\s+(.+)/i,
+  )?.[1];
   return dependente ?? null;
 }
 
@@ -151,8 +175,16 @@ function dadosJuntoDaEscolha(texto: string): DadosIdentificacao | null {
 function aceiteParaPacienteIdentificado(mensagem: string, ctx: CtxNinaPaciente): string {
   const p = ctx.estado?.patient;
   if (!p?.identified || !p.validated || !p.id || !ctx.pacienteNome) return mensagem;
-  const normalizar = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-  const sufixo = mensagem.match(/\s+(?:para|pra|pro)\s+(?:(?:a|o)\s+)?(?:minha|meu)\s+(mãe|mae|pai|filha|filho|esposa|esposo)[.!\s]*$/i);
+  const normalizar = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  const sufixo = mensagem.match(
+    /\s+(?:para|pra|pro)\s+(?:(?:a|o)\s+)?(?:minha|meu)\s+(mãe|mae|pai|filha|filho|esposa|esposo)[.!\s]*$/i,
+  );
   if (!sufixo) return mensagem;
   const historico = ctx.consultaAgenda?.historico ?? [];
   for (let i = historico.length - 1; i >= 0; i--) {
@@ -162,10 +194,16 @@ function aceiteParaPacienteIdentificado(mensagem: string, ctx: CtxNinaPaciente):
     if (!declaracao) continue;
     const nome = extrairDadosIdentificacao(declaracao).nome;
     if (!nome) continue;
-    const parentesco = item.content.match(/(?:^|[.!?]\s*)(?:meu|minha)\s+(mãe|mae|pai|filha|filho|esposa|esposo)\s+(?:é|eh|e|se\s+chama)\s+/i)?.[1];
+    const parentesco = item.content.match(
+      /(?:^|[.!?]\s*)(?:meu|minha)\s+(mãe|mae|pai|filha|filho|esposa|esposo)\s+(?:é|eh|e|se\s+chama)\s+/i,
+    )?.[1];
     // A declaração mais recente prevalece: não reutilize um parente anterior.
-    if (!parentesco || normalizar(nome) !== normalizar(ctx.pacienteNome) ||
-        normalizar(parentesco) !== normalizar(sufixo[1]!)) return mensagem;
+    if (
+      !parentesco ||
+      normalizar(nome) !== normalizar(ctx.pacienteNome) ||
+      normalizar(parentesco) !== normalizar(sufixo[1]!)
+    )
+      return mensagem;
     return mensagem.slice(0, sufixo.index).trim();
   }
   return mensagem;
@@ -183,13 +221,27 @@ function extrairNome(semData: string): string | null {
   const partes = semData
     .replace(/\d[\d.\- ]{9,17}\d/g, " ")
     .replace(/\d/g, " ")
-    .split(/[,;:|.!?\n]+|\s+e\s+(?=(?:nasci|nascid[oa]|que\s+nasceu|data)\b)|\b(?:nascid[oa]|nasci|que\s+nasceu)\s+(?:em|no\s+dia)?\b/i);
+    .split(
+      /[,;:|.!?\n]+|\s+e\s+(?=(?:nasci|nascid[oa]|que\s+nasceu|data)\b)|\b(?:nascid[oa]|nasci|que\s+nasceu)\s+(?:em|no\s+dia)?\b|\b(?:nasci|nascid[oa]|nasceu|nascimento|nacimento|nasimento|nascimeto|nacimeto|data|dia|tem|anos?|meses|idade)\b/i,
+    );
   const candidatos = partes
-    .map((p) => p.replace(/\s+/g, " ").trim().replace(ABERTURA_NOME, "").trim().replace(PARENTESCO_ANTES, "").trim())
+    .map((p) =>
+      p
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(ABERTURA_NOME, "")
+        .trim()
+        .replace(PARENTESCO_ANTES, "")
+        .trim()
+        // "dona Benedita", "seu José": tratamento não é parte do nome (07/10/2026).
+        .replace(/^(?:dona|dna|seu|sr|sra|senhor|senhora)\.?\s+/i, ""),
+    )
     .map((p) => p.split(" ").filter((w) => /^[A-Za-zÀ-ÿ'´`^~-]{2,}$/.test(w)))
     .filter(pareceNome);
   const melhor = candidatos.sort((a, b) => b.length - a.length)[0];
-  return melhor ? melhor.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ") : null;
+  return melhor
+    ? melhor.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ")
+    : null;
 }
 
 /**
@@ -199,13 +251,12 @@ function extrairNome(semData: string): string | null {
  */
 export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
-  const data = normalizarData(t);
+  const dataEncontrada = encontrarDataNascimento(t);
 
   // CPF: 11 dígitos, com ou sem pontuação. Remove a data antes para não
   // confundir "21/10/1999" com número.
   let semData = t;
-  const alvoData = t.match(/\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/);
-  if (alvoData) semData = t.replace(alvoData[0], " ");
+  if (dataEncontrada) semData = t.replace(dataEncontrada.trecho, " ");
   let cpf: string | null = null;
   for (const m of semData.matchAll(/\d[\d.\- ]{9,17}\d/g)) {
     const d = somenteDigitos(m[0]);
@@ -220,7 +271,7 @@ export function extrairDadosIdentificacao(texto: string): DadosIdentificacao {
   const numeros = semData.match(/(?:\+?55\s*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]*\d{4}/g) ?? [];
   const telefone =
     numeros.map(somenteDigitos).find((n) => n !== cpf && n.length >= 10 && n.length <= 13) ?? null;
-  return { nome, cpf, data_nascimento: data, telefone };
+  return { nome, cpf, data_nascimento: dataEncontrada?.data ?? null, telefone };
 }
 
 /* -------------------------------------------------------------- mensagens */
@@ -287,20 +338,89 @@ export async function aplicarGateIdentificacao(params: {
   const p = estado.patient;
   const mensagemAceite = aceiteParaPacienteIdentificado(mensagem, ctx);
   if (estado.flow.stage === "HANDOFF") return null;
+  const corrigindoTelefone = registrarPedidoTelefone(estado, mensagem);
+  // Homologação não altera o contato do paciente de teste: o pedido é
+  // descartado e a conversa segue com o número virtual (06/10/2026).
+  if (p.alteracao_telefone && (ctx.teste || ctx.origem === "homologacao")) {
+    p.alteracao_telefone = null;
+    const escolhaAtual = confirmacaoDaEscolha(estado, ctx.clinicaId);
+    if (p.validated && p.id && escolhaAtual && !declaracaoDePaciente(mensagem)) {
+      if (!a.appointment_id) estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
+      return criarResultado({
+        origem: "gate",
+        texto: a.appointment_id
+          ? `${TELEFONE_SIMULADO} Seu agendamento permanece o mesmo.`
+          : `${TELEFONE_SIMULADO}\n\n${escolhaAtual.resumo}`,
+        restricoes: ["nao_afirmar_telefone_alterado", "aguardar_aceite_do_resumo"],
+      });
+    }
+  }
+  if (p.alteracao_telefone?.telefone === null)
+    return criarResultado({
+      origem: "gate",
+      texto: PEDIR_TELEFONE,
+      restricoes: ["aguardar_telefone_solicitado", "nao_agendar"],
+    });
+  // Corrigir contato não é recusar a vaga nem confirmar o resumo anterior.
+  if (
+    p.alteracao_telefone &&
+    p.validated &&
+    p.id &&
+    confirmacaoDaEscolha(estado, ctx.clinicaId) &&
+    !declaracaoDePaciente(mensagem)
+  ) {
+    const etapa = estado.flow.stage;
+    const r = await executar(ctx, "identificar_paciente", {});
+    if (!r.ok) {
+      // Falha de operação vira encaminhamento: sem "tente novamente" e sem
+      // deixar o pedido pendente prendendo as próximas mensagens.
+      p.alteracao_telefone = null;
+      estado.flow.stage = "HANDOFF";
+      const ok =
+        (await params
+          .encaminharVagaIndisponivel?.(
+            motivoTelefoneNaoAtualizado(r.erro, Boolean(a.appointment_id)),
+          )
+          .catch(() => false)) ?? false;
+      return criarResultado({
+        origem: ok ? "handoff" : "erro",
+        texto: ok ? TEXTO_ENCAMINHADO_FALHA : TELEFONE_FALHA_SEM_ENCAMINHAMENTO,
+        fatosConfirmados: ok ? ["handoff_confirmado"] : [],
+        restricoes: ["nao_agendar", "nao_afirmar_telefone_alterado"],
+      });
+    }
+    estado.flow.stage = a.appointment_id ? etapa : "WAITING_FINAL_CONFIRMATION";
+    return criarResultado({
+      origem: "gate",
+      texto: a.appointment_id
+        ? `Telefone atualizado para ${p.telefone_confirmado?.telefone}. Seu agendamento permanece o mesmo.`
+        : confirmacaoDaEscolha(estado, ctx.clinicaId)!.resumo,
+      fatosConfirmados: ["telefone_atualizado"],
+      restricoes: ["aguardar_aceite_do_resumo"],
+    });
+  }
   if (a.appointment_id) {
-    if (reservaDaSessaoAtual(estado) &&
-      ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga)) {
-      return criarResultado({ origem: "gate",
+    if (
+      reservaDaSessaoAtual(estado) &&
+      ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga)
+    ) {
+      return criarResultado({
+        origem: "gate",
         texto: "Seu agendamento já foi realizado. Não é necessário confirmar novamente.",
         fatosConfirmados: ["agendamento_ja_existente"],
-        restricoes: ["nao_criar_nova_reserva", "nao_repetir_conclusao_completa"] });
+        restricoes: ["nao_criar_nova_reserva", "nao_repetir_conclusao_completa"],
+      });
     }
     return null;
   }
   const { pedidoPreventivo } = await import("./atendimento-consulta");
   const preventivo = pedidoPreventivo(mensagem);
-  if (a.procedure && preventivo &&
-    (/\bpreventivo\b/i.test(a.procedure) && !/\bsem\s+preventivo\b/i.test(a.procedure)) !== (preventivo === "com")) {
+  if (
+    a.procedure &&
+    preventivo &&
+    (/\bpreventivo\b/i.test(a.procedure) && !/\bsem\s+preventivo\b/i.test(a.procedure)) !==
+      (preventivo === "com")
+  ) {
     // Mudança do atendimento exige releitura do catálogo e novo resumo.
     // Não reaproveite uma vaga/aceite da variante anterior na coleta de dados.
     limparEscolhaAgendamento(estado);
@@ -308,43 +428,112 @@ export async function aplicarGateIdentificacao(params: {
     estado.flow.stage = "CHOOSING_SLOT";
     return null;
   }
-  const encaminharSfp = async () => {
+  const encaminharRestricaoCatalogo = async (motivo?: unknown) => {
     limparEscolhaAgendamento(estado);
     a.slot_options = null;
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "HANDOFF";
-    const ok = await params.encaminharVagaIndisponivel?.(MOTIVO_SFP).catch(() => false) ?? false;
-    return resultadoEncaminhamentoSfp(ok);
+    const ok =
+      (await params
+        .encaminharVagaIndisponivel?.(
+          typeof motivo === "string" && motivo.trim()
+            ? motivo
+            : "CATALOGO_ATENDIMENTO_HUMANO: restrição explícita do cadastro",
+        )
+        .catch(() => false)) ?? false;
+    return criarResultado({
+      origem: "handoff",
+      texto: ok
+        ? "A equipe continuará seu atendimento."
+        : "Não consegui encaminhar neste momento. Tente novamente.",
+      fatosConfirmados: ok ? ["handoff_confirmado"] : [],
+    });
   };
   const encaminhar = async (modalidadePendente = false) => {
-    const motivo = modalidadePendente ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."
+    const motivo = modalidadePendente
+      ? "MODALIDADE_ALTERADA: conferir a modalidade de atendimento antes de reservar."
       : "VAGA_ESCOLHIDA_INDISPONIVEL: a vaga escolhida pelo paciente não pôde ser reservada; não substituir médico, data ou horário.";
     limparEscolhaAgendamento(estado);
     a.slot_options = null;
     estado.flow.stage = "HANDOFF";
-    const ok = await params.encaminharVagaIndisponivel?.(motivo).catch(() => false) ?? false;
-    return criarResultado({ origem: ok ? "handoff" : "erro", texto: respostaSemVagas(ok, true, modalidadePendente),
-      fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_substituir_vaga_escolhida"] });
+    const ok = (await params.encaminharVagaIndisponivel?.(motivo).catch(() => false)) ?? false;
+    return criarResultado({
+      origem: ok ? "handoff" : "erro",
+      texto: respostaSemVagas(ok, true, modalidadePendente),
+      fatosConfirmados: ok ? ["handoff_confirmado"] : [],
+      restricoes: ["nao_substituir_vaga_escolhida"],
+    });
   };
   // Regra da clínica (26/09/2026): a Nina não diz ao paciente que "não
   // conseguiu" e o deixa sem saída. Falha de operação vai para a equipe.
   const encaminharFalha = async (etapa: string, codigo?: string | null) => {
     const motivo = `FALHA_OPERACIONAL_AGENDAMENTO: ${etapa} (${codigo ?? "SEM_CODIGO"}). A equipe deve conferir o cadastro e a agenda antes de continuar; a falha não comprova falta de vagas.`;
     estado.flow.stage = "HANDOFF";
-    const ok = await params.encaminharVagaIndisponivel?.(motivo).catch(() => false) ?? false;
-    return criarResultado({ origem: ok ? "handoff" : "erro",
+    const ok = (await params.encaminharVagaIndisponivel?.(motivo).catch(() => false)) ?? false;
+    return criarResultado({
+      origem: ok ? "handoff" : "erro",
       texto: ok ? TEXTO_ENCAMINHADO_FALHA : respostaFalhaAgendamento(false),
-      fatosConfirmados: ok ? ["handoff_confirmado"] : [], restricoes: ["nao_afirmar_agendamento_sem_gravacao"] });
+      fatosConfirmados: ok ? ["handoff_confirmado"] : [],
+      restricoes: ["nao_afirmar_agendamento_sem_gravacao"],
+    });
   };
   let selecionouAgora = params.aposSelecao === true;
   const cadastroProntoNoInicio = Boolean(p.identified && p.validated && p.id);
-  const aceiteDaVaga = !selecionouAgora && ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
-  const escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
+  let aceiteDaVaga =
+    !corrigindoTelefone &&
+    !p.alteracao_telefone &&
+    !selecionouAgora &&
+    ehConfirmacaoDeAgendamento(mensagemAceite, confirmacaoDaEscolha(estado, ctx.clinicaId)?.vaga);
+  let escolha = selecionouAgora || aceiteDaVaga ? null : lerEscolhaHorario(mensagem);
   const opcoes = vagasDaSessao(estado, ctx.clinicaId);
+  // Jev Fase 7: só quando as regras não entenderam a resposta a um resumo ou
+  // a uma lista de horários. Escolhe apenas entre opções oferecidas; abaixo
+  // de 80% nada muda. A gravação continua dependendo do sistema.
+  let vagaDoJev: (typeof opcoes)[number] | null = null;
+  if (
+    !corrigindoTelefone &&
+    !p.alteracao_telefone &&
+    !selecionouAgora &&
+    !aceiteDaVaga &&
+    !escolha &&
+    !a.confirmation?.aceita &&
+    !ehNegacao(mensagem)
+  ) {
+    const resumo = confirmacaoDaEscolha(estado, ctx.clinicaId);
+    const situacao =
+      resumo && !consentimentoDaEscolha(estado, ctx.clinicaId)
+        ? { tipo: "resumo" as const, vaga: resumo.vaga, resumo: resumo.resumo }
+        : !resumo && opcoes.length
+          ? { tipo: "opcoes" as const, opcoes }
+          : null;
+    if (situacao) {
+      const { interpretarEscolhaJev } = await import("./jev.server");
+      const ultima = [...(ctx.consultaAgenda?.historico ?? [])]
+        .reverse()
+        .find((h) => h.role === "assistant");
+      const d = await interpretarEscolhaJev({
+        clinicaId: ctx.clinicaId,
+        conversaId: ctx.conversaId,
+        teste: Boolean(ctx.teste || ctx.origem === "homologacao"),
+        mensagem,
+        ultimaMaria: ultima?.content ?? null,
+        situacao,
+      });
+      if (d.tipo === "aceitou") aceiteDaVaga = true;
+      if (d.tipo === "escolheu") {
+        vagaDoJev = d.vaga;
+        escolha = { hora: d.vaga.hora, data: d.vaga.data };
+      }
+    }
+  }
   // Uma correção/recusa após o aceite suspende a gravação. A Nina não troca
   // a vaga no meio da coleta; a equipe humana deverá tratar a mudança.
-  if (a.confirmation?.aceita && (!consentimentoDaEscolha(estado, ctx.clinicaId) || ehNegacao(mensagem) ||
-    (escolha && vagasDaEscolha([a.confirmation.vaga], escolha).length === 0))) {
+  if (
+    a.confirmation?.aceita &&
+    (!consentimentoDaEscolha(estado, ctx.clinicaId) ||
+      ehNegacao(mensagem) ||
+      (escolha && vagasDaEscolha([a.confirmation.vaga], escolha).length === 0))
+  ) {
     a.slot_confirmed_by_patient = false;
     a.intent_confirmed = false;
     p.pending = { nome: null, cpf: null, data_nascimento: null };
@@ -352,7 +541,7 @@ export async function aplicarGateIdentificacao(params: {
     return null;
   }
   if (escolha && opcoes.length && !consentimentoDaEscolha(estado, ctx.clinicaId)) {
-    const vagas = vagasDaEscolha(opcoes, escolha);
+    const vagas = vagaDoJev ? [vagaDoJev] : vagasDaEscolha(opcoes, escolha);
     // Um horário ainda não consultado precisa de nova leitura da agenda.
     // Não o declare indisponível e não o substitua por uma opção da lista.
     if (vagas.length === 0) {
@@ -365,26 +554,34 @@ export async function aplicarGateIdentificacao(params: {
     }
     const vaga = vagas[0]!;
     const r = await executar(ctx, "selecionar_horario", {
-      medico_id: vaga.medico_id, inicio: vaga.inicio, fim: vaga.fim,
+      medico_id: vaga.medico_id,
+      inicio: vaga.inicio,
+      fim: vaga.fim,
     });
-    if (!r.ok && r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
-    if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return encaminhar();
-    if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro)) return encaminhar(true);
+    if (!r.ok && r.erro === "CATALOGO_ATENDIMENTO_HUMANO")
+      return encaminharRestricaoCatalogo(r.motivo_transferencia);
+    if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
+    if (!r.ok && ["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(r.erro))
+      return encaminhar(true);
     if (r.ok && typeof r.orientacao_atendimento === "string")
-      return criarResultado({ origem: "gate", texto: r.orientacao_atendimento,
-        fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"] });
+      return criarResultado({
+        origem: "gate",
+        texto: r.orientacao_atendimento,
+        fatosConfirmados: ["modalidade:chegada_sem_pre_agendamento"],
+      });
     if (r.ok && typeof r.resumo_confirmacao === "string") {
       selecionouAgora = true;
     } else if (r.ok && r.selecao_preservada === true) {
       selecionouAgora = true;
     } else {
-      if (r.ok || r.erro === "ACTION_NOT_AUTHORIZED") return resultadoGate(textos, "fluxo.agendamento.escolher", {});
+      if (r.ok || r.erro === "ACTION_NOT_AUTHORIZED")
+        return resultadoGate(textos, "fluxo.agendamento.escolher", {});
       return encaminharFalha("selecionar_horario", r.erro);
     }
   }
   // "Prefiro 08:10" é uma escolha já validada, não uma recusa que a apaga.
   // Negativas sem seleção válida continuam suspendendo o fluxo.
-  if (!selecionouAgora && ehNegacao(mensagem)) {
+  if (!corrigindoTelefone && !p.alteracao_telefone && !selecionouAgora && ehNegacao(mensagem)) {
     limparEscolhaAgendamento(estado);
     p.pending = { nome: null, cpf: null, data_nascimento: null };
     estado.flow.stage = "CHOOSING_SLOT";
@@ -400,16 +597,23 @@ export async function aplicarGateIdentificacao(params: {
   // Uma repetição do aceite durante a coleta não é nome de paciente.
   // A própria escolha de horário também nunca é um dado cadastral.
   const ultimaMensagem = ctx.consultaAgenda?.historico.at(-1);
-  const coletandoDados = ["AWAITING_PATIENT_DATA", "COLLECTING_PATIENT_DATA", "IDENTIFYING_PATIENT"].includes(estado.flow.stage) ||
-    (ultimaMensagem?.role === "assistant" && /nome completo|data de nascimento|telefone com DDD/i.test(ultimaMensagem.content ?? ""));
-  const declaracaoNaEscolha = selecionouAgora
-    ? declaracaoDePaciente(mensagem)
-    : null;
-  const novo = declaracaoNaEscolha ? extrairDadosIdentificacao(declaracaoNaEscolha)
-    : selecionouAgora ? dadosJuntoDaEscolha(mensagem)
-    : aceiteDaVaga || !coletandoDados ? null : extrairDadosIdentificacao(mensagem);
+  const coletandoDados =
+    ["AWAITING_PATIENT_DATA", "COLLECTING_PATIENT_DATA", "IDENTIFYING_PATIENT"].includes(
+      estado.flow.stage,
+    ) ||
+    (ultimaMensagem?.role === "assistant" &&
+      /nome completo|data de nascimento|telefone com DDD/i.test(ultimaMensagem.content ?? ""));
+  const declaracaoNaEscolha = declaracaoDePaciente(mensagem);
+  const novo = declaracaoNaEscolha
+    ? extrairDadosIdentificacao(declaracaoNaEscolha)
+    : selecionouAgora
+      ? dadosJuntoDaEscolha(mensagem)
+      : aceiteDaVaga || !coletandoDados
+        ? null
+        : extrairDadosIdentificacao(mensagem);
   if (
     !aceiteDaVaga &&
+    !p.alteracao_telefone &&
     pareceAssuntoParalelo(mensagem) &&
     !novo?.data_nascimento &&
     !novo?.telefone
@@ -419,26 +623,78 @@ export async function aplicarGateIdentificacao(params: {
   // Lê o cadastro confirmado antes de pedir dados. Telefone sozinho não
   // confirma o paciente: nesse caso ainda faltam nome e nascimento.
   const consulta = await executar(ctx, "consultar_cadastro_paciente", {});
-  if (!consulta.ok && consulta.erro === "PROFISSIONAL_SFP") return encaminharSfp();
+  if (!consulta.ok && consulta.erro === "CATALOGO_ATENDIMENTO_HUMANO")
+    return encaminharRestricaoCatalogo(consulta.motivo_transferencia);
   if (!consulta.ok) return encaminharFalha("consultar_cadastro_paciente", consulta.erro);
-  const faltantesNoCadastro = (consulta.campos_faltantes ?? []) as CampoCadastro[];
-  {
+  const compararNome = (nome: string) =>
+    nome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  const dadosConfirmados = consulta.dados_confirmados as
+    | { nome?: string; data_nascimento?: string }
+    | undefined;
+  const nomeAtual = dadosConfirmados?.nome ?? ctx.pacienteNome;
+  const mudouPaciente = Boolean(
+    novo?.nome && nomeAtual && compararNome(novo.nome) !== compararNome(nomeAtual),
+  );
+  const mudouNascimento = Boolean(
+    novo?.data_nascimento &&
+    dadosConfirmados?.data_nascimento &&
+    novo.data_nascimento !== dadosConfirmados.data_nascimento,
+  );
+  if ((mudouPaciente || mudouNascimento) && novo) {
+    if (p.alteracao_telefone?.paciente_id) p.alteracao_telefone = null;
+    p.telefone_confirmado = null;
+    // Uma declaração nova não pode herdar nome/nascimento da pessoa anterior.
+    p.pending = {
+      nome: novo.nome ?? p.pending.nome,
+      data_nascimento: novo.data_nascimento ?? null,
+      cpf: null,
+    };
+    resumoEscolhido.aceita = false;
+    a.slot_confirmed_by_patient = false;
+    a.intent_confirmed = false;
+  }
+  const outraIdentificacao =
+    mudouPaciente ||
+    mudouNascimento ||
+    Boolean(
+      p.pending.nome && nomeAtual && compararNome(p.pending.nome) !== compararNome(nomeAtual),
+    );
+  const faltantesNoCadastro = outraIdentificacao
+    ? (["nome", "data_nascimento"] as CampoCadastro[])
+    : ((consulta.campos_faltantes ?? []) as CampoCadastro[]);
+  if (!outraIdentificacao) {
     // Dados já informados são candidatos ao cadastro, nunca prova de identidade.
     // Não extraia nomes de pedidos de consulta ou de resumos do assistente.
     const historico = ctx.consultaAgenda?.historico ?? [];
     for (let i = 0; i < historico.length; i++) {
       const item = historico[i]!;
       if (item.role !== "user" || !item.content) continue;
-      const declaracao = declaracaoDePaciente(item.content) ?? item.content.match(/\bsou\s+.+/i)?.[0];
-      const respostaCadastro = historico[i - 1]?.role === "assistant" &&
-        /(?:nome completo|data de nascimento|telefone com DDD)/i.test(historico[i - 1]?.content ?? "");
+      const declaracao =
+        declaracaoDePaciente(item.content) ?? item.content.match(/\bsou\s+.+/i)?.[0];
+      const respostaCadastro =
+        historico[i - 1]?.role === "assistant" &&
+        /(?:nome completo|data de nascimento|telefone com DDD)/i.test(
+          historico[i - 1]?.content ?? "",
+        );
       if (!declaracao && !respostaCadastro) continue;
       const trecho = declaracao ?? item.content;
-      if (/\b(?:consulta|agendar|marcar|confirmo|horário|horario|doutor|doutora)\b|\?/i.test(trecho)) continue;
+      if (
+        /\b(?:consulta|agendar|marcar|confirmo|horário|horario|doutor|doutora)\b|\?/i.test(trecho)
+      )
+        continue;
       const recebido = extrairDadosIdentificacao(trecho);
       for (const campo of faltantesNoCadastro) {
-        if (recebido[campo] && camposCadastroFaltantes(p.pending).includes(campo) &&
-          !camposCadastroFaltantes(recebido).includes(campo)) p.pending[campo] = recebido[campo];
+        if (
+          recebido[campo] &&
+          camposCadastroFaltantes(p.pending).includes(campo) &&
+          !camposCadastroFaltantes(recebido).includes(campo)
+        )
+          p.pending[campo] = recebido[campo];
       }
     }
   }
@@ -454,12 +710,18 @@ export async function aplicarGateIdentificacao(params: {
   );
   if (faltando.length) {
     estado.flow.stage = "AWAITING_PATIENT_DATA";
+    // Resposta ao pedido de dados sem nenhum campo reconhecido: dizer que não
+    // entendeu, em vez de repetir o mesmo pedido (07/10/2026).
+    const respondeuPedido =
+      ultimaMensagem?.role === "assistant" &&
+      /nome completo|data de nascimento/i.test(ultimaMensagem.content ?? "");
+    const naoEntendeu = respondeuPedido && !novo?.nome && !novo?.data_nascimento && !novo?.cpf;
     return resultadoGate(
       textos,
-      "fluxo.cadastro.obrigatorios",
+      naoEntendeu ? "fluxo.cadastro.nao_entendido" : "fluxo.cadastro.obrigatorios",
       {
         lista: rotularFaltantes(faltando),
-        exemplo: faltando.map((campo) => EXEMPLOS_CADASTRO[campo]).join(" "),
+        exemplo: "\n" + faltando.map((campo) => EXEMPLOS_CADASTRO[campo]).join("\n"),
       },
       { camposPendentes: faltando, restricoes: ["nao_afirmar_agendamento_sem_gravacao"] },
     );
@@ -474,7 +736,8 @@ export async function aplicarGateIdentificacao(params: {
     ),
   );
   if (!r.ok) {
-    if (r.erro === "PROFISSIONAL_SFP") return encaminharSfp();
+    if (r.erro === "CATALOGO_ATENDIMENTO_HUMANO")
+      return encaminharRestricaoCatalogo(r.motivo_transferencia);
     estado.flow.stage = "AWAITING_PATIENT_DATA";
     if (r.erro === "PATIENT_DATA_REQUIRED") {
       const campos = (r.campos_faltantes ?? []) as CampoCadastro[];
@@ -483,7 +746,7 @@ export async function aplicarGateIdentificacao(params: {
         "fluxo.cadastro.obrigatorios",
         {
           lista: rotularFaltantes(campos),
-          exemplo: campos.map((campo) => EXEMPLOS_CADASTRO[campo]).join(" "),
+          exemplo: "\n" + campos.map((campo) => EXEMPLOS_CADASTRO[campo]).join("\n"),
         },
         { camposPendentes: campos },
       );
@@ -504,18 +767,31 @@ export async function aplicarGateIdentificacao(params: {
   // Dados completos vêm antes da confirmação. Um "sim" anterior à coleta
   // não autoriza a reserva: o paciente precisa responder ao resumo entregue.
   // Aceites de conversas já em andamento continuam preservados.
-  if (!consentimentoDaEscolha(estado, ctx.clinicaId) && cadastroProntoNoInicio &&
-    !selecionouAgora && aceiteDaVaga) {
+  if (
+    !consentimentoDaEscolha(estado, ctx.clinicaId) &&
+    cadastroProntoNoInicio &&
+    !selecionouAgora &&
+    aceiteDaVaga
+  ) {
     aceitarResumoEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? []);
   }
   const confirmacao = consentimentoDaEscolha(estado, ctx.clinicaId);
+  // Guarda o aceite do resumo entregue, mas deixa o modelo responder também
+  // aos pedidos paralelos. A ferramenta agendar conserva todas as validações.
+  if (confirmacao && (separarAceiteComPergunta(mensagem) || pareceAssuntoParalelo(mensagem)))
+    return null;
   if (!confirmacao) {
     estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
-    const resumoJaEntregue = cadastroProntoNoInicio && !selecionouAgora &&
+    const resumoJaEntregue =
+      cadastroProntoNoInicio &&
+      !selecionouAgora &&
       resumoDaEscolhaEntregue(estado, ctx.clinicaId, ctx.consultaAgenda?.historico ?? []);
-    return criarResultado({ origem: "gate", texto: resumoJaEntregue ? LEMBRETE_CONFIRMACAO : resumoEscolhido.resumo,
+    return criarResultado({
+      origem: "gate",
+      texto: resumoJaEntregue ? LEMBRETE_CONFIRMACAO : resumoEscolhido.resumo,
       fatosConfirmados: ["vaga_escolhida_validada", "paciente_identificado"],
-      restricoes: ["aguardar_aceite_do_resumo"] });
+      restricoes: ["aguardar_aceite_do_resumo"],
+    });
   }
 
   // Revalida a vaga e grava. `agendar` já revalida o slot e confere a
@@ -568,12 +844,20 @@ export async function aplicarGateIdentificacao(params: {
       conversa: ctx.conversaId,
       appointment_id: (ag as unknown as { appointment_id: string }).appointment_id,
     });
-    return resultadoAgendamentoConfirmado(ag, estado, params.nomeUnidade || "nossa clínica", textos, ctx.conversaId);
+    return resultadoAgendamentoConfirmado(
+      ag,
+      estado,
+      params.nomeUnidade || "nossa clínica",
+      textos,
+      ctx.conversaId,
+    );
   }
 
   const erroAg = (ag as { erro?: string }).erro;
-  if (erroAg === "PROFISSIONAL_SFP") return encaminharSfp();
-  if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(erroAg ?? "")) return encaminhar(true);
+  if (erroAg === "CATALOGO_ATENDIMENTO_HUMANO")
+    return encaminharRestricaoCatalogo(ag.motivo_transferencia);
+  if (["MODALIDADE_NAO_DEFINIDA", "MODALIDADE_ALTERADA"].includes(erroAg ?? ""))
+    return encaminhar(true);
   log("agendamento_falhou", { conversa: ctx.conversaId, erro: erroAg });
   // Reserva anterior encontrada pela idempotência: consultada, nunca criada
   // de novo. A prova é o ID lido do registro existente.
@@ -618,7 +902,8 @@ export async function aplicarGateIdentificacao(params: {
       },
     );
   }
-  if (erroAg === "SLOT_UNAVAILABLE" || erroAg === "NO_AVAILABILITY") return encaminhar();
+  if (erroAg === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
+  if (erroAg === "NO_AVAILABILITY") return encaminhar();
   // Uma falha técnica não autoriza escolher uma nova vaga nem afirmar sucesso.
   return encaminharFalha("agendar", erroAg);
 }

@@ -34,13 +34,7 @@ import {
   TRAVA_TEMPO_ATIVA,
   formatDuracaoMs,
 } from "@/lib/coach/treinamento-plano";
-import {
-  clearEstadoProva,
-  loadEstadoProva,
-  saveEstadoProva,
-} from "@/lib/coach/prova-persist";
-
-
+import { clearEstadoProva, loadEstadoProva, saveEstadoProva } from "@/lib/coach/prova-persist";
 
 export const Route = createFileRoute("/_authenticated/app/coach/prova/$nome")({
   head: ({ params }) => ({
@@ -54,7 +48,8 @@ export const Route = createFileRoute("/_authenticated/app/coach/prova/$nome")({
       { property: "og:title", content: "Prova de treinamento · Coach WhatsApp" },
       {
         property: "og:description",
-        content: "Avalie o conhecimento do atendente com questões baseadas nas ligações analisadas.",
+        content:
+          "Avalie o conhecimento do atendente com questões baseadas nas ligações analisadas.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -76,7 +71,6 @@ function ProvaRoute() {
     </AtendenteGuard>
   );
 }
-
 
 type AnaliseRow = {
   titulo: string;
@@ -127,12 +121,9 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
   const [restanteMs, setRestanteMs] = useState(COTA_ATIVIDADE_MS);
   const [restaurado, setRestaurado] = useState(false);
 
-
   const acertos = useMemo(
     () =>
-      prova
-        ? prova.questoes.reduce((n, q, i) => (respostas[i] === q.correta ? n + 1 : n), 0)
-        : 0,
+      prova ? prova.questoes.reduce((n, q, i) => (respostas[i] === q.correta ? n + 1 : n), 0) : 0,
     [prova, respostas],
   );
 
@@ -147,7 +138,6 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
     setFeedbackError(null);
     clearEstadoProva(escopoLocal);
     try {
-
       const { data, error: dbError } = await supabase
         .from("coach_analises")
         .select("titulo,resultado")
@@ -185,11 +175,19 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
           .order("created_at", { ascending: false })
           .limit(6);
         exemplos = (rp ?? []).map((r) => {
-          const msgs = Array.isArray(r.mensagens) ? (r.mensagens as { role?: string; content?: string }[]) : [];
+          const msgs = Array.isArray(r.mensagens)
+            ? (r.mensagens as { role?: string; content?: string }[])
+            : [];
           return {
-            titulo: `Treinamento ${r.modo === "texto" ? "WhatsApp" : "ligação"}${r.cenario ? ` — ${String(r.cenario).slice(0, 200)}` : ""}`.slice(0, 300),
+            titulo:
+              `Treinamento ${r.modo === "texto" ? "WhatsApp" : "ligação"}${r.cenario ? ` — ${String(r.cenario).slice(0, 200)}` : ""}`.slice(
+                0,
+                300,
+              ),
             resumo: String(r.resumo ?? "").slice(0, 2000),
-            pontos_positivos: (Array.isArray(r.acertos) ? (r.acertos as string[]) : []).slice(0, 12).map((s) => String(s).slice(0, 500)),
+            pontos_positivos: (Array.isArray(r.acertos) ? (r.acertos as string[]) : [])
+              .slice(0, 12)
+              .map((s) => String(s).slice(0, 500)),
             pontos_negativos: [
               ...(Array.isArray(r.melhorias) ? (r.melhorias as string[]) : []),
               ...(Array.isArray(r.pontos_fracos) ? (r.pontos_fracos as string[]) : []),
@@ -199,7 +197,10 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
             frases: [],
             checklist: [],
             transcricao: msgs
-              .map((m) => `${m.role === "user" ? "Atendente" : "Paciente"}: ${String(m.content ?? "")}`)
+              .map(
+                (m) =>
+                  `${m.role === "user" ? "Atendente" : "Paciente"}: ${String(m.content ?? "")}`,
+              )
               .join("\n")
               .slice(0, 8000),
           };
@@ -248,12 +249,8 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
       const p = salvo.prova as ProvaGerada;
       const n = p.questoes.length;
       setProva(p);
-      setRespostas(
-        Array.from({ length: n }, (_, i) => salvo.respostas?.[i] ?? -1),
-      );
-      setReveladas(
-        Array.from({ length: n }, (_, i) => salvo.reveladas?.[i] ?? false),
-      );
+      setRespostas(Array.from({ length: n }, (_, i) => salvo.respostas?.[i] ?? -1));
+      setReveladas(Array.from({ length: n }, (_, i) => salvo.reveladas?.[i] ?? false));
       setEnviado(Boolean(salvo.enviado));
       setLoading(false);
       setRestaurado(true);
@@ -270,7 +267,6 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
     if (!restaurado || !prova) return;
     saveEstadoProva(escopoLocal, { prova, respostas, reveladas, enviado });
   }, [restaurado, escopoLocal, prova, respostas, reveladas, enviado]);
-
 
   // Cronômetro da prova: ao zerar, finaliza sozinha (sem perder tempo)
   useEffect(() => {
@@ -363,9 +359,7 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
       feedbackRef.current = fb;
       void guardarFeedback(fb);
     } catch (e) {
-      setFeedbackError(
-        e instanceof Error ? e.message : "Não foi possível gerar o feedback da IA.",
-      );
+      setFeedbackError(e instanceof Error ? e.message : "Não foi possível gerar o feedback da IA.");
     } finally {
       setFeedbackLoading(false);
     }
@@ -412,8 +406,8 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
 
           {/* Aviso claro: a prova registra saída de aba e cópia. */}
           <p className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            Esta prova registra quando você sai da aba e quando tenta copiar ou imprimir o
-            conteúdo. Faça sozinha, sem consultar outra janela.
+            Esta prova registra quando você sai da aba e quando tenta copiar ou imprimir o conteúdo.
+            Faça sozinha, sem consultar outra janela.
           </p>
 
           {!loading && prova && !enviado && (
@@ -421,13 +415,13 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
               <Sparkles className="h-4 w-4 text-primary" />
               {respondidas}/{total} respondidas
               {TRAVA_TEMPO_ATIVA && (
-              <span
-                className={`ml-auto font-semibold tabular-nums ${
-                  restanteMs <= 30_000 ? "text-destructive" : "text-primary"
-                }`}
-              >
-                {formatDuracaoMs(restanteMs)} restantes
-              </span>
+                <span
+                  className={`ml-auto font-semibold tabular-nums ${
+                    restanteMs <= 30_000 ? "text-destructive" : "text-primary"
+                  }`}
+                >
+                  {formatDuracaoMs(restanteMs)} restantes
+                </span>
               )}
             </div>
           )}
@@ -616,12 +610,10 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
                       const selected = escolhida === ai;
                       const correta = q.correta === ai;
                       let cls = "border bg-background hover:bg-secondary/50";
-                      if (revelado && correta)
-                        cls = "border-[color:var(--success)] bg-success/10";
+                      if (revelado && correta) cls = "border-[color:var(--success)] bg-success/10";
                       else if (revelado && selected && !correta)
                         cls = "border-destructive bg-destructive/10";
-                      else if (!revelado && selected)
-                        cls = "border-primary bg-primary/10";
+                      else if (!revelado && selected) cls = "border-primary bg-primary/10";
                       return (
                         <button
                           key={ai}
@@ -667,8 +659,8 @@ function ProvaPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }) {
                       <p className="font-semibold flex items-center gap-2">
                         {escolhida === q.correta ? (
                           <>
-                            <CheckCircle2 className="h-4 w-4 text-[color:var(--success)]" /> Resposta
-                            correta
+                            <CheckCircle2 className="h-4 w-4 text-[color:var(--success)]" />{" "}
+                            Resposta correta
                           </>
                         ) : (
                           <>

@@ -11,8 +11,7 @@ type MensagemAudio = {
 /** Áudios antigos também guardavam a transcrição no corpo, depois de 🎤. */
 export function transcricaoDoAudioPaciente(mensagem: MensagemAudio): string | null {
   if (mensagem.tipo !== "audio" || mensagem.direction !== "in") return null;
-  const texto = mensagem.transcricao?.trim() ||
-    (mensagem.body ?? "").replace(/^🎤\s*/, "").trim();
+  const texto = mensagem.transcricao?.trim() || (mensagem.body ?? "").replace(/^🎤\s*/, "").trim();
   if (!texto || /^\[.*\]$/.test(texto)) return null;
   return texto;
 }

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,13 +25,17 @@ import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
-import { mostrarErro } from "@/lib/traduzir-erro";
+import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import {
   agruparPagamentosPorAtendimento,
   LABEL_MODALIDADE,
   resumirPagamentos,
 } from "@/lib/relatorios/modalidade-atendimento";
 import { carregarMapaConvenioPacientes } from "@/lib/convenio/modalidade";
+import { buscarPaginado } from "@/lib/financeiro/paginacao";
+import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
+import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
+import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 import {
   Download,
   Save,
@@ -98,49 +103,48 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const fimDia = fim + "T23:59:59";
-      const [rows, pagamentos, mapaConvenio] = await Promise.all([
-        fetchAllRows(() =>
+      const [agendTodas, mapaConvenio] = await Promise.all([
+        // Vagas livres da grade ("DISPONIVEL") não são agendamentos — mesma
+        // regra do Dashboard Operacional.
+        buscarPorDia<any>(ini, fim, (de, ate) =>
           supabase
             .from("agendamentos")
             .select("id, inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
             .eq("clinica_id", clinicaId)
-            .gte("inicio", ini)
-            .lte("inicio", fimDia)
-            .order("inicio", { ascending: true }),
-        ),
-        // Modalidade e forma de pagamento vêm do lançamento de receita
-        // confirmado do atendimento, pela mesma regra do Rateio da Receita —
-        // a marcação "Particular/Convênio" da agenda não serve para separar o
-        // Cartão (ver `@/lib/relatorios/modalidade-atendimento`). O recorte é
-        // pela data do ATENDIMENTO, não do lançamento, para casar com as linhas
-        // acima mesmo quando o pagamento foi feito em outro dia. Não traz valor.
-        fetchAllRows(() =>
-          supabase
-            .from("fin_lancamentos")
-            .select(
-              "id, agendamento_id, forma_pagamento, convenio_modalidade, descricao, paciente_id, agendamentos!inner(inicio)",
-            )
-            .eq("clinica_id", clinicaId)
-            .eq("tipo", "receita")
-            .eq("status", "confirmado")
-            .gte("agendamentos.inicio", ini)
-            .lte("agendamentos.inicio", fimDia)
-            .order("id", { ascending: true }),
+            .gte("inicio", de)
+            .lt("inicio", ate)
+            .or(FILTRO_SEM_VAGA_LIVRE)
+            .order("inicio", { ascending: true })
+            .order("id"),
         ),
         // Contrato ativo de cada paciente: 2ª regra da modalidade, a mesma que
         // o Rateio usa quando o lançamento não tem a marca do cartão.
         carregarMapaConvenioPacientes(clinicaId),
       ]);
+      const rows = agendTodas.filter((r) => !ehVagaLivre(r));
+      // Modalidade e forma de pagamento vêm do lançamento de receita
+      // confirmado do atendimento, pela mesma regra do Rateio da Receita —
+      // a marcação "Particular/Convênio" da agenda não serve para separar o
+      // Cartão (ver `@/lib/relatorios/modalidade-atendimento`). Busca pelos
+      // ids dos atendimentos acima (índice em agendamento_id), e não filtrando
+      // pela data da agenda dentro do lançamento: esse cruzamento varria os
+      // lançamentos da clínica a cada dia e estourava o tempo do servidor.
+      // Não traz valor.
+      const pagamentos = await pagamentosDosAtendimentos(
+        clinicaId,
+        rows.map((r) => r.id),
+      );
       const pagPorAtendimento = agruparPagamentosPorAtendimento(pagamentos);
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
         lookupNames(
           "medicos",
           rows.map((r) => r.medico_id),
         ),
+        // O nome já vem gravado no agendamento; o cadastro só é consultado
+        // quando ele falta (34 mil agendamentos/mês = ~20 mil pacientes).
         lookupNames(
           "pacientes",
-          rows.map((r) => r.paciente_id),
+          rows.filter((r) => !r.paciente_nome).map((r) => r.paciente_id),
         ),
         lookupEspecialidadePorProcedimento(
           clinicaId,
@@ -164,7 +168,7 @@ const CUBOS: CubeSpec[] = [
           procedimento: r.procedimento ?? "—",
           modalidade: LABEL_MODALIDADE[pagamento.modalidade],
           forma_pagamento: pagamento.forma,
-          paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
+          paciente: r.paciente_nome ?? pacMap.get(r.paciente_id) ?? "—",
         });
       });
     },
@@ -190,16 +194,17 @@ const CUBOS: CubeSpec[] = [
       { key: "valor", label: "Valor (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
+      const rows = await buscarPorDia<any>(ini, fim, (de, ate) =>
         supabase
           .from("fin_lancamentos")
           .select(
             "data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id",
           )
           .eq("clinica_id", clinicaId)
-          .gte("data", ini)
-          .lte("data", fim)
-          .order("data", { ascending: true }),
+          .gte("data", de)
+          .lt("data", ate)
+          .order("data", { ascending: true })
+          .order("id"),
       );
       const [catMap, contMap, pacMap, medMap, espMap] = await Promise.all([
         lookupNames(
@@ -250,14 +255,15 @@ const CUBOS: CubeSpec[] = [
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
+      const rows = await buscarPorDia<any>(ini, fim, (de, ate) =>
         supabase
           .from("prontuarios")
           .select("data, medico_id, paciente_id")
           .eq("clinica_id", clinicaId)
-          .gte("data", ini)
-          .lte("data", fim + "T23:59:59")
-          .order("data", { ascending: true }),
+          .gte("data", de)
+          .lt("data", ate)
+          .order("data", { ascending: true })
+          .order("id"),
       );
       const [medMap, pacMap, espMap] = await Promise.all([
         lookupNames(
@@ -295,7 +301,8 @@ const CUBOS: CubeSpec[] = [
           .from("pacientes")
           .select("sexo, ativo, created_at")
           .eq("clinica_id", clinicaId)
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: true })
+          .order("id"),
       );
       return rows.map((r: any) => {
         const d = (r.created_at ?? "").slice(0, 10);
@@ -324,24 +331,23 @@ const CUBOS: CubeSpec[] = [
       { key: "desconto", label: "Desconto (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() =>
+      const rows = await buscarPorDia<any>(ini, fim, (de, ate) =>
         supabase
           .from("orcamentos")
-          .select("created_at, status, valor_final, desconto, paciente_id")
+          // `orcamentos` não tem `valor_final` nem `paciente_id`: o total já é
+          // gravado com o desconto abatido e o paciente vai pelo nome.
+          .select("created_at, status, valor_total, desconto, paciente_nome")
           .eq("clinica_id", clinicaId)
-          .gte("created_at", ini)
-          .lte("created_at", fim + "T23:59:59")
-          .order("created_at", { ascending: true }),
-      );
-      const pacMap = await lookupNames(
-        "pacientes",
-        rows.map((r) => r.paciente_id),
+          .gte("created_at", de)
+          .lt("created_at", ate)
+          .order("created_at", { ascending: true })
+          .order("id"),
       );
       return rows.map((r) =>
         transformDate(r.created_at, {
           status: r.status ?? "—",
-          paciente: pacMap.get(r.paciente_id) ?? "—",
-          valor_final: Number(r.valor_final) || 0,
+          paciente: r.paciente_nome ?? "—",
+          valor_final: Number(r.valor_total) || 0,
           desconto: Number(r.desconto) || 0,
         }),
       );
@@ -365,19 +371,11 @@ const MESES_NOMES = [
   "12-Dez",
 ];
 
+// Páginas pedidas em ondas paralelas (um mês tem ~34 mil agendamentos e o
+// laço em fila indiana demorava). O teto cobre o cadastro inteiro de
+// pacientes (~254 mil) com folga.
 async function fetchAllRows(builder: () => any): Promise<any[]> {
-  const PAGE_SIZE = 1000;
-  const all: any[] = [];
-  let offset = 0;
-  while (true) {
-    const { data, error } = await builder().range(offset, offset + PAGE_SIZE - 1);
-    if (error) throw error;
-    const rows = (data ?? []) as any[];
-    all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
-  }
-  return all;
+  return buscarPaginado<any>(builder, { maxPaginas: 400, porOnda: 6 });
 }
 
 async function loadFinanceiroAgregado(
@@ -416,25 +414,58 @@ async function lookupNames(
   table: "medicos" | "pacientes" | "fin_categorias" | "fin_contas",
   ids: Array<string | null | undefined>,
 ): Promise<Map<string, string>> {
-  const unique = Array.from(new Set(ids.filter((x): x is string => !!x)));
-  if (unique.length === 0) return new Map();
-  const { data } = await supabase.from(table).select("id, nome").in("id", unique);
-  const map = new Map<string, string>();
-  for (const r of (data ?? []) as Array<{ id: string; nome: string }>) {
-    map.set(r.id, r.nome);
+  // Em lotes: um `.in` com milhares de ids estourava a URL ou voltava cortado
+  // em 1.000, e o cubo mostrava "—" no lugar do nome do paciente.
+  return nomesPorId(table, ids);
+}
+
+// Receitas confirmadas dos atendimentos, em lotes de ids (cabem na URL) e em
+// ondas para não disparar dezenas de requisições juntas.
+async function pagamentosDosAtendimentos(
+  clinicaId: string,
+  agendamentoIds: string[],
+): Promise<any[]> {
+  const ids = Array.from(new Set(agendamentoIds.filter(Boolean)));
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) lotes.push(ids.slice(i, i + 150));
+  const out: any[] = [];
+  for (let i = 0; i < lotes.length; i += 6) {
+    const respostas = await Promise.all(
+      lotes
+        .slice(i, i + 6)
+        .map((lote) =>
+          buscarPaginado<any>(() =>
+            supabase
+              .from("fin_lancamentos")
+              .select(
+                "id, agendamento_id, forma_pagamento, convenio_modalidade, descricao, paciente_id",
+              )
+              .eq("clinica_id", clinicaId)
+              .eq("tipo", "receita")
+              .eq("status", "confirmado")
+              .in("agendamento_id", lote)
+              .order("id", { ascending: true }),
+          ),
+        ),
+    );
+    for (const r of respostas) out.push(...r);
   }
-  return map;
+  return out;
 }
 
 async function lookupEspecialidadePorMedico(
   medicoIds: Array<string | null | undefined>,
 ): Promise<Map<string, string>> {
-  const unique = Array.from(new Set(medicoIds.filter((x): x is string => !!x)));
-  if (unique.length === 0) return new Map();
-  const { data: meds } = await supabase
-    .from("medicos")
-    .select("id, especialidade_id")
-    .in("id", unique);
+  const meds = Array.from(
+    (
+      await buscarPorIds<{ id: string; especialidade_id: string | null }>(
+        "medicos",
+        "id, especialidade_id",
+        medicoIds,
+      )
+    ).values(),
+  );
+  if (meds.length === 0) return new Map();
   const espIds = Array.from(
     new Set(((meds ?? []) as any[]).map((m) => m.especialidade_id).filter((x): x is string => !!x)),
   );
@@ -476,12 +507,13 @@ async function lookupEspecialidadePorProcedimento(
 ): Promise<Map<string, string>> {
   const unique = Array.from(new Set(procNomes.map(normalizeProcKey).filter((x) => x.length > 0)));
   if (unique.length === 0) return new Map();
-  const { data } = await supabase
-    .from("procedimentos")
-    .select("nome, grupo")
-    .eq("clinica_id", clinicaId);
+  // A clínica tem mais de 4 mil serviços; sem paginar vinham só 1.000 e a
+  // especialidade de boa parte dos atendimentos caía em "—".
+  const data = await fetchAllRows(() =>
+    supabase.from("procedimentos").select("nome, grupo").eq("clinica_id", clinicaId).order("id"),
+  );
   const map = new Map<string, string>();
-  for (const r of (data ?? []) as Array<{ nome: string; grupo: string | null }>) {
+  for (const r of data as Array<{ nome: string; grupo: string | null }>) {
     if (r.grupo) map.set(normalizeProcKey(r.nome), r.grupo);
   }
   return map;
@@ -659,7 +691,23 @@ interface SavedView {
   config: CubeConfig;
 }
 
-export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
+/**
+ * Cubos que somam dinheiro (lançamentos e orçamentos). Ficam fora da lista de
+ * quem não tem acesso ao módulo Financeiro — o perfil Supervisor.
+ */
+const CUBOS_FINANCEIROS = new Set(["financeiro", "orcamentos"]);
+
+export function CuboBI({
+  clinicaId,
+  ini,
+  fim,
+  veFinanceiro,
+}: {
+  clinicaId?: string;
+  ini: string;
+  fim: string;
+  veFinanceiro: boolean;
+}) {
   const STORAGE_KEY = `relatorios.cubo.views.${clinicaId ?? "default"}`;
 
   const [cfg, setCfg] = useState<CubeConfig>({
@@ -673,9 +721,19 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     viz: "barras",
     topN: 10,
   });
-  const cube = useMemo(() => CUBOS.find((c) => c.id === cfg.cubeId)!, [cfg.cubeId]);
+  const cubosVisiveis = useMemo(
+    () => (veFinanceiro ? CUBOS : CUBOS.filter((c) => !CUBOS_FINANCEIROS.has(c.id))),
+    [veFinanceiro],
+  );
+  // Visão salva apontando para um cubo de dinheiro cai no primeiro permitido:
+  // a trava é aqui, não só na lista do seletor.
+  const cube = useMemo(
+    () => cubosVisiveis.find((c) => c.id === cfg.cubeId) ?? cubosVisiveis[0],
+    [cfg.cubeId, cubosVisiveis],
+  );
   const [rawRows, setRawRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedView[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Sort state for the result table. key: "__label__" (row label), "__total__" or one of colLabels
@@ -744,6 +802,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     if (!clinicaId) return;
     let cancel = false;
     setLoading(true);
+    setErroCarga(null);
     setRawRows([]);
     const loadRows =
       cube.id === "financeiro"
@@ -753,7 +812,12 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       .then((rows) => {
         if (!cancel) setRawRows(rows);
       })
-      .catch((e) => mostrarErro(e))
+      .catch((e) => {
+        if (cancel) return;
+        // Sem isto a falha aparecia como "Sem dados no período".
+        setErroCarga(traduzirErro(e));
+        mostrarErro(e);
+      })
       .finally(() => {
         if (!cancel) setLoading(false);
       });
@@ -961,11 +1025,7 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             .replace(/[^a-zA-Z0-9]+/g, "-")
             .toLowerCase()
         : "";
-    exportToExcel(
-      linhas,
-      `cubo-${cube.id}${sufixoFiltro}-${new Date().toISOString().slice(0, 10)}`,
-      headers,
-    );
+    exportToExcel(linhas, `cubo-${cube.id}${sufixoFiltro}-${hojeBR()}`, headers);
   }
 
   return (
@@ -1013,12 +1073,12 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Fonte de dados</Label>
-              <Select value={cfg.cubeId} onValueChange={(v) => setField("cubeId", v)}>
+              <Select value={cube.id} onValueChange={(v) => setField("cubeId", v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CUBOS.map((c) => (
+                  {cubosVisiveis.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.label}
                     </SelectItem>
@@ -1286,6 +1346,10 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <p className="text-sm text-muted-foreground py-8 text-center">Selecione uma clínica.</p>
           ) : loading ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Carregando…</p>
+          ) : erroCarga ? (
+            <p className="text-sm text-destructive py-8 text-center">
+              Não foi possível carregar os dados: {erroCarga}
+            </p>
           ) : piv.rowLabels.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Sem dados no período.</p>
           ) : cfg.viz === "tabela" ? (
@@ -1486,6 +1550,17 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <MiniLineChart
               labels={topRows.rowLabels}
               values={topRows.totalByRow}
+              // Com "Colunas (séries)" escolhida, uma linha por coluna — como
+              // nas barras. Antes desenhava só o total e ignorava a escolha.
+              series={
+                cfg.colKey
+                  ? piv.colLabels.map((cl, ci) => ({
+                      name: cl,
+                      color: PALETTE[ci % PALETTE.length],
+                      values: topRows.matrix.map((row) => row[ci] ?? 0),
+                    }))
+                  : undefined
+              }
               color={PALETTE[0]}
               formatY={fmt}
             />

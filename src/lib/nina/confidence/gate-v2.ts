@@ -86,11 +86,17 @@ export const CASOS_GATE_V2: CasoGateV2[] = [
       catalogoEncontrou: true,
       ferramentas: [catalogoOk],
       retrievedSources: [fonteCatalogo],
-      fatos: [{
-        consulta: "buscar_procedimentos", capacidade: "searchKnowledgeBase",
-        fonte: "catalogo_publicado", entidade: "servico", campo: "oferecido", valor: "cardiologia",
-        chave: { especialidade: "cardiologia", unidadeId: "central" },
-      }],
+      fatos: [
+        {
+          consulta: "buscar_procedimentos",
+          capacidade: "searchKnowledgeBase",
+          fonte: "catalogo_publicado",
+          entidade: "servico",
+          campo: "oferecido",
+          valor: "cardiologia",
+          chave: { especialidade: "cardiologia", unidadeId: "central" },
+        },
+      ],
     },
     verificar: (r) => r.level === "HIGH" && r.decision === "ALLOW",
   },
@@ -444,12 +450,7 @@ export type ComparacaoShadow = {
 };
 
 function chaveDoSnapshot(s: SnapshotComparavel): string | null {
-  return (
-    s.outgoing_message_id?.trim() ||
-    s.message_id?.trim() ||
-    s.execucao_id?.trim() ||
-    null
-  );
+  return s.outgoing_message_id?.trim() || s.message_id?.trim() || s.execucao_id?.trim() || null;
 }
 
 /** v2 = motor corrigido; qualquer outra versão (inclusive nula) é histórica. */
@@ -483,7 +484,8 @@ export function compararShadow(
       scoreAntigo,
       scoreNovo,
       delta: scoreAntigo !== null && scoreNovo !== null ? scoreNovo - scoreAntigo : null,
-      coberturaAntiga: typeof antigo?.evidence_coverage === "number" ? antigo.evidence_coverage : null,
+      coberturaAntiga:
+        typeof antigo?.evidence_coverage === "number" ? antigo.evidence_coverage : null,
       coberturaNova: typeof novo.evidence_coverage === "number" ? novo.evidence_coverage : null,
       decisaoAntiga: antigo?.resultado_final ?? null,
       decisaoNova: novo.resultado_final ?? null,
@@ -506,9 +508,7 @@ export function resumoComparacaoShadow(linhas: ComparacaoShadow[]) {
     errosReportados: linhas.filter((l) => l.erroReportado).length,
     errosConfirmados: linhas.filter((l) => l.erroConfirmado).length,
     /** Alta confiança nova que depois teve erro confirmado. */
-    altaConfiancaComErro: linhas.filter(
-      (l) => l.erroConfirmado && (l.scoreNovo ?? 0) >= 90,
-    ).length,
+    altaConfiancaComErro: linhas.filter((l) => l.erroConfirmado && (l.scoreNovo ?? 0) >= 90).length,
   };
 }
 
@@ -650,9 +650,7 @@ export function verificarConfiancaRunner(
   return {
     confidence_snapshot_present: presente,
     all_outputs_evaluated: semAvaliacao === 0,
-    no_input_id_as_output: lista.every(
-      (s) => !!txt(s.outgoing_message_id) || !txt(s.message_id),
-    ),
+    no_input_id_as_output: lista.every((s) => !!txt(s.outgoing_message_id) || !txt(s.message_id)),
     confidence_linked_to_message: lista.every((s) => !!txt(s.outgoing_message_id)),
     evaluation_type_valid: lista.every((s) => {
       const a = txt(s.avaliacao);

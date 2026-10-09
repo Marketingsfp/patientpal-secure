@@ -61,7 +61,12 @@ describe("FASE 4 — Inbox fora do caminho crítico da mensagem", () => {
   it("conversa fora da lista atual pede reconciliação em vez de palpite", () => {
     const r = patchListaPorMensagem(
       lista,
-      { conversa_id: "Z", direction: "in", body: "novo lead", created_at: "2026-09-09T12:00:00.000Z" },
+      {
+        conversa_id: "Z",
+        direction: "in",
+        body: "novo lead",
+        created_at: "2026-09-09T12:00:00.000Z",
+      },
       { conversaAberta: null },
     );
     expect(r.aplicado).toBe(false);
@@ -93,7 +98,11 @@ describe("FASE 4 — Inbox fora do caminho crítico da mensagem", () => {
 
   it("mensagem comum não recalcula a fila de espera", () => {
     const alvos = classificarEvento(
-      { table: "whatsapp_mensagens", eventType: "INSERT", new: { clinica_id: "cl-1", conversa_id: "B" } },
+      {
+        table: "whatsapp_mensagens",
+        eventType: "INSERT",
+        new: { clinica_id: "cl-1", conversa_id: "B" },
+      },
       { clinicaId: "cl-1", conversaAberta: "A" },
     );
     expect(alvos).not.toContain("espera");

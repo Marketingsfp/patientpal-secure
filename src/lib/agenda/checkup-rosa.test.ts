@@ -1,11 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import { detectarCheckupRosa, itemCheckupRosa, ratearPacote } from "./checkup-rosa";
+import {
+  checkupRosaVigente,
+  detectarCheckupRosa,
+  itemCheckupRosa,
+  ratearPacote,
+} from "./checkup-rosa";
 
-const consulta = { id: "c", procedimento: "CONSULTA (GINECOLOGIA)" };
-const preventivo = { id: "p", procedimento: "PREVENTIVO (GINECOLOGIA)" };
-const transvaginal = { id: "t", procedimento: "USG TRANSVAGINAL (ULTRASSONOGRAFIA)" };
-const usgMama = { id: "u", procedimento: "USG MAMA (ULTRASSONOGRAFIA)" };
-const mamografia = { id: "m", procedimento: "MAMOGRAFIA" };
+const OUTUBRO = "2026-10-15";
+const NOVEMBRO = "2026-11-03";
+
+const consulta = { id: "c", procedimento: "CONSULTA (GINECOLOGIA)", dia: OUTUBRO };
+const preventivo = { id: "p", procedimento: "PREVENTIVO (GINECOLOGIA)", dia: OUTUBRO };
+const transvaginal = { id: "t", procedimento: "USG TRANSVAGINAL (ULTRASSONOGRAFIA)", dia: OUTUBRO };
+const usgMama = { id: "u", procedimento: "USG MAMA (ULTRASSONOGRAFIA)", dia: OUTUBRO };
+const mamografia = { id: "m", procedimento: "MAMOGRAFIA", dia: OUTUBRO };
 
 describe("itemCheckupRosa", () => {
   it("reconhece os nomes gravados na agenda", () => {
@@ -62,11 +70,35 @@ describe("detectarCheckupRosa", () => {
         consulta,
         preventivo,
         transvaginal,
-        { id: "x", procedimento: "HEMOGRAMA" },
+        { id: "x", procedimento: "HEMOGRAMA", dia: OUTUBRO },
       ]),
     ).toBeNull();
     expect(
       detectarCheckupRosa([consulta, preventivo, transvaginal, { ...transvaginal, id: "t2" }]),
+    ).toBeNull();
+  });
+});
+
+describe("vigência da campanha (outubro de 2026)", () => {
+  it("vale de 01/10 a 31/10, inclusive, e aceita data com hora", () => {
+    expect(checkupRosaVigente("2026-10-01")).toBe(true);
+    expect(checkupRosaVigente("2026-10-31T18:30")).toBe(true);
+    expect(checkupRosaVigente("2026-09-30")).toBe(false);
+    expect(checkupRosaVigente("2026-11-01")).toBe(false);
+    expect(checkupRosaVigente("")).toBe(false);
+    expect(checkupRosaVigente(null)).toBe(false);
+  });
+
+  it("atendimento fora de outubro não forma pacote", () => {
+    expect(
+      detectarCheckupRosa([consulta, preventivo, { ...transvaginal, dia: NOVEMBRO }]),
+    ).toBeNull();
+    expect(
+      detectarCheckupRosa([
+        { ...consulta, dia: NOVEMBRO },
+        { ...preventivo, dia: NOVEMBRO },
+        { ...transvaginal, dia: NOVEMBRO },
+      ]),
     ).toBeNull();
   });
 });

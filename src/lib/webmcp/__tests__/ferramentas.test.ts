@@ -41,7 +41,13 @@ function apiFalsa(registro: string[]): ApiWebmcp {
   };
 }
 
-function montar(opcoes: Partial<{ ambiente: AmbienteWebmcp; clinicaId: string | null; autenticado: boolean }> = {}) {
+function montar(
+  opcoes: Partial<{
+    ambiente: AmbienteWebmcp;
+    clinicaId: string | null;
+    autenticado: boolean;
+  }> = {},
+) {
   const registro: string[] = [];
   const notificados: string[] = [];
   const selecionadas: string[] = [];
@@ -205,4 +211,3 @@ describe("homologação da Nina", () => {
     expect(ok["ok"]).toBe(true);
   });
 });
-

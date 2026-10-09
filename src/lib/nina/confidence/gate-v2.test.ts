@@ -62,7 +62,6 @@ describe("versão do motor", () => {
   });
 });
 
-
 describe("comparação shadow v1 x v2", () => {
   const snaps = [
     {
@@ -162,4 +161,3 @@ describe("assertions do Test Runner", () => {
     expect(criterios.every((c) => c.ok)).toBe(true);
   });
 });
-

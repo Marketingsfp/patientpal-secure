@@ -45,6 +45,7 @@ export function estadoAutorizaTurno(
   );
 }
 export type TurnoAgrupado = {
+  recebeuAudio?: boolean;
   batchId: string;
   mensagens: string[];
   texto: string;
@@ -56,7 +57,7 @@ export type DependenciasAgrupamento = {
   adquirir: (batchId: string) => Promise<ReservaTurno | null>;
   validarConversa: () => Promise<boolean>;
   reivindicar: (batchId: string, revision: number, forcar: boolean) => Promise<string[] | null>;
-  lerMensagens: (ids: string[]) => Promise<{ id: string; texto: string }[]>;
+  lerMensagens: (ids: string[]) => Promise<{ id: string; texto: string; tipo?: string }[]>;
   lerRevisao: () => Promise<number>;
   iniciar: (batchId: string, lock: ReservaTurno) => Promise<boolean>;
   concluir: (batchId: string, lock: ReservaTurno, motivo: string) => Promise<void>;
@@ -129,6 +130,7 @@ export async function agruparTurnoPersistido(
       batchId: registro.batchId,
       mensagens: ids,
       texto: montarTurnoPaciente(ids.map((id) => porId.get(id)!)),
+      recebeuAudio: mensagens.some((m) => m.tipo === "audio"),
       lock,
       revisao,
     };

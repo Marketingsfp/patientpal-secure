@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Stethoscope, UserRound, Clock } from "lucide-react";
+import { Stethoscope, UserRound, Clock, DollarSign, CheckCircle2, Ban } from "lucide-react";
 
 export type AgendaMedicoColuna = { id: string; nome: string; especialidade_nome?: string | null };
 
@@ -12,6 +12,25 @@ export type AgendaMedicoItem = {
   procedimento: string | null;
   status: string;
   livre?: boolean;
+  /** Situação da cobrança, para colorir o cifrão como na visão em lista. */
+  pagamento?: "pago" | "parcial" | "pendente" | "sem_faturamento" | "externo";
+};
+
+// Mesmas cores do cifrão da visão em lista.
+const COBRAR_COR: Record<NonNullable<AgendaMedicoItem["pagamento"]>, string> = {
+  pago: "border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+  parcial: "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100",
+  pendente: "border-rose-200 bg-card text-rose-600 hover:bg-rose-50",
+  sem_faturamento: "border-slate-300 bg-slate-100 text-slate-500 hover:bg-slate-200",
+  externo: "border-violet-400 bg-card text-violet-600 hover:bg-violet-50",
+};
+
+const COBRAR_TITULO: Record<NonNullable<AgendaMedicoItem["pagamento"]>, string> = {
+  pago: "Pago",
+  parcial: "Parcialmente pago — clique para receber o saldo",
+  pendente: "Cobrar",
+  sem_faturamento: "Sem faturamento",
+  externo: "Atendimento externo — sem lançamento em caixa",
 };
 
 // Mesmas cores da visão em lista: verde cheio = confirmado (vem),
@@ -56,6 +75,8 @@ export function AgendaPorMedicoDia({
   ocultarPaciente = false,
   mostrarResumo = true,
   somenteLeitura = false,
+  onCobrar,
+  onFinalizar,
 }: {
   dataRef: string;
   medicos: AgendaMedicoColuna[];
@@ -67,6 +88,10 @@ export function AgendaPorMedicoDia({
   mostrarResumo?: boolean;
   /** Modo leitura: sem "+ Agendar" e sem clique em horários livres. */
   somenteLeitura?: boolean;
+  /** Atalho do cifrão: abre a cobrança do caixa (mesma da visão em lista). */
+  onCobrar?: (a: AgendaMedicoItem) => void;
+  /** Atalho ✅: marca como Realizado, com as mesmas regras da visão em lista. */
+  onFinalizar?: (a: AgendaMedicoItem) => void;
 }) {
   const porMedico = useMemo(() => {
     const map = new Map<string, AgendaMedicoItem[]>();
@@ -125,6 +150,7 @@ export function AgendaPorMedicoDia({
             const ags = porMedico.get(m.id) ?? [];
             const ocupados = ags.filter((a) => !a.livre);
             const livres = ags.filter((a) => a.livre);
+            const realizados = ocupados.filter((a) => a.status === "realizado");
             return (
               <section
                 key={m.id}
@@ -135,7 +161,9 @@ export function AgendaPorMedicoDia({
                     {iniciais(m.nome)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-slate-900">{m.nome}</p>
+                    <p className="truncate text-sm font-bold text-primary" title={m.nome}>
+                      {m.nome}
+                    </p>
                     <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       {m.especialidade_nome || "Profissional"}
                     </p>
@@ -154,83 +182,130 @@ export function AgendaPorMedicoDia({
                   {ags.map((a) => {
                     const livre = !!a.livre;
                     const leituraLivre = livre && somenteLeitura;
+                    // Atalhos ficam fora do <button> do cartão (botão dentro de
+                    // botão não é HTML válido), por cima do canto inferior direito.
+                    const comAtalhos =
+                      !livre &&
+                      !somenteLeitura &&
+                      a.status !== "cancelado" &&
+                      a.status !== "faltou" &&
+                      !!(onCobrar || onFinalizar);
+                    const pg = a.pagamento ?? "pendente";
                     return (
-                      <button
-                        key={a.id}
-                        type="button"
-                        disabled={leituraLivre}
-                        onClick={() => {
-                          if (leituraLivre) return;
-                          if (livre) onSlotClick(a);
-                          else onAgClick(a);
-                        }}
-                        className={
-                          livre
-                            ? leituraLivre
-                              ? "flex w-full min-w-0 flex-col rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
-                              : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center hover:border-primary/40 hover:bg-primary/5"
-                            : a.status === "confirmado"
-                              ? "flex w-full min-w-0 flex-col rounded-lg border border-emerald-200 border-l-4 border-l-emerald-600 bg-emerald-50 p-2.5 text-left shadow-xs hover:bg-emerald-100"
-                              : a.status === "cancelado" || a.status === "faltou"
-                                ? "flex w-full min-w-0 flex-col rounded-lg border border-rose-200 border-l-4 border-l-rose-600 bg-rose-50 p-2.5 text-left shadow-xs hover:bg-rose-100"
-                                : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-card p-2.5 text-left shadow-xs hover:bg-slate-50"
-                        }
-                      >
-                        {livre ? (
-                          <>
-                            <p
-                              className={
-                                somenteLeitura
-                                  ? "text-[12px] font-semibold text-emerald-900"
-                                  : "text-[12px] font-medium text-slate-400"
-                              }
-                            >
-                              {fmtHora(a.inicio)} – {fmtHora(a.fim)}
-                            </p>
-                            <p
-                              className={
-                                somenteLeitura
-                                  ? "text-[11px] font-semibold text-emerald-700"
-                                  : "text-[11px] font-semibold text-slate-400"
-                              }
-                            >
-                              {somenteLeitura ? "Livre" : "+ Agendar"}
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex min-w-0 items-center justify-between gap-1 text-xs font-bold text-slate-800">
-                              <span className="inline-flex min-w-0 items-center gap-1 truncate">
-                                <Clock className="h-3 w-3 shrink-0 text-slate-400" />
-                                {fmtHora(a.inicio)}
-                                <span className="text-slate-300">–</span>
-                                {fmtHora(a.fim)}
-                              </span>
-                              <span
-                                className={`shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                                  STATUS_BADGE[a.status] ?? "bg-slate-100 text-slate-600"
+                      <div key={a.id} className="relative w-full min-w-0">
+                        <button
+                          type="button"
+                          disabled={leituraLivre}
+                          onClick={() => {
+                            if (leituraLivre) return;
+                            if (livre) onSlotClick(a);
+                            else onAgClick(a);
+                          }}
+                          className={
+                            livre
+                              ? leituraLivre
+                                ? "flex w-full min-w-0 flex-col rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-2 text-center"
+                                : "flex w-full min-w-0 cursor-pointer flex-col rounded-lg border border-dashed border-slate-200/60 bg-slate-50/50 p-2 text-center hover:border-primary/40 hover:bg-primary/5"
+                              : a.status === "confirmado"
+                                ? "flex w-full min-w-0 flex-col rounded-lg border border-emerald-200 border-l-4 border-l-emerald-600 bg-emerald-50 p-2.5 text-left shadow-xs hover:bg-emerald-100"
+                                : a.status === "cancelado" || a.status === "faltou"
+                                  ? "flex w-full min-w-0 flex-col rounded-lg border border-rose-200 border-l-4 border-l-rose-600 bg-rose-50 p-2.5 text-left shadow-xs hover:bg-rose-100"
+                                  : "flex w-full min-w-0 flex-col rounded-lg border border-slate-200/80 border-l-4 border-l-indigo-600 bg-card p-2.5 text-left shadow-xs hover:bg-slate-50"
+                          }
+                        >
+                          {livre ? (
+                            <>
+                              <p
+                                className={
+                                  somenteLeitura
+                                    ? "text-[12px] font-semibold text-emerald-900"
+                                    : "text-[12px] font-medium text-slate-400"
+                                }
+                              >
+                                {fmtHora(a.inicio)} – {fmtHora(a.fim)}
+                              </p>
+                              <p
+                                className={
+                                  somenteLeitura
+                                    ? "text-[11px] font-semibold text-emerald-700"
+                                    : "text-[11px] font-semibold text-slate-400"
+                                }
+                              >
+                                {somenteLeitura ? "Livre" : "+ Agendar"}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex min-w-0 items-center justify-between gap-1 text-xs font-bold text-slate-800">
+                                <span className="inline-flex min-w-0 items-center gap-1 truncate">
+                                  <Clock className="h-3 w-3 shrink-0 text-slate-400" />
+                                  {fmtHora(a.inicio)}
+                                  <span className="text-slate-300">–</span>
+                                  {fmtHora(a.fim)}
+                                </span>
+                                <span
+                                  className={`shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                                    STATUS_BADGE[a.status] ?? "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {STATUS_LABEL[a.status] ?? a.status}
+                                </span>
+                              </div>
+                              <p className="mt-1 block max-w-full truncate text-xs font-semibold uppercase tracking-tight text-slate-700">
+                                {ocultarPaciente ? (
+                                  "—"
+                                ) : (
+                                  <span className="flex min-w-0 items-center gap-1">
+                                    <UserRound className="h-3 w-3 shrink-0 text-primary/60" />
+                                    <span className="truncate">{a.paciente_nome}</span>
+                                  </span>
+                                )}
+                              </p>
+                              <p
+                                className={`mt-0.5 flex min-w-0 max-w-full items-center gap-1 text-[12px] font-medium text-slate-500 ${
+                                  comAtalhos ? "pr-14" : ""
                                 }`}
                               >
-                                {STATUS_LABEL[a.status] ?? a.status}
-                              </span>
-                            </div>
-                            <p className="mt-1 block max-w-full truncate text-xs font-bold uppercase tracking-tight text-slate-900">
-                              {ocultarPaciente ? (
-                                "—"
-                              ) : (
-                                <span className="flex min-w-0 items-center gap-1">
-                                  <UserRound className="h-3 w-3 shrink-0 text-slate-400" />
-                                  <span className="truncate">{a.paciente_nome}</span>
-                                </span>
-                              )}
-                            </p>
-                            <p className="mt-0.5 flex min-w-0 max-w-full items-center gap-1 text-[12px] font-medium text-slate-500">
-                              <Stethoscope className="h-3 w-3 shrink-0 text-slate-400" />
-                              <span className="truncate">{a.procedimento || "Consulta"}</span>
-                            </p>
-                          </>
+                                <Stethoscope className="h-3 w-3 shrink-0 text-slate-400" />
+                                <span className="truncate">{a.procedimento || "Consulta"}</span>
+                              </p>
+                            </>
+                          )}
+                        </button>
+                        {comAtalhos && (
+                          <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">
+                            {onCobrar && (
+                              <button
+                                type="button"
+                                onClick={() => onCobrar(a)}
+                                title={COBRAR_TITULO[pg]}
+                                aria-label={COBRAR_TITULO[pg]}
+                                className={`grid h-6 w-6 place-items-center rounded-md border-2 ${COBRAR_COR[pg]}`}
+                              >
+                                {pg === "sem_faturamento" ? (
+                                  <Ban className="h-3.5 w-3.5" />
+                                ) : (
+                                  <DollarSign
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={pg === "pago" ? 3 : 2.5}
+                                  />
+                                )}
+                              </button>
+                            )}
+                            {onFinalizar && a.status !== "realizado" && (
+                              <button
+                                type="button"
+                                onClick={() => onFinalizar(a)}
+                                title="Finalizar atendimento (Realizado)"
+                                aria-label="Finalizar atendimento (Realizado)"
+                                className="grid h-6 w-6 place-items-center rounded-md border-2 border-slate-300 bg-card text-slate-600 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -238,6 +313,8 @@ export function AgendaPorMedicoDia({
                 <footer className="border-t border-slate-100 px-3 py-1.5 text-[12px] text-slate-500">
                   {livres.length} livre{livres.length === 1 ? "" : "s"} · {ocupados.length} agendado
                   {ocupados.length === 1 ? "" : "s"}
+                  {realizados.length > 0 &&
+                    ` · ${realizados.length} realizado${realizados.length === 1 ? "" : "s"}`}
                 </footer>
               </section>
             );

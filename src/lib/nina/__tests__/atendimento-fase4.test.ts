@@ -7,10 +7,7 @@ import {
   textoResumo,
 } from "../atendimento-fase4";
 
-function estadoCom(
-  appointment: Record<string, unknown>,
-  patient: Record<string, unknown> = {},
-) {
+function estadoCom(appointment: Record<string, unknown>, patient: Record<string, unknown> = {}) {
   const base = estadoVazio();
   return {
     ...base,

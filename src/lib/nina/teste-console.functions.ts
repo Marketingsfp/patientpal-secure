@@ -13,6 +13,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { periodoExportacaoSchema } from "./homologacao-exportacao";
 
 import {
   CANAL_TESTE,
@@ -29,7 +30,6 @@ import {
 } from "@/lib/nina/teste-console.server";
 import { resumirLeads, previaTexto, type MensagemResumoRow } from "@/lib/nina/leads-resumo";
 
-
 async function assertMembership(supabase: any, userId: string, clinicaId: string) {
   const { data, error } = await supabase
     .from("clinica_memberships")
@@ -41,7 +41,6 @@ async function assertMembership(supabase: any, userId: string, clinicaId: string
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem acesso a esta clínica");
 }
-
 
 export const listarLeadsTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -79,7 +78,7 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
           { _clinica_id: data.clinicaId, _conversa_ids: ids } as never,
         );
         if (error) throw new Error(error.message);
-        for (const r of ((rows ?? []) as any[])) porConversa.set(r.conversa_id, r as ResumoRpc);
+        for (const r of (rows ?? []) as any[]) porConversa.set(r.conversa_id, r as ResumoRpc);
         rpcOk = porConversa.size > 0;
       } catch (e) {
         console.error("[homologacao] resumo agrupado falhou, usando amostra", e);
@@ -130,7 +129,9 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
           mensagens: g ? Number(g.total_mensagens ?? 0) : r.totalMensagens,
           ultimaMensagemId: g ? g.ultima_msg_id : r.lastMessageId,
           ultimaMensagemTexto: g
-            ? (g.ultima_msg_body ? previaTexto(g.ultima_msg_body) : null)
+            ? g.ultima_msg_body
+              ? previaTexto(g.ultima_msg_body)
+              : null
             : r.lastMessageText,
           ultimaMensagemAutor: g ? g.ultima_msg_autor : r.lastMessageAuthor,
           ultimaMensagemEm: ultimaEm,
@@ -141,8 +142,6 @@ export const listarLeadsTeste = createServerFn({ method: "POST" })
         };
       }),
     };
-
-
   });
 
 /**
@@ -173,14 +172,35 @@ export const marcarLeadTesteLido = createServerFn({ method: "POST" })
       _mensagem_id: data.mensagemId ?? undefined,
     } as never);
     if (error) throw new Error(error.message);
-    const { data: cont } = await context.supabase.rpc("nina_teste_nao_lidas" as never, {
-      _clinica_id: data.clinicaId,
-      _conversa_ids: [data.conversaId],
-    } as never);
+    const { data: cont } = await context.supabase.rpc(
+      "nina_teste_nao_lidas" as never,
+      {
+        _clinica_id: data.clinicaId,
+        _conversa_ids: [data.conversaId],
+      } as never,
+    );
     const linha = ((cont ?? []) as any[])[0];
     return { ok: true, naoLidas: Number(linha?.nao_lidas ?? 0) || 0 };
   });
 
+export const mensagensPdfLeadTeste = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        leadId: z.string().uuid(),
+        periodo: periodoExportacaoSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMembership(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
+    const { lerMensagensExportacao } = await import("./homologacao-exportacao.server");
+    return lerMensagensExportacao(supabaseAdmin, data.clinicaId, lead, data.periodo);
+  });
 
 export const historicoLeadTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -198,7 +218,6 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     if (ids.length === 0)
       return { mensagens: [], conversaId: lead.conversa_id, sessao: lead.sessao_seq };
 
-
     // Busca as mensagens MAIS RECENTES (desc) e reordena para exibição: com
     // muitas sessões o lead passa do limite, e ordenar asc esconderia justo as
     // mensagens novas enviadas depois do reset.
@@ -214,7 +233,9 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
         blocos.map((bloco) =>
           supabaseAdmin
             .from("whatsapp_mensagens")
-            .select("id, conversa_id, direction, body, tipo, transcricao, status, enviada_por, created_at, execucao_id, wa_message_id")
+            .select(
+              "id, conversa_id, direction, body, tipo, transcricao, media_url, media_mime, status, enviada_por, created_at, execucao_id, wa_message_id",
+            )
             .eq("clinica_id", data.clinicaId)
             .in("conversa_id", bloco)
             .order("created_at", { ascending: false })
@@ -240,7 +261,6 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
       throw new Error("Conexão com o banco instável. Tente novamente em alguns segundos.");
     if (error) throw new Error(error.message);
     const msgs = ((msgsDesc ?? []) as any[]).slice().reverse();
-
 
     // Eventos operacionais (resolvida, memória resetada, atribuição…). O
     // console mescla com as mensagens por `created_at` — nada de popup.
@@ -284,7 +304,6 @@ export const historicoLeadTeste = createServerFn({ method: "POST" })
     };
   });
 
-
 export const enviarMensagemTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -296,6 +315,33 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
         tipo: z.enum(["text", "audio", "image", "document", "sticker"]).default("text"),
         // Em áudio, o texto é a "transcrição": vazio simula transcrição falha.
         texto: z.string().trim().max(2000).default(""),
+        audioArquivo: z
+          .object({
+            base64: z
+              .string()
+              .min(4)
+              .max(22_369_624)
+              .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+            mime: z.enum([
+              "audio/ogg",
+              "audio/mpeg",
+              "audio/mp4",
+              "audio/aac",
+              "audio/amr",
+              "audio/wav",
+            ]),
+          })
+          .optional(),
+        imagemArquivo: z
+          .object({
+            base64: z
+              .string()
+              .min(4)
+              .max(6_990_508)
+              .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+            mime: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          })
+          .optional(),
         chave: z.string().min(6).max(80),
       })
       .parse(input),
@@ -309,13 +355,17 @@ export const enviarMensagemTeste = createServerFn({ method: "POST" })
       const { ErroSessaoTesteOcupada } = await import("./sessao-teste-exclusiva.server");
       if (!(e instanceof ErroSessaoTesteOcupada)) throw e;
       return {
-        duplicada: false, reply: null, erro: e.message, audio: null,
-        transferida: false, processamento: "ERRO" as const,
-        mensagemPersistida: false, mensagemId: null,
+        duplicada: false,
+        reply: null,
+        erro: e.message,
+        audio: null,
+        transferida: false,
+        processamento: "ERRO" as const,
+        mensagemPersistida: false,
+        mensagemId: null,
       };
     }
   });
-
 
 /**
  * Painel técnico da homologação: quais ferramentas a Nina chamou nesta
@@ -399,7 +449,9 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
     // Só aparece na homologação; nunca é enviada ao paciente.
     const { data: exec } = await supabaseAdmin
       .from("nina_execucoes")
-      .select("model,thinking_level,route_reason,knowledge_status,tool_calls,latency_ms,input_tokens,output_tokens,retries,success,error_category,handoff")
+      .select(
+        "model,thinking_level,route_reason,knowledge_status,tool_calls,latency_ms,input_tokens,output_tokens,retries,success,error_category,handoff",
+      )
       .eq("conversation_id", data.conversaId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -417,7 +469,8 @@ export const ferramentasUsadasTeste = createServerFn({ method: "POST" })
           output_tokens: exec.output_tokens,
           retries: exec.retries,
           sucesso_ultima_chamada_modelo: exec.success,
-          entrega: "Sucesso do modelo não confirma entrega; confira a mensagem e a conciliação do teste.",
+          entrega:
+            "Sucesso do modelo não confirma entrega; confira a mensagem e a conciliação do teste.",
           error_category: exec.error_category,
           handoff: exec.handoff,
         }
@@ -455,9 +508,7 @@ export const resolverConversaTeste = createServerFn({ method: "POST" })
       origem: "console_teste",
       manual: true,
     });
-
   });
-
 
 /**
  * FASE 3 — detalhe técnico de UMA mensagem da Nina na homologação.

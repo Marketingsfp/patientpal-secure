@@ -10,11 +10,7 @@
  * contrato: quais ferramentas cada camada libera, o que é proibido tocar, como
  * o passo a passo é registrado e quando o teste comprova a correção.
  */
-import {
-  CAMADAS_APLICAVEIS,
-  type CamadaProposta,
-  type PropostaCorrecao,
-} from "./analise-erro";
+import { CAMADAS_APLICAVEIS, type CamadaProposta, type PropostaCorrecao } from "./analise-erro";
 
 /** Mesmo modelo da investigação, papel diferente. */
 export const MODELO_EXECUTOR = "anthropic/claude-opus-5-5" as const;

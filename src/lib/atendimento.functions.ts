@@ -5,7 +5,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
+import { periodoCentralSchema, aplicarPeriodoCentral } from "@/lib/atendimento/periodo-central";
 import { z } from "zod";
+import { cursorInboxSchema, filtroAposCursor } from "./atendimento/paginacao-inbox";
 import {
   STATUS_FECHADOS,
   atendenteFiltroEfetivo,
@@ -24,14 +26,17 @@ import { loadWhatsAppConfig, metaSendText } from "./whatsapp.server";
 import {
   MSG_ADMIN_NAO_ATENDE,
   MSG_ADMIN_NAO_RESPONDE_AQUI,
+  motivoAdminNaoResponde,
+  conversaComNina,
+  MSG_CONVERSA_DA_NINA,
   MSG_DESTINO_EM_PAUSA,
   adminPodeResponder,
   apenasDestinatariosValidos,
   conversaSemResponsavel,
   estadoBloqueiaTransferencia,
   perfilSupervisao,
+  podeEncerrarConversa,
   statusPresenca,
-
 } from "@/lib/atendimento/perfil-atendimento";
 import {
   ESTADOS_MANUAIS,
@@ -48,11 +53,7 @@ import {
 /* =========================================================
  *  Helpers
  * ======================================================= */
-async function assertMember(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  clinicaId: string,
-) {
+async function assertMember(supabase: SupabaseClient<Database>, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("is_member", {
     _user_id: userId,
     _clinica_id: clinicaId,
@@ -92,7 +93,9 @@ async function assertDestinoNaoEstaEmPausa(
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (estadoBloqueiaTransferencia((data as { estado_manual?: string | null } | null)?.estado_manual))
+  if (
+    estadoBloqueiaTransferencia((data as { estado_manual?: string | null } | null)?.estado_manual)
+  )
     throw new Error(MSG_DESTINO_EM_PAUSA);
 }
 /**
@@ -216,6 +219,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         // banco, antes do LIMIT, para nunca esconder resultado válido.
         visualizacao: z.enum(["recentes", "resolvidas", "espera"]).default("recentes"),
         limit: z.number().int().min(1).max(500).default(100),
+        apos: cursorInboxSchema.nullish(),
       })
       .parse(i),
   )
@@ -292,10 +296,14 @@ export const listarConversas = createServerFn({ method: "POST" })
       let esperaConsiderada = mapaEspera;
       if (responsavelEspera && !plano.somenteResolvidas) {
         const doResponsavel = await idsPendentesDoAtendente(
-          context.supabase, data.clinicaId, responsavelEspera, mapaEspera,
+          context.supabase,
+          data.clinicaId,
+          responsavelEspera,
+          mapaEspera,
         );
         esperaConsiderada = Object.fromEntries(doResponsavel.map((id) => [id, mapaEspera[id]!]));
-        for (const id of Object.keys(mapaEspera)) if (!(id in esperaConsiderada)) delete mapaEspera[id];
+        for (const id of Object.keys(mapaEspera))
+          if (!(id in esperaConsiderada)) delete mapaEspera[id];
       }
       // Recorte pela métrica canônica ANTES do LIMIT: se houver mais conversas
       // aguardando do que o teto da lista, ficam as de maior espera.
@@ -368,6 +376,7 @@ export const listarConversas = createServerFn({ method: "POST" })
       }
     }
     // --- Ordenação e limite (sempre por último) ----------------------------
+    if (data.visualizacao === "recentes" && data.apos) q = q.or(filtroAposCursor(data.apos));
     q = q.order(plano.ordenarPor, { ascending: plano.ascendente, nullsFirst: false });
     // Desempate estável: conversa sem a coluna da visualização não embaralha.
     if (plano.ordenarPor !== "inbox_entrada_em") {
@@ -381,18 +390,15 @@ export const listarConversas = createServerFn({ method: "POST" })
 
     // Não lidas pela equipe operacional; supervisão acompanha o mesmo número.
     // O contador legado permanece apenas como referência histórica.
-    let naoLidas = new Map<string, number>();
-    const ids = (rows ?? []).map((r: any) => r.id);
-    if (ids.length) {
-      const { data: cont, error: erroLeitura } = await context.supabase.rpc("atend_nao_lidas", {
-        _clinica_id: data.clinicaId,
-        _conversa_ids: ids,
-      });
-      if (erroLeitura) throw new Error(erroLeitura.message);
-      naoLidas = new Map((cont ?? []).map((c: any) => [c.conversa_id, Number(c.nao_lidas) || 0]));
-      marcar("nao_lidas");
-    }
-
+    const { carregarMetadadosLista } = await import("./atendimento/metadados-lista.server");
+    const { naoLidas, comAberturas, tempos } = await carregarMetadadosLista(
+      context.supabase,
+      data.clinicaId,
+      context.userId,
+      rows ?? [],
+    );
+    marcar("metadados_paralelos");
+    Object.assign(marcos, tempos);
     const total = Date.now() - t0;
     // Só registra quando realmente demorou, para não poluir o log.
     if (total > 400) {
@@ -402,17 +408,18 @@ export const listarConversas = createServerFn({ method: "POST" })
         etapas: marcos,
       });
     }
-    const saida = (rows ?? []).map((r: any) => ({
+    const saida = comAberturas.map((r: any) => ({
       ...r,
       nao_lidas: naoLidas.get(r.id) ?? 0,
       // Métrica canônica de espera (mesma da Central "Prioridades Agora"),
       // devolvida pronta para a tela não recalcular duração item a item.
-      ...(plano.exigeEsperaPaciente ? { aguardando_desde: mapaEspera[r.id] ?? r.aguardando_desde } : {}),
+      ...(plano.exigeEsperaPaciente
+        ? { aguardando_desde: mapaEspera[r.id] ?? r.aguardando_desde }
+        : {}),
     }));
     // Quem começou a esperar antes vem primeiro, pela métrica canônica.
     return plano.exigeEsperaPaciente ? ordenarPorEspera(saida, mapaEspera) : saida;
   });
-
 
 /**
  * FASE 2 — Deep link / F5: carrega UMA conversa pelo id do endereço, mesmo
@@ -438,7 +445,12 @@ export const obterConversa = createServerFn({ method: "POST" })
       .eq("is_teste", false)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return row ?? null;
+    if (!row) return null;
+    const { carregarAberturasInbox } = await import("./atendimento/conversa-nova.server");
+    return (
+      (await carregarAberturasInbox(context.supabase, data.clinicaId, [row], context.userId))[0] ??
+      null
+    );
   });
 
 /**
@@ -486,7 +498,6 @@ export const buscarConversaPorNumero = createServerFn({ method: "POST" })
     return row;
   });
 
-
 /**
  * Contagem independente de cada filtro da Inbox. Cada número é calculado com
  * o mesmo critério da listagem, sem misturar escopos.
@@ -525,9 +536,7 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
       gestor
         ? abertas().is("atribuida_user_id", null).neq("owner_type", "AI")
         : Promise.resolve({ count: 0 } as { count: number | null }),
-      gestor
-        ? base().in("status", [...STATUS_FECHADOS])
-        : minhasFechadas,
+      gestor ? base().in("status", [...STATUS_FECHADOS]) : minhasFechadas,
       gestor ? abertas() : Promise.resolve({ count: null } as { count: number | null }),
       contarPendentesDoAtendente(context.supabase, data.clinicaId, context.userId),
     ]);
@@ -559,9 +568,12 @@ export const souGestorAtendimento = createServerFn({ method: "POST" })
     // `admin` = supervisão total, sem atender: a Inbox usa isto para abrir na
     // visão da equipe e esconder as ações de atendimento.
     const admin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
-    const { data: leituraOperacional, error } = await context.supabase.rpc("atend_permite_leitura_operacional", {
-      _clinica_id: data.clinicaId,
-    });
+    const { data: leituraOperacional, error } = await context.supabase.rpc(
+      "atend_permite_leitura_operacional",
+      {
+        _clinica_id: data.clinicaId,
+      },
+    );
     if (error) throw new Error(error.message);
     return { gestor: !!podeGerir, admin, leituraOperacional: leituraOperacional === true };
   });
@@ -621,7 +633,8 @@ export const atribuirConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    const anterior = (antes as { atribuida_user_id: string | null } | null)?.atribuida_user_id ?? null;
+    const anterior =
+      (antes as { atribuida_user_id: string | null } | null)?.atribuida_user_id ?? null;
     const semMudanca = anterior === (data.userId ?? null) && data.departamentoId === undefined;
     const patch: {
       atribuida_user_id: string | null;
@@ -665,7 +678,6 @@ export const atribuirConversa = createServerFn({ method: "POST" })
   });
 
 export const transferirConversa = createServerFn({ method: "POST" })
-
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
     z
@@ -680,9 +692,13 @@ export const transferirConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    if (data.paraUserId && (await ehAdminClinica(context.supabase, data.paraUserId, data.clinicaId)))
+    if (
+      data.paraUserId &&
+      (await ehAdminClinica(context.supabase, data.paraUserId, data.clinicaId))
+    )
       throw new Error(MSG_ADMIN_NAO_ATENDE);
-    if (data.paraUserId) await assertDestinoNaoEstaEmPausa(context.supabase, data.paraUserId, data.clinicaId);
+    if (data.paraUserId)
+      await assertDestinoNaoEstaEmPausa(context.supabase, data.paraUserId, data.clinicaId);
     const { data: conv, error: e1 } = await context.supabase
       .from("atend_conversas")
       .select("atribuida_user_id, departamento_id")
@@ -769,9 +785,8 @@ export const transferirConversa = createServerFn({ method: "POST" })
     const destinatario = data.paraUserId ?? sorteada ?? null;
     if (destinatario) {
       try {
-        const { protocoloAoAtribuirHumano } = await import(
-          "@/lib/atendimento/protocolo-atendimento.server"
-        );
+        const { protocoloAoAtribuirHumano } =
+          await import("@/lib/atendimento/protocolo-atendimento.server");
         await protocoloAoAtribuirHumano({
           clinicaId: data.clinicaId,
           conversaId: data.conversaId,
@@ -783,7 +798,6 @@ export const transferirConversa = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
-
 
 export const fecharConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -797,15 +811,36 @@ export const fecharConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    // Só o responsável atual encerra (evita encerrar atendimento de outra pessoa).
-    const { data: dono } = await context.supabase
+    // Supervisão encerra sem assumir; autoria continua sendo a sessão autenticada.
+    const { data: dono, error: erroConversa } = await context.supabase
       .from("atend_conversas")
-      .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado")
+      .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, status")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    if (dono?.atribuida_user_id && dono.atribuida_user_id !== context.userId)
-      throw new Error("Esta conversa está com outro atendente. Assuma antes de encerrar.");
+    if (erroConversa) throw new Error(erroConversa.message);
+    if (!dono) throw new Error("Conversa não encontrada nesta clínica.");
+    if (dono.status === "closed" || dono.status === "finished")
+      throw new Error("Esta conversa já foi encerrada.");
+    const [{ data: gestao, error: erroGestao }, admin] = await Promise.all([
+      context.supabase.rpc("can_manage_clinica", {
+        _user_id: context.userId,
+        _clinica_id: data.clinicaId,
+      }),
+      ehAdminClinica(context.supabase, context.userId, data.clinicaId),
+    ]);
+    if (erroGestao) throw new Error(erroGestao.message);
+    if (
+      !podeEncerrarConversa({
+        userId: context.userId,
+        responsavelId: dono.atribuida_user_id,
+        admin,
+        gestor: gestao === true,
+      })
+    )
+      throw new Error(
+        "Somente o responsável, a supervisão ou um administrador pode encerrar esta conversa.",
+      );
     // Mecanismo ÚNICO de resolução (o mesmo usado pela Nina no encerramento
     // automático): status, prazos, estados transacionais, evento e resumo.
     const { resolverConversaCore } = await import("@/lib/atendimento/resolver-conversa.server");
@@ -813,10 +848,37 @@ export const fecharConversa = createServerFn({ method: "POST" })
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
       userId: context.userId,
+      // A IA do resumo é lenta: o botão volta já; o resumo é atualizado em
+      // seguida por `atualizarResumoEncerramento`, chamado pela tela.
+      adiarResumo: true,
     });
     return { ok: true, protocol: r.protocol as string };
+  });
 
-
+/** Atualiza o resumo vigente com o desfecho "resolvida" após o encerramento manual. */
+export const atualizarResumoEncerramento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: conv } = await context.supabase
+      .from("atend_conversas")
+      .select("status, resolved_by")
+      .eq("id", data.conversaId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!conv || conv.status !== "closed" || conv.resolved_by !== context.userId)
+      return { ok: false };
+    const { registrarDesfechoResumo } = await import("@/lib/atendimento/handoff-resumo.server");
+    await registrarDesfechoResumo({
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      desfecho: "conversa_resolvida",
+      resolvidoPor: context.userId,
+    });
+    return { ok: true };
   });
 
 /** Contagem após a última leitura operacional confirmada no banco. */
@@ -834,16 +896,37 @@ async function contarNaoLidasConversa(
   return Number(linha?.nao_lidas ?? 0) || 0;
 }
 
-/**
+/** Registra abertura do chat pelo responsável atual, separada do cursor de não lidas. */
+export const registrarPrimeiraAbertura = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        entradaEm: z.string().datetime(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+    await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    const { registrarAberturaInbox } = await import("./atendimento/conversa-nova.server");
+    return registrarAberturaInbox(
+      context.supabase,
+      data.clinicaId,
+      context.userId,
+      data.conversaId,
+      data.entradaEm,
+    );
+  });
 
+/**
  * Registra a leitura DESTE usuário até uma mensagem real da timeline.
- *
- * A leitura operacional atualiza o indicador da equipe e preserva o histórico
- * individual. O usuário vem da autenticação. Admin, gestão e supervisão não
- * consomem mensagens, inclusive em chamadas explícitas.
- *
- * O contador antigo da conversa (`unread_count`) NÃO é zerado: fica como
- * referência histórica.
+ * A leitura operacional preserva o histórico individual. Admin, gestão e
+ * supervisão não consomem mensagens, inclusive em chamadas explícitas.
+ * O contador legado `unread_count` permanece como referência histórica.
  */
 export const marcarLida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -861,9 +944,7 @@ export const marcarLida = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { assertAcessoConversa } = await import(
-      "./atendimento/acesso-conversa.server"
-    );
+    const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
     const { avaliarLeituraAutomatica } = await import("./atendimento/leitura-inbox");
     const conv = await assertAcessoConversa(
       context.supabase,
@@ -871,9 +952,12 @@ export const marcarLida = createServerFn({ method: "POST" })
       data.clinicaId,
       data.conversaId,
     );
-    const { data: leituraOperacional, error: erroPerfil } = await context.supabase.rpc("atend_permite_leitura_operacional", {
-      _clinica_id: data.clinicaId,
-    });
+    const { data: leituraOperacional, error: erroPerfil } = await context.supabase.rpc(
+      "atend_permite_leitura_operacional",
+      {
+        _clinica_id: data.clinicaId,
+      },
+    );
     if (erroPerfil) throw new Error(erroPerfil.message);
     const { pode, motivo } = avaliarLeituraAutomatica({
       userId: context.userId,
@@ -882,7 +966,11 @@ export const marcarLida = createServerFn({ method: "POST" })
       acessoPermitido: true,
     });
     if (!pode) {
-      const naoLidas = await contarNaoLidasConversa(context.supabase, data.clinicaId, data.conversaId);
+      const naoLidas = await contarNaoLidasConversa(
+        context.supabase,
+        data.clinicaId,
+        data.conversaId,
+      );
       return { ok: true, marcada: false, motivo, lidaAte: null, naoLidas };
     }
 
@@ -896,12 +984,19 @@ export const marcarLida = createServerFn({ method: "POST" })
     // Reconciliação: devolve o número verdadeiro DEPOIS da gravação. Se uma
     // mensagem nova chegou durante a operação, ela continua contando como não
     // lida — a tela não fica com um zero falso.
-    const naoLidas = await contarNaoLidasConversa(context.supabase, data.clinicaId, data.conversaId);
-    return { ok: true, marcada: true, motivo, lidaAte: (lidaAte as string | null) ?? null, naoLidas };
-
-
+    const naoLidas = await contarNaoLidasConversa(
+      context.supabase,
+      data.clinicaId,
+      data.conversaId,
+    );
+    return {
+      ok: true,
+      marcada: true,
+      motivo,
+      lidaAte: (lidaAte as string | null) ?? null,
+      naoLidas,
+    };
   });
-
 
 /* =========================================================
  *  NOTAS INTERNAS
@@ -1217,7 +1312,6 @@ export const meuStatusAgente = createServerFn({ method: "POST" })
  * página ou perder a conexão não podem mais mudar a escolha de presença.
  * O único caminho de gravação é `definirPresencaManual`. */
 
-
 /* =========================================================
  *  BASE DE CONHECIMENTO
  * ======================================================= */
@@ -1458,11 +1552,13 @@ export const excluirPauseReason = createServerFn({ method: "POST" })
 export const iniciarPausa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({
-      clinicaId: z.string().uuid(),
-      reasonId: z.string().uuid().optional(),
-      versao: z.number().int().nonnegative().optional(),
-    }).parse(i),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        reasonId: z.string().uuid().optional(),
+        versao: z.number().int().nonnegative().optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
@@ -1839,7 +1935,6 @@ export const listarUsuariosClinica = createServerFn({ method: "POST" })
     );
   });
 
-
 /* =========================================================
  *  PAINEL — métricas do dia
  * ======================================================= */
@@ -2014,9 +2109,6 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
     };
   });
 
-
-
-
 export const enviarMensagemConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -2090,7 +2182,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
       throw new Error("Conversa encerrada. Reabra o atendimento para responder.");
-    if (ehAdmin && !adminPodeResponder(conv)) throw new Error(MSG_ADMIN_NAO_RESPONDE_AQUI);
+    // Conversa com a Nina: ninguém envia (admin, supervisão ou atendente); atribuir tira a Nina.
+    if (conversaComNina(conv)) throw new Error(MSG_CONVERSA_DA_NINA);
+    if (ehAdmin && !adminPodeResponder(conv)) throw new Error(motivoAdminNaoResponde(conv));
     // Supervisão responde conversa sem responsável (fila global) SEM virar responsável:
     // só assume se clicar em "Assumir conversa". A da Nina segue a regra de antes.
     const respondeSemAssumir = !!perfilSup && conversaSemResponsavel(conv);
@@ -2117,9 +2211,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         .select("id");
       if (claimErr) throw new Error(claimErr.message);
       if (!claim || claim.length === 0)
-        throw new Error(
-          "Outra pessoa assumiu esta conversa agora. Sua mensagem não foi enviada.",
-        );
+        throw new Error("Outra pessoa assumiu esta conversa agora. Sua mensagem não foi enviada.");
       await registrarEventoConversa(context.supabase, {
         clinicaId: data.clinicaId,
         conversaId: data.conversaId,
@@ -2127,9 +2219,8 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         userId: context.userId,
       });
       try {
-        const { protocoloAoAtribuirHumano } = await import(
-          "@/lib/atendimento/protocolo-atendimento.server"
-        );
+        const { protocoloAoAtribuirHumano } =
+          await import("@/lib/atendimento/protocolo-atendimento.server");
         await protocoloAoAtribuirHumano({
           clinicaId: data.clinicaId,
           conversaId: data.conversaId,
@@ -2140,16 +2231,24 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       }
     }
 
-
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
       : `+${conv.contato_telefone}`;
+    // Assinatura: nome de quem escreveu, em negrito no WhatsApp, para o
+    // paciente distinguir uma atendente da outra. Sem nome cadastrado, vai sem.
+    const { data: perfilAutor } = await context.supabase
+      .from("profiles")
+      .select("nome")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const { assinarTexto } = await import("@/lib/atendimento/envio-otimista");
+    const textoEnviado = assinarTexto((perfilAutor as any)?.nome, data.text);
     trace.marcar("SEND_T6_META_REQUEST_START");
     const { wa_message_id } = await metaSendText(
       cfg.phone_number_id,
       cfg.access_token,
       to,
-      data.text,
+      textoEnviado,
     );
     trace.marcar("SEND_T7_META_RESPONSE");
 
@@ -2162,7 +2261,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         direction: "out",
         from_number: cfg.display_phone_number,
         to_number: to,
-        body: data.text,
+        body: textoEnviado,
         tipo: "text",
         status: "sent",
         enviada_por: "humano",
@@ -2211,7 +2310,11 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       ok: true,
       wa_message_id,
       mensagem: gravada ?? null,
-      latencia: { traceId: trace.traceId, marcas: trace.marcas(), subprocessos: trace.subprocessos() },
+      latencia: {
+        traceId: trace.traceId,
+        marcas: trace.marcas(),
+        subprocessos: trace.subprocessos(),
+      },
     };
   });
 
@@ -2267,7 +2370,6 @@ export const obterDadosContato = createServerFn({ method: "POST" })
         contatoVia = "id";
       }
     }
-
 
     if (paciente?.id) {
       const [agR, ctR] = await Promise.all([
@@ -2360,7 +2462,8 @@ export const revisarVinculoPacienteConversa = createServerFn({ method: "POST" })
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
-    const anterior = (conv as { contato_paciente_id?: string | null } | null)?.contato_paciente_id ?? null;
+    const anterior =
+      (conv as { contato_paciente_id?: string | null } | null)?.contato_paciente_id ?? null;
     if (anterior === data.pacienteId) return { ok: true, paciente: pac, trocado: false };
 
     const { vincularPacienteConversa } = await import("./atendimento/vinculo-contato.server");
@@ -2392,8 +2495,6 @@ export const revisarVinculoPacienteConversa = createServerFn({ method: "POST" })
     }
     return { ok: true, paciente: pac, trocado: true };
   });
-
-
 
 /* =========================================================
  *  ROUND-ROBIN — auto-atribuição
@@ -2704,7 +2805,12 @@ export const consultarCentralAtencao = createServerFn({ method: "POST" })
     await assertMember(context.supabase, context.userId, data.clinicaId);
     const { carregarDadosCentralAtencao } = await import("./atendimento/central-atencao.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    return carregarDadosCentralAtencao(context.supabase, data.clinicaId, context.userId, supabaseAdmin);
+    return carregarDadosCentralAtencao(
+      context.supabase,
+      data.clinicaId,
+      context.userId,
+      supabaseAdmin,
+    );
   });
 
 /** Fila de conversas aguardando um atendente humano (handoff da Nina). */
@@ -2790,9 +2896,8 @@ export const assumirConversa = createServerFn({ method: "POST" })
 
     // A conversa passou para uma pessoa: nenhum prazo de espera da Nina
     // continua valendo a partir daqui.
-    const { limparEsperaPaciente: limparEsperaAoAssumir } = await import(
-      "@/lib/nina/espera-paciente.server"
-    );
+    const { limparEsperaPaciente: limparEsperaAoAssumir } =
+      await import("@/lib/nina/espera-paciente.server");
 
     if (conv.atribuida_user_id && !data.forcar)
       return {
@@ -2880,9 +2985,8 @@ export const assumirConversa = createServerFn({ method: "POST" })
     });
     // Encaminhamento da Nina concluído por quem assumiu na fila.
     try {
-      const { protocoloAoAtribuirHumano } = await import(
-        "@/lib/atendimento/protocolo-atendimento.server"
-      );
+      const { protocoloAoAtribuirHumano } =
+        await import("@/lib/atendimento/protocolo-atendimento.server");
       await protocoloAoAtribuirHumano({
         clinicaId: data.clinicaId,
         conversaId: data.conversaId,
@@ -2898,8 +3002,6 @@ export const assumirConversa = createServerFn({ method: "POST" })
       jaEra: false,
     };
   });
-
-
 
 /** Devolve a conversa para a Nina (reativa a IA). */
 export const devolverParaNina = createServerFn({ method: "POST" })
@@ -2980,12 +3082,15 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
     // um UUID. Uma consulta só para todos os responsáveis dos eventos.
     const ids = Array.from(
       new Set(
-        lista.flatMap((r) => {
-          const det = (r.detalhes ?? null) as
-            | { para_user_id?: string | null; de_user_id?: string | null }
-            | null;
-          return [r.user_id, det?.para_user_id ?? null, det?.de_user_id ?? null];
-        }).filter((v): v is string => typeof v === "string" && v.length > 0),
+        lista
+          .flatMap((r) => {
+            const det = (r.detalhes ?? null) as {
+              para_user_id?: string | null;
+              de_user_id?: string | null;
+            } | null;
+            return [r.user_id, det?.para_user_id ?? null, det?.de_user_id ?? null];
+          })
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
     );
     const nomes = new Map<string, string>();
@@ -2999,9 +3104,10 @@ export const listarEventosConversa = createServerFn({ method: "POST" })
       });
     }
     return lista.map((r) => {
-      const det = (r.detalhes ?? null) as
-        | { para_user_id?: string | null; de_user_id?: string | null }
-        | null;
+      const det = (r.detalhes ?? null) as {
+        para_user_id?: string | null;
+        de_user_id?: string | null;
+      } | null;
       const paraId = det?.para_user_id ?? null;
       const deId = det?.de_user_id ?? null;
       return {
@@ -3201,7 +3307,6 @@ export const diagnosticarPoolTelefonia = createServerFn({ method: "POST" })
     };
   });
 
-
 export const listarPresenca = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
@@ -3241,4 +3346,163 @@ export const esperaConversas = createServerFn({ method: "POST" })
       if (r?.conversa_id && r?.aguardando_desde) mapa[r.conversa_id] = r.aguardando_desde;
     }
     return mapa;
+  });
+
+/**
+ * Pesquisa geral de conversas do OS ZAP — só admin, gestor e supervisão.
+ * Procura pelo id interno, número (#1342), protocolo, nome, telefone e pelo
+ * texto das mensagens. Somente leitura; conversas de homologação ficam fora.
+ */
+async function assertPesquisaConversas(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  clinicaId: string,
+) {
+  await assertMember(supabase, userId, clinicaId);
+  const { data: podeGerir } = await supabase.rpc("can_manage_clinica", {
+    _user_id: userId,
+    _clinica_id: clinicaId,
+  });
+  let permitido = !!podeGerir || (await ehAdminClinica(supabase, userId, clinicaId));
+  if (!permitido) {
+    const { data: sup } = await supabase
+      .from("atend_departamento_membros")
+      .select("id")
+      .eq("clinica_id", clinicaId)
+      .eq("user_id", userId)
+      .in("role", ["supervisor", "gestor", "admin"])
+      .limit(1);
+    permitido = (sup?.length ?? 0) > 0;
+  }
+  if (!permitido) throw new Error("Pesquisa disponível só para administração e supervisão.");
+}
+
+export const pesquisarConversasGeral = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(1).max(200) })
+      .and(periodoCentralSchema)
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertPesquisaConversas(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bruto = data.termo.replace(/\s+/g, " ").trim();
+    const termo = bruto.replace(/[%_,()'"\\*]/g, "").trim();
+    const campos =
+      "id, numero_conversa, protocolo_atendimento, protocol_number, contato_nome, whatsapp_profile_name, contato_telefone, status, owner_type, ultima_msg_em, created_at, atribuida_user_id";
+    const base = () =>
+      aplicarPeriodoCentral(
+        supabaseAdmin
+          .from("atend_conversas")
+          .select(campos)
+          .eq("clinica_id", data.clinicaId)
+          .eq("is_teste", false),
+        data,
+      );
+
+    const ids = new Set<string>();
+    const achados: Record<string, string> = {};
+    const consultas: PromiseLike<{ data: any[] | null; error: { message: string } | null }>[] = [];
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bruto);
+    if (uuid) consultas.push(base().eq("id", bruto.toLowerCase()));
+    const num = /^#?\d{1,12}$/.test(bruto) ? Number(bruto.replace("#", "")) : null;
+    if (num) consultas.push(base().eq("numero_conversa", num));
+    if (termo.length >= 2 && !bruto.startsWith("#")) {
+      const digitos = termo.replace(/\D/g, "");
+      const ors = [
+        `contato_nome.ilike.%${termo}%`,
+        `whatsapp_profile_name.ilike.%${termo}%`,
+        `protocolo_atendimento.ilike.%${termo}%`,
+        `protocol_number.ilike.%${termo}%`,
+      ];
+      if (digitos.length >= 3) ors.push(`contato_telefone.ilike.%${digitos}%`);
+      consultas.push(
+        base()
+          .or(ors.join(","))
+          .order("ultima_msg_em", { ascending: false, nullsFirst: false })
+          .limit(100),
+      );
+    }
+    const res = await Promise.all(consultas);
+    const conversas: any[] = [];
+    for (const r of res) {
+      if (r.error) throw new Error(r.error.message);
+      for (const c of r.data ?? [])
+        if (!ids.has(c.id)) {
+          ids.add(c.id);
+          conversas.push(c);
+        }
+    }
+
+    if (termo.length >= 2 && !uuid && !bruto.startsWith("#")) {
+      // Filtra pela abertura da conversa vinculada, antes do limite de mensagens.
+      // A data da mensagem pode ser diferente da data de abertura pesquisada.
+      const { data: msgs, error: erroMsgs } = await aplicarPeriodoCentral(
+        supabaseAdmin
+          .from("whatsapp_mensagens")
+          .select("conversa_id, body, created_at, atend_conversas!inner(created_at)")
+          .eq("clinica_id", data.clinicaId)
+          .eq("is_teste", false)
+          .eq("atend_conversas.clinica_id", data.clinicaId)
+          .eq("atend_conversas.is_teste", false)
+          .neq("status", "system")
+          .not("conversa_id", "is", null)
+          .ilike("body", `%${termo}%`),
+        data,
+        "atend_conversas.created_at",
+      )
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (erroMsgs) throw new Error(erroMsgs.message);
+      const novos: string[] = [];
+      for (const m of msgs ?? []) {
+        if (!m.conversa_id || achados[m.conversa_id]) continue;
+        achados[m.conversa_id] = m.body ?? "";
+        if (!ids.has(m.conversa_id)) novos.push(m.conversa_id);
+      }
+      if (novos.length) {
+        const { data: extra, error: erroExtra } = await base().in("id", novos.slice(0, 100));
+        if (erroExtra) throw new Error(erroExtra.message);
+        for (const c of extra ?? [])
+          if (!ids.has(c.id)) {
+            ids.add(c.id);
+            conversas.push(c);
+          }
+      }
+    }
+    return conversas.slice(0, 150).map((c) => ({ ...c, trecho: achados[c.id] ?? null }));
+  });
+
+/** Painel de TV do atendimento: só contagens, só administração/supervisão. */
+export const consultarPainelTv = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { carregarPainelTv } = await import("./atendimento/painel-tv.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return carregarPainelTv(context.supabase, supabaseAdmin, data.clinicaId, context.userId);
+  });
+
+/** Central de conversas: todas as situações, com paginação e a mesma autorização da pesquisa. */
+export const listarCentralConversas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        situacao: z.enum(["todas", "abertas", "encerradas"]).default("todas"),
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(100).default(50),
+      })
+      .and(periodoCentralSchema)
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertPesquisaConversas(context.supabase, context.userId, data.clinicaId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { listarPaginaCentral } = await import("@/lib/atendimento/central-conversas.server");
+    return listarPaginaCentral(supabaseAdmin, data);
   });

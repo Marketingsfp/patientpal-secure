@@ -86,9 +86,7 @@ export function montarOpcoesProfissional(params: {
   onlyMedicoId?: string | null;
 }): { opcoes: OpcaoProfissional[]; rotuloMedico: Map<string, string> } {
   const { medicos, agendasPorMedico, agendasComGrade, incluirTodos, onlyMedicoId } = params;
-  const lista = ordenarProfissionais(
-    medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId),
-  );
+  const lista = ordenarProfissionais(medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId));
   const rotuloMedico = rotulosDeMedicos(lista);
   const out: OpcaoProfissional[] = [];
   if (incluirTodos && !onlyMedicoId) {
@@ -150,9 +148,7 @@ export function rotuloProfissionalAgenda(
   if (!medicoId) return null;
   const chave = chaveNomeAgenda(agendaNome ?? "");
   if (chave) {
-    const exata = opcoes.find(
-      (o) => o.medicoId === medicoId && o.agendaFiltro === `nome:${chave}`,
-    );
+    const exata = opcoes.find((o) => o.medicoId === medicoId && o.agendaFiltro === `nome:${chave}`);
     if (exata) return exata.rotulo;
   }
   const simples = opcoes.find((o) => o.medicoId === medicoId && o.agendaFiltro === "todos");

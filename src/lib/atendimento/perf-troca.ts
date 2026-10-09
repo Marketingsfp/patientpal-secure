@@ -71,8 +71,7 @@ let seq = 0;
 /** Montagens/desmontagens acumuladas da Inbox, independentes de navegação. */
 const ciclos = { montagens: 0, desmontagens: 0 };
 
-const agora = () =>
-  typeof performance !== "undefined" ? performance.now() : Date.now();
+const agora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 export function perfLigada(): boolean {
   try {

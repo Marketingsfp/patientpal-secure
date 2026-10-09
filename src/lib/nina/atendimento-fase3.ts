@@ -11,7 +11,12 @@
  */
 import { detectarIntencoes, type IntencaoNina } from "./atendimento-fase1";
 import type { EstadoFluxoNina } from "./fluxo-estado.server";
-import { CAMPOS_CADASTRO, camposCadastroFaltantes, atendimentoDefinido, type CampoCadastro } from "./cadastro-paciente";
+import {
+  CAMPOS_CADASTRO,
+  camposCadastroFaltantes,
+  atendimentoDefinido,
+  type CampoCadastro,
+} from "./cadastro-paciente";
 
 function normalizar(texto: string): string {
   return (texto ?? "")
@@ -31,8 +36,9 @@ const PADROES_CONFIRMACAO: RegExp[] = [
 ];
 
 /** Respostas curtas de aceite a uma vaga já oferecida ("sim", "pode ser"). */
-const PADROES_ACEITE_CURTO: RegExp[] =
-  [/^(sim|isso|isso mesmo|ok|okay|claro|perfeito|pode ser|pode sim|quero|quero sim|bora|fechado|tudo bem|ta bom|esta bom|aceito|confirmo)[.! ]*$/];
+const PADROES_ACEITE_CURTO: RegExp[] = [
+  /^(sim|isso|isso mesmo|ok|okay|claro|perfeito|pode ser|pode sim|quero|quero sim|bora|fechado|tudo bem|ta bom|esta bom|aceito|confirmo)[.! ]*$/,
+];
 
 export type ResultadoIntencaoAgendar = {
   confirmado: boolean;
@@ -59,8 +65,7 @@ export function avaliarIntencaoAgendar(
 
   const confirmado = jaConfirmadoAntes || explicito || aceiteCurto;
   const interesse =
-    !confirmado &&
-    (intencoes.includes("disponibilidade") || intencoes.includes("agendamento"));
+    !confirmado && (intencoes.includes("disponibilidade") || intencoes.includes("agendamento"));
 
   return { confirmado, interesse, intencoes };
 }
@@ -120,7 +125,9 @@ export function blocoPromptFase3({ mensagem, estado }: EntradaFase3): string {
   } else {
     linhas.push("- INTENÇÃO DE AGENDAR CONFIRMADA (estado BOOKING_INTENT_CONFIRMED).");
     if (!atendimentoDefinido(estado) || !estado.appointment.confirmation) {
-      linhas.push("- Defina primeiro procedimento, profissional e a escolha de uma vaga real. Ainda NÃO colete dados cadastrais. Depois da escolha, complete o cadastro antes de apresentar o resumo final para confirmação.");
+      linhas.push(
+        "- Defina primeiro procedimento, profissional e a escolha de uma vaga real. Ainda NÃO colete dados cadastrais. Depois da escolha, complete o cadastro antes de apresentar o resumo final para confirmação.",
+      );
     } else if (estado.patient.identified && estado.patient.id) {
       linhas.push(
         `- O cadastro do paciente${estado.patient.first_name ? ` (${estado.patient.first_name})` : ""} JÁ existe e está vinculado a esta conversa. Consulte sua completude; NÃO peça dados preenchidos e NÃO crie cadastro novo.`,
@@ -132,7 +139,11 @@ export function blocoPromptFase3({ mensagem, estado }: EntradaFase3): string {
       );
     } else {
       linhas.push(
-        `- O paciente JÁ informou: ${CAMPOS_OBRIGATORIOS.filter((c) => !faltam.includes(c)).map((c) => ROTULO[c]).join(", ")}. Peça SOMENTE o que falta: ${rotulos(faltam)} (ex.: "Obrigada! Agora só preciso da sua ${ROTULO[faltam[0]!]}.").`,
+        `- O paciente JÁ informou: ${CAMPOS_OBRIGATORIOS.filter((c) => !faltam.includes(c))
+          .map((c) => ROTULO[c])
+          .join(
+            ", ",
+          )}. Peça SOMENTE o que falta: ${rotulos(faltam)} (ex.: "Obrigada! Agora só preciso da sua ${ROTULO[faltam[0]!]}.").`,
         "- NÃO recomece a coleta e NÃO repita perguntas já respondidas.",
       );
     }

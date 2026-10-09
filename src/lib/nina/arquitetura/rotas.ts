@@ -39,11 +39,7 @@ const RAIO = 10;
 /** Folga entre a borda do node e a primeira/última porta. */
 const MARGEM_PORTA = 14;
 
-function distribuirPortas(
-  quantidade: number,
-  indice: number,
-  centro: number,
-): number {
+function distribuirPortas(quantidade: number, indice: number, centro: number): number {
   if (quantidade <= 1) return centro;
   const util = Math.max(ALTURA_NODE - MARGEM_PORTA * 2, 8);
   const passo = util / (quantidade - 1);
@@ -51,12 +47,7 @@ function distribuirPortas(
 }
 
 /** Uma linha reta horizontal cruzaria algum node no caminho? */
-function cruzaNode(
-  a: Ponto,
-  b: Ponto,
-  nodes: NodePosicionado[],
-  ignorar: Set<string>,
-): boolean {
+function cruzaNode(a: Ponto, b: Ponto, nodes: NodePosicionado[], ignorar: Set<string>): boolean {
   const minX = Math.min(a.x, b.x);
   const maxX = Math.max(a.x, b.x);
   const minY = Math.min(a.y, b.y);
@@ -64,10 +55,7 @@ function cruzaNode(
   return nodes.some((n) => {
     if (ignorar.has(n.node.id)) return false;
     return (
-      n.x < maxX &&
-      n.x + LARGURA_NODE > minX &&
-      n.y < maxY + 6 &&
-      n.y + ALTURA_NODE > minY - 6
+      n.x < maxX && n.x + LARGURA_NODE > minX && n.y < maxY + 6 && n.y + ALTURA_NODE > minY - 6
     );
   });
 }
@@ -92,15 +80,11 @@ function corredorLivre(
 ): number {
   const minX = Math.min(x1, x2);
   const maxX = Math.max(x1, x2);
-  const ordenados = [...candidatos].sort(
-    (a, b) => Math.abs(a - alvo) - Math.abs(b - alvo),
-  );
+  const ordenados = [...candidatos].sort((a, b) => Math.abs(a - alvo) - Math.abs(b - alvo));
   for (const y of ordenados) {
     const bloqueado = nodes.some((n) => {
       if (ignorar.has(n.node.id)) return false;
-      return (
-        n.x < maxX && n.x + LARGURA_NODE > minX && n.y - 4 < y && n.y + ALTURA_NODE + 4 > y
-      );
+      return n.x < maxX && n.x + LARGURA_NODE > minX && n.y - 4 < y && n.y + ALTURA_NODE + 4 > y;
     });
     if (!bloqueado) return y;
   }
@@ -116,14 +100,8 @@ export function pontosParaPath(pontos: Ponto[], raio = RAIO): string {
     const anterior = pontos[i - 1]!;
     const atual = pontos[i]!;
     const proximo = pontos[i + 1]!;
-    const entrada = Math.min(
-      raio,
-      Math.hypot(atual.x - anterior.x, atual.y - anterior.y) / 2,
-    );
-    const saida = Math.min(
-      raio,
-      Math.hypot(proximo.x - atual.x, proximo.y - atual.y) / 2,
-    );
+    const entrada = Math.min(raio, Math.hypot(atual.x - anterior.x, atual.y - anterior.y) / 2);
+    const saida = Math.min(raio, Math.hypot(proximo.x - atual.x, proximo.y - atual.y) / 2);
     const ax = atual.x - Math.sign(atual.x - anterior.x) * entrada;
     const ay = atual.y - Math.sign(atual.y - anterior.y) * entrada;
     const bx = atual.x + Math.sign(proximo.x - atual.x) * saida;
@@ -140,10 +118,7 @@ function pontoMedio(pontos: Ponto[]): Ponto {
   const totais: number[] = [];
   let total = 0;
   for (let i = 1; i < pontos.length; i += 1) {
-    const seg = Math.hypot(
-      pontos[i]!.x - pontos[i - 1]!.x,
-      pontos[i]!.y - pontos[i - 1]!.y,
-    );
+    const seg = Math.hypot(pontos[i]!.x - pontos[i - 1]!.x, pontos[i]!.y - pontos[i - 1]!.y);
     total += seg;
     totais.push(total);
   }
@@ -179,9 +154,7 @@ export function calcularRotas(layout: LayoutArquitetura): RotaAresta[] {
   for (const aresta of layout.arestas) {
     if (!mapa.has(aresta.de) || !mapa.has(aresta.para)) continue;
     (saidas.get(aresta.de) ?? saidas.set(aresta.de, []).get(aresta.de)!).push(aresta);
-    (entradas.get(aresta.para) ?? entradas.set(aresta.para, []).get(aresta.para)!).push(
-      aresta,
-    );
+    (entradas.get(aresta.para) ?? entradas.set(aresta.para, []).get(aresta.para)!).push(aresta);
   }
   // Ordena as portas pela altura do outro extremo: evita linhas se cruzando
   // logo na saída/entrada do node.

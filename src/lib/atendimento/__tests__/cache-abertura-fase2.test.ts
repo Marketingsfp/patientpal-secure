@@ -34,7 +34,9 @@ describe("Fase 2 — cache de abertura da conversa", () => {
     const historico = [msg("m1", "2026-01-01"), msg("m2", "2026-01-02"), msg("m3", "2026-01-03")];
     const janelaInicial = [msg("m3", "2026-01-03")];
     const visiveis =
-      historico.length > janelaInicial.length ? mesclarNovas(historico, janelaInicial) : janelaInicial;
+      historico.length > janelaInicial.length
+        ? mesclarNovas(historico, janelaInicial)
+        : janelaInicial;
     expect(visiveis.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
   });
 

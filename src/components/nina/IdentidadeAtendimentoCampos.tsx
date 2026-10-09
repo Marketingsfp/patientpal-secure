@@ -60,9 +60,9 @@ export function IdentidadeAtendimentoCampos({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        É o nome que a assistente usa ao falar com o paciente. Não muda cadastro, documentos,
-        agenda nem endereço do estabelecimento. O que vale é o bloco {ABERTURA_IDENTIDADE} do texto
-        abaixo — publicar é o que passa a valer no atendimento.
+        É o nome que a assistente usa ao falar com o paciente. Não muda cadastro, documentos, agenda
+        nem endereço do estabelecimento. O que vale é o bloco {ABERTURA_IDENTIDADE} do texto abaixo
+        — publicar é o que passa a valer no atendimento.
       </p>
 
       {!leitura.ok ? (

@@ -120,7 +120,9 @@ describe("regras publicadas — leitura do texto da Arquitetura", () => {
   it("regra de homologação não é cobrada em produção", () => {
     const instrucoes = instrucoesV6();
     const regra = instrucoes.regras![0]!;
-    expect(regraSeAplica(regra, { mensagemPaciente: "TESTE-ARQUITETURA-9381", ambiente: "producao" })).toBe(false);
+    expect(
+      regraSeAplica(regra, { mensagemPaciente: "TESTE-ARQUITETURA-9381", ambiente: "producao" }),
+    ).toBe(false);
     expect(
       regraSeAplica(regra, { mensagemPaciente: "TESTE-ARQUITETURA-9381", ambiente: "homologacao" }),
     ).toBe(true);

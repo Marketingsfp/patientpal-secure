@@ -48,7 +48,12 @@ class Banco {
       let ativo = this.ciclos.find((c) => c.lead_id === args.p_lead_id && c.status === "ativo");
       let criado = false;
       if (!ativo) {
-        ativo = { id: `ciclo-${++this.seq}`, lead_id: args.p_lead_id, status: "ativo", conversa_id: null };
+        ativo = {
+          id: `ciclo-${++this.seq}`,
+          lead_id: args.p_lead_id,
+          status: "ativo",
+          conversa_id: null,
+        };
         this.ciclos.push(ativo);
         criado = true;
       }
@@ -57,11 +62,13 @@ class Banco {
         this.conversas.push(conversaId);
         ativo.conversa_id = conversaId;
       }
-      return { data: [{ ciclo_id: ativo.id, conversa_id: ativo.conversa_id, criado }], error: null };
+      return {
+        data: [{ ciclo_id: ativo.id, conversa_id: ativo.conversa_id, criado }],
+        error: null,
+      };
     })) as any;
 
   from() {
-    const self = this;
     const filtro: any = { lead_id: "", status: "" };
     const api: any = {
       select: () => api,
@@ -70,7 +77,7 @@ class Banco {
         return api;
       },
       maybeSingle: async () => {
-        const c = self.ciclos.find((x) => x.lead_id === filtro.lead_id && x.status === "ativo");
+        const c = this.ciclos.find((x) => x.lead_id === filtro.lead_id && x.status === "ativo");
         return { data: c ? { id: c.id, conversa_id: c.conversa_id } : null, error: null };
       },
       insert: () => api,
@@ -124,7 +131,10 @@ describe("garantirCiclo sob concorrência", () => {
     banco.ciclos.push({ id: "ciclo-v", lead_id: "lead-1", status: "ativo", conversa_id: "conv-v" });
     banco.rpc = (async () => ({
       data: null,
-      error: { message: 'duplicate key value violates unique constraint "nina_teste_ciclos_um_ativo_por_lead"' },
+      error: {
+        message:
+          'duplicate key value violates unique constraint "nina_teste_ciclos_um_ativo_por_lead"',
+      },
     })) as any;
 
     const r = await garantirCiclo(banco as any, CLINICA, lead(), null);

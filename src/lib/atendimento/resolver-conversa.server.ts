@@ -26,6 +26,8 @@ export type ResolverConversaArgs = {
   /** Resolução automática da Nina após o paciente confirmar que não precisa de mais nada. */
   automatico?: boolean;
   motivo?: string | null;
+  /** Não espera a IA reescrever o resumo (o chamador dispara depois, em separado). */
+  adiarResumo?: boolean;
 };
 
 export async function resolverConversaCore(
@@ -80,7 +82,8 @@ export async function resolverConversaCore(
     })
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId);
-  if (error) throw new Error((error as { message?: string }).message ?? "Falha ao resolver conversa");
+  if (error)
+    throw new Error((error as { message?: string }).message ?? "Falha ao resolver conversa");
 
   const { error: errEvento } = await db.from("atend_conversa_eventos").insert({
     clinica_id: args.clinicaId,
@@ -101,6 +104,7 @@ export async function resolverConversaCore(
     console.error("[resolver-conversa] evento não registrado", (errEvento as any)?.message);
 
   // Resumo vigente passa a representar o resultado FINAL do atendimento.
+  if (args.adiarResumo) return { ok: true, protocol: prot };
   try {
     const { registrarDesfechoResumo } = await import("./handoff-resumo.server");
     await registrarDesfechoResumo({

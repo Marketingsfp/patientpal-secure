@@ -282,7 +282,6 @@ export async function conversarComNina(args: {
   return { texto: texto.trim(), falou: tocouAlgo, erro };
 }
 
-
 export function pararNina() {
   abortar?.abort();
   abortar = null;

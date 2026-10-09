@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useState, type FormEvent } from "react";
@@ -46,7 +47,7 @@ interface Lemb {
 const EMPTY = {
   titulo: "",
   descricao: "",
-  data_lembrete: new Date().toISOString().slice(0, 10),
+  data_lembrete: hojeBR(),
   prioridade: "media",
 };
 

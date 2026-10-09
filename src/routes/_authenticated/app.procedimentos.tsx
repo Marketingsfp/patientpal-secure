@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { chaveNomeServicoUnico, MSG_SERVICO_JA_CADASTRADO } from "@/lib/nome-servico";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -67,6 +69,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { ExigeUnidadeEscolhida, FaixaUnidadeAtual } from "@/components/exige-unidade-escolhida";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
@@ -405,12 +408,14 @@ function ProcedimentosPage() {
   const [items, setItems] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState<string>("todos");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | Tipo>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "exames_procedimentos" | Tipo>("todos");
   const [filtroSituacao, setFiltroSituacao] = useState<"todos" | "ativos" | "inativos">("ativos");
   // Valores aplicados (só mudam ao clicar em Pesquisar)
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [grupoAplicado, setGrupoAplicado] = useState<string>("todos");
-  const [tipoAplicado, setTipoAplicado] = useState<"todos" | Tipo>("todos");
+  const [tipoAplicado, setTipoAplicado] = useState<"todos" | "exames_procedimentos" | Tipo>(
+    "todos",
+  );
   const [situacaoAplicada, setSituacaoAplicada] = useState<"todos" | "ativos" | "inativos">(
     "ativos",
   );
@@ -426,19 +431,21 @@ function ProcedimentosPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  // Confirmação de cadastro com nome duplicado
+  // Serviço ativo com o mesmo nome — bloqueia o salvamento
   const [dupConflitos, setDupConflitos] = useState<
     { id: string; nome: string; especialidades: string[]; valor: number }[]
   >([]);
-  const [pendingPayload, setPendingPayload] = useState<any | null>(null);
   const [tipos, setTipos] = useState<{ id: string; nome: string }[]>([]);
   const [openTipoPicker, setOpenTipoPicker] = useState(false);
 
   useEffect(() => {
+    if (!clinicaAtual) return;
     void (async () => {
+      // Só as categorias ativas nesta unidade.
       const { data, error } = await supabase
-        .from("tipos_servico")
+        .from("tipos_servico_da_unidade")
         .select("id,nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome");
       if (error) {
@@ -454,9 +461,12 @@ function ProcedimentosPage() {
   // Especialidades marcadas no diálogo (apenas para tipo === 'consulta')
   const [formEspIds, setFormEspIds] = useState<string[]>([]);
   const loadEspecialidades = async () => {
+    if (!clinicaAtual) return;
+    // Só as especialidades ativas nesta unidade.
     const { data, error } = await supabase
-      .from("especialidades")
+      .from("especialidades_da_unidade")
       .select("id,nome")
+      .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
     if (error) {
@@ -668,7 +678,9 @@ function ProcedimentosPage() {
     const espIdFiltro =
       grupoAplicado !== "todos" ? espIdByNome.get(norm(grupoAplicado)) : undefined;
     return items.filter((p) => {
-      if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
+      if (tipoAplicado === "exames_procedimentos") {
+        if (p.tipo !== "exame" && p.tipo !== "procedimento") return false;
+      } else if (tipoAplicado !== "todos" && p.tipo !== tipoAplicado) return false;
       if (situacaoAplicada === "ativos" && !p.ativo) return false;
       if (situacaoAplicada === "inativos" && p.ativo) return false;
       if (grupoAplicado !== "todos") {
@@ -697,8 +709,12 @@ function ProcedimentosPage() {
   ]);
 
   const ordenados = useMemo(() => {
-    if (!sort) return filtrados;
     const cmp = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    // Filtrando por categoria, a lista vem A→Z pelo nome do serviço (sem
+    // agrupar por especialidade), salvo se o usuário clicou numa coluna.
+    if (!sort && tipoAplicado !== "todos")
+      return [...filtrados].sort((a, b) => cmp(a.nome ?? "", b.nome ?? ""));
+    if (!sort) return filtrados;
     const get = (p: Procedimento): string => {
       if (sort.col === "nome") return p.nome ?? "";
       if (sort.col === "grupo") return p.grupo ?? "";
@@ -714,7 +730,7 @@ function ProcedimentosPage() {
       return sort.dir === "asc" ? r : -r;
     });
     return arr;
-  }, [filtrados, sort]);
+  }, [filtrados, sort, tipoAplicado]);
 
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
   const paginaAtual = Math.min(pagina, totalPaginas);
@@ -920,12 +936,13 @@ function ProcedimentosPage() {
         Number(form.sessoes_incluidas) >= 2 ? Number(form.sessoes_incluidas) : null,
       ciclo_dias: Number(form.ciclo_dias) >= 1 ? Number(form.ciclo_dias) : null,
     };
-    // Ao criar (não editar), verifica se já existe procedimento com o mesmo nome
-    // nesta clínica e pergunta antes de cadastrar.
-    if (!editing) {
-      const normalizado = payload.nome.trim().toUpperCase();
+    // Nome único por clínica entre os serviços ativos (o banco também recusa,
+    // via uq_procedimentos_clinica_nome_ativo). Vale ao criar, ao renomear e ao
+    // reativar; o serviço em edição não conta como conflito consigo mesmo.
+    if (payload.ativo) {
+      const chave = chaveNomeServicoUnico(payload.nome);
       const conflitos = items
-        .filter((p) => (p.nome ?? "").trim().toUpperCase() === normalizado)
+        .filter((p) => p.ativo && p.id !== editing?.id && chaveNomeServicoUnico(p.nome) === chave)
         .map((p) => {
           const espIds = vincEspMap.get(p.id);
           const espNomes = espIds
@@ -940,7 +957,6 @@ function ProcedimentosPage() {
         });
       if (conflitos.length > 0) {
         setDupConflitos(conflitos);
-        setPendingPayload(payload);
         return;
       }
     }
@@ -1056,14 +1072,14 @@ function ProcedimentosPage() {
       return;
     }
     setSeeding(true);
-    const { data: existentes } = await supabase
-      .from("procedimentos")
-      .select("nome")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("grupo", pacote.grupo);
-    const existSet = new Set((existentes ?? []).map((r: any) => String(r.nome).toLowerCase()));
+    // Compara com todos os serviços ativos da clínica (já carregados em `items`,
+    // paginados), não só os do grupo: o nome é único por clínica e um único
+    // repetido recusaria o lote inteiro.
+    const existSet = new Set(
+      items.filter((p) => p.ativo).map((p) => chaveNomeServicoUnico(p.nome)),
+    );
     const novos = pacote.itens
-      .filter((n) => !existSet.has(n.toLowerCase()))
+      .filter((n) => !existSet.has(chaveNomeServicoUnico(n)))
       .map((nome) => ({
         clinica_id: clinicaAtual.clinica_id,
         nome,
@@ -1186,6 +1202,7 @@ function ProcedimentosPage() {
     <div className="space-y-6">
       {/* ============ SERVIÇOS (unificado) ============ */}
       <div className="space-y-4 pt-4 pb-16">
+        <FaixaUnidadeAtual />
         <div className="flex flex-wrap gap-2 justify-end">
           {podeEscrever && (
             <DropdownMenu>
@@ -1233,7 +1250,7 @@ function ProcedimentosPage() {
                   preparo: p.preparo ?? "",
                   ativo: p.ativo ? "Sim" : "Não",
                 })),
-                `servicos-${new Date().toISOString().slice(0, 10)}`,
+                `servicos-${hojeBR()}`,
                 [
                   { key: "nome", label: "Nome" },
                   { key: "grupo", label: "Especialidade" },
@@ -1285,6 +1302,7 @@ function ProcedimentosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Categorias</SelectItem>
+              <SelectItem value="exames_procedimentos">Exames e procedimentos</SelectItem>
               {tipos.map((t) => (
                 <SelectItem key={t.id} value={t.nome}>
                   {tipoLabel(t.nome)}
@@ -1597,7 +1615,15 @@ function ProcedimentosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0 bg-background">
-            <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Editar serviço" : "Novo serviço"}
+              {clinicaAtual && (
+                <span className="font-normal text-muted-foreground">
+                  {" "}
+                  — {clinicaAtual.clinica.nome}
+                </span>
+              )}
+            </DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
@@ -2052,51 +2078,49 @@ function ProcedimentosPage() {
       <Dialog
         open={dupConflitos.length > 0}
         onOpenChange={(o) => {
-          if (!o) {
-            setDupConflitos([]);
-            setPendingPayload(null);
-          }
+          if (!o) setDupConflitos([]);
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nome já cadastrado</DialogTitle>
-            <DialogDescription>
-              Já existe(m) {dupConflitos.length} serviço(s) com este nome nesta clínica. Deseja
-              cadastrar mesmo assim?
-            </DialogDescription>
+            <DialogTitle>Serviço já cadastrado</DialogTitle>
+            <DialogDescription>{MSG_SERVICO_JA_CADASTRADO}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 max-h-64 overflow-auto">
-            {dupConflitos.map((d) => (
-              <div key={d.id} className="rounded-md border p-2 text-sm">
-                <div className="font-medium">{d.nome}</div>
-                <div className="text-muted-foreground">
-                  Especialidade: {d.especialidades.length > 0 ? d.especialidades.join(", ") : "—"}
+            {dupConflitos.map((d) => {
+              const existente = items.find((p) => p.id === d.id);
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">{d.nome}</div>
+                    <div className="text-muted-foreground">
+                      Especialidade:{" "}
+                      {d.especialidades.length > 0 ? d.especialidades.join(", ") : "—"}
+                    </div>
+                    <div className="text-muted-foreground">Valor: {fmtBRL(d.valor)}</div>
+                  </div>
+                  {existente && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setDupConflitos([]);
+                        openEdit(existente);
+                      }}
+                    >
+                      Abrir este cadastro
+                    </Button>
+                  )}
                 </div>
-                <div className="text-muted-foreground">Valor: {fmtBRL(d.valor)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDupConflitos([]);
-                setPendingPayload(null);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={async () => {
-                const p = pendingPayload;
-                setDupConflitos([]);
-                setPendingPayload(null);
-                if (p) await executarSalvar(p);
-              }}
-              disabled={saving}
-            >
-              {saving ? "Salvando…" : "Cadastrar mesmo assim"}
+            <Button variant="outline" onClick={() => setDupConflitos([])}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2109,7 +2133,9 @@ function ProcedimentosPageWithTabs() {
   return (
     <>
       <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
-      <ProcedimentosPage />
+      <ExigeUnidadeEscolhida oQue="editar serviços">
+        <ProcedimentosPage />
+      </ExigeUnidadeEscolhida>
     </>
   );
 }

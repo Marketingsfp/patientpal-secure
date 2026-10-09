@@ -97,7 +97,12 @@ describe("matriz escopo × visualização", () => {
       estado: { base: "minhas", visualizacao: "recentes" },
       escopo: "minhas",
       atendente: null,
-      plano: { somenteResolvidas: false, exigeEsperaPaciente: false, ordenarPor: "inbox_entrada_em" },
+      plano: {
+        somenteResolvidas: false,
+        exigeEsperaPaciente: false,
+        ordenarPor: "inbox_entrada_em",
+        ascendente: true,
+      },
     },
     {
       nome: "2 minhas + resolvidas",
@@ -118,7 +123,7 @@ describe("matriz escopo × visualização", () => {
       estado: { base: "equipe", atendenteId: "jean", visualizacao: "recentes", gestor: true },
       escopo: "equipe",
       atendente: "jean",
-      plano: { somenteResolvidas: false, ordenarPor: "inbox_entrada_em" },
+      plano: { somenteResolvidas: false, ordenarPor: "inbox_entrada_em", ascendente: true },
     },
     {
       nome: "5 atendente + resolvidas",
@@ -139,7 +144,7 @@ describe("matriz escopo × visualização", () => {
       estado: { base: "equipe", visualizacao: "recentes", gestor: true },
       escopo: "equipe",
       atendente: null,
-      plano: { ordenarPor: "inbox_entrada_em", ascendente: false },
+      plano: { ordenarPor: "inbox_entrada_em", ascendente: true },
     },
     {
       nome: "8 todas + resolvidas",
@@ -169,7 +174,12 @@ describe("matriz escopo × visualização", () => {
   }
 
   it("sem supervisão o atendente escolhido não entra na consulta", () => {
-    const e = base({ base: "equipe", atendenteId: "jean", visualizacao: "recentes", gestor: false });
+    const e = base({
+      base: "equipe",
+      atendenteId: "jean",
+      visualizacao: "recentes",
+      gestor: false,
+    });
     expect(atendenteConsulta(e)).toBeNull();
   });
 

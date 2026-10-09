@@ -6,8 +6,8 @@
  * A conta vive em `@/lib/caixa/resumo-operadoras`; aqui se carrega e desenha.
  * É uma leitura à parte: se falhar, o resto da tela segue igual.
  */
-import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, HandCoins, Scale, Wallet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Banknote, ChevronDown, ChevronUp, HandCoins, Scale, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,13 +29,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { brl } from "@/lib/financeiro/format";
-import { dataClinicaDe, formatDatePura } from "@/lib/date-utils";
+import { dataClinicaDe, formatDatePura, formatDateTime } from "@/lib/date-utils";
 import {
+  especiePreSangria,
   resumoOperadoras,
   type LinhaOperadora,
   type MovOperadora,
   type PorForma,
   type ResumoOperadoras,
+  type ResumoPreSangria,
   type SessaoOperadora,
 } from "@/lib/caixa/resumo-operadoras";
 
@@ -60,7 +62,7 @@ async function carregar(
   de: string,
   ate: string,
   usuario: string,
-): Promise<ResumoOperadoras> {
+): Promise<{ resumo: ResumoOperadoras; preSangria: ResumoPreSangria }> {
   let q = supabase
     .from("caixa_sessoes")
     .select(
@@ -85,7 +87,7 @@ async function carregar(
     for (let off = 0; ; off += PAGINA) {
       const { data, error: errMv } = await supabase
         .from("caixa_movimentos")
-        .select("id, sessao_id, tipo, valor, forma_pagamento")
+        .select("id, sessao_id, tipo, valor, forma_pagamento, created_at")
         .in("sessao_id", ids)
         .in("tipo", ["recebimento", "estorno", "sangria", "suprimento", "despesa"])
         .order("id")
@@ -96,7 +98,10 @@ async function carregar(
       if (rows.length < PAGINA) break;
     }
   }
-  return resumoOperadoras(sessoes, movs);
+  return {
+    resumo: resumoOperadoras(sessoes, movs),
+    preSangria: especiePreSangria(sessoes, movs),
+  };
 }
 
 function corDiferenca(v: number | null) {
@@ -212,35 +217,113 @@ function DetalheOperadora({
   );
 }
 
+/** Janela do card "Total em espécie (pré-sangria)": quanto falta recolher de cada gaveta. */
+function DetalhePreSangria({
+  dados,
+  aberto,
+  onClose,
+}: {
+  dados: ResumoPreSangria | null;
+  aberto: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={aberto} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Total em espécie (pré-sangria)</DialogTitle>
+          <DialogDescription>
+            Dinheiro que cada atendente recebeu e que ainda não saiu da gaveta por sangria — inclui
+            o resto que a última sangria deixou. Já descontados os estornos e as despesas pagas em
+            dinheiro; não inclui o troco de abertura. Só entram caixas abertos: o de caixa fechado
+            já foi entregue no fechamento.
+          </DialogDescription>
+        </DialogHeader>
+        {dados && dados.linhas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum caixa aberto no período.</p>
+        ) : (
+          <Table containerClassName="rounded-lg border">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Atendente</TableHead>
+                <TableHead>Última sangria</TableHead>
+                <TableHead className="text-right">Em espécie</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dados?.linhas.map((l) => (
+                <TableRow key={l.userId}>
+                  <TableCell className="whitespace-nowrap">{l.nome}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {l.ultimaSangria ? formatDateTime(l.ultimaSangria) : "Nenhuma ainda"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">
+                    {brl(l.especie)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="font-semibold">
+                <TableCell colSpan={2}>Total geral</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {dados ? brl(dados.total) : "…"}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function CaixasOperadoras({
   clinicaId,
   de,
   ate,
   usuario,
+  recarga = 0,
 }: {
   clinicaId: string | undefined;
   de: string;
   ate: string;
   /** Filtro "Usuário" da tela: "todos", "sem" ou um user_id. */
   usuario: string;
+  /** Muda a cada "atualizar" da tela (manual ou automático) para reler sem trocar filtro. */
+  recarga?: number;
 }) {
   const [resumo, setResumo] = useState<ResumoOperadoras | null>(null);
+  const [preSangria, setPreSangria] = useState<ResumoPreSangria | null>(null);
   const [erro, setErro] = useState(false);
   const [aberto, setAberto] = useState(true);
   const [detalhe, setDetalhe] = useState<LinhaOperadora | null>(null);
+  const [verPreSangria, setVerPreSangria] = useState(false);
+  const chaveAnterior = useRef("");
 
   useEffect(() => {
     if (!clinicaId) return;
     let cancelado = false;
-    setResumo(null);
+    // Troca de filtro zera os números; a releitura do "atualizar" mantém os
+    // atuais na tela até chegar a nova, para os cards não piscarem "…".
+    const chave = [clinicaId, de, ate, usuario].join("|");
+    if (chave !== chaveAnterior.current) {
+      chaveAnterior.current = chave;
+      setResumo(null);
+      setPreSangria(null);
+    }
     setErro(false);
     carregar(clinicaId, de, ate, usuario)
-      .then((r) => !cancelado && setResumo(r))
+      .then((r) => {
+        if (cancelado) return;
+        setResumo(r.resumo);
+        setPreSangria(r.preSangria);
+      })
       .catch(() => !cancelado && setErro(true));
     return () => {
       cancelado = true;
     };
-  }, [clinicaId, de, ate, usuario]);
+  }, [clinicaId, de, ate, usuario, recarga]);
 
   if (erro) return null;
   const t = resumo?.total;
@@ -298,7 +381,26 @@ export function CaixasOperadoras({
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {/* Quanto falta recolher de cada gaveta: dinheiro recebido que ainda
+              não saiu em sangria, só de caixa aberto. Clique abre por atendente. */}
+          <button
+            type="button"
+            onClick={() => setVerPreSangria(true)}
+            title="Clique para ver por atendente"
+            className="rounded-lg border bg-card p-3 space-y-1 min-w-0 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <p className="flex items-center gap-1.5 text-[12px] uppercase tracking-wide text-muted-foreground">
+              <Banknote className="h-3.5 w-3.5 shrink-0" /> Total em espécie (pré-sangria)
+            </p>
+            <p className="text-lg font-bold tabular-nums text-sky-700 dark:text-sky-400">
+              {preSangria ? brl(preSangria.total) : "…"}
+            </p>
+            <p className="text-[12px] text-muted-foreground">
+              Dinheiro recebido que ainda não saiu em sangria, nas gavetas abertas · clique para ver
+              por atendente
+            </p>
+          </button>
           {cards.map((c) => (
             <div key={c.label} className="rounded-lg border bg-card p-3 space-y-1 min-w-0">
               <p className="flex items-center gap-1.5 text-[12px] uppercase tracking-wide text-muted-foreground">
@@ -383,6 +485,11 @@ export function CaixasOperadoras({
           </Table>
         )}
         <DetalheOperadora linha={detalhe} onClose={() => setDetalhe(null)} />
+        <DetalhePreSangria
+          dados={preSangria}
+          aberto={verPreSangria}
+          onClose={() => setVerPreSangria(false)}
+        />
       </CardContent>
     </Card>
   );

@@ -1,4 +1,5 @@
 import { registrosSemMotor } from "./fluxo-direto";
+import { NINA_SOURCE_FINGERPRINT } from "./runtime-version";
 /** Leitura autenticada pelo chamador. Nenhum registro de auditoria é reescrito. */
 import {
   montarLeituraDetalhesMensagem,
@@ -101,19 +102,30 @@ export async function carregarDetalhesMensagem(
     (r.conversa_id ?? r.conversation_id) === conversaId;
   const vinculos = vinculosBrutos.filter(mesmaConversa);
   const avisos = mensagem
-    ? avisosOficiaisDaMensagem(mensagem, avisosBrutos, alvo.clinicaId) as RegistroDetalhes[]
+    ? (avisosOficiaisDaMensagem(mensagem, avisosBrutos, alvo.clinicaId) as RegistroDetalhes[])
     : [];
   if (mensagem && !mensagemNinaInspecionavel(mensagem, avisos, alvo.clinicaId))
-    throw new Error("Selecione uma mensagem de saída da Nina ou um aviso oficialmente vinculado a ela.");
+    throw new Error(
+      "Selecione uma mensagem de saída da Nina ou um aviso oficialmente vinculado a ela.",
+    );
   if (vinculos.length !== vinculosBrutos.length || avisos.length !== avisosBrutos.length)
     alertas.push("Vínculos de outra conversa foram desconsiderados.");
   let execucaoId = s(mensagem?.execucao_id);
-  const idsDiretos = [...new Set([execucaoId, ...avisos.map((a) => s(a.execucao_id)),
-    ...vinculos.map((v) => s(v.execucao_id))].filter((id): id is string => id != null))];
+  const idsDiretos = [
+    ...new Set(
+      [
+        execucaoId,
+        ...avisos.map((a) => s(a.execucao_id)),
+        ...vinculos.map((v) => s(v.execucao_id)),
+      ].filter((id): id is string => id != null),
+    ),
+  ];
   const execucaoConflitante = idsDiretos.length > 1;
   if (execucaoConflitante) {
     execucaoId = null;
-    alertas.push("Os vínculos oficiais apontam para execuções diferentes; nenhuma foi escolhida automaticamente.");
+    alertas.push(
+      "Os vínculos oficiais apontam para execuções diferentes; nenhuma foi escolhida automaticamente.",
+    );
   }
   if (!execucaoId && mensagem && !execucaoConflitante) {
     const vinculadas = [
@@ -241,19 +253,71 @@ export async function carregarDetalhesMensagem(
     vistos.add(id);
     return true;
   });
-  const entradasIds = Array.isArray(execucao?.mensagens_entrada)
-    ? execucao.mensagens_entrada.filter((v): v is string => typeof v === "string")
-    : [];
+  // Também existe turno sem execução do modelo (ex.: encaminhamento pelo Jev).
+  const entradasIds = [
+    ...new Set([
+      ...(Array.isArray(execucao?.mensagens_entrada)
+        ? execucao.mensagens_entrada.filter((v): v is string => typeof v === "string")
+        : []),
+      ...eventos
+        .filter((e) => e.node_id === "message.inbound")
+        .map((e) => s(e.message_id))
+        .filter((v): v is string => v != null),
+      ...eventos
+        .filter((e) => e.node_id === "turn.summary")
+        .flatMap((e) => {
+          const ids = objetoDetalhes(e.metadata).mensagens_entrada_ids;
+          return Array.isArray(ids) ? ids.filter((v): v is string => typeof v === "string") : [];
+        }),
+    ]),
+  ];
   const entradasBrutas = entradasIds.length
     ? await ler(
-        db.from("whatsapp_mensagens")
-          .select("id, clinica_id, conversa_id, execucao_id, direction, body, transcricao, created_at")
-          .eq("clinica_id", alvo.clinicaId).in("id", entradasIds).eq("direction", "in")
+        db
+          .from("whatsapp_mensagens")
+          .select(
+            "id, clinica_id, conversa_id, execucao_id, direction, body, tipo, transcricao, raw, created_at",
+          )
+          .eq("clinica_id", alvo.clinicaId)
+          .in("id", entradasIds)
+          .eq("direction", "in")
           .order("created_at", { ascending: true }),
         "as mensagens de entrada vinculadas",
       )
     : [];
   const entradas = entradasBrutas.filter(mesmaConversa);
+  // Legado: só associa Jev por IDs físicos da entrada, nunca pelo horário ou texto semelhante.
+  const decisoesJevBrutas =
+    conversaId && !eventos.some((e) => e.node_id === "jev.decision")
+      ? (
+          await Promise.all(
+            entradas.map((entrada) =>
+              ler(
+                db
+                  .from("nina_jev_decisoes" as never)
+                  .select(
+                    "id, clinica_id, conversation_id, fase, aplicada, respostas, perguntas, erro, latency_ms, created_at",
+                  )
+                  .eq("clinica_id", alvo.clinicaId)
+                  .eq("conversation_id", conversaId)
+                  .contains("perguntas", {
+                    _texto_analisado: { mensagens_entrada: [String(entrada.id)] },
+                  })
+                  .order("created_at", { ascending: true })
+                  .limit(101),
+                "as decisões do Jev vinculadas à entrada",
+              ),
+            ),
+          )
+        ).flat()
+      : [];
+  const decisoesJev = [
+    ...new Map(decisoesJevBrutas.filter(mesmaConversa).map((d) => [d.id, d])).values(),
+  ];
+  if (decisoesJev.length >= 101)
+    alertas.push(
+      "A leitura das decisões antigas do Jev atingiu o limite; o histórico pode estar incompleto.",
+    );
   const decisoes: RegistroDetalhes[] = [];
   const etapasBrutas = Array.isArray(evidencias[0]?.etapas)
     ? evidencias[0].etapas.map(objetoDetalhes)
@@ -268,6 +332,8 @@ export async function carregarDetalhesMensagem(
     etapas,
     eventos,
     decisoes,
+    decisoesJev,
+    fingerprintServidor: NINA_SOURCE_FINGERPRINT,
     vinculos,
     avisos,
     alertas,
@@ -278,6 +344,12 @@ export async function carregarDetalhesMensagem(
     traceId,
     eventos,
     leitura,
-    registrosComplementares: { mensagem, avisos, vinculos: registrosSemMotor(vinculos), eventosAuxiliares: registrosSemMotor(eventosAuxiliares) },
+    registrosComplementares: {
+      mensagem,
+      avisos,
+      decisoesJev,
+      vinculos: registrosSemMotor(vinculos),
+      eventosAuxiliares: registrosSemMotor(eventosAuxiliares),
+    },
   };
 }

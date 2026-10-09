@@ -28,10 +28,7 @@ export async function incrementarRevisaoConversa(input: {
   }
 }
 
-export async function revisaoAtualConversa(
-  clinicaId: string,
-  telefone: string,
-): Promise<number> {
+export async function revisaoAtualConversa(clinicaId: string, telefone: string): Promise<number> {
   if (!telefone) return 0;
   try {
     const { data, error } = await supabaseAdmin.rpc("nina_revisao_atual", {

@@ -1,3 +1,7 @@
+import {
+  motivoParaAtendimento,
+  MOTIVO_TRANSFERENCIA_AUSENTE,
+} from "@/lib/atendimento/texto-interno-apresentacao";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -88,17 +92,13 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
       <CardHeader className="py-2 flex-row items-center gap-2 space-y-0">
         <Inbox className="h-4 w-4 text-atd-danger" />
         <CardTitle className="text-base text-atd-danger-ink">🔴 Não atribuídas</CardTitle>
-        <Badge className="ml-1 bg-atd-danger text-atd-on-strong">
-          {rows.length}
-        </Badge>
+        <Badge className="ml-1 bg-atd-danger text-atd-on-strong">{rows.length}</Badge>
         <Button size="sm" variant="ghost" className="ml-auto" onClick={carregar} disabled={loading}>
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </CardHeader>
       <CardContent className="pt-0">
-        {(
-
-
+        {
           <div className="space-y-2">
             {rows.map((c) => {
               const urgente = (c.prioridade ?? 0) >= 2;
@@ -133,11 +133,10 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
                         {c.contato_telefone}
                       </p>
                     )}
-                    {c.handoff_motivo && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <span className="font-medium">Motivo:</span> {c.handoff_motivo}
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <span className="font-medium">Motivo:</span>{" "}
+                      {motivoParaAtendimento(c.handoff_motivo) ?? MOTIVO_TRANSFERENCIA_AUSENTE}
+                    </p>
                     {c.handoff_resumo?.resumo && (
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                         <span className="font-medium">Resumo da Nina:</span>{" "}
@@ -149,7 +148,7 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
               );
             })}
           </div>
-        )}
+        }
       </CardContent>
     </Card>
   );

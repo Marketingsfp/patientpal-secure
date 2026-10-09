@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { encaminhamentoSemVagas, respostaSemVagas } from "../agenda-sem-vagas";
+import {
+  encaminhamentoSemVagas,
+  respostaSemVagas,
+  RESPOSTA_VAGA_OCUPADA,
+} from "../agenda-sem-vagas";
 import { validarResultado } from "../tool-broker";
 
 describe("encaminhamento após consulta de agenda sem vagas", () => {
@@ -69,13 +73,18 @@ describe("encaminhamento após consulta de agenda sem vagas", () => {
     expect(respostaSemVagas(false)).not.toContain("Encaminhei");
   });
   for (const nome of ["selecionar_horario", "agendar"]) {
-    test(`${nome}: vaga escolhida perdida encaminha mesmo existindo outras opções`, () => {
-      const pedido = encaminhamentoSemVagas(validarResultado(nome, {
-        ok: false, erro: "SLOT_UNAVAILABLE", alternativas: [{ hora: "08:00" }],
-      }), {});
-      expect(pedido?.motivo).toContain("VAGA_ESCOLHIDA_INDISPONIVEL");
-      expect(respostaSemVagas(true, true)).toContain("Não fiz nenhuma reserva alternativa");
-      expect(respostaSemVagas(false, true)).not.toContain("Encaminhei");
+    test(`${nome}: vaga escolhida ocupada não transfere e não reserva alternativa`, () => {
+      const pedido = encaminhamentoSemVagas(
+        validarResultado(nome, {
+          ok: false,
+          erro: "SLOT_UNAVAILABLE",
+          alternativas: [{ hora: "08:00" }],
+        }),
+        {},
+      );
+      expect(pedido).toBeNull();
+      expect(RESPOSTA_VAGA_OCUPADA).toContain("não fiz nenhuma reserva");
+      expect(RESPOSTA_VAGA_OCUPADA).toContain("outras opções");
     });
   }
 });

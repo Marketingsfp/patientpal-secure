@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +9,7 @@ import {
   Trash2,
   Search,
   AlertTriangle,
-  Calendar,
+  CalendarPlus,
   Columns2,
   CheckCircle2,
   CircleDashed,
@@ -19,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { filtrosOrNomeServico } from "@/lib/busca-servico";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -53,6 +55,7 @@ import { VirtualList } from "@/components/list-shell";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { ReactNode } from "react";
+import { primeiroValorValido } from "@/lib/convenio/info-convenio-paciente";
 
 const ICON_BTN =
   "p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center";
@@ -61,16 +64,23 @@ function IconAction({
   label,
   onClick,
   children,
+  className,
 }: {
   label: string;
   onClick: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button type="button" aria-label={label} onClick={onClick} className={ICON_BTN}>
+          <button
+            type="button"
+            aria-label={label}
+            onClick={onClick}
+            className={className ?? ICON_BTN}
+          >
             {children}
           </button>
         </TooltipTrigger>
@@ -285,6 +295,32 @@ type Item = {
   valores_formas?: Record<string, number> | null;
 };
 
+/**
+ * Valores por forma agrupados para a tela: Dinheiro e, quando PIX, Crédito e
+ * Débito custam o mesmo, uma linha só "PIX / Cartão". Formas extras marcadas
+ * (Boleto, Outro) entram no fim.
+ */
+function gruposPorForma(
+  valores: Record<string, number>,
+  extras: string[],
+): { rotulo: string; valor: number }[] {
+  const cartao = ["PIX", "Cartão de Crédito", "Cartão de Débito"];
+  const out: { rotulo: string; valor: number }[] = [
+    { rotulo: "Dinheiro", valor: Number(valores["Dinheiro"] ?? 0) },
+  ];
+  const vCartao = cartao.map((f) => Number(valores[f] ?? 0));
+  if (vCartao.every((v) => v === vCartao[0])) {
+    out.push({ rotulo: "PIX / Cartão", valor: vCartao[0] });
+  } else {
+    cartao.forEach((f, i) => out.push({ rotulo: f.replace("Cartão de ", ""), valor: vCartao[i] }));
+  }
+  for (const f of extras) {
+    if (f !== "Dinheiro" && !cartao.includes(f) && valores[f] != null)
+      out.push({ rotulo: f, valor: Number(valores[f]) });
+  }
+  return out;
+}
+
 type MedicoOpt = {
   id: string;
   nome: string;
@@ -394,7 +430,7 @@ function OrcamentosCompactList({
                       </IconAction>
                     )}
                     <Button size="sm" className="h-8 gap-1.5" onClick={() => onAgendar(o)}>
-                      <Calendar className="h-3.5 w-3.5" /> Agendar
+                      <CalendarPlus className="h-3.5 w-3.5" /> Agendar
                     </Button>
                   </div>
                 </div>
@@ -425,7 +461,7 @@ function OrcamentosPage() {
   const [periodo, setPeriodo] = useState<
     "hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos"
   >("todos");
-  const hojeIso = new Date().toISOString().slice(0, 10);
+  const hojeIso = hojeBR();
   const [dataIni, setDataIni] = useState<string>(hojeIso);
   const [dataFim, setDataFim] = useState<string>(hojeIso);
   // Modo compacto: usado quando a tela roda embutida no split
@@ -608,7 +644,7 @@ function OrcamentosPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `orcamentos-${filtroRealizacao}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `orcamentos-${filtroRealizacao}-${hojeBR()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -898,10 +934,19 @@ function OrcamentosPage() {
                         {BRL(Number(o.valor_total))}
                         {o.valores_pagamento && Object.keys(o.valores_pagamento).length > 1 && (
                           <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
-                            {Object.entries(o.valores_pagamento).map(([f, v]) => (
-                              <div key={f}>
-                                <span className="uppercase">{f.replace("Cartão de ", "")}:</span>{" "}
-                                {BRL(Number(v))}
+                            {/* Orçamento novo grava as 4 formas: agrupa PIX/Cartão. */}
+                            {(FORMAS_LAB.every((f) => o.valores_pagamento?.[f] != null)
+                              ? gruposPorForma(
+                                  o.valores_pagamento,
+                                  Object.keys(o.valores_pagamento),
+                                )
+                              : Object.entries(o.valores_pagamento).map(([f, v]) => ({
+                                  rotulo: f.replace("Cartão de ", ""),
+                                  valor: Number(v),
+                                }))
+                            ).map((g) => (
+                              <div key={g.rotulo}>
+                                <span className="uppercase">{g.rotulo}:</span> {BRL(g.valor)}
                               </div>
                             ))}
                           </div>
@@ -909,11 +954,15 @@ function OrcamentosPage() {
                       </td>
                       <td className="px-3">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Atalho principal da recepção: abre a agenda com a
+                              ficha já preenchida (paciente + serviços). Botão
+                              cheio para se destacar dos ícones secundários. */}
                           <IconAction
-                            label="Agendar este orçamento"
+                            label="Agendar / pagar este orçamento (abre a ficha já preenchida)"
                             onClick={() => enviarParaAgenda(o)}
+                            className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-colors inline-flex items-center justify-center"
                           >
-                            <Calendar className="h-4 w-4 text-emerald-600" />
+                            <CalendarPlus className="h-4 w-4" />
                           </IconAction>
                           {podeEscrever && (
                             <IconAction
@@ -1033,6 +1082,7 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+  const [naOutraCategoria, setNaOutraCategoria] = useState(false);
   // Categoria Laboratório é identificada diretamente em `procedimentos`
   // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
   // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
@@ -1098,17 +1148,12 @@ function NovoOrcamentoDialog({
     let cancel = false;
     if (procQuery.trim().length < 2) {
       setProcResults([]);
+      setNaOutraCategoria(false);
       return;
     }
     setSearchingProc(true);
-    const t = setTimeout(async () => {
-      const norm = procQuery
-        .trim()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
-      const safeQ = sanitizePostgrestSearch(procQuery);
-      const safeNorm = sanitizePostgrestSearch(norm);
+    setNaOutraCategoria(false);
+    const buscar = (cat: typeof categoria) => {
       let q = supabase
         .from("procedimentos")
         .select(
@@ -1116,20 +1161,33 @@ function NovoOrcamentoDialog({
         )
         .eq("clinica_id", clinicaId)
         .eq("ativo", true);
-      if (safeQ.length > 0 || safeNorm.length > 0) {
-        const parts: string[] = [];
-        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
-        if (safeNorm.length > 0 && safeNorm !== safeQ) parts.push(`nome.ilike.%${safeNorm}%`);
-        q = q.or(parts.join(","));
-      }
-      if (categoria === "laboratorio") {
+      // Palavra por palavra, com as abreviações do cadastro (RM, USG, TC…).
+      for (const filtro of filtrosOrNomeServico(procQuery)) q = q.or(filtro);
+      if (cat === "laboratorio") {
         q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
-      } else if (categoria === "demais") {
-        q = q.not("tipo_procedimento", "eq", "laboratorio").not("grupo", "ilike", "%labor%");
+      } else if (cat === "demais") {
+        // Tipo/grupo em branco é "demais": `not eq` sozinho descarta o NULL e
+        // escondia Ecocardiograma, Doppler de Carótidas, RM de Joelho…
+        q = q
+          .or("tipo_procedimento.is.null,tipo_procedimento.neq.laboratorio")
+          .or("grupo.is.null,grupo.not.ilike.%labor%");
       }
-      const { data } = await q.limit(20);
+      return q;
+    };
+    const t = setTimeout(async () => {
+      const { data } = await buscar(categoria).order("nome").limit(20);
+      // Nada na categoria escolhida: confere a outra para avisar a recepção
+      // (ex.: "RM de Joelho" digitado num orçamento de Laboratório).
+      let outra = false;
+      if (categoria && (data ?? []).length === 0) {
+        const { data: d2 } = await buscar(
+          categoria === "laboratorio" ? "demais" : "laboratorio",
+        ).limit(1);
+        outra = (d2 ?? []).length > 0;
+      }
       if (!cancel) {
         setProcResults((data ?? []) as Procedimento[]);
+        setNaOutraCategoria(outra);
         setSearchingProc(false);
       }
     }, 250);
@@ -1139,17 +1197,36 @@ function NovoOrcamentoDialog({
     };
   }, [procQuery, clinicaId, categoria]);
 
+  // Preço do serviço em cada forma. Pula coluna zerada (mesma regra da
+  // cobrança na Agenda): antes o `??` aceitava 0 e o item entrava sem valor.
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro")
-      return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
-    if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
+      return primeiroValorValido(p.valor_dinheiro, p.valor_dinheiro_pix, p.valor_padrao);
+    if (f === "PIX")
+      return primeiroValorValido(
+        p.valor_pix,
+        p.valor_cartao_credito,
+        p.valor_cartao,
+        p.valor_dinheiro_pix,
+        p.valor_padrao,
+      );
     if (f === "Cartão de Crédito")
-      return Number(p.valor_cartao_credito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
+      return primeiroValorValido(p.valor_cartao_credito, p.valor_cartao, p.valor_padrao);
     if (f === "Cartão de Débito")
-      return Number(p.valor_cartao_debito ?? p.valor_cartao ?? p.valor_padrao ?? 0);
-    return Number(p.valor_padrao ?? p.valor_dinheiro_pix ?? 0);
+      return primeiroValorValido(p.valor_cartao_debito, p.valor_cartao, p.valor_padrao);
+    return primeiroValorValido(p.valor_padrao, p.valor_dinheiro_pix);
   };
-  const valorDoProc = (p: Procedimento) => valorPorForma(p, formasPagamento[0] ?? "Dinheiro");
+  // Forma que define o "Valor unit." e o Total do orçamento: a primeira
+  // marcada (no valor único do Laboratório, o preço é igual em todas).
+  const formaPrincipal = pagamentoUnico ? "Dinheiro" : (formasPagamento[0] ?? "Dinheiro");
+  const valorDoProc = (p: Procedimento) => valorPorForma(p, formaPrincipal);
+  // O item guarda o preço das 4 formas, mesmo as não marcadas: a Agenda cobra
+  // pela forma escolhida no caixa e o cupom imprime Dinheiro × PIX/Cartão.
+  const valoresTodasFormas = (p: Procedimento) => {
+    const out: Record<string, number> = {};
+    for (const f of new Set([...FORMAS_LAB, ...formasPagamento])) out[f] = valorPorForma(p, f);
+    return out;
+  };
   const abreviar = (f: string) =>
     f === "Cartão de Crédito" ? "Crédito" : f === "Cartão de Débito" ? "Débito" : f;
 
@@ -1210,6 +1287,34 @@ function NovoOrcamentoDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formasPagamento.join("|"), itens.length]);
 
+  // Trocou a forma de pagamento: o "Valor unit." de cada item (e o Total)
+  // passa na hora para o preço da nova forma principal. Valor digitado à mão
+  // fica gravado em `valores_formas` da forma em que foi digitado.
+  // Valor digitado no "Valor unit.": vale para a forma principal, para as
+  // formas sem preço na tabela (serviço de valor variável) e, no valor único
+  // do Laboratório, para todas — senão o caixa cobraria outro valor.
+  const precosComValorDigitado = (atual: Record<string, number>, v: number) => {
+    const out = { ...atual };
+    for (const f of Object.keys(out)) {
+      if (pagamentoUnico || f === formaPrincipal || !(Number(out[f]) > 0)) out[f] = v;
+    }
+    out[formaPrincipal] = v;
+    return out;
+  };
+  const assinaturaPrecos = itens.map((i) => i.valores_formas?.[formaPrincipal] ?? "").join("|");
+  useEffect(() => {
+    setItens((arr) => {
+      let mudou = false;
+      const next = arr.map((it) => {
+        const v = it.valores_formas?.[formaPrincipal];
+        if (v == null || Number(v) === Number(it.valor_unitario)) return it;
+        mudou = true;
+        return { ...it, valor_unitario: Number(v) };
+      });
+      return mudou ? next : arr;
+    });
+  }, [formaPrincipal, assinaturaPrecos]);
+
   const adicionarProc = (p: Procedimento) => {
     if (itens.some((it) => it.procedimento_id === p.id)) {
       toast.warning(`${p.nome} já foi adicionado ao orçamento`);
@@ -1217,9 +1322,7 @@ function NovoOrcamentoDialog({
       setProcResults([]);
       return;
     }
-    const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
-    const valores: Record<string, number> = {};
-    for (const f of formas) valores[f] = valorPorForma(p, f);
+    const valores = valoresTodasFormas(p);
     setItens((arr) => [
       ...arr,
       {
@@ -1290,10 +1393,13 @@ function NovoOrcamentoDialog({
 
   // Total por forma de pagamento: cada forma é uma alternativa de pagamento integral.
   // Ex.: "Se pagar tudo em Dinheiro = R$ X; se pagar tudo no Cartão = R$ Y".
+  // Calculado para as 4 formas básicas além das marcadas: a Agenda cobra pela
+  // forma escolhida no caixa, que pode não ser a marcada aqui.
+  const formasTotais = Array.from(new Set([...FORMAS_LAB, ...formasPagamento]));
   const totaisPorForma = (() => {
     const out: Record<string, number> = {};
     const desc = Number(desconto) || 0;
-    for (const f of formasPagamento) {
+    for (const f of formasTotais) {
       const sub = itens.reduce((s, i) => {
         const v = Number(i.valores_formas?.[f] ?? i.valor_unitario ?? 0);
         return s + Number(i.quantidade || 0) * v;
@@ -1302,6 +1408,8 @@ function NovoOrcamentoDialog({
     }
     return out;
   })();
+  // Há diferença de preço entre Dinheiro e PIX/Cartão em algum item?
+  const precoVariaPorForma = new Set(FORMAS_LAB.map((f) => totaisPorForma[f])).size > 1;
 
   const salvar = async () => {
     if (!categoria) return toast.error("Selecione o tipo do orçamento");
@@ -1337,8 +1445,13 @@ function NovoOrcamentoDialog({
     if ((observacoes ?? "").length > 1000) {
       return toast.error("Observações não podem exceder 1000 caracteres");
     }
-    const valoresPag: Record<string, number> | null =
-      !pagamentoUnico && formasPagamento.length > 1 ? { ...totaisPorForma } : null;
+    // Com preço diferente por forma, grava o total de TODAS as formas (a Agenda
+    // cobra pela escolhida no caixa). Sem diferença, só quando há 2 marcadas.
+    const valoresPag: Record<string, number> | null = precoVariaPorForma
+      ? { ...totaisPorForma }
+      : !pagamentoUnico && formasPagamento.length > 1
+        ? Object.fromEntries(formasPagamento.map((f) => [f, totaisPorForma[f] ?? 0]))
+        : null;
     setSaving(true);
 
     const { data: orc, error } = await supabase
@@ -1667,6 +1780,25 @@ function NovoOrcamentoDialog({
                   {searchingProc && (
                     <div className="text-xs text-muted-foreground mt-1">Buscando…</div>
                   )}
+                  {!searchingProc && naOutraCategoria && procResults.length === 0 && (
+                    <div className="mt-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span>
+                        Este serviço não é de{" "}
+                        {categoria === "laboratorio" ? "Laboratório" : "Demais Serviços"}: ele está
+                        em <b>{categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"}</b>.
+                      </span>
+                      <button
+                        type="button"
+                        className="font-semibold text-primary underline"
+                        onClick={() =>
+                          escolherCategoria(categoria === "laboratorio" ? "demais" : "laboratorio")
+                        }
+                      >
+                        Trocar para{" "}
+                        {categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <Button
                   type="button"
@@ -1747,7 +1879,20 @@ function NovoOrcamentoDialog({
                               onChange={(v) =>
                                 setItens((a) =>
                                   a.map((x, i) =>
-                                    i === idx ? { ...x, valor_unitario: Number(v) || 0 } : x,
+                                    i === idx
+                                      ? {
+                                          ...x,
+                                          valor_unitario: Number(v) || 0,
+                                          ...(x.valores_formas
+                                            ? {
+                                                valores_formas: precosComValorDigitado(
+                                                  x.valores_formas,
+                                                  Number(v) || 0,
+                                                ),
+                                              }
+                                            : {}),
+                                        }
+                                      : x,
                                   ),
                                 )
                               }
@@ -1755,21 +1900,17 @@ function NovoOrcamentoDialog({
                           </td>
                           <td className="px-2 py-1 text-right font-medium">
                             {BRL(it.quantidade * it.valor_unitario)}
-                            {formasPagamento.length > 1 && (
-                              <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
-                                {formasPagamento.map((f) => {
-                                  const v = Number(
-                                    it.valores_formas?.[f] ?? it.valor_unitario ?? 0,
-                                  );
-                                  return (
-                                    <div key={f}>
-                                      <b className="uppercase">{abreviar(f)}:</b>{" "}
-                                      {BRL(it.quantidade * v)}
+                            {(precoVariaPorForma || formasPagamento.length > 1) &&
+                              it.valores_formas && (
+                                <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
+                                  {gruposPorForma(it.valores_formas, formasPagamento).map((g) => (
+                                    <div key={g.rotulo}>
+                                      <b className="uppercase">{g.rotulo}:</b>{" "}
+                                      {BRL(it.quantidade * g.valor)}
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+                                  ))}
+                                </div>
+                              )}
                           </td>
                           <td className="px-2 py-1">
                             <Button
@@ -1862,15 +2003,29 @@ function NovoOrcamentoDialog({
                     </p>
                   )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
-                    <span>Total</span>
+                    <span>
+                      Total
+                      {precoVariaPorForma && (
+                        <span className="ml-1 text-sm font-medium text-muted-foreground">
+                          ({abreviar(formaPrincipal)})
+                        </span>
+                      )}
+                    </span>
                     <span className="text-primary">{BRL(total)}</span>
                   </div>
-                  {formasPagamento.length > 1 && (
+                  {(precoVariaPorForma || formasPagamento.length > 1) && (
                     <div className="space-y-1 border-t pt-2">
-                      {formasPagamento.map((f) => (
-                        <div key={f} className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Total {abreviar(f)}</span>
-                          <span className="font-semibold">{BRL(totaisPorForma[f] ?? 0)}</span>
+                      {precoVariaPorForma && (
+                        <p className="text-[12px] text-muted-foreground">
+                          O valor muda conforme a forma de pagamento:
+                        </p>
+                      )}
+                      {gruposPorForma(totaisPorForma, formasPagamento).map((g) => (
+                        <div key={g.rotulo} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Total {g.rotulo === "Dinheiro" ? "em" : "no"} {g.rotulo}
+                          </span>
+                          <span className="font-semibold">{BRL(g.valor)}</span>
                         </div>
                       ))}
                     </div>

@@ -56,7 +56,7 @@ import {
 import { useBuscaDebounced } from "@/hooks/use-debounced-value";
 import { LIMITES } from "@/lib/seguranca/sanitizar";
 import { InputCPF, InputTelefone } from "@/components/ui/masked-input";
-import { dataClinicaDe, formatarIdadeCurta, hojeBR } from "@/lib/date-utils";
+import { dataClinicaDe, formatarIdadeCurta, hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,8 +121,7 @@ import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
-import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
+import { setTurboMode } from "@/lib/turbo-mode";
 import {
   DividirOrcamentoDialog,
   type DividirItem,
@@ -200,6 +199,7 @@ import {
   vaosEntreHorarios,
   vaoCobertoPelasFichas,
   vaosDaGrade,
+  temGradeNoDia,
   rotuloDoVao,
   type FaixaGrade,
 } from "@/lib/agenda/intervalos-grade";
@@ -237,17 +237,21 @@ import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { posicoesDaFila } from "@/lib/agenda/fila-ordem-chegada";
+import {
+  avisosFichasExtras,
+  montarFichasExtras,
+  type LinhaDoDia,
+} from "@/lib/agenda/fichas-extras";
 import { numerarFichasFormatadas } from "@/lib/agenda/ficha-numero";
 import { descricaoParaEquipe } from "@/lib/agenda/confirmacao-whatsapp";
 import {
+  checkupRosaVigente,
   detectarCheckupRosa,
   itemCheckupRosa,
-  NOME_ITEM_CHECKUP_ROSA,
-  PACOTES_CHECKUP_ROSA,
   ratearPacote,
-  type ItemCheckupRosa,
   type PacoteAplicado,
 } from "@/lib/agenda/checkup-rosa";
+import { TabelaCheckupRosa } from "@/components/agenda/tabela-checkup-rosa";
 import {
   obterEtapaSinal,
   registrarPagamentoEtapaSinal,
@@ -266,6 +270,7 @@ import { ClienteForm, type Paciente as PacienteFull } from "@/components/cliente
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { AgendaEmptyState } from "@/components/agenda/agenda-empty-state";
+import { ficouSemDesfecho, ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 
 // Em agenda de ORDEM DE CHEGADA a clínica atende as 30 primeiras fichas do dia
 // em HORA MARCADA; só da ficha 31 em diante é que vale a ordem de chegada. Por
@@ -702,6 +707,30 @@ function mesmosAtendimentosDoPacote(agIds: string | string[], aplicado: PacoteAp
 }
 
 /**
+ * Faixa recolhida com os quatro pacotes CHECKUP ROSA, os serviços de cada um e
+ * os totais. Aparece no agendamento e na cobrança de consulta de ginecologia
+ * ou preventivo: só lembra a recepção de oferecer o pacote, não muda nada.
+ */
+function LembreteCheckupRosa({ complemento }: { complemento: string }) {
+  return (
+    <details className="text-xs rounded-md border border-pink-200 bg-pink-50/60 text-slate-700 px-2 py-1.5 dark:border-pink-900 dark:bg-pink-950/20 dark:text-slate-200">
+      <summary className="cursor-pointer">
+        Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com consulta e exames.{" "}
+        {complemento}
+      </summary>
+      <div className="mt-1.5 space-y-1.5">
+        <TabelaCheckupRosa colunas={2} />
+        <p className="text-muted-foreground leading-snug">
+          Agende cada serviço na agenda do seu profissional. Na cobrança, marque os atendimentos da
+          paciente e use <b>Cobrar selecionados</b>: o sistema reconhece o pacote e oferece aplicar
+          o preço.
+        </p>
+      </div>
+    </details>
+  );
+}
+
+/**
  * Guarda as duas versões da mesma cobrança quando o desconto do cartão entra
  * automaticamente: a com o preço do convênio (usada por padrão) e a com o
  * valor cheio. Serve para o botão "Cobrar valor cheio (Particular)" da tela de
@@ -734,6 +763,31 @@ type ItemOrcamentoCobranca = {
   valor_pago: number | null;
   valores_formas?: Record<string, number> | null;
 };
+
+/** Rótulos gravados pelo orçamento para cada forma da cobrança. */
+const ROTULOS_FORMA_ORCAMENTO: Record<string, string[]> = {
+  dinheiro: ["Dinheiro"],
+  pix: ["PIX", "Pix"],
+  cartao_debito: ["Cartão de Débito"],
+  cartao_credito: ["Cartão de Crédito"],
+};
+const FORMAS_BASICAS_ORCAMENTO = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de Débito"];
+
+/**
+ * Valor do item do orçamento se pago na `forma` (dinheiro, pix, …). Só usa o
+ * preço por forma do item quando ele tem as 4 formas gravadas (orçamento feito
+ * a partir de 03/10/2026); item antigo segue no valor único (`valor_total`).
+ */
+function valorItemOrcamentoNaForma(i: ItemOrcamentoCobranca, forma: string): number {
+  const qtd = Number(i.quantidade ?? 1) || 1;
+  const base = Number(i.valor_total ?? qtd * Number(i.valor_unitario ?? 0));
+  const vf = i.valores_formas;
+  if (!vf || !FORMAS_BASICAS_ORCAMENTO.every((k) => vf[k] != null)) return base;
+  const rotulo = ROTULOS_FORMA_ORCAMENTO[forma]?.[0];
+  if (!rotulo) return base;
+  const unit = Number(vf[rotulo] ?? 0);
+  return unit > 0 ? Math.round(qtd * unit * 100) / 100 : base;
+}
 
 /** Resultado da leitura de um orçamento para cobrança na agenda. */
 type OrcamentoCobranca = {
@@ -1032,7 +1086,12 @@ function AgendaPage() {
   const { clinicaAtual } = useClinica();
   // Undo em exclusões em lote — só São Francisco de Paula (flag ux_melhorias).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  const turboDisabled = useTurboDisabled();
+  // Modo Turbo (atalhos F2/F3…) saiu da Agenda em todas as unidades — o
+  // cabeçalho da São Francisco ficou igual ao da Menino Jesus, que já não tinha
+  // o botão. Desliga quem ficou com o modo salvo no navegador.
+  useEffect(() => {
+    setTurboMode(false);
+  }, []);
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   // Escopo por profissional: quem foi restrito na tela de Equipe (por exemplo,
@@ -1379,6 +1438,8 @@ function AgendaPage() {
       numero: number;
       paciente_id: string | null;
       paciente_nome: string | null;
+      /** Médico do orçamento a preencher — só em agendamento novo. */
+      medico_id?: string | null;
     };
     itensRestantes: SelectItemOrc[];
     totalItens: number;
@@ -1663,15 +1724,17 @@ function AgendaPage() {
   }, [dupDoDia, form.medico_id, form.procedimento]);
   /** Demais atendimentos do paciente no dia — informativo, não trava nada. */
   /**
-   * Lembrete do CHECKUP ROSA no agendamento novo: a consulta de ginecologia e
-   * o preventivo são a porta de entrada dos pacotes. Só informa — o pacote é
-   * aplicado na cobrança agrupada.
+   * Lembrete do CHECKUP ROSA no agendamento (novo ou em edição, enquanto não
+   * pago): a consulta de ginecologia e o preventivo são a porta de entrada dos
+   * pacotes. Só informa — o pacote é aplicado na cobrança agrupada.
    */
   const ofereceCheckupRosa = useMemo(() => {
+    // Só para atendimento marcado dentro da campanha (outubro).
+    if (!checkupRosaVigente(form.inicio)) return false;
     const esp = medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? null;
     const item = itemCheckupRosa(form.procedimento, esp);
     return item === "consulta" || item === "preventivo";
-  }, [medicos, form.medico_id, form.procedimento]);
+  }, [medicos, form.medico_id, form.procedimento, form.inicio]);
   const dupOutros = useMemo(
     () => dupDoDia.filter((d) => !dupProvavel.some((p) => p.id === d.id)),
     [dupDoDia, dupProvavel],
@@ -1949,6 +2012,9 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // Valor de cada forma nesta cobrança: a janela de pagamento usa para
+  // reajustar o valor se o caixa trocar a forma lá dentro.
+  const [pagamentoValoresForma, setPagamentoValoresForma] = useState<Record<string, number>>({});
   // Peso por atendimento p/ rateio quando o pagamento é agrupado.
   // key = agendamento_id, value = valor cheio (cartão preferido, senão dinheiro).
   const [pagamentoPesos, setPagamentoPesos] = useState<Record<string, number>>({});
@@ -2403,8 +2469,41 @@ function AgendaPage() {
       ctx: FormaPagCtx;
     };
   } | null>(null);
+  /** "Colinha" com a tabela de valores do Checkup Rosa (botão na barra). */
+  const [tabelaRosaAberta, setTabelaRosaAberta] = useState(false);
   /** Pacote em vigor no rateio da cobrança agrupada em andamento. */
   const pacoteRosaRef = useRef<PacoteAplicado | null>(null);
+  /**
+   * Cobrança INDIVIDUAL de um atendimento que, junto com outros da mesma
+   * paciente no mesmo dia (ainda não pagos), forma um CHECKUP ROSA. A
+   * recepção costuma cobrar pelo $ de cada linha, e por ali o pacote nunca
+   * aparece — o aviso manda para "Cobrar selecionados".
+   */
+  const pacoteRosaDaCobrancaIndividual = (agId: string | undefined): PacoteAplicado | null => {
+    if (!agId || agId.includes(",")) return null;
+    const atual = items.find((a) => a.id === agId);
+    if (!atual?.paciente_id) return null;
+    const dia = dataClinicaDe(atual.inicio);
+    const especialidade = (medicoId: string | null) =>
+      medicos.find((m) => m.id === medicoId)?.especialidade_nome ?? null;
+    const doDia = items.filter(
+      (a) =>
+        a.paciente_id === atual.paciente_id &&
+        dataClinicaDe(a.inicio) === dia &&
+        (a.id === agId || !pagosSet.has(a.id)) &&
+        a.status !== "cancelado" &&
+        itemCheckupRosa(a.procedimento, especialidade(a.medico_id)) !== null,
+    );
+    const pacote = detectarCheckupRosa(
+      doDia.map((a) => ({
+        id: a.id,
+        procedimento: a.procedimento,
+        especialidade: especialidade(a.medico_id),
+        dia,
+      })),
+    );
+    return pacote && agId in pacote.precoPorAtendimento ? pacote : null;
+  };
   const alternarPacoteRosa = () => {
     if (!pacoteRosa) return;
     const { aplicado, normal } = pacoteRosa;
@@ -2863,7 +2962,17 @@ function AgendaPage() {
       filtroStatus !== "agendado" &&
       filtroStatus !== "pago" &&
       filtroStatus !== "parcial";
-    if (statusEspecifico) {
+    if (filtroStatus === "faltou") {
+      // "Não compareceu" = marcado "faltou" + quem não passou pelo balcão em
+      // dia já encerrado (a clínica fecha às 19h). Regra em sem-desfecho.ts;
+      // o filtro em memória abaixo aplica o resto (vaga livre, bloqueio).
+      const corte = janelaDiaClinica(ultimoDiaEncerrado()).fimExclusivo;
+      q = q
+        .or(
+          `status.eq.faltou,and(status.in.(agendado,confirmado),inicio.lt."${corte}",or(fluxo_etapa.is.null,fluxo_etapa.eq.aguardando_recepcao))`,
+        )
+        .limit(1000);
+    } else if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
     // Empurra o filtro de profissional para o servidor quando definido.
@@ -3314,7 +3423,13 @@ function AgendaPage() {
     if (!clinicaAtual) return;
     const [m, e, me, pr, sr, mcRows, mp, agendasRes, gradesRes] = await Promise.all([
       getMedicosAgenda(clinicaAtual.clinica_id),
-      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      // Só as especialidades ativas nesta unidade.
+      supabase
+        .from("especialidades_da_unidade")
+        .select("id,nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("nome"),
       supabase
         .from("medico_especialidades")
         .select("medico_id,especialidade_id,medicos!inner(clinica_id)")
@@ -4096,6 +4211,41 @@ function AgendaPage() {
   const rotuloFallbackProc = (medicoId: string | null | undefined) =>
     medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
 
+  // "LABORATORIO", "EXAMES LABORATORIAIS", "EXAMES LABORATORIAIS (LABORATORIO)":
+  // nomes da categoria, não de um exame.
+  const ehServicoLabGenerico = (t: string) =>
+    /^(exames laboratoriais|laboratorio)( \(laboratorio\))?$/.test(normalizar(t).trim());
+
+  // Caixa "Médico ou Exame" do modal: atendimento de laboratório mostra
+  // "Laboratório - EAS, PARASITOLOGICO" em vez só do nome da agenda (ex.: ITB),
+  // para recepção e caixa verem na hora quais exames o paciente contratou.
+  // APENAS exibição — o valor continua sendo a agenda do laboratório.
+  const rotuloCaixaLaboratorio = (() => {
+    const ehLab =
+      (!!form.orcamento_id && orcamentoLaboratorio) ||
+      medicoEhLaboratorioFormulario(form.medico_id);
+    if (!ehLab) return undefined;
+    const brutos =
+      form.orcamento_itens.length > 0
+        ? form.orcamento_itens
+        : form.procedimentos.length > 0
+          ? form.procedimentos
+          : [form.procedimento];
+    const nomes = brutos
+      // Texto montado pelo orçamento: "LABORATÓRIO (2 EXAMES): EAS, PARASITOLOGICO".
+      .map((t) => (t ?? "").replace(/^LABORAT[ÓO]RIO\s*\([^)]*\)\s*:\s*/i, "").trim())
+      .filter((t) => t && !ehServicoLabGenerico(t));
+    return nomes.length > 0 ? `🧪 Laboratório - ${nomes.join(", ")}` : undefined;
+  })();
+  // Ficha de laboratório sem exame escolhido: o serviço é só o genérico
+  // ("LABORATORIO" / "EXAMES LABORATORIAIS") e não há orçamento ligado.
+  const fichaLabSemExames =
+    !form.orcamento_id &&
+    medicoEhLaboratorioFormulario(form.medico_id) &&
+    (form.procedimentos.length > 0 ? form.procedimentos : [form.procedimento]).every(
+      (t) => !t?.trim() || ehServicoLabGenerico(t),
+    );
+
   // Rótulo do serviço na GRADE (Lista, cartão mobile e visão "Por médico").
   // Regra (2026-08-18): agendamento de laboratório sempre aparece na coluna
   // "Serviço" como "EXAMES LABORATORIAIS" — nunca com o nome do exame avulso
@@ -4272,8 +4422,11 @@ function AgendaPage() {
       avisoSemPermissaoAgenda();
       return;
     }
-    const nomeFinal = novoNome.trim();
-    // Sentinela vazio: limpa o procedimento (volta ao padrão do médico).
+    // Sentinela vazio: volta ao padrão do médico. Grava o nome do padrão em vez
+    // de vazio — gravando vazio a Agenda mostrava o padrão, mas o Financeiro
+    // (que lê o que está gravado) mostrava "—". Sem padrão cadastrado
+    // (laboratório) continua gravando vazio, que as telas já tratam.
+    const nomeFinal = novoNome.trim() || procedimentoPadraoDoMedico(ag.medico_id);
     const limpar = nomeFinal === "";
     if (!limpar && nomeFinal === (ag.procedimento ?? "")) return;
     const anterior = ag.procedimento;
@@ -4323,6 +4476,17 @@ function AgendaPage() {
     void recarregarExpedientes();
   }, [recarregarExpedientes]);
 
+  // Dia encerrado e o paciente não passou pelo balcão: conta como "Não
+  // compareceu" no filtro e ganha a etiqueta "sem desfecho" — só leitura.
+  const semDesfecho = useCallback(
+    (a: Agendamento) =>
+      ficouSemDesfecho(
+        { ...a, fluxo_etapa: etapaMap.get(a.id) ?? "aguardando_recepcao" },
+        ultimoDiaEncerrado(),
+      ),
+    [etapaMap],
+  );
+
   const { filtrados, ocultosPorExpediente } = useMemo(() => {
     // Livres escondidos por expediente encerrado, já com TODOS os outros
     // filtros aplicados — é o que alimenta o aviso no topo da lista.
@@ -4342,6 +4506,9 @@ function AgendaPage() {
         // "Falta receber": já recebeu alguma coisa e ainda tem saldo aberto.
         if (ehLivre) return false;
         if (!parciaisSet.has(a.id)) return false;
+      } else if (filtroStatus === "faltou") {
+        if (ehLivre) return false;
+        if (a.status !== "faltou" && !semDesfecho(a)) return false;
       } else if (filtroStatus !== "todos") {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
@@ -4415,6 +4582,7 @@ function AgendaPage() {
     medicoEspec,
     fichaPorId,
     parciaisSet,
+    semDesfecho,
   ]);
 
   const totais = useMemo(
@@ -4463,11 +4631,15 @@ function AgendaPage() {
       // A grade manda: é o horário combinado com o médico. Uma ficha gerada
       // por engano dentro do almoço (foi o caso das vagas que avançaram sobre
       // o meio-dia) encurtaria o intervalo se o cálculo saísse das fichas.
+      // Com grade valendo no dia, só os vãos dela contam — mesmo que não haja
+      // nenhum: antes, sem almoço na grade, o cálculo caía nas fichas e um
+      // encaixe às 19:00 de quem termina às 17:30 virava "INTERVALO 18:00–19:00".
+      // As fichas só servem de referência para quem não tem grade cadastrada.
       const grade = faixasDaGrade.get(`${ctx.medicoId}|${ctx.agendaId}`);
-      const daGrade = grade
-        ? vaosDaGrade(grade, ctx.diaIso, new Date(`${ctx.diaIso}T12:00:00`).getDay())
-        : [];
-      const vaos = (daGrade.length > 0 ? daGrade : vaosEntreHorarios(pedacos)).filter(
+      const dow = new Date(`${ctx.diaIso}T12:00:00`).getDay();
+      const comGrade = !!grade && temGradeNoDia(grade, ctx.diaIso, dow);
+      const daGrade = comGrade ? vaosDaGrade(grade!, ctx.diaIso, dow) : [];
+      const vaos = (comGrade ? daGrade : vaosEntreHorarios(pedacos)).filter(
         (v) => !vaoCobertoPelasFichas(v, pedacos),
       );
       if (vaos.length > 0) out.set(chave, vaos);
@@ -4485,6 +4657,9 @@ function AgendaPage() {
     () => new Set(filtradosOrdenados.map((a) => chaveDiaLocal(a.inicio))).size > 1,
     [filtradosOrdenados],
   );
+  // Colunas Dia/Data da tabela: escondidas abaixo de 1600px de largura quando a
+  // lista é de um dia só (ver comentário no cabeçalho da tabela).
+  const colunaDataSoNoMonitor = listaTemVariosDias ? "" : "hidden min-[1600px]:table-cell";
 
   // ---- "Agora": destaque do horário atual (só hoje). A rolagem acontece apenas
   // quando o usuário clica no botão "Ir para agora" — nunca na abertura da tela.
@@ -4754,6 +4929,7 @@ function AgendaPage() {
           id: i.id,
           procedimento: i.procedimento,
           especialidade: medicos.find((mm) => mm.id === i.medico_id)?.especialidade_nome ?? null,
+          dia: dataClinicaDe(i.inicio),
         })),
       );
       setPacoteRosa(
@@ -5460,6 +5636,114 @@ function AgendaPage() {
     }
   };
 
+  // "+ Mais fichas" (agenda de HORA MARCADA): acrescenta N fichas livres no
+  // último horário do turno do dia, depois das que já existem — sem mudar o
+  // horário do médico nem o número de nenhuma ficha (regra em fichas-extras.ts,
+  // a mesma do "Adicionar mais fichas" de Horários médicos). Só para quem pode
+  // gerar horários: aumentar a agenda do médico não é decisão do balcão comum.
+  const podeGerirHorarios =
+    usePodeEscrever("disponibilidades") || !!clinicaAtual?.pode_gerir_horarios;
+  const [maisFichasAberto, setMaisFichasAberto] = useState(false);
+  const [maisFichasQtd, setMaisFichasQtd] = useState("");
+  const [criandoMaisFichas, setCriandoMaisFichas] = useState(false);
+  // Agendas de hora marcada do médico filtrado com grade valendo no dia, cada
+  // uma com o fim do turno. Vazio = o botão não aparece.
+  const agendasParaMaisFichas = useMemo(() => {
+    if (filtroMedico === "todos") return [];
+    const dow = new Date(`${dataRef}T12:00:00`).getDay();
+    return (agendasPorMedico.get(filtroMedico) ?? [])
+      .filter(
+        (a) =>
+          !a.ordem_chegada &&
+          (filtroAgenda === "todos" || filtroAgenda.startsWith("nome:") || a.id === filtroAgenda),
+      )
+      .flatMap((a) => {
+        const vigentes = (faixasDaGrade.get(`${filtroMedico}|${a.id}`) ?? []).filter(
+          (f) =>
+            f.dia_semana === dow &&
+            (!f.vigencia_inicio || f.vigencia_inicio <= dataRef) &&
+            (!f.vigencia_fim || f.vigencia_fim >= dataRef),
+        );
+        if (vigentes.length === 0) return [];
+        const fimTurno = vigentes
+          .map((f) => f.hora_fim.slice(0, 5))
+          .reduce((x, y) => (y > x ? y : x));
+        return [{ id: a.id, nome: a.nome, fimTurno }];
+      });
+  }, [filtroMedico, filtroAgenda, dataRef, agendasPorMedico, faixasDaGrade]);
+  const criarMaisFichas = async () => {
+    if (!clinicaAtual || filtroMedico === "todos") return;
+    const qtd = parseInt(maisFichasQtd || "0", 10);
+    if (!qtd || qtd < 1) {
+      toast.error("Informe quantas fichas a mais.");
+      return;
+    }
+    if (agendasParaMaisFichas.length > 1) {
+      toast.error(
+        `Este médico tem mais de uma agenda nesse dia (${agendasParaMaisFichas.map((a) => a.nome).join(", ")}). Escolha a agenda no filtro "Tipo de agenda" e tente de novo.`,
+        { duration: 10000 },
+      );
+      return;
+    }
+    const ag = agendasParaMaisFichas[0];
+    if (!ag) return;
+    setCriandoMaisFichas(true);
+    try {
+      // Lido AGORA: outra recepcionista pode ter marcado alguém nesse meio tempo.
+      const { data: existentes, error: eLer } = await supabase
+        .from("agendamentos")
+        .select("agenda_id, inicio, fim, status, fluxo_etapa")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", filtroMedico)
+        .eq("agenda_id", ag.id)
+        .gte("inicio", new Date(`${dataRef}T00:00:00`).toISOString())
+        .lte("inicio", new Date(`${dataRef}T23:59:59`).toISOString());
+      if (eLer) {
+        mostrarErro(eLer);
+        return;
+      }
+      const montado = montarFichasExtras({
+        alvos: [{ diaIso: dataRef, agendaId: ag.id, fimTurno: ag.fimTurno }],
+        existentes: (existentes ?? []) as LinhaDoDia[],
+        quantidade: qtd,
+        diaLocal: chaveDiaLocal,
+      });
+      const avisos = avisosFichasExtras(montado, (iso) => iso.split("-").reverse().join("/"));
+      if (montado.fichas.length === 0) {
+        toast.error(avisos.join(" ") || "Nenhuma ficha a acrescentar.", { duration: 10000 });
+        return;
+      }
+      const procedimento = procedimentoPadraoDoMedico(filtroMedico);
+      const { error: erroIns } = await supabase.from("agendamentos").insert(
+        montado.fichas.map((f) => ({
+          clinica_id: clinicaAtual.clinica_id,
+          medico_id: filtroMedico,
+          agenda_id: ag.id,
+          paciente_nome: "DISPONÍVEL",
+          inicio: f.inicio.toISOString(),
+          fim: f.fim.toISOString(),
+          status: "agendado" as const,
+          observacoes: "Ficha extra gerada na Agenda",
+          ...(procedimento ? { procedimento } : {}),
+        })),
+      );
+      if (erroIns) {
+        mostrarErro(erroIns);
+        return;
+      }
+      setMaisFichasAberto(false);
+      setMaisFichasQtd("");
+      await load();
+      toast.success(
+        `${montado.fichas.length} ficha(s) a mais criada(s) às ${toLocalInput(montado.fichas[0].inicio.toISOString()).slice(11)}.` +
+          (avisos.length > 0 ? ` ${avisos.join(" ")}` : ""),
+        { duration: 8000 },
+      );
+    } finally {
+      setCriandoMaisFichas(false);
+    }
+  };
+
   const openNew = async () => {
     if (!podeEscrever) {
       avisoSemPermissaoAgenda();
@@ -5516,12 +5800,20 @@ function AgendaPage() {
     setOpen(true);
   };
 
-  const buscarOrcamento = async (numeroOverride?: number) => {
+  const buscarOrcamento = async (
+    numeroOverride?: number,
+    serieOverride?: string | null,
+    // Vindo de abrirNovoComOrcamento: o form/editing deste closure ainda são
+    // os da ficha anterior (o setState acabou de ser chamado).
+    fichaNova = false,
+  ) => {
+    const fichaAtual = fichaNova ? null : editing;
+    const medicoAtual = fichaNova ? "" : form.medico_id;
     if (!clinicaAtual) return;
     const digitado = form.orcamento_numero.trim();
     const parsed = numeroOverride
       ? {
-          serie: null as string | null,
+          serie: (serieOverride || null) as string | null,
           numero: numeroOverride,
           numeroAlternativo: null as number | null,
         }
@@ -5545,13 +5837,16 @@ function AgendaPage() {
         especialidade_id: string | null;
         validade_dias: number | null;
         created_at: string | null;
+        medico_id: string | null;
+        medico_externo: boolean | null;
+        categoria: string | null;
       };
       let orc: OrcBusca | null = null;
       for (const cand of candidatos) {
         let q = supabase
           .from("orcamentos")
           .select(
-            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at",
+            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at, medico_id, medico_externo, categoria",
           )
           .eq("clinica_id", clinicaAtual.clinica_id)
           .eq("numero", cand);
@@ -5711,7 +6006,8 @@ function AgendaPage() {
         const t = norm(p.tipo);
         return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
-      const todosLab = its.every((i) => isLab(i.procedimento_id));
+      const todosLab =
+        orc.categoria === "laboratorio" || its.every((i) => isLab(i.procedimento_id));
       // (Bloqueio antigo removido: agora permitimos agendamentos parciais,
       // controlados via `agendamento_orcamento_itens`.)
       const nomes = its.map((i) => i.descricao);
@@ -5750,21 +6046,48 @@ function AgendaPage() {
       // único agendamento, abre um pop-up para o usuário escolher quais
       // itens usar agora. O restante fica disponível para agendar depois.
       const isOdonto = orc.especialidade_id === ODONTO_ESPECIALIDADE_ID;
+      // Orçamento de laboratório: a tela de Orçamentos grava só
+      // `categoria='laboratorio'` (sem especialidade), então os dois contam.
+      const orcEhLab =
+        orc.categoria === "laboratorio" ||
+        (!!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id));
+      const medicoIncompativel =
+        !!medicoAtual &&
+        ((isOdonto && !medicoEspec.get(medicoAtual)?.has(ODONTO_ESPECIALIDADE_ID)) ||
+          (orcEhLab && !medicoEhLaboratorista(medicoAtual)));
+      // Ficha que já existe não troca de médico (o campo fica travado): ligar
+      // o orçamento a ela deixaria exames de laboratório na agenda de outro
+      // profissional (ex.: ITB). Barra e manda abrir a ficha na agenda certa.
+      if (fichaAtual && medicoIncompativel) {
+        const nomeMed = medicos.find((m) => m.id === medicoAtual)?.nome ?? "deste profissional";
+        toast.error(
+          `Este orçamento é de ${isOdonto ? "Odontologia" : "Laboratório"} e esta ficha é da agenda ${nomeMed}. Abra uma ficha na agenda ${isOdonto ? "de Odontologia" : "do Laboratório"} para vinculá-lo.`,
+        );
+        return;
+      }
       setOrcamentoOdonto(isOdonto);
-      if (
-        isOdonto &&
-        form.medico_id &&
-        !medicoEspec.get(form.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)
-      ) {
+      if (isOdonto && medicoIncompativel) {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
       }
-      const orcEhLab = !!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id);
       setOrcamentoLaboratorio(orcEhLab);
-      if (orcEhLab && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+      if (orcEhLab && medicoAtual && !medicoEhLaboratorista(medicoAtual)) {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Laboratório para este orçamento.");
       }
+      // Médico do orçamento: entra só em agendamento NOVO e só se o campo
+      // estiver vazio na hora de aplicar. Numa ficha que já existe, trocar o
+      // médico levaria o paciente para a agenda de outro profissional. Médico
+      // externo (quem pediu o exame) e médico sem agenda aqui ficam de fora.
+      const medicoDoOrc =
+        !fichaAtual &&
+        orc.medico_id &&
+        !orc.medico_externo &&
+        medicos.some((m) => m.id === orc.medico_id) &&
+        (!isOdonto || !!medicoEspec.get(orc.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)) &&
+        (!orcEhLab || medicoEhLaboratorista(orc.medico_id))
+          ? orc.medico_id
+          : null;
       if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
@@ -5772,6 +6095,7 @@ function AgendaPage() {
             numero: orc.numero,
             paciente_id: pacId,
             paciente_nome: pacNome,
+            medico_id: medicoDoOrc,
           },
           itensRestantes: its.map((i) => ({
             id: i.id,
@@ -5838,7 +6162,14 @@ function AgendaPage() {
         orcamento_numero: formatNumeroOrcamento(orc.serie, orc.numero),
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
-        paciente_nome: pacNome ?? f.paciente_nome,
+        // Orçamento sem cadastro (só o nome digitado, ex.: "EMANUELLY") não
+        // troca a paciente que a ficha já tem escolhida.
+        paciente_nome: pacId
+          ? (pacNome ?? f.paciente_nome)
+          : f.paciente_id
+            ? f.paciente_nome
+            : (pacNome ?? f.paciente_nome),
+        medico_id: f.medico_id || medicoDoOrc || "",
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
       }));
@@ -5869,7 +6200,7 @@ function AgendaPage() {
     setEditing(null);
     setForm({ ...EMPTY, inicio, fim, orcamento_numero: String(numero) });
     setOpen(true);
-    void buscarOrcamento(numero);
+    void buscarOrcamento(numero, null, true);
   };
 
   useEffect(() => {
@@ -6044,12 +6375,13 @@ function AgendaPage() {
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
       const { data: orcRow } = await supabase
         .from("orcamentos")
-        .select("especialidade_id")
+        .select("especialidade_id, categoria")
         .eq("id", a.orcamento_id)
         .maybeSingle();
       setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
       setOrcamentoLaboratorio(
-        !!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id),
+        orcRow?.categoria === "laboratorio" ||
+          (!!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id)),
       );
     } else {
       setOrcamentoOdonto(false);
@@ -6305,6 +6637,17 @@ function AgendaPage() {
     // as fichas seguintes — inclusive as que a recepção já imprimiu.
     let inicioIsoParaSalvar = new Date(form.inicio).toISOString();
     let fimIsoParaSalvar = new Date(form.fim).toISOString();
+    // Horário não mexido no formulário: grava o EXATO da linha, com segundos.
+    // As fichas a mais do gerador (Pacientes/dia acima da grade) ficam no
+    // último horário separadas por 1 segundo (11:45:01, 11:45:02…); zerar os
+    // segundos ao ocupar uma delas a juntaria com a ficha anterior e puxaria
+    // em -1 o número de todas as seguintes.
+    if (editing && form.inicio === toLocalInput(editing.inicio)) {
+      inicioIsoParaSalvar = new Date(editing.inicio).toISOString();
+    }
+    if (editing && form.fim === toLocalInput(editing.fim)) {
+      fimIsoParaSalvar = new Date(editing.fim).toISOString();
+    }
     const filaNoSalvamento = !editing ? agendaDeFila(form.medico_id) : null;
     if (filaNoSalvamento && form.medico_id) {
       const diaIso = new Date(form.inicio).toLocaleDateString("en-CA", {
@@ -6340,13 +6683,8 @@ function AgendaPage() {
       // Ficha de fila em EDIÇÃO: mantém o horário gravado (com segundos), que
       // é a posição dela na fila. Encaixe novo continua entrando pelo fim.
       inicio:
-        edicaoFichaFila && editing
-          ? new Date(editing.inicio).toISOString()
-          : inicioIsoParaSalvar,
-      fim:
-        edicaoFichaFila && editing
-          ? new Date(editing.fim).toISOString()
-          : fimIsoParaSalvar,
+        edicaoFichaFila && editing ? new Date(editing.inicio).toISOString() : inicioIsoParaSalvar,
+      fim: edicaoFichaFila && editing ? new Date(editing.fim).toISOString() : fimIsoParaSalvar,
       procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
@@ -6389,6 +6727,7 @@ function AgendaPage() {
     })();
     const enviarAoServidor = (confirmacoes: {
       permitirConflitoPaciente: boolean;
+      permitirConflitoMesmoProfissional: boolean;
       permitirEncaixeSemVaga: boolean;
     }) =>
       fnCriarAgendamento({
@@ -6407,6 +6746,7 @@ function AgendaPage() {
           pending_orc_item_ids: pendingOrcItemIds,
           confirmacoes: {
             permitir_conflito_paciente: confirmacoes.permitirConflitoPaciente,
+            permitir_conflito_mesmo_profissional: confirmacoes.permitirConflitoMesmoProfissional,
             permitir_encaixe_sem_vaga: confirmacoes.permitirEncaixeSemVaga,
           },
           agenda_preferida_id: agendaPreferidaId,
@@ -6416,23 +6756,36 @@ function AgendaPage() {
     // repetições: quando o servidor devolve um segundo aviso, o "sim" que ela
     // já deu ao primeiro não pode ser perdido — senão a tela volta a perguntar
     // a mesma coisa em loop.
-    const confirmado = { permitirConflitoPaciente: false, permitirEncaixeSemVaga: false };
+    const confirmado = {
+      permitirConflitoPaciente: false,
+      permitirConflitoMesmoProfissional: false,
+      permitirEncaixeSemVaga: false,
+    };
     let result = await enviarAoServidor(confirmado);
     // O servidor devolve até dois avisos confirmáveis, um de cada vez:
     //   • conflito_paciente — o paciente já tem outro atendimento nesse
     //     horário, com OUTRO profissional;
+    //   • conflito_mesmo_profissional — o paciente já tem uma ficha com o
+    //     MESMO profissional nesse horário (ex.: várias infiltrações no dia,
+    //     nas fichas extras empilhadas no fim do turno);
     //   • encaixe_sem_vaga — não há vaga livre na grade e a recepção quer
     //     lançar por cima da ficha existente (encaixe).
     // Em ambos, pergunta e, se ela confirmar, grava do mesmo jeito.
     for (let tentativa = 0; tentativa < 2; tentativa++) {
       if (!result.ok && "validation_error" in result) {
         const aviso = result.validation_error.confirmavel;
-        if (aviso === "conflito_paciente" || aviso === "encaixe_sem_vaga") {
+        if (
+          aviso === "conflito_paciente" ||
+          aviso === "conflito_mesmo_profissional" ||
+          aviso === "encaixe_sem_vaga"
+        ) {
           if (!(await confirmDialog(result.validation_error.message))) {
             setSaving(false);
             return;
           }
           if (aviso === "conflito_paciente") confirmado.permitirConflitoPaciente = true;
+          else if (aviso === "conflito_mesmo_profissional")
+            confirmado.permitirConflitoMesmoProfissional = true;
           else confirmado.permitirEncaixeSemVaga = true;
           result = await enviarAoServidor(confirmado);
           continue;
@@ -7045,12 +7398,21 @@ function AgendaPage() {
         <title>{infoWa.texto}</title>
       </MessageCircle>
     ) : null;
+    const etiquetaSemDesfecho = semDesfecho(a) ? (
+      <span
+        className="shrink-0 rounded border border-rose-200 bg-rose-50 px-1 text-[10px] font-semibold text-rose-700"
+        title="O dia acabou e o paciente não passou pelo balcão: conta como Não compareceu. Dê o desfecho: check-in, Não compareceu, cancelar ou reagendar."
+      >
+        sem desfecho
+      </span>
+    ) : null;
     const badge = (
       <span className="inline-flex max-w-full items-center gap-1" title={infoWa?.texto}>
         <Badge className={`${STATUS_COR[a.status]} ${className}`} title={STATUS_LABEL[a.status]}>
           {STATUS_LABEL[a.status]}
         </Badge>
         {iconeWa}
+        {etiquetaSemDesfecho}
       </span>
     );
     if (!podeEscrever) return badge;
@@ -7134,6 +7496,7 @@ function AgendaPage() {
           </DropdownMenuContent>
         </DropdownMenu>
         {iconeWa}
+        {etiquetaSemDesfecho}
       </span>
     );
   };
@@ -7453,8 +7816,8 @@ function AgendaPage() {
     // cobrado é o dos itens escolhidos (menos o que já foi pago neles). Os
     // demais itens continuam livres para outros agendamentos/pagamentos.
     let totalLiquido = totalOrcamento;
-    let proporcao = 1;
     let itensCobranca: ItemOrcamentoCobranca[] = [];
+    let soItensVinculados = false;
     if (agendamentoId) {
       const { data: links } = await supabase
         .from("agendamento_orcamento_itens")
@@ -7481,7 +7844,7 @@ function AgendaPage() {
           );
           const pago = rows.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
           totalLiquido = Math.round(Math.max(0, subtotal - pago) * 100) / 100;
-          proporcao = totalOrcamento > 0 ? Math.min(1, totalLiquido / totalOrcamento) : 1;
+          soItensVinculados = true;
         }
       }
     }
@@ -7494,17 +7857,38 @@ function AgendaPage() {
         .eq("orcamento_id", orcamentoId);
       itensCobranca = (todos ?? []) as ItemOrcamentoCobranca[];
     }
+    // Valor pela forma escolhida no caixa (ex.: ultrassom R$ 110 no dinheiro,
+    // R$ 130 no PIX/cartão).
+    //  - Ficha com itens vinculados: soma o preço de cada item NAQUELA forma,
+    //    menos o que já foi pago neles.
+    //  - Orçamento inteiro: total da forma gravado no orçamento (já com o
+    //    desconto); sem ele, ajusta o total pela diferença de preço dos itens.
+    // Orçamento antigo, sem preço por forma, cobra o mesmo valor em todas.
     const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
-    const pegar = (label: string) => {
-      const v = vals ? Number(vals[label] ?? 0) : 0;
-      if (v <= 0) return totalLiquido;
-      return proporcao >= 1 ? v : Math.round(v * proporcao * 100) / 100;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const pegar = (forma: string) => {
+      if (soItensVinculados) {
+        const soma = itensCobranca.reduce((s, i) => s + valorItemOrcamentoNaForma(i, forma), 0);
+        const pago = itensCobranca.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
+        return r2(Math.max(0, soma - pago));
+      }
+      const gravado = (ROTULOS_FORMA_ORCAMENTO[forma] ?? [])
+        .map((k) => Number(vals?.[k] ?? 0))
+        .find((v) => v > 0);
+      if (gravado) return gravado;
+      const base = itensCobranca.reduce(
+        (s, i) => s + valorItemOrcamentoNaForma(i, "valor_unico"),
+        0,
+      );
+      const naForma = itensCobranca.reduce((s, i) => s + valorItemOrcamentoNaForma(i, forma), 0);
+      if (base > 0 && naForma !== base) return r2(Math.max(0, totalLiquido * (naForma / base)));
+      return totalLiquido;
     };
     const opcoesBase: FormaOpcao[] = [
-      { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
-      { forma: "pix", label: "Pix", valor: pegar("Pix") },
-      { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("Cartão de Débito") },
-      { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("Cartão de Crédito") },
+      { forma: "dinheiro", label: "Dinheiro", valor: pegar("dinheiro") },
+      { forma: "pix", label: "Pix", valor: pegar("pix") },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("cartao_debito") },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("cartao_credito") },
     ];
     // Benefício do convênio: o orçamento é sempre gravado em valor PARTICULAR.
     // O desconto é apurado agora, no momento do pagamento, porque a situação do
@@ -8093,6 +8477,18 @@ function AgendaPage() {
     setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
     setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma(op.forma);
+    // Pagamento parcial guarda o total da forma escolhida para calcular o que
+    // falta: ali a troca de forma dentro da janela não reajusta o valor.
+    setPagamentoValoresForma(
+      cobrancaParcialRef.current?.ativo
+        ? {}
+        : Object.fromEntries(
+            formaPagOpcoes.map((o) => [
+              o.forma,
+              Math.round(aplicarDescontoPendente(o.valor) * 100) / 100,
+            ]),
+          ),
+    );
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
     // Abre o diálogo de pagamento ANTES de fechar o de forma de pagamento.
@@ -8114,6 +8510,7 @@ function AgendaPage() {
     setPagamentoDesc(descricaoComDesconto(formaPagCtx.desc));
     setPagamentoValor(valorFinal > 0 ? valorFinal.toFixed(2) : "");
     setPagamentoForma("__misto__");
+    setPagamentoValoresForma({});
     setPagamentoAgId(principal);
     setPagamentoExtraIds(extras);
     setPagamentoOpen(true);
@@ -9333,7 +9730,9 @@ function AgendaPage() {
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg tela-alta:text-xl font-bold tracking-tight text-slate-900">Agendas</h1>
+            <h1 className="truncate text-lg tela-alta:text-xl font-bold tracking-tight text-slate-900">
+              Agendas
+            </h1>
             <div className="mt-1 tela-alta:mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {(() => {
@@ -9362,11 +9761,6 @@ function AgendaPage() {
           </div>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1">
-          {!turboDisabled && (
-            <span className="hidden lg:contents">
-              <TurboModeToggle />
-            </span>
-          )}
           <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold text-slate-600">
             <button
               type="button"
@@ -9488,6 +9882,16 @@ function AgendaPage() {
               <Users className="h-3.5 w-3.5" /> Marcações por atendente
             </button>
           )}
+          {checkupRosaVigente(hojeBR()) && (
+            <button
+              type="button"
+              title="Tabela de valores dos pacotes Checkup Rosa"
+              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-1.5 text-xs font-semibold text-pink-800 shadow-xs hover:bg-pink-100 dark:border-pink-900 dark:bg-pink-950/40 dark:text-pink-200"
+              onClick={() => setTabelaRosaAberta(true)}
+            >
+              🎀 Checkup Rosa
+            </button>
+          )}
           <button
             type="button"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-card px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
@@ -9510,6 +9914,11 @@ function AgendaPage() {
               {ehSupervisor && (
                 <DropdownMenuItem onClick={() => setMarcacoesAberto(true)}>
                   <Users className="h-4 w-4 mr-2" /> Marcações por atendente
+                </DropdownMenuItem>
+              )}
+              {checkupRosaVigente(hojeBR()) && (
+                <DropdownMenuItem onClick={() => setTabelaRosaAberta(true)}>
+                  🎀 Checkup Rosa (valores)
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={exportarAgendaExcel}>
@@ -9541,6 +9950,56 @@ function AgendaPage() {
                 {criandoFichaExtra ? "Criando..." : "Ficha extra"}
               </Button>
             )}
+          {podeGerirHorarios &&
+            !agendaDeFila(filtroMedico) &&
+            agendasParaMaisFichas.length > 0 &&
+            dataRef >= hojeBR() && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMaisFichasAberto(true)}
+                disabled={criandoMaisFichas || !clinicaAtual}
+                title="Acrescenta fichas livres no último horário do turno, sem mudar o horário do médico nem o número das fichas"
+                className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold"
+              >
+                <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" />
+                Mais fichas
+              </Button>
+            )}
+          <Dialog open={maisFichasAberto} onOpenChange={setMaisFichasAberto}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Mais fichas</DialogTitle>
+                <DialogDescription>
+                  Quantas fichas a mais neste dia? Elas entram no último horário do turno, depois
+                  das que já existem — o horário do médico e o número das fichas atuais não mudam.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1">
+                <Label htmlFor="agenda-mais-fichas-qtd">Fichas a mais</Label>
+                <Input
+                  id="agenda-mais-fichas-qtd"
+                  type="number"
+                  min={1}
+                  placeholder="ex.: 20"
+                  value={maisFichasQtd}
+                  onChange={(e) => setMaisFichasQtd(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void criarMaisFichas();
+                  }}
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setMaisFichasAberto(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => void criarMaisFichas()} disabled={criandoMaisFichas}>
+                  {criandoMaisFichas ? "Criando..." : "Criar fichas"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog
             open={open}
             onOpenChange={(o) => {
@@ -9672,7 +10131,28 @@ function AgendaPage() {
                                 paciente_id: p?.id ?? "",
                               }));
                             }}
-                            placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
+                            // Nº do orçamento (202600530 ou #202600530) também
+                            // vale aqui: escolher o orçamento importa paciente e
+                            // serviços pelo mesmo fluxo do botão Agendar da tela
+                            // de Orçamentos.
+                            onSelectOrcamento={(o) => {
+                              // Para digitar o número a recepção apaga o nome, o
+                              // que desmarca a paciente. Na ficha já existente,
+                              // devolve a paciente gravada — o orçamento só a
+                              // troca se tiver cadastro próprio.
+                              setForm((f) => ({
+                                ...f,
+                                orcamento_numero: formatNumeroOrcamento(o.serie, o.numero),
+                                ...(editing?.paciente_id && !f.paciente_id
+                                  ? {
+                                      paciente_id: editing.paciente_id,
+                                      paciente_nome: editing.paciente_nome,
+                                    }
+                                  : {}),
+                              }));
+                              void buscarOrcamento(o.numero, o.serie);
+                            }}
+                            placeholder="Nome, CPF, nascimento, prontuário ou nº do orçamento…"
                             autoFocus
                             enableVoice
                           />
@@ -9922,37 +10402,8 @@ function AgendaPage() {
                         desconto, o setor de contratos precisa cadastrá-lo como beneficiário.
                       </p>
                     )}
-                    {!editing && ofereceCheckupRosa && (
-                      <details className="text-xs rounded-md border border-pink-200 bg-pink-50/60 text-slate-700 px-2 py-1.5 dark:border-pink-900 dark:bg-pink-950/20 dark:text-slate-200">
-                        <summary className="cursor-pointer">
-                          Lembrete: ofereça o <b>Checkup Rosa</b> — preventivo sem custo com
-                          consulta e exames. Nada muda neste agendamento.
-                        </summary>
-                        <div className="mt-1.5 space-y-1">
-                          {PACOTES_CHECKUP_ROSA.map((p) => {
-                            const totais = Object.values(p.itens).reduce(
-                              (s, v) => ({ d: s.d + v!.dinheiro, c: s.c + v!.cartao }),
-                              { d: 0, c: 0 },
-                            );
-                            const brl = (n: number) =>
-                              n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                            return (
-                              <p key={p.id} className="leading-snug">
-                                <b>{p.nome}</b>:{" "}
-                                {(Object.keys(p.itens) as ItemCheckupRosa[])
-                                  .map((i) => NOME_ITEM_CHECKUP_ROSA[i])
-                                  .join(" + ")}{" "}
-                                — {brl(totais.d)} dinheiro / {brl(totais.c)} Pix/cartão
-                              </p>
-                            );
-                          })}
-                          <p className="text-muted-foreground leading-snug">
-                            Agende cada serviço na agenda do seu profissional. Na cobrança, marque
-                            os atendimentos da paciente e use <b>Cobrar selecionados</b>: o sistema
-                            reconhece o pacote e oferece aplicar o preço.
-                          </p>
-                        </div>
-                      </details>
+                    {ofereceCheckupRosa && !(editing && pagosSet.has(editing.id)) && (
+                      <LembreteCheckupRosa complemento="Nada muda neste agendamento." />
                     )}
                     {previaCobranca && (
                       <div className="space-y-1.5">
@@ -10041,6 +10492,7 @@ function AgendaPage() {
                       </Label>
                       <SearchableSelect
                         value={form.medico_id || "none"}
+                        displayLabel={rotuloCaixaLaboratorio}
                         disabled={!!editing}
                         onChange={(v) => {
                           if (v.startsWith("exame:")) {
@@ -10246,6 +10698,12 @@ function AgendaPage() {
                           />
                         );
                       })()}
+                      {fichaLabSemExames && (
+                        <p className="text-xs text-amber-700 font-medium">
+                          Nenhum exame escolhido — marque os exames nesta caixa ou digite o nº do
+                          orçamento no campo Paciente para trazer os exames dele.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-slate-700">Status</Label>
@@ -10427,6 +10885,20 @@ function AgendaPage() {
         requireNfse
       />
 
+      <Dialog open={tabelaRosaAberta} onOpenChange={setTabelaRosaAberta}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>🎀 Checkup Rosa — tabela de valores</DialogTitle>
+          </DialogHeader>
+          <TabelaCheckupRosa />
+          <p className="text-xs text-muted-foreground leading-snug">
+            D = dinheiro · C = Pix ou cartão. Agende cada serviço na agenda do seu profissional; na
+            cobrança, marque os atendimentos da paciente e use <b>Cobrar selecionados</b> — o
+            sistema reconhece o pacote e oferece aplicar o preço.
+          </p>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -10456,6 +10928,35 @@ function AgendaPage() {
               Dica: use as teclas 1–5 para escolher rapidamente.
             </span>
           </div>
+          {(() => {
+            const pacoteIndividual = pacoteRosaDaCobrancaIndividual(formaPagCtx?.agId);
+            if (!pacoteIndividual) {
+              // Consulta de ginecologia ou preventivo cobrados sozinhos: só o
+              // lembrete com a tabela, para a recepção oferecer o pacote.
+              const ag =
+                formaPagCtx && !formaPagCtx.agId.includes(",")
+                  ? items.find((a) => a.id === formaPagCtx.agId)
+                  : null;
+              const item =
+                ag && checkupRosaVigente(dataClinicaDe(ag.inicio))
+                  ? itemCheckupRosa(
+                      ag.procedimento,
+                      medicos.find((m) => m.id === ag.medico_id)?.especialidade_nome ?? null,
+                    )
+                  : null;
+              return item === "consulta" || item === "preventivo" ? (
+                <LembreteCheckupRosa complemento="Esta cobrança segue com o preço normal." />
+              ) : null;
+            }
+            return (
+              <p className="rounded-md border border-pink-300 bg-pink-50 px-2 py-2 text-[12px] leading-snug dark:border-pink-800 dark:bg-pink-950/40">
+                Esta paciente tem hoje os atendimentos do <b>{pacoteIndividual.pacote.nome}</b>.
+                Para cobrar com o preço do pacote (preventivo sem custo), feche esta janela, marque
+                os {Object.keys(pacoteIndividual.precoPorAtendimento).length} atendimentos dela na
+                lista e use <b>Cobrar selecionados</b>.
+              </p>
+            );
+          })()}
           <div className="grid gap-2 mt-2">
             {/* Pagamento parcial (entrada com saldo). Fica escondido na
                 cobrança agrupada — lá o valor é rateado entre vários
@@ -10624,12 +11125,21 @@ function AgendaPage() {
             setDescontoPendente(null);
             setSaldoOrcResumo(null);
             setSegundoRecebimentoLiberado(false);
+            setPagamentoValoresForma({});
           }
         }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
         initialFormaPagamento={pagamentoForma}
+        // Trocar a forma dentro da janela reajusta o valor (ex.: dinheiro
+        // R$ 110 → PIX R$ 130). Fora na cobrança com saldo (entrada/parcial)
+        // e na agrupada, cujos totais são montados para a forma já escolhida.
+        valoresPorForma={
+          saldoOrcResumo || segundoRecebimentoLiberado || pagamentoExtraIds.length > 0
+            ? undefined
+            : pagamentoValoresForma
+        }
         agendamentoId={pagamentoAgId}
         resumoSaldo={saldoOrcResumo}
         // Cobrança de um atendimento só: o pagamento pode ter parcelas pagas
@@ -12525,6 +13035,22 @@ function AgendaPage() {
             filtroMedico={filtroMedico}
             medicoNome={medicos.find((m) => m.id === filtroMedico)?.nome ?? null}
             onFechar={alternarResumo}
+            medicos={medicos.map((m) => ({
+              id: m.id,
+              nome: m.nome,
+              especialidade_nome: m.especialidade_nome ?? null,
+            }))}
+            // Login só de médico não vê nome de paciente na Agenda — a lista
+            // detalhada fica desligada para ele.
+            podeDetalhar={!isMedicoOnly}
+            onAbrirFicha={(id) => {
+              const orig = items.find((i) => i.id === id);
+              if (orig) openEdit(orig);
+              else
+                toast.info(
+                  "Esta ficha não está na lista carregada da Agenda. Ajuste a data ou os filtros e abra por ali.",
+                );
+            }}
           />
         )}
 
@@ -13093,10 +13619,18 @@ function AgendaPage() {
                     <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Ficha
                     </TableHead>
-                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {/* Dia e Data saem no notebook quando a lista é de um dia só:
+                    a data já está no filtro e no "Resumo do dia", e as duas
+                    colunas custavam ~150px que faltavam para nome e ações
+                    caberem sem rolagem lateral. Lista de vários dias mantém. */}
+                    <TableHead
+                      className={`h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground ${colunaDataSoNoMonitor}`}
+                    >
                       Dia
                     </TableHead>
-                    <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead
+                      className={`h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground ${colunaDataSoNoMonitor}`}
+                    >
                       Data
                     </TableHead>
                     <TableHead className="h-9 tela-alta:h-11 w-auto whitespace-nowrap px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -13105,7 +13639,10 @@ function AgendaPage() {
                     {/* As três colunas de texto livre dividem a sobra da linha em
                     proporção fixa. Sem isso um nome comprido de médico ou de
                     procedimento estica a coluna e empurra as ações para fora
-                    da tela em notebook. O conteúdo delas trunca com "…". */}
+                    da tela em notebook. O conteúdo delas trunca com "…" — e
+                    para isso as células levam `max-w-0`: sem ele a tabela
+                    automática alarga a coluna até caber o nome inteiro e o
+                    "…" nunca aparece. */}
                     <TableHead className="h-9 tela-alta:h-11 w-[15%] px-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Profissional
                     </TableHead>
@@ -13225,49 +13762,55 @@ function AgendaPage() {
                       const ocultarPaciente = estornoPend && isMedicoOnly;
                       const ehLivre = isSlotLivre(a.paciente_nome);
 
-                      // Cor de fundo da linha — overlay translúcido (bg-{cor}-500/N)
-                      // em vez de tom sólido -50/-100: o sólido fica quase branco e,
-                      // no modo escuro, o texto claro (--foreground) perde contraste
-                      // sobre ele. O overlay se mistura com o fundo real da linha e
-                      // funciona nos dois temas.
+                      // Cor de fundo da linha — no tema claro, os tons exatos do
+                      // sistema antigo (verde #d0f3c4, amarelo #ffffbf, azul
+                      // #b0deff), que a recepção pediu para manter: linha inteira
+                      // pintada, sem faixa lateral. O significado de cada cor é o
+                      // deste sistema (azul = check-in feito). No modo escuro segue
+                      // o overlay bg-{cor}-500/N: um tom sólido claro ali apagaria
+                      // o texto claro (--foreground).
                       // Sinalizado pela recepção: destaque âmbar. Fica abaixo do
                       // estorno (mais crítico) e acima das demais cores.
                       const sinalizado = !!a.sinalizado_em;
                       const semFaturamento = ehSemFaturamento(a);
                       let bgClass = "";
-                      let borderLeft = "";
                       const naoVem = !ehLivre && statusNaoVem(a.status);
                       if (estornoPend) {
-                        bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
-                        borderLeft = "border-l-4 border-rose-500";
+                        bgClass = "bg-[#ffc9c9] dark:bg-rose-500/10";
                       } else if (naoVem) {
                         // Cancelado / desistência / não compareceu: vermelho acima
                         // de qualquer outra marcação, para ninguém contar com ele.
-                        bgClass = "bg-rose-500/15 hover:bg-rose-500/20";
-                        borderLeft = "border-l-4 border-rose-600";
+                        bgClass = "bg-[#ffc9c9] dark:bg-rose-500/15";
                       } else if (sinalizado) {
-                        bgClass = "bg-amber-500/10 hover:bg-amber-500/15";
-                        borderLeft = "border-l-4 border-amber-500";
+                        bgClass = "bg-[#ffffbf] dark:bg-amber-500/10";
                       } else if (a.origem_externa) {
-                        bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
-                        borderLeft = "border-l-4 border-violet-400";
+                        bgClass = "bg-[#e2d6ff] dark:bg-violet-500/10";
                       } else if (realizado) {
-                        bgClass = "bg-slate-500/10 hover:bg-slate-500/15";
-                        borderLeft = "border-l-4 border-slate-500";
+                        bgClass = "bg-[#d3d7dc] dark:bg-slate-500/10";
                       } else if (presente) {
-                        bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
-                        borderLeft = "border-l-4 border-blue-400";
+                        bgClass = "bg-[#b0deff] dark:bg-blue-500/10";
                       } else if (!ehLivre && a.status === "confirmado") {
                         // Confirmou por telefone/WhatsApp que vem: VERDE. Quem já fez
                         // check-in cai no ramo `presente` acima e fica azul — presença
                         // continua sendo só o clique manual da recepção.
-                        bgClass = "bg-emerald-500/15 hover:bg-emerald-500/20";
-                        borderLeft = "border-l-4 border-emerald-500";
+                        bgClass = "bg-[#d0f3c4] dark:bg-emerald-500/15";
                       }
 
                       const ehAgora = a.id === agoraAgId;
-                      if (ehAgora && !bgClass) bgClass = "bg-blue-500/5 hover:bg-blue-500/10";
-                      if (ehAgora && !borderLeft) borderLeft = "border-l-4 border-blue-500";
+                      if (ehAgora && !bgClass) bgClass = "bg-blue-50 dark:bg-blue-500/5";
+
+                      // Zebrado com contraste real (branco × slate-200) — a
+                      // recepção perdia a linha com o tom quase branco de antes.
+                      // Só vale para a linha sem cor de situação: verde, azul,
+                      // vermelho etc. são informação e continuam valendo.
+                      const zebra = bgClass
+                        ? ""
+                        : idx % 2 === 0
+                          ? "bg-white dark:bg-transparent"
+                          : "bg-slate-200 dark:bg-white/5";
+                      // Destaque ao passar o mouse vem por último para vencer o
+                      // hover da cor de situação: a atendente não perde a linha.
+                      const linhaClass = `${zebra} ${bgClass} border-b border-b-white hover:bg-blue-100 dark:border-b-slate-700 dark:hover:bg-blue-500/20`;
 
                       return (
                         <Fragment key={a.id}>
@@ -13302,13 +13845,13 @@ function AgendaPage() {
                               </TableCell>
                             </TableRow>
                           )}
-                          <TableRow data-ag-id={a.id} className={`${bgClass} ${borderLeft}`}>
+                          <TableRow data-ag-id={a.id} className={linhaClass}>
                             {/* Checkbox — horário livre TAMBÉM é selecionável: sem
                           isso uma grade aberta por engano não tinha como ser
                           apagada pela tela (o "Excluir" só age no que está
                           marcado). Quem protege o paciente é a trava dentro de
                           excluirSelecionados, não a caixinha desabilitada. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-xs">
                               <Checkbox
                                 checked={selecionados.has(a.id)}
                                 onCheckedChange={() => toggleSel(a.id)}
@@ -13317,7 +13860,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Ficha */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center font-mono text-xs font-medium">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-center font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
                               {ehFila ? (
                                 <span className="text-sm font-bold text-primary">
                                   #{fichaNum || "—"}
@@ -13328,19 +13871,23 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Dia da semana */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-muted-foreground">
+                            <TableCell
+                              className={`py-0.5 tela-alta:py-1 px-1.5 align-middle text-center text-xs font-medium tabular-nums text-slate-900 dark:text-muted-foreground ${colunaDataSoNoMonitor}`}
+                            >
                               {fmtDiaSemana(a.inicio)}
                             </TableCell>
 
                             {/* Data */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle whitespace-nowrap text-[12px] text-muted-foreground">
+                            <TableCell
+                              className={`py-0.5 tela-alta:py-1 px-1.5 align-middle whitespace-nowrap text-[12px] font-medium text-slate-900 dark:text-muted-foreground ${colunaDataSoNoMonitor}`}
+                            >
                               {fmtData(a.inicio)}
                             </TableCell>
 
                             {/* Horário — uma linha só, tabular, 24h. Em agenda de
                             ordem de chegada o horário não é hora marcada: a
                             coluna diz isso em vez de mostrar o relógio. */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-emerald-600">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-[12px] font-semibold tabular-nums whitespace-nowrap text-[#007bf7] dark:text-sky-400">
                               {ehFila ? (
                                 <span className="text-[11px] font-normal text-muted-foreground">
                                   Ordem de chegada
@@ -13353,7 +13900,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Profissional */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="max-w-0 py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               {(() => {
                                 const label = medicoNomeAgendamento(a);
                                 const m = medicos.find((x) => x.id === a.medico_id);
@@ -13361,7 +13908,10 @@ function AgendaPage() {
                                   m && m.usa_sistema === false && !recursoIds.has(m.id);
                                 return (
                                   <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                                    <span className="block truncate text-xs" title={label}>
+                                    <span
+                                      className="block truncate text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100"
+                                      title={label}
+                                    >
                                       {label}
                                     </span>
                                     {manual && (
@@ -13375,20 +13925,20 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Cliente */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="max-w-0 py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               {ocultarPaciente ? (
-                                <span className="block truncate text-xs italic text-rose-600">
+                                <span className="block truncate text-sm font-medium italic text-rose-600">
                                   — aguardando estorno —
                                 </span>
                               ) : ehLivre ? (
-                                <span className="block truncate text-xs font-medium text-primary/60">
+                                <span className="block truncate text-sm font-medium text-primary/70">
                                   Nenhum paciente agendado
                                 </span>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                                  className="block w-full max-w-full overflow-hidden text-left text-xs text-foreground hover:text-primary"
+                                  className="block w-full max-w-full overflow-hidden text-left text-sm text-foreground hover:text-primary"
                                   title={a.paciente_nome}
                                 >
                                   <span className="flex max-w-full items-center gap-1.5 overflow-hidden font-medium text-foreground hover:underline">
@@ -13403,7 +13953,7 @@ function AgendaPage() {
                                     {a.status === "confirmado" && (
                                       <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                                     )}
-                                    <span className="block max-w-full truncate text-xs font-bold text-foreground">
+                                    <span className="block max-w-full truncate text-sm font-bold leading-tight text-slate-900 dark:text-foreground">
                                       {a.paciente_nome}
                                     </span>
                                   </span>
@@ -13442,7 +13992,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Serviço */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs overflow-hidden">
+                            <TableCell className="max-w-0 py-0.5 tela-alta:py-1 px-1.5 align-middle text-sm overflow-hidden">
                               <ProcedimentoCell
                                 valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                                 rotuloExibicao={
@@ -13467,7 +14017,7 @@ function AgendaPage() {
                             </TableCell>
 
                             {/* Situação */}
-                            <TableCell className="py-1 tela-alta:py-1.5 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
+                            <TableCell className="py-0.5 tela-alta:py-1 px-1.5 align-middle text-xs w-[110px] whitespace-nowrap">
                               {ehLivre ? (
                                 (() => {
                                   const lockNome = slotTravadoPorOutro(a);
@@ -13533,7 +14083,7 @@ function AgendaPage() {
                           vazia (nem o traço, que já custava largura); com
                           observação mostra o balão com a bolinha vermelha,
                           o texto no tooltip e o modal completo no clique. */}
-                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-1 tela-alta:py-1.5 px-1 align-middle text-center">
+                            <TableCell className="w-[34px] min-w-[34px] max-w-[34px] py-0.5 tela-alta:py-1 px-1 align-middle text-center">
                               {(() => {
                                 const obs = (a.observacoes ?? "").trim();
                                 if (ehLivre || ocultarPaciente || !obs) return null;
@@ -13569,14 +14119,16 @@ function AgendaPage() {
                             {/* Ações - Botões na linha + Menu
                                 Os botões desta linha são 24px (`h-6 tela-alta:h-7 w-6 tela-alta:w-7`), e não
                                 28px. Quem define a altura da linha da tabela são
-                                eles, não o texto: com 24px mais o respiro de 4px,
-                                a linha fica em 32px no lugar de 40px, o que cabe
+                                eles, não o texto: com 24px mais o respiro de 2px
+                                (py-0.5, reduzido em 02/10/2026 para caber a fonte
+                                de 14px sem a linha crescer), a linha fica em
+                                ~28px no lugar de 40px, o que cabe
                                 cerca de três linhas a mais na tela de um
                                 notebook. Foi uma troca decidida em 25/09/2026 —
                                 alvo de clique menor em troca de menos rolagem,
                                 porque a recepção reclamou de rolar demais.
                                 24px é o piso: não diminuir mais. */}
-                            <TableCell className="w-[170px] min-w-[170px] py-1 tela-alta:py-1.5 px-2 text-right whitespace-nowrap">
+                            <TableCell className="w-[170px] min-w-[170px] py-0.5 tela-alta:py-1 px-2 text-right whitespace-nowrap">
                               <TooltipProvider delayDuration={200}>
                                 <div className="flex items-center justify-end gap-1.5">
                                   {/* Confirmar (1 clique). Ocupa o lugar do check-in:
@@ -14076,7 +14628,42 @@ function AgendaPage() {
                   : a.procedimento,
                 status: a.status,
                 livre: isSlotLivre(a.paciente_nome),
+                pagamento: ehSemFaturamento(a)
+                  ? ("sem_faturamento" as const)
+                  : a.origem_externa
+                    ? ("externo" as const)
+                    : parciaisSet.has(a.id)
+                      ? ("parcial" as const)
+                      : pagosSet.has(a.id)
+                        ? ("pago" as const)
+                        : ("pendente" as const),
               }))}
+            // Atalhos 💲 e ✅ do cartão: as mesmas funções da visão em lista,
+            // com as mesmas travas (particular só realiza depois de pago, nada
+            // de data futura, sem faturamento não cobra). Médico não vê.
+            onCobrar={
+              podeEscrever && !isMedicoOnly
+                ? (a) => {
+                    const orig = items.find((i) => i.id === a.id);
+                    if (orig) void cobrarAgendamento(orig);
+                  }
+                : undefined
+            }
+            onFinalizar={
+              podeEscrever && !isMedicoOnly
+                ? async (a) => {
+                    const orig = items.find((i) => i.id === a.id);
+                    if (!orig) return;
+                    if (
+                      !(await confirmDialog(
+                        `Finalizar o atendimento de ${orig.paciente_nome} (marcar como Realizado)?`,
+                      ))
+                    )
+                      return;
+                    await mudarStatus(orig, "realizado");
+                  }
+                : undefined
+            }
             fmtHora={fmtHora}
             onAgClick={(a) => {
               const orig = items.find((i) => i.id === a.id);
@@ -14581,7 +15168,12 @@ function AgendaPage() {
               orcamento_numero: String(ctx.orcamento.numero),
               orcamento_itens: nomes,
               paciente_id: ctx.orcamento.paciente_id ?? f.paciente_id,
-              paciente_nome: ctx.orcamento.paciente_nome ?? f.paciente_nome,
+              paciente_nome: ctx.orcamento.paciente_id
+                ? (ctx.orcamento.paciente_nome ?? f.paciente_nome)
+                : f.paciente_id
+                  ? f.paciente_nome
+                  : (ctx.orcamento.paciente_nome ?? f.paciente_nome),
+              medico_id: f.medico_id || ctx.orcamento.medico_id || "",
               procedimento: procStr,
               procedimentos: procStr ? [procStr] : [],
             }));

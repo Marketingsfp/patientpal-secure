@@ -188,7 +188,8 @@ function repasseDaColuna(
  *    Cartão Desconto / Convênio / Particular);
  * 2. para atendimento de convênio, a coluna Convênio da mesma linha;
  * 3. o repasse de cartão benefício cadastrado no médico;
- * 4. o Repasse Padrão do médico.
+ * 4. no cartão, a coluna Particular da linha do serviço (se maior que zero);
+ * 5. o Repasse Padrão do médico.
  *
  * Uma coluna em branco (vazia, nula ou "padrão") NÃO zera nada: só passa a vez
  * para o próximo degrau. O repasse só fica zerado quando alguém gravou o
@@ -280,6 +281,20 @@ function resolverRepasseExecutante(params: {
   if (forma !== "particular" || base === 0) {
     const cb = repasseCartaoBeneficios(med, base);
     if (cb != null) return { total: base, repasse: cb };
+  }
+  // Cartão (Consulta/Desconto) com as colunas do cartão em branco e sem
+  // repasse de cartão no médico: vale a coluna Particular do serviço, não o
+  // Repasse Padrão — o padrão é o valor da consulta e pagava R$ 72,80 num OCT
+  // de R$ 203,00 (decisão do dono, 09/10/2026). Só quando a Particular é maior
+  // que zero: zero ali fala do particular e não zera o repasse do cartão.
+  if (forma === "cartao_consulta" || forma === "cartao_desconto") {
+    const particular = repasseDaColuna(linha, "particular", base);
+    if (particular && particular.repasse > 0) {
+      return {
+        total: particular.inflaTotal ? Math.max(base, particular.repasse) : base,
+        repasse: particular.repasse,
+      };
+    }
   }
   return { total: base, repasse: repassePadraoDoMedico(med, base) };
 }

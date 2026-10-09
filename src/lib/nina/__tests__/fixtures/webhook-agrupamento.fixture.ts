@@ -1,3 +1,4 @@
+import { deveResponderEmAudio } from "../../audio";
 /** POST real, persistência e agrupador reais; dependências externas isoladas no subprocesso. */
 import { mock } from "bun:test";
 import { createHmac } from "node:crypto";
@@ -12,8 +13,16 @@ import { entradaPermiteReabertura } from "../../reabertura-entrada";
 type Linha = Record<string, any>;
 const cenario = process.argv[2]!;
 const paridade = cenario === "paridade-cardiologia";
+// Exercita a autenticação real, inclusive a antiga configuração de reversão.
+const assinaturaErrada = [
+  "assinatura-invalida",
+  "assinatura-registrar",
+  "assinatura-status-invalida",
+].includes(cenario);
+if (cenario === "assinatura-registrar") process.env.WHATSAPP_WEBHOOK_ASSINATURA = "registrar";
+else delete process.env.WHATSAPP_WEBHOOK_ASSINATURA;
 const respostaCardiologia =
-  "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão.";
+  "Olá! Temos Cardiologia. Dinheiro: R$ 120,00 Cartão: R$ 145,00. Quer consultar os horários?";
 const entradasGerador: Linha[] = [];
 const db: Record<string, Linha[]> = {
   nina_message_batches: [],
@@ -31,6 +40,7 @@ let falhaRevisao = [
 ].includes(cenario);
 let fechada = cenario === "revisao-conversa-fechada";
 let reservaPerdidaDepois = false;
+let leiturasFoto = 0;
 let tts = 0,
   uploads = 0;
 let closedAt = "2026-09-14T03:00:00.000Z";
@@ -41,6 +51,9 @@ let modelo = 0,
   reaberturas = 0,
   revisao = 0,
   seq = 0;
+let recibosFrancisco = 0,
+  recibosConfirmacao = 0,
+  respostasFrancisco = 0;
 const estados = new Map<string, string>();
 const encerramentos: unknown[][] = [];
 globalThis.fetch = Object.assign(
@@ -143,6 +156,21 @@ mock.module("@/lib/nina/revisao-conversa.server", () => ({
   incrementarRevisaoConversa: async () => ++revisao,
   respostaObsoleta: async () => false,
 }));
+mock.module("@/lib/francisco/replies.server", () => ({
+  processarRespostaFrancisco: async () => {
+    respostasFrancisco++;
+    return false;
+  },
+  registrarEntregaFrancisco: async () => {
+    recibosFrancisco++;
+  },
+}));
+mock.module("@/lib/agenda/confirmacao-whatsapp.server", () => ({
+  processarRespostaConfirmacao: async () => ({ tratada: false }),
+  registrarStatusEntregaConfirmacao: async () => {
+    recibosConfirmacao++;
+  },
+}));
 mock.module("@/lib/integracoes/verificacao-v1.server", () => ({
   reconhecerCodigoVerificacao: async () =>
     cenario === "verificacao-revisao"
@@ -179,19 +207,24 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
     ai_enabled: true,
     status: fechada ? "closed" : "open",
   }),
-  ninaPodeResponder: () => true,
+  ninaPodeResponder: () => cenario !== "foto-humano",
 }));
 mock.module("@/lib/nina-desligada.server", () => ({ ninaDesativadaNaClinica: async () => false }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
   transcreverAudioWhatsapp: async () => ({ texto: "Bom dia", mime: "audio/ogg" }),
   receberMidiaWhatsapp: async () => ({
     base64: "AAAA",
-    mime: "audio/ogg",
+    mime: cenario.startsWith("foto-") ? "image/jpeg" : "audio/ogg",
     caminho: "clinica/2026-09/wamid_teste.ogg",
     erro: null,
   }),
   transcreverAudioBase64: async () => ({ texto: "Bom dia", erro: null }),
-  lerPedidoNaImagem: async () => ({ tipo: "outro" }),
+  lerPedidoNaImagem: async () => {
+    leiturasFoto++;
+    return cenario === "foto-legivel"
+      ? { tipo: "pedido_medico", itens: ["ECG"] }
+      : { tipo: "ilegivel" };
+  },
   limparMidiasExpiradasSeChegouAHora: async () => {},
   RESPOSTA_AUDIO_FALHOU: "Áudio indisponível",
   respostaMidiaNaoSuportada: () => "Mídia indisponível",
@@ -215,7 +248,11 @@ mock.module("@/lib/nina/burst.server", () => ({
       lerMensagens: async (ids) =>
         db
           .whatsapp_mensagens!.filter((m) => ids.includes(m.id))
-          .map((m) => ({ id: m.id, texto: m.body })),
+          .map((m) => ({
+            id: m.id,
+            texto: m.tipo === "image" ? m.transcricao : m.body,
+            tipo: m.tipo,
+          })),
       lerRevisao: async () => revisao,
       iniciar: async () => true,
       concluir: async (id) => {
@@ -243,7 +280,7 @@ mock.module("@/lib/whatsapp.server", () => ({
   },
   loadWhatsAppConfig: async () => ({
     access_token: "token-ficticio",
-    app_secret: "segredo-ficticio",
+    app_secret: cenario === "assinatura-sem-secret" ? null : "segredo-ficticio",
     phone_number_id: "telefone-clinica",
     display_phone_number: "5511999990000",
   }),
@@ -275,6 +312,23 @@ mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
   },
 }));
 mock.module("@/lib/nina-audio.server", () => ({
+  guardarAudioMensagem: async () => {},
+  avaliarFala: async () => ({
+    decisaoId: null,
+    textoHash: "hash-audio",
+    representacao: "audio_integral",
+  }),
+  prepararAudioResposta: async (
+    _clinica: string,
+    texto: string,
+    entrada: { recebeuAudio: boolean; mensagem: string },
+  ) => {
+    if (!deveResponderEmAudio(entrada)) return null;
+    tts++;
+    if (cenario === "audio-falha") return null;
+    if (cenario === "reserva-perdida-tts") reservaPerdidaDepois = true;
+    return { bytes: new Uint8Array([1, 2]), mime: "audio/ogg", ext: "ogg", texto, longa: false };
+  },
   respostaAudioDesativada: async () => false,
   prepararParaFala: (s: string) => s,
   pareceLista: () => false,
@@ -303,32 +357,73 @@ const corpo = JSON.stringify({
         {
           value: {
             metadata: { phone_number_id: "telefone-clinica" },
-            messages: [
-              {
-                id: "wa-entrada",
-                from: "5511999991111",
-                type: ["reserva-perdida-tts", "reserva-perdida-upload"].includes(cenario)
-                  ? "audio"
-                  : "text",
-                audio: { id: "audio-entrada" },
-                text: { body: paridade ? "Vocês tem cardiologista?" : "Bom dia" },
-              },
-            ],
+            ...(cenario.startsWith("assinatura-status-")
+              ? {
+                  statuses: [{ id: "wa-saida", status: "delivered" }],
+                }
+              : {}),
+            messages: cenario.startsWith("assinatura-status-")
+              ? []
+              : [
+                  {
+                    id: "wa-entrada",
+                    from: "5511999991111",
+                    image: { id: "foto-entrada" },
+                    type: cenario.startsWith("foto-")
+                      ? "image"
+                      : [
+                            "reserva-perdida-tts",
+                            "reserva-perdida-upload",
+                            "audio-recebido",
+                          ].includes(cenario)
+                        ? "audio"
+                        : "text",
+                    audio: { id: "audio-entrada" },
+                    text: {
+                      body:
+                        cenario === "audio-pedido" || cenario === "audio-falha"
+                          ? "Me responda em áudio"
+                          : paridade
+                            ? "Vocês tem cardiologista?"
+                            : "Bom dia",
+                    },
+                  },
+                ],
           },
         },
       ],
     },
   ],
 });
+const corpoEnviado =
+  cenario === "assinatura-corpo-alterado"
+    ? corpo.replace("Bom dia", "Boa tarde")
+    : cenario === "assinatura-bom-alterado" || cenario === "sucesso-bom"
+      ? "\uFEFF" + corpo
+      : corpo;
+const assinatura = `sha256=${createHmac(
+  "sha256",
+  assinaturaErrada ? "segredo-errado" : "segredo-ficticio",
+)
+  .update(cenario === "sucesso-bom" ? corpoEnviado : corpo)
+  .digest("hex")}`;
+const cabecalho =
+  cenario === "assinatura-sufixo-invalido"
+    ? assinatura + "junk"
+    : cenario === "assinatura-nibble-extra"
+      ? assinatura + "a"
+      : cenario === "assinatura-duplicada"
+        ? assinatura + ", " + assinatura
+        : cenario === "assinatura-curta"
+          ? "sha256=00"
+          : assinatura;
 const enviar = async () =>
   post({
     params: { clinicaId: "clinica" },
     request: new Request("https://teste.local/api/public/whatsapp/clinica", {
       method: "POST",
-      body: corpo,
-      headers: {
-        "x-hub-signature-256": `sha256=${createHmac("sha256", "segredo-ficticio").update(corpo).digest("hex")}`,
-      },
+      body: corpoEnviado,
+      headers: cenario === "assinatura-ausente" ? {} : { "x-hub-signature-256": cabecalho },
     }),
   });
 const primeira = await enviar();
@@ -359,9 +454,13 @@ console.log(
       rede,
       revisao,
       reaberturas,
+      recibosFrancisco,
+      recibosConfirmacao,
+      respostasFrancisco,
       encerramentos,
       entradasGerador,
       esperas,
+      leiturasFoto,
       entradas: db.whatsapp_mensagens!.filter((m) => m.direction === "in"),
       saidas: db.whatsapp_mensagens!.filter((m) => m.direction === "out"),
       logs: db.whatsapp_webhook_logs!.map((l) => l.resultado),

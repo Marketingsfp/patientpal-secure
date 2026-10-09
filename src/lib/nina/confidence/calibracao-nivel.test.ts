@@ -70,6 +70,10 @@ describe("FASE 6 — calibração por nível", () => {
     const r = calcularCalibracaoPorNivel(linhas, [
       erro({ conversa_id: "c1", created_at: "2026-09-02T09:00:00.000Z" }),
     ]);
-    expect(r.find((x) => x.nivel === "HIGH")).toMatchObject({ mensagens: 1, erros: 1, taxaErro: 100 });
+    expect(r.find((x) => x.nivel === "HIGH")).toMatchObject({
+      mensagens: 1,
+      erros: 1,
+      taxaErro: 100,
+    });
   });
 });

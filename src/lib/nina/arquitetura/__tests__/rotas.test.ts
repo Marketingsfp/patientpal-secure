@@ -87,12 +87,7 @@ describe("roteamento das conexões (FASE 4)", () => {
         const maxX = Math.max(a.x, b.x) - 2;
         for (const n of layout.nodes) {
           if (n.node.id === rota.de || n.node.id === rota.para) continue;
-          if (
-            n.x < maxX &&
-            n.x + LARGURA_NODE > minX &&
-            n.y < a.y &&
-            n.y + ALTURA_NODE > a.y
-          ) {
+          if (n.x < maxX && n.x + LARGURA_NODE > minX && n.y < a.y && n.y + ALTURA_NODE > a.y) {
             atravessa += 1;
           }
         }

@@ -158,9 +158,14 @@ export type CargaAgregada = {
 export function agregarCargaLuna(amostras: AmostraCarga[]): CargaAgregada {
   const mapa = new Map<number, LeadAgregado>();
   for (const a of amostras) {
-    const atual =
-      mapa.get(a.lead_indice) ??
-      { leadIndice: a.lead_indice, mensagens: 0, ok: 0, erros: 0, latenciaMediaMs: null, amostras: [] };
+    const atual = mapa.get(a.lead_indice) ?? {
+      leadIndice: a.lead_indice,
+      mensagens: 0,
+      ok: 0,
+      erros: 0,
+      latenciaMediaMs: null,
+      amostras: [],
+    };
     atual.mensagens += 1;
     if (a.status === "ok") atual.ok += 1;
     else atual.erros += 1;

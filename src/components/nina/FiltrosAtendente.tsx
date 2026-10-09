@@ -11,11 +11,7 @@ export function FiltrosAtendente({
   onChange: (valor: FiltroAtendente) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Filtrar conversas"
-      className="grid grid-cols-3 gap-1 pt-1.5"
-    >
+    <div role="group" aria-label="Filtrar conversas" className="grid grid-cols-3 gap-1 pt-1.5">
       {OPCOES_FILTRO_ATENDENTE.map((opcao) => {
         const quantidade = contagens[opcao.valor];
         const descricao = `${opcao.rotulo}: ${quantidade} ${quantidade === 1 ? "conversa" : "conversas"}`;
@@ -27,7 +23,7 @@ export function FiltrosAtendente({
             aria-pressed={valor === opcao.valor}
             aria-label={descricao}
             title={descricao}
-            className="relative h-9 min-w-0 px-1 text-[11px]"
+            className="relative h-7 min-w-0 px-1 text-[11px]"
             onClick={() => onChange(opcao.valor)}
           >
             {opcao.rotulo}

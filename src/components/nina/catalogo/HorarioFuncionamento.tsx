@@ -5,6 +5,7 @@
  * Rascunho não tem efeito nenhum; só a versão publicada é usada pela Nina e
  * pelas métricas. Publicar cria uma versão nova e preserva a anterior.
  */
+import { hojeBR } from "@/lib/date-utils";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -49,7 +50,12 @@ import {
 
 type Props = { clinicaId?: string; podeEditar: boolean };
 
-type LinhaDia = { dia_semana: number; fechado: boolean; hora_inicio: string | null; hora_fim: string | null };
+type LinhaDia = {
+  dia_semana: number;
+  fechado: boolean;
+  hora_inicio: string | null;
+  hora_fim: string | null;
+};
 
 function agrupar(linhas: LinhaDia[]): Record<number, DiaHorario> {
   const mapa: Record<number, DiaHorario> = {};
@@ -57,7 +63,8 @@ function agrupar(linhas: LinhaDia[]): Record<number, DiaHorario> {
     const d = Number(l.dia_semana);
     mapa[d] ??= { dia_semana: d, fechado: false, faixas: [] };
     if (l.fechado) mapa[d].fechado = true;
-    else if (l.hora_inicio) mapa[d].faixas.push({ hora_inicio: l.hora_inicio, hora_fim: l.hora_fim ?? "" });
+    else if (l.hora_inicio)
+      mapa[d].faixas.push({ hora_inicio: l.hora_inicio, hora_fim: l.hora_fim ?? "" });
   }
   return mapa;
 }
@@ -91,7 +98,7 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
   const rascunho = (data as any)?.rascunho ?? null;
   const vigente = (data as any)?.vigente ?? null;
   const versoes: any[] = (data as any)?.versoes ?? [];
-  const hoje: string = (data as any)?.hoje ?? new Date().toISOString().slice(0, 10);
+  const hoje: string = (data as any)?.hoje ?? hojeBR();
   const role: string = (data as any)?.role ?? "";
 
   const [edicao, setEdicao] = useState<Record<number, DiaHorario>>({});
@@ -103,8 +110,10 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
   const salvos = useMemo(() => agrupar(rascunho?.dias ?? []), [rascunho]);
   const oficiais = useMemo(() => agrupar(vigente?.dias ?? []), [vigente]);
 
-  const dia = (n: number): DiaHorario => edicao[n] ?? salvos[n] ?? { dia_semana: n, fechado: false, faixas: [] };
-  const alterar = (n: number, patch: Partial<DiaHorario>) => setEdicao((r) => ({ ...r, [n]: { ...dia(n), ...patch } }));
+  const dia = (n: number): DiaHorario =>
+    edicao[n] ?? salvos[n] ?? { dia_semana: n, fechado: false, faixas: [] };
+  const alterar = (n: number, patch: Partial<DiaHorario>) =>
+    setEdicao((r) => ({ ...r, [n]: { ...dia(n), ...patch } }));
 
   const mCriar = useMutation({
     mutationFn: (copiar: boolean) =>
@@ -125,14 +134,27 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
 
   const mVigencia = useMutation({
     mutationFn: (valor: string) =>
-      atualizarRascunho({ data: { versaoId: rascunho!.id, vigenciaInicio: valor, observacao: rascunho?.observacao ?? null } }),
+      atualizarRascunho({
+        data: {
+          versaoId: rascunho!.id,
+          vigenciaInicio: valor,
+          observacao: rascunho?.observacao ?? null,
+        },
+      }),
     onSuccess: invalidar,
-    onError: (e: any) => toast.error(String(e?.message ?? "Não foi possível atualizar a validade.")),
+    onError: (e: any) =>
+      toast.error(String(e?.message ?? "Não foi possível atualizar a validade.")),
   });
 
   const mObs = useMutation({
     mutationFn: (valor: string) =>
-      atualizarRascunho({ data: { versaoId: rascunho!.id, vigenciaInicio: rascunho!.vigencia_inicio, observacao: valor || null } }),
+      atualizarRascunho({
+        data: {
+          versaoId: rascunho!.id,
+          vigenciaInicio: rascunho!.vigencia_inicio,
+          observacao: valor || null,
+        },
+      }),
     onSuccess: invalidar,
   });
 
@@ -148,7 +170,14 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
 
   const mSalvarDia = useMutation({
     mutationFn: (n: number) =>
-      salvarDia({ data: { versaoId: rascunho!.id, diaSemana: n, fechado: dia(n).fechado, faixas: dia(n).faixas } }),
+      salvarDia({
+        data: {
+          versaoId: rascunho!.id,
+          diaSemana: n,
+          fechado: dia(n).fechado,
+          faixas: dia(n).faixas,
+        },
+      }),
     onSuccess: (_r, n) => {
       setEdicao((r) => {
         const c = { ...r };
@@ -161,7 +190,13 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
     onError: (e: any) => toast.error(String(e?.message ?? "Não foi possível salvar.")),
   });
 
-  const [exc, setExc] = useState({ data: "", tipo: "fechado" as "fechado" | "especial", ini: "", fim: "", desc: "" });
+  const [exc, setExc] = useState({
+    data: "",
+    tipo: "fechado" as "fechado" | "especial",
+    ini: "",
+    fim: "",
+    desc: "",
+  });
 
   const mSalvarExc = useMutation({
     mutationFn: () =>
@@ -221,7 +256,12 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
   const retro = rascunho ? ehRetroativa(vigenciaRascunho, hoje) : false;
   const temDiaConfigurado = (rascunho?.dias ?? []).length > 0;
   const errosExc = exc.data
-    ? validarExcecao({ data: exc.data, tipo: exc.tipo, hora_inicio: exc.ini || null, hora_fim: exc.fim || null })
+    ? validarExcecao({
+        data: exc.data,
+        tipo: exc.tipo,
+        hora_inicio: exc.ini || null,
+        hora_fim: exc.fim || null,
+      })
     : [];
   const bloqueiaRetro = retro && (!podePublicarRetroativo(role) || motivoRetro.trim().length < 5);
 
@@ -239,8 +279,8 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
           </p>
           {!vigente ? (
             <p className="text-sm text-muted-foreground">
-              Nenhuma versão publicada. Enquanto não houver, os atendimentos ficam como “não classificáveis” — o sistema
-              não presume que a clínica estava aberta nem fechada.
+              Nenhuma versão publicada. Enquanto não houver, os atendimentos ficam como “não
+              classificáveis” — o sistema não presume que a clínica estava aberta nem fechada.
             </p>
           ) : (
             <div className="space-y-2 text-sm">
@@ -251,7 +291,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                   {vigente.vigencia_fim ? ` até ${vigente.vigencia_fim}` : ""} · publicada em{" "}
                   {String(vigente.publicado_em ?? "").slice(0, 10)}
                 </span>
-                {vigente.retroativa && <Badge variant="outline">Publicada com efeito retroativo</Badge>}
+                {vigente.retroativa && (
+                  <Badge variant="outline">Publicada com efeito retroativo</Badge>
+                )}
               </div>
               <ul className="grid gap-1 sm:grid-cols-2">
                 {DIAS_SEMANA.map((nome, n) => (
@@ -265,7 +307,10 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                 <p className="text-muted-foreground">
                   Exceções nesta versão:{" "}
                   {(vigente.excecoes ?? [])
-                    .map((e: any) => `${e.data} (${e.tipo === "fechado" ? "fechado" : `${e.hora_inicio}–${e.hora_fim}`})`)
+                    .map(
+                      (e: any) =>
+                        `${e.data} (${e.tipo === "fechado" ? "fechado" : `${e.hora_inicio}–${e.hora_fim}`})`,
+                    )
                     .join(", ")}
                 </p>
               )}
@@ -283,7 +328,12 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                   onChange={(e) => setVigenciaNova(e.target.value)}
                 />
               </div>
-              <Button type="button" size="sm" disabled={mCriar.isPending} onClick={() => mCriar.mutate(!!vigente)}>
+              <Button
+                type="button"
+                size="sm"
+                disabled={mCriar.isPending}
+                onClick={() => mCriar.mutate(!!vigente)}
+              >
                 {vigente ? "Criar rascunho a partir da versão atual" : "Criar rascunho"}
               </Button>
             </div>
@@ -303,8 +353,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Alterar este rascunho não muda nada no atendimento da Nina nem nas métricas. Um dia sem configuração não
-                significa que a clínica estava fechada — para isso, marque “Fechado”.
+                Alterar este rascunho não muda nada no atendimento da Nina nem nas métricas. Um dia
+                sem configuração não significa que a clínica estava fechada — para isso, marque
+                “Fechado”.
               </p>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -315,11 +366,14 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                     type="date"
                     defaultValue={vigenciaRascunho}
                     disabled={!podeEditar}
-                    onBlur={(e) => e.target.value !== vigenciaRascunho && mVigencia.mutate(e.target.value)}
+                    onBlur={(e) =>
+                      e.target.value !== vigenciaRascunho && mVigencia.mutate(e.target.value)
+                    }
                   />
                   {retro && (
                     <p className="text-sm text-muted-foreground">
-                      Data no passado: a publicação será retroativa e afeta a classificação de atendimentos já ocorridos.
+                      Data no passado: a publicação será retroativa e afeta a classificação de
+                      atendimentos já ocorridos.
                     </p>
                   )}
                 </div>
@@ -331,7 +385,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                     placeholder="Texto complementar (não substitui os horários abaixo)"
                     defaultValue={rascunho.observacao ?? ""}
                     disabled={!podeEditar}
-                    onBlur={(e) => e.target.value !== (rascunho.observacao ?? "") && mObs.mutate(e.target.value)}
+                    onBlur={(e) =>
+                      e.target.value !== (rascunho.observacao ?? "") && mObs.mutate(e.target.value)
+                    }
                   />
                 </div>
               </div>
@@ -353,9 +409,19 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{nome}</span>
                           <Badge
-                            variant={estado === "aberto" ? "default" : estado === "fechado" ? "destructive" : "secondary"}
+                            variant={
+                              estado === "aberto"
+                                ? "default"
+                                : estado === "fechado"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
                           >
-                            {estado === "aberto" ? "Aberto" : estado === "fechado" ? "Fechado" : "Não configurado"}
+                            {estado === "aberto"
+                              ? "Aberto"
+                              : estado === "fechado"
+                                ? "Fechado"
+                                : "Não configurado"}
                           </Badge>
                           {alterado && <Badge variant="outline">Alteração não salva</Badge>}
                         </div>
@@ -368,7 +434,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                             checked={d.fechado}
                             disabled={!podeEditar}
                             aria-label={`Marcar ${nome} como fechado`}
-                            onCheckedChange={(v) => alterar(n, { fechado: v, faixas: v ? [] : d.faixas })}
+                            onCheckedChange={(v) =>
+                              alterar(n, { fechado: v, faixas: v ? [] : d.faixas })
+                            }
                           />
                         </div>
                       </div>
@@ -376,7 +444,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                       {!d.fechado && (
                         <div className="space-y-2">
                           {d.faixas.length === 0 && (
-                            <p className="text-sm text-muted-foreground">Nenhuma faixa cadastrada para este dia.</p>
+                            <p className="text-sm text-muted-foreground">
+                              Nenhuma faixa cadastrada para este dia.
+                            </p>
                           )}
                           {d.faixas.map((f: Faixa, i) => (
                             <div key={i} className="flex flex-wrap items-end gap-2">
@@ -392,7 +462,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                                   disabled={!podeEditar}
                                   onChange={(e) =>
                                     alterar(n, {
-                                      faixas: d.faixas.map((x, k) => (k === i ? { ...x, hora_inicio: e.target.value } : x)),
+                                      faixas: d.faixas.map((x, k) =>
+                                        k === i ? { ...x, hora_inicio: e.target.value } : x,
+                                      ),
                                     })
                                   }
                                 />
@@ -409,7 +481,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                                   disabled={!podeEditar}
                                   onChange={(e) =>
                                     alterar(n, {
-                                      faixas: d.faixas.map((x, k) => (k === i ? { ...x, hora_fim: e.target.value } : x)),
+                                      faixas: d.faixas.map((x, k) =>
+                                        k === i ? { ...x, hora_fim: e.target.value } : x,
+                                      ),
                                     })
                                   }
                                 />
@@ -420,7 +494,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                                 size="icon"
                                 disabled={!podeEditar}
                                 aria-label={`Remover faixa ${i + 1} de ${nome}`}
-                                onClick={() => alterar(n, { faixas: d.faixas.filter((_, k) => k !== i) })}
+                                onClick={() =>
+                                  alterar(n, { faixas: d.faixas.filter((_, k) => k !== i) })
+                                }
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -431,7 +507,11 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                             variant="outline"
                             size="sm"
                             disabled={!podeEditar || d.faixas.length >= 6}
-                            onClick={() => alterar(n, { faixas: [...d.faixas, { hora_inicio: "", hora_fim: "" }] })}
+                            onClick={() =>
+                              alterar(n, {
+                                faixas: [...d.faixas, { hora_inicio: "", hora_fim: "" }],
+                              })
+                            }
                           >
                             <Plus className="mr-1 h-4 w-4" /> Adicionar faixa
                           </Button>
@@ -467,8 +547,8 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Uma data cadastrada aqui prevalece sobre a programação da semana. O sistema não deduz feriados: só vale o
-                que estiver cadastrado.
+                Uma data cadastrada aqui prevalece sobre a programação da semana. O sistema não
+                deduz feriados: só vale o que estiver cadastrado.
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-1">
@@ -488,7 +568,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={exc.tipo}
                     disabled={!podeEditar}
-                    onChange={(e) => setExc({ ...exc, tipo: e.target.value as "fechado" | "especial" })}
+                    onChange={(e) =>
+                      setExc({ ...exc, tipo: e.target.value as "fechado" | "especial" })
+                    }
                   >
                     <option value="fechado">Fechado</option>
                     <option value="especial">Funcionamento especial</option>
@@ -543,7 +625,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
 
               <ul className="divide-y rounded-md border">
                 {(rascunho.excecoes ?? []).length === 0 && (
-                  <li className="p-3 text-sm text-muted-foreground">Nenhuma exceção cadastrada neste rascunho.</li>
+                  <li className="p-3 text-sm text-muted-foreground">
+                    Nenhuma exceção cadastrada neste rascunho.
+                  </li>
                 )}
                 {(rascunho.excecoes ?? []).map((e: any) => (
                   <li key={e.id} className="flex items-center justify-between gap-2 p-3 text-sm">
@@ -579,7 +663,12 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                   >
                     Revisar e publicar
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => mDescartar.mutate()} disabled={mDescartar.isPending}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => mDescartar.mutate()}
+                    disabled={mDescartar.isPending}
+                  >
                     Descartar rascunho
                   </Button>
                 </div>
@@ -599,12 +688,27 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
             Um atendimento antigo continua sendo avaliado pela versão que valia na data dele.
           </p>
           <ul className="divide-y rounded-md border text-sm">
-            {versoes.length === 0 && <li className="p-3 text-muted-foreground">Nenhuma versão ainda.</li>}
+            {versoes.length === 0 && (
+              <li className="p-3 text-muted-foreground">Nenhuma versão ainda.</li>
+            )}
             {versoes.map((v: any) => (
               <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
                 <span className="flex flex-wrap items-center gap-2">
-                  <Badge variant={v.status === "publicado" ? "default" : v.status === "rascunho" ? "secondary" : "outline"}>
-                    Versão {v.versao} · {v.status === "publicado" ? "Publicada" : v.status === "rascunho" ? "Rascunho" : "Substituída"}
+                  <Badge
+                    variant={
+                      v.status === "publicado"
+                        ? "default"
+                        : v.status === "rascunho"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    Versão {v.versao} ·{" "}
+                    {v.status === "publicado"
+                      ? "Publicada"
+                      : v.status === "rascunho"
+                        ? "Rascunho"
+                        : "Substituída"}
                   </Badge>
                   <span className="text-muted-foreground">
                     Vale de {v.vigencia_inicio}
@@ -612,7 +716,9 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
                   </span>
                 </span>
                 <span className="text-muted-foreground">
-                  {v.publicado_em ? `Publicada em ${String(v.publicado_em).slice(0, 10)}` : "Ainda não publicada"}
+                  {v.publicado_em
+                    ? `Publicada em ${String(v.publicado_em).slice(0, 10)}`
+                    : "Ainda não publicada"}
                   {v.retroativa ? ` · retroativa: ${v.motivo_retroativo ?? ""}` : ""}
                 </span>
               </li>
@@ -627,17 +733,20 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
           <DialogHeader>
             <DialogTitle>Publicar horário — versão {rascunho?.versao}</DialogTitle>
             <DialogDescription>
-              Confira antes de publicar. Depois de publicada, esta versão vira o histórico oficial e não pode ser editada.
+              Confira antes de publicar. Depois de publicada, esta versão vira o histórico oficial e
+              não pode ser editada.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 text-sm">
             <p>
-              <strong>Escopo:</strong> clínica selecionada{rascunho?.unidade_id ? " (unidade específica)" : " (todas as unidades)"} ·{" "}
+              <strong>Escopo:</strong> clínica selecionada
+              {rascunho?.unidade_id ? " (unidade específica)" : " (todas as unidades)"} ·{" "}
               <strong>Fuso:</strong> {(data as any)?.fuso}
             </p>
             <p>
-              <strong>Vale a partir de:</strong> {vigenciaRascunho} {retro && <Badge variant="outline">retroativa</Badge>}
+              <strong>Vale a partir de:</strong> {vigenciaRascunho}{" "}
+              {retro && <Badge variant="outline">retroativa</Badge>}
             </p>
             <ul className="grid gap-1">
               {DIAS_SEMANA.map((nome, n) => (
@@ -652,15 +761,18 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
               {(rascunho?.excecoes ?? []).length === 0
                 ? "nenhuma"
                 : (rascunho?.excecoes ?? [])
-                    .map((e: any) => `${e.data} (${e.tipo === "fechado" ? "fechado" : `${e.hora_inicio}–${e.hora_fim}`})`)
+                    .map(
+                      (e: any) =>
+                        `${e.data} (${e.tipo === "fechado" ? "fechado" : `${e.hora_inicio}–${e.hora_fim}`})`,
+                    )
                     .join(", ")}
             </p>
 
             {retro && (
               <div className="space-y-1 rounded border border-destructive/40 p-3">
                 <p className="text-destructive">
-                  Publicação retroativa: atendimentos já ocorridos a partir de {vigenciaRascunho} passarão a ser avaliados
-                  por esta versão nas métricas.
+                  Publicação retroativa: atendimentos já ocorridos a partir de {vigenciaRascunho}{" "}
+                  passarão a ser avaliados por esta versão nas métricas.
                 </p>
                 {!podePublicarRetroativo(role) ? (
                   <p role="alert" className="text-destructive">
@@ -684,9 +796,18 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
               <div className="space-y-1 rounded border border-destructive/40 p-3" role="alert">
                 <p className="text-destructive">
                   Já existe horário oficial valendo neste período:{" "}
-                  {conflitos.map((c: any) => `versão ${c.versao} (${c.vigencia_inicio}–${c.vigencia_fim ?? "em diante"})`).join(", ")}.
+                  {conflitos
+                    .map(
+                      (c: any) =>
+                        `versão ${c.versao} (${c.vigencia_inicio}–${c.vigencia_fim ?? "em diante"})`,
+                    )
+                    .join(", ")}
+                  .
                 </p>
-                <p>Ao confirmar, a versão anterior passa a valer apenas até o dia anterior ao início desta. Nada é apagado.</p>
+                <p>
+                  Ao confirmar, a versão anterior passa a valer apenas até o dia anterior ao início
+                  desta. Nada é apagado.
+                </p>
               </div>
             )}
           </div>

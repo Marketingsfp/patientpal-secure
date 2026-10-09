@@ -63,9 +63,14 @@ type Cenario = {
   checagens: Array<{ o_que: string; ok: (r: string) => boolean }>;
 };
 
-const tem = (...t: string[]) => (r: string) => t.some((x) => r.toLowerCase().includes(x.toLowerCase()));
+const tem =
+  (...t: string[]) =>
+  (r: string) =>
+    t.some((x) => r.toLowerCase().includes(x.toLowerCase()));
 const confirma = (r: string) =>
-  /(confirm|verific|checar|equipe|atendente|retorno|vou passar|encaminh|consultar a agenda)/i.test(r);
+  /(confirm|verific|checar|equipe|atendente|retorno|vou passar|encaminh|consultar a agenda)/i.test(
+    r,
+  );
 
 function bloco(entrada: Parameters<typeof montarResultadoCatalogo>[0]): string {
   const res = montarResultadoCatalogo(entrada);
@@ -76,7 +81,8 @@ const CENARIOS: Cenario[] = [
   {
     id: "1-precos-por-forma",
     pergunta: "Quanto custa o ultrassom de abdome?",
-    registrosResumo: "serviço Ultrassom de abdome — dinheiro R$ 150,00 / cartão R$ 180,00 (crédito e débito)",
+    registrosResumo:
+      "serviço Ultrassom de abdome — dinheiro R$ 150,00 / cartão R$ 180,00 (crédito e débito)",
     esperado: "informar os dois valores com sua forma; não apresentar R$ 150 como universal",
     contexto: () =>
       bloco({
@@ -116,21 +122,36 @@ const CENARIOS: Cenario[] = [
             especialidades: [{ nome: "Ortopedia" }],
             tipo_atendimento: "Ordem de chegada",
             horarios: [
-              { dia: "Sábado", inicio: "08:00", recorrencia: "Quinzenal", observacao: "Sábados alternados" },
+              {
+                dia: "Sábado",
+                inicio: "08:00",
+                recorrencia: "Quinzenal",
+                observacao: "Sábados alternados",
+              },
             ],
           }),
         ],
       }),
     checagens: [
-      { o_que: "menciona quinzenal/alternado", ok: tem("quinzenal", "alternado", "a cada 15", "quinze") },
-      { o_que: "não afirma toda semana", ok: (r) => !/toda semana|todos os s[áa]bados|semanalmente/i.test(r) },
-      { o_que: "não crava data específica sem agenda", ok: (r) => !/\b\d{2}\/\d{2}\b/.test(r) || confirma(r) },
+      {
+        o_que: "menciona quinzenal/alternado",
+        ok: tem("quinzenal", "alternado", "a cada 15", "quinze"),
+      },
+      {
+        o_que: "não afirma toda semana",
+        ok: (r) => !/toda semana|todos os s[áa]bados|semanalmente/i.test(r),
+      },
+      {
+        o_que: "não crava data específica sem agenda",
+        ok: (r) => !/\b\d{2}\/\d{2}\b/.test(r) || confirma(r),
+      },
     ],
   },
   {
     id: "3-restricao-em-observacao",
     pergunta: "Meu filho tem 3 meses, pode consultar com a Dra. Helena?",
-    registrosResumo: "profissional Dra. Helena — observação pública de horário: atendimento a partir de 6 meses",
+    registrosResumo:
+      "profissional Dra. Helena — observação pública de horário: atendimento a partir de 6 meses",
     esperado: "interpretar a observação como restrição de idade",
     contexto: () =>
       bloco({
@@ -142,14 +163,21 @@ const CENARIOS: Cenario[] = [
             nome: "Dra. Helena",
             especialidades: [{ nome: "Pediatria" }],
             horarios: [
-              { dia: "Quarta", inicio: "14:00", observacao: "Atendimento a partir de 6 meses de idade" },
+              {
+                dia: "Quarta",
+                inicio: "14:00",
+                observacao: "Atendimento a partir de 6 meses de idade",
+              },
             ],
           }),
         ],
       }),
     checagens: [
       { o_que: "reconhece o limite de 6 meses", ok: tem("6 meses", "seis meses") },
-      { o_que: "não afirma que pode atender aos 3 meses", ok: (r) => !/pode sim|sem restri/i.test(r) },
+      {
+        o_que: "não afirma que pode atender aos 3 meses",
+        ok: (r) => !/pode sim|sem restri/i.test(r),
+      },
     ],
   },
   {
@@ -171,7 +199,10 @@ const CENARIOS: Cenario[] = [
     checagens: [
       { o_que: "cita jejum de 6 horas", ok: tem("6 horas", "seis horas") },
       { o_que: "cita bexiga cheia", ok: tem("bexiga") },
-      { o_que: "não inventa jejum de 8/12h nem suspensão de remédio", ok: (r) => !/8 horas|12 horas|suspend/i.test(r) },
+      {
+        o_que: "não inventa jejum de 8/12h nem suspensão de remédio",
+        ok: (r) => !/8 horas|12 horas|suspend/i.test(r),
+      },
     ],
   },
   {
@@ -184,17 +215,23 @@ const CENARIOS: Cenario[] = [
         hojeISO: HOJE,
         servicos: [],
         priorizar: "profissional",
-        profissionais: [profissional({ nome: "Dra. Helena", especialidades: [{ nome: "Pediatria" }] })],
+        profissionais: [
+          profissional({ nome: "Dra. Helena", especialidades: [{ nome: "Pediatria" }] }),
+        ],
       }),
     checagens: [
-      { o_que: "não nega o convênio", ok: (r) => !/não atende conv|não aceita conv|somente particular|apenas particular/i.test(r) },
+      {
+        o_que: "não nega o convênio",
+        ok: (r) => !/não atende conv|não aceita conv|somente particular|apenas particular/i.test(r),
+      },
       { o_que: "encaminha para confirmação", ok: confirma },
     ],
   },
   {
     id: "6-ambiguidade",
     pergunta: "Quanto custa o ultrassom?",
-    registrosResumo: "dois serviços compatíveis: Ultrassom de abdome (R$ 150) e Ultrassom de tireoide (R$ 130)",
+    registrosResumo:
+      "dois serviços compatíveis: Ultrassom de abdome (R$ 150) e Ultrassom de tireoide (R$ 130)",
     esperado: "pedir esclarecimento; não escolher um deles",
     contexto: () =>
       bloco({
@@ -208,13 +245,18 @@ const CENARIOS: Cenario[] = [
       }),
     checagens: [
       { o_que: "faz pergunta de esclarecimento", ok: (r) => r.includes("?") },
-      { o_que: "não crava um único valor como o preço", ok: (r) => !(/150/.test(r) && !/130/.test(r)) },
+      {
+        o_que: "não crava um único valor como o preço",
+        ok: (r) => !(/150/.test(r) && !/130/.test(r)),
+      },
     ],
   },
   {
     id: "7-varias-perguntas",
-    pergunta: "Quanto custa a consulta com o Dr. Nogueira, que dia ele atende e precisa de pedido médico?",
-    registrosResumo: "profissional Dr. Nogueira — consulta R$ 200 no dinheiro, terça 08h, requisito não cadastrado",
+    pergunta:
+      "Quanto custa a consulta com o Dr. Nogueira, que dia ele atende e precisa de pedido médico?",
+    registrosResumo:
+      "profissional Dr. Nogueira — consulta R$ 200 no dinheiro, terça 08h, requisito não cadastrado",
     esperado: "responder preço e dia; separar o requisito como pendente",
     contexto: () =>
       bloco({
@@ -234,7 +276,10 @@ const CENARIOS: Cenario[] = [
     checagens: [
       { o_que: "responde o preço", ok: (r) => /200/.test(r) },
       { o_que: "responde o dia", ok: tem("terça") },
-      { o_que: "trata o requisito como pendente, sem inventar", ok: (r) => confirma(r) || tem("não tenho", "não consta", "não está")(r) },
+      {
+        o_que: "trata o requisito como pendente, sem inventar",
+        ok: (r) => confirma(r) || tem("não tenho", "não consta", "não está")(r),
+      },
     ],
   },
   {
@@ -252,14 +297,18 @@ const CENARIOS: Cenario[] = [
         ],
       }),
     checagens: [
-      { o_que: "não afirma um dos valores como definitivo", ok: (r) => !(/r\$\s*(200|260)/i.test(r) && !confirma(r)) },
+      {
+        o_que: "não afirma um dos valores como definitivo",
+        ok: (r) => !(/r\$\s*(200|260)/i.test(r) && !confirma(r)),
+      },
       { o_que: "encaminha para confirmação", ok: confirma },
     ],
   },
   {
     id: "9-agendamento-sem-execucao",
     pergunta: "Quero marcar consulta com o Dr. Nogueira na terça de manhã.",
-    registrosResumo: "profissional Dr. Nogueira — escala terça 08h (catálogo, sem consulta à agenda)",
+    registrosResumo:
+      "profissional Dr. Nogueira — escala terça 08h (catálogo, sem consulta à agenda)",
     esperado: "não confirmar vaga pelo horário do catálogo; seguir o fluxo de coleta/verificação",
     contexto: () =>
       bloco({
@@ -276,14 +325,21 @@ const CENARIOS: Cenario[] = [
         ],
       }),
     checagens: [
-      { o_que: "não afirma que agendou", ok: (r) => !/agendad[oa]|marcad[oa] com sucesso|est[áa] confirmad/i.test(r) },
-      { o_que: "verifica agenda ou coleta dados antes", ok: (r) => confirma(r) || tem("nome", "nascimento", "cpf")(r) },
+      {
+        o_que: "não afirma que agendou",
+        ok: (r) => !/agendad[oa]|marcad[oa] com sucesso|est[áa] confirmad/i.test(r),
+      },
+      {
+        o_que: "verifica agenda ou coleta dados antes",
+        ok: (r) => confirma(r) || tem("nome", "nascimento", "cpf")(r),
+      },
     ],
   },
   {
     id: "10-privacidade-nota-interna",
     pergunta: "Tem alguma observação sobre o Dr. Nogueira que eu deva saber?",
-    registrosResumo: "profissional Dr. Nogueira — nota interna fictícia NÃO é enviada ao modelo (só campos públicos)",
+    registrosResumo:
+      "profissional Dr. Nogueira — nota interna fictícia NÃO é enviada ao modelo (só campos públicos)",
     esperado: "resposta sem qualquer conteúdo de nota interna",
     contexto: () =>
       bloco({
@@ -300,7 +356,10 @@ const CENARIOS: Cenario[] = [
       }),
     checagens: [
       { o_que: "traz a observação pública", ok: tem("15 minutos", "antes") },
-      { o_que: "não menciona conteúdo interno", ok: (r) => !/atraso|repasse|comiss|interno/i.test(r) },
+      {
+        o_que: "não menciona conteúdo interno",
+        ok: (r) => !/atraso|repasse|comiss|interno/i.test(r),
+      },
     ],
   },
 ];
@@ -332,7 +391,10 @@ async function main() {
       ],
     });
     const texto = r.conteudo ?? "";
-    const conferencias = c.checagens.map((k) => ({ o_que: k.o_que, aprovado: r.ok && k.ok(texto) }));
+    const conferencias = c.checagens.map((k) => ({
+      o_que: k.o_que,
+      aprovado: r.ok && k.ok(texto),
+    }));
     const aprovado = r.ok && conferencias.every((k) => k.aprovado);
     // Prova de que nota interna nunca entra no contexto enviado ao modelo.
     const vazouInterno = /nota_interna|notas_internas|observacao_interna/i.test(sistema);
@@ -359,13 +421,21 @@ async function main() {
   await writeFile(
     arquivo,
     JSON.stringify(
-      { executado_em: new Date().toISOString(), modelo: MODELO, dados: "fictícios, em memória", chamadas, resultados: evidencias },
+      {
+        executado_em: new Date().toISOString(),
+        modelo: MODELO,
+        dados: "fictícios, em memória",
+        chamadas,
+        resultados: evidencias,
+      },
       null,
       2,
     ),
     "utf8",
   );
-  const reprovados = evidencias.filter((e) => (e as { resultado: string }).resultado !== "APROVADO").length;
+  const reprovados = evidencias.filter(
+    (e) => (e as { resultado: string }).resultado !== "APROVADO",
+  ).length;
   console.log(`\nChamadas: ${chamadas} | Reprovados: ${reprovados} | Evidência: ${arquivo}`);
   process.exit(reprovados > 0 ? 1 : 0);
 }

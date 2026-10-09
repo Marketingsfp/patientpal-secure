@@ -11,6 +11,7 @@
  * papel e confunde na hora de ler.
  */
 
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useState } from "react";
 import { Tag, Printer, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
@@ -106,7 +107,7 @@ export function TabelaPrecosOdontoButton({ especialidadeId }: Props) {
       i === 0 ? { rotulo, tipo: "texto", largura: 46 } : { rotulo, tipo: "moeda", largura: 16 },
     );
     void exportarRelatorioXlsx({
-      arquivo: `tabela-precos-odontologia-${new Date().toISOString().slice(0, 10)}`,
+      arquivo: `tabela-precos-odontologia-${hojeBR()}`,
       aba: "Preços Odontologia",
       cabecalho: ["Tabela de Preços — Odontologia", ...contexto()],
       colunas,

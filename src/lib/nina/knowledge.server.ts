@@ -2,13 +2,12 @@
  * CONSULTA DA NINA AO CADASTRO (camada única de consulta).
  *
  * Fluxo oficial:
- *   Paciente → intenção → searchKnowledgeBase() → CADASTRO DO SISTEMA
+ *   Paciente → intenção → searchKnowledgeBase() → FONTE SELECIONADA NA CLÍNICA
  *   (médicos, horários, consultas, exames e procedimentos) → resultado
  *   estruturado → modelo → resposta.
  *
- * Não existe base de conhecimento própria da Nina: ela informa o que está no cadastro do sistema
- * (Clínica médica > Cadastros), do jeito que está. O que não está lá é tratado como informação
- * desconhecida, e quem corrige é a equipe, na origem.
+ * A seleção manual escolhe entre cadastro do sistema e base editorial publicada.
+ * Não mistura fontes nem faz fallback. A equipe corrige os dados na fonte escolhida.
  *
  * Server-only.
  */
@@ -35,7 +34,9 @@ export type PedidoConhecimento = {
 export async function searchKnowledgeBase(
   pedido: PedidoConhecimento,
 ): Promise<ResultadoConhecimento> {
-  const query = String(pedido.query ?? "").trim().slice(0, 200);
+  const query = String(pedido.query ?? "")
+    .trim()
+    .slice(0, 200);
 
   const { buscarNoCatalogo } = await import("./catalogo-retrieval.server");
   const resultado = await buscarNoCatalogo({
@@ -49,6 +50,7 @@ export async function searchKnowledgeBase(
   });
 
   console.info("[nina-cadastro]", {
+    fonte_consulta: resultado.fonte_consulta,
     knowledge_status: resultado.knowledge_status,
     itens: resultado.records.length,
     trace: resultado.trace.slice(0, 3),

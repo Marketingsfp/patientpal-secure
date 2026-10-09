@@ -10,11 +10,3 @@ test("revisão preserva identidade e encaminhamento do prompt vigente e é idemp
   expect(revisarFontesPromptMaster(depois)).toBe(depois);
   expect(() => revisarFontesPromptMaster("Texto sem marcador")).toThrow();
 });
-
-test("fallback também só informa e encaminha a marcação sem coletar cadastro", () => {
-  const p = PROMPT_NINA_WHATSAPP_V4;
-  expect(p).toContain("PACIENTE_QUER_MARCAR");
-  expect(p).toContain("Não consulte vagas, não peça dados cadastrais e não prometa horário");
-  expect(p).not.toContain("execute o agendamento autorizado");
-  expect(p).not.toContain("consulte a comparação de agendas");
-});

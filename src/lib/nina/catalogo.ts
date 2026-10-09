@@ -12,8 +12,7 @@
  *    fonte: havendo formas de pagamento com valor, o resumo é derivado delas.
  */
 import { z } from "zod";
-import { estruturaCatalogoSchema, padronizarSfp } from "./catalogo-estrutura";
-import { rotuloPagamentoNina } from "./pagamento-catalogo";
+import { estruturaCatalogoSchema } from "./catalogo-estrutura";
 
 export const STATUS_CATALOGO = ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] as const;
 export type StatusCatalogo = (typeof STATUS_CATALOGO)[number];
@@ -35,12 +34,7 @@ export const DIAS_SEMANA = [
 ] as const;
 
 /** Recorrência: preserva exceções (quinzenal etc.) sem virar regra permanente. */
-export const RECORRENCIAS = [
-  "Toda semana",
-  "Quinzenal",
-  "Mensal",
-  "Data específica",
-] as const;
+export const RECORRENCIAS = ["Toda semana", "Quinzenal", "Mensal", "Data específica"] as const;
 
 /* ------------------------------------------------------------------ */
 /* Utilitários de formato                                              */
@@ -92,7 +86,7 @@ const textoOpcional = z
   .max(4000)
   .optional()
   .nullable()
-  .transform((v) => (v ? padronizarSfp(v) : null));
+  .transform((v) => v || null);
 
 const textoCurtoOpcional = z
   .string()
@@ -100,7 +94,7 @@ const textoCurtoOpcional = z
   .max(200)
   .optional()
   .nullable()
-  .transform((v) => (v ? padronizarSfp(v) : null));
+  .transform((v) => v || null);
 
 const valorOpcional = z
   .union([z.number(), z.string(), z.null()])
@@ -129,7 +123,7 @@ const dataOpcional = z
 /* ------------------------------------------------------------------ */
 
 export const formaPagamentoSchema = z.object({
-  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80).transform(rotuloPagamentoNina),
+  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80),
   valor: valorOpcional,
   condicao: textoCurtoOpcional,
   observacao: textoOpcional,
@@ -137,33 +131,54 @@ export const formaPagamentoSchema = z.object({
 export type FormaPagamento = z.infer<typeof formaPagamentoSchema>;
 
 export const executanteSchema = z.object({
+  tipo_escala: z.enum(["consulta", "exame_procedimento"]).optional(),
   medico_id: z.string().uuid().nullable().optional().default(null),
-  nome: z.string().trim().min(1, "Informe quem realiza").max(160).transform(padronizarSfp),
-  horarios: textoCurtoOpcional,
+  nome: z.string().trim().min(1, "Informe quem realiza").max(160),
+  // A origem pode reunir vários dias, turnos e exceções. Preserve o texto completo.
+  horarios: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((v) => v || null),
   observacao: textoOpcional,
 });
 export type Executante = z.infer<typeof executanteSchema>;
 
-export const servicoSchema = z.object({
-  estrutura: estruturaCatalogoSchema.nullable().optional(),
-  procedimento_id: z.string().uuid().nullable().optional().default(null),
-  nome: z.string().trim().min(2, "Informe o procedimento").max(200),
-  valor: valorOpcional,
-  valor_observacao: textoCurtoOpcional,
-  descricao_publica: textoOpcional,
-  preparo: textoOpcional,
-  restricoes: textoOpcional,
-  nota_interna: textoOpcional,
-  executantes: z.array(executanteSchema).max(50).default([]),
-  formas_pagamento: z.array(formaPagamentoSchema).max(30).default([]),
-}).superRefine((v, ctx) => {
-  if (v.estrutura?.categoria === "consulta") ctx.addIssue({ code: "custom", path: ["estrutura", "categoria"], message: "Cadastre consultas na seção de profissionais." });
-  if (v.estrutura?.preparo_status === "sem_preparo" && v.preparo) ctx.addIssue({ code: "custom", path: ["preparo"], message: "Há orientações de preparo cadastradas. Confira antes de marcar que não exige preparo." });
-}).transform(v => {
-  if (v.estrutura && v.estrutura.preparo_status !== "sem_preparo")
-    v.estrutura.preparo_status = v.preparo ? "informado" : "nao_informado";
-  return v;
-});
+export const servicoSchema = z
+  .object({
+    estrutura: estruturaCatalogoSchema.nullable().optional(),
+    procedimento_id: z.string().uuid().nullable().optional().default(null),
+    nome: z.string().trim().min(2, "Informe o procedimento").max(200),
+    valor: valorOpcional,
+    valor_observacao: textoCurtoOpcional,
+    descricao_publica: textoOpcional,
+    preparo: textoOpcional,
+    restricoes: textoOpcional,
+    nota_interna: textoOpcional,
+    executantes: z.array(executanteSchema).max(50).default([]),
+    formas_pagamento: z.array(formaPagamentoSchema).max(30).default([]),
+  })
+  .superRefine((v, ctx) => {
+    if (v.estrutura?.categoria === "consulta")
+      ctx.addIssue({
+        code: "custom",
+        path: ["estrutura", "categoria"],
+        message: "Cadastre consultas na seção de profissionais.",
+      });
+    if (v.estrutura?.preparo_status === "sem_preparo" && v.preparo)
+      ctx.addIssue({
+        code: "custom",
+        path: ["preparo"],
+        message:
+          "Há orientações de preparo cadastradas. Confira antes de marcar que não exige preparo.",
+      });
+  })
+  .transform((v) => {
+    if (v.estrutura && v.estrutura.preparo_status !== "sem_preparo")
+      v.estrutura.preparo_status = v.preparo ? "informado" : "nao_informado";
+    return v;
+  });
 export type ServicoCatalogo = z.infer<typeof servicoSchema>;
 
 /**
@@ -194,16 +209,15 @@ export type Vinculo = z.infer<typeof vinculoSchema>;
 
 export const horarioSchema = z
   .object({
+    // Origem vinculada por procedimento; preserva o escopo mesmo se a agenda tiver nome genérico.
+    tipo_escala: z.enum(["consulta", "exame_procedimento"]).optional(),
     dia: z.enum(DIAS_SEMANA),
     inicio: horaOpcional,
     fim: horaOpcional,
     recorrencia: z.enum(RECORRENCIAS).default("Toda semana"),
     observacao: textoCurtoOpcional,
   })
-  .refine(
-    (h) => !h.inicio || !h.fim || h.fim > h.inicio,
-    "O término precisa ser depois do início",
-  );
+  .refine((h) => !h.inicio || !h.fim || h.fim > h.inicio, "O término precisa ser depois do início");
 export type HorarioAtendimento = z.infer<typeof horarioSchema>;
 
 export const profissionalSchema = z
@@ -226,15 +240,18 @@ export const profissionalSchema = z
     nota_interna: textoOpcional,
   })
   .refine(
-    (p) =>
-      !p.aviso_valido_de || !p.aviso_valido_ate || p.aviso_valido_ate >= p.aviso_valido_de,
+    (p) => !p.aviso_valido_de || !p.aviso_valido_ate || p.aviso_valido_ate >= p.aviso_valido_de,
     "O fim da validade do aviso não pode ser antes do início",
   );
 export type ProfissionalCatalogo = z.infer<typeof profissionalSchema>;
 
 /** O aviso do dia é temporário: fora da validade, não deve ser tratado como regra. */
 export function avisoVigente(
-  item: { aviso_dia?: string | null; aviso_valido_de?: string | null; aviso_valido_ate?: string | null },
+  item: {
+    aviso_dia?: string | null;
+    aviso_valido_de?: string | null;
+    aviso_valido_ate?: string | null;
+  },
   hojeIso: string,
 ): boolean {
   if (!item.aviso_dia) return false;

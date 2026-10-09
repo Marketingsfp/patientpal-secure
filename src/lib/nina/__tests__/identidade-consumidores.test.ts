@@ -39,8 +39,7 @@ describe("saudação segue a identidade publicada, não a palavra Nina", () => {
   });
 
   it("sem identidade publicada não reprova por nome", () => {
-    const texto =
-      "Bom dia! Sou a assistente virtual do atendimento. Como posso te ajudar?";
+    const texto = "Bom dia! Sou a assistente virtual do atendimento. Como posso te ajudar?";
     const d = avaliarSaudacao(texto, { assistente: null, estabelecimento: null });
     expect(d.elementos.assistente).toBe(true);
     expect(d.completa).toBe(true);

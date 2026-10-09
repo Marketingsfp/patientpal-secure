@@ -3,6 +3,10 @@
  * mesmas linhas "publicadas" que o banco falso de cada teste já simula. O acesso paginado ao banco
  * do catálogo não existe mais; a conversão do cadastro tem testes próprios (fonte-operacional.test).
  */
+import { mock } from "bun:test";
+mock.module("../../fonte-consulta-config.server", () => ({
+  lerSelecaoFonte: async () => ({ fonte: "clinica_os", revisao: null }),
+}));
 type Linha = Record<string, unknown>;
 
 export function fonteOperacionalDoBanco(
@@ -29,8 +33,8 @@ export function fonteOperacionalDoBanco(
       registro.push(clinicaId);
       if (falhar()) throw new Error("Falha ao ler o cadastro");
       return {
-      servicos: publicados("servicos", clinicaId),
-      profissionais: publicados("profissionais", clinicaId),
+        servicos: publicados("servicos", clinicaId),
+        profissionais: publicados("profissionais", clinicaId),
       };
     },
   };

@@ -1,10 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  selectThinkingLevel,
-  escalonar,
-  nivelNaoRegride,
-  rotuloDebug,
-} from "../reasoning-router";
+import { selectThinkingLevel, escalonar, nivelNaoRegride, rotuloDebug } from "../reasoning-router";
 
 const nivel = (mensagem: string, extra = {}) =>
   selectThinkingLevel({ mensagem, temFerramentas: true, ...extra }).nivel;
@@ -24,7 +19,8 @@ describe("Reasoning Router — MEDIUM", () => {
     expect(nivel("Quero cardiologista sábado de manhã.")).toBe("medium"));
   it("múltiplas restrições de agenda é MEDIUM", () =>
     expect(nivel("Pode ser Dr. A ou Dra. B, sábado ou segunda depois das 14h.")).toBe("medium"));
-  it("cancelamento é MEDIUM", () => expect(nivel("Preciso cancelar minha consulta")).toBe("medium"));
+  it("cancelamento é MEDIUM", () =>
+    expect(nivel("Preciso cancelar minha consulta")).toBe("medium"));
   it("etapa com ferramenta já executada é MEDIUM", () =>
     expect(nivel("obrigado", { rodada: 1, ferramentasExecutadas: 1 })).toBe("medium"));
 });
@@ -32,14 +28,14 @@ describe("Reasoning Router — MEDIUM", () => {
 describe("Reasoning Router — HIGH (raro)", () => {
   it("conflito de ferramenta sobe para HIGH", () =>
     expect(nivel("Quero sábado", { houveConflito: true })).toBe("high"));
-  it("várias ferramentas interdependentes sobe para HIGH", () =>
+  it("sequência normal de catálogo e agenda não sobe para HIGH só por quantidade", () =>
     expect(
       nivel("Quero sábado", {
-        rodada: 2,
-        ferramentasExecutadas: 2,
-        nomesFerramentas: ["disponibilidade", "buscar_paciente"],
+        rodada: 12,
+        ferramentasExecutadas: 12,
+        nomesFerramentas: ["consultar_cadastro", "buscar_medicos", "consultar_disponibilidade"],
       }),
-    ).toBe("high"));
+    ).toBe("medium"));
   it("pergunta clínica fora de escopo NÃO vira HIGH", () =>
     expect(nivel("Estou com dor no peito, o que devo tomar?")).not.toBe("high"));
 });

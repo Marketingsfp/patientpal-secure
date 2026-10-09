@@ -13,7 +13,10 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { VALORES_CATEGORIA_FEEDBACK } from "@/lib/nina/feedback-erros";
 import { descricaoRecorte } from "@/lib/nina/metricas-filtros";
-import { resolverRecorteNoCiclo as resolverRecorte, AVISO_CICLO_APRENDIZADO } from "./ciclo-aprendizado";
+import {
+  resolverRecorteNoCiclo as resolverRecorte,
+  AVISO_CICLO_APRENDIZADO,
+} from "./ciclo-aprendizado";
 import {
   DEFINICOES_INDICADORES,
   VERSAO_REGRAS_ANALISE,
@@ -26,14 +29,7 @@ import {
   type FaixaHoraria,
 } from "@/lib/nina/metricas-analise";
 
-const STATUS = [
-  "pending",
-  "under_review",
-  "approved",
-  "rejected",
-  "applied",
-  "reverted",
-] as const;
+const STATUS = ["pending", "under_review", "approved", "rejected", "applied", "reverted"] as const;
 
 const CAUSAS = [
   "knowledge_error",
@@ -51,8 +47,14 @@ const recorteSchema = z.object({
   de: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   ate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   diaInteiro: z.boolean().default(true),
-  horaInicio: z.string().regex(/^\d{2}:\d{2}$/).nullish(),
-  horaFim: z.string().regex(/^\d{2}:\d{2}$/).nullish(),
+  horaInicio: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullish(),
+  horaFim: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullish(),
   /** 0 = domingo. Vazio ou ausente = todos os dias. */
   diasSemana: z.array(z.number().int().min(0).max(6)).max(7).nullish(),
   rotulo: z.string().trim().max(60).nullish(),
@@ -210,7 +212,6 @@ export const consultarMetricasNina = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => entrada.parse(i))
   .handler(async ({ data, context }) => executarConsultaMetricas(context, data));
 
-
 /**
  * Configuração de calendário e faixas usada pela análise. Sem configuração,
  * o analista deve dizer que o recorte não é classificável e pedir o
@@ -223,7 +224,9 @@ export const configuracaoAnaliseNina = createServerFn({ method: "POST" })
     const [cal, exc, faixas] = await Promise.all([
       context.supabase
         .from("nina_calendario_atendimento")
-        .select("id, unidade_id, dia_semana, hora_inicio, hora_fim, vigencia_inicio, vigencia_fim, ativo, updated_at")
+        .select(
+          "id, unidade_id, dia_semana, hora_inicio, hora_fim, vigencia_inicio, vigencia_fim, ativo, updated_at",
+        )
         .eq("clinica_id", data.clinicaId)
         .order("dia_semana", { ascending: true })
         .limit(500),

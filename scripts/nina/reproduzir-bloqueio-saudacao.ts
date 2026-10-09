@@ -32,10 +32,7 @@ import {
 } from "../../src/lib/nina/confidence/policy";
 import { decidirHandoff } from "../../src/lib/nina/confidence/handoff-decision";
 import { decidirBloqueioBaixaConfianca } from "../../src/lib/nina/confidence/baixa-confiabilidade";
-import type {
-  ContextoConfianca,
-  ResultadoValidador,
-} from "../../src/lib/nina/confidence/types";
+import type { ContextoConfianca, ResultadoValidador } from "../../src/lib/nina/confidence/types";
 
 const MENSAGEM = "oi boa tarde";
 const RESPOSTA =

@@ -375,7 +375,9 @@ async function executarFerramentaNinaInterno(
     case "consultar_cadastro": {
       // FASE 3: única porta de acesso à planilha oficial.
       const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
-      const termo = String(args.termo ?? "").trim().slice(0, 200);
+      const termo = String(args.termo ?? "")
+        .trim()
+        .slice(0, 200);
       if (termo.length < 2) throw new Error("Informe o assunto da consulta.");
       return await searchKnowledgeBase({
         clinicaId,
@@ -522,8 +524,9 @@ async function executarFerramentaNinaInterno(
         : null;
       if (!especialidadeId && args.especialidade) {
         const { data: esps } = await supabase
-          .from("especialidades")
+          .from("especialidades_da_unidade")
           .select("id, nome")
+          .eq("clinica_id", clinicaId)
           .eq("ativo", true);
         const alvo = String(args.especialidade)
           .normalize("NFD")

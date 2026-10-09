@@ -45,10 +45,7 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
   });
 
   it("3 atendentes Online: distribui equilibrado, não tudo para a primeira", () => {
-    const r = simularRedistribuicao(
-      [atendente("a"), atendente("b"), atendente("c")],
-      fila(9),
-    );
+    const r = simularRedistribuicao([atendente("a"), atendente("b"), atendente("c")], fila(9));
     const porUsuario = r.atribuicoes.reduce<Record<string, number>>((acc, x) => {
       acc[x.userId] = (acc[x.userId] ?? 0) + 1;
       return acc;
@@ -118,10 +115,7 @@ describe("FASE 4 — redistribuição de Não atribuídas", () => {
       enteredUnassignedAt: "2026-09-08T10:00:00Z",
       departamentoId: dep,
     });
-    const r = simularRedistribuicao(candidatos, [
-      item("x", "exames"),
-      item("y", "recepcao"),
-    ]);
+    const r = simularRedistribuicao(candidatos, [item("x", "exames"), item("y", "recepcao")]);
     expect(r.atribuicoes.map((a) => a.conversationId)).toContain("y");
     expect(r.restantes).toHaveLength(0); // setor sem ninguém cai no pool geral
   });

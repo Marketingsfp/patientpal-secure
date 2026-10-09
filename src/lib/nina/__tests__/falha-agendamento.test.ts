@@ -33,14 +33,49 @@ test("vínculo ausente é identificado para a atendente", () => {
   );
 });
 
+test.each([
+  "consultar_disponibilidade",
+  "proxima_vaga",
+  "verificar_horario",
+  "consultar_primeiro_disponivel",
+])("%s: tipo de consulta ambíguo não gera handoff nem agenda vazia", (ferramenta) => {
+  const pendente = {
+    ok: false,
+    erro: "ACTION_NOT_AUTHORIZED",
+    codigo: "ATENDIMENTO_CONSULTA_PENDENTE",
+    consulta_realizada: false,
+    aguardando_paciente: true,
+  };
+  const r = validarResultado(ferramenta, pendente);
+  expect(encaminhamentoFalhaAgendamento(r)).toBeNull();
+  expect(encaminhamentoSemVagas(r, {})).toBeNull();
+  expect(
+    encaminhamentoFalhaAgendamento(
+      validarResultado(ferramenta, { ...pendente, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" }),
+    ),
+  ).not.toBeNull();
+});
+
 test("escolha de período sem horário mantém o bloqueio e pede a escolha, sem handoff técnico", () => {
-  const pendente = { ok: false, erro: "ACTION_NOT_AUTHORIZED", codigo: "ESCOLHA_HORARIO_PENDENTE", aguardando_paciente: true };
+  const pendente = {
+    ok: false,
+    erro: "ACTION_NOT_AUTHORIZED",
+    codigo: "ESCOLHA_HORARIO_PENDENTE",
+    aguardando_paciente: true,
+  };
   const r = validarResultado("selecionar_horario", pendente);
   expect(r.success).toBe(false);
   expect(encaminhamentoFalhaAgendamento(r)).toBeNull();
   expect(encaminhamentoSemVagas(r, {})).toBeNull();
   expect(encaminhamentoFalhaAgendamento(validarResultado("agendar", pendente))).not.toBeNull();
-  expect(encaminhamentoFalhaAgendamento(validarResultado("selecionar_horario", { ...pendente, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" }))).not.toBeNull();
+  expect(
+    encaminhamentoFalhaAgendamento(
+      validarResultado("selecionar_horario", {
+        ...pendente,
+        codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO",
+      }),
+    ),
+  ).not.toBeNull();
 });
 test("agenda vazia, SFP e identificação ambígua mantêm seus tratamentos", () => {
   for (const resultado of [

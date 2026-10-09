@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
 import { Link } from "@tanstack/react-router";
@@ -240,7 +241,7 @@ export function PacienteCartoesBeneficios({
     if (!(await confirmDialog("Excluir este dependente do contrato?"))) return;
     const { error } = await supabase
       .from("contrato_dependentes")
-      .update({ ativo: false, excluido_em: new Date().toISOString().slice(0, 10) })
+      .update({ ativo: false, excluido_em: hojeBR() })
       .eq("id", depId);
     if (error) {
       mostrarErro(error);

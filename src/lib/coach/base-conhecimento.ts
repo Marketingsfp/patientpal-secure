@@ -101,7 +101,9 @@ export const TETO_PADRAO = 40_000;
 // ————————————————————————————————————————— formatação
 
 function texto(v: unknown): string {
-  return String(v ?? "").replace(/\s+/g, " ").trim();
+  return String(v ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function moeda(v: number | null | undefined): string | null {
@@ -171,7 +173,10 @@ function horariosTexto(v: unknown): string {
 }
 
 function campos(...partes: Array<string | null | undefined>): string {
-  return partes.map((p) => texto(p)).filter(Boolean).join(" | ");
+  return partes
+    .map((p) => texto(p))
+    .filter(Boolean)
+    .join(" | ");
 }
 
 const RE_CONSULTA = /consulta|retorno|avalia[çc][ãa]o/i;
@@ -448,7 +453,11 @@ export function selecionarParaIA(
   if (relevantes.length) anexar("## RELACIONADO AO ASSUNTO DA CONVERSA", relevantes.slice(0, 400));
 
   const comuns = secoes.find((x) => x.titulo === SECOES.comuns);
-  if (comuns) anexar(comuns.titulo, comuns.linhas.filter((l) => !relevantes.includes(l)));
+  if (comuns)
+    anexar(
+      comuns.titulo,
+      comuns.linhas.filter((l) => !relevantes.includes(l)),
+    );
 
   return partes.join("\n\n") + rodape;
 }

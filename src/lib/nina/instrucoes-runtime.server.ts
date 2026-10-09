@@ -246,11 +246,7 @@ export async function promptInstrucoes(
   let snapshot: SnapshotInstrucoes;
 
   if (!ultima) {
-    snapshot = snapshotDoCodigo(
-      escopo,
-      fallbackCodigo,
-      erroLeitura ?? "nenhuma versão publicada",
-    );
+    snapshot = snapshotDoCodigo(escopo, fallbackCodigo, erroLeitura ?? "nenhuma versão publicada");
     registrarFalha(escopo, snapshot.motivo ?? "sem versão");
   } else {
     const idadeMs = agora - ultima.em;
@@ -264,8 +260,7 @@ export async function promptInstrucoes(
       );
       registrarFalha(escopo, snapshot.motivo ?? "cache vencido");
     } else {
-      const valoresDoTurno =
-        typeof valores === "function" ? valores(ultima.conteudo) : valores;
+      const valoresDoTurno = typeof valores === "function" ? valores(ultima.conteudo) : valores;
       const render = renderizarTemplateInstrucoes(ultima.conteudo, valoresDoTurno);
       if (render.ok) {
         snapshot = {

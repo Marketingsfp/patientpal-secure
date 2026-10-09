@@ -58,7 +58,9 @@ export function ExecucaoDiagnostico({ eventos }: { eventos: EventoTrace[] }) {
           </Badge>
         )}
         {d.duracaoTotalMs !== null && (
-          <span className="text-xs text-muted-foreground">Duração total: {d.duracaoTotalMs} ms</span>
+          <span className="text-xs text-muted-foreground">
+            Duração total: {d.duracaoTotalMs} ms
+          </span>
         )}
       </div>
 
@@ -144,10 +146,15 @@ export function ExecucaoDiagnostico({ eventos }: { eventos: EventoTrace[] }) {
         </CardHeader>
         <CardContent className="space-y-4">
           {d.falhas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma falha registrada nesta execução.</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhuma falha registrada nesta execução.
+            </p>
           ) : (
             d.falhas.map((falha) => (
-              <div key={falha.nodeId} className="space-y-2 rounded-md border border-destructive/40 p-3">
+              <div
+                key={falha.nodeId}
+                className="space-y-2 rounded-md border border-destructive/40 p-3"
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-sm">{falha.nome}</span>
                   <Badge variant="destructive">{falha.rotulo}</Badge>

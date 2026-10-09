@@ -16,8 +16,19 @@ function banco(tabelas: Tabelas) {
         consultas.push(registro);
         let max = Infinity;
         let unica = false;
+        const contem: Array<[string, unknown]> = [];
+        const inclui = (valor: any, filtro: any): boolean =>
+          Array.isArray(filtro)
+            ? Array.isArray(valor) && filtro.every((f) => valor.some((v) => inclui(v, f)))
+            : filtro && typeof filtro === "object"
+              ? valor != null && Object.entries(filtro).every(([k, v]) => inclui(valor[k], v))
+              : valor === filtro;
         const q = {
           select: () => q,
+          contains(chave: string, valor: unknown) {
+            contem.push([chave, valor]);
+            return q;
+          },
           eq(chave: string, valor: unknown) {
             registro.filtros.push([chave, valor]);
             return q;
@@ -42,6 +53,7 @@ function banco(tabelas: Tabelas) {
                   Array.isArray(v) ? v.includes(r[k]) : r[k] === v,
                 ),
               )
+              .filter((r) => contem.every(([k, v]) => inclui(r[k], v)))
               .slice(0, max);
             return Promise.resolve(
               resolve({ data: unica ? (linhas[0] ?? null) : linhas, error: null }),
@@ -72,10 +84,69 @@ function preparar() {
 }
 
 describe("carregador por mensagem — leitura isolada", () => {
+  it("recupera Jev de turno sem modelo só pelo ID da entrada e pela clínica/conversa", async () => {
+    const { p, tabelas, cliente } = preparar();
+    const traceId = String(p.avisos[0]!.turno_id);
+    p.mensagem!.execucao_id = null;
+    tabelas.nina_execucoes = [];
+    tabelas.nina_confianca_vinculos = [];
+    p.avisos[0]!.execucao_id = null;
+    const entradaId = String(p.entradas[0]!.id);
+    tabelas.nina_trace_eventos = [
+      {
+        id: "entrada",
+        clinica_id: p.clinicaId,
+        trace_id: traceId,
+        conversation_id: p.mensagem!.conversa_id,
+        message_id: entradaId,
+        node_id: "message.inbound",
+        event_type: "completed",
+        status: "ok",
+      },
+      {
+        id: "prompt",
+        clinica_id: p.clinicaId,
+        trace_id: traceId,
+        node_id: "instructions.published",
+        event_type: "completed",
+        metadata: { versao: 64 },
+      },
+    ];
+    const d = {
+      id: "jev-certo",
+      clinica_id: p.clinicaId,
+      conversation_id: p.mensagem!.conversa_id,
+      fase: "fase2_encaminhamento",
+      aplicada: true,
+      respostas: { urgencia: { noul: 0.97 } },
+      perguntas: { _texto_analisado: { mensagens_entrada: [entradaId] } },
+    };
+    tabelas.nina_jev_decisoes = [
+      d,
+      { ...d, id: "outra-clinica", clinica_id: "outra" },
+      { ...d, id: "outra-conversa", conversation_id: "outra" },
+      {
+        ...d,
+        id: "outro-turno",
+        perguntas: { _texto_analisado: { mensagens_entrada: ["outra-entrada"] } },
+      },
+    ];
+    const r = await carregarDetalhesMensagem(cliente, {
+      clinicaId: p.clinicaId,
+      mensagemId: String(p.mensagem!.id),
+    });
+    expect(r.leitura?.versaoPrompt).toBe(64);
+    expect(r.leitura?.entradas).toEqual([p.entradas[0]!.body as string]);
+    expect(r.leitura?.decisoesJev).toHaveLength(1);
+    expect(r.leitura?.decisoesJev?.[0]?.resumo).toContain("0.97");
+  });
   it("vínculos oficiais conflitantes não escolhem execução nem atribuem nota", async () => {
     const { p, cliente } = preparar();
     p.mensagem!.execucao_id = "outra-execucao";
-    const r = await carregarDetalhesMensagem(cliente, { clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id) });
+    const r = await carregarDetalhesMensagem(cliente, {
+      clinicaId: p.clinicaId,
+      mensagemId: String(p.mensagem!.id),
+    });
     expect(r.execucao).toBeNull();
     expect(r.leitura?.avaliacoes).toEqual([]);
     expect(r.leitura?.alertas.some((a) => a.includes("execuções diferentes"))).toBe(true);
@@ -85,7 +156,8 @@ describe("carregador por mensagem — leitura isolada", () => {
     p.mensagem!.enviada_por = "sistema";
     p.mensagem!.execucao_id = null;
     const r = await carregarDetalhesMensagem(cliente, {
-      clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id),
+      clinicaId: p.clinicaId,
+      mensagemId: String(p.mensagem!.id),
     });
     expect(r.leitura?.mensagem?.origem).toBe("Aviso do sistema");
     expect(r.leitura?.avaliacoes).toEqual([]);
@@ -94,9 +166,12 @@ describe("carregador por mensagem — leitura isolada", () => {
     const { p, tabelas, cliente } = preparar();
     p.mensagem!.enviada_por = "sistema";
     tabelas.atend_aviso_encaminhamento = [];
-    await expect(carregarDetalhesMensagem(cliente, {
-      clinicaId: p.clinicaId, mensagemId: String(p.mensagem!.id),
-    })).rejects.toThrow("oficialmente vinculado");
+    await expect(
+      carregarDetalhesMensagem(cliente, {
+        clinicaId: p.clinicaId,
+        mensagemId: String(p.mensagem!.id),
+      }),
+    ).rejects.toThrow("oficialmente vinculado");
   });
   it("MJ55: trace ligado à mensagem prevalece sobre traces auxiliares da execução", async () => {
     const { p, tabelas, cliente } = preparar();

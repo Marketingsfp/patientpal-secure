@@ -81,10 +81,7 @@ export function rotuloHomologacao(entrada: {
   knowledge_status?: KnowledgeStatus | null;
   tool_calls?: readonly string[];
 }): string {
-  const partes = [
-    `Model: ${entrada.model}`,
-    `Reasoning: ${entrada.thinking_level.toUpperCase()}`,
-  ];
+  const partes = [`Model: ${entrada.model}`, `Reasoning: ${entrada.thinking_level.toUpperCase()}`];
   if (entrada.knowledge_status) partes.push(`Knowledge: ${entrada.knowledge_status.toUpperCase()}`);
   if (entrada.tool_calls && entrada.tool_calls.length > 0) {
     partes.push(`Tools: ${entrada.tool_calls.join(", ")}`);

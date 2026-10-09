@@ -253,7 +253,9 @@ export async function exemplosDaAtendente(
     frases: [],
     checklist: [],
     transcricao: (Array.isArray(r.mensagens) ? r.mensagens : [])
-      .map((m) => `${m.role === "atendente" ? "Atendente" : "Paciente"}: ${String(m.content ?? "")}`)
+      .map(
+        (m) => `${m.role === "atendente" ? "Atendente" : "Paciente"}: ${String(m.content ?? "")}`,
+      )
       .join("\n")
       .slice(0, 8000),
   }));

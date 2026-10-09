@@ -1,5 +1,9 @@
 import { normalizarResumo, type ResumoHandoff } from "./handoff-resumo";
-import { ajustarResumoPorDesfecho, ehConclusaoDaNina, type DesfechoConversa } from "./resumo-desfecho";
+import {
+  ajustarResumoPorDesfecho,
+  ehConclusaoDaNina,
+  type DesfechoConversa,
+} from "./resumo-desfecho";
 import { acaoConcluida, acoesSolicitadas } from "./resumo-atividades";
 
 export const RETENCAO_RESUMO_MS = 7 * 24 * 60 * 60 * 1000;
@@ -143,10 +147,18 @@ export interface ResumoNaConversa {
  * Um resumo por conclusão da Nina: só desfechos da Nina, já gerados, dentro do prazo e, quando há
  * mais de uma versão para o mesmo momento, a mais recente. Ordem cronológica (a do chat).
  */
-export function selecionarResumosDaConversa(linhas: ResumoRetido[], agora = Date.now()): ResumoNaConversa[] {
+export function selecionarResumosDaConversa(
+  linhas: ResumoRetido[],
+  agora = Date.now(),
+): ResumoNaConversa[] {
   const porMomento = new Map<number, ResumoRetido>();
   for (const r of linhas) {
-    if (r.status !== "ok" || !r.payload || !ehConclusaoDaNina(r.desfecho) || !resumoNoPrazo(r.handoff_em, agora))
+    if (
+      r.status !== "ok" ||
+      !r.payload ||
+      !ehConclusaoDaNina(r.desfecho) ||
+      !resumoNoPrazo(r.handoff_em, agora)
+    )
       continue;
     const chave = Date.parse(r.handoff_em);
     const atual = porMomento.get(chave);

@@ -99,8 +99,35 @@ export const ROTULO_PERFIL_SUPERVISAO: Record<PerfilSupervisao, string> = {
 export const MSG_ADMIN_NAO_RESPONDE_AQUI =
   "Administrador responde apenas conversas abertas que estão com uma atendente ou sem responsável.";
 
+/**
+ * Conversa aberta com a Nina: ninguém envia mensagem — admin, supervisão ou
+ * atendente (regra de 08/10/2026). Para tirar a Nina, atribui-se a conversa.
+ */
+export const MSG_CONVERSA_DA_NINA =
+  "Conversas atribuídas à Nina são bloqueadas: não é possível enviar mensagem enquanto a Nina estiver atendendo. Para responder, atribua a conversa a uma atendente.";
+
+export function conversaComNina(conversa: {
+  owner_type?: string | null;
+  status?: string | null;
+}): boolean {
+  return (
+    conversa.owner_type === "AI" && conversa.status !== "closed" && conversa.status !== "finished"
+  );
+}
+
+/** Motivo exibido ao admin: conversa da Nina tem aviso próprio; os demais casos seguem o geral. */
+export function motivoAdminNaoResponde(conversa: {
+  owner_type?: string | null;
+  status?: string | null;
+}): string {
+  return conversaComNina(conversa) ? MSG_CONVERSA_DA_NINA : MSG_ADMIN_NAO_RESPONDE_AQUI;
+}
+
 /** Perfil exato de supervisão: admin tem precedência sobre gestor. */
-export function perfilSupervisao(args: { admin: boolean; gestor: boolean }): PerfilSupervisao | null {
+export function perfilSupervisao(args: {
+  admin: boolean;
+  gestor: boolean;
+}): PerfilSupervisao | null {
   if (args.admin) return "admin";
   return args.gestor ? "gestor" : null;
 }
@@ -154,4 +181,14 @@ export function rotuloAutorSupervisao(
   const rotulo = ROTULO_PERFIL_SUPERVISAO[perfil];
   const autor = nome?.trim();
   return autor ? `${rotulo} ${autor}` : rotulo;
+}
+
+/** Encerramento por responsável ou supervisão; não exige assumir a conversa. */
+export function podeEncerrarConversa(args: {
+  userId: string | null | undefined;
+  responsavelId: string | null | undefined;
+  admin: boolean;
+  gestor: boolean;
+}): boolean {
+  return Boolean(args.userId && (args.admin || args.gestor || args.responsavelId === args.userId));
 }

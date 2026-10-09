@@ -11,7 +11,18 @@
 // `pdfBase64` deve ser somente o conteúdo base64 do PDF
 // (sem o prefixo "data:application/pdf;base64,").
 
-import { assinarQzMessage } from "@/lib/qz/sign.functions";
+import { assinarQzMessage, assinarQzMessageTotem } from "@/lib/qz/sign.functions";
+
+// Token do link público do totem (/totem/t/<token>). Sem login, é ele que
+// libera a assinatura do QZ Tray; logado, a assinatura usa a sessão.
+let tokenTotem: string | null = null;
+export function definirTokenTotem(token: string | null): void {
+  tokenTotem = token;
+}
+/** Token do totem público (rota /totem/t/$token); null nas rotas com login. */
+export function obterTokenTotem(): string | null {
+  return tokenTotem;
+}
 
 // O pacote qz-tray faz `require("node:path")` no topo do módulo. Com import
 // estático, o Vite arrastava esse polyfill para o bundle do browser (aviso
@@ -99,7 +110,10 @@ function configurarQzUmaVez(qz: QzApi) {
   }
 
   qz.security.setSignaturePromise((toSign) => (resolve, reject) => {
-    assinarQzMessage({ data: { toSign } })
+    (tokenTotem
+      ? assinarQzMessageTotem({ data: { toSign, token: tokenTotem } })
+      : assinarQzMessage({ data: { toSign } })
+    )
       .then((r) => resolve(r.signature))
       .catch((e) => reject(e));
   });

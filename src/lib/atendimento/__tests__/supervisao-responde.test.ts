@@ -77,3 +77,25 @@ describe("supervisão (admin e gestor) respondendo no chat da atendente", () => 
     expect(comum.enviada_por_perfil).toBeNull();
   });
 });
+
+it("conversa da Nina mostra o aviso próprio de bloqueio; as demais seguem o aviso geral (08/10/2026)", async () => {
+  const { motivoAdminNaoResponde, MSG_CONVERSA_DA_NINA, MSG_ADMIN_NAO_RESPONDE_AQUI } =
+    await import("@/lib/atendimento/perfil-atendimento");
+  expect(motivoAdminNaoResponde({ owner_type: "AI", status: "active" })).toBe(MSG_CONVERSA_DA_NINA);
+  expect(MSG_CONVERSA_DA_NINA).toContain("Conversas atribuídas à Nina são bloqueadas");
+  expect(motivoAdminNaoResponde({ owner_type: "AI", status: "closed" })).toBe(
+    MSG_ADMIN_NAO_RESPONDE_AQUI,
+  );
+  expect(motivoAdminNaoResponde({ owner_type: "HUMAN", status: "finished" })).toBe(
+    MSG_ADMIN_NAO_RESPONDE_AQUI,
+  );
+});
+
+it("ninguém envia em conversa aberta com a Nina; encerrada ou humana não entra na regra (08/10/2026)", async () => {
+  const { conversaComNina, MSG_CONVERSA_DA_NINA } =
+    await import("@/lib/atendimento/perfil-atendimento");
+  expect(conversaComNina({ owner_type: "AI", status: "active" })).toBe(true);
+  expect(conversaComNina({ owner_type: "AI", status: "closed" })).toBe(false);
+  expect(conversaComNina({ owner_type: "HUMAN", status: "active" })).toBe(false);
+  expect(MSG_CONVERSA_DA_NINA).toMatch(/^Conversas atribuídas à Nina são bloqueadas/);
+});

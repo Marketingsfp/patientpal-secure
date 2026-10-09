@@ -7,7 +7,10 @@ export type FaseJev =
   | "fase2_encaminhamento"
   | "fase3_especialidade"
   | "fase4_cadastro"
-  | "fase5_avaliacao";
+  | "fase5_avaliacao"
+  | "fase6_conferencia"
+  | "fase7_escolha"
+  | "fase8_motivo";
 
 export const FLAG_JEV: Record<FaseJev, string> = {
   fase1_intencao: "nina_jev_fase1",
@@ -15,6 +18,9 @@ export const FLAG_JEV: Record<FaseJev, string> = {
   fase3_especialidade: "nina_jev_fase3",
   fase4_cadastro: "nina_jev_fase4",
   fase5_avaliacao: "nina_jev_fase5",
+  fase6_conferencia: "nina_jev_fase6",
+  fase7_escolha: "nina_jev_fase7",
+  fase8_motivo: "nina_jev_fase8",
 };
 
 export type PerguntaJev =
@@ -31,9 +37,15 @@ export type RespostaJev = {
 };
 
 /** "sem decisão": a Nina segue o fluxo atual. Nunca inventa certeza. */
-export type ResultadoJev =
-  | { ok: true; respostas: Record<string, RespostaJev>; latencyMs: number }
-  | { ok: false; motivo: string; status?: number; latencyMs: number };
+export type ResultadoJev = { chamadaId?: string } & (
+  | {
+      ok: true;
+      respostas: Record<string, RespostaJev>;
+      latencyMs: number;
+      observacaoIntencao?: import("./jev-observacao-intencao").ObservacaoIntencaoJev;
+    }
+  | { ok: false; motivo: string; status?: number; latencyMs: number }
+);
 
 /** Valida que cada pergunta voltou com o campo do seu tipo. */
 export function validarRespostas(
@@ -45,7 +57,8 @@ export function validarRespostas(
   for (const [id, p] of Object.entries(perguntas)) {
     const r = answers[id];
     if (!r) return null;
-    if (p.type === "choice" && (typeof r.choice !== "string" || !(r.choice in p.criteria))) return null;
+    if (p.type === "choice" && (typeof r.choice !== "string" || !(r.choice in p.criteria)))
+      return null;
     if (p.type === "noul" && typeof r.noul !== "number") return null;
     if (p.type === "score" && typeof r.score !== "number") return null;
   }

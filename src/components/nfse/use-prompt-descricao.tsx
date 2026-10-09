@@ -24,15 +24,21 @@ const SERVICOS_PRESET = [
 export function usePromptDescricaoNfse() {
   const [open, setOpen] = useState(false);
   const [texto, setTexto] = useState("");
+  // Informação só de leitura exibida na janela (ex.: valor e código de tributação).
+  const [info, setInfo] = useState<string | null>(null);
   const resolverRef = useRef<((v: string | null) => void) | null>(null);
 
-  const prompt = useCallback(async (sugestao: string): Promise<string | null> => {
-    return new Promise<string | null>((resolve) => {
-      setTexto(sugestao ?? "");
-      resolverRef.current = resolve;
-      setOpen(true);
-    });
-  }, []);
+  const prompt = useCallback(
+    async (sugestao: string, infoLeitura?: string): Promise<string | null> => {
+      return new Promise<string | null>((resolve) => {
+        setTexto(sugestao ?? "");
+        setInfo(infoLeitura ?? null);
+        resolverRef.current = resolve;
+        setOpen(true);
+      });
+    },
+    [],
+  );
 
   const confirm = () => {
     const r = resolverRef.current;
@@ -80,6 +86,7 @@ export function usePromptDescricaoNfse() {
             autoFocus
           />
           <p className="text-xs text-muted-foreground">{texto.length}/2000 caracteres</p>
+          {info ? <p className="text-xs text-muted-foreground">{info}</p> : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={cancel}>

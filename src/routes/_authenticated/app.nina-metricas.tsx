@@ -32,20 +32,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import {
-  CATEGORIAS_FEEDBACK_NINA,
-  rotuloCategoriaFeedback,
-} from "@/lib/nina/feedback-erros";
+import { CATEGORIAS_FEEDBACK_NINA, rotuloCategoriaFeedback } from "@/lib/nina/feedback-erros";
 import {
   CAUSAS_RAIZ_NINA,
   PRIORIDADES_NINA,
   rotuloCausaRaiz,
   rotuloPrioridade,
 } from "@/lib/nina/feedback-diagnostico";
-import {
-  FUSO_OPERACAO_PADRAO,
-  validarRecorte,
-} from "@/lib/nina/metricas-filtros";
+import { FUSO_OPERACAO_PADRAO, validarRecorte } from "@/lib/nina/metricas-filtros";
 import { AnalistaMetricasIA } from "@/components/nina/AnalistaMetricasIA";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 import {
@@ -104,7 +98,15 @@ function dataISO(diasAtras: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function Indicador({ titulo, valor, detalhe }: { titulo: string; valor: string; detalhe?: string }) {
+function Indicador({
+  titulo,
+  valor,
+  detalhe,
+}: {
+  titulo: string;
+  valor: string;
+  detalhe?: string;
+}) {
   return (
     <Card>
       <CardContent className="p-4">
@@ -243,7 +245,6 @@ function Pagina() {
     }
   };
 
-
   const maxSerie = useMemo(
     () => Math.max(1, ...(dados?.evolucao ?? []).map((p) => p.reportados)),
     [dados],
@@ -262,7 +263,9 @@ function Pagina() {
   // Resumo do recorte ativo, sempre visível (mesmo antes da primeira resposta).
   const resumoRecorte = useMemo(() => {
     const nomeUnidade =
-      unidadeId === TODOS ? "todas as unidades" : (unidades.find((u) => u.id === unidadeId)?.nome ?? "unidade selecionada");
+      unidadeId === TODOS
+        ? "todas as unidades"
+        : (unidades.find((u) => u.id === unidadeId)?.nome ?? "unidade selecionada");
     const faixa = diaInteiro ? "dia inteiro" : `das ${horaInicio} às ${horaFim} em cada dia`;
     const amb = ambiente === "producao" ? "somente produção" : "produção + testes";
     return `${de} a ${ate} · ${faixa} · ${nomeUnidade} · ${amb} · fuso ${FUSO_OPERACAO_PADRAO}`;
@@ -349,7 +352,9 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Período do gráfico</Label>
             <Select value={granularidade} onValueChange={(v) => setGranularidade(v as never)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="dia">Por dia</SelectItem>
                 <SelectItem value="semana">Por semana</SelectItem>
@@ -360,11 +365,15 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Unidade</Label>
             <Select value={unidadeId} onValueChange={setUnidadeId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TODOS}>Todas</SelectItem>
                 {unidades.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -372,7 +381,9 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Ambiente</Label>
             <Select value={ambiente} onValueChange={(v) => setAmbiente(v as never)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="producao">Somente produção</SelectItem>
                 <SelectItem value="todos">Produção + testes</SelectItem>
@@ -395,7 +406,12 @@ function Pagina() {
               Os cartões ficam ocultos de propósito: uma falha de consulta não é o mesmo que
               “nenhuma ocorrência”. Detalhe técnico: {erroConsulta}
             </p>
-            <Button variant="outline" size="sm" onClick={() => void carregar()} disabled={carregando}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void carregar()}
+              disabled={carregando}
+            >
               Tentar de novo
             </Button>
           </CardContent>
@@ -425,7 +441,9 @@ function Pagina() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Indicadores operacionais do período</CardTitle>
             <p className="text-xs text-muted-foreground">
-              {carregando ? "Atualizando com o recorte novo…" : `Recorte: ${dados?.recorte?.descricao ?? resumoRecorte}`}
+              {carregando
+                ? "Atualizando com o recorte novo…"
+                : `Recorte: ${dados?.recorte?.descricao ?? resumoRecorte}`}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -537,11 +555,15 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Situação</Label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TODOS}>Todas</SelectItem>
                 {Object.entries(STATUS_ROTULO).map(([v, r]) => (
-                  <SelectItem key={v} value={v}>{r}</SelectItem>
+                  <SelectItem key={v} value={v}>
+                    {r}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -549,11 +571,15 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Tipo de erro</Label>
             <Select value={categoria} onValueChange={setCategoria}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TODOS}>Todos</SelectItem>
                 {CATEGORIAS_FEEDBACK_NINA.map((c) => (
-                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
+                  <SelectItem key={c.valor} value={c.valor}>
+                    {c.rotulo}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -561,11 +587,15 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Causa</Label>
             <Select value={rootCause} onValueChange={setRootCause}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TODOS}>Todas</SelectItem>
                 {CAUSAS_RAIZ_NINA.map((c) => (
-                  <SelectItem key={c.valor} value={c.valor}>{c.rotulo}</SelectItem>
+                  <SelectItem key={c.valor} value={c.valor}>
+                    {c.rotulo}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -573,11 +603,15 @@ function Pagina() {
           <div className="space-y-1">
             <Label>Prioridade</Label>
             <Select value={prioridade} onValueChange={setPrioridade}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TODOS}>Todas</SelectItem>
                 {PRIORIDADES_NINA.map((p) => (
-                  <SelectItem key={p.valor} value={p.valor}>{p.rotulo}</SelectItem>
+                  <SelectItem key={p.valor} value={p.valor}>
+                    {p.rotulo}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -736,7 +770,10 @@ function Pagina() {
               onChange={(e) => setTrilhaId(e.target.value)}
             />
           </div>
-          <Button onClick={() => void abrirTrilha()} disabled={carregandoTrilha || !trilhaId.trim()}>
+          <Button
+            onClick={() => void abrirTrilha()}
+            disabled={carregandoTrilha || !trilhaId.trim()}
+          >
             {carregandoTrilha ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
             ) : (
@@ -758,8 +795,8 @@ function Pagina() {
           {trilha ? (
             <div className="space-y-3 text-sm">
               <p>
-                <strong>Tipo de erro:</strong> {rotuloCategoriaFeedback(trilha.feedback.categoria)} ·{" "}
-                <strong>Situação:</strong>{" "}
+                <strong>Tipo de erro:</strong> {rotuloCategoriaFeedback(trilha.feedback.categoria)}{" "}
+                · <strong>Situação:</strong>{" "}
                 {STATUS_ROTULO[trilha.feedback.status] ?? trilha.feedback.status}
               </p>
               <p>

@@ -181,17 +181,11 @@ export function ArquiteturaCanvas({
     setCarregou(true);
   }, [chavePosicoes, nodes]);
 
-  const posicoes = useMemo(
-    () => ({ ...estado.canonical, ...estado.overrides }),
-    [estado],
-  );
+  const posicoes = useMemo(() => ({ ...estado.canonical, ...estado.overrides }), [estado]);
 
   const layout = useMemo(() => calcularLayout(nodes, posicoes), [nodes, posicoes]);
 
-  const mapaPosicionado = useMemo(
-    () => new Map(layout.nodes.map((n) => [n.node.id, n])),
-    [layout],
-  );
+  const mapaPosicionado = useMemo(() => new Map(layout.nodes.map((n) => [n.node.id, n])), [layout]);
 
   const rotas = useMemo(() => calcularRotas(layout), [layout]);
 
@@ -221,23 +215,24 @@ export function ArquiteturaCanvas({
     [nodes, categoriasVisiveis],
   );
 
-  const resultadosBusca = useMemo(() => new Set(buscarNodes(nodes, termoBusca)), [nodes, termoBusca]);
-
-  const minimapa = useMemo(
-    () => calcularMinimapa(layout, { largura: 180, altura: 120 }),
-    [layout],
+  const resultadosBusca = useMemo(
+    () => new Set(buscarNodes(nodes, termoBusca)),
+    [nodes, termoBusca],
   );
 
-
-
+  const minimapa = useMemo(() => calcularMinimapa(layout, { largura: 180, altura: 120 }), [layout]);
 
   const ajustarTela = useCallback(() => {
     const area = areaRef.current;
     if (!area) return;
-    const { escala, x, y } = calcularFitView(layout, {
-      largura: area.clientWidth,
-      altura: area.clientHeight,
-    }, { escalaMinima: ESCALA_MIN, escalaMaxima: 1.1 });
+    const { escala, x, y } = calcularFitView(
+      layout,
+      {
+        largura: area.clientWidth,
+        altura: area.clientHeight,
+      },
+      { escalaMinima: ESCALA_MIN, escalaMaxima: 1.1 },
+    );
     setView({ escala, x, y });
   }, [layout]);
 
@@ -282,8 +277,6 @@ export function ArquiteturaCanvas({
     },
     [mapaPosicionado],
   );
-
-
 
   const aplicarZoom = useCallback((fator: number, centro?: { x: number; y: number }) => {
     const area = areaRef.current;
@@ -372,7 +365,7 @@ export function ArquiteturaCanvas({
     ajustarTela();
   }, [pedidoAjuste, ajustarTela]);
 
-  const detalhe = selecionado ? mapaPosicionado.get(selecionado)?.node ?? null : null;
+  const detalhe = selecionado ? (mapaPosicionado.get(selecionado)?.node ?? null) : null;
 
   return (
     <div className="space-y-3">
@@ -509,8 +502,6 @@ export function ArquiteturaCanvas({
         })}
       </div>
 
-
-
       <div
         ref={areaRef}
         onWheel={onWheel}
@@ -618,7 +609,6 @@ export function ArquiteturaCanvas({
             })}
           </svg>
 
-
           {layout.nodes.map(({ node, x, y, principal }) => {
             if (!visiveis.has(node.id)) return null;
             const estado = execucao?.[node.id];
@@ -659,7 +649,6 @@ export function ArquiteturaCanvas({
                 } ${principal ? "shadow-md" : "shadow-sm"} ${
                   selecionado === node.id ? "ring-2 ring-primary" : ""
                 }`}
-
                 style={{
                   left: x,
                   top: y,
@@ -737,17 +726,13 @@ export function ArquiteturaCanvas({
               style={{
                 left: (-view.x / view.escala) * minimapa.escala,
                 top: (-view.y / view.escala) * minimapa.escala,
-                width:
-                  ((areaRef.current?.clientWidth ?? 0) / view.escala) * minimapa.escala,
-                height:
-                  ((areaRef.current?.clientHeight ?? 0) / view.escala) * minimapa.escala,
+                width: ((areaRef.current?.clientWidth ?? 0) / view.escala) * minimapa.escala,
+                height: ((areaRef.current?.clientHeight ?? 0) / view.escala) * minimapa.escala,
               }}
             />
           </div>
         </div>
       </div>
-
-
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 px-2 py-0.5 text-[11px] text-foreground">
@@ -777,7 +762,6 @@ export function ArquiteturaCanvas({
         nunca o funcionamento da Nina.
       </p>
 
-
       <NodeDetalhePainel
         node={detalhe}
         aberto={Boolean(detalhe)}
@@ -785,7 +769,7 @@ export function ArquiteturaCanvas({
         clinicaId={clinicaId}
         nivelAcesso={nivelAcesso}
         pacienteExecucaoId={pacienteExecucaoId}
-        execucao={detalhe ? execucao?.[detalhe.id] ?? null : null}
+        execucao={detalhe ? (execucao?.[detalhe.id] ?? null) : null}
         modoExecucao={modoExecucao}
       />
     </div>

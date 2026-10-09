@@ -25,7 +25,8 @@ export function inserirResumosNaTimeline<T extends { at: number }>(
     let melhor = -1;
     let distancia = Infinity;
     saida.forEach((item, i) => {
-      if ((item as { kind?: string }).kind === "resumo" || !ehAvisoDeEncaminhamento(item as T)) return;
+      if ((item as { kind?: string }).kind === "resumo" || !ehAvisoDeEncaminhamento(item as T))
+        return;
       const d = Math.abs(item.at - em);
       if (d <= JANELA_AVISO_RESUMO_MS && d < distancia) {
         melhor = i;
@@ -39,7 +40,9 @@ export function inserirResumosNaTimeline<T extends { at: number }>(
       saida.splice(pos, 0, novo);
       continue;
     }
-    const pos = saida.findIndex((item) => (item as { kind?: string }).kind !== "resumo" && item.at > em);
+    const pos = saida.findIndex(
+      (item) => (item as { kind?: string }).kind !== "resumo" && item.at > em,
+    );
     saida.splice(pos < 0 ? saida.length : pos, 0, novo);
   }
   return saida;

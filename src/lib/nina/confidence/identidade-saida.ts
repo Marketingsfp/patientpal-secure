@@ -128,8 +128,7 @@ export function selecionarAvaliacaoDaSaida<T extends AvaliacaoRegistrada>(
   candidatas: ReadonlyArray<T>,
   alvo: AlvoDaSaida,
 ): EscolhaDeAvaliacao<T> {
-  const hashAlvo =
-    alvo.textoHash ?? (alvo.conteudo != null ? hashDoTexto(alvo.conteudo) : null);
+  const hashAlvo = alvo.textoHash ?? (alvo.conteudo != null ? hashDoTexto(alvo.conteudo) : null);
 
   const noEscopo = candidatas.filter((c) => {
     if (c.clinicaId && c.clinicaId !== alvo.clinicaId) return false;
@@ -146,7 +145,12 @@ export function selecionarAvaliacaoDaSaida<T extends AvaliacaoRegistrada>(
   });
 
   if (candidatas.length === 0) {
-    return { avaliacao: null, motivo: "sem_avaliacao", suficiente: false, conteudoConferido: false };
+    return {
+      avaliacao: null,
+      motivo: "sem_avaliacao",
+      suficiente: false,
+      conteudoConferido: false,
+    };
   }
   if (noEscopo.length === 0) {
     return { avaliacao: null, motivo: "outro_escopo", suficiente: false, conteudoConferido: false };

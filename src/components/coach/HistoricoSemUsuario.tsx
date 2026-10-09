@@ -44,13 +44,15 @@ async function carregarOrfaos(clinicaId: string): Promise<NomeOrfao[]> {
     _clinica_id: clinicaId,
   });
   if (error) return [];
-  return ((data ?? []) as {
-    atendente: string;
-    analises: number;
-    treinos: number;
-    provas: number;
-    total: number;
-  }[]).map((r) => ({
+  return (
+    (data ?? []) as {
+      atendente: string;
+      analises: number;
+      treinos: number;
+      provas: number;
+      total: number;
+    }[]
+  ).map((r) => ({
     nome: r.atendente,
     analises: Number(r.analises) || 0,
     treinos: Number(r.treinos) || 0,
@@ -142,8 +144,8 @@ export function HistoricoSemUsuario({
         <h2 className="text-lg font-semibold tracking-tight">Histórico sem usuário</h2>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Nomes que vieram do histórico antigo e ainda não estão ligados a um usuário do sistema.
-        Ao vincular, o histórico passa a usar o nome do perfil e continua com a pessoa.
+        Nomes que vieram do histórico antigo e ainda não estão ligados a um usuário do sistema. Ao
+        vincular, o histórico passa a usar o nome do perfil e continua com a pessoa.
       </p>
 
       {loading ? (

@@ -28,8 +28,7 @@ export async function etapaConfianca(clinicaId: string): Promise<EtapaAtivacao> 
     if (error || !data) return "A";
 
     const linhaEtapa = data.find((l) => l.flag_key === FLAG_CONFIDENCE_ETAPA);
-    const enforceLegado =
-      data.find((l) => l.flag_key === FLAG_CONFIDENCE_ENFORCE)?.ativo === true;
+    const enforceLegado = data.find((l) => l.flag_key === FLAG_CONFIDENCE_ENFORCE)?.ativo === true;
 
     const cfg = (linhaEtapa?.config ?? null) as { etapa?: unknown } | null;
     const valor = linhaEtapa?.ativo === true ? cfg?.etapa : undefined;

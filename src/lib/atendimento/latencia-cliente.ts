@@ -45,7 +45,11 @@ const FINAL: Record<string, Etapa> = {
   recv: "RECV_T8_MESSAGE_RENDERED",
 };
 
-export function abrirTrace(chave: string, fluxo: Fluxo, conversationId?: string | null): Trace | null {
+export function abrirTrace(
+  chave: string,
+  fluxo: Fluxo,
+  conversationId?: string | null,
+): Trace | null {
   if (!latenciaLigada()) return null;
   const existente = traces.get(chave);
   if (existente) return existente;

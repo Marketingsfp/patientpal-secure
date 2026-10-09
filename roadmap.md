@@ -18,3 +18,20 @@
 - [ ] Etapa 2: fila do médico (cabeçalho, contadores, abas, chamar/atender/estornar, editor rico) — aguarda conferência da etapa 1
 - [ ] Etapa 3: menu Opções e Baixar — aguarda confirmação das regras (estorno, convênio na baixa, consultas avulsas)
 - [ ] Etapa 4: avaliações corporais, alertas do paciente, anexos/fotos, hiperbárico — precisam de tabelas novas aprovadas
+
+## NFS-e
+- [x] Regime de apuração do Simples (regApTribSN) e pTotTribSN configuráveis por emitente — não publicado
+
+## Atendimento
+- [x] Painel da TV: tempo médio de resposta das atendentes, mais antiga sem resposta e volume por hora — não publicado
+- [x] NFS-e — cTribNac por convênio nas notas de mensalidade/adesão do Cartão Benefício (não publicado)
+
+## Melhorias do Jev (plano 03/10/2026)
+- [x] Etapa A — conferência antes do envio (`nina_jev_fase6`, desligada)
+- [ ] Etapa B — entender o "sim" e a escolha de horário (aguarda aprovação da A)
+- [ ] Etapa C — painel de decisões e limites ajustáveis
+- [ ] Etapa D — motivo da transferência, filtro e prioridade na Central
+- [ ] Etapa E — remarcação e sinais de urgência (aguarda regras da clínica)
+
+## Latência da Nina
+- [x] Pré-busca do cadastro antes da 1ª chamada ao modelo (flag `nina_prefetch_cadastro`, padrão ligada) — não publicado

@@ -157,7 +157,8 @@ export const DEFINICOES_INDICADORES: Record<string, string> = {
   ninaParticipacao: "Recebidas processadas pela Nina somadas às respostas enviadas por ela.",
   errosReportados:
     "Erros reportados de mensagens da Nina, atribuídos ao período da mensagem original. Reportes rejeitados ficam fora.",
-  errosConfirmados: "Reportes confirmados pela revisão humana (aprovados, aplicados ou revertidos).",
+  errosConfirmados:
+    "Reportes confirmados pela revisão humana (aprovados, aplicados ou revertidos).",
   errosPendentes: "Reportes ainda sem decisão humana.",
   errosRejeitados: "Reportes rejeitados na revisão. Não entram na taxa de erro.",
   correcoesAplicadas: "Correções efetivamente aplicadas.",

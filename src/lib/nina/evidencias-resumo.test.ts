@@ -83,8 +83,7 @@ describe("valorOuNaoRegistrado", () => {
 });
 
 describe("limitesDaCaptura", () => {
-  const etapa = (tipo: string, dados: Record<string, unknown>) =>
-    ({ tipo, dados }) as never;
+  const etapa = (tipo: string, dados: Record<string, unknown>) => ({ tipo, dados }) as never;
 
   it("nunca declara requisição completa", () => {
     const r = limitesDaCaptura([

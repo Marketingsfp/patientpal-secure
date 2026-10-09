@@ -145,7 +145,6 @@ export const VERSAO_MOTOR = "confidence-v3";
 /** Versões antigas do motor que continuam válidas apenas para leitura. */
 export const VERSOES_MOTOR_HISTORICAS = ["engine-v6", "confidence-v2"] as const;
 
-
 export function ehVersaoMotorHistorica(versao: string | null | undefined): boolean {
   const v = (versao ?? "").trim();
   return v !== VERSAO_MOTOR;
@@ -270,7 +269,6 @@ export function medirEvidencia(
     // orçamento do agregado JUNTO com o peso das suas próprias parcelas.
     const peso = v.pesoParcela ?? politica.pesos[v.validator] ?? 0;
     if (v.status === "NOT_APPLICABLE") {
-
       naoAplicaveis.push(v.validator);
       continue;
     }
@@ -335,8 +333,10 @@ export function detectarHardBlockers(
     // UNKNOWN não é falha comprovada: limita a decisão pela cobertura,
     // não inventa um bloqueio absoluto que não foi observado.
     if (!contaContraANota(v.status)) continue;
-    if (v.validator === "EntityResolutionValidator" && critico) out.add("AMBIGUOUS_CRITICAL_ENTITY");
-    if (v.validator === "ToolIntegrityValidator" && critico) out.add("TOOL_FAILURE_ON_CRITICAL_ACTION");
+    if (v.validator === "EntityResolutionValidator" && critico)
+      out.add("AMBIGUOUS_CRITICAL_ENTITY");
+    if (v.validator === "ToolIntegrityValidator" && critico)
+      out.add("TOOL_FAILURE_ON_CRITICAL_ACTION");
   }
   return [...out];
 }
@@ -381,7 +381,6 @@ export type EntradaPolitica = {
   requisitoEssencialViolado?: boolean;
   /** FASE 3 (pontuação) — requisito ESSENCIAL aplicável sem prova conclusiva. */
   requisitoEssencialSemProva?: boolean;
-
 };
 
 export type SaidaPolitica = {
@@ -461,7 +460,6 @@ export function aplicarPolitica(
     limitacoes.push("ESSENTIAL_REQUIREMENT_UNPROVEN");
   }
 
-
   // (4) Fonte obrigatória desconhecida: não se responde no escuro.
   const fontesDesconhecidas = desconhecidas.filter((d) => cfg.fontesObrigatorias.includes(d));
   if (fontesDesconhecidas.length > 0) {
@@ -484,7 +482,6 @@ export function aplicarPolitica(
   else if (level === "LOW")
     decision = e.ambiguidadeResolvivel === true && !e.esclarecimentoUsado ? "CLARIFY" : "HANDOFF";
   else decision = e.esclarecimentoUsado ? "HANDOFF" : "CLARIFY";
-
 
   return { score, level, decision, limitacoes };
 }

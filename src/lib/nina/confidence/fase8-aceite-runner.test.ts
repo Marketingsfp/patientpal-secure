@@ -127,8 +127,7 @@ describe("runner — critérios executam mesmo sem snapshot", () => {
 
   it("reprova execução divergente e hash de texto divergente", () => {
     expect(
-      verificarConfiancaRunner([snapOk({ execucao_id: "ex-9" })], [saida()], ctx)
-        .execution_matches,
+      verificarConfiancaRunner([snapOk({ execucao_id: "ex-9" })], [saida()], ctx).execution_matches,
     ).toBe(false);
     expect(
       verificarConfiancaRunner(
@@ -456,11 +455,9 @@ describe("matriz — ações: identificação, consentimento e prova", () => {
   });
 
   it("retry recuperado só confirma com registro lido", () => {
-    const falhou = verificarResultadoAgendamento(
-      { pacienteId: "pac-1" },
-      null,
-      { erro: "timeout" },
-    );
+    const falhou = verificarResultadoAgendamento({ pacienteId: "pac-1" }, null, {
+      erro: "timeout",
+    });
     const recuperado = verificarResultadoAgendamento(
       { pacienteId: "pac-1" },
       { id: "ag-2", paciente_id: "pac-1", status: "agendado" },

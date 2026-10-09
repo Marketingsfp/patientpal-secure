@@ -1,10 +1,10 @@
 /**
  * Nina → Arquitetura.
  *
- * Tela somente leitura. Ela desenha o Architecture Manifest já existente
+ * O mapa desenha o Architecture Manifest já existente
  * (`src/lib/nina/arquitetura/manifesto.ts`) e, no modo Execução, mostra o
- * caminho real de uma mensagem a partir do tracing. Nada aqui altera o backend,
- * a ordem de execução, prompts, ferramentas ou dados de atendimento.
+ * caminho real de uma mensagem a partir do tracing. Os controles abaixo do mapa
+ * permitem alterar instruções e temperatura, com permissão e auditoria no servidor.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -14,9 +14,10 @@ import { Network } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArquiteturaCanvas } from "@/components/nina/ArquiteturaCanvas";
+import { CaminhoProducaoCanvas } from "@/components/nina/CaminhoProducaoCanvas";
 import { RastrearExecucao } from "@/components/nina/RastrearExecucao";
 import { InstrucoesNina } from "@/components/nina/InstrucoesNina";
+import { TemperaturaNina } from "@/components/nina/TemperaturaNina";
 import { VisaoSimplesNina } from "@/components/nina/VisaoSimplesNina";
 
 import { useClinica } from "@/hooks/use-clinica";
@@ -24,16 +25,11 @@ import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functi
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
 import { NODES_ARQUITETURA } from "@/lib/nina/arquitetura/manifesto";
 import { statusArquitetura } from "@/lib/nina/arquitetura/conferencia";
-import {
-  HISTORICO_ARQUITETURA,
-  comparacaoRecente,
-  destaquesDaComparacao,
-} from "@/lib/nina/arquitetura/versoes";
+import { HISTORICO_ARQUITETURA, comparacaoRecente } from "@/lib/nina/arquitetura/versoes";
 import { mudancaConfiguracaoPrompt } from "@/lib/nina/arquitetura/sync";
 import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 import { useAuth } from "@/hooks/use-auth";
-
 
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
@@ -93,7 +89,6 @@ function Pagina() {
     }
   }, []);
 
-
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
     queryKey: ["arquitetura-capacidades", clinicaId, session?.user.id],
@@ -112,10 +107,7 @@ function Pagina() {
   const nivelAcesso = nivelAcessoDe(capacidades);
   const chavePosicoes = `nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`;
   const status = statusArquitetura(NODES_ARQUITETURA);
-  const comparacao = comparacaoRecente();
-  const marcasAlteracao = destaquesDaComparacao(comparacao);
-  const sinal =
-    status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
+  const sinal = status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
 
   if (permissao && !podeVer) {
     return (
@@ -182,19 +174,15 @@ function Pagina() {
           <VisaoSimplesNina />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">O que a Nina pode fazer</CardTitle>
+              <CardTitle className="text-base">Caminho da mensagem em produção</CardTitle>
               <Badge variant="outline">Somente leitura</Badge>
             </CardHeader>
             <CardContent>
-              <ArquiteturaCanvas
-                chavePosicoes={chavePosicoes}
-                clinicaId={clinicaId}
-                nivelAcesso={nivelAcesso}
-                marcasAlteracao={marcasAlteracao}
-              />
+              <CaminhoProducaoCanvas clinicaId={clinicaId} nivelAcesso={nivelAcesso} />
             </CardContent>
           </Card>
 
+          {clinicaId && podeVer ? <TemperaturaNina key={clinicaId} clinicaId={clinicaId} /> : null}
           <div id="instrucoes-nina" className="scroll-mt-24">
             {clinicaId && podeArquitetura(capacidades, "nina.instrucoes.ver") ? (
               <InstrucoesNina
@@ -205,12 +193,13 @@ function Pagina() {
               />
             ) : null}
           </div>
-
         </TabsContent>
 
-
         <TabsContent value="alteracoes" className="mt-4">
-          <PainelAlteracoes clinicaId={clinicaId ?? null} podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")} />
+          <PainelAlteracoes
+            clinicaId={clinicaId ?? null}
+            podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")}
+          />
         </TabsContent>
 
         <TabsContent value="execucao" className="mt-4">
@@ -376,10 +365,9 @@ function PainelAlteracoes({
       {clinicaId && podeHistorico ? <MudancasDoPrompt clinicaId={clinicaId} /> : null}
 
       <p className="text-xs text-muted-foreground">
-        Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova
-        da arquitetura.
+        Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova da
+        arquitetura.
       </p>
-
     </div>
   );
 }

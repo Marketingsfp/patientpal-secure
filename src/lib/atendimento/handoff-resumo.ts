@@ -124,7 +124,7 @@ export function textoCorrido(v: unknown, max = 6000): string | null {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  if (!t || /^[{\[]/.test(t)) return null;
+  if (!t || /^[{[]/.test(t)) return null;
   return t.length > max ? `${t.slice(0, max).replace(/\s+\S*$/, "")}…` : t;
 }
 
@@ -134,7 +134,11 @@ export function textoCorrido(v: unknown, max = 6000): string | null {
  */
 export function paragrafosDoResumo(r: ResumoHandoff): string[] {
   const corrido = textoCorrido(r.texto_resumo);
-  if (corrido) return corrido.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (corrido)
+    return corrido
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
   return blocosVisiveis(r).map((b) => `${b.titulo}: ${b.itens.join("; ")}`);
 }
 
@@ -224,7 +228,7 @@ Regras obrigatórias:
 - Se o atendimento foi resolvido, "pendencias" deve ser [] e "proxima_acao" deve ser vazia.
 - "proxima_acao": UMA frase com a próxima ação operacional sugerida ao atendente.
 - "situacao": use apenas quando a Nina NÃO conseguiu resolver (ex.: "A Nina não encontrou informação suficiente na base"). Caso contrário, string vazia.
-- "texto_resumo": o resumo COMPLETO e elaborado da conversa, em frases completas, de 2 a 5 parágrafos separados por uma linha em branco (sem telegrafar e sem cortar ideias). Conte: quem é o paciente (o nome só se ele o informou), o que pediu, o que a Nina informou (cite valores, médicos, dias e horários exatamente como foram ditos), o que ficou pendente, até onde o atendimento chegou e por que foi transferido. Sem listas, sem títulos e sem termos técnicos do sistema (não cite ferramentas, códigos nem identificadores). As regras abaixo de não afirmar ação concluída e de não inventar dados valem também para este texto.
+- "texto_resumo": resumo TELEGRÁFICO da conversa, em UMA frase só (no máximo 20 palavras). Diga só: o que o paciente quer e por que foi transferido. Não cite o nome do paciente, não liste valores, exames ou horários (agrupe: "valores de exames"). Exemplo: "Pediu valores de exames; a Nina não tinha todos e transferiu." Sem listas, sem títulos, sem repetir detalhes e sem termos técnicos do sistema (não cite ferramentas, códigos nem identificadores). As regras abaixo de não afirmar ação concluída e de não inventar dados valem também para este texto.
 - NUNCA afirme que algo foi agendado, confirmado, cancelado ou pago. Intenção não é ação concluída: escreva "deseja agendar", nunca "foi agendado".
 - Nunca invente valores, médicos, horários ou dados pessoais. Sem informação, deixe a lista vazia.
 - Ignore saudações e frases sem valor operacional ("olá", "bom dia").
@@ -238,10 +242,19 @@ export type ConteudoDoResumo =
  * O que o cartão mostra: texto corrido nos resumos novos; campos "rotulo: valor" (compactos, como
  * o restante do cartao) nos resumos antigos. O protocolo pode ser omitido quando o cartao ja o mostra.
  */
-export function conteudoDoResumo(r: ResumoHandoff, opcoes?: { omitirProtocolo?: boolean }): ConteudoDoResumo {
+export function conteudoDoResumo(
+  r: ResumoHandoff,
+  opcoes?: { omitirProtocolo?: boolean },
+): ConteudoDoResumo {
   const corrido = textoCorrido(r.texto_resumo);
   if (corrido) {
-    return { tipo: "texto", paragrafos: corrido.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) };
+    return {
+      tipo: "texto",
+      paragrafos: corrido
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    };
   }
   return {
     tipo: "campos",

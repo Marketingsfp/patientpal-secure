@@ -152,47 +152,91 @@ describe("candidatos de entidade", () => {
     expect(r.reasonCode).toBe("ENTIDADE_AMBIGUA");
   });
   const profissionais = [
-    fato({ entidade: "escala", campo: "dia_atendimento", valor: "segunda 09:30", chave: { procedimento: "Consulta Cardiologia", medicoNome: "Rosângela Riolino", especialidade: "Cardiologia" } }),
-    fato({ entidade: "escala", campo: "dia_atendimento", valor: "quinta 13:30", chave: { procedimento: "Consulta Cardiologia", medicoNome: "Antonio Cobucci", especialidade: "Cardiologia" } }),
-    fato({ entidade: "servico", campo: "nome", valor: "Ecocardiograma", chave: { procedimento: "Ecocardiograma", especialidade: "Cardiologia" } }),
+    fato({
+      entidade: "escala",
+      campo: "dia_atendimento",
+      valor: "segunda 09:30",
+      chave: {
+        procedimento: "Consulta Cardiologia",
+        medicoNome: "Rosângela Riolino",
+        especialidade: "Cardiologia",
+      },
+    }),
+    fato({
+      entidade: "escala",
+      campo: "dia_atendimento",
+      valor: "quinta 13:30",
+      chave: {
+        procedimento: "Consulta Cardiologia",
+        medicoNome: "Antonio Cobucci",
+        especialidade: "Cardiologia",
+      },
+    }),
+    fato({
+      entidade: "servico",
+      campo: "nome",
+      valor: "Ecocardiograma",
+      chave: { procedimento: "Ecocardiograma", especialidade: "Cardiologia" },
+    }),
   ];
-  const contextoLista = (mensagemPaciente: string, e: Partial<EstadoDoTurno> = {}) => montarContextoDoTurno(estado({
-    mensagemPaciente,
-    acao: "informar_profissional",
-    tipoTurno: "INFORMACAO",
-    intentAmbiguo: intencaoAmbigua(mensagemPaciente, detectarIntencoes(mensagemPaciente)),
-    fatos: profissionais,
-    ...e,
-  }));
+  const contextoLista = (mensagemPaciente: string, e: Partial<EstadoDoTurno> = {}) =>
+    montarContextoDoTurno(
+      estado({
+        mensagemPaciente,
+        acao: "informar_profissional",
+        tipoTurno: "INFORMACAO",
+        intentAmbiguo: intencaoAmbigua(mensagemPaciente, detectarIntencoes(mensagemPaciente)),
+        fatos: profissionais,
+        ...e,
+      }),
+    );
 
-  it.each(["vcs tem cardiologista?", "Vocês têm cardiologia e quais dias os médicos atendem?"])("preserva opções publicadas sem inventar ambiguidade na lista: %s", (m) => {
-    const ctx = contextoLista(m);
-    expect(ctx.entityCandidates?.medico).toHaveLength(2);
-    expect(ctx.entityCandidates?.procedimento).toHaveLength(2);
-    expect(IntentClarityValidator(ctx).status).toBe("PASS");
-    const r = EntityResolutionValidator(ctx);
-    expect(r.status).toBe("PASS");
-    expect(r.reasonCode).toBe("OPCOES_INFORMATIVAS_PUBLICADAS");
-    expect(r.evidence["opcoes"]).toContainEqual({ campo: "medico", opcoes: ["Rosângela Riolino", "Antonio Cobucci"] });
-  });
+  it.each(["vcs tem cardiologista?", "Vocês têm cardiologia e quais dias os médicos atendem?"])(
+    "preserva opções publicadas sem inventar ambiguidade na lista: %s",
+    (m) => {
+      const ctx = contextoLista(m);
+      expect(ctx.entityCandidates?.medico).toHaveLength(2);
+      expect(ctx.entityCandidates?.procedimento).toHaveLength(2);
+      expect(IntentClarityValidator(ctx).status).toBe("PASS");
+      const r = EntityResolutionValidator(ctx);
+      expect(r.status).toBe("PASS");
+      expect(r.reasonCode).toBe("OPCOES_INFORMATIVAS_PUBLICADAS");
+      expect(r.evidence["opcoes"]).toContainEqual({
+        campo: "medico",
+        opcoes: ["Rosângela Riolino", "Antonio Cobucci"],
+      });
+    },
+  );
 
-  it.each(["cardiologia", "Tem vaga com cardiologista?", "Quero agendar cardiologia", "Vocês têm cardiologista Antonio?", "Tem cardiologista amanhã?"])("não dispensa resolução para pedido específico ou assunto solto: %s", (m) => {
+  it.each([
+    "cardiologia",
+    "Tem vaga com cardiologista?",
+    "Quero agendar cardiologia",
+    "Vocês têm cardiologista Antonio?",
+    "Tem cardiologista amanhã?",
+  ])("não dispensa resolução para pedido específico ou assunto solto: %s", (m) => {
     expect(EntityResolutionValidator(contextoLista(m)).reasonCode).toBe("ENTIDADE_AMBIGUA");
   });
 
   it("uma pergunta geral não dispensa a escolha antes de informar vaga ou gravar agendamento", () => {
     for (const acao of ["informar_disponibilidade", "criar_agendamento"] as const) {
-      expect(EntityResolutionValidator(contextoLista("vcs tem cardiologista?", { acao })).status).toBe("FAIL");
+      expect(
+        EntityResolutionValidator(contextoLista("vcs tem cardiologista?", { acao })).status,
+      ).toBe("FAIL");
     }
   });
 
   it("não aprova candidatos ausentes da evidência publicada", () => {
-    const ctx = contextoLista("vcs tem cardiologista?", { entityCandidates: { medico: ["Rosângela Riolino", "Médico inventado"] } });
+    const ctx = contextoLista("vcs tem cardiologista?", {
+      entityCandidates: { medico: ["Rosângela Riolino", "Médico inventado"] },
+    });
     expect(EntityResolutionValidator(ctx).status).toBe("FAIL");
   });
 
   it("uma fonte de agenda não é tratada como lista publicada", () => {
-    const ctx = contextoLista("vcs tem cardiologista?", { fatos: profissionais.map((f) => ({ ...f, fonte: "agenda" })) });
+    const ctx = contextoLista("vcs tem cardiologista?", {
+      fatos: profissionais.map((f) => ({ ...f, fonte: "agenda" })),
+    });
     expect(EntityResolutionValidator(ctx).status).toBe("FAIL");
   });
 });
@@ -203,7 +247,11 @@ describe("campos obrigatórios da ação", () => {
     expect(camposObrigatoriosDaAcao("responder_informacao")).toBeNull();
 
     const ctx = montarContextoDoTurno(
-      estado({ acao: "criar_agendamento", tipoTurno: "OPERACAO", entities: { procedimento: "Consulta" } }),
+      estado({
+        acao: "criar_agendamento",
+        tipoTurno: "OPERACAO",
+        entities: { procedimento: "Consulta" },
+      }),
     );
     const r = RequiredDataValidator(ctx);
     expect(r.status).toBe("BLOCK");

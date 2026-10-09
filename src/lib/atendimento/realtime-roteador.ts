@@ -59,9 +59,12 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
   switch (ev.table) {
     case "agendamentos": {
       if (!aberta || !ctx.pacienteAberto) return [];
-      return linha.paciente_id === ctx.pacienteAberto || ev.old?.paciente_id === ctx.pacienteAberto ||
-        ctx.agendamentosAbertos?.includes(linha.id) || !linha.paciente_id
-        ? ["contato"] : [];
+      return linha.paciente_id === ctx.pacienteAberto ||
+        ev.old?.paciente_id === ctx.pacienteAberto ||
+        ctx.agendamentosAbertos?.includes(linha.id) ||
+        !linha.paciente_id
+        ? ["contato"]
+        : [];
     }
     case "atend_leitura_operacional":
       // A leitura da equipe atualiza também o contador de quem supervisiona.
@@ -82,6 +85,8 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
       return alvos;
     }
     case "atend_conversa_eventos": {
+      // A primeira abertura é um indicador do card, inclusive para supervisão.
+      if (linha.evento === "INBOX_ABERTA_ATENDENTE") return ["lista"];
       // Movimentações de estado da conversa aberta entram no histórico; das
       // demais, a própria linha de `atend_conversas` já atualiza a lista.
       if (aberta && linha.conversa_id === aberta) return ["conversa"];

@@ -22,10 +22,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type {
-  EtapaFluxoNina,
-  EstadoFluxoNina,
-} from "./fluxo-estado-normalizar";
+export type { EtapaFluxoNina, EstadoFluxoNina } from "./fluxo-estado-normalizar";
 export { estadoVazio, normalizarEstado } from "./fluxo-estado-normalizar";
 
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
@@ -100,7 +97,9 @@ export async function limparFluxoEstado(
 export function blocoPromptEstado(estado: EstadoFluxoNina): string {
   const p = estado.patient;
   const a = estado.appointment;
-  const linhas: string[] = ["ESTADO ESTRUTURADO DESTE ATENDIMENTO (fonte de verdade — confie nele):"];
+  const linhas: string[] = [
+    "ESTADO ESTRUTURADO DESTE ATENDIMENTO (fonte de verdade — confie nele):",
+  ];
 
   if (p.identified && p.id) {
     linhas.push(
@@ -126,9 +125,7 @@ export function blocoPromptEstado(estado: EstadoFluxoNina): string {
   if (a.date) escolhido.push(`data: ${a.date}`);
   if (a.time) escolhido.push(`hora: ${a.time}`);
   if (escolhido.length > 0) {
-    linhas.push(
-      `- Já definido nesta conversa — NÃO pergunte de novo: ${escolhido.join(" | ")}.`,
-    );
+    linhas.push(`- Já definido nesta conversa — NÃO pergunte de novo: ${escolhido.join(" | ")}.`);
   }
   if (a.slot_inicio && a.slot_fim) {
     linhas.push(

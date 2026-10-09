@@ -134,6 +134,7 @@ const PERIODO_LABEL: Record<string, string> = {
   semana: "por semana",
   mes: "por mês",
   ano: "por ano",
+  "12m_uso": "a cada 12 meses entre usos",
   contrato: "por contrato (uma vez só)",
 };
 

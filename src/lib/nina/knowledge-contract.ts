@@ -11,6 +11,7 @@
  */
 
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
+import type { mapaCamposResultado } from "./catalogo-mapa-campos";
 
 export type KnowledgeStatus = "found" | "not_found" | "conflict";
 
@@ -41,10 +42,21 @@ export type TraceConhecimento = {
 };
 
 export type ResultadoConhecimento = {
+  /** Fonte efetivamente consultada neste turno, escolhida pela clínica. */
+  fonte_consulta?: import("./fonte-consulta").FonteConsulta;
+  revisao_fonte?: string | null;
+  /** Índice de caminhos do retorno. Não contém fatos ou decisões de atendimento. */
+  mapa_campos?: ReturnType<typeof mapaCamposResultado>;
   /** Categoria da pesquisa, preservada separadamente do termo e do objetivo. */
   tipo_atendimento?: TipoAtendimentoCatalogo;
   found: boolean;
   knowledge_status: KnowledgeStatus;
+  /** Pedido compreendido, mas a fonte não confirma a oferta específica. Não é dúvida de escrita. */
+  limitacao_catalogo?: {
+    codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA";
+    pedido: string;
+    mensagem: string;
+  };
   source: "nina_knowledge_base" | "nina_catalogo";
   source_type: "spreadsheet" | "catalog";
   base_version: number | null;
@@ -63,7 +75,7 @@ export type ResultadoConhecimento = {
   esclarecimento?: {
     tipo: "procedimento" | "profissional" | "sigla";
     /** Consulta comprovada; somente a escolha do médico precisa ser corrigida. */
-    motivo?: "medico_nao_identificado";
+    motivo?: "medico_nao_identificado" | "sem_registro_confirmar";
     atendimento?: string;
     pergunta: string;
     opcoes: Array<{ id: string; nome: string; especialidade?: string; unidade?: string | null }>;
@@ -119,8 +131,8 @@ export function resumoDePrecos(
 ): string | null {
   const d = moeda(dinheiro);
   const c = moeda(cartao);
-  if (d && c) return `Dinheiro: ${d} / Pix/cartão: ${c}`;
-  if (c) return `Pix/cartão: ${c}`;
+  if (d && c) return `Dinheiro: ${d} / Cartão: ${c}`;
+  if (c) return `Cartão: ${c}`;
   return d ? `Dinheiro: ${d}` : null;
 }
 

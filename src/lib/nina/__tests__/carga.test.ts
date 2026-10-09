@@ -116,7 +116,9 @@ describe("métricas medidas", () => {
 
 describe("variações de linguagem", () => {
   it("limpa numeração, aspas e duplicidade", () => {
-    const lista = extrairVariacoes('1. "Tem cardio amanhã?"\n- Tem cardio amanhã?\n\nQueria consulta de coração');
+    const lista = extrairVariacoes(
+      '1. "Tem cardio amanhã?"\n- Tem cardio amanhã?\n\nQueria consulta de coração',
+    );
     expect(lista).toEqual(["Tem cardio amanhã?", "Queria consulta de coração"]);
   });
 

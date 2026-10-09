@@ -216,10 +216,7 @@ export function extrairIdentidade(texto: string): LeituraIdentidade {
  * Grava a identidade no texto: substitui o bloco existente ou insere um bloco
  * novo no topo. Fonte única — o texto continua sendo o que será publicado.
  */
-export function aplicarIdentidadeNoTexto(
-  texto: string,
-  identidade: IdentidadeAtendimento,
-): string {
+export function aplicarIdentidadeNoTexto(texto: string, identidade: IdentidadeAtendimento): string {
   const novo = montarBlocoIdentidade(identidade);
   const aberturas = ocorrencias(texto, ABERTURA_IDENTIDADE);
   const fechamentos = ocorrencias(texto, FECHAMENTO_IDENTIDADE);

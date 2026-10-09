@@ -53,7 +53,11 @@ function notaGeral(a: DesempenhoAluno) {
 }
 
 function normalizarPonto(txt: string) {
-  return txt.trim().replace(/\s+/g, " ").replace(/^[-•\s]+/, "").slice(0, 90);
+  return txt
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/^[-•\s]+/, "")
+    .slice(0, 90);
 }
 
 /** Painel de gestão de desempenho: ranking, comparativo por clínica, pontos fracos e metas. */
@@ -204,7 +208,9 @@ export function GestaoDesempenho({
       .filter((f) => nomesVisiveis.has(f.atendente))
       .map((f) => {
         const contagem = new Map<string, number>();
-        f.itens.forEach((i) => contagem.set(i.toLowerCase(), (contagem.get(i.toLowerCase()) ?? 0) + 1));
+        f.itens.forEach((i) =>
+          contagem.set(i.toLowerCase(), (contagem.get(i.toLowerCase()) ?? 0) + 1),
+        );
         return {
           atendente: f.atendente,
           top: Array.from(contagem.entries())
@@ -296,7 +302,10 @@ export function GestaoDesempenho({
       )
       .join("");
     const fracosHtml = fracosGerais
-      .map((f) => `<li>${f.texto.replace(/</g, "&lt;")} — ${f.total}x (${f.pessoas.length} atendentes)</li>`)
+      .map(
+        (f) =>
+          `<li>${f.texto.replace(/</g, "&lt;")} — ${f.total}x (${f.pessoas.length} atendentes)</li>`,
+      )
       .join("");
     const w = window.open("", "_blank", "width=900,height=1000");
     if (!w) return;
@@ -479,7 +488,10 @@ export function GestaoDesempenho({
                 {formatDuracao(c.tempo)} · {c.naMeta}/{c.atendentes} na meta
               </p>
               <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${c.progresso}%` }} />
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${c.progresso}%` }}
+                />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">
                 {c.conversas} conversas · {c.ligacoes} ligações · {c.provas} provas · progresso{" "}
@@ -611,9 +623,7 @@ function Mini({ label, valor, alerta }: { label: string; valor: string; alerta?:
   return (
     <div className="rounded-xl border bg-background/60 px-3 py-2">
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p
-        className={`text-lg font-semibold tabular-nums ${alerta ? "text-destructive" : ""}`}
-      >
+      <p className={`text-lg font-semibold tabular-nums ${alerta ? "text-destructive" : ""}`}>
         {valor}
       </p>
     </div>

@@ -25,7 +25,10 @@ export async function descricaoComEspecialidade(
       ((ags ?? []) as { procedimento: string | null; especialidade_id: string | null }[]).map(
         (a) =>
           (a.especialidade_id
-            ? lista.find((e) => e.id === a.especialidade_id)?.nome?.toUpperCase().trim()
+            ? lista
+                .find((e) => e.id === a.especialidade_id)
+                ?.nome?.toUpperCase()
+                .trim()
             : null) ?? especialidadeDoProcedimento(a.procedimento, nomes),
       ),
     );

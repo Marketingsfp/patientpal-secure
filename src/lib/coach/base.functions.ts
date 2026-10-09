@@ -38,7 +38,6 @@ export const gerarBaseConhecimento = createServerFn({ method: "POST" })
     if (erroPermissao) throw new Error("Não foi possível validar a permissão.");
     if (!podeGerir) throw new Error("Só a gestão do Coach pode atualizar a base da clínica.");
 
-
     const { texto, geradoEm, tamanho } = await gerarBaseDoSistema(
       db,
       data.clinicaId,

@@ -7,10 +7,7 @@
 import { describe, expect, it } from "bun:test";
 import { PROMPT_CANDIDATO_23_REGRAS } from "./fixtures/prompt-23-regras";
 import { compilarContratoRegras } from "./contrato-regras";
-import {
-  montarContextoCanonico,
-  type EntradaContextoCanonico,
-} from "./contexto-canonico";
+import { montarContextoCanonico, type EntradaContextoCanonico } from "./contexto-canonico";
 import {
   avaliarContrato,
   entidadeAfirmada,
@@ -116,9 +113,7 @@ describe("3. saudação contaminada por informação inventada", () => {
     ambiente: "homologacao",
     primeiraResposta: true,
     apresentacaoEntregue: false,
-    afirmacoes: [
-      { id: "a1", texto: "hemograma R$ 51,00", tipo: "preco", comFonte: false },
-    ],
+    afirmacoes: [{ id: "a1", texto: "hemograma R$ 51,00", tipo: "preco", comFonte: false }],
   });
 
   it("FAT-01 descumprida com o trecho e a evidência do preço sem fonte", () => {
@@ -237,7 +232,10 @@ describe("6. apenas linguagem indeterminada", () => {
         apresentacaoEntregue: false,
       },
       {
-        revisorSemantico: () => ({ veredito: "cumprida" as const, referencia: "texto em português" }),
+        revisorSemantico: () => ({
+          veredito: "cumprida" as const,
+          referencia: "texto em português",
+        }),
       },
     );
     expect(reg(b, "LING-01").status).toBe("PASS");

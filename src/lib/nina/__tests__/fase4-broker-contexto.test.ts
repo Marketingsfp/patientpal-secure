@@ -47,7 +47,10 @@ describe("Context Builder — só o necessário", () => {
   it("não começa a janela com resultado de tool órfão", () =>
     expect(
       selecionarMensagensRelevantes(
-        [{ role: "tool", content: "x" }, { role: "user", content: "y" }],
+        [
+          { role: "tool", content: "x" },
+          { role: "user", content: "y" },
+        ],
         2,
       ),
     ).toHaveLength(1));
@@ -82,9 +85,9 @@ describe("Tool Broker — validação de resultado", () => {
     expect(String(respostaParaModelo(r)["instrucao"])).toMatch(/proibido/i);
   });
   it("agendar com appointment_id é confirmado", () =>
-    expect(validarResultado("agendar", { ok: true, appointment_id: "a1" }).appointment_confirmed).toBe(
-      true,
-    ));
+    expect(
+      validarResultado("agendar", { ok: true, appointment_id: "a1" }).appointment_confirmed,
+    ).toBe(true));
   it("duplicado idempotente conta como confirmado", () =>
     expect(validarResultado("agendar", { ok: true, duplicado: true }).success).toBe(true));
   it("retry com os mesmos argumentos gera a mesma chave", () =>
@@ -92,13 +95,17 @@ describe("Tool Broker — validação de resultado", () => {
       chaveIdempotencia("agendar", { a: 1, b: 2 }),
     ));
   it("argumentos diferentes geram chaves diferentes", () =>
-    expect(chaveIdempotencia("agendar", { a: 1 })).not.toBe(chaveIdempotencia("agendar", { a: 2 })));
+    expect(chaveIdempotencia("agendar", { a: 1 })).not.toBe(
+      chaveIdempotencia("agendar", { a: 2 }),
+    ));
 });
 
 describe("Decisão estruturada", () => {
   it("aceita o schema esperado", () =>
     expect(
-      parseDecisaoNina('{"intent":"appointment","needs_knowledge":true,"needs_tool":true,"missing_fields":[]}'),
+      parseDecisaoNina(
+        '{"intent":"appointment","needs_knowledge":true,"needs_tool":true,"missing_fields":[]}',
+      ),
     ).toEqual({
       intent: "appointment",
       needs_knowledge: true,

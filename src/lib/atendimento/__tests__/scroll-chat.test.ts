@@ -1,10 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  decidirScroll,
-  distanciaDoFim,
-  pertoDoFim,
-  rotuloNovasMensagens,
-} from "../scroll-chat";
+import { decidirScroll, distanciaDoFim, pertoDoFim, rotuloNovasMensagens } from "../scroll-chat";
 
 const noFim = { scrollTop: 900, scrollHeight: 1400, clientHeight: 500 };
 const lendoHistorico = { scrollTop: 0, scrollHeight: 4000, clientHeight: 500 };

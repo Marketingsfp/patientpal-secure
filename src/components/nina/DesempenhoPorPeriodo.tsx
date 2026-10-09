@@ -104,7 +104,8 @@ export function DesempenhoPorPeriodo(props: Props) {
   }, [carregar]);
 
   const n = useCallback(
-    (tipo: string, campo: "eventos" | "distintos" = "eventos") => contagem(dados, filtro, tipo, campo),
+    (tipo: string, campo: "eventos" | "distintos" = "eventos") =>
+      contagem(dados, filtro, tipo, campo),
     [dados, filtro],
   );
 
@@ -122,7 +123,11 @@ export function DesempenhoPorPeriodo(props: Props) {
   const trTodos = useMemo(() => {
     const t = dados?.tempoResposta ?? {};
     const amostras = Object.values(t).reduce((a, b) => a + (b?.amostras ?? 0), 0);
-    return { amostras, medianaSegundos: null as number | null, mediaSegundos: null as number | null };
+    return {
+      amostras,
+      medianaSegundos: null as number | null,
+      mediaSegundos: null as number | null,
+    };
   }, [dados]);
 
   return (
@@ -146,17 +151,22 @@ export function DesempenhoPorPeriodo(props: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           Mesmo intervalo de datas e mesmos critérios dos cartões acima. A classificação usa o
-          horário oficial publicado em Informações da clínica{dados?.fuso ? ` (fuso ${dados.fuso})` : ""}.
+          horário oficial publicado em Informações da clínica
+          {dados?.fuso ? ` (fuso ${dados.fuso})` : ""}.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="max-w-xs space-y-1">
           <Label htmlFor="filtro-periodo">Período do dia</Label>
           <Select value={filtro} onValueChange={(v) => setFiltro(v as FiltroPeriodo)}>
-            <SelectTrigger id="filtro-periodo"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="filtro-periodo">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {FILTROS_PERIODO.map((f) => (
-                <SelectItem key={f.valor} value={f.valor}>{f.rotulo}</SelectItem>
+                <SelectItem key={f.valor} value={f.valor}>
+                  {f.rotulo}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -178,9 +188,20 @@ export function DesempenhoPorPeriodo(props: Props) {
 
         {dados ? (
           <>
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Atividade da Nina">
-              <Bloco titulo="Mensagens do atendimento" valor={String(n("mensagem"))} explicacao={EXPLICACOES.mensagem} />
-              <Bloco titulo="Respostas da Nina" valor={String(n("resposta_nina"))} explicacao={EXPLICACOES.resposta_nina} />
+            <section
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              aria-label="Atividade da Nina"
+            >
+              <Bloco
+                titulo="Mensagens do atendimento"
+                valor={String(n("mensagem"))}
+                explicacao={EXPLICACOES.mensagem}
+              />
+              <Bloco
+                titulo="Respostas da Nina"
+                valor={String(n("resposta_nina"))}
+                explicacao={EXPLICACOES.resposta_nina}
+              />
               <Bloco
                 titulo="Tempo de resposta"
                 valor={
@@ -201,9 +222,21 @@ export function DesempenhoPorPeriodo(props: Props) {
                 }
                 explicacao="Contado do horário da mensagem do paciente que iniciou a espera até a primeira resposta. Tempo corrido real, sem descontar períodos fechados."
               />
-              <Bloco titulo="Agendamentos registrados" valor={String(n("agendamento"))} explicacao={EXPLICACOES.agendamento} />
-              <Bloco titulo="Encaminhamentos para atendente" valor={String(n("encaminhamento"))} explicacao={EXPLICACOES.encaminhamento} />
-              <Bloco titulo="Respostas avaliadas" valor={String(n("resposta_avaliada"))} explicacao={EXPLICACOES.resposta_avaliada} />
+              <Bloco
+                titulo="Agendamentos registrados"
+                valor={String(n("agendamento"))}
+                explicacao={EXPLICACOES.agendamento}
+              />
+              <Bloco
+                titulo="Encaminhamentos para atendente"
+                valor={String(n("encaminhamento"))}
+                explicacao={EXPLICACOES.encaminhamento}
+              />
+              <Bloco
+                titulo="Respostas avaliadas"
+                valor={String(n("resposta_avaliada"))}
+                explicacao={EXPLICACOES.resposta_avaliada}
+              />
             </section>
 
             <section className="space-y-2" aria-label="Qualidade das respostas">
@@ -266,7 +299,10 @@ export function DesempenhoPorPeriodo(props: Props) {
                   titulo="Iniciadas neste recorte"
                   valor={String(
                     filtro === "todos"
-                      ? Object.values(dados.conversas?.iniciadas ?? {}).reduce((a, b) => a + (b ?? 0), 0)
+                      ? Object.values(dados.conversas?.iniciadas ?? {}).reduce(
+                          (a, b) => a + (b ?? 0),
+                          0,
+                        )
                       : (dados.conversas?.iniciadas?.[filtro] ?? 0),
                   )}
                   explicacao="Classificadas pela primeira mensagem da conversa."
@@ -307,7 +343,8 @@ export function DesempenhoPorPeriodo(props: Props) {
               </ul>
               {(dados.versoesUtilizadas ?? []).length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Versões do horário usadas: {dados.versoesUtilizadas.map((v) => `v${v.versao}`).join(", ")}
+                  Versões do horário usadas:{" "}
+                  {dados.versoesUtilizadas.map((v) => `v${v.versao}`).join(", ")}
                 </p>
               ) : null}
             </section>

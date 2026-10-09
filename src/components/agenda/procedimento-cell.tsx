@@ -98,8 +98,12 @@ export function ProcedimentoCell({
     await onChange(nome);
   };
 
-  const fallback = (padrao && padrao.trim()) || (semFallback ? "" : "CONSULTA");
+  // Sem serviço gravado e sem padrão no médico, a célula não finge "CONSULTA":
+  // a recepção cobrava achando que havia serviço e o Financeiro mostrava "—".
+  const padraoReal = (padrao ?? "").trim();
+  const fallback = padraoReal || (semFallback ? "" : "SEM SERVIÇO");
   const textoReal = valor || fallback || "—";
+  const semServico = !valor && !padraoReal && !semFallback;
   const rotulo = (rotuloExibicao ?? "").trim();
   const textoAtual = rotulo || textoReal;
   // Quando o rótulo de categoria esconde o serviço real, o tooltip mostra os
@@ -112,9 +116,10 @@ export function ProcedimentoCell({
       <Badge
         variant="secondary"
         title={tituloAtual}
-        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0.5 text-left text-[12px] font-medium leading-snug text-muted-foreground"
+        className="inline-block max-w-full whitespace-normal break-words align-middle rounded-md border-0 bg-muted/70 px-1.5 py-0 text-left text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100"
       >
-        {textoAtual}
+        {/* Vaga livre não precisa de alerta de serviço. */}
+        {disabled && semServico && !rotulo ? "—" : textoAtual}
       </Badge>
     );
   }
@@ -125,11 +130,11 @@ export function ProcedimentoCell({
         <button
           type="button"
           title={`${tituloAtual} — clique para trocar o serviço`}
-          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0.5 text-left text-[12px] font-medium uppercase leading-snug text-muted-foreground hover:bg-primary/10 hover:text-primary"
+          className="group flex w-full max-w-full items-center gap-1 rounded-md border-0 bg-muted/60 px-1.5 py-0 text-left text-sm font-semibold uppercase leading-tight text-slate-900 dark:text-slate-100 hover:bg-primary/10 hover:text-primary"
         >
           <span
             title={tituloAtual}
-            className="inline-block min-w-0 flex-1 whitespace-normal break-words align-middle"
+            className={`inline-block min-w-0 flex-1 whitespace-normal break-words align-middle${semServico && !rotulo ? " text-rose-700 dark:text-rose-400" : ""}`}
           >
             {textoAtual}
           </span>
@@ -157,13 +162,15 @@ export function ProcedimentoCell({
           <p className="text-[11px] text-muted-foreground mt-1">
             {lista.length} serviço(s) — na ordem do cadastro do médico. Tecle 1-9 para selecionar.
           </p>
-          {valor && (
+          {/* Só há para onde voltar quando o médico tem serviço padrão; sem ele
+              (ex.: São Francisco), limpar deixaria a ficha sem serviço. */}
+          {valor && padraoReal && norm(valor) !== norm(padraoReal) && (
             <button
               type="button"
               onClick={() => escolher("")}
               className="mt-2 w-full text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 rounded px-2 py-1"
             >
-              Limpar serviço (voltar para {fallback})
+              Voltar para o padrão ({padraoReal})
             </button>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
@@ -251,7 +252,7 @@ function EquipePage() {
         telefone: m.telefone ?? "",
         status: m.pending ? "Cadastro pendente" : m.ativo ? "Ativo" : "Inativo",
       })),
-      `medicos-${new Date().toISOString().slice(0, 10)}`,
+      `medicos-${hojeBR()}`,
       [
         { key: "nome", label: "Nome" },
         { key: "crm", label: "CRM" },

@@ -67,10 +67,7 @@ export function posicoesEfetivas(estado: EstadoLayout): Record<string, Posicao> 
  * mudaram, vizinhos de componentes removidos e os vizinhos imediatos de todos
  * eles (raio 1). Mudança só de propriedade interna não entra aqui.
  */
-export function subgrafoAfetado(
-  nodes: NodeArquitetura[],
-  diff: DiffArquitetura,
-): Set<string> {
+export function subgrafoAfetado(nodes: NodeArquitetura[], diff: DiffArquitetura): Set<string> {
   const existentes = new Set(nodes.map((n) => n.id));
   const vizinhos = new Map<string, Set<string>>();
   for (const node of nodes) vizinhos.set(node.id, new Set());
@@ -163,7 +160,10 @@ function acomodar(posicao: Posicao, ocupadas: Posicao[]): Posicao {
 export function aplicarDiffIncremental(
   nodes: NodeArquitetura[],
   estadoAnterior: EstadoLayout = ESTADO_LAYOUT_VAZIO,
-  diff: DiffArquitetura = calcularDiffArquitetura(estadoAnterior.assinatura, assinaturaAtual(nodes)),
+  diff: DiffArquitetura = calcularDiffArquitetura(
+    estadoAnterior.assinatura,
+    assinaturaAtual(nodes),
+  ),
 ): ResultadoIncremental {
   const base = calcularLayout(nodes);
   const basePos = new Map(base.nodes.map((n) => [n.node.id, { x: n.x, y: n.y }]));
@@ -215,9 +215,7 @@ export function aplicarDiffIncremental(
       }
       const { x, y, qtd } = referencia(escolhido, canonical);
       const alvo =
-        qtd > 0
-          ? { x: Math.round(x), y: Math.round(y) }
-          : (anterior ?? basePos.get(escolhido.id)!);
+        qtd > 0 ? { x: Math.round(x), y: Math.round(y) } : (anterior ?? basePos.get(escolhido.id)!);
       canonical[escolhido.id] = acomodar(alvo, ocupadas());
       restantes.delete(escolhido.id);
     }
@@ -330,7 +328,10 @@ export function verificarIntegridade(nodes: NodeArquitetura[]): ProblemaIntegrid
     for (const seguinte of node.seguintes) {
       const alvo = mapa.get(seguinte);
       if (!alvo) {
-        problemas.push({ id: node.id, problema: `aponta para componente inexistente (${seguinte})` });
+        problemas.push({
+          id: node.id,
+          problema: `aponta para componente inexistente (${seguinte})`,
+        });
         continue;
       }
       if (!alvo.anteriores.includes(node.id)) {

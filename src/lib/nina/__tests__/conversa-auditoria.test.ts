@@ -28,10 +28,12 @@ const msg = (over: Partial<MensagemAuditoria> & { id: string }): MensagemAuditor
 describe("ver conversa — vínculo exato", () => {
   it("TESTE 1/8 — o estado depende do conversa_id do reporte, nunca do lead", () => {
     // dois erros do mesmo lead, em conversas diferentes
-    expect(estadoAuditoria({ conversaId: "conv-2", mensagemId: "m2", mensagemEncontrada: true }))
-      .toBe("ok");
-    expect(estadoAuditoria({ conversaId: "conv-3", mensagemId: "m9", mensagemEncontrada: true }))
-      .toBe("ok");
+    expect(
+      estadoAuditoria({ conversaId: "conv-2", mensagemId: "m2", mensagemEncontrada: true }),
+    ).toBe("ok");
+    expect(
+      estadoAuditoria({ conversaId: "conv-3", mensagemId: "m9", mensagemEncontrada: true }),
+    ).toBe("ok");
   });
 
   it("TESTE 6 — sem conversa vinculada mostra erro e não sugere outra conversa", () => {
@@ -94,7 +96,10 @@ describe("ver conversa — mensagem reportada", () => {
 
 describe("ver conversa — timestamps e autoria", () => {
   it("TESTE 3 — todas as mensagens exibem DD/MM/AAAA HH:mm:ss", () => {
-    for (const m of [msg({ id: "a" }), msg({ id: "b", enviada_por: "paciente", direction: "in" })]) {
+    for (const m of [
+      msg({ id: "a" }),
+      msg({ id: "b", enviada_por: "paciente", direction: "in" }),
+    ]) {
       expect(fmtHora(m.recebida_em)).toMatch(/^\d{2}\/\d{2}\/\d{4},? \d{2}:\d{2}:\d{2}$/);
     }
     expect(fmtHora("2026-09-05T16:51:52.000Z")).toContain("05/09/2026");

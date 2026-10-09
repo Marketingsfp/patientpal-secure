@@ -21,7 +21,8 @@ describe("visão simples da Nina", () => {
 
   test("cada saída sai de uma etapa que existe", () => {
     const etapas = new Set(ETAPAS_VISAO_SIMPLES.map((e) => e.id));
-    for (const saida of SAIDAS_VISAO_SIMPLES) expect(etapas.has(saida.depoisDe), saida.id).toBe(true);
+    for (const saida of SAIDAS_VISAO_SIMPLES)
+      expect(etapas.has(saida.depoisDe), saida.id).toBe(true);
   });
 
   test("só aponta para caixas que existem no mapa técnico", () => {

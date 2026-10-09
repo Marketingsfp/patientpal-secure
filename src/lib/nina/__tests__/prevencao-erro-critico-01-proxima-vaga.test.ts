@@ -74,6 +74,8 @@ const texto = (n: number) => "Informação pública do atendimento. ".repeat(n);
 const base: Record<string, Linha[]> = {
   medicos,
   especialidades,
+  // Visão "ativas nesta unidade": todas ligadas na clínica do teste.
+  especialidades_da_unidade: especialidades.map((e) => ({ ...e, clinica_id: CLINICA })),
   medico_especialidades: [
     { medico_id: MEDICO, especialidade_id: especialidades[0]!.id },
     { medico_id: MEDICO, especialidade_id: especialidades[1]!.id },

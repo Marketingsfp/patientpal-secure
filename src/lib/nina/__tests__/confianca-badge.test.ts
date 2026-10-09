@@ -91,7 +91,12 @@ describe("FASE 10 — selo de confiança por mensagem", () => {
     expect(r.policyVersion).toBe("v1");
 
     // Uma resposta nova sob a política v2 não altera a leitura da antiga.
-    const nova = snapshot({ execucao_id: "exec-2", score: 88, nivel: "MEDIUM", policy_version: "v2" });
+    const nova = snapshot({
+      execucao_id: "exec-2",
+      score: 88,
+      nivel: "MEDIUM",
+      policy_version: "v2",
+    });
     expect(rotuloConfianca(nova).policyVersion).toBe("v2");
     expect(rotuloConfianca(historica).texto).toBe("94% Alta");
     expect(rotuloConfianca(historica).policyVersion).toBe("v1");

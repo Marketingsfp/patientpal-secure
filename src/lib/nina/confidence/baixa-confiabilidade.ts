@@ -265,11 +265,9 @@ export function decidirBloqueioBaixaConfianca(
     ...(e.bloqueadoresAbsolutos ? { bloqueadoresAbsolutos: e.bloqueadoresAbsolutos } : {}),
     ...(saudacao ? { saudacao } : {}),
   });
-  const isencaoIncerteza =
-    !pedidoDeHumano && nivelExigeEncaminhamento(e.nivel) && incerteza.aplica;
+  const isencaoIncerteza = !pedidoDeHumano && nivelExigeEncaminhamento(e.nivel) && incerteza.aplica;
   const aplicavel =
-    pedidoDeHumano ||
-    (nivelExigeEncaminhamento(e.nivel) && !isencaoSocial && !isencaoIncerteza);
+    pedidoDeHumano || (nivelExigeEncaminhamento(e.nivel) && !isencaoSocial && !isencaoIncerteza);
   const jaAplicado = e.avisoJaAplicado === true;
   const base = {
     nivel: e.nivel ?? null,
@@ -345,9 +343,7 @@ export type SaidaControlada = {
 };
 
 /** Monta a saída controlada a partir do resultado real/simulado. */
-export function saidaControladaBaixaConfianca(
-  resultado: ResultadoEncaminhamento,
-): SaidaControlada {
+export function saidaControladaBaixaConfianca(resultado: ResultadoEncaminhamento): SaidaControlada {
   if (resultado.tipo === "simulado") {
     return {
       aviso: AVISO_ENCAMINHAMENTO_SIMULADO,
@@ -375,7 +371,8 @@ export function saidaControladaBaixaConfianca(
     };
   }
   const erro =
-    (resultado.tipo === "real" ? resultado.erro : resultado.erro) ?? "encaminhamento_nao_confirmado";
+    (resultado.tipo === "real" ? resultado.erro : resultado.erro) ??
+    "encaminhamento_nao_confirmado";
   return {
     aviso: AVISO_ENCAMINHAMENTO_FALHOU,
     origem: "mensagem_controlada_sistema",

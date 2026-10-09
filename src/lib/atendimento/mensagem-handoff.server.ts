@@ -12,7 +12,7 @@ import {
   validarMensagemHandoff,
   type ContextoMensagemHandoff,
 } from "./mensagem-handoff";
-import { removerEmojisNina } from "@/lib/nina/resposta/sem-emojis";
+import { formatarMensagemNina } from "@/lib/nina/resposta/formato-mobile";
 
 const MODELO = "google/gemini-2.5-flash";
 
@@ -30,7 +30,7 @@ export async function gerarMensagemHandoff(
         { role: "user", content: "Escreva a mensagem agora." },
       ],
     });
-    const texto = removerEmojisNina(r.conteudo ?? "").trim();
+    const texto = formatarMensagemNina(r.conteudo ?? "");
     if (r.ok && texto) {
       const v = validarMensagemHandoff(texto, { protocolo: ctx.protocolo, setor: ctx.setor });
       if (v.ok) return { texto, origem: "modelo" };

@@ -50,8 +50,10 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
   ninaInformaPeloCadastro: async () => true,
   limparCacheFonteOperacional: () => {},
   lerFonteOperacional: async (clinicaId: string) => {
-    const publicados = (t: string) => ((db.tabelas as Record<string, any[]>)[t] ?? [])
-      .filter((l) => l.clinica_id === clinicaId && l.status === "PUBLICADO");
+    const publicados = (t: string) =>
+      ((db.tabelas as Record<string, any[]>)[t] ?? []).filter(
+        (l) => l.clinica_id === clinicaId && l.status === "PUBLICADO",
+      );
     return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
 }));

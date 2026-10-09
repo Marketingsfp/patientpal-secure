@@ -21,15 +21,13 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ambienteDoHandoff, vinculoProtocolo } from "./protocolo-handoff";
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 import { nomeContato } from "./rotulo-conversa";
-import { motivoProfissionalSfp } from "@/lib/nina/regras-catalogo";
+import { handoffSemAviso } from "@/lib/nina/handoff-silencioso";
 import type { StatusEnvioHandoff, TransporteHandoff } from "./handoff-auditoria";
 import type {
   AmbienteAviso,
   OrigemAviso,
   ResultadoAvisoEncaminhamento,
 } from "./aviso-encaminhamento";
-
-
 
 export type ProtocoloGerado = { protocolo: string; novo: boolean } | null;
 
@@ -38,6 +36,7 @@ type LinhaConversa = {
   protocolo_sessao_id: string | null;
   handoff_em: string | null;
   handoff_motivo: string | null;
+  handoff_resumo: unknown;
   contato_telefone: string | null;
   contato_nome: string | null;
   whatsapp_profile_name: string | null;
@@ -55,7 +54,7 @@ async function lerConversa(clinicaId: string, conversaId: string) {
   const { data } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "protocolo_atendimento, protocolo_sessao_id, handoff_em, handoff_motivo, contato_telefone, contato_nome, whatsapp_profile_name, departamento_id, is_teste, nina_fluxo_estado",
+      "protocolo_atendimento, protocolo_sessao_id, handoff_em, handoff_motivo, handoff_resumo, contato_telefone, contato_nome, whatsapp_profile_name, departamento_id, is_teste, nina_fluxo_estado",
     )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
@@ -130,9 +129,7 @@ export async function protocoloAoIniciarHandoff(args: {
   /** Turno/sessão de origem — identidade persistente da operação de aviso. */
   turnoId?: string | null;
   sessaoId?: string | null;
-}): Promise<
-  (NonNullable<ProtocoloGerado> & { anuncio: ResultadoAnuncioHandoff | null }) | null
-> {
+}): Promise<(NonNullable<ProtocoloGerado> & { anuncio: ResultadoAnuncioHandoff | null }) | null> {
   const r = await garantirProtocoloAtendimento({
     clinicaId: args.clinicaId,
     conversaId: args.conversaId,
@@ -177,9 +174,11 @@ export async function anuncioHandoffVigente(
     .limit(50);
   for (const e of (data ?? []) as Array<{ detalhes: unknown; created_at: string }>) {
     if (desde && e.created_at < desde) continue;
-    const d = e.detalhes as
-      | { protocolo_informado?: unknown; protocol_number?: unknown; message_id?: unknown }
-      | null;
+    const d = e.detalhes as {
+      protocolo_informado?: unknown;
+      protocol_number?: unknown;
+      message_id?: unknown;
+    } | null;
     if (!d?.protocolo_informado) continue;
     const mensagemId = typeof d.message_id === "string" ? d.message_id : null;
     if (!mensagemId) continue;
@@ -191,7 +190,6 @@ export async function anuncioHandoffVigente(
   }
   return null;
 }
-
 
 /**
  * Mensagem transacional (sistema) para o paciente. Usada quando a Nina já foi
@@ -258,7 +256,7 @@ async function enviarTextoSistema(
     }
     return {
       ok: true,
-      mensagemId: ((data as { id?: string } | null)?.id ?? null),
+      mensagemId: (data as { id?: string } | null)?.id ?? null,
       status: "sent",
       transporte: "test-console",
       transporteId: null,
@@ -290,12 +288,7 @@ async function enviarTextoSistema(
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
       : `+${conv.contato_telefone}`;
-    const { wa_message_id } = await metaSendText(
-      cfg.phone_number_id,
-      cfg.access_token,
-      to,
-      texto,
-    );
+    const { wa_message_id } = await metaSendText(cfg.phone_number_id, cfg.access_token, to, texto);
     const { data } = await supabaseAdmin
       .from("whatsapp_mensagens")
       .insert({
@@ -315,7 +308,7 @@ async function enviarTextoSistema(
       .maybeSingle();
     return {
       ok: true,
-      mensagemId: ((data as { id?: string } | null)?.id ?? null),
+      mensagemId: (data as { id?: string } | null)?.id ?? null,
       status: "sent",
       transporte: "whatsapp",
       transporteId: wa_message_id ?? null,
@@ -339,7 +332,6 @@ async function enviarTextoSistema(
     };
   }
 }
-
 
 /**
  * FASE 3 — comunica ao paciente a transferência + o protocolo real.
@@ -382,15 +374,14 @@ export async function prepararAvisoHandoff(args: {
 }): Promise<AvisoPreparado | null> {
   const conv = await lerConversa(args.clinicaId, args.conversaId);
   if (!conv) return null;
-  // Vale também para atribuição posterior e retry: SFP nunca gera aviso ao paciente.
-  if (motivoProfissionalSfp(conv.handoff_motivo ?? "")) return null;
+  // Atribuição posterior e retry preservam a opção explícita deste ciclo.
+  if (handoffSemAviso(conv.handoff_resumo, conv.handoff_motivo ?? "")) return null;
   const setor = await nomeDepartamento(args.clinicaId, conv.departamento_id);
   const { gerarMensagemHandoff } = await import("./mensagem-handoff.server");
   // O texto de transferência usa a MESMA identidade publicada do atendimento;
   // sem identidade válida ele fala de forma neutra.
-  const { identidadeEfetivaAtual, identidadeParaMensagens } = await import(
-    "@/lib/nina/identidade-efetiva.server"
-  );
+  const { identidadeEfetivaAtual, identidadeParaMensagens } =
+    await import("@/lib/nina/identidade-efetiva.server");
   const identidade = identidadeParaMensagens(await identidadeEfetivaAtual("whatsapp"));
   const { texto: textoAviso, origem } = await gerarMensagemHandoff({
     protocolo: args.protocolo,
@@ -662,7 +653,6 @@ export async function anunciarHandoffAoPaciente(args: {
   };
 }
 
-
 /**
  * Chamado quando a conversa passa efetivamente para uma pessoa.
  * Só vale para conversas que vieram da Nina (`handoff_em` preenchido) — uma
@@ -708,10 +698,7 @@ async function nomeDepartamento(clinicaId: string, departamentoId: string | null
 }
 
 /** Traduz o motivo registrado no handoff para o motivo funcional da mensagem. */
-async function motivoDoHandoff(
-  clinicaId: string,
-  conversaId: string,
-): Promise<MotivoHandoff> {
+async function motivoDoHandoff(clinicaId: string, conversaId: string): Promise<MotivoHandoff> {
   const { data } = await supabaseAdmin
     .from("atend_conversa_eventos")
     .select("evento, motivo")
@@ -720,6 +707,8 @@ async function motivoDoHandoff(
     .eq("evento", "HANDOFF_SOLICITADO")
     .order("created_at", { ascending: false })
     .limit(1);
-  const bruto = ((data as Array<{ motivo?: string | null }> | null)?.[0]?.motivo ?? "").toLowerCase();
+  const bruto = (
+    (data as Array<{ motivo?: string | null }> | null)?.[0]?.motivo ?? ""
+  ).toLowerCase();
   return classificarMotivoHandoff(bruto);
 }

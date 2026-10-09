@@ -16,9 +16,17 @@ export type FalhaBackfill =
   | "iss_nao_bate"
   | "iss_maior_que_servicos";
 
-export const SEM_SENTIDO: FalhaBackfill[] = ["aliquota_fora_faixa", "iss_nao_bate", "iss_maior_que_servicos"];
+export const SEM_SENTIDO: FalhaBackfill[] = [
+  "aliquota_fora_faixa",
+  "iss_nao_bate",
+  "iss_maior_que_servicos",
+];
 
-export type Gravado = { aliquota_iss: number | null; valor_iss: number | null; valor_servicos: number | null };
+export type Gravado = {
+  aliquota_iss: number | null;
+  valor_iss: number | null;
+  valor_servicos: number | null;
+};
 
 export type ResultadoNota =
   | { ok: true; aliquota_iss: number; valor_iss: number; conferencia: Record<string, unknown> }
@@ -55,7 +63,13 @@ export function resultadoBackfill(
   const falhar = (falha: FalhaBackfill) => ({
     ok: false as const,
     falha,
-    conferencia: { ...base, xml_lido: true, falha, xml: lido, divergencia_servicos: divergenciaServicos },
+    conferencia: {
+      ...base,
+      xml_lido: true,
+      falha,
+      xml: lido,
+      divergencia_servicos: divergenciaServicos,
+    },
   });
   if (x.aliquota_iss === null || x.valor_iss === null) return falhar("xml_sem_campos");
   if (x.aliquota_iss < 0 || x.aliquota_iss > 0.05) return falhar("aliquota_fora_faixa");
@@ -65,7 +79,8 @@ export function resultadoBackfill(
     if (Math.abs(r2(servRef * x.aliquota_iss) - x.valor_iss) > 0.02) return falhar("iss_nao_bate");
   }
   const divergente =
-    gravado.aliquota_iss !== null && Math.abs(Number(gravado.aliquota_iss) - x.aliquota_iss) > 0.00001;
+    gravado.aliquota_iss !== null &&
+    Math.abs(Number(gravado.aliquota_iss) - x.aliquota_iss) > 0.00001;
   return {
     ok: true,
     aliquota_iss: x.aliquota_iss,
@@ -74,7 +89,9 @@ export function resultadoBackfill(
       ...base,
       xml_lido: true,
       xml: lido,
-      divergencia_aliquota: divergente ? { gravada: Number(gravado.aliquota_iss), autorizada: x.aliquota_iss } : null,
+      divergencia_aliquota: divergente
+        ? { gravada: Number(gravado.aliquota_iss), autorizada: x.aliquota_iss }
+        : null,
       divergencia_servicos: divergenciaServicos,
     },
   };

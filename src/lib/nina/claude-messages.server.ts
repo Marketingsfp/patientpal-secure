@@ -302,7 +302,10 @@ export async function chamarClaudeComoResponses(
     // estruturado do Claude não compila (muitas uniões, enum com null).
     // Reparo único: pede o mesmo JSON pelas instruções, sem o formato forçado.
     if (/schema|union|output_config/i.test(erro)) {
-      console.warn("[claude-messages] schema recusado; usando JSON pelas instruções:", erro.slice(0, 200));
+      console.warn(
+        "[claude-messages] schema recusado; usando JSON pelas instruções:",
+        erro.slice(0, 200),
+      );
       res = await enviar(semFormatoEstruturado(corpoClaude));
     } else {
       return new Response(erro, { status: 400 });
@@ -317,7 +320,8 @@ export async function chamarClaudeComoResponses(
   const final = saidaResponses(r);
 
   if (body.stream === false) {
-    if (r.erro) return new Response(JSON.stringify({ error: { message: r.erro } }), { status: 502 });
+    if (r.erro)
+      return new Response(JSON.stringify({ error: { message: r.erro } }), { status: 502 });
     return new Response(JSON.stringify(final), {
       headers: { "Content-Type": "application/json" },
     });

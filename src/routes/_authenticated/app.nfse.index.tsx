@@ -35,9 +35,28 @@ import {
 import { avisarCepDoTomadorInvalido } from "@/lib/nfse-aviso-cep";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { exportarRelatorioXlsx, type ColunaXlsx } from "@/lib/exportar-xlsx";
 
@@ -45,6 +64,10 @@ export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
   head: () => ({ meta: [{ title: "Notas Fiscais — ClinicaOS" }] }),
 });
+
+/** Espaço mínimo entre consultas à Focus (limite da conta: 100 por minuto). */
+const INTERVALO_CONSULTA_MS = 700;
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Emitente {
   id: string;
@@ -63,6 +86,9 @@ interface Row {
   emitente_id: string | null;
   emitente: { nome: string; cnpj: string } | null;
   erro_mensagem: string | null;
+  /** Última consulta de status na Focus falhou (ex.: limite_excedido). Não é erro da nota. */
+  consulta_erro_codigo?: string | null;
+  consulta_erro_mensagem?: string | null;
   payload_resposta: unknown;
   /** Quem apertou "Emitir" — `nfse.emitida_por` sempre foi gravado, só nunca era exibido. */
   emitida_por: string | null;
@@ -91,7 +117,9 @@ function dataBr(v: string): string {
 function horaBr(v: string | null | undefined): string {
   if (!v) return "";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 /** CPF/CNPJ com máscara; devolve o original quando não tem 11 nem 14 dígitos. */
@@ -110,12 +138,15 @@ function NfsePage() {
   // ocorre por outro fluxo). Identificação por nome, mesmo padrão do app-shell
   // e da agenda para esta clínica.
   const nomeClinica = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
-  const ehSaoFrancisco = nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
+  const ehSaoFrancisco =
+    nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
   // Quem emitiu cada nota é informação de gestão, não de operação: só Admin,
-  // Gestor e Supervisor enxergam. Para os demais a coluna some da tela, sai da
+  // Gestor, Financeiro e Supervisor enxergam. Para os demais a coluna some da tela, sai da
   // planilha e deixa de ser pesquisável — senão daria para descobrir o emissor
   // filtrando pelo nome mesmo sem a coluna à vista.
-  const podeVerQuemEmitiu = ["admin", "gestor", "supervisor"].includes((clinicaAtual?.role ?? "").toLowerCase());
+  const podeVerQuemEmitiu = ["admin", "gestor", "financeiro", "supervisor"].includes(
+    (clinicaAtual?.role ?? "").toLowerCase(),
+  );
   const consulta = useServerFn(consultarNfse);
   // NFS-e parte 1b: correção manual (admin) de alíquota/ISS pelo XML oficial.
   const corrigirLote = useServerFn(corrigirIssLote);
@@ -129,10 +160,19 @@ function NfsePage() {
     }
     setCorrigindo(true);
     try {
-      const r = await corrigirLote({ data: { clinicaId: clinicaAtual.clinica.id, limite, emitenteId, reprocessarFalhas } });
-      const falhas = Object.entries(r.falhas).map(([k, v]) => `${k}: ${v}`).join(", ") || "nenhuma";
+      const r = await corrigirLote({
+        data: { clinicaId: clinicaAtual.clinica.id, limite, emitenteId, reprocessarFalhas },
+      });
+      const falhas =
+        Object.entries(r.falhas)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ") || "nenhuma";
       const msg = `${r.processadas} notas · ${r.corrigidas} corrigidas · ISS R$ ${r.issAntes.toFixed(2)} → R$ ${r.issDepois.toFixed(2)} · falhas: ${falhas}`;
-      if (r.parado) toast.error(`Parado: ${r.semSentido} notas com valor sem sentido (>5%). Nada gravado neste lote. ${msg}`, { duration: 20000 });
+      if (r.parado)
+        toast.error(
+          `Parado: ${r.semSentido} notas com valor sem sentido (>5%). Nada gravado neste lote. ${msg}`,
+          { duration: 20000 },
+        );
       else toast.success(msg, { duration: 15000 });
     } catch (e) {
       mostrarErro(e);
@@ -148,7 +188,9 @@ function NfsePage() {
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
   const [conferirPreview, setConferirPreview] = useState<string | null>(null);
-  const [conferirExtraido, setConferirExtraido] = useState<Awaited<ReturnType<typeof extrair>> | null>(null);
+  const [conferirExtraido, setConferirExtraido] = useState<Awaited<
+    ReturnType<typeof extrair>
+  > | null>(null);
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -199,7 +241,7 @@ function NfsePage() {
       const { data, error } = await supabase
         .from("nfse")
         .select(
-          "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at",
+          "id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, tomador_documento, emitente_id, erro_mensagem, payload_resposta, emitida_por, created_at, consulta_erro_codigo, consulta_erro_mensagem",
         )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .gte("data_emissao", periodo.inicio)
@@ -239,7 +281,10 @@ function NfsePage() {
       : [];
     const nomes = new Map<string, string>();
     if (idsUsuarios.length > 0) {
-      const { data: perfis } = await supabase.from("profiles").select("id, nome").in("id", idsUsuarios);
+      const { data: perfis } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", idsUsuarios);
       for (const p of perfis ?? []) nomes.set(p.id, p.nome ?? "");
     }
 
@@ -265,15 +310,27 @@ function NfsePage() {
 
   // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
   // (webhook do Focus pode falhar/não estar configurado).
+  //
+  // Foi esta rotina que, em 02/10/2026, disparou 14 consultas em 8 segundos e
+  // levou "limite_excedido" da Focus (100 req/min por conta, somadas todas as
+  // abas abertas). Agora: 700 ms entre chamadas e, ao levar limite_excedido,
+  // para a varredura e só retoma depois de 60 s.
   useEffect(() => {
     const pendentes = rows.filter((r) => r.status === "processando").map((r) => r.id);
     if (pendentes.length === 0) return;
     let cancelled = false;
+    let pausadoAte = 0;
     const tick = async () => {
-      for (const id of pendentes) {
+      if (Date.now() < pausadoAte) return;
+      for (let i = 0; i < pendentes.length; i++) {
         if (cancelled) return;
+        if (i > 0) await esperar(INTERVALO_CONSULTA_MS);
         try {
-          await consulta({ data: { id } });
+          const r = await consulta({ data: { id: pendentes[i] } });
+          if (r?.limiteExcedido) {
+            pausadoAte = Date.now() + 60_000;
+            break;
+          }
         } catch {
           /* ignore */
         }
@@ -288,6 +345,70 @@ function NfsePage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.map((r) => `${r.id}:${r.status}`).join("|")]);
+
+  // "Reconsultar notas presas": percorre TODAS as notas em processando da
+  // clínica (não só as da tela), uma por vez, 700 ms entre chamadas. Só
+  // consulta — não emite, não reenvia, não cancela. Se a Focus responder
+  // limite_excedido mesmo após as novas tentativas, para e informa quantas
+  // ficaram sem consultar.
+  const [reconsultando, setReconsultando] = useState<{ feito: number; total: number } | null>(null);
+  async function reconsultarPresas() {
+    if (!clinicaAtual) return;
+    const { data: presas, error } = await supabase
+      .from("nfse")
+      .select("id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("status", "processando")
+      .not("focus_ref", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(500);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const ids = (presas ?? []).map((p) => p.id);
+    if (ids.length === 0) {
+      toast.info("Nenhuma nota em processando.");
+      return;
+    }
+    let autorizadas = 0;
+    let processando = 0;
+    let erros = 0;
+    let interrompida = 0;
+    setReconsultando({ feito: 0, total: ids.length });
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        if (i > 0) await esperar(INTERVALO_CONSULTA_MS);
+        try {
+          const r = await consulta({ data: { id: ids[i] } });
+          if (r?.limiteExcedido) {
+            erros++;
+            interrompida = ids.length - i - 1;
+            break;
+          }
+          if (r?.erroConsulta) erros++;
+          else if (r?.status === "autorizado") autorizadas++;
+          else if (r?.status === "erro_autorizacao" || r?.status === "erro") erros++;
+          else processando++;
+        } catch {
+          erros++;
+        }
+        setReconsultando({ feito: i + 1, total: ids.length });
+      }
+    } finally {
+      setReconsultando(null);
+      await load();
+    }
+    const resumo = `${autorizadas} autorizada(s), ${processando} continuam processando, ${erros} com erro.`;
+    if (interrompida > 0) {
+      toast.warning(
+        `${resumo} A Focus pediu para esperar (limite de consultas); ${interrompida} nota(s) não foram consultadas. Tente de novo em 1 minuto.`,
+        { duration: 15000 },
+      );
+    } else {
+      toast.success(`Reconsulta concluída: ${resumo}`, { duration: 15000 });
+    }
+  }
 
   // Ao abrir o diálogo de erro, carrega o "Próx. nº RPS" atual do emitente
   // para permitir avançar o contador rapidamente (útil no erro E0014).
@@ -319,7 +440,8 @@ function NfsePage() {
           const alvo =
             `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.tomador_documento ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""} ${r.emitida_por_nome ?? ""}`.toLowerCase();
           const qDigits = q.replace(/\D/g, "");
-          if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits))) return false;
+          if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits)))
+            return false;
         }
         return true;
       }),
@@ -386,7 +508,12 @@ function NfsePage() {
 
   const onConsultar = async (id: string) => {
     try {
-      await consulta({ data: { id } });
+      const r = await consulta({ data: { id } });
+      if (r?.erroConsulta) {
+        toast.error(
+          `A consulta à Focus falhou (${r.erroConsulta.codigo})${r.erroConsulta.mensagem ? `: ${r.erroConsulta.mensagem}` : ""}. A nota não foi alterada.`,
+        );
+      }
       await load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -455,7 +582,9 @@ function NfsePage() {
         { rotulo: "Valor", tipo: "moeda", largura: 14 },
         { rotulo: "Status", tipo: "texto", largura: 14 },
         // "Emitido por" só entra na planilha para quem enxerga a coluna na tela.
-        ...(podeVerQuemEmitiu ? [{ rotulo: "Emitido por", tipo: "texto", largura: 30 } as ColunaXlsx] : []),
+        ...(podeVerQuemEmitiu
+          ? [{ rotulo: "Emitido por", tipo: "texto", largura: 30 } as ColunaXlsx]
+          : []),
       ];
       const linhas = filtrados.map((r) => [
         r.numero ?? "",
@@ -467,7 +596,9 @@ function NfsePage() {
         documentoBr(r.tomador_documento),
         Number(r.valor_servicos) || 0,
         r.status,
-        ...(podeVerQuemEmitiu ? [r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—")] : []),
+        ...(podeVerQuemEmitiu
+          ? [r.emitida_por_nome ?? (r.emitida_por ? "(usuário removido)" : "—")]
+          : []),
       ]);
       const total = filtrados.reduce((s, r) => s + (Number(r.valor_servicos) || 0), 0);
       const nomeEmitenteFiltro =
@@ -488,7 +619,18 @@ function NfsePage() {
         ],
         colunas,
         linhas,
-        totais: ["", "", "", "", "", "", `${filtrados.length} nota(s)`, total, "", ...(podeVerQuemEmitiu ? [""] : [])],
+        totais: [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          `${filtrados.length} nota(s)`,
+          total,
+          "",
+          ...(podeVerQuemEmitiu ? [""] : []),
+        ],
         resumo: {
           titulo: "Total por emitente",
           itens: totais.map((t) => ({
@@ -508,31 +650,68 @@ function NfsePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <h1 className="text-2xl font-semibold flex items-center gap-2 whitespace-nowrap">
             <Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)
           </h1>
-          <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
+          <p className="text-sm text-muted-foreground">
+            Emissão e controle de notas fiscais de serviço.
+          </p>
         </div>
-        <div className="flex gap-2">
+        {/* Os botões quebram linha quando não cabem: com o perfil admin são
+            sete, e numa linha só o "Emitir NFS-e" saía cortado da tela. */}
+        <div className="flex flex-wrap justify-end gap-2">
           {/* Exportar não depende de permissão de escrita nem da clínica: é
               leitura do que já está na tela, e a São Francisco também precisa
               fechar o mês. */}
           <Button variant="outline" onClick={() => void onExportar()} disabled={exportando}>
-            {exportando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            {exportando ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
             Exportar Excel
           </Button>
-          {clinicaAtual?.role?.toLowerCase() === "admin" && (
+          {podeVerQuemEmitiu && (
+            <Button
+              variant="outline"
+              disabled={reconsultando !== null}
+              onClick={() => void reconsultarPresas()}
+              title="Só consulta a situação na Focus, uma nota por vez. Não emite, não reenvia, não cancela."
+            >
+              {reconsultando ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {reconsultando
+                ? `Reconsultando ${reconsultando.feito}/${reconsultando.total}…`
+                : "Reconsultar notas presas"}
+            </Button>
+          )}
+          {["admin", "financeiro"].includes(clinicaAtual?.role?.toLowerCase() ?? "") && (
             <>
-              <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(20)}>
+              <Button
+                variant="outline"
+                disabled={corrigindo}
+                onClick={() => void rodarCorrecao(20)}
+              >
                 {corrigindo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Corrigir ISS pelo XML (amostra 20)
               </Button>
-              <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(100)}>
+              <Button
+                variant="outline"
+                disabled={corrigindo}
+                onClick={() => void rodarCorrecao(100)}
+              >
                 Próximo lote (100)
               </Button>
-              <Button variant="outline" disabled={corrigindo} onClick={() => void rodarCorrecao(100, true)}>
+              <Button
+                variant="outline"
+                disabled={corrigindo}
+                onClick={() => void rodarCorrecao(100, true)}
+              >
                 Tentar de novo as falhas
               </Button>
             </>
@@ -658,13 +837,19 @@ function NfsePage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={podeVerQuemEmitiu ? 8 : 7} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={podeVerQuemEmitiu ? 8 : 7}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : filtrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={podeVerQuemEmitiu ? 8 : 7} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={podeVerQuemEmitiu ? 8 : 7}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   Nenhuma nota.
                 </TableCell>
               </TableRow>
@@ -709,11 +894,22 @@ function NfsePage() {
                     >
                       {r.status}
                     </span>
+                    {r.status === "processando" && r.consulta_erro_codigo && (
+                      <div
+                        className="text-[11px] text-destructive mt-0.5 max-w-[220px] truncate"
+                        title={r.consulta_erro_mensagem ?? r.consulta_erro_codigo}
+                      >
+                        Consulta falhou: {r.consulta_erro_codigo}
+                      </div>
+                    )}
                   </TableCell>
                   {podeVerQuemEmitiu && (
                     <TableCell>
                       {r.emitida_por_nome ? (
-                        <span className="text-xs flex items-center gap-1" title={r.emitida_por_nome}>
+                        <span
+                          className="text-xs flex items-center gap-1"
+                          title={r.emitida_por_nome}
+                        >
                           <User className="h-3 w-3 text-muted-foreground shrink-0" />
                           <span className="truncate">{r.emitida_por_nome}</span>
                         </span>
@@ -828,7 +1024,11 @@ function NfsePage() {
               <div className="grid md:grid-cols-2 gap-4">
                 {conferirPreview && (
                   <div className="border rounded-md overflow-hidden bg-muted/30 max-h-[400px] flex items-center justify-center">
-                    <img src={conferirPreview} alt="NFS-e" className="max-h-[400px] object-contain" />
+                    <img
+                      src={conferirPreview}
+                      alt="NFS-e"
+                      className="max-h-[400px] object-contain"
+                    />
                   </div>
                 )}
                 <div className="space-y-2 text-sm">
@@ -839,7 +1039,9 @@ function NfsePage() {
                       [
                         "Data emissão",
                         conferirExtraido.data_emissao,
-                        notaMatch ? new Date(notaMatch.data_emissao).toISOString().slice(0, 10) : null,
+                        notaMatch
+                          ? new Date(notaMatch.data_emissao).toISOString().slice(0, 10)
+                          : null,
                       ],
                       [
                         "Valor",
@@ -854,7 +1056,11 @@ function NfsePage() {
                         conferirExtraido.emitente_cnpj,
                         notaMatch?.emitente?.cnpj?.replace(/\D/g, "") ?? null,
                       ],
-                      ["Emitente", conferirExtraido.emitente_nome, notaMatch?.emitente?.nome ?? null],
+                      [
+                        "Emitente",
+                        conferirExtraido.emitente_nome,
+                        notaMatch?.emitente?.nome ?? null,
+                      ],
                       ["Tomador CPF/CNPJ", conferirExtraido.tomador_cpf_cnpj, null],
                       ["Tomador", conferirExtraido.tomador_nome, notaMatch?.tomador_nome ?? null],
                     ];
@@ -875,7 +1081,9 @@ function NfsePage() {
                           <div className="text-xs text-muted-foreground pt-0.5">{label}</div>
                           <div>
                             <div className="break-words">{e}</div>
-                            {s != null && s !== e && <div className="text-xs text-muted-foreground">Sistema: {s}</div>}
+                            {s != null && s !== e && (
+                              <div className="text-xs text-muted-foreground">Sistema: {s}</div>
+                            )}
                           </div>
                           {match != null &&
                             (match ? (
@@ -889,9 +1097,13 @@ function NfsePage() {
                   })()}
                   <div className="pt-2 text-xs">
                     {notaMatch ? (
-                      <span className="text-green-700">✓ Nota nº {notaMatch.numero} encontrada no sistema.</span>
+                      <span className="text-green-700">
+                        ✓ Nota nº {notaMatch.numero} encontrada no sistema.
+                      </span>
                     ) : (
-                      <span className="text-amber-700">Nenhuma nota com esse número foi encontrada no sistema.</span>
+                      <span className="text-amber-700">
+                        Nenhuma nota com esse número foi encontrada no sistema.
+                      </span>
                     )}
                   </div>
                 </div>
@@ -938,16 +1150,23 @@ function NfsePage() {
                 <div className="space-y-3 text-sm max-h-[60vh] overflow-auto">
                   {erroDetalhe.erro_mensagem && (
                     <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
-                      <div className="text-xs font-medium uppercase tracking-wide text-red-700">Mensagem</div>
-                      <div className="mt-1 whitespace-pre-wrap break-words">{erroDetalhe.erro_mensagem}</div>
+                      <div className="text-xs font-medium uppercase tracking-wide text-red-700">
+                        Mensagem
+                      </div>
+                      <div className="mt-1 whitespace-pre-wrap break-words">
+                        {erroDetalhe.erro_mensagem}
+                      </div>
                     </div>
                   )}
                   {isE0014 && erroDetalhe.emitente_id && (
                     <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2 text-amber-900">
-                      <div className="text-xs font-semibold uppercase tracking-wide">Ação recomendada</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide">
+                        Ação recomendada
+                      </div>
                       <p className="text-sm">
-                        A prefeitura recusou porque o nº do RPS já foi usado. Avance o<strong> Próx. nº RPS</strong> do
-                        emitente para pular a faixa já consumida e tente reenviar.
+                        A prefeitura recusou porque o nº do RPS já foi usado. Avance o
+                        <strong> Próx. nº RPS</strong> do emitente para pular a faixa já consumida e
+                        tente reenviar.
                       </p>
                       <div className="flex flex-wrap items-end gap-2">
                         <div className="space-y-1">
@@ -1008,7 +1227,9 @@ function NfsePage() {
                       {body?.mensagem_sefaz && (
                         <>
                           <div className="text-xs text-muted-foreground">SEFAZ/Prefeitura</div>
-                          <div className="whitespace-pre-wrap break-words">{body.mensagem_sefaz}</div>
+                          <div className="whitespace-pre-wrap break-words">
+                            {body.mensagem_sefaz}
+                          </div>
                         </>
                       )}
                     </div>
@@ -1032,7 +1253,9 @@ function NfsePage() {
                               </span>
                             )}
                           </div>
-                          {er.mensagem && <div className="whitespace-pre-wrap break-words">{er.mensagem}</div>}
+                          {er.mensagem && (
+                            <div className="whitespace-pre-wrap break-words">{er.mensagem}</div>
+                          )}
                           {er.correcao && (
                             <div className="text-xs text-muted-foreground">
                               <span className="font-medium">Correção:</span> {er.correcao}
@@ -1043,9 +1266,15 @@ function NfsePage() {
                     </div>
                   )}
                   <details className="rounded-md border bg-muted/30 p-2">
-                    <summary className="cursor-pointer text-xs text-muted-foreground">Retorno completo (JSON)</summary>
+                    <summary className="cursor-pointer text-xs text-muted-foreground">
+                      Retorno completo (JSON)
+                    </summary>
                     <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap break-words">
-                      {JSON.stringify(body ?? { erro_mensagem: erroDetalhe.erro_mensagem }, null, 2)}
+                      {JSON.stringify(
+                        body ?? { erro_mensagem: erroDetalhe.erro_mensagem },
+                        null,
+                        2,
+                      )}
                     </pre>
                   </details>
                 </div>
@@ -1056,7 +1285,11 @@ function NfsePage() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  const txt = JSON.stringify(erroDetalhe.payload_resposta ?? erroDetalhe.erro_mensagem, null, 2);
+                  const txt = JSON.stringify(
+                    erroDetalhe.payload_resposta ?? erroDetalhe.erro_mensagem,
+                    null,
+                    2,
+                  );
                   void navigator.clipboard.writeText(txt).then(() => toast.success("Copiado"));
                 }}
               >
@@ -1076,7 +1309,9 @@ function NfsePage() {
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-4 w-4" /> DANFSE Nº {pdfVisualizando?.numero ?? "—"}
               {pdfVisualizando?.tomador_nome && (
-                <span className="text-sm font-normal text-muted-foreground">· {pdfVisualizando.tomador_nome}</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  · {pdfVisualizando.tomador_nome}
+                </span>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -1122,10 +1357,12 @@ function NfsePage() {
             <div className="space-y-3 text-sm">
               <div className="rounded-md bg-muted p-3 space-y-1">
                 <div>
-                  <span className="text-muted-foreground">Número:</span> <b>{cancelarAlvo.numero ?? "—"}</b>
+                  <span className="text-muted-foreground">Número:</span>{" "}
+                  <b>{cancelarAlvo.numero ?? "—"}</b>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Tomador:</span> {cancelarAlvo.tomador_nome ?? "—"}
+                  <span className="text-muted-foreground">Tomador:</span>{" "}
+                  {cancelarAlvo.tomador_nome ?? "—"}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Valor:</span>{" "}
@@ -1152,7 +1389,9 @@ function NfsePage() {
                         }).`
                       : ""}
                   </span>
-                  <span className="text-muted-foreground shrink-0">{cancelarJustificativa.length}/255</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {cancelarJustificativa.length}/255
+                  </span>
                 </div>
               </div>
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
@@ -1211,7 +1450,9 @@ function PdfPreview({
   title,
 }: {
   nfseId: string;
-  baixar: (args: { data: { nfseId: string; tipo: "pdf" | "xml" } }) => Promise<{ base64: string; mime: string }>;
+  baixar: (args: {
+    data: { nfseId: string; tipo: "pdf" | "xml" };
+  }) => Promise<{ base64: string; mime: string }>;
   className?: string;
   title?: string;
 }) {
@@ -1243,11 +1484,17 @@ function PdfPreview({
   }, [nfseId, baixar]);
   if (erro)
     return (
-      <div className={`${className ?? ""} flex items-center justify-center text-xs text-destructive p-4`}>{erro}</div>
+      <div
+        className={`${className ?? ""} flex items-center justify-center text-xs text-destructive p-4`}
+      >
+        {erro}
+      </div>
     );
   if (!url)
     return (
-      <div className={`${className ?? ""} flex items-center justify-center text-xs text-muted-foreground`}>
+      <div
+        className={`${className ?? ""} flex items-center justify-center text-xs text-muted-foreground`}
+      >
         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando PDF…
       </div>
     );

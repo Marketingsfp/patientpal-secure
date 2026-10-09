@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791393265459,
+      "tag": "0000_rel_agendamentos_por_usuario_dia_lista",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791494917329,
+      "tag": "0001_revoke_credito_clinica_situacao_interna",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791544068376,
+      "tag": "0002_totem_exige_token",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791565529442,
+      "tag": "0003_fechar_acesso_visitante_funcoes",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791566364737,
+      "tag": "0004_catalogos_leitura_so_admin",
+      "breakpoints": true
+    }
+  ]
+}

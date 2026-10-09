@@ -117,6 +117,12 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /**
+   * Valor desta cobrança em cada forma (dinheiro, pix, cartao_debito,
+   * cartao_credito). Se informado, trocar a "Forma pgto" reajusta o valor —
+   * exceto quando o operador já digitou um valor à mão.
+   */
+  valoresPorForma?: Record<string, number>;
   /** Paciente (titular) a vincular quando o recebimento não vem de um
    *  agendamento — ex.: mensalidade do cartão e pagamento avulso. Garante que
    *  a coluna "Paciente" do Caixa mostre o nome. */
@@ -181,6 +187,7 @@ export function LancamentoDialog({
   initialValor,
   agendamentoId,
   initialFormaPagamento,
+  valoresPorForma,
   pacienteIdFixo,
   categoriaFixaNome,
   permiteParcelasEmOutrasDatas = true,
@@ -572,6 +579,24 @@ export function LancamentoDialog({
     };
   }, [open, agendamentoId, tipo]);
 
+  // Trocou a forma aqui dentro (ex.: escolheu Dinheiro na agenda e o paciente
+  // decidiu pagar no PIX): o valor vai para o preço daquela forma. O desconto
+  // continua valendo, porque o efeito abaixo recalcula a partir do novo valor
+  // original. Valor digitado à mão não é sobrescrito.
+  const reajustarValorPelaForma = (forma: string) => {
+    const alvo = Number(valoresPorForma?.[forma]);
+    if (!Number.isFinite(alvo) || alvo <= 0 || ehCategoriaGratuidade) return;
+    if (Math.abs(alvo - origNum) < 0.005) return;
+    const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const esperado = Math.max(0, origNum - descontoNum);
+    if (Math.abs(Number(valor || 0) - esperado) > 0.004) {
+      toast.info(`Valor digitado mantido. Nesta forma de pagamento o valor seria ${brl(alvo)}.`);
+      return;
+    }
+    setValorOriginal(alvo.toFixed(2));
+    toast.info(`Valor ajustado para esta forma de pagamento: ${brl(alvo)}.`);
+  };
+
   // Mantém o `valor` (total a pagar) sincronizado com o desconto.
   useEffect(() => {
     if (!open) return;
@@ -852,7 +877,7 @@ export function LancamentoDialog({
     // sem categoria e 33 sem conta. Receita não é travada aqui: ela vem do
     // atendimento, com categoria definida pelo serviço.
     if (tipo === "despesa") {
-      // Sem forma de pagamento a despesa não entra em "Em espécie (gaveta)"
+      // Sem forma de pagamento a despesa não entra em "Em dinheiro (resultado do dia)"
       // nem em "Em banco": cai em "Outros" e o saldo da gaveta aparece maior
       // do que o dinheiro que está lá. Ver a mesma trava no Movimento de Caixa.
       if (!pagamentoMisto && !formaPagamento) {
@@ -2227,6 +2252,7 @@ export function LancamentoDialog({
                   value={formaPagamento}
                   onValueChange={(v) => {
                     setFormaPagamento(v);
+                    reajustarValorPelaForma(v);
                     if (v !== "cartao_credito") {
                       setBandeiraCartao("");
                       setParcelas("1");
@@ -2777,7 +2803,9 @@ export function LancamentoDialog({
               />
             </div>
           </div>
-          <DialogFooter>
+          {/* Três botões não cabem numa linha da largura deste diálogo: sem a
+              quebra, o "Cancelar" saía cortado pela borda esquerda. */}
+          <DialogFooter className="flex-wrap gap-2 sm:space-x-0">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={ocupado}>
               Cancelar
             </Button>

@@ -67,23 +67,44 @@ describe("heranca do Repasse Padrao", () => {
     expect(r.repasse).toBe(55);
   });
 
-  it("coluna Cartao Consulta em branco herda o padrao do medico", () => {
+  // Decisao do dono (09/10/2026): no cartao, coluna em branco usa a Particular
+  // do servico — o padrao e o valor da consulta e pagava R$ 72,80 num OCT.
+  it("coluna Cartao Consulta em branco usa a Particular do servico", () => {
     const r = resolverRepasse({
       linha: LINHA_SO_PARTICULAR,
       med: MEDICO,
       base: 200,
       forma: "cartao_consulta",
     });
-    expect(r.repasse).toBe(55);
+    expect(r.repasse).toBe(150);
   });
 
-  it("coluna Cartao Desconto em branco herda o padrao do medico", () => {
+  it("coluna Cartao Desconto em branco usa a Particular do servico", () => {
     const r = resolverRepasse({
       linha: LINHA_SO_PARTICULAR,
       med: MEDICO,
       base: 200,
       forma: "cartao_desconto",
     });
+    expect(r.repasse).toBe(150);
+  });
+
+  it("OCT do Cartao Consulta paga o valor do exame, nao o da consulta", () => {
+    const med: RepasseMedico = { ...MEDICO, valor_repasse_padrao: 72.8 };
+    const oct: RepasseConvenio = { ...LINHA_SO_PARTICULAR, nome: "OCT", valor: 203 };
+    const r = resolverRepasse({ linha: oct, med, base: 350, forma: "cartao_consulta" });
+    expect(r.repasse).toBe(203);
+  });
+
+  it("cartao com Particular zero nao zera: herda o padrao do medico", () => {
+    const linha: RepasseConvenio = { ...LINHA_SO_PARTICULAR, valor: 0 };
+    const r = resolverRepasse({ linha, med: MEDICO, base: 200, forma: "cartao_consulta" });
+    expect(r.repasse).toBe(55);
+  });
+
+  it("cartao com Particular em branco herda o padrao do medico", () => {
+    const linha: RepasseConvenio = { ...LINHA_SO_PARTICULAR, valor: null };
+    const r = resolverRepasse({ linha, med: MEDICO, base: 200, forma: "cartao_consulta" });
     expect(r.repasse).toBe(55);
   });
 
@@ -179,9 +200,9 @@ describe("calcRepasseFull encontra a linha do servico", () => {
     expect(r.repasse).toBe(150);
   });
 
-  it("cai no Repasse Padrao quando o atendimento e por convenio", () => {
+  it("usa a coluna Particular no atendimento do Cartao Consulta", () => {
     const r = calcRepasseFull(ctx, "med-1", 200, "ACUPUNTURA (4 SESSOES)", null, "cartao_consulta");
-    expect(r.repasse).toBe(55);
+    expect(r.repasse).toBe(150);
   });
 
   it("servico sem linha cadastrada usa o Repasse Padrao", () => {

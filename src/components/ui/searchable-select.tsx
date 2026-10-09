@@ -24,6 +24,11 @@ interface Props {
   emptyText?: string;
   className?: string;
   disabled?: boolean;
+  /**
+   * Texto exibido na caixa fechada no lugar do rótulo da opção escolhida.
+   * Só muda a exibição: o valor e a lista ao abrir continuam iguais.
+   */
+  displayLabel?: string;
 }
 
 export function SearchableSelect({
@@ -35,6 +40,7 @@ export function SearchableSelect({
   emptyText = "Nenhum resultado.",
   className,
   disabled = false,
+  displayLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
@@ -56,12 +62,15 @@ export function SearchableSelect({
           className={cn("w-full justify-between font-normal disabled:opacity-100", className)}
         >
           <span
+            title={displayLabel}
             className={cn(
               "truncate text-left opacity-100",
-              selected ? "text-slate-900 dark:text-slate-50 font-medium" : "text-muted-foreground",
+              selected || displayLabel
+                ? "text-slate-900 dark:text-slate-50 font-medium"
+                : "text-muted-foreground",
             )}
           >
-            {selected ? selected.label : placeholder}
+            {displayLabel ?? (selected ? selected.label : placeholder)}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

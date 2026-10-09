@@ -38,7 +38,10 @@ export function detectarAfirmacaoAgendamento(texto?: string | null): AfirmacaoAg
     if (original[fim] === "?") continue;
     // Data e médico podem estar entre vírgulas no mesmo sujeito. Examine
     // essa frase antes de separar as orações, preservando negativas/perguntas.
-    if (HORARIO_ESPECIFICO_RESERVADO.test(frase) && classificarNatureza(frase) === "afirmacao_positiva")
+    if (
+      HORARIO_ESPECIFICO_RESERVADO.test(frase) &&
+      classificarNatureza(frase) === "afirmacao_positiva"
+    )
       return { tipo: "sucesso_agendamento", trecho: frase };
     for (const oracao of oracoesDaResposta(frase)) {
       const trecho = oracao.texto.trim();

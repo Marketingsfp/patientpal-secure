@@ -1,4 +1,10 @@
-import { LIMITE_SEM_SENTIDO, ORIGEM_BACKFILL, SEM_SENTIDO, resultadoBackfill, type FalhaBackfill } from "./nfse-backfill";
+import {
+  LIMITE_SEM_SENTIDO,
+  ORIGEM_BACKFILL,
+  SEM_SENTIDO,
+  resultadoBackfill,
+  type FalhaBackfill,
+} from "./nfse-backfill";
 
 type Linha = {
   id: string;
@@ -30,13 +36,17 @@ export async function executarLoteBackfill(
 ) {
   let q = admin
     .from("nfse")
-    .select("id, numero, emitente_id, aliquota_iss, valor_iss, valor_servicos, url_xml, payload_resposta")
+    .select(
+      "id, numero, emitente_id, aliquota_iss, valor_iss, valor_servicos, url_xml, payload_resposta",
+    )
     .eq("clinica_id", clinicaId)
     .eq("emitente_id", opts.emitenteId)
     .eq("status", "emitida");
   // Tentar de novo: só as que a própria rotina marcou como falha.
   q = opts.reprocessarFalhas
-    ? q.eq("retorno_conferencia->>origem", ORIGEM_BACKFILL).not("retorno_conferencia->>falha", "is", null)
+    ? q
+        .eq("retorno_conferencia->>origem", ORIGEM_BACKFILL)
+        .not("retorno_conferencia->>falha", "is", null)
     : q.is("retorno_conferencia", null);
   const { data: notas, error } = await q.order("created_at").limit(limite);
   if (error) throw new Error("Falha ao ler notas: " + error.message);
@@ -58,11 +68,12 @@ export async function executarLoteBackfill(
     const grupo = lista.slice(i, i + 5);
     await Promise.all(
       grupo.map(async (n) => {
-        const cam = n.payload_resposta?.url_xml_nota_fiscal
-          ?? (n.payload_resposta?.caminho_xml_nota_fiscal
+        const cam =
+          n.payload_resposta?.url_xml_nota_fiscal ??
+          (n.payload_resposta?.caminho_xml_nota_fiscal
             ? `https://api.focusnfe.com.br${n.payload_resposta.caminho_xml_nota_fiscal}`
-            : null)
-          ?? n.url_xml;
+            : null) ??
+          n.url_xml;
         const xml = cam ? await baixar(cam, tokenDe(n.emitente_id)) : null;
         const falha = !cam ? "sem_caminho" : xml ? null : "xml_nao_baixou";
         decisoes.push({ n, r: resultadoBackfill(xml, n, falha) });
@@ -74,7 +85,11 @@ export async function executarLoteBackfill(
   const parado = lista.length > 0 && semSentido / lista.length > LIMITE_SEM_SENTIDO;
 
   const falhas: Record<string, number> = {};
-  let corrigidas = 0, comDivergencia = 0, divergServicos = 0, issAntes = 0, issDepois = 0;
+  let corrigidas = 0,
+    comDivergencia = 0,
+    divergServicos = 0,
+    issAntes = 0,
+    issDepois = 0;
   const itens: any[] = [];
   for (const { n, r } of decisoes) {
     const upd = r.ok

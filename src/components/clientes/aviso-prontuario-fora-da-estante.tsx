@@ -83,9 +83,15 @@ export function AvisoProntuarioForaDaEstante({ paciente, onCorrigido }: Props) {
             não corresponde a nenhuma pasta da estante.
           </p>
           <p>
-            {cadastradoEm ? <>Este cadastro é de <b>{cadastradoEm}</b>, de quando</> : "De quando"} o
-            gerador automático ainda errava (entre 08/07 e 04/09). Cadastro feito de hoje em diante
-            já nasce com o número certo da estante.
+            {cadastradoEm ? (
+              <>
+                Este cadastro é de <b>{cadastradoEm}</b>, de quando
+              </>
+            ) : (
+              "De quando"
+            )}{" "}
+            o gerador automático ainda errava (entre 08/07 e 04/09). Cadastro feito de hoje em
+            diante já nasce com o número certo da estante.
           </p>
           {podeEscrever && (
             <>

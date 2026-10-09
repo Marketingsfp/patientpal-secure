@@ -12,7 +12,13 @@ import {
 const casos: ContextoMensagemHandoff[] = [
   { protocolo: "MJ-14712", nome: "Felipe Souza", setor: "Recepção", motivo: "agendamento" },
   { protocolo: "MJ-14713", nome: null, setor: null, motivo: "informacao_indisponivel" },
-  { protocolo: "MJ-14714", nome: "Ana", setor: "Financeiro", motivo: "financeiro", assunto: "o valor do exame" },
+  {
+    protocolo: "MJ-14714",
+    nome: "Ana",
+    setor: "Financeiro",
+    motivo: "financeiro",
+    assunto: "o valor do exame",
+  },
   { protocolo: "MJ-14715", nome: "Bruno", setor: "Ambulatório 3B", motivo: "pedido_do_paciente" },
 ];
 
@@ -26,7 +32,9 @@ describe("mensagem de handoff — conteúdo obrigatório", () => {
   });
 
   it("mensagens de motivos diferentes não são idênticas", () => {
-    const textos = new Set(casos.map((c) => montarMensagemHandoffFallback(c).replace(/MJ-\d+/, "")));
+    const textos = new Set(
+      casos.map((c) => montarMensagemHandoffFallback(c).replace(/MJ-\d+/, "")),
+    );
     expect(textos.size).toBeGreaterThanOrEqual(3);
   });
 
@@ -49,13 +57,14 @@ describe("mensagem de handoff — conteúdo obrigatório", () => {
 
   it("rejeita texto sem protocolo, sem equipe ou com setor não estruturado", () => {
     expect(
-      validarMensagemHandoff("Vou encaminhar para nossa equipe por aqui.", { protocolo: "MJ-9" }).problemas,
+      validarMensagemHandoff("Vou encaminhar para nossa equipe por aqui.", { protocolo: "MJ-9" })
+        .problemas,
     ).toContain("protocolo ausente");
     expect(
-      validarMensagemHandoff(
-        "Vou encaminhar para nossa equipe de Financeiro por aqui. MJ-9",
-        { protocolo: "MJ-9", setor: null },
-      ).problemas,
+      validarMensagemHandoff("Vou encaminhar para nossa equipe de Financeiro por aqui. MJ-9", {
+        protocolo: "MJ-9",
+        setor: null,
+      }).problemas,
     ).toContain("menciona setor não estruturado");
   });
 
@@ -63,7 +72,9 @@ describe("mensagem de handoff — conteúdo obrigatório", () => {
     expect(classificarMotivoHandoff("paciente pediu remarcação")).toBe("agendamento");
     expect(classificarMotivoHandoff("dúvida sobre pagamento")).toBe("financeiro");
     expect(classificarMotivoHandoff("solicitar_atendente_humano")).toBe("pedido_do_paciente");
-    expect(classificarMotivoHandoff("catálogo sem registro publicado")).toBe("informacao_indisponivel");
+    expect(classificarMotivoHandoff("catálogo sem registro publicado")).toBe(
+      "informacao_indisponivel",
+    );
     expect(classificarMotivoHandoff(null)).toBe("indefinido");
   });
 });

@@ -19,6 +19,7 @@
  * telas fazendo isso e furando a regra do plano.
  */
 
+import { hojeBR } from "@/lib/date-utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { moduloDoProduto, rotuloProduto, type ProdutoCartao } from "@/lib/cartao/produto";
 import {
@@ -411,7 +412,7 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
       );
 
       // ETAPA 2 — contrato do plano para cada titular
-      const hoje = new Date().toISOString().slice(0, 10);
+      const hoje = hojeBR();
       const dia = Math.min(28, Math.max(1, Number(diaVencimento) || 10));
       const vigencia = Number(convenio.vigencia_meses) || 12;
       const parcelas = Number(convenio.num_parcelas) || 12;

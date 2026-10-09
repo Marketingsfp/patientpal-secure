@@ -14,11 +14,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { garantirProposta, normalizarProposta, type PropostaCorrecao } from "./analise-erro";
-import {
-  assinaturaProposta,
-  avaliarProntidao,
-  type EtapaExecucao,
-} from "./correcao-prontidao";
+import { assinaturaProposta, avaliarProntidao, type EtapaExecucao } from "./correcao-prontidao";
 import {
   MAX_TENTATIVAS,
   TEMPO_MAXIMO_MS,
@@ -43,7 +39,6 @@ import {
 } from "./correcao-executor";
 import type { PacoteInvestigacao } from "./evidencias-pacote";
 import { montarRelatorio, type RelatorioCorrecao } from "./correcao-relatorio";
-
 
 async function exigirPermissao(supabase: any, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("nina_fb_pode_revisar", {
@@ -116,14 +111,16 @@ async function chamarExecutor(input: any[], ferramentas: any[]): Promise<SaidaMo
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Correção indisponível: chave do provedor de IA não configurada.");
 
-  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
-      model: MODELO_EXECUTOR,
-      instructions: INSTRUCOES_EXECUTOR,
-      input,
-      tools: ferramentas,
-      stream: true,
-      store: false,
-    });
+  const res = await (
+    await import("@/lib/nina/claude-messages.server")
+  ).chamarClaudeComoResponses({
+    model: MODELO_EXECUTOR,
+    instructions: INSTRUCOES_EXECUTOR,
+    input,
+    tools: ferramentas,
+    stream: true,
+    store: false,
+  });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");
@@ -237,598 +234,610 @@ export const aplicarCorrecaoComIA = createServerFn({ method: "POST" })
     }): Promise<
       ResumoExecucao & { acaoId: string | null; relatorio: RelatorioCorrecao | null }
     > => {
-    const supabase = context.supabase as any;
-    const userId = context.userId;
-    await exigirPermissao(supabase, userId, data.clinicaId);
+      const supabase = context.supabase as any;
+      const userId = context.userId;
+      await exigirPermissao(supabase, userId, data.clinicaId);
 
-    const { data: fb, error: eFb } = await supabase
-      .from("nina_feedback_erros")
-      .select("id, clinica_id, mensagem_texto, pergunta_texto, root_cause, reportado_por, revisado_por")
-      .eq("id", data.feedbackId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
-    if (eFb) throw new Error(eFb.message);
-    if (!fb) throw new Error("Erro reportado não encontrado nesta clínica.");
+      const { data: fb, error: eFb } = await supabase
+        .from("nina_feedback_erros")
+        .select(
+          "id, clinica_id, mensagem_texto, pergunta_texto, root_cause, reportado_por, revisado_por",
+        )
+        .eq("id", data.feedbackId)
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle();
+      if (eFb) throw new Error(eFb.message);
+      if (!fb) throw new Error("Erro reportado não encontrado nesta clínica.");
 
-    // A análise usada é a que estava na tela; sem id, a mais recente concluída.
-    let consulta = supabase
-      .from("nina_feedback_analises")
-      .select("id, status, resultado, conclusao, pacote, pacote_hash, pacote_revisao")
-      .eq("clinica_id", data.clinicaId)
-      .eq("feedback_id", data.feedbackId);
-    consulta = data.analiseId
-      ? consulta.eq("id", data.analiseId)
-      : consulta.eq("status", "done").order("versao", { ascending: false }).limit(1);
-    const { data: analise, error: eAn } = await consulta.maybeSingle();
-    if (eAn) throw new Error(eAn.message);
-    if (!analise)
-      throw new Error("Analise o erro com IA antes de aplicar a correção: não há proposta na tela.");
-
-    const resultado = (analise.resultado ?? {}) as Record<string, unknown>;
-    const proposta =
-      garantirProposta(resultado["proposta"]) ?? normalizarProposta(resultado["proposta"]);
-
-    /**
-     * FASE 2 — o mesmo gate da tela roda aqui: permissão, análise concluída,
-     * proposta aplicável, executor disponível e proposta idêntica à exibida.
-     */
-    const { data: emCurso } = await supabase
-      .from("nina_correcao_execucoes")
-      .select("id")
-      .eq("clinica_id", data.clinicaId)
-      .eq("feedback_id", data.feedbackId)
-      .eq("status", "em_curso")
-      .maybeSingle();
-
-    const prontidao = avaliarProntidao({
-      statusAnalise: (analise.status as "processing" | "done" | "failed") ?? null,
-      resultado: (analise.resultado as any) ?? null,
-      proposta,
-      temPermissao: true,
-      executorDisponivel: Boolean(process.env["LOVABLE_API_KEY"]),
-      execucaoEmCurso: Boolean(emCurso),
-      assinaturaExibida: data.propostaAssinatura ?? null,
-    });
-    if (!prontidao.habilitado || !proposta) throw new Error(prontidao.motivo);
-
-    if (data.pacoteHash && analise.pacote_hash && data.pacoteHash !== String(analise.pacote_hash))
-      throw new Error(
-        "As evidências desta análise mudaram desde o que foi exibido. Confira a proposta atualizada antes de aplicar.",
-      );
-
-    /**
-     * FASE 1 — a correção usa o MESMO pacote que fundamentou a proposta.
-     * Análises antigas (sem pacote persistido) são reconstruídas com as
-     * evidências disponíveis e a revisão sobe; nada é reanalisado à força.
-     */
-    let pacote = (analise.pacote as PacoteInvestigacao | null) ?? null;
-    if (!pacote) {
-      const { montarPacoteInvestigacao } = await import("./evidencias-pacote.server");
-      pacote = await montarPacoteInvestigacao(context.supabase, {
-        clinicaId: data.clinicaId,
-        feedbackId: data.feedbackId,
-        analiseId: String(analise.id),
-        origem: "enriquecido",
-        revisaoAnterior: (analise.pacote_revisao as number | null) ?? 0,
-      });
-      await supabase
+      // A análise usada é a que estava na tela; sem id, a mais recente concluída.
+      let consulta = supabase
         .from("nina_feedback_analises")
-        .update({
-          pacote,
-          pacote_hash: pacote.hash,
-          pacote_revisao: pacote.revisao,
-        })
-        .eq("id", analise.id)
-        .eq("clinica_id", data.clinicaId);
-    }
+        .select("id, status, resultado, conclusao, pacote, pacote_hash, pacote_revisao")
+        .eq("clinica_id", data.clinicaId)
+        .eq("feedback_id", data.feedbackId);
+      consulta = data.analiseId
+        ? consulta.eq("id", data.analiseId)
+        : consulta.eq("status", "done").order("versao", { ascending: false }).limit(1);
+      const { data: analise, error: eAn } = await consulta.maybeSingle();
+      if (eAn) throw new Error(eAn.message);
+      if (!analise)
+        throw new Error(
+          "Analise o erro com IA antes de aplicar a correção: não há proposta na tela.",
+        );
 
-    /**
-     * Registro de autorização e progresso: quem clicou, quando, qual análise,
-     * pacote, proposta, ambiente e alcance. Recarregar a tela retoma daqui.
-     */
-    const assinatura = assinaturaProposta(proposta);
-    const inicioMs = Date.now();
+      const resultado = (analise.resultado ?? {}) as Record<string, unknown>;
+      const proposta =
+        garantirProposta(resultado["proposta"]) ?? normalizarProposta(resultado["proposta"]);
 
-    /**
-     * FASE 3 — repetição: duplo clique, refresh ou retomada da mesma proposta
-     * geram a mesma chave. Se já existe aplicação com essa chave, o resultado
-     * dela é devolvido; nada é aplicado duas vezes.
-     */
-    const chave = chaveIdempotencia({
-      feedbackId: data.feedbackId,
-      analiseId: String(analise.id),
-      assinaturaProposta: assinatura,
-      pacoteHash: pacote.hash,
-    });
-    const { data: jaExiste } = await supabase
-      .from("nina_correcao_execucoes")
-      .select("id, resumo, relatorio, acao_id, status")
-      .eq("clinica_id", data.clinicaId)
-      .eq("idempotencia_chave", chave)
-      .maybeSingle();
-    if (jaExiste?.resumo)
-      return {
-        ...(jaExiste.resumo as ResumoExecucao),
-        acaoId: (jaExiste.acao_id as string | null) ?? null,
-        relatorio: (jaExiste.relatorio as RelatorioCorrecao | null) ?? null,
-      };
-    if (jaExiste)
-      throw new Error("Esta mesma correção já está sendo aplicada. Aguarde o resultado.");
-
-    const { count: tentativasAnteriores } = await supabase
-      .from("nina_correcao_execucoes")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", data.clinicaId)
-      .eq("feedback_id", data.feedbackId);
-    if ((tentativasAnteriores ?? 0) >= MAX_TENTATIVAS)
-      throw new Error(
-        `Já houve ${tentativasAnteriores} tentativas de aplicação para este erro. Analise novamente antes de insistir.`,
-      );
-
-    const { data: execLinha, error: eExec } = await supabase
-      .from("nina_correcao_execucoes")
-      .insert({
-        clinica_id: data.clinicaId,
-        feedback_id: data.feedbackId,
-        analise_id: analise.id,
-        pacote_hash: pacote.hash,
-        pacote_revisao: pacote.revisao,
-        proposta,
-        proposta_assinatura: assinatura,
-        ambiente: proposta.ambiente ?? pacote.identificacao.ambiente ?? null,
-        escopo: proposta.escopo,
-        autorizado_por: userId,
-        etapa: "verificando",
-        status: "em_curso",
-        passos: [],
-        idempotencia_chave: chave,
-        resultado_final: "preparado",
-        alvo_revisao: proposta.revisaoBase ?? null,
-        tentativas: (tentativasAnteriores ?? 0) + 1,
-      })
-      .select("id")
-      .single();
-    if (eExec) throw new Error("Já existe uma aplicação em andamento para este erro.");
-    const execucaoId = execLinha?.id as string;
-
-    const passos: PassoExecucao[] = [];
-    const atualizarEtapa = async (etapa: EtapaExecucao) => {
-      await supabase
+      /**
+       * FASE 2 — o mesmo gate da tela roda aqui: permissão, análise concluída,
+       * proposta aplicável, executor disponível e proposta idêntica à exibida.
+       */
+      const { data: emCurso } = await supabase
         .from("nina_correcao_execucoes")
-        .update({ etapa, passos })
-        .eq("id", execucaoId)
-        .eq("clinica_id", data.clinicaId);
-    };
-    const passo = (
-      ferramenta: PassoExecucao["ferramenta"],
-      titulo: string,
-      detalhe: string,
-      ok = true,
-    ) => {
-      passos.push({
-        ordem: passos.length + 1,
-        ferramenta,
-        titulo,
-        detalhe: detalhe.slice(0, 2000),
-        ok,
-        em: new Date().toISOString(),
+        .select("id")
+        .eq("clinica_id", data.clinicaId)
+        .eq("feedback_id", data.feedbackId)
+        .eq("status", "em_curso")
+        .maybeSingle();
+
+      const prontidao = avaliarProntidao({
+        statusAnalise: (analise.status as "processing" | "done" | "failed") ?? null,
+        resultado: (analise.resultado as any) ?? null,
+        proposta,
+        temPermissao: true,
+        executorDisponivel: Boolean(process.env["LOVABLE_API_KEY"]),
+        execucaoEmCurso: Boolean(emCurso),
+        assinaturaExibida: data.propostaAssinatura ?? null,
       });
-    };
+      if (!prontidao.habilitado || !proposta) throw new Error(prontidao.motivo);
 
+      if (data.pacoteHash && analise.pacote_hash && data.pacoteHash !== String(analise.pacote_hash))
+        throw new Error(
+          "As evidências desta análise mudaram desde o que foi exibido. Confira a proposta atualizada antes de aplicar.",
+        );
 
-    let teste: ResultadoTeste = {
-      executado: false,
-      aprovado: false,
-      pergunta: (fb.pergunta_texto as string | null) ?? null,
-      resposta: null,
-      motivo: "Teste ainda não executado.",
-    };
-    let publicado = false;
-    /** FASE 5 — versão real da Arquitetura antes/depois, quando houve publicação. */
-    let versaoPrompt: { anterior: string | null; nova: string | null } | null = null;
-    let valorAnterior: string | null = proposta.valorAtual;
-    let pendenciaTecnica: string | null = null;
-    let motivoFinal = "";
-    /** Contagem real de operações desta correção (teto por ferramenta). */
-    let contagem: ContagemOperacoes = {};
-    /** O que precisa ser relido depois da gravação para conferir o efetivo. */
-    let alvoVerificacao: { tipo: "prompt"; conteudo: string; versao: number | null } | null = null;
-
-    const aplicavel = podeAplicarAutomaticamente(proposta);
-    passo(
-      "sistema",
-      "Proposta autorizada",
-      `${proposta.alvo} — camada ${proposta.camada}. ${
-        aplicavel
-          ? "Camada é configuração viva: o executor altera e publica."
-          : proposta.camada === "catalogo"
-            ? "Informação vem do cadastro do sistema: o executor não altera o cadastro; a equipe corrige na origem."
-            : "Camada vive em código: o executor registra a mudança para quem publica código."
-      }`,
-    );
-    await atualizarEtapa("aplicando");
-
-
-    const ferramentas = definicoesFerramentas(proposta.camada);
-    const entradaModelo: any[] = [
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: montarPromptExecutor({
-              proposta,
-              diagnostico: String(analise.conclusao ?? ""),
-              perguntaOriginal: (fb.pergunta_texto as string | null) ?? null,
-              respostaErrada: String(fb.mensagem_texto ?? ""),
-              evidencias: {
-                hash: pacote.hash,
-                revisao: pacote.revisao,
-                origem: pacote.origem,
-                ambiente: pacote.identificacao.ambiente,
-                entradas: pacote.entradas.map((m) => ({
-                  id: m.id,
-                  em: m.em,
-                  texto: m.texto,
-                  ausente: m.ausente,
-                })),
-                prompt: pacote.prompt,
-                lacunas: pacote.lacunas,
-                cortes: pacote.cortes,
-              },
-            }),
-          },
-        ],
-      },
-    ];
-
-    const ferramentasServer = await import("./correcao-ferramentas.server");
-
-    try {
-      for (let rodada = 0; rodada < LIMITE_RODADAS_EXECUTOR; rodada++) {
-        if (prazoExcedido(inicioMs, Date.now())) {
-          motivoFinal = "Tempo máximo desta correção excedido. Execução interrompida.";
-          passo("sistema", "Tempo excedido", motivoFinal, false);
-          break;
-        }
-        const saida = await chamarExecutor(entradaModelo, ferramentas);
-        const chamadas = saida.itens.filter((i: any) => i?.type === "function_call");
-        entradaModelo.push(...saida.itens);
-
-        if (!chamadas.length) {
-          motivoFinal = saida.texto.trim().slice(0, 2000) || "Execução concluída.";
-          break;
-        }
-
-        for (const c of chamadas) {
-          let args: any = {};
-          try {
-            args = JSON.parse(c.arguments ?? "{}");
-          } catch {
-            args = {};
-          }
-          let retorno: unknown;
-          try {
-            // Teto real de operações: nenhuma ferramenta passa do limite.
-            const limite = podeExecutar(contagem, c.name as OperacaoLimitada);
-            if (!limite.ok) throw new Error(limite.motivo);
-            contagem = registrarOperacao(contagem, c.name as OperacaoLimitada);
-
-            if (c.name === "ler_prompt_publicado") {
-              retorno = await ferramentasServer.lerPromptPublicado(supabase);
-              passo("ler_prompt_publicado", "Prompt publicado lido", "Versão ativa da Arquitetura.");
-            } else if (c.name === "publicar_prompt") {
-              const anterior = await ferramentasServer.lerPromptPublicado(supabase);
-              valorAnterior = anterior?.conteudo ?? null;
-              // Concorrência: se a versão em vigor mudou desde a análise, recusa.
-              if (
-                proposta.revisaoBase &&
-                anterior &&
-                String(proposta.revisaoBase) !== String(anterior.id) &&
-                String(proposta.revisaoBase) !== String(anterior.versao)
-              )
-                throw new Error(
-                  `A Arquitetura foi publicada por outra pessoa depois desta análise (em vigor: versão ${anterior.versao}). Analise de novo antes de aplicar.`,
-                );
-              await atualizarEtapa("publicando");
-              const r = await ferramentasServer.publicarPrompt(supabase, userId, data.clinicaId, {
-                conteudo: String(args.conteudo ?? ""),
-                comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
-              });
-              publicado = true;
-              versaoPrompt = {
-                anterior: r.anterior == null ? null : String(r.anterior),
-                nova: r.versao == null ? null : String(r.versao),
-              };
-              alvoVerificacao = {
-                tipo: "prompt",
-                conteudo: String(args.conteudo ?? ""),
-                versao: Number(r.versao) || null,
-              };
-              retorno = r;
-              passo(
-                "publicar_prompt",
-                "Arquitetura publicada",
-                `Versão ${r.anterior ?? "—"} → ${r.versao}. Identidade preservada.`,
-              );
-            } else if (c.name === "testar_em_homologacao") {
-              await atualizarEtapa("testando");
-              teste = await ferramentasServer.testarEmHomologacao(data.clinicaId, userId, {
-                pergunta: String(args.pergunta ?? fb.pergunta_texto ?? ""),
-                respostaErrada: String(fb.mensagem_texto ?? ""),
-                valorNovo: proposta.valorNovo,
-              });
-              retorno = teste;
-              passo(
-                "testar_em_homologacao",
-                teste.aprovado ? "Teste aprovado" : "Teste não comprovou",
-                teste.motivo,
-                teste.aprovado,
-              );
-            } else if (c.name === "registrar_pendencia_tecnica") {
-              pendenciaTecnica = String(args.instrucao ?? "").slice(0, 4000);
-              retorno = { registrado: true };
-              passo("registrar_pendencia_tecnica", "Pendência técnica registrada", pendenciaTecnica);
-            } else {
-              retorno = { erro: "Ferramenta não liberada para esta camada." };
-            }
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : "Falha na ferramenta.";
-            retorno = { erro: msg };
-            passo(
-              (c.name as PassoExecucao["ferramenta"]) ?? "sistema",
-              "Ferramenta recusada",
-              msg,
-              false,
-            );
-          }
-
-          entradaModelo.push({
-            type: "function_call_output",
-            call_id: c.call_id,
-            output: JSON.stringify(retorno).slice(0, 12000),
-          });
-        }
-      }
-    } catch (e) {
-      motivoFinal = e instanceof Error ? e.message : "Falha desconhecida na correção.";
-      passo("sistema", "Execução interrompida", motivoFinal, false);
-    }
-
-    await atualizarEtapa("verificando_resultado");
-
-    /**
-     * FASE 3 — camada de código: nada é aplicado sem serviço de execução real.
-     * Sem ele, a mudança fica registrada e o estado é "aguardando publicação".
-     */
-    let resultadoCodigo: Awaited<
-      ReturnType<typeof import("./executor-codigo.server").aplicarMudancaCodigo>
-    > | null = null;
-    if (!aplicavel) {
-      const { aplicarMudancaCodigo } = await import("./executor-codigo.server");
-      resultadoCodigo = await aplicarMudancaCodigo({
-        chaveIdempotencia: chave,
-        clinicaId: data.clinicaId,
-        feedbackId: data.feedbackId,
-        alvo: proposta.alvo,
-        arquivos: proposta.arquivos ?? [],
-        patch: proposta.patch ?? null,
-        revisaoBase: proposta.revisaoBase ?? null,
-        instrucao: pendenciaTecnica ?? proposta.justificativa,
-        tempoMaximoMs: Math.max(5000, TEMPO_MAXIMO_MS - (Date.now() - inicioMs)),
-      });
-      passo(
-        "sistema",
-        resultadoCodigo.aplicado ? "Código aplicado e publicado" : "Mudança de código registrada",
-        `${resultadoCodigo.motivo}${resultadoCodigo.dependencia ? ` ${resultadoCodigo.dependencia}` : ""}`,
-        resultadoCodigo.aplicado || !resultadoCodigo.disponivel,
-      );
-    }
-
-    /** Conferência do valor efetivo: gravar não basta, o sistema relê. */
-    let verificacao: import("./correcao-verificacao.server").Verificacao | null = null;
-    if (alvoVerificacao) {
-      const v = await import("./correcao-verificacao.server");
-      verificacao = await v.verificarPromptPublicado(supabase, {
-        conteudoEsperado: alvoVerificacao.conteudo,
-        versaoEsperada: alvoVerificacao.versao,
-      });
-      passo(
-        "sistema",
-        verificacao.conferido ? "Valor efetivo conferido" : "Valor efetivo não confere",
-        `${verificacao.alvo}: ${verificacao.motivo}`,
-        verificacao.conferido,
-      );
-    }
-
-    const status: ResumoExecucao["status"] = !aplicavel
-      ? resultadoCodigo?.aplicado
-        ? "aplicado"
-        : "pendente_tecnico"
-      : publicado && teste.aprovado
-        ? "aplicado"
-        : "falhou";
-
-    /** Estado técnico separado: preparado ≠ aplicado ≠ publicado ≠ verificado. */
-    const resultadoFinal: ResultadoFinalExecucao = !aplicavel
-      ? resultadoCodigo?.publicado
-        ? "verificado"
-        : "aguardando_publicacao"
-      : !publicado
-        ? "falhou"
-        : verificacao?.conferido && teste.aprovado
-          ? "verificado"
-          : "aplicado";
-
-    if (!motivoFinal) motivoFinal = resultadoCodigo?.motivo ?? teste.motivo;
-
-    // Registro rastreável — mesmas tabelas do fluxo existente.
-    const agora = new Date().toISOString();
-    const resumo: ResumoExecucao = {
-      status,
-      camada: proposta.camada,
-      passos,
-      teste,
-      publicado,
-      valorAnterior,
-      valorNovo: proposta.valorNovo,
-      motivo: motivoFinal,
-    };
-    /**
-     * FASE 5 — "Resultado da correção": montado a partir do que o executor de
-     * fato fez (gravou, publicou, testou, reconferiu), não da afirmação do
-     * avaliador. Proposta ≠ patch ≠ teste aprovado ≠ publicação concluída.
-     */
-    const relatorio: RelatorioCorrecao = montarRelatorio({
-      proposta,
-      status,
-      resultadoFinal,
-      aplicavel,
-      publicado,
-      valorAnterior,
-      motivo: motivoFinal,
-      passos,
-      teste,
-      verificacao,
-      codigo: resultadoCodigo,
-      evidencias: {
-        analiseId: String(analise.id),
-        pacoteHash: pacote.hash,
-        pacoteRevisao: pacote.revisao,
-        origem: pacote.origem,
-        ambiente: pacote.identificacao.ambiente,
-        entradas: pacote.entradas.length,
-        lacunas: pacote.lacunas.map((l) => ({ rotulo: l.rotulo, motivo: l.motivo })),
-        cortes: pacote.cortes,
-      },
-      trabalho: {
-        execucaoId,
-        solicitadoPor: userId,
-        modelo: MODELO_EXECUTOR,
-        provedor: "Lovable AI Gateway",
-        inicio: new Date(inicioMs).toISOString(),
-        fim: agora,
-        idempotenciaChave: chave,
-        tentativa: (tentativasAnteriores ?? 0) + 1,
-      },
-      versaoPrompt,
-    });
-
-    let acao: { id: string } | null = null;
-
-    try {
-      const { data: acaoCriada } = await supabase
-        .from("nina_feedback_acoes")
-        .insert({
-          clinica_id: data.clinicaId,
-          feedback_id: data.feedbackId,
-          root_cause: (fb.root_cause as string | null) ?? proposta.camada,
-          camada: proposta.camada === "modelo" ? "modelo" : proposta.camada,
-          tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
-          titulo: proposta.alvo.slice(0, 300),
-          instrucao: pendenciaTecnica ?? proposta.justificativa,
-          valor_atual: valorAnterior,
-          valor_novo: proposta.valorNovo,
-          status: status === "aplicado" ? "done" : "open",
-          evidencia: { proposta, teste, publicado, executor: MODELO_EXECUTOR },
-          execucao: {
-            status,
-            resultado_final: resultadoFinal,
-            passos,
-            teste,
-            verificacao,
-            codigo: resultadoCodigo,
-            operacoes: contagem,
-            motivo: motivoFinal,
-            modelo: MODELO_EXECUTOR,
-            // Origem verificável do que fundamentou a correção.
+      /**
+       * FASE 1 — a correção usa o MESMO pacote que fundamentou a proposta.
+       * Análises antigas (sem pacote persistido) são reconstruídas com as
+       * evidências disponíveis e a revisão sobe; nada é reanalisado à força.
+       */
+      let pacote = (analise.pacote as PacoteInvestigacao | null) ?? null;
+      if (!pacote) {
+        const { montarPacoteInvestigacao } = await import("./evidencias-pacote.server");
+        pacote = await montarPacoteInvestigacao(context.supabase, {
+          clinicaId: data.clinicaId,
+          feedbackId: data.feedbackId,
+          analiseId: String(analise.id),
+          origem: "enriquecido",
+          revisaoAnterior: (analise.pacote_revisao as number | null) ?? 0,
+        });
+        await supabase
+          .from("nina_feedback_analises")
+          .update({
+            pacote,
             pacote_hash: pacote.hash,
             pacote_revisao: pacote.revisao,
-            analise_id: String(analise.id),
-            idempotencia_chave: chave,
-          },
-          criado_por: userId,
-          concluido_por: status === "aplicado" ? userId : null,
-          concluido_em: status === "aplicado" ? agora : null,
-          homologado: teste.aprovado,
-        })
-        .select("id")
-        .single();
-      acao = (acaoCriada as { id: string } | null) ?? null;
-
-      const { count } = await supabase
-        .from("nina_feedback_versoes")
-        .select("id", { count: "exact", head: true })
-        .eq("feedback_id", data.feedbackId);
-
-      await supabase.from("nina_feedback_versoes").insert({
-        clinica_id: data.clinicaId,
-        feedback_id: data.feedbackId,
-        acao_id: acao?.id ?? null,
-        versao: (count ?? 0) + 1,
-        item: proposta.alvo.slice(0, 500),
-        valor_anterior: valorAnterior,
-        valor_novo: proposta.valorNovo,
-        motivo: proposta.justificativa.slice(0, 2000) || motivoFinal,
-        camada: proposta.camada,
-        tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
-        root_cause: (fb.root_cause as string | null) ?? proposta.camada,
-        reportado_por: (fb.reportado_por as string | null) ?? null,
-        aprovado_por: (fb.revisado_por as string | null) ?? null,
-        aplicado_por: userId,
-        evidencia: { teste, passos, publicado, verificacao, resultado_final: resultadoFinal },
-        teste_status: teste.aprovado ? "aprovado" : teste.executado ? "reprovado" : "pendente",
-      });
-
-      if (status === "aplicado") {
-        await supabase
-          .from("nina_feedback_erros")
-          .update({
-            status: "applied",
-            aplicacao_tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
-            aplicacao_resumo: proposta.alvo.slice(0, 300),
-            aplicacao_evidencia: { proposta, teste, passos, verificacao },
-            aplicado_por: userId,
-            aplicado_em: agora,
           })
-          .eq("id", data.feedbackId)
+          .eq("id", analise.id)
           .eq("clinica_id", data.clinicaId);
       }
 
-      await supabase
-        .from("nina_correcao_execucoes")
-        .update({
-          etapa: "concluido",
-          status: status === "falhou" ? "falhou" : "concluida",
-          passos,
-          resumo,
-          relatorio,
-          verificacao,
-          resultado_final: resultadoFinal,
-          alvo_revisao: verificacao?.revisao ?? proposta.revisaoBase ?? null,
-          erro: status === "falhou" ? motivoFinal : null,
-          acao_id: acao?.id ?? null,
-        })
-        .eq("id", execucaoId)
-        .eq("clinica_id", data.clinicaId);
-    } catch (e) {
-      // Nenhuma execução fica presa em "em curso": a falha é registrada.
-      const msg = e instanceof Error ? e.message : "Falha ao registrar o resultado da correção.";
-      await supabase
-        .from("nina_correcao_execucoes")
-        .update({
-          etapa: "concluido",
-          status: "falhou",
-          passos,
-          resumo,
-          relatorio: { ...relatorio, resultado: "falhou" },
-          resultado_final: "falhou",
-          erro: msg,
-        })
-        .eq("id", execucaoId)
-        .eq("clinica_id", data.clinicaId);
-      throw new Error(msg);
-    }
+      /**
+       * Registro de autorização e progresso: quem clicou, quando, qual análise,
+       * pacote, proposta, ambiente e alcance. Recarregar a tela retoma daqui.
+       */
+      const assinatura = assinaturaProposta(proposta);
+      const inicioMs = Date.now();
 
-    return { ...resumo, acaoId: acao?.id ?? null, relatorio };
-  });
+      /**
+       * FASE 3 — repetição: duplo clique, refresh ou retomada da mesma proposta
+       * geram a mesma chave. Se já existe aplicação com essa chave, o resultado
+       * dela é devolvido; nada é aplicado duas vezes.
+       */
+      const chave = chaveIdempotencia({
+        feedbackId: data.feedbackId,
+        analiseId: String(analise.id),
+        assinaturaProposta: assinatura,
+        pacoteHash: pacote.hash,
+      });
+      const { data: jaExiste } = await supabase
+        .from("nina_correcao_execucoes")
+        .select("id, resumo, relatorio, acao_id, status")
+        .eq("clinica_id", data.clinicaId)
+        .eq("idempotencia_chave", chave)
+        .maybeSingle();
+      if (jaExiste?.resumo)
+        return {
+          ...(jaExiste.resumo as ResumoExecucao),
+          acaoId: (jaExiste.acao_id as string | null) ?? null,
+          relatorio: (jaExiste.relatorio as RelatorioCorrecao | null) ?? null,
+        };
+      if (jaExiste)
+        throw new Error("Esta mesma correção já está sendo aplicada. Aguarde o resultado.");
+
+      const { count: tentativasAnteriores } = await supabase
+        .from("nina_correcao_execucoes")
+        .select("id", { count: "exact", head: true })
+        .eq("clinica_id", data.clinicaId)
+        .eq("feedback_id", data.feedbackId);
+      if ((tentativasAnteriores ?? 0) >= MAX_TENTATIVAS)
+        throw new Error(
+          `Já houve ${tentativasAnteriores} tentativas de aplicação para este erro. Analise novamente antes de insistir.`,
+        );
+
+      const { data: execLinha, error: eExec } = await supabase
+        .from("nina_correcao_execucoes")
+        .insert({
+          clinica_id: data.clinicaId,
+          feedback_id: data.feedbackId,
+          analise_id: analise.id,
+          pacote_hash: pacote.hash,
+          pacote_revisao: pacote.revisao,
+          proposta,
+          proposta_assinatura: assinatura,
+          ambiente: proposta.ambiente ?? pacote.identificacao.ambiente ?? null,
+          escopo: proposta.escopo,
+          autorizado_por: userId,
+          etapa: "verificando",
+          status: "em_curso",
+          passos: [],
+          idempotencia_chave: chave,
+          resultado_final: "preparado",
+          alvo_revisao: proposta.revisaoBase ?? null,
+          tentativas: (tentativasAnteriores ?? 0) + 1,
+        })
+        .select("id")
+        .single();
+      if (eExec) throw new Error("Já existe uma aplicação em andamento para este erro.");
+      const execucaoId = execLinha?.id as string;
+
+      const passos: PassoExecucao[] = [];
+      const atualizarEtapa = async (etapa: EtapaExecucao) => {
+        await supabase
+          .from("nina_correcao_execucoes")
+          .update({ etapa, passos })
+          .eq("id", execucaoId)
+          .eq("clinica_id", data.clinicaId);
+      };
+      const passo = (
+        ferramenta: PassoExecucao["ferramenta"],
+        titulo: string,
+        detalhe: string,
+        ok = true,
+      ) => {
+        passos.push({
+          ordem: passos.length + 1,
+          ferramenta,
+          titulo,
+          detalhe: detalhe.slice(0, 2000),
+          ok,
+          em: new Date().toISOString(),
+        });
+      };
+
+      let teste: ResultadoTeste = {
+        executado: false,
+        aprovado: false,
+        pergunta: (fb.pergunta_texto as string | null) ?? null,
+        resposta: null,
+        motivo: "Teste ainda não executado.",
+      };
+      let publicado = false;
+      /** FASE 5 — versão real da Arquitetura antes/depois, quando houve publicação. */
+      let versaoPrompt: { anterior: string | null; nova: string | null } | null = null;
+      let valorAnterior: string | null = proposta.valorAtual;
+      let pendenciaTecnica: string | null = null;
+      let motivoFinal = "";
+      /** Contagem real de operações desta correção (teto por ferramenta). */
+      let contagem: ContagemOperacoes = {};
+      /** O que precisa ser relido depois da gravação para conferir o efetivo. */
+      let alvoVerificacao: { tipo: "prompt"; conteudo: string; versao: number | null } | null =
+        null;
+
+      const aplicavel = podeAplicarAutomaticamente(proposta);
+      passo(
+        "sistema",
+        "Proposta autorizada",
+        `${proposta.alvo} — camada ${proposta.camada}. ${
+          aplicavel
+            ? "Camada é configuração viva: o executor altera e publica."
+            : proposta.camada === "catalogo"
+              ? "Informação vem do cadastro do sistema: o executor não altera o cadastro; a equipe corrige na origem."
+              : "Camada vive em código: o executor registra a mudança para quem publica código."
+        }`,
+      );
+      await atualizarEtapa("aplicando");
+
+      const ferramentas = definicoesFerramentas(proposta.camada);
+      const entradaModelo: any[] = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: montarPromptExecutor({
+                proposta,
+                diagnostico: String(analise.conclusao ?? ""),
+                perguntaOriginal: (fb.pergunta_texto as string | null) ?? null,
+                respostaErrada: String(fb.mensagem_texto ?? ""),
+                evidencias: {
+                  hash: pacote.hash,
+                  revisao: pacote.revisao,
+                  origem: pacote.origem,
+                  ambiente: pacote.identificacao.ambiente,
+                  entradas: pacote.entradas.map((m) => ({
+                    id: m.id,
+                    em: m.em,
+                    texto: m.texto,
+                    ausente: m.ausente,
+                  })),
+                  prompt: pacote.prompt,
+                  lacunas: pacote.lacunas,
+                  cortes: pacote.cortes,
+                },
+              }),
+            },
+          ],
+        },
+      ];
+
+      const ferramentasServer = await import("./correcao-ferramentas.server");
+
+      try {
+        for (let rodada = 0; rodada < LIMITE_RODADAS_EXECUTOR; rodada++) {
+          if (prazoExcedido(inicioMs, Date.now())) {
+            motivoFinal = "Tempo máximo desta correção excedido. Execução interrompida.";
+            passo("sistema", "Tempo excedido", motivoFinal, false);
+            break;
+          }
+          const saida = await chamarExecutor(entradaModelo, ferramentas);
+          const chamadas = saida.itens.filter((i: any) => i?.type === "function_call");
+          entradaModelo.push(...saida.itens);
+
+          if (!chamadas.length) {
+            motivoFinal = saida.texto.trim().slice(0, 2000) || "Execução concluída.";
+            break;
+          }
+
+          for (const c of chamadas) {
+            let args: any = {};
+            try {
+              args = JSON.parse(c.arguments ?? "{}");
+            } catch {
+              args = {};
+            }
+            let retorno: unknown;
+            try {
+              // Teto real de operações: nenhuma ferramenta passa do limite.
+              const limite = podeExecutar(contagem, c.name as OperacaoLimitada);
+              if (!limite.ok) throw new Error(limite.motivo);
+              contagem = registrarOperacao(contagem, c.name as OperacaoLimitada);
+
+              if (c.name === "ler_prompt_publicado") {
+                retorno = await ferramentasServer.lerPromptPublicado(supabase);
+                passo(
+                  "ler_prompt_publicado",
+                  "Prompt publicado lido",
+                  "Versão ativa da Arquitetura.",
+                );
+              } else if (c.name === "publicar_prompt") {
+                const anterior = await ferramentasServer.lerPromptPublicado(supabase);
+                valorAnterior = anterior?.conteudo ?? null;
+                // Concorrência: se a versão em vigor mudou desde a análise, recusa.
+                if (
+                  proposta.revisaoBase &&
+                  anterior &&
+                  String(proposta.revisaoBase) !== String(anterior.id) &&
+                  String(proposta.revisaoBase) !== String(anterior.versao)
+                )
+                  throw new Error(
+                    `A Arquitetura foi publicada por outra pessoa depois desta análise (em vigor: versão ${anterior.versao}). Analise de novo antes de aplicar.`,
+                  );
+                await atualizarEtapa("publicando");
+                const r = await ferramentasServer.publicarPrompt(supabase, userId, data.clinicaId, {
+                  conteudo: String(args.conteudo ?? ""),
+                  comentario: String(args.comentario ?? "Correção assistida de erro reportado"),
+                });
+                publicado = true;
+                versaoPrompt = {
+                  anterior: r.anterior == null ? null : String(r.anterior),
+                  nova: r.versao == null ? null : String(r.versao),
+                };
+                alvoVerificacao = {
+                  tipo: "prompt",
+                  conteudo: String(args.conteudo ?? ""),
+                  versao: Number(r.versao) || null,
+                };
+                retorno = r;
+                passo(
+                  "publicar_prompt",
+                  "Arquitetura publicada",
+                  `Versão ${r.anterior ?? "—"} → ${r.versao}. Identidade preservada.`,
+                );
+              } else if (c.name === "testar_em_homologacao") {
+                await atualizarEtapa("testando");
+                teste = await ferramentasServer.testarEmHomologacao(data.clinicaId, userId, {
+                  pergunta: String(args.pergunta ?? fb.pergunta_texto ?? ""),
+                  respostaErrada: String(fb.mensagem_texto ?? ""),
+                  valorNovo: proposta.valorNovo,
+                });
+                retorno = teste;
+                passo(
+                  "testar_em_homologacao",
+                  teste.aprovado ? "Teste aprovado" : "Teste não comprovou",
+                  teste.motivo,
+                  teste.aprovado,
+                );
+              } else if (c.name === "registrar_pendencia_tecnica") {
+                pendenciaTecnica = String(args.instrucao ?? "").slice(0, 4000);
+                retorno = { registrado: true };
+                passo(
+                  "registrar_pendencia_tecnica",
+                  "Pendência técnica registrada",
+                  pendenciaTecnica,
+                );
+              } else {
+                retorno = { erro: "Ferramenta não liberada para esta camada." };
+              }
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Falha na ferramenta.";
+              retorno = { erro: msg };
+              passo(
+                (c.name as PassoExecucao["ferramenta"]) ?? "sistema",
+                "Ferramenta recusada",
+                msg,
+                false,
+              );
+            }
+
+            entradaModelo.push({
+              type: "function_call_output",
+              call_id: c.call_id,
+              output: JSON.stringify(retorno).slice(0, 12000),
+            });
+          }
+        }
+      } catch (e) {
+        motivoFinal = e instanceof Error ? e.message : "Falha desconhecida na correção.";
+        passo("sistema", "Execução interrompida", motivoFinal, false);
+      }
+
+      await atualizarEtapa("verificando_resultado");
+
+      /**
+       * FASE 3 — camada de código: nada é aplicado sem serviço de execução real.
+       * Sem ele, a mudança fica registrada e o estado é "aguardando publicação".
+       */
+      let resultadoCodigo: Awaited<
+        ReturnType<typeof import("./executor-codigo.server").aplicarMudancaCodigo>
+      > | null = null;
+      if (!aplicavel) {
+        const { aplicarMudancaCodigo } = await import("./executor-codigo.server");
+        resultadoCodigo = await aplicarMudancaCodigo({
+          chaveIdempotencia: chave,
+          clinicaId: data.clinicaId,
+          feedbackId: data.feedbackId,
+          alvo: proposta.alvo,
+          arquivos: proposta.arquivos ?? [],
+          patch: proposta.patch ?? null,
+          revisaoBase: proposta.revisaoBase ?? null,
+          instrucao: pendenciaTecnica ?? proposta.justificativa,
+          tempoMaximoMs: Math.max(5000, TEMPO_MAXIMO_MS - (Date.now() - inicioMs)),
+        });
+        passo(
+          "sistema",
+          resultadoCodigo.aplicado ? "Código aplicado e publicado" : "Mudança de código registrada",
+          `${resultadoCodigo.motivo}${resultadoCodigo.dependencia ? ` ${resultadoCodigo.dependencia}` : ""}`,
+          resultadoCodigo.aplicado || !resultadoCodigo.disponivel,
+        );
+      }
+
+      /** Conferência do valor efetivo: gravar não basta, o sistema relê. */
+      let verificacao: import("./correcao-verificacao.server").Verificacao | null = null;
+      if (alvoVerificacao) {
+        const v = await import("./correcao-verificacao.server");
+        verificacao = await v.verificarPromptPublicado(supabase, {
+          conteudoEsperado: alvoVerificacao.conteudo,
+          versaoEsperada: alvoVerificacao.versao,
+        });
+        passo(
+          "sistema",
+          verificacao.conferido ? "Valor efetivo conferido" : "Valor efetivo não confere",
+          `${verificacao.alvo}: ${verificacao.motivo}`,
+          verificacao.conferido,
+        );
+      }
+
+      const status: ResumoExecucao["status"] = !aplicavel
+        ? resultadoCodigo?.aplicado
+          ? "aplicado"
+          : "pendente_tecnico"
+        : publicado && teste.aprovado
+          ? "aplicado"
+          : "falhou";
+
+      /** Estado técnico separado: preparado ≠ aplicado ≠ publicado ≠ verificado. */
+      const resultadoFinal: ResultadoFinalExecucao = !aplicavel
+        ? resultadoCodigo?.publicado
+          ? "verificado"
+          : "aguardando_publicacao"
+        : !publicado
+          ? "falhou"
+          : verificacao?.conferido && teste.aprovado
+            ? "verificado"
+            : "aplicado";
+
+      if (!motivoFinal) motivoFinal = resultadoCodigo?.motivo ?? teste.motivo;
+
+      // Registro rastreável — mesmas tabelas do fluxo existente.
+      const agora = new Date().toISOString();
+      const resumo: ResumoExecucao = {
+        status,
+        camada: proposta.camada,
+        passos,
+        teste,
+        publicado,
+        valorAnterior,
+        valorNovo: proposta.valorNovo,
+        motivo: motivoFinal,
+      };
+      /**
+       * FASE 5 — "Resultado da correção": montado a partir do que o executor de
+       * fato fez (gravou, publicou, testou, reconferiu), não da afirmação do
+       * avaliador. Proposta ≠ patch ≠ teste aprovado ≠ publicação concluída.
+       */
+      const relatorio: RelatorioCorrecao = montarRelatorio({
+        proposta,
+        status,
+        resultadoFinal,
+        aplicavel,
+        publicado,
+        valorAnterior,
+        motivo: motivoFinal,
+        passos,
+        teste,
+        verificacao,
+        codigo: resultadoCodigo,
+        evidencias: {
+          analiseId: String(analise.id),
+          pacoteHash: pacote.hash,
+          pacoteRevisao: pacote.revisao,
+          origem: pacote.origem,
+          ambiente: pacote.identificacao.ambiente,
+          entradas: pacote.entradas.length,
+          lacunas: pacote.lacunas.map((l) => ({ rotulo: l.rotulo, motivo: l.motivo })),
+          cortes: pacote.cortes,
+        },
+        trabalho: {
+          execucaoId,
+          solicitadoPor: userId,
+          modelo: MODELO_EXECUTOR,
+          provedor: "Lovable AI Gateway",
+          inicio: new Date(inicioMs).toISOString(),
+          fim: agora,
+          idempotenciaChave: chave,
+          tentativa: (tentativasAnteriores ?? 0) + 1,
+        },
+        versaoPrompt,
+      });
+
+      let acao: { id: string } | null = null;
+
+      try {
+        const { data: acaoCriada } = await supabase
+          .from("nina_feedback_acoes")
+          .insert({
+            clinica_id: data.clinicaId,
+            feedback_id: data.feedbackId,
+            root_cause: (fb.root_cause as string | null) ?? proposta.camada,
+            camada: proposta.camada === "modelo" ? "modelo" : proposta.camada,
+            tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
+            titulo: proposta.alvo.slice(0, 300),
+            instrucao: pendenciaTecnica ?? proposta.justificativa,
+            valor_atual: valorAnterior,
+            valor_novo: proposta.valorNovo,
+            status: status === "aplicado" ? "done" : "open",
+            evidencia: { proposta, teste, publicado, executor: MODELO_EXECUTOR },
+            execucao: {
+              status,
+              resultado_final: resultadoFinal,
+              passos,
+              teste,
+              verificacao,
+              codigo: resultadoCodigo,
+              operacoes: contagem,
+              motivo: motivoFinal,
+              modelo: MODELO_EXECUTOR,
+              // Origem verificável do que fundamentou a correção.
+              pacote_hash: pacote.hash,
+              pacote_revisao: pacote.revisao,
+              analise_id: String(analise.id),
+              idempotencia_chave: chave,
+            },
+            criado_por: userId,
+            concluido_por: status === "aplicado" ? userId : null,
+            concluido_em: status === "aplicado" ? agora : null,
+            homologado: teste.aprovado,
+          })
+          .select("id")
+          .single();
+        acao = (acaoCriada as { id: string } | null) ?? null;
+
+        const { count } = await supabase
+          .from("nina_feedback_versoes")
+          .select("id", { count: "exact", head: true })
+          .eq("feedback_id", data.feedbackId);
+
+        await supabase.from("nina_feedback_versoes").insert({
+          clinica_id: data.clinicaId,
+          feedback_id: data.feedbackId,
+          acao_id: acao?.id ?? null,
+          versao: (count ?? 0) + 1,
+          item: proposta.alvo.slice(0, 500),
+          valor_anterior: valorAnterior,
+          valor_novo: proposta.valorNovo,
+          motivo: proposta.justificativa.slice(0, 2000) || motivoFinal,
+          camada: proposta.camada,
+          tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
+          root_cause: (fb.root_cause as string | null) ?? proposta.camada,
+          reportado_por: (fb.reportado_por as string | null) ?? null,
+          aprovado_por: (fb.revisado_por as string | null) ?? null,
+          aplicado_por: userId,
+          evidencia: { teste, passos, publicado, verificacao, resultado_final: resultadoFinal },
+          teste_status: teste.aprovado ? "aprovado" : teste.executado ? "reprovado" : "pendente",
+        });
+
+        if (status === "aplicado") {
+          await supabase
+            .from("nina_feedback_erros")
+            .update({
+              status: "applied",
+              aplicacao_tipo: proposta.camada === "catalogo" ? "kb_update" : "reasoning_fix",
+              aplicacao_resumo: proposta.alvo.slice(0, 300),
+              aplicacao_evidencia: { proposta, teste, passos, verificacao },
+              aplicado_por: userId,
+              aplicado_em: agora,
+            })
+            .eq("id", data.feedbackId)
+            .eq("clinica_id", data.clinicaId);
+        }
+
+        await supabase
+          .from("nina_correcao_execucoes")
+          .update({
+            etapa: "concluido",
+            status: status === "falhou" ? "falhou" : "concluida",
+            passos,
+            resumo,
+            relatorio,
+            verificacao,
+            resultado_final: resultadoFinal,
+            alvo_revisao: verificacao?.revisao ?? proposta.revisaoBase ?? null,
+            erro: status === "falhou" ? motivoFinal : null,
+            acao_id: acao?.id ?? null,
+          })
+          .eq("id", execucaoId)
+          .eq("clinica_id", data.clinicaId);
+      } catch (e) {
+        // Nenhuma execução fica presa em "em curso": a falha é registrada.
+        const msg = e instanceof Error ? e.message : "Falha ao registrar o resultado da correção.";
+        await supabase
+          .from("nina_correcao_execucoes")
+          .update({
+            etapa: "concluido",
+            status: "falhou",
+            passos,
+            resumo,
+            relatorio: { ...relatorio, resultado: "falhou" },
+            resultado_final: "falhou",
+            erro: msg,
+          })
+          .eq("id", execucaoId)
+          .eq("clinica_id", data.clinicaId);
+        throw new Error(msg);
+      }
+
+      return { ...resumo, acaoId: acao?.id ?? null, relatorio };
+    },
+  );

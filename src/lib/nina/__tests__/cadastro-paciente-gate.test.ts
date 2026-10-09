@@ -1,20 +1,58 @@
 import { describe, expect, test } from "bun:test";
-import { aplicarGateIdentificacao, extrairDadosIdentificacao } from "../identificacao-gate.server";
+import {
+  aplicarGateIdentificacao,
+  extrairDadosIdentificacao,
+  TEXTO_ENCAMINHADO_FALHA,
+} from "../identificacao-gate.server";
+import { TELEFONE_SIMULADO } from "../telefone-paciente";
 import { cadastroMinimoSchema, camposCadastroFaltantes } from "../cadastro-paciente";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "../paciente-tools.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
-import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada, LEMBRETE_CONFIRMACAO } from "../agendamento-escolha";
+import {
+  confirmacaoDaEscolha,
+  resumoDaEscolhaEntregue,
+  registrarOpcoesAgendamento,
+  selecionarVagaValidada,
+  LEMBRETE_CONFIRMACAO,
+  incluirPacienteNoResumo,
+} from "../agendamento-escolha";
 import { derivarEtapa } from "../atendimento-fase6";
 
-test.each(["O paciente é", "A paciente se chama", "O paciente eh"])("declaração explícita de paciente: %s", prefixo => {
-  expect(extrairDadosIdentificacao(`${prefixo} Miguel Simulação Teste, nascido em 18/05/2022.`)).toMatchObject({
-    nome: "Miguel Simulação Teste", data_nascimento: "2022-05-18",
-  });
-});
+test.each(["O paciente é", "A paciente se chama", "O paciente eh"])(
+  "declaração explícita de paciente: %s",
+  (prefixo) => {
+    expect(
+      extrairDadosIdentificacao(`${prefixo} Miguel Simulação Teste, nascido em 18/05/2022.`),
+    ).toMatchObject({
+      nome: "Miguel Simulação Teste",
+      data_nascimento: "2022-05-18",
+    });
+  },
+);
 
 test("a pergunta sobre quem é o paciente não vira um nome", () => {
   expect(extrairDadosIdentificacao("O paciente é meu filho, posso agendar?").nome).toBeNull();
+});
+
+test.each([
+  ["sebastiao alves de lima 1950 dia 20 de julho", "Sebastiao Alves De Lima", "1950-07-20"],
+  ["sebastiao alves de lima 20/07/1950", "Sebastiao Alves De Lima", "1950-07-20"],
+  ["davi lucas pereira nasceu 14/06/2017", "Davi Lucas Pereira", "2017-06-14"],
+  ["jose carlos da silva nacimento 5 de marco de 1960", "Jose Carlos Da Silva", "1960-03-05"],
+  ["jessica oliveira santos 02 04 2001", "Jessica Oliveira Santos", "2001-04-02"],
+  ["maria dias souza data de nascimento 01/02/1980", "Maria Dias Souza", "1980-02-01"],
+  ["meu nome e geraldo pereira da cruz nasci 03/03/1958", "Geraldo Pereira Da Cruz", "1958-03-03"],
+  ["geraldo pereira da cruz nascido 03/03/1958", "Geraldo Pereira Da Cruz", "1958-03-03"],
+  [
+    "ela chama ana julia moreira campos tem 6 ano nasceu 11/09/2019",
+    "Ana Julia Moreira Campos",
+    "2019-09-11",
+  ],
+  ["dona benedita alves de souza 1939 dia 3 de maio", "Benedita Alves De Souza", "1939-05-03"],
+  ["seu jose da silva 01/01/1940", "Jose Da Silva", "1940-01-01"],
+])("dados escritos sem pontuação (07/10/2026): %s", (texto, nome, data) => {
+  expect(extrairDadosIdentificacao(texto)).toMatchObject({ nome, data_nascimento: data });
 });
 
 function preparar(faltantes = ["nome", "data_nascimento"]) {
@@ -59,6 +97,17 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
       ctx.pacienteId = "paciente";
       ctx.pacienteNome = "Ana da Silva";
       estado.patient.id = "paciente";
+      if (estado.patient.alteracao_telefone?.telefone) {
+        const telefone = estado.patient.alteracao_telefone.telefone;
+        estado.patient.telefone_confirmado = { paciente_id: "paciente", telefone };
+        estado.patient.alteracao_telefone = null;
+        incluirPacienteNoResumo(estado, "clinica", {
+          id: "paciente",
+          nome: "Ana da Silva",
+          data_nascimento: "1990-01-02",
+          telefone,
+        });
+      }
       faltantes = [];
       return { ok: true };
     }
@@ -82,8 +131,16 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
     encaminhamentos,
     turno: async (mensagem: string) => {
       ctx.consultaAgenda!.mensagemAtual = mensagem;
-      const r = await aplicarGateIdentificacao({ mensagem, estado, ctx, executar,
-        encaminharVagaIndisponivel: async (motivo) => { encaminhamentos.push(motivo); return true; } });
+      const r = await aplicarGateIdentificacao({
+        mensagem,
+        estado,
+        ctx,
+        executar,
+        encaminharVagaIndisponivel: async (motivo) => {
+          encaminhamentos.push(motivo);
+          return true;
+        },
+      });
       ctx.consultaAgenda!.historico.push({ role: "user", content: mensagem });
       if (r) ctx.consultaAgenda!.historico.push({ role: "assistant", content: r.texto });
       return r;
@@ -92,6 +149,117 @@ function preparar(faltantes = ["nome", "data_nascimento"]) {
 }
 
 describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
+  test.each([true, false])(
+    "sessão 670: aceite com pergunta mantém outras perguntas para o modelo (%s)",
+    async (teste) => {
+      const t = preparar();
+      t.ctx.teste = teste;
+      t.ctx.origem = teste ? "homologacao" : "whatsapp";
+      await t.turno("Ana da Silva, 02/01/1990");
+      const resposta = await t.turno(
+        "isso ai pode marca. ah e da pra fazer um hemograma e o TSH no msm dia?",
+      );
+      expect(resposta).toBeNull();
+      expect(t.estado.appointment.confirmation?.aceita).toBe(true);
+      expect(t.estado.appointment.slot_confirmed_by_patient).toBe(true);
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(0);
+      expect(t.encaminhamentos).toHaveLength(0);
+    },
+  );
+  test("correção explícita conserva vaga, mostra Telefone e só reserva após novo aceite", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    const vaga = t.estado.appointment.slot_inicio;
+    const r = await t.turno("não é esse telefone, altere para 21988887777, pode marcar");
+    expect(r!.texto).toContain("*Telefone:* 21988887777");
+    expect(r!.texto).not.toContain("WhatsApp de contato");
+    expect(t.estado.appointment.slot_inicio).toBe(vaga);
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(0);
+    await t.turno("confirmo");
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+  });
+  test("pedido sem número pergunta só DDD e aceita o número na mensagem seguinte", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    expect((await t.turno("quero trocar o telefone"))!.texto).toContain("com DDD");
+    expect((await t.turno("21988887777"))!.texto).toContain("*Telefone:* 21988887777");
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(0);
+  });
+  test("pedido de troca com gravação falhando encaminha à equipe, sem agendar nem prender o paciente", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    t.falhar({ ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha simulada" });
+    const r = (await t.turno("troque o telefone para 21988887777"))!;
+    expect(r.texto).toBe(TEXTO_ENCAMINHADO_FALHA);
+    expect(r.texto).not.toContain("Tente novamente");
+    expect(t.encaminhamentos).toHaveLength(1);
+    expect(t.encaminhamentos[0]).toStartWith("TELEFONE_NAO_ATUALIZADO");
+    expect(t.encaminhamentos[0]).toContain("Nenhum agendamento foi gravado");
+    expect(t.estado.patient.alteracao_telefone).toBeNull();
+    expect(t.estado.flow.stage).toBe("HANDOFF");
+    // Encaminhada, a conversa sai do gate: nada é agendado depois.
+    expect(await t.turno("confirmo")).toBeNull();
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(0);
+  });
+  test("homologação não troca o telefone: avisa a simulação e reapresenta o resumo", async () => {
+    const t = preparar();
+    t.ctx.teste = true;
+    t.ctx.origem = "homologacao";
+    await t.turno("Ana da Silva, 02/01/1990");
+    const antes = t.chamadas.length;
+    const r = (await t.turno("troque o telefone para 21988887777"))!;
+    expect(r.texto).toStartWith(TELEFONE_SIMULADO);
+    expect(r.texto).not.toContain("21988887777");
+    expect(t.chamadas.slice(antes).map((c) => c.nome)).not.toContain("identificar_paciente");
+    expect(t.estado.patient.alteracao_telefone).toBeNull();
+    expect(t.encaminhamentos).toHaveLength(0);
+    await t.turno("confirmo");
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+  });
+  test("só o aviso fixo da simulação pode anteceder o resumo entregue", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    const resumo = confirmacaoDaEscolha(t.estado, "clinica")!.resumo;
+    expect(
+      resumoDaEscolhaEntregue(t.estado, "clinica", [
+        {
+          role: "assistant",
+          content: `${TELEFONE_SIMULADO}
+
+${resumo}`,
+        },
+      ]),
+    ).toBe(true);
+    expect(
+      resumoDaEscolhaEntregue(t.estado, "clinica", [
+        {
+          role: "assistant",
+          content: `Seu horário está reservado.
+
+${resumo}`,
+        },
+      ]),
+    ).toBe(false);
+  });
+  test("homologação com reserva concluída mantém o agendamento e não troca o telefone", async () => {
+    const t = preparar();
+    t.ctx.teste = true;
+    t.ctx.origem = "homologacao";
+    await t.turno("Ana da Silva, 02/01/1990");
+    await t.turno("confirmo");
+    const r = (await t.turno("troque o telefone para 21988887777"))!;
+    expect(r.texto).toBe(`${TELEFONE_SIMULADO} Seu agendamento permanece o mesmo.`);
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+  });
+  test("telefone de reserva já concluída pode mudar sem nova reserva", async () => {
+    const t = preparar();
+    await t.turno("Ana da Silva, 02/01/1990");
+    await t.turno("confirmo");
+    expect((await t.turno("troque o telefone para 21988887777"))!.texto).toContain(
+      "Seu agendamento permanece o mesmo",
+    );
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+  });
   test("CPF, endereço e e-mail não são necessários", () => {
     expect(
       cadastroMinimoSchema.safeParse({
@@ -124,34 +292,122 @@ describe("cadastro obrigatório compartilhado com o Clínica OS", () => {
 });
 
 describe("gate: escolher vaga → coletar dados → confirmar → agendar", () => {
+  for (const origem of ["homologacao", "whatsapp"] as const) {
+    test(`${origem}: nascimento por extenso completa a coleta sem reservar antes da confirmação`, async () => {
+      const t = preparar();
+      t.ctx.origem = origem;
+      t.ctx.teste = origem === "homologacao";
+      await t.turno("Meu nome é Ana da Silva");
+      const r = await t.turno("15 de janeiro de 1979");
+      expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
+        nome: "Ana Da Silva",
+        data_nascimento: "1979-01-15",
+      });
+      expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+      expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
+      expect(t.encaminhamentos).toHaveLength(0);
+      await t.turno("Isso, pode confirmar.");
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+    });
+  }
+  test.each(["15 de janeiro de 1979", "15/01/79", "1979-01-15"])(
+    "extrai nome e data sem incorporar o mês ao nome: %s",
+    (data) => {
+      expect(extrairDadosIdentificacao(`Ana da Silva, ${data}`)).toMatchObject({
+        nome: "Ana Da Silva",
+        data_nascimento: "1979-01-15",
+      });
+      expect(extrairDadosIdentificacao(data)).toMatchObject({
+        nome: null,
+        data_nascimento: "1979-01-15",
+      });
+    },
+  );
+  test("troca responsável pela filha sem herdar o nascimento antigo e sem agendar durante a coleta", async () => {
+    const t = preparar([]);
+    Object.assign(t.estado.patient, { id: "responsavel", identified: true, validated: true });
+    t.ctx.pacienteId = "responsavel";
+    t.ctx.pacienteNome = "Ana da Silva";
+    t.estado.flow.stage = "WAITING_FINAL_CONFIRMATION";
+    t.ctx.consultaAgenda!.historico.unshift({
+      role: "user",
+      content: "Meu nome é Ana da Silva, 02/01/1990",
+    });
+    const executar = async (
+      ctx: CtxNinaPaciente,
+      nome: string,
+      args: unknown,
+    ): Promise<ResultadoFerramenta> =>
+      nome === "consultar_cadastro_paciente"
+        ? {
+            ok: true,
+            campos_faltantes: [],
+            dados_confirmados: { nome: "Ana da Silva", data_nascimento: "1990-01-02" },
+          }
+        : t.executar(ctx, nome, args);
+    const primeiro = await aplicarGateIdentificacao({
+      mensagem: "O nome dela é Sofia Lima Rocha",
+      estado: t.estado,
+      ctx: t.ctx,
+      executar,
+    });
+    expect(primeiro?.texto).toContain("data de nascimento");
+    expect(t.estado.patient.pending).toMatchObject({
+      nome: "Sofia Lima Rocha",
+      data_nascimento: null,
+    });
+    expect(t.chamadas).toHaveLength(0);
+    const segundo = await aplicarGateIdentificacao({
+      mensagem: "Nasceu em 14/02/2023",
+      estado: t.estado,
+      ctx: t.ctx,
+      executar,
+    });
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Sofia Lima Rocha",
+      data_nascimento: "2023-02-14",
+    });
+    expect(segundo?.restricoes).toContain("aguardar_aceite_do_resumo");
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
+  });
   test.each(["Sim, confirmo para minha mãe.", "Isso aí, pode marcar pra minha mãe!"])(
-    "aceita referência à mesma paciente identificada: %s", async frase => {
+    "aceita referência à mesma paciente identificada: %s",
+    async (frase) => {
       const t = preparar();
       await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
-      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+      expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
       expect((await t.turno(frase))?.acoesConcluidas[0]?.confirmada).toBe(true);
-      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
       expect((await t.turno(frase))?.fatosConfirmados).toContain("agendamento_ja_existente");
-      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
-    });
-  test.each(["Sim, confirmo para meu pai.", "Não confirmo para minha mãe.", "Sim, mas outro horário para minha mãe.", "Confirmo às 15:00 para minha mãe."])(
-    "parentesco, recusa ou escolha divergentes não autorizam reserva: %s", async frase => {
-      const t = preparar();
-      await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
-      await t.turno(frase);
-      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
-    });
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+    },
+  );
+  test.each([
+    "Sim, confirmo para meu pai.",
+    "Não confirmo para minha mãe.",
+    "Sim, mas outro horário para minha mãe.",
+    "Confirmo às 15:00 para minha mãe.",
+  ])("parentesco, recusa ou escolha divergentes não autorizam reserva: %s", async (frase) => {
+    const t = preparar();
+    await t.turno("Minha mãe se chama Ana da Silva, 02/01/1990");
+    await t.turno(frase);
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
+  });
   test("não inventa vínculo familiar nem aceita declaração antiga para outro cadastro", async () => {
-    for (const declarado of ["Ana da Silva, 02/01/1990", "Minha mãe se chama Maria de Souza, 02/01/1990"]) {
+    for (const declarado of [
+      "Ana da Silva, 02/01/1990",
+      "Minha mãe se chama Maria de Souza, 02/01/1990",
+    ]) {
       const t = preparar();
       await t.turno(declarado);
       // O executor da fixture identifica sempre Ana da Silva.
       await t.turno("Sim, confirmo para minha mãe.");
-      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+      expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
     }
   });
   test.each(["Prefiro 14:00", "Prefiro 14:00 da lista anterior."])(
-    "preserva preferência validada no começo da frase: %s", async mensagem => {
+    "preserva preferência validada no começo da frase: %s",
+    async (mensagem) => {
       const t = preparar();
       const vaga = t.estado.appointment.confirmation!.vaga;
       t.estado.appointment.confirmation = null;
@@ -161,7 +417,7 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
       expect(confirmacaoDaEscolha(t.estado)?.vaga).toEqual(vaga);
       await t.turno("Ana da Silva, 02/01/1990");
       expect((await t.turno("Isso, pode confirmar."))?.acoesConcluidas[0]?.confirmada).toBe(true);
-      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
     },
   );
   test("recusa sem outra vaga validada limpa a escolha e não agenda", async () => {
@@ -177,22 +433,31 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
     expect(await t.turno("14:00 fica bom. Se eu pagar no Pix lá na hora pode?")).toBeNull();
     expect(confirmacaoDaEscolha(t.estado)?.vaga).toEqual(vaga);
-    expect(t.chamadas.map(c => c.nome)).toEqual(["selecionar_horario"]);
-    t.ctx.consultaAgenda!.historico.push({ role: "assistant", content: "Pix somente antecipado pelo WhatsApp. Informe seu nome completo e data de nascimento." });
-    expect((await t.turno("Ana da Silva, 02/01/1990"))?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.map((c) => c.nome)).toEqual(["selecionar_horario"]);
+    t.ctx.consultaAgenda!.historico.push({
+      role: "assistant",
+      content:
+        "Pix somente antecipado pelo WhatsApp. Informe seu nome completo e data de nascimento.",
+    });
+    expect((await t.turno("Ana da Silva, 02/01/1990"))?.texto).toBe(
+      confirmacaoDaEscolha(t.estado)?.resumo,
+    );
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
   test("aproveita nome e nascimento declarados junto da preferência sem reservar antes do aceite", async () => {
     const t = preparar();
     const vaga = t.estado.appointment.confirmation!.vaga;
     t.estado.appointment.confirmation = null;
     registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
-    const r = await t.turno("Prefiro 14:00 da lista anterior. Meu nome é Lucas Simulação Teste Um, nasci em 21/10/1990.");
+    const r = await t.turno(
+      "Prefiro 14:00 da lista anterior. Meu nome é Lucas Simulação Teste Um, nasci em 21/10/1990.",
+    );
     expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
-    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
-      nome: "Lucas Simulação Teste Um", data_nascimento: "1990-10-21",
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Lucas Simulação Teste Um",
+      data_nascimento: "1990-10-21",
     });
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
     expect((await t.turno("Isso, pode confirmar."))?.acoesConcluidas[0]?.confirmada).toBe(true);
   });
   test("escolha pede dados antes da confirmação, sem interpretar o horário como nome", async () => {
@@ -204,7 +469,10 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(r?.camposPendentes).toEqual(["nome", "data_nascimento"]);
     expect(r?.texto).not.toContain("Confirma");
     expect(t.estado.patient.pending.nome).toBeNull();
-    expect(t.chamadas.map(c => c.nome)).toEqual(["selecionar_horario", "consultar_cadastro_paciente"]);
+    expect(t.chamadas.map((c) => c.nome)).toEqual([
+      "selecionar_horario",
+      "consultar_cadastro_paciente",
+    ]);
     expect(confirmacaoDaEscolha(t.estado)?.aceita).toBe(false);
   });
   test("responsável fornece os dados do filho junto do horário sem perder a escolha", async () => {
@@ -212,12 +480,15 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     const vaga = t.estado.appointment.confirmation!.vaga;
     t.estado.appointment.confirmation = null;
     registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
-    const r = await t.turno("Esse mesmo, 14:00. É pro meu filho Pedro Simulação Teste Três, nascido em 12/03/2018.");
+    const r = await t.turno(
+      "Esse mesmo, 14:00. É pro meu filho Pedro Simulação Teste Três, nascido em 12/03/2018.",
+    );
     expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
-    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
-      nome: "Pedro Simulação Teste Três", data_nascimento: "2018-03-12",
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Pedro Simulação Teste Três",
+      data_nascimento: "2018-03-12",
     });
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
   test("declaração Minha filha é aproveita o nome sem confundir o médico", async () => {
     const t = preparar();
@@ -226,82 +497,113 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
     const r = await t.turno("Quero 14:00. Minha filha é Helena Teste Quarenta Dois, 03/07/2024.");
     expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
-    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
-      nome: "Helena Teste Quarenta Dois", data_nascimento: "2024-07-03",
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
+      nome: "Helena Teste Quarenta Dois",
+      data_nascimento: "2024-07-03",
     });
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
-    expect(extrairDadosIdentificacao("Quero o doutor Sergio Palermo. Minha filha é Helena Teste Quarenta Dois, 03/07/2024.").nome).toBe("Helena Teste Quarenta Dois");
-    expect(extrairDadosIdentificacao("Minha filha é menor de idade. Ela pode ir com a avó?").nome).toBeNull();
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
+    expect(
+      extrairDadosIdentificacao(
+        "Quero o doutor Sergio Palermo. Minha filha é Helena Teste Quarenta Dois, 03/07/2024.",
+      ).nome,
+    ).toBe("Helena Teste Quarenta Dois");
+    expect(
+      extrairDadosIdentificacao("Minha filha é menor de idade. Ela pode ir com a avó?").nome,
+    ).toBeNull();
   });
   test.each([
     "14:00. Sou Fabio Segunda Rodada Oito, nasci em 17/08/1980.",
     "14:00, por favor. O nome dele é Fabio Segunda Rodada Oito, nasceu em 17/08/1980.",
     "14:00. Ele se chama Fabio Segunda Rodada Oito, 17/08/1980.",
-  ])("apresentação com nome e nascimento na escolha identifica antes de pedir aceite: %s", async (frase) => {
-    const t = preparar();
-    const vaga = t.estado.appointment.confirmation!.vaga;
-    t.estado.appointment.confirmation = null;
-    registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
-    const r = await t.turno(frase);
-    expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
-    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toMatchObject({
-      nome: "Fabio Segunda Rodada Oito", data_nascimento: "1980-08-17",
-    });
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
-    expect(extrairDadosIdentificacao("Sou a mãe do paciente, ele tem oito anos.").nome).toBeNull();
-    expect(extrairDadosIdentificacao("Sou atendido pelo doutor Carlos Eduardo.").nome).toBeNull();
-  });
+  ])(
+    "apresentação com nome e nascimento na escolha identifica antes de pedir aceite: %s",
+    async (frase) => {
+      const t = preparar();
+      const vaga = t.estado.appointment.confirmation!.vaga;
+      t.estado.appointment.confirmation = null;
+      registrarOpcoesAgendamento(t.estado, "clinica", [vaga]);
+      const r = await t.turno(frase);
+      expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
+      expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
+        nome: "Fabio Segunda Rodada Oito",
+        data_nascimento: "1980-08-17",
+      });
+      expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
+      expect(
+        extrairDadosIdentificacao("Sou a mãe do paciente, ele tem oito anos.").nome,
+      ).toBeNull();
+      expect(extrairDadosIdentificacao("Sou atendido pelo doutor Carlos Eduardo.").nome).toBeNull();
+    },
+  );
   test.each([
     "Não, deixa pra lá. Não quero marcar agora.",
     "Na verdade não, preciso falar com meu trabalho antes. Não confirma por enquanto.",
-    "Não confirme por enquanto.", "Não agende agora.", "Não marque ainda.",
+    "Não confirme por enquanto.",
+    "Não agende agora.",
+    "Não marque ainda.",
   ])("recusa explícita interrompe a confirmação sem reservar: %s", async (frase) => {
     const t = preparar();
     expect(await t.turno(frase)).toBeNull();
     expect(t.estado.appointment.confirmation).toBeNull();
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
-  for (const frase of ["Sim, confirmo.", "Sim, confirmo todos esses dados para concluir o agendamento.",
-    "isso mesmo, pode confirmar", "sim, tudo certo por aqui", "confirmo sim, obrigado!",
-    "tá tudo certo, pode confirmar", "Isso, esse mesmo.",
+  for (const frase of [
+    "Sim, confirmo.",
+    "Sim, confirmo todos esses dados para concluir o agendamento.",
+    "isso mesmo, pode confirmar",
+    "sim, tudo certo por aqui",
+    "confirmo sim, obrigado!",
+    "tá tudo certo, pode confirmar",
+    "Isso, esse mesmo.",
     "Isso aí, pode marcar.",
-    "já é", "formou", "demorou", "blz, pode confirmar", "ss, pode agendar pfv",
-    "Confirmo a consulta de ortopedia com Jorge Ribeiro em 21/01/2030 às 14:00."]) {
+    "já é",
+    "formou",
+    "demorou",
+    "blz, pode confirmar",
+    "ss, pode agendar pfv",
+    "Confirmo a consulta de ortopedia com Jorge Ribeiro em 21/01/2030 às 14:00.",
+  ]) {
     test(`confirmação natural não retorna à escolha: ${frase}`, async () => {
       const t = preparar();
       expect((await t.turno(frase))?.camposPendentes).toEqual(["nome", "data_nascimento"]);
       expect(t.estado.appointment.confirmation?.aceita).toBe(false);
       const resumo = t.estado.appointment.confirmation;
       expect((await t.turno("Ana da Silva, 02/01/1990"))?.texto).toBe(resumo!.resumo);
-      expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+      expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
       expect((await t.turno(frase))?.acoesConcluidas[0]?.confirmada).toBe(true);
       expect(t.estado.appointment.confirmation).toBe(resumo);
-      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
-      expect(t.chamadas.some(c => c.nome === "selecionar_horario")).toBe(false);
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+      expect(t.chamadas.some((c) => c.nome === "selecionar_horario")).toBe(false);
       const repeticao = await t.turno(frase);
-      expect(repeticao?.texto).toBe("Seu agendamento já foi realizado. Não é necessário confirmar novamente.");
+      expect(repeticao?.texto).toBe(
+        "Seu agendamento já foi realizado. Não é necessário confirmar novamente.",
+      );
       expect(repeticao?.acoesConcluidas).toHaveLength(0);
-      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
     });
   }
   test("lembrete curto mantém a prova do resumo sem repetir a conclusão ou reservar antes do aceite", async () => {
     const t = preparar();
     await t.turno("Ana da Silva, 02/01/1990");
-    const chamadasAntes = t.chamadas.filter(c => c.nome === "agendar").length;
+    const chamadasAntes = t.chamadas.filter((c) => c.nome === "agendar").length;
     expect((await t.turno("entendi a mensagem"))?.texto).toBe(LEMBRETE_CONFIRMACAO);
     expect((await t.turno("li aqui"))?.texto).toBe(LEMBRETE_CONFIRMACAO);
-    expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(chamadasAntes);
-    expect((await t.turno("isso mesmo, pode confirmar"))?.acoesConcluidas[0]?.confirmada).toBe(true);
-    expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(chamadasAntes);
+    expect((await t.turno("isso mesmo, pode confirmar"))?.acoesConcluidas[0]?.confirmada).toBe(
+      true,
+    );
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
   });
   test.each(["sim, mas quero outro horário", "qual o endereço?", "quero outra consulta"])(
-    "pedido após conclusão não é engolido como novo aceite: %s", async mensagem => {
+    "pedido após conclusão não é engolido como novo aceite: %s",
+    async (mensagem) => {
       const t = preparar();
       await t.turno("Ana da Silva, 02/01/1990");
       await t.turno("sim");
       expect(await t.turno(mensagem)).toBeNull();
-      expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
-    });
+      expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
+    },
+  );
   test("reserva de sessão antiga não produz resposta de agendamento atual", async () => {
     const t = preparar();
     t.estado.appointment.appointment_id = "antigo";
@@ -314,11 +616,15 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     t.ctx.consultaAgenda!.historico.unshift(
       { role: "user", content: "Quero consulta de ortopedia em 21/01/2030" },
       { role: "assistant", content: "Qual seu nome completo e sua data de nascimento?" },
-      { role: "user", content: "Ana da Silva, 02/01/1990" });
+      { role: "user", content: "Ana da Silva, 02/01/1990" },
+    );
     const r = await t.turno("Sim, confirmo.");
     expect(r?.restricoes).toContain("aguardar_aceite_do_resumo");
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
-    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toEqual({ nome: "Ana Da Silva", data_nascimento: "1990-01-02" });
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toEqual({
+      nome: "Ana Da Silva",
+      data_nascimento: "1990-01-02",
+    });
   });
   test("repetir o aceite durante o cadastro não vira nome nem reinicia a confirmação", async () => {
     const t = preparar();
@@ -328,16 +634,20 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(r?.camposPendentes).toEqual(["nome", "data_nascimento"]);
     expect(t.estado.patient.pending.nome).toBeNull();
     expect(t.estado.appointment.confirmation).toBe(resumo);
-      expect(t.estado.appointment.confirmation?.aceita).toBe(false);
-    expect(t.chamadas.some(c => ["selecionar_horario", "agendar"].includes(c.nome))).toBe(false);
+    expect(t.estado.appointment.confirmation?.aceita).toBe(false);
+    expect(t.chamadas.some((c) => ["selecionar_horario", "agendar"].includes(c.nome))).toBe(false);
   });
   test.each(["Sim, confirmo às 15:00", "Confirmo com Paulo Guilherme", "Sim, mas qual o valor?"])(
-    "não registra aceite divergente: %s", async frase => {
+    "não registra aceite divergente: %s",
+    async (frase) => {
       const t = preparar();
       await t.turno(frase);
       expect(t.estado.appointment.confirmation?.aceita).not.toBe(true);
-      expect(t.chamadas.some(c => ["identificar_paciente", "agendar"].includes(c.nome))).toBe(false);
-    });
+      expect(t.chamadas.some((c) => ["identificar_paciente", "agendar"].includes(c.nome))).toBe(
+        false,
+      );
+    },
+  );
   for (const campo of ["slot_inicio", "doctor_id", "procedure"] as const) {
     test(`sem ${campo} não coleta nem cria paciente`, async () => {
       const t = preparar();
@@ -366,7 +676,7 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect((await t.turno("Ana da Silva"))?.camposPendentes).toEqual(["data_nascimento"]);
     const resumo = await t.turno("02/01/1990");
     expect(resumo?.restricoes).toContain("aguardar_aceite_do_resumo");
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
     const r = await t.turno("Sim, confirmo.");
     expect(r?.acoesConcluidas[0]).toMatchObject({
       acao: "agendar",
@@ -393,6 +703,27 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     ]);
   });
 
+  test("resposta sem nenhum dado reconhecido diz que não entendeu, em vez de repetir o pedido", async () => {
+    const t = preparar();
+    expect((await t.turno("sim"))?.chaveTemplate).toBe("fluxo.cadastro.obrigatorios");
+    const r = await t.turno("sebastiao");
+    expect(r?.chaveTemplate).toBe("fluxo.cadastro.nao_entendido");
+    expect(r?.texto).toMatch(
+      /^Não consegui entender os dados na sua mensagem\. Para continuar, preciso de \*nome completo\*.*\*data de nascimento\*/,
+    );
+    await t.turno("sebastiao alves de lima 1950 dia 20 de julho");
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toEqual({
+      nome: "Sebastiao Alves De Lima",
+      data_nascimento: "1950-07-20",
+    });
+  });
+  test("só o nome, sem a data, pede a data normalmente", async () => {
+    const t = preparar();
+    await t.turno("sim");
+    const r = await t.turno("Ana da Silva");
+    expect(r?.chaveTemplate).toBe("fluxo.cadastro.obrigatorios");
+    expect(r?.camposPendentes).toEqual(["data_nascimento"]);
+  });
   test("frase de nascimento não substitui nome já coletado", async () => {
     const t = preparar();
     await t.turno("sim");
@@ -409,10 +740,17 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     const r = await t.turno("sim");
     expect(r?.camposPendentes).toEqual(["data_nascimento"]);
     expect(r?.texto).not.toMatch(/CPF|nome|telefone/);
-    t.estado.flow.stage = derivarEtapa({ estado: t.estado, mensagem: "02/01/1990", primeiraMensagem: false, intencoes: [] });
+    t.estado.flow.stage = derivarEtapa({
+      estado: t.estado,
+      mensagem: "02/01/1990",
+      primeiraMensagem: false,
+      intencoes: [],
+    });
     expect((await t.turno("02/01/1990"))?.restricoes).toContain("aguardar_aceite_do_resumo");
-    expect(t.chamadas.find(c => c.nome === "identificar_paciente")?.args).toEqual({ data_nascimento: "1990-01-02" });
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toEqual({
+      data_nascimento: "1990-01-02",
+    });
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
   test("sem telefone disponível pede esse obrigatório também", async () => {
     const t = preparar(["nome", "data_nascimento", "telefone"]);
@@ -430,7 +768,9 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(r?.chaveTemplate).not.toBe("fluxo.identificacao.instabilidade");
     expect(r?.texto).not.toMatch(/Não consegui/);
     expect(t.encaminhamentos).toHaveLength(1);
-    expect(t.encaminhamentos[0]).toContain("FALHA_OPERACIONAL_AGENDAMENTO: identificar_paciente (INTERNAL_ERROR)");
+    expect(t.encaminhamentos[0]).toContain(
+      "FALHA_OPERACIONAL_AGENDAMENTO: identificar_paciente (INTERNAL_ERROR)",
+    );
     expect(t.estado.flow.stage).toBe("HANDOFF");
     expect(t.estado.patient.pending.nome).toBe("Ana Da Silva");
     expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
@@ -461,38 +801,49 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
     expect(t.estado.flow.stage).toBe("HANDOFF");
     expect(t.chamadas).toHaveLength(0);
   });
-  test.each(["nn", "quero não", "esse não", "não quero não", "não vai rolar", "deixa pra lá"])("recusa informal impede reserva: %s", async frase => {
-    const t = preparar();
-    await t.turno("Ana da Silva, 02/01/1990");
-    t.chamadas.length = 0;
-    expect(await t.turno(frase)).toBeNull();
-    expect(t.estado.appointment.confirmation).toBeNull();
-    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
-    expect(t.estado.flow.stage).toBe("CHOOSING_SLOT");
-    expect(t.chamadas).toHaveLength(0);
-  });
-  test.each(["nn", "quero não", "não vai rolar"])("recusa informal revoga aceite antigo antes da gravação: %s", async frase => {
-    const t = preparar();
-    resumoEntregueFixture(t.estado, "clinica", true);
-    expect(await t.turno(frase)).toBeNull();
-    expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
-    expect(t.estado.flow.stage).toBe("HANDOFF");
-    expect(t.chamadas).toHaveLength(0);
-  });
+  test.each(["nn", "quero não", "esse não", "não quero não", "não vai rolar", "deixa pra lá"])(
+    "recusa informal impede reserva: %s",
+    async (frase) => {
+      const t = preparar();
+      await t.turno("Ana da Silva, 02/01/1990");
+      t.chamadas.length = 0;
+      expect(await t.turno(frase)).toBeNull();
+      expect(t.estado.appointment.confirmation).toBeNull();
+      expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+      expect(t.estado.flow.stage).toBe("CHOOSING_SLOT");
+      expect(t.chamadas).toHaveLength(0);
+    },
+  );
+  test.each(["nn", "quero não", "não vai rolar"])(
+    "recusa informal revoga aceite antigo antes da gravação: %s",
+    async (frase) => {
+      const t = preparar();
+      resumoEntregueFixture(t.estado, "clinica", true);
+      expect(await t.turno(frase)).toBeNull();
+      expect(t.estado.appointment.slot_confirmed_by_patient).toBe(false);
+      expect(t.estado.flow.stage).toBe("HANDOFF");
+      expect(t.chamadas).toHaveLength(0);
+    },
+  );
   test("aceite do fluxo antigo em andamento é preservado durante a coleta", async () => {
     const t = preparar();
     resumoEntregueFixture(t.estado, "clinica", true);
     expect((await t.turno("Ana da Silva, 02/01/1990"))?.acoesConcluidas[0]?.confirmada).toBe(true);
-    expect(t.chamadas.filter(c => c.nome === "agendar")).toHaveLength(1);
+    expect(t.chamadas.filter((c) => c.nome === "agendar")).toHaveLength(1);
   });
   test("cadastro completo após escolha pede confirmação, sem repetir dados", async () => {
     const t = preparar([]);
     Object.assign(t.estado.patient, { id: "paciente", identified: true, validated: true });
     t.ctx.pacienteId = "paciente";
-    const r = await aplicarGateIdentificacao({ mensagem: "o segundo horário", estado: t.estado,
-      ctx: t.ctx, executar: t.executar, aposSelecao: true });
+    const r = await aplicarGateIdentificacao({
+      mensagem: "o segundo horário",
+      estado: t.estado,
+      ctx: t.ctx,
+      executar: t.executar,
+      aposSelecao: true,
+    });
     expect(r?.texto).toBe(t.estado.appointment.confirmation!.resumo);
-    expect(t.chamadas.some(c => c.nome === "agendar")).toBe(false);
+    expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
 });
 
@@ -500,13 +851,22 @@ describe("gate: escolher vaga → coletar dados → confirmar → agendar", () =
 describe("nome dentro de mensagem livre", () => {
   test.each([
     ["A consulta é do meu filho: Simulação Teste Um, nascido em 12/03/2018.", "Simulação Teste Um"],
-    ["É para minha mãe, o nome dela é Joana Pereira Lima, nascida em 03/05/1950", "Joana Pereira Lima"],
+    [
+      "É para minha mãe, o nome dela é Joana Pereira Lima, nascida em 03/05/1950",
+      "Joana Pereira Lima",
+    ],
     ["Meu nome é Simulação Teste Três e nasci em 22/07/1975.", "Simulação Teste Três"],
     ["meu nome completo é Maria de Lourdes Souza", "Maria De Lourdes Souza"],
     ["Ana da Silva, 02/01/1990", "Ana Da Silva"],
-    ["É pro meu filho Pedro Simulação Teste Três, nascido em 12/03/2018.", "Pedro Simulação Teste Três"],
+    [
+      "É pro meu filho Pedro Simulação Teste Três, nascido em 12/03/2018.",
+      "Pedro Simulação Teste Três",
+    ],
   ])("%s", (texto, nome) => expect(extrairDadosIdentificacao(texto).nome).toBe(nome));
 
-  test.each(["sim", "Prefiro o das 12:20. E se eu pagar em dinheiro fica quanto mesmo?", "A consulta é do meu filho"])(
-    "%s não vira nome", (texto) => expect(extrairDadosIdentificacao(texto).nome).toBeNull());
+  test.each([
+    "sim",
+    "Prefiro o das 12:20. E se eu pagar em dinheiro fica quanto mesmo?",
+    "A consulta é do meu filho",
+  ])("%s não vira nome", (texto) => expect(extrairDadosIdentificacao(texto).nome).toBeNull());
 });

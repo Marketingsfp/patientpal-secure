@@ -22,15 +22,24 @@ const anterior: ConhecimentoSessao = {
 };
 
 describe("continuidade da pesquisa de conhecimento", () => {
-  test.each(["consulta", "exame_procedimento"] as const)("preserva a categoria %s na referência da sessão", (tipo_atendimento) => {
-    const memoria = lembrarConsultaComprovada({
-      clinicaId: anterior.clinicaId, sessionId: anterior.sessionId,
-      args: { termo: "cardiologia", tipo_atendimento }, fatos: [],
-      esclarecimento: { tipo: "profissional", pergunta: "Qual profissional?", opcoes: [] },
-    });
-    const normalizada = conhecimentoDaMesmaSessao(memoria, anterior.clinicaId, anterior.sessionId);
-    expect(normalizada?.consulta).toEqual({ termo: "cardiologia", tipo_atendimento });
-  });
+  test.each(["consulta", "exame_procedimento"] as const)(
+    "preserva a categoria %s na referência da sessão",
+    (tipo_atendimento) => {
+      const memoria = lembrarConsultaComprovada({
+        clinicaId: anterior.clinicaId,
+        sessionId: anterior.sessionId,
+        args: { termo: "cardiologia", tipo_atendimento },
+        fatos: [],
+        esclarecimento: { tipo: "profissional", pergunta: "Qual profissional?", opcoes: [] },
+      });
+      const normalizada = conhecimentoDaMesmaSessao(
+        memoria,
+        anterior.clinicaId,
+        anterior.sessionId,
+      );
+      expect(normalizada?.consulta).toEqual({ termo: "cardiologia", tipo_atendimento });
+    },
+  );
   test.each([
     "sim",
     "sim por favor",
@@ -67,20 +76,36 @@ describe("continuidade da pesquisa de conhecimento", () => {
 
 describe("continuidade de esclarecimentos do catálogo", () => {
   const pendente: ConhecimentoSessao = {
-    ...anterior, consulta: { termo: "USG" },
+    ...anterior,
+    consulta: { termo: "USG" },
     referencias: [
-      { registro: "usg-tireoide", versao: null, procedimento: "Ultrassonografia de tireoide", medicoNome: null },
-      { registro: "usg-abdome", versao: null, procedimento: "Ultrassonografia de abdome total", medicoNome: null },
+      {
+        registro: "usg-tireoide",
+        versao: null,
+        procedimento: "Ultrassonografia de tireoide",
+        medicoNome: null,
+      },
+      {
+        registro: "usg-abdome",
+        versao: null,
+        procedimento: "Ultrassonografia de abdome total",
+        medicoNome: null,
+      },
     ],
-    esclarecimento: { tipo: "procedimento", pergunta: "Qual exame?", opcoes: [
-      { id: "usg-tireoide", nome: "Ultrassonografia de tireoide" },
-      { id: "usg-abdome", nome: "Ultrassonografia de abdome total" },
-    ] },
+    esclarecimento: {
+      tipo: "procedimento",
+      pergunta: "Qual exame?",
+      opcoes: [
+        { id: "usg-tireoide", nome: "Ultrassonografia de tireoide" },
+        { id: "usg-abdome", nome: "Ultrassonografia de abdome total" },
+      ],
+    },
   };
   test("resposta curta conserva a família do exame e reconsulta a opção completa", () => {
     const memoria = conhecimentoDaMesmaSessao(pendente, anterior.clinicaId, anterior.sessionId);
     expect(consultaDoNovoTurno({ mensagem: "o de tireoide", anterior: memoria })).toEqual({
-      args: { termo: "Ultrassonografia de tireoide" }, continuidade: true,
+      args: { termo: "Ultrassonografia de tireoide" },
+      continuidade: true,
     });
   });
   test("sim não escolhe arbitrariamente entre duas opções", () => {
@@ -91,36 +116,56 @@ describe("continuidade de esclarecimentos do catálogo", () => {
       expect(consultaDoNovoTurno({ mensagem, anterior: pendente })?.continuidade).toBe(false);
   });
   test("homônimos esclarecidos pela unidade usam ID distinto, não só o nome", () => {
-    const memoria: ConhecimentoSessao = { ...pendente, esclarecimento: {
-      tipo: "profissional", pergunta: "Qual profissional?", opcoes: [
-        { id: "medico-1", nome: "João Silva", especialidade: "Cardiologia", unidade: "Centro" },
-        { id: "medico-2", nome: "João Silva", especialidade: "Cardiologia", unidade: "Norte" },
-      ],
-    } };
+    const memoria: ConhecimentoSessao = {
+      ...pendente,
+      esclarecimento: {
+        tipo: "profissional",
+        pergunta: "Qual profissional?",
+        opcoes: [
+          { id: "medico-1", nome: "João Silva", especialidade: "Cardiologia", unidade: "Centro" },
+          { id: "medico-2", nome: "João Silva", especialidade: "Cardiologia", unidade: "Norte" },
+        ],
+      },
+    };
     expect(consultaDoNovoTurno({ mensagem: "da unidade Norte", anterior: memoria })).toEqual({
-      args: { termo: "Cardiologia", medico: "medico-2" }, continuidade: true,
+      args: { termo: "Cardiologia", medico: "medico-2" },
+      continuidade: true,
     });
   });
 });
 
 test("ordinal responde à lista de procedimentos, sem virar escolha de horário", () => {
-  const memoria: ConhecimentoSessao = { ...anterior, esclarecimento: {
-    tipo: "procedimento", pergunta: "Qual exame?", opcoes: [
-      { id: "a", nome: "Ultrassonografia de abdome total" }, { id: "b", nome: "Ultrassonografia de tireoide" },
-    ],
-  } };
+  const memoria: ConhecimentoSessao = {
+    ...anterior,
+    esclarecimento: {
+      tipo: "procedimento",
+      pergunta: "Qual exame?",
+      opcoes: [
+        { id: "a", nome: "Ultrassonografia de abdome total" },
+        { id: "b", nome: "Ultrassonografia de tireoide" },
+      ],
+    },
+  };
   expect(consultaDoNovoTurno({ mensagem: "o segundo", anterior: memoria })).toEqual({
-    args: { termo: "Ultrassonografia de tireoide" }, continuidade: true,
+    args: { termo: "Ultrassonografia de tireoide" },
+    continuidade: true,
   });
 });
 
-test.each(["sim", "isso mesmo", "sim esse mesmo", "é esse", "pode ser", "s"])("confirmação contextual de uma única sugestão: %s", (mensagem) => {
-  const memoria: ConhecimentoSessao = { ...anterior, esclarecimento: {
-    tipo: "profissional", pergunta: "Você se refere ao Dr. Jorge Ribeiro?", opcoes: [
-      { id: "medico-jorge", nome: "Jorge Ribeiro", especialidade: "Ortopedia" },
-    ],
-  } };
-  expect(consultaDoNovoTurno({ mensagem, anterior: memoria })?.args).toEqual({
-    termo: "Ortopedia", medico: "medico-jorge",
-  });
-});
+test.each(["sim", "isso mesmo", "sim esse mesmo", "é esse", "pode ser", "s"])(
+  "confirmação contextual de uma única sugestão: %s",
+  (mensagem) => {
+    const memoria: ConhecimentoSessao = {
+      ...anterior,
+      esclarecimento: {
+        tipo: "profissional",
+        pergunta: "Você se refere ao Dr. Jorge Ribeiro?",
+        opcoes: [{ id: "medico-jorge", nome: "Jorge Ribeiro", especialidade: "Ortopedia" }],
+      },
+    };
+    expect(consultaDoNovoTurno({ mensagem, anterior: memoria })?.args).toEqual({
+      termo: "Ortopedia",
+      medico: "medico-jorge",
+    });
+  },
+);

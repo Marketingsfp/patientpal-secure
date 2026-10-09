@@ -13,7 +13,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ninaResponde } from "./ciclo-responsabilidade";
 import type { ResultadoAvisoEncaminhamento } from "./aviso-encaminhamento";
 import { filtrosVersaoFluxo } from "@/lib/nina/fluxo-estado-versao";
-import { motivoProfissionalSfp } from "@/lib/nina/regras-catalogo";
 
 export type OwnerType = "AI" | "HUMAN" | "NONE";
 
@@ -167,7 +166,11 @@ export async function registrarMarcadorSistema(args: {
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId)
     .maybeSingle();
-  const conv = data as { contato_telefone?: string | null; canal?: string | null; is_teste?: boolean | null } | null;
+  const conv = data as {
+    contato_telefone?: string | null;
+    canal?: string | null;
+    is_teste?: boolean | null;
+  } | null;
   // O trigger `atend_ensure_conversa` escolhe a conversa pelo telefone e pelo
   // canal da mensagem (sem canal, "whatsapp"). Sem copiar canal e marca de
   // teste, o aviso de uma conversa da homologação criava uma conversa "real"
@@ -217,6 +220,8 @@ export async function encaminharParaHumano(args: {
   departamentoNome?: string | null;
   dadosColetados?: Record<string, unknown> | null;
   solicitadoPor?: "IA" | "PACIENTE" | "SISTEMA";
+  /** Opção explícita do solicitante; nenhum nome de profissional muda a decisão. */
+  avisarPaciente?: boolean;
   /** Recuperação ou espera vencida: só transfere a versão ainda conduzida pela Nina. */
   somenteSeNina?: {
     ultimaMsgEm: string;
@@ -254,6 +259,7 @@ export async function encaminharParaHumano(args: {
       aguardando_desde: agora,
       handoff_motivo: args.motivo.slice(0, 500),
       handoff_resumo: {
+        avisar_paciente: args.avisarPaciente !== false,
         resumo: (args.resumo ?? "").slice(0, 2000),
         urgencia: args.urgencia ?? "normal",
         dados: args.dadosColetados ?? null,
@@ -331,6 +337,7 @@ export async function encaminharParaHumano(args: {
       resumo: args.resumo ?? null,
       // Métricas: distingue transferência pedida pela Nina de tomada manual.
       solicitado_por: args.solicitadoPor ?? "IA",
+      avisar_paciente: args.avisarPaciente !== false,
     },
   });
   await registrarEvento({
@@ -364,8 +371,8 @@ export async function encaminharParaHumano(args: {
       clinicaId: args.clinicaId,
       conversaId: args.conversaId,
       handoffEventoId,
-      // SFP: protocolo e motivo ficam internos; nenhuma mensagem ao paciente.
-      anunciar: !motivoProfissionalSfp(args.motivo),
+      // O protocolo continua interno quando o solicitante pediu silêncio.
+      anunciar: args.avisarPaciente !== false,
     });
     protocoloHandoff = p?.protocolo ?? null;
     avisoEncaminhamento = p?.anuncio?.aviso ?? null;
@@ -385,7 +392,8 @@ export async function encaminharParaHumano(args: {
         conversaId: args.conversaId,
         texto:
           `🧾 Handoff realizado pela Nina · Protocolo: ${p.protocolo}` +
-          ` · Destino: ${depto?.nome ?? "Não atribuídas"}`,
+          ` · Destino: ${depto?.nome ?? "Não atribuídas"}` +
+          ` · Motivo: ${args.motivo}`,
       });
   } catch (e) {
     console.error("[handoff] falha ao gerar protocolo do handoff", e);

@@ -74,7 +74,15 @@ export const FERRAMENTAS_ANALISTA = [
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["de", "ate", "dia_inteiro", "hora_inicio", "hora_fim", "dias_semana", "rotulo"],
+            required: [
+              "de",
+              "ate",
+              "dia_inteiro",
+              "hora_inicio",
+              "hora_fim",
+              "dias_semana",
+              "rotulo",
+            ],
             properties: {
               de: { type: "string", description: "AAAA-MM-DD" },
               ate: { type: "string", description: "AAAA-MM-DD" },
@@ -351,7 +359,9 @@ function proximo(valor: number, aceitos: number[]): boolean {
  * Extrai do resultado das consultas todos os valores que o modelo tem direito
  * de citar. Nada fora disso pode aparecer como número na resposta.
  */
-export function valoresPermitidos(resultados: { id: string; dados: any }[]): Map<string, ValoresConsulta> {
+export function valoresPermitidos(
+  resultados: { id: string; dados: any }[],
+): Map<string, ValoresConsulta> {
   const mapa = new Map<string, ValoresConsulta>();
   for (const { id, dados } of resultados) {
     const indicadores = new Map<string, number[]>();
@@ -402,7 +412,10 @@ export function valoresPermitidos(resultados: { id: string; dados: any }[]): Map
           comparacoes.push(item.variacaoPercentual);
         }
       }
-      if (c.taxaErro?.diferencaPontosPercentuais !== null && c.taxaErro?.diferencaPontosPercentuais !== undefined) {
+      if (
+        c.taxaErro?.diferencaPontosPercentuais !== null &&
+        c.taxaErro?.diferencaPontosPercentuais !== undefined
+      ) {
         comparacoes.push(c.taxaErro.diferencaPontosPercentuais);
       }
       if (c.taxaErro?.variacaoPercentual !== null && c.taxaErro?.variacaoPercentual !== undefined) {

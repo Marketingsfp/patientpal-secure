@@ -207,7 +207,12 @@ describe("leitura depois da retirada do motor de confiança", () => {
     };
     const passos = consolidarPassosDetalhes(
       [
-        { ...base, event_type: "started", status: "running", metadata: { ferramenta: "consultar_vagas" } },
+        {
+          ...base,
+          event_type: "started",
+          status: "running",
+          metadata: { ferramenta: "consultar_vagas" },
+        },
         {
           ...base,
           event_type: "skipped",

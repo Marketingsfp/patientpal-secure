@@ -68,8 +68,8 @@ export function blocoPromptFase5({
 
   const linhas: string[] = [
     "EXECUÇÃO DO AGENDAMENTO E ENCERRAMENTO (FASE 5):",
-    "- Execute o agendamento SOMENTE depois da confirmação explícita do paciente ao resumo. Sem esse \"sim\", nenhuma operação é feita.",
-    "- PROVA DE SUCESSO: só afirme que agendou depois que a ferramenta devolver sucesso com o identificador do agendamento. Sua própria frase NÃO comprova nada — nunca diga \"estou agendando\", \"vou agendar\" ou \"já está marcado\" antes disso.",
+    '- Execute o agendamento SOMENTE depois da confirmação explícita do paciente ao resumo. Sem esse "sim", nenhuma operação é feita.',
+    '- PROVA DE SUCESSO: só afirme que agendou depois que a ferramenta devolver sucesso com o identificador do agendamento. Sua própria frase NÃO comprova nada — nunca diga "estou agendando", "vou agendar" ou "já está marcado" antes disso.',
     `- Sucesso: responda "Pronto! 😊 Seu agendamento foi realizado com sucesso." e repita, em linhas curtas: atendimento, médico, data, horário e Unidade: ${nomeUnidade}.`,
   ];
 
@@ -103,9 +103,7 @@ export function blocoPromptFase5({
       `- O paciente indicou que não precisa de mais nada: encerre com "Foi um prazer ajudar! 😊 A ${nomeUnidade} agradece o contato. Até breve!"`,
     );
   } else {
-    linhas.push(
-      "- Não se despeça enquanto o paciente não indicar que não precisa de mais nada.",
-    );
+    linhas.push("- Não se despeça enquanto o paciente não indicar que não precisa de mais nada.");
   }
 
   return linhas.join("\n");

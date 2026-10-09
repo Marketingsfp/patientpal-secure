@@ -170,10 +170,12 @@ describe("fonte operacional — médicos e consultas", () => {
 
   test("o texto por consulta é lido pelo interpretador que a Nina já usa", () => {
     const blocos = separarAtendimentos(alex.observacao_publica, alex.nome);
-    expect(blocos.map((b) => [b.atendimento, b.especialidade, b.dinheiro, b.pix_cartao])).toEqual([
+    // A origem rotula Cartão; o parser mantém esse campo separado de Pix/cartão.
+    expect(blocos.map((b) => [b.atendimento, b.especialidade, b.dinheiro, b.cartao])).toEqual([
       ["CONSULTA", "CARDIOLOGIA", "R$ 120,00", "R$ 145,00"],
       ["CONSULTA CARDIOLOGIA INFANTIL", "CARDIOLOGIA INFANTIL", "R$ 160,00", "R$ 190,00"],
     ]);
+    expect(blocos.every((b) => b.pix_cartao === null)).toBe(true);
   });
 
   test("vira registro de conhecimento da Nina com preço da consulta certa e Pix/cartão", () => {
@@ -193,7 +195,7 @@ describe("paridade com os cadastros usados pela recepção", () => {
       disponibilidades: [
         {
           medico_id: "m-alex",
-          agenda_id: "ag1",
+          agenda_id: null, // sem agenda: vale para consulta e exame (as escalas por tipo são filtradas pela agenda)
           dia_semana: 6,
           hora_inicio: "08:00",
           hora_fim: "18:00",
@@ -257,7 +259,7 @@ describe("paridade com os cadastros usados pela recepção", () => {
   test("preço manual de convênio mantém condição sem prometer elegibilidade ou alterar particular", () => {
     const entrada = {
       ...base,
-      convenios: [{ id: "c1", nome: "CARTÃO CONSULTA" }],
+      convenios: [{ id: "c1", nome: "CARTÃO CONSULTA", ativo: true }],
       valoresManuais: [
         {
           procedimento_id: "p-cons",
@@ -278,7 +280,7 @@ describe("paridade com os cadastros usados pela recepção", () => {
   test("regra ativa prevalece sobre preço manual; gratuidade condicionada não torna particular grátis", () => {
     const entrada = {
       ...base,
-      convenios: [{ id: "c1", nome: "BENEFÍCIO" }],
+      convenios: [{ id: "c1", nome: "BENEFÍCIO", ativo: true }],
       valoresManuais: [
         { procedimento_id: "p-cons", convenio_id: "c1", valor_dinheiro: 80, valor_outros: 90 },
       ],
@@ -320,10 +322,10 @@ describe("fonte operacional — exames e procedimentos", () => {
     expect(ecg.preparo).toBeNull();
   });
 
-  test("executante oculto não aparece; o visível sai com horários do cadastro", () => {
+  test("executante oculto não aparece; horário exclusivo de CONSULTAS não vira horário de exame", () => {
     const ecg = servicos[0]!;
     expect((ecg.executantes as any[]).map((e) => e.nome)).toEqual(["ALEX LOUZA MACEDO"]);
-    expect((ecg.executantes as any[])[0].horarios).toContain("Quarta-feira 13:00–18:00");
+    expect((ecg.executantes as any[])[0].horarios).toBe("não informado no cadastro");
   });
 
   test("preço sem forma de pagamento definida fica como valor de referência, com o preparo cadastrado", () => {

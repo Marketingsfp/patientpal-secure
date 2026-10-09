@@ -1,31 +1,76 @@
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import { conhecimentoDaMesmaSessao } from "./confidence/conhecimento-sessao";
-import { limparEscolhaAgendamento } from "./agendamento-escolha";
+import {
+  limparEscolhaAgendamento,
+  confirmacaoDaEscolha,
+  vagasDaSessao,
+} from "./agendamento-escolha";
+
+export const REGRA_PRESERVAR_RESERVA =
+  "PEDIDOS PARALELOS — Preserve atendimento, profissional e vaga escolhidos ao pesquisar outro exame. Um aceite explícito do resumo entregue pode vir junto de uma pergunta independente: conclua a reserva autorizada e responda à pergunta, sem pedir o mesmo aceite novamente. Condição, recusa ou mudança da reserva exige esclarecimento. Uma dúvida sobre outro item não impede a operação que o sistema vinculou à escolha identificada; siga as validações das ferramentas. Não associe o médico de um exame aos demais. Bloqueio de identificação não significa instabilidade técnica. Só confirme reserva ou encaminhamento após retorno de execução bem-sucedida.";
 
 /** Identidade do pedido, independente da última busca auxiliar e da especialidade. */
 export type ProcedimentoSolicitado = {
-  clinica_id: string; session_id: string; catalogo_id: string; nome: string;
+  clinica_id: string;
+  session_id: string;
+  catalogo_id: string;
+  nome: string;
   procedimento_id?: string | null;
   tipo_atendimento: "exame_procedimento";
 };
 
-export function procedimentoDaSessao(estado: EstadoFluxoNina | undefined, clinicaId: string): ProcedimentoSolicitado | null {
+export function procedimentoDaSessao(
+  estado: EstadoFluxoNina | undefined,
+  clinicaId: string,
+): ProcedimentoSolicitado | null {
   if (!estado?.session_id) return null;
   const salvo = estado.appointment.procedimento_solicitado;
-  if (salvo?.clinica_id === clinicaId && salvo.session_id === estado.session_id &&
-    salvo.tipo_atendimento === "exame_procedimento" && salvo.catalogo_id && salvo.nome) return salvo;
-  const contexto = conhecimentoDaMesmaSessao(estado.knowledge_context, clinicaId, estado.session_id);
-  if (contexto?.consulta.tipo_atendimento !== "exame_procedimento" || contexto.esclarecimento?.tipo === "procedimento") return null;
-  const refs = contexto.referencias.filter(r => r.registro && r.procedimento);
-  if (!refs.length || refs.some(r => r.registro !== refs[0]!.registro || r.procedimento !== refs[0]!.procedimento)) return null;
-  return { clinica_id: clinicaId, session_id: estado.session_id, catalogo_id: refs[0]!.registro,
-    nome: refs[0]!.procedimento!, tipo_atendimento: "exame_procedimento" };
+  if (
+    salvo?.clinica_id === clinicaId &&
+    salvo.session_id === estado.session_id &&
+    salvo.tipo_atendimento === "exame_procedimento" &&
+    salvo.catalogo_id &&
+    salvo.nome
+  )
+    return salvo;
+  // Uma pesquisa auxiliar de exame não muda a modalidade da consulta escolhida.
+  if (confirmacaoDaEscolha(estado, clinicaId)?.vaga.tipo_atendimento === "consulta") return null;
+  const contexto = conhecimentoDaMesmaSessao(
+    estado.knowledge_context,
+    clinicaId,
+    estado.session_id,
+  );
+  if (
+    contexto?.consulta.tipo_atendimento !== "exame_procedimento" ||
+    contexto.esclarecimento?.tipo === "procedimento"
+  )
+    return null;
+  const refs = contexto.referencias.filter((r) => r.registro && r.procedimento);
+  if (
+    !refs.length ||
+    refs.some((r) => r.registro !== refs[0]!.registro || r.procedimento !== refs[0]!.procedimento)
+  )
+    return null;
+  return {
+    clinica_id: clinicaId,
+    session_id: estado.session_id,
+    catalogo_id: refs[0]!.registro,
+    nome: refs[0]!.procedimento!,
+    tipo_atendimento: "exame_procedimento",
+  };
 }
 
-export function lembrarProcedimentoSolicitado(estado: EstadoFluxoNina | undefined, clinicaId: string,
-  resultado: ResultadoConhecimento, novaSolicitacao = false) {
+export function lembrarProcedimentoSolicitado(
+  estado: EstadoFluxoNina | undefined,
+  clinicaId: string,
+  resultado: ResultadoConhecimento,
+  novaSolicitacao = false,
+) {
   if (!estado?.session_id || estado.appointment.appointment_id) return;
+  // Consultar outro exame não cancela uma vaga oferecida/escolhida. A troca de
+  // escolha passa por selecionar_horario; nova_solicitacao organiza só a busca.
+  if (confirmacaoDaEscolha(estado, clinicaId) || vagasDaSessao(estado, clinicaId).length) return;
   if (novaSolicitacao) {
     estado.knowledge_context = null;
     estado.appointment.procedimento_solicitado = null;
@@ -41,16 +86,44 @@ export function lembrarProcedimentoSolicitado(estado: EstadoFluxoNina | undefine
   if (!resultado.found || resultado.esclarecimento?.tipo === "procedimento") return;
   const registros = resultado.records;
   const r = registros[0];
-  if (!r?.id || !r.procedimento || registros.some(item => item.tipo !== "servico" || item.id !== r.id || item.procedimento !== r.procedimento)) return;
-  estado.appointment.procedimento_solicitado = { clinica_id: clinicaId, session_id: estado.session_id,
-    catalogo_id: r.id, nome: r.procedimento, tipo_atendimento: "exame_procedimento",
-    procedimento_id: typeof r.extras?.procedimento_id === "string" ? r.extras.procedimento_id : null };
+  if (
+    !r?.id ||
+    !r.procedimento ||
+    registros.some(
+      (item) => item.tipo !== "servico" || item.id !== r.id || item.procedimento !== r.procedimento,
+    )
+  )
+    return;
+  estado.appointment.procedimento_solicitado = {
+    clinica_id: clinicaId,
+    session_id: estado.session_id,
+    catalogo_id: r.id,
+    nome: r.procedimento,
+    tipo_atendimento: "exame_procedimento",
+    procedimento_id:
+      typeof r.extras?.procedimento_id === "string" ? r.extras.procedimento_id : null,
+  };
 }
 
-export function vagaPreservaProcedimento(estado: EstadoFluxoNina | undefined, clinicaId: string,
-  vaga: { procedimento: string | null; catalogo_id?: string | null; procedimento_id?: string | null; tipo_atendimento?: string } | undefined) {
+export function vagaPreservaProcedimento(
+  estado: EstadoFluxoNina | undefined,
+  clinicaId: string,
+  vaga:
+    | {
+        procedimento: string | null;
+        catalogo_id?: string | null;
+        procedimento_id?: string | null;
+        tipo_atendimento?: string;
+      }
+    | undefined,
+) {
   const pedido = procedimentoDaSessao(estado, clinicaId);
-  return !pedido || !!vaga && vaga.catalogo_id === pedido.catalogo_id &&
-    vaga.tipo_atendimento === pedido.tipo_atendimento && vaga.procedimento === pedido.nome &&
-    (!pedido.procedimento_id || vaga.procedimento_id === pedido.procedimento_id);
+  return (
+    !pedido ||
+    (!!vaga &&
+      vaga.catalogo_id === pedido.catalogo_id &&
+      vaga.tipo_atendimento === pedido.tipo_atendimento &&
+      vaga.procedimento === pedido.nome &&
+      (!pedido.procedimento_id || vaga.procedimento_id === pedido.procedimento_id))
+  );
 }

@@ -23,7 +23,8 @@ export type CamposAutorizados = {
   rps_numero: number | null;
   rps_serie: string | null;
   aliquota_iss: number | null; // fração: 0.03 = 3%
-  valor_iss: number | null;
+  /** Ausente quando o XML não foi lido: não sobrescreve o que já está gravado. */
+  valor_iss?: number;
   chave_acesso: string | null;
 };
 
@@ -31,6 +32,8 @@ export type Conferencia = {
   conferido_em: string;
   xml_lido: boolean;
   faltando: (keyof CamposAutorizados)[];
+  /** XML autorizado lido e sem vISSQN: a nota não destaca ISS (valor_iss gravado = 0). */
+  sem_iss_destacado?: boolean;
   divergencia_aliquota: null | {
     cadastro_emitente: number;
     autorizada: number;
@@ -92,12 +95,19 @@ export function montarCamposAutorizados(
     rps_numero: num(body.numero_rps) ?? x?.rps_numero ?? null,
     rps_serie: vazio(body.serie_rps) ?? x?.rps_serie ?? null,
     aliquota_iss: x?.aliquota_iss ?? null,
-    valor_iss: x?.valor_iss ?? null,
+    // XML autorizado lido sem vISSQN: a nota autorizada não destaca ISS, então
+    // o ISS dela é zero — zero é o fato, não um palpite. Continua proibido usar
+    // o valor calculado por nós. Sem XML lido não há fato: a chave é omitida
+    // (ver abaixo), para não sobrescrever o gravado nem derrubar a linha (NOT NULL).
     chave_acesso: chaveDoJson(body) ?? x?.chave_acesso ?? null,
   };
+  if (x) campos.valor_iss = x.valor_iss ?? 0;
+  const semIss = !!x && x.valor_iss === null;
   const faltando = (Object.keys(campos) as (keyof CamposAutorizados)[]).filter(
-    (k) => campos[k] === null,
+    (k) => campos[k] === null || (k === "valor_iss" && semIss),
   );
+  // Sem XML lido o ISS não foi conferido (marca: xml_lido=false).
+  if (!x) faltando.push("valor_iss");
   const divergente =
     campos.aliquota_iss !== null &&
     aliquotaCadastro !== null &&
@@ -108,6 +118,7 @@ export function montarCamposAutorizados(
       conferido_em: agora.toISOString(),
       xml_lido: !!x,
       faltando,
+      ...(semIss ? { sem_iss_destacado: true } : {}),
       divergencia_aliquota: divergente
         ? { cadastro_emitente: Number(aliquotaCadastro), autorizada: campos.aliquota_iss! }
         : null,

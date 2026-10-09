@@ -50,7 +50,9 @@ function simularWebhookAtual(opcoes: {
       .filter((m) => m.direcao === "out" && m.em <= inicio)
       .reduce<number | null>((acc, m) => (acc === null || m.em > acc ? m.em : acc), null);
     const entradas = armazem
-      .filter((m) => m.direcao === "in" && m.em <= inicio && (ultimaSaida === null || m.em > ultimaSaida))
+      .filter(
+        (m) => m.direcao === "in" && m.em <= inicio && (ultimaSaida === null || m.em > ultimaSaida),
+      )
       .map((m) => m.id);
 
     const fim = inicio + opcoes.duracaoExecucaoMs;
@@ -77,7 +79,10 @@ function paresSimultaneos(execs: Execucao[]): Array<[string, string]> {
     for (let j = i + 1; j < execs.length; j += 1) {
       const a = execs[i]!;
       const b = execs[j]!;
-      if (a.processingStartedAt < b.processingFinishedAt && b.processingStartedAt < a.processingFinishedAt) {
+      if (
+        a.processingStartedAt < b.processingFinishedAt &&
+        b.processingStartedAt < a.processingFinishedAt
+      ) {
         pares.push([a.executionId, b.executionId]);
       }
     }

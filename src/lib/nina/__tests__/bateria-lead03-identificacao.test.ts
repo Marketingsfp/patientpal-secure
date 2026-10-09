@@ -5,7 +5,11 @@ import { estadoVazio } from "../fluxo-estado-normalizar";
 import { inicioSessaoComEntradas } from "../sessao";
 import type { CtxNinaPaciente, ResultadoFerramenta } from "../paciente-tools.server";
 import { resumoEntregueFixture } from "./agendamento-fixture";
-import { confirmacaoDaEscolha, registrarOpcoesAgendamento, selecionarVagaValidada } from "../agendamento-escolha";
+import {
+  confirmacaoDaEscolha,
+  registrarOpcoesAgendamento,
+  selecionarVagaValidada,
+} from "../agendamento-escolha";
 
 // Falhas da bateria de 50 consultas do Lead 03 (homologação, 28/09/2026).
 
@@ -84,13 +88,18 @@ function preparar() {
     consultaAgenda: { mensagemAtual: "", historico: [{ role: "assistant", content: resumo }] },
   };
   const chamadas: Array<{ nome: string; args: unknown }> = [];
-  const executar = async (_ctx: CtxNinaPaciente, nome: string, args: unknown): Promise<ResultadoFerramenta> => {
+  const executar = async (
+    _ctx: CtxNinaPaciente,
+    nome: string,
+    args: unknown,
+  ): Promise<ResultadoFerramenta> => {
     chamadas.push({ nome, args });
     if (nome === "selecionar_horario") {
       selecionarVagaValidada(estado, "clinica", estado.appointment.slot_options!.vagas[0]!, resumo);
       return { ok: true, resumo_confirmacao: resumo };
     }
-    if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: ["nome", "data_nascimento"] };
+    if (nome === "consultar_cadastro_paciente")
+      return { ok: true, campos_faltantes: ["nome", "data_nascimento"] };
     if (nome === "identificar_paciente") {
       ctx.pacienteId = "paciente";
       estado.patient.id = "paciente";
@@ -100,8 +109,13 @@ function preparar() {
   };
   const turno = async (mensagem: string) => {
     ctx.consultaAgenda!.mensagemAtual = mensagem;
-    return aplicarGateIdentificacao({ mensagem, estado, ctx, executar,
-      encaminharVagaIndisponivel: async () => true });
+    return aplicarGateIdentificacao({
+      mensagem,
+      estado,
+      ctx,
+      executar,
+      encaminharVagaIndisponivel: async () => true,
+    });
   };
   return { estado, chamadas, turno };
 }
@@ -116,33 +130,46 @@ describe("dados junto da escolha do horário, sem 'meu nome é'", () => {
     const r = await t.turno(frase);
     expect(r?.texto).toBe(confirmacaoDaEscolha(t.estado)?.resumo);
     expect(t.chamadas.find((c) => c.nome === "identificar_paciente")?.args).toMatchObject({
-      nome, data_nascimento: nascimento,
+      nome,
+      data_nascimento: nascimento,
     });
     expect(t.chamadas.some((c) => c.nome === "agendar")).toBe(false);
   });
 
   test.each(["14:00 com o Jorge Ribeiro", "14:00 do dia 21/01/2030 com Jorge Ribeiro"])(
-    "horário com médico ou data da consulta não vira cadastro: %s", async (frase) => {
+    "horário com médico ou data da consulta não vira cadastro: %s",
+    async (frase) => {
       const t = preparar();
       const r = await t.turno(frase);
       expect(r?.camposPendentes).toEqual(["nome", "data_nascimento"]);
       expect(t.estado.patient.pending.nome).toBeNull();
       expect(t.chamadas.some((c) => c.nome === "identificar_paciente")).toBe(false);
-    });
+    },
+  );
 });
 
 describe("início da sessão aberta no turno", () => {
-  const base = { ...estadoVazio(), session_id: "s", session_started_at: "2026-09-28T21:46:40.000Z" };
+  const base = {
+    ...estadoVazio(),
+    session_id: "s",
+    session_started_at: "2026-09-28T21:46:40.000Z",
+  };
   const mensagens = [
     { id: "antiga", created_at: "2026-09-28T20:00:00.000Z" },
     { id: "m1", created_at: "2026-09-28T21:46:18.068Z" },
     { id: "m2", created_at: "2026-09-28T21:46:20.000Z" },
   ];
   test("recua até a 1ª mensagem do próprio turno", () => {
-    expect(inicioSessaoComEntradas(base, mensagens, ["m1", "m2"]).session_started_at).toBe("2026-09-28T21:46:18.068Z");
+    expect(inicioSessaoComEntradas(base, mensagens, ["m1", "m2"]).session_started_at).toBe(
+      "2026-09-28T21:46:18.068Z",
+    );
   });
   test("não inclui mensagens de fora do turno", () => {
-    expect(inicioSessaoComEntradas(base, mensagens, ["m2"]).session_started_at).toBe("2026-09-28T21:46:20.000Z");
-    expect(inicioSessaoComEntradas(base, mensagens, []).session_started_at).toBe(base.session_started_at);
+    expect(inicioSessaoComEntradas(base, mensagens, ["m2"]).session_started_at).toBe(
+      "2026-09-28T21:46:20.000Z",
+    );
+    expect(inicioSessaoComEntradas(base, mensagens, []).session_started_at).toBe(
+      base.session_started_at,
+    );
   });
 });

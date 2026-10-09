@@ -78,6 +78,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // que é como ela sempre funcionou, e só se separa quando alguém mexer.
   "/app/tabela-valores": "consulta-rapida-valores",
   "/app/nina": "nina",
+  "/app/francisco": "francisco",
   // Telas de aprendizado/métricas da Nina. Sem estas entradas exatas o mapa
   // devolvia `undefined` (a rota "/app/nina" não casa por prefixo com
   // "/app/nina-..."), escondendo o menu e mostrando "Acesso negado" para

@@ -16,12 +16,7 @@
  */
 import { hashDoTexto } from "./hash";
 import { mesclarPolitica, type AjustePolitica } from "./calibracao";
-import {
-  POLITICA_PADRAO,
-  VERSAO_MOTOR,
-  VERSAO_POLITICA,
-  type PoliticaConfianca,
-} from "./policy";
+import { POLITICA_PADRAO, VERSAO_MOTOR, VERSAO_POLITICA, type PoliticaConfianca } from "./policy";
 
 /** Tipos de proposta que esta via consegue colocar em vigor de verdade. */
 export const TIPOS_APLICAVEIS_EM_RUNTIME = ["AJUSTAR_PESO", "AJUSTAR_LIMITE"] as const;
@@ -139,7 +134,8 @@ export function montarConfiguracao(
     try {
       atual = mesclarPolitica(atual, [ajuste]);
       aplicadas.push({ id: p.id, tipo: p.tipo, alvo: p.alvo, valor, aplicadoEm: p.aplicadoEm });
-      if (p.aplicadoEm && (!vigenteDesde || p.aplicadoEm > vigenteDesde)) vigenteDesde = p.aplicadoEm;
+      if (p.aplicadoEm && (!vigenteDesde || p.aplicadoEm > vigenteDesde))
+        vigenteDesde = p.aplicadoEm;
     } catch (e) {
       descartadas.push({
         id: p.id,

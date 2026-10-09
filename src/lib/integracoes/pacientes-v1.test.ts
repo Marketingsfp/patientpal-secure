@@ -37,7 +37,8 @@ function fakeDb(opts: {
 }) {
   return {
     rpc: async (nome: string, args: Record<string, unknown>) => {
-      if (nome === "integracao_rate_limit_consumir") return { data: { permitido: true }, error: null };
+      if (nome === "integracao_rate_limit_consumir")
+        return { data: { permitido: true }, error: null };
       opts.onRpc?.(args);
       return { data: opts.rpc, error: null };
     },
@@ -46,7 +47,10 @@ function fakeDb(opts: {
         eq: () => ({
           eq: () => ({
             maybeSingle: async () => ({
-              data: opts.paciente === undefined ? { id: PAC, nome: entrada.nome, telefone: entrada.telefone, clinica_id: CLINICA } : opts.paciente,
+              data:
+                opts.paciente === undefined
+                  ? { id: PAC, nome: entrada.nome, telefone: entrada.telefone, clinica_id: CLINICA }
+                  : opts.paciente,
               error: null,
             }),
           }),
@@ -60,16 +64,16 @@ function fakeDb(opts: {
 describe("resolverPaciente — validação de CPF", () => {
   it("rejeita CPF com dígito verificador errado", async () => {
     const db = fakeDb({ rpc: { paciente_id: PAC, criado: true } });
-    await expect(resolverPaciente(db, ctx, { ...entrada, cpf: "12345678901" })).rejects.toMatchObject(
-      { code: "invalid_cpf", status: 422 },
-    );
+    await expect(
+      resolverPaciente(db, ctx, { ...entrada, cpf: "12345678901" }),
+    ).rejects.toMatchObject({ code: "invalid_cpf", status: 422 });
   });
 
   it("rejeita CPF com todos os dígitos iguais", async () => {
     const db = fakeDb({ rpc: { paciente_id: PAC, criado: true } });
-    await expect(resolverPaciente(db, ctx, { ...entrada, cpf: "111.111.111-11" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
+    await expect(
+      resolverPaciente(db, ctx, { ...entrada, cpf: "111.111.111-11" }),
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });
 
@@ -108,8 +112,8 @@ describe("resolverPaciente — resolução", () => {
       onRpc: (a) => (visto = a),
     });
     await resolverPaciente(db, ctx, entrada);
-    expect(visto['_cpf_digits']).toBe("52998224725");
-    expect(visto['_clinica_id']).toBe(CLINICA);
+    expect(visto["_cpf_digits"]).toBe("52998224725");
+    expect(visto["_clinica_id"]).toBe(CLINICA);
   });
 
   it("não sobrescreve o cadastro: telefone diferente vira observação", async () => {
@@ -123,7 +127,10 @@ describe("resolverPaciente — resolução", () => {
 
   it("trata paciente fora da clínica da chave como divergência (nunca vaza)", async () => {
     // O SELECT de conferência filtra por clinica_id; sem linha, não passa.
-    const db = fakeDb({ rpc: { paciente_id: PAC, criado: false, mismatch: false }, paciente: null });
+    const db = fakeDb({
+      rpc: { paciente_id: PAC, criado: false, mismatch: false },
+      paciente: null,
+    });
     await expect(resolverPaciente(db, ctx, entrada)).rejects.toMatchObject({
       code: "patient_data_mismatch",
     });
@@ -155,8 +162,14 @@ describe("pacienteSchema", () => {
 describe("resolverPaciente — v1.4 sem nome/telefone", () => {
   it("pede só cadastro existente quando falta nome ou telefone", async () => {
     let visto: Record<string, unknown> = {};
-    const db = fakeDb({ rpc: { paciente_id: PAC, criado: false, mismatch: false }, onRpc: (a) => (visto = a) });
-    const r = await resolverPaciente(db, ctx, { cpf: entrada.cpf, data_nascimento: entrada.data_nascimento });
+    const db = fakeDb({
+      rpc: { paciente_id: PAC, criado: false, mismatch: false },
+      onRpc: (a) => (visto = a),
+    });
+    const r = await resolverPaciente(db, ctx, {
+      cpf: entrada.cpf,
+      data_nascimento: entrada.data_nascimento,
+    });
     expect(visto["_somente_existente"]).toBe(true);
     expect(r.paciente_id).toBe(PAC);
     expect(r.telefone_divergente).toBeNull();
@@ -164,7 +177,10 @@ describe("resolverPaciente — v1.4 sem nome/telefone", () => {
 
   it("com nome e telefone mantém o comportamento de sempre", async () => {
     let visto: Record<string, unknown> = {};
-    const db = fakeDb({ rpc: { paciente_id: PAC, criado: true, mismatch: false }, onRpc: (a) => (visto = a) });
+    const db = fakeDb({
+      rpc: { paciente_id: PAC, criado: true, mismatch: false },
+      onRpc: (a) => (visto = a),
+    });
     await resolverPaciente(db, ctx, entrada);
     expect(visto["_somente_existente"]).toBe(false);
   });
@@ -191,7 +207,11 @@ describe("consultarPaciente — v1.4 lookup", () => {
 
   it("achado devolve só nome de exibição e telefone mascarado", async () => {
     const r = await consultarPaciente(fakeDb({ rpc: achado }), ctx, e);
-    expect(r).toEqual({ encontrado: true, nome_exibicao: "MARIA S.", telefone_mascarado: "(21) ****-8970" });
+    expect(r).toEqual({
+      encontrado: true,
+      nome_exibicao: "MARIA S.",
+      telefone_mascarado: "(21) ****-8970",
+    });
     expect(Object.keys(r).sort()).toEqual(["encontrado", "nome_exibicao", "telefone_mascarado"]);
   });
 
@@ -201,7 +221,9 @@ describe("consultarPaciente — v1.4 lookup", () => {
   });
 
   it("CPF inválido → invalid_cpf", async () => {
-    await expect(consultarPaciente(fakeDb({ rpc: nada }), ctx, { ...e, cpf: "12345678901" })).rejects.toMatchObject({
+    await expect(
+      consultarPaciente(fakeDb({ rpc: nada }), ctx, { ...e, cpf: "12345678901" }),
+    ).rejects.toMatchObject({
       code: "invalid_cpf",
       status: 422,
     });

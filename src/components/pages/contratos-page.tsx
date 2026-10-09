@@ -1,5 +1,11 @@
+import { hojeBR } from "@/lib/date-utils";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contratoDoProduto, produtoDoModulo, type ProdutoCartao } from "@/lib/cartao/produto";
+import {
+  calcularParcelasQueFaltam,
+  vencimentoDaProximaParcela,
+} from "@/lib/cartao/parcelas-que-faltam";
+import { planejarRegeracao } from "@/lib/cartao/regerar-parcelas";
 import { CalendarRange, LayoutGrid, Rows3 } from "lucide-react";
 import { ContratosCards, type ContratoCardItem } from "@/components/contratos/contratos-cards";
 import { confirmDialog } from "@/lib/confirm";
@@ -29,6 +35,11 @@ import {
 import { toast } from "sonner";
 import { IsencaoCarenciaLoteDialog } from "@/components/contratos/isencao-carencia-lote-dialog";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { ehCobrancaCredito } from "@/lib/cartao/credito-clinica";
+import {
+  CreditoClinicaPainel,
+  PagarCobrancaCreditoDialog,
+} from "@/components/cartao/credito-clinica-painel";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -401,6 +412,9 @@ type Mens = {
   taxa_adesao?: number | null;
   lancamento_id?: string | null;
   valor_pago?: number | null;
+  /** 'credito_clinica' = cobrança do Crédito na clínica; null = parcela/taxa. */
+  origem?: string | null;
+  observacoes?: string | null;
 };
 
 const isAdesao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) === 0;
@@ -417,8 +431,14 @@ const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_par
 /** Taxa cobrada no balcão para reimprimir o carnê/cartão do contrato. */
 const VALOR_TAXA_SEGUNDA_VIA = 10;
 
-const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
-  isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa inclusão" : `Mensalidade ${m.numero_parcela}`;
+const cobrancaLabel = (m: Pick<Mens, "numero_parcela" | "origem">) =>
+  ehCobrancaCredito(m)
+    ? "Crédito na clínica"
+    : isAdesao(m)
+      ? "Adesão"
+      : isTaxaInclusao(m)
+        ? "Taxa inclusão"
+        : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
   id: string;
   paciente_id: string;
@@ -791,7 +811,7 @@ export function ContratosPage({
       // Buscar mensalidades em lotes de contratos para evitar o teto de 1000
       // linhas por request do PostgREST (ex.: 500 contratos × 12 parcelas
       // ≈ 6000 linhas retornariam truncadas, deixando contratos com "0/0").
-      const hojeStr = new Date().toISOString().slice(0, 10);
+      const hojeStr = hojeBR();
       const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
       for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
       const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
@@ -886,7 +906,7 @@ export function ContratosPage({
     // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
     // truncado, então filtrar por ele aqui esconderia resultados válidos.
     const base = list;
-    const hojeStr = new Date().toISOString().slice(0, 10);
+    const hojeStr = hojeBR();
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
     const dHoje = new Date(hojeStr + "T00:00:00").getTime();
@@ -1357,6 +1377,8 @@ export function ContratosPage({
             <ContratosCards
               clinicaId={clinicaAtual?.clinica_id ?? ""}
               itens={filtered.map((c) => paraCardItem(c))}
+              produto={produtoFiltro}
+              convenioFiltro={filtroConvenio}
               podeEscrever={podeEscrever}
               onAbrir={(id) => abrirContratoCom(id, "dados", null)}
               onPagar={(id) => abrirContratoCom(id, "resumo", "pagar")}
@@ -1922,7 +1944,7 @@ function NovoContratoForm({
   const [taxa, setTaxa] = useState(0);
   const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [dataInicio, setDataInicio] = useState(hojeBR());
   const [mensalidadesJaPagas, setMensalidadesJaPagas] = useState(0);
   const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne" | null>(null);
   const [obs, setObs] = useState("");
@@ -1969,7 +1991,7 @@ function NovoContratoForm({
   const emailValido = (e?: string | null) => !!e && /.+@.+\..+/.test(e);
   const OBS_MAX = 1000;
   const obsSanitizedLen = obs.trim().length;
-  const dataHoje = new Date().toISOString().slice(0, 10);
+  const dataHoje = hojeBR();
   const dataAvisoExtrema = (() => {
     if (!dataInicio) return null;
     const d = new Date(dataInicio + "T00:00:00").getTime();
@@ -3082,7 +3104,9 @@ function DetalheContrato({
   const consultarNfseFn = useServerFn(consultarNfse);
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
   const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
-  const [emitentes, setEmitentes] = useState<Array<{ id: string; nome: string }>>([]);
+  const [emitentes, setEmitentes] = useState<
+    Array<{ id: string; nome: string; item_lista_servico: string | null }>
+  >([]);
   const [emitenteId, setEmitenteId] = useState<string>("");
   const [nfsePorLancamento, setNfsePorLancamento] = useState<
     Record<
@@ -3105,9 +3129,7 @@ function DetalheContrato({
   // vem de cb_convenios.taxa_inclusao_dependente e permanece editável.
   const [incCobrarTaxa, setIncCobrarTaxa] = useState<boolean>(true);
   const [incTaxaValor, setIncTaxaValor] = useState<string>("0.00");
-  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() => hojeBR());
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
@@ -3428,7 +3450,9 @@ function DetalheContrato({
     await load();
   };
 
-  // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
+  // Refaz as 12 parcelas a partir da nova data de início; as N primeiras entram
+  // como pagas. Parcela paga, cancelada ou com boleto/guia nunca é apagada —
+  // regras em `src/lib/cartao/regerar-parcelas.ts`.
   const regerarComPagas = async (n: number) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -3437,56 +3461,87 @@ function DetalheContrato({
     if (!retroDialog) return;
     const iniStr = retroDialog.dataInicio;
     if (!iniStr) return;
-    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 10));
     const valor = Number((contrato as any).valor_mensal ?? 0);
-    const pagas = Math.max(0, Math.min(12, Math.floor(n)));
     setRegerandoRetro(true);
-    // 1) Apaga TODAS as mensalidades (≠0) — pendentes e pagas —
-    // para regenerar exatamente 12 parcelas numeradas de 1 a 12.
-    // Sem isso, uma parcela órfã anterior fazia o prox virar 2 e o
-    // contrato terminar com 13 linhas (bug do contrato #20261888).
-    const { error: delErr } = await supabase
+    // Lê as parcelas do banco (não da tela, que pode ter rascunho) e quais têm
+    // boleto ou guia — essas não podem sair, o boleto iria junto em cascata.
+    const { data: atuaisData, error: lerErr } = await supabase
       .from("contrato_mensalidades")
-      .delete()
+      .select("id, numero_parcela, vencimento, status")
       .eq("contrato_id", contrato.id)
       .gt("numero_parcela", 0);
-    if (delErr) {
+    if (lerErr) {
       setRegerandoRetro(false);
-      return mostrarErro(delErr);
+      return mostrarErro(lerErr);
     }
-    // 2) Gera exatamente 12 parcelas (1..12) a partir do mês da nova data de início
-    let prox = 1;
-    const ini = new Date(iniStr + "T00:00:00");
-    const baseAno = ini.getFullYear();
-    const baseMes = ini.getMonth();
-    const rows: any[] = [];
-    for (let i = 0; i < 12; i++) {
-      const ref = new Date(baseAno, baseMes + i, 1);
-      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-      const d = Math.min(dia, lastDay);
-      const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
-      const vencIso = venc.toISOString().slice(0, 10);
-      const paga = i < pagas;
-      rows.push({
-        contrato_id: contrato.id,
-        clinica_id: (contrato as any).clinica_id,
-        numero_parcela: prox++,
-        vencimento: vencIso,
-        valor,
-        status: paga ? "pago" : "pendente",
-        pago_em: paga ? vencIso : null,
-        valor_pago: paga ? valor : null,
-      });
+    const atuais = (atuaisData ?? []) as Array<{
+      id: string;
+      numero_parcela: number | null;
+      vencimento: string;
+      status: string | null;
+    }>;
+    const idsAtuais = atuais.map((m) => m.id);
+    const travadas = new Set<string>();
+    if (idsAtuais.length > 0) {
+      const [bol, gr] = await Promise.all([
+        supabase.from("boletos").select("mensalidade_id").in("mensalidade_id", idsAtuais),
+        supabase.from("gr_impressoes").select("mensalidade_id").in("mensalidade_id", idsAtuais),
+      ]);
+      if (bol.error || gr.error) {
+        setRegerandoRetro(false);
+        return mostrarErro(bol.error ?? gr.error);
+      }
+      for (const r of [...(bol.data ?? []), ...(gr.data ?? [])] as Array<{
+        mensalidade_id: string | null;
+      }>) {
+        if (r.mensalidade_id) travadas.add(r.mensalidade_id);
+      }
     }
-    const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-    setRegerandoRetro(false);
-    if (insErr) return mostrarErro(insErr, "falha ao gerar parcelas");
-    setRetroDialog(null);
-    toast.success(
-      pagas > 0
-        ? `${pagas} parcela${pagas === 1 ? "" : "s"} marcada${pagas === 1 ? "" : "s"} como paga${pagas === 1 ? "" : "s"} e ${12 - pagas} pendente${12 - pagas === 1 ? "" : "s"} gerada${12 - pagas === 1 ? "" : "s"}.`
-        : "12 parcelas pendentes geradas.",
+    const plano = planejarRegeracao(
+      iniStr,
+      (contrato as any).dia_vencimento ?? null,
+      n,
+      atuais.map((m) => ({ ...m, travada: travadas.has(m.id) })),
     );
+    // 1) Apaga só as pendentes livres. Paga, cancelada e com boleto/guia ficam.
+    if (plano.apagar.length > 0) {
+      const { error: delErr } = await supabase
+        .from("contrato_mensalidades")
+        .delete()
+        .in("id", plano.apagar)
+        .neq("status", "pago");
+      if (delErr) {
+        setRegerandoRetro(false);
+        return mostrarErro(delErr);
+      }
+    }
+    // 2) Recria só os meses que ficaram sem parcela.
+    const rows = plano.criar.map((c) => ({
+      contrato_id: contrato.id,
+      clinica_id: (contrato as any).clinica_id,
+      numero_parcela: c.numero_parcela,
+      vencimento: c.vencimento,
+      valor,
+      status: c.paga ? "pago" : "pendente",
+      pago_em: c.paga ? c.vencimento : null,
+      valor_pago: c.paga ? valor : null,
+    }));
+    if (rows.length > 0) {
+      const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows as any);
+      if (insErr) {
+        setRegerandoRetro(false);
+        return mostrarErro(insErr, "falha ao gerar parcelas");
+      }
+    }
+    setRegerandoRetro(false);
+    setRetroDialog(null);
+    const pagasNovas = rows.filter((r) => r.status === "pago").length;
+    const partes = [
+      `${rows.length} parcela(s) gerada(s)`,
+      pagasNovas > 0 ? `${pagasNovas} marcada(s) como paga(s) no sistema anterior` : null,
+      plano.pagasMantidas > 0 ? `${plano.pagasMantidas} paga(s) preservada(s)` : null,
+    ].filter(Boolean);
+    toast.success(partes.join(" · ") + ".");
     await load();
   };
 
@@ -3549,17 +3604,106 @@ function DetalheContrato({
       return;
     }
     const prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const agora = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const hojeIso = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`;
+    // Mês seguinte à última mensalidade, não hoje — ver `vencimentoDaProximaParcela`.
+    const vencimento = vencimentoDaProximaParcela(
+      mens,
+      (contrato as any).dia_vencimento ?? null,
+      hojeIso,
+    );
     const { error } = await supabase.from("contrato_mensalidades").insert({
       contrato_id: contrato.id,
       clinica_id: (contrato as any).clinica_id,
       numero_parcela: prox,
-      vencimento: hoje,
+      vencimento,
       valor: Number(valorMensalAtual) || 0,
       status: "pendente",
     } as any);
     if (error) return mostrarErro(error);
-    toast.success("Parcela adicionada.");
+    toast.success(
+      `Parcela adicionada, vencendo em ${fmtD(vencimento)}. A data pode ser ajustada na grade.`,
+    );
+    await load();
+  };
+  // "Gerar parcelas que faltam": do mês corrente ao fim da vigência, uma por
+  // mês. Regras em `src/lib/cartao/parcelas-que-faltam.ts`.
+  const gerarParcelasQueFaltam = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    if ((contrato.status ?? "").toLowerCase() !== "ativo") {
+      toast.error("Só contrato ativo gera mensalidades.");
+      return;
+    }
+    const valor = Number(valorMensalAtual) || 0;
+    if (valor <= 0) {
+      toast.error("Este contrato não tem mensalidade (valor R$ 0,00).");
+      return;
+    }
+    if (totalRascunhos > 0) {
+      if (
+        !(await confirmDialog(
+          "Existem alterações não salvas nas mensalidades. Deseja descartar e gerar as parcelas que faltam?",
+        ))
+      )
+        return;
+      setRascunhos({});
+    }
+    const agora = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const hojeIso = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`;
+    const r = calcularParcelasQueFaltam({
+      dataInicio: contrato.data_inicio,
+      dataFim: contrato.data_fim ?? null,
+      diaVencimento: (contrato as any).dia_vencimento ?? null,
+      hojeIso,
+      existentes: mens,
+    });
+    if (r.tipo === "vigencia_encerrada") {
+      toast.error(
+        `A vigência deste contrato terminou em ${fmtD(r.dataFim)}. Para cobrar novos meses, renove o contrato.`,
+      );
+      return;
+    }
+    if (r.tipo === "nada_faltando") {
+      toast.info(
+        "Nenhuma mensalidade faltando: todos os meses até o fim da vigência já têm parcela.",
+      );
+      return;
+    }
+    const ok = await confirmDialog({
+      title: `Gerar ${r.vencimentos.length} mensalidade(s)?`,
+      description: (
+        <div className="space-y-2">
+          <p>
+            {r.vencimentos.length} parcela(s) de {BRL(valor)}, com vencimento em:{" "}
+            <strong>{r.vencimentos.map((v) => fmtD(v)).join(", ")}</strong>.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Meses anteriores a este não são gerados: o que o paciente pagou antes (no sistema
+            anterior) não vira dívida. Se ele realmente deve um mês passado, use “Adicionar
+            parcela”.
+          </p>
+        </div>
+      ),
+      confirmText: "Gerar parcelas",
+    });
+    if (!ok) return;
+    let prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0);
+    const rows = r.vencimentos.map((vencimento) => ({
+      contrato_id: contrato.id,
+      clinica_id: (contrato as any).clinica_id,
+      numero_parcela: ++prox,
+      vencimento,
+      valor,
+      status: "pendente",
+    }));
+    const { error } = await supabase.from("contrato_mensalidades").insert(rows as any);
+    if (error) return mostrarErro(error, "falha ao gerar parcelas");
+    toast.success(`${rows.length} mensalidade(s) gerada(s).`);
     await load();
   };
   const excluirParcela = async (id: string) => {
@@ -3568,6 +3712,15 @@ function DetalheContrato({
       return;
     }
     const alvo = mens.find((m) => m.id === id);
+    // Parcela paga é histórico financeiro: apagar sumia com o registro de que o
+    // mês foi quitado, enquanto o dinheiro continuava no caixa. O caminho certo
+    // é "Reverter", que trata o estorno no caixa e reabre a parcela.
+    if ((alvo?.status ?? "").toLowerCase() === "pago") {
+      toast.error(
+        "Parcela paga não pode ser excluída. Use “Reverter” para desfazer o pagamento e depois exclua, se for o caso.",
+      );
+      return;
+    }
     const removendoAdesao = Number(alvo?.numero_parcela ?? -1) === 0;
     if (
       !(await confirmDialog(
@@ -3871,6 +4024,8 @@ function DetalheContrato({
 
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
+  /** Cobrança do Crédito na clínica sendo recebida (diálogo próprio). */
+  const [pagCredito, setPagCredito] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   /** Etapa do QR Code, entre escolher "Pix" e dar a baixa de fato. */
   const [pixOpen, setPixOpen] = useState(false);
@@ -3910,7 +4065,7 @@ function DetalheContrato({
         ? supabase
             .from("cb_convenios")
             .select(
-              "nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente",
+              "nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente, item_lista_servico",
             )
             .eq("id", contrato.convenio_id)
             .maybeSingle()
@@ -4088,13 +4243,17 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse_emitentes_publico")
-      .select("id, nome")
+      .select("id, nome, item_lista_servico")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome")
       .then(({ data }) => {
         if (cancel) return;
-        const list = (data ?? []) as Array<{ id: string; nome: string }>;
+        const list = (data ?? []) as Array<{
+          id: string;
+          nome: string;
+          item_lista_servico: string | null;
+        }>;
         setEmitentes(list);
         setEmitenteId((prev) => prev || (list[0]?.id ?? ""));
       });
@@ -4216,7 +4375,7 @@ function DetalheContrato({
     const patch = paga
       ? {
           status: "pago",
-          pago_em: pagoEm && pagoEm.length > 0 ? pagoEm : new Date().toISOString().slice(0, 10),
+          pago_em: pagoEm && pagoEm.length > 0 ? pagoEm : hojeBR(),
           ...(forma !== undefined ? { forma_pagamento: forma } : {}),
           ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
           ...(valorPago != null ? { valor_pago: valorPago } : {}),
@@ -4493,6 +4652,22 @@ function DetalheContrato({
     }
   };
 
+  // Código de tributação nacional das notas de mensalidade/adesão: o do
+  // convênio do contrato quando preenchido; senão, o do emitente (sem override).
+  const codigoTributacaoParcelas = () => {
+    const doConvenio = String(convenio?.item_lista_servico ?? "").trim();
+    const doEmitente = emitentes.find((e) => e.id === emitenteId)?.item_lista_servico ?? "";
+    const override = doConvenio
+      ? {
+          itemListaOverride: doConvenio,
+          itemListaMotivo: `código do convênio do Cartão Benefício "${convenio?.nome ?? ""}" (cb_convenios.item_lista_servico)`,
+        }
+      : {};
+    const info = (valor: number) =>
+      `Valor: ${valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · Código de tributação nacional: ${doConvenio || doEmitente || "—"} (${doConvenio ? "do convênio" : "do emitente"})`;
+    return { override, info };
+  };
+
   // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
   // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
   // com bloqueio de endereço e escolha de percentual do valor.
@@ -4554,7 +4729,8 @@ function DetalheContrato({
         ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
-      const descFinal = await pedirDescricaoNfse(descSugerida);
+      const codTrib = codigoTributacaoParcelas();
+      const descFinal = await pedirDescricaoNfse(descSugerida, codTrib.info(parcial.valor));
       if (!descFinal) {
         toast.error("Emissão cancelada.");
         return;
@@ -4568,6 +4744,7 @@ function DetalheContrato({
           valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
+          ...codTrib.override,
         },
       });
       avisarEmitenteDivergente(res);
@@ -4697,7 +4874,8 @@ function DetalheContrato({
         ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
-      const descFinal = await pedirDescricaoNfse(descSugerida);
+      const codTrib = codigoTributacaoParcelas();
+      const descFinal = await pedirDescricaoNfse(descSugerida, codTrib.info(parcial.valor));
       if (!descFinal) {
         toast.error("Emissão cancelada.");
         return;
@@ -4713,6 +4891,7 @@ function DetalheContrato({
           valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
+          ...codTrib.override,
         },
       });
       avisarEmitenteDivergente(res);
@@ -4893,7 +5072,7 @@ function DetalheContrato({
       return;
     }
     abrirFormaPag(proxima);
-  }, [acaoInicial, loading, cancelado, podeEscrever, mensalidades]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [acaoInicial, loading, cancelado, podeEscrever, mensalidades]);
 
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens
@@ -5058,7 +5237,7 @@ function DetalheContrato({
       DEPENDENTE_CPF: dep.cpf ?? "",
       DEPENDENTE_TIPO: dep.tipo,
       TIPO_MOVIMENTO: movimento,
-      DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
+      DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? hojeBR()),
     };
     let out = tpl.replace(
       /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
@@ -5240,7 +5419,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       return;
     }
     if (!excAlvo) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const { error } = await supabase
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: hoje })
@@ -5259,7 +5438,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
       .select("id, observacoes")
       .eq("contrato_id", contrato.id)
       .eq("status", "pendente")
-      .lt("numero_parcela", 0);
+      .lt("numero_parcela", 0)
+      // Cobrança do Crédito na clínica cita o nome no texto do atendimento,
+      // mas não é taxa do dependente: nunca sai junto com ele.
+      .is("origem" as never, null);
     const idsRemover = ((taxasPend ?? []) as Array<{ id: string; observacoes: string | null }>)
       .filter((r) => (r.observacoes ?? "").includes(alvoNome))
       .map((r) => r.id);
@@ -5469,6 +5651,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <ProntuarioBadge codigo={prontuarioExibicao(pacienteFull)} />
                 </div>
               ) : null}
+              {contrato.paciente_id && contrato.clinica_id && !cancelado ? (
+                <CreditoClinicaPainel
+                  pacienteId={contrato.paciente_id}
+                  clinicaId={contrato.clinica_id}
+                  contratoId={contrato.id}
+                  versao={mens
+                    .filter(ehCobrancaCredito)
+                    .map((m) => `${m.id}:${m.status}:${m.valor}`)
+                    .join("|")}
+                />
+              ) : null}
+              <PagarCobrancaCreditoDialog
+                cobranca={
+                  pagCredito
+                    ? {
+                        id: pagCredito.id,
+                        valor: Number(pagCredito.valor),
+                        vencimento: pagCredito.vencimento,
+                      }
+                    : null
+                }
+                onOpenChange={(v) => {
+                  if (!v) setPagCredito(null);
+                }}
+                onPago={() => void load()}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <button
                   type="button"
@@ -5714,6 +5922,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <Button size="sm" variant="outline" onClick={adicionarParcela}>
                         <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={gerarParcelasQueFaltam}
+                        title="Gera uma mensalidade por mês, do mês atual até o fim da vigência, só nos meses sem parcela"
+                      >
+                        <CalendarRange className="h-3 w-3 mr-1" /> Gerar parcelas que faltam
+                      </Button>
                       <Button size="sm" variant="outline" onClick={abrirRecalcVencimentos}>
                         <RefreshCw className="h-3 w-3 mr-1" /> Recalcular vencimentos
                       </Button>
@@ -5722,7 +5938,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 {podeEscrever
                   ? (() => {
-                      const selecionaveis = mens.filter((m) => !(isAdesao(m) && adesaoEmbutida));
+                      // Cobrança do crédito tem recebimento e regra próprios:
+                      // fica fora do pagamento e da NFS-e em lote.
+                      const selecionaveis = mens.filter(
+                        (m) => !(isAdesao(m) && adesaoEmbutida) && !ehCobrancaCredito(m),
+                      );
                       const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
                       const total = selecionadas.reduce(
                         (s, m) =>
@@ -5913,7 +6133,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 </TableCell>
                               ) : null}
                               <TableCell>
-                                {isAdesao(m) ? (
+                                {ehCobrancaCredito(m) ? (
+                                  <Badge
+                                    className="bg-rose-600"
+                                    title={m.observacoes ?? "Crédito na clínica"}
+                                  >
+                                    Crédito na clínica
+                                  </Badge>
+                                ) : isAdesao(m) ? (
                                   <Badge variant="secondary">Adesão</Badge>
                                 ) : isTaxaInclusao(m) ? (
                                   <Badge
@@ -6005,7 +6232,28 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1 justify-end">
-                                  {m.status === "pago" ? (
+                                  {ehCobrancaCredito(m) ? (
+                                    // Crédito na clínica: recebimento próprio (vai para a
+                                    // gaveta, não fatura de novo). Paga não tem NFS-e (os
+                                    // atendimentos já foram faturados) nem "Reverter".
+                                    m.status === "pago" ? (
+                                      <span
+                                        className="text-xs text-muted-foreground"
+                                        title="Cobrança do crédito recebida — os atendimentos já foram faturados no dia do uso"
+                                      >
+                                        Recebida
+                                      </span>
+                                    ) : m.status === "cancelado" ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        Estornada
+                                      </span>
+                                    ) : (
+                                      <Button size="sm" onClick={() => setPagCredito(m)}>
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Receber
+                                      </Button>
+                                    )
+                                  ) : m.status === "pago" ? (
                                     <>
                                       {podeEmitirNfse && m.lancamento_id ? (
                                         nfsePorLancamento[m.lancamento_id] ? (
@@ -6104,7 +6352,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      title="Excluir parcela"
+                                      title={
+                                        m.status === "pago"
+                                          ? "Parcela paga não pode ser excluída — use “Reverter”"
+                                          : "Excluir parcela"
+                                      }
+                                      disabled={m.status === "pago"}
                                       onClick={() => excluirParcela(m.id)}
                                     >
                                       <Trash2 className="h-3 w-3 text-destructive" />
@@ -6398,7 +6651,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const hoje = new Date().toISOString().slice(0, 10);
+                          const hoje = hojeBR();
                           const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
                           const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
                           const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;
@@ -7090,7 +7343,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 // Segue a mesma data escolhida no diálogo (permite retroativo):
                 // se o operador pagou 20/07, tanto a mensalidade quanto a taxa
                 // de adesão vinculada vão para 20/07 no financeiro e no caixa.
-                const dataLanc = dados.data || new Date().toISOString().slice(0, 10);
+                const dataLanc = dados.data || hojeBR();
                 const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
                 const { data: rpcData, error: rpcErr } = await supabase.rpc(
                   "fn_registrar_lancamento_e_caixa",
@@ -7221,7 +7474,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             // da venda (data_inicio do contrato). Nos demais casos, taxa vem
             // marcada. Valor sugerido: cb_convenios.taxa_inclusao_dependente
             // (0 quando ainda não configurado no convênio) — sempre editável.
-            const hoje = new Date().toISOString().slice(0, 10);
+            const hoje = hojeBR();
             const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
             const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
             const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;
@@ -7566,6 +7819,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <p className="text-xs text-muted-foreground">
                   Serão geradas 12 parcelas a partir de {retroDialog.dataInicio.slice(8, 10)}/
                   {retroDialog.dataInicio.slice(5, 7)}/{retroDialog.dataInicio.slice(0, 4)}.
+                  Parcelas já pagas, canceladas ou com boleto/guia são mantidas, e o mês delas não é
+                  gerado de novo.
                 </p>
               </div>
             </div>

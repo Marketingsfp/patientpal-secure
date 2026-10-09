@@ -9,196 +9,139 @@ import type { AssinaturaNode } from "./sync";
 
 export const SNAPSHOT_V5: AssinaturaNode[] = [
   {
-    "id": "message.inbound",
-    "categoria": "ENTRADA",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "Route",
-    "anteriores": [],
-    "seguintes": [
-      "message.log_raw"
-    ]
+    id: "message.inbound",
+    categoria: "ENTRADA",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "Route",
+    anteriores: [],
+    seguintes: ["message.log_raw"],
   },
   {
-    "id": "message.log_raw",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "registrarLogWebhook",
-    "anteriores": [
-      "message.inbound"
-    ],
-    "seguintes": [
-      "message.validate"
-    ]
+    id: "message.log_raw",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "registrarLogWebhook",
+    anteriores: ["message.inbound"],
+    seguintes: ["message.validate"],
   },
   {
-    "id": "message.validate",
-    "categoria": "VALIDACAO",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "verifySignature",
-    "anteriores": [
-      "message.log_raw"
-    ],
-    "seguintes": [
-      "message.deduplicate",
-      "status.update"
-    ]
+    id: "message.validate",
+    categoria: "VALIDACAO",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "verifySignature",
+    anteriores: ["message.log_raw"],
+    seguintes: ["message.deduplicate", "status.update"],
   },
   {
-    "id": "status.update",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "registrarStatusWhatsapp",
-    "anteriores": [
-      "message.validate"
-    ],
-    "seguintes": []
+    id: "status.update",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "registrarStatusWhatsapp",
+    anteriores: ["message.validate"],
+    seguintes: [],
   },
   {
-    "id": "message.deduplicate",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNina",
-    "anteriores": [
-      "message.validate"
-    ],
-    "seguintes": [
-      "conversation.ensure"
-    ]
+    id: "message.deduplicate",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNina",
+    anteriores: ["message.validate"],
+    seguintes: ["conversation.ensure"],
   },
   {
-    "id": "conversation.ensure",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "carregarEstadoIdentidade",
-    "anteriores": [
-      "message.deduplicate"
-    ],
-    "seguintes": [
-      "conversation.reopen",
-      "routing.decide"
-    ]
+    id: "conversation.ensure",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "carregarEstadoIdentidade",
+    anteriores: ["message.deduplicate"],
+    seguintes: ["conversation.reopen", "routing.decide"],
   },
   {
-    "id": "conversation.reopen",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "reabrirConversaPorMensagemPaciente",
-    "anteriores": [
-      "conversation.ensure"
-    ],
-    "seguintes": [
-      "routing.decide"
-    ]
+    id: "conversation.reopen",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "reabrirConversaPorMensagemPaciente",
+    anteriores: ["conversation.ensure"],
+    seguintes: ["routing.decide"],
   },
   {
-    "id": "routing.decide",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "ninaPodeResponder",
-    "anteriores": [
-      "conversation.ensure",
-      "conversation.reopen"
-    ],
-    "seguintes": [
-      "handoff.queue",
-      "session.resolve"
-    ]
+    id: "routing.decide",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "ninaPodeResponder",
+    anteriores: ["conversation.ensure", "conversation.reopen"],
+    seguintes: ["handoff.queue", "session.resolve"],
   },
   {
-    "id": "session.resolve",
-    "categoria": "MEMORIA",
-    "arquivo": "src/lib/nina/sessao.server.ts",
-    "funcao": "resolverSessao",
-    "anteriores": [
-      "routing.decide"
-    ],
-    "seguintes": [
-      "context.load",
-      "flow.state",
-      "instructions.greeting"
-    ]
+    id: "session.resolve",
+    categoria: "MEMORIA",
+    arquivo: "src/lib/nina/sessao.server.ts",
+    funcao: "resolverSessao",
+    anteriores: ["routing.decide"],
+    seguintes: ["context.load", "flow.state", "instructions.greeting"],
   },
   {
-    "id": "context.load",
-    "categoria": "CONTEXTO",
-    "arquivo": "src/lib/nina-contexto.server.ts",
-    "funcao": "contextoClinicaTexto",
-    "anteriores": [
-      "flow.state",
-      "session.resolve",
-      "test.inbound"
-    ],
-    "seguintes": [
+    id: "context.load",
+    categoria: "CONTEXTO",
+    arquivo: "src/lib/nina-contexto.server.ts",
+    funcao: "contextoClinicaTexto",
+    anteriores: ["flow.state", "session.resolve", "test.inbound"],
+    seguintes: [
       "identity.gate",
       "instructions.catalog",
       "instructions.learnings",
       "instructions.phases",
       "instructions.published",
       "prompt.compose",
-      "response.templates"
-    ]
-  },
-  {
-    "id": "instructions.catalog",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/catalogo-prompt.server.ts",
-    "funcao": "blocoPromptCatalogo",
-    "anteriores": [
-      "context.load"
+      "response.templates",
     ],
-    "seguintes": [
-      "prompt.compose"
-    ]
   },
   {
-    "id": "instructions.learnings",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/aprendizado.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "instructions.catalog",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/catalogo-prompt.server.ts",
+    funcao: "blocoPromptCatalogo",
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "instructions.published",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/instrucoes-runtime.server.ts",
-    "funcao": "promptInstrucoes",
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "instructions.learnings",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/aprendizado.server.ts",
+    funcao: null,
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "prompt.compose",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNinaInterno",
-    "anteriores": [
+    id: "instructions.published",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/instrucoes-runtime.server.ts",
+    funcao: "promptInstrucoes",
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
+  },
+  {
+    id: "prompt.compose",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNinaInterno",
+    anteriores: [
       "context.load",
       "identity.gate",
       "instructions.catalog",
       "instructions.greeting",
       "instructions.learnings",
       "instructions.phases",
-      "instructions.published"
+      "instructions.published",
     ],
-    "seguintes": [
-      "llm.generate",
-      "llm.model_flag"
-    ]
+    seguintes: ["llm.generate", "llm.model_flag"],
   },
   {
-    "id": "llm.generate",
-    "categoria": "IA",
-    "arquivo": "src/lib/nina/ai-gateway.server.ts",
-    "funcao": "ninaAIGateway",
-    "anteriores": [
+    id: "llm.generate",
+    categoria: "IA",
+    arquivo: "src/lib/nina/ai-gateway.server.ts",
+    funcao: "ninaAIGateway",
+    anteriores: [
       "llm.model_flag",
       "offer.complete",
       "patient.link",
@@ -212,36 +155,25 @@ export const SNAPSHOT_V5: AssinaturaNode[] = [
       "tool.my_appointments",
       "tool.schedule.availability",
       "tool.schedule.book",
-      "voice.reasoning"
+      "voice.reasoning",
     ],
-    "seguintes": [
-      "error.handle",
-      "metrics.record",
-      "response.finalize",
-      "tool.execute"
-    ]
+    seguintes: ["error.handle", "metrics.record", "response.finalize", "tool.execute"],
   },
   {
-    "id": "llm.model_flag",
-    "categoria": "IA",
-    "arquivo": "src/lib/nina/modelo-flag.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "prompt.compose"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "llm.model_flag",
+    categoria: "IA",
+    arquivo: "src/lib/nina/modelo-flag.server.ts",
+    funcao: null,
+    anteriores: ["prompt.compose"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.execute",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/tool-broker.server.ts",
-    "funcao": "criarToolBroker",
-    "anteriores": [
-      "llm.generate"
-    ],
-    "seguintes": [
+    id: "tool.execute",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/tool-broker.server.ts",
+    funcao: "criarToolBroker",
+    anteriores: ["llm.generate"],
+    seguintes: [
       "llm.generate",
       "tool.business_hours",
       "tool.catalog.list",
@@ -252,562 +184,375 @@ export const SNAPSHOT_V5: AssinaturaNode[] = [
       "tool.my_appointments",
       "tool.patient.lookup",
       "tool.schedule.availability",
-      "tool.schedule.book"
-    ]
-  },
-  {
-    "id": "tool.catalog.lookup",
-    "categoria": "CONHECIMENTO",
-    "arquivo": "src/lib/nina/catalogo-retrieval.server.ts",
-    "funcao": "buscarNoCatalogo",
-    "anteriores": [
-      "tool.execute",
-      "tool.knowledge.lookup"
+      "tool.schedule.book",
     ],
-    "seguintes": [
-      "llm.generate"
-    ]
   },
   {
-    "id": "tool.knowledge.lookup",
-    "categoria": "CONHECIMENTO",
-    "arquivo": "src/lib/nina/knowledge.server.ts",
-    "funcao": "searchKnowledgeBase",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate",
-      "tool.catalog.lookup"
-    ]
+    id: "tool.catalog.lookup",
+    categoria: "CONHECIMENTO",
+    arquivo: "src/lib/nina/catalogo-retrieval.server.ts",
+    funcao: "buscarNoCatalogo",
+    anteriores: ["tool.execute", "tool.knowledge.lookup"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.business_hours",
-    "categoria": "CONHECIMENTO",
-    "arquivo": "src/lib/nina/horario-oficial.ts",
-    "funcao": "horarioOficialDoDia",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.knowledge.lookup",
+    categoria: "CONHECIMENTO",
+    arquivo: "src/lib/nina/knowledge.server.ts",
+    funcao: "searchKnowledgeBase",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate", "tool.catalog.lookup"],
   },
   {
-    "id": "tool.schedule.availability",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "consultarDisponibilidadeCore",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate",
-      "offer.complete"
-    ]
+    id: "tool.business_hours",
+    categoria: "CONHECIMENTO",
+    arquivo: "src/lib/nina/horario-oficial.ts",
+    funcao: "horarioOficialDoDia",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.schedule.book",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "executarFerramentaPaciente",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.schedule.availability",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "consultarDisponibilidadeCore",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate", "offer.complete"],
   },
   {
-    "id": "tool.patient.lookup",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "identificarPaciente",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "patient.link"
-    ]
+    id: "tool.schedule.book",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "executarFerramentaPaciente",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.handoff",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/handoff-tool.server.ts",
-    "funcao": "executarHandoffTool",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "handoff.queue"
-    ]
+    id: "tool.patient.lookup",
+    categoria: "TOOLS",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "identificarPaciente",
+    anteriores: ["tool.execute"],
+    seguintes: ["patient.link"],
   },
   {
-    "id": "handoff.queue",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "encaminharParaHumano",
-    "anteriores": [
-      "routing.decide",
-      "tool.handoff",
-      "wait.timeout"
-    ],
-    "seguintes": [
-      "handoff.assign",
-      "handoff.summary"
-    ]
+    id: "tool.handoff",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/handoff-tool.server.ts",
+    funcao: "executarHandoffTool",
+    anteriores: ["tool.execute"],
+    seguintes: ["handoff.queue"],
   },
   {
-    "id": "handoff.summary",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff-resumo.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "handoff.queue"
-    ],
-    "seguintes": []
+    id: "handoff.queue",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "encaminharParaHumano",
+    anteriores: ["routing.decide", "tool.handoff", "wait.timeout"],
+    seguintes: ["handoff.assign", "handoff.summary"],
   },
   {
-    "id": "handoff.assign",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "atribuirAtendenteOnline",
-    "anteriores": [
-      "handoff.queue"
-    ],
-    "seguintes": [
-      "protocol.generate"
-    ]
+    id: "handoff.summary",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff-resumo.server.ts",
+    funcao: null,
+    anteriores: ["handoff.queue"],
+    seguintes: [],
   },
   {
-    "id": "protocol.generate",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/protocolo-atendimento.server.ts",
-    "funcao": "protocoloAoAtribuirHumano",
-    "anteriores": [
-      "handoff.assign"
-    ],
-    "seguintes": []
+    id: "handoff.assign",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "atribuirAtendenteOnline",
+    anteriores: ["handoff.queue"],
+    seguintes: ["protocol.generate"],
   },
   {
-    "id": "response.templates",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/resposta/templates.server.ts",
-    "funcao": "carregarTemplatesPublicados",
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "response.finalize"
-    ]
+    id: "protocol.generate",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/protocolo-atendimento.server.ts",
+    funcao: "protocoloAoAtribuirHumano",
+    anteriores: ["handoff.assign"],
+    seguintes: [],
   },
   {
-    "id": "response.finalize",
-    "categoria": "SAIDA",
-    "arquivo": "src/lib/nina/resposta/finalizacao.server.ts",
-    "funcao": "finalizarResposta",
-    "anteriores": [
-      "llm.generate",
-      "response.templates"
-    ],
-    "seguintes": [
-      "response.validate"
-    ]
+    id: "response.templates",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/resposta/templates.server.ts",
+    funcao: "carregarTemplatesPublicados",
+    anteriores: ["context.load"],
+    seguintes: ["response.finalize"],
   },
   {
-    "id": "response.validate",
-    "categoria": "SAIDA",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNinaInterno",
-    "anteriores": [
-      "response.finalize"
-    ],
-    "seguintes": [
-      "message.outbound"
-    ]
+    id: "response.finalize",
+    categoria: "SAIDA",
+    arquivo: "src/lib/nina/resposta/finalizacao.server.ts",
+    funcao: "finalizarResposta",
+    anteriores: ["llm.generate", "response.templates"],
+    seguintes: ["response.validate"],
   },
   {
-    "id": "message.outbound",
-    "categoria": "SAIDA",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "metaSendText",
-    "anteriores": [
-      "response.validate"
-    ],
-    "seguintes": [
-      "audio.fallback",
-      "message.persist",
-      "test.evaluate.sol"
-    ]
+    id: "response.validate",
+    categoria: "SAIDA",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNinaInterno",
+    anteriores: ["response.finalize"],
+    seguintes: ["message.outbound"],
   },
   {
-    "id": "audio.fallback",
-    "categoria": "ERRO_FALLBACK",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "metaSendAudio",
-    "anteriores": [
-      "message.outbound"
-    ],
-    "seguintes": [
-      "message.persist"
-    ]
+    id: "message.outbound",
+    categoria: "SAIDA",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "metaSendText",
+    anteriores: ["response.validate"],
+    seguintes: ["audio.fallback", "message.persist", "test.evaluate.sol"],
   },
   {
-    "id": "message.persist",
-    "categoria": "SAIDA",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNinaInterno",
-    "anteriores": [
-      "audio.fallback",
-      "message.outbound"
-    ],
-    "seguintes": [
-      "conversation.close",
-      "metrics.record",
-      "wait.start"
-    ]
+    id: "audio.fallback",
+    categoria: "ERRO_FALLBACK",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "metaSendAudio",
+    anteriores: ["message.outbound"],
+    seguintes: ["message.persist"],
   },
   {
-    "id": "wait.start",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/espera-paciente.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "message.persist"
-    ],
-    "seguintes": [
-      "wait.timeout_job"
-    ]
+    id: "message.persist",
+    categoria: "SAIDA",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNinaInterno",
+    anteriores: ["audio.fallback", "message.outbound"],
+    seguintes: ["conversation.close", "metrics.record", "wait.start"],
   },
   {
-    "id": "wait.timeout",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/espera-timeout.server.ts",
-    "funcao": "processarTimeoutsEsperaPaciente",
-    "anteriores": [
-      "wait.timeout_job"
-    ],
-    "seguintes": [
-      "handoff.queue"
-    ]
+    id: "wait.start",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/espera-paciente.server.ts",
+    funcao: null,
+    anteriores: ["message.persist"],
+    seguintes: ["wait.timeout_job"],
   },
   {
-    "id": "conversation.close",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/encerramento-automatico.server.ts",
-    "funcao": "avaliarEncerramentoAutomatico",
-    "anteriores": [
-      "message.persist"
-    ],
-    "seguintes": [
-      "metrics.record"
-    ]
+    id: "wait.timeout",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/espera-timeout.server.ts",
+    funcao: "processarTimeoutsEsperaPaciente",
+    anteriores: ["wait.timeout_job"],
+    seguintes: ["handoff.queue"],
   },
   {
-    "id": "metrics.record",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/telemetria.server.ts",
-    "funcao": "registrarExecucao",
-    "anteriores": [
-      "conversation.close",
-      "llm.generate",
-      "message.persist"
-    ],
-    "seguintes": [
-      "evidence.record"
-    ]
+    id: "conversation.close",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/encerramento-automatico.server.ts",
+    funcao: "avaliarEncerramentoAutomatico",
+    anteriores: ["message.persist"],
+    seguintes: ["metrics.record"],
   },
   {
-    "id": "evidence.record",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/evidencias.server.ts",
-    "funcao": "gravarEvidencias",
-    "anteriores": [
-      "metrics.record"
-    ],
-    "seguintes": [
-      "metrics.period",
-      "trace.record"
-    ]
+    id: "metrics.record",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/telemetria.server.ts",
+    funcao: "registrarExecucao",
+    anteriores: ["conversation.close", "llm.generate", "message.persist"],
+    seguintes: ["evidence.record"],
   },
   {
-    "id": "metrics.period",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/desempenho-periodo.ts",
-    "funcao": null,
-    "anteriores": [
-      "evidence.record"
-    ],
-    "seguintes": []
+    id: "evidence.record",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/evidencias.server.ts",
+    funcao: "gravarEvidencias",
+    anteriores: ["metrics.record"],
+    seguintes: ["metrics.period", "trace.record"],
   },
   {
-    "id": "error.handle",
-    "categoria": "ERRO_FALLBACK",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "marcarResultado",
-    "anteriores": [
-      "llm.generate"
-    ],
-    "seguintes": []
+    id: "metrics.period",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/desempenho-periodo.ts",
+    funcao: null,
+    anteriores: ["evidence.record"],
+    seguintes: [],
   },
   {
-    "id": "flow.state",
-    "categoria": "MEMORIA",
-    "arquivo": "src/lib/nina/fluxo-estado.server.ts",
-    "funcao": "carregarFluxoEstado",
-    "anteriores": [
-      "session.resolve"
-    ],
-    "seguintes": [
-      "context.load"
-    ]
+    id: "error.handle",
+    categoria: "ERRO_FALLBACK",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "marcarResultado",
+    anteriores: ["llm.generate"],
+    seguintes: [],
   },
   {
-    "id": "instructions.greeting",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/saudacao-sessao.ts",
-    "funcao": "avaliarSaudacao",
-    "anteriores": [
-      "session.resolve"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "flow.state",
+    categoria: "MEMORIA",
+    arquivo: "src/lib/nina/fluxo-estado.server.ts",
+    funcao: "carregarFluxoEstado",
+    anteriores: ["session.resolve"],
+    seguintes: ["context.load"],
   },
   {
-    "id": "instructions.phases",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/atendimento-fase1.ts",
-    "funcao": "detectarIntencoes",
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "instructions.greeting",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/saudacao-sessao.ts",
+    funcao: "avaliarSaudacao",
+    anteriores: ["session.resolve"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "identity.gate",
-    "categoria": "VALIDACAO",
-    "arquivo": "src/lib/nina/identificacao-gate.server.ts",
-    "funcao": "aplicarGateIdentificacao",
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "instructions.phases",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/atendimento-fase1.ts",
+    funcao: "detectarIntencoes",
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "patient.link",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/vinculo-contato.server.ts",
-    "funcao": "vincularPacienteConversa",
-    "anteriores": [
-      "tool.patient.lookup"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "identity.gate",
+    categoria: "VALIDACAO",
+    arquivo: "src/lib/nina/identificacao-gate.server.ts",
+    funcao: "aplicarGateIdentificacao",
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "offer.complete",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/oferta-completa.ts",
-    "funcao": "montarOferta",
-    "anteriores": [
-      "tool.schedule.availability"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "patient.link",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/vinculo-contato.server.ts",
+    funcao: "vincularPacienteConversa",
+    anteriores: ["tool.patient.lookup"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.catalog.list",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "listarEspecialidades",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "offer.complete",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/oferta-completa.ts",
+    funcao: "montarOferta",
+    anteriores: ["tool.schedule.availability"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.doctor_schedule",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "escalaDoMedico",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.catalog.list",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "listarEspecialidades",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.my_appointments",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "executarFerramentaPaciente",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.doctor_schedule",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "escalaDoMedico",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "voice.inbound",
-    "categoria": "ENTRADA",
-    "arquivo": "src/routes/api/nina-fala.ts",
-    "funcao": "Route",
-    "anteriores": [],
-    "seguintes": [
-      "voice.reasoning"
-    ]
+    id: "tool.my_appointments",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "executarFerramentaPaciente",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "voice.reasoning",
-    "categoria": "IA",
-    "arquivo": "src/lib/nina/reasoning-router.ts",
-    "funcao": "selectThinkingLevel",
-    "anteriores": [
-      "voice.inbound"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "voice.inbound",
+    categoria: "ENTRADA",
+    arquivo: "src/routes/api/nina-fala.ts",
+    funcao: "Route",
+    anteriores: [],
+    seguintes: ["voice.reasoning"],
   },
   {
-    "id": "wait.timeout_job",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/routes/api/public/nina.watchdog.ts",
-    "funcao": "executarJobWatchdog",
-    "anteriores": [
-      "wait.start"
-    ],
-    "seguintes": [
-      "wait.timeout"
-    ]
+    id: "voice.reasoning",
+    categoria: "IA",
+    arquivo: "src/lib/nina/reasoning-router.ts",
+    funcao: "selectThinkingLevel",
+    anteriores: ["voice.inbound"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "trace.record",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/arquitetura/tracing.server.ts",
-    "funcao": "gravarEventosTrace",
-    "anteriores": [
-      "evidence.record"
-    ],
-    "seguintes": [
-      "test.evaluate.sol"
-    ]
+    id: "wait.timeout_job",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/routes/api/public/nina.watchdog.ts",
+    funcao: "executarJobWatchdog",
+    anteriores: ["wait.start"],
+    seguintes: ["wait.timeout"],
   },
   {
-    "id": "test.cycle",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/teste-console.server.ts",
-    "funcao": "garantirCiclo",
-    "anteriores": [],
-    "seguintes": [
-      "test.inbound"
-    ]
+    id: "trace.record",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/arquitetura/tracing.server.ts",
+    funcao: "gravarEventosTrace",
+    anteriores: ["evidence.record"],
+    seguintes: ["test.evaluate.sol"],
   },
   {
-    "id": "test.inbound",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/teste-console.server.ts",
-    "funcao": "processarMensagemTeste",
-    "anteriores": [
-      "test.cycle",
-      "test.load.luna",
-      "test.patient.terra",
-      "test.scenario.run"
-    ],
-    "seguintes": [
-      "context.load"
-    ]
+    id: "test.cycle",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/teste-console.server.ts",
+    funcao: "garantirCiclo",
+    anteriores: [],
+    seguintes: ["test.inbound"],
   },
   {
-    "id": "test.patient.terra",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/simulador-terra.functions.ts",
-    "funcao": "proximaMensagemTerra",
-    "anteriores": [],
-    "seguintes": [
-      "test.inbound"
-    ]
+    id: "test.inbound",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/teste-console.server.ts",
+    funcao: "processarMensagemTeste",
+    anteriores: ["test.cycle", "test.load.luna", "test.patient.terra", "test.scenario.run"],
+    seguintes: ["context.load"],
   },
   {
-    "id": "test.scenario.run",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/cenarios.functions.ts",
-    "funcao": "iniciarItemExecucao",
-    "anteriores": [
-      "test.regression"
-    ],
-    "seguintes": [
-      "test.inbound"
-    ]
+    id: "test.patient.terra",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/simulador-terra.functions.ts",
+    funcao: "proximaMensagemTerra",
+    anteriores: [],
+    seguintes: ["test.inbound"],
   },
   {
-    "id": "test.load.luna",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/carga.functions.ts",
-    "funcao": "executarLoteCarga",
-    "anteriores": [],
-    "seguintes": [
-      "test.inbound"
-    ]
+    id: "test.scenario.run",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/cenarios.functions.ts",
+    funcao: "iniciarItemExecucao",
+    anteriores: ["test.regression"],
+    seguintes: ["test.inbound"],
   },
   {
-    "id": "test.evaluate.sol",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/avaliador-sol.functions.ts",
-    "funcao": "avaliarComSol",
-    "anteriores": [
-      "message.outbound",
-      "trace.record"
-    ],
-    "seguintes": [
-      "test.report"
-    ]
+    id: "test.load.luna",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/carga.functions.ts",
+    funcao: "executarLoteCarga",
+    anteriores: [],
+    seguintes: ["test.inbound"],
   },
   {
-    "id": "test.report",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/relatorio-teste.functions.ts",
-    "funcao": "detalheRelatorioTeste",
-    "anteriores": [
-      "test.evaluate.sol"
-    ],
-    "seguintes": [
-      "test.review"
-    ]
+    id: "test.evaluate.sol",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/avaliador-sol.functions.ts",
+    funcao: "avaliarComSol",
+    anteriores: ["message.outbound", "trace.record"],
+    seguintes: ["test.report"],
   },
   {
-    "id": "test.review",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/revisao-teste.functions.ts",
-    "funcao": "enviarAchadoParaRevisao",
-    "anteriores": [
-      "test.report"
-    ],
-    "seguintes": [
-      "test.regression"
-    ]
+    id: "test.report",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/relatorio-teste.functions.ts",
+    funcao: "detalheRelatorioTeste",
+    anteriores: ["test.evaluate.sol"],
+    seguintes: ["test.review"],
   },
   {
-    "id": "test.regression",
-    "categoria": "HOMOLOGACAO",
-    "arquivo": "src/lib/nina/revisao-teste.functions.ts",
-    "funcao": "criarTesteRegressaoDeAchado",
-    "anteriores": [
-      "test.review"
-    ],
-    "seguintes": [
-      "test.scenario.run"
-    ]
-  }
+    id: "test.review",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/revisao-teste.functions.ts",
+    funcao: "enviarAchadoParaRevisao",
+    anteriores: ["test.report"],
+    seguintes: ["test.regression"],
+  },
+  {
+    id: "test.regression",
+    categoria: "HOMOLOGACAO",
+    arquivo: "src/lib/nina/revisao-teste.functions.ts",
+    funcao: "criarTesteRegressaoDeAchado",
+    anteriores: ["test.review"],
+    seguintes: ["test.scenario.run"],
+  },
 ];

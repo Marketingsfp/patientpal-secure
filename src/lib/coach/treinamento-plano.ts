@@ -15,7 +15,11 @@ export type Dificuldade = "facil" | "medio" | "dificil";
 export const DIFICULDADES: { valor: Dificuldade; label: string; descricao: string }[] = [
   { valor: "facil", label: "Fácil", descricao: "Paciente receptivo, poucas objeções." },
   { valor: "medio", label: "Médio", descricao: "Dúvidas de preço e horário, objeções comuns." },
-  { valor: "dificil", label: "Difícil", descricao: "Paciente apressado, desconfiado e resistente." },
+  {
+    valor: "dificil",
+    label: "Difícil",
+    descricao: "Paciente apressado, desconfiado e resistente.",
+  },
 ];
 
 /** Um atendimento só conta para a meta quando atinge a nota mínima. */
@@ -181,8 +185,7 @@ export function calcularProgresso(
     provaAprovada,
   ];
 
-  const pct = (itens: boolean[]) =>
-    Math.round((itens.filter(Boolean).length / itens.length) * 100);
+  const pct = (itens: boolean[]) => Math.round((itens.filter(Boolean).length / itens.length) * 100);
 
   return {
     hoje: {

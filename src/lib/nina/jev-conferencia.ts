@@ -1,0 +1,134 @@
+/**
+ * Jev — Fase 6: confere a resposta da Maria ANTES do envio. O Jev só lê o
+ * texto; o código cruza com os fatos do turno (agenda consultada, gravação
+ * confirmada, dados devolvidos pelas ferramentas). Puro (sem rede).
+ * Flag `nina_jev_fase6`. Erro/demora = resposta segue como hoje.
+ */
+import type { PerguntaJev, RespostaJev } from "./jev";
+import { REGRA_MODALIDADES_PAGAMENTO } from "./eficiencia-turno";
+
+export const LIMITE_CONFERENCIA = 0.7;
+
+export type FatosTurno = {
+  /** Agenda consultada com opções neste turno ou opções já oferecidas na sessão. */
+  agendaConsultada: boolean;
+  /** Gravação confirmada pelo sistema (neste turno ou já existente). */
+  agendamentoConfirmado: boolean;
+  /** Resultados das ferramentas deste turno (texto). Vazio = não confere dados. */
+  dadosConsultados: string[];
+};
+
+export type ProblemaConferencia =
+  | "vaga_sem_agenda"
+  | "agendado_sem_confirmacao"
+  | "cancelamento"
+  | "dado_sem_fonte";
+
+export function estadoConferencia(resposta: string, fatos: FatosTurno) {
+  const dados = [...new Set(fatos.dadosConsultados.map(dadosParaConferencia))].join("\n");
+  return { resposta, dados_consultados: dados || null };
+}
+
+/** Mantém preços e condições junto do atendimento, inclusive no fim do retorno.
+ * Cortar os primeiros 12 mil caracteres podia esconder a própria fonte do preço.
+ * Não valida valores por coincidência numérica nem aprova a resposta sem o Jev. */
+export function dadosParaConferencia(dados: string): string {
+  let valor: unknown;
+  try {
+    valor = JSON.parse(dados);
+  } catch {
+    return dados;
+  }
+  const financeiro =
+    /preco|valor|pagamento|dinheiro|cartao|pix|convenio|condicao|endereco|telefone|whatsapp|logradouro|bairro|cep|numero|complemento|cidade|estado/i;
+  const identidade =
+    /^(id|nome|medico|profissional|procedimento|atendimento|especialidade|categoria|tipo|forma|unidade|clinica)$/i;
+  function filtrar(v: unknown): unknown {
+    if (Array.isArray(v)) {
+      const itens = v.map(filtrar).filter((x) => x !== undefined);
+      return itens.length ? itens : undefined;
+    }
+    if (!v || typeof v !== "object")
+      return typeof v === "string" && /R\$|endere[cç]o|telefone|whatsapp/i.test(v) ? v : undefined;
+    const objeto = v as Record<string, unknown>;
+    const campos: Record<string, unknown> = {};
+    for (const [chave, item] of Object.entries(objeto)) {
+      if (financeiro.test(chave)) campos[chave] = item;
+      else if (!identidade.test(chave)) {
+        const parte = filtrar(item);
+        if (parte !== undefined) campos[chave] = parte;
+      }
+    }
+    if (!Object.keys(campos).length) return undefined;
+    return {
+      ...Object.fromEntries(Object.entries(objeto).filter(([k]) => identidade.test(k))),
+      ...campos,
+    };
+  }
+  // Retorno sem campos reconhecíveis continua literal; ausência de projeção não é ausência de fonte.
+  return JSON.stringify(filtrar(valor) ?? valor);
+}
+
+export function perguntasConferencia(fatos: FatosTurno): Record<string, PerguntaJev> {
+  const p: Record<string, PerguntaJev> = {
+    afirma_vaga: {
+      type: "noul",
+      instructions:
+        "`resposta` afirma que existe vaga, horário livre ou data disponível específica para o paciente marcar? Perguntar a preferência de dia ou período, ou dizer que vai verificar, não é afirmar vaga.",
+    },
+    afirma_agendado: {
+      type: "noul",
+      instructions:
+        "`resposta` afirma que um agendamento já foi feito, marcado, reservado ou confirmado? Resumir dados para o paciente confirmar ou perguntar se pode agendar não é afirmar.",
+    },
+    cancelamento: {
+      type: "noul",
+      instructions:
+        "`resposta` diz que a própria atendente cancelou, vai cancelar ou desmarcou uma consulta? Dizer que vai encaminhar o pedido de cancelamento para a recepção não conta.",
+    },
+  };
+  if (fatos.dadosConsultados.length > 0)
+    p.dado_sem_fonte = {
+      type: "noul",
+      instructions:
+        "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. Compare valores numéricos equivalentes (120, 120.00 e R$ 120,00), preservando atendimento, profissional, forma de pagamento e condições; o preço de outro atendimento não comprova este. " +
+        REGRA_MODALIDADES_PAGAMENTO,
+    };
+  return p;
+}
+
+/** Problemas encontrados. Resposta ausente nunca vira problema (não bloqueia o envio). */
+export function problemasConferencia(
+  respostas: Record<string, RespostaJev>,
+  fatos: FatosTurno,
+  limite: number = LIMITE_CONFERENCIA,
+): ProblemaConferencia[] {
+  const sim = (r: RespostaJev | undefined) => typeof r?.noul === "number" && r.noul >= limite;
+  const out: ProblemaConferencia[] = [];
+  if (sim(respostas["afirma_vaga"]) && !fatos.agendaConsultada) out.push("vaga_sem_agenda");
+  if (sim(respostas["afirma_agendado"]) && !fatos.agendamentoConfirmado)
+    out.push("agendado_sem_confirmacao");
+  if (sim(respostas["cancelamento"])) out.push("cancelamento");
+  if (fatos.dadosConsultados.length > 0 && sim(respostas["dado_sem_fonte"]))
+    out.push("dado_sem_fonte");
+  return out;
+}
+
+const CORRECOES: Record<ProblemaConferencia, string> = {
+  vaga_sem_agenda:
+    "A resposta afirma vaga ou horário disponível sem consulta à agenda neste atendimento. Não afirme disponibilidade sem consultar a agenda.",
+  agendado_sem_confirmacao:
+    "A resposta afirma agendamento feito, mas não há gravação confirmada pelo sistema. Não diga que está agendado.",
+  cancelamento:
+    "A Maria nunca cancela consultas. Pedidos de cancelamento são sempre encaminhados para a recepção.",
+  dado_sem_fonte:
+    "A resposta cita valor, endereço ou telefone que não aparece nos dados consultados. Use só dados consultados; se não houver, não informe.",
+};
+
+/** Instrução interna (papel de sistema) para a Maria refazer a resposta uma vez. */
+export function instrucaoCorrecao(problemas: ProblemaConferencia[]): string {
+  return `Conferência antes do envio encontrou problema(s): ${problemas.map((p) => CORRECOES[p]).join(" ")} Reescreva a resposta corrigindo só isso, preservando o restante que estiver correto. Esta correção não autoriza agendar, cancelar nem consultar nada novo.`;
+}
+
+export const RESPOSTA_SEGURA_CONFERENCIA =
+  "Desculpe, preciso conferir essa informação antes de te responder. Pode me dizer novamente como posso ajudar?";

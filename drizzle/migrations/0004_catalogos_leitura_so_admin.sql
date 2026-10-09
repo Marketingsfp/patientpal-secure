@@ -1,0 +1,6 @@
+DROP POLICY IF EXISTS permissions_select_auth ON public.permissions;
+DROP POLICY IF EXISTS tipos_servico_select ON public.tipos_servico;
+DROP POLICY IF EXISTS especialidades_select ON public.especialidades;
+CREATE POLICY permissions_select_admin ON public.permissions FOR SELECT TO authenticated USING (public.is_platform_admin(auth.uid()) OR EXISTS (SELECT 1 FROM public.clinica_memberships m WHERE m.user_id = auth.uid() AND m.ativo AND public.has_role(auth.uid(), m.clinica_id, 'admin'::public.app_role)));
+CREATE POLICY tipos_servico_select_admin ON public.tipos_servico FOR SELECT TO authenticated USING (public.is_platform_admin(auth.uid()) OR EXISTS (SELECT 1 FROM public.clinica_memberships m WHERE m.user_id = auth.uid() AND m.ativo AND public.has_role(auth.uid(), m.clinica_id, 'admin'::public.app_role)));
+CREATE POLICY especialidades_select_admin ON public.especialidades FOR SELECT TO authenticated USING (public.is_platform_admin(auth.uid()) OR EXISTS (SELECT 1 FROM public.clinica_memberships m WHERE m.user_id = auth.uid() AND m.ativo AND public.has_role(auth.uid(), m.clinica_id, 'admin'::public.app_role)));

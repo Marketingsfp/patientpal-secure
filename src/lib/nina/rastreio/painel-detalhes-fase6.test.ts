@@ -198,7 +198,9 @@ describe("FASE 6 — painel coerente para a execução de referência", () => {
   });
 
   it("estados das etapas respeitam os eventos registrados; ✔ só para sucesso", () => {
-    const [running, ok, skipped] = CASO.eventosRastreio.map((e) => apresentarEstadoEvento(e.status));
+    const [running, ok, skipped] = CASO.eventosRastreio.map((e) =>
+      apresentarEstadoEvento(e.status),
+    );
     expect(ok!.simbolo).toBe("✔");
     expect(running!.simbolo).not.toBe("✔");
     expect(skipped!.simbolo).not.toBe("✔");
@@ -243,9 +245,7 @@ describe("FASE 6 — isolamento e registros antigos", () => {
   });
 
   it("registro antigo sem hashes fica indeterminado, nunca 'sem alteração'", () => {
-    const situacao = avaliarTransformacoes([
-      { antesHash: null, depoisHash: null },
-    ]);
+    const situacao = avaliarTransformacoes([{ antesHash: null, depoisHash: null }]);
     expect(situacao).toBe("indeterminado");
     expect(ROTULO_SITUACAO_TRANSFORMACAO[situacao]).toBe(
       "Não foi possível determinar se houve alteração",

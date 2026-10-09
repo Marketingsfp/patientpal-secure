@@ -4,9 +4,7 @@ import {
   executarDistribuicaoFila,
   salvarPresencaComDistribuicao,
 } from "../distribuicao.server";
-import {
-  type ResultadoDistribuicaoFila,
-} from "../distribuicao-contrato";
+import { type ResultadoDistribuicaoFila } from "../distribuicao-contrato";
 
 const concluida: ResultadoDistribuicaoFila = {
   status: "concluida",
@@ -70,12 +68,16 @@ describe("contrato de presença e distribuição do Zap OS", () => {
       pausaId: null,
     });
     const resultado = await salvarPresencaComDistribuicao(db, {
-      clinicaId: "clinica", estado: "PAUSA", versao: 2,
+      clinicaId: "clinica",
+      estado: "PAUSA",
+      versao: 2,
     });
-    expect(db.chamadas).toEqual([{
-      nome: "atend_definir_presenca_manual",
-      args: { _clinica_id: "clinica", _estado: "PAUSA", _versao: 2 },
-    }]);
+    expect(db.chamadas).toEqual([
+      {
+        nome: "atend_definir_presenca_manual",
+        args: { _clinica_id: "clinica", _estado: "PAUSA", _versao: 2 },
+      },
+    ]);
     expect(resultado.ok && resultado.estado).toBe("PAUSA");
     expect(resultado.ok && resultado.pausaId).toBeNull();
   });

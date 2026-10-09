@@ -42,9 +42,9 @@ describe("Catálogo da Nina — exames e procedimentos", () => {
   });
 
   it("resumo de preço vem das formas de pagamento quando existem", () => {
-    expect(
-      valorResumo({ valor: 999, formas_pagamento: [{ valor: 130 }, { valor: 150 }] }),
-    ).toBe(130);
+    expect(valorResumo({ valor: 999, formas_pagamento: [{ valor: 130 }, { valor: 150 }] })).toBe(
+      130,
+    );
     expect(valorResumo({ valor: 200, formas_pagamento: [] })).toBe(200);
     expect(valorResumo({ valor: null, formas_pagamento: [{ valor: null }] })).toBeNull();
   });
@@ -76,7 +76,11 @@ describe("Catálogo da Nina — consultas e profissionais", () => {
   });
 
   it("aviso do dia vale apenas dentro do período informado", () => {
-    const aviso = { aviso_dia: "Hoje começa às 10h", aviso_valido_de: "2026-09-01", aviso_valido_ate: "2026-09-02" };
+    const aviso = {
+      aviso_dia: "Hoje começa às 10h",
+      aviso_valido_de: "2026-09-01",
+      aviso_valido_ate: "2026-09-02",
+    };
     expect(avisoVigente(aviso, "2026-09-01")).toBe(true);
     expect(avisoVigente(aviso, "2026-09-05")).toBe(false);
     expect(avisoVigente({ aviso_dia: null }, "2026-09-01")).toBe(false);

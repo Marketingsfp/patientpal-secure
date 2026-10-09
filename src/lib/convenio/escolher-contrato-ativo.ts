@@ -124,4 +124,3 @@ export function filtrarTitularesBeneficiarios<T extends ContratoComTitular>(
 ): T[] {
   return lista.filter((c): c is T => titularUsaBeneficio(c));
 }
-

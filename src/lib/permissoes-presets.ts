@@ -9,6 +9,8 @@ export type PerfilKey =
   | "caixa"
   | "financeiro"
   | "enfermeiro"
+  // Gestão operacional sem dinheiro: equipe, indicadores, agendas e filas.
+  | "supervisor"
   // Perfil próprio (mesmo nível de recepção/caixa): atendimento humano das
   // conversas encaminhadas pela Nina.
   | "telefonia";
@@ -28,6 +30,7 @@ export const PERFIS_SISTEMA: ReadonlyArray<{ value: PerfilKey; label: string }> 
   { value: "recepcao", label: "Recepção" },
   { value: "caixa", label: "Caixa" },
   { value: "financeiro", label: "Financeiro" },
+  { value: "supervisor", label: "Supervisor" },
   { value: "telefonia", label: "Telefonia" },
 ];
 
@@ -60,6 +63,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "alertas-enfermagem",
   "consulta-rapida",
   "nina",
+  "francisco",
   "odontologia",
   "fisioterapia",
   "prontuarios",
@@ -283,6 +287,45 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     orcamentos: "write",
     "atendimento-multiplo": "write",
     caixa: "read",
+  },
+  // Supervisão da unidade (pedido da gestão, 08/10/2026): vê a operação inteira
+  // — agenda, recepção, filas, atendimentos, equipe e relatórios de
+  // produtividade — e NADA de dinheiro. Ficam de fora, de propósito: caixa,
+  // financeiro (e abas), DRE/painel executivo, boletos, contratos, NFS-e,
+  // cartões, orçamentos, tabela de preços, holerites e toda configuração do
+  // sistema. Em Relatórios, os quadros e planilhas em dinheiro somem para quem
+  // não tem o módulo "financeiro" (ver app.relatorios.tsx).
+  supervisor: {
+    dashboard: "read",
+    agenda: "write",
+    "agenda-escala": "read",
+    "atendimento-multiplo": "write",
+    checkin: "write",
+    recepcao: "write",
+    fluxo: "write",
+    clientes: "write",
+    chat: "write",
+    "triagem-enfermagem": "read",
+    "alertas-enfermagem": "read",
+    "consulta-rapida": "read",
+    // "Informações rápidas" sim, tabela de preços não. O "none" explícito é o
+    // que impede o submódulo de herdar o pai (ver negadosNoPreset).
+    "consulta-rapida-valores": "none",
+    relatorios: "read",
+    equipe: "read",
+    "hr-ponto": "read",
+    "hr-ferias": "read",
+    treinamentos: "read",
+    medicos: "read",
+    especialidades: "read",
+    disponibilidades: "read",
+    nina: "write",
+    "nina-aprendizado": "write",
+    "nina-metricas": "read",
+    // Configuração da Nina é do administrador.
+    "nina-arquitetura": "none",
+    // Marcar quem é da gestão é poder de administrador (a tela ainda confere).
+    "equipe-acessos": "none",
   },
   // Espelha o que a migration grava em perfil_permissoes para o perfil
   // TELEFONIA — é o padrão de quem recebe os handoffs da Nina. A elegibilidade

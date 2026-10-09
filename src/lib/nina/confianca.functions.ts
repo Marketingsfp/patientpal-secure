@@ -31,7 +31,10 @@ function filtrarAmbiente<T>(q: T, ambiente: string): T {
 
 /** FASE 7 — leitura paginada: evita contar apenas o começo do recorte. */
 async function lerPaginado<T>(
-  montar: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  montar: (
+    de: number,
+    ate: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   limite: number,
   pagina = 1000,
 ): Promise<{ linhas: T[]; truncado: boolean }> {
@@ -79,7 +82,9 @@ export const resumoConfiancaNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         dias: z.number().int().min(1).max(90).default(7),
-        ambiente: z.enum(["todos", "producao", "homologacao", "teste_automatizado"]).default("todos"),
+        ambiente: z
+          .enum(["todos", "producao", "homologacao", "teste_automatizado"])
+          .default("todos"),
       })
       .parse(i),
   )
@@ -275,7 +280,9 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
         /** FASE 6 — texto/áudio realmente entregue nesta bolha. */
         conteudo: z.string().max(20000).optional(),
         /** FASE 6 — forma da saída: texto completo ou áudio. */
-        representacao: z.enum(["texto_completo", "audio_integral", "audio_resumo", "audio"]).optional(),
+        representacao: z
+          .enum(["texto_completo", "audio_integral", "audio_resumo", "audio"])
+          .optional(),
       })
       .parse(i),
   )
@@ -396,7 +403,10 @@ export const confiabilidadeDaExecucao = createServerFn({ method: "POST" })
       const s = segRow as Record<string, unknown>;
       const acao = s["acao_solicitada"] ? String(s["acao_solicitada"]) : null;
       const bloqueadores = [
-        ...new Set([...lista(s["bloqueadores"]), ...(s["bloqueio"] ? [String(s["bloqueio"])] : [])]),
+        ...new Set([
+          ...lista(s["bloqueadores"]),
+          ...(s["bloqueio"] ? [String(s["bloqueio"])] : []),
+        ]),
       ];
       const executavel =
         acao === "criar_agendamento" ||
@@ -566,12 +576,16 @@ export const metricasConfiabilidadeNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         dias: z.number().int().min(1).max(180).default(30),
-        ambiente: z.enum(["todos", "producao", "homologacao", "teste_automatizado"]).default("producao"),
+        ambiente: z
+          .enum(["todos", "producao", "homologacao", "teste_automatizado"])
+          .default("producao"),
       })
       .parse(i),
   )
   .handler(async ({ data, context }): Promise<MetricasConfiabilidade> => {
-    const desde = inicioNoCicloAprendizado(new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString());
+    const desde = inicioNoCicloAprendizado(
+      new Date(Date.now() - data.dias * 24 * 60 * 60 * 1000).toISOString(),
+    );
 
     const LIMITE = 5000;
     const { linhas: rows, truncado } = await lerPaginado<Record<string, unknown>>(
@@ -733,10 +747,7 @@ async function lerProvasTransferencia(
 ): Promise<ProvaTransferencia[]> {
   const ids = [...new Set(conversas.filter(Boolean) as string[])].slice(0, 1000);
   if (ids.length === 0) return [];
-  const { data } = await supabase
-    .from("atend_conversas")
-    .select("id, handoff_em")
-    .in("id", ids);
+  const { data } = await supabase.from("atend_conversas").select("id, handoff_em").in("id", ids);
   return ((data ?? []) as Array<{ id: string; handoff_em: string | null }>).map((c) => ({
     conversa_id: c.id,
     houveHandoff: Boolean(c.handoff_em),
@@ -752,9 +763,7 @@ async function lerProvasAgendamento(
   const coletar = (valor: unknown, conversa: string | null) => {
     if (!valor) return;
     const texto = JSON.stringify(valor);
-    for (const m of texto.matchAll(
-      /"agendamento_id"\s*:\s*"([0-9a-fA-F-]{36})"/g,
-    )) {
+    for (const m of texto.matchAll(/"agendamento_id"\s*:\s*"([0-9a-fA-F-]{36})"/g)) {
       candidatos.set(m[1]!, conversa);
     }
   };
@@ -796,7 +805,9 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         dias: z.number().int().min(7).max(180).default(30),
-        ambiente: z.enum(["todos", "producao", "homologacao", "teste_automatizado"]).default("producao"),
+        ambiente: z
+          .enum(["todos", "producao", "homologacao", "teste_automatizado"])
+          .default("producao"),
       })
       .parse(i),
   )
@@ -832,7 +843,7 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         policy_version: (r["policy_version"] as string) ?? null,
         score: Number(r["score"]) || 0,
         nivel: (r["nivel"] as string) ?? null,
-        decisao: ((r["decisao"] as string) ?? (r["acao"] as string)) ?? null,
+        decisao: (r["decisao"] as string) ?? (r["acao"] as string) ?? null,
         resultado_final: (r["resultado_final"] as string) ?? null,
         acao_solicitada: (r["acao_solicitada"] as string) ?? null,
         bloqueadores: [...new Set([...lista(r["bloqueadores"]), ...bloqueio])],
@@ -851,10 +862,10 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
     // FASE 7 — cada ambiente usa os próprios reportes.
     const { data: errosRows } = await filtrarAmbiente(
       context.supabase
-      .from("nina_feedback_erros")
-      .select("id, conversa_id, mensagem_id, execucao_id, categoria, status, created_at")
-      .eq("clinica_id", data.clinicaId)
-      .gte("created_at", desde),
+        .from("nina_feedback_erros")
+        .select("id, conversa_id, mensagem_id, execucao_id, categoria, status, created_at")
+        .eq("clinica_id", data.clinicaId)
+        .gte("created_at", desde),
       data.ambiente,
     ).limit(5000);
 
@@ -882,7 +893,10 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         .in("id", ids.slice(0, 1000));
       // FASE 7 — reserva confirmada exige prova na agenda; decisão ALLOW não
       // comprova execução.
-      const provas = await lerProvasAgendamento(context.supabase, (rows ?? []) as Array<Record<string, unknown>>);
+      const provas = await lerProvasAgendamento(
+        context.supabase,
+        (rows ?? []) as Array<Record<string, unknown>>,
+      );
       const pediuAgendamento = new Set(
         decisoes
           .filter((d) => (d.acao_solicitada ?? "").includes("agendamento") && d.conversation_id)
@@ -908,7 +922,6 @@ export const calibracaoConfiancaNina = createServerFn({ method: "POST" })
         };
       });
     }
-
 
     // FASE 7 — a calibração compara com a configuração REALMENTE em vigor
     // nesta clínica, não com a política padrão.

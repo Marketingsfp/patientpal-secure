@@ -50,7 +50,6 @@ import {
   salvarRespostaRapida,
 } from "@/lib/atendimento/respostas-rapidas.functions";
 
-
 type Form = {
   id: string | null;
   nome: string;
@@ -92,8 +91,7 @@ export function RespostasRapidasManager() {
     );
   }, [dados.respostas, busca]);
 
-  const podeEditar = (r: RespostaRapida) =>
-    r.escopo === "pessoal" ? true : dados.podeGerenciar;
+  const podeEditar = (r: RespostaRapida) => (r.escopo === "pessoal" ? true : dados.podeGerenciar);
 
   function abrirNovo() {
     setForm({ ...VAZIO, escopo: dados.podeGerenciar ? "clinica" : "pessoal" });
@@ -206,9 +204,9 @@ export function RespostasRapidasManager() {
       <div className="flex items-start gap-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <p>
-          Respostas rápidas são atalhos de digitação usados na conversa com o comando{" "}
-          <code>/</code>. Elas <strong>não</strong> são templates oficiais do WhatsApp (Meta) e
-          não reabrem a janela de 24 horas.
+          Respostas rápidas são atalhos de digitação usados na conversa com o comando <code>/</code>
+          . Elas <strong>não</strong> são templates oficiais do WhatsApp (Meta) e não reabrem a
+          janela de 24 horas.
         </p>
       </div>
 
@@ -333,9 +331,7 @@ export function RespostasRapidasManager() {
                 <Label htmlFor="rr-categoria">Categoria</Label>
                 <Select
                   value={form.categoria || "__nenhuma"}
-                  onValueChange={(v) =>
-                    setForm({ ...form, categoria: v === "__nenhuma" ? "" : v })
-                  }
+                  onValueChange={(v) => setForm({ ...form, categoria: v === "__nenhuma" ? "" : v })}
                 >
                   <SelectTrigger id="rr-categoria">
                     <SelectValue placeholder="Sem categoria" />

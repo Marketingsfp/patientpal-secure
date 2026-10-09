@@ -47,9 +47,7 @@ export function BaseConhecimentoEditor({
         <Database className="h-4 w-4 text-muted-foreground" />
         Base de conhecimento da clínica
         <span className="ml-auto text-xs font-normal text-muted-foreground">
-          {gerando
-            ? "atualizando…"
-            : `${tamanho.toLocaleString("pt-BR")} caracteres · ${quando}`}
+          {gerando ? "atualizando…" : `${tamanho.toLocaleString("pt-BR")} caracteres · ${quando}`}
         </span>
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
@@ -62,7 +60,13 @@ export function BaseConhecimentoEditor({
             cadastro para valer na hora.
           </p>
           <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" size="sm" onClick={onAtualizar} disabled={gerando}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onAtualizar}
+              disabled={gerando}
+            >
               {gerando ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

@@ -28,7 +28,6 @@ type ResumoEvidencias = ResumoPacote & {
   modelo_da_execucao: string | null;
 };
 
-
 type Analise = {
   id: string;
   feedback_id: string;
@@ -71,24 +70,26 @@ async function chamarAvaliador(
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Análise indisponível: chave do provedor de IA não configurada.");
 
-  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
-      model: MODELO_ANALISE,
-      instructions: INSTRUCOES_AVALIADOR,
-      input: prompt,
-      stream: true,
-      store: false,
-      // Sem ferramentas: o avaliador não escreve, não navega e não executa código.
-      tools: [],
-      // Não pedimos resumo de raciocínio: nada de pensamento privado é solicitado ou guardado.
-      text: {
-        format: {
-          type: "json_schema",
-          name: "analise_erro_nina",
-          strict: true,
-          schema: SCHEMA_ANALISE,
-        },
+  const res = await (
+    await import("@/lib/nina/claude-messages.server")
+  ).chamarClaudeComoResponses({
+    model: MODELO_ANALISE,
+    instructions: INSTRUCOES_AVALIADOR,
+    input: prompt,
+    stream: true,
+    store: false,
+    // Sem ferramentas: o avaliador não escreve, não navega e não executa código.
+    tools: [],
+    // Não pedimos resumo de raciocínio: nada de pensamento privado é solicitado ou guardado.
+    text: {
+      format: {
+        type: "json_schema",
+        name: "analise_erro_nina",
+        strict: true,
+        schema: SCHEMA_ANALISE,
       },
-    });
+    },
+  });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");
@@ -183,9 +184,8 @@ export const analisarErroNinaComIA = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await exigirPermissao(context, data.clinicaId);
-    const { analiseIAAtivaNaClinica, MSG_ANALISE_DESATIVADA } = await import(
-      "./analise-flag.server"
-    );
+    const { analiseIAAtivaNaClinica, MSG_ANALISE_DESATIVADA } =
+      await import("./analise-flag.server");
     if (!(await analiseIAAtivaNaClinica(data.clinicaId))) {
       throw new Error(MSG_ANALISE_DESATIVADA);
     }

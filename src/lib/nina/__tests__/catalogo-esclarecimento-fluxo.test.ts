@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
-describe("Nina: até duas perguntas e encaminhamento na geração real", () => {
+describe("Nina: confirmação e encaminhamento após reformulação inconclusiva", () => {
   for (const ambiente of ["producao", "homologacao"])
     for (const etapa of [
       "primeiro",
@@ -30,27 +30,23 @@ describe("Nina: até duas perguntas e encaminhamento na geração real", () => {
         expect(r.rede).toBe(0);
         expect(
           r.ferramentas.filter((f: string) => f === "solicitar_atendente_humano"),
-        ).toHaveLength(etapa === "terceiro" ? 1 : 0);
+        ).toHaveLength(etapa === "terceiro" || etapa.startsWith("segundo") ? 1 : 0);
         if (etapa === "primeiro" || etapa === "novo_pedido") {
           expect(r.resposta).toContain("Pode informar o nome do procedimento por extenso?");
           expect(r.resposta).not.toContain("R$");
-          expect(r.requests).toHaveLength(1);
+          expect(r.requests).toHaveLength(2); // permite pesquisar outras perguntas antes de concluir
           expect(JSON.stringify(r.gravacoes)).toContain("esclarecimento");
           expect(JSON.stringify(r.gravacoes)).toContain('"esclarecimentoTentativas":1');
-        } else if (etapa.startsWith("segundo")) {
-          expect(r.resposta).toContain("Pode conferir e copiar o nome completo");
-          expect(r.resposta).not.toContain("Pode informar o nome do procedimento por extenso?");
-          expect(r.requests).toHaveLength(1);
-          expect(JSON.stringify(r.gravacoes)).toContain('"esclarecimentoTentativas":2');
-        } else if (etapa === "terceiro") {
+        } else if (etapa === "terceiro" || etapa.startsWith("segundo")) {
           expect(r.encaminhamentos[0].motivo).toContain("CATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA");
           expect(r.encaminhamentos[0].resumo).toContain("Não sei explicar");
-          expect(r.encaminhamentos[0].resumo).toContain("duas tentativas");
+          expect(r.encaminhamentos[0].resumo).toContain("após a resposta ao esclarecimento");
           expect(r.resposta).not.toContain("Pode informar o nome do procedimento por extenso?");
           expect(r.requests).toHaveLength(1);
         } else expect(r.requests).toHaveLength(2);
         expect(r.ordem[0]).toBe("modelo");
-        if (etapa !== "primeiro") expect(JSON.stringify(r.requests[0].messages)).toContain("esclarecimento");
+        if (etapa !== "primeiro" && etapa !== "novo_pedido")
+          expect(JSON.stringify(r.requests[0].messages)).toContain("esclarecimento");
       });
     }
 });

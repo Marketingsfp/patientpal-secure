@@ -105,7 +105,11 @@ describe("fallback preservado", () => {
     ["sem conteúdo", evento({ body: "" }), "sem_conteudo"],
     ["direção inválida", evento({ direction: "x" }), "direcao_invalida"],
     ["console de homologação", evento({ is_teste: true }), "homologacao"],
-    ["exclusão", { table: "whatsapp_mensagens", eventType: "DELETE", new: null }, "evento_nao_suportado"],
+    [
+      "exclusão",
+      { table: "whatsapp_mensagens", eventType: "DELETE", new: null },
+      "evento_nao_suportado",
+    ],
     ["outra tabela", { table: "atend_conversas", eventType: "INSERT", new: {} }, "tabela"],
   ];
 

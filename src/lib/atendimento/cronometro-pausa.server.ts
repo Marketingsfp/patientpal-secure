@@ -11,18 +11,26 @@ export async function consultarInicioCronometroPausa(
   args: { clinicaId: string; userId: string; estado: EstadoManualPresenca | null; versao: number },
 ): Promise<string | null> {
   if (!ehEstadoPausa(args.estado)) return null;
-  const base = () => db.from("atend_presenca_manual_log")
-    .select("estado, versao, created_at")
-    .eq("clinica_id", args.clinicaId)
-    .eq("user_id", args.userId)
-    // Reconstrói a mesma versão da presença, mesmo se outra aba gravar durante a leitura.
-    .lte("versao", args.versao);
-  const { data: encerramento, error: erroEncerramento } = await base().neq("estado", args.estado as string)
-    .order("versao", { ascending: false }).limit(1).maybeSingle();
+  const base = () =>
+    db
+      .from("atend_presenca_manual_log")
+      .select("estado, versao, created_at")
+      .eq("clinica_id", args.clinicaId)
+      .eq("user_id", args.userId)
+      // Reconstrói a mesma versão da presença, mesmo se outra aba gravar durante a leitura.
+      .lte("versao", args.versao);
+  const { data: encerramento, error: erroEncerramento } = await base()
+    .neq("estado", args.estado as string)
+    .order("versao", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (erroEncerramento) throw erroEncerramento;
-  const { data: pausa, error: erroPausa } = await base().eq("estado", args.estado as string)
+  const { data: pausa, error: erroPausa } = await base()
+    .eq("estado", args.estado as string)
     .gt("versao", encerramento?.versao ?? -1)
-    .order("versao", { ascending: true }).limit(1).maybeSingle();
+    .order("versao", { ascending: true })
+    .limit(1)
+    .maybeSingle();
   if (erroPausa) throw erroPausa;
   return pausa?.created_at ?? null;
 }

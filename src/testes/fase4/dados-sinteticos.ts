@@ -60,7 +60,7 @@ export const presenca = {
   online: { status: "ONLINE", vistoEm: agora(), emPausa: false },
   pausa: { status: "ONLINE", vistoEm: agora(), emPausa: true },
   /** Heartbeat vencido (a janela válida é de 5 minutos). */
-  offline: { status: "ONLINE", vistoEm: minutosAtras(30), emPausa: false },
+  offline: { status: "OFFLINE", vistoEm: minutosAtras(30), emPausa: false },
   nuncaVisto: { status: null, vistoEm: null, emPausa: false },
 } as const;
 

@@ -112,7 +112,10 @@ function janelaPreferida(data?: string | null, hora?: string | null, periodo?: s
   // America/Sao_Paulo = UTC-3 (sem horário de verão desde 2019).
   const inicio = new Date(`${base}T${hhmm}:00-03:00`);
   if (Number.isNaN(inicio.getTime())) return null;
-  return { inicio: inicio.toISOString(), fim: new Date(inicio.getTime() + 30 * 60000).toISOString() };
+  return {
+    inicio: inicio.toISOString(),
+    fim: new Date(inicio.getTime() + 30 * 60000).toISOString(),
+  };
 }
 
 export async function handleIntake(
@@ -196,7 +199,9 @@ export async function handleIntake(
       },
     } as never);
     if (error) {
-      return json(500, { error: { code: "intake_failed", message: "Não foi possível registrar." } });
+      return json(500, {
+        error: { code: "intake_failed", message: "Não foi possível registrar." },
+      });
     }
     return json(201, { data: { recebido: true, protocolo: idExterno, tipo: "contato" } });
   }
@@ -260,7 +265,11 @@ export async function handleIntake(
   // Especialidade escolhida no site → id do catálogo (sem diferenciar
   // maiúscula/minúscula nem acento). Não achou, segue null como antes.
   const normalizar = (s: string) =>
-    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
   const pedidoPaciente = body.procedimento?.trim() || null;
   let especialidadeId: string | null = null;
   let procedimentoCatalogo: string | null = null;
@@ -289,7 +298,9 @@ export async function handleIntake(
         .eq("especialidade_id", achada.id)
         .eq("clinica_id", clinicaId)
         .eq("procedimento.ativo", true);
-      const lista = ((procs ?? []) as Array<{ procedimento: { nome: string; tipo: string | null } | null }>)
+      const lista = (
+        (procs ?? []) as Array<{ procedimento: { nome: string; tipo: string | null } | null }>
+      )
         .map((p) => p.procedimento)
         .filter((p): p is { nome: string; tipo: string | null } => !!p?.nome)
         .sort(

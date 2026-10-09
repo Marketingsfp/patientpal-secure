@@ -2,13 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { nomeArquivoSeguro, textoDoDocumento } from "@/lib/whatsapp-midia-armazenamento";
 import { createHmac, timingSafeEqual } from "crypto";
 import { loadWhatsAppConfig, metaSendText } from "@/lib/whatsapp.server";
+import { bloquearLinksRecebidos } from "@/lib/atendimento/links-entrada";
+import { decidirAssinaturaWebhook } from "@/lib/whatsapp-assinatura";
 
 function verifySignature(
   appSecret: string,
-  rawBody: string,
+  rawBody: Uint8Array,
   signatureHeader: string | null,
 ): boolean {
-  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+  if (!signatureHeader || !/^sha256=[a-fA-F0-9]{64}$/.test(signatureHeader)) return false;
   const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const received = signatureHeader.slice("sha256=".length);
   const a = Buffer.from(expected, "hex");
@@ -130,7 +132,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
         const trace = iniciarTraceServidor({ fluxo: "recv" });
         trace.marcar("RECV_T0_WEBHOOK_RECEIVED");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const rawBody = await request.text();
+        // A assinatura autentica os bytes recebidos, antes da decodificação do JSON.
+        const rawBodyBytes = new Uint8Array(await request.arrayBuffer());
+        const rawBody = new TextDecoder().decode(rawBodyBytes);
         const logId = await registrarLogWebhook(params.clinicaId, "POST", request, rawBody);
         let resultado = "evento_ignorado";
         try {
@@ -145,12 +149,23 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
           }
 
           const sigHeader = request.headers.get("x-hub-signature-256");
-          // Assinatura não confere (ou App Secret vazio/errado): registramos, mas
-          // NUNCA descartamos a mensagem do paciente.
+          // Recusa antes de processar mensagens ou recibos. Somente o log
+          // técnico da tentativa é permitido sem autenticação.
           const assinaturaOk = Boolean(
-            cfg.app_secret && verifySignature(cfg.app_secret, rawBody, sigHeader),
+            cfg.app_secret && verifySignature(cfg.app_secret, rawBodyBytes, sigHeader),
           );
-          if (!assinaturaOk) resultado = "assinatura_invalida";
+          const decisaoAssinatura = decidirAssinaturaWebhook({
+            appSecretConfigurado: Boolean(cfg.app_secret),
+            assinaturaOk,
+          });
+          if (!decisaoAssinatura.processar) {
+            resultado = decisaoAssinatura.resultado ?? "erro:aviso recusado";
+            console.error("[whatsapp] aviso recusado: assinatura da Meta não confere", {
+              clinica_id: params.clinicaId,
+            });
+            return new Response("Invalid signature", { status: 401 });
+          }
+          if (decisaoAssinatura.resultado) resultado = decisaoAssinatura.resultado;
           trace.marcar("RECV_T1_SIGNATURE_VALIDATED");
           trace.marcar("RECV_T2_CONFIG_READY");
 
@@ -178,6 +193,15 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
               // Nunca interrompe o processamento das mensagens.
               const statuses: any[] = value?.statuses ?? [];
               if (statuses.length > 0) {
+                if (assinaturaOk) {
+                  try {
+                    const { registrarEntregaFrancisco } =
+                      await import("@/lib/francisco/replies.server");
+                    await registrarEntregaFrancisco(params.clinicaId, statuses);
+                  } catch {
+                    console.error("[francisco] Falha ao registrar recibo de entrega.");
+                  }
+                }
                 try {
                   const { registrarStatusEntregaConfirmacao } =
                     await import("@/lib/agenda/confirmacao-whatsapp.server");
@@ -196,6 +220,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 const ehImagem = tipo === "image";
                 const ehDocumento = tipo === "document";
                 const ehVideo = tipo === "video";
+                const chamadasIA: import("@/lib/nina/auditoria-ia").ChamadaIA[] = [];
+                const registrarIA = (c: import("@/lib/nina/auditoria-ia").ChamadaIA) => {
+                  chamadasIA.push(c);
+                };
 
                 // Texto do paciente que a Nina vai processar (áudio vira transcrição).
                 let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
@@ -204,7 +232,14 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 let mediaMime: string | null = null;
                 // Caminho do arquivo no bucket privado (imagem e áudio recebidos).
                 let caminhoMidia: string | null = null;
-                const legendaImagem = ehImagem ? String(msg.image?.caption ?? "").trim() : "";
+                // Classificação persistida: o núcleo controla leitura, nova tentativa e encaminhamento.
+                let leituraImagem: import("@/lib/nina/leitura-imagem").LeituraImagem = {
+                  tipo: "falha_tecnica",
+                  motivo: "download",
+                };
+                const legendaImagem = ehImagem
+                  ? bloquearLinksRecebidos(String(msg.image?.caption ?? "").trim())
+                  : "";
 
                 if (ehAudio || ehImagem || ehDocumento || ehVideo) {
                   // Mantém o armazenamento em dia: apaga só o que passou dos 5 anos de guarda (no máx. a cada hora).
@@ -213,7 +248,26 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   await limparMidiasExpiradasSeChegouAHora(params.clinicaId);
                 }
 
-                if (ehImagem && cfg.access_token) {
+                const imagemExistente = ehImagem
+                  ? await supabaseAdmin
+                      .from("whatsapp_mensagens")
+                      .select("id,transcricao,media_url,media_mime,raw")
+                      .eq("clinica_id", params.clinicaId)
+                      .eq("wa_message_id", wa_message_id)
+                      .maybeSingle()
+                  : null;
+                if (imagemExistente?.error)
+                  throw new Error("Não foi possível conferir a foto recebida anteriormente");
+                if (imagemExistente?.data) {
+                  const { leituraSalvaDaFoto } = await import("@/lib/nina/fotos");
+                  leituraImagem = leituraSalvaDaFoto(imagemExistente.data.raw) ?? {
+                    tipo: "falha_tecnica",
+                    motivo: "resposta_invalida",
+                  };
+                  caminhoMidia = imagemExistente.data.media_url;
+                  mediaMime = imagemExistente.data.media_mime;
+                }
+                if (ehImagem && cfg.access_token && !imagemExistente?.data) {
                   const mediaId = String(msg.image?.id ?? "");
                   if (mediaId) {
                     const { receberMidiaWhatsapp, lerPedidoNaImagem } =
@@ -231,18 +285,19 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     // A IA só lê a imagem quando a Nina vai mesmo responder (conversa de gente
                     // ou Nina desligada: a imagem não sai do sistema).
                     if (recebida.base64 && recebida.mime?.startsWith("image/")) {
-                      const { estadoConversaPorTelefone: estadoAntes, ninaPodeResponder: podeAntes } =
-                        await import("@/lib/atendimento/handoff.server");
+                      const {
+                        estadoConversaPorTelefone: estadoAntes,
+                        ninaPodeResponder: podeAntes,
+                      } = await import("@/lib/atendimento/handoff.server");
                       const { ninaDesativadaNaClinica: desligadaAntes } =
                         await import("@/lib/nina-desligada.server");
                       const estado = from ? await estadoAntes(params.clinicaId, from) : null;
                       if (podeAntes(estado) && !(await desligadaAntes(params.clinicaId))) {
-                        const leitura = await lerPedidoNaImagem(recebida.base64, recebida.mime);
-                        if (leitura.tipo === "pedido_medico") {
-                          const { textoDoPedidoLido } = await import("@/lib/nina/leitura-imagem");
-                          textoPaciente = textoDoPedidoLido(leitura.itens, legendaImagem);
-                          transcricao = textoPaciente;
-                        }
+                        leituraImagem = await lerPedidoNaImagem(
+                          recebida.base64,
+                          recebida.mime,
+                          registrarIA,
+                        );
                       }
                     }
                   }
@@ -271,6 +326,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     if (arquivo.erro) console.error("recebimento de arquivo falhou", arquivo.erro);
                   }
                 }
+                if (ehImagem) {
+                  const { textoDaImagem } = await import("@/lib/nina/leitura-imagem");
+                  textoPaciente = textoDaImagem(leituraImagem, legendaImagem);
+                  transcricao = textoPaciente;
+                }
 
                 if (ehAudio && cfg.access_token) {
                   const mediaId = String(msg.audio?.id ?? msg.voice?.id ?? "");
@@ -286,7 +346,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                     });
                     caminhoMidia = recebido.caminho;
                     const r = recebido.base64
-                      ? await transcreverAudioBase64(recebido.base64, recebido.mime)
+                      ? await transcreverAudioBase64(recebido.base64, recebido.mime, registrarIA)
                       : { texto: "", erro: recebido.erro };
                     mediaMime = recebido.mime;
                     if (r.texto) {
@@ -339,7 +399,11 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   media_url: caminhoMidia,
                   status: "received",
                   enviada_por: "paciente",
-                  raw: msg,
+                  raw: {
+                    ...msg,
+                    ...(ehImagem ? { nina_leitura_imagem: leituraImagem } : {}),
+                    nina_chamadas_ia: chamadasIA,
+                  },
                 });
                 const msgInserida = entradaPersistida.mensagem;
                 trace.marcar("RECV_T5_DB_INSERT_DONE");
@@ -348,8 +412,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   resultado = "duplicada_ignorada";
                   continue;
                 }
-                if (entradaPersistida.repetida) {
-                  // Retry reutiliza o conteúdo imutável da entrada, não o payload reenviado.
+                {
+                  // Sempre usa a entrada protegida, também no primeiro recebimento.
+                  // Retry reutiliza o conteúdo persistido, não o payload reenviado.
                   textoPaciente =
                     msgInserida.tipo === "audio" || msgInserida.tipo === "image"
                       ? (msgInserida.transcricao ?? "")
@@ -368,6 +433,37 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   telefone: String(from ?? "").replace(/\D/g, "") || from,
                   mensagemId: msgInserida.id,
                 });
+
+                // Francisco trata respostas antes de qualquer automação da Nina.
+                if (assinaturaOk) {
+                  try {
+                    const { processarRespostaFrancisco } =
+                      await import("@/lib/francisco/replies.server");
+                    const tratada = await processarRespostaFrancisco({
+                      clinicaId: params.clinicaId,
+                      from,
+                      mensagemId: msgInserida.id,
+                      waMessageId: wa_message_id,
+                      contextoId: (msgInserida.raw as any)?.context?.id,
+                      texto: textoPaciente,
+                      recebidaEm: msgInserida.recebida_em,
+                    });
+                    if (tratada) {
+                      const marcada = await supabaseAdmin
+                        .from("whatsapp_mensagens")
+                        .update({ nina_status: "handoff" })
+                        .eq("id", msgInserida.id)
+                        .eq("clinica_id", params.clinicaId);
+                      if (marcada.error) throw marcada.error;
+                      continue;
+                    }
+                  } catch {
+                    const { ErroAgrupamentoNina } = await import("@/lib/nina/agrupamento-turno");
+                    throw new ErroAgrupamentoNina(
+                      "Resposta ao Francisco aguarda encaminhamento seguro para a equipe.",
+                    );
+                  }
+                }
 
                 // ---------------------------------------------------------
                 // Resposta ao lembrete automático de consulta ("1"/"2" ou
@@ -638,7 +734,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
             }
           }
 
-          if (processou && resultado !== "assinatura_invalida") resultado = "processado_ok";
+          if (processou) resultado = "processado_ok";
           return new Response("ok", { status: 200 });
         } catch (e) {
           resultado = `erro:${String((e as Error)?.message ?? e)}`;

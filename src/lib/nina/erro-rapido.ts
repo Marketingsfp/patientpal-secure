@@ -47,7 +47,11 @@ export const ROTULO_AUDITORIA: Record<EstadoAuditoria, string> = {
  */
 export function estadoAuditoria(entrada: {
   execucaoId?: string | null;
-  execucao?: { model?: string | null; latency_ms?: number | null; created_at?: string | null } | null;
+  execucao?: {
+    model?: string | null;
+    latency_ms?: number | null;
+    created_at?: string | null;
+  } | null;
   mensagemCriadaEmMs?: number | null;
   agoraMs?: number;
 }): EstadoAuditoria {
@@ -94,7 +98,11 @@ export function estadoAnalise(item: {
 
 export type ResultadoValidacao =
   | { ok: true; snapshot: string }
-  | { ok: false; motivo: "mensagem_inexistente" | "conversa_divergente" | "autor_invalido" | "sem_conteudo"; mensagem: string };
+  | {
+      ok: false;
+      motivo: "mensagem_inexistente" | "conversa_divergente" | "autor_invalido" | "sem_conteudo";
+      mensagem: string;
+    };
 
 /**
  * Confere que a mensagem existe, pertence à conversa informada e foi enviada
@@ -128,11 +136,16 @@ export function validarMensagemNina(
       mensagem: "Só é possível reportar respostas da Nina ou avisos oficialmente vinculados a ela.",
     };
   }
-  const snapshot = mensagem.tipo === "audio" || mensagem.tipo === "voice"
-    ? mensagem.transcricao ?? ""
-    : mensagem.body ?? mensagem.transcricao ?? "";
+  const snapshot =
+    mensagem.tipo === "audio" || mensagem.tipo === "voice"
+      ? (mensagem.transcricao ?? "")
+      : (mensagem.body ?? mensagem.transcricao ?? "");
   if (snapshot === "") {
-    return { ok: false, motivo: "sem_conteudo", mensagem: "A mensagem não possui conteúdo de texto." };
+    return {
+      ok: false,
+      motivo: "sem_conteudo",
+      mensagem: "A mensagem não possui conteúdo de texto.",
+    };
   }
   return { ok: true, snapshot };
 }
@@ -174,7 +187,6 @@ export function ambienteDoReporte(entrada: {
   return entrada.automatizado ? "automated_test" : "homologation";
 }
 
-
 /** Payload de inserção do reporte rápido (sem motivo, categoria detalhada ou correção). */
 export function montarRegistroErroRapido(params: {
   clinicaId: string;
@@ -188,7 +200,6 @@ export function montarRegistroErroRapido(params: {
   ambiente?: AmbienteReporte;
   vinculo?: VinculoComplementar;
 }) {
-
   const v = params.vinculo ?? {};
   return {
     clinica_id: params.clinicaId,
@@ -207,8 +218,6 @@ export function montarRegistroErroRapido(params: {
     trace_id: v.traceId ?? null,
     nina_session_id: v.ninaSessionId ?? null,
     ambiente: params.ambiente ?? "production",
-
-
 
     categoria: CATEGORIA_A_CLASSIFICAR,
     correcao: null,
@@ -241,9 +250,10 @@ export function deveMostrarBotaoReporte(
 }
 
 /** Resultado do backend → aviso discreto correspondente. */
-export function avisoReporte(
-  resultado: { duplicado?: boolean } | null,
-): { tipo: "sucesso" | "duplicado"; texto: string } {
+export function avisoReporte(resultado: { duplicado?: boolean } | null): {
+  tipo: "sucesso" | "duplicado";
+  texto: string;
+} {
   return resultado?.duplicado
     ? { tipo: "duplicado", texto: TEXTO_REPORTE_DUPLICADO }
     : { tipo: "sucesso", texto: TEXTO_REPORTE_SUCESSO };

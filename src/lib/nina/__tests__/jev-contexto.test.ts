@@ -20,12 +20,48 @@ const OFERTA_NEURO =
 
 /** Registros como vêm do banco: do mais novo para o mais antigo, `in`/`out`. */
 const HISTORICO_BANCO = [
-  { id: "m5", direction: "in", body: "carlos eduardo", created_at: "2026-09-25T19:51:54Z", conversa_id: "c1" },
-  { id: "m4", direction: "out", body: OFERTA_NEURO, created_at: "2026-09-25T19:51:16Z", conversa_id: "c1" },
-  { id: "m3", direction: "in", body: "neuro", created_at: "2026-09-25T19:50:52Z", conversa_id: "c1" },
-  { id: "m2", direction: "out", body: "Claro! Qual especialidade ou médico você procura?", created_at: "2026-09-25T19:50:39Z", conversa_id: "c1" },
-  { id: "m1", direction: "in", body: "quero marcar uma consulta", created_at: "2026-09-25T19:50:19Z", conversa_id: "c1" },
-  { id: "m0", direction: "out", body: "Olá! Sou a Nina (ciclo anterior)", created_at: "2026-09-25T18:00:00Z", conversa_id: "c1" },
+  {
+    id: "m5",
+    direction: "in",
+    body: "carlos eduardo",
+    created_at: "2026-09-25T19:51:54Z",
+    conversa_id: "c1",
+  },
+  {
+    id: "m4",
+    direction: "out",
+    body: OFERTA_NEURO,
+    created_at: "2026-09-25T19:51:16Z",
+    conversa_id: "c1",
+  },
+  {
+    id: "m3",
+    direction: "in",
+    body: "neuro",
+    created_at: "2026-09-25T19:50:52Z",
+    conversa_id: "c1",
+  },
+  {
+    id: "m2",
+    direction: "out",
+    body: "Claro! Qual especialidade ou médico você procura?",
+    created_at: "2026-09-25T19:50:39Z",
+    conversa_id: "c1",
+  },
+  {
+    id: "m1",
+    direction: "in",
+    body: "quero marcar uma consulta",
+    created_at: "2026-09-25T19:50:19Z",
+    conversa_id: "c1",
+  },
+  {
+    id: "m0",
+    direction: "out",
+    body: "Olá! Sou a Nina (ciclo anterior)",
+    created_at: "2026-09-25T18:00:00Z",
+    conversa_id: "c1",
+  },
 ];
 
 function estadoComOferta(): EstadoFluxoNina {
@@ -38,8 +74,18 @@ function estadoComOferta(): EstadoFluxoNina {
     sessionId: "s1",
     consulta: { termo: "neurologia" },
     referencias: [
-      { registro: "cat-anderson", versao: null, procedimento: "Consulta Neurologia", medicoNome: "Anderson Eloy" },
-      { registro: "cat-carlos", versao: null, procedimento: "Consulta Neurologia", medicoNome: "Carlos Eduardo Lima" },
+      {
+        registro: "cat-anderson",
+        versao: null,
+        procedimento: "Consulta Neurologia",
+        medicoNome: "Anderson Eloy",
+      },
+      {
+        registro: "cat-carlos",
+        versao: null,
+        procedimento: "Consulta Neurologia",
+        medicoNome: "Carlos Eduardo Lima",
+      },
     ],
   };
   return e;
@@ -83,9 +129,20 @@ describe("histórico enviado ao Jev", () => {
   });
 
   test("outra conversa não entra", () => {
-    const h = montarHistoricoJev([{ id: "x", direction: "in", body: "oi", created_at: "2026-09-25T10:00:00Z", conversa_id: "outra" }], {
-      conversaId: "c1",
-    });
+    const h = montarHistoricoJev(
+      [
+        {
+          id: "x",
+          direction: "in",
+          body: "oi",
+          created_at: "2026-09-25T10:00:00Z",
+          conversa_id: "outra",
+        },
+      ],
+      {
+        conversaId: "c1",
+      },
+    );
     expect(h).toEqual([]);
   });
 });
@@ -120,17 +177,39 @@ describe("contexto do atendimento e escolha de opção", () => {
 
 describe("regressão da sessão 470", () => {
   test("pedir consulta → neuro → carlos eduardo não encaminha", () => {
-    const base = { urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
+    const base = {
+      entendimento: { noul: 0.12 },
+      urgencia: { noul: 0.05 },
+      pedido_atendente: { noul: 0.05 },
+      irritacao: { noul: 0.05 },
+    };
     const semOferta = estadoVazio();
     semOferta.session_id = "s1";
     // "quero marcar uma consulta": entendido (1,00).
-    const c1 = contarDuvida({ entendimento: { noul: 0.98 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: null });
+    const c1 = contarDuvida({
+      entendimento: { noul: 0.98 },
+      selecaoValida: false,
+      marco: marcoAtendimento(semOferta),
+      anterior: null,
+    });
     expect(decidirEncaminhamento(base, c1)).toBeNull();
     // "neuro" responde "qual especialidade?": a intenção se divide (0,39), mas dá para entender.
-    const c2 = contarDuvida({ entendimento: { noul: 0.9 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: c1 });
+    const c2 = contarDuvida({
+      entendimento: { noul: 0.9 },
+      selecaoValida: false,
+      marco: marcoAtendimento(semOferta),
+      anterior: c1,
+    });
     expect(c2.falhas).toBe(0);
     // Mesmo que o Jev achasse "neuro" incompreensível, seria só 1 falha.
-    expect(contarDuvida({ entendimento: { noul: 0.3 }, selecaoValida: false, marco: marcoAtendimento(semOferta), anterior: c1 }).falhas).toBe(1);
+    expect(
+      contarDuvida({
+        entendimento: { noul: 0.3 },
+        selecaoValida: false,
+        marco: marcoAtendimento(semOferta),
+        anterior: c1,
+      }).falhas,
+    ).toBe(1);
     expect(decidirEncaminhamento(base, c2)).toBeNull();
     // A Nina ofereceu Neurologia; "carlos eduardo" (0,37) escolhe uma opção.
     const comOferta = estadoComOferta();
@@ -146,19 +225,41 @@ describe("regressão da sessão 470", () => {
     expect(decidirEncaminhamento(base, c3)).toBeNull();
   });
 
-  test("três respostas realmente incompreensíveis, sem avanço, encaminham (duas não)", () => {
-    const base = { urgencia: { noul: 0.05 }, pedido_atendente: { noul: 0.05 }, irritacao: { noul: 0.05 } };
+  test("duas mensagens realmente incompreensíveis, sem avanço, encaminham", () => {
+    const base = {
+      entendimento: { noul: 0.12 },
+      urgencia: { noul: 0.05 },
+      pedido_atendente: { noul: 0.05 },
+      irritacao: { noul: 0.05 },
+    };
     const e = estadoComOferta();
     const marco = marcoAtendimento(e);
-    const c1 = contarDuvida({ entendimento: { noul: 0.1 }, selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null, marco, anterior: null });
-    const c2 = contarDuvida({ entendimento: { noul: 0.12 }, selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null, marco, anterior: c1 });
-    expect(decidirEncaminhamento(base, c2)).toBeNull();
-    const c3 = contarDuvida({ entendimento: { noul: 0.08 }, selecaoValida: opcaoEscolhidaJev("??", opcoesOferecidasJev(e)) !== null, marco, anterior: c2 });
-    expect(decidirEncaminhamento(base, c3)?.motivo).toContain("JEV_DUVIDA_REPETIDA");
+    const c1 = contarDuvida({
+      entendimento: { noul: 0.1 },
+      selecaoValida: opcaoEscolhidaJev("asdkj qwe", opcoesOferecidasJev(e)) !== null,
+      marco,
+      anterior: null,
+      mensagensEntrada: ["m1"],
+    });
+    const c2 = contarDuvida({
+      entendimento: { noul: 0.12 },
+      selecaoValida: opcaoEscolhidaJev("zzz ???", opcoesOferecidasJev(e)) !== null,
+      marco,
+      anterior: c1,
+      mensagensEntrada: ["m2"],
+      esclarecimento: { mensagemId: "saida", entradaAnteriorId: "m1" },
+    });
+    expect(decidirEncaminhamento(base, c1)).toBeNull();
+    expect(decidirEncaminhamento(base, c2)?.motivo).toContain("JEV_DUVIDA_REPETIDA");
   });
 
   test("confirmação curta ('sim') entendida não conta como falha", () => {
-    const c = contarDuvida({ entendimento: { noul: 0.92 }, selecaoValida: false, marco: "m", anterior: { falhas: 1, marco: "m", confiancas: [0.4] } });
+    const c = contarDuvida({
+      entendimento: { noul: 0.92 },
+      selecaoValida: false,
+      marco: "m",
+      anterior: { falhas: 1, marco: "m", confiancas: [0.4] },
+    });
     expect(c.falhas).toBe(0);
   });
 });

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface DependenteIncluido {
@@ -273,7 +274,7 @@ export async function incluirDependenteContrato(params: {
     avisoVinculoDuplicado = descricao;
   }
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeBR();
   const { data, error } = await supabase
     .from("contrato_dependentes")
     .insert({

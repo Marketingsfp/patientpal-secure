@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -6,6 +7,12 @@ import { documentoTomadorValido, problemaNoDocumentoDoTomador } from "@/lib/nfse
 import { avancarContadorDps, reservarNumeroDps } from "@/lib/nfse-numeracao";
 import type { Json } from "@/integrations/supabase/types";
 import { resolverEnderecoDoTomador } from "@/lib/nfse-endereco-tomador";
+import {
+  totaisAproximadosNaoOptante,
+  totaisAproximadosSimples,
+} from "@/lib/nfse-tributos-aproximados";
+import { codigoServicoDaNota } from "@/lib/nfse-classificacao-servico";
+import { ibsCbsDaNota, pisCofinsDaNota } from "@/lib/nfse-tributos-federais";
 
 const FOCUS_API = "https://api.focusnfe.com.br/v2";
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -23,11 +30,137 @@ function authHeader(token: string) {
 }
 
 /**
+ * Resposta da Focus que traz `codigo` e NÃO traz `status` (ex.: limite_excedido,
+ * nao_encontrado, permissao_negada) é FALHA DA CONSULTA, não ausência de status.
+ * Em 02/10/2026 14 notas ficaram dois dias em "processando" porque essa resposta
+ * sobrescrevia `focus_status` com null e nenhum ramo tratava. A nota pode já
+ * estar autorizada na prefeitura — por isso falha de consulta nunca muda o
+ * status da nota, só fica registrada em `consulta_erro_*`.
+ */
+export function falhaDeConsultaFocus(
+  body: unknown,
+): { codigo: string; mensagem: string | null } | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as { status?: unknown; codigo?: unknown; mensagem?: unknown };
+  if (b.status) return null;
+  if (typeof b.codigo !== "string" || !b.codigo) return null;
+  return { codigo: b.codigo, mensagem: typeof b.mensagem === "string" ? b.mensagem : null };
+}
+
+/** Segundos pedidos na mensagem "Tente novamente em N segundos" (padrão 2). */
+export function segundosPedidosPelaFocus(mensagem: string | null | undefined): number {
+  const m = (mensagem ?? "").match(/(\d+)\s*segundo/i);
+  const n = m ? Number(m[1]) : 2;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 30) : 2;
+}
+
+const MAX_TENTATIVAS_LIMITE = 3;
+
+/**
+ * GET de status na Focus. Em `limite_excedido` (transitório) tenta de novo até
+ * 3 vezes, esperando o que a mensagem pede multiplicado pela tentativa
+ * (espaçamento crescente). Devolve o último corpo e, se ainda for falha, qual.
+ */
+async function consultarStatusFocus(
+  url: string,
+  token: string,
+): Promise<{ body: Record<string, unknown>; falha: ReturnType<typeof falhaDeConsultaFocus> }> {
+  let body: Record<string, unknown> = {};
+  let falha: ReturnType<typeof falhaDeConsultaFocus> = null;
+  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS_LIMITE; tentativa++) {
+    const r = await fetch(url, { headers: { Authorization: authHeader(token) } });
+    body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    falha = falhaDeConsultaFocus(body);
+    if (!falha || falha.codigo !== "limite_excedido" || tentativa === MAX_TENTATIVAS_LIMITE) break;
+    const espera = segundosPedidosPelaFocus(falha.mensagem) * 1000 * tentativa;
+    await new Promise((res) => setTimeout(res, espera));
+  }
+  return { body, falha };
+}
+
+/** Campos a gravar na nota conforme a consulta falhou ou não. */
+function camposDaConsulta(falha: ReturnType<typeof falhaDeConsultaFocus>) {
+  const agora = new Date().toISOString();
+  return falha
+    ? {
+        consultado_em: agora,
+        consulta_erro_codigo: falha.codigo,
+        consulta_erro_mensagem: falha.mensagem,
+        consulta_erro_em: agora,
+      }
+    : {
+        consultado_em: agora,
+        consulta_erro_codigo: null,
+        consulta_erro_mensagem: null,
+        consulta_erro_em: null,
+      };
+}
+
+/**
  * O Ambiente Nacional /v2/nfsen é assíncrono: o POST responde
  * `processando_autorizacao` e o resultado real (autorizado / erro_autorizacao
  * com códigos como E0014) só aparece via GET segundos depois. Esta função
  * faz polling até obter status terminal ou timeout.
+ *
+ * Falha de consulta (corpo com `codigo` e sem `status`) não é terminal: espera
+ * o que a Focus pede e tenta de novo. Se o polling acabar só com falhas, devolve
+ * o último corpo com status que tiver visto; sem nenhum, devolve a falha — e
+ * quem chama grava em `consulta_erro_*` sem tocar no status.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ClienteNfse = { from: (t: any) => any };
+
+/**
+ * Grava com o cliente do usuário e, se não gravar, repete com o admin.
+ * A RLS não devolve erro num UPDATE barrado — só afeta 0 linhas —, então a
+ * conferência é pela linha devolvida, não só pelo `error`.
+ */
+async function gravarComFallback(
+  usuario: ClienteNfse,
+  admin: ClienteNfse,
+  executar: (c: ClienteNfse) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  contexto: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; erro: string }> {
+  const tentar = async (c: ClienteNfse) => {
+    const { data, error } = await executar(c);
+    return error
+      ? error.message
+      : Array.isArray(data) && data.length > 0
+        ? null
+        : "nenhuma linha gravada";
+  };
+  const erroUsuario = await tentar(usuario);
+  if (!erroUsuario) return { ok: true };
+  const erroAdmin = await tentar(admin);
+  if (!erroAdmin) return { ok: true };
+  console.error("[nfse] gravação falhou nos dois clientes", {
+    ...contexto,
+    erroUsuario,
+    erroAdmin,
+  });
+  return { ok: false, erro: erroAdmin };
+}
+
+function gravarNfse(
+  usuario: ClienteNfse,
+  admin: ClienteNfse,
+  id: string,
+  campos: Record<string, unknown>,
+  onde: string,
+) {
+  return gravarComFallback(
+    usuario,
+    admin,
+    (c) =>
+      c
+        .from("nfse")
+        .update(campos as never)
+        .eq("id", id)
+        .select("id"),
+    { id, onde },
+  );
+}
+
 async function pollFocusTerminal(
   baseUrl: string,
   ref: string,
@@ -42,20 +175,31 @@ async function pollFocusTerminal(
   } & Record<string, unknown>
 > {
   let last: Record<string, unknown> = {};
+  let ultimoComStatus: Record<string, unknown> | null = null;
+  let proximaEspera = intervalMs;
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, intervalMs));
+    await new Promise((r) => setTimeout(r, proximaEspera));
+    proximaEspera = intervalMs;
     try {
       const r = await fetch(`${baseUrl}/${encodeURIComponent(ref)}`, {
         headers: { Authorization: authHeader(token) },
       });
       last = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      const falha = falhaDeConsultaFocus(last);
+      if (falha) {
+        if (falha.codigo === "limite_excedido") {
+          proximaEspera = Math.max(intervalMs, segundosPedidosPelaFocus(falha.mensagem) * 1000);
+        }
+        continue;
+      }
+      ultimoComStatus = last;
       const s = (last as { status?: string }).status;
       if (s && s !== "processando_autorizacao" && s !== "processando") return last as never;
     } catch {
       // ignora — tenta de novo
     }
   }
-  return last as never;
+  return (ultimoComStatus ?? last) as never;
 }
 
 function only(s: string | null | undefined) {
@@ -104,6 +248,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
         }),
         aliquotaIssOverride: z.number().min(0).max(1).optional(),
         itemListaOverride: z.string().optional(),
+        // Por que o código acima substituiu o do emitente (vai para observacoes).
+        itemListaMotivo: z.string().max(300).optional(),
       })
       .parse(input),
   )
@@ -173,7 +319,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
     if (vinculo) {
       const { data: existentes } = await supabase
         .from("nfse")
-        .select("id, numero, status, valor_servicos, tomador_documento")
+        .select(
+          "id, numero, status, valor_servicos, tomador_documento, created_at, consultado_em, consulta_erro_codigo, consulta_erro_mensagem",
+        )
         .eq(vinculo.coluna, vinculo.valor)
         .in("status", ["processando", "emitida"])
         .limit(50);
@@ -184,8 +332,30 @@ export const emitirNfse = createServerFn({ method: "POST" })
 
       const emProcessamento = (existentes ?? []).find((n) => n.status === "processando");
       if (emProcessamento) {
+        // Dois casos. Nota consultada há pouco e sem falha: está de fato
+        // processando, a mensagem antiga vale. Nota parada há mais de 30 min ou
+        // cuja última consulta falhou: está PRESA e pode já estar autorizada na
+        // prefeitura — a mensagem diz isso e manda consultar. A emissão continua
+        // bloqueada nos dois casos (nunca liberar automaticamente: duplicaria nota).
+        const ultimaAtividade = new Date(
+          emProcessamento.consultado_em ?? emProcessamento.created_at,
+        ).getTime();
+        const paradaMs = Date.now() - new Date(emProcessamento.created_at).getTime();
+        const presa =
+          !!emProcessamento.consulta_erro_codigo || Date.now() - ultimaAtividade > 30 * 60_000;
+        if (!presa) {
+          throw new Error(
+            `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+          );
+        }
+        const horas = Math.floor(paradaMs / 3_600_000);
+        const minutos = Math.floor((paradaMs % 3_600_000) / 60_000);
+        const tempo = horas > 0 ? `${horas}h${String(minutos).padStart(2, "0")}` : `${minutos} min`;
+        const motivo = emProcessamento.consulta_erro_codigo
+          ? ` A última consulta à Focus falhou (${emProcessamento.consulta_erro_codigo}${emProcessamento.consulta_erro_mensagem ? `: ${emProcessamento.consulta_erro_mensagem}` : ""}).`
+          : "";
         throw new Error(
-          `Já existe uma NFS-e em processamento para este ${vinculo.rotulo}. Aguarde alguns segundos e atualize a tela antes de tentar de novo.`,
+          `A NFS-e deste ${vinculo.rotulo} está presa em "processando" há ${tempo}.${motivo} Ela pode já ter sido autorizada pela prefeitura. Não emita de novo: abra Fiscal › NFS-e e clique em "Consultar status" nessa nota (ou em "Reconsultar notas presas") antes de qualquer nova emissão.`,
         );
       }
       const duplicada = (existentes ?? []).find(
@@ -235,6 +405,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
     }
     const aliquota = data.aliquotaIssOverride ?? Number(emitente.aliquota_iss ?? 0.02);
     const valorIss = +(data.valorServicos * aliquota).toFixed(2);
+    // pTotTribSN: percentual informado pela contabilidade; fallback = valor antigo (alíquota).
+    const pctTotTribSN =
+      emitente.pct_total_tributos_sn != null
+        ? Number(emitente.pct_total_tributos_sn)
+        : +(aliquota * 100).toFixed(2);
     const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
 
     // Focus/Ambiente Nacional NFS-e interpreta o horário no fuso local.
@@ -247,12 +422,29 @@ export const emitirNfse = createServerFn({ method: "POST" })
       return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
     })();
 
-    const itemListaServico = only(data.itemListaOverride ?? emitente.item_lista_servico);
+    // NFS-e Nacional: código e NBS pelo tipo de serviço da descrição, como o
+    // portal (ver `nfse-classificacao-servico.ts`). Fora dele, código do cadastro.
+    const servicoNota = emitente.usar_ambiente_nacional
+      ? codigoServicoDaNota({
+          descricao: data.descricaoServicos,
+          codigoForcado: data.itemListaOverride,
+          codigoEmitente: emitente.item_lista_servico,
+          nbsEmitente: emitente.codigo_nbs,
+        })
+      : {
+          codigo: only(data.itemListaOverride ?? emitente.item_lista_servico),
+          nbs: null,
+          codigoMunicipalValido: true,
+        };
+    const itemListaServico = servicoNota.codigo;
+    const codigoNbs = servicoNota.nbs;
     if (!itemListaServico)
       throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
-    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
-      emitente.codigo_tributario_municipio,
-    );
+    // O código municipal do cadastro corresponde ao código do cadastro; com
+    // outro código nacional ele não vale e não é enviado.
+    const codigoTributarioMunicipio = servicoNota.codigoMunicipalValido
+      ? normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio)
+      : undefined;
 
     const imRaw = only(emitente.inscricao_municipal ?? "");
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
@@ -322,13 +514,17 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // NFS-e Nacional: 1 = Não optante; 2 = MEI; 3 = ME/EPP optante.
       codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional,
       regime_especial_tributacao: "0",
-      // E0166: para optante SN ME/EPP é obrigatório o regime de apuração dos tributos do SN.
-      // 1 = Competência. Sem isso a NFS-e Nacional rejeita.
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+      // E0166: para optante SN ME/EPP é obrigatório o regApTribSN; vem do cadastro
+      // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
       // Bloco <trib> exige tribFed OU totTrib. Sem isto: erro_validacao_schema
       // "Element 'trib': Missing child element(s). Expected is one of (tribFed, totTrib)".
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
         : {}),
     };
 
@@ -379,6 +575,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       ...(codigoTributarioMunicipio
         ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
         : {}),
+      ...(codigoNbs ? { codigo_nbs: codigoNbs } : {}),
       descricao_servico: data.descricaoServicos,
       valor_servico: data.valorServicos,
       tributacao_iss: 1,
@@ -386,22 +583,32 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // tpSusp, BM, cPaisResult). Como tribISSQN=1 (tributável), enviamos
       // tipo_retencao_iss=1 (Não Retido).
       tipo_retencao_iss: 1,
-      // <tribFed> exige PIS/COFINS. Para Simples Nacional usamos CST=08
-      // (Operação sem Incidência).
-      situacao_tributaria_pis_cofins: "08",
-      // <totTrib>: ME/EPP optante do SN -> usar pTotTribSN (E0712 proíbe indTotTrib).
-      // Para Não Optante (cod=1) o schema exige o bloco vTotTrib com os
-      // valores federais/estaduais/municipais (E0713 rejeita indTotTrib e
-      // pTotTribSN). Enviamos zeros quando não há cálculo IBPT disponível.
+      // <tribFed> exige PIS/COFINS. Simples: CST 08 (sem incidência). Não
+      // optante com alíquotas no cadastro: CST e valores, como o portal.
+      ...pisCofinsDaNota(emitente, data.valorServicos),
+      ...ibsCbsDaNota(emitente, cpfCnpjTomador),
+      // <totTrib>: ME/EPP optante do SN -> pTotTribSN (E0712 proíbe indTotTrib);
+      // com ISS fora do Simples, pTotTrib por esfera, igual ao portal nacional.
+      // Para Não Optante (cod=1): pTotTrib por esfera, como o portal emite
+      // (E0713 rejeita indTotTrib e pTotTribSN). Federais = % da contabilidade;
+      // municipais = alíquota do ISS.
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
-      // E0166: para optante SN ME/EPP é obrigatório o regime de apuração SN.
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+        ? totaisAproximadosSimples({
+            regimeApuracaoSn: codigoOpcaoSimplesNacional === 3 ? emitente.regime_apuracao_sn : 1,
+            pctTotTribSN,
+            aliquotaIss: aliquota,
+          })
+        : totaisAproximadosNaoOptante({
+            pctFederais: emitente.pct_total_tributos_sn,
+            aliquotaIss: aliquota,
+          })),
+      // E0166: para optante SN ME/EPP é obrigatório o regApTribSN; vem do cadastro
+      // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
     };
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
@@ -432,10 +639,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
               ? [data.pagamentoId]
               : [],
         agendamento_id: data.agendamentoId ?? null,
-        data_emissao: new Date().toISOString().slice(0, 10),
+        data_emissao: hojeBR(),
         valor_servicos: data.valorServicos,
         valor_iss: valorIss,
         aliquota_iss: aliquota,
+        // Código de tributação efetivamente usado (override ou emitente);
+        // o reenvio reaproveita este valor.
+        item_lista_servico: itemListaServico,
+        codigo_nbs: codigoNbs,
         descricao_servicos: data.descricaoServicos,
         tomador_nome: data.tomador.nome,
         tomador_documento: data.tomador.cpfCnpj ?? null,
@@ -455,6 +666,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
               ? `Emitida por "${emitenteDivergente.usado}" conforme escolha do formulário; a orientação para este serviço seria "${emitenteDivergente.sugerido}" (${emitenteDivergente.motivo}).`
               : null,
             avisoCep,
+            // Trilha do código de tributação: quando outro código substitui o
+            // do emitente, registra qual foi, qual seria e por quê.
+            data.itemListaOverride
+              ? `Código de tributação ${itemListaServico} usado no lugar do código do emitente (${only(emitente.item_lista_servico) || "vazio"})${data.itemListaMotivo ? `: ${data.itemListaMotivo}` : ""}.`
+              : null,
           ]
             .filter(Boolean)
             .join(" ") || null,
@@ -524,7 +740,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
       isNacional && attempts > 1
         ? `DPS renumerada: a prefeitura recusou por número repetido (E0014); ${attempts} tentativas, última enviada nº ${numeroEnviado}.`
         : null;
-    if (notaRenumerada) console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
+    if (notaRenumerada)
+      console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
     const observacoesComRenumeracao = notaRenumerada
       ? [nota.observacoes, notaRenumerada].filter(Boolean).join(" ")
       : nota.observacoes;
@@ -532,9 +749,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
     if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
-      await supabase
-        .from("nfse")
-        .update({
+      await gravarNfse(
+        supabase,
+        supabaseAdmin,
+        nota.id,
+        {
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
@@ -544,8 +763,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_envio: payload,
           payload_resposta: body,
-        })
-        .eq("id", nota.id);
+        },
+        "emissao-erro",
+      );
       return {
         ok: false,
         id: nota.id,
@@ -557,16 +777,23 @@ export const emitirNfse = createServerFn({ method: "POST" })
       };
     }
 
-    await supabase
-      .from("nfse")
-      .update({
+    // A nota já foi aceita pela Focus com esta ref; sem gravá-la ninguém consegue consultá-la depois.
+    await gravarNfse(
+      supabase,
+      supabaseAdmin,
+      nota.id,
+      {
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        // Polling terminou só com falha de consulta (ex.: limite_excedido):
+        // registra a falha; o status da nota continua "processando".
+        ...(falhaDeConsultaFocus(body) ? camposDaConsulta(falhaDeConsultaFocus(body)) : {}),
         observacoes: observacoesComRenumeracao,
         payload_envio: payload,
         payload_resposta: body,
-      })
-      .eq("id", nota.id);
+      },
+      "emissao",
+    );
 
     // Vincula todos os agendamentos selecionados (agrupamento no mesmo dia).
     // Inclui o agendamento principal para que a consulta por nfse_agendamentos
@@ -577,14 +804,27 @@ export const emitirNfse = createServerFn({ method: "POST" })
         ...((data.agendamentoIds ?? []) as string[]),
       ]),
     );
+    // O vínculo não derruba a emissão (a nota já foi para a prefeitura), mas
+    // não pode se perder em silêncio: falhando nos dois clientes, vira aviso.
+    let avisoVinculo: string | null = null;
     if (idsVinculo.length > 0) {
-      await supabase.from("nfse_agendamentos").insert(
-        idsVinculo.map((ag) => ({
-          nfse_id: nota.id,
-          agendamento_id: ag,
-          clinica_id: emitente.clinica_id,
-        })),
+      const linhas = idsVinculo.map((ag) => ({
+        nfse_id: nota.id,
+        agendamento_id: ag,
+        clinica_id: emitente.clinica_id,
+      }));
+      const vinculo = await gravarComFallback(
+        supabase,
+        supabaseAdmin,
+        (c) =>
+          c
+            .from("nfse_agendamentos")
+            .insert(linhas as never)
+            .select("nfse_id"),
+        { id: nota.id, onde: "emissao-vinculo-agendamentos" },
       );
+      if (!vinculo.ok)
+        avisoVinculo = `A nota foi enviada, mas o vínculo com ${idsVinculo.length} agendamento(s) não foi gravado (${vinculo.erro}).`;
     }
 
     return {
@@ -595,6 +835,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       tentativas: attempts,
       emitenteDivergente,
       avisoCep,
+      avisoVinculo,
     };
   });
 
@@ -623,14 +864,38 @@ export const consultarNfse = createServerFn({ method: "POST" })
         : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
-    const resp = await fetch(`${focusNfseBase(emitente)}/${nota.focus_ref}`, {
-      headers: { Authorization: authHeader(token) },
-    });
-    const body = await resp.json().catch(() => ({}));
+    const consultaFocus = await consultarStatusFocus(
+      `${focusNfseBase(emitente)}/${nota.focus_ref}`,
+      token,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = consultaFocus.body as Record<string, any>;
+
+    // Falha da consulta (corpo com `codigo` e sem `status`, já com as novas
+    // tentativas de limite_excedido esgotadas): preserva focus_status e o
+    // status da nota, registra o erro em campo próprio e devolve para a tela.
+    if (consultaFocus.falha) {
+      // A falha da consulta precisa ficar registrada mesmo que a RLS barre o usuário.
+      await gravarNfse(
+        supabase,
+        supabaseAdmin,
+        nota.id,
+        { payload_resposta: body, ...camposDaConsulta(consultaFocus.falha) },
+        "consulta-falha",
+      );
+      return {
+        ok: false,
+        status: null,
+        body,
+        erroConsulta: consultaFocus.falha,
+        limiteExcedido: consultaFocus.falha.codigo === "limite_excedido",
+      };
+    }
 
     const updates: Record<string, unknown> = {
       focus_status: body?.status ?? null,
       payload_resposta: body,
+      ...camposDaConsulta(null),
     };
     if (body?.status === "autorizado") {
       updates.status = "emitida";
@@ -663,11 +928,28 @@ export const consultarNfse = createServerFn({ method: "POST" })
         body?.mensagem_sefaz ?? body?.mensagem ?? body?.erros?.[0]?.mensagem ?? null;
     }
 
-    await supabase
-      .from("nfse")
-      .update(updates as never)
-      .eq("id", nota.id);
-    return { ok: true, status: body?.status ?? null, body };
+    // A nota já foi autorizada (ou recusada) pela prefeitura e não tem volta:
+    // o registro local precisa refletir isso mesmo que a RLS barre este usuário.
+    const gravou = await gravarNfse(supabase, supabaseAdmin, nota.id, updates, "consulta");
+    if (!gravou.ok) {
+      return {
+        ok: false,
+        status: (body?.status as string | undefined) ?? null,
+        body,
+        erroConsulta: {
+          codigo: "gravacao_falhou",
+          mensagem: `A Focus respondeu, mas o registro local não foi gravado: ${gravou.erro}`,
+        },
+        limiteExcedido: false,
+      };
+    }
+    return {
+      ok: true,
+      status: (body?.status as string | undefined) ?? null,
+      body,
+      erroConsulta: null,
+      limiteExcedido: false,
+    };
   });
 
 /** Cancela uma NFS-e já emitida. */
@@ -724,8 +1006,11 @@ export const cancelarNfse = createServerFn({ method: "POST" })
     };
     // Daqui em diante o cancelamento já foi aceito e não tem volta, então o
     // registro local precisa refletir isso mesmo que a RLS barre este usuário.
-    const { error: upErr } = await supabase.from("nfse").update(cancelamento).eq("id", data.id);
-    if (upErr) await supabaseAdmin.from("nfse").update(cancelamento).eq("id", data.id);
+    const gravou = await gravarNfse(supabase, supabaseAdmin, data.id, cancelamento, "cancelamento");
+    if (!gravou.ok)
+      throw new Error(
+        `A prefeitura aceitou o cancelamento, mas o registro local não foi atualizado (${gravou.erro}). Avise o suporte: a nota continua aparecendo como não cancelada.`,
+      );
     return { ok: true };
   });
 
@@ -821,6 +1106,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const aliquota = Number(nota.aliquota_iss ?? emitente.aliquota_iss ?? 0.02);
     const valorServicos = Number(nota.valor_servicos);
     const valorIss = +(valorServicos * aliquota).toFixed(2);
+    // pTotTribSN: percentual informado pela contabilidade; fallback = valor antigo (alíquota).
+    const pctTotTribSN =
+      emitente.pct_total_tributos_sn != null
+        ? Number(emitente.pct_total_tributos_sn)
+        : +(aliquota * 100).toFixed(2);
     const ref = `nfse-${emitente.id.slice(0, 8)}-${Date.now()}`;
 
     const dataEmissaoBR = (() => {
@@ -828,11 +1118,19 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       return now.toISOString().replace(/\.\d{3}Z$/, "-03:00");
     })();
 
-    const itemListaServico = only(emitente.item_lista_servico);
+    // Reenvio repete o código gravado na nota (ex.: 042201 do convênio do
+    // Cartão Benefício). Notas emitidas antes da coluna nfse.item_lista_servico
+    // existir têm o campo vazio — só nesse caso cai no código do emitente.
+    const itemListaServico = only(nota.item_lista_servico || emitente.item_lista_servico);
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço no emitente.");
-    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
-      emitente.codigo_tributario_municipio,
-    );
+    // NBS gravado na nota; nota antiga sem NBS usa o do cadastro só se o código
+    // for o do cadastro.
+    const codigoDoCadastro = itemListaServico === only(emitente.item_lista_servico);
+    const codigoNbs = only(nota.codigo_nbs) || (codigoDoCadastro ? only(emitente.codigo_nbs) : "");
+    const codigoTributarioMunicipio =
+      codigoDoCadastro || !emitente.usar_ambiente_nacional
+        ? normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio)
+        : undefined;
 
     // Documento do tomador no reenvio.
     //
@@ -954,11 +1252,16 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       optante_simples_nacional: codigoOpcaoSimplesNacional !== 1,
       codigo_opcao_simples_nacional: codigoOpcaoSimplesNacional, // 1 = não optante; 2 = MEI; 3 = ME/EPP
       regime_especial_tributacao: "0",
-      // E0166: para optante SN ME/EPP, regime de apuração é obrigatório (1 = Competência).
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+      // E0166: para optante SN ME/EPP o regApTribSN é obrigatório; vem do cadastro
+      // (1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN).
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
       // Bloco <trib> exige tribFed OU totTrib (evita erro_validacao_schema).
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
+        ? { percentual_total_tributos_simples_nacional: pctTotTribSN }
         : {}),
     };
 
@@ -998,19 +1301,29 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       ...(codigoTributarioMunicipio
         ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
         : {}),
+      ...(codigoNbs ? { codigo_nbs: codigoNbs } : {}),
       descricao_servico: nota.descricao_servicos,
       valor_servico: valorServicos,
       tributacao_iss: 1,
       tipo_retencao_iss: 1,
-      situacao_tributaria_pis_cofins: "08",
+      ...pisCofinsDaNota(emitente, valorServicos),
+      ...ibsCbsDaNota(emitente, cpfCnpj),
+      // pTotTribSN = percentual total aproximado de tributos (contabilidade), não a
+      // alíquota do ISS. A alíquota só é usada como fallback se o cadastro estiver vazio.
       ...(codigoOpcaoSimplesNacional !== 1
-        ? { percentual_total_tributos_simples_nacional: +(aliquota * 100).toFixed(2) }
-        : {
-            valor_total_tributos_federais: 0,
-            valor_total_tributos_estaduais: 0,
-            valor_total_tributos_municipais: 0,
-          }),
-      ...(codigoOpcaoSimplesNacional === 3 ? { regime_tributario_simples_nacional: 1 } : {}),
+        ? totaisAproximadosSimples({
+            regimeApuracaoSn: codigoOpcaoSimplesNacional === 3 ? emitente.regime_apuracao_sn : 1,
+            pctTotTribSN,
+            aliquotaIss: aliquota,
+          })
+        : totaisAproximadosNaoOptante({
+            pctFederais: emitente.pct_total_tributos_sn,
+            aliquotaIss: aliquota,
+          })),
+      // regApTribSN: 1 = tudo no SN; 2 = federais no SN e ISSQN por fora; 3 = tudo fora do SN.
+      ...(codigoOpcaoSimplesNacional === 3
+        ? { regime_tributario_simples_nacional: Number(emitente.regime_apuracao_sn ?? 1) }
+        : {}),
     };
 
     // Reenvio também reserva o número no banco antes de mandar. Sem isto, um
@@ -1028,9 +1341,13 @@ export const reenviarNfse = createServerFn({ method: "POST" })
 
     const payload = emitente.usar_ambiente_nacional ? payloadNacional : payloadMunicipal;
 
-    await supabase
-      .from("nfse")
-      .update({
+    // Sem a ref nova gravada, uma nota aceita pela Focus fica impossível de
+    // consultar depois. Se o registro local não atualizar, não envia.
+    const preEnvio = await gravarNfse(
+      supabase,
+      supabaseAdmin,
+      nota.id,
+      {
         focus_ref: ref,
         focus_status: "enviando",
         status: "processando",
@@ -1042,8 +1359,18 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         // Idem para o endereço: se o CEP foi corrigido no cadastro e o reenvio
         // usou a ficha, a nota passa a guardar o endereço que realmente saiu.
         tomador_endereco: enderecoTomadorAtual as Json,
-      })
-      .eq("id", nota.id);
+      },
+      "reenvio-pre-envio",
+    );
+    if (!preEnvio.ok)
+      return {
+        ok: false,
+        id: nota.id,
+        error: `O reenvio não foi feito: o registro local da nota não pôde ser atualizado (${preEnvio.erro}).`,
+        body: {},
+        tentativas: 0,
+        avisoCep,
+      };
 
     // E0014 (DPS já existente) — probing com salto geométrico até encontrar
     // um numero_dps livre. Cada tentativa aqui envolve polling assíncrono
@@ -1097,7 +1424,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       isNacional && attempts > 1
         ? `DPS renumerada: a prefeitura recusou por número repetido (E0014); ${attempts} tentativas, última enviada nº ${numeroEnviado}.`
         : null;
-    if (notaRenumerada) console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
+    if (notaRenumerada)
+      console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
     const observacoesComRenumeracao = notaRenumerada
       ? [nota.observacoes, notaRenumerada].filter(Boolean).join(" ")
       : nota.observacoes;
@@ -1105,9 +1433,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
     if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
-      await supabase
-        .from("nfse")
-        .update({
+      await gravarNfse(
+        supabase,
+        supabaseAdmin,
+        nota.id,
+        {
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
@@ -1116,8 +1446,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
             ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_resposta: body,
-        })
-        .eq("id", nota.id);
+        },
+        "reenvio-erro",
+      );
       return {
         ok: false,
         id: nota.id,
@@ -1128,15 +1459,22 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       };
     }
 
-    await supabase
-      .from("nfse")
-      .update({
+    // A nota já foi aceita pela Focus com esta ref; sem gravá-la ninguém consegue consultá-la depois.
+    await gravarNfse(
+      supabase,
+      supabaseAdmin,
+      nota.id,
+      {
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
+        // Polling terminou só com falha de consulta (ex.: limite_excedido):
+        // registra a falha; o status da nota continua "processando".
+        ...(falhaDeConsultaFocus(body) ? camposDaConsulta(falhaDeConsultaFocus(body)) : {}),
         observacoes: observacoesComRenumeracao,
         payload_resposta: body,
-      })
-      .eq("id", nota.id);
+      },
+      "reenvio",
+    );
 
     return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts, avisoCep };
   });

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { contratoDoProduto, type ProdutoCartao } from "@/lib/cartao/produto";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -88,7 +89,7 @@ const faixas = [
 
 export function RelatoriosPage({ produto }: { produto: ProdutoCartao }) {
   const { clinicaAtual } = useClinica();
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeBR();
   const primeiroDoAno = `${new Date().getFullYear()}-01-01`;
   const [from, setFrom] = useState(primeiroDoAno);
   const [to, setTo] = useState(hoje);

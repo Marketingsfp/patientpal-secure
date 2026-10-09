@@ -10,12 +10,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { decidirConfianca } from "./engine";
-import {
-  aplicarPolitica,
-  medirEvidencia,
-  POLITICA_PADRAO,
-  VERSAO_POLITICA,
-} from "./policy";
+import { aplicarPolitica, medirEvidencia, POLITICA_PADRAO, VERSAO_POLITICA } from "./policy";
 import {
   OfficialSourceValidator,
   RequiredDataValidator,
@@ -143,9 +138,9 @@ describe("FASE 3.3 — dispensa legítima continua possível", () => {
   it("saudação simples não precisa de Agenda nem de catálogo", () => {
     const r = ToolIntegrityValidator(ctx({ requestedAction: "responder_informacao" }));
     expect(r.status).toBe("NOT_APPLICABLE");
-    expect(OfficialSourceValidator(ctx({ requestedAction: "responder_informacao" }), []).status).toBe(
-      "NOT_APPLICABLE",
-    );
+    expect(
+      OfficialSourceValidator(ctx({ requestedAction: "responder_informacao" }), []).status,
+    ).toBe("NOT_APPLICABLE");
   });
 
   it("NOT_APPLICABLE não pesa contra a cobertura", () => {

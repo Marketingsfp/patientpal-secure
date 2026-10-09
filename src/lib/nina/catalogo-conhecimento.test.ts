@@ -162,7 +162,7 @@ describe("catálogo como fonte de conhecimento da Nina", () => {
     });
     expect(r.knowledge_status).toBe("found");
     // FASE 4 — o resumo preserva as duas formas quando os valores divergem.
-    expect(r.price).toBe("Dinheiro: R$ 152,00 / Pix/cartão: R$ 180,00");
+    expect(r.price).toBe("Dinheiro: R$ 152,00 / Cartão: R$ 180,00");
 
     expect(r.doctors).toContain("Rosângela Riolino");
     expect(r.doctors).toContain("Alex Louza");

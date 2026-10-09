@@ -74,9 +74,7 @@ describe("dossiê do Sol", () => {
   });
 
   test("mensagem legada: declara ausência em vez de usar o prompt atual", () => {
-    const input = montarInputSol(
-      base({ versao: null, publicadoEm: null, origem: null }),
-    );
+    const input = montarInputSol(base({ versao: null, publicadoEm: null, origem: null }));
     const texto = JSON.stringify(input);
     expect(texto).toContain("Snapshot do prompt não disponível para esta execução.");
     expect(texto).toContain("evidência insuficiente");

@@ -72,6 +72,7 @@ import { formatDatePura, hojeBR, TZ_CLINICA, zonedDateStringToUtcISO } from "@/l
 import { cn } from "@/lib/utils";
 import { useDashboardBlocos } from "@/hooks/use-dashboard-blocos";
 import { BlocosDashboard } from "@/components/painel-executivo/blocos";
+import { SecaoOrigemPacientes } from "@/components/painel-executivo/origem-pacientes";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
   head: () => ({ meta: [{ title: "Painel Executivo — ClinicaOS" }] }),
@@ -666,7 +667,7 @@ function PainelExecutivoPage() {
       </TooltipProvider>
 
       <Tabs defaultValue="producao" className="space-y-4">
-        {/* As cinco abas somam mais que a largura de um celular. O invólucro
+        {/* As abas somam mais que a largura de um celular. O invólucro
             rolável deixa deslizar de lado só a faixa de abas, em vez de a
             página inteira sair do lugar. */}
         <div className="-mx-1 overflow-x-auto px-1 pb-1">
@@ -676,6 +677,7 @@ function PainelExecutivoPage() {
             {podeFin && <TabsTrigger value="financeiro">Financeiro</TabsTrigger>}
             <TabsTrigger value="comercial">Comercial</TabsTrigger>
             <TabsTrigger value="qualidade">Qualidade</TabsTrigger>
+            <TabsTrigger value="origem">Origem dos pacientes</TabsTrigger>
           </TabsList>
         </div>
 
@@ -762,6 +764,11 @@ function PainelExecutivoPage() {
               rows={p.porEspecialidade.map((e) => ({ nome: e.nome, valor: e.total }))}
             />
           </div>
+        </TabsContent>
+
+        {/* De onde vêm os pacientes atendidos no período (ver SecaoOrigemPacientes) */}
+        <TabsContent value="origem" className="space-y-6">
+          <SecaoOrigemPacientes clinicaId={clinicaAtual.clinica_id} periodo={periodo} />
         </TabsContent>
 
         {/* GRs do período escolhido no topo — resumo e lista (ver SecaoGrsDoDia) */}

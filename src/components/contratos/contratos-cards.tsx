@@ -15,7 +15,13 @@ import {
   Users,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { classificarParcela, DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
+import { DIAS_TOLERANCIA_MENSALIDADE } from "@/lib/cb-regras";
+import {
+  resumirContratosDoMes,
+  type ContratoMesRow,
+  type ParcelaMesRow,
+} from "@/lib/cartao/indicadores";
+import { contratoDoProduto, type ProdutoCartao } from "@/lib/cartao/produto";
 
 /**
  * Visão em CARDS da lista de contratos do Cartão Benefício.
@@ -61,6 +67,14 @@ interface Props {
   onInativar?: (id: string) => void;
   /** Sem permissão de escrita, as ações que gravam ficam desabilitadas. */
   podeEscrever?: boolean;
+  /**
+   * Produto do módulo aberto (Cartão Benefícios / Cartão Terapêutico). Os
+   * indicadores contam só os contratos dele; `null` (tela /app/contratos)
+   * conta todos.
+   */
+  produto?: ProdutoCartao | null;
+  /** Filtro "Tipo de convênio" da tela: "todos", "sem" ou o id do convênio. */
+  convenioFiltro?: string;
 }
 
 interface Dependente {
@@ -78,22 +92,21 @@ interface Cobranca {
 }
 
 /**
- * Indicadores de contratos da clínica INTEIRA.
+ * Indicadores de contratos: lidos do BANCO, não da lista da tela.
  *
- * Não saem da lista da tela de propósito: a listagem carrega no máximo 500
- * contratos (corte de performance da busca), e contar em cima dela mostrava
- * "483 contratos ativos · R$ 34.485,00" numa clínica que tem 1.882 ativos e
- * R$ 202.730,70 previstos. Pior, os indicadores vizinhos (pagos no mês, a
- * vencer, inadimplentes) sempre vieram do banco inteiro — a mesma faixa
- * misturava duas bases diferentes.
+ * Não saem da lista de propósito: a listagem carrega no máximo 500 contratos
+ * (corte de performance da busca), e contar em cima dela mostrava "483
+ * contratos ativos · R$ 34.485,00" numa clínica que tem 1.882 ativos e
+ * R$ 202.730,70 previstos.
+ *
+ * Mas respeitam o produto do módulo e o filtro "Tipo de convênio": antes, no
+ * Cartão Terapêutico, a faixa mostrava os 1.848 contratos da clínica inteira
+ * em cima de meia dúzia de cards do Terapêutico.
  */
-interface TotaisClinica {
-  ativos: number;
-  receita: number;
-  inativos: number;
-  novos: number;
-  novosValor: number;
-}
+type ContratoBruto = ContratoMesRow & {
+  convenio_id: string | null;
+  data_inicio: string | null;
+};
 
 /**
  * Quantos contratos pedir por ida ao banco na soma dos indicadores. O
@@ -106,7 +119,6 @@ const MAX_PAGINAS_TOTAIS = 50;
 // Quantos cards a relação desenha por vez (o filtro dos indicadores continua
 // olhando a lista inteira; isto é só o recorte de exibição).
 const POR_PAGINA_CARDS = 50;
-
 
 const BRL = (v: number) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -188,13 +200,21 @@ const TONS = {
 type TomNome = keyof typeof TONS;
 
 /** Indicador do topo escolhido como filtro da relação de cards. */
-type FiltroKpi = "ativos" | "pagos" | "avencer" | "inadimplentes" | "novos" | "inativos";
+type FiltroKpi =
+  | "ativos"
+  | "pagos"
+  | "avencer"
+  | "inadimplentes"
+  | "semcobranca"
+  | "novos"
+  | "inativos";
 
 const ROTULO_FILTRO: Record<FiltroKpi, string> = {
   ativos: "Contratos ativos",
   pagos: "Pagos no mês",
   avencer: "A vencer",
   inadimplentes: "Inadimplentes",
+  semcobranca: "Sem cobrança no mês",
   novos: "Novos contratos",
   inativos: "Cancelados / inativos",
 };
@@ -209,11 +229,13 @@ const ROTULO_FILTRO: Record<FiltroKpi, string> = {
  */
 const AJUDA: Record<FiltroKpi, string> = {
   ativos:
-    "Todos os contratos com situação 'ativo' na clínica, e a soma das mensalidades deles. Não depende dos filtros da tela.",
+    "Contratos ativos com mensalidade maior que R$ 0,00, e a soma das mensalidades deles. Dependentes de R$ 0,00 aparecem à parte. Pagos + A vencer + Inadimplentes + Sem cobrança somam este número.",
   pagos:
-    "Parcelas com vencimento neste mês que já foram quitadas. Não é o dinheiro recebido no mês: quem pagou em atraso uma parcela de outro mês entra no mês do vencimento dela, não neste.",
-  avencer: `Parcelas deste mês ainda em aberto que não bloqueiam o cartão: as que ainda não venceram e as vencidas há até ${DIAS_TOLERANCIA_MENSALIDADE} dias, que ainda estão na tolerância.`,
-  inadimplentes: `Parcelas com vencimento neste mês, não pagas, atrasadas há mais de ${DIAS_TOLERANCIA_MENSALIDADE} dias — a mesma régua que bloqueia o cartão no balcão. Só olha o mês corrente: quem deve de meses anteriores não entra aqui.`,
+    "Contratos ativos cuja mensalidade com vencimento neste mês já foi quitada. Taxa de adesão não conta. O valor é a mensalidade contratada, não o dinheiro recebido no mês.",
+  avencer: `Contratos ativos com a mensalidade deste mês em aberto, sem bloquear o cartão: ainda não venceu ou venceu há até ${DIAS_TOLERANCIA_MENSALIDADE} dias.`,
+  inadimplentes: `Contratos ativos com a mensalidade deste mês atrasada há mais de ${DIAS_TOLERANCIA_MENSALIDADE} dias — a mesma régua que bloqueia o cartão no balcão. Só olha o mês corrente: quem deve de meses anteriores não entra aqui.`,
+  semcobranca:
+    "Contratos ativos pagantes sem mensalidade válida com vencimento neste mês: parcela nunca gerada, parcela do mês cancelada ou parcelas já encerradas. Clique para listar e conferir.",
   novos:
     "Contratos cujo INÍCIO de vigência cai neste mês. Não é o mesmo que vendidos no mês: contrato cadastrado agora com início retroativo não entra.",
   inativos: "Contratos cancelados, inativos ou encerrados. Não entram na receita prevista.",
@@ -227,10 +249,13 @@ function KpiCard({
   ativo = false,
   onClick,
   ajuda,
+  extra,
 }: {
   titulo: string;
   valor: string;
   detalhe: string;
+  /** Segunda linha discreta abaixo do detalhe. */
+  extra?: string;
   tom: TomNome;
   ativo?: boolean;
   onClick?: () => void;
@@ -285,6 +310,7 @@ function KpiCard({
         </div>
         <div className={`mt-1 text-3xl font-semibold tabular-nums ${t.texto}`}>{valor}</div>
         <div className="mt-1 text-xs text-muted-foreground">{detalhe}</div>
+        {extra ? <div className="text-xs text-muted-foreground/80">{extra}</div> : null}
       </div>
     </Card>
   );
@@ -311,6 +337,8 @@ export function ContratosCards({
   onEditar,
   onInativar,
   podeEscrever = true,
+  produto = null,
+  convenioFiltro = "todos",
 }: Props) {
   const [deps, setDeps] = useState<Record<string, Dependente[]>>({});
   const [aberto, setAberto] = useState<Record<string, boolean>>({});
@@ -320,15 +348,41 @@ export function ContratosCards({
   const [filtro, setFiltro] = useState<FiltroKpi | null>(null);
   const [pagina, setPagina] = useState(1);
 
-  const [totais, setTotais] = useState<TotaisClinica | null>(null);
-  const [mes, setMes] = useState<{
-    pagos: number;
-    pagosValor: number;
-    aVencer: number;
-    aVencerValor: number;
-    atrasados: number;
-    atrasadosValor: number;
-  } | null>(null);
+  // Linhas cruas do banco; o recorte por produto/convênio é feito na memória,
+  // para trocar o filtro sem baixar tudo de novo.
+  const [contratosBanco, setContratosBanco] = useState<ContratoBruto[] | null>(null);
+  const [parcelasMes, setParcelasMes] = useState<ParcelaMesRow[] | null>(null);
+  const [convenioIdsProduto, setConvenioIdsProduto] = useState<Set<string> | null>(null);
+
+  const totais = useMemo(() => {
+    if (!contratosBanco || !parcelasMes) return null;
+    if (produto && !convenioIdsProduto) return null;
+    const noEscopo = (convenioId: string | null) => {
+      if (convenioFiltro === "sem") return !convenioId;
+      if (convenioFiltro !== "todos") return convenioId === convenioFiltro;
+      if (!produto || !convenioIdsProduto) return true;
+      return contratoDoProduto(produto, convenioIdsProduto, convenioId);
+    };
+    const { ini, hojeIso } = limitesDoMes();
+    const escopo = contratosBanco.filter((c) => noEscopo(c.convenio_id));
+    let inativos = 0;
+    let novos = 0;
+    let novosValor = 0;
+    for (const c of escopo) {
+      const status = (c.status ?? "").toLowerCase();
+      if (["cancelado", "inativo", "encerrado"].includes(status)) inativos += 1;
+      if ((c.data_inicio ?? "").slice(0, 10) >= ini) {
+        novos += 1;
+        novosValor += Number(c.valor_mensal || 0);
+      }
+    }
+    return {
+      ...resumirContratosDoMes(escopo, parcelasMes, hojeIso),
+      inativos,
+      novos,
+      novosValor,
+    };
+  }, [contratosBanco, parcelasMes, convenioIdsProduto, produto, convenioFiltro]);
 
   // Todos os contratos recebidos (a relação inteira, não só uma página). O
   // filtro dos indicadores precisa enxergar tudo, senão clicar em
@@ -339,37 +393,32 @@ export function ContratosCards({
   // para não desenhar centenas de cards de uma vez.
   const visiveis = useMemo(() => {
     if (!filtro) return itens;
-    const { ini, fim, hojeIso } = limitesDoMes();
+    const { ini } = limitesDoMes();
+    // Pagos / a vencer / inadimplentes / sem cobrança usam a situação que o
+    // próprio indicador calculou — clicar no card lista exatamente quem ele contou.
+    const situacao = totais?.situacao;
     return itens.filter((c) => {
       const status = (c.status ?? "").toLowerCase();
-      const cob = cobrancas[c.id];
       switch (filtro) {
         case "ativos":
-          return status === "ativo";
+          return status === "ativo" && Number(c.valor_mensal || 0) > 0;
         case "inativos":
           return ["cancelado", "inativo", "encerrado"].includes(status);
         case "novos":
           return (c.data_inicio ?? "").slice(0, 10) >= ini;
         case "pagos":
-          return Boolean(
-            cob?.ultimoPagamento && cob.ultimoPagamento >= ini && cob.ultimoPagamento <= fim,
-          );
+          return situacao?.get(c.id) === "pago";
         case "avencer":
-          // Mesma régua do indicador: ainda não venceu OU está dentro da
-          // tolerância — nos dois casos o cartão continua valendo.
-          return Boolean(
-            cob?.proximoVencimento &&
-            cob.proximoVencimento <= fim &&
-            (cob.proximoVencimento >= hojeIso || cob.diasEmAberto <= DIAS_TOLERANCIA_MENSALIDADE),
-          );
+          return situacao?.get(c.id) === "a_vencer";
         case "inadimplentes":
-          // Só a partir do 6º dia, igual ao bloqueio do balcão.
-          return (cob?.diasEmAberto ?? 0) > DIAS_TOLERANCIA_MENSALIDADE;
+          return situacao?.get(c.id) === "inadimplente";
+        case "semcobranca":
+          return situacao?.get(c.id) === "sem_cobranca";
         default:
           return true;
       }
     });
-  }, [itens, filtro, cobrancas]);
+  }, [itens, filtro, totais]);
 
   const totalPaginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA_CARDS));
   const paginaSegura = Math.min(pagina, totalPaginas);
@@ -386,7 +435,6 @@ export function ContratosCards({
       ).join(","),
     [visiveisPagina],
   );
-
 
   useEffect(() => {
     const lista = idsPagina ? idsPagina.split(",") : [];
@@ -413,7 +461,6 @@ export function ContratosCards({
       cancelado = true;
     };
   }, [idsPagina]);
-
 
   // CPF do titular: o contrato guarda só o nome, o documento vem do paciente.
   useEffect(() => {
@@ -463,13 +510,15 @@ export function ContratosCards({
       for (let i = 0; i < lotes.length; i += CONCORRENCIA) {
         if (cancelado) return;
         const bloco = await Promise.all(
-          lotes.slice(i, i + CONCORRENCIA).map((slice) =>
-            supabase
-              .from("contrato_mensalidades")
-              .select("contrato_id, vencimento, status, pago_em, numero_parcela")
-              .in("contrato_id", slice)
-              .gt("numero_parcela", 0),
-          ),
+          lotes
+            .slice(i, i + CONCORRENCIA)
+            .map((slice) =>
+              supabase
+                .from("contrato_mensalidades")
+                .select("contrato_id, vencimento, status, pago_em, numero_parcela")
+                .in("contrato_id", slice)
+                .gt("numero_parcela", 0),
+            ),
         );
         respostas.push(...bloco);
       }
@@ -517,135 +566,82 @@ export function ContratosCards({
     };
   }, [ids]);
 
+  // Indicadores: lê do banco a clínica inteira (paginado, por causa do corte de
+  // 1.000 linhas do PostgREST); o recorte por produto/convênio fica no `totais`.
   useEffect(() => {
+    setContratosBanco(null);
+    setParcelasMes(null);
     if (!clinicaId) return;
     let cancelado = false;
     void (async () => {
-      const { ini, fim, hojeIso } = limitesDoMes();
-      const resumo = {
-        pagos: 0,
-        pagosValor: 0,
-        aVencer: 0,
-        aVencerValor: 0,
-        atrasados: 0,
-        atrasadosValor: 0,
-      };
+      const { ini, fim } = limitesDoMes();
+      const contratos: ContratoBruto[] = [];
+      for (let pagina = 0; pagina < MAX_PAGINAS_TOTAIS; pagina += 1) {
+        const de = pagina * PAGINA_TOTAIS;
+        const { data, error } = await supabase
+          .from("contratos_assinatura")
+          .select("id, status, valor_mensal, data_inicio, convenio_id")
+          .eq("clinica_id", clinicaId)
+          .order("id")
+          .range(de, de + PAGINA_TOTAIS - 1);
+        if (cancelado) return;
+        // Erro no meio da paginação deixaria um total menor que o real — pior
+        // que não mostrar número nenhum, porque parece certo.
+        if (error) return;
+        const lote = (data ?? []) as ContratoBruto[];
+        contratos.push(...lote);
+        if (lote.length < PAGINA_TOTAIS) break;
+      }
+      const parcelas: ParcelaMesRow[] = [];
       for (let pagina = 0; pagina < MAX_PAGINAS_TOTAIS; pagina += 1) {
         const de = pagina * PAGINA_TOTAIS;
         const { data, error } = await supabase
           .from("contrato_mensalidades")
-          .select("status, valor, valor_pago, vencimento")
+          .select("contrato_id, status, vencimento, numero_parcela")
           .eq("clinica_id", clinicaId)
           .gte("vencimento", ini)
           .lte("vencimento", fim)
+          .order("id")
           .range(de, de + PAGINA_TOTAIS - 1);
         if (cancelado) return;
-        // Meio da paginação quebrado devolveria um total menor que o real —
-        // e um número menor que parece certo é pior que número nenhum.
-        if (error) {
-          setMes(null);
-          return;
-        }
-        const linhas = (data ?? []) as Array<{
-          status: string | null;
-          valor: number | null;
-          valor_pago: number | null;
-          vencimento: string;
-        }>;
-        linhas.forEach((l) => {
-          switch (classificarParcela(l.status, l.vencimento, hojeIso)) {
-            case "paga":
-              resumo.pagos += 1;
-              resumo.pagosValor += Number(l.valor_pago ?? l.valor ?? 0);
-              break;
-            case "inadimplente":
-              resumo.atrasados += 1;
-              resumo.atrasadosValor += Number(l.valor ?? 0);
-              break;
-            case "a_vencer":
-              resumo.aVencer += 1;
-              resumo.aVencerValor += Number(l.valor ?? 0);
-              break;
-            case "cancelada":
-              break;
-          }
-        });
-        if (linhas.length < PAGINA_TOTAIS) break;
+        if (error) return;
+        const lote = (data ?? []) as ParcelaMesRow[];
+        parcelas.push(...lote);
+        if (lote.length < PAGINA_TOTAIS) break;
       }
       if (cancelado) return;
-      setMes(resumo);
+      setContratosBanco(contratos);
+      setParcelasMes(parcelas);
     })();
     return () => {
       cancelado = true;
     };
   }, [clinicaId]);
 
-  // Indicadores de contratos: sempre a clínica inteira, nunca a página. Ver o
-  // comentário de `TotaisClinica`.
+  // Convênios do produto do módulo — inclusive os desativados, senão o
+  // contrato de um convênio desligado sumiria da conta.
   useEffect(() => {
-    if (!clinicaId) {
-      setTotais(null);
-      return;
-    }
+    setConvenioIdsProduto(null);
+    if (!clinicaId || !produto) return;
     let cancelado = false;
     void (async () => {
-      const { ini } = limitesDoMes();
-      const acumulado: TotaisClinica = {
-        ativos: 0,
-        receita: 0,
-        inativos: 0,
-        novos: 0,
-        novosValor: 0,
-      };
-      for (let pagina = 0; pagina < MAX_PAGINAS_TOTAIS; pagina += 1) {
-        const de = pagina * PAGINA_TOTAIS;
-        const { data, error } = await supabase
-          .from("contratos_assinatura")
-          .select("status, valor_mensal, data_inicio")
-          .eq("clinica_id", clinicaId)
-          .range(de, de + PAGINA_TOTAIS - 1);
-        if (cancelado) return;
-        // Erro no meio da paginação deixaria um total menor que o real — pior
-        // que não mostrar número nenhum, porque parece certo.
-        if (error) {
-          setTotais(null);
-          return;
-        }
-        const lote = (data ?? []) as Array<{
-          status: string | null;
-          valor_mensal: number | null;
-          data_inicio: string | null;
-        }>;
-        lote.forEach((c) => {
-          const status = (c.status ?? "").toLowerCase();
-          const valor = Number(c.valor_mensal || 0);
-          if (status === "ativo") {
-            acumulado.ativos += 1;
-            acumulado.receita += valor;
-          } else if (["cancelado", "inativo", "encerrado"].includes(status)) {
-            acumulado.inativos += 1;
-          }
-          if ((c.data_inicio ?? "").slice(0, 10) >= ini) {
-            acumulado.novos += 1;
-            acumulado.novosValor += valor;
-          }
-        });
-        if (lote.length < PAGINA_TOTAIS) break;
-      }
-      if (cancelado) return;
-      setTotais(acumulado);
+      const { data, error } = await supabase
+        .from("cb_convenios")
+        .select("id")
+        .eq("clinica_id", clinicaId)
+        .eq("produto", produto);
+      if (cancelado || error) return;
+      setConvenioIdsProduto(new Set(((data ?? []) as Array<{ id: string }>).map((c) => c.id)));
     })();
     return () => {
       cancelado = true;
     };
-  }, [clinicaId]);
+  }, [clinicaId, produto]);
 
   // Trocar de filtro sempre volta para a primeira página da relação.
   useEffect(() => {
     setPagina(1);
   }, [filtro, ids]);
-
-
 
   const imprimirCartao = async (id: string) => {
     if (!onCartao) return;
@@ -662,11 +658,16 @@ export function ContratosCards({
   return (
     <div className="space-y-4">
       <TooltipProvider delayDuration={200}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <KpiCard
             titulo="Contratos ativos"
             valor={totais ? String(totais.ativos) : "—"}
-            detalhe={totais ? `Receita prevista ${BRL(totais.receita)}` : "Carregando…"}
+            detalhe={totais ? `Receita prevista ${BRL(totais.receitaPrevista)}` : "Carregando…"}
+            extra={
+              totais && totais.dependentes > 0
+                ? `+ ${totais.dependentes} dependente(s) de R$ 0,00`
+                : undefined
+            }
             tom="azul"
             ativo={filtro === "ativos"}
             onClick={() => alternar("ativos")}
@@ -674,8 +675,8 @@ export function ContratosCards({
           />
           <KpiCard
             titulo="Pagos no mês"
-            valor={mes ? String(mes.pagos) : "—"}
-            detalhe={mes ? BRL(mes.pagosValor) : "Carregando…"}
+            valor={totais ? String(totais.pagos) : "—"}
+            detalhe={totais ? BRL(totais.pagosValor) : "Carregando…"}
             tom="verde"
             ativo={filtro === "pagos"}
             onClick={() => alternar("pagos")}
@@ -683,8 +684,8 @@ export function ContratosCards({
           />
           <KpiCard
             titulo="A vencer"
-            valor={mes ? String(mes.aVencer) : "—"}
-            detalhe={mes ? BRL(mes.aVencerValor) : "Carregando…"}
+            valor={totais ? String(totais.aVencer) : "—"}
+            detalhe={totais ? BRL(totais.aVencerValor) : "Carregando…"}
             tom="ambar"
             ativo={filtro === "avencer"}
             onClick={() => alternar("avencer")}
@@ -692,12 +693,21 @@ export function ContratosCards({
           />
           <KpiCard
             titulo="Inadimplentes"
-            valor={mes ? String(mes.atrasados) : "—"}
-            detalhe={mes ? BRL(mes.atrasadosValor) : "Carregando…"}
+            valor={totais ? String(totais.inadimplentes) : "—"}
+            detalhe={totais ? BRL(totais.inadimplentesValor) : "Carregando…"}
             tom="vermelho"
             ativo={filtro === "inadimplentes"}
             onClick={() => alternar("inadimplentes")}
             ajuda={AJUDA.inadimplentes}
+          />
+          <KpiCard
+            titulo="Sem cobrança no mês"
+            valor={totais ? String(totais.semCobranca) : "—"}
+            detalhe={totais ? BRL(totais.semCobrancaValor) : "Carregando…"}
+            tom="neutro"
+            ativo={filtro === "semcobranca"}
+            onClick={() => alternar("semcobranca")}
+            ajuda={AJUDA.semcobranca}
           />
           <KpiCard
             titulo="Novos contratos"
@@ -740,7 +750,6 @@ export function ContratosCards({
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {visiveisPagina.map((c) => {
-
             const lista = deps[c.id] ?? [];
             const expandido = Boolean(aberto[c.id]);
             const cobranca = cobrancas[c.id];
@@ -971,6 +980,5 @@ export function ContratosCards({
         </div>
       )}
     </div>
-
   );
 }

@@ -427,6 +427,12 @@ export interface RateioContexto {
   /** nome normalizado do serviço -> tipo (fallback de repasse por categoria). */
   procTipos: Map<string, string>;
   /**
+   * Agendas de laboratório: profissional cuja especialidade contém "Laborat",
+   * a mesma régua da Agenda (`medicoEhLaboratorioFormulario`). Todo atendimento
+   * dessas agendas conta como EXAMES LABORATORIAIS (ver `chaveDoServico`).
+   */
+  medicosLaboratorio: Set<string>;
+  /**
    * Cadastro de Financeiro → Categorias, para o seletor de Categoria da tela
    * ter as opções antes do primeiro "Buscar". Só as de receita entram: o
    * rateio olha atendimento, e categoria de despesa (aluguel, salários) nunca
@@ -514,6 +520,14 @@ async function lerContextoDoBanco(clinicaId: string): Promise<RateioContexto> {
     especialidade_id: (m.especialidade_id as string) ?? null,
   }));
   const medicosById = new Map(medicos.map((m) => [m.id, m]));
+  const especialidadesLab = new Set(
+    especialidadesRaw.filter((e) => normRepasse(e.nome ?? "").includes("laborat")).map((e) => e.id),
+  );
+  const medicosLaboratorio = new Set(
+    medicos
+      .filter((m) => m.especialidade_id && especialidadesLab.has(m.especialidade_id))
+      .map((m) => m.id),
+  );
 
   // O repasse padrão de cada médico vem por RPC (a tabela `medicos` não expõe
   // esses campos a todos os perfis); o cartão benefícios vem do cadastro.
@@ -610,6 +624,7 @@ async function lerContextoDoBanco(clinicaId: string): Promise<RateioContexto> {
     rotuloGrupoPorServico,
     nomeServicoPorChave,
     procTipos,
+    medicosLaboratorio,
     categorias: categorias.filter((c) => c.tipo === "receita"),
     categoriaNomePorId: mapaDeCategorias(categorias),
     repasseMedicos,
@@ -630,16 +645,43 @@ async function lerContextoDoBanco(clinicaId: string): Promise<RateioContexto> {
  * usava (`procVariants`), então filtro e comissão passam a enxergar o mesmo
  * serviço.
  *
+ * Laboratório (08/10/2026): todo atendimento da agenda de laboratório conta
+ * como EXAMES LABORATORIAIS, a mesma regra que a Agenda já usa na coluna
+ * Serviço. Desde 05/10/2026 o orçamento grava "LABORATÓRIO (2 EXAMES): TSH,
+ * T4 LIVRE", e cada combinação de exames virava uma linha própria nas
+ * Estatísticas, partindo a receita do laboratório. O texto gravado não muda:
+ * é dele que a cobrança e o comprovante tiram a lista de exames.
+ *
  * Devolve `null` quando o atendimento não tem serviço ou quando nenhuma
  * variante existe no cadastro.
  */
-function chaveDoServico(ctx: RateioContexto, procNome: string | null): string | null {
+function chaveDoServico(
+  ctx: RateioContexto,
+  procNome: string | null,
+  medicoId?: string | null,
+): string | null {
+  const temLab = ctx.nomeServicoPorChave.has(CHAVE_EXAMES_LAB);
+  if (temLab && medicoId && ctx.medicosLaboratorio?.has(medicoId)) return CHAVE_EXAMES_LAB;
   if (!procNome) return null;
   for (const alvo of procVariants(procNome)) {
     if (ctx.nomeServicoPorChave.has(alvo)) return alvo;
   }
-  return null;
+  // Texto do orçamento fora da agenda de laboratório (ex.: ECG lançado como
+  // "LABORATÓRIO (1 EXAMES): ELETROCARDIOGRAMA"): com um item só, vale o
+  // serviço daquele item; senão, é laboratório.
+  const orc = normRepasse(procNome).match(ORCAMENTO_LAB);
+  if (!orc) return null;
+  if (Number(orc[1]) === 1) {
+    for (const alvo of procVariants(normRepasse(procNome).slice(orc[0].length))) {
+      if (ctx.nomeServicoPorChave.has(alvo)) return alvo;
+    }
+  }
+  return temLab ? CHAVE_EXAMES_LAB : null;
 }
+
+const CHAVE_EXAMES_LAB = normRepasse("EXAMES LABORATORIAIS");
+/** Prefixo que o orçamento grava: "LABORATÓRIO (2 EXAMES): ..." (já normalizado). */
+const ORCAMENTO_LAB = /^laboratorio\s*\(\s*(\d+)\s*exames?\s*\)\s*:\s*/;
 
 /** Acha a linha da grade de repasse do serviço (ou da categoria dele). */
 function linhaDoServico(
@@ -786,7 +828,7 @@ function reparte(
     mapa: ctx.mapaConvenio,
   });
   const forma = formaDoAtendimento(params.descricao ?? null, modalidade);
-  const chaveServico = chaveDoServico(ctx, params.procedimento);
+  const chaveServico = chaveDoServico(ctx, params.procedimento, params.medicoId);
   const linha = params.medicoId
     ? linhaDoServico(ctx, params.medicoId, params.procedimento)
     : undefined;
@@ -872,10 +914,10 @@ function reparte(
     servico_nome: params.laudo
       ? rotuloDoLaudo(params.procedimento)
       : chaveServico
-      ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
-      : // Serviço que não está (mais) no cadastro continua aparecendo com o
-        // texto que a agenda gravou; some do relatório seria pior.
-        params.procedimento?.trim() || SEM_SERVICO,
+        ? (ctx.nomeServicoPorChave.get(chaveServico) ?? params.procedimento ?? SEM_SERVICO)
+        : // Serviço que não está (mais) no cadastro continua aparecendo com o
+          // texto que a agenda gravou; some do relatório seria pior.
+          params.procedimento?.trim() || SEM_SERVICO,
     condicao: ROTULO_CONDICAO[forma] ?? "PARTICULAR",
     // Mesma chave de serviço que resolve o grupo e a grade de repasse: o
     // atendimento gravado como "CONSULTA OFTALMO (OFTALMOLOGIA)" acha o tipo
@@ -1015,8 +1057,6 @@ async function enriquecerPacientes(clinicaId: string, linhas: RateioLinha[]): Pr
   }
 }
 
-
-
 /**
  * Busca os recebimentos do período e devolve cada um já rateado.
  *
@@ -1104,7 +1144,6 @@ async function lerRateioDoBanco(
         .order("data"),
     ),
   ]);
-
 
   // Um atendimento manual criado a partir de um pagamento da agenda espelha o
   // mesmo dinheiro do lançamento — contar os dois dobraria a receita.
@@ -1319,7 +1358,7 @@ export function filtrarRateio(
     if (servicoAlvo || grupoAlvo) {
       // O serviço vem do cadastro (ver `chaveDoServico`): o atendimento gravado
       // como "CONSULTA (CARDIOLOGIA)" tem que entrar no filtro "CONSULTA".
-      const chave = chaveDoServico(ctx, l.procedimento);
+      const chave = chaveDoServico(ctx, l.procedimento, l.medico_id);
       // Atendimento sem serviço identificado não pertence a grupo nenhum.
       if (!chave) return false;
       if (servicoAlvo && chave !== servicoAlvo) return false;

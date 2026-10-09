@@ -171,7 +171,9 @@ describe("tracing — reconstrução do fluxo real", () => {
     const fluxo = reconstruirFluxo(rastro.eventos());
     expect(fluxo.ciclos).toBe(2);
     expect(fluxo.caminho.filter((n) => n === "llm.generate").length).toBe(2);
-    expect(fluxo.passos.find((p) => p.node_id === "tool.knowledge.lookup")?.metadata.resultados).toBe(3);
+    expect(
+      fluxo.passos.find((p) => p.node_id === "tool.knowledge.lookup")?.metadata.resultados,
+    ).toBe(3);
   });
 
   it("mensagem com agenda: consulta e marcação aparecem no trace", () => {

@@ -6,7 +6,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDatePura } from "@/lib/date-utils";
+import { formatDatePura, hojeBR } from "@/lib/date-utils";
 import {
   PACOTE_STATUS_LABEL,
   SESSAO_CLASSE,
@@ -144,7 +144,7 @@ function PacoteCard({ pacote }: { pacote: Pacote }) {
   );
   // Próxima data marcada na agenda. É a resposta que a recepção dá no balcão.
   const proxima = useMemo(() => {
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     return pacote.sessoes
       .filter((s) => s.status === "agendada" && s.data_prevista && s.data_prevista >= hoje)
       .map((s) => s.data_prevista as string)

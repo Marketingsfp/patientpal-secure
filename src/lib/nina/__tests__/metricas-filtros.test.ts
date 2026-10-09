@@ -7,7 +7,13 @@ import {
   validarRecorte,
 } from "@/lib/nina/metricas-filtros";
 
-const base = { de: "2026-09-10", ate: "2026-09-12", diaInteiro: false, horaInicio: "07:00", horaFim: "12:00" };
+const base = {
+  de: "2026-09-10",
+  ate: "2026-09-12",
+  diaInteiro: false,
+  horaInicio: "07:00",
+  horaFim: "12:00",
+};
 
 describe("validação do recorte", () => {
   it("recusa data inicial posterior à final", () => {

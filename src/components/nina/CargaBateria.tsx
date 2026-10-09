@@ -51,7 +51,9 @@ export function CargaBateria({
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
   const [variacoes, setVariacoes] = useState(1);
   const [turnosTexto, setTurnosTexto] = useState(String(LIMITES_BATERIA.turnosPadrao));
-  const [simultaneasTexto, setSimultaneasTexto] = useState(String(LIMITES_BATERIA.simultaneasPadrao));
+  const [simultaneasTexto, setSimultaneasTexto] = useState(
+    String(LIMITES_BATERIA.simultaneasPadrao),
+  );
   const turnos = valorDigitado(turnosTexto, LIMITES_BATERIA.turnosMin, LIMITES_BATERIA.turnosMax);
   const simultaneas = valorDigitado(simultaneasTexto, 1, LIMITES_BATERIA.cenariosMax);
   const [filtro, setFiltro] = useState("");

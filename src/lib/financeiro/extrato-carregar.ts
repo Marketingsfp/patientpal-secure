@@ -334,6 +334,43 @@ export async function carregarMovimentacao(params: {
     });
   }
 
+  // Recebimento da cobrança do Crédito na clínica: dinheiro que entra no caixa
+  // sem lançamento de receita (os atendimentos já foram faturados no dia do
+  // uso). Entra no extrato como entrada que não é faturamento, igual ao
+  // suprimento — senão o PIX e o cartão dessas cobranças sumiriam do extrato.
+  const recebCredito = await buscarTudo<MovimentoBruto>(() =>
+    supabase
+      .from("caixa_movimentos")
+      .select(
+        "id, tipo, sessao_id, valor, descricao, forma_pagamento, user_id, created_at, destino_nome",
+      )
+      .eq("clinica_id", clinicaId)
+      .eq("tipo", "recebimento")
+      .is("lancamento_id", null)
+      .ilike("descricao", "CRÉDITO NA CLÍNICA%")
+      .gte("created_at", `${de}T00:00:00`)
+      .lte("created_at", `${ate}T23:59:59`)
+      .order("created_at"),
+  );
+  const userCredito = await nomesPorId(
+    "profiles",
+    recebCredito.map((m) => m.user_id).filter((x): x is string => !!x),
+  );
+  for (const m of recebCredito) {
+    saida.push({
+      data: new Date(m.created_at).toLocaleDateString("en-CA"),
+      hora: horaLocal(m.created_at),
+      tipo: "transferencia",
+      transferSentido: "entrada",
+      descricao: m.descricao ?? "Crédito na clínica — pagamento da cobrança",
+      valor: Number(m.valor) || 0,
+      formaPagamento: LABEL_FORMA[classificarForma(m.forma_pagamento ?? "dinheiro")],
+      formaCanonica: classificarForma(m.forma_pagamento ?? "dinheiro"),
+      usuarioNome: m.user_id ? (userCredito.get(m.user_id) ?? null) : null,
+      status: "confirmado",
+    });
+  }
+
   // Fechamento de caixa: só a sobra em dinheiro da sessão, pela mesma conta
   // de gaveta do Movimento de Caixa.
   if (fechamentos.length) {

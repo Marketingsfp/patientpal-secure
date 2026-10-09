@@ -38,13 +38,14 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
  * isso é informação financeira que não tem nada a ver com o trabalho de lá.
  *
  * Agora a fila só é carregada para quem trabalha no dinheiro: caixa,
- * financeiro, supervisor, gestor e administrador. Para os demais perfis a
+ * financeiro, gestor e administrador. O Supervisor ficou de fora quando
+ * virou perfil de gestão operacional sem acesso a valores (08/10/2026). Para os demais perfis a
  * consulta nem sai do navegador e o sino não é montado — some do cabeçalho.
  *
  * A resposta do financeiro ao pedido QUE A PRÓPRIA PESSOA FEZ continua chegando
  * para todo mundo, como toast: é o retorno do trabalho dela, não a fila dos outros.
  */
-const PAPEIS_DO_CAIXA = ["admin", "gestor", "supervisor", "caixa", "financeiro"];
+const PAPEIS_DO_CAIXA = ["admin", "gestor", "caixa", "financeiro"];
 
 export function EstornosBell() {
   const { clinicaAtual } = useClinica();

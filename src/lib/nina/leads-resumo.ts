@@ -139,7 +139,6 @@ export function resumirLeads(
     if (autor === "nina" && naoLida(m, lidoAtePorConversa[m.conversa_id!] ?? null))
       atual.unreadCount += 1;
 
-
     const maisNova =
       !atual.lastMessageAt ||
       new Date(m.created_at).getTime() > new Date(atual.lastMessageAt).getTime();
@@ -169,9 +168,9 @@ export function rotuloAutorResumo(autor: AutorResumo | null): string {
  * técnico não reposiciona card. Empate/sem atividade cai no índice do lead,
  * então a ordem nunca "dança" entre atualizações.
  */
-export function ordenarPorAtividade<T extends { indice: number; ultimaAtividadeEm?: string | null }>(
-  leads: T[],
-): T[] {
+export function ordenarPorAtividade<
+  T extends { indice: number; ultimaAtividadeEm?: string | null },
+>(leads: T[]): T[] {
   return leads.slice().sort((a, b) => {
     const ta = a.ultimaAtividadeEm ? new Date(a.ultimaAtividadeEm).getTime() : 0;
     const tb = b.ultimaAtividadeEm ? new Date(b.ultimaAtividadeEm).getTime() : 0;

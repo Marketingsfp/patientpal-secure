@@ -74,8 +74,14 @@ const DOCUMENTO_OUTROS = new Set(
 );
 
 /** Tipos aceitos para guardar; qualquer outro (ex.: SVG, HTML, executável) é recusado. */
-export function tipoMimeAceito(tipo: TipoMidiaGuardada, mime: string | null | undefined): string | null {
-  const limpo = String(mime ?? "").split(";")[0]!.trim().toLowerCase();
+export function tipoMimeAceito(
+  tipo: TipoMidiaGuardada,
+  mime: string | null | undefined,
+): string | null {
+  const limpo = String(mime ?? "")
+    .split(";")[0]!
+    .trim()
+    .toLowerCase();
   if (!limpo || !(limpo in EXTENSOES)) return null;
   if (tipo === "document") {
     // Também vale foto enviada "como documento".
@@ -141,7 +147,10 @@ const MARCA_DOCUMENTO = "📎 ";
 /** Texto da mensagem de documento: "📎 nome.pdf" e, se houver, " — legenda". */
 export function textoDoDocumento(nome: string, legenda?: string | null): string {
   const base = `${MARCA_DOCUMENTO}${nome || "Documento"}`;
-  const extra = String(legenda ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+  const extra = String(legenda ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
   return extra ? `${base} — ${extra}` : base;
 }
 

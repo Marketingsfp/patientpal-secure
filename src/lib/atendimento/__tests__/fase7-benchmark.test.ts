@@ -222,7 +222,9 @@ describe("FASE 7 — cenários controlados", () => {
       id: "carga",
       descricao: "30 envios + 30 recebimentos concorrentes",
       resumos: [
-        ...Array.from({ length: 30 }, (_, i) => traceSend(`c10-s${i}`, { rede: 40 + (i % 5) * 20 })),
+        ...Array.from({ length: 30 }, (_, i) =>
+          traceSend(`c10-s${i}`, { rede: 40 + (i % 5) * 20 }),
+        ),
         ...Array.from({ length: 30 }, (_, i) =>
           traceRecv(`c10-r${i}`, { realtime: 180 + (i % 5) * 60 }),
         ),

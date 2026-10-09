@@ -60,12 +60,23 @@ import {
 import { HomologacaoInbox } from "@/components/nina/HomologacaoInbox";
 import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
 
-const LaboratorioNina = lazy(() => import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })));
+const LaboratorioNina = lazy(() =>
+  import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })),
+);
+const BaseConhecimento = lazy(() =>
+  import("@/components/nina/BaseConhecimento").then((m) => ({ default: m.BaseConhecimento })),
+);
+const VozNina = lazy(() =>
+  import("@/components/nina/VozNina").then((m) => ({ default: m.VozNina })),
+);
+const DashboardOsZap = lazy(() =>
+  import("@/components/nina/DashboardOsZap").then((m) => ({ default: m.DashboardOsZap })),
+);
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
+import { PesquisaConversas } from "@/components/nina/PesquisaConversas";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
-
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   // A tela de atendimento tem sempre o mesmo endereço (/app/nina): a conversa
@@ -93,6 +104,7 @@ function NinaPage() {
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
   const abaAtiva = [
+    "dashboard-oszap",
     "chat",
     "config",
     "templates",
@@ -100,20 +112,20 @@ function NinaPage() {
     "laboratorio-nina",
     "atend-macros",
     "atend-inbox",
+    "pesquisa-conversas",
     "informacoes-clinica",
     "base-conhecimento",
+    "voz-nina",
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
-      : // O nome antigo da aba continua valendo para links e favoritos já guardados.
-        hashAba === "base-conhecimento"
-        ? "informacoes-clinica"
-        : hashAba
+      : hashAba
     : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
-  const areaChat = abaAtiva === "atend-inbox" || abaAtiva === "homologacao";
+  const areaChat =
+    abaAtiva === "atend-inbox" || abaAtiva === "homologacao" || abaAtiva === "pesquisa-conversas";
   useEffect(() => {
     // Só normaliza o hash enquanto o usuário ainda está na tela da Nina.
     // Sem essa guarda, ao clicar em outro item do menu a rota muda, o hash
@@ -135,6 +147,17 @@ function NinaPage() {
         className={areaChat ? "h-full" : "space-y-4"}
       >
         {/* ============ CONVERSAS ============ */}
+        <TabsContent value="dashboard-oszap">
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm text-muted-foreground">
+                Carregando dashboard do OS ZAP…
+              </p>
+            }
+          >
+            <DashboardOsZap key={clinicaId} />
+          </Suspense>
+        </TabsContent>
 
         {/* ============ CONFIGURAÇÃO ============ */}
         <TabsContent value="config">
@@ -148,22 +171,37 @@ function NinaPage() {
 
         {/* ============ HOMOLOGAÇÃO ============ */}
         <TabsContent value="homologacao" className="mt-0 h-full">
-          <HomologacaoInbox abrirConversa={conversaTesteAlvo} onConversaAberta={() => setConversaTesteAlvo(null)} />
+          <HomologacaoInbox
+            abrirConversa={conversaTesteAlvo}
+            onConversaAberta={() => setConversaTesteAlvo(null)}
+          />
         </TabsContent>
         <TabsContent value="laboratorio-nina">
-          <Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">Carregando Laboratório Nina…</p>}>
-            <LaboratorioNina key={clinicaId} onAbrirChat={() => setAbaAtiva("homologacao")} onVerConversa={(alvo) => {
-              if (alvo.clinicaId !== clinicaId) return;
-              setConversaTesteAlvo(alvo);
-              setAbaAtiva("homologacao");
-            }} />
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm text-muted-foreground">
+                Carregando Laboratório Nina…
+              </p>
+            }
+          >
+            <LaboratorioNina
+              key={clinicaId}
+              onAbrirChat={() => setAbaAtiva("homologacao")}
+              onVerConversa={(alvo) => {
+                if (alvo.clinicaId !== clinicaId) return;
+                setConversaTesteAlvo(alvo);
+                setAbaAtiva("homologacao");
+              }}
+            />
           </Suspense>
         </TabsContent>
-
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
         <TabsContent value="atend-macros">
           <RespostasRapidasManager />
+        </TabsContent>
+        <TabsContent value="pesquisa-conversas" className="mt-0 h-full">
+          <PesquisaConversas />
         </TabsContent>
         <TabsContent value="atend-inbox" className="mt-0 h-full">
           <AtendInbox />
@@ -172,8 +210,30 @@ function NinaPage() {
         {/* ============ APRENDIZADO ============ */}
 
         {/* ============ INFORMAÇÕES DA CLÍNICA ============ */}
+        <TabsContent value="base-conhecimento">
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm text-muted-foreground">
+                Carregando base de conhecimento…
+              </p>
+            }
+          >
+            <BaseConhecimento key={clinicaId} />
+          </Suspense>
+        </TabsContent>
         <TabsContent value="informacoes-clinica">
           <InformacoesClinica />
+        </TabsContent>
+        <TabsContent value="voz-nina">
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm text-muted-foreground">
+                Carregando voz da Nina…
+              </p>
+            }
+          >
+            <VozNina key={clinicaId} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

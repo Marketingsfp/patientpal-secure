@@ -1,3 +1,4 @@
+import "@/components/nina/os-zap.css";
 import { AppSidebarLayout } from "@/components/app-sidebar-layout";
 import {
   Link,
@@ -50,6 +51,8 @@ import {
   Wallet,
   ChevronDown,
   Search,
+  Star,
+  Monitor,
   X,
   HeartPulse,
   Contact,
@@ -93,6 +96,7 @@ import {
   rotaSomenteAdmin,
 } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
+import { podeAbrirTelaOsZap } from "@/lib/atendimento/acesso-telas-oszap";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getSubsystem,
@@ -119,6 +123,7 @@ import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { TTSToggle } from "@/components/tts/tts-toggle";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useMenuOrdem } from "@/hooks/use-menu-ordem";
+import { useMenuFavoritos } from "@/hooks/use-menu-favoritos";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { garantirContrasteTextoBranco } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
@@ -180,7 +185,10 @@ import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { AcessibilidadeProvider } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { AtalhosAcessibilidade } from "@/components/acessibilidade/AtalhosAcessibilidade";
-import { BotaoAcessibilidade } from "@/components/acessibilidade/BotaoAcessibilidade";
+import {
+  BotaoAcessibilidade,
+  PainelAcessibilidade,
+} from "@/components/acessibilidade/BotaoAcessibilidade";
 import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 
 const VoiceInput = lazy(() =>
@@ -215,6 +223,55 @@ const textoBuscavel = (it: NavLeaf): string => [it.label, ...(it.busca ?? [])].j
 // (leaf = rota + hash; grupo expansível = prefixo com o rótulo).
 const navItemKey = (it: NavItem): string =>
   isParent(it) ? `grupo:${it.label}` : `${it.to}${it.hash ? `#${it.hash}` : ""}`;
+
+/**
+ * Estrela de "Meus Favoritos" ao lado de um item do menu lateral. Fica fora do
+ * link (botão dentro de <a> não é HTML válido), posicionada sobre a borda
+ * direita do item. Marcada: sempre visível e amarela; desmarcada: aparece ao
+ * passar o mouse ou focar o item, e fica sempre visível em tela de toque.
+ */
+function EstrelaFavorito({
+  marcado,
+  rotulo,
+  ativo,
+  onAlternar,
+}: {
+  marcado: boolean;
+  rotulo: string;
+  /** Item da tela atual: fundo claro, então a estrela usa tom escuro. */
+  ativo: boolean;
+  onAlternar: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onAlternar();
+      }}
+      title={marcado ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+      aria-label={marcado ? `Remover ${rotulo} dos favoritos` : `Adicionar ${rotulo} aos favoritos`}
+      aria-pressed={marcado}
+      className={cn(
+        // z-20: o efeito de crescer ao passar o mouse (`menu_hover_scale`) põe o
+        // link em z-10; sem isto o link cobre a estrela e o clique abre a tela.
+        "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded p-1 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1",
+        ativo
+          ? "text-slate-500 hover:text-slate-900 hover:bg-slate-900/10 focus-visible:ring-slate-500"
+          : "text-white/70 hover:text-white hover:bg-white/15 focus-visible:ring-white/70",
+        marcado
+          ? "opacity-100"
+          : "opacity-0 group-hover/fav:opacity-100 group-focus-within/fav:opacity-100 [@media(hover:none)]:opacity-60",
+      )}
+    >
+      <Star
+        className={cn("h-3.5 w-3.5", marcado && "fill-amber-400 text-amber-400")}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
 
 // Rotas que só ficam ativas em correspondência exata. "/app/clientes" tem
 // sub-rotas com item próprio no menu (ex.: "/app/clientes/duplicados"), então
@@ -601,13 +658,23 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Atendimento",
     items: [
+      { to: "/app/nina", hash: "dashboard-oszap", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
       { to: "/app/nina", hash: "atend-macros", label: "/ Mensagens prontas", icon: Zap },
+      { to: "/app/nina", hash: "pesquisa-conversas", label: "Central de conversas", icon: Search },
+      { to: "/app/painel-tv-atendimento", label: "Painel da TV", icon: Monitor },
     ],
   },
   {
     label: "Nina",
     items: [
+      { to: "/app/nina", hash: "voz-nina", label: "Voz da Nina", icon: Mic },
+      {
+        to: "/app/nina",
+        hash: "base-conhecimento",
+        label: "Base de conhecimento",
+        icon: BookOpen,
+      },
       {
         to: "/app/nina",
         hash: "informacoes-clinica",
@@ -623,6 +690,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/nina", hash: "laboratorio-nina", label: "Laboratório Nina", icon: FlaskConical },
       { to: "/app/nina-aprendizado", label: "Revisão de Aprendizados", icon: ShieldCheck },
       { to: "/app/nina-metricas", label: "Métricas de Aprendizado", icon: BarChart3 },
+      { to: "/app/nina-jev", label: "Decisões do Jev", icon: BarChart3 },
       { to: "/app/nina-arquitetura", label: "Arquitetura", icon: Network },
     ],
   },
@@ -634,9 +702,22 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
   // ---------------------------------------------------------------------
-  // Portal "Coach WhatsApp" (treinamento e avaliação de atendentes).
+  // Francisco: acompanhamento independente de orçamentos.
   // ---------------------------------------------------------------------
   {
+    label: "Francisco",
+    items: [
+      { to: "/app/francisco", hash: "visao-geral", label: "Visão geral", icon: LayoutDashboard },
+      { to: "/app/francisco", hash: "arquitetura", label: "Arquitetura", icon: Network },
+      { to: "/app/francisco", hash: "voz", label: "Voz do Francisco", icon: Mic },
+      { to: "/app/francisco", hash: "mensagens", label: "Mensagens", icon: MessageCircle },
+      { to: "/app/francisco", hash: "acompanhamento", label: "Acompanhamento", icon: Clock },
+      { to: "/app/francisco", hash: "homologacao", label: "Homologação", icon: FlaskConical },
+      { to: "/app/francisco", hash: "historico", label: "Histórico", icon: FileText },
+    ],
+  },
+  {
+    // Portal "Coach WhatsApp" (treinamento e avaliação de atendentes).
     label: "Treinamento",
     items: [
       { to: "/app/coach", label: "Coach WhatsApp", icon: GraduationCap },
@@ -747,6 +828,8 @@ function AppShellInner() {
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   // Ordem personalizada dos itens do menu (arrastar e soltar) — por usuário.
   const { ordem: menuOrdem, salvar: salvarMenuOrdem } = useMenuOrdem(uxMelhorias);
+  // Telas fixadas pelo usuário em "Meus Favoritos" (estrela ao lado do item).
+  const { favoritos: menuFavoritos, alternar: alternarFavorito } = useMenuFavoritos();
   const [dragMenu, setDragMenu] = useState<{ row: string; key: string } | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const location = useLocation();
@@ -837,6 +920,15 @@ function AppShellInner() {
   // Aberto, o menu ocupa uma coluna e desloca o conteúdo; fechado, devolve
   // toda a largura ao atendimento. AppSidebarLayout adapta as telas pequenas.
   const [sidebarAberta, setSidebarAberta] = useState(false);
+  const [acessibilidadeAberta, setAcessibilidadeAberta] = useState(false);
+  const alternarAcessibilidade = useCallback((aberta: boolean) => {
+    setAcessibilidadeAberta(aberta);
+    // No celular, cada painel ocupa a largura da tela: nunca abrir os dois.
+    if (aberta && window.innerWidth < 1024) setSidebarAberta(false);
+  }, []);
+  useEffect(() => {
+    if (sidebarAberta && window.innerWidth < 1024) setAcessibilidadeAberta(false);
+  }, [sidebarAberta]);
   // Busca/filtro das telas dentro do menu lateral.
   const [buscaMenu, setBuscaMenu] = useState("");
   const buscaMenuInputRef = useRef<HTMLInputElement | null>(null);
@@ -1041,7 +1133,6 @@ function AppShellInner() {
     };
   }, [modoTodas, nomeClinicaAtual]);
 
-
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const seletorPortaisAberto = useSeletorPortaisAberto();
   // Trocar de portal não desmonta a tela atual: o seletor entra como camada
@@ -1125,6 +1216,7 @@ function AppShellInner() {
             if (filhos.length === 0) return null;
             return { ...item, children: filhos };
           }
+          if (!podeAbrirTelaOsZap(clinicaAtual?.role, item.to, item.hash)) return null;
           return leafAllowed(item.to, allowedModules, configuredModules) ? item : null;
         })
         .filter((it): it is NavItem => it !== null);
@@ -1170,6 +1262,21 @@ function AppShellInner() {
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
 
+  // "Meus Favoritos": só entram as telas que o menu já está mostrando (mesmo
+  // filtro de permissão, portal e flags). Favorito de tela que deixou de ser
+  // liberada, ou que é de outro portal, simplesmente não aparece aqui.
+  const favoritosVisiveis = useMemo(() => {
+    const porChave = new Map<string, NavLeaf>();
+    for (const row of flagFilteredRows) {
+      for (const it of row.items) {
+        const folhas = isParent(it) ? it.children : [it];
+        for (const f of folhas) porChave.set(navItemKey(f), f);
+      }
+    }
+    return menuFavoritos.map((k) => porChave.get(k)).filter((f): f is NavLeaf => f !== undefined);
+  }, [flagFilteredRows, menuFavoritos]);
+  const favoritosSet = useMemo(() => new Set(menuFavoritos), [menuFavoritos]);
+
   // Barra inferior do celular: só entram as telas que o perfil realmente pode
   // abrir. Sem esse filtro uma recepcionista veria "Início" e "Caixa" fixos no
   // rodapé e tocaria neles para cair em "Acesso negado".
@@ -1179,10 +1286,14 @@ function AppShellInner() {
   );
 
   // Portal sem nenhuma tela liberada não aparece no hub nem no seletor.
-  // O OS ZAP depende do módulo "nina", o mesmo de sempre — nenhum módulo novo.
+  // Nina e Francisco têm permissões independentes dentro do OS ZAP.
   const portaisOcultos = useMemo<SubsystemId[]>(() => {
     const ocultos: SubsystemId[] = [];
-    if (!leafAllowed("/app/nina", allowedModules, configuredModules)) ocultos.push("os-zap");
+    if (
+      !leafAllowed("/app/nina", allowedModules, configuredModules) &&
+      !leafAllowed("/app/francisco", allowedModules, configuredModules)
+    )
+      ocultos.push("os-zap");
     // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
     if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
     return ocultos;
@@ -1294,7 +1405,7 @@ function AppShellInner() {
         label: "OS ZAP / Central de Atendimento",
         icon: MessageCircle,
         portal: "os-zap",
-        candidatas: ["/app/nina"],
+        candidatas: ["/app/nina", "/app/francisco"],
       },
       {
         key: "coach",
@@ -1416,6 +1527,8 @@ function AppShellInner() {
   // para evitar flash de "Acesso negado".
   const currentModulo = moduloDaRota(location.pathname);
   const rotaPermitida = (() => {
+    // Mesma restrição do menu, inclusive para favoritos e links com hash.
+    if (!podeAbrirTelaOsZap(clinicaAtual?.role, location.pathname, location.hash)) return false;
     // Rotas administrativas: só o admin da clínica entra, mesmo digitando a URL.
     if (rotaSomenteAdmin(location.pathname)) return allowedModules === null;
     // Mesma regra do menu lateral (`leafAllowed`): submódulo sem linha salva
@@ -1437,7 +1550,9 @@ function AppShellInner() {
       : location.pathname;
   const areaConversas =
     pathAtual === "/app/nina" &&
-    ["", "chat", "atend-inbox", "homologacao"].includes((location.hash ?? "").replace(/^#/, ""));
+    ["", "chat", "atend-inbox", "homologacao", "pesquisa-conversas"].includes(
+      (location.hash ?? "").replace(/^#/, ""),
+    );
   const destinoPortal =
     !permsLoading && !rotaPermitida && ROTAS_HOME_PORTAL.has(pathAtual)
       ? primeiraRotaVisivel(visibleNavRows)
@@ -1470,6 +1585,7 @@ function AppShellInner() {
 
   return (
     <div
+      data-os-zap={subsystem === "os-zap" ? "true" : undefined}
       className={cn(
         "flex flex-col bg-background overflow-hidden",
         // `dvh` acompanha a barra de endereço do navegador do celular, que
@@ -1646,7 +1762,10 @@ function AppShellInner() {
             >
               <span className="text-base font-semibold">?</span>
             </Button>
-            <BotaoAcessibilidade />
+            <BotaoAcessibilidade
+              aberto={subsystem === "os-zap" ? acessibilidadeAberta : undefined}
+              onAbertoChange={subsystem === "os-zap" ? alternarAcessibilidade : undefined}
+            />
             <div className="flex items-center gap-1.5 [&_button]:text-foreground [&_button:hover]:bg-muted [&_button:hover]:text-foreground">
               <EstornosBell />
               {/* Leitura em voz alta: recurso de mesa, escondido no celular
@@ -1672,6 +1791,8 @@ function AppShellInner() {
       )}
 
       <AppSidebarLayout
+        painelDireitoAberto={subsystem === "os-zap" && acessibilidadeAberta}
+        painelDireito={<PainelAcessibilidade onFechar={() => setAcessibilidadeAberta(false)} />}
         aberta={!isChooser && sidebarAberta}
         modo={subsystem === "os-zap" ? "coluna" : "gaveta"}
         onFechar={fecharSidebar}
@@ -1746,6 +1867,95 @@ function AppShellInner() {
                 {buscandoMenu && searchedNavRows.length === 0 && (
                   <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
                 )}
+                {/* "Meus Favoritos": telas fixadas pelo usuário com a estrela,
+                    na ordem em que foram marcadas. Some durante a busca (o
+                    resultado já mostra os itens). */}
+                {!buscandoMenu &&
+                  (() => {
+                    const rotulo = "Meus Favoritos";
+                    const open = openGroups[rotulo] ?? true;
+                    return (
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenGroups((prev) => ({
+                              ...prev,
+                              [rotulo]: !(prev[rotulo] ?? true),
+                            }));
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1 text-[12px] font-bold uppercase tracking-[0.1em] text-white/70 hover:text-white transition-colors rounded-md"
+                          aria-expanded={open}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            {rotulo}
+                          </span>
+                          <ChevronDown
+                            className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+                          />
+                        </button>
+                        {open && favoritosVisiveis.length === 0 && (
+                          <p className="px-3 py-1 text-xs leading-snug text-white/60">
+                            Clique na estrela ao lado de uma tela para fixá-la aqui.
+                          </p>
+                        )}
+                        {open &&
+                          favoritosVisiveis.map((fav) => {
+                            const aliases = fav.aliases ?? [];
+                            const active =
+                              navLeafAtivo(
+                                itemDeMenuAtivo(location.pathname, fav.to),
+                                location.hash,
+                                fav.hash,
+                              ) ||
+                              (!fav.hash &&
+                                aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
+                            const href = hrefDoNavLeaf(fav);
+                            const key = navItemKey(fav);
+                            return (
+                              <div key={key} className="group/fav relative">
+                                <a
+                                  href={href}
+                                  data-nav-active={active ? "true" : undefined}
+                                  aria-current={uxMelhorias && active ? "page" : undefined}
+                                  onMouseEnter={() => preCarregar(fav.to)}
+                                  onClick={(event) => {
+                                    if (
+                                      event.metaKey ||
+                                      event.ctrlKey ||
+                                      event.shiftKey ||
+                                      event.altKey ||
+                                      event.button !== 0
+                                    )
+                                      return;
+                                    event.preventDefault();
+                                    fecharSidebar();
+                                    irPara(href);
+                                  }}
+                                  className={`relative flex items-center gap-2.5 rounded-lg pl-3 pr-8 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                    active
+                                      ? "bg-card text-slate-900 shadow-sm"
+                                      : "text-white hover:bg-white/10 hover:text-white"
+                                  }${hoverScaleCls}`}
+                                >
+                                  <fav.icon className="h-[18px] w-[18px] shrink-0" />
+                                  <span className="leading-snug break-words">{fav.label}</span>
+                                </a>
+                                <EstrelaFavorito
+                                  marcado
+                                  rotulo={fav.label}
+                                  ativo={active}
+                                  onAlternar={() => void alternarFavorito(key)}
+                                />
+                              </div>
+                            );
+                          })}
+                      </div>
+                    );
+                  })()}
                 {searchedNavRows.map((row) => {
                   const leafIsActive = (to: string, hash?: string) =>
                     navLeafAtivo(itemDeMenuAtivo(location.pathname, to), location.hash, hash);
@@ -1836,37 +2046,46 @@ function AppShellInner() {
                                       );
                                     }
                                     return (
-                                      <a
-                                        key={linkKey}
-                                        href={href}
-                                        data-nav-to={child.to}
-                                        data-nav-active={active ? "true" : undefined}
-                                        aria-current={uxMelhorias && active ? "page" : undefined}
-                                        onMouseEnter={() => preCarregar(child.to)}
-                                        onClick={(event) => {
-                                          if (
-                                            event.metaKey ||
-                                            event.ctrlKey ||
-                                            event.shiftKey ||
-                                            event.altKey ||
-                                            event.button !== 0
-                                          )
-                                            return;
-                                          event.preventDefault();
-                                          fecharSidebar();
-                                          irPara(href);
-                                        }}
-                                        className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
-                                          active
-                                            ? "bg-card text-slate-900 shadow-sm"
-                                            : "text-white hover:bg-white/10 hover:text-white"
-                                        }${hoverScaleCls}`}
-                                      >
-                                        <child.icon className="h-[18px] w-[18px] shrink-0" />
-                                        <span className="leading-snug break-words">
-                                          {child.label}
-                                        </span>
-                                      </a>
+                                      <div key={linkKey} className="group/fav relative">
+                                        <a
+                                          href={href}
+                                          data-nav-to={child.to}
+                                          data-nav-active={active ? "true" : undefined}
+                                          aria-current={uxMelhorias && active ? "page" : undefined}
+                                          onMouseEnter={() => preCarregar(child.to)}
+                                          onClick={(event) => {
+                                            if (
+                                              event.metaKey ||
+                                              event.ctrlKey ||
+                                              event.shiftKey ||
+                                              event.altKey ||
+                                              event.button !== 0
+                                            )
+                                              return;
+                                            event.preventDefault();
+                                            fecharSidebar();
+                                            irPara(href);
+                                          }}
+                                          className={`relative flex items-center gap-2.5 rounded-lg pl-8 pr-8 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                            active
+                                              ? "bg-card text-slate-900 shadow-sm"
+                                              : "text-white hover:bg-white/10 hover:text-white"
+                                          }${hoverScaleCls}`}
+                                        >
+                                          <child.icon className="h-[18px] w-[18px] shrink-0" />
+                                          <span className="leading-snug break-words">
+                                            {child.label}
+                                          </span>
+                                        </a>
+                                        <EstrelaFavorito
+                                          marcado={favoritosSet.has(navItemKey(child))}
+                                          rotulo={child.label}
+                                          ativo={active}
+                                          onAlternar={() =>
+                                            void alternarFavorito(navItemKey(child))
+                                          }
+                                        />
+                                      </div>
                                     );
                                   })}
                               </div>
@@ -1879,39 +2098,46 @@ function AppShellInner() {
                               aliases.some((a) => itemDeMenuAtivo(location.pathname, a)));
                           const href = hrefDoNavLeaf(item);
                           return (
-                            <a
-                              key={navItemKey(item)}
-                              href={href}
-                              data-nav-to={item.to}
-                              data-nav-active={active ? "true" : undefined}
-                              aria-current={uxMelhorias && active ? "page" : undefined}
-                              onMouseEnter={() => preCarregar(item.to)}
-                              onClick={(event) => {
-                                if (
-                                  event.metaKey ||
-                                  event.ctrlKey ||
-                                  event.shiftKey ||
-                                  event.altKey ||
-                                  event.button !== 0
-                                )
-                                  return;
-                                event.preventDefault();
-                                fecharSidebar();
-                                irPara(href);
-                              }}
-                              {...dragProps(row.label, navItemKey(item))}
-                              className={cn(
-                                `relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium tracking-tight transition-all ${
-                                  active
-                                    ? "bg-card text-slate-900 shadow-sm"
-                                    : "text-white hover:bg-white/10 hover:text-white"
-                                }${hoverScaleCls}`,
-                                dragCls(navItemKey(item)),
-                              )}
-                            >
-                              <item.icon className="h-[18px] w-[18px] shrink-0" />
-                              <span className="leading-snug break-words">{item.label}</span>
-                            </a>
+                            <div key={navItemKey(item)} className="group/fav relative">
+                              <a
+                                href={href}
+                                data-nav-to={item.to}
+                                data-nav-active={active ? "true" : undefined}
+                                aria-current={uxMelhorias && active ? "page" : undefined}
+                                onMouseEnter={() => preCarregar(item.to)}
+                                onClick={(event) => {
+                                  if (
+                                    event.metaKey ||
+                                    event.ctrlKey ||
+                                    event.shiftKey ||
+                                    event.altKey ||
+                                    event.button !== 0
+                                  )
+                                    return;
+                                  event.preventDefault();
+                                  fecharSidebar();
+                                  irPara(href);
+                                }}
+                                {...dragProps(row.label, navItemKey(item))}
+                                className={cn(
+                                  `relative flex items-center gap-2.5 rounded-lg pl-3 pr-8 py-2 text-[14px] font-medium tracking-tight transition-all ${
+                                    active
+                                      ? "bg-card text-slate-900 shadow-sm"
+                                      : "text-white hover:bg-white/10 hover:text-white"
+                                  }${hoverScaleCls}`,
+                                  dragCls(navItemKey(item)),
+                                )}
+                              >
+                                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                                <span className="leading-snug break-words">{item.label}</span>
+                              </a>
+                              <EstrelaFavorito
+                                marcado={favoritosSet.has(navItemKey(item))}
+                                rotulo={item.label}
+                                ativo={active}
+                                onAlternar={() => void alternarFavorito(navItemKey(item))}
+                              />
+                            </div>
                           );
                         })}
                     </div>
@@ -1936,6 +2162,8 @@ function AppShellInner() {
         }
       >
         <main
+          data-oszap-chat={subsystem === "os-zap" && areaConversas ? "true" : undefined}
+          data-header-recolhido={headerRecolhido ? "true" : undefined}
           key={uxMelhorias ? chaveAreaPrincipal(location.pathname) : "static"}
           className={cn(
             "flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0",
@@ -1973,15 +2201,18 @@ function AppShellInner() {
           Francisco), e no celular sobrava apenas o hambúrguer para navegar.
           Ela some enquanto a gaveta está aberta: é fixa no rodapé e cobriria o
           menu do usuário dentro da gaveta. */}
-      {!isChooser && !sidebarAberta && bottomNavItens.length > 0 && (
-        <LiquidBottomNav
-          pathname={location.pathname}
-          onNavigate={irPara}
-          cor={corSidebar}
-          onMais={() => setSidebarAberta(true)}
-          itens={bottomNavItens}
-        />
-      )}
+      {!isChooser &&
+        !sidebarAberta &&
+        !(subsystem === "os-zap" && acessibilidadeAberta) &&
+        bottomNavItens.length > 0 && (
+          <LiquidBottomNav
+            pathname={location.pathname}
+            onNavigate={irPara}
+            cor={corSidebar}
+            onMais={() => setSidebarAberta(true)}
+            itens={bottomNavItens}
+          />
+        )}
       {seletorPortaisAberto && !isChooser && (
         <div
           className="fixed inset-0 z-[60] overflow-y-auto bg-background"

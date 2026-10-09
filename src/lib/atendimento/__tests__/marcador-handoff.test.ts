@@ -6,9 +6,17 @@ const MARCADOR =
 
 describe("marcador de handoff na timeline", () => {
   it("oculta o aviso azul de reserva mesmo antes de carregar os eventos antigos", () => {
-    expect(textoMarcadorSistema("Conversa reservada na fila individual de JEAN TELEFONE.")).toBe("");
-    expect(textoMarcadorSistema("Conversa reservada na fila individual de Ana. A IA parou de responder.")).toBe("");
-    expect(textoMarcadorSistema("Conversa reservada na fila individual de Ana. Verificar documento.")).toContain("Verificar documento");
+    expect(textoMarcadorSistema("Conversa reservada na fila individual de JEAN TELEFONE.")).toBe(
+      "",
+    );
+    expect(
+      textoMarcadorSistema(
+        "Conversa reservada na fila individual de Ana. A IA parou de responder.",
+      ),
+    ).toBe("");
+    expect(
+      textoMarcadorSistema("Conversa reservada na fila individual de Ana. Verificar documento."),
+    ).toContain("Verificar documento");
   });
   it("reconhece o marcador extenso", () => {
     expect(ehMarcadorHandoff(MARCADOR)).toBe(true);
@@ -16,12 +24,14 @@ describe("marcador de handoff na timeline", () => {
     expect(ehMarcadorHandoff(null)).toBe(false);
   });
 
-  it("compacta sem motivo, fila nem resumo", () => {
+  it("mantém o motivo legível sem fila nem resumo", () => {
     const t = textoMarcadorSistema(MARCADOR);
-    expect(t).toBe("Transferida para atendimento humano · Recepção");
+    expect(t).toBe(
+      "Transferida para atendimento humano · Recepção · Motivo: O paciente pediu atendimento humano.",
+    );
     expect(t).not.toMatch(/Resumo:/);
     expect(t).not.toMatch(/Posição na fila/);
-    expect(t).not.toMatch(/Motivo:/);
+    expect(t).toMatch(/Motivo:/);
   });
 
   it("mantém urgência e funciona sem setor (conversas antigas)", () => {
@@ -29,11 +39,13 @@ describe("marcador de handoff na timeline", () => {
       textoMarcadorSistema(
         "🔁 Conversa transferida da Nina para atendimento humano · Motivo: x · URGENTE · Posição na fila: 1",
       ),
-    ).toBe("Transferida para atendimento humano · URGENTE");
+    ).toBe("Transferida para atendimento humano · URGENTE · Motivo: x");
   });
 
   it("apresenta protocolo e destino sem o nome técnico handoff", () => {
     const protocolo = "🧾 Handoff realizado pela Nina · Protocolo: MJ-4 · Destino: Recepção";
-    expect(textoMarcadorSistema(protocolo)).toBe("Encaminhamento para atendimento humano · Protocolo MJ-4 · Destino: Recepção");
+    expect(textoMarcadorSistema(protocolo)).toBe(
+      "Encaminhamento para atendimento humano · Protocolo MJ-4 · Destino: Recepção · Motivo: Motivo não registrado neste atendimento.",
+    );
   });
 });

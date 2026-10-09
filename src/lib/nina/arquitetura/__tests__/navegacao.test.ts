@@ -2,11 +2,7 @@
  * FASE 7 — busca, filtro e minimapa do canvas (comportamento apenas visual).
  */
 import { describe, expect, it } from "bun:test";
-import {
-  NODES_ARQUITETURA,
-  CATEGORIAS_ARQUITETURA,
-  type CategoriaArquitetura,
-} from "../manifesto";
+import { NODES_ARQUITETURA, CATEGORIAS_ARQUITETURA, type CategoriaArquitetura } from "../manifesto";
 import {
   buscarNodes,
   calcularMinimapa,

@@ -38,11 +38,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
   });
 
   it("cenário 2: conversa transferida para Maria sai da lista de Jean", () => {
-    const r = patchListaPorConversa(
-      [conversa()],
-      conversa({ atribuida_user_id: MARIA }),
-      ctx(),
-    );
+    const r = patchListaPorConversa([conversa()], conversa({ atribuida_user_id: MARIA }), ctx());
     expect(r.aplicado).toBe(true);
     expect(r.reconciliar).toBe(false);
     expect(r.lista).toEqual([]);
@@ -86,11 +82,12 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
   });
 
   it("atendente comum não recebe conversa de terceiro pelo tempo real", () => {
-    const r = patchListaPorConversa(
-      [],
-      conversa({ atribuida_user_id: JEAN }),
-      { escopo: "minhas", userId: MARIA, gestor: false, atendenteId: JEAN },
-    );
+    const r = patchListaPorConversa([], conversa({ atribuida_user_id: JEAN }), {
+      escopo: "minhas",
+      userId: MARIA,
+      gestor: false,
+      atendenteId: JEAN,
+    });
     expect(r.lista).toEqual([]);
     expect(r.reconciliar).toBe(false);
   });
@@ -106,7 +103,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
     expect(r.lista).toEqual([]);
   });
 
-  it("nova atribuição entra antes das anteriores, independentemente da última mensagem", () => {
+  it("nova atribuição entra depois das anteriores, independentemente da última mensagem", () => {
     const antiga = conversa({
       id: "c0",
       inbox_entrada_em: "2026-01-01T09:00:00.000Z",
@@ -117,7 +114,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
       conversa({ inbox_entrada_em: "2026-01-01T10:00:00.000Z" }),
       ctx(),
     );
-    expect(r.lista.map((c) => c.id)).toEqual(["c1", "c0"]);
+    expect(r.lista.map((c) => c.id)).toEqual(["c0", "c1"]);
   });
 
   it("'Todos os atendentes' volta ao escopo normal", () => {

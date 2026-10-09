@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LineChart as LineIcon } from "lucide-react";
@@ -24,10 +25,10 @@ function Page() {
     (async () => {
       if (!clinicaAtual) return;
       setLoading(true);
-      const since = new Date();
-      since.setDate(since.getDate() - 30);
+      const fim = hojeBR();
+      const since = new Date(`${fim}T12:00:00Z`);
+      since.setUTCDate(since.getUTCDate() - 30);
       const ini = since.toISOString().slice(0, 10);
-      const fim = new Date().toISOString().slice(0, 10);
       const [serieRes, catRes, cats] = await Promise.all([
         supabase.rpc("fin_serie_diaria", {
           p_clinica: clinicaAtual.clinica_id,

@@ -131,7 +131,12 @@ export function RastrearExecucao({ clinicaId, nivelAcesso, chavePosicoes }: Prop
         </div>
         <div className="space-y-1">
           <Label htmlFor="rastreio-ate">Até</Label>
-          <Input id="rastreio-ate" type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+          <Input
+            id="rastreio-ate"
+            type="date"
+            value={ate}
+            onChange={(e) => setAte(e.target.value)}
+          />
         </div>
       </div>
 

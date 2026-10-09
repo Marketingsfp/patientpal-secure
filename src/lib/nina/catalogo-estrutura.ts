@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { interpretarModalidade } from "./modalidade-atendimento";
-import { REGRA_APRESENTACAO_VALORES } from "./pagamento-catalogo";
-import { REGRA_ANESTESIA_ADICIONAL, REGRA_HORARIOS_PUBLICADOS, REGRA_MODALIDADES_CONFIRMADAS } from "./regras-administrativas-confirmadas";
+import {
+  REGRA_ANESTESIA_ADICIONAL,
+  REGRA_HORARIOS_PUBLICADOS,
+  REGRA_MODALIDADES_CONFIRMADAS,
+  REGRA_IDADE_NAO_INFORMADA,
+  idadeNaoInformada,
+} from "./regras-administrativas-confirmadas";
 
 const texto = z.string().trim().max(4000).nullable().optional();
 const hora = z
@@ -45,6 +50,14 @@ export const complementoAtendimentoSchema = z
 export const estruturaCatalogoSchema = z
   .object({
     versao: z.literal(1).default(1),
+    origem_clinica_os: z
+      .object({
+        tipo: z.enum(["medico", "procedimento", "consulta"]),
+        id: z.string().uuid(),
+        ativo: z.boolean(),
+        visivel: z.boolean(),
+      })
+      .optional(),
     aliases: z.array(z.string().trim().min(2).max(160)).max(50).default([]),
     categoria: z
       .enum(["consulta", "exame", "procedimento", "exame_procedimento"])
@@ -74,7 +87,6 @@ export function lerEstrutura(v: unknown): EstruturaCatalogo {
   return r.success ? r.data : estruturaVazia();
 }
 
-export const padronizarSfp = (s: string) => s.replace(/\bSPF\b/gi, "SFP");
 const normal = (v: string) =>
   v
     .normalize("NFD")
@@ -85,9 +97,7 @@ const normal = (v: string) =>
 
 /** Alteração editorial: preserva palavras, números, critérios e ordem dos blocos. */
 export function organizarTextoCatalogo(v: string): string {
-  return padronizarSfp(v)
-    .replace(/[ \t]+\|[ \t]+/g, "\n")
-    .trim();
+  return v.replace(/[ \t]+\|[ \t]+/g, "\n").trim();
 }
 
 export type AtendimentoPublicado = {
@@ -103,6 +113,8 @@ export type AtendimentoPublicado = {
   modalidade: ReturnType<typeof interpretarModalidade>;
   dinheiro: string | null;
   pix_cartao: string | null;
+  cartao?: string | null;
+  pix?: string | null;
   observacoes: string | null;
   outros: string[];
   complemento?: ComplementoAtendimento;
@@ -132,6 +144,7 @@ export function separarAtendimentos(
       "dinheiro",
       "pix/cartao",
       "cartao",
+      "pix",
       "observacao",
       "pode chegar ate que horas",
     ];
@@ -159,7 +172,9 @@ export function separarAtendimentos(
       unidade_idade: idade ? (/^a/i.test(idade[2]!) ? "anos" : "meses") : null,
       modalidade: interpretarModalidade(obs),
       dinheiro: campos.get("dinheiro") || null,
-      pix_cartao: campos.get("pix/cartao") || campos.get("cartao") || null,
+      pix_cartao: campos.get("pix/cartao") || null,
+      cartao: campos.get("cartao") || null,
+      pix: campos.get("pix") || null,
       observacoes: obs,
       outros,
     });
@@ -211,12 +226,13 @@ export function modalidadeEstruturada(
   modalidadeLegada: string | null | undefined,
   selecionados?: AtendimentoPublicado[],
 ) {
-  const itens = selecionados ?? atendimentosEstruturados(conteudo, estrutura, profissional, "Consulta");
+  const itens =
+    selecionados ?? atendimentosEstruturados(conteudo, estrutura, profissional, "Consulta");
   if (!itens.length) return "nao_definida" as const;
   const base = interpretarModalidade(modalidadeLegada);
   const modos = itens.map((a) => {
     const fontes = [a.complemento?.modalidade, a.modalidade, base].filter(Boolean);
-    return new Set(fontes).size > 1 ? "nao_definida" : fontes[0] ?? null;
+    return new Set(fontes).size > 1 ? "nao_definida" : (fontes[0] ?? null);
   });
   if (modos.every((m) => !m)) return null;
   if (modos.some((m) => !m || m === "nao_definida") || new Set(modos).size !== 1)
@@ -238,6 +254,8 @@ export function textoAtendimentos(itens: AtendimentoPublicado[]): string {
         a.criterio_publicado && `Critério publicado: ${a.criterio_publicado}`,
         a.dinheiro && `Dinheiro: ${a.dinheiro}`,
         a.pix_cartao && `Pix/cartão: ${a.pix_cartao}`,
+        a.cartao && `Cartão: ${a.cartao}`,
+        a.pix && `Pix: ${a.pix}`,
         a.observacoes && `Observações: ${a.observacoes}`,
         ...a.outros,
       ]
@@ -250,7 +268,7 @@ export function textoAtendimentos(itens: AtendimentoPublicado[]): string {
 /** Elimina somente a cópia comprovadamente idêntica; condições extras são preservadas. */
 export function pagamentosJaDescritos(formas: unknown, itens: AtendimentoPublicado[]): boolean {
   if (!Array.isArray(formas) || !formas.length || !itens.length) return false;
-  const valor = (t: string | null) => {
+  const valor = (t: string | null | undefined) => {
     if (!t || !/^R\$\s*[\d.]+,\d{2}$/.test(t)) return null;
     return Number(t.replace(/R\$|\s|\./g, "").replace(",", "."));
   };
@@ -260,9 +278,13 @@ export function pagamentosJaDescritos(formas: unknown, itens: AtendimentoPublica
     const campo =
       forma === "dinheiro"
         ? "dinheiro"
-        : ["cartao", "pix/cartao"].includes(forma)
+        : forma === "pix/cartao"
           ? "pix_cartao"
-          : null;
+          : forma === "cartao"
+            ? "cartao"
+            : forma === "pix"
+              ? "pix"
+              : null;
     if (!campo) return false;
     const alvos = f.condicao
       ? itens.filter((a) => normal(a.atendimento) === normal(f.condicao))
@@ -279,7 +301,11 @@ export function pendenciasEstrutura(
   const atendimentos = atendimentosEstruturados(conteudo, estrutura, profissional);
   const pendencias: string[] = [];
   for (const a of atendimentos) {
-    if (a.criterio_publicado && a.idade_minima === null && !a.complemento?.criterio_adicional)
+    if (
+      !idadeNaoInformada(a.criterio_publicado) &&
+      a.idade_minima === null &&
+      !a.complemento?.criterio_adicional
+    )
       pendencias.push(
         `${a.atendimento}: critério “${a.criterio_publicado}” precisa de conferência.`,
       );
@@ -290,8 +316,13 @@ export function pendenciasEstrutura(
       !a.complemento?.referencia_recorrencia
     )
       pendencias.push(`${a.atendimento}: recorrência sem data de referência.`);
-    if (/anestesia/i.test(a.observacoes ?? "") && !a.complemento?.acrescimos &&
-        !/(?:R\$\s*[\d.]+,\d{2}\s*\(anestesia\)|anestesia adicional:\s*R\$\s*[\d.]+,\d{2})/i.test(a.observacoes ?? ""))
+    if (
+      /anestesia/i.test(a.observacoes ?? "") &&
+      !a.complemento?.acrescimos &&
+      !/(?:R\$\s*[\d.]+,\d{2}\s*\(anestesia\)|anestesia adicional:\s*R\$\s*[\d.]+,\d{2})/i.test(
+        a.observacoes ?? "",
+      )
+    )
       pendencias.push(`${a.atendimento}: confirmar o valor adicional da anestesia.`);
   }
   return [...new Set(pendencias)];
@@ -301,20 +332,22 @@ export const INSTRUCAO_DADOS_CATALOGO =
   "Cada item de atendimentos_publicados associa consulta/procedimento, profissional, valores, critérios e escala. " +
   "Nunca misture preço ou idade de atendimentos diferentes do mesmo profissional. Complementos são informações confirmadas para aquela chave; " +
   "se contradisserem o texto publicado, confirme com a equipe o aspecto conflitante, sem escolher uma versão. " +
-  REGRA_MODALIDADES_CONFIRMADAS + " " +
+  REGRA_MODALIDADES_CONFIRMADAS +
+  " " +
+  REGRA_IDADE_NAO_INFORMADA +
+  " " +
   "Preparo não informado não significa sem preparo; convênios não informados não significam que não aceita. " +
-  "Pedido médico: quando obrigatório, avise ao apresentar o exame que é necessário levar o pedido médico para realizá-lo; " +
+  "Pedido médico: quando obrigatório na base de conhecimento, solicite uma foto legível do pedido para o exame, procedimento ou consulta identificado; " +
   "quando dispensado, informe que não precisa se o paciente perguntar. Não informado não significa dispensado: " +
   "não presuma a exigência ou a dispensa. Se perguntarem e não houver regra publicada explícita, confirme com a equipe. " +
-  "Não peça envio de foto do pedido nem bloqueie o agendamento por esse campo: ele orienta a realização do exame. " +
+  "Siga o controle pedido_medico_do_turno para não repetir a solicitação nem pedir uma foto já recebida para o mesmo atendimento. Esse campo não bloqueia o agendamento por si só. " +
   "Se a opção de pedido médico contradisser requisitos em texto, confirme com a equipe antes de orientar. " +
   "'40 kg' não é idade. 'Manhã e tarde' não estabelece um limite numérico de chegada. Quinzenal sem data de referência não identifica o próximo dia. " +
-  REGRA_HORARIOS_PUBLICADOS + " " + REGRA_ANESTESIA_ADICIONAL + " " +
+  REGRA_HORARIOS_PUBLICADOS +
+  " " +
+  REGRA_ANESTESIA_ADICIONAL +
+  " " +
   "Grupo geral e item específico não compartilham regras automaticamente. " +
   "Responda somente aos objetivos do pedido, sem copiar os rótulos internos ou repetir fatos.";
 
-export const INSTRUCAO_ESTRUTURA_CATALOGO =
-  INSTRUCAO_DADOS_CATALOGO +
-  " " +
-  REGRA_APRESENTACAO_VALORES +
-  " Profissional genérico é equipe interna: omita o nome; SFP exige encaminhamento humano silencioso.";
+export const INSTRUCAO_ESTRUTURA_CATALOGO = INSTRUCAO_DADOS_CATALOGO;

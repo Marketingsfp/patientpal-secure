@@ -17,7 +17,6 @@ import {
   type SnapshotPrompt,
 } from "./evidencias";
 
-
 const escopo = new AsyncLocalStorage<Coletor>();
 
 /** Executa `fn` com um coletor próprio e devolve o resultado + o pacote. */
@@ -59,8 +58,6 @@ export function registrarSnapshotPrompt(snap: SnapshotPrompt): void {
   }
 }
 
-
-
 /** Atalho seguro: registra a etapa só se existir um coletor no escopo. */
 export function registrarEtapa(etapa: Omit<Etapa, "em"> & { em?: string }): void {
   try {
@@ -82,17 +79,15 @@ export async function gravarEvidencias(
   if (!execucaoId) return;
   try {
     const pacote = coletor.pacote();
-    const { error } = await supabaseAdmin
-      .from("nina_execucao_evidencias")
-      .upsert(
-        {
-          execucao_id: execucaoId,
-          clinica_id: clinicaId,
-          etapas: pacote.etapas as never,
-          lacunas: pacote.lacunas,
-        } as never,
-        { onConflict: "execucao_id" },
-      );
+    const { error } = await supabaseAdmin.from("nina_execucao_evidencias").upsert(
+      {
+        execucao_id: execucaoId,
+        clinica_id: clinicaId,
+        etapas: pacote.etapas as never,
+        lacunas: pacote.lacunas,
+      } as never,
+      { onConflict: "execucao_id" },
+    );
     if (error) console.warn("[nina-evidencias] falha ao gravar:", error.message);
 
     // FASE 6 — referência imutável da versão do prompt usada nesta execução.
@@ -115,34 +110,30 @@ export async function gravarEvidencias(
     // garante que uma segunda gravação NUNCA reescreva o registro original.
     if (pacote.snapshot) {
       const s = pacote.snapshot;
-      const { error: e4 } = await supabaseAdmin
-        .from("nina_prompt_snapshots")
-        .upsert(
-          {
-            execucao_id: execucaoId,
-            clinica_id: clinicaId,
-            conversation_id: pacote.prompt?.conversaId ?? null,
-            escopo: pacote.prompt?.escopo ?? "whatsapp",
-            prompt_versao_id: pacote.prompt?.versaoId ?? null,
-            prompt_versao: pacote.prompt?.versao ?? null,
-            prompt_publicado_em: pacote.prompt?.publicadoEm ?? null,
-            prompt_origem: pacote.prompt?.origem ?? null,
-            behavior_prompt_template: s.behaviorPromptTemplate,
-            behavior_prompt_rendered: s.behaviorPromptRendered,
-            behavior_prompt_hash: s.behaviorPromptHash,
-            envelope_tecnico: s.envelopeTecnico,
-            runtime_context: s.runtimeContext as never,
-            request_final: s.requestFinal,
-            model: s.model,
-            model_parameters: s.modelParameters as never,
-            tool_schemas: s.toolSchemas as never,
-          } as never,
-          { onConflict: "execucao_id", ignoreDuplicates: true },
-        );
+      const { error: e4 } = await supabaseAdmin.from("nina_prompt_snapshots").upsert(
+        {
+          execucao_id: execucaoId,
+          clinica_id: clinicaId,
+          conversation_id: pacote.prompt?.conversaId ?? null,
+          escopo: pacote.prompt?.escopo ?? "whatsapp",
+          prompt_versao_id: pacote.prompt?.versaoId ?? null,
+          prompt_versao: pacote.prompt?.versao ?? null,
+          prompt_publicado_em: pacote.prompt?.publicadoEm ?? null,
+          prompt_origem: pacote.prompt?.origem ?? null,
+          behavior_prompt_template: s.behaviorPromptTemplate,
+          behavior_prompt_rendered: s.behaviorPromptRendered,
+          behavior_prompt_hash: s.behaviorPromptHash,
+          envelope_tecnico: s.envelopeTecnico,
+          runtime_context: s.runtimeContext as never,
+          request_final: s.requestFinal,
+          model: s.model,
+          model_parameters: s.modelParameters as never,
+          tool_schemas: s.toolSchemas as never,
+        } as never,
+        { onConflict: "execucao_id", ignoreDuplicates: true },
+      );
       if (e4) console.warn("[nina-evidencias] falha ao gravar snapshot do prompt:", e4.message);
     }
-
-
 
     if (pacote.mensagensEntrada.length) {
       const { error: e2 } = await supabaseAdmin
@@ -196,12 +187,10 @@ async function registrarTracePrompt(
       status: "ok",
       metadata,
     };
-    const { error } = await supabaseAdmin
-      .from("nina_trace_eventos")
-      .insert([
-        { ...base, node_id: "instructions.published" },
-        { ...base, node_id: "prompt.compose" },
-      ] as never);
+    const { error } = await supabaseAdmin.from("nina_trace_eventos").insert([
+      { ...base, node_id: "instructions.published" },
+      { ...base, node_id: "prompt.compose" },
+    ] as never);
     if (error) console.warn("[nina-evidencias] falha ao gravar rastro do prompt:", error.message);
   } catch (e) {
     console.warn("[nina-evidencias] rastro do prompt:", e instanceof Error ? e.message : e);

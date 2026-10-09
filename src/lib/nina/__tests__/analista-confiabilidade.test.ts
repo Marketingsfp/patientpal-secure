@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { valoresPermitidos, validarResposta } from "@/lib/nina/analista-metricas";
-import { calcularCalibracaoPorTipo, type LinhaDecisaoMetrica } from "@/lib/nina/confidence/metricas";
+import {
+  calcularCalibracaoPorTipo,
+  type LinhaDecisaoMetrica,
+} from "@/lib/nina/confidence/metricas";
 
 const resultadoConfiabilidade = {
   id: "conf1",
@@ -20,9 +23,22 @@ const resultadoConfiabilidade = {
       inversoes: [],
     },
     calibracaoPorTipoDePergunta: [
-      { tipo: "valor", mensagens: 300, mensagensAlta: 250, errosReportados: 9, errosAlta: 6, taxaErro: 3, taxaErroAlta: 2.4 },
+      {
+        tipo: "valor",
+        mensagens: 300,
+        mensagensAlta: 250,
+        errosReportados: 9,
+        errosAlta: 6,
+        taxaErro: 3,
+        taxaErroAlta: 2.4,
+      },
     ],
-    altaConfiancaComErro: { classificacao: "HIGH_CONFIDENCE_ERROR", casos: 7, mensagensAlta: 1000, taxa: 0.7 },
+    altaConfiancaComErro: {
+      classificacao: "HIGH_CONFIDENCE_ERROR",
+      casos: 7,
+      mensagensAlta: 1000,
+      taxa: 0.7,
+    },
   },
 };
 
@@ -83,7 +99,13 @@ describe("FASE 9 — analista e os dados de confiabilidade", () => {
     });
     const linhas = [base("a", 97, "valor"), base("b", 95, "valor"), base("c", 50, "agenda")];
     const r = calcularCalibracaoPorTipo(linhas, [
-      { id: "e1", conversa_id: null, execucao_id: "a", created_at: "2026-09-01T11:00:00.000Z", categoria: null },
+      {
+        id: "e1",
+        conversa_id: null,
+        execucao_id: "a",
+        created_at: "2026-09-01T11:00:00.000Z",
+        categoria: null,
+      },
     ]);
     expect(r.find((t) => t.tipo === "valor")).toMatchObject({
       mensagens: 2,

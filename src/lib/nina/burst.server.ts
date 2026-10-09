@@ -118,8 +118,8 @@ export async function aguardarTurnoNina(entrada: EntradaAgrupamento): Promise<Tu
         throw new ErroAgrupamentoNina(`Leitura das entradas do lote falhou: ${error.message}`);
       return (data ?? []).map((m) => ({
         id: m.id,
-        texto:
-          m.tipo === "audio" || m.tipo === "image" ? (m.transcricao ?? "") : (m.body ?? ""),
+        tipo: m.tipo ?? undefined,
+        texto: m.tipo === "audio" || m.tipo === "image" ? (m.transcricao ?? "") : (m.body ?? ""),
       }));
     },
     lerRevisao: async () =>

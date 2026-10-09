@@ -28,17 +28,49 @@ export type EstiloPersona = "objetivo" | "confuso" | "apressado" | "educado" | "
 export type NivelDetalhe = "curto" | "medio" | "detalhado";
 
 export const ESTILOS: { valor: EstiloPersona; rotulo: string; instrucao: string }[] = [
-  { valor: "objetivo", rotulo: "Paciente objetivo", instrucao: "Você é direto e responde exatamente o que foi perguntado." },
-  { valor: "confuso", rotulo: "Paciente confuso", instrucao: "Você se confunde com as opções, repete dúvidas e às vezes entende errado." },
-  { valor: "apressado", rotulo: "Paciente apressado", instrucao: "Você tem pressa, escreve mensagens muito curtas e cobra rapidez." },
-  { valor: "educado", rotulo: "Paciente educado", instrucao: "Você é cordial, agradece e usa frases completas." },
-  { valor: "desconfiado", rotulo: "Paciente desconfiado", instrucao: "Você questiona preços e condições antes de confirmar qualquer coisa." },
+  {
+    valor: "objetivo",
+    rotulo: "Paciente objetivo",
+    instrucao: "Você é direto e responde exatamente o que foi perguntado.",
+  },
+  {
+    valor: "confuso",
+    rotulo: "Paciente confuso",
+    instrucao: "Você se confunde com as opções, repete dúvidas e às vezes entende errado.",
+  },
+  {
+    valor: "apressado",
+    rotulo: "Paciente apressado",
+    instrucao: "Você tem pressa, escreve mensagens muito curtas e cobra rapidez.",
+  },
+  {
+    valor: "educado",
+    rotulo: "Paciente educado",
+    instrucao: "Você é cordial, agradece e usa frases completas.",
+  },
+  {
+    valor: "desconfiado",
+    rotulo: "Paciente desconfiado",
+    instrucao: "Você questiona preços e condições antes de confirmar qualquer coisa.",
+  },
 ];
 
 export const DETALHES: { valor: NivelDetalhe; rotulo: string; instrucao: string }[] = [
-  { valor: "curto", rotulo: "Pouco detalhe", instrucao: "Escreva no máximo uma frase por mensagem." },
-  { valor: "medio", rotulo: "Detalhe médio", instrucao: "Escreva uma ou duas frases por mensagem." },
-  { valor: "detalhado", rotulo: "Muito detalhe", instrucao: "Escreva até três frases, dando contexto extra." },
+  {
+    valor: "curto",
+    rotulo: "Pouco detalhe",
+    instrucao: "Escreva no máximo uma frase por mensagem.",
+  },
+  {
+    valor: "medio",
+    rotulo: "Detalhe médio",
+    instrucao: "Escreva uma ou duas frases por mensagem.",
+  },
+  {
+    valor: "detalhado",
+    rotulo: "Muito detalhe",
+    instrucao: "Escreva até três frases, dando contexto extra.",
+  },
 ];
 
 /** Cenários sugeridos (o operador pode escrever o próprio). */
@@ -126,24 +158,22 @@ export function custoEstimado(tokens: number, creditosPorMilTokens: number): num
   return (Math.max(0, tokens) / 1000) * creditosPorMilTokens;
 }
 
-
 export type TurnoConversa = { autor: "paciente" | "nina"; texto: string };
 
 /**
  * Instruções do paciente simulado. Não contém o Prompt Principal da Nina,
  * resposta esperada, avaliação, dados reais nem raciocínio interno.
  */
-export function montarInstrucoesTerra(
-  cenario: string,
-  persona: Persona,
-  limites: Limites,
-): string {
+export function montarInstrucoesTerra(cenario: string, persona: Persona, limites: Limites): string {
   const estilo = ESTILOS.find((e) => e.valor === persona.estilo) ?? ESTILOS[0]!;
   const detalhe = DETALHES.find((d) => d.valor === persona.detalhe) ?? DETALHES[0]!;
   const extras: string[] = [];
-  if (persona.errosDigitacao) extras.push("Cometa erros leves de digitação, sem impedir o entendimento.");
-  if (persona.mudaDeAssunto) extras.push("De vez em quando puxe um assunto secundário antes de voltar ao objetivo.");
-  if (persona.respondeParcialmente) extras.push("Às vezes responda só parte do que foi perguntado.");
+  if (persona.errosDigitacao)
+    extras.push("Cometa erros leves de digitação, sem impedir o entendimento.");
+  if (persona.mudaDeAssunto)
+    extras.push("De vez em quando puxe um assunto secundário antes de voltar ao objetivo.");
+  if (persona.respondeParcialmente)
+    extras.push("Às vezes responda só parte do que foi perguntado.");
   if (persona.objetivo?.trim()) extras.push(`Seu objetivo pessoal: ${persona.objetivo.trim()}`);
 
   return [
@@ -181,7 +211,12 @@ export function montarInputTerra(historico: TurnoConversa[]): unknown[] {
   if (itens.length === 0)
     itens.push({
       role: "user",
-      content: [{ type: "input_text", text: "(a conversa ainda não começou; escreva sua primeira mensagem)" }],
+      content: [
+        {
+          type: "input_text",
+          text: "(a conversa ainda não começou; escreva sua primeira mensagem)",
+        },
+      ],
     });
   return itens;
 }
@@ -257,4 +292,3 @@ export const ROTULO_MOTIVO: Record<MotivoFim, string> = {
   timeout: "Tempo de espera excedido.",
   operador: "Interrompido pelo operador.",
 };
-

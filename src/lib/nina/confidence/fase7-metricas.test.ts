@@ -207,10 +207,7 @@ describe("amostra e calibração", () => {
   });
 
   it("ignora decisões em modo observacional e reportes não confirmados", () => {
-    const decisoes = [
-      decisao({ modo: "shadow" }),
-      decisao({ message_id: "m1" }),
-    ];
+    const decisoes = [decisao({ modo: "shadow" }), decisao({ message_id: "m1" })];
     const r = calibrar(
       decisoes,
       [
@@ -235,7 +232,14 @@ describe("amostra e calibração", () => {
     const r = calibrar(
       [decisao({ decisao: "HANDOFF", score: 40 })],
       [],
-      [{ conversa_id: "c1", status: "resolvido", houveHandoff: false, agendamentoConfirmado: null }],
+      [
+        {
+          conversa_id: "c1",
+          status: "resolvido",
+          houveHandoff: false,
+          agendamentoConfirmado: null,
+        },
+      ],
     );
     expect(r.bloqueioIndevido).toBe(1);
   });

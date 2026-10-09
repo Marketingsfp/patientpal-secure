@@ -42,13 +42,17 @@ export function useRealtimeRefresh(
     for (const t of tables) {
       ch.on(
         "postgres_changes" as any,
-        { event: "*", schema: "public", table: t, ...(opcoes?.filtro ? { filter: opcoes.filtro } : {}) },
+        {
+          event: "*",
+          schema: "public",
+          table: t,
+          ...(opcoes?.filtro ? { filter: opcoes.filtro } : {}),
+        },
         (payload: any) => {
           const interessa = opcoesRef.current?.interessa;
           if (interessa) {
-            const linha = (payload?.new && Object.keys(payload.new).length
-              ? payload.new
-              : payload?.old) ?? {};
+            const linha =
+              (payload?.new && Object.keys(payload.new).length ? payload.new : payload?.old) ?? {};
             if (!interessa(linha, t)) return;
           }
           cbRef.current();

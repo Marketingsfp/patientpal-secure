@@ -12,11 +12,20 @@
 //   • LIVRE        — ficha sem paciente ("DISPONÍVEL"/"BLOQUEIO").
 //   • AGENDADA     — ficha com paciente alocado, qualquer que seja o status.
 //     É o mesmo sentido do filtro "agendado" da lista.
-//   • Os demais números são o `status` da ficha ocupada.
+//   • Os demais números dividem as fichas ocupadas em situações — ver
+//     `situacaoDaFicha`. Somar as situações sempre devolve o total de agendadas.
 //
-// Cancelado e faltou continuam contando como ficha agendada: a grade foi
-// ocupada, o paciente é que não foi atendido. Somar os status de uma ficha
-// ocupada sempre devolve o total de agendadas.
+// PRESENÇA vem do check-in (`fluxo_etapa`), nunca do `status`: "confirmado"
+// também é a resposta do paciente no WhatsApp/site e não quer dizer que ele
+// chegou, e o check-in nem sempre muda o status. Em 07/10/2026 a barra
+// mostrava 46 "presentes" (17 nunca vieram), 138 "aguardando" (30 já tinham
+// feito check-in), "em atendimento" sempre 0 (o status "em_atendimento" não
+// existe no banco) e 0 faltas contra 125 pacientes que não passaram pelo balcão.
+//
+// Cancelado e falta continuam contando como ficha agendada: a grade foi
+// ocupada, o paciente é que não foi atendido.
+
+import { ficouSemDesfecho, ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 
 export type LinhaResumo = {
   id: string;
@@ -26,6 +35,7 @@ export type LinhaResumo = {
   medico_id?: string | null;
   agenda_id?: string | null;
   status?: string | null;
+  fluxo_etapa?: string | null;
 };
 
 export type ResumoDoDia = {
@@ -35,15 +45,16 @@ export type ResumoDoDia = {
   livres: number;
   /** Fichas com paciente alocado, em qualquer status. */
   agendados: number;
-  /** Status "agendado": marcado, mas o paciente ainda não chegou. */
+  /** Sem check-in e o dia ainda não acabou (a clínica fecha às 19h). */
   aguardando: number;
-  /** Status "confirmado": presente na clínica (check-in feito no balcão). */
+  /** Presentes: check-in feito (recepção, caixa, triagem), ainda sem atendimento. */
   confirmados: number;
-  /** Status "em_atendimento": já entrou na sala. */
+  /** Na sala ou no exame. */
   emAtendimento: number;
-  /** Status "realizado": atendimento concluído. */
+  /** Status "realizado" ou fluxo finalizado. */
   atendidos: number;
   cancelados: number;
+  /** "Faltou" + sem check-in em dia encerrado (ver `ficouSemDesfecho`). */
   faltas: number;
   /** Fichas ocupadas que dividem horário com outra — ver `contarEncaixes`. */
   encaixes: number;
@@ -107,8 +118,41 @@ export function contarEncaixes(linhas: readonly LinhaResumo[]): number {
   return encaixes;
 }
 
+export type SituacaoFicha =
+  | "aguardando"
+  | "confirmados"
+  | "emAtendimento"
+  | "atendidos"
+  | "cancelados"
+  | "faltas";
+
+/**
+ * Em que contador entra uma ficha OCUPADA. `ateDia` = último dia encerrado
+ * (`ultimoDiaEncerrado`): sem check-in até ele é falta, depois é aguardando.
+ * Mesma regra do Dashboard operacional (`lib/painel/sem-desfecho.ts`).
+ */
+export function situacaoDaFicha(a: LinhaResumo, ateDia: string): SituacaoFicha {
+  const etapa = a.fluxo_etapa ?? "aguardando_recepcao";
+  if (a.status === "cancelado") return "cancelados";
+  if (a.status === "faltou") return "faltas";
+  if (a.status === "realizado" || etapa === "finalizado") return "atendidos";
+  if (etapa === "atendimento" || etapa === "exame") return "emAtendimento";
+  if (etapa !== "aguardando_recepcao") return "confirmados";
+  const ficha = {
+    inicio: a.inicio,
+    status: a.status ?? "",
+    fluxo_etapa: a.fluxo_etapa ?? null,
+    paciente_nome: a.paciente_nome ?? null,
+    paciente_id: a.paciente_id,
+  };
+  return ficouSemDesfecho(ficha, ateDia) ? "faltas" : "aguardando";
+}
+
 /** Contagem completa do dia a partir das linhas da grade. */
-export function resumirDia(linhas: readonly LinhaResumo[]): ResumoDoDia {
+export function resumirDia(
+  linhas: readonly LinhaResumo[],
+  ateDia: string = ultimoDiaEncerrado(),
+): ResumoDoDia {
   const resumo: ResumoDoDia = {
     fichasGeradas: linhas.length,
     livres: 0,
@@ -127,27 +171,7 @@ export function resumirDia(linhas: readonly LinhaResumo[]): ResumoDoDia {
       continue;
     }
     resumo.agendados += 1;
-    switch (a.status) {
-      case "confirmado":
-        resumo.confirmados += 1;
-        break;
-      case "em_atendimento":
-        resumo.emAtendimento += 1;
-        break;
-      case "realizado":
-        resumo.atendidos += 1;
-        break;
-      case "cancelado":
-        resumo.cancelados += 1;
-        break;
-      case "faltou":
-        resumo.faltas += 1;
-        break;
-      default:
-        // "agendado" e qualquer status novo que apareça no banco caem aqui:
-        // melhor contar como "aguardando" do que sumir da soma.
-        resumo.aguardando += 1;
-    }
+    resumo[situacaoDaFicha(a, ateDia)] += 1;
   }
   return resumo;
 }

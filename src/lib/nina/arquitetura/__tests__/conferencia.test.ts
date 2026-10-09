@@ -7,7 +7,12 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CATALOGO_FERRAMENTAS } from "../../tool-broker";
 import { MODELO_NINA_ALVO } from "../../modelo-nina";
-import { MANIFESTO_ARQUITETURA, NODES_ARQUITETURA, nodePorId, type NodeArquitetura } from "../manifesto";
+import {
+  MANIFESTO_ARQUITETURA,
+  NODES_ARQUITETURA,
+  nodePorId,
+  type NodeArquitetura,
+} from "../manifesto";
 import { FATOS_DO_CODIGO, conferirMapaComCodigo, statusArquitetura } from "../conferencia";
 import { versaoAtual } from "../versoes";
 
@@ -76,7 +81,7 @@ describe("aviso do topo da Arquitetura", () => {
     expect(status.cor).toBe("verde");
     expect(status.titulo).toBe("Mapa conferido com o código");
     expect(status.detalhe).toContain(`${FATOS_DO_CODIGO.ferramentas.length} ferramentas`);
-    expect(status.detalhe).toContain("25/09/2026");
+    expect(status.detalhe).toContain("09/10/2026");
   });
 
   test("qualquer diferença com o código deixa amarelo, nunca verde", () => {

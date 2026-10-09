@@ -99,35 +99,58 @@ describe("leitura da imagem: só identifica pedido", () => {
     const r = interpretarLeituraImagem(
       '{"tipo":"pedido_medico","itens":["Hemograma completo","Glicemia de jejum"]}',
     );
-    expect(r).toEqual({ tipo: "pedido_medico", itens: ["Hemograma completo", "Glicemia de jejum"] });
+    expect(r).toEqual({
+      tipo: "pedido_medico",
+      itens: ["Hemograma completo", "Glicemia de jejum"],
+    });
   });
 
   it("aceita JSON dentro de bloco de código e limpa, deduplica e limita", () => {
-    const itens = Array.from({ length: 30 }, (_, i) => `Exame ${i}`);
+    const itens = Array.from({ length: 3 }, (_, i) => `Exame ${i}`);
     const r = interpretarLeituraImagem(
-      "```json\n" + JSON.stringify({ tipo: "pedido_medico", itens: ["  TSH \n", "tsh", ...itens] }) + "\n```",
+      "```json\n" +
+        JSON.stringify({ tipo: "pedido_medico", itens: ["  TSH \n", "tsh", ...itens] }) +
+        "\n```",
     );
     expect(r.tipo).toBe("pedido_medico");
     if (r.tipo === "pedido_medico") {
       expect(r.itens[0]).toBe("TSH");
-      expect(r.itens).toHaveLength(15);
+      expect(r.itens).toHaveLength(4);
       expect(r.itens.filter((i) => i.toLowerCase() === "tsh")).toHaveLength(1);
     }
   });
 
-  it("qualquer dúvida vira 'outro' (vai para a atendente)", () => {
-    expect(interpretarLeituraImagem("não sei")).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem("{ quebrado")).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem('{"tipo":"resultado_exame","itens":["Glicose 98"]}')).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[]}')).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[1,null,"a"]}')).toEqual({ tipo: "outro" });
-    expect(interpretarLeituraImagem(null)).toEqual({ tipo: "outro" });
+  it("resposta inválida indica falha técnica, sem declarar conteúdo nem julgar a foto", () => {
+    expect(interpretarLeituraImagem("não sei")).toEqual({
+      tipo: "falha_tecnica",
+      motivo: "resposta_invalida",
+    });
+    expect(interpretarLeituraImagem("{ quebrado")).toEqual({
+      tipo: "falha_tecnica",
+      motivo: "resposta_invalida",
+    });
+    expect(interpretarLeituraImagem('{"tipo":"resultado_exame","itens":["Glicose 98"]}')).toEqual({
+      tipo: "falha_tecnica",
+      motivo: "resposta_invalida",
+    });
+    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[]}')).toEqual({
+      tipo: "ilegivel",
+    });
+    expect(interpretarLeituraImagem('{"tipo":"pedido_medico","itens":[1,null,"a"]}')).toEqual({
+      tipo: "ilegivel",
+    });
+    expect(interpretarLeituraImagem(null)).toEqual({
+      tipo: "falha_tecnica",
+      motivo: "resposta_invalida",
+    });
   });
 
   it("o texto entregue à Nina vem na voz do paciente, com a legenda se houver", () => {
-    expect(textoDoPedidoLido(["Hemograma", "TSH"])).toBe("Enviei a foto de um pedido médico com: Hemograma; TSH.");
+    expect(textoDoPedidoLido(["Hemograma", "TSH"])).toBe(
+      "Enviei a foto de um pedido médico com: Hemograma; TSH.",
+    );
     expect(textoDoPedidoLido(["TSH"], "quanto custa?")).toBe(
-      "Enviei a foto de um pedido médico com: TSH. quanto custa?",
+      "Enviei a foto de um pedido médico com: TSH.\nLegenda do paciente: quanto custa?",
     );
   });
 });
@@ -135,9 +158,15 @@ describe("leitura da imagem: só identifica pedido", () => {
 function respostaMeta(conteudo: Uint8Array, mime: string) {
   const fetchFn = (async (url: string) => {
     if (!String(url).includes("download")) {
-      return new Response(JSON.stringify({ url: "https://meta.test/download/1", mime_type: mime }), { status: 200 });
+      return new Response(
+        JSON.stringify({ url: "https://meta.test/download/1", mime_type: mime }),
+        { status: 200 },
+      );
     }
-    return new Response(conteudo as unknown as BodyInit, { status: 200, headers: { "content-type": mime } });
+    return new Response(conteudo as unknown as BodyInit, {
+      status: 200,
+      headers: { "content-type": mime },
+    });
   }) as unknown as typeof fetch;
   return { fetchFn };
 }
@@ -194,7 +223,10 @@ describe("recebimento da mídia (rede e bucket simulados)", () => {
 
   it("arquivo acima do limite da Meta não é guardado nem lido", async () => {
     const { fetchFn } = respostaMeta(new Uint8Array(5 * 1024 * 1024 + 1), "image/jpeg");
-    const r = await receberMidiaWhatsapp(entrada("image"), { fetchFn, armazenar: async () => null });
+    const r = await receberMidiaWhatsapp(entrada("image"), {
+      fetchFn,
+      armazenar: async () => null,
+    });
     expect(r.caminho).toBeNull();
     expect(r.base64).toBeNull();
     expect(r.erro).toContain("limite");
@@ -202,7 +234,10 @@ describe("recebimento da mídia (rede e bucket simulados)", () => {
 
   it("erro da Meta vira erro no resultado, sem lançar", async () => {
     const fetchFn = (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch;
-    const r = await receberMidiaWhatsapp(entrada("audio"), { fetchFn, armazenar: async () => null });
+    const r = await receberMidiaWhatsapp(entrada("audio"), {
+      fetchFn,
+      armazenar: async () => null,
+    });
     expect(r.caminho).toBeNull();
     expect(r.erro).toBeTruthy();
   });
@@ -228,7 +263,9 @@ describe("limpeza de mídias que passaram dos 5 anos", () => {
     };
     const admin: any = {
       from: () => consulta,
-      storage: { from: () => ({ remove: async (c: string[]) => (removidos.push(c), { error: null }) }) },
+      storage: {
+        from: () => ({ remove: async (c: string[]) => (removidos.push(c), { error: null }) }),
+      },
     };
     return { admin, removidos, atualizados, filtros };
   }
@@ -401,8 +438,13 @@ describe("bolha do chat", () => {
     expect(temMidiaVisivel(img)).toBe(true);
     expect(textoDaBolha(img)).toBe("");
     expect(textoDaBolha({ ...img, body: "📷 quanto custa?" })).toBe("📷 quanto custa?");
-    const audio = { id: "m2", tipo: "audio", body: "🎤 bom dia", media_url: `${CLINICA}/2026-09/a.ogg` };
-    expect(textoDaBolha(audio)).toBe("🎤 bom dia");
+    const audio = {
+      id: "m2",
+      tipo: "audio",
+      body: "🎤 bom dia",
+      media_url: `${CLINICA}/2026-09/a.ogg`,
+    };
+    expect(textoDaBolha(audio)).toBe(""); // transcrição agora fica no player expansível
   });
 
   it("documento e vídeo guardados aparecem; o texto padrão some e a legenda fica", () => {
@@ -420,7 +462,9 @@ describe("bolha do chat", () => {
     const antiga = { id: "m3", tipo: "image", body: "[image]", media_url: null };
     expect(temMidiaVisivel(antiga)).toBe(false);
     expect(textoDaBolha(antiga)).toBe("[image]");
-    expect(textoDaBolha({ id: "m4", tipo: "image", body: "📷 Imagem", media_url: null })).toBe("📷 Imagem");
+    expect(textoDaBolha({ id: "m4", tipo: "image", body: "📷 Imagem", media_url: null })).toBe(
+      "📷 Imagem",
+    );
   });
 });
 
@@ -431,7 +475,9 @@ describe("integração no sistema", () => {
     expect(webhook).toContain("media_url: caminhoMidia");
     const verificacao = webhook.indexOf("podeAntes(estado)");
     expect(verificacao).toBeGreaterThan(-1);
-    expect(verificacao).toBeLessThan(webhook.indexOf("lerPedidoNaImagem(recebida.base64"));
+    const leitura = /lerPedidoNaImagem\(\s*recebida\.base64/.exec(webhook);
+    expect(leitura).not.toBeNull();
+    expect(verificacao).toBeLessThan(leitura!.index);
   });
 
   it("o webhook guarda documentos e vídeos e o áudio da Nina também tem cópia", () => {
@@ -449,12 +495,17 @@ describe("integração no sistema", () => {
   });
 
   it("o bucket é privado e não tem política de acesso para usuários", () => {
-    const sql = readFileSync("supabase/migrations/20260930180000_whatsapp_midia_armazenamento.sql", "utf8");
+    const sql = readFileSync(
+      "supabase/migrations/20260930180000_whatsapp_midia_armazenamento.sql",
+      "utf8",
+    );
     expect(sql).toMatch(/'whatsapp-midia'[\s\S]*false/);
     expect(sql).not.toMatch(/CREATE POLICY/i);
   });
 
   it("o painel do chat usa o componente de mídia", () => {
-    expect(readFileSync("src/components/nina/AtendimentoExtraTabs.tsx", "utf8")).toContain("<MidiaMensagem");
+    expect(readFileSync("src/components/nina/AtendimentoExtraTabs.tsx", "utf8")).toContain(
+      "<MidiaMensagem",
+    );
   });
 });

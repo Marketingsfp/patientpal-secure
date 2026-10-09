@@ -29,8 +29,27 @@ export type MensagemOtimista = {
   enviada_por_user_id: string | null;
   /** Perfil de supervisão de quem enviou (admin/gestor); null para atendente comum. */
   enviada_por_perfil: "admin" | "gestor" | null;
+  /** Texto digitado, sem a assinatura: é o que vai ao servidor num reenvio. */
+  texto_original: string;
   optimistic: true;
 };
+
+/**
+ * Assinatura da mensagem humana: nome de quem escreveu, em negrito no
+ * WhatsApp, antes do texto. Usada no servidor (texto que vai ao paciente) e
+ * na bolha otimista, para a assinatura já aparecer no clique. Sem nome
+ * cadastrado, vai sem.
+ */
+export function limparNomeAssinatura(nome: unknown): string {
+  return String(nome ?? "")
+    .replace(/[*_~`]/g, "")
+    .trim();
+}
+
+export function assinarTexto(nome: unknown, texto: string): string {
+  const n = limparNomeAssinatura(nome);
+  return n ? `*${n}:*\n${texto}` : texto;
+}
 
 /**
  * Chave LÓGICA da mensagem (Fase 2).
@@ -66,6 +85,8 @@ export function criarMensagemOtimista(p: {
   texto: string;
   usuarioId?: string | null;
   perfil?: "admin" | "gestor" | null;
+  /** Nome de quem envia, para a bolha já nascer com a assinatura. */
+  nomeAutor?: string | null;
   clientMessageId?: string;
   agora?: Date;
 }): MensagemOtimista {
@@ -75,13 +96,14 @@ export function criarMensagemOtimista(p: {
     client_message_id: clientMessageId,
     conversa_id: p.conversaId,
     direction: "out",
-    body: p.texto,
+    body: assinarTexto(p.nomeAutor, p.texto),
     tipo: "text",
     enviada_por: "humano",
     status: "sending",
     recebida_em: (p.agora ?? new Date()).toISOString(),
     enviada_por_user_id: p.usuarioId ?? null,
     enviada_por_perfil: p.perfil ?? null,
+    texto_original: p.texto,
     optimistic: true,
   };
 }
@@ -121,7 +143,10 @@ function temEquivalenteReal(otimista: any, lista: any[]): boolean {
     if (iguais.length === 0) {
       // Continua valendo a comparação antiga apenas para linhas SEM
       // identificador (mensagens gravadas antes desta fase).
-      return paridadePorTexto(otimista, lista.filter((m) => !m?.client_message_id));
+      return paridadePorTexto(
+        otimista,
+        lista.filter((m) => !m?.client_message_id),
+      );
     }
   }
   return paridadePorTexto(otimista, lista);

@@ -61,8 +61,7 @@ export async function aplicarMudancaCodigo(entrada: {
       revisaoBase: entrada.revisaoBase,
       revisaoNova: null,
       testes: null,
-      motivo:
-        "Mudança de código registrada para publicação. Nada foi alterado no sistema ativo.",
+      motivo: "Mudança de código registrada para publicação. Nada foi alterado no sistema ativo.",
       dependencia: DEPENDENCIA,
     };
   }

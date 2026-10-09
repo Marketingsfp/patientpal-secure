@@ -25,7 +25,12 @@ describe("resultado da distribuição no controle de presença", () => {
         pendentes: 2,
         status: "bloqueada",
         motivo: "sem_atendentes_elegiveis",
-        meu: { carga_atual: 3, capacidade: null, elegivel: false, motivo: "escolha_manual_pausa_saida" },
+        meu: {
+          carga_atual: 3,
+          capacidade: null,
+          elegivel: false,
+          motivo: "escolha_manual_pausa_saida",
+        },
       }),
     );
     expect(aviso.texto).toContain("Em pausa para almoço.");

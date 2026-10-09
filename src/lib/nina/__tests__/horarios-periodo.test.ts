@@ -1,26 +1,49 @@
 import { describe, expect, test } from "bun:test";
 import {
-  AVISO_HA_MAIS, chaveHorario, chavePaginacao, instrucaoDoPlano, interpretarRespostaHorarios, LIMITE_EXIBICAO,
-  paginacaoVigente, periodoDaHora, planejarHorarios, registrarPaginacao, respondeEscolhaDeHorarios,
+  AVISO_HA_MAIS,
+  chaveHorario,
+  chavePaginacao,
+  instrucaoDoPlano,
+  interpretarRespostaHorarios,
+  LIMITE_EXIBICAO,
+  paginacaoVigente,
+  periodoDaHora,
+  planejarHorarios,
+  registrarPaginacao,
+  respondeEscolhaDeHorarios,
 } from "../horarios-periodo";
 import { estadoVazio } from "../fluxo-estado-normalizar";
 
-const slot = (hora: string, medico = "m1", dia = "2026-09-30") =>
-  ({ medico_id: medico, hora, inicio: new Date(`${dia}T${hora}:00-03:00`).toISOString() });
+const slot = (hora: string, medico = "m1", dia = "2026-09-30") => ({
+  medico_id: medico,
+  hora,
+  inicio: new Date(`${dia}T${hora}:00-03:00`).toISOString(),
+});
 /** De `ini` a `fim` (exclusivo), a cada `passo` minutos. */
 function faixa(ini: string, fim: string, passo = 5, medico = "m1") {
   const m = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3));
   const r = [];
   for (let t = m(ini); t < m(fim); t += passo)
-    r.push(slot(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`, medico));
+    r.push(
+      slot(
+        `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`,
+        medico,
+      ),
+    );
   return r;
 }
 const horas = (xs: { hora: string }[]) => xs.map((x) => x.hora);
 
 describe("períodos da clínica (America/Sao_Paulo)", () => {
   test.each([
-    ["00:00", "madrugada"], ["04:59", "madrugada"], ["05:00", "manha"], ["11:59", "manha"],
-    ["12:00", "tarde"], ["17:59", "tarde"], ["18:00", "noite"], ["23:59", "noite"],
+    ["00:00", "madrugada"],
+    ["04:59", "madrugada"],
+    ["05:00", "manha"],
+    ["11:59", "manha"],
+    ["12:00", "tarde"],
+    ["17:59", "tarde"],
+    ["18:00", "noite"],
+    ["23:59", "noite"],
   ])("%s → %s", (h, p) => expect(periodoDaHora(h)).toBe(p as never));
 });
 
@@ -35,7 +58,10 @@ describe("regra de apresentação", () => {
     const plano = planejarHorarios([...faixa("08:00", "10:20"), ...faixa("13:40", "17:50")]);
     expect(plano.modo).toBe("escolher_periodo");
     if (plano.modo !== "escolher_periodo") return;
-    expect(plano.periodos.map((p) => [p.periodo, p.quantidade])).toEqual([["manha", 28], ["tarde", 50]]);
+    expect(plano.periodos.map((p) => [p.periodo, p.quantidade])).toEqual([
+      ["manha", 28],
+      ["tarde", 50],
+    ]);
     expect(instrucaoDoPlano(plano)).toContain("pela manhã (28), à tarde (50)");
     expect(instrucaoDoPlano(plano)).not.toContain("noite");
   });
@@ -51,19 +77,32 @@ describe("regra de apresentação", () => {
   });
 
   test("preferência informada: tarde em ordem cronológica, sem perguntar", () => {
-    const plano = planejarHorarios([...faixa("08:00", "10:20"), ...faixa("13:40", "17:50")], { filtro: { periodo: "tarde" } });
+    const plano = planejarHorarios([...faixa("08:00", "10:20"), ...faixa("13:40", "17:50")], {
+      filtro: { periodo: "tarde" },
+    });
     expect(plano.modo === "lista" && horas(plano.horarios)[0]).toBe("13:40");
     expect(plano.modo === "lista" && plano.horarios).toHaveLength(LIMITE_EXIBICAO);
   });
 
   test("tanto faz: os primeiros do dia, em ordem cronológica", () => {
-    const plano = planejarHorarios([...faixa("13:40", "17:50"), ...faixa("08:00", "10:20")], { filtro: { periodo: "qualquer" } });
+    const plano = planejarHorarios([...faixa("13:40", "17:50"), ...faixa("08:00", "10:20")], {
+      filtro: { periodo: "qualquer" },
+    });
     expect(plano.modo === "lista" && horas(plano.horarios)).toEqual(horas(faixa("08:00", "08:50")));
   });
 
   test("depois das 14h", () => {
-    const plano = planejarHorarios(faixa("13:00", "17:00", 30), { filtro: { a_partir_de: "14:00" } });
-    expect(plano.modo === "lista" && horas(plano.horarios)).toEqual(["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"]);
+    const plano = planejarHorarios(faixa("13:00", "17:00", 30), {
+      filtro: { a_partir_de: "14:00" },
+    });
+    expect(plano.modo === "lista" && horas(plano.horarios)).toEqual([
+      "14:00",
+      "14:30",
+      "15:00",
+      "15:30",
+      "16:00",
+      "16:30",
+    ]);
   });
 
   test("próximas páginas sem repetir; não diz que acabou enquanto houver horários", () => {
@@ -75,7 +114,11 @@ describe("regra de apresentação", () => {
       paginas.push(horas(plano.horarios));
       vistos.push(...plano.horarios.map(chaveHorario));
       if (plano.restantes > 0) expect(instrucaoDoPlano(plano)).toContain("Não diga que acabaram");
-      plano = planejarHorarios(dia, { filtro: { periodo: "tarde" }, mais: true, jaApresentados: vistos });
+      plano = planejarHorarios(dia, {
+        filtro: { periodo: "tarde" },
+        mais: true,
+        jaApresentados: vistos,
+      });
     }
     expect(paginas.map((p) => p.length)).toEqual([10, 10, 10, 10, 10]);
     expect(new Set(paginas.flat()).size).toBe(50);
@@ -92,7 +135,9 @@ describe("regra de apresentação", () => {
   test("período sem vaga oferece só os períodos que têm", () => {
     const plano = planejarHorarios(faixa("08:00", "10:00"), { filtro: { periodo: "noite" } });
     expect(plano.modo).toBe("sem_horarios_no_filtro");
-    expect(plano.modo === "sem_horarios_no_filtro" && plano.periodos.map((p) => p.periodo)).toEqual(["manha"]);
+    expect(plano.modo === "sem_horarios_no_filtro" && plano.periodos.map((p) => p.periodo)).toEqual(
+      ["manha"],
+    );
   });
 });
 
@@ -110,10 +155,14 @@ describe("respostas naturais", () => {
     ["tem mais horários?", { tipo: "mais" }],
     ["e os próximos?", { tipo: "mais" }],
     ["à noite", { tipo: "periodo", periodo: "noite" }],
-  ])("%s", (texto, esperado) => expect(interpretarRespostaHorarios(texto)).toEqual(esperado as never));
+  ])("%s", (texto, esperado) =>
+    expect(interpretarRespostaHorarios(texto)).toEqual(esperado as never),
+  );
 
   test.each(["quero ver os horários", "Pode ser 08:00", "Qual o valor?", "Dr. Alex Louza"])(
-    "%s não é resposta de período nem pedido de mais", (texto) => expect(interpretarRespostaHorarios(texto)).toBeNull());
+    "%s não é resposta de período nem pedido de mais",
+    (texto) => expect(interpretarRespostaHorarios(texto)).toBeNull(),
+  );
 });
 
 describe("paginação na conversa", () => {
@@ -124,8 +173,14 @@ describe("paginação na conversa", () => {
     return e;
   }
   const chave = chavePaginacao({ medicoId: "m1", atendimento: "neuro", data: "2026-09-30" });
-  const pag = { clinica_id: CLINICA, chave, filtro: { periodo: "tarde" as const }, aguardando: "horario" as const,
-    periodos_oferecidos: [], apresentados: ["m1|1"] };
+  const pag = {
+    clinica_id: CLINICA,
+    chave,
+    filtro: { periodo: "tarde" as const },
+    aguardando: "horario" as const,
+    periodos_oferecidos: [],
+    apresentados: ["m1|1"],
+  };
 
   test("vale para a mesma lista", () => {
     const e = estado();
@@ -135,8 +190,14 @@ describe("paginação na conversa", () => {
 
   test.each([
     ["troca de data", chavePaginacao({ medicoId: "m1", atendimento: "neuro", data: "2026-10-01" })],
-    ["troca de médico", chavePaginacao({ medicoId: "m2", atendimento: "neuro", data: "2026-09-30" })],
-    ["troca de atendimento", chavePaginacao({ medicoId: "m1", atendimento: "cardio", data: "2026-09-30" })],
+    [
+      "troca de médico",
+      chavePaginacao({ medicoId: "m2", atendimento: "neuro", data: "2026-09-30" }),
+    ],
+    [
+      "troca de atendimento",
+      chavePaginacao({ medicoId: "m1", atendimento: "cardio", data: "2026-09-30" }),
+    ],
   ])("%s reinicia a lista", (_, outra) => {
     const e = estado();
     registrarPaginacao(e, pag);

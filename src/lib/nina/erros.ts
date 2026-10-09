@@ -33,7 +33,8 @@ export type EntradaClassificacao = {
 
 const TIMEOUT_RE = /timeout|timed out|aborted|abort|etimedout|econnreset|network|fetch failed/i;
 const NOT_FOUND_RE = /not_found|não encontrad|nao encontrad|sem resultado/i;
-const REGRA_RE = /regra de neg|não permitido|nao permitido|conflito de hor|já existe|ja existe|indispon/i;
+const REGRA_RE =
+  /regra de neg|não permitido|nao permitido|conflito de hor|já existe|ja existe|indispon/i;
 
 export function classificarErro(entrada: EntradaClassificacao): CategoriaErro {
   const texto =

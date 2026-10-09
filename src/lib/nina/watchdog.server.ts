@@ -446,6 +446,7 @@ export async function executarWatchdogNina(limite = POLITICA_WATCHDOG.paralelism
           lock,
           revisao,
           mensagens: entradas.map((m: any) => m.id),
+          recebeuAudio: entradas.some((m: any) => m.tipo === "audio"),
           texto: montarTurnoPaciente(
             entradas.map((m: any) => (m.tipo === "audio" ? m.transcricao : m.body)),
           ),

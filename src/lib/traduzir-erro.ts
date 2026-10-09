@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { INDICE_SERVICO_NOME_UNICO, MSG_SERVICO_JA_CADASTRADO } from "@/lib/nome-servico";
 
 /**
  * Converte erros técnicos (Postgres, Supabase Auth, Focus NFe, rede, storage)
@@ -64,6 +65,9 @@ function traduzirPostgres(msg: string, code?: string, details?: string): string 
       // Cadastro repetido do mesmo funcionário (mesmo CPF na mesma clínica).
       if (detalhe.includes("hr_contratos_cpf_unico_por_clinica")) {
         return "Já existe um funcionário com este CPF nesta clínica.";
+      }
+      if (detalhe.includes(INDICE_SERVICO_NOME_UNICO)) {
+        return MSG_SERVICO_JA_CADASTRADO;
       }
       if (detalhe.includes("ux_fin_lanc_receita_duplicata_exata")) {
         return "Este mesmo recebimento já foi registrado (mesmo atendimento, mesmo valor, mesma data). Confira no caixa antes de lançar de novo — para receber uma parcela diferente, mude o valor ou a data.";
@@ -167,6 +171,34 @@ function traduzirFocusNfe(msg: string): string | null {
   return null;
 }
 
+/**
+ * Respostas cruas de gateway/HTTP ("Bad Request", "503"...). Só casa mensagem
+ * curta, para não capturar texto do banco. Números só contam como status HTTP
+ * quando são a mensagem inteira ou vêm após "http", "status", "erro" ou "error"
+ * — "Nota 414 já emitida" passa intacta.
+ */
+export function traduzirHttpCru(msg: string): string | null {
+  const m = (msg ?? "").trim();
+  if (!m || m.length > 60) return null;
+  const status = (codigos: string) =>
+    new RegExp(
+      `^(?:(?:http|status|erro|error)\\s*:?\\s*)?(?:${codigos})$|\\b(?:http|status|erro|error)\\s*:?\\s*(?:${codigos})\\b`,
+      "i",
+    ).test(m);
+  if (
+    /bad request|request entity too large|payload too large|uri too long|request-uri too large|request header fields too large/i.test(
+      m,
+    ) ||
+    status("413|414|431")
+  )
+    return "A operação enviou dados demais de uma vez. Selecione menos itens e tente de novo.";
+  if (/service unavailable|bad gateway|gateway timeout/i.test(m) || status("502|503|504"))
+    return "O servidor está indisponível no momento. Tente de novo em alguns instantes.";
+  if (/too many requests/i.test(m) || status("429"))
+    return "Muitas operações seguidas. Aguarde alguns segundos e tente de novo.";
+  return null;
+}
+
 function pareceTecnico(msg: string): boolean {
   if (!msg) return true;
   return (
@@ -188,6 +220,7 @@ export function traduzirErro(err: QualquerErro, contexto?: string): string {
     traduzirRede(msg),
     traduzirStorage(msg),
     traduzirFocusNfe(msg),
+    traduzirHttpCru(msg),
   ];
   let amigavel = traducoes.find((t): t is string => Boolean(t));
 
@@ -234,7 +267,7 @@ export function mostrarErro(err: QualquerErro, contexto?: string) {
     return;
   }
 
-  if (original && original !== amigavel && pareceTecnico(msg)) {
+  if (original && original !== amigavel && (pareceTecnico(msg) || traduzirHttpCru(msg))) {
     toast.error(amigavel, {
       duration: 8000,
       action: {

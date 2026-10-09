@@ -11,12 +11,15 @@ import {
 import { ImagemMensagemAmpliada } from "./ImagemMensagemAmpliada";
 import { urlMidiaMensagem } from "@/lib/atendimento/midia-mensagem.functions";
 import { ehCaminhoGuardado, nomeDoDocumento } from "@/lib/whatsapp-midia-armazenamento";
+import { protegerMensagemRecebida } from "@/lib/atendimento/links-entrada";
+import { AudioMensagem } from "./AudioMensagem";
 
 type MensagemComMidia = {
   id: string;
   tipo?: string | null;
-  body?: string | null;
   direction?: string | null;
+  body?: string | null;
+  transcricao?: string | null;
   media_url?: string | null;
 };
 
@@ -40,8 +43,8 @@ function legendaDoDocumento(corpo: string): string {
  * a legenda fica; a transcrição do áudio do paciente tem seu próprio botão.
  */
 export function textoDaBolha(m: MensagemComMidia): string {
-  if (m.tipo === "audio" && m.direction === "in") return "";
-  const corpo = String(m.body ?? "");
+  if (m.tipo === "audio") return ""; // A transcrição pertence ao player expansível.
+  const corpo = String(protegerMensagemRecebida(m).body ?? "");
   if (temMidiaVisivel(m)) {
     if (m.tipo === "image" && corpo === TEXTO_PADRAO_IMAGEM) return "";
     if (m.tipo === "video" && corpo === TEXTO_PADRAO_VIDEO) return "";
@@ -131,6 +134,16 @@ export function MidiaMensagem({
     visivel && temMidiaVisivel(mensagem),
   );
   const [ampliada, setAmpliada] = useState(false);
+  if (mensagem.tipo === "audio")
+    return (
+      <div ref={ref} className="mb-1" data-testid="midia-mensagem" data-tipo="audio">
+        <AudioMensagem
+          mensagem={mensagem}
+          url={temMidiaVisivel(mensagem) ? url : null}
+          carregando={temMidiaVisivel(mensagem) && estado === "carregando"}
+        />
+      </div>
+    );
   if (!temMidiaVisivel(mensagem)) return null;
   const tipo = String(mensagem.tipo);
   const ehImagem = tipo === "image";

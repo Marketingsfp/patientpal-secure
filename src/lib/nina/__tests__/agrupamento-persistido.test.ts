@@ -312,6 +312,27 @@ const fisica = {
   tipo: "text",
 };
 describe("persistência idempotente comum aos adaptadores", () => {
+  for (const teste of [false, true])
+    it(`bloqueia links antes do realtime e mantém bloqueio no retry (teste=${teste})`, async () => {
+      const db = bancoEntrada();
+      const entrada = {
+        ...fisica,
+        is_teste: teste,
+        body: "Veja https://externo.com/arquivo",
+        transcricao: "www.externo.com",
+        raw: { text: { body: "https://externo.com/arquivo" } },
+        media_url: "midias/clinica/foto.jpg",
+      };
+      const [a, b] = await Promise.all([
+        persistirEntradaNina(db.admin, entrada),
+        persistirEntradaNina(db.admin, entrada),
+      ]);
+      expect(db.linhas).toHaveLength(1);
+      expect(a.mensagem.body).toBe("Veja [link bloqueado]");
+      expect(b.mensagem.body).toBe(a.mensagem.body);
+      expect(JSON.stringify(db.linhas)).not.toContain("externo.com");
+      expect(db.linhas[0]!.media_url).toBe(entrada.media_url);
+    });
   it("duas inserções concorrentes recuperam o mesmo ID sem duplicar a entrada", async () => {
     const db = bancoEntrada();
     const [a, b] = await Promise.all([

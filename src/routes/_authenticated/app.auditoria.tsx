@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/section-tabs";
 import { useEffect, useMemo, useState } from "react";
@@ -475,7 +476,7 @@ function Page() {
         dados_antes: r.dados_antes ? JSON.stringify(r.dados_antes) : "",
         dados_depois: r.dados_depois ? JSON.stringify(r.dados_depois) : "",
       })),
-      `auditoria_${new Date().toISOString().slice(0, 10)}`,
+      `auditoria_${hojeBR()}`,
       [
         { key: "data", label: "Data/Hora" },
         { key: "usuario", label: "Usuário" },

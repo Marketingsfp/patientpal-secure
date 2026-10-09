@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,7 +45,7 @@ interface OrcamentoAberto {
 }
 
 const SEM = "nenhum";
-const hojeISO = () => new Date().toISOString().slice(0, 10);
+const hojeISO = () => hojeBR();
 
 /**
  * Criação de um pacote de sessões.

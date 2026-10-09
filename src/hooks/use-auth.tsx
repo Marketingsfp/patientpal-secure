@@ -3,7 +3,6 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { lerSessaoEmCache } from "@/lib/sessao-cache";
 
-
 interface AuthContextValue {
   user: User | null;
   session: Session | null;

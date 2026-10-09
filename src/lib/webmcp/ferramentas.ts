@@ -74,7 +74,11 @@ const objeto = (props: Dados, obrigatorios: string[] = []): Dados => ({
   additionalProperties: false,
 });
 
-const texto = (descricao: string, max = 2000) => ({ type: "string", description: descricao, maxLength: max });
+const texto = (descricao: string, max = 2000) => ({
+  type: "string",
+  description: descricao,
+  maxLength: max,
+});
 const uuid = (descricao: string) => ({ type: "string", description: descricao });
 
 function entradaComo(entrada: unknown): Dados {
@@ -341,10 +345,7 @@ export function montarFerramentasWebmcp(deps: DepsWebmcp): FerramentaWebmcp[] {
           ? exigirUuid(entrada["paraDepartamentoId"], "paraDepartamentoId")
           : null;
         if (!paraUserId && !paraDepartamentoId) {
-          throw new ErroWebmcp(
-            "entrada_invalida",
-            "Informe o atendente ou o setor de destino.",
-          );
+          throw new ErroWebmcp("entrada_invalida", "Informe o atendente ou o setor de destino.");
         }
         const resultado = await api.transferirConversa({
           clinicaId,
@@ -394,7 +395,10 @@ export function montarFerramentasWebmcp(deps: DepsWebmcp): FerramentaWebmcp[] {
         const leadId = exigirUuid(entrada["leadId"], "leadId");
         const chave = textoObrigatorio(entrada["chave"], "chave", 80);
         if (chave.length < 6)
-          throw new ErroWebmcp("entrada_invalida", 'Campo "chave" precisa de ao menos 6 caracteres.');
+          throw new ErroWebmcp(
+            "entrada_invalida",
+            'Campo "chave" precisa de ao menos 6 caracteres.',
+          );
         const resultado = (await api.enviarMensagemTeste({
           clinicaId,
           leadId,
@@ -444,7 +448,8 @@ export function montarFerramentasWebmcp(deps: DepsWebmcp): FerramentaWebmcp[] {
             conversaId: uuid("Conversa a encerrar."),
             removerAgendamentos: {
               type: "boolean",
-              description: "Devolve à agenda (livres) as vagas ocupadas nesta sessão de teste; nada é apagado.",
+              description:
+                "Devolve à agenda (livres) as vagas ocupadas nesta sessão de teste; nada é apagado.",
             },
           },
           ["leadId", "conversaId"],
@@ -466,6 +471,5 @@ export function montarFerramentasWebmcp(deps: DepsWebmcp): FerramentaWebmcp[] {
         return { resultado };
       },
     ),
-
   ];
 }

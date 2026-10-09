@@ -1,5 +1,5 @@
 import { POLITICA_WATCHDOG } from "./watchdog";
-import { removerEmojisNina } from "./resposta/sem-emojis";
+import { formatarMensagemNina } from "./resposta/formato-mobile";
 /** Transporte canônico da Nina, reutilizado pelo webhook e pela retomada de lotes. */
 import {
   carregarControleWatchdog,
@@ -83,6 +83,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
     const { RESPOSTA_AUDIO_FALHOU, respostaMidiaNaoSuportada } =
       await import("@/lib/whatsapp-midia.server");
     let reply = "";
+    let recebeuAudioNoTurno = ehAudio;
+    let mensagemDoTurno = textoPaciente;
     // FASE 5 — contrato do resultado deste turno. Todo texto
     // passa pela finalização antes de ser avaliado e enviado.
     const { criarResultado } = await import("@/lib/nina/resposta/contrato");
@@ -140,6 +142,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         });
         return { agrupada: true };
       }
+      recebeuAudioNoTurno = turno.recebeuAudio ?? ehAudio;
+      mensagemDoTurno = turno.texto;
       loteId = turno.batchId;
       lockTurno = turno.lock;
       revisaoTurno = turno.revisao;
@@ -265,7 +269,7 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       }
     }
     // Também protege checkpoints de versões antigas e falha da finalização.
-    reply = removerEmojisNina(reply);
+    reply = formatarMensagemNina(reply);
     // FASE 4 — antes de QUALQUER envio: a resposta ainda vale?
     if (reply && revisaoTurno) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
@@ -304,21 +308,33 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       // clínica não desligou). Qualquer falha cai para texto.
       let audioEnviado = false;
       let precisaTextoCompleto = true;
-      if (ehAudio && cfg.access_token) {
+      if (cfg.access_token) {
         try {
-          const {
-            respostaAudioDesativada,
-            prepararParaFala,
-            pareceLista,
-            resumoFalado,
-            sintetizarFala,
-            LIMITE_FALA_CURTA,
-          } = await import("@/lib/nina-audio.server");
-          if (!(await respostaAudioDesativada(params.clinicaId))) {
-            const longa = reply.length > LIMITE_FALA_CURTA || pareceLista(reply);
-            const falado = longa ? resumoFalado(reply) : prepararParaFala(reply);
-            const audio = await sintetizarFala(falado);
-            if (audio) {
+          const { prepararAudioResposta } = await import("@/lib/nina-audio.server");
+          const { registrarChamadaIATurno } = await import("./auditoria-ia.server");
+          const chamadasVoz: import("./auditoria-ia").ChamadaIA[] = [];
+          const audio = await prepararAudioResposta(
+            params.clinicaId,
+            reply,
+            { recebeuAudio: recebeuAudioNoTurno, mensagem: mensagemDoTurno },
+            (c) => {
+              chamadasVoz.push(c);
+            },
+          );
+          if (auditoriaNina.traceId)
+            await Promise.all(
+              chamadasVoz.map((c) =>
+                registrarChamadaIATurno(c, {
+                  clinicaId: params.clinicaId,
+                  conversaId: convId,
+                  traceId: auditoriaNina.traceId!,
+                  execucaoId: auditoriaNina.execucaoId,
+                }),
+              ),
+            );
+          if (audio) {
+            const { longa, texto: falado } = audio;
+            {
               const { metaUploadMedia, metaSendAudio } = await import("@/lib/whatsapp.server");
               await conferirReservaTurno();
               const mediaId = await metaUploadMedia(
@@ -331,25 +347,13 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               // O áudio é OUTRA representação: quando é resumo
               // falado, o conteúdo difere do texto avaliado e
               // recebe o seu próprio registro.
-              const representacaoAudio = longa
-                ? ("audio_resumo" as const)
-                : ("audio_integral" as const);
               const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
-              const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
-              const hashFalado = hashDoTexto(falado);
-              // Conteúdo falado diferente do texto avaliado =>
-              // avaliação PRÓPRIA. Sem ela, o áudio fica sem
-              // nota; nunca herda a nota do texto completo.
-              const { falaPrecisaDeAvaliacaoPropria } =
-                await import("@/lib/nina/confidence/identidade-saida");
-              const precisa = falaPrecisaDeAvaliacaoPropria({
-                textoAvaliadoHash: auditoriaNina.textoFinalHash,
-                conteudoFalado: falado,
-              }).precisa;
-              const decisaoAudio = precisa
-                ? ((await auditoriaNina.avaliarRepresentacao?.(falado, representacaoAudio)) ?? null)
-                : { decisaoId: auditoriaNina.decisaoId ?? null, textoHash: hashFalado };
-              const decisaoIdAudio = decisaoAudio?.decisaoId ?? null;
+              const { avaliarFala } = await import("@/lib/nina-audio.server");
+              const {
+                decisaoId: decisaoIdAudio,
+                textoHash: hashFalado,
+                representacao: representacaoAudio,
+              } = await avaliarFala(audio, auditoriaNina);
               await registrarEntregaSaida({
                 clinicaId: params.clinicaId,
                 decisaoId: decisaoIdAudio,
@@ -413,15 +417,19 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               {
                 const idMsgAudio = (msgAudio as { id?: string } | null)?.id ?? null;
                 if (idMsgAudio && audioId) {
-                  const { guardarMidiaEnviada } = await import("@/lib/whatsapp-midia.server");
-                  await guardarMidiaEnviada({
-                    clinicaId: params.clinicaId,
-                    mensagemId: idMsgAudio,
-                    waMessageId: audioId,
-                    tipo: "audio",
-                    bytes: audio.bytes,
-                    mime: audio.mime,
-                  });
+                  try {
+                    const { guardarMidiaEnviada } = await import("@/lib/whatsapp-midia.server");
+                    await guardarMidiaEnviada({
+                      clinicaId: params.clinicaId,
+                      mensagemId: idMsgAudio,
+                      waMessageId: audioId,
+                      tipo: "audio",
+                      bytes: audio.bytes,
+                      mime: audio.mime,
+                    });
+                  } catch (e) {
+                    console.error("[nina] cópia do áudio não guardada", e);
+                  }
                 }
               }
               // Confirmada só porque a Meta devolveu id da
@@ -607,7 +615,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       // Conclusão da Nina: se esta resposta encerrou com uma transferência, o resumo interno é escrito
       // agora, DEPOIS de o paciente já ter recebido a mensagem (nunca atrasa o atendimento).
       if (convId) {
-        const { gerarResumoDaConclusaoDaNina } = await import("@/lib/atendimento/handoff-resumo.server");
+        const { gerarResumoDaConclusaoDaNina } =
+          await import("@/lib/atendimento/handoff-resumo.server");
         await gerarResumoDaConclusaoDaNina(params.clinicaId, convId);
       }
 

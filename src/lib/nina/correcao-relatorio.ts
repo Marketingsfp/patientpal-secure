@@ -80,7 +80,11 @@ export type RelatorioCorrecao = {
     publicacaoConfirmada: boolean;
     revisaoAtual: string | null;
   };
-  reversao: { possivel: boolean; tipo: "catalogo" | "prompt" | "codigo" | "nenhum"; instrucao: string };
+  reversao: {
+    possivel: boolean;
+    tipo: "catalogo" | "prompt" | "codigo" | "nenhum";
+    instrucao: string;
+  };
   passos: PassoExecucao[];
 };
 
@@ -198,7 +202,10 @@ function resultadoDe(e: EntradaRelatorio, alteracoes: AlteracaoRelatorio[]): Res
   return "aplicado_aguardando_publicacao";
 }
 
-function explicar(e: EntradaRelatorio, resultado: ResultadoRelatorio): RelatorioCorrecao["explicacao"] {
+function explicar(
+  e: EntradaRelatorio,
+  resultado: ResultadoRelatorio,
+): RelatorioCorrecao["explicacao"] {
   const problema = e.proposta.justificativa.trim() || e.motivo;
   const mudanca =
     resultado === "pendente_integracao"

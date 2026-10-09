@@ -5,18 +5,15 @@ import {
   gerarMigrationConsolidacao,
   MIGRATION_CONSOLIDACAO,
 } from "../../../../scripts/nina/gerar-consolidacao-instrucoes";
-import { PROMPT_NINA_WHATSAPP_V4 } from "../prompt/behavior-v4";
 import { PROMPT_NINA_PAINEL_INTERNO } from "../prompt/painel-interno";
 import { renderizarTemplateInstrucoes, validarTemplateInstrucoes } from "../instrucoes-template";
 import { resolverIdentidadeEfetiva, valoresIdentidade } from "../identidade-efetiva";
 import { removerEmojisNina } from "../resposta/sem-emojis";
 import anteriores from "./fixtures/instrucoes-antes-consolidacao.json";
 import { atualizarLimiteEsclarecimento } from "../prompt/limite-esclarecimento";
-import { REGRA_INFORMACOES_GRUPO } from "../clinicas-grupo";
-import { MIGRATION_REGRAS_CONFIRMADAS } from "../../../../scripts/nina/gerar-regras-confirmadas";
 
 describe("consolidação da publicação e do fallback", () => {
-  it("publica exatamente as regras do fallback, preservando a identidade da versão auditada", () => {
+  it("reproduz a publicação histórica sem substituí-la pelo fallback atual e preserva a identidade auditada", () => {
     const nova = PUBLICACOES_CONSOLIDADAS[0]!;
     const identidade = resolverIdentidadeEfetiva({
       template: nova.conteudo,
@@ -31,15 +28,11 @@ describe("consolidação da publicação e do fallback", () => {
       versaoId: "antiga",
     });
     expect(identidade.identidade).toEqual(antiga.identidade);
-    let atual =
-      atualizarLimiteEsclarecimento(nova.conteudo).split("[/IDENTIDADE DO ATENDIMENTO]\n\n")[1] +
-        "\n\n" +
-        REGRA_INFORMACOES_GRUPO;
-    for (const [antes, depois] of JSON.parse(readFileSync(MIGRATION_REGRAS_CONFIRMADAS, "utf8").split("$trocas$")[1]!))
-      atual = atual.replace(antes, depois);
-    for (const [antes, depois] of JSON.parse(readFileSync("supabase/migrations/20260921220000_nina_ordem_dados_confirmacao.sql", "utf8").split("$trocas$")[1]!))
-      atual = atual.replace(antes, depois);
-    expect(atual).toBe(PROMPT_NINA_WHATSAPP_V4);
+    // O gerador mantém o snapshot de 20/09; regras posteriores pertencem a
+    // versões novas. Comparar esse snapshot ao fallback de outubro obrigaria
+    // reescrever o histórico já aplicado. A referência atual tem teste próprio.
+    expect(nova.anterior_id).toBe(anteriores.whatsapp.id);
+    expect(validarTemplateInstrucoes("whatsapp", nova.conteudo).ok).toBe(true);
     const render = renderizarTemplateInstrucoes(nova.conteudo, valoresIdentidade(identidade));
     expect(render.ok).toBe(true);
     if (render.ok) {

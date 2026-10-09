@@ -1,6 +1,5 @@
 import { describe, it, expect } from "bun:test";
 import {
-  
   detectarIntencoes,
   intencaoAmbigua,
   perguntaGeralSobreAtendimento,
@@ -11,17 +10,22 @@ import {
 const em = (isoUtc: string) => new Date(isoUtc);
 
 describe("saudação por horário (fuso da clínica)", () => {
-  it("manhã", () => expect(saudacaoPorHorario(undefined, em("2026-09-05T12:00:00Z"))).toBe("Bom dia"));
-  it("tarde", () => expect(saudacaoPorHorario(undefined, em("2026-09-05T18:00:00Z"))).toBe("Boa tarde"));
-  it("noite", () => expect(saudacaoPorHorario(undefined, em("2026-09-05T23:00:00Z"))).toBe("Boa noite"));
+  it("manhã", () =>
+    expect(saudacaoPorHorario(undefined, em("2026-09-05T12:00:00Z"))).toBe("Bom dia"));
+  it("tarde", () =>
+    expect(saudacaoPorHorario(undefined, em("2026-09-05T18:00:00Z"))).toBe("Boa tarde"));
+  it("noite", () =>
+    expect(saudacaoPorHorario(undefined, em("2026-09-05T23:00:00Z"))).toBe("Boa noite"));
 });
 
 describe("identificação de intenção", () => {
   it("valor", () => expect(detectarIntencoes("Quanto custa a consulta?")).toContain("valor"));
   it("médico", () => expect(detectarIntencoes("Tem cardiologista?")).toContain("medico"));
   it("endereço", () => expect(detectarIntencoes("Onde fica a clínica?")).toContain("endereco"));
-  it("cancelamento", () => expect(detectarIntencoes("Quero cancelar minha consulta")).toContain("cancelamento"));
-  it("humano", () => expect(detectarIntencoes("Quero falar com uma atendente")).toContain("falar_humano"));
+  it("cancelamento", () =>
+    expect(detectarIntencoes("Quero cancelar minha consulta")).toContain("cancelamento"));
+  it("humano", () =>
+    expect(detectarIntencoes("Quero falar com uma atendente")).toContain("falar_humano"));
 
   it("múltiplas intenções são preservadas", () => {
     const i = detectarIntencoes("Quanto custa Cardiologia e tem vaga sábado?");
@@ -32,8 +36,10 @@ describe("identificação de intenção", () => {
 
 describe("pergunta simples não é agendamento", () => {
   it("preço não agenda", () => expect(querAgendar(detectarIntencoes("Quanto custa?"))).toBe(false));
-  it("médico não agenda", () => expect(querAgendar(detectarIntencoes("Quais médicos atendem?"))).toBe(false));
-  it("marcar agenda", () => expect(querAgendar(detectarIntencoes("Quero marcar uma consulta"))).toBe(true));
+  it("médico não agenda", () =>
+    expect(querAgendar(detectarIntencoes("Quais médicos atendem?"))).toBe(false));
+  it("marcar agenda", () =>
+    expect(querAgendar(detectarIntencoes("Quero marcar uma consulta"))).toBe(true));
 });
 
 describe("ambiguidade", () => {
@@ -45,16 +51,30 @@ describe("ambiguidade", () => {
     const m = "Quanto custa a consulta de cardiologia?";
     expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(false);
   });
-  it.each(["Tem cardiologista?", "vcs tem cardiologista?", "Vocês têm cardiologistas e quais dias eles atendem?", "Quais os horários habituais dos médicos?"])("pergunta informativa geral é clara: %s", (m) => {
+  it.each([
+    "Tem cardiologista?",
+    "vcs tem cardiologista?",
+    "Vocês têm cardiologistas e quais dias eles atendem?",
+    "Quais os horários habituais dos médicos?",
+  ])("pergunta informativa geral é clara: %s", (m) => {
     expect(perguntaGeralSobreAtendimento(m)).toBe(true);
     expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(false);
     expect(querAgendar(detectarIntencoes(m))).toBe(false);
   });
-  it.each(["cardiologia", "cardiologista?", "ultrassom"])("assunto isolado continua ambíguo: %s", (m) => {
-    expect(perguntaGeralSobreAtendimento(m)).toBe(false);
-    expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(true);
-  });
-  it.each(["Tem vaga com cardiologista?", "Quero agendar cardiologia", "Tem cardiologista disponível amanhã?", "Vocês têm cardiologista no dia 21?", "Quais dias o Dr. Alex atende?"])("pedido delimitado não é lista geral: %s", (m) => {
+  it.each(["cardiologia", "cardiologista?", "ultrassom"])(
+    "assunto isolado continua ambíguo: %s",
+    (m) => {
+      expect(perguntaGeralSobreAtendimento(m)).toBe(false);
+      expect(intencaoAmbigua(m, detectarIntencoes(m))).toBe(true);
+    },
+  );
+  it.each([
+    "Tem vaga com cardiologista?",
+    "Quero agendar cardiologia",
+    "Tem cardiologista disponível amanhã?",
+    "Vocês têm cardiologista no dia 21?",
+    "Quais dias o Dr. Alex atende?",
+  ])("pedido delimitado não é lista geral: %s", (m) => {
     expect(perguntaGeralSobreAtendimento(m)).toBe(false);
   });
 });

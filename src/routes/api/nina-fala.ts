@@ -157,16 +157,14 @@ export const Route = createFileRoute("/api/nina-fala")({
 
             try {
               // Streaming também passa pelo adapter do Nina AI Gateway.
-              const { chamarModeloGeminiStream } = await import(
-                "@/lib/nina/adapters/gemini-adapter.server"
-              );
+              const { chamarModeloGeminiStream } =
+                await import("@/lib/nina/adapters/gemini-adapter.server");
               const { modeloNinaParaClinica } = await import("@/lib/nina/modelo-flag.server");
               const { modelo } = await modeloNinaParaClinica(body.clinicaId, "voz");
               // Reasoning Router (Fase 2): a voz também escolhe o nível por
               // requisição — política única, sem `if` novo aqui.
-              const { selectThinkingLevel, rotuloDebug } = await import(
-                "@/lib/nina/reasoning-router"
-              );
+              const { selectThinkingLevel, rotuloDebug } =
+                await import("@/lib/nina/reasoning-router");
               const ultimaFala =
                 [...body.messages].reverse().find((m: { role: string }) => m.role === "user")
                   ?.content ?? "";

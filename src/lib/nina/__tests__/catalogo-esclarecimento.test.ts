@@ -19,8 +19,7 @@ const pendente = lembrarConsultaComprovada({
   fatos: [],
   esclarecimento: { tipo: "sigla", pergunta: "Qual é o nome por extenso?", opcoes: [] },
 })!;
-const resultado = (dados: object) =>
-  validarResultado("consultar_cadastro", { ok: true, ...dados });
+const resultado = (dados: object) => validarResultado("consultar_cadastro", { ok: true, ...dados });
 const segunda = prepararSegundaPergunta(
   pendente,
   resultado({ esclarecimento: pendente.esclarecimento }),
@@ -35,7 +34,7 @@ const duas = lembrarConsultaComprovada({
     .esclarecimento,
 })!;
 
-describe("até duas perguntas para esclarecer antes de encaminhar", () => {
+describe("encaminhamento após uma reformulação inconclusiva", () => {
   it("preserva a pergunta mesmo sem nenhum candidato e isola a sessão", () => {
     expect(pendente).not.toBeNull();
     expect(conhecimentoDaMesmaSessao(pendente, "clinica", "sessao")?.esclarecimento).toEqual(
@@ -57,13 +56,15 @@ describe("até duas perguntas para esclarecer antes de encaminhar", () => {
     { esclarecimento: pendente.esclarecimento },
     { found: false, knowledge_status: "not_found", records: [] },
   ])("resposta ainda não identificada vai para humano com motivo interno", (dados) => {
-    expect(encaminharAposEsclarecimento(pendente, resultado(dados), "Não sei explicar")).toBeNull();
+    expect(
+      encaminharAposEsclarecimento(pendente, resultado(dados), "Não sei explicar"),
+    ).not.toBeNull();
     const r = encaminharAposEsclarecimento(duas, resultado(dados), "Não sei explicar");
     expect(r?.motivo).toBe(MOTIVO_IDENTIFICACAO_PENDENTE);
     expect(r?.resumo).toContain("XYZ");
     expect(r?.resumo).toContain("Qual é o nome por extenso?");
     expect(r?.resumo).toContain("Não sei explicar");
-    expect(motivoParaAtendimento(r?.motivo)).toContain("pediu esclarecimento duas vezes");
+    expect(motivoParaAtendimento(r?.motivo)).toContain("Nina");
     expect(r?.resumo).toContain(duas.esclarecimento!.pergunta);
   });
   it("resposta esclarecida continua o atendimento normalmente", () => {
@@ -89,7 +90,7 @@ describe("até duas perguntas para esclarecer antes de encaminhar", () => {
     expect(contarEsclarecimentos(duas)).toBe(2);
     expect(contarEsclarecimentos(conhecimentoDaMesmaSessao(duas, "clinica", "sessao"))).toBe(2);
     expect(contarEsclarecimentos({ esclarecimento: pendente.esclarecimento })).toBe(1);
-    expect(duas.esclarecimento!.pergunta).not.toBe(pendente.esclarecimento!.pergunta);
+    expect(duas.esclarecimento!.pergunta).toBe(pendente.esclarecimento!.pergunta);
     // Reconsultar no mesmo turno usa sempre o estado de entrada, não gasta outra pergunta.
     expect(
       contarEsclarecimentos(
@@ -104,13 +105,13 @@ describe("até duas perguntas para esclarecer antes de encaminhar", () => {
       ),
     ).toBe(2);
   });
-  it("após a primeira resposta não encontrada ainda oferece a segunda pergunta", () => {
+  it("após a reformulação não encontrada não cria outra pergunta", () => {
     const r = prepararSegundaPergunta(
       pendente,
       resultado({ found: false, knowledge_status: "not_found", records: [] }),
     );
-    expect((r.dados as { esclarecimento?: unknown }).esclarecimento).toBeDefined();
-    expect(encaminharAposEsclarecimento(pendente, r, "Não sei")).toBeNull();
+    expect((r.dados as { esclarecimento?: unknown }).esclarecimento).toBeUndefined();
+    expect(encaminharAposEsclarecimento(pendente, r, "Não sei")).not.toBeNull();
   });
   it("identificação resolvida após a segunda resposta continua imediatamente", () => {
     const r = resultado({ found: true, knowledge_status: "found", records: [] });
@@ -134,23 +135,6 @@ describe("até duas perguntas para esclarecer antes de encaminhar", () => {
       esclarecimento: pendente.esclarecimento,
     });
     expect(contarEsclarecimentos(nova)).toBe(1);
-  });
-  it("a segunda pergunta de uma consulta não pede um exame ou pedido médico", () => {
-    const consulta = {
-      ...pendente,
-      consulta: { termo: "cardio", tipo_atendimento: "consulta" as const },
-    };
-    for (const opcoes of [[], [{ id: "cardio", nome: "Cardiologia" }]]) {
-      const r = prepararSegundaPergunta(
-        consulta,
-        resultado({ esclarecimento: { tipo: "procedimento", opcoes } }),
-      );
-      const pergunta = (r.dados as { esclarecimento: { pergunta: string } }).esclarecimento
-        .pergunta;
-      expect(pergunta).toContain("consulta");
-      expect(pergunta).not.toContain("exame");
-      expect(pergunta).not.toContain("pedido médico");
-    }
   });
   it("uma nova sessão não herda as perguntas anteriores e o histórico antigo continua fiel", () => {
     const nova = lembrarConsultaComprovada({

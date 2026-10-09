@@ -229,17 +229,22 @@ export function BlocoTopoExecutivo({
 // BLOCO 2 — Gráficos e Operação Clínica
 // ===========================================================================
 
-/** Lista dos aniversariantes de hoje — nome e idade, nada de dado clínico. */
+/**
+ * Lista dos aniversariantes de hoje — nome e idade, nada de dado clínico.
+ * Só quem foi agendado na clínica nos últimos 2 anos (mesma regra da
+ * contagem), por isso usa `painel_aniversariantes_hoje` e não a função da
+ * tela de Clientes, que olha o cadastro inteiro.
+ */
 function useAniversariantesDeHoje(clinicaId: string | null | undefined) {
   return useQuery({
     queryKey: ["dashboard-aniversariantes-hoje", clinicaId],
     enabled: Boolean(clinicaId),
     staleTime: 30 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("pacientes_aniversariantes_hoje", {
-        _clinica_id: clinicaId as string,
-        _limite: 60,
-      });
+      const { data, error } = await supabase.rpc(
+        "painel_aniversariantes_hoje" as never,
+        { _clinica_id: clinicaId as string, _limite: 60 } as never,
+      );
       if (error) return [] as { id: string; nome: string; data_nascimento: string | null }[];
       return (
         (data ?? []) as Array<{
@@ -304,17 +309,16 @@ export function BlocoVisaoClinica({
   /**
    * Fatias da pizza. A soma delas é sempre o total de atendimentos realizados.
    *
-   * "Sem tipo cadastrado" é uma fatia de verdade, não um resto escondido: em
-   * agosto de 2026 são 729 de 3.073 atendimentos, de serviços como
-   * ECOCARDIOGRAMA (ADULTO), PREVENTIVO, EXAMES LABORATORIAIS e RESTAURACAO
-   * RESINA FOTOPOLIMERIZAVEL, que estão no cadastro sem o campo "tipo de
-   * procedimento". Empurrá-los para dentro de Consultas ou de Exames seria
-   * inventar regra de negócio; deixá-los de fora faria a pizza mentir sobre o
-   * tamanho do mês.
+   * O tipo vem do campo "tipo de procedimento" do serviço; quando ele está em
+   * branco (a maioria do cadastro), vale o campo "tipo" do mesmo serviço
+   * (consulta / exame / procedimento) — ver
+   * supabase/migrations/20261002150000_painel_executivo_pizza_e_aniversariantes.sql.
+   * Em setembro de 2026 isso levou a fatia sem tipo de 2.102 para 198.
    *
-   * "Procedimentos" fica em zero nesta clínica porque nenhum serviço está
-   * cadastrado com o tipo "procedimento" ou "cirurgia" — a fatia some sozinha
-   * do gráfico enquanto isso (o `.filter(value > 0)` abaixo).
+   * "Sem tipo cadastrado" continua sendo uma fatia de verdade, não um resto
+   * escondido: sobra o serviço que não foi achado no cadastro ou cujo tipo é
+   * "outro". Empurrá-lo para Consultas ou Exames seria inventar regra de
+   * negócio; deixá-lo de fora faria a pizza mentir sobre o tamanho do mês.
    */
   const fatias = useMemo(
     () =>
@@ -354,6 +358,13 @@ export function BlocoVisaoClinica({
               <MiniBarChart
                 labels={ev.labels}
                 height={280}
+                // O mês corrente ainda está correndo: barra esmaecida e
+                // marcada como parcial, para não parecer queda no ano.
+                parcialIndex={
+                  hojeIso && ev.meses.at(-1) === hojeIso.slice(0, 7)
+                    ? ev.meses.length - 1
+                    : undefined
+                }
                 formatY={(n) =>
                   `R$ ${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`
                 }
@@ -389,9 +400,9 @@ export function BlocoVisaoClinica({
               {at.semTipo > 0 && (
                 <p className="mt-2 text-xs leading-snug text-muted-foreground">
                   <strong>{int(at.semTipo)}</strong> atendimento(s) aparecem como “sem tipo
-                  cadastrado” porque o serviço deles está no cadastro sem o campo{" "}
-                  <em>tipo de procedimento</em>. Preencher esse campo em Serviços move cada um para
-                  Consultas ou Exames automaticamente.
+                  cadastrado” porque o serviço deles não foi encontrado em Serviços ou está com o
+                  tipo “outro”. Ajustar o tipo em Serviços move cada um para a fatia certa
+                  automaticamente.
                 </p>
               )}
             </>
@@ -427,7 +438,11 @@ export function BlocoVisaoClinica({
 
         <PainelGrafico
           titulo="Aniversariantes"
-          sub={aniver ? `${int(aniver.hoje)} hoje · ${int(aniver.mes)} no mês` : undefined}
+          sub={
+            aniver
+              ? `${int(aniver.hoje)} hoje · ${int(aniver.mes)} no mês · pacientes que vieram nos últimos 2 anos`
+              : undefined
+          }
         >
           {carregando ? (
             <div className="h-[200px] animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
@@ -474,9 +489,10 @@ export function BlocoVisaoClinica({
                 </p>
               )}
               {/*
-                A clínica tem centenas de aniversariantes por dia (681 em
-                29/08/2026), então a lista é um recorte. Dizer o tamanho do
-                recorte evita que alguém a leia como "são só estes".
+                A lista tem limite de 60 nomes. Contando só quem veio nos
+                últimos 2 anos são poucas dezenas por dia (28 em 02/10/2026),
+                mas se um dia passar do limite, dizer o tamanho do recorte
+                evita que alguém a leia como "são só estes".
               */}
               {listaAniver.data && aniver.hoje > listaAniver.data.length && (
                 <p className="text-xs text-muted-foreground">

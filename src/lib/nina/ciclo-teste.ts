@@ -14,12 +14,7 @@
  */
 
 /** Situação persistida em `nina_teste_ciclos.status`. */
-export type StatusCicloTeste =
-  | "ativo"
-  | "resolvido"
-  | "encerrado_handoff"
-  | "cancelado"
-  | "falhou";
+export type StatusCicloTeste = "ativo" | "resolvido" | "encerrado_handoff" | "cancelado" | "falhou";
 
 /** Vocabulário conceitual pedido pela homologação. */
 export type EstadoCicloTeste =

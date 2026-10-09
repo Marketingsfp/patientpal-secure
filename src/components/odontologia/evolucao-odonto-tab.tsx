@@ -17,7 +17,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { formatDatePura } from "@/lib/date-utils";
+import { formatDatePura, hojeBR } from "@/lib/date-utils";
 
 interface Evolucao {
   id: string;
@@ -41,7 +41,7 @@ export function EvolucaoOdontoTab({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    data: new Date().toISOString().slice(0, 10),
+    data: hojeBR(),
     titulo: "",
     descricao: "",
     procedimento: "",
@@ -90,7 +90,7 @@ export function EvolucaoOdontoTab({
     if (error) return mostrarErro(error);
     toast.success("Evolução registrada");
     setForm({
-      data: new Date().toISOString().slice(0, 10),
+      data: hojeBR(),
       titulo: "",
       descricao: "",
       procedimento: "",

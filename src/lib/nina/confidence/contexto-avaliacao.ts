@@ -98,13 +98,26 @@ export function candidatosDeEntidade(fatos: FatoRecuperado[]): Record<string, st
 export function camposDeOpcoesInformativas(ctx: ContextoConfianca): string[] {
   if (!perguntaGeralSobreAtendimento(ctx.mensagemPaciente ?? "")) return [];
   if (ctx.turnType !== "INFORMACAO") return [];
-  if (!ctx.requestedAction || !["responder_informacao", "informar_profissional", "informar_horario", "informar_valor"].includes(ctx.requestedAction)) return [];
+  if (
+    !ctx.requestedAction ||
+    ![
+      "responder_informacao",
+      "informar_profissional",
+      "informar_horario",
+      "informar_valor",
+    ].includes(ctx.requestedAction)
+  )
+    return [];
   const palavrasDoPedido = new Set(normalizarTexto(ctx.mensagemPaciente).match(/[a-z]+/g) ?? []);
   const medicoNomeado = (ctx.entityCandidates?.medico ?? []).some((nome) =>
-    normalizarTexto(nome).split(/\s+/).some((parte) => parte.length >= 4 && palavrasDoPedido.has(parte)),
+    normalizarTexto(nome)
+      .split(/\s+/)
+      .some((parte) => parte.length >= 4 && palavrasDoPedido.has(parte)),
   );
   if (medicoNomeado) return [];
-  const publicados = candidatosDeEntidade((ctx.fatos ?? []).filter((f) => f.fonte === "catalogo_publicado"));
+  const publicados = candidatosDeEntidade(
+    (ctx.fatos ?? []).filter((f) => f.fonte === "catalogo_publicado"),
+  );
   return Object.entries(ctx.entityCandidates ?? {})
     .filter(([campo, candidatos]) => {
       const comprovados = new Set((publicados[campo] ?? []).map(normalizarTexto));
@@ -139,7 +152,10 @@ export function camposObrigatoriosDaAcao(acao: AcaoSolicitada | null | undefined
  * a mesma leitura que preserva blocos de várias linhas, condição e proibição.
  * Sem limite de quantidade e sem cortar texto — regra não some em silêncio.
  */
-export function obrigacoesDoPrompt(texto: string | null | undefined, escopo = "whatsapp"): string[] {
+export function obrigacoesDoPrompt(
+  texto: string | null | undefined,
+  escopo = "whatsapp",
+): string[] {
   const { regras } = extrairRegrasPublicadas(texto, { escopo });
   const unicas: string[] = [];
   for (const r of regras) {

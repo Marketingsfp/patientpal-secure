@@ -10,7 +10,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { FUSO_OPERACAO_PADRAO } from "@/lib/nina/metricas-filtros";
-import { INICIO_CICLO_APRENDIZADO, AVISO_CICLO_APRENDIZADO, inicioNoCicloAprendizado } from "./ciclo-aprendizado";
+import {
+  INICIO_CICLO_APRENDIZADO,
+  AVISO_CICLO_APRENDIZADO,
+  inicioNoCicloAprendizado,
+} from "./ciclo-aprendizado";
 import {
   FERRAMENTAS_ANALISTA,
   INSTRUCOES_ANALISTA,
@@ -25,7 +29,6 @@ import {
   valoresPermitidos,
   type RespostaAnalista,
 } from "@/lib/nina/analista-metricas";
-
 
 const contextoPainel = z.object({
   de: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -77,24 +80,26 @@ async function chamarModelo(input: any[], maxTokensSaida: number): Promise<Saida
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Análise indisponível: chave do provedor de IA não configurada.");
 
-  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
-      model: MODELO_ANALISTA,
-      instructions: INSTRUCOES_ANALISTA,
-      input,
-      stream: true,
-      store: false,
-      tools: FERRAMENTAS_ANALISTA,
-      tool_choice: "auto",
-      max_output_tokens: maxTokensSaida,
-      text: {
-        format: {
-          type: "json_schema",
-          name: "analise_metricas_nina",
-          strict: false,
-          schema: SCHEMA_RESPOSTA_ANALISTA,
-        },
+  const res = await (
+    await import("@/lib/nina/claude-messages.server")
+  ).chamarClaudeComoResponses({
+    model: MODELO_ANALISTA,
+    instructions: INSTRUCOES_ANALISTA,
+    input,
+    stream: true,
+    store: false,
+    tools: FERRAMENTAS_ANALISTA,
+    tool_choice: "auto",
+    max_output_tokens: maxTokensSaida,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "analise_metricas_nina",
+        strict: false,
+        schema: SCHEMA_RESPOSTA_ANALISTA,
       },
-    });
+    },
+  });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");
@@ -200,10 +205,14 @@ async function ferramentaConsultarMetricas(
 async function ferramentaConfiabilidade(context: Contexto, clinicaId: string, args: any) {
   const mod = await import("@/lib/nina/confidence/metricas");
   const dias = Math.min(180, Math.max(1, Number(args?.dias) || 30));
-  const ambiente = ["producao", "homologacao", "teste_automatizado", "todos"].includes(args?.ambiente)
+  const ambiente = ["producao", "homologacao", "teste_automatizado", "todos"].includes(
+    args?.ambiente,
+  )
     ? args.ambiente
     : "producao";
-  const desde = inicioNoCicloAprendizado(new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString());
+  const desde = inicioNoCicloAprendizado(
+    new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString(),
+  );
 
   let q = context.supabase
     .from("nina_confianca_decisoes")
@@ -434,9 +443,8 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
     const ctx = context as unknown as Contexto;
     await exigirPermissao(ctx, data.clinicaId);
 
-    const { analiseIAAtivaNaClinica, MSG_ANALISE_DESATIVADA } = await import(
-      "./analise-flag.server"
-    );
+    const { analiseIAAtivaNaClinica, MSG_ANALISE_DESATIVADA } =
+      await import("./analise-flag.server");
     if (!(await analiseIAAtivaNaClinica(data.clinicaId))) throw new Error(MSG_ANALISE_DESATIVADA);
 
     const fuso = data.fuso?.trim() || FUSO_OPERACAO_PADRAO;
@@ -519,12 +527,7 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
               } else {
                 // Permissões revalidadas a cada consulta, inclusive em perguntas seguintes.
                 await exigirPermissao(ctx, data.clinicaId);
-                const dados = await ferramentaConsultarMetricas(
-                  ctx,
-                  data.clinicaId,
-                  fuso,
-                  args,
-                );
+                const dados = await ferramentaConsultarMetricas(ctx, data.clinicaId, fuso, args);
                 const id = `consulta_${consultas.length + 1}`;
                 consultas.push({ id, dados });
                 resultado = { consulta_id: id, ...dados };

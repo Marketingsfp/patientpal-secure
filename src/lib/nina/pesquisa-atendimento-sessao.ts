@@ -1,3 +1,4 @@
+import { confirmarItemDaPergunta, mudouSolicitacaoExplicitamente } from "./identificacao-catalogo";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 import { conhecimentoDaMesmaSessao, consultaDoNovoTurno } from "./confidence/conhecimento-sessao";
 import { prepararPesquisaMedicoDaSessao } from "./pesquisa-medico-sessao";
@@ -14,15 +15,56 @@ export function prepararPesquisaAtendimentoDaSessao(
     historico: ReadonlyArray<{ role: string; content: string | null }>;
   },
 ): string | undefined {
-  const anterior = conhecimentoDaMesmaSessao(contexto.conhecimento, contexto.clinicaId, contexto.sessionId);
-  const preparado = prepararPesquisaMedicoDaSessao(ferramenta, args, anterior, contexto);
-  const campo = ferramenta === "consultar_cadastro" ? "termo"
-    : ["buscar_medicos", "proxima_vaga", "consultar_primeiro_disponivel", "consultar_disponibilidade", "verificar_horario"].includes(ferramenta)
-      ? "especialidade" : null;
+  const anterior = conhecimentoDaMesmaSessao(
+    contexto.conhecimento,
+    contexto.clinicaId,
+    contexto.sessionId,
+  );
+  let preparado = prepararPesquisaMedicoDaSessao(ferramenta, args, anterior, contexto);
+  if (preparado && ["consultar_cadastro", "buscar_procedimentos"].includes(ferramenta)) {
+    try {
+      const p = JSON.parse(preparado);
+      const confirmada = confirmarItemDaPergunta(anterior, contexto);
+      if (confirmada)
+        preparado = JSON.stringify({
+          ...p,
+          termo: confirmada.nome,
+          ...(anterior?.consulta.tipo_atendimento
+            ? { tipo_atendimento: anterior.consulta.tipo_atendimento }
+            : {}),
+          nova_solicitacao: false,
+        });
+      else if (anterior?.esclarecimento)
+        preparado = JSON.stringify({
+          ...p,
+          nova_solicitacao: mudouSolicitacaoExplicitamente(contexto.mensagem),
+        });
+    } catch {
+      /* Validação dos argumentos permanece no executor. */
+    }
+  }
+  const campo =
+    ferramenta === "consultar_cadastro"
+      ? "termo"
+      : [
+            "buscar_medicos",
+            "proxima_vaga",
+            "consultar_primeiro_disponivel",
+            "consultar_disponibilidade",
+            "verificar_horario",
+          ].includes(ferramenta)
+        ? "especialidade"
+        : null;
   if (!campo || !preparado) return preparado;
   try {
     const p = JSON.parse(preparado);
-    if (!p || typeof p !== "object" || Array.isArray(p) || p.tipo_atendimento === "exame_procedimento") return preparado;
+    if (
+      !p ||
+      typeof p !== "object" ||
+      Array.isArray(p) ||
+      p.tipo_atendimento === "exame_procedimento"
+    )
+      return preparado;
     const termo = normalizarBuscaCatalogo(typeof p[campo] === "string" ? p[campo] : "").trim();
     const canonico = /^(?:consulta(?: de| com)? )?clinico geral$/.test(termo);
     // Não elimina qualificadores ou transforma uma frase inteira em especialidade.
@@ -34,12 +76,21 @@ export function prepararPesquisaAtendimentoDaSessao(
     const nome = normalizarBuscaCatalogo(String(p.nome ?? p.medico ?? "")).trim();
     // Só uma resposta de continuidade (eventualmente com o nome escolhido)
     // pode herdar o atendimento; outra especialidade/unidade não pode.
-    const semNome = nome.length >= 3 && mensagem.includes(nome)
-      ? mensagem.replace(nome, " ").replace(/\b(?:dr|dra|doutor|doutora)\.?\s*/g, " ") : mensagem;
-    const continuidade = consultaDoNovoTurno({ mensagem: semNome, anterior })?.continuidade === true;
-    const herdado = !negado && p.nova_solicitacao !== true &&
-      anterior?.consulta.tipo_atendimento === "consulta" && anterior.referencias.length > 0 &&
-      /^(?:consulta(?: de| com)? )?clinico geral$/.test(normalizarBuscaCatalogo(anterior.consulta.termo)) && continuidade;
+    const semNome =
+      nome.length >= 3 && mensagem.includes(nome)
+        ? mensagem.replace(nome, " ").replace(/\b(?:dr|dra|doutor|doutora)\.?\s*/g, " ")
+        : mensagem;
+    const continuidade =
+      consultaDoNovoTurno({ mensagem: semNome, anterior })?.continuidade === true;
+    const herdado =
+      !negado &&
+      p.nova_solicitacao !== true &&
+      anterior?.consulta.tipo_atendimento === "consulta" &&
+      anterior.referencias.length > 0 &&
+      /^(?:consulta(?: de| com)? )?clinico geral$/.test(
+        normalizarBuscaCatalogo(anterior.consulta.termo),
+      ) &&
+      continuidade;
     if (!canonico && !explicito && !herdado) return preparado;
     return JSON.stringify({ ...p, [campo]: "Clínico Geral" });
   } catch {

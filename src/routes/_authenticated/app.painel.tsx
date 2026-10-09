@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAcessoModulo } from "@/hooks/use-permissoes";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { HhpPageHeader, HhpKpiCard, HhpKpiRow, HhpEmptyState } from "@/design-system/hhp";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { InformacoesRapidasCard } from "@/components/painel/informacoes-rapidas";
 import { BannerBoasVindas } from "@/components/painel/banner-boas-vindas";
-import { MedicosDoDiaTv } from "@/components/painel/medicos-do-dia-tv";
+import { MedicosDoDiaTv, type MedicoDoDia } from "@/components/painel/medicos-do-dia-tv";
+import {
+  ehPeriodoHoje,
+  periodoHoje,
+  SeletorPeriodoMedicos,
+  useMedicosPeriodo,
+  type PeriodoMedicos,
+} from "@/components/painel/medicos-periodo";
+import { formatDatePura } from "@/lib/date-utils";
+import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
+import { separarPorCartao, type CartaoDia } from "@/lib/painel/cards-do-dia";
+import { DetalheCartaoDia } from "@/components/painel/detalhe-cartao-dia";
+import { AvisoSemDesfecho } from "@/components/painel/aviso-sem-desfecho";
+import { ficouSemDesfecho, ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardOperacional,
@@ -95,17 +109,6 @@ async function buscarTudo<T>(
   return linhas;
 }
 
-/**
- * Vaga vazia da grade. A agenda pré-gera os horários livres do médico como
- * linhas "DISPONIVEL" sem paciente vinculado; elas não são atendimentos e não
- * podem entrar em nenhum indicador do dia.
- */
-const ehVagaLivre = (a: { paciente_nome: string | null; paciente_id?: string | null }) => {
-  if (a.paciente_id) return false;
-  const nome = (a.paciente_nome ?? "").trim().toUpperCase();
-  return nome === "" || nome === "DISPONIVEL";
-};
-
 type Ag = {
   id: string;
   paciente_nome: string | null;
@@ -138,7 +141,6 @@ type CaixaSessao = {
   id: string;
   user_nome: string | null;
   aberto_em: string;
-  valor_abertura: number | null;
 };
 
 const ETAPA_LABEL: Record<string, string> = {
@@ -180,7 +182,7 @@ function DashboardOperacional() {
             .in("clinica_id", ids)
             .gte("inicio", de)
             .lte("inicio", ate)
-            .or("paciente_nome.is.null,paciente_nome.neq.DISPONIVEL")
+            .or(FILTRO_SEM_VAGA_LIVRE)
             .order("inicio")
             .order("id")
             .range(pDe, pAte),
@@ -201,7 +203,9 @@ function DashboardOperacional() {
           .limit(8),
         supabase
           .from("caixa_sessoes")
-          .select("id,user_nome,aberto_em,valor_abertura")
+          // Só quem abriu e quando: o valor de abertura não é pedido ao banco,
+          // porque o Dashboard abre também para perfis sem acesso a dinheiro.
+          .select("id,user_nome,aberto_em")
           .in("clinica_id", ids)
           .eq("status", "aberto")
           .order("aberto_em", { ascending: false }),
@@ -244,25 +248,35 @@ function DashboardOperacional() {
   );
 
   const d = q.data;
-  const k = useMemo(() => {
-    const ags = d?.ags ?? [];
-    const naFila = ags.filter((a) =>
-      ["recepcao", "caixa", "triagem"].includes(a.fluxo_etapa ?? ""),
-    );
-    const emAtend = ags.filter((a) => ["atendimento", "exame"].includes(a.fluxo_etapa ?? ""));
-    const checkins = ags.filter((a) => a.fluxo_etapa && a.fluxo_etapa !== "aguardando_recepcao");
-    return {
-      agendados: ags.length,
-      checkins: checkins.length,
-      naFila: naFila.length,
-      emAtend: emAtend.length,
-      concluidos: ags.filter((a) => a.status === "realizado" || a.fluxo_etapa === "finalizado")
-        .length,
-      faltas: ags.filter((a) => a.status === "faltou").length,
-      aguardando: ags.filter((a) => !a.fluxo_etapa || a.fluxo_etapa === "aguardando_recepcao")
-        .length,
-    };
-  }, [d]);
+  // Número do cartão e lista que abre ao clicar saem da mesma separação.
+  const porCartao = useMemo(() => separarPorCartao(d?.ags ?? []), [d]);
+  const k = useMemo(
+    () => ({
+      agendados: porCartao.agendados.length,
+      checkins: porCartao.checkins.length,
+      naFila: porCartao.naFila.length,
+      emAtend: porCartao.emAtend.length,
+      concluidos: porCartao.concluidos.length,
+      faltas: porCartao.agendados.filter((a) => a.status === "faltou").length,
+      aguardando: porCartao.aguardando.length,
+    }),
+    [porCartao],
+  );
+
+  const [cartaoAberto, setCartaoAberto] = useState<CartaoDia | null>(null);
+  const medicoNome = useMemo(() => new Map((d?.medicos ?? []).map((m) => [m.id, m.nome])), [d]);
+  // Contagem por atendente é ferramenta de supervisão: mesma regra de
+  // Relatórios → Marcações por atendente (`pode_autorizar` + admin, gestor ou
+  // supervisor).
+  // A função do banco repete a checagem.
+  // Atalho e "ver todos" do caixa só para quem abre a tela do Caixa — o perfil
+  // Supervisor vê quem está em turno, mas não entra no caixa.
+  const abreCaixa = useAcessoModulo("caixa") !== "none";
+  const ehSupervisor =
+    !!clinicaAtual?.pode_autorizar &&
+    (clinicaAtual.role === "admin" ||
+      clinicaAtual.role === "gestor" ||
+      clinicaAtual.role === "supervisor");
 
   const proximos = useMemo(() => {
     const agora = Date.now();
@@ -294,17 +308,9 @@ function DashboardOperacional() {
     const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
     const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
     const novos = d?.pacientesNovos ?? new Set<string>();
-    const mapa = new Map<
-      string,
-      {
-        id: string;
-        nome: string;
-        especialidade: string | null;
-        total: number;
-        pagos: number;
-        novos: number;
-      }
-    >();
+    // Depois das 19h quem não passou pelo balcão já conta como falta (sem-desfecho.ts).
+    const ateDia = ultimoDiaEncerrado();
+    const mapa = new Map<string, MedicoDoDia>();
     for (const a of ags) {
       const id = a.medico_id as string;
       const info = medInfo.get(id);
@@ -313,10 +319,14 @@ function DashboardOperacional() {
         nome: info?.nome ?? "Médico",
         especialidade: info?.especialidade_id ? (espNome.get(info.especialidade_id) ?? null) : null,
         total: 0,
+        atendidos: 0,
+        faltas: 0,
         pagos: 0,
         novos: 0,
       };
       item.total += 1;
+      if (a.status === "realizado" || a.fluxo_etapa === "finalizado") item.atendidos += 1;
+      if (a.status === "faltou" || ficouSemDesfecho(a, ateDia)) item.faltas += 1;
       if (a.data_pagamento) item.pagos += 1;
       if (a.paciente_id && novos.has(a.paciente_id)) item.novos += 1;
       mapa.set(id, item);
@@ -324,7 +334,36 @@ function DashboardOperacional() {
     return [...mapa.values()].sort((a, b) => b.total - a.total);
   }, [d]);
 
+  // Seção de médicos com período: "Hoje" usa os dados ao vivo já carregados;
+  // outros períodos vêm prontos do banco. O Modo TV continua sempre no dia.
+  const [periodoMedicos, setPeriodoMedicos] = useState<PeriodoMedicos>(periodoHoje);
+  const medicosHoje = ehPeriodoHoje(periodoMedicos);
+  const qPeriodo = useMedicosPeriodo(ids, periodoMedicos, !medicosHoje);
+  const medicosSecao = useMemo<MedicoDoDia[]>(() => {
+    if (medicosHoje) return medicosDoDia;
+    const espNome = new Map((d?.especialidades ?? []).map((e) => [e.id, e.nome]));
+    const medInfo = new Map((d?.medicos ?? []).map((m) => [m.id, m]));
+    return (qPeriodo.data ?? [])
+      .map((r) => {
+        const info = medInfo.get(r.medico_id);
+        return {
+          id: r.medico_id,
+          nome: info?.nome ?? "Médico",
+          especialidade: info?.especialidade_id
+            ? (espNome.get(info.especialidade_id) ?? null)
+            : null,
+          total: r.total,
+          atendidos: r.atendidos,
+          faltas: r.faltas,
+          pagos: r.pagos,
+          novos: r.novos,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [medicosHoje, medicosDoDia, qPeriodo.data, d]);
+
   const carregando = loading || q.isLoading;
+  const carregandoMedicos = carregando || (!medicosHoje && qPeriodo.isLoading);
   const sairModoTv = useCallback(() => setModoTv(false), []);
 
   return (
@@ -371,7 +410,7 @@ function DashboardOperacional() {
           <Atalho to="/app/agenda" icon={CalendarPlus} label="Novo agendamento" />
           <Atalho to="/app/checkin" icon={UserCheck} label="Check-in" />
           <Atalho to="/app/recepcao" icon={Ticket} label="Recepção / Filas" />
-          <Atalho to="/app/caixa" icon={Banknote} label="Caixa" />
+          {abreCaixa && <Atalho to="/app/caixa" icon={Banknote} label="Caixa" />}
           <Atalho to="/app/clientes" icon={Search} label="Buscar paciente" />
           <Atalho to="/app/fluxo" icon={Stethoscope} label="Fluxo do paciente" />
         </div>
@@ -385,31 +424,70 @@ function DashboardOperacional() {
           </div>
         ) : (
           <HhpKpiRow className="grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
-            <HhpKpiCard label="Agendados hoje" value={k.agendados} icon={Users} tone="info" />
+            <HhpKpiCard
+              label="Agendados hoje"
+              value={k.agendados}
+              icon={Users}
+              tone="info"
+              hint={
+                ehSupervisor
+                  ? "Clique para ver quantos cada atendente marcou"
+                  : "Clique para ver a lista"
+              }
+              onClick={() => setCartaoAberto("agendados")}
+            />
             <HhpKpiCard
               label="Check-ins feitos"
               value={k.checkins}
               icon={UserCheck}
               tone="ok"
-              hint="Pacientes que já chegaram"
+              hint="Pacientes que já chegaram — clique para ver a lista"
+              onClick={() => setCartaoAberto("checkins")}
             />
             <HhpKpiCard
               label="Aguardando chegada"
               value={k.aguardando}
               icon={Clock}
               tone="default"
+              hint="Clique para ver a lista"
+              onClick={() => setCartaoAberto("aguardando")}
             />
             <HhpKpiCard
               label="Na fila"
               value={k.naFila}
               icon={ListChecks}
               tone="warn"
-              hint="Recepção, caixa e triagem"
+              hint="Recepção, caixa e triagem — clique para ver a lista"
+              onClick={() => setCartaoAberto("naFila")}
             />
-            <HhpKpiCard label="Em atendimento" value={k.emAtend} icon={Activity} tone="info" />
-            <HhpKpiCard label="Concluídos" value={k.concluidos} icon={CheckCircle2} tone="ok" />
+            <HhpKpiCard
+              label="Em atendimento"
+              value={k.emAtend}
+              icon={Activity}
+              tone="info"
+              hint="Clique para ver a lista"
+              onClick={() => setCartaoAberto("emAtend")}
+            />
+            <HhpKpiCard
+              label="Concluídos"
+              value={k.concluidos}
+              icon={CheckCircle2}
+              tone="ok"
+              hint="Clique para ver a lista"
+              onClick={() => setCartaoAberto("concluidos")}
+            />
           </HhpKpiRow>
         )}
+
+        <DetalheCartaoDia
+          cartao={cartaoAberto}
+          onClose={() => setCartaoAberto(null)}
+          fichas={cartaoAberto ? porCartao[cartaoAberto] : []}
+          medicoNome={medicoNome}
+          dia={dia}
+          clinicaIds={ids}
+          ehSupervisor={ehSupervisor}
+        />
 
         <InformacoesRapidasCard className="w-full mb-6" />
 
@@ -590,7 +668,7 @@ function DashboardOperacional() {
             <Painel
               title="Caixas abertos"
               subtitle="Operadores em turno"
-              action={<LinkMais to="/app/caixa" />}
+              action={abreCaixa ? <LinkMais to="/app/caixa" /> : undefined}
             >
               <div className="p-4 space-y-2">
                 {carregando ? (
@@ -620,7 +698,7 @@ function DashboardOperacional() {
                           </span>
                         </div>
                       ))}
-                    {(d?.caixas ?? []).length > 5 && (
+                    {abreCaixa && (d?.caixas ?? []).length > 5 && (
                       <Link
                         to="/app/caixa"
                         className="block pt-1 text-[12px] font-medium text-slate-500 hover:text-slate-800"
@@ -637,28 +715,56 @@ function DashboardOperacional() {
 
         {/* Médicos do dia */}
         <Painel
-          title="Médicos do dia — Total de atendimentos"
-          subtitle="Agendamentos de hoje por profissional"
+          title={medicosHoje ? "Médicos do dia — Total de atendimentos" : "Médicos no período"}
+          subtitle={
+            medicosHoje
+              ? "Agendamentos de hoje por profissional"
+              : periodoMedicos.de === periodoMedicos.ate
+                ? `Agendamentos de ${formatDatePura(periodoMedicos.de)} por profissional`
+                : `Agendamentos de ${formatDatePura(periodoMedicos.de)} a ${formatDatePura(periodoMedicos.ate)} por profissional`
+          }
           action={<LinkMais to="/app/agenda-medicos" />}
           className="mb-6"
         >
-          {carregando ? (
+          <div className="px-4 pt-3">
+            <SeletorPeriodoMedicos periodo={periodoMedicos} onChange={setPeriodoMedicos} />
+          </div>
+          <AvisoSemDesfecho clinicaIds={ids} medicoNome={medicoNome} />
+          {!medicosHoje && periodoMedicos.de > periodoMedicos.ate ? (
+            <HhpEmptyState
+              icon={Stethoscope}
+              title="Período inválido"
+              description="A data inicial precisa ser anterior ou igual à data final."
+              className="min-h-[180px]"
+            />
+          ) : !medicosHoje && qPeriodo.isError ? (
+            <HhpEmptyState
+              icon={AlertTriangle}
+              title="Não foi possível carregar o período"
+              description="Tente de novo em instantes pelo botão Atualizar."
+              className="min-h-[180px]"
+            />
+          ) : carregandoMedicos ? (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-28 rounded-xl" />
               ))}
             </div>
-          ) : medicosDoDia.length === 0 ? (
+          ) : medicosSecao.length === 0 ? (
             <HhpEmptyState
               icon={Stethoscope}
-              title="Nenhum médico com atendimentos hoje"
+              title={
+                medicosHoje
+                  ? "Nenhum médico com atendimentos hoje"
+                  : "Nenhum médico com atendimentos no período"
+              }
               description="Assim que houver agendamentos vinculados a profissionais, eles aparecem aqui."
               className="min-h-[180px]"
             />
           ) : (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {medicosDoDia.map((m) => {
-                const pct = m.total > 0 ? Math.round((m.pagos / m.total) * 100) : 0;
+              {medicosSecao.map((m) => {
+                const naoPagos = m.total - m.pagos;
                 return (
                   <div
                     key={m.id}
@@ -688,23 +794,22 @@ function DashboardOperacional() {
                         </Link>
                       </Button>
                     </div>
-                    <div className="mt-2 text-3xl font-bold tabular-nums text-slate-900 leading-none">
-                      {m.total}
+                    <div className="mt-2 flex items-baseline justify-between gap-2 border-b border-slate-100 pb-2">
+                      <span className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
+                        Agendamentos
+                      </span>
+                      <span className="text-3xl font-bold tabular-nums text-slate-900 leading-none">
+                        {m.total}
+                      </span>
                     </div>
-                    <div className="text-[11px] uppercase tracking-widest font-semibold text-slate-500">
-                      Atendimentos
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                      <MetricaMedico rotulo="Atendidos" qtd={m.atendidos} total={m.total} />
+                      <MetricaMedico rotulo="Faltas" qtd={m.faltas} total={m.total} />
+                      <MetricaMedico rotulo="Pagos" qtd={m.pagos} total={m.total} />
+                      <MetricaMedico rotulo="Não pagos" qtd={naoPagos} total={m.total} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
-                        <div className="text-[11px] font-semibold text-emerald-700">Pagos</div>
-                        <div className="text-sm font-bold tabular-nums text-emerald-800">
-                          {pct}%
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-sky-50 px-2 py-1.5">
-                        <div className="text-[11px] font-semibold text-sky-700">Clientes novos</div>
-                        <div className="text-sm font-bold tabular-nums text-sky-800">{m.novos}</div>
-                      </div>
+                    <div className="mt-2 text-[11px] text-slate-500">
+                      {m.novos} cliente(s) novo(s)
                     </div>
                   </div>
                 );
@@ -802,6 +907,22 @@ function MiniStat({
         {label}
       </div>
       <div className="text-lg font-bold tabular-nums text-slate-800 truncate">{value}</div>
+    </div>
+  );
+}
+
+/** Quantidade + % sobre o total de agendamentos do médico (formato do sistema antigo). */
+function MetricaMedico({ rotulo, qtd, total }: { rotulo: string; qtd: number; total: number }) {
+  const pct = total > 0 ? (qtd / total) * 100 : 0;
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">{rotulo}</div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-lg font-bold tabular-nums text-slate-800 leading-tight">{qtd}</span>
+        <span className="text-[11px] tabular-nums text-slate-500">
+          {pct.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+        </span>
+      </div>
     </div>
   );
 }

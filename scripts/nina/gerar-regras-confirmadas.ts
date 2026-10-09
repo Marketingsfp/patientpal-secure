@@ -1,15 +1,25 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { INSTRUCAO_DADOS_CATALOGO } from "../../src/lib/nina/catalogo-estrutura";
 
-export const MIGRATION_REGRAS_CONFIRMADAS = "supabase/migrations/20260921210000_nina_regras_confirmadas_clinica.sql";
-const consolidacao = JSON.parse(readFileSync("supabase/migrations/20260920220000_nina_consolidacao_instrucoes.sql", "utf8").split("$nina_dados$")[1]!);
-const anterior = consolidacao.find((p: any) => p.escopo === "whatsapp").conteudo.match(/Cada item de atendimentos_publicados[^\n]+/u)?.[0];
+export const MIGRATION_REGRAS_CONFIRMADAS =
+  "supabase/migrations/20260921210000_nina_regras_confirmadas_clinica.sql";
+const consolidacao = JSON.parse(
+  readFileSync("supabase/migrations/20260920220000_nina_consolidacao_instrucoes.sql", "utf8").split(
+    "$nina_dados$",
+  )[1]!,
+);
+const anterior = consolidacao
+  .find((p: any) => p.escopo === "whatsapp")
+  .conteudo.match(/Cada item de atendimentos_publicados[^\n]+/u)?.[0];
 if (!anterior) throw new Error("Bloco histórico do catálogo não encontrado.");
 
 export function gerarRegrasConfirmadas() {
   const trocas = JSON.stringify([
     [anterior, INSTRUCAO_DADOS_CATALOGO],
-    ["escolhe um horário para o pré-agendamento, mas quem chegar primeiro será atendido primeiro", "escolhe um horário para o pré-agendamento e, entre os pacientes daquele horário, quem chegar primeiro será atendido primeiro"],
+    [
+      "escolhe um horário para o pré-agendamento, mas quem chegar primeiro será atendido primeiro",
+      "escolhe um horário para o pré-agendamento e, entre os pacientes daquele horário, quem chegar primeiro será atendido primeiro",
+    ],
   ]);
   return `-- Regras confirmadas pelo usuário em 21/09/2026. Sem alteração de schema,
 -- preços-base, horários, pacientes, agendas, financeiro ou histórico de mensagens.

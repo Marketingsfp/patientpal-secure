@@ -142,7 +142,11 @@ export async function contextoClinicaTexto(
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
     carregarProcedimentos(),
-    supabase.from("especialidades").select("id, nome").eq("ativo", true),
+    supabase
+      .from("especialidades_da_unidade")
+      .select("id, nome")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true),
     supabase
       .from("cb_convenios")
       .select("nome, modalidade, valor_mensal, max_dependentes, descricao")

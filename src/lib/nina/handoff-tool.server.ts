@@ -6,7 +6,6 @@
  * server-side e escopada por clínica.
  */
 import { encaminharParaHumano } from "@/lib/atendimento/handoff.server";
-import { motivoProfissionalSfp } from "./regras-catalogo";
 
 export const NOME_FERRAMENTA_HANDOFF = "solicitar_atendente_humano";
 
@@ -15,13 +14,19 @@ export const FERRAMENTA_HANDOFF = {
   function: {
     name: NOME_FERRAMENTA_HANDOFF,
     description:
-      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou identificação ainda ambígua após as respostas a duas perguntas de esclarecimento. Se a primeira resposta não esclarecer a identificação, faça a segunda pergunta antes de encaminhar por esse motivo. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento. Profissional SFP exige motivo PROFISSIONAL_SFP e transferência silenciosa, sem nenhuma mensagem ao paciente.",
+      "Transfere a conversa para atendimento humano. Use para pedido explícito por uma pessoa, reclamação, urgência clínica, cobrança, dependência da equipe, ausência confirmada no catálogo/agenda ou duas mensagens do paciente sem entendimento: na primeira peça esclarecimento; se a resposta continuar incompreendida, encaminhe sem pedir uma terceira tentativa. Chamadas ao modelo e pesquisas no mesmo turno não contam como mensagens do paciente. Analise o pedido e consulte a fonte apropriada antes de concluir ausência; motivo e resumo devem explicar a pendência específica. Não repita uma transferência confirmada. O sistema coordena o aviso e o protocolo; não produza uma segunda mensagem após o encaminhamento.",
     parameters: {
       type: "object",
       properties: {
+        avisar_paciente: {
+          type: "boolean",
+          description:
+            "Padrão true. Use false somente quando as instruções publicadas determinarem encaminhamento silencioso, sem aviso ao paciente. A decisão vem das instruções, não do nome do profissional nem do motivo.",
+        },
         motivo: {
           type: "string",
-          description: "Motivo curto do encaminhamento (ex.: 'paciente pediu atendente').",
+          description:
+            "Informe a causa concreta da transferência e o atendimento ou profissional envolvido. Se decorrer da regra SFP das instruções publicadas, identifique com PROFISSIONAL_SFP e descreva o item. Não atribua o pedido ao paciente se ele não pediu atendente.",
         },
         resumo: {
           type: "string",
@@ -46,7 +51,7 @@ export function ehFerramentaHandoff(nome: string | undefined | null) {
 }
 
 export async function executarHandoffTool(
-  ctx: { clinicaId: string; conversaId: string | null },
+  ctx: { clinicaId: string; conversaId: string | null; teste?: boolean },
   argumentosJson: string | undefined,
 ) {
   if (!ctx.conversaId) {
@@ -54,12 +59,30 @@ export async function executarHandoffTool(
   }
   let args: Record<string, unknown> = {};
   try {
-    args = argumentosJson ? JSON.parse(argumentosJson) : {};
+    const lido: unknown = argumentosJson ? JSON.parse(argumentosJson) : {};
+    args =
+      lido && typeof lido === "object" && !Array.isArray(lido)
+        ? (lido as Record<string, unknown>)
+        : {};
   } catch {
     args = {};
   }
-  const motivo = String(args.motivo ?? "Paciente solicitou atendimento humano").slice(0, 500);
+  const motivoMaria = (
+    typeof args.motivo === "string" && args.motivo.trim()
+      ? args.motivo.trim()
+      : "MOTIVO_NAO_INFORMADO: Nina solicitou transferência sem detalhar a causa"
+  ).slice(0, 500);
   const resumo = args.resumo ? String(args.resumo).slice(0, 2000) : null;
+  // Jev Fase 8: categoria fixa como prefixo "[Rótulo]"; sem decisão = motivo da Maria.
+  const motivo = await (
+    await import("./jev.server")
+  ).categorizarMotivoJev({
+    clinicaId: ctx.clinicaId,
+    conversaId: ctx.conversaId,
+    teste: ctx.teste === true,
+    motivo: motivoMaria,
+    resumo,
+  });
   const urgencia = ["baixa", "normal", "alta"].includes(String(args.urgencia))
     ? (String(args.urgencia) as "baixa" | "normal" | "alta")
     : "normal";
@@ -73,8 +96,9 @@ export async function executarHandoffTool(
     urgencia,
     departamentoNome: setor,
     solicitadoPor: "IA",
+    avisarPaciente: args.avisar_paciente !== false,
   });
-  const silencioso = r.ok && motivoProfissionalSfp(motivo);
+  const silencioso = r.ok && args.avisar_paciente === false;
 
   return {
     ok: r.ok,
@@ -84,7 +108,7 @@ export async function executarHandoffTool(
     posicao_fila: r.posicao_fila ?? null,
     setor: r.departamento ?? null,
     instrucao_para_voce: silencioso
-      ? "Encerre o turno sem mensagem ao paciente. A transferência por profissional SFP é silenciosa."
+      ? "Encerre o turno sem mensagem ao paciente, conforme a opção de aviso solicitada."
       : r.ok
         ? "O sistema coordena o aviso e o protocolo. Encerre o turno sem produzir outro aviso ou continuar o atendimento; não repita a transferência."
         : "O encaminhamento não foi confirmado. Informe a dificuldade sem afirmar que transferiu, seguindo o tratamento de falha disponível.",

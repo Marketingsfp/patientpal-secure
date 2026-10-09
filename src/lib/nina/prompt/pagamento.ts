@@ -1,3 +1,4 @@
+/** Texto exclusivo do system prompt de reserva; não altera dados nem respostas. */
 /** Condição da clínica e apresentação comum nas mensagens ao paciente. */
 export const REGRA_PIX_ANTECIPADO =
   'Ao apresentar valores com Pix/cartão ou orientar pagamento por Pix, inclua em linha própria: "*Pix:* pagamento somente antecipado, pelo WhatsApp." ' +
@@ -11,7 +12,8 @@ export const REGRA_PIX_CARTAO =
   'Informe os dois juntos, na mesma frase ou linha: "Pix/cartão: R$ X,XX", inclusive quando o paciente perguntar apenas por Pix ou apenas por cartão. ' +
   "Toda menção ao preço em Pix ou cartão, inclusive na frase de abertura, deve citar Pix/cartão. Não escreva uma frase com preço só no Pix ou só no cartão para depois agrupar os dois em uma lista. " +
   "Dinheiro permanece separado: nunca use seu preço como preço do Pix. Preserve as condições do atendimento e informe parcelamento somente para cartão. " +
-  REGRA_PIX_ANTECIPADO + " " +
+  REGRA_PIX_ANTECIPADO +
+  " " +
   "Quando o paciente perguntar sobre pagamento por Pix, desconto ou diferença entre as formas de pagamento, explique que Pix é aceito somente de forma antecipada pelo WhatsApp e que pagamento em dinheiro tem desconto. " +
   "O valor cadastrado em dinheiro já é o valor com desconto: não aplique desconto adicional nem invente percentual. A exigência de antecipação pelo WhatsApp é exclusiva do Pix; compartilhar o preço não torna essa condição obrigatória para o cartão. " +
   "A explicação adicional sobre desconto em dinheiro depende da pergunta do paciente; o aviso sobre Pix antecipado acompanha a apresentação dos valores. " +
@@ -29,27 +31,3 @@ export const REGRA_APRESENTACAO_VALORES =
   "Se pelo menos um valor ou condição for diferente, apresente o valor de cada profissional no respectivo bloco. " +
   "Campo ausente não comprova igualdade; nesse caso mantenha os valores conhecidos associados às respectivas opções e indique apenas a lacuna relevante. " +
   "Nunca use só o preço do primeiro registro como preço de todos nem combine consultas ou procedimentos diferentes.";
-
-/** Idempotente; mantém qualificadores como crédito/débito e não muda valores. */
-export function rotuloPagamentoNina(forma: string): string {
-  if (/\bpix\b/i.test(forma)) return forma;
-  return forma.replace(/\bcart[aã]o\b/i, "Pix/cartão");
-}
-
-/** Atualiza apenas rótulos de preço; não altera condições nem prosa clínica. */
-export function rotularValoresCartao(texto: string): string {
-  return texto.replace(
-    /\b(?:pix\s*(?:\/|e)\s*)?cart[aã]o(?=\s*:\s*(?:R\$|\d|[—–-]|(?:valor\s+)?n[aã]o\s+informado))/giu,
-    "Pix/cartão",
-  );
-}
-
-/** Mantém listas ausentes/malformadas distinguíveis de uma lista vazia. */
-export function formasPagamentoNina(formas: unknown): unknown {
-  if (!Array.isArray(formas)) return formas;
-  return formas.map((f) =>
-    f && typeof f === "object" && typeof f.forma === "string"
-      ? { ...f, forma: rotuloPagamentoNina(f.forma) }
-      : f,
-  );
-}

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useState, useEffect, type FormEvent } from "react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -49,7 +50,7 @@ export function SolicitarEstornoDialog({
 }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeBR();
   const [tipo, setTipo] = useState<"erro_caixa" | "devolucao">("erro_caixa");
   const ehSangria = !!caixaMovimentoId;
   // Sangria só faz sentido como "erro de caixa" — trava o tipo.

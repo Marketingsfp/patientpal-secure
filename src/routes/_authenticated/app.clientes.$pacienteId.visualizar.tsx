@@ -1,3 +1,4 @@
+import { AlertasAtivosBanner } from "@/components/medico/paciente-dialogs";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Pencil, Users } from "lucide-react";
@@ -123,93 +124,96 @@ function VisualizarClientePage() {
         // num scroll único e muito longo. As abas mantêm exatamente os mesmos
         // painéis, só que um de cada vez — e abrem espaço para as abas por
         // especialidade (Odontologia hoje, Fisioterapia depois).
-        <Tabs value={aba} onValueChange={setAba} className="space-y-4">
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
-            <TabsTrigger value="cartoes">Cartões</TabsTrigger>
-            <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
-            {verProntuario && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}
-            <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
-            {/* Sem trava de módulo de propósito: a recepção precisa responder
+        <div className="space-y-4">
+          <AlertasAtivosBanner pacienteId={paciente.id} />
+          <Tabs value={aba} onValueChange={setAba} className="space-y-4">
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+              <TabsTrigger value="cartoes">Cartões</TabsTrigger>
+              <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+              {verProntuario && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}
+              <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
+              {/* Sem trava de módulo de propósito: a recepção precisa responder
                 "quantas sessões faltam?" no balcão, e ela não tem Fisioterapia
                 liberada. A leitura vem de `fn_pacotes_do_paciente`, que devolve
                 só a parte administrativa — nada de evolução clínica. */}
-            <TabsTrigger value="sessoes">Sessões</TabsTrigger>
-            {verOdonto && <TabsTrigger value="odontologia">Odontologia</TabsTrigger>}
-            {verFisio && <TabsTrigger value="fisioterapia">Fisioterapia</TabsTrigger>}
-          </TabsList>
+              <TabsTrigger value="sessoes">Sessões</TabsTrigger>
+              {verOdonto && <TabsTrigger value="odontologia">Odontologia</TabsTrigger>}
+              {verFisio && <TabsTrigger value="fisioterapia">Fisioterapia</TabsTrigger>}
+            </TabsList>
 
-          <TabsContent value="cadastro">
-            <div className="rounded-lg border border-border bg-card p-6">
-              <ClienteForm
+            <TabsContent value="cadastro">
+              <div className="rounded-lg border border-border bg-card p-6">
+                <ClienteForm
+                  clinicaId={clinicaAtual.clinica_id}
+                  paciente={paciente}
+                  onCancel={voltar}
+                  onSaved={voltar}
+                  readOnly
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="cartoes">
+              <PacienteCartoesBeneficios
+                pacienteId={paciente.id}
                 clinicaId={clinicaAtual.clinica_id}
-                paciente={paciente}
-                onCancel={voltar}
-                onSaved={voltar}
-                readOnly
               />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="cartoes">
-            <PacienteCartoesBeneficios
-              pacienteId={paciente.id}
-              clinicaId={clinicaAtual.clinica_id}
-            />
-          </TabsContent>
-
-          <TabsContent value="atendimentos">
-            <PacienteAtendimentosResumo
-              pacienteId={paciente.id}
-              clinicaId={clinicaAtual.clinica_id}
-            />
-          </TabsContent>
-
-          {verProntuario && (
-            <TabsContent value="prontuario">
-              <LinhaDoTempoProntuario pacienteId={paciente.id} />
             </TabsContent>
-          )}
 
-          <TabsContent value="sessoes">
-            <PacienteSessoesPanel pacienteId={paciente.id} />
-          </TabsContent>
-
-          <TabsContent value="hiperdia" className="space-y-6">
-            <HiperdiaPanel
-              pacienteId={paciente.id}
-              clinicaId={clinicaAtual.clinica_id}
-              readOnly={!podeHiperdia}
-            />
-            <CriteriosSbd2025 />
-          </TabsContent>
-
-          {verOdonto && (
-            <TabsContent value="odontologia">
-              <div className="rounded-lg border border-border bg-card p-6">
-                <PacienteOdontoPanel
-                  pacienteId={paciente.id}
-                  clinicaId={clinicaAtual.clinica_id}
-                  readOnly={acessoOdonto !== "write"}
-                />
-              </div>
+            <TabsContent value="atendimentos">
+              <PacienteAtendimentosResumo
+                pacienteId={paciente.id}
+                clinicaId={clinicaAtual.clinica_id}
+              />
             </TabsContent>
-          )}
 
-          {verFisio && (
-            <TabsContent value="fisioterapia">
-              <div className="rounded-lg border border-border bg-card p-6">
-                <PacienteFisioPanel
-                  pacienteId={paciente.id}
-                  pacienteNome={paciente.nome}
-                  clinicaId={clinicaAtual.clinica_id}
-                  userId={user?.id ?? null}
-                  readOnly={acessoFisio !== "write"}
-                />
-              </div>
+            {verProntuario && (
+              <TabsContent value="prontuario">
+                <LinhaDoTempoProntuario pacienteId={paciente.id} />
+              </TabsContent>
+            )}
+
+            <TabsContent value="sessoes">
+              <PacienteSessoesPanel pacienteId={paciente.id} />
             </TabsContent>
-          )}
-        </Tabs>
+
+            <TabsContent value="hiperdia" className="space-y-6">
+              <HiperdiaPanel
+                pacienteId={paciente.id}
+                clinicaId={clinicaAtual.clinica_id}
+                readOnly={!podeHiperdia}
+              />
+              <CriteriosSbd2025 />
+            </TabsContent>
+
+            {verOdonto && (
+              <TabsContent value="odontologia">
+                <div className="rounded-lg border border-border bg-card p-6">
+                  <PacienteOdontoPanel
+                    pacienteId={paciente.id}
+                    clinicaId={clinicaAtual.clinica_id}
+                    readOnly={acessoOdonto !== "write"}
+                  />
+                </div>
+              </TabsContent>
+            )}
+
+            {verFisio && (
+              <TabsContent value="fisioterapia">
+                <div className="rounded-lg border border-border bg-card p-6">
+                  <PacienteFisioPanel
+                    pacienteId={paciente.id}
+                    pacienteNome={paciente.nome}
+                    clinicaId={clinicaAtual.clinica_id}
+                    userId={user?.id ?? null}
+                    readOnly={acessoFisio !== "write"}
+                  />
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+        </div>
       )}
     </div>
   );

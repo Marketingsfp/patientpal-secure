@@ -8,7 +8,7 @@ export class ErroSessaoTesteOcupada extends Error {
 /** Serializa reset e entrada de mensagens, sem segurar a trava durante a IA. */
 export async function comSessaoTesteExclusiva<T>(
   alvo: { clinicaId: string; leadId: string },
-  executar: () => Promise<T>,
+  executar: (conferir: () => void) => Promise<T>,
 ) {
   const { adquirirLockConversa, liberarLockConversa, lockConversaConfirmado } =
     await import("./lock-conversa.server");
@@ -21,7 +21,9 @@ export async function comSessaoTesteExclusiva<T>(
   if (!lock) throw new ErroSessaoTesteOcupada();
   try {
     if (!lockConversaConfirmado(lock)) throw new ErroSessaoTesteOcupada();
-    return await executar();
+    return await executar(() => {
+      if (!lockConversaConfirmado(lock)) throw new ErroSessaoTesteOcupada();
+    });
   } finally {
     await liberarLockConversa(lock);
   }

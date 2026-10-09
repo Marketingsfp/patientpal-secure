@@ -27,10 +27,7 @@ describe("broker revalida somente leituras comandadas pelo servidor", () => {
   test("retry comum reutiliza a leitura e não duplica execução na trilha", async () => {
     const { broker, chamadas } = preparar([{ ok: true, versao: "v1" }]);
     const primeira = await broker.executar("consultar_cadastro", { termo: "cardiologia" });
-    const repetida = await broker.executar(
-      "consultar_cadastro",
-      '{"termo":"cardiologia"}',
-    );
+    const repetida = await broker.executar("consultar_cadastro", '{"termo":"cardiologia"}');
     expect(chamadas).toHaveLength(1);
     expect(repetida).toEqual({ ...primeira, reused: true });
     expect(broker.resultados()).toHaveLength(1);

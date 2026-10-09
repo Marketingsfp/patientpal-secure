@@ -106,7 +106,11 @@ export function DashboardHomologacao() {
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={() => void buscar()} disabled={carregando}>
-          {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {carregando ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
           <span className="ml-2">Atualizar</span>
         </Button>
       </CardHeader>
@@ -164,7 +168,11 @@ export function DashboardHomologacao() {
             </select>
           </div>
           <div className="flex items-end">
-            <Button className="w-full" onClick={() => void buscar()} disabled={carregando || !clinicaId}>
+            <Button
+              className="w-full"
+              onClick={() => void buscar()}
+              disabled={carregando || !clinicaId}
+            >
               Aplicar filtros
             </Button>
           </div>
@@ -181,7 +189,9 @@ export function DashboardHomologacao() {
                 variant={ativo ? "default" : "outline"}
                 onClick={() =>
                   setTipos((atual) =>
-                    atual.includes(t.valor) ? atual.filter((x) => x !== t.valor) : [...atual, t.valor],
+                    atual.includes(t.valor)
+                      ? atual.filter((x) => x !== t.valor)
+                      : [...atual, t.valor],
                   )
                 }
               >
@@ -198,16 +208,38 @@ export function DashboardHomologacao() {
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Metrica rotulo="Testes executados" valor={String(resumo.testes)} dica={`${resumo.avaliados} avaliados pelo Sol`} />
-              <Metrica rotulo="Aprovados" valor={String(resumo.aprovados + resumo.aprovadosObservacao)} dica={`${resumo.aprovadosObservacao} com observação`} />
+              <Metrica
+                rotulo="Testes executados"
+                valor={String(resumo.testes)}
+                dica={`${resumo.avaliados} avaliados pelo Sol`}
+              />
+              <Metrica
+                rotulo="Aprovados"
+                valor={String(resumo.aprovados + resumo.aprovadosObservacao)}
+                dica={`${resumo.aprovadosObservacao} com observação`}
+              />
               <Metrica rotulo="Reprovados" valor={String(resumo.reprovados)} />
               <Metrica rotulo="Erros críticos" valor={String(resumo.errosCriticos)} />
-              <Metrica rotulo="Score médio" valor={resumo.scoreMedio === null ? "—" : `${resumo.scoreMedio}/100`} />
-              <Metrica rotulo="Taxa de aprovação" valor={resumo.taxaAprovacao === null ? "—" : `${resumo.taxaAprovacao}%`} />
+              <Metrica
+                rotulo="Score médio"
+                valor={resumo.scoreMedio === null ? "—" : `${resumo.scoreMedio}/100`}
+              />
+              <Metrica
+                rotulo="Taxa de aprovação"
+                valor={resumo.taxaAprovacao === null ? "—" : `${resumo.taxaAprovacao}%`}
+              />
               <Metrica rotulo="Agendamentos testados" valor={String(resumo.agendamentos)} />
               <Metrica rotulo="Transferências testadas" valor={String(resumo.transferencias)} />
-              <Metrica rotulo="Latência média" valor={formatarDuracao(resumo.latenciaMediaMs)} dica={`p95 ${formatarDuracao(resumo.latenciaP95Ms)}`} />
-              <Metrica rotulo="Mensagens processadas" valor={String(resumo.mensagens)} dica={`${resumo.tools} ferramentas · ${resumo.rag} com conhecimento`} />
+              <Metrica
+                rotulo="Latência média"
+                valor={formatarDuracao(resumo.latenciaMediaMs)}
+                dica={`p95 ${formatarDuracao(resumo.latenciaP95Ms)}`}
+              />
+              <Metrica
+                rotulo="Mensagens processadas"
+                valor={String(resumo.mensagens)}
+                dica={`${resumo.tools} ferramentas · ${resumo.rag} com conhecimento`}
+              />
               <Metrica
                 rotulo="Tokens"
                 valor={(resumo.inputTokens + resumo.outputTokens).toLocaleString("pt-BR")}
@@ -215,7 +247,11 @@ export function DashboardHomologacao() {
               />
               <Metrica
                 rotulo="Custo registrado"
-                valor={resumo.custo === null ? "—" : resumo.custo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                valor={
+                  resumo.custo === null
+                    ? "—"
+                    : resumo.custo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                }
                 dica={resumo.custo === null ? "Não informado pelo provedor" : undefined}
               />
             </div>
@@ -283,10 +319,17 @@ export function DashboardHomologacao() {
                       </div>
                       <div>
                         Aprovação:{" "}
-                        <strong>{v.resumo.taxaAprovacao === null ? "—" : `${v.resumo.taxaAprovacao}%`}</strong>
+                        <strong>
+                          {v.resumo.taxaAprovacao === null ? "—" : `${v.resumo.taxaAprovacao}%`}
+                        </strong>
                       </div>
-                      <div>Testes: {v.resumo.testes} · Reprovados: {v.resumo.reprovados}</div>
-                      <div>Score médio: {v.resumo.scoreMedio === null ? "—" : `${v.resumo.scoreMedio}/100`}</div>
+                      <div>
+                        Testes: {v.resumo.testes} · Reprovados: {v.resumo.reprovados}
+                      </div>
+                      <div>
+                        Score médio:{" "}
+                        {v.resumo.scoreMedio === null ? "—" : `${v.resumo.scoreMedio}/100`}
+                      </div>
                       <div>Erros críticos: {v.resumo.errosCriticos}</div>
                       <div>Latência média: {formatarDuracao(v.resumo.latenciaMediaMs)}</div>
                     </div>

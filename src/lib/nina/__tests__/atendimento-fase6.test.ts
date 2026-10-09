@@ -42,8 +42,14 @@ describe("fase 6 — pedido de humano", () => {
 
 describe("fase 6 — máquina de estados", () => {
   it("escolha validada coleta dados antes de aguardar confirmação", () => {
-    const estado = comEstado({ appointment: { doctor_id: "medico", procedure: "Consulta",
-      slot_inicio: "2030-01-01T14:00:00Z", slot_fim: "2030-01-01T14:30:00Z" } });
+    const estado = comEstado({
+      appointment: {
+        doctor_id: "medico",
+        procedure: "Consulta",
+        slot_inicio: "2030-01-01T14:00:00Z",
+        slot_fim: "2030-01-01T14:30:00Z",
+      },
+    });
     resumoEntregueFixture(estado, "clinica", false);
     expect(derivarEtapa(ctx({ estado }))).toBe("COLLECTING_PATIENT_DATA");
     Object.assign(estado.patient, identificado);
@@ -66,9 +72,9 @@ describe("fase 6 — máquina de estados", () => {
   });
 
   it("interesse em agendar fica pendente de confirmação", () => {
-    expect(
-      derivarEtapa(ctx({ mensagem: "tem vaga?", intencoes: ["agendamento"] })),
-    ).toBe("BOOKING_INTENT_PENDING");
+    expect(derivarEtapa(ctx({ mensagem: "tem vaga?", intencoes: ["agendamento"] }))).toBe(
+      "BOOKING_INTENT_PENDING",
+    );
   });
 
   it("intenção confirmada ainda define o atendimento antes de coletar dados", () => {

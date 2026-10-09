@@ -396,7 +396,6 @@ export function montarPromptAnalise(p: PacoteEvidencias): string {
   ].join("\n");
 }
 
-
 /* ------------------------------------------------------------------ */
 /* Resultado estruturado                                               */
 /* ------------------------------------------------------------------ */
@@ -544,10 +543,7 @@ const GRAVIDADES: Gravidade[] = ["baixa", "media", "alta", "critica"];
  * o veredito nunca fica abaixo de "suspeita" quando há falha objetiva
  * comprovada, e a causa permanece hipótese sem evidência que a sustente.
  */
-export function normalizarResultado(
-  bruto: unknown,
-  verificacoes: Verificacao[],
-): ResultadoAnalise {
+export function normalizarResultado(bruto: unknown, verificacoes: Verificacao[]): ResultadoAnalise {
   const o = (bruto ?? {}) as Record<string, unknown>;
   const veredito = VEREDITOS.includes(o["veredito"] as Veredito)
     ? (o["veredito"] as Veredito)
@@ -582,7 +578,8 @@ export function normalizarResultado(
 
   return {
     veredito: vFinal,
-    conclusao: String(o["conclusao"] ?? "").slice(0, 2000) || "Sem conclusão devolvida pelo avaliador.",
+    conclusao:
+      String(o["conclusao"] ?? "").slice(0, 2000) || "Sem conclusão devolvida pelo avaliador.",
     problema: o["problema"] == null ? null : String(o["problema"]).slice(0, 600),
     evidencias,
     etapa: o["etapa"] == null ? null : String(o["etapa"]).slice(0, 120),
@@ -614,12 +611,18 @@ export function normalizarProposta(bruto: unknown): PropostaCorrecao | null {
   const camada = CAMADAS.includes(p["camada"] as CamadaProposta)
     ? (p["camada"] as CamadaProposta)
     : null;
-  const valorNovo = String(p["valor_novo"] ?? "").trim().slice(0, 4000);
+  const valorNovo = String(p["valor_novo"] ?? "")
+    .trim()
+    .slice(0, 4000);
   if (!camada || !valorNovo) return null;
   const escopoBruto = p["escopo"];
   const arquivos = Array.isArray(p["arquivos"])
     ? (p["arquivos"] as unknown[])
-        .map((a) => String(a ?? "").trim().slice(0, 300))
+        .map((a) =>
+          String(a ?? "")
+            .trim()
+            .slice(0, 300),
+        )
         .filter(Boolean)
         .slice(0, 30)
     : [];

@@ -72,7 +72,9 @@ export function parseDecisaoNina(bruto: unknown): DecisaoNina {
     ? (o["intent"] as IntencaoNina)
     : "other";
   const campos = Array.isArray(o["missing_fields"])
-    ? (o["missing_fields"] as unknown[]).filter((c): c is string => typeof c === "string").slice(0, 10)
+    ? (o["missing_fields"] as unknown[])
+        .filter((c): c is string => typeof c === "string")
+        .slice(0, 10)
     : [];
   return {
     intent,

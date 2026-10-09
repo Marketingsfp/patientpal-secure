@@ -13,11 +13,7 @@ import { afirmaOuPrometeAgendamento } from "../afirmacao-agendamento";
 import { avaliarGrounding, extrairClaimsDoTexto, somenteNegativasApoiadas } from "./claims";
 import { fontesPresentes, requisitosDeFonte, reservaComProva } from "./fontes-requeridas";
 import { hashDoTexto } from "./hash";
-import {
-  executarValidadoresDeConfianca,
-  riscoDaAcao,
-  type ConfigValidadores,
-} from "./validators";
+import { executarValidadoresDeConfianca, riscoDaAcao, type ConfigValidadores } from "./validators";
 import {
   aplicarPolitica,
   detectarHardBlockers,
@@ -27,10 +23,7 @@ import {
   type HardBlocker,
   type PoliticaConfianca,
 } from "./policy";
-import {
-  DIMENSAO_INSTRUCOES,
-  repartirInstrucoes,
-} from "./pontuacao-instrucoes";
+import { DIMENSAO_INSTRUCOES, repartirInstrucoes } from "./pontuacao-instrucoes";
 
 import { acaoExecutavel, acaoOuNenhuma, contaContraANota } from "./types";
 import type {
@@ -98,9 +91,7 @@ function filtrarCategoriasAfirmadas(
   for (const c of extrairClaimsDoTexto(texto)) {
     for (const cat of CATEGORIA_POR_CLAIM[c.tipo] ?? []) afirmadas.add(cat);
   }
-  return detectadas.filter(
-    (c) => !CATEGORIAS_QUE_EXIGEM_AFIRMACAO.has(c) || afirmadas.has(c),
-  );
+  return detectadas.filter((c) => !CATEGORIAS_QUE_EXIGEM_AFIRMACAO.has(c) || afirmadas.has(c));
 }
 
 /**
@@ -173,7 +164,8 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
   );
   // FASE 2 — reserva já persistida comprova o horário reservado.
   const reservaPersistida =
-    ctx.operationalState?.appointmentCreated === true && Boolean(ctx.operationalState?.appointmentId);
+    ctx.operationalState?.appointmentCreated === true &&
+    Boolean(ctx.operationalState?.appointmentId);
 
   const checks: Verificacao[] = [];
 
@@ -201,19 +193,24 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
   }
 
   const semOperacao = requisitos.filter((r) => r.fonte !== "operacao_confirmada");
-  const negativaComProva = semOperacao.some((r) => !presentes[r.fonte]) && somenteNegativasApoiadas(ctx);
+  const negativaComProva =
+    semOperacao.some((r) => !presentes[r.fonte]) && somenteNegativasApoiadas(ctx);
   for (const fonte of new Set(semOperacao.map((r) => r.fonte))) {
     const doTipo = semOperacao.filter((r) => r.fonte === fonte);
     const bloqueador: Bloqueador = doTipo.some((r) => r.tipoClaim === "valor")
       ? "VALOR_SEM_CATALOGO"
-      : doTipo.some((r) => r.tipoClaim === "preparo") ? "PREPARO_SEM_FONTE" : "FONTE_OFICIAL_AUSENTE";
-    checks.push(check(
-      `fonte_${fonte}`,
-      `Fonte exigida para ${doTipo.map((r) => r.tipoClaim).join(", ")}: ${fonte}`,
-      presentes[fonte] || negativaComProva,
-      100,
-      bloqueador,
-    ));
+      : doTipo.some((r) => r.tipoClaim === "preparo")
+        ? "PREPARO_SEM_FONTE"
+        : "FONTE_OFICIAL_AUSENTE";
+    checks.push(
+      check(
+        `fonte_${fonte}`,
+        `Fonte exigida para ${doTipo.map((r) => r.tipoClaim).join(", ")}: ${fonte}`,
+        presentes[fonte] || negativaComProva,
+        100,
+        bloqueador,
+      ),
+    );
   }
 
   // FASE 2 — campo obrigatório só é bloqueio quando existe uma AÇÃO
@@ -279,7 +276,14 @@ export function executarValidadores(ctx: ContextoConfianca): Verificacao[] {
   // reduz é fato SEM evidência, medido claim a claim (ClaimGroundingValidator).
 
   if (ctx.draftText !== undefined && ctx.draftText !== null) {
-    checks.push(check("resposta_nao_vazia", "A resposta tem conteúdo", ctx.draftText.trim().length > 0, POLITICA_PADRAO.penalidades["resposta_nao_vazia"] ?? 0));
+    checks.push(
+      check(
+        "resposta_nao_vazia",
+        "A resposta tem conteúdo",
+        ctx.draftText.trim().length > 0,
+        POLITICA_PADRAO.penalidades["resposta_nao_vazia"] ?? 0,
+      ),
+    );
   }
 
   return checks;
@@ -294,7 +298,10 @@ export function decidirConfianca(
   opcoes: { config?: ConfigValidadores; agora?: Date; politica?: PoliticaConfianca } = {},
 ): ResultadoConfianca {
   const agora = opcoes.agora ?? new Date(ctx.instanteAvaliacao ?? Date.now());
-  ctx = { ...ctx, instanteAvaliacao: Number.isFinite(agora.getTime()) ? agora.toISOString() : "invalido" };
+  ctx = {
+    ...ctx,
+    instanteAvaliacao: Number.isFinite(agora.getTime()) ? agora.toISOString() : "invalido",
+  };
   const cats = categoriasDoContexto(ctx);
   const politica = opcoes.politica ?? POLITICA_PADRAO;
   const tipoAvaliacao = ctx.tipoAvaliacao ?? "action_safety";
@@ -349,18 +356,20 @@ export function decidirConfianca(
     : validators;
 
   const reprovados = checks.filter((c) => !c.aprovado);
-  const blockers = [...new Set(reprovados.map((c) => c.bloqueador).filter(Boolean))] as Bloqueador[];
+  const blockers = [
+    ...new Set(reprovados.map((c) => c.bloqueador).filter(Boolean)),
+  ] as Bloqueador[];
 
-  const motivos = reprovados.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao));
+  const motivos = reprovados.map((c) =>
+    c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao,
+  );
 
   // FASE 3 (pontuação) — o orçamento de cumprimento de instruções é repartido
   // entre as obrigações substantivas aplicáveis, agrupando equivalentes. O
   // agregado sai da conta: agregado e parcelas nunca são somados juntos.
   // Linguagem vai para dimensão separada, com peso zero.
   const agregadoInstrucoes = validatorsParaNota.find((v) => v.validator === DIMENSAO_INSTRUCOES);
-  const reparticao = agregadoInstrucoes
-    ? repartirInstrucoes(agregadoInstrucoes, politica)
-    : null;
+  const reparticao = agregadoInstrucoes ? repartirInstrucoes(agregadoInstrucoes, politica) : null;
   const validatorsMedidos = reparticao
     ? [
         ...validatorsParaNota.filter((v) => v.validator !== DIMENSAO_INSTRUCOES),
@@ -370,7 +379,6 @@ export function decidirConfianca(
 
   // FASE 3 — nota E cobertura, medidas na mesma passada e reportadas separadas.
   const medida = medirEvidencia(validatorsMedidos, politica);
-
 
   const risco = riscoDaAcao(ctx);
   const hardBlockers: HardBlocker[] = detectarHardBlockers(
@@ -383,9 +391,7 @@ export function decidirConfianca(
 
   // Pontuação: validadores ponderados pela política, menos as penalidades
   // graduais (verificações que descontam sem bloquear).
-  const penalidade = reprovados
-    .filter((c) => !c.bloqueador)
-    .reduce((soma, c) => soma + c.peso, 0);
+  const penalidade = reprovados.filter((c) => !c.bloqueador).reduce((soma, c) => soma + c.peso, 0);
 
   const { score, level, decision, limitacoes } = aplicarPolitica(
     {
@@ -404,11 +410,9 @@ export function decidirConfianca(
       // pela média das demais parcelas.
       requisitoEssencialViolado: reparticao?.memoria.essencial.violado ?? false,
       requisitoEssencialSemProva: reparticao?.memoria.essencial.semProva ?? false,
-
     },
     politica,
   );
-
 
   // FASE 4/5 — handoff já pedido pelo runtime deixa de ser atalho cego.
   // TRANSFERIR é uma AÇÃO segura (action_safety), então a decisão pode ser
@@ -473,9 +477,7 @@ export function decidirConfianca(
         blockers: blockersAcao,
         hardBlockers: hardBlockersAcao,
         motivos: [
-          ...reprovadosAcao.map((c) =>
-            c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao,
-          ),
+          ...reprovadosAcao.map((c) => (c.detalhe ? `${c.descricao} — ${c.detalhe}` : c.descricao)),
           ...motivosPendencia,
         ],
       }
@@ -522,7 +524,6 @@ export function decidirConfianca(
     validators: reparticao?.linguagem ? [...validators, reparticao.linguagem] : validators,
     evidence: montarEvidencia(ctx, cats, motivos),
     ...(reparticao ? { instrucoes: reparticao.memoria } : {}),
-
   };
 }
 

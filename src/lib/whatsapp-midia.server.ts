@@ -1,3 +1,5 @@
+import { fetchComAuditoriaIA } from "./nina/auditoria-ia.server";
+import type { RegistrarChamadaIA } from "./nina/auditoria-ia";
 import { VOCABULARIO_DICA, corrigirFala } from "@/lib/voz-correcoes";
 import { MAPA_TEMPLATES } from "@/lib/nina/resposta/templates";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -13,7 +15,11 @@ import {
 
 /** Imagem e áudio são lidos inteiros (a IA precisa do conteúdo); documento e vídeo seguem em fluxo. */
 type TipoMidiaEmMemoria = Extract<TipoMidiaGuardada, "image" | "audio">;
-import { PROMPT_LEITURA_IMAGEM, interpretarLeituraImagem, type LeituraImagem } from "@/lib/nina/leitura-imagem";
+import {
+  PROMPT_LEITURA_IMAGEM,
+  interpretarLeituraImagem,
+  type LeituraImagem,
+} from "@/lib/nina/leitura-imagem";
 
 const META_VERSION_MEDIA = "v26.0";
 
@@ -57,7 +63,11 @@ export async function metaDownloadMedia(
 /** Pontos de saída (rede e bucket) trocáveis nos testes. */
 export type DependenciasMidia = {
   fetchFn?: typeof fetch;
-  armazenar?: (caminho: string, bytes: Uint8Array, mime: string) => Promise<{ message: string } | null>;
+  armazenar?: (
+    caminho: string,
+    bytes: Uint8Array,
+    mime: string,
+  ) => Promise<{ message: string } | null>;
 };
 
 async function armazenarNoBucket(caminho: string, bytes: Uint8Array, mime: string) {
@@ -80,29 +90,58 @@ export type MidiaRecebida = {
  * Baixa a mídia da Meta UMA vez e guarda no bucket privado. Falha em guardar nunca derruba o
  * atendimento: o conteúdo ainda segue para a transcrição/leitura e a mensagem fica sem anexo.
  */
-export async function receberMidiaWhatsapp(entrada: {
-  clinicaId: string;
-  waMessageId: string;
-  tipo: TipoMidiaEmMemoria;
-  mediaId: string;
-  accessToken: string;
-}, deps: DependenciasMidia = {}): Promise<MidiaRecebida> {
+export async function receberMidiaWhatsapp(
+  entrada: {
+    clinicaId: string;
+    waMessageId: string;
+    tipo: TipoMidiaEmMemoria;
+    mediaId: string;
+    accessToken: string;
+  },
+  deps: DependenciasMidia = {},
+): Promise<MidiaRecebida> {
   const fetchFn = deps.fetchFn ?? fetch;
   try {
-    const { url, mime: mimeMeta } = await metaFetchMediaUrl(entrada.mediaId, entrada.accessToken, fetchFn);
-    if (!url) return { base64: null, mime: mimeMeta, caminho: null, erro: "URL da mídia não retornada pela Meta" };
+    const { url, mime: mimeMeta } = await metaFetchMediaUrl(
+      entrada.mediaId,
+      entrada.accessToken,
+      fetchFn,
+    );
+    if (!url)
+      return {
+        base64: null,
+        mime: mimeMeta,
+        caminho: null,
+        erro: "URL da mídia não retornada pela Meta",
+      };
     const res = await fetchFn(url, { headers: { Authorization: `Bearer ${entrada.accessToken}` } });
     if (!res.ok) throw new Error(`Falha ao baixar mídia (${res.status})`);
     const mimeBruto = res.headers.get("content-type") ?? mimeMeta;
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length === 0) return { base64: null, mime: mimeBruto, caminho: null, erro: "Mídia vazia" };
+    if (bytes.length === 0)
+      return { base64: null, mime: mimeBruto, caminho: null, erro: "Mídia vazia" };
     if (bytes.length > limiteDeBytes(entrada.tipo)) {
-      return { base64: null, mime: mimeBruto, caminho: null, erro: "Mídia acima do limite de tamanho" };
+      return {
+        base64: null,
+        mime: mimeBruto,
+        caminho: null,
+        erro: "Mídia acima do limite de tamanho",
+      };
     }
     const base64 = bytesParaBase64(bytes);
     const mime = tipoMimeAceito(entrada.tipo, mimeBruto) ?? tipoMimeAceito(entrada.tipo, mimeMeta);
-    if (!mime) return { base64, mime: mimeBruto, caminho: null, erro: `Tipo de mídia não guardado: ${mimeBruto ?? "?"}` };
-    const caminho = caminhoDaMidia({ clinicaId: entrada.clinicaId, waMessageId: entrada.waMessageId, mime });
+    if (!mime)
+      return {
+        base64,
+        mime: mimeBruto,
+        caminho: null,
+        erro: `Tipo de mídia não guardado: ${mimeBruto ?? "?"}`,
+      };
+    const caminho = caminhoDaMidia({
+      clinicaId: entrada.clinicaId,
+      waMessageId: entrada.waMessageId,
+      mime,
+    });
     const falha = await (deps.armazenar ?? armazenarNoBucket)(caminho, bytes, mime);
     if (falha) {
       console.error("[whatsapp-midia] guardar mídia falhou", falha.message);
@@ -124,7 +163,11 @@ export type DependenciasArquivo = {
     tamanho: number,
   ) => Promise<{ message: string } | null>;
   /** Envio com o conteúdo já em memória (tamanho desconhecido, dentro do teto). */
-  armazenar?: (caminho: string, bytes: Uint8Array, mime: string) => Promise<{ message: string } | null>;
+  armazenar?: (
+    caminho: string,
+    bytes: Uint8Array,
+    mime: string,
+  ) => Promise<{ message: string } | null>;
 };
 
 export type ArquivoRecebido = { mime: string | null; caminho: string | null; erro: string | null };
@@ -162,7 +205,10 @@ async function enviarEmFluxoParaBucket(
 }
 
 /** Lê o corpo até o teto; passou do teto, cancela e devolve null. */
-async function lerComTeto(corpo: ReadableStream<Uint8Array>, teto: number): Promise<Uint8Array | null> {
+async function lerComTeto(
+  corpo: ReadableStream<Uint8Array>,
+  teto: number,
+): Promise<Uint8Array | null> {
   const leitor = corpo.getReader();
   const partes: Uint8Array[] = [];
   let total = 0;
@@ -203,8 +249,13 @@ export async function receberArquivoWhatsapp(
 ): Promise<ArquivoRecebido> {
   const fetchFn = deps.fetchFn ?? fetch;
   try {
-    const { url, mime: mimeMeta } = await metaFetchMediaUrl(entrada.mediaId, entrada.accessToken, fetchFn);
-    if (!url) return { mime: mimeMeta, caminho: null, erro: "URL do arquivo não retornada pela Meta" };
+    const { url, mime: mimeMeta } = await metaFetchMediaUrl(
+      entrada.mediaId,
+      entrada.accessToken,
+      fetchFn,
+    );
+    if (!url)
+      return { mime: mimeMeta, caminho: null, erro: "URL do arquivo não retornada pela Meta" };
     const res = await fetchFn(url, { headers: { Authorization: `Bearer ${entrada.accessToken}` } });
     if (!res.ok || !res.body) throw new Error(`Falha ao baixar arquivo (${res.status})`);
     const mimeBruto = res.headers.get("content-type") ?? mimeMeta ?? entrada.mimeInformado ?? null;
@@ -214,7 +265,11 @@ export async function receberArquivoWhatsapp(
       tipoMimeAceito(entrada.tipo, entrada.mimeInformado);
     if (!mime) {
       await res.body.cancel().catch(() => {});
-      return { mime: mimeBruto, caminho: null, erro: `Tipo de arquivo não guardado: ${mimeBruto ?? "?"}` };
+      return {
+        mime: mimeBruto,
+        caminho: null,
+        erro: `Tipo de arquivo não guardado: ${mimeBruto ?? "?"}`,
+      };
     }
     const limite = limiteDeBytes(entrada.tipo);
     const tamanho = Number(res.headers.get("content-length"));
@@ -223,10 +278,19 @@ export async function receberArquivoWhatsapp(
       await res.body.cancel().catch(() => {});
       return { mime, caminho: null, erro: "Arquivo acima do limite de tamanho" };
     }
-    const caminho = caminhoDaMidia({ clinicaId: entrada.clinicaId, waMessageId: entrada.waMessageId, mime });
+    const caminho = caminhoDaMidia({
+      clinicaId: entrada.clinicaId,
+      waMessageId: entrada.waMessageId,
+      mime,
+    });
     let falha: { message: string } | null;
     if (tamanhoConhecido) {
-      falha = await (deps.enviarEmFluxo ?? enviarEmFluxoParaBucket)(caminho, res.body, mime, tamanho);
+      falha = await (deps.enviarEmFluxo ?? enviarEmFluxoParaBucket)(
+        caminho,
+        res.body,
+        mime,
+        tamanho,
+      );
     } else {
       const bytes = await lerComTeto(res.body, limite);
       if (!bytes) return { mime, caminho: null, erro: "Arquivo acima do limite de tamanho" };
@@ -262,8 +326,13 @@ export async function guardarMidiaEnviada(
 ): Promise<string | null> {
   try {
     const mime = tipoMimeAceito(entrada.tipo, entrada.mime);
-    if (!mime || entrada.bytes.length === 0 || entrada.bytes.length > limiteDeBytes(entrada.tipo)) return null;
-    const caminho = caminhoDaMidia({ clinicaId: entrada.clinicaId, waMessageId: entrada.waMessageId, mime });
+    if (!mime || entrada.bytes.length === 0 || entrada.bytes.length > limiteDeBytes(entrada.tipo))
+      return null;
+    const caminho = caminhoDaMidia({
+      clinicaId: entrada.clinicaId,
+      waMessageId: entrada.waMessageId,
+      mime,
+    });
     const falha = await (deps.armazenar ?? armazenarNoBucket)(caminho, entrada.bytes, mime);
     if (falha) {
       console.error("[whatsapp-midia] cópia da mídia enviada falhou", falha.message);
@@ -290,36 +359,46 @@ async function ligarMidiaNaMensagem(mensagemId: string, caminho: string) {
 }
 
 /** Lê a imagem com IA só para identificar pedido médico. Qualquer falha vira "outro" (atendente). */
-export async function lerPedidoNaImagem(base64: string, mime: string): Promise<LeituraImagem> {
+export async function lerPedidoNaImagem(
+  base64: string,
+  mime: string,
+  registrar?: RegistrarChamadaIA,
+): Promise<LeituraImagem> {
   const key = process.env.LOVABLE_API_KEY;
-  if (!key) return { tipo: "outro" };
+  if (!key) return { tipo: "falha_tecnica", motivo: "configuracao" };
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: PROMPT_LEITURA_IMAGEM },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Leia esta imagem:" },
-              { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
-            ],
-          },
-        ],
-      }),
-    });
+    const res = await fetchComAuditoriaIA(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: PROMPT_LEITURA_IMAGEM },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Leia esta imagem:" },
+                { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
+              ],
+            },
+          ],
+        }),
+      },
+      { finalidade: "leitura_imagem", modelo: "google/gemini-2.5-flash" },
+      registrar,
+    );
     if (!res.ok) {
       console.error("[whatsapp-midia] leitura de imagem falhou", res.status);
-      return { tipo: "outro" };
+      return { tipo: "falha_tecnica", motivo: "provedor" };
     }
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     return interpretarLeituraImagem(json.choices?.[0]?.message?.content);
   } catch (e) {
     console.error("[whatsapp-midia] leitura de imagem exception", e);
-    return { tipo: "outro" };
+    return { tipo: "falha_tecnica", motivo: "provedor" };
   }
 }
 
@@ -352,7 +431,10 @@ export async function limparMidiasExpiradas(
   await admin
     .from("whatsapp_mensagens")
     .update({ media_url: null })
-    .in("id", data.map((m) => m.id));
+    .in(
+      "id",
+      data.map((m) => m.id),
+    );
   return data.length;
 }
 
@@ -369,6 +451,7 @@ function formatoDeMime(mime: string | null): string {
 export async function transcreverAudioBase64(
   base64: string,
   mime: string | null,
+  registrar?: RegistrarChamadaIA,
 ): Promise<{ texto: string; erro: string | null }> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) return { texto: "", erro: "LOVABLE_API_KEY ausente" };
@@ -379,26 +462,32 @@ VOCABULÁRIO ESPERADO (prefira estas grafias quando o som for parecido): ${VOCAB
 Se o áudio estiver inaudível ou vazio, responda exatamente: (inaudível)`;
 
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: sys },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Transcreva este áudio:" },
-              {
-                type: "input_audio",
-                input_audio: { data: base64, format: formatoDeMime(mime) },
-              },
-            ],
-          },
-        ],
-      }),
-    });
+    const res = await fetchComAuditoriaIA(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: sys },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Transcreva este áudio:" },
+                {
+                  type: "input_audio",
+                  input_audio: { data: base64, format: formatoDeMime(mime) },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+      { finalidade: "transcricao_audio", modelo: "google/gemini-2.5-flash" },
+      registrar,
+    );
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("transcrever audio whatsapp erro", res.status, body);
@@ -438,6 +527,7 @@ export async function transcreverAudioWhatsapp(
  */
 export const CHAVES_TEMPLATE_MIDIA: Record<string, string> = {
   image: "midia.imagem",
+  image_receita: "midia.receita_remedio",
   document: "midia.documento",
   sticker: "midia.figurinha",
 };

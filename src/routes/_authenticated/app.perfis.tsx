@@ -104,6 +104,13 @@ const PERFIS: Array<{
       "Gestão financeira completa: contas a pagar/receber, conciliação bancária, relatórios e BI.",
   },
   {
+    key: "supervisor",
+    nome: "SUPERVISOR",
+    icon: UserCog,
+    descricao:
+      "Gestão operacional e supervisão da unidade: acompanha equipe, indicadores, agendas e filas, sem acesso a dados financeiros e configurações do sistema.",
+  },
+  {
     key: "enfermeiro",
     nome: "ENFERMEIRO",
     icon: HeartPulse,
@@ -649,6 +656,13 @@ const GRUPOS_BASE: Grupo[] = [
         descricao: "Treinamento de atendentes (ver = só o próprio; editar = painel da gestora)",
         menu: "Treinamento › Coach WhatsApp",
       },
+      {
+        key: "francisco",
+        nome: "Francisco",
+        descricao:
+          "Acompanhamento de orçamentos, configuração e homologação; publicação exclusiva de administrador",
+        menu: "OS ZAP › Francisco",
+      },
     ],
   },
   {
@@ -748,6 +762,12 @@ const ALCADAS: ReadonlyArray<{ escopo: EscopoAutorizacao; nome: string; descrica
     escopo: "alerta_critico",
     nome: "Alerta crítico do paciente",
     descricao: "Marcar ou retirar aviso jurídico no cadastro do paciente.",
+  },
+  {
+    escopo: "credito_clinica",
+    nome: "Revisar Crédito na clínica",
+    descricao:
+      "Definir o novo limite do Crédito na clínica do titular na revisão de 6 meses (só por pessoa).",
   },
 ];
 

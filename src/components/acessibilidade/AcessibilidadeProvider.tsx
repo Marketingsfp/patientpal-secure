@@ -23,6 +23,7 @@ type Ctx = {
   prefs: A11yPrefs;
   set: <K extends keyof A11yPrefs>(chave: K, valor: A11yPrefs[K]) => void;
   restaurarPadrao: () => void;
+  ajustar: (patch: Partial<A11yPrefs>) => void;
   /** Anuncia um texto para leitores de tela (região aria-live educada). */
   anunciar: (texto: string, assertivo?: boolean) => void;
 };
@@ -38,6 +39,7 @@ export function useAcessibilidade(): Ctx {
       prefs: A11Y_DEFAULTS,
       set: () => {},
       restaurarPadrao: () => {},
+      ajustar: () => {},
       anunciar: () => {},
     };
   }
@@ -126,6 +128,18 @@ export function AcessibilidadeProvider({ children }: { children: ReactNode }) {
     void persistir(A11Y_DEFAULTS).catch(() => {});
   }, [persistir]);
 
+  // Um preset é uma única atualização; evita gravar várias versões parciais.
+  const ajustar = useCallback(
+    (patch: Partial<A11yPrefs>) => {
+      setPrefs((antes) => {
+        const novo = normalizarPrefs({ ...antes, ...patch });
+        void persistir(novo).catch(() => {});
+        return novo;
+      });
+    },
+    [persistir],
+  );
+
   const anunciar = useCallback((texto: string, urgente = false) => {
     if (!texto) return;
     if (urgente) {
@@ -138,8 +152,8 @@ export function AcessibilidadeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ prefs, set, restaurarPadrao, anunciar }),
-    [prefs, set, restaurarPadrao, anunciar],
+    () => ({ prefs, set, restaurarPadrao, ajustar, anunciar }),
+    [prefs, set, restaurarPadrao, ajustar, anunciar],
   );
 
   return (

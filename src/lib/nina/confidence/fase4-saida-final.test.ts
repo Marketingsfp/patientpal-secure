@@ -12,10 +12,7 @@ import { montarContextoCanonico, type EntradaContextoCanonico } from "./contexto
 import { avaliarContrato } from "./avaliacao-regras";
 import { configuracaoPadrao } from "./configuracao";
 import { pontuarContrato } from "./pontuacao-contrato";
-import {
-  AVISO_ENCAMINHAMENTO_HUMANO,
-  AVISO_ENCAMINHAMENTO_SIMULADO,
-} from "./baixa-confiabilidade";
+import { AVISO_ENCAMINHAMENTO_HUMANO, AVISO_ENCAMINHAMENTO_SIMULADO } from "./baixa-confiabilidade";
 import {
   chaveIdempotente,
   decidirSaidaFinal,
@@ -240,11 +237,7 @@ describe("5. concorrência, retry, timeout e falhas de infraestrutura", () => {
         consulta: { confirmado: true, comprovante: "fila-existente" },
       }),
     });
-    expect(reg.map((r) => r.porta)).toEqual([
-      "entrarNaFilaHumana",
-      "consultarFila",
-      "enviarAviso",
-    ]);
+    expect(reg.map((r) => r.porta)).toEqual(["entrarNaFilaHumana", "consultarFila", "enviarAviso"]);
     expect(s.encaminhamento?.comprovanteFila).toBe("fila-existente");
   });
 

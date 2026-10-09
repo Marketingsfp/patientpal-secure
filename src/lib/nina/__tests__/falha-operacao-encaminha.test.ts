@@ -16,7 +16,9 @@ describe("falha de operação vai para a equipe", () => {
 
   test("seleção feita sem continuação do cadastro devolve a vez ao modelo, sem aviso falso", () => {
     const turno = ler("../../whatsapp.server.ts");
-    expect(turno).toContain("resumoEscolha = await continuarAgendamento?.(true) ?? null;");
+    expect(turno).toMatch(
+      /resumoEscolha\s*=\s*\(?await\s+continuarAgendamento\?\.\(true\)\)?\s*\?\?\s*null;/,
+    );
     expect(turno).toContain("CHAMADA_NAO_EXECUTADA");
   });
 });

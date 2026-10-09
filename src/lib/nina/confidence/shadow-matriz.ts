@@ -76,7 +76,6 @@ const fatoServicoCardiologia = {
   fonte: "catalogo_publicado" as const,
 };
 
-
 export const CENARIOS_SHADOW: CenarioShadow[] = [
   {
     id: "pergunta-simples-correta",
@@ -210,7 +209,12 @@ export const CENARIOS_SHADOW: CenarioShadow[] = [
       ferramentas: [
         agendaOk,
         { nome: "agendar", capacidade: "createAppointment", fonte: "agenda", success: true },
-        { nome: "identificar_paciente", capacidade: "getPatient", fonte: "cadastro", success: true },
+        {
+          nome: "identificar_paciente",
+          capacidade: "getPatient",
+          fonte: "cadastro",
+          success: true,
+        },
       ],
       fatos: [
         {

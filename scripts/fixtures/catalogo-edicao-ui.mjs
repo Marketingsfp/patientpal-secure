@@ -111,18 +111,28 @@ try {
 
   await page.goto(String(url));
   await page.getByRole("button", { name: "Editar vários com IA", exact: true }).click();
-  await page.getByLabel("O que deseja alterar?").fill("Altere o dinheiro da mamografia para 180 e a quinta-feira da Dra. Ana para 14:30.");
+  await page
+    .getByLabel("O que deseja alterar?")
+    .fill("Altere o dinheiro da mamografia para 180 e a quinta-feira da Dra. Ana para 14:30.");
   await page.getByRole("button", { name: "Preparar alterações", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Confirmar e publicar 2 selecionado(s)", exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Confirmar e publicar 2 selecionado(s)", exact: true }),
+  ).toBeEnabled();
   expect(await saves()).toHaveLength(0);
   await page.getByRole("checkbox", { name: /Dra. Ana/ }).uncheck();
-  await page.getByRole("button", { name: "Confirmar e publicar 1 selecionado(s)", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Confirmar e publicar 1 selecionado(s)", exact: true })
+    .click();
   await expect(page.getByRole("checkbox", { name: /Mamografia.*Publicado/ })).toBeDisabled();
-  expect((await saves()).map(i => i.tipo)).toEqual(["servico"]);
-  await expect(page.getByRole("button", { name: "Confirmar e publicar 0 selecionado(s)", exact: true })).toBeDisabled();
+  expect((await saves()).map((i) => i.tipo)).toEqual(["servico"]);
+  await expect(
+    page.getByRole("button", { name: "Confirmar e publicar 0 selecionado(s)", exact: true }),
+  ).toBeDisabled();
   console.log("PASS lote misto, seleção parcial e proteção contra republicação");
 
-  await page.getByLabel("O que deseja alterar?").fill("Pedido ambiguo: mudar cardiologia para 130 reais.");
+  await page
+    .getByLabel("O que deseja alterar?")
+    .fill("Pedido ambiguo: mudar cardiologia para 130 reais.");
   await page.getByRole("button", { name: "Preparar alterações", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("qual médico");
   await expect(page.getByRole("checkbox")).toHaveCount(0);
@@ -133,7 +143,9 @@ try {
   await expect(
     page.getByRole("button", { name: "Criar ou editar com IA", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Editar vários com IA", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Editar vários com IA", exact: true })).toHaveCount(
+    0,
+  );
   expect(erros).toEqual([]);
   console.log("PASS perfil somente leitura; sem erros de renderização");
 } finally {

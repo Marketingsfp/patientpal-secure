@@ -26,6 +26,14 @@ export interface MiniLineChartProps {
   formatY?: (n: number) => string;
 }
 
+/** Espaço reservado por rótulo do eixo X, em px. */
+const LARGURA_ROTULO = 110;
+const MAX_CARACTERES_ROTULO = 14;
+
+function encurtar(s: string): string {
+  return s.length > MAX_CARACTERES_ROTULO ? s.slice(0, MAX_CARACTERES_ROTULO - 1) + "…" : s;
+}
+
 /**
  * Gráfico de linha minimalista baseado em uPlot.
  * Mantém a API próxima da que tínhamos com Recharts (data + dataKey),
@@ -68,7 +76,15 @@ export function MiniLineChart({
         {
           stroke: "currentColor",
           grid: { stroke: "rgba(125,125,125,0.15)" },
-          values: (_u, ticks) => ticks.map((t) => labels[Math.round(t)] ?? ""),
+          // Marcas só nos índices inteiros, pulando de N em N quando não cabe.
+          // Antes o uPlot punha marcas em 0,5; 1,5… e o arredondamento repetia
+          // cada rótulo — nomes longos (médicos no Cubo BI) viravam um borrão.
+          splits: (u) => {
+            const porRotulo = Math.max(1, Math.floor(u.width / LARGURA_ROTULO));
+            const passo = Math.max(1, Math.ceil(labels.length / porRotulo));
+            return xs.filter((i) => i % passo === 0);
+          },
+          values: (_u, ticks) => ticks.map((t) => encurtar(labels[t] ?? "")),
         },
         {
           stroke: "currentColor",
@@ -77,7 +93,8 @@ export function MiniLineChart({
         },
       ],
       series: [
-        { label: "x" },
+        // Na legenda, o rótulo inteiro (o eixo mostra encurtado).
+        { label: "", value: (_u: uPlot, v: number | null) => (v == null ? "" : (labels[v] ?? "")) },
         ...linhas.map((l) => ({
           label: l.name,
           stroke: l.color,

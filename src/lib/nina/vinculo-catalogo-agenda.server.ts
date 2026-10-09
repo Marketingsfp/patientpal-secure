@@ -6,7 +6,10 @@ import { normalizar } from "@/lib/nina-especialidade";
 import { registrarEtapa } from "./evidencias.server";
 import type { RegistroConhecimento } from "./knowledge-contract";
 import { atendimentosEstruturados, modalidadeEstruturada } from "./catalogo-estrutura";
-import { selecionarAtendimentosConsulta, type EscopoAtendimentoConsulta } from "./atendimento-consulta";
+import {
+  selecionarAtendimentosConsulta,
+  type EscopoAtendimentoConsulta,
+} from "./atendimento-consulta";
 import { servicoParaRegistro, type ServicoPublicado } from "./catalogo-conhecimento";
 import type { AtendimentoPublicado } from "./catalogo-estrutura";
 
@@ -109,14 +112,19 @@ function origemVinculo(profissional: ProfissionalCatalogo, resolucao: ResolucaoM
  * somente ID operacional ou nome oficial completo, sem busca aproximada.
  * As publicações recebidas já estão limitadas à clínica e ao atendimento. */
 export async function publicacaoDoMedicoAgenda(
-  clinicaId: string, termo: string, publicados: ProfissionalCatalogo[],
+  clinicaId: string,
+  termo: string,
+  publicados: ProfissionalCatalogo[],
 ): Promise<string | null> {
   if (!publicados.length) return null;
   const cadastros = await medicosDaClinica(clinicaId);
-  const oficiais = cadastros.filter(m => m.ativo &&
-    (m.id.toLowerCase() === termo.toLowerCase() || normalizar(m.nome) === normalizar(termo)));
+  const oficiais = cadastros.filter(
+    (m) =>
+      m.ativo &&
+      (m.id.toLowerCase() === termo.toLowerCase() || normalizar(m.nome) === normalizar(termo)),
+  );
   if (oficiais.length !== 1) return null;
-  const vinculados = publicados.filter(p => {
+  const vinculados = publicados.filter((p) => {
     const r = resolverPublicado(p, cadastros);
     return r.ok && r.id === oficiais[0]!.id;
   });
@@ -124,10 +132,14 @@ export async function publicacaoDoMedicoAgenda(
 }
 
 /** A mesma resolução de identidade do catálogo é usada para ler a modalidade. */
-export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: string, escopo?: EscopoAtendimentoConsulta) {
+export async function modalidadePublicadaDoMedico(
+  clinicaId: string,
+  medicoId: string,
+  escopo?: EscopoAtendimentoConsulta,
+) {
   const leitura = await catalogoDoTurno(clinicaId);
   if (escopo?.procedimentoId) {
-    const data = leitura.servicos.find(s => s.id === escopo.procedimentoId);
+    const data = leitura.servicos.find((s) => s.id === escopo.procedimentoId);
     // O ID da publicação preserva a identidade mesmo após renomear o serviço.
     if (!data) return "nao_definida" as const;
     const servico = data as ServicoPublicado;
@@ -143,39 +155,65 @@ export async function modalidadePublicadaDoMedico(clinicaId: string, medicoId: s
     const itens = (registro.extras?.atendimentos_publicados ?? []) as AtendimentoPublicado[];
     const selecionados: AtendimentoPublicado[] = [];
     for (const item of itens) {
-      if (!item.profissional || nomesVinculados.includes(normalizar(item.profissional))) selecionados.push(item);
+      if (!item.profissional || nomesVinculados.includes(normalizar(item.profissional)))
+        selecionados.push(item);
       else {
         const r = await resolverMedicoAgenda(clinicaId, item.profissional);
         if (r.ok && r.id === medicoId) selecionados.push(item);
       }
     }
     if (!selecionados.length) return "nao_definida" as const;
-    return modalidadeEstruturada(servico.descricao_publica, servico.estrutura, "", null, selecionados);
+    return modalidadeEstruturada(
+      servico.descricao_publica,
+      servico.estrutura,
+      "",
+      null,
+      selecionados,
+    );
   }
   const ativos = await medicosDaClinica(clinicaId);
   const catalogo = leitura.profissionais;
   const cadastros = await incluirCadastrosVinculados(clinicaId, ativos, catalogo);
-  const vinculados = catalogo.filter(p => {
+  const vinculados = catalogo.filter((p) => {
     const r = resolverPublicado(p, cadastros);
     return r.ok && r.id === medicoId;
   });
-  const modos = vinculados.flatMap(p => {
+  const modos = vinculados.flatMap((p) => {
     const itens = atendimentosEstruturados(p.observacao_publica, p.estrutura, p.nome);
-    let selecionados = escopo && itens.length ? selecionarAtendimentosConsulta(itens, escopo) : undefined;
+    let selecionados =
+      escopo && itens.length ? selecionarAtendimentosConsulta(itens, escopo) : undefined;
     if (selecionados && !selecionados.length && escopo?.referencias?.length) {
       // "pré-natal" ou o nome do médico podem ser o termo da pesquisa,
       // enquanto a referência identifica Consulta Obstétrica. Revalide apenas
       // referências do mesmo registro; nunca presuma a modalidade do médico.
-      selecionados = [...new Set(escopo.referencias.filter(r => r.registro === p.id && r.procedimento)
-        .flatMap(r => selecionarAtendimentosConsulta(itens, { atendimento: r.procedimento!, preferencia: escopo.preferencia })))];
+      selecionados = [
+        ...new Set(
+          escopo.referencias
+            .filter((r) => r.registro === p.id && r.procedimento)
+            .flatMap((r) =>
+              selecionarAtendimentosConsulta(itens, {
+                atendimento: r.procedimento!,
+                preferencia: escopo.preferencia,
+              }),
+            ),
+        ),
+      ];
     }
     if (selecionados && !selecionados.length) return [];
-    return [modalidadeEstruturada(p.observacao_publica, p.estrutura, p.nome, p.tipo_atendimento, selecionados)];
+    return [
+      modalidadeEstruturada(
+        p.observacao_publica,
+        p.estrutura,
+        p.nome,
+        p.tipo_atendimento,
+        selecionados,
+      ),
+    ];
   });
   if (escopo && vinculados.length && !modos.length) return "nao_definida" as const;
   if (modos.includes("nao_definida")) return "nao_definida";
-  const definidos = [...new Set(modos.filter(m => m !== null))];
-  return definidos.length > 1 ? "nao_definida" : definidos[0] ?? null;
+  const definidos = [...new Set(modos.filter((m) => m !== null))];
+  return definidos.length > 1 ? "nao_definida" : (definidos[0] ?? null);
 }
 
 /** Aceita o UUID operacional, nome ou um UUID de profissional publicado.
@@ -191,7 +229,7 @@ export async function resolverMedicoAgenda(
   if (operacional) return { ok: true, ...operacional, candidatosOficiais: medicos };
 
   const leitura = await catalogoDoTurno(clinicaId);
-  const data = leitura.profissionais.find(p => p.id.toLowerCase() === termo.toLowerCase());
+  const data = leitura.profissionais.find((p) => p.id.toLowerCase() === termo.toLowerCase());
   if (!data) return { ok: false, opcoes: [] };
   const resultado = resolverPublicado(
     data,
@@ -227,7 +265,9 @@ export async function vincularProfissionaisCatalogo(
   if (!profissionais.length) return [];
   const leitura = await catalogoDoTurno(clinicaId);
   const cadastros = await medicosDaClinica(clinicaId);
-  const catalogo = { data: leitura.profissionais.filter(p => profissionais.some(r => r.id === p.id)) };
+  const catalogo = {
+    data: leitura.profissionais.filter((p) => profissionais.some((r) => r.id === p.id)),
+  };
   const publicados = new Map(catalogo.data.map((p) => [p.id, p]));
   const cadastrosVinculados = await incluirCadastrosVinculados(clinicaId, cadastros, catalogo.data);
   const vinculos = profissionais.map((r) => {

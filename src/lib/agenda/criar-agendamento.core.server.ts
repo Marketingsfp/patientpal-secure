@@ -196,7 +196,9 @@ export async function criarAgendamentoCore(
       recursoId
         ? supabase
             .from("medico_agendas")
-            .select("id, nome, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))")
+            .select(
+              "id, nome, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))",
+            )
             .eq("clinica_id", clinica_id)
             .eq("medico_id", recursoId)
             .then((r) => (r.error ? null : (r.data as unknown as AgendaComTipos[])))
@@ -234,17 +236,33 @@ export async function criarAgendamentoCore(
   // otimista no UPDATE, fechando a janela entre "validei que está livre" e
   // "gravei o agendamento".
   let slotPacienteNomeNaValidacao: string | null = null;
+  // Linha nova que cai numa vaga livre da grade: a vaga é OCUPADA (UPDATE),
+  // não fica ao lado. Antes a marcação vinda do site/API (sempre sem
+  // `editing_id`) era inserida como linha à parte, sem agenda — a vaga das
+  // 13:30 seguia "DISPONÍVEL" embaixo da paciente e a ficha dela formava uma
+  // fila própria (06/10/2026, Dr. Paulo Roberto).
+  let vagaOcupadaNaCriacao: { id: string; paciente_nome: string } | null = null;
   // A Nina converte exclusivamente a vaga escolhida e confirmada. Mesmo que
   // o intervalo não mude (edição de DISPONIVEL), revalida a ocupação e passa
   // a condição otimista para a RPC: outro atendimento não pode ser sobrescrito.
   if (ctx.ator.tipo === "integracao" && ctx.ator.api_key_id === "nina-ai") {
-    if (!editing_id || !atual || atual.paciente_id ||
+    if (
+      !editing_id ||
+      !atual ||
+      atual.paciente_id ||
       normalizarLocal(atual.paciente_nome ?? "").trim() !== "disponivel" ||
-      atual.status === "cancelado" || atual.medico_id !== payload.medico_id ||
-      Date.parse(atual.inicio) !== di.getTime() || Date.parse(atual.fim) !== df.getTime()) {
-      return { ok: false, validation_error: {
-        message: "O horário confirmado não está mais disponível. Nenhum outro horário foi reservado.",
-      } };
+      atual.status === "cancelado" ||
+      atual.medico_id !== payload.medico_id ||
+      Date.parse(atual.inicio) !== di.getTime() ||
+      Date.parse(atual.fim) !== df.getTime()
+    ) {
+      return {
+        ok: false,
+        validation_error: {
+          message:
+            "O horário confirmado não está mais disponível. Nenhum outro horário foi reservado.",
+        },
+      };
     }
     slotPacienteNomeNaValidacao = atual.paciente_nome;
   }
@@ -290,6 +308,17 @@ export async function criarAgendamentoCore(
     // (duas fichas no mesmo horário com o mesmo médico). Com profissional
     // diferente vira aviso: a tela pergunta e, confirmando, reenvia com
     // `confirmacoes.permitir_conflito_paciente`.
+    //
+    // MESMO profissional (revisto em 2026-10-06). O bloqueio duro impedia a
+    // recepção de dar várias fichas ao mesmo paciente no dia quando as vagas
+    // livres eram as fichas extras do "+ Mais fichas" — elas nascem todas no
+    // último horário do turno, 1 segundo uma da outra, e portanto "cruzam" a
+    // ficha que o paciente já tem. Caso real: ADRIANA SOUZA DE PAULA MARTINS,
+    // 4 infiltrações com o Dr. Paulo Roberto em 06/10/2026; a 3ª e a 4ª foram
+    // parar em 07/10 e 08/10. Agora a tela pergunta se é OUTRO procedimento e,
+    // confirmando, reenvia com `permitir_conflito_mesmo_profissional`. Nina e
+    // API não têm como perguntar e não mandam esse flag: para elas o choque
+    // com o mesmo profissional continua bloqueado.
     const conflitos_ = (conflitos ?? []) as Array<{
       id: string;
       inicio: string;
@@ -303,14 +332,20 @@ export async function criarAgendamentoCore(
     if (conflito) {
       const quando = new Date(conflito.inicio).toLocaleString("pt-BR", { timeZone: TZ_CLINICA });
       if (mesmoProfissional) {
-        return {
-          ok: false,
-          validation_error: {
-            message: `Este paciente já tem outro agendamento nesse horário com o mesmo profissional (${quando}). Escolha outro horário ou cancele o conflito primeiro.`,
-          },
-        };
-      }
-      if (!data.confirmacoes?.permitir_conflito_paciente) {
+        if (!data.confirmacoes?.permitir_conflito_mesmo_profissional) {
+          return {
+            ok: false,
+            validation_error: {
+              message:
+                `Este paciente já tem uma ficha com este mesmo profissional nesse horário (${quando}).\n\n` +
+                `É OUTRO procedimento (por exemplo, mais uma infiltração ou outro exame)? ` +
+                `Confirmando, o paciente fica com mais uma ficha no mesmo dia.\n\n` +
+                `Se for a mesma marcação repetida, cancele e abra a ficha que já existe.`,
+              confirmavel: "conflito_mesmo_profissional",
+            },
+          };
+        }
+      } else if (!data.confirmacoes?.permitir_conflito_paciente) {
         return {
           ok: false,
           validation_error: {
@@ -372,6 +407,9 @@ export async function criarAgendamentoCore(
       const sFim = new Date(s.fim).getTime();
       return sIni <= inicioMs && sFim >= fimMs;
     });
+    if (!editing_id && slotEscolhido) {
+      vagaOcupadaNaCriacao = { id: slotEscolhido.id, paciente_nome: slotEscolhido.paciente_nome };
+    }
     // ENCAIXE EM AGENDA DE HORA MARCADA (2026-09-09)
     // Sem vaga livre cobrindo o intervalo, isto era um bloqueio duro e a
     // recepção não conseguia colocar um paciente a mais em cima de uma ficha
@@ -537,7 +575,13 @@ export async function criarAgendamentoCore(
   }
 
   // ---------- 6. INSERT ou UPDATE do agendamento ----------
-  let novoId: string | null = editing_id;
+  // Vaga livre encontrada na validação vira o alvo do UPDATE, com a mesma
+  // trava otimista da edição (o nome "DISPONIVEL" tem que continuar lá).
+  const idParaGravar = editing_id ?? vagaOcupadaNaCriacao?.id ?? null;
+  const nomeEsperadoNoSlot = editing_id
+    ? slotPacienteNomeNaValidacao
+    : (vagaOcupadaNaCriacao?.paciente_nome ?? null);
+  let novoId: string | null = idParaGravar;
   let siblingIds: string[] = [];
   const conflitoDeSlot: CriarAgendamentoResult = {
     ok: false,
@@ -551,7 +595,7 @@ export async function criarAgendamentoCore(
       (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.() ??
       Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 10)).join("-");
     const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_multi_imagem", {
-      _editing_id: editing_id,
+      _editing_id: idParaGravar,
       _clinica_id: clinica_id,
       _paciente_id: payload.paciente_id,
       _paciente_nome: payload.paciente_nome,
@@ -567,7 +611,7 @@ export async function criarAgendamentoCore(
       _forma_pagamento_prevista: payload.forma_pagamento_prevista,
       _especialidade_id: payload.especialidade_id ?? null,
       _grupo_id: grupoId,
-      _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+      _paciente_nome_esperado_no_slot: nomeEsperadoNoSlot,
       _orcamento_item_ids: pending_orc_item_ids,
     } as never);
     if (error) {
@@ -587,7 +631,7 @@ export async function criarAgendamentoCore(
     const procedimentoFinal =
       multiModo === "laboratorio" ? procedimentos.join(" + ") : payload.procedimento;
     const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_e_vincular_orcamento", {
-      _editing_id: editing_id,
+      _editing_id: idParaGravar,
       _clinica_id: clinica_id,
       _paciente_id: payload.paciente_id,
       _paciente_nome: payload.paciente_nome,
@@ -603,7 +647,7 @@ export async function criarAgendamentoCore(
       _forma_pagamento_prevista: payload.forma_pagamento_prevista,
       _especialidade_id: payload.especialidade_id ?? null,
       _orcamento_item_ids: pending_orc_item_ids,
-      _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+      _paciente_nome_esperado_no_slot: nomeEsperadoNoSlot,
     } as never);
     if (error) {
       if ((error as { code?: string }).code === "23505") return conflitoDeSlot;

@@ -15,6 +15,7 @@
  */
 
 import { removerEmojisNina } from "@/lib/nina/resposta/sem-emojis";
+import { formatarMensagemNina, REGRA_FORMATO_MOBILE } from "@/lib/nina/resposta/formato-mobile";
 
 /** Setores que podem ser citados ao paciente quando vierem estruturados. */
 export const SETORES_MENCIONAVEIS = [
@@ -153,7 +154,8 @@ export function validarMensagemHandoff(
   const citouSetor = SETORES_MENCIONAVEIS.some((s) => baixo.includes(s));
   if (citouSetor) {
     const permitidoNorm = (permitido ?? "").toLowerCase();
-    if (!permitido || !baixo.includes(permitidoNorm)) problemas.push("menciona setor não estruturado");
+    if (!permitido || !baixo.includes(permitidoNorm))
+      problemas.push("menciona setor não estruturado");
   }
   if (t.length > 400) problemas.push("mensagem longa demais");
 
@@ -190,7 +192,7 @@ export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): str
       corpo = `${saudacao ? saudacao.charAt(0).toUpperCase() + saudacao.slice(1) : ""}vou encaminhar seu atendimento${sobre} para ${destino} continuar com você por aqui.`;
   }
   corpo = corpo.charAt(0).toUpperCase() + corpo.slice(1);
-  return removerEmojisNina(`${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`);
+  return formatarMensagemNina(`${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`);
 }
 
 /** Instrução do modelo para redigir a mensagem contextual. */
@@ -207,13 +209,16 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
       : `Você é a assistente virtual${ondeAtende}, falando por mensagem com o paciente.`,
     "Escreva UMA mensagem curta (até 3 linhas) avisando que o atendimento será encaminhado para a equipe humana.",
     "Regras obrigatórias:",
+    REGRA_FORMATO_MOBILE,
     "- emojis são proibidos em toda a mensagem; use apenas texto;",
     `- diga que vai encaminhar para ${destino};`,
     "- diga que o atendimento continua por aqui (mesmo canal);",
     `- termine com uma linha exatamente assim: Protocolo do atendimento: ${ctx.protocolo}`,
     "- nunca cite outro setor além do informado acima;",
     "- nunca cite erro técnico, ferramenta, sistema, base de dados ou modelo;",
-    "- tom acolhedor e natural, sem repetir frases prontas.",
+    "- tom acolhedor e natural, sem repetir frases prontas;",
+    "- a conversa já está em andamento: não cumprimente (sem Olá, Oi, Bom dia, Boa tarde ou Boa noite) e não se apresente de novo;",
+    "- use o nome no máximo uma vez e só se for um nome de pessoa; nunca use nomes como Lead, Teste, Paciente ou números.",
     ctx.nome ? `Nome do paciente: ${ctx.nome}` : "Nome do paciente: desconhecido",
     ctx.assunto ? `Assunto da conversa: ${ctx.assunto}` : "Assunto da conversa: não informado",
     `Motivo do encaminhamento (uso interno): ${ctx.motivo ?? "indefinido"}`,
@@ -228,9 +233,14 @@ export function classificarMotivoHandoff(motivoBruto?: string | null): MotivoHan
   const m = (motivoBruto ?? "").toLowerCase();
   if (!m) return "indefinido";
   if (/(agenda|marca|remarca|consulta|exame|horário|horario)/.test(m)) return "agendamento";
-  if (/(financ|pagam|boleto|valor|preço|preco|cobran|convênio|convenio)/.test(m)) return "financeiro";
+  if (/(financ|pagam|boleto|valor|preço|preco|cobran|convênio|convenio)/.test(m))
+    return "financeiro";
   if (/(human|atendente|pessoa|falar com)/.test(m)) return "pedido_do_paciente";
-  if (/(sem informa|não encontr|nao encontr|indisponí|indisponi|catálogo|catalogo|erro|falha|tool)/.test(m))
+  if (
+    /(sem informa|não encontr|nao encontr|indisponí|indisponi|catálogo|catalogo|erro|falha|tool)/.test(
+      m,
+    )
+  )
     return "informacao_indisponivel";
   return "indefinido";
 }

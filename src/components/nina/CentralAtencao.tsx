@@ -23,6 +23,7 @@ import { criarAgrupador } from "@/lib/atendimento/realtime-roteador";
 import { ouvirOutrasAbas } from "@/lib/atendimento/presenca-sync";
 import { AtendentesEmPausa } from "./AtendentesEmPausa";
 import { cn } from "@/lib/utils";
+import { CATEGORIAS_MOTIVO, type CategoriaMotivo } from "@/lib/nina/jev-motivo";
 
 const VAZIO: ResumoAtencao = {
   total: 0,
@@ -65,6 +66,8 @@ export function CentralAtencao() {
   const [aberto, setAberto] = useState(false);
   /** Categoria em foco dentro da própria Central (não filtra a Inbox). */
   const [categoria, setCategoria] = useState<CategoriaAtencao | null>(null);
+  /** Filtro pela categoria do motivo da transferência (Jev). */
+  const [motivo, setMotivo] = useState<CategoriaMotivo | null>(null);
 
   const carregar = useCallback(async () => {
     const sequencia = ++sequenciaCarga.current;
@@ -100,6 +103,7 @@ export function CentralAtencao() {
 
   useEffect(() => {
     setCategoria(null);
+    setMotivo(null);
   }, [chaveContexto]);
 
   // Relógio único: reclassifica as faixas de espera sem consultar o banco.
@@ -148,10 +152,20 @@ export function CentralAtencao() {
   const pausas = dados?.chave === chaveContexto ? (dados.pausas ?? []) : [];
 
   // Prioridades: só esperas críticas (8 primeiras), ou a categoria escolhida.
+  const baseCategoria = useMemo(
+    () => itensDaCategoria(resumo.itens, categoria),
+    [resumo.itens, categoria],
+  );
+  const motivosPresentes = useMemo(() => {
+    const cont = new Map<CategoriaMotivo, number>();
+    for (const i of baseCategoria)
+      if (i.motivoCategoria) cont.set(i.motivoCategoria, (cont.get(i.motivoCategoria) ?? 0) + 1);
+    return [...cont.entries()];
+  }, [baseCategoria]);
   const lista = useMemo(() => {
-    const base = itensDaCategoria(resumo.itens, categoria);
-    return categoria ? base : base.slice(0, 8);
-  }, [resumo.itens, categoria]);
+    const base = motivo ? baseCategoria.filter((i) => i.motivoCategoria === motivo) : baseCategoria;
+    return categoria || motivo ? base : base.slice(0, 8);
+  }, [baseCategoria, categoria, motivo]);
 
   // Animação de entrada mais perceptível só quando SURGE algo crítico novo.
   const [novo, setNovo] = useState(false);
@@ -207,9 +221,7 @@ export function CentralAtencao() {
           className={cn(
             "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold",
             "will-change-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60",
-            alerta
-              ? "text-white shadow-sm"
-              : "bg-muted text-foreground hover:bg-accent",
+            alerta ? "text-white shadow-sm" : "bg-muted text-foreground hover:bg-accent",
             // Só transform/box-shadow/background: nada no cabeçalho se desloca.
             alerta && resumo.nivel === 1 && "central-atencao-n1",
             alerta && resumo.nivel === 2 && "central-atencao-n2",
@@ -242,9 +254,9 @@ export function CentralAtencao() {
 
       <PopoverContent
         align="start"
-        className="max-h-[var(--radix-popover-content-available-height)] w-[340px] max-w-[calc(100vw-1rem)] overflow-y-auto p-0"
+        className="oszap-attention max-h-[var(--radix-popover-content-available-height)] w-[420px] max-w-[calc(100vw-1rem)] overflow-y-auto p-0"
       >
-        <div className="border-b border-border px-3 py-2">
+        <div className="border-b border-border px-4 py-3">
           <p className="text-sm font-semibold">Central de Atenção</p>
           <p className="text-[11px] text-muted-foreground" aria-live="polite">
             {alerta
@@ -281,7 +293,7 @@ export function CentralAtencao() {
           />
         </div>
 
-        <div className="border-t border-border px-3 py-2">
+        <div className="border-t border-border px-4 py-3">
           <div className="mb-1 flex items-center gap-2">
             <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               {categoria ? tituloCategoria(categoria) : "Prioridades agora"}
@@ -296,6 +308,29 @@ export function CentralAtencao() {
               </button>
             )}
           </div>
+          {motivosPresentes.length > 0 && (
+            <div
+              className="mb-1.5 flex flex-wrap gap-1"
+              aria-label="Filtrar pelo motivo da transferência"
+            >
+              {motivosPresentes.map(([c, n]) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setMotivo((atual) => (atual === c ? null : c))}
+                  aria-pressed={motivo === c}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    motivo === c
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border hover:bg-muted",
+                  )}
+                >
+                  {CATEGORIAS_MOTIVO[c]} · {n}
+                </button>
+              ))}
+            </div>
+          )}
           {lista.length === 0 ? (
             <p className="py-2 text-xs text-muted-foreground">
               {categoria === "nao_atribuida_global" && resumo.naoAtribuidasGlobal > 0
@@ -303,7 +338,7 @@ export function CentralAtencao() {
                 : "Nenhuma pendência."}
             </p>
           ) : (
-            <ul className="max-h-64 space-y-0.5 overflow-y-auto">
+            <ul className="max-h-[min(16rem,45vh)] space-y-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin]">
               {lista.map((i) => (
                 <li key={i.id}>
                   <ItemLinha item={i} onClick={() => abrirConversa(i.id)} />
@@ -347,7 +382,7 @@ function LinhaCategoria({
       onClick={onClick}
       aria-pressed={Boolean(ativo)}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted",
+        "flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm hover:bg-muted",
         ativo && "bg-muted",
       )}
     >
@@ -383,15 +418,21 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted"
+      className="flex w-full items-center gap-2 rounded-lg border border-border/60 px-3 py-3 text-left hover:bg-muted"
     >
       <span
         aria-hidden
-        className={cn("h-2 w-2 shrink-0 rounded-full", critico ? "bg-destructive" : "bg-amber-500")}
+        className={cn(
+          "h-2 w-2 shrink-0 rounded-full",
+          critico || item.motivoCategoria === "urgencia_clinica"
+            ? "bg-destructive"
+            : "bg-amber-500",
+        )}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium">{item.nome}</span>
-        <span className="block truncate text-[11px] text-muted-foreground">
+        <span className="block truncate text-sm font-semibold">{item.nome}</span>
+        <span className="block text-xs leading-5 text-muted-foreground">
+          {item.motivoCategoria ? `${CATEGORIAS_MOTIVO[item.motivoCategoria]} · ` : ""}
           {marca}
           {item.minutos > 0 ? ` • ${formatarEspera(item.minutos)}` : ""}
         </span>

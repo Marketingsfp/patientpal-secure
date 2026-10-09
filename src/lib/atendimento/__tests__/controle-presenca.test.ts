@@ -50,7 +50,10 @@ describe("FASE 3 — controle manual de presença", () => {
   });
 
   test("sucesso: só após confirmação o estado muda e o recebimento abre", () => {
-    const e = aoConfirmar(aoIniciarGravacao(aoCarregar(CONTROLE_INICIAL, "OFFLINE"), "ONLINE"), "ONLINE");
+    const e = aoConfirmar(
+      aoIniciarGravacao(aoCarregar(CONTROLE_INICIAL, "OFFLINE"), "ONLINE"),
+      "ONLINE",
+    );
     expect(opcaoSelecionada(e, "ONLINE")).toBe(true);
     expect(opcaoSelecionada(e, "OFFLINE")).toBe(false);
     expect(opcaoDesabilitada(e)).toBe(false);
@@ -70,7 +73,10 @@ describe("FASE 3 — controle manual de presença", () => {
   });
 
   test("falha permite nova tentativa explícita, que pode dar certo", () => {
-    const falhou = aoFalhar(aoIniciarGravacao(aoCarregar(CONTROLE_INICIAL, "OFFLINE"), "ONLINE"), "erro");
+    const falhou = aoFalhar(
+      aoIniciarGravacao(aoCarregar(CONTROLE_INICIAL, "OFFLINE"), "ONLINE"),
+      "erro",
+    );
     expect(opcaoDesabilitada(falhou)).toBe(false);
     const retry = aoConfirmar(aoIniciarGravacao(falhou, "ONLINE"), "ONLINE");
     expect(retry.erro).toBeNull();

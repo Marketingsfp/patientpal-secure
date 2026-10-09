@@ -116,7 +116,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Validação de assinatura",
     categoria: "VALIDACAO",
     descricao:
-      "Confere a assinatura HMAC-SHA256 do corpo com o app secret. Assinatura ausente ou inválida fica registrada no log do webhook como assinatura_invalida, mas a mensagem do paciente nunca é descartada.",
+      "Confere a assinatura HMAC-SHA256 dos bytes recebidos com o app secret. Assinatura ausente, malformada ou inválida (ou app secret não configurado) recusa o aviso com 401 antes de gravar mensagens, processar recibos ou chamar a Nina. O log técnico registra a recusa. A autenticação é obrigatória, inclusive quando a antiga variável WHATSAPP_WEBHOOK_ASSINATURA estiver definida como registrar.",
     arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
     funcao: "verifySignature",
     entrada: "Corpo bruto + cabeçalho de assinatura",
@@ -124,8 +124,8 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["message.log_raw"],
     seguintes: ["message.deduplicate", "status.update", "audio.transcribe"],
     erros: [
-      "assinatura inválida (registrada; a mensagem segue)",
-      "app secret ausente (registrado; a mensagem segue)",
+      "assinatura inválida (aviso recusado com 401; registrado no log)",
+      "app secret ausente (aviso recusado com 401; registrado no log)",
     ],
   },
   {
@@ -448,7 +448,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Filtro de decisão (Jev)",
     categoria: "IA",
     descricao:
-      "Igual em produção e homologação, ligado por fase na clínica. Fase 1 confirma a intenção da mensagem (com a opção “continuação” para respostas à última pergunta), com o histórico em ordem e as opções já oferecidas. Fase 2 encaminha para a equipe em urgência, pedido de atendente, irritação ou três mensagens seguidas que ele não consegue entender (pergunta própria de entendimento, não a confiança da intenção), sem avanço do atendimento, igual à CONV-04: até duas perguntas de esclarecimento antes de encaminhar (escolher uma opção oferecida não conta). Fase 3 escolhe a especialidade quando a busca não acha; fase 4 deixa sugestão de cadastro para a recepção. Erro ou demora mantém o fluxo normal.",
+      "Igual em produção e homologação, ligado por fase na clínica. Fase 1 confirma a intenção da mensagem (com a opção “continuação” para respostas à última pergunta), com o histórico em ordem e as opções já oferecidas. Fase 2 encaminha para a equipe em urgência, pedido de atendente, irritação ou duas mensagens seguidas sem entendimento e sem avanço: a primeira pede esclarecimento; a segunda encaminha. Escolher uma opção oferecida não conta como falha. Reprocessamentos e chamadas internas não são novas mensagens. Fase 3 escolhe a especialidade quando a busca não acha; fase 4 deixa sugestão de cadastro para a recepção. Erro ou demora mantém o fluxo normal.",
     arquivo: "src/lib/nina/jev.server.ts",
     funcao: "perguntarJev",
     servico: "Lovable AI Gateway (typesafe/jev-latest)",
@@ -485,8 +485,28 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
       "tool.business_hours",
       "tool.handoff",
       "llm.generate",
+      "tool.prefetch",
     ],
     erros: ["ferramenta desconhecida", "limite de rodadas atingido", "chamada repetida no turno"],
+  },
+  {
+    id: "tool.prefetch",
+    nome: "Pré-busca do cadastro",
+    categoria: "TOOLS",
+    descricao:
+      "Antes da 1ª chamada ao modelo, com intenção segura do Jev e um único atendimento citado, executa consultar_cadastro ou buscar_medicos pelo mesmo broker e entrega o resultado ao modelo. Flag nina_prefetch_cadastro (ligada sem registro).",
+    arquivo: "src/lib/nina/prefetch-cadastro.server.ts",
+    funcao: "executarPrefetchCadastro",
+    entrada: "Mensagem, intenção do Jev e catálogo do turno",
+    saida: "Resultados de ferramenta já executados",
+    anteriores: ["tool.execute"],
+    seguintes: [],
+    erros: [
+      "termo não identificado com segurança",
+      "passou do prazo de 2 s",
+      "ferramenta falhou",
+      "flag desligada",
+    ],
   },
   {
     id: "tool.catalog.lookup",
@@ -608,12 +628,26 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     entrada: "Motivo da transferência",
     saida: "Transferência solicitada",
     anteriores: ["tool.execute"],
-    seguintes: ["handoff.queue"],
+    seguintes: ["handoff.queue", "handoff.reason"],
     erros: ["conversa já atendida por humano"],
     ferramentas: ["solicitar_atendente_humano"],
   },
 
   // ───────────────────────── HANDOFF ─────────────────────────
+  {
+    id: "handoff.reason",
+    nome: "Motivo do encaminhamento",
+    categoria: "OBSERVABILIDADE",
+    descricao:
+      "Registra a causa concreta do encaminhamento e sua origem, preservando o diagnóstico para a equipe.",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "executarDecisaoEncaminhamento",
+    entrada: "Motivo e origem da decisão",
+    saida: "Causa registrada no rastreio do turno",
+    erros: ["falha ao gravar o motivo no rastreio"],
+    anteriores: ["tool.handoff"],
+    seguintes: ["handoff.queue"],
+  },
   {
     id: "handoff.queue",
     nome: "Transferência e fila",
@@ -624,7 +658,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     funcao: "encaminharParaHumano",
     entrada: "Conversa e motivo",
     saida: "Conversa aguardando atendimento humano",
-    anteriores: ["tool.handoff", "wait.timeout", "turn.watchdog", "jev.filtro"],
+    anteriores: ["tool.handoff", "handoff.reason", "wait.timeout", "turn.watchdog", "jev.filtro"],
     seguintes: ["handoff.assign", "handoff.summary"],
     tabelas: ["atend_conversas", "atend_conversa_eventos"],
     erros: ["nenhum atendente disponível"],
@@ -1275,13 +1309,13 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
 ];
 
 export const MANIFESTO_ARQUITETURA = {
-  versao: 6,
+  versao: 7,
   descricao:
     "Descrição estruturada da arquitetura real da Nina. Não executa nada e não substitui o código.",
   /** Modelo que o mapa declara para a Nina; a conferência compara com o código. */
   modelo: "google/gemini-3.8-flash",
   /** Última revisão completa do mapa contra o código (data ISO). */
-  revisadoEm: "2026-09-25",
+  revisadoEm: "2026-10-09",
   categorias: CATEGORIAS_ARQUITETURA,
   nodes: NODES_ARQUITETURA,
 } as const;

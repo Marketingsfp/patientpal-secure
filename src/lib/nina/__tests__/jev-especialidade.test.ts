@@ -6,19 +6,72 @@ import {
   perguntaEspecialidade,
 } from "../jev-especialidade";
 
-const SERVICOS = [{ nome: "USG ABDOMEN" }, { nome: "usg abdomen" }, { nome: "Ultrassonografía de tireoide" }];
-const PROFISSIONAIS = [{ especialidades: [{ nome: "ODONTOLOGIA" }, { nome: "PNEUMOLOGIA" }] }, { especialidades: null }];
+const SERVICOS = [
+  { nome: "USG ABDOMEN" },
+  { nome: "usg abdomen" },
+  { nome: "Ultrassonografía de tireoide" },
+];
+const PROFISSIONAIS = [
+  { especialidades: [{ nome: "ODONTOLOGIA" }, { nome: "PNEUMOLOGIA" }] },
+  { especialidades: null },
+];
 
 describe("Jev Fase 3 — especialidade", () => {
+  test("prioriza candidatos relevantes antes de limitar um catálogo grande", () => {
+    const servicos = Array.from({ length: 600 }, (_, i) => ({ nome: `HEMOGRAMA ${i}` }));
+    servicos.push({ nome: "DENSITOMETRIA DUO ENERGÉTICA" }, { nome: "DENSITOMETRIA ÓSSEA" });
+    const selecionadas = opcoesCatalogo(
+      servicos,
+      PROFISSIONAIS,
+      "exame_procedimento",
+      "densitometria óssea coluna lombar e colo de fêmur",
+    );
+    expect(selecionadas).toEqual(["DENSITOMETRIA ÓSSEA", "DENSITOMETRIA DUO ENERGÉTICA"]);
+    expect(opcoesCatalogo(servicos, [], "exame_procedimento", "hemograma")).toHaveLength(40);
+  });
+
+  test("reserva uma escolha para nenhuma e protege também chamadores legados", () => {
+    const servicos = Array.from({ length: 600 }, (_, i) => ({ nome: `SERVIÇO ${i}` }));
+    const selecionadas = opcoesCatalogo(
+      servicos,
+      [],
+      "exame_procedimento",
+      "nome popular desconhecido",
+    );
+    expect(selecionadas).toHaveLength(254);
+    const pergunta = perguntaEspecialidade(servicos.map((s) => s.nome)).especialidade as {
+      criteria: Record<string, unknown>;
+    };
+    expect(Object.keys(pergunta.criteria)).toHaveLength(255);
+    expect(pergunta.criteria.nenhuma).toBeDefined();
+    expect(opcoesCatalogo([{ nome: "nenhuma" }], [])).toHaveLength(0);
+  });
+
+  test("sem pista lexical mantém especialidades para interpretação de nomes populares", () => {
+    expect(opcoesCatalogo(SERVICOS, PROFISSIONAIS, "consulta", "médico do pulmão")).toEqual([
+      "ODONTOLOGIA",
+      "PNEUMOLOGIA",
+    ]);
+  });
   const opcoes = opcoesCatalogo(SERVICOS, PROFISSIONAIS);
 
   test("sem tipo definido: junta especialidades e serviços sem repetir", () => {
-    expect(opcoes).toEqual(["ODONTOLOGIA", "PNEUMOLOGIA", "USG ABDOMEN", "Ultrassonografía de tireoide"]);
-    expect(Object.keys((perguntaEspecialidade(opcoes).especialidade as any).criteria)).toContain("nenhuma");
+    expect(opcoes).toEqual([
+      "ODONTOLOGIA",
+      "PNEUMOLOGIA",
+      "USG ABDOMEN",
+      "Ultrassonografía de tireoide",
+    ]);
+    expect(Object.keys((perguntaEspecialidade(opcoes).especialidade as any).criteria)).toContain(
+      "nenhuma",
+    );
   });
 
   test("mesmo recorte da busca normal: consulta só especialidades; exame só serviços", () => {
-    expect(opcoesCatalogo(SERVICOS, PROFISSIONAIS, "consulta")).toEqual(["ODONTOLOGIA", "PNEUMOLOGIA"]);
+    expect(opcoesCatalogo(SERVICOS, PROFISSIONAIS, "consulta")).toEqual([
+      "ODONTOLOGIA",
+      "PNEUMOLOGIA",
+    ]);
     expect(opcoesCatalogo(SERVICOS, PROFISSIONAIS, "exame_procedimento")).toEqual([
       "USG ABDOMEN",
       "Ultrassonografía de tireoide",
@@ -26,15 +79,25 @@ describe("Jev Fase 3 — especialidade", () => {
   });
 
   test("repetição com acento diferente não vira outra opção", () => {
-    expect(opcoesCatalogo([{ nome: "Ultrassonografia" }, { nome: "ULTRASSONOGRAFÍA" }], [], "exame_procedimento")).toEqual([
-      "Ultrassonografia",
-    ]);
+    expect(
+      opcoesCatalogo(
+        [{ nome: "Ultrassonografia" }, { nome: "ULTRASSONOGRAFÍA" }],
+        [],
+        "exame_procedimento",
+      ),
+    ).toEqual(["Ultrassonografia"]);
   });
 
   test("o estado enviado ao Jev tem todos os campos que a pergunta cita", () => {
     const estado = estadoEspecialidade("pulmao", "quero marcar com médico do pulmão", "consulta");
-    expect(estado).toEqual({ pedido: "pulmao", mensagem_atual: "quero marcar com médico do pulmão", tipo_atendimento: "consulta" });
-    const instrucao = String((perguntaEspecialidade(["PNEUMOLOGIA"]).especialidade as any).instructions);
+    expect(estado).toEqual({
+      pedido: "pulmao",
+      mensagem_atual: "quero marcar com médico do pulmão",
+      tipo_atendimento: "consulta",
+    });
+    const instrucao = String(
+      (perguntaEspecialidade(["PNEUMOLOGIA"]).especialidade as any).instructions,
+    );
     for (const campo of Object.keys(estado)) expect(instrucao).toContain(`\`${campo}\``);
     expect(estadoEspecialidade("pulmao", null, undefined)).toEqual({
       pedido: "pulmao",
@@ -44,7 +107,9 @@ describe("Jev Fase 3 — especialidade", () => {
   });
 
   test("aplica só com confiança >= 0,8 e opção da lista", () => {
-    expect(especialidadeAplicavel({ choice: "ODONTOLOGIA", confidence: 0.9 }, opcoes)).toBe("ODONTOLOGIA");
+    expect(especialidadeAplicavel({ choice: "ODONTOLOGIA", confidence: 0.9 }, opcoes)).toBe(
+      "ODONTOLOGIA",
+    );
     expect(especialidadeAplicavel({ choice: "ODONTOLOGIA", confidence: 0.7 }, opcoes)).toBeNull();
     expect(especialidadeAplicavel({ choice: "nenhuma", confidence: 0.99 }, opcoes)).toBeNull();
     expect(especialidadeAplicavel({ choice: "INVENTADA", confidence: 0.99 }, opcoes)).toBeNull();

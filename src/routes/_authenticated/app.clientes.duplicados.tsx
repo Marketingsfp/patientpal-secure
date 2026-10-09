@@ -542,9 +542,7 @@ function DuplicadosPage() {
           >
             {loading ? "Carregando…" : "Carregar mais grupos"}
           </button>
-          <span className="text-xs text-muted-foreground">
-            {grupos.length} grupos carregados
-          </span>
+          <span className="text-xs text-muted-foreground">{grupos.length} grupos carregados</span>
         </div>
       )}
 

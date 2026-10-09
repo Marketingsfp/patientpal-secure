@@ -1,38 +1,73 @@
 /** Interpretação de escrita para buscar fatos publicados; nunca cria um atendimento. */
 import { normalizarBuscaCatalogo, termosItemCatalogo } from "./catalogo-sem-registro";
-import { REGRA_ESCLARECIMENTO_DUAS } from "./prompt/limite-esclarecimento";
+import { REGRA_IDENTIFICACAO_UNIFICADA } from "./identificacao-catalogo";
 import { REGRA_IDENTIDADE_ATENDIMENTO } from "./prompt/identidade-atendimento";
 
 // Equivalências de busca, não equivalências de preço, preparo ou modalidade.
 // Qualificadores (órgão, total/superior, infantil etc.) continuam obrigatórios.
 const GRUPOS = [
-  ["ultrassonografia", "ultra", "usg", "ultrassom", "ultrassons"],
+  [
+    "ultrassonografia",
+    "ultra",
+    "usg",
+    "us",
+    "ultrassom",
+    "ultrassons",
+    "ultrasom",
+    "utrassom",
+    "usam",
+    "ultrasonografia",
+    "ultrassonografias",
+  ],
+  ["abdome", "abdominal", "abdomen", "barriga"],
+  ["ecocardiograma", "ecocardio"],
   ["radiografia", "rx", "raio"],
-  ["eletrocardiograma", "ecg"],
+  ["eletrocardiograma", "ecg", "eletro"],
   ["eletroencefalograma", "eeg"],
+  ["papanicolau", "preventivo", "citopatologico"],
   ["cardiologia", "cardio", "cardiologista"],
   ["dermatologia", "dermato", "dermatologista"],
   ["ginecologia", "gineco", "ginecologista"],
   ["oftalmologia", "oftalmo", "oftalmologista"],
   ["odontologia", "odonto", "dentista", "odontologista", "odontologica", "odontologico"],
   ["otorrinolaringologia", "otorrino", "otorrinolaringologista"],
-  ["ortopedia", "ortopedista"],
+  ["ortopedia", "ortopedista", "orto"],
   ["pediatria", "pediatra"],
   ["neurologia", "neuro", "neurologista"],
   ["pneumologia", "pneumo", "pneumologista"],
   ["urologia", "uro", "urologista"],
   ["endocrinologia", "endocrino", "endocrinologista"],
+  ["gastroenterologia", "gastro", "gastroenterologista"],
+  ["nutricao", "nutri", "nutricionista", "nutricionistas"],
+  ["fonoaudiologia", "fono", "fonoaudiologo", "fonoaudiologa"],
+  ["clinico", "clinicos"],
 ] as const;
 const ALIASES = new Map<string, string>(
   GRUPOS.flatMap(([nome, ...aliases]) => [nome, ...aliases].map((alias) => [alias, nome] as const)),
 );
+const DESCRITORES_PADRAO = new Set(["transtoracico"]);
+
+// Expressões populares de várias palavras → nome usual do cadastro.
+const EXPRESSOES: Array<[RegExp, string]> = [
+  [/\bultra[ -]+som\b/g, "ultrassonografia"],
+  [/\braio[s]?[ -]*x\b/g, "radiografia"],
+  [/\burina (?:tipo )?(?:1|i|um)\b/g, "urina tipo 1"],
+  [/\bmedic[oa]s? de mulher(?:es)?\b/g, "ginecologia"],
+  [/\bmedic[oa]s? de crianca[s]?\b/g, "pediatria"],
+  [/\bmedic[oa]s? de pele\b/g, "dermatologia"],
+  [/\bexame de vista\b/g, "oftalmologia"],
+  [/\bexame do coracao\b/g, "eletrocardiograma"],
+  [/\bclinica geral\b/g, "clinico geral"],
+];
 
 function escrita(texto: string): string {
-  return normalizarBuscaCatalogo(texto)
-    .replace(/\bultra[ -]+som\b/g, "ultrassonografia")
-    .replace(/\braio[s]?[ -]*x\b/g, "radiografia");
+  let t = normalizarBuscaCatalogo(texto);
+  for (const [re, para] of EXPRESSOES) t = t.replace(re, para);
+  return t;
 }
 function canonico(termo: string): string {
+  // Prefixo de ultrassom digitado pela metade ("ultrass", "utrasson").
+  if (/^u?l?tras+o/.test(termo) && termo.length >= 6) return "ultrassonografia";
   return (
     ALIASES.get(termo) ??
     ALIASES.get(termo.replace(/s$/, "")) ??
@@ -44,6 +79,16 @@ function palavras(texto: string): string[] {
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .map(canonico);
+}
+
+/** Termo do paciente → nome usual, para registrar no trace o que foi interpretado. */
+export function expansoesDeEscrita(texto: string): { original: string; interpretado: string }[] {
+  const vistos = new Set<string>();
+  return normalizarBuscaCatalogo(texto)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t && !vistos.has(t) && (vistos.add(t), true))
+    .map((t) => ({ original: t, interpretado: canonico(escrita(t)) }))
+    .filter((e) => e.original !== e.interpretado);
 }
 
 /** Distância com transposição adjacente, limitada a pequenos erros de escrita. */
@@ -129,8 +174,12 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
         ].includes(t),
     )
     .map(canonico);
-  const termos = [...new Set([...tokens, ...curtas])];
   const vocabulario = [...new Set(textosPublicados.flatMap(palavras))];
+  // Via padrão escrita pelo médico no pedido ("ecocardiograma transtorácico"): quando o cadastro
+  // não usa a palavra, ela não pode impedir achar o exame. "Transesofágico" continua obrigatório.
+  const termos = [...new Set([...tokens, ...curtas])].filter(
+    (t) => !(DESCRITORES_PADRAO.has(t) && !vocabulario.includes(t)),
+  );
   const grafias = [
     ...new Set([...vocabulario, ...GRUPOS.filter(([nome]) => vocabulario.includes(nome)).flat()]),
   ];
@@ -158,6 +207,13 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
     const candidatos = ajustes.find((ajuste) => ajuste.original === termo)?.candidatos;
     return candidatos?.length === 1 ? candidatos[0]! : termo;
   });
+  // Escrita do paciente sem converter siglas: "USG ABDOMINAL TOTAL" copiado
+  // da lista distingue esse registro de "ULTRASSONOGRAFIA ABDOMINAL TOTAL".
+  const literal = (texto: string) =>
+    normalizarBuscaCatalogo(texto)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t && !["de", "da", "do", "das", "dos"].includes(t));
+  const pedidoLiteral = literal(query);
   return {
     termos,
     ajustes,
@@ -168,6 +224,14 @@ export function prepararBuscaCatalogo(query: string, textosPublicados: string[])
         nomePedido.length > 0 &&
         nomePedido.length === nomePublicado.length &&
         nomePedido.every((termo, i) => termo === nomePublicado[i])
+      );
+    },
+    correspondeNomeLiteral(nome: string): boolean {
+      const nomePublicado = literal(nome);
+      return (
+        pedidoLiteral.length > 0 &&
+        pedidoLiteral.length === nomePublicado.length &&
+        pedidoLiteral.every((termo, i) => termo === nomePublicado[i])
       );
     },
     pontuar(nome: string, secundario: string): number {
@@ -244,11 +308,11 @@ export const REGRA_CONSULTA_CATALOGO =
 
 export const REGRA_INTERPRETACAO_CATALOGO = `INTERPRETAÇÃO DO PEDIDO E IDENTIDADE
 - ${REGRA_IDENTIDADE_ATENDIMENTO}
-- Separe o tipo de atendimento do assunto e do objetivo: consulta com cardiologista = tipo consulta, termo cardiologia, objetivo agendamento quando o paciente quer marcar. Exames e procedimentos usam tipo exame_procedimento. Sintomas não mudam consulta para exame. Pesquise cada atendimento separadamente e mantenha a categoria nas continuações; não peça pedido médico nem ofereça exames para esclarecer um pedido explícito de consulta.
+- Separe o tipo de atendimento do assunto e do objetivo: consulta com cardiologista = tipo consulta, termo cardiologia, objetivo agendamento quando o paciente quer marcar. Exames e procedimentos usam tipo exame_procedimento. Sintomas não mudam consulta para exame. Pesquise cada atendimento separadamente e mantenha a categoria nas continuações; não peça pedido médico nem ofereça exames para esclarecer um pedido explícito de consulta. Depois de identificar a consulta, siga a exigência de foto quando pedido_medico estiver obrigatório na base publicada.
 - Analise a mensagem inteira e o histórico atual antes de buscar. Extraia somente a consulta ou o procedimento e seus qualificadores para o termo; não envie a frase inteira, saudações, sintomas ou preferências de data como termo. Identifique separadamente o objetivo: informações gerais, valor, horários, médicos, preparo, condições ou intenção de agendar. Abreviações, siglas, erros de escrita e respostas curtas podem retomar um atendimento já identificado; nunca invente órgão, modalidade, profissional ou equivalência para uma sigla desconhecida.
-- A busca aceita equivalências de escrita, como ultra/ultrassom/USG, e pequenos erros. Isso só localiza candidatos publicados; não autoriza escolher um exame parecido. Preserve total/superior, órgão, infantil/adulto e demais diferenças do pedido.
+- Antes de buscar, converta a escrita do paciente no nome usual do exame/especialidade (ex.: usam/ultra → ultrassonografia, uro → urologia, médico de criança → pediatria). A busca aceita equivalências e pequenos erros. Isso só localiza candidatos publicados; não autoriza escolher um exame parecido. Preserve total/superior, órgão, infantil/adulto e demais diferenças do pedido.
 - Quando o retorno trouxer esclarecimento, faça a pergunta indicada, usando as opções publicadas. Não informe preço, preparo nem consulte agenda como se o item ou profissional já estivesse escolhido. Sigla desconhecida: peça o nome por extenso ou como está no pedido. Após esclarecer, consulte novamente a base.
-- ${REGRA_ESCLARECIMENTO_DUAS}
+- ${REGRA_IDENTIFICACAO_UNIFICADA}
 - Nomes iguais ou parecidos: apresente nome completo, especialidade e unidade disponíveis no próprio registro. Se esses dados não distinguirem os profissionais, peça outra informação de identificação e encaminhe à equipe se a dúvida persistir. Nunca escolha pelo primeiro resultado, preço ou disponibilidade sem a preferência do paciente.
 - Confirme com o paciente um nome de médico encontrado por escrita aproximada. Depois da escolha inequívoca, use o identificador do registro e o vínculo oficial da agenda; não reúna pessoas diferentes só por terem o mesmo nome.
 - Um termo não identificado não comprova ausência do atendimento. Depois que o atendimento estiver identificado e for pesquisado, ausência confirmada na base segue a transferência humana obrigatória.`;

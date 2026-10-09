@@ -92,19 +92,35 @@ export function avaliarCriterio(criterio: Criterio, fatos: FatosExecucao): Crite
   switch (criterio.tipo) {
     case "contem_texto": {
       const ok = !!alvo && texto.includes(alvo);
-      return { ...criterio, ok, detalhe: ok ? "Texto encontrado na resposta." : "Texto não apareceu na resposta." };
+      return {
+        ...criterio,
+        ok,
+        detalhe: ok ? "Texto encontrado na resposta." : "Texto não apareceu na resposta.",
+      };
     }
     case "nao_contem_texto": {
       const ok = !alvo || !texto.includes(alvo);
-      return { ...criterio, ok, detalhe: ok ? "Texto proibido não apareceu." : "Texto proibido apareceu na resposta." };
+      return {
+        ...criterio,
+        ok,
+        detalhe: ok ? "Texto proibido não apareceu." : "Texto proibido apareceu na resposta.",
+      };
     }
     case "usou_ferramenta": {
       const ok = !!alvo && ferramentas.some((f) => f.includes(alvo));
-      return { ...criterio, ok, detalhe: ok ? "Ferramenta utilizada." : "Ferramenta não foi utilizada." };
+      return {
+        ...criterio,
+        ok,
+        detalhe: ok ? "Ferramenta utilizada." : "Ferramenta não foi utilizada.",
+      };
     }
     case "nao_usou_ferramenta": {
       const ok = !alvo || !ferramentas.some((f) => f.includes(alvo));
-      return { ...criterio, ok, detalhe: ok ? "Ferramenta não foi utilizada." : "Ferramenta proibida foi utilizada." };
+      return {
+        ...criterio,
+        ok,
+        detalhe: ok ? "Ferramenta não foi utilizada." : "Ferramenta proibida foi utilizada.",
+      };
     }
     case "transferiu":
       return {
@@ -216,16 +232,14 @@ export const CENARIOS_MODELO: {
     nome: "Falar com atendente",
     categoria: "transferencia",
     objetivo: "Paciente insiste em falar com um atendente humano.",
-    descricao:
-      "Verifica transferência, protocolo e mensagem de encaminhamento ao paciente.",
+    descricao: "Verifica transferência, protocolo e mensagem de encaminhamento ao paciente.",
     criterios: [{ tipo: "sem_erro" }, { tipo: "transferiu" }],
     maxTurnos: 4,
   },
   {
     nome: "Informação fora do catálogo publicado",
     categoria: "fallback",
-    objetivo:
-      "Paciente pergunta algo que não existe no catálogo publicado da clínica.",
+    objetivo: "Paciente pergunta algo que não existe no catálogo publicado da clínica.",
     descricao:
       "A Nina deve reconhecer a ausência, encaminhar para a equipe e informar o protocolo.",
     criterios: [{ tipo: "sem_erro" }, { tipo: "transferiu" }],

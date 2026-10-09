@@ -67,13 +67,25 @@ describe("pesquisa usa atendimento, não texto conversacional", () => {
     expect(recusarFraseComoPesquisa("consultar_cadastro", { termo })).toBeNull();
   });
   it("aplica a validação também aos atalhos de busca, sem bloquear o motivo de uma transferência legítima", () => {
-    for (const nome of ["buscar_medicos", "proxima_vaga", "consultar_primeiro_disponivel", "consultar_disponibilidade", "verificar_horario"]) {
-      expect(recusarFraseComoPesquisa(nome, { especialidade: "Clínica Geral" }))
-        .toMatchObject({ codigo: PESQUISA_NAO_INTERPRETADA, consulta_executada: false });
+    for (const nome of [
+      "buscar_medicos",
+      "proxima_vaga",
+      "consultar_primeiro_disponivel",
+      "consultar_disponibilidade",
+      "verificar_horario",
+    ]) {
+      expect(recusarFraseComoPesquisa(nome, { especialidade: "Clínica Geral" })).toMatchObject({
+        codigo: PESQUISA_NAO_INTERPRETADA,
+        consulta_executada: false,
+      });
       expect(recusarFraseComoPesquisa(nome, { especialidade: "Clínico Geral" })).toBeNull();
     }
-    expect(recusarFraseComoPesquisa("buscar_medicos", { especialidade: "Clínica Médica", nome: "Dra. Ana" }))
-      .toMatchObject({ codigo: PESQUISA_NAO_INTERPRETADA, consulta_executada: false });
+    expect(
+      recusarFraseComoPesquisa("buscar_medicos", {
+        especialidade: "Clínica Médica",
+        nome: "Dra. Ana",
+      }),
+    ).toMatchObject({ codigo: PESQUISA_NAO_INTERPRETADA, consulta_executada: false });
     expect(recusarFraseComoPesquisa("dados_da_clinica", { clinica: "Clínica Médica" })).toBeNull();
     expect(
       recusarFraseComoPesquisa("buscar_medicos", { especialidade: "Quero cardiologista" }),

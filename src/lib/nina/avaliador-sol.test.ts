@@ -1,17 +1,24 @@
 import { describe, expect, it } from "bun:test";
 import {
   DIMENSOES,
+  VERSAO_RUBRICA,
   calcularScore,
   classificar,
+  classificacaoAuditoria,
   montarInputSol,
   montarInstrucoesSol,
   parseAvaliacaoSol,
+  parseRelatorioAuditoria,
   type Achado,
   type Dossie,
   type NotaDimensao,
 } from "./avaliador-sol";
 
-function nota(dimensao: any, valor: number | null, situacao: NotaDimensao["situacao"] = "avaliada"): NotaDimensao {
+function nota(
+  dimensao: any,
+  valor: number | null,
+  situacao: NotaDimensao["situacao"] = "avaliada",
+): NotaDimensao {
   return { dimensao, nota: valor, situacao, justificativa: "x" };
 }
 
@@ -31,7 +38,8 @@ function achado(p: Partial<Achado>): Achado {
 
 describe("score", () => {
   it("é ponderado pelas dimensões avaliadas", () => {
-    expect(calcularScore([nota("correcao_informacao", 10), nota("qualidade_resposta", 0)])).toBe(75);
+    // sol-v2: segurança pesa 15, conversão 4 → 10·15/19 ≈ 79
+    expect(calcularScore([nota("seguranca", 10), nota("conversao", 0)])).toBe(79);
   });
 
   it("ignora dimensões não verificáveis", () => {
@@ -105,7 +113,9 @@ describe("leitura da resposta do avaliador", () => {
         JSON.stringify({
           resumo: "ok",
           dimensoes: [],
-          achados: [{ mensagem: "", observado: "A resposta poderia ser melhor.", esperado: "", fonte: "" }],
+          achados: [
+            { mensagem: "", observado: "A resposta poderia ser melhor.", esperado: "", fonte: "" },
+          ],
           lacunas: [],
         }) +
         "\n```",
@@ -114,7 +124,9 @@ describe("leitura da resposta do avaliador", () => {
   });
 
   it("dimensão ausente vira não verificável, nunca nota cheia", () => {
-    const r = parseAvaliacaoSol(JSON.stringify({ resumo: "", dimensoes: [], achados: [], lacunas: [] }));
+    const r = parseAvaliacaoSol(
+      JSON.stringify({ resumo: "", dimensoes: [], achados: [], lacunas: [] }),
+    );
     expect(r.dimensoes).toHaveLength(DIMENSOES.length);
     expect(r.dimensoes.every((d) => d.situacao === "nao_verificavel")).toBe(true);
     expect(r.score).toBe(0);
@@ -132,7 +144,9 @@ describe("dossiê", () => {
     objetivo: "Agendar",
     criteriosEsperados: ["Deve usar a ferramenta: buscar_horarios"],
     instrucoes: { versao: 3, publicadoEm: "2026-09-01", origem: "banco" },
-    turnos: [{ autor: "paciente", texto: "Quero marcar cardiologista", em: "2026-09-01T10:00:00Z" }],
+    turnos: [
+      { autor: "paciente", texto: "Quero marcar cardiologista", em: "2026-09-01T10:00:00Z" },
+    ],
     ferramentas: [
       {
         ferramenta: "buscar_horarios",
@@ -142,7 +156,9 @@ describe("dossiê", () => {
         em: "2026-09-01T10:00:01Z",
       },
     ],
-    conhecimento: [{ consulta: "Consultas e profissionais", status: "OK", registros: ["Dr. Teste"] }],
+    conhecimento: [
+      { consulta: "Consultas e profissionais", status: "OK", registros: ["Dr. Teste"] },
+    ],
     eventos: [{ node: "prompt.compose", tipo: "start", status: "ok", em: "2026-09-01T10:00:00Z" }],
     execucoes: [
       {
@@ -171,5 +187,54 @@ describe("dossiê", () => {
     const i = montarInstrucoesSol();
     expect(i).toContain("Não invente a verdade esperada");
     expect(i).toContain("nao_verificavel");
+  });
+});
+
+describe("sol-v2 — critérios do Treinador e Auditor", () => {
+  it("usa a nova rubrica", () => expect(VERSAO_RUBRICA).toBe("sol-v2"));
+  it("escala do documento; erro crítico sempre Crítico", () => {
+    expect(classificacaoAuditoria(97)).toBe("Excelente");
+    expect(classificacaoAuditoria(91)).toBe("Muito bom");
+    expect(classificacaoAuditoria(72)).toBe("Precisa melhorar");
+    expect(classificacaoAuditoria(55)).toBe("Crítico");
+    expect(classificacaoAuditoria(98, "erro_critico")).toBe("Crítico");
+  });
+  it("relatório ausente vira null; resultado inválido não é inventado", () => {
+    expect(parseRelatorioAuditoria(undefined)).toBeNull();
+    const r = parseRelatorioAuditoria({
+      resultado_contato: "xyz",
+      eficiencia: { mensagens: 12, ideal: 7 },
+    });
+    expect(r).not.toBeNull();
+    if (!r) throw new Error("O relatório enviado deve ser reconhecido");
+    expect(r.resultado_contato).toBeNull();
+    expect(r.eficiencia.mensagens).toBe(12);
+  });
+  it("achado crítico é sempre prioridade 1 e origem padrão indefinida", () => {
+    const a = parseAvaliacaoSol(
+      JSON.stringify({
+        dimensoes: [],
+        lacunas: [],
+        achados: [
+          {
+            observado: "inventou preço",
+            esperado: "valor do sistema",
+            fonte: "catálogo",
+            gravidade: "critica",
+            prioridade: 4,
+          },
+        ],
+      }),
+    );
+    expect(a.achados[0].prioridade).toBe(1);
+    expect(a.achados[0].origem).toBe("indefinido");
+    expect(a.resultado).toBe("erro_critico");
+  });
+});
+
+describe("sol-v2 — condução comercial", () => {
+  it("pede a dimensão de condução e cobra ética comercial", () => {
+    expect(DIMENSOES.some((d: { valor: string }) => d.valor === "conducao_comercial")).toBe(true);
+    expect(montarInstrucoesSol()).toContain("urgência falsa");
   });
 });

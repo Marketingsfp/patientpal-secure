@@ -39,7 +39,6 @@ export type AtorAgenda =
       pode_gerenciar_todos?: boolean;
     };
 
-
 /** Contexto passado para todo núcleo de regra de agenda. */
 export type CtxAgenda = {
   db: DbAgenda;
@@ -89,4 +88,3 @@ export function assertEscopoRegistro(
     throw new EscopoClinicaError();
   }
 }
-

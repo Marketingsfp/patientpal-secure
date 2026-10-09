@@ -32,8 +32,10 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { ExigeUnidadeEscolhida } from "@/components/exige-unidade-escolhida";
+import { useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { mostrarErro } from "@/lib/traduzir-erro";
+import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import { confirmDialog } from "@/lib/confirm";
 import { exportToExcel } from "@/lib/export-csv";
 import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
@@ -71,7 +73,11 @@ import {
 } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos_/importar")({
-  component: ImportarServicosPage,
+  component: () => (
+    <ExigeUnidadeEscolhida oQue="importar serviços">
+      <ImportarServicosPage />
+    </ExigeUnidadeEscolhida>
+  ),
   head: () => ({
     meta: [
       { title: "Importar serviços por planilha — Catálogo de Serviços" },
@@ -94,7 +100,7 @@ export const Route = createFileRoute("/_authenticated/app/procedimentos_/importa
 const TAMANHO_MAXIMO = 15 * 1024 * 1024; // 15 MB
 const LOTE = 200;
 
-type ServicoExistente = { id: string; nome: string };
+type ServicoExistente = { id: string; nome: string; ativo: boolean };
 
 type Resultado = {
   criados: number;
@@ -180,7 +186,10 @@ function ImportarServicosPage() {
   const [especialidades, setEspecialidades] = useState<string[]>([]);
   const [carregandoCatalogo, setCarregandoCatalogo] = useState(false);
 
-  const [criarEspecialidades, setCriarEspecialidades] = useState(false);
+  const [criarEspecialidadesMarcado, setCriarEspecialidades] = useState(false);
+  // A lista de especialidades é global: só quem está na lista nominal cria.
+  const editaCatalogo = useEditaCatalogoGlobal();
+  const criarEspecialidades = criarEspecialidadesMarcado && editaCatalogo;
   const [quandoExiste, setQuandoExiste] = useState<"pular" | "atualizar">("pular");
 
   const [importando, setImportando] = useState(false);
@@ -206,7 +215,7 @@ function ImportarServicosPage() {
       for (;;) {
         const { data, error } = await supabase
           .from("procedimentos")
-          .select("id,nome")
+          .select("id,nome,ativo")
           .eq("clinica_id", clinicaId)
           .order("nome")
           .range(de, de + 999);
@@ -231,10 +240,15 @@ function ImportarServicosPage() {
   }, [clinicaId, versaoCatalogo]);
 
   const mapaExistentes = useMemo(() => {
+    // Cópias inativas (ex.: unificação de duplicados de 02/10/2026) têm o mesmo
+    // nome do cadastro em uso; o ativo sempre vence, para que "atualizar" mexa
+    // no serviço que a recepção enxerga.
     const m = new Map<string, ServicoExistente>();
     for (const s of existentes) {
       const k = chaveNomeServico(s.nome);
-      if (k && !m.has(k)) m.set(k, s);
+      if (!k) continue;
+      const atual = m.get(k);
+      if (!atual || (!atual.ativo && s.ativo)) m.set(k, s);
     }
     return m;
   }, [existentes]);
@@ -548,10 +562,22 @@ function ImportarServicosPage() {
     try {
       // 1. especialidades que faltam (lista compartilhada entre as clínicas)
       if (criarEspecialidades && faltamEspecialidades.length) {
-        const { error } = await supabase
+        const { data: criadas, error } = await supabase
           .from("especialidades")
-          .insert(faltamEspecialidades.map((nome) => ({ nome, ativo: true })));
-        if (error) {
+          .insert(faltamEspecialidades.map((nome) => ({ nome, ativo: true })))
+          .select("id");
+        // Nasce ativa só nesta unidade.
+        const { error: errUnidade } = error
+          ? { error: null }
+          : await supabase.from("especialidade_unidade").upsert(
+              (criadas ?? []).map((e) => ({
+                clinica_id: clinicaId,
+                especialidade_id: e.id,
+                ativo: true,
+              })),
+              { onConflict: "clinica_id,especialidade_id" },
+            );
+        if (error || errUnidade) {
           toast.error("Não consegui criar as especialidades que faltavam. Os serviços seguiram.");
         } else {
           especialidadesCriadas = faltamEspecialidades.length;
@@ -568,7 +594,7 @@ function ImportarServicosPage() {
             problemas.push({
               linhaExcel: l.linhaExcel,
               nome: l.nome,
-              motivo: `Não foi possível cadastrar: ${error.message}`,
+              motivo: `Não foi possível cadastrar: ${traduzirErro(error)}`,
             });
           }
           continue;
@@ -587,7 +613,7 @@ function ImportarServicosPage() {
             problemas.push({
               linhaExcel: l.linhaExcel,
               nome: l.nome,
-              motivo: `Não foi possível atualizar: ${error.message}`,
+              motivo: `Não foi possível atualizar: ${traduzirErro(error)}`,
             });
             continue;
           }
@@ -792,13 +818,19 @@ function ImportarServicosPage() {
                     criar uma nova aqui faz ela aparecer também na Menino Jesus. Os serviços são
                     importados mesmo sem criar — a especialidade fica escrita no serviço.
                   </p>
-                  <label className="flex items-center gap-2">
-                    <Checkbox
-                      checked={criarEspecialidades}
-                      onCheckedChange={(v) => setCriarEspecialidades(v === true)}
-                    />
-                    <span>Criar as especialidades que faltam</span>
-                  </label>
+                  {editaCatalogo ? (
+                    <label className="flex items-center gap-2">
+                      <Checkbox
+                        checked={criarEspecialidades}
+                        onCheckedChange={(v) => setCriarEspecialidades(v === true)}
+                      />
+                      <span>Criar as especialidades que faltam</span>
+                    </label>
+                  ) : (
+                    <p className="font-medium">
+                      Só as pessoas autorizadas criam especialidades; peça a uma delas se precisar.
+                    </p>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

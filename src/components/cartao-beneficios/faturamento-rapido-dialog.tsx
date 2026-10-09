@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useState } from "react";
 import { Loader2, Search, Receipt, BadgePercent, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -211,6 +212,9 @@ export function FaturamentoRapidoMensalidadeDialog({
         )
         .in("contrato_id", Array.from(contratos.keys()))
         .in("status", ["pendente", "aberto"])
+        // Cobrança do Crédito na clínica é recebida na tela do contrato, sem
+        // virar receita de novo — aqui ela seria lançada como mensalidade.
+        .is("origem" as never, null)
         .order("numero_parcela")
         .order("vencimento");
       if (error) throw error;
@@ -281,7 +285,7 @@ export function FaturamentoRapidoMensalidadeDialog({
       ).filter((m) => Number(m.numero_parcela) > 0);
       const ultima = positivas[0];
       const proximoNumero = (ultima?.numero_parcela ?? 0) + 1;
-      const baseVenc = ultima?.vencimento ?? new Date().toISOString().slice(0, 10);
+      const baseVenc = ultima?.vencimento ?? hojeBR();
       const vencimento = proximoVencimento(baseVenc, c.dia_vencimento);
       const valor = Number(ultima?.valor) || c.valor_mensal || 0;
 
@@ -507,7 +511,7 @@ export function FaturamentoRapidoMensalidadeDialog({
           if (!pagando) return;
           const m = pagando;
           const taxaAdesao = Number(m.taxa_adesao) || 0;
-          const dataLanc = dados.data || new Date().toISOString().slice(0, 10);
+          const dataLanc = dados.data || hojeBR();
           const { error } = await supabase
             .from("contrato_mensalidades")
             .update({

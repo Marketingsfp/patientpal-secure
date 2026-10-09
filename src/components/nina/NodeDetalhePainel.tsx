@@ -51,7 +51,9 @@ function ConfiguracaoInstrucoes({ onVerInstrucoes }: { onVerInstrucoes: () => vo
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo="Versão publicada">{whatsapp ? `v${whatsapp.versao}` : "—"}</Campo>
           <Campo rotulo="Fonte">Instruções da Nina</Campo>
-          <Campo rotulo="Status">{whatsapp ? "Publicada" : "Nenhuma publicada (usa o texto do código)"}</Campo>
+          <Campo rotulo="Status">
+            {whatsapp ? "Publicada" : "Nenhuma publicada (usa o texto do código)"}
+          </Campo>
           <Campo rotulo="Última publicação">
             {whatsapp?.publicado_em
               ? new Date(whatsapp.publicado_em).toLocaleString("pt-BR", {
@@ -72,7 +74,6 @@ function ConfiguracaoInstrucoes({ onVerInstrucoes }: { onVerInstrucoes: () => vo
     </div>
   );
 }
-
 
 type Props = {
   node: NodeArquitetura | null;

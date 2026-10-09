@@ -11,9 +11,9 @@ import { textoMarcadorSistema } from "../marcador-handoff";
 
 type ItemTimeline = { tipo: "mensagem"; enviada_por: string; body: string };
 
-/** Texto detalhado = repete o resumo/motivo/fila do handoff. */
+/** O motivo permanece visível; o resumo completo e a fila ficam no card. */
 function pareceResumoDetalhado(texto: string): boolean {
-  return /Resumo:|Posição na fila|Motivo:/.test(texto);
+  return /Resumo:|Posição na fila/.test(texto);
 }
 
 /** Quantos resumos detalhados a timeline renderiza (deve ser sempre 0). */
@@ -58,9 +58,8 @@ describe("FASE 3 — resumo detalhado único", () => {
   for (const [nome, itens] of CENARIOS) {
     it(`cenário ${nome}: timeline sem resumo detalhado`, () => {
       expect(resumosDetalhadosNaTimeline(itens)).toBe(0);
-      expect(textoMarcadorSistema(itens[0]!.body)).toContain(
-        "Transferida para atendimento humano",
-      );
+      expect(textoMarcadorSistema(itens[0]!.body)).toContain("Transferida para atendimento humano");
+      expect(textoMarcadorSistema(itens[0]!.body)).toContain("Motivo:");
     });
   }
 
@@ -75,10 +74,7 @@ describe("FASE 3 — resumo detalhado único", () => {
   });
 
   it("eventos operacionais da timeline continuam intactos", () => {
-    const operacionais = [
-      "Conversa atribuída a Tuane",
-      "Conversa encerrada e resolvida por Tuane",
-    ];
+    const operacionais = ["Conversa atribuída a Tuane", "Conversa encerrada e resolvida por Tuane"];
     for (const t of operacionais) expect(textoMarcadorSistema(t)).toBe(t);
   });
 });

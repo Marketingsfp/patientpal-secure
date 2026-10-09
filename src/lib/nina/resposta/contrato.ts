@@ -72,6 +72,8 @@ export type ResultadoRespostaNina = {
   texto: string;
   /** Chave do template determinístico, quando o texto não veio do modelo. */
   chaveTemplate: string | null;
+  /** Respostas independentes preservadas ao renderizar a confirmação da reserva. */
+  complementoTexto?: string;
   /** Variáveis usadas para renderizar o template. */
   variaveis: Record<string, string>;
   /** Fatos que o texto pode afirmar porque há fonte/evidência. */

@@ -56,12 +56,12 @@ function contexto(fatos = catalogo): ContextoConfianca {
 }
 
 describe("área de atendimento não é endereço", () => {
-  it.each([
-    "O exame avalia a região lombar.",
-    "A imagem mostra a zona de transição.",
-  ])("termos anatômicos não viram localização: %s", (texto) => {
-    expect(extrairClaimsDoTexto(texto).filter((c) => c.tipo === "endereco")).toHaveLength(0);
-  });
+  it.each(["O exame avalia a região lombar.", "A imagem mostra a zona de transição."])(
+    "termos anatômicos não viram localização: %s",
+    (texto) => {
+      expect(extrairClaimsDoTexto(texto).filter((c) => c.tipo === "endereco")).toHaveLength(0);
+    },
+  );
 
   it.each([
     "Atendemos na área de **Cardiologia** com os seguintes profissionais:",

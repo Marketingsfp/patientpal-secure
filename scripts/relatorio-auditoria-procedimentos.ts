@@ -3,15 +3,40 @@ const dir = process.argv[2];
 if (!dir) throw new Error("Informe a pasta local da auditoria.");
 const r = await Bun.file(`${dir}/resultado.json`).json();
 const base = await Bun.file(`${dir}/base.json`).json();
-const rows = r.resultados.flatMap((s: any) => s.executantes.map((e: any) => ({...e,procedimento:s.procedimento})));
-const ok = rows.filter((e: any)=>e.resultado==="gravacao_simulada_correta");
-const modal = rows.filter((e: any)=>e.resultado==="modalidade_pendente");
-const vinc = rows.filter((e: any)=>e.resultado==="vinculo_ausente");
-const recuperados = ok.filter((e: any)=>e.modalidade!==e.modalidade_consulta_na_rota_antiga||!e.executante_encontrado_como_consulta);
-const nomeModo: any={hora_marcada:"Hora marcada",chegada_com_pre_agendamento:"Ordem de chegada com pré-agendamento",chegada_sem_pre_agendamento:"Comparecimento sem reserva",ficha:"Ficha",nao_definida:"Indefinida"};
-const nomeResultado: any={gravacao_simulada_correta:"Reserva simulada correta",PROFISSIONAL_SFP:"Equipe humana (SFP)",modalidade_pendente:"Modalidade ausente",vinculo_ausente:"Vínculo com agenda não resolvido",esclarecimento_de_termo_generico:"Esclarecer procedimento específico"};
-const cell=(s: any)=>String(s??"—").replaceAll("|","/").replaceAll("\n"," ");
-const tabela=(header: string[],linhas: any[][])=>["| "+header.join(" | ")+" |","| "+header.map(()=>"---").join(" | ")+" |",...linhas.map(l=>"| "+l.map(cell).join(" | ")+" |")].join("\n");
+const rows = r.resultados.flatMap((s: any) =>
+  s.executantes.map((e: any) => ({ ...e, procedimento: s.procedimento })),
+);
+const ok = rows.filter((e: any) => e.resultado === "gravacao_simulada_correta");
+const modal = rows.filter((e: any) => e.resultado === "modalidade_pendente");
+const vinc = rows.filter((e: any) => e.resultado === "vinculo_ausente");
+const recuperados = ok.filter(
+  (e: any) =>
+    e.modalidade !== e.modalidade_consulta_na_rota_antiga || !e.executante_encontrado_como_consulta,
+);
+const nomeModo: any = {
+  hora_marcada: "Hora marcada",
+  chegada_com_pre_agendamento: "Ordem de chegada com pré-agendamento",
+  chegada_sem_pre_agendamento: "Comparecimento sem reserva",
+  ficha: "Ficha",
+  nao_definida: "Indefinida",
+};
+const nomeResultado: any = {
+  gravacao_simulada_correta: "Reserva simulada correta",
+  PROFISSIONAL_SFP: "Equipe humana (SFP)",
+  modalidade_pendente: "Modalidade ausente",
+  vinculo_ausente: "Vínculo com agenda não resolvido",
+  esclarecimento_de_termo_generico: "Esclarecer procedimento específico",
+};
+const cell = (s: any) =>
+  String(s ?? "—")
+    .replaceAll("|", "/")
+    .replaceAll("\n", " ");
+const tabela = (header: string[], linhas: any[][]) =>
+  [
+    "| " + header.join(" | ") + " |",
+    "| " + header.map(() => "---").join(" | ") + " |",
+    ...linhas.map((l) => "| " + l.map(cell).join(" | ") + " |"),
+  ].join("\n");
 const md = `# Auditoria local dos procedimentos da Nina — 23/09/2026
 
 Fonte: catálogo autenticado da Policlínica Menino Jesus, lido em 23/09/2026. ${r.servicos} serviços publicados e 80 cadastros operacionais ativos de profissionais/recursos. Dados externos congelados para os testes. Nenhuma mensagem enviada nem reserva real criada. Alterações de código ainda locais, sem publicação nesta tarefa.
@@ -20,7 +45,7 @@ Fonte: catálogo autenticado da Policlínica Menino Jesus, lido em 23/09/2026. $
 
 - ${r.servicos} procedimentos verificados; três são termos genéricos que exigem esclarecimento.
 - ${r.executantes} combinações específicas de procedimento e executante verificadas.
-- ${ok.length} combinações, abrangendo ${new Set(ok.map((e: any)=>e.procedimento)).size} procedimentos, chegaram à gravação e releitura simuladas mantendo o serviço correto.
+- ${ok.length} combinações, abrangendo ${new Set(ok.map((e: any) => e.procedimento)).size} procedimentos, chegaram à gravação e releitura simuladas mantendo o serviço correto.
 - 22 combinações seguiram a regra de encaminhamento SFP.
 - ${modal.length} procedimentos têm modalidade não informada na base.
 - ${vinc.length} procedimentos têm vínculo de executante/recurso não resolvido no conjunto ativo consultado.
@@ -29,7 +54,7 @@ Fonte: catálogo autenticado da Policlínica Menino Jesus, lido em 23/09/2026. $
 
 ## Outros casos semelhantes ao da Bioimpedância
 
-A comparação entre a leitura da modalidade da consulta e a leitura do procedimento identificou ${recuperados.length} combinações (${new Set(recuperados.map((e: any)=>e.procedimento)).size} procedimentos) em que a rota antiga por consulta não encontra o executante ou não fornece a modalidade correta. Isto é evidência técnica local de exposição à falha, não comprovação de que todos esses pacientes tiveram erro em produção.
+A comparação entre a leitura da modalidade da consulta e a leitura do procedimento identificou ${recuperados.length} combinações (${new Set(recuperados.map((e: any) => e.procedimento)).size} procedimentos) em que a rota antiga por consulta não encontra o executante ou não fornece a modalidade correta. Isto é evidência técnica local de exposição à falha, não comprovação de que todos esses pacientes tiveram erro em produção.
 
 Exemplos: acupuntura e fisioterapia com Daiane Helena; procedimentos de urologia com Marcelo Barreto; endoscopia com Bruno Moraes; serviços de enfermagem; ultrassonografias com Cintia, Isis e Samuel. Na infiltração com Valeria Silveira, a consulta é por ficha e o procedimento é por hora marcada; o teste preservou a modalidade do procedimento.
 
@@ -43,10 +68,17 @@ A proteção implementada anteriormente foi validada com os dados completos: ide
 
 ## Modalidades que dependem da equipe
 
-${tabela(["Procedimento","Profissional","Informação atual no campo de observação"],modal.map((e: any)=>{
-const s=base.servicos.find((s: any)=>s.nome===e.procedimento);
-return [e.procedimento,e.profissional,(s?.descricao_publica??"").match(/Observação: ([^\n]*)/)?.[1]??"Não informada"];
-}))}
+${tabela(
+  ["Procedimento", "Profissional", "Informação atual no campo de observação"],
+  modal.map((e: any) => {
+    const s = base.servicos.find((s: any) => s.nome === e.procedimento);
+    return [
+      e.procedimento,
+      e.profissional,
+      (s?.descricao_publica ?? "").match(/Observação: ([^\n]*)/)?.[1] ?? "Não informada",
+    ];
+  }),
+)}
 
 Recorrência quinzenal e adicional de anestesia não definem se o atendimento é por hora marcada, ficha ou ordem de chegada. Não alterei essas informações nem deduzi uma modalidade. Uma agenda real com modalidade explícita pode fornecer informação adicional; esses testes não a inventaram.
 
@@ -54,11 +86,26 @@ Recorrência quinzenal e adicional de anestesia não definem se o atendimento é
 
 35 itens com “Técnica”, dois com “Técnico” e três com “DRA. POLIANA”. Não foi possível confirmar com segurança qual recurso/cadastro ativo deve receber essas reservas. Alguns nomes indicam equipes ou equipamentos, não um médico. Não foram associados por semelhança ou por escolha do primeiro cadastro.
 
-${tabela(["Procedimento","Executante publicado"],vinc.map((e: any)=>[e.procedimento,e.profissional]))}
+${tabela(
+  ["Procedimento", "Executante publicado"],
+  vinc.map((e: any) => [e.procedimento, e.profissional]),
+)}
 
 ## Resultado individual de todos os procedimentos
 
-${tabela(["Procedimento","Executante","Modalidade do procedimento","Resultado local"],r.resultados.flatMap((s: any)=>s.executantes.length?s.executantes.map((e: any)=>[s.procedimento,e.profissional,nomeModo[e.modalidade]??"Não determinada",nomeResultado[e.resultado]??e.resultado]):[[s.procedimento,"—","—",nomeResultado[s.resultado]??s.resultado]]))}
+${tabela(
+  ["Procedimento", "Executante", "Modalidade do procedimento", "Resultado local"],
+  r.resultados.flatMap((s: any) =>
+    s.executantes.length
+      ? s.executantes.map((e: any) => [
+          s.procedimento,
+          e.profissional,
+          nomeModo[e.modalidade] ?? "Não determinada",
+          nomeResultado[e.resultado] ?? e.resultado,
+        ])
+      : [[s.procedimento, "—", "—", nomeResultado[s.resultado] ?? s.resultado]],
+  ),
+)}
 
 ## Reprodução e limites
 
@@ -74,8 +121,21 @@ bun scripts/relatorio-auditoria-procedimentos.ts '${dir}'
 
 O script exige base.json e opcoes.json previamente exportados. Não contém credenciais e bloqueia fetch. Exercita o executor e a recuperação reais do código local com banco e escrita simulados. Não executa o modelo de linguagem externo: fluidez da conversa e variações livres do paciente ainda exigem reteste após publicação. Não valida preço, duração, idade, agenda disponível ou execução clínica real.
 
-SHA-256 de base.json: ${createHash("sha256").update(await Bun.file(`${dir}/base.json`).text()).digest("hex")}.
+SHA-256 de base.json: ${createHash("sha256")
+  .update(await Bun.file(`${dir}/base.json`).text())
+  .digest("hex")}.
 `;
-await Bun.write("artifacts/auditoria-todos-procedimentos-2026-09-23.md",md);
-await Bun.write("artifacts/auditoria-todos-procedimentos-2026-09-23.json",JSON.stringify(r,null,2));
-console.log(JSON.stringify({procedimentos:r.servicos,combinacoes:r.executantes,reservas_simuladas:ok.length,modalidades_pendentes:modal.length,vinculos_pendentes:vinc.length}));
+await Bun.write("artifacts/auditoria-todos-procedimentos-2026-09-23.md", md);
+await Bun.write(
+  "artifacts/auditoria-todos-procedimentos-2026-09-23.json",
+  JSON.stringify(r, null, 2),
+);
+console.log(
+  JSON.stringify({
+    procedimentos: r.servicos,
+    combinacoes: r.executantes,
+    reservas_simuladas: ok.length,
+    modalidades_pendentes: modal.length,
+    vinculos_pendentes: vinc.length,
+  }),
+);

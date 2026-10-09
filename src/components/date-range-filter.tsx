@@ -65,7 +65,6 @@ export function DateRangeFilter({
   mostrarCampos = true,
   mesAteHoje = false,
 }: DateRangeFilterProps) {
-
   const [openFrom, setOpenFrom] = useState(false);
   const [openTo, setOpenTo] = useState(false);
   const fromDate = useMemo(

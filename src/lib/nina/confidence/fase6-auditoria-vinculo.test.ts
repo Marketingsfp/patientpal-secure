@@ -69,9 +69,7 @@ describe("FASE 6 — conflito auditável", () => {
 
   it("remove dado pessoal do valor conflitante", () => {
     const c = extrairConflitos({
-      conflitos: [
-        { campo: "contato", valores: [{ origem: "cadastro", valor: "joao@ex.com" }] },
-      ],
+      conflitos: [{ campo: "contato", valores: [{ origem: "cadastro", valor: "joao@ex.com" }] }],
     });
     expect(c[0]!.origens[0]!.valor).toBe("[email]");
   });

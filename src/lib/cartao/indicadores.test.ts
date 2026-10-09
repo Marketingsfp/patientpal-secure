@@ -2,8 +2,11 @@ import { describe, expect, it } from "bun:test";
 import {
   limitesDoMes,
   resumirContratos,
+  resumirContratosDoMes,
   resumirMensalidades,
   type ContratoIndicadorRow,
+  type ContratoMesRow,
+  type ParcelaMesRow,
   type MensalidadeIndicadorRow,
 } from "./indicadores";
 
@@ -229,5 +232,82 @@ describe("resumirMensalidades", () => {
     const r = resumirMensalidades([parcela({ vencimento: diasAtras(6), valor: 100 })], HOJE);
     expect(r.atrasadas).toBe(1);
     expect(r.inadimplenciaPct).toBeCloseTo(100, 2);
+  });
+});
+
+describe("resumirContratosDoMes", () => {
+  const c = (id: string, p: Partial<ContratoMesRow> = {}): ContratoMesRow => ({
+    id,
+    status: "ativo",
+    valor_mensal: 100,
+    ...p,
+  });
+  const pm = (contrato_id: string, p: Partial<ParcelaMesRow> = {}): ParcelaMesRow => ({
+    contrato_id,
+    status: "pendente",
+    vencimento: "2026-08-30",
+    numero_parcela: 3,
+    ...p,
+  });
+
+  it("a soma dos quatro cards fecha com os ativos, em quantidade e em valor", () => {
+    const r = resumirContratosDoMes(
+      [
+        c("pago", { valor_mensal: 290 }),
+        c("aberto"),
+        c("atrasado", { valor_mensal: 50 }),
+        c("sem", { valor_mensal: 20 }),
+      ],
+      [pm("pago", { status: "pago" }), pm("aberto"), pm("atrasado", { vencimento: diasAtras(6) })],
+      HOJE,
+    );
+    expect(r.ativos).toBe(4);
+    expect(r.pagos + r.aVencer + r.inadimplentes + r.semCobranca).toBe(r.ativos);
+    expect(r.receitaPrevista).toBe(460);
+    expect(r.pagosValor + r.aVencerValor + r.inadimplentesValor + r.semCobrancaValor).toBe(460);
+    expect(r.situacao.get("sem")).toBe("sem_cobranca");
+  });
+
+  it("taxa de adesão paga não conta como mensalidade paga", () => {
+    const r = resumirContratosDoMes(
+      [c("x")],
+      [pm("x", { status: "pago", numero_parcela: 0 })],
+      HOJE,
+    );
+    expect(r.pagos).toBe(0);
+    expect(r.semCobranca).toBe(1);
+  });
+
+  it("parcela do mês cancelada deixa o contrato sem cobrança", () => {
+    const r = resumirContratosDoMes([c("x")], [pm("x", { status: "cancelado" })], HOJE);
+    expect(r.situacao.get("x")).toBe("sem_cobranca");
+  });
+
+  it("contrato com várias parcelas no mês conta uma vez, pela pior", () => {
+    const r = resumirContratosDoMes(
+      [c("x")],
+      [pm("x", { status: "pago" }), pm("x"), pm("x", { vencimento: diasAtras(10) }), pm("x")],
+      HOJE,
+    );
+    expect(r.ativos).toBe(1);
+    expect(r.inadimplentes).toBe(1);
+    expect(r.pagos + r.aVencer).toBe(0);
+  });
+
+  it("dependente de R$ 0 fica fora dos ativos e aparece à parte", () => {
+    const r = resumirContratosDoMes([c("dep", { valor_mensal: 0 }), c("tit")], [], HOJE);
+    expect(r.ativos).toBe(1);
+    expect(r.dependentes).toBe(1);
+    expect(r.situacao.has("dep")).toBe(false);
+  });
+
+  it("contrato cancelado não entra, mesmo com parcela paga no mês", () => {
+    const r = resumirContratosDoMes(
+      [c("x", { status: "cancelado" })],
+      [pm("x", { status: "pago" })],
+      HOJE,
+    );
+    expect(r.ativos).toBe(0);
+    expect(r.pagos).toBe(0);
   });
 });

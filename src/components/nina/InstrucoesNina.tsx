@@ -16,10 +16,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { IdentidadeAtendimentoCampos } from "@/components/nina/IdentidadeAtendimentoCampos";
+import { PromptSystemEditor } from "@/components/nina/PromptSystemEditor";
 import { validarIdentidadeParaPublicacao } from "@/lib/nina/identidade-atendimento";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -53,7 +53,6 @@ import {
 } from "@/lib/nina/instrucoes.functions";
 import { apenasMudancas, compararTextos, resumoDiff } from "@/lib/nina/instrucoes-diff";
 import { previewRequestNina } from "@/lib/nina/prompt-preview.functions";
-
 
 const ROTULO_STATUS: Record<string, string> = {
   publicada: "Atual",
@@ -214,7 +213,6 @@ function Editor({
   );
   const identidadeInvalida = !identidade.ok;
 
-
   return (
     <div className="space-y-3">
       {bloco.escopo === "whatsapp" ? (
@@ -260,7 +258,6 @@ function Editor({
         ) : null}
       </div>
 
-
       {bloco.escopo === "whatsapp" ? (
         <IdentidadeAtendimentoCampos
           texto={texto}
@@ -269,18 +266,13 @@ function Editor({
         />
       ) : null}
 
-      <label className="sr-only" htmlFor={`instrucoes-${bloco.escopo}`}>
-        Instruções da Nina — {ROTULO_ESCOPO[bloco.escopo]}
-      </label>
-      <Textarea
+      <PromptSystemEditor
         id={`instrucoes-${bloco.escopo}`}
+        label={`Instruções da Nina — ${ROTULO_ESCOPO[bloco.escopo]}`}
         value={texto}
-        onChange={(e) => setTexto(e.target.value)}
+        onChange={setTexto}
         readOnly={!podeEditar}
-        spellCheck={false}
-        className="min-h-[520px] resize-y overflow-auto whitespace-pre font-mono text-xs leading-relaxed"
       />
-
 
       <Input
         value={comentario}
@@ -329,7 +321,6 @@ function Editor({
         />
       ) : null}
 
-
       {!podePublicar ? (
         <p className="text-xs text-muted-foreground">
           {podeEditar
@@ -354,7 +345,9 @@ function Editor({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => publicar.mutate({ conteudo: texto, comentario: comentario || undefined })}
+              onClick={() =>
+                publicar.mutate({ conteudo: texto, comentario: comentario || undefined })
+              }
             >
               Publicar
             </AlertDialogAction>
@@ -440,7 +433,8 @@ function HistoricoVersoes({
                     {ROTULO_STATUS[v.status] ?? v.status}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {dataBr(v.publicado_em ?? v.created_at)} · {v.autor ?? "responsável não registrado"}
+                    {dataBr(v.publicado_em ?? v.created_at)} ·{" "}
+                    {v.autor ?? "responsável não registrado"}
                   </span>
                 </div>
                 {v.comentario ? <p className="mt-1 text-muted-foreground">{v.comentario}</p> : null}
@@ -567,7 +561,10 @@ function Comparacao({ antes, depois }: { antes: string; depois: string }) {
           }
           if (l.tipo === "alterada") {
             return (
-              <div key={i} className="border-l-2 border-l-[var(--chart-4)] bg-[color-mix(in_oklch,var(--chart-4)_14%,transparent)] px-3 py-0.5">
+              <div
+                key={i}
+                className="border-l-2 border-l-[var(--chart-4)] bg-[color-mix(in_oklch,var(--chart-4)_14%,transparent)] px-3 py-0.5"
+              >
                 <div className="whitespace-pre-wrap line-through opacity-70">{l.antes}</div>
                 <div className="whitespace-pre-wrap">{l.depois}</div>
               </div>
@@ -655,9 +652,7 @@ function AuditoriaPrompt({
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="secondary">
-                Comportamento: Arquitetura v{data.versao ?? "—"}
-              </Badge>
+              <Badge variant="secondary">Comportamento: Arquitetura v{data.versao ?? "—"}</Badge>
               {data.alcanceGlobal ? (
                 <Badge variant="outline">Vale para todas as clínicas</Badge>
               ) : null}
@@ -709,8 +704,7 @@ function AuditoriaPrompt({
                 <p className="text-muted-foreground">
                   Atendente <strong>{data.identidade.assistente}</strong> ·{" "}
                   {data.identidade.tipoEstabelecimento}{" "}
-                  <strong>{data.identidade.estabelecimento}</strong> · origem:{" "}
-                  {data.fonteConteudo}
+                  <strong>{data.identidade.estabelecimento}</strong> · origem: {data.fonteConteudo}
                 </p>
               ) : (
                 <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs">
@@ -731,9 +725,7 @@ function AuditoriaPrompt({
                     }`
                   : "nenhuma regra publicada aplicável a este exemplo"
               }
-              conteudo={
-                data.contratoPrecedencia || "(nenhuma restrição adicional neste exemplo)"
-              }
+              conteudo={data.contratoPrecedencia || "(nenhuma restrição adicional neste exemplo)"}
             />
             <BlocoLeitura
               titulo="Prompt de comportamento"

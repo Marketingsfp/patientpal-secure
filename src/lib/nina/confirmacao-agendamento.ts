@@ -19,13 +19,38 @@ const VOCABULARIO = new Set(
   ).split(/\s+/),
 );
 
+/** Aceite explícito seguido de uma pergunta adicional. Não aceita ressalvas,
+ * condições ou mudanças da reserva. Casos abertos ficam para o Jev. */
+export function separarAceiteComPergunta(
+  texto: string,
+): { aceite: string; pergunta: string } | null {
+  const t = normalizar(texto);
+  const partes = t.match(
+    /^(.+?)[.!;\n]+\s*((?:ah\s+)?(?:e\s+)?(?:da pra fazer|da para fazer|voces fazem|vcs fazem|quanto custa|qual o valor|precisa de|precisa ficar|tem que|tem q)\b[\s\S]*)$/,
+  );
+  if (!partes) return null;
+  const pergunta = partes[2]!;
+  if (
+    /\b(?:mas|porem|se|caso|so|somente|apenas|nao|nem|troc\w*|mud\w*|alter\w*|cancel\w*|remarc\w*|agend\w*|marc\w*|outro horario|outra data|outro medico|amanha|hoje|dr|dra|doutor|doutora|medico|medica)\b|\d{1,2}(?::|h|\/)\d*/.test(
+      pergunta,
+    )
+  )
+    return null;
+  return { aceite: partes[1]!, pergunta };
+}
+
 /** Aceite explícito; qualificadores só valem quando conferem com a vaga do resumo.
  * A entrega do resumo e o escopo da sessão são verificados separadamente. */
 export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento | null): boolean {
+  const separado = separarAceiteComPergunta(texto);
+  if (separado && vaga) return ehConfirmacaoDeAgendamento(separado.aceite, vaga);
   if (ehRespostaAfirmativaCurta(texto)) return true;
   let t = normalizar(texto ?? "");
   if (!t || t.length > 500) return false;
-  t = t.replace(/\b(?:pode|podemos) (?:finalizar|concluir)\?\s*$/, "");
+  t = t
+    .replace(/\b(?:pode|podemos) (?:finalizar|concluir)\?\s*$/, "")
+    .replace(/^ja (?:falei|disse) (?:q|que) sim(?: moca)?(?: k+)?\s+confirmo[.!]*$/, "sim confirmo")
+    .replace(/\bpode marca\b/g, "pode marcar");
   if (
     /[?]/.test(t) ||
     /\b(?:nao|nem|talvez|mas|porem|se|caso|ou|ainda|outro|outra|trocar|mudar|alterar|cancelar|exceto|apenas|so)\b/.test(
@@ -35,7 +60,10 @@ export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento
     return false;
   // Complementos de cortesia/localização não mudam o aceite. Remova apenas
   // sufixos conhecidos; uma ressalva ou outro atendimento continua inválido.
-  t = t.replace(/[,.!;]+/g, " ").replace(/\s+/g, " ").trim()
+  t = t
+    .replace(/[,.!;]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
     .replace(/(?:\s+(?:muito\s+)?(?:obrigad[oa]|valeu|grat[oa]))?(?:\s+nina)?$/, "")
     .replace(/\s+(?:por favor|por gentileza|pfv|pfvr|obrigad[oa])$/, "")
     .replace(/\s+por aqui$/, "")
@@ -43,7 +71,10 @@ export function ehConfirmacaoDeAgendamento(texto: string, vaga?: VagaAgendamento
     .replace(/\b(?:ja\s+)?(?:falei|disse)\s+(?:que\s+)?(?=(?:eu\s+)?confirmo\b)/, "")
     .replace(/\s+/g, " ")
     .trim();
-  t = t.replace(/^(?:isso (?:ai|ae)|ja e|formou|demorou|fechou|combinado|blz|beleza|bora|ss|s)(?=\s+(?:pode|confirmo|eu confirmo)\b)/, "sim");
+  t = t.replace(
+    /^(?:isso (?:ai|ae)|ja e|formou|demorou|fechou|combinado|blz|beleza|bora|ss|s)(?=\s+(?:pode|confirmo|eu confirmo)\b)/,
+    "sim",
+  );
   if (CURTA.test(t.replace(/[,.!]/g, " ").replace(/\s+/g, " ").trim())) return true;
   if (
     !/^(?:(?:sim|isso(?: mesmo)?|esse(?: mesmo)?|essa(?: mesma)?|claro|ok|certo|certinho|perfeito|combinado|beleza|otimo)[,.!\s]+)?(?:eu\s+)?(?:confirmo|aceito|autorizo|pode\s+(?:sim\s+)?(?:marcar|agendar|confirmar|finalizar|concluir)|(?:(?:esta|estao|ta)\s+(?:tudo\s+)?|tudo\s+)(?:certo|correto|certinho))\b/.test(

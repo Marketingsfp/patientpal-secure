@@ -56,6 +56,7 @@ export type FormaCanonica =
   | "credito"
   | "legado_cartao"
   | "pago_sistema_anterior"
+  | "credito_clinica"
   | "boleto"
   | "transferencia"
   | "convenio"
@@ -70,6 +71,7 @@ export const LABEL_FORMA: Record<FormaCanonica, string> = {
   credito: "Cartão de Crédito",
   legado_cartao: "Parcelas do sistema antigo",
   pago_sistema_anterior: "Pago no sistema anterior",
+  credito_clinica: "Crédito na clínica",
   boleto: "Boleto",
   transferencia: "Transferência / Depósito",
   convenio: "Convênio / Gratuidade",
@@ -86,6 +88,7 @@ export const ORDEM_FORMAS: FormaCanonica[] = [
   "credito",
   "legado_cartao",
   "pago_sistema_anterior",
+  "credito_clinica",
   "boleto",
   "transferencia",
   "convenio",
@@ -137,6 +140,17 @@ export const FORMA_PAGO_SISTEMA_ANTERIOR = "pago_sistema_anterior";
 export const LABEL_PAGO_SISTEMA_ANTERIOR = "Pago no sistema anterior";
 
 /**
+ * Crédito na clínica (cartões da SFP): o titular paga com o crédito do
+ * contrato e o valor vira uma cobrança no contrato, com o vencimento da
+ * mensalidade. Fatura no dia do atendimento, como cartão de crédito, mas NÃO
+ * é dinheiro na gaveta: o movimento de caixa sai como `registro` (pesa zero).
+ * A regra de quem pode usar e quanto mora no banco (gatilho
+ * `fn_credito_clinica_usar`).
+ */
+export const FORMA_CREDITO_CLINICA = "credito_clinica";
+export const LABEL_CREDITO_CLINICA = "Crédito na clínica";
+
+/**
  * Textos que significam "o dinheiro entrou no sistema antigo, não na gaveta de
  * hoje". Casa tanto a chave que o sistema grava (`pago_sistema_anterior`)
  * quanto variações digitadas à mão em lançamentos avulsos.
@@ -172,6 +186,8 @@ export function classificarForma(raw: string | null | undefined): FormaCanonica 
   // ser cobrado na conferência da gaveta — que é exatamente o que esta forma
   // existe para evitar.
   if (PAGO_NO_SISTEMA_ANTERIOR.test(k)) return "pago_sistema_anterior";
+  // Antes do teste de "credito": senão o crédito da clínica cairia em cartão.
+  if (/\bcredito (na |da )?clinica\b/.test(k)) return "credito_clinica";
   if (/\bdinheiro\b/.test(k) || /^caixa\b/.test(k) || /^cx\b/.test(k) || /\bespecie\b/.test(k)) {
     return "dinheiro";
   }

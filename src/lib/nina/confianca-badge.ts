@@ -67,20 +67,17 @@ export function rotuloConfianca(
     nivel: confianca.nivel,
     score: exibido,
     policyVersion: confianca.policy_version,
-    altaConfiancaComErro:
-      confianca.nivel === "HIGH" && Boolean(confianca.erro_reportado),
+    altaConfiancaComErro: confianca.nivel === "HIGH" && Boolean(confianca.erro_reportado),
   };
 }
 
 /** Classificação interna HIGH_CONFIDENCE_ERROR de uma resposta. */
-export function ehAltaConfiancaComErro(
-  confianca: ConfiancaDaMensagem | null | undefined,
-): boolean {
+export function ehAltaConfiancaComErro(confianca: ConfiancaDaMensagem | null | undefined): boolean {
   return Boolean(
     confianca &&
-      confianca.avaliacao === "answer_confidence" &&
-      confianca.nivel === "HIGH" &&
-      confianca.erro_reportado,
+    confianca.avaliacao === "answer_confidence" &&
+    confianca.nivel === "HIGH" &&
+    confianca.erro_reportado,
   );
 }
 

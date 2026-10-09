@@ -1,10 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TranscricaoAudioMensagem, transcricaoDoAudioPaciente } from "@/components/nina/TranscricaoAudioMensagem";
+import {
+  TranscricaoAudioMensagem,
+  transcricaoDoAudioPaciente,
+} from "@/components/nina/TranscricaoAudioMensagem";
 import { textoDaBolha } from "@/components/nina/MidiaMensagem";
 
 describe("transcrição do áudio do paciente", () => {
-  const mensagem = { id: "audio-1", tipo: "audio", direction: "in", body: "🎤 Texto antigo", transcricao: "Texto transcrito" };
+  const mensagem = {
+    id: "audio-1",
+    tipo: "audio",
+    direction: "in",
+    body: "🎤 Texto antigo",
+    transcricao: "Texto transcrito",
+  };
 
   it("usa a transcrição salva e começa completamente recolhida", () => {
     expect(transcricaoDoAudioPaciente(mensagem)).toBe("Texto transcrito");
@@ -31,7 +40,7 @@ describe("transcrição do áudio do paciente", () => {
   it("preserva áudios enviados pela Nina e mensagens de outros tipos", () => {
     const enviada = { ...mensagem, direction: "out" };
     expect(transcricaoDoAudioPaciente(enviada)).toBeNull();
-    expect(textoDaBolha(enviada)).toBe("🎤 Texto antigo");
+    expect(textoDaBolha(enviada)).toBe(""); // A transcrição fica no player expansível (AudioMensagem).
     expect(renderToStaticMarkup(<TranscricaoAudioMensagem mensagem={enviada} />)).toBe("");
     expect(transcricaoDoAudioPaciente({ ...mensagem, tipo: "image" })).toBeNull();
   });

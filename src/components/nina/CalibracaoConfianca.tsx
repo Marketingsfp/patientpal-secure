@@ -321,9 +321,7 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
             </div>
 
             <div className="rounded-md border p-3">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                Propostas em revisão
-              </p>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Propostas em revisão</p>
               {propostas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma proposta registrada.</p>
               ) : (
@@ -355,10 +353,7 @@ export function CalibracaoConfianca({ clinicaId }: { clinicaId: string }) {
                           </>
                         )}
                         {p.status === "aprovada" && (
-                          <Button
-                            size="sm"
-                            onClick={() => void decidirProposta(p.id, "aplicada")}
-                          >
+                          <Button size="sm" onClick={() => void decidirProposta(p.id, "aplicada")}>
                             Colocar em vigor
                           </Button>
                         )}

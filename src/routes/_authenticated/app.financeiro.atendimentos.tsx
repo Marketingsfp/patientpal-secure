@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useMatch } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -118,6 +119,13 @@ import {
 /** "2026-09-08" — só aceita o formato exato, para não semear filtro inválido. */
 const ehDataIso = (v: unknown): v is string =>
   typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** Máximo de ids por `.in()`: a lista vai na URL e seleções grandes estouram o limite (400). */
+const IN_BLOCO = 200;
+
+/** Baixa recusada pelo banco (perfil sem permissão de alterar a agenda). */
+const BAIXA_NAO_GRAVADA =
+  "A baixa não foi gravada: seu perfil não tem permissão para alterar este atendimento. Chame o administrador.";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
@@ -247,7 +255,7 @@ interface PacFull {
 }
 
 const EMPTY = {
-  data: new Date().toISOString().slice(0, 10),
+  data: hojeBR(),
   medico_id: "",
   paciente_id: "",
   procedimento: "",
@@ -337,7 +345,7 @@ function AtendimentosPage() {
   const [editing, setEditing] = useState<Atend | null>(null);
   const [form, setForm] = useState(EMPTY);
   // Filtros do relatório
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeBR();
   // Sem `throw`: no painel direito do modo Comparar a tela é desenhada fora
   // do próprio endereço, e aí não há `?de=&ate=` — abre em hoje.
   const buscaUrl = useMatch({ from: Route.id, shouldThrow: false })?.search ?? {};
@@ -362,6 +370,9 @@ function AtendimentosPage() {
   >("gr");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
   const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");
+  // Recorte por produto, independente do filtro "Médico": o Cartão Terapêutico
+  // contra todo o resto (particular e demais convênios).
+  const [fConvenio, setFConvenio] = useState<"todos" | "ct" | "outros">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
@@ -2360,28 +2371,42 @@ function AtendimentosPage() {
           toast.error("Atendimento sem agendamento vinculado.");
           return;
         }
-        const { error } = await supabase
+        // `.select` devolve as linhas gravadas: quando a regra do banco recusa
+        // a alteração, o update volta SEM erro e sem linha nenhuma. Sem esta
+        // conferência a tela dizia "Baixa realizada" e nada mudava (foi o que
+        // aconteceu com o perfil Financeiro em 08/10/2026).
+        const { data: gravadas, error } = await supabase
           .from("agendamentos")
           .update({ status: "realizado" })
-          .eq("id", a.agendamento_id);
+          .eq("id", a.agendamento_id)
+          .select("id");
         if (error) {
           mostrarErro(error);
+          return;
+        }
+        if (!gravadas || gravadas.length === 0) {
+          toast.error(BAIXA_NAO_GRAVADA);
           return;
         }
       } else {
         // Sem faturamento: o repasse é calculado na tela (tabela do serviço).
         // Gravá-lo na baixa faz os demais relatórios, que leem o valor
         // guardado, enxergarem o mesmo número que o setor de repasse vê aqui.
-        const { error } = await supabase
+        const { data: gravadas, error } = await supabase
           .from("fin_atendimentos")
           .update(
             ehLinhaSemFaturamento(a.forma_pagamento)
               ? { status: "realizado", valor_medico: Number(a.valor_medico) || 0 }
               : { status: "realizado" },
           )
-          .eq("id", a.id);
+          .eq("id", a.id)
+          .select("id");
         if (error) {
           mostrarErro(error);
+          return;
+        }
+        if (!gravadas || gravadas.length === 0) {
+          toast.error(BAIXA_NAO_GRAVADA);
           return;
         }
       }
@@ -2483,26 +2508,35 @@ function AtendimentosPage() {
         .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
         .map((a) => a.agendamento_id as string);
       const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
-      if (agIds.length) {
-        const { error } = await supabase
+      // Em blocos: a lista de ids vai na URL e, com seleções grandes, estoura o limite (400).
+      // Conta as linhas realmente gravadas (ver `darBaixa`): recusa da regra
+      // do banco não vem como erro.
+      let gravados = 0;
+      for (let i = 0; i < agIds.length; i += IN_BLOCO) {
+        const { data, error } = await supabase
           .from("agendamentos")
           .update({ status: "realizado" })
-          .in("id", agIds);
+          .in("id", agIds.slice(i, i + IN_BLOCO))
+          .select("id");
         if (error) {
           mostrarErro(error);
           return;
         }
+        gravados += data?.length ?? 0;
       }
-      if (manualIds.length) {
-        const { error } = await supabase
+      for (let i = 0; i < manualIds.length; i += IN_BLOCO) {
+        const { data, error } = await supabase
           .from("fin_atendimentos")
           .update({ status: "realizado" })
-          .in("id", manualIds);
+          .in("id", manualIds.slice(i, i + IN_BLOCO))
+          .select("id");
         if (error) {
           mostrarErro(error);
           return;
         }
+        gravados += data?.length ?? 0;
       }
+      const esperados = agIds.length + manualIds.length;
       // Sem faturamento: grava o repasse calculado na tela (ver `darBaixa`).
       for (const a of alvos) {
         if (a.origem !== "manual" || !ehLinhaSemFaturamento(a.forma_pagamento)) continue;
@@ -2515,7 +2549,15 @@ function AtendimentosPage() {
           return;
         }
       }
-      toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      if (gravados < esperados) {
+        toast.error(
+          gravados === 0
+            ? BAIXA_NAO_GRAVADA
+            : `Só ${gravados} de ${esperados} baixa(s) foram gravadas. ` + BAIXA_NAO_GRAVADA,
+        );
+      } else {
+        toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      }
       await load();
     } catch (err) {
       mostrarErro(err);
@@ -2667,12 +2709,18 @@ function AtendimentosPage() {
         : fTipo === "medico"
           ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
           : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
+    const baseConvenio =
+      fConvenio === "todos"
+        ? baseTipo
+        : fConvenio === "ct"
+          ? baseTipo.filter((a) => ehServicoCartaoTerapeutico(a.procedimento))
+          : baseTipo.filter((a) => !ehServicoCartaoTerapeutico(a.procedimento));
     const baseLaudo =
       fLaudo === "todos"
-        ? baseTipo
+        ? baseConvenio
         : fLaudo === "baixado"
-          ? baseTipo.filter((a) => a.laudo_status === "emitido")
-          : baseTipo.filter((a) => a.laudo_status !== "emitido");
+          ? baseConvenio.filter((a) => a.laudo_status === "emitido")
+          : baseConvenio.filter((a) => a.laudo_status !== "emitido");
     const nomeDe = (a: Atend) =>
       norm(
         ((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim(),
@@ -2705,7 +2753,7 @@ function AtendimentosPage() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo, fConvenio]);
   const totais = useMemo(
     () =>
       filteredItems.reduce(
@@ -2900,16 +2948,21 @@ function AtendimentosPage() {
       // A mesma regra é reforçada no banco pela RPC pagar_repasse_medico.
       // A mensalidade do Cartão Terapêutico fica fora desta checagem: ela não
       // tem agendamento de propósito (o banco aceita esse caso específico).
-      const hojeIso = new Date().toISOString().slice(0, 10);
+      const hojeIso = hojeBR();
       const agendaIdsCheck = selectedItems
         .filter((x) => x.origem === "agenda" && !x.mensalidade_ct)
         .map((x) => x.id);
       if (agendaIdsCheck.length) {
-        const { data: lancs, error: eChk } = await supabase
-          .from("fin_lancamentos")
-          .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
-          .in("id", agendaIdsCheck);
-        if (eChk) throw eChk;
+        // Em blocos: a lista de ids vai na URL e, com o mês inteiro, estoura o limite (400).
+        const lancs: unknown[] = [];
+        for (let i = 0; i < agendaIdsCheck.length; i += IN_BLOCO) {
+          const { data: parte, error: eChk } = await supabase
+            .from("fin_lancamentos")
+            .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
+            .in("id", agendaIdsCheck.slice(i, i + IN_BLOCO));
+          if (eChk) throw eChk;
+          lancs.push(...(parte ?? []));
+        }
         const bloq: string[] = [];
         for (const l of (lancs ?? []) as Array<{
           id: string;
@@ -3276,7 +3329,7 @@ function AtendimentosPage() {
                       forma_pagamento: a.forma_pagamento ?? "",
                       status: a.status,
                     })),
-                    `atendimentos-${new Date().toISOString().slice(0, 10)}`,
+                    `atendimentos-${hojeBR()}`,
                     isMedicoOnly
                       ? [
                           { key: "data", label: "Data" },
@@ -3611,6 +3664,22 @@ function AtendimentosPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Convênio</Label>
+                  <Select
+                    value={fConvenio}
+                    onValueChange={(v) => setFConvenio(v as "todos" | "ct" | "outros")}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os atendimentos</SelectItem>
+                      <SelectItem value="ct">Somente Cartão Terapêutico</SelectItem>
+                      <SelectItem value="outros">Particulares / outros convênios</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
                   <Label className="text-xs font-medium">
                     Laudo
                     <span className="ml-1 font-normal text-muted-foreground">
@@ -3938,6 +4007,14 @@ function AtendimentosPage() {
                                 title="Parte do médico que laudou o exame. É o mesmo exame já cobrado do paciente — não conta como um novo atendimento."
                               >
                                 LAUDO DO EXAME
+                              </div>
+                            )}
+                            {ehServicoCartaoTerapeutico(a.procedimento) && (
+                              <div
+                                className="text-[10px] font-semibold text-violet-700 dark:text-violet-400"
+                                title="Atendimento do Cartão Terapêutico. O repasse sai em nome do produto, em recibo próprio."
+                              >
+                                CARTÃO TERAPÊUTICO
                               </div>
                             )}
                             {ehLinhaSemFaturamento(a.forma_pagamento) && (

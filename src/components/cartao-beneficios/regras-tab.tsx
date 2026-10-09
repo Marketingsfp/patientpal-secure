@@ -114,7 +114,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         )
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
-      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      // Só as especialidades ativas nesta unidade.
+      supabase
+        .from("especialidades_da_unidade")
+        .select("id,nome")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("nome"),
     ]);
     // Paginar procedimentos — PostgREST corta em db-max-rows=1000, o que
     // ocultava serviços (ex.: "Preventivo") em clínicas com catálogo grande.
@@ -1042,6 +1048,7 @@ function LimiteDialog({
                   <SelectItem value="semana">Por semana</SelectItem>
                   <SelectItem value="mes">Por mês</SelectItem>
                   <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
+                  <SelectItem value="12m_uso">12 meses entre usos</SelectItem>
                   <SelectItem value="contrato">Por contrato</SelectItem>
                 </SelectContent>
               </Select>
@@ -1609,6 +1616,7 @@ function NovaRegraDialog({
                     <SelectItem value="semana">Por semana</SelectItem>
                     <SelectItem value="mes">Por mês</SelectItem>
                     <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
+                    <SelectItem value="12m_uso">12 meses entre usos</SelectItem>
                     <SelectItem value="contrato">Por contrato</SelectItem>
                   </SelectContent>
                 </Select>

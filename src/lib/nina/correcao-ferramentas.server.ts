@@ -62,9 +62,7 @@ export async function publicarPrompt(
   const atual = await lerPromptPublicado(supabase);
   if (!atual) throw new Error("Não há versão publicada da Arquitetura para corrigir.");
   if (!identidadePreservada(atual.conteudo, entrada.conteudo))
-    throw new Error(
-      "A correção tentou alterar a identidade do atendimento. Publicação recusada.",
-    );
+    throw new Error("A correção tentou alterar a identidade do atendimento. Publicação recusada.");
 
   const { validarTemplateInstrucoes } = await import("./instrucoes-template");
   const template = validarTemplateInstrucoes("whatsapp", entrada.conteudo);
@@ -147,7 +145,6 @@ export async function testarEmHomologacao(
         'Sessão de homologação em andamento neste lead. Use "Resolver / Reiniciar teste" e execute o reteste novamente.',
     };
   }
-
 
   const r = await processarMensagemTeste(
     {

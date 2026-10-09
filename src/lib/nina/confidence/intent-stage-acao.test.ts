@@ -37,6 +37,7 @@ function estadoProntoParaCriar(): EstadoFluxoNina {
       date: "2026-09-10",
       time: "09:00",
       slot_inicio: "2026-09-10T09:00:00",
+      slot_fim: "2026-09-10T09:30:00",
       slot_confirmed_by_patient: true,
     },
   };

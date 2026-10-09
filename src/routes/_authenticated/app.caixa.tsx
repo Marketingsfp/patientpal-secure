@@ -93,9 +93,12 @@ import {
   STATUS_CAIXA_CLASS,
 } from "@/lib/caixa/fechamento";
 import {
+  FORMA_CREDITO_CLINICA,
   FORMA_PAGO_SISTEMA_ANTERIOR,
+  LABEL_CREDITO_CLINICA,
   LABEL_PAGO_SISTEMA_ANTERIOR,
 } from "@/lib/financeiro/formas-pagamento";
+import { carregarCreditoClinica, type CreditoClinica } from "@/lib/cartao/credito-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
@@ -301,7 +304,8 @@ function CaixaRouteDispatcher() {
   // O aviso de versão nova vale para todo o sistema, no layout
   // `_authenticated` — não precisa mais ser ligado tela a tela.
   const role = clinicaAtual?.role ?? null;
-  const v2Allowed = role === "admin" || role === "gestor";
+  // Financeiro opera o caixa como a gestão (Beth e Zenilda, 08/10/2026).
+  const v2Allowed = role === "admin" || role === "gestor" || role === "financeiro";
   if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
   return <Page />;
 }
@@ -620,7 +624,12 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever("caixa");
-  const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+  // Aba "Todos (Financeiro)" — o caixa de todas as operadoras. O perfil
+  // Financeiro ficava de fora e não conseguia conferir o caixa das outras.
+  const isManager =
+    clinicaAtual?.role === "admin" ||
+    clinicaAtual?.role === "gestor" ||
+    clinicaAtual?.role === "financeiro";
   const podeLancarRecebDespesa =
     clinicaAtual?.role === "admin" ||
     clinicaAtual?.role === "gestor" ||
@@ -649,7 +658,7 @@ function Page() {
   >([]);
   const loadRepasseHoje = useCallback(async () => {
     if (!clinicaAtual) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const { data, error } = await supabase
       .from("fin_lancamentos")
       .select("valor, medico_id, repasse_pago, agendamento_id, data")
@@ -790,8 +799,8 @@ function Page() {
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
-  const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [meuDataIni, setMeuDataIni] = useState<string>(() => hojeBR());
+  const [meuDataFim, setMeuDataFim] = useState<string>(() => hojeBR());
   const [meuMedico, setMeuMedico] = useState<string>("__all__");
   const [meuPaciente, setMeuPaciente] = useState<string>("");
   const [openCal, setOpenCal] = useState(false);
@@ -903,7 +912,7 @@ function Page() {
     setMeuPeriodo("hoje");
     setMeuMedico("__all__");
     setMeuPaciente("");
-    const hj = new Date().toISOString().slice(0, 10);
+    const hj = hojeBR();
     setMeuDataIni(hj);
     setMeuDataFim(hj);
   };
@@ -925,7 +934,7 @@ function Page() {
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
   const [fIni, setFIni] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [fFim, setFFim] = useState(new Date().toISOString().slice(0, 10));
+  const [fFim, setFFim] = useState(hojeBR());
   const [fUserId, setFUserId] = useState<string>("");
   const [usersList, setUsersList] = useState<Array<{ user_id: string; nome: string }>>([]);
 
@@ -972,6 +981,8 @@ function Page() {
    */
   const [precoCobranca, setPrecoCobranca] = useState<PrecoCaixa | null>(null);
   const [calculandoPreco, setCalculandoPreco] = useState(false);
+  /** Crédito na clínica do paciente da cobrança aberta (null = não tem). */
+  const [creditoCobranca, setCreditoCobranca] = useState<CreditoClinica | null>(null);
   /** Guarda qual cobrança está sendo calculada, para descartar resposta atrasada. */
   const precoPedidoRef = useRef<string | null>(null);
 
@@ -1052,7 +1063,7 @@ function Page() {
       setCartaoEdit({
         bandeira: prefill.bandeira ?? "",
         parcelas: prefill.parcelas ?? "1",
-        data: prefill.data ?? new Date().toISOString().slice(0, 10),
+        data: prefill.data ?? hojeBR(),
         autorizacao: prefill.autorizacao ?? "",
         valorLiquido: prefill.valorLiquido ?? String(m.valor ?? ""),
       });
@@ -1301,9 +1312,7 @@ function Page() {
     [],
   );
   const [obsFechamento, setObsFechamento] = useState("");
-  const [dataFechamento, setDataFechamento] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [dataFechamento, setDataFechamento] = useState<string>(() => hojeBR());
   const [saving, setSaving] = useState(false);
   const lancandoMovRef = useRef(false);
   // Conferência por forma de pagamento no fechamento do próprio caixa.
@@ -1313,9 +1322,7 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
-  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() => hojeBR());
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
@@ -1867,8 +1874,12 @@ function Page() {
         { forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" },
       ]);
       setPrecoCobranca(null);
+      setCreditoCobranca(null);
       if (!clinicaAtual || !f.paciente_id) return;
       precoPedidoRef.current = f.id;
+      void carregarCreditoClinica(f.paciente_id, clinicaAtual.clinica_id).then((c) => {
+        if (precoPedidoRef.current === f.id) setCreditoCobranca(c);
+      });
       setCalculandoPreco(true);
       try {
         // O nome do serviço vem do próprio agendamento, e não do texto montado
@@ -2053,6 +2064,23 @@ function Page() {
       toast.error("Adicione ao menos uma forma de pagamento");
       return;
     }
+    // Crédito na clínica: confere aqui para avisar cedo; quem garante a regra
+    // é o banco (gatilho fn_credito_clinica_usar).
+    const totalCredito = linhasValidadas
+      .filter((l) => l.forma === FORMA_CREDITO_CLINICA)
+      .reduce((acc, l) => acc + l.valor, 0);
+    if (totalCredito > 0) {
+      if (!creditoCobranca?.apto) {
+        toast.error("Este paciente não pode usar Crédito na clínica agora.");
+        return;
+      }
+      if (totalCredito > creditoCobranca.disponivel + 0.005) {
+        toast.error(
+          `Crédito na clínica insuficiente: disponível ${fmt(creditoCobranca.disponivel)}.`,
+        );
+        return;
+      }
+    }
     setSaving(true);
     // Escopo externo ao try para permitir rollback inter-linhas no catch.
     // Cada par (lançamento + movimento) é atômico via RPC no banco
@@ -2087,7 +2115,7 @@ function Page() {
         .eq("id", openCobranca.id)
         .maybeSingle();
       const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
-      const hoje = new Date().toISOString().slice(0, 10);
+      const hoje = hojeBR();
       // Carimbo do convênio na descrição, no mesmo formato da Agenda. Serve à
       // contagem de cota do benefício: um atendimento gravado como "particular"
       // só conta como uso do convênio quando o lançamento registra que o
@@ -2151,7 +2179,9 @@ function Page() {
               ? null
               : {
                   user_id: user.id,
-                  tipo: "recebimento",
+                  // Crédito na clínica não é dinheiro na gaveta: a linha aparece
+                  // no extrato do dia, mas pesa zero no fechamento.
+                  tipo: l.forma === FORMA_CREDITO_CLINICA ? "registro" : "recebimento",
                   valor: l.valor,
                   descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}${sufixoConvenio}`,
                   forma_pagamento: l.forma,
@@ -3622,7 +3652,7 @@ function Page() {
       ? `Dias ${diasComMovimento.join(" + ")}`
       : `Dia ${dataFechamento}`;
     // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const fechadoEmISO =
       dataFechamento && dataFechamento !== hoje
         ? new Date(`${dataFechamento}T23:59:59`).toISOString()
@@ -3664,7 +3694,7 @@ function Page() {
     // Fechou um caixa pendente de outro dia: a tela volta sozinha para o caixa
     // de hoje, senão ficaria presa numa sessão que não existe mais como aberta.
     setSessaoAtivaId(null);
-    setDataFechamento(new Date().toISOString().slice(0, 10));
+    setDataFechamento(hojeBR());
     toast.success("Caixa fechado");
     // Comprovante escopado ao dia selecionado.
     // Entradas e saídas de cada forma no dia. Nada é removido aqui: quem
@@ -3731,7 +3761,7 @@ function Page() {
     const breakdownStr = Object.entries(conferidoNum)
       .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
       .join("; ");
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const fechadoEmISO =
       dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
         ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
@@ -3770,7 +3800,7 @@ function Page() {
     setInformadoTerceiro("");
     setObsTerceiro("");
     setConferidoTerceiro({});
-    setDataFechamentoTerceiro(new Date().toISOString().slice(0, 10));
+    setDataFechamentoTerceiro(hojeBR());
     toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
     printComprovanteCaixa({
       tipo: "fechamento",
@@ -5181,7 +5211,7 @@ function Page() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const hoje = new Date().toISOString().slice(0, 10);
+                    const hoje = hojeBR();
                     setFIni(hoje);
                     setFFim(hoje);
                   }}
@@ -6228,7 +6258,7 @@ function Page() {
               <Label>Data do fechamento</Label>
               <DateInputBR
                 value={dataFechamentoTerceiro}
-                max={new Date().toISOString().slice(0, 10)}
+                max={hojeBR()}
                 onChange={(e) => setDataFechamentoTerceiro(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -6487,6 +6517,11 @@ function Page() {
                           <SelectItem value="debito">Débito</SelectItem>
                           <SelectItem value="credito">Crédito</SelectItem>
                           <SelectItem value="boleto">Boleto</SelectItem>
+                          {creditoCobranca?.apto && (
+                            <SelectItem value={FORMA_CREDITO_CLINICA}>
+                              {LABEL_CREDITO_CLINICA} (disponível {fmt(creditoCobranca.disponivel)})
+                            </SelectItem>
+                          )}
                           {/* Transição de sistemas: paciente já pagou na
                               Clínica Total. Por último porque é exceção — e
                               porque tira o valor do fechamento do dia. */}
@@ -6508,6 +6543,14 @@ function Page() {
                       />
                     </div>
                   </div>
+                  {l.forma === FORMA_CREDITO_CLINICA && creditoCobranca && (
+                    <div className="rounded-md border border-rose-200 bg-rose-50 p-2 text-[12px] text-rose-900">
+                      <strong>{LABEL_CREDITO_CLINICA}</strong> do titular · disponível{" "}
+                      {fmt(creditoCobranca.disponivel)} de {fmt(creditoCobranca.limite)}. O valor
+                      vira uma cobrança no contrato, com o vencimento da próxima mensalidade, e{" "}
+                      <strong>não entra na gaveta de hoje</strong>.
+                    </div>
+                  )}
                   {l.forma === FORMA_PAGO_SISTEMA_ANTERIOR && (
                     <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-2">
                       <p className="text-[12px] text-amber-900">

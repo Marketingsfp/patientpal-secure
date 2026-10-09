@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { bloquearLinksRecebidos } from "@/lib/atendimento/links-entrada";
 
 type Props = {
   content: string;
@@ -14,7 +15,9 @@ type Props = {
  */
 export function NinaMessage({ content, variant, className }: Props) {
   if (variant === "user") {
-    return <div className={cn("whitespace-pre-wrap", className)}>{content}</div>;
+    return (
+      <div className={cn("whitespace-pre-wrap", className)}>{bloquearLinksRecebidos(content)}</div>
+    );
   }
 
   return (

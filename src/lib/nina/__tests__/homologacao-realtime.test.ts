@@ -33,14 +33,28 @@ const linha = (extra: Record<string, unknown> = {}) => ({
 
 describe("chat aberto acompanha o card sem trocar de lead", () => {
   const lead = {
-    conversaId: "conv", cicloId: "ciclo", sessao: 38, mensagens: 1,
-    ultimaMensagemId: "m1", ultimaMensagemTexto: "oi",
+    conversaId: "conv",
+    cicloId: "ciclo",
+    sessao: 38,
+    mensagens: 1,
+    ultimaMensagemId: "m1",
+    ultimaMensagemTexto: "oi",
   };
 
   it("atualizações do paciente e da Nina invalidam o histórico do mesmo lead", () => {
     const r1 = revisaoHistoricoLead(lead);
-    const paciente = { ...lead, mensagens: 2, ultimaMensagemId: "m2", ultimaMensagemTexto: "Quero marcar" };
-    const nina = { ...paciente, mensagens: 3, ultimaMensagemId: "m3", ultimaMensagemTexto: "Qual consulta?" };
+    const paciente = {
+      ...lead,
+      mensagens: 2,
+      ultimaMensagemId: "m2",
+      ultimaMensagemTexto: "Quero marcar",
+    };
+    const nina = {
+      ...paciente,
+      mensagens: 3,
+      ultimaMensagemId: "m3",
+      ultimaMensagemTexto: "Qual consulta?",
+    };
     expect(revisaoHistoricoLead(paciente)).not.toBe(r1);
     expect(revisaoHistoricoLead(nina)).not.toBe(revisaoHistoricoLead(paciente));
   });
@@ -48,17 +62,24 @@ describe("chat aberto acompanha o card sem trocar de lead", () => {
   it("recupera conversa criada após reset mesmo sem evento Realtime aceito", () => {
     const reiniciado = { ...lead, conversaId: null, mensagens: 0, ultimaMensagemId: null };
     const novaConversa = { ...reiniciado, conversaId: "nova", mensagens: 1 };
-    expect(aceitaMensagemRealtime(linha({ conversa_id: "nova" }), { ...alvo, conversaId: null })).toBe(false);
+    expect(
+      aceitaMensagemRealtime(linha({ conversa_id: "nova" }), { ...alvo, conversaId: null }),
+    ).toBe(false);
     expect(revisaoHistoricoLead(novaConversa)).not.toBe(revisaoHistoricoLead(reiniciado));
   });
 
   it("leitura do card não dispara um ciclo infinito de recargas", () => {
-    expect(revisaoHistoricoLead({ ...lead, ...{ naoLidas: 0 } }))
-      .toBe(revisaoHistoricoLead({ ...lead, ...{ naoLidas: 2 } }));
+    expect(revisaoHistoricoLead({ ...lead, ...{ naoLidas: 0 } })).toBe(
+      revisaoHistoricoLead({ ...lead, ...{ naoLidas: 2 } }),
+    );
   });
 
   it("edição de texto, sessão e ciclo também atualizam a revisão", () => {
-    for (const alteracao of [{ ultimaMensagemTexto: "corrigido" }, { sessao: 39 }, { cicloId: "novo" }]) {
+    for (const alteracao of [
+      { ultimaMensagemTexto: "corrigido" },
+      { sessao: 39 },
+      { cicloId: "novo" },
+    ]) {
       expect(revisaoHistoricoLead({ ...lead, ...alteracao })).not.toBe(revisaoHistoricoLead(lead));
     }
   });
@@ -97,7 +118,9 @@ describe("respostas de histórico fora de ordem", () => {
 
   it("histórico iniciado antes da resposta não apaga a nova bolha da Nina", () => {
     const paciente = paraMensagemTimeline(linha());
-    const nina = paraMensagemTimeline(linha({ id: "nina", wa_message_id: "reply", direction: "out" }));
+    const nina = paraMensagemTimeline(
+      linha({ id: "nina", wa_message_id: "reply", direction: "out" }),
+    );
     const resultado = reconciliarCargaHistorico([paciente], [], [paciente], [paciente, nina]);
     expect(resultado.map((m) => m.id)).toEqual(["m1", "nina"]);
   });
@@ -169,9 +192,21 @@ describe("reconciliação sem duplicar", () => {
 
   it("mantém a posição da bolha na timeline", () => {
     const antes: MensagemTimeline[] = [
-      { id: "x", direction: "out", body: "anterior", enviada_por: "nina", created_at: "2026-09-10T02:59:00.000Z" },
+      {
+        id: "x",
+        direction: "out",
+        body: "anterior",
+        enviada_por: "nina",
+        created_at: "2026-09-10T02:59:00.000Z",
+      },
       otimista("k1", "Olá"),
-      { id: "z", direction: "out", body: "depois", enviada_por: "nina", created_at: "2026-09-10T03:00:05.000Z" },
+      {
+        id: "z",
+        direction: "out",
+        body: "depois",
+        enviada_por: "nina",
+        created_at: "2026-09-10T03:00:05.000Z",
+      },
     ];
     const lista = mesclarMensagemTimeline(antes, paraMensagemTimeline(linha()));
     expect(lista.map((m) => m.id)).toEqual(["x", "m1", "z"]);
@@ -179,28 +214,43 @@ describe("reconciliação sem duplicar", () => {
 
   it("INSERT seguido de UPDATE atualiza a mesma bolha", () => {
     let lista = mesclarMensagemTimeline([otimista("k1", "Olá")], paraMensagemTimeline(linha()));
-    lista = mesclarMensagemTimeline(lista, paraMensagemTimeline(linha({ body: "Olá (corrigido)" })));
+    lista = mesclarMensagemTimeline(
+      lista,
+      paraMensagemTimeline(linha({ body: "Olá (corrigido)" })),
+    );
     expect(lista).toHaveLength(1);
     expect(lista[0]!.body).toBe("Olá (corrigido)");
   });
 
   it("Realtime repetido não cria bolha nova", () => {
     let lista: MensagemTimeline[] = [];
-    for (let i = 0; i < 3; i++) lista = mesclarMensagemTimeline(lista, paraMensagemTimeline(linha()));
+    for (let i = 0; i < 3; i++)
+      lista = mesclarMensagemTimeline(lista, paraMensagemTimeline(linha()));
     expect(lista).toHaveLength(1);
   });
 
   it("resposta da Nina entra na timeline sem esperar o histórico", () => {
     const lista = mesclarMensagemTimeline(
       [otimista("k1", "Olá")],
-      paraMensagemTimeline(linha({ id: "m2", direction: "out", enviada_por: "nina", wa_message_id: "test-lead-k1-reply" })),
+      paraMensagemTimeline(
+        linha({
+          id: "m2",
+          direction: "out",
+          enviada_por: "nina",
+          wa_message_id: "test-lead-k1-reply",
+        }),
+      ),
     );
     expect(lista).toHaveLength(2);
   });
 
   it("três mensagens rápidas continuam três bolhas depois da confirmação", () => {
     const textos = { a: "Olá", b: "Quero marcar", c: "Neurologista" } as const;
-    let lista: MensagemTimeline[] = [otimista("a", textos.a), otimista("b", textos.b), otimista("c", textos.c)];
+    let lista: MensagemTimeline[] = [
+      otimista("a", textos.a),
+      otimista("b", textos.b),
+      otimista("c", textos.c),
+    ];
     expect(lista).toHaveLength(3);
     for (const [i, chave] of (["a", "b", "c"] as const).entries()) {
       lista = mesclarMensagemTimeline(

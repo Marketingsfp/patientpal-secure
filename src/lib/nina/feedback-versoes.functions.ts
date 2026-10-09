@@ -63,9 +63,7 @@ const COLUNAS_VERSAO =
 export const listarVersoesAprendizadoNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z
-      .object({ clinicaId: z.string().uuid(), feedbackId: z.string().uuid().optional() })
-      .parse(i),
+    z.object({ clinicaId: z.string().uuid(), feedbackId: z.string().uuid().optional() }).parse(i),
   )
   .handler(async ({ data, context }) => {
     let q = context.supabase

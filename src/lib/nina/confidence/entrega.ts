@@ -20,11 +20,7 @@
 import { hashDoTexto } from "./hash";
 
 /** O que exatamente foi avaliado/entregue naquela linha. */
-export const REPRESENTACOES_SAIDA = [
-  "texto_completo",
-  "audio_integral",
-  "audio_resumo",
-] as const;
+export const REPRESENTACOES_SAIDA = ["texto_completo", "audio_integral", "audio_resumo"] as const;
 export type RepresentacaoSaida = (typeof REPRESENTACOES_SAIDA)[number];
 
 export const ROTULO_REPRESENTACAO: Record<RepresentacaoSaida, string> = {
@@ -124,10 +120,7 @@ export type MotivoReuso =
  * ou outra revisão da conversa.
  */
 export function avaliacaoAindaVale(
-  previa:
-    | { chaveIdentidade?: string | null; textoAvaliadoHash?: string | null }
-    | null
-    | undefined,
+  previa: { chaveIdentidade?: string | null; textoAvaliadoHash?: string | null } | null | undefined,
   ctx: ContextoDaAvaliacao,
 ): { vale: boolean; motivo: MotivoReuso } {
   if (!previa) return { vale: false, motivo: "sem_avaliacao_previa" };
@@ -198,8 +191,7 @@ export function saidasSemVinculo(
 ): RepresentacaoSaida[] {
   return saidas
     .filter(
-      (s) =>
-        !vinculos.some((v) => v.representacao === s.representacao && v.estado === s.estado),
+      (s) => !vinculos.some((v) => v.representacao === s.representacao && v.estado === s.estado),
     )
     .map((s) => s.representacao);
 }

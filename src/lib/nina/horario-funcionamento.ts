@@ -87,13 +87,19 @@ export function validarDia(dia: DiaHorario): string[] {
   });
 
   const validas = dia.faixas
-    .map((f, i) => ({ i, ini: minutos(normalizarHora(f.hora_inicio)), fim: minutos(normalizarHora(f.hora_fim)) }))
+    .map((f, i) => ({
+      i,
+      ini: minutos(normalizarHora(f.hora_inicio)),
+      fim: minutos(normalizarHora(f.hora_fim)),
+    }))
     .filter((f) => Number.isFinite(f.ini) && Number.isFinite(f.fim) && f.fim > f.ini)
     .sort((a, b) => a.ini - b.ini);
 
   for (let k = 1; k < validas.length; k++) {
     if (validas[k].ini < validas[k - 1].fim) {
-      erros.push("Existem faixas sobrepostas neste dia. Ajuste os horários para que não se cruzem.");
+      erros.push(
+        "Existem faixas sobrepostas neste dia. Ajuste os horários para que não se cruzem.",
+      );
       break;
     }
   }
@@ -129,7 +135,8 @@ export function validarExcecao(e: Excecao): string[] {
 }
 
 export function validarVigencia(inicio: string, fim?: string | null): string[] {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(inicio ?? ""))) return ["Informe a partir de quando este horário vale."];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(inicio ?? "")))
+    return ["Informe a partir de quando este horário vale."];
   if (fim && fim < inicio) return ["O fim da vigência não pode ser antes do início."];
   return [];
 }
@@ -165,7 +172,11 @@ export function versaoAplicavel(versoes: VersaoHorario[], data: string): VersaoH
     .filter((v) => v.status !== "rascunho" && !!v.publicado_em)
     .filter((v) => v.vigencia_inicio <= data && (!v.vigencia_fim || v.vigencia_fim >= data))
     .sort((a, b) =>
-      a.vigencia_inicio === b.vigencia_inicio ? b.versao - a.versao : a.vigencia_inicio < b.vigencia_inicio ? 1 : -1,
+      a.vigencia_inicio === b.vigencia_inicio
+        ? b.versao - a.versao
+        : a.vigencia_inicio < b.vigencia_inicio
+          ? 1
+          : -1,
     );
   return candidatas[0] ?? null;
 }
@@ -178,7 +189,10 @@ export function conflitosDeVigencia(
   const fimNova = nova.vigencia_fim ?? "9999-12-31";
   return (publicadas ?? [])
     .filter((v) => v.status === "publicado" && v.id !== nova.id)
-    .filter((v) => (v.vigencia_fim ?? "9999-12-31") >= nova.vigencia_inicio && v.vigencia_inicio <= fimNova);
+    .filter(
+      (v) =>
+        (v.vigencia_fim ?? "9999-12-31") >= nova.vigencia_inicio && v.vigencia_inicio <= fimNova,
+    );
 }
 
 /** Publicar valendo para data passada exige justificativa e perfil de administrador. */
@@ -198,12 +212,16 @@ export function validarPublicacao(params: {
   temDiaConfigurado: boolean;
 }): string[] {
   const erros: string[] = [];
-  if (!podeEditarHorario(params.role)) erros.push("Apenas administradores e gestores podem publicar o horário.");
-  if (!params.temDiaConfigurado) erros.push("Configure pelo menos um dia (aberto ou fechado) antes de publicar.");
+  if (!podeEditarHorario(params.role))
+    erros.push("Apenas administradores e gestores podem publicar o horário.");
+  if (!params.temDiaConfigurado)
+    erros.push("Configure pelo menos um dia (aberto ou fechado) antes de publicar.");
   erros.push(...validarVigencia(params.vigenciaInicio, null));
   if (ehRetroativa(params.vigenciaInicio, params.hoje)) {
     if (!podePublicarRetroativo(params.role)) {
-      erros.push("Publicação com validade em data passada é permitida apenas para administradores.");
+      erros.push(
+        "Publicação com validade em data passada é permitida apenas para administradores.",
+      );
     }
     if (String(params.motivoRetroativo ?? "").trim().length < 5) {
       erros.push("Informe a justificativa da publicação retroativa (mínimo de 5 caracteres).");

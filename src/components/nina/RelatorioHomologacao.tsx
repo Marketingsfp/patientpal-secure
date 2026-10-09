@@ -14,7 +14,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, MessageSquare, Network, Route as RouteIcon, FileText, Flag, RotateCcw } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  MessageSquare,
+  Network,
+  Route as RouteIcon,
+  FileText,
+  Flag,
+  RotateCcw,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +105,9 @@ function dataHora(v: string | null | undefined) {
   return new Date(v).toLocaleString("pt-BR");
 }
 
-export function RelatorioHomologacao({ onVerConversa }: {
+export function RelatorioHomologacao({
+  onVerConversa,
+}: {
   onVerConversa?: (alvo: import("@/lib/nina/homologacao-navegacao").ConversaTesteAlvo) => void;
 } = {}) {
   const { clinicaAtual } = useClinica();
@@ -216,14 +227,17 @@ export function RelatorioHomologacao({ onVerConversa }: {
     }
   };
 
-
   const carregarEnviados = async (avaliacaoIds: string[]) => {
     if (!clinicaId || avaliacaoIds.length === 0) return;
     const mapa: Record<string, { id: string; cenarioRegressaoId: string | null }> = {};
     for (const avaliacaoId of avaliacaoIds) {
       try {
         const r = (await listarEnviadosFn({ data: { clinicaId, avaliacaoId } })) as {
-          itens: Array<{ id: string; achadoIndice: number | null; cenarioRegressaoId: string | null }>;
+          itens: Array<{
+            id: string;
+            achadoIndice: number | null;
+            cenarioRegressaoId: string | null;
+          }>;
         };
         for (const it of r.itens ?? []) {
           if (it.achadoIndice === null) continue;
@@ -317,7 +331,12 @@ export function RelatorioHomologacao({ onVerConversa }: {
             realmente fez e atalhos para investigar até o componente responsável.
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void carregarLista()} disabled={carregandoLista}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void carregarLista()}
+          disabled={carregandoLista}
+        >
           {carregandoLista ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -413,7 +432,9 @@ export function RelatorioHomologacao({ onVerConversa }: {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Nenhum erro registrado nesta execução.</p>
+              <p className="text-xs text-muted-foreground">
+                Nenhum erro registrado nesta execução.
+              </p>
             )}
 
             <div className="space-y-3">
@@ -512,7 +533,9 @@ export function RelatorioHomologacao({ onVerConversa }: {
                       <div key={a.id} className="space-y-2 rounded-md bg-muted/40 p-3 text-xs">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge>{ROTULO_RESULTADO[a.resultado ?? ""] ?? a.resultado ?? "—"}</Badge>
-                          {a.score !== null ? <span className="font-semibold">{a.score}/100</span> : null}
+                          {a.score !== null ? (
+                            <span className="font-semibold">{a.score}/100</span>
+                          ) : null}
                           <span className="text-muted-foreground">
                             Avaliação {a.modelo} · {dataHora(a.criadoEm)}
                           </span>
@@ -558,7 +581,9 @@ export function RelatorioHomologacao({ onVerConversa }: {
                                       ) : (
                                         <Flag className="mr-2 h-4 w-4" />
                                       )}
-                                      {enviado ? "Já enviado para Revisão" : "Enviar para Revisão de Aprendizados"}
+                                      {enviado
+                                        ? "Já enviado para Revisão"
+                                        : "Enviar para Revisão de Aprendizados"}
                                     </Button>
                                     {enviado ? (
                                       <Button
@@ -658,7 +683,6 @@ export function RelatorioHomologacao({ onVerConversa }: {
             </Button>
           </DialogFooter>
         </DialogContent>
-
       </Dialog>
     </Card>
   );

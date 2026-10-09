@@ -94,9 +94,15 @@ export function ResultView({ result, atendente }: { result: AnalysisResult; aten
   }, [score]);
 
   const sentimentMap = {
-    positivo: { label: "Cliente satisfeito", color: "bg-success/15 text-[color:var(--success)] border-success/30" },
+    positivo: {
+      label: "Cliente satisfeito",
+      color: "bg-success/15 text-[color:var(--success)] border-success/30",
+    },
     neutro: { label: "Cliente neutro", color: "bg-muted text-muted-foreground border-border" },
-    negativo: { label: "Cliente insatisfeito", color: "bg-destructive/10 text-destructive border-destructive/20" },
+    negativo: {
+      label: "Cliente insatisfeito",
+      color: "bg-destructive/10 text-destructive border-destructive/20",
+    },
   } as const;
   const sentiment = sentimentMap[result.sentimento] ?? sentimentMap.neutro;
 
@@ -276,11 +282,7 @@ function ChecklistResultView({
   return <ChecklistResultViewInner items={items} />;
 }
 
-function CuriosidadeTapCard({
-  data,
-}: {
-  data: NonNullable<AnalysisResult["curiosidade_tap"]>;
-}) {
+function CuriosidadeTapCard({ data }: { data: NonNullable<AnalysisResult["curiosidade_tap"]> }) {
   return (
     <Section icon={Flame} title="Curiosidade do dia">
       <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
@@ -345,11 +347,7 @@ function ChecklistResultViewInner({
   );
 }
 
-function AgendamentoView({
-  data,
-}: {
-  data: NonNullable<AnalysisResult["agendamento"]>;
-}) {
+function AgendamentoView({ data }: { data: NonNullable<AnalysisResult["agendamento"]> }) {
   const cfg =
     data.status === "agendado"
       ? { label: "Agendou", cls: "text-[color:var(--success)]", Icon: CheckCircle2 }
@@ -383,9 +381,7 @@ function AgendamentoView({
                 style={{ width: `${Math.max(0, Math.min(100, data.aderencia_script))}%` }}
               />
             </div>
-            <span className="text-sm font-semibold">
-              {Math.round(data.aderencia_script)}%
-            </span>
+            <span className="text-sm font-semibold">{Math.round(data.aderencia_script)}%</span>
           </div>
         </div>
         {data.oportunidades_perdidas?.length > 0 && (
@@ -448,8 +444,8 @@ export function ScriptsEditor({
         <div className="px-4 pb-4 space-y-3 border-t pt-3">
           <p className="text-xs text-muted-foreground">
             Escreva os scripts oficiais de agendamento (abertura, apresentação de valor, oferta de
-            horários, quebra de objeções, confirmação). Eles são usados na análise, no roleplay e nas
-            provas para medir aderência e treinar a conversão.
+            horários, quebra de objeções, confirmação). Eles são usados na análise, no roleplay e
+            nas provas para medir aderência e treinar a conversão.
           </p>
           {items.map((s, i) => (
             <div key={i} className="rounded-xl border bg-background p-3 space-y-2">
@@ -473,7 +469,9 @@ export function ScriptsEditor({
               <Textarea
                 value={s.conteudo}
                 onChange={(e) => update(i, { conteudo: e.target.value.slice(0, 4000) })}
-                placeholder={"Ex: \"Perfeito, {nome}! Tenho horário hoje às 15h ou amanhã às 10h. Qual fica melhor pra você?\""}
+                placeholder={
+                  'Ex: "Perfeito, {nome}! Tenho horário hoje às 15h ou amanhã às 10h. Qual fica melhor pra você?"'
+                }
                 className="min-h-[110px] bg-background text-sm"
                 maxLength={4000}
               />
@@ -526,15 +524,13 @@ export function ChecklistEditor({
             {items.length} {items.length === 1 ? "item" : "itens"}
           </Badge>
         </span>
-        <span className="text-xs text-muted-foreground">
-          {open ? "Recolher" : "Editar"}
-        </span>
+        <span className="text-xs text-muted-foreground">{open ? "Recolher" : "Editar"}</span>
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t pt-3">
           <p className="text-xs text-muted-foreground">
-            Defina os passos obrigatórios em toda ligação/mensagem. A IA vai marcar cada item
-            como cumprido, parcial ou não cumprido em cada análise.
+            Defina os passos obrigatórios em toda ligação/mensagem. A IA vai marcar cada item como
+            cumprido, parcial ou não cumprido em cada análise.
           </p>
           {items.length > 0 && (
             <ul className="space-y-2">
@@ -617,7 +613,8 @@ function printTranscricaoAnonima(transcricao: string, nome: string) {
       return `<div class="row ${side}"><div class="bubble ${side}"><div class="who">${who}</div><div class="msg">${esc(t.text)}</div></div></div>`;
     })
     .join("");
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Transcrição do atendimento</title>
+  w.document
+    .write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Transcrição do atendimento</title>
 <style>
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color:#111; max-width: 720px; margin: 32px auto; padding: 0 24px; background:#fff; }
   h1 { font-size: 20px; margin: 0 0 4px; }
@@ -650,8 +647,7 @@ type ConversaTurn = { role: "atendente" | "paciente"; text: string };
 function parseConversa(texto: string): ConversaTurn[] {
   const atendenteWords =
     /^(atendente|operador|operadora|agente|recepcionista|enfermeir[oa]?|secretári[oa]?|sac|suporte|a)$/i;
-  const pacienteWords =
-    /^(paciente|cliente|usuári[oa]?|chamador[a]?|interlocutor[a]?|p|c)$/i;
+  const pacienteWords = /^(paciente|cliente|usuári[oa]?|chamador[a]?|interlocutor[a]?|p|c)$/i;
 
   const classify = (
     speaker: string,
@@ -664,12 +660,11 @@ function parseConversa(texto: string): ConversaTurn[] {
   };
 
   // Normaliza: remove timestamps tipo [00:12] ou (00:12) soltos
-  const limpo = texto.replace(/[\[\(]\d{1,2}:\d{2}(?::\d{2})?[\]\)]/g, " ");
+  const limpo = texto.replace(/[[(]\d{1,2}:\d{2}(?::\d{2})?[\])]/g, " ");
 
   // 1) Tenta achar marcadores de fala em qualquer ponto do texto.
   //    Aceita: "Atendente:", "- Atendente:", "Atendente —", "Atendente -"
-  const reSpeakerGlobal =
-    /(^|\n|\s|[—\-•])\s*([\p{L}][\p{L}.\s]{0,30}?)\s*[:：]\s+/gu;
+  const reSpeakerGlobal = /(^|\n|\s|[—\-•])\s*([\p{L}][\p{L}.\s]{0,30}?)\s*[:：]\s+/gu;
 
   const matches: { idx: number; end: number; speaker: string }[] = [];
   let m: RegExpExecArray | null;
@@ -702,7 +697,7 @@ function parseConversa(texto: string): ConversaTurn[] {
   // 2) Fallback: nenhum marcador encontrado. Divide por sentenças e alterna falantes.
   const sentences = limpo
     .replace(/\s+/g, " ")
-    .split(/(?<=[.!?…])\s+(?=[A-ZÀ-Ý"“\-])/)
+    .split(/(?<=[.!?…])\s+(?=[A-ZÀ-Ý"“-])/)
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -787,8 +782,7 @@ export function ProfilesView({
               : p.media >= 5
                 ? "oklch(0.78 0.16 85)"
                 : "var(--destructive)";
-          const trendIcon =
-            p.delta > 0.3 ? TrendingUp : p.delta < -0.3 ? TrendingDown : Minus;
+          const trendIcon = p.delta > 0.3 ? TrendingUp : p.delta < -0.3 ? TrendingDown : Minus;
           const TrendIcon = trendIcon;
           const trendCls =
             p.delta > 0.3
@@ -853,9 +847,7 @@ function Sparkline({ scores }: { scores: number[] }) {
   const w = 200;
   const h = 48;
   const step = w / (scores.length - 1);
-  const pts = scores
-    .map((s, i) => `${i * step},${h - (s / 10) * h}`)
-    .join(" ");
+  const pts = scores.map((s, i) => `${i * step},${h - (s / 10) * h}`).join(" ");
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="mt-4 w-full h-12">
       <polyline
@@ -944,14 +936,12 @@ function ProfileDetail({
           <div className="flex-1">
             <h2 className="text-2xl font-semibold tracking-tight">{profile.nome}</h2>
             <p className="text-sm text-muted-foreground">
-              {profile.total} {profile.total === 1 ? "atendimento avaliado" : "atendimentos avaliados"}
+              {profile.total}{" "}
+              {profile.total === 1 ? "atendimento avaliado" : "atendimentos avaliados"}
             </p>
             <div className="flex flex-wrap gap-3 mt-4">
               <Stat label="Média" value={profile.media.toFixed(1)} color={cor} />
-              <Stat
-                label="Última nota"
-                value={profile.last.toFixed(1)}
-              />
+              <Stat label="Última nota" value={profile.last.toFixed(1)} />
               <Stat
                 label="Evolução"
                 value={`${profile.delta >= 0 ? "+" : ""}${profile.delta.toFixed(1)}`}
@@ -987,7 +977,9 @@ function ProfileDetail({
                 <li key={p.text} className="flex gap-2">
                   <span className="h-1.5 w-1.5 mt-1.5 rounded-full bg-[color:var(--success)] shrink-0" />
                   <span className="flex-1">{p.text}</span>
-                  <Badge variant="outline" className="text-[10px]">×{p.count}</Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    ×{p.count}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -1002,7 +994,9 @@ function ProfileDetail({
                 <li key={p.text} className="flex gap-2">
                   <span className="h-1.5 w-1.5 mt-1.5 rounded-full bg-destructive shrink-0" />
                   <span className="flex-1">{p.text}</span>
-                  <Badge variant="outline" className="text-[10px]">×{p.count}</Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    ×{p.count}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -1027,7 +1021,9 @@ function ProfileDetail({
                   onClick={() => onOpenItem(it)}
                   className="w-full text-left py-3 flex items-center gap-3 hover:bg-secondary/40 rounded-lg px-2 transition-colors"
                 >
-                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${scoreCls}`}>
+                  <div
+                    className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${scoreCls}`}
+                  >
                     {s.toFixed(1)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1062,12 +1058,14 @@ type ProvaRow = {
   acertos: number;
   total: number;
   created_at: string;
-  questoes?: {
-    pergunta: string;
-    alternativas: string[];
-    correta: number;
-    explicacao?: string;
-  }[] | null;
+  questoes?:
+    | {
+        pergunta: string;
+        alternativas: string[];
+        correta: number;
+        explicacao?: string;
+      }[]
+    | null;
   respostas?: number[] | null;
 };
 
@@ -1337,11 +1335,7 @@ function RoleplayHistorySection({
               label="Evolução"
               value={`${delta >= 0 ? "+" : ""}${delta.toFixed(1)}`}
               color={
-                delta > 0.3
-                  ? "var(--success)"
-                  : delta < -0.3
-                    ? "var(--destructive)"
-                    : undefined
+                delta > 0.3 ? "var(--success)" : delta < -0.3 ? "var(--destructive)" : undefined
               }
             />
           </div>
@@ -1562,7 +1556,6 @@ function StatusAluno({
   );
 }
 
-
 function EvolutionChart({ items }: { items: HistoryItem[] }) {
   const scores = items.map((i) => Number(i.pontuacao) || 0);
   if (scores.length === 0) return null;
@@ -1603,9 +1596,7 @@ function EvolutionChart({ items }: { items: HistoryItem[] }) {
           strokeWidth="1.5"
           strokeDasharray="5 4"
         />
-        {scores.length > 1 && (
-          <polygon points={area} fill="var(--primary)" opacity="0.1" />
-        )}
+        {scores.length > 1 && <polygon points={area} fill="var(--primary)" opacity="0.1" />}
         {scores.length > 1 && (
           <polyline
             fill="none"
@@ -1699,9 +1690,7 @@ function ListCard({
             isPos ? "bg-bubble" : "bg-destructive/10"
           }`}
         >
-          <Icon
-            className={`h-4 w-4 ${isPos ? "text-primary-deep" : "text-destructive"}`}
-          />
+          <Icon className={`h-4 w-4 ${isPos ? "text-primary-deep" : "text-destructive"}`} />
         </div>
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
@@ -1806,9 +1795,7 @@ export function HistorySidebar({
                           <User className="h-3 w-3" />
                           <span className="truncate">{it.atendente}</span>
                         </div>
-                        <p className="font-medium text-sm leading-snug line-clamp-2">
-                          {it.titulo}
-                        </p>
+                        <p className="font-medium text-sm leading-snug line-clamp-2">{it.titulo}</p>
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
                           {it.preview}
                         </p>
@@ -1870,7 +1857,9 @@ export function CourseView({
   const [aberto, setAberto] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<CourseFiltro>("todas");
-  const [clinicaFiltro, setClinicaFiltro] = useState<string>(isSuper ? "todas" : (clinicaId ?? "todas"));
+  const [clinicaFiltro, setClinicaFiltro] = useState<string>(
+    isSuper ? "todas" : (clinicaId ?? "todas"),
+  );
 
   useEffect(() => {
     if (!isSuper) setClinicaFiltro(clinicaId ?? "todas");
@@ -2096,11 +2085,6 @@ export function CourseView({
 
       <EventosSeguranca clinicaId={clinicaFiltro === "todas" ? null : clinicaFiltro} />
 
-
-
-
-
-
       <div className="rounded-xl border bg-card p-4 md:p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
           <div className="relative flex-1 min-w-0">
@@ -2166,210 +2150,215 @@ export function CourseView({
         )}
 
         {grupos.map((g) => (
-        <div key={g.id} className="mb-6 last:mb-0">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <h3 className="font-display text-sm font-semibold tracking-tight flex items-center gap-2">
-            <MarcaClinica nome={g.nome} className="h-6 w-6 rounded-md text-[10px]" />
-            {g.nome}
-          </h3>
-          <span className="text-xs text-muted-foreground">
-            {g.alunos.length} {g.alunos.length === 1 ? "atendente" : "atendentes"} ·{" "}
-            {formatDuracao(g.alunos.reduce((s, x) => s + x.segundosTotal, 0))}
-          </span>
-        </div>
-        {/* Cabeçalho de colunas, no espírito de uma tabela de gestão */}
-        <div className="hidden md:flex items-center gap-3 px-4 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span className="w-9 shrink-0" />
-          <span className="flex-1">Atendente / fase</span>
-          <span className="w-16 shrink-0">Conversas</span>
-          <span className="w-16 shrink-0">Ligações</span>
-          <span className="w-14 shrink-0">Provas</span>
-          <span className="w-14 shrink-0">Dias</span>
-          <span className="w-28 shrink-0">Progresso</span>
-          <span className="w-4 shrink-0" />
-        </div>
-        <ul className="divide-y rounded-xl border overflow-hidden bg-card">
-        {g.alunos.map((a) => {
-          const completo = a.progresso === 100;
-          const expandido = aberto === a.nome;
-          return (
-            <li key={a.nome} className={expandido ? "bg-secondary/20" : "hover:bg-secondary/20"}>
-              <button
-                type="button"
-                onClick={() => setAberto((cur) => (cur === a.nome ? null : a.nome))}
-                className="w-full text-left px-4 py-3 flex items-center gap-3"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase">
-                  {a.nome.slice(0, 2)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">{a.nome}</span>
-                    {completo ? (
-                      <Award className="h-3.5 w-3.5 shrink-0 text-success" />
-                    ) : null}
-                    <StatusAluno
-                      completo={completo}
-                      ativaHoje={a.segundosHoje > 0}
-                      progresso={a.progresso}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {completo
-                      ? "Trilha concluída"
-                      : a.fase === "texto"
-                        ? "Fase: conversas de WhatsApp"
-                        : a.fase === "voz"
-                          ? "Fase: ligações"
-                          : "Fase: prova"}
-                    {" · "}
-                    {formatDuracao(a.segundosTotal)} na plataforma
-                  </p>
-                </div>
-                <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                  <span className="inline-flex items-center gap-1 w-16">
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    {a.conversas}/{META_WHATSAPP}
-                  </span>
-                  <span className="inline-flex items-center gap-1 w-16">
-                    <Phone className="h-3.5 w-3.5" />
-                    {a.ligacoes}/{META_LIGACOES}
-                  </span>
-                  <span className="inline-flex items-center gap-1 w-14">
-                    <ClipboardCheck className="h-3.5 w-3.5" />
-                    {a.provas}
-                  </span>
-                  <span className="inline-flex items-center gap-1 w-14">
-                    <Flame className="h-3.5 w-3.5" />
-                    {a.dias}d
-                  </span>
-                </div>
-                <div className="w-28 shrink-0">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-                    <span>{a.progresso}%</span>
-                    {a.ultimo && (
-                      <span className="hidden sm:inline">
-                        {new Date(`${a.ultimo}T12:00:00`).toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "short",
-                        })}
+          <div key={g.id} className="mb-6 last:mb-0">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <h3 className="font-display text-sm font-semibold tracking-tight flex items-center gap-2">
+                <MarcaClinica nome={g.nome} className="h-6 w-6 rounded-md text-[10px]" />
+                {g.nome}
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {g.alunos.length} {g.alunos.length === 1 ? "atendente" : "atendentes"} ·{" "}
+                {formatDuracao(g.alunos.reduce((s, x) => s + x.segundosTotal, 0))}
+              </span>
+            </div>
+            {/* Cabeçalho de colunas, no espírito de uma tabela de gestão */}
+            <div className="hidden md:flex items-center gap-3 px-4 pb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="w-9 shrink-0" />
+              <span className="flex-1">Atendente / fase</span>
+              <span className="w-16 shrink-0">Conversas</span>
+              <span className="w-16 shrink-0">Ligações</span>
+              <span className="w-14 shrink-0">Provas</span>
+              <span className="w-14 shrink-0">Dias</span>
+              <span className="w-28 shrink-0">Progresso</span>
+              <span className="w-4 shrink-0" />
+            </div>
+            <ul className="divide-y rounded-xl border overflow-hidden bg-card">
+              {g.alunos.map((a) => {
+                const completo = a.progresso === 100;
+                const expandido = aberto === a.nome;
+                return (
+                  <li
+                    key={a.nome}
+                    className={expandido ? "bg-secondary/20" : "hover:bg-secondary/20"}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setAberto((cur) => (cur === a.nome ? null : a.nome))}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase">
+                        {a.nome.slice(0, 2)}
                       </span>
-                    )}
-                  </div>
-                  <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${completo ? "bg-[color:var(--success)]" : "bg-primary"}`}
-                      style={{ width: `${a.progresso}%` }}
-                    />
-                  </div>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expandido ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {expandido && (
-              <div className="px-4 pb-4 space-y-4">
-              <div className="grid sm:grid-cols-2 gap-2">
-                <ModuleRow
-                  done={a.segundosTotal >= 3600}
-                  titulo="1 hora de plataforma"
-                  detalhe={`${formatDuracao(a.segundosTotal)} de 1h · hoje ${formatDuracao(a.segundosHoje)}`}
-                />
-                <ModuleRow
-                  done={a.conversas >= META_WHATSAPP}
-                  titulo={`${META_WHATSAPP} conversas de WhatsApp`}
-                  detalhe={`${a.conversas} de ${META_WHATSAPP} concluídas`}
-                  action={
-                    <Link to="/app/coach/roleplay/$nome" params={{ nome: a.nome }}>
-                      <Button size="sm" variant="outline">
-                        Treinar
-                      </Button>
-                    </Link>
-                  }
-                />
-                <ModuleRow
-                  done={a.ligacoes >= META_LIGACOES}
-                  titulo={`${META_LIGACOES} treinos de ligação`}
-                  detalhe={`${a.ligacoes} de ${META_LIGACOES} concluídos${a.roleplays ? ` · média ${a.mediaRoleplay.toFixed(1)}` : ""}`}
-                  action={
-                    <Link to="/app/coach/roleplay/$nome" params={{ nome: a.nome }}>
-                      <Button size="sm" variant="outline">
-                        <Phone className="h-3.5 w-3.5" />
-                      </Button>
-                    </Link>
-                  }
-                />
-                <ModuleRow
-                  done={a.provas > 0}
-                  titulo="Prova de conversão"
-                  detalhe={
-                    a.provas > 0
-                      ? `${a.provas} ${a.provas === 1 ? "prova" : "provas"} · média ${a.mediaProva.toFixed(1)}`
-                      : "Prova não realizada"
-                  }
-                  action={
-                    <Link to="/app/coach/prova/$nome" params={{ nome: a.nome }}>
-                      <Button size="sm" variant="outline">
-                        {a.provas > 0 ? "Nova prova" : "Fazer prova"}
-                      </Button>
-                    </Link>
-                  }
-                />
-                <ModuleRow
-                  done={a.dias >= 3}
-                  titulo="Constância de estudo"
-                  detalhe={`${a.dias} de 3 dias · ${a.analises} ${a.analises === 1 ? "atendimento avaliado" : "atendimentos avaliados"}`}
-                />
-              </div>
-
-              <div className="space-y-4">
-                    <Section icon={History} title="Atendimentos analisados">
-                      {a.analises === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          Nenhum atendimento analisado ainda.
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{a.nome}</span>
+                          {completo ? (
+                            <Award className="h-3.5 w-3.5 shrink-0 text-success" />
+                          ) : null}
+                          <StatusAluno
+                            completo={completo}
+                            ativaHoje={a.segundosHoje > 0}
+                            progresso={a.progresso}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {completo
+                            ? "Trilha concluída"
+                            : a.fase === "texto"
+                              ? "Fase: conversas de WhatsApp"
+                              : a.fase === "voz"
+                                ? "Fase: ligações"
+                                : "Fase: prova"}
+                          {" · "}
+                          {formatDuracao(a.segundosTotal)} na plataforma
                         </p>
-                      ) : (
-                        <ul className="divide-y">
-                          {history
-                            .filter((h) => h.atendente === a.nome)
-                            .map((it) => (
-                              <li key={it.id} className="py-2.5">
-                                <div className="flex items-center gap-3">
-                                  <Badge variant="outline" className="text-[10px] shrink-0">
-                                    {(Number(it.pontuacao) || 0).toFixed(1)}
-                                  </Badge>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium truncate">{it.titulo}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {new Date(it.created_at).toLocaleString("pt-BR", {
-                                        timeZone: "America/Sao_Paulo",
-                                        day: "2-digit",
-                                        month: "short",
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                    </p>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-wrap">
-                                  {it.preview}
-                                </p>
-                              </li>
-                            ))}
-                        </ul>
-                      )}
-                    </Section>
-                    <RoleplayHistorySection atendente={a.nome} clinicaId={clinicaId} />
-                    <ProvaHistorySection atendente={a.nome} clinicaId={clinicaId} />
-              </div>
-              </div>
-              )}
-            </li>
-          );
-        })}
-        </ul>
-        </div>
+                      </div>
+                      <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
+                        <span className="inline-flex items-center gap-1 w-16">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          {a.conversas}/{META_WHATSAPP}
+                        </span>
+                        <span className="inline-flex items-center gap-1 w-16">
+                          <Phone className="h-3.5 w-3.5" />
+                          {a.ligacoes}/{META_LIGACOES}
+                        </span>
+                        <span className="inline-flex items-center gap-1 w-14">
+                          <ClipboardCheck className="h-3.5 w-3.5" />
+                          {a.provas}
+                        </span>
+                        <span className="inline-flex items-center gap-1 w-14">
+                          <Flame className="h-3.5 w-3.5" />
+                          {a.dias}d
+                        </span>
+                      </div>
+                      <div className="w-28 shrink-0">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                          <span>{a.progresso}%</span>
+                          {a.ultimo && (
+                            <span className="hidden sm:inline">
+                              {new Date(`${a.ultimo}T12:00:00`).toLocaleDateString("pt-BR", {
+                                day: "2-digit",
+                                month: "short",
+                              })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${completo ? "bg-[color:var(--success)]" : "bg-primary"}`}
+                            style={{ width: `${a.progresso}%` }}
+                          />
+                        </div>
+                      </div>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expandido ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {expandido && (
+                      <div className="px-4 pb-4 space-y-4">
+                        <div className="grid sm:grid-cols-2 gap-2">
+                          <ModuleRow
+                            done={a.segundosTotal >= 3600}
+                            titulo="1 hora de plataforma"
+                            detalhe={`${formatDuracao(a.segundosTotal)} de 1h · hoje ${formatDuracao(a.segundosHoje)}`}
+                          />
+                          <ModuleRow
+                            done={a.conversas >= META_WHATSAPP}
+                            titulo={`${META_WHATSAPP} conversas de WhatsApp`}
+                            detalhe={`${a.conversas} de ${META_WHATSAPP} concluídas`}
+                            action={
+                              <Link to="/app/coach/roleplay/$nome" params={{ nome: a.nome }}>
+                                <Button size="sm" variant="outline">
+                                  Treinar
+                                </Button>
+                              </Link>
+                            }
+                          />
+                          <ModuleRow
+                            done={a.ligacoes >= META_LIGACOES}
+                            titulo={`${META_LIGACOES} treinos de ligação`}
+                            detalhe={`${a.ligacoes} de ${META_LIGACOES} concluídos${a.roleplays ? ` · média ${a.mediaRoleplay.toFixed(1)}` : ""}`}
+                            action={
+                              <Link to="/app/coach/roleplay/$nome" params={{ nome: a.nome }}>
+                                <Button size="sm" variant="outline">
+                                  <Phone className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                            }
+                          />
+                          <ModuleRow
+                            done={a.provas > 0}
+                            titulo="Prova de conversão"
+                            detalhe={
+                              a.provas > 0
+                                ? `${a.provas} ${a.provas === 1 ? "prova" : "provas"} · média ${a.mediaProva.toFixed(1)}`
+                                : "Prova não realizada"
+                            }
+                            action={
+                              <Link to="/app/coach/prova/$nome" params={{ nome: a.nome }}>
+                                <Button size="sm" variant="outline">
+                                  {a.provas > 0 ? "Nova prova" : "Fazer prova"}
+                                </Button>
+                              </Link>
+                            }
+                          />
+                          <ModuleRow
+                            done={a.dias >= 3}
+                            titulo="Constância de estudo"
+                            detalhe={`${a.dias} de 3 dias · ${a.analises} ${a.analises === 1 ? "atendimento avaliado" : "atendimentos avaliados"}`}
+                          />
+                        </div>
+
+                        <div className="space-y-4">
+                          <Section icon={History} title="Atendimentos analisados">
+                            {a.analises === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                Nenhum atendimento analisado ainda.
+                              </p>
+                            ) : (
+                              <ul className="divide-y">
+                                {history
+                                  .filter((h) => h.atendente === a.nome)
+                                  .map((it) => (
+                                    <li key={it.id} className="py-2.5">
+                                      <div className="flex items-center gap-3">
+                                        <Badge variant="outline" className="text-[10px] shrink-0">
+                                          {(Number(it.pontuacao) || 0).toFixed(1)}
+                                        </Badge>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-medium truncate">
+                                            {it.titulo}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {new Date(it.created_at).toLocaleString("pt-BR", {
+                                              timeZone: "America/Sao_Paulo",
+                                              day: "2-digit",
+                                              month: "short",
+                                              hour: "2-digit",
+                                              minute: "2-digit",
+                                            })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-wrap">
+                                        {it.preview}
+                                      </p>
+                                    </li>
+                                  ))}
+                              </ul>
+                            )}
+                          </Section>
+                          <RoleplayHistorySection atendente={a.nome} clinicaId={clinicaId} />
+                          <ProvaHistorySection atendente={a.nome} clinicaId={clinicaId} />
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         ))}
       </div>
     </div>

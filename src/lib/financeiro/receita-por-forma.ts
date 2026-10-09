@@ -67,6 +67,7 @@ export const COR_FORMA: Record<FormaCanonica, string> = {
   credito: "bg-amber-600",
   legado_cartao: "bg-slate-400",
   pago_sistema_anterior: "bg-slate-400",
+  credito_clinica: "bg-rose-500",
   boleto: "bg-slate-400",
   transferencia: "bg-slate-400",
   convenio: "bg-slate-400",

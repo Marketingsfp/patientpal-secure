@@ -14,12 +14,7 @@
  */
 import type { EstadoConexao } from "./realtime-conexao";
 
-export type MotivoSincronizacao =
-  | "inicial"
-  | "realtime"
-  | "reconnect"
-  | "visibility"
-  | "fallback";
+export type MotivoSincronizacao = "inicial" | "realtime" | "reconnect" | "visibility" | "fallback";
 
 export type DecisaoWatchdog = {
   /** O que fazer com a conferência periódica temporária. */

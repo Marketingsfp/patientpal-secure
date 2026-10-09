@@ -1,6 +1,7 @@
 import type { ConhecimentoSessao } from "./confidence/conhecimento-sessao";
 import type { ResultadoBroker } from "./tool-broker";
 import type { ResultadoConhecimento } from "./knowledge-contract";
+import { MOTIVO_SEM_REGISTRO, MOTIVO_MEDICO_SEM_REGISTRO } from "./catalogo-sem-registro";
 
 export const LIMITE_ESCLARECIMENTOS = 2;
 
@@ -24,6 +25,7 @@ function identificacaoPendente(resultado: ResultadoBroker) {
     dados?.fonte === "catalogo_publicado" &&
     dados.encaminhar_para_humano === true &&
     ["DOCTOR_NOT_FOUND", "PROCEDURE_NOT_FOUND"].includes(resultado.erro ?? "");
+  if (dados?.limitacao_catalogo) return null;
   if ((!resultado.success || resultado.erro) && !ausenciaTipada) return null;
   return dados?.esclarecimento ||
     (dados?.found === false && dados.knowledge_status === "not_found") ||
@@ -32,35 +34,16 @@ function identificacaoPendente(resultado: ResultadoBroker) {
     : null;
 }
 
-/** A segunda pergunta aproveita as opções atuais, sem repetir a primeira. */
+/** Compatibilidade dos chamadores: uma reformulação inconclusiva já encaminha. */
 export function prepararSegundaPergunta(
-  anterior: ConhecimentoSessao | null,
+  _anterior: ConhecimentoSessao | null,
   resultado: ResultadoBroker,
 ): ResultadoBroker {
-  // A correção da escolha tem uma única repetição da lista, separada das
-  // duas perguntas gerais para identificar um atendimento ainda desconhecido.
-  if (anterior?.esclarecimento?.motivo === "medico_nao_identificado" ||
-    (resultado.dados as Partial<ResultadoConhecimento> | null)?.esclarecimento?.motivo === "medico_nao_identificado") return resultado;
-  if (contarEsclarecimentos(anterior) !== 1) return resultado;
-  const dados = identificacaoPendente(resultado);
-  if (!dados) return resultado;
-  const tipo = dados.esclarecimento?.tipo ?? anterior!.esclarecimento!.tipo;
-  const opcoes = dados.esclarecimento?.opcoes ?? [];
-  const nomes = opcoes.map((o) => [o.nome, o.especialidade, o.unidade].filter(Boolean).join(" — "));
-  const consulta = (dados.tipo_atendimento ?? anterior!.consulta.tipo_atendimento) === "consulta";
-  const pergunta =
-    tipo === "profissional"
-      ? `Para identificar o profissional, pode confirmar o nome completo, a especialidade ou a unidade?${nomes.length ? `\nAs opções encontradas são:\n${nomes.join("\n")}` : ""}`
-      : nomes.length
-        ? `Qual destas opções corresponde ${consulta ? "à consulta" : "ao exame ou procedimento"} que você deseja? Confira também os complementos do nome, se houver:\n${nomes.join("\n")}`
-        : consulta
-          ? "Pode confirmar a especialidade ou o nome completo do profissional com quem deseja a consulta?"
-          : "Pode conferir e copiar o nome completo da consulta, do exame ou do procedimento que deseja? Se houver um pedido médico, escreva como está nele, incluindo os complementos do nome.";
-  return { ...resultado, dados: { ...dados, esclarecimento: { tipo, opcoes, pergunta } } };
+  return resultado;
 }
 
 export const MOTIVO_IDENTIFICACAO_PENDENTE =
-  "CATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA: a Nina pediu esclarecimento duas vezes e ainda não conseguiu identificar o atendimento ou profissional";
+  "CATALOGO_IDENTIFICACAO_NAO_ESCLARECIDA: a Nina pediu confirmação e ainda não conseguiu identificar o atendimento ou profissional após a resposta";
 
 export const MOTIVO_MEDICO_NAO_IDENTIFICADO =
   "CATALOGO_MEDICO_NAO_IDENTIFICADO: consulta encontrada; médico não identificado após repetir a lista e pedir nova escolha";
@@ -71,17 +54,38 @@ export function encaminharAposEsclarecimento(
   resultado: ResultadoBroker,
   respostaPaciente: string,
 ) {
-  if (anterior?.esclarecimento?.motivo === "medico_nao_identificado" && identificacaoPendente(resultado)) {
+  if (
+    anterior?.esclarecimento?.motivo === "medico_nao_identificado" &&
+    identificacaoPendente(resultado)
+  ) {
     return {
       motivo: MOTIVO_MEDICO_NAO_IDENTIFICADO,
       resumo: `Consulta encontrada: ${anterior.esclarecimento.atendimento ?? anterior.consulta.termo}. Não foi possível identificar o médico após pedir uma nova escolha. Pergunta feita: ${anterior.esclarecimento.pergunta.slice(0, 1000)}. Resposta recebida: ${respostaPaciente.slice(0, 400)}. A equipe deve confirmar o profissional desejado e continuar o atendimento.`,
       urgencia: "normal" as const,
     };
   }
-  if ((resultado.dados as Partial<ResultadoConhecimento> | null)?.esclarecimento?.motivo === "medico_nao_identificado") return null;
+  // Já perguntamos uma vez após "não encontrado": nova falha encaminha.
+  if (
+    anterior?.esclarecimento?.motivo === "sem_registro_confirmar" &&
+    identificacaoPendente(resultado)
+  ) {
+    return {
+      motivo:
+        anterior.esclarecimento.tipo === "profissional"
+          ? MOTIVO_MEDICO_SEM_REGISTRO
+          : MOTIVO_SEM_REGISTRO,
+      resumo: `O atendimento solicitado não foi encontrado na base publicada, nem após pedir confirmação ao paciente. Busca inicial: ${anterior.consulta.termo.slice(0, 200)}. Pergunta feita: ${anterior.esclarecimento.pergunta.slice(0, 600)}. Resposta recebida: ${respostaPaciente.slice(0, 400)}. A equipe deve conferir e continuar a conversa; a ausência no catálogo não comprova que a clínica não oferece o serviço.`,
+      urgencia: "normal" as const,
+    };
+  }
+  if (
+    (resultado.dados as Partial<ResultadoConhecimento> | null)?.esclarecimento?.motivo ===
+    "medico_nao_identificado"
+  )
+    return null;
   if (
     !anterior?.esclarecimento ||
-    contarEsclarecimentos(anterior) < LIMITE_ESCLARECIMENTOS ||
+    contarEsclarecimentos(anterior) < 1 ||
     !identificacaoPendente(resultado)
   )
     return null;
@@ -90,7 +94,7 @@ export function encaminharAposEsclarecimento(
     : [anterior.esclarecimento.pergunta];
   return {
     motivo: MOTIVO_IDENTIFICACAO_PENDENTE,
-    resumo: `Não foi possível identificar com segurança a consulta, o procedimento ou o profissional após duas tentativas de esclarecimento. Pedido anterior: ${anterior.consulta.termo.slice(0, 200)}. Perguntas feitas: ${perguntas
+    resumo: `Não foi possível identificar com segurança a consulta, o procedimento ou o profissional após a resposta ao esclarecimento. Pedido anterior: ${anterior.consulta.termo.slice(0, 200)}. Perguntas feitas: ${perguntas
       .slice(0, LIMITE_ESCLARECIMENTOS)
       .map((p, i) => `${i + 1}) ${p.slice(0, 600)}`)
       .join(

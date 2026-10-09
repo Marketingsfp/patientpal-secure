@@ -24,9 +24,7 @@ import {
 } from "@/lib/nina/homologacao/verificacoes.functions";
 
 function Sim({ v }: { v: boolean }) {
-  return (
-    <Badge variant={v ? "default" : "destructive"}>{v ? "sim" : "não"}</Badge>
-  );
+  return <Badge variant={v ? "default" : "destructive"}>{v ? "sim" : "não"}</Badge>;
 }
 
 export function VerificacoesHomologacao() {
@@ -79,9 +77,8 @@ export function VerificacoesHomologacao() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Publica a regra de teste pelo caminho real, em um espaço isolado, e confere se
-            ela chegou ao modelo e foi cumprida na primeira resposta. Não aprova o
-            atendimento inteiro.
+            Publica a regra de teste pelo caminho real, em um espaço isolado, e confere se ela
+            chegou ao modelo e foi cumprida na primeira resposta. Não aprova o atendimento inteiro.
           </p>
           <Button onClick={executarFonte} disabled={carregandoFonte || !clinicaId}>
             {carregandoFonte ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -94,7 +91,9 @@ export function VerificacoesHomologacao() {
               {fonte.resultados.map((r: any) => (
                 <div key={r.parId} className="rounded-md border p-3 space-y-1">
                   <div className="font-medium">{r.parId}</div>
-                  <div>Versão publicada usada: {r.versao ?? "—"} ({r.origemVersao})</div>
+                  <div>
+                    Versão publicada usada: {r.versao ?? "—"} ({r.origemVersao})
+                  </div>
                   <div className="flex items-center gap-2">
                     Regra chegou ao modelo: <Sim v={r.regraChegouAoPayload} />
                   </div>
@@ -122,8 +121,8 @@ export function VerificacoesHomologacao() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Roda o fluxo normal da homologação, com todas as verificações de sempre, e
-            mostra separadamente o que o modelo produziu e o que foi entregue.
+            Roda o fluxo normal da homologação, com todas as verificações de sempre, e mostra
+            separadamente o que o modelo produziu e o que foi entregue.
           </p>
           <div className="space-y-2">
             <Label htmlFor="verif-lead">Lead de teste</Label>
@@ -144,7 +143,9 @@ export function VerificacoesHomologacao() {
           {completo ? (
             <div className="space-y-2 text-sm">
               <p className="text-muted-foreground">{completo.exercitado}</p>
-              <div>Resultado do turno: <Badge>{completo.turno.resultado}</Badge></div>
+              <div>
+                Resultado do turno: <Badge>{completo.turno.resultado}</Badge>
+              </div>
               <div>Origem da resposta: {completo.turno.origemResposta ?? "não registrada"}</div>
               <div>
                 Intervenções:{" "}

@@ -78,7 +78,9 @@ describe("FASE 3 — pós-envio incremental", () => {
   });
 
   it("não sobrescreve uma confirmação mais nova do servidor", () => {
-    const lista = [{ id: "A", ultima_msg_preview: "servidor", ultima_msg_em: "2026-09-09T13:00:00.000Z" }];
+    const lista = [
+      { id: "A", ultima_msg_preview: "servidor", ultima_msg_em: "2026-09-09T13:00:00.000Z" },
+    ];
     const nova = aplicarPreviaLocalEnvio(lista, {
       conversaId: "A",
       texto: "Oi",

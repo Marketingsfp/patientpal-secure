@@ -112,7 +112,12 @@ describe("FASE 6 — A/B/C: saudação, pedido junto e continuidade", () => {
         ...SESSAO_NOVA,
         fatosOficiais: [{ fonte: "catalogo", campo: "usg_abdome", valor: "250.00" }],
         ferramentas: [
-          { nome: "catalogo_precos", executada: true, ok: true, referencia: "fict-proc-usg-abdome" },
+          {
+            nome: "catalogo_precos",
+            executada: true,
+            ok: true,
+            referencia: "fict-proc-usg-abdome",
+          },
         ],
         afirmacoes: [
           {
@@ -150,7 +155,10 @@ describe("FASE 6 — A/B/C: saudação, pedido junto e continuidade", () => {
 
 describe("FASE 6 — D/E/F: identidade, aplicabilidade e linguagem", () => {
   it("D. identidade alterada só na Arquitetura: a identidade nova é a verificada", async () => {
-    const outroPrompt = PROMPT.replace("Nome da atendente virtual: Nina", "Nome da atendente virtual: Aurora")
+    const outroPrompt = PROMPT.replace(
+      "Nome da atendente virtual: Nina",
+      "Nome da atendente virtual: Aurora",
+    )
       .replace("Nome do estabelecimento: Menino Jesus", "Nome do estabelecimento: Clínica Vida")
       .replace("Tipo do estabelecimento: Policlínica", "Tipo do estabelecimento: Clínica");
 
@@ -390,7 +398,8 @@ describe("FASE 6 — K/L/M: reescrita, falha de correção e frase de encaminham
     const { portas, chamadas } = portasReais();
     const r = await turno({
       mensagemPaciente: "qual o preço?",
-      candidato: "Vou transferir você para um atendente, que já vai assumir. O exame custa R$ 55,00.",
+      candidato:
+        "Vou transferir você para um atendente, que já vai assumir. O exame custa R$ 55,00.",
       portas,
       contexto: {
         primeiraResposta: false,
@@ -631,18 +640,18 @@ describe("FASE 6 — R/S/T: versões, marcador literal e histórico", () => {
       candidato: "9381",
       contexto: { primeiraResposta: false, apresentacaoEntregue: true, sessaoEmAndamento: true },
     });
-    expect(caixaDiferente.avaliacao!.resultados.find((x) => x.identificador === "TESTE-01")?.status).toBe(
-      "NOT_APPLICABLE",
-    );
+    expect(
+      caixaDiferente.avaliacao!.resultados.find((x) => x.identificador === "TESTE-01")?.status,
+    ).toBe("NOT_APPLICABLE");
 
     const emProducao = await turno({
       mensagemPaciente: "verificar fonte 9381",
       candidato: "9381",
       contexto: { primeiraResposta: false, apresentacaoEntregue: true, sessaoEmAndamento: true },
     });
-    expect(emProducao.avaliacao!.resultados.find((x) => x.identificador === "TESTE-01")?.status).toBe(
-      "NOT_APPLICABLE",
-    );
+    expect(
+      emProducao.avaliacao!.resultados.find((x) => x.identificador === "TESTE-01")?.status,
+    ).toBe("NOT_APPLICABLE");
 
     // Trocar o marcador no prompt prova que 9381 não está fixo no código.
     const outroMarcador = PROMPT.replace(/9381/g, "5127");
@@ -705,7 +714,13 @@ describe("FASE 6 — ativação, reversão e reconciliação", () => {
       { ...base, chave: "k1", etapa: "fila_confirmada", comprovanteFila: "p1", aviso: "enviado" },
       { ...base, chave: "k1", etapa: "fila_confirmada", comprovanteFila: "p1", aviso: "enviado" },
       { ...base, chave: "k2", etapa: "fila_confirmada", comprovanteFila: "p2", aviso: "pendente" },
-      { ...base, chave: "k3", etapa: "encaminhamento_pendente", comprovanteFila: null, aviso: "pendente" },
+      {
+        ...base,
+        chave: "k3",
+        etapa: "encaminhamento_pendente",
+        comprovanteFila: null,
+        aviso: "pendente",
+      },
       { ...base, chave: "k4", etapa: "falhou", comprovanteFila: null, aviso: "pendente" },
     ];
     const r = reconciliarEncaminhamentos(registros);

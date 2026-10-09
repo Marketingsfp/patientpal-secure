@@ -1,9 +1,6 @@
 import { hashDoTexto } from "./confidence/hash";
 import { representacaoDaMensagem } from "./confidence/identidade-saida";
-import {
-  ROTULO_ESTADO_AVISO,
-  ROTULO_ESTADO_ENTREGA,
-} from "./confidence/classificacao-saida";
+import { ROTULO_ESTADO_AVISO, ROTULO_ESTADO_ENTREGA } from "./confidence/classificacao-saida";
 
 import type { SaidaMensagemView } from "./saida-mensagem.functions";
 import {
@@ -112,7 +109,9 @@ export async function carregarSaidasDasMensagens(
       execucaoId,
       ambiente: m["is_teste"] === true ? "homologacao" : "producao",
       classe: avisoOperacional ? "aviso_operacional" : "sem_avaliacao",
-      explicacao: avisoOperacional ? "Aviso operacional registrado." : "Resposta da Nina registrada.",
+      explicacao: avisoOperacional
+        ? "Aviso operacional registrado."
+        : "Resposta da Nina registrada.",
       limitacao: execucaoConflitante ? "Vínculos de execução divergentes." : null,
       origem:
         (origemBruta ? (ORIGEM_ROTULO[origemBruta] ?? origemBruta) : null) ??

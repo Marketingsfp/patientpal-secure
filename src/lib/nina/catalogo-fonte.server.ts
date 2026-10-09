@@ -1,9 +1,8 @@
 /**
- * FONTE ÚNICA DA NINA — catálogo estruturado PUBLICADO.
+ * FONTE SELECIONADA DA NINA — catálogo estruturado PUBLICADO.
  *
- * Server-only. Existe para que nenhuma ferramenta do atendimento volte a ler
- * tabela operacional/legada (procedimentos, medicos, especialidades) como
- * fonte de resposta ao paciente. Rascunho e arquivado não existem aqui.
+ * Server-only. Todas as ferramentas usam o adaptador da fonte escolhida pela
+ * clínica. Rascunho e arquivado não existem aqui; não há fallback entre fontes.
  */
 import { catalogoDoTurno } from "./catalogo-turno.server";
 

@@ -69,11 +69,17 @@ export function VisaoSimplesNina() {
           Paciente
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3 w-3 rounded-[3px] border border-primary/40 bg-primary/5" />
+          <span
+            aria-hidden
+            className="h-3 w-3 rounded-[3px] border border-primary/40 bg-primary/5"
+          />
           Caminho da Nina
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3 w-3 rounded-[3px] border border-amber-500/50 bg-amber-500/5" />
+          <span
+            aria-hidden
+            className="h-3 w-3 rounded-[3px] border border-amber-500/50 bg-amber-500/5"
+          />
           Quando o atendimento sai da Nina
         </span>
       </div>
@@ -127,7 +133,9 @@ export function VisaoSimplesNina() {
         })}
       </ol>
 
-      <p className="border-t pt-3 text-xs text-muted-foreground">{NOTA_HOMOLOGACAO_VISAO_SIMPLES}</p>
+      <p className="border-t pt-3 text-xs text-muted-foreground">
+        {NOTA_HOMOLOGACAO_VISAO_SIMPLES}
+      </p>
     </section>
   );
 }

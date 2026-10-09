@@ -62,7 +62,10 @@ function processarTimeout(c: Conversa, agora: Date, atendenteOnline: string | nu
   c.awaiting_patient_since = null;
   c.patient_response_deadline = null;
   c.status = "waiting";
-  Object.assign(c, atendenteOnline ? CICLO_PATCH.humano(atendenteOnline) : CICLO_PATCH.filaHumana());
+  Object.assign(
+    c,
+    atendenteOnline ? CICLO_PATCH.humano(atendenteOnline) : CICLO_PATCH.filaHumana(),
+  );
   return true;
 }
 

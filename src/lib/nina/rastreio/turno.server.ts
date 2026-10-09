@@ -323,7 +323,10 @@ function eventoResumo(registro: RegistroTurno): EventoTrace {
  */
 export async function gravarResumoTurno(registro: RegistroTurno): Promise<void> {
   try {
-    await gravarEventosTrace(registro.clinicaId, [eventoResumo(registro)]);
+    await gravarEventosTrace(registro.clinicaId, [
+      ...(registro.eventosAuxiliares ?? []),
+      eventoResumo(registro),
+    ]);
   } catch (e) {
     console.warn("[nina-turno] falha ao gravar resumo:", e instanceof Error ? e.message : e);
   }

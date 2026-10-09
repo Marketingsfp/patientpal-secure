@@ -23,9 +23,13 @@ import {
   verificarResultado,
   type ResultadoRespostaNina,
 } from "./contrato";
-import { acrescentarDespedidaAgendamento, textoDaChave, CHAVES_CONFIRMACAO_AGENDAMENTO } from "./templates";
+import {
+  acrescentarDespedidaAgendamento,
+  textoDaChave,
+  CHAVES_CONFIRMACAO_AGENDAMENTO,
+} from "./templates";
 import { carregarTemplatesPublicados } from "./templates.server";
-import { removerEmojisNina } from "./sem-emojis";
+import { formatarMensagemNina } from "./formato-mobile";
 
 export type CanalFinalizacao = "whatsapp" | "test-console";
 
@@ -88,7 +92,7 @@ export type RespostaFinalizada = {
 /** Chave de idempotência: turno + candidato exato que entrou. */
 function chaveDeEntrada(pedido: PedidoFinalizacao): string {
   const bruto = pedido.resultado.texto ?? "";
-  return `${pedido.chaveTurno}::${hashDoTexto(bruto) ?? "-"}::${pedido.resultado.chaveTemplate ?? "-"}`;
+  return `${pedido.chaveTurno}::${hashDoTexto([bruto, pedido.resultado.complementoTexto ?? ""].join("\n")) ?? "-"}::${pedido.resultado.chaveTemplate ?? "-"}`;
 }
 
 const finalizados = new Map<string, RespostaFinalizada>();
@@ -98,11 +102,7 @@ const ultimaPorTurno = new Map<string, RespostaFinalizada>();
 const efeitosPorTurno = new Map<string, { encerrarConversaId: string | null }>();
 const LIMITE_CACHE = 500;
 
-function guardar(
-  chave: string,
-  raiz: string,
-  valor: RespostaFinalizada,
-): RespostaFinalizada {
+function guardar(chave: string, raiz: string, valor: RespostaFinalizada): RespostaFinalizada {
   if (finalizados.size > LIMITE_CACHE) finalizados.clear();
   if (ultimaPorTurno.size > LIMITE_CACHE) ultimaPorTurno.clear();
   if (efeitosPorTurno.size > LIMITE_CACHE) efeitosPorTurno.clear();
@@ -115,9 +115,7 @@ function guardar(
  * FASE 4 — última versão APROVADA do turno. O transporte usa isto para nunca
  * enviar um candidato anterior à correção.
  */
-export function ultimaFinalizacaoDoTurno(
-  chaveTurnoRaiz: string,
-): RespostaFinalizada | null {
+export function ultimaFinalizacaoDoTurno(chaveTurnoRaiz: string): RespostaFinalizada | null {
   return ultimaPorTurno.get(chaveTurnoRaiz) ?? null;
 }
 
@@ -128,9 +126,7 @@ export function limparFinalizacoes(): void {
   efeitosPorTurno.clear();
 }
 
-export async function finalizarResposta(
-  pedido: PedidoFinalizacao,
-): Promise<RespostaFinalizada> {
+export async function finalizarResposta(pedido: PedidoFinalizacao): Promise<RespostaFinalizada> {
   const raiz = pedido.chaveTurnoRaiz ?? pedido.chaveTurno;
   const chaveEntrada = chaveDeEntrada(pedido);
 
@@ -143,7 +139,13 @@ export async function finalizarResposta(
   //    e sem repetir efeito externo.
   const aprovada = ultimaPorTurno.get(raiz);
   const candidatoHash = hashDoTexto(pedido.resultado.texto ?? "");
-  if (aprovada && candidatoHash && aprovada.textoHash === candidatoHash) {
+  if (
+    aprovada &&
+    candidatoHash &&
+    aprovada.textoHash === candidatoHash &&
+    (!pedido.resultado.complementoTexto ||
+      pedido.resultado.complementoTexto === aprovada.resultado.complementoTexto)
+  ) {
     return { ...aprovada, reaproveitada: true };
   }
 
@@ -158,7 +160,7 @@ export async function finalizarResposta(
   if (resultado.chaveTemplate) {
     const t = textoDaChave(resultado.chaveTemplate, resultado.variaveis, publicados.textos);
     if (t.texto) {
-      resultado.texto = t.texto;
+      resultado.texto = [t.texto, resultado.complementoTexto?.trim()].filter(Boolean).join("\n\n");
       usouPublicado = t.origemTemplate === "publicado";
     }
     if (t.motivo) resultado.restricoes = [...resultado.restricoes, `template:${t.motivo}`];
@@ -196,9 +198,8 @@ export async function finalizarResposta(
     pedido.mensagemPaciente
   ) {
     try {
-      const { avaliarEncerramentoAutomatico } = await import(
-        "@/lib/nina/encerramento-automatico.server"
-      );
+      const { avaliarEncerramentoAutomatico } =
+        await import("@/lib/nina/encerramento-automatico.server");
       const av = await avaliarEncerramentoAutomatico({
         clinicaId: pedido.clinicaId,
         telefone: pedido.telefone,
@@ -240,7 +241,7 @@ export async function finalizarResposta(
   }
 
   // Depois de TODOS os templates e despedidas, antes do hash e da entrega.
-  resultado.texto = removerEmojisNina(resultado.texto ?? "");
+  resultado.texto = formatarMensagemNina(resultado.texto ?? "");
   if (!resultado.texto && resultado.estado === "entregar") {
     resultado.estado = "descartar";
     resultado.restricoes = [...resultado.restricoes, "sem_texto_apos_remover_emojis"];

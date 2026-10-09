@@ -1,5 +1,6 @@
 /** Mesma entrada física em retries dos dois transportes; nunca gerar para um insert falho. */
 import { ErroAgrupamentoNina } from "./agrupamento-turno";
+import { protegerMensagemRecebida } from "../atendimento/links-entrada";
 export async function registrarRevisaoEntradaNina(
   admin: any,
   entrada: {
@@ -30,6 +31,7 @@ export async function persistirEntradaNina(
   admin: any,
   entrada: Record<string, unknown> & { clinica_id: string; wa_message_id: string },
 ) {
+  entrada = protegerMensagemRecebida(entrada);
   try {
     const campos = "*";
     const { data, error } = await admin
@@ -52,7 +54,7 @@ export async function persistirEntradaNina(
       throw new ErroAgrupamentoNina(
         "Não foi possível recuperar a entrada persistida para conferir a duplicidade.",
       );
-    const m = existente.data;
+    const m = protegerMensagemRecebida(existente.data);
     if (
       String(m.from_number).replace(/\D/g, "") !== String(entrada.from_number).replace(/\D/g, "") ||
       (entrada.conversa_id && m.conversa_id !== entrada.conversa_id)

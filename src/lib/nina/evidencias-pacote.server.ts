@@ -395,8 +395,7 @@ export async function montarPacoteInvestigacao(
         textoHash: entrega?.textoHash ?? null,
         estado: entrega?.estado ?? null,
         canal: entrega?.canal ?? null,
-        em:
-          ((msg as Record<string, any>)["created_at"] as string | null) ?? entrega?.em ?? null,
+        em: ((msg as Record<string, any>)["created_at"] as string | null) ?? entrega?.em ?? null,
       };
     }
   }

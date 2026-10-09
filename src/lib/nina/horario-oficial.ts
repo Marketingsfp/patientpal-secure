@@ -97,8 +97,10 @@ export function horarioOficialDoDia(params: {
     instrucao,
   });
 
-  if (dow === null) return vazio("timestamp_ausente_ou_invalido", "Data inválida — peça a data ao paciente.");
-  if (!escopo.clinica_id) return vazio("escopo_nao_identificavel", "Escopo não identificado — não afirme horário.");
+  if (dow === null)
+    return vazio("timestamp_ausente_ou_invalido", "Data inválida — peça a data ao paciente.");
+  if (!escopo.clinica_id)
+    return vazio("escopo_nao_identificavel", "Escopo não identificado — não afirme horário.");
 
   if ((params.calendarios ?? []).length === 0)
     return vazio(
@@ -106,7 +108,11 @@ export function horarioOficialDoDia(params: {
       "Não há horário oficial publicado — diga que não tem essa informação confirmada. Nunca diga que está fechado.",
     );
 
-  const { calendario, conflito } = calendarioAplicavel(params.calendarios ?? [], escopo, params.data);
+  const { calendario, conflito } = calendarioAplicavel(
+    params.calendarios ?? [],
+    escopo,
+    params.data,
+  );
   if (conflito)
     return vazio(
       "conflito_de_configuracao",
@@ -205,7 +211,13 @@ export function semanaOficial(params: {
   escopo: EscopoEvento;
   calendarios: CalendarioPublicado[];
   fuso?: string | null;
-}): { encontrado: boolean; versao: number | null; fuso: string; dias: DiaOficial[]; motivo: MotivoClassificacao | null } {
+}): {
+  encontrado: boolean;
+  versao: number | null;
+  fuso: string;
+  dias: DiaOficial[];
+  motivo: MotivoClassificacao | null;
+} {
   const fuso = params.fuso || FUSO_PADRAO;
   const { calendario, conflito } = calendarioAplicavel(
     params.calendarios ?? [],
@@ -236,7 +248,13 @@ export function semanaOficial(params: {
         .map((f) => ({ inicio: String(f.hora_inicio), fim: String(f.hora_fim) })),
     });
   }
-  return { encontrado: true, versao: calendario.versao, fuso: calendario.fuso || fuso, dias, motivo: null };
+  return {
+    encontrado: true,
+    versao: calendario.versao,
+    fuso: calendario.fuso || fuso,
+    dias,
+    motivo: null,
+  };
 }
 
 /** Está aberto AGORA? Usa exclusivamente o classificador central da Fase 3. */

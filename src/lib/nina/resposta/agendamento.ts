@@ -5,8 +5,11 @@ import { textoDaChave, type TextosTemplates } from "./templates";
 
 /** Gate e caminho do modelo entregam os mesmos dados comprovados da reserva. */
 export function resultadoAgendamentoConfirmado(
-  dados: Record<string, unknown>, estado: EstadoFluxoNina, unidade: string,
-  textos?: TextosTemplates | null, conversaId?: string | null,
+  dados: Record<string, unknown>,
+  estado: EstadoFluxoNina,
+  unidade: string,
+  textos?: TextosTemplates | null,
+  conversaId?: string | null,
 ) {
   const a = estado.appointment;
   const modalidade = dados.modalidade_atendimento ?? a.modalidade_atendimento;
@@ -16,15 +19,28 @@ export function resultadoAgendamentoConfirmado(
   const ficha = typeof dados.ficha_numero === "string" ? dados.ficha_numero : null;
   const chave = chaveConfirmacaoModalidade(modalidade, ficha);
   const agendamento = dados.agendamento as Record<string, unknown> | undefined;
-  const variaveis = { profissional: String(dados.medico ?? a.doctor_name ?? "-"),
+  const variaveis = {
+    profissional: String(dados.medico ?? a.doctor_name ?? "-"),
     procedimento: String(agendamento?.procedimento ?? a.procedure ?? ""),
     data: String(dados.date ?? a.date?.split("-").reverse().join("/") ?? "-"),
-    horario: String(dados.time ?? a.time ?? "-"), unidade: unidade.trim() || "nossa clínica",
-    modalidade, ficha: ficha ?? "" };
-  return criarResultado({ origem: "gate", chaveTemplate: chave, variaveis,
+    horario: String(dados.time ?? a.time ?? "-"),
+    unidade: unidade.trim() || "nossa clínica",
+    modalidade,
+    ficha: ficha ?? "",
+  };
+  return criarResultado({
+    origem: "gate",
+    chaveTemplate: chave,
+    variaveis,
     texto: textoDaChave(chave, variaveis, textos).texto,
     fatosConfirmados: ["agendamento_gravado", `modalidade:${modalidade}`],
-    acoesConcluidas: [{ acao: "agendar", idempotencia: `agendar|${conversaId}|${a.slot_inicio ?? ""}`,
-      confirmada: true, evidencia: id }],
+    acoesConcluidas: [
+      {
+        acao: "agendar",
+        idempotencia: `agendar|${conversaId}|${a.slot_inicio ?? ""}`,
+        confirmada: true,
+        evidencia: id,
+      },
+    ],
   });
 }

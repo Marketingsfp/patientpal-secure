@@ -74,9 +74,7 @@ export function EventosSeguranca({ clinicaId }: { clinicaId?: string | null }) {
               {eventos.map((e) => (
                 <tr key={e.id} className="border-b last:border-0">
                   <td className="py-2 font-medium">{e.atendente}</td>
-                  <td className="py-2">
-                    {LABEL_EVENTO[e.tipo as TipoEventoSeguranca] ?? e.tipo}
-                  </td>
+                  <td className="py-2">{LABEL_EVENTO[e.tipo as TipoEventoSeguranca] ?? e.tipo}</td>
                   <td className="py-2 capitalize text-muted-foreground">{e.tela}</td>
                   <td className="py-2 text-right tabular-nums text-muted-foreground">
                     {quando(e.created_at)}

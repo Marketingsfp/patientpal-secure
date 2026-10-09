@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ const emptyForm = (clinicaId: string) => ({
   regime: "clt",
   carga_horaria_semanal: "44",
   salario: "0",
-  data_admissao: new Date().toISOString().slice(0, 10),
+  data_admissao: hojeBR(),
   data_demissao: "",
   status: "ativo",
   sexo: "nao_informar",
@@ -112,8 +113,7 @@ export function FuncionarioDadosDialog({
           regime: (contrato.regime as string) ?? "clt",
           carga_horaria_semanal: String(contrato.carga_horaria_semanal ?? "44"),
           salario: String(contrato.salario ?? "0"),
-          data_admissao:
-            (contrato.data_admissao as string) ?? new Date().toISOString().slice(0, 10),
+          data_admissao: (contrato.data_admissao as string) ?? hojeBR(),
           data_demissao: (contrato.data_demissao as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
           sexo: (contrato.sexo as string) ?? "nao_informar",

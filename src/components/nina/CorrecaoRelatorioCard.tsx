@@ -6,10 +6,7 @@
  * autoria/tempo, versões e reversão. Somente leitura — não dispara nada.
  */
 import { Badge } from "@/components/ui/badge";
-import {
-  ROTULO_RESULTADO_RELATORIO,
-  type RelatorioCorrecao,
-} from "@/lib/nina/correcao-relatorio";
+import { ROTULO_RESULTADO_RELATORIO, type RelatorioCorrecao } from "@/lib/nina/correcao-relatorio";
 
 const VARIANTE: Record<
   RelatorioCorrecao["resultado"],
@@ -69,7 +66,8 @@ export function CorrecaoRelatorioCard({ relatorio }: { relatorio: RelatorioCorre
               <p className="text-xs font-medium">
                 {a.alvo}{" "}
                 <span className="font-normal text-muted-foreground">
-                  ({a.tipo}) — {a.efetivada ? "alteração efetivada" : "registrada, ainda não aplicada"}
+                  ({a.tipo}) —{" "}
+                  {a.efetivada ? "alteração efetivada" : "registrada, ainda não aplicada"}
                 </span>
               </p>
               <div className="mt-1 grid gap-2 md:grid-cols-2">
@@ -88,7 +86,9 @@ export function CorrecaoRelatorioCard({ relatorio }: { relatorio: RelatorioCorre
               </div>
               {a.diff && (
                 <details className="mt-1">
-                  <summary className="cursor-pointer text-xs font-medium">Ver diff detalhado</summary>
+                  <summary className="cursor-pointer text-xs font-medium">
+                    Ver diff detalhado
+                  </summary>
                   <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-[11px]">
                     {a.diff}
                   </pre>

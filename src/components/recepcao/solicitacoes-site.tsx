@@ -163,10 +163,18 @@ export function SolicitacoesSite() {
                 <Link to="/app/agenda" className={BTN}>
                   Abrir agenda
                 </Link>
-                <button type="button" className={BTN} onClick={() => void resolver(s.id, "confirmar")}>
+                <button
+                  type="button"
+                  className={BTN}
+                  onClick={() => void resolver(s.id, "confirmar")}
+                >
                   <Check className="size-3.5" /> Confirmar
                 </button>
-                <button type="button" className={BTN} onClick={() => void resolver(s.id, "recusar")}>
+                <button
+                  type="button"
+                  className={BTN}
+                  onClick={() => void resolver(s.id, "recusar")}
+                >
                   <X className="size-3.5" /> Recusar
                 </button>
               </div>

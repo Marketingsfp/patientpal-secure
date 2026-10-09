@@ -1,3 +1,4 @@
+import { deveResponderEmAudio } from "../../audio";
 /**
  * Executa o console REAL em um subprocesso isolado. Somente banco, modelo,
  * transporte, áudio e serviços externos são simulados; não copia a lógica de
@@ -5,8 +6,9 @@
  */
 import { mock } from "bun:test";
 import { criarResultadoSemNovaMensagem } from "@/lib/nina/resposta/contrato";
-import { resultadoEncaminhamentoSfp } from "@/lib/nina/regras-catalogo";
+import { resultadoHandoffSilencioso } from "@/lib/nina/handoff-silencioso";
 import { hashDoTexto } from "@/lib/nina/confidence/hash";
+import { formatarMensagemNina } from "@/lib/nina/resposta/formato-mobile";
 
 type Linha = Record<string, any>;
 const cenario = process.argv[2];
@@ -18,7 +20,7 @@ const entradasGerador: Linha[] = [];
 const encaminhada = cenario.startsWith("handoff-");
 const AVISO = "Nesta simulação, o atendimento precisaria de uma pessoa da equipe. Protocolo MJ-53.";
 const RESPOSTA = paridade
-  ? "Temos Cardiologia. A consulta custa R$ 120,00 no dinheiro e R$ 145,00 no cartão."
+  ? "Olá! Temos Cardiologia. Dinheiro: R$ 120,00 Cartão: R$ 145,00. Quer consultar os horários?"
   : "Olá! Como posso ajudar?";
 const lead: Linha = {
   id: "lead-mj53",
@@ -50,6 +52,9 @@ const bd: Record<string, Linha[]> = {
 };
 let sequencia = 0;
 let chamadasRede = 0;
+let transcricoes = 0;
+let leiturasFoto = 0;
+const arquivos: string[] = [];
 let chamadasModelo = 0;
 let chamadasFinalizacao = 0;
 let chamadasAudio = 0;
@@ -82,12 +87,26 @@ function consulta(tabela: string) {
   let atualizacao: Linha | null = null;
   let singular = false;
   let executada = false;
-  let retorno: { data: Linha | Linha[] | null; error: null; count: number };
+  let retorno: {
+    data: Linha | Linha[] | null;
+    error: { code: string; message: string } | null;
+    count: number;
+  };
   const executar = () => {
     if (executada) return retorno;
     executada = true;
     let linhas: Linha[];
     if (insercao) {
+      if (
+        tabela === "whatsapp_mensagens" &&
+        bd[tabela].some(
+          (m) =>
+            m.clinica_id === insercao!.clinica_id && m.wa_message_id === insercao!.wa_message_id,
+        )
+      ) {
+        retorno = { data: null, error: { code: "23505", message: "duplicate key" }, count: 0 };
+        return retorno;
+      }
       const nova = { id: `mensagem-${++sequencia}`, ...insercao };
       bd[tabela].push(nova);
       linhas = [nova];
@@ -127,6 +146,14 @@ function consulta(tabela: string) {
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: consulta,
+    storage: {
+      from: () => ({
+        upload: async (caminho: string) => {
+          arquivos.push(caminho);
+          return { error: null };
+        },
+      }),
+    },
     rpc: (nome: string) => {
       if (nome === "nina_revisao_registrar_entrada")
         return Promise.resolve({ data: 1, error: null });
@@ -144,6 +171,16 @@ mock.module("@/lib/atendimento/handoff.server", () => ({
   ninaPodeResponder: () => !transferidaSfp,
 }));
 mock.module("@/lib/whatsapp-midia.server", () => ({
+  lerPedidoNaImagem: async () => {
+    leiturasFoto++;
+    return cenario === "foto-legivel"
+      ? { tipo: "pedido_medico", itens: ["ECG"] }
+      : { tipo: "ilegivel" };
+  },
+  transcreverAudioBase64: async () => {
+    transcricoes++;
+    return { texto: "Quero cardiologista. https://exemplo.com", erro: null };
+  },
   RESPOSTA_AUDIO_FALHOU: "Não consegui ouvir esse áudio.",
   respostaMidiaNaoSuportada: () => "Envie uma mensagem de texto.",
 }));
@@ -181,7 +218,7 @@ mock.module("@/lib/whatsapp.server", () => ({
     if (cenario === "erro-real") throw new Error("Falha simulada do provedor");
     if (cenario.startsWith("handoff-sfp-")) {
       transferidaSfp = true;
-      opcoes.auditoria.resultado = resultadoEncaminhamentoSfp(true);
+      opcoes.auditoria.resultado = resultadoHandoffSilencioso();
       return "";
     }
     if (encaminhada) {
@@ -213,9 +250,14 @@ mock.module("@/lib/whatsapp.server", () => ({
       return "";
     }
     if (cenario === "vazio-real") return "";
-    opcoes.auditoria.textoFinalHash = hashDoTexto(RESPOSTA);
+    // Núcleo atual já finaliza; cenário legado exercita a defesa do transporte.
+    const resposta =
+      cenario === "resposta-antiga-sem-formatacao" || paridade
+        ? RESPOSTA
+        : formatarMensagemNina(RESPOSTA);
+    opcoes.auditoria.textoFinalHash = hashDoTexto(resposta);
     opcoes.auditoria.decisaoId = "avaliacao-resposta";
-    return RESPOSTA;
+    return resposta;
   },
 }));
 mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
@@ -226,6 +268,23 @@ mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
   },
 }));
 mock.module("@/lib/nina-audio.server", () => ({
+  guardarAudioMensagem: async () => {},
+  avaliarFala: async () => ({
+    decisaoId: null,
+    textoHash: "hash-audio",
+    representacao: "audio_integral",
+  }),
+  prepararAudioResposta: async (
+    _clinica: string,
+    texto: string,
+    entrada: { recebeuAudio: boolean; mensagem: string },
+  ) => {
+    if (!deveResponderEmAudio(entrada)) return null;
+    chamadasAudio++;
+    if (cenario === "audio-falha") return null;
+    if (cenario === "reserva-perdida-tts") reservaPerdidaDepois = true;
+    return { bytes: new Uint8Array([1, 2]), mime: "audio/ogg", ext: "ogg", texto, longa: false };
+  },
   respostaAudioDesativada: async () => false,
   prepararParaFala: (texto: string) => texto,
   pareceLista: () => false,
@@ -249,21 +308,43 @@ mock.module("@/lib/nina/rastreio/turno.server", () => ({
 }));
 
 const { processarMensagemTeste } = await import("@/lib/nina/teste-console.server");
-const resultado = await processarMensagemTeste(
-  {
-    clinicaId: lead.clinica_id,
-    leadId: lead.id,
-    tipo: ["handoff-audio", "handoff-sfp-audio", "reserva-perdida-tts"].includes(cenario) ? "audio" : "text",
-    texto: paridade ? "Vocês tem cardiologista?" : "vcs tem cardiologista?",
-    chave: "entrada-mj53",
-  },
-  "operador-teste",
-);
+const entradaTeste = {
+  clinicaId: lead.clinica_id,
+  leadId: lead.id,
+  tipo: cenario.startsWith("foto-")
+    ? ("image" as const)
+    : [
+          "handoff-audio",
+          "handoff-sfp-audio",
+          "reserva-perdida-tts",
+          "audio-recebido",
+          "audio-arquivo",
+        ].includes(cenario)
+      ? ("audio" as const)
+      : ("text" as const),
+  ...(cenario.startsWith("foto-") ? { imagemArquivo: { base64: "AQID", mime: "image/jpeg" } } : {}),
+  ...(cenario === "audio-arquivo"
+    ? { audioArquivo: { base64: "T2dnUw==", mime: "audio/ogg" } }
+    : {}),
+  texto:
+    cenario === "audio-pedido" || cenario === "audio-falha"
+      ? "Me responda em áudio"
+      : paridade
+        ? "Vocês tem cardiologista?"
+        : "vcs tem cardiologista?",
+  chave: "entrada-mj53",
+};
+const resultado = await processarMensagemTeste(entradaTeste, "operador-teste");
+if (cenario === "audio-arquivo" || cenario.startsWith("foto-"))
+  await processarMensagemTeste(entradaTeste, "operador-teste");
 
 console.log(
   "MJ53_RESULTADO=" +
     JSON.stringify({
       resultado,
+      transcricoes,
+      arquivos,
+      leiturasFoto,
       saidas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "out"),
       entradas: bd.whatsapp_mensagens.filter((linha) => linha.direction === "in"),
       chamadasModelo,

@@ -7,14 +7,17 @@ describe("Nina sem motor — geração real com dependências externas simuladas
     it(`${ambiente}: interpreta, consulta a base e responde sem avaliador adicional`, () => {
       const p = Bun.spawnSync([process.execPath, fixture, ambiente], {
         cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
-        stdout: "pipe", stderr: "pipe", timeout: 15_000,
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 15_000,
       });
       const output = p.stdout.toString();
       expect(p.exitCode, output + p.stderr.toString()).toBe(0);
       const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
       expect(linha).toBeDefined();
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
-      expect(r.resposta).toBe(r.respostaModelo);
+      expect(r.resposta.replace(/\s/g, "")).toBe(r.respostaModelo.replace(/\s/g, ""));
+      expect(r.resposta).toContain("\nProfissional:");
       expect(r.requests).toHaveLength(2);
       expect(r.ordem).toEqual(["modelo", "consultar_cadastro", "modelo"]);
       expect(JSON.stringify(r.requests)).toContain(r.prompt);
@@ -22,10 +25,11 @@ describe("Nina sem motor — geração real com dependências externas simuladas
       expect(JSON.stringify(r.requests)).toContain("Sem jejum");
       // Mesma geração de produção/homologação recebe o relógio do servidor.
       const textoRequest = JSON.stringify(r.requests);
-      expect(textoRequest).toContain("INFORMAR_PIX_ANTECIPADO");
-      expect(textoRequest).toContain("*Pix:* pagamento somente antecipado, pelo WhatsApp.");
-      expect(textoRequest).toContain("ANTECEDENCIA_CHEGADA_30_MINUTOS");
-      expect(textoRequest).toContain("chegar com 30 minutos de antecedência");
+      expect(textoRequest).toContain("FORMATO_MOBILE_OBRIGATORIO");
+      expect(textoRequest).not.toContain("INFORMAR_PIX_ANTECIPADO");
+      expect(textoRequest).not.toContain("*Pix:* pagamento somente antecipado, pelo WhatsApp.");
+      expect(textoRequest).not.toContain("ANTECEDENCIA_CHEGADA_30_MINUTOS");
+      expect(textoRequest).not.toContain("chegar com 30 minutos de antecedência");
       expect(textoRequest).toContain("saudacao_do_periodo");
       expect(textoRequest).toContain("datas_referencia");
       expect(textoRequest).toContain("America/Sao_Paulo");
