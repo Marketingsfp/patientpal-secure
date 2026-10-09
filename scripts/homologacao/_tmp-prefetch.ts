@@ -4,7 +4,6 @@ const clinicaId = "7570ddde-8c1c-4b55-ba72-cf12b2a6c940";
 const admin = supabaseAdmin as any;
 const leads = await garantirLeads(admin, clinicaId);
 const leadId = leads[1]!.id;
-await resetarLeadTeste(admin, { clinicaId, leadId, userId: null, origem: "diagnostico-prefetch" });
 await new Promise(r => setTimeout(r, 1500));
 const r: any = await processarMensagemTeste({ clinicaId, leadId, tipo: "text", texto: "bom dia, quanto ta a consulta com dermatologista? tem vaga semana q vem?", chave: `pf-${Date.now()}` }, null);
 console.log("TURNO", r.turnoId, r.erro ?? "");
