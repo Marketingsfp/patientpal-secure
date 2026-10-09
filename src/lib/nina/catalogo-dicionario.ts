@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const MODELO_DICIONARIO = "openai/gpt-6-astra";
 export const LIMITE_VARIACOES = 50;
+export const LIMITE_OBSERVACAO = 350;
 export const contextoDicionarioSchema = z.object({
   tipo: z.enum(["servico", "profissional"]),
   nome: z.string().trim().min(2).max(200),
@@ -12,24 +13,30 @@ export const contextoDicionarioSchema = z.object({
 });
 export type ContextoDicionario = z.infer<typeof contextoDicionarioSchema>;
 const categorias = ["sigla", "nome_popular", "sinonimo", "grafia", "erro_comum"] as const;
-const saidaSchema = z
-  .object({
-    variacoes: z
-      .array(
-        z
-          .object({
-            termo: z.string().trim().min(2).max(160),
-            categoria: z.enum(categorias),
-            explicacao: z.string().trim().min(1).max(350),
-            origem: z.enum(["web", "linguistica"]),
-            fontes: z.array(z.string().url().max(2000)).max(5),
-          })
-          .strict(),
-      )
-      .max(LIMITE_VARIACOES),
-    duvidas: z.array(z.string().trim().min(1).max(350)).max(20),
-  })
-  .strict();
+const criarSaidaSchema = (limitarTextos: boolean) => {
+  const texto = z.string().trim().min(1);
+  const observacao = limitarTextos ? texto.max(LIMITE_OBSERVACAO) : texto;
+  return z
+    .object({
+      variacoes: z
+        .array(
+          z
+            .object({
+              termo: z.string().trim().min(2).max(160),
+              categoria: z.enum(categorias),
+              explicacao: observacao,
+              origem: z.enum(["web", "linguistica"]),
+              fontes: z.array(z.string().url().max(2000)).max(5),
+            })
+            .strict(),
+        )
+        .max(LIMITE_VARIACOES),
+      duvidas: z.array(observacao).max(20),
+    })
+    .strict();
+};
+const saidaSchema = criarSaidaSchema(true);
+export const saidaComTextosCompletosSchema = criarSaidaSchema(false);
 export type SugestoesDicionario = z.infer<typeof saidaSchema>;
 export type PesquisaDicionario = {
   chamadas: number;
@@ -38,6 +45,8 @@ export type PesquisaDicionario = {
 export type ResultadoDicionario = SugestoesDicionario & {
   modelo: string;
   pesquisa: PesquisaDicionario;
+  aviso?: string;
+  observacoesOriginais?: { id: string; rotulo: string; texto: string }[];
 };
 export const chaveVariacao = (v: string) =>
   v
@@ -50,8 +59,11 @@ export const chaveVariacao = (v: string) =>
 export function validarSugestoesDicionario(
   bruto: unknown,
   contexto: ContextoDicionario,
+  permitirTextosCompletos = false,
 ): SugestoesDicionario {
-  const resultado = saidaSchema.parse(bruto);
+  const resultado = (permitirTextosCompletos ? saidaComTextosCompletosSchema : saidaSchema).parse(
+    bruto,
+  );
   const vistas = new Set([contexto.nome, ...contexto.aliases].map(chaveVariacao));
   return {
     ...resultado,
@@ -94,7 +106,7 @@ Consultas e exames são diferentes, mesmo com a mesma especialidade. Para profis
 Se uma expressão pode significar mais de um atendimento fora da abrangência do cadastro (por exemplo uma sigla curta ou um pedido muito geral para um item específico), escreva a dúvida em duvidas, não como variação equivalente. Uma sigla desconhecida como USA não deve ser inventada ou tratada como USG sem evidência.
 Não gere preços, regras clínicas, horários ou disponibilidade. Não repita o nome oficial nem os aliases já cadastrados; acentuação e maiúsculas sozinhas não precisam de novas entradas.
 Para termos encontrados em fontes, use origem=web e fontes com as URLs exatas consultadas que sustentam aquele termo. Para erros de digitação e transformações linguísticas propostos por você, use origem=linguistica e fontes vazias, sem apresentar hipótese como termo comprovado na web. Siglas e sinônimos reais precisam de fonte web. Não invente URLs. A página é evidência de nomenclatura, não de serviços ou regras da clínica.
-Cada sugestão precisa de uma explicação curta do vínculo. As sugestões serão revisadas por uma pessoa; não são publicadas automaticamente. Nenhum número de sugestões é obrigatório. Se o cadastro não permite equivalências seguras, devolva variacoes vazia e explique em duvidas.`;
+Cada sugestão precisa de uma explicação curta do vínculo. Cada termo deve ter de 2 a 160 caracteres; cada explicação e cada dúvida, de 1 a ${LIMITE_OBSERVACAO} caracteres. Retorne no máximo 20 dúvidas e 5 URLs por sugestão, cada URL com até 2000 caracteres. Escreva de forma concisa sem omitir ressalvas nem qualificadores. As sugestões serão revisadas por uma pessoa; não são publicadas automaticamente. Nenhum número de sugestões é obrigatório. Se o cadastro não permite equivalências seguras, devolva variacoes vazia e explique em duvidas.`;
 
 export function requisicaoDicionario(contexto: ContextoDicionario) {
   return {
@@ -132,15 +144,32 @@ export function requisicaoDicionario(contexto: ContextoDicionario) {
                 additionalProperties: false,
                 required: ["termo", "categoria", "explicacao", "origem", "fontes"],
                 properties: {
-                  termo: { type: "string" },
+                  termo: {
+                    type: "string",
+                    description: "De 2 a 160 caracteres; preserve todos os qualificadores.",
+                  },
                   categoria: { type: "string", enum: [...categorias] },
-                  explicacao: { type: "string" },
+                  explicacao: {
+                    type: "string",
+                    description: `De 1 a ${LIMITE_OBSERVACAO} caracteres, incluindo ressalvas.`,
+                  },
                   origem: { type: "string", enum: ["web", "linguistica"] },
-                  fontes: { type: "array", items: { type: "string" } },
+                  fontes: {
+                    type: "array",
+                    description: "Até 5 URLs consultadas, com até 2000 caracteres cada.",
+                    items: { type: "string" },
+                  },
                 },
               },
             },
-            duvidas: { type: "array", items: { type: "string" } },
+            duvidas: {
+              type: "array",
+              description: "Até 20 dúvidas.",
+              items: {
+                type: "string",
+                description: `De 1 a ${LIMITE_OBSERVACAO} caracteres, sem omitir ressalvas.`,
+              },
+            },
           },
         },
       },
