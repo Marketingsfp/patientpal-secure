@@ -1128,6 +1128,8 @@ async function gerarRespostaNinaInterno(
   let jevEncaminhamento: import("@/lib/nina/jev-encaminhamento").Encaminhamento | null = null;
   let jevPontuacoes: Record<string, number | null> | null = null;
   let orientacaoIntencaoJev: import("@/lib/nina/jev-orientacao-intencao").OrientacaoIntencaoJev | null = null;
+  /** Intenção do Jev com confiança alta (usada só para decidir a pré-busca). */
+  let intencaoJevSegura: import("@/lib/nina/atendimento-fase1").IntencaoNina | null = null;
   try {
     const jev = await import("@/lib/nina/jev.server");
     const [f1, f2] = await Promise.all([
@@ -1165,6 +1167,7 @@ async function gerarRespostaNinaInterno(
       alteracaoSolicitada = alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
+      intencaoJevSegura = escolhida;
       if (escolhida) {
         intencoesTurno = [escolhida];
         intencaoAmbiguaTurno = false;
@@ -1921,6 +1924,22 @@ async function gerarRespostaNinaInterno(
       return r;
     },
   };
+  // PRÉ-BUSCA DO CADASTRO (flag `nina_prefetch_cadastro`, padrão ligada):
+  // roda em paralelo com a montagem do contexto, pelo mesmo broker.
+  const nomesFerramentas = (ferramentas as Array<{ function?: { name?: string } }>)
+    .map(f => f.function?.name ?? "").filter(Boolean);
+  const motivoSemPrefetch = !ctxFerramentas ? "ferramentas do paciente indisponíveis"
+    : !intencaoJevSegura ? "Jev sem intenção segura"
+    : nomeAtendimentoAusente || alteracaoSolicitada || multiplosAtendimentos || jevEncaminhamento
+      ? "turno com encaminhamento, alteração ou pedido múltiplo" : null;
+  if (motivoSemPrefetch) rastro?.pular("tool.prefetch", motivoSemPrefetch);
+  else rastro?.iniciar("tool.prefetch", {});
+  const prefetchPromessa = motivoSemPrefetch ? Promise.resolve(null)
+    : import("@/lib/nina/prefetch-cadastro.server").then(m => m.executarPrefetchCadastro({
+        clinicaId, mensagem: mensagemPaciente, intencao: intencaoJevSegura, nomePopular,
+        ferramentasDisponiveis: nomesFerramentas,
+        executar: (nome, args) => broker.executar(nome, args),
+      })).catch(() => null);
   // FASE 3 — as regras de handoff vivem no prompt publicado. Aqui não se
   // concatena mais nenhum comportamento ao system prompt.
 
@@ -2414,6 +2433,30 @@ async function gerarRespostaNinaInterno(
     registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: "Identificação confirmada e reconsultada",
       dados: { registro: confirmacao.registro, sucesso: r.success && !r.erro,
         pendencias_restantes: perguntasDoTurno.pendentes.map(p => p.consulta.termo), permite_reservar: false } });
+  }
+  // PRÉ-BUSCA DO CADASTRO: resultados entram como chamadas de ferramenta já
+  // executadas, no mesmo formato que o modelo recebe. Fallback silencioso.
+  {
+    const r = await prefetchPromessa;
+    const aproveitar = r && "plano" in r && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto &&
+      !perguntaComplementar && !respostaNomeAtendimento && reconsultasIdentificacao.length === 0;
+    if (r && "plano" in r) {
+      if (aproveitar) {
+        for (const [i, x] of r.resultados.entries()) {
+          const id = `prefetch_${x.nome}_${i}`;
+          mensagens.push({ role: "assistant", content: null, tool_calls: [{ id, type: "function",
+            function: { name: x.nome, arguments: x.args } }] });
+          const retorno = await compartilharResultado(x.nome, x.args, x.r);
+          mensagens.push({ role: "tool", tool_call_id: id, content: JSON.stringify(compactarRetorno(retorno)) });
+        }
+      }
+      rastro?.concluir("tool.prefetch", { duracao_ms: r.duracaoMs, termo: r.plano.termo, tipo: r.plano.tipo,
+        ferramentas: r.resultados.map(x => x.nome), aproveitado: Boolean(aproveitar),
+        ...(aproveitar ? {} : { motivo: "turno seguiu outro caminho antes do modelo" }) });
+    } else if (r) {
+      rastro?.concluir("tool.prefetch", { duracao_ms: r.duracaoMs, termo: r.termo ?? null, ferramentas: [],
+        aproveitado: false, motivo: r.motivo });
+    }
   }
   // JEV — Fase 6 (flag `nina_jev_fase6`): confere a resposta antes do envio.
   const inicioMensagensTurno = mensagens.length;

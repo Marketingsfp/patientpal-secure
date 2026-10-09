@@ -465,8 +465,23 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
       "tool.business_hours",
       "tool.handoff",
       "llm.generate",
+      "tool.prefetch",
     ],
     erros: ["ferramenta desconhecida", "limite de rodadas atingido", "chamada repetida no turno"],
+  },
+  {
+    id: "tool.prefetch",
+    nome: "Pré-busca do cadastro",
+    categoria: "TOOLS",
+    descricao:
+      "Antes da 1ª chamada ao modelo, com intenção segura do Jev e um único atendimento citado, executa consultar_cadastro ou buscar_medicos pelo mesmo broker e entrega o resultado ao modelo. Flag nina_prefetch_cadastro (ligada sem registro).",
+    arquivo: "src/lib/nina/prefetch-cadastro.server.ts",
+    funcao: "executarPrefetchCadastro",
+    entrada: "Mensagem, intenção do Jev e catálogo do turno",
+    saida: "Resultados de ferramenta já executados",
+    anteriores: ["tool.execute"],
+    seguintes: [],
+    erros: ["termo não identificado com segurança", "passou do prazo de 2 s", "ferramenta falhou", "flag desligada"],
   },
   {
     id: "tool.catalog.lookup",

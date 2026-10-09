@@ -127,6 +127,10 @@ function descreverConclusao(
         : "Chamada ao modelo concluída.";
     case "tool.execute":
       return "Execução da ferramenta concluída.";
+    case "tool.prefetch":
+      return meta.aproveitado === true
+        ? `Pré-busca do cadastro aproveitada: "${s(meta.termo) ?? "?"}" (${Array.isArray(meta.ferramentas) ? meta.ferramentas.join(", ") : ""}) em ${n(meta.duracao_ms) ?? "?"} ms.`
+        : `Pré-busca não usada: ${s(meta.motivo) ?? "sem motivo registrado"}${n(meta.duracao_ms) != null ? ` (${n(meta.duracao_ms)} ms)` : ""}.`;
     case "confidence.decision":
     case "answer.verify":
       return n(meta.score) != null
