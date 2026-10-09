@@ -29,6 +29,7 @@ import { Route as ApiNinaFalaRouteImport } from './routes/api/nina-fala'
 import { Route as ApiNinaVozRouteImport } from './routes/api/nina-voz'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as DevFranciscoRouteImport } from './routes/dev.francisco'
+import { Route as DevPainelTvRouteImport } from './routes/dev.painel-tv'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
@@ -299,6 +300,11 @@ const CheckinTokenRoute = CheckinTokenRouteImport.update({
 const DevFranciscoRoute = DevFranciscoRouteImport.update({
   id: '/dev/francisco',
   path: '/dev/francisco',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevPainelTvRoute = DevPainelTvRouteImport.update({
+  id: '/dev/painel-tv',
+  path: '/dev/painel-tv',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LpSlugRoute = LpSlugRouteImport.update({
@@ -1297,6 +1303,7 @@ export interface FileRoutesByFullPath {
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/dev/francisco': typeof DevFranciscoRoute
+  '/dev/painel-tv': typeof DevPainelTvRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1487,6 +1494,7 @@ export interface FileRoutesByTo {
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/dev/francisco': typeof DevFranciscoRoute
+  '/dev/painel-tv': typeof DevPainelTvRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1677,6 +1685,7 @@ export interface FileRoutesById {
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/dev/francisco': typeof DevFranciscoRoute
+  '/dev/painel-tv': typeof DevPainelTvRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1870,6 +1879,7 @@ export interface FileRouteTypes {
     | '/api/nina-voz'
     | '/checkin/$token'
     | '/dev/francisco'
+    | '/dev/painel-tv'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2060,6 +2070,7 @@ export interface FileRouteTypes {
     | '/api/nina-voz'
     | '/checkin/$token'
     | '/dev/francisco'
+    | '/dev/painel-tv'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2249,6 +2260,7 @@ export interface FileRouteTypes {
     | '/api/nina-voz'
     | '/checkin/$token'
     | '/dev/francisco'
+    | '/dev/painel-tv'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2441,6 +2453,7 @@ export interface RootRouteChildren {
   ApiNinaVozRoute: typeof ApiNinaVozRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   DevFranciscoRoute: typeof DevFranciscoRoute
+  DevPainelTvRoute: typeof DevPainelTvRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
@@ -2613,6 +2626,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/francisco'
       fullPath: '/dev/francisco'
       preLoaderRoute: typeof DevFranciscoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/painel-tv': {
+      id: '/dev/painel-tv'
+      path: '/dev/painel-tv'
+      fullPath: '/dev/painel-tv'
+      preLoaderRoute: typeof DevPainelTvRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lp/$slug': {
@@ -4267,6 +4287,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNinaVozRoute: ApiNinaVozRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   DevFranciscoRoute: DevFranciscoRoute,
+  DevPainelTvRoute: DevPainelTvRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
