@@ -1,36 +1,33 @@
-# Revisão de segurança completa — 09/10/2026 14:24 UTC (somente leitura, nada foi alterado)
+# Fechar acesso de visitante — itens 1, 2 e 3 da revisão de segurança
 
-## O que mudou desde a última revisão (13:28 UTC)
-- Nenhuma mudança de código, banco, permissões, rotas públicas ou login. Os últimos commits de código (repasse no cartão, assinatura do webhook) já estavam cobertos.
+## O que muda (em linguagem simples)
+Hoje 8 funções do banco aceitam ser chamadas por quem não fez login. Elas já conferem por dentro quem está chamando, mas a porta de fora fica aberta. A mudança fecha essa porta. Nenhuma tela, texto, regra de negócio ou dado é alterado.
 
-## Conferido agora no banco
-- Tabelas sem proteção por linha (RLS): **0**.
-- Funções com privilégio elevado: 300; **76 chamáveis por visitante sem login** (igual).
+| Item | Funções | Depois da mudança |
+|---|---|---|
+| 1 | `pagar_cobranca_credito_clinica` | Só usuário logado. |
+| 2 | `nina_trace_purgar`, `nina_execucoes_expurgo`, `integracao_verificacoes_limpar`, `coach_limpar_eventos_antigos` | Só o servidor (rotinas automáticas). Nem visitante nem usuário logado. |
+| 3 | `integracao_criar_api_key`, `nina_instrucoes_publicar`, `revisar_limite_credito_clinica` | Só usuário logado. |
 
-## Achados (nenhum novo; todos continuam abertos)
+## Fora do escopo
+- A conferência do papel de quem recebe no item 1 (caixa/financeiro/gestor/admin). Fica para depois que a clínica confirmar quais papéis podem receber — "Possível regra de negócio — validar com a equipe da clínica".
+- Itens 4 a 15 da revisão, telas, dados e publicação.
 
-| # | Sev. | Onde | Achado | Correção sugerida |
-|---|---|---|---|---|
-| 1 | Média | `pagar_cobranca_credito_clinica` | Liberada a visitante; não confere o papel de quem recebe. | Tirar acesso de visitante; exigir caixa/financeiro/gestor/admin (papéis a validar com a clínica). |
-| 2 | Média | `nina_trace_purgar`, `nina_execucoes_expurgo`, `integracao_verificacoes_limpar`, `coach_limpar_eventos_antigos` | Rotinas de limpeza liberadas a visitante (conferem por dentro). | Só servidor. |
-| 3 | Média | `integracao_criar_api_key`, `nina_instrucoes_publicar`, `revisar_limite_credito_clinica` | Gravam e estão liberadas a visitante; conferem papel por dentro. | Tirar acesso de visitante. |
-| 4 | Média | `is_financeiro_clinica` | Usa `clinica_memberships.role`, diferente de `user_roles`. | Unificar a fonte do papel. |
-| 5 | Média | perfil Financeiro | Pode excluir em 15 tabelas de dinheiro. | Confirmar `audit_log`; preferir cancelamento. |
-| 6 | Baixa | `coach_*` | Liberadas a visitante; checagem interna. | Só usuários logados. |
-| 7 | Baixa | gatilhos `fn_*`, `tg_*`, `pacientes_*` | Execução liberada; sem efeito fora do gatilho. | Retirar EXECUTE em lote. |
-| 8 | Baixa | totem | Limite de 20 tentativas e recusa sem token não testados no aparelho. | Teste na recepção. |
-| 9 | Baixa | `src/routes/api/public/hooks/francisco.ts` | Sem trava contra rodadas simultâneas. | Trava de rodada única. |
-| 10 | Baixa | `src/routes/api/public/nina.espera-timeout.ts` | Segredo comparado com `!==`; aceita GET. | Comparação em tempo constante; só POST. |
-| 11 | Baixa | baixa do Financeiro na agenda | Pode mudar qualquer campo do agendamento. | Restringir por gatilho. |
-| 12 | Baixa (scanner) | `permissions`, `tipos_servico`, `especialidades` | Leitura por qualquer logado; catálogos. | Marcar como intencional. |
-| 13 | OK | webhook WhatsApp | Recusa assinatura inválida ou sem App Secret. | Confirmar App Secret nas 3 clínicas. |
-| 14 | Crítica (indireta) | dependências | `proxy-addr` (via `@lovable.dev/mcp-js`); altas em `undici`, `sharp`, `ws`, `seroval`, `fast-uri`, `js-yaml`, `browserslist`. | Atualizar `@tanstack/react-start`, `@tanstack/react-router`, `@lovable.dev/mcp-js`, com testes. |
-| 15 | OK | segredos | Chave de serviço só no servidor; `.env.example` sem valores reais. | Nada. |
+## Riscos
+- Baixo. As telas que usam os itens 1 e 3 já exigem login.
+- Item 2: se alguma rotina automática chamar a limpeza como usuário comum, ela passaria a falhar em silêncio (é limpeza "best-effort", não derruba nada). Antes de aplicar, confirmo que a limpeza de verificações da integração roda pelo servidor; se não rodar, mantenho essa função liberada a usuário logado.
 
-## Não coberto
-- Corpo de cada função pública de propósito (consulta, contrato, anamnese, painel, check-in).
-- Regras das ~250 tabelas linha a linha; scanner automático desatualizado (08/10 20:52).
-- Não há Edge Functions no projeto.
+## Validação
+- Consultar as permissões depois: visitante sem acesso às 8; usuário logado com acesso só às 4 dos itens 1 e 3.
+- Conferir que nada mais mudou (total de funções abertas a visitante cai de 76 para 68).
+- Typecheck e testes existentes.
 
-## Próximo passo (se aprovar)
-Nada muda automaticamente. Sugiro uma migração pequena só fechando acesso de visitante para os itens 1, 2 e 3; a checagem de papel do item 1 depois de a clínica confirmar.
+## Detalhes técnicos
+Migração única, só permissões, assinaturas exatas:
+```text
+REVOKE EXECUTE ON FUNCTION <8 assinaturas> FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION <4 de limpeza> FROM authenticated;
+GRANT  EXECUTE ON FUNCTION <4 dos itens 1 e 3> TO authenticated;
+GRANT  EXECUTE ON FUNCTION <8 assinaturas> TO service_role;
+```
+Reversível com o GRANT inverso.
