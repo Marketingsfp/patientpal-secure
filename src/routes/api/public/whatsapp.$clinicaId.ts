@@ -2,14 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { loadWhatsAppConfig, metaSendText } from "@/lib/whatsapp.server";
 import { bloquearLinksRecebidos } from "@/lib/atendimento/links-entrada";
-import { decidirAssinaturaWebhook, modoAssinaturaWebhook } from "@/lib/whatsapp-assinatura";
+import { decidirAssinaturaWebhook } from "@/lib/whatsapp-assinatura";
 
 function verifySignature(
   appSecret: string,
-  rawBody: string,
+  rawBody: Uint8Array,
   signatureHeader: string | null,
 ): boolean {
-  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+  if (!signatureHeader || !/^sha256=[a-fA-F0-9]{64}$/.test(signatureHeader)) return false;
   const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const received = signatureHeader.slice("sha256=".length);
   const a = Buffer.from(expected, "hex");
@@ -131,7 +131,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
         const trace = iniciarTraceServidor({ fluxo: "recv" });
         trace.marcar("RECV_T0_WEBHOOK_RECEIVED");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const rawBody = await request.text();
+        // A assinatura autentica os bytes recebidos, antes da decodificação do JSON.
+        const rawBodyBytes = new Uint8Array(await request.arrayBuffer());
+        const rawBody = new TextDecoder().decode(rawBodyBytes);
         const logId = await registrarLogWebhook(params.clinicaId, "POST", request, rawBody);
         let resultado = "evento_ignorado";
         try {
@@ -146,16 +148,14 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
           }
 
           const sigHeader = request.headers.get("x-hub-signature-256");
-          // Assinatura que não confere (ou App Secret vazio/errado): o aviso é
-          // recusado antes de gravar ou acionar a Nina. A Meta repete avisos
-          // recusados. Reversão global: WHATSAPP_WEBHOOK_ASSINATURA=registrar.
+          // Recusa antes de processar mensagens ou recibos. Somente o log
+          // técnico da tentativa é permitido sem autenticação.
           const assinaturaOk = Boolean(
-            cfg.app_secret && verifySignature(cfg.app_secret, rawBody, sigHeader),
+            cfg.app_secret && verifySignature(cfg.app_secret, rawBodyBytes, sigHeader),
           );
           const decisaoAssinatura = decidirAssinaturaWebhook({
             appSecretConfigurado: Boolean(cfg.app_secret),
             assinaturaOk,
-            modo: modoAssinaturaWebhook(),
           });
           if (!decisaoAssinatura.processar) {
             resultado = decisaoAssinatura.resultado ?? "erro:aviso recusado";
@@ -663,7 +663,7 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
             }
           }
 
-          if (processou && resultado !== "assinatura_invalida") resultado = "processado_ok";
+          if (processou) resultado = "processado_ok";
           return new Response("ok", { status: 200 });
         } catch (e) {
           resultado = `erro:${String((e as Error)?.message ?? e)}`;
