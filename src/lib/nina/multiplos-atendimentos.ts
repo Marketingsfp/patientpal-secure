@@ -7,13 +7,20 @@ import type { PerguntaJev, RespostaJev } from "./jev";
  * pedido médico com dois ou mais exames.
  */
 export function perguntaMultiplosAtendimentos(): Record<string, PerguntaJev> {
-  return { multiplos_atendimentos: { type: "choice", instructions:
-    "A mensagem atual do paciente pede, para informação ou agendamento, dois ou mais atendimentos diferentes (exames, consultas ou exame e consulta juntos)? Conte só o que o paciente pede nesta mensagem, não o histórico. Um pacote único (ex.: consulta com preventivo), várias sessões do mesmo atendimento (ex.: 10 sessões de fisioterapia), o mesmo atendimento com vários médicos ou dias, e perguntas sobre o mesmo item (preço, preparo e horário do mesmo exame) contam como um só. Dois exames diferentes do mesmo tipo (ex.: ultrassom de abdome e de tireoide) contam como dois.",
-    criteria: {
-      varios: "Pede dois ou mais atendimentos diferentes na mesma mensagem: 'cardiologista e dermatologista', 'quanto custa hemograma e TSH', 'ginecologista e um ultrassom', 'tem dentista? e fono?'.",
-      um: "Pede um único atendimento, inclusive pacote, várias sessões do mesmo serviço ou várias perguntas sobre o mesmo item.",
-      nenhum: "Não pede atendimento: saudação, escolha de horário, dados pessoais, confirmação ou outro assunto.",
-    } } };
+  return {
+    multiplos_atendimentos: {
+      type: "choice",
+      instructions:
+        "A mensagem atual do paciente pede, para informação ou agendamento, dois ou mais atendimentos diferentes (exames, consultas ou exame e consulta juntos)? Conte só o que o paciente pede nesta mensagem, não o histórico. Um pacote único (ex.: consulta com preventivo), várias sessões do mesmo atendimento (ex.: 10 sessões de fisioterapia), o mesmo atendimento com vários médicos ou dias, e perguntas sobre o mesmo item (preço, preparo e horário do mesmo exame) contam como um só. Dois exames diferentes do mesmo tipo (ex.: ultrassom de abdome e de tireoide) contam como dois.",
+      criteria: {
+        varios:
+          "Pede dois ou mais atendimentos diferentes na mesma mensagem: 'cardiologista e dermatologista', 'quanto custa hemograma e TSH', 'ginecologista e um ultrassom', 'tem dentista? e fono?'.",
+        um: "Pede um único atendimento, inclusive pacote, várias sessões do mesmo serviço ou várias perguntas sobre o mesmo item.",
+        nenhum:
+          "Não pede atendimento: saudação, escolha de horário, dados pessoais, confirmação ou outro assunto.",
+      },
+    },
+  };
 }
 
 export function multiplosPeloJev(r: RespostaJev | undefined): boolean {
@@ -32,7 +39,10 @@ export function itensDoPedidoLido(mensagem: string): string[] {
   for (const ponto of lista.matchAll(/\.(?=\s|$)/g)) {
     const antes = lista.slice(0, ponto.index);
     if (/(?:^|[\s;])(?:[A-Za-z]\.)+[A-Za-z]$/.test(antes)) continue;
-    return antes.split(";").map((i) => i.trim()).filter(Boolean);
+    return antes
+      .split(";")
+      .map((i) => i.trim())
+      .filter(Boolean);
   }
   return [];
 }

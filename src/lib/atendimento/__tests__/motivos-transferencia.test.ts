@@ -35,8 +35,11 @@ describe("causa interna de transferência", () => {
     it(codigo!, () => expect(motivoParaAtendimento("[Outro] " + codigo)).toContain(explicacao!));
 
   it("preserva detalhes úteis e não vaza erros ou payloads", () => {
-    expect(motivoParaAtendimento("MULTIPLOS_ATENDIMENTOS: o paciente enviou pedido médico com 2 exames (ECG; TSH)."))
-      .toContain("2 exames (ECG; TSH)");
+    expect(
+      motivoParaAtendimento(
+        "MULTIPLOS_ATENDIMENTOS: o paciente enviou pedido médico com 2 exames (ECG; TSH).",
+      ),
+    ).toContain("2 exames (ECG; TSH)");
     expect(motivoParaAtendimento("PROFISSIONAL_SFP: Eletrocardiograma")).toContain(
       "Eletrocardiograma",
     );
@@ -93,6 +96,12 @@ describe("causa interna de transferência", () => {
 });
 
 it("motivo livre do SFP conserva o procedimento e não sobrepõe outra causa", () => {
-  expect(motivoParaAtendimento("Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia")).toContain("Anestesia da Videohisteroscopia");
-  expect(motivoParaAtendimento("JEV_URGENCIA_CLINICA: paciente buscava profissional SFP")).toContain("possível urgência");
+  expect(
+    motivoParaAtendimento(
+      "Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia",
+    ),
+  ).toContain("Anestesia da Videohisteroscopia");
+  expect(
+    motivoParaAtendimento("JEV_URGENCIA_CLINICA: paciente buscava profissional SFP"),
+  ).toContain("possível urgência");
 });
