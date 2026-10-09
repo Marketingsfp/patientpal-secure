@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 import { especialidadePorNomePopular } from "../nome-popular-especialidade";
-import { PEDIR_NOME_ATENDIMENTO, PEDIR_NOME_ATENDIMENTO_NEUTRO, REGRA_SEM_INDICACAO, perguntaNomeAtendimento,
-  textoPedirNomeAtendimento } from "../atendimento-sem-indicacao";
+import {
+  PEDIR_NOME_ATENDIMENTO,
+  PEDIR_NOME_ATENDIMENTO_NEUTRO,
+  REGRA_SEM_INDICACAO,
+  perguntaNomeAtendimento,
+  textoPedirNomeAtendimento,
+} from "../atendimento-sem-indicacao";
 
 test.each([
   ["oi qro marca consulta do coracao", "CARDIOLOGIA"],
@@ -22,13 +27,20 @@ test.each([
   expect(especialidadePorNomePopular(msg)?.especialidade).toBe(esp);
 });
 
-test.each(["to com dor no peito qual medico eu passo", "meu coracao ta acelerado", "medico de cabeca", "quero uma consulta", "dor no osso"])(
-  "sintoma, pedido sem nome ou nome ambíguo não vira especialidade: %s", (msg) => {
-    expect(especialidadePorNomePopular(msg)).toBeNull();
-  });
+test.each([
+  "to com dor no peito qual medico eu passo",
+  "meu coracao ta acelerado",
+  "medico de cabeca",
+  "quero uma consulta",
+  "dor no osso",
+])("sintoma, pedido sem nome ou nome ambíguo não vira especialidade: %s", (msg) => {
+  expect(especialidadePorNomePopular(msg)).toBeNull();
+});
 
 test("frase sobre sintomas só quando o paciente citou sintoma", () => {
-  expect(textoPedirNomeAtendimento("to com dor nas costas qual medico")).toBe(PEDIR_NOME_ATENDIMENTO);
+  expect(textoPedirNomeAtendimento("to com dor nas costas qual medico")).toBe(
+    PEDIR_NOME_ATENDIMENTO,
+  );
   expect(textoPedirNomeAtendimento("quero uma consulta")).toBe(PEDIR_NOME_ATENDIMENTO_NEUTRO);
   expect(PEDIR_NOME_ATENDIMENTO_NEUTRO).not.toMatch(/sintoma/);
   expect(PEDIR_NOME_ATENDIMENTO_NEUTRO).toContain("Se souber o nome do profissional");

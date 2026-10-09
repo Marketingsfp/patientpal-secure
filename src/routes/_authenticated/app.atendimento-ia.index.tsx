@@ -946,10 +946,10 @@ function AtendimentoIaPage() {
                     {rascunho[it.id] === undefined ? (
                       <div className="text-sm text-muted-foreground">Carregando prontuário…</div>
                     ) : (
-                    <EditorProntuario
-                      value={rascunho[it.id] ?? ""}
-                      onChange={(v) => setRascunho((r) => ({ ...r, [it.id]: v }))}
-                    />
+                      <EditorProntuario
+                        value={rascunho[it.id] ?? ""}
+                        onChange={(v) => setRascunho((r) => ({ ...r, [it.id]: v }))}
+                      />
                     )}
                     <div className="flex justify-end gap-2">
                       <Button

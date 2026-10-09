@@ -14,9 +14,24 @@ export const preverImportacaoCompleta = createServerFn({ method: "POST" })
   });
 export const aplicarImportacaoCompleta = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ clinicaId: z.string().uuid(), assinatura: z.string().regex(/^[a-f0-9]{64}$/),
-    alvos: z.array(z.object({ tipo: z.enum(["servico", "profissional"]), fonteId: z.string().uuid(), assinatura: z.string().regex(/^[a-f0-9]{64}$/) })).min(1).max(50),
-  }).parse(i))
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        assinatura: z.string().regex(/^[a-f0-9]{64}$/),
+        alvos: z
+          .array(
+            z.object({
+              tipo: z.enum(["servico", "profissional"]),
+              fonteId: z.string().uuid(),
+              assinatura: z.string().regex(/^[a-f0-9]{64}$/),
+            }),
+          )
+          .min(1)
+          .max(50),
+      })
+      .parse(i),
+  )
   .handler(async ({ data, context }) => {
     const { importacaoCompleta } = await import("./catalogo-importacao.server");
     return importacaoCompleta(context).aplicar(data.clinicaId, data.assinatura, data.alvos);
@@ -35,8 +50,12 @@ async function servico(contexto: { supabase: any; userId: string }) {
       // Mesma adaptação da importação completa, para não perder preços e detalhes
       // na próxima sincronização individual. A seleção continua apenas de ativos.
       const origens = await lerCadastroCompleto(contexto.supabase, clinicaId);
-      return { profissionais: [], servicos: origens
-        .filter(o => o.tipo === "servico" && !o.somenteRascunho).map(o => o.fonte) };
+      return {
+        profissionais: [],
+        servicos: origens
+          .filter((o) => o.tipo === "servico" && !o.somenteRascunho)
+          .map((o) => o.fonte),
+      };
     },
     perguntar: perguntarJev,
   });

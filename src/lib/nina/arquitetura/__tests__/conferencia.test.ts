@@ -7,7 +7,12 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CATALOGO_FERRAMENTAS } from "../../tool-broker";
 import { MODELO_NINA_ALVO } from "../../modelo-nina";
-import { MANIFESTO_ARQUITETURA, NODES_ARQUITETURA, nodePorId, type NodeArquitetura } from "../manifesto";
+import {
+  MANIFESTO_ARQUITETURA,
+  NODES_ARQUITETURA,
+  nodePorId,
+  type NodeArquitetura,
+} from "../manifesto";
 import { FATOS_DO_CODIGO, conferirMapaComCodigo, statusArquitetura } from "../conferencia";
 import { versaoAtual } from "../versoes";
 

@@ -93,13 +93,10 @@ describe("auditoria das instruções — rodada", () => {
   });
 
   it("fechar a rodada guarda o texto entregue e as intervenções", () => {
-    const a = fecharAuditoriaRodada(
-      montarAuditoriaRodada({ rodada: 1, respostaOriginal: "oi" }),
-      {
-        entregue: "Olá! oi",
-        intervencoes: [{ etapa: "templates", motivo: "saudação", alterou: true }],
-      },
-    );
+    const a = fecharAuditoriaRodada(montarAuditoriaRodada({ rodada: 1, respostaOriginal: "oi" }), {
+      entregue: "Olá! oi",
+      intervencoes: [{ etapa: "templates", motivo: "saudação", alterou: true }],
+    });
     expect(a.entregue?.hash).toBeTruthy();
     expect(a.intervencoes[0]?.etapa).toBe("templates");
   });

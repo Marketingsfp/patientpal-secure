@@ -58,9 +58,21 @@ export function montarHistoricoJev(
   const excluir = new Set(opcoes.excluirIds ?? []);
   const desde = opcoes.desde ? Date.parse(opcoes.desde) : Number.NaN;
   const validas = mensagens
-    .map((m) => ({ m, t: Date.parse(String(m.created_at ?? "")), de: autorDaMensagem(m.direction) }))
+    .map((m) => ({
+      m,
+      t: Date.parse(String(m.created_at ?? "")),
+      de: autorDaMensagem(m.direction),
+    }))
     .filter(({ m, t, de }) => {
-      if (!de || !String((m.tipo === "image" || m.tipo === "audio") ? m.transcricao ?? m.body ?? "" : m.body ?? "").trim()) return false;
+      if (
+        !de ||
+        !String(
+          m.tipo === "image" || m.tipo === "audio"
+            ? (m.transcricao ?? m.body ?? "")
+            : (m.body ?? ""),
+        ).trim()
+      )
+        return false;
       if (m.id && excluir.has(m.id)) return false;
       if (opcoes.conversaId && m.conversa_id && m.conversa_id !== opcoes.conversaId) return false;
       if (Number.isFinite(desde) && Number.isFinite(t) && t < desde) return false;
@@ -70,18 +82,29 @@ export function montarHistoricoJev(
   const recentes = validas.slice(-(opcoes.limite ?? 6));
   const ultimaDaAtendente = recentes.map((r) => r.de).lastIndexOf("atendente");
   return recentes.map(({ m, de }, i) => {
-    const texto = String((m.tipo === "image" || m.tipo === "audio") ? m.transcricao ?? m.body ?? "" : m.body ?? "").trim();
+    const texto = String(
+      m.tipo === "image" || m.tipo === "audio" ? (m.transcricao ?? m.body ?? "") : (m.body ?? ""),
+    ).trim();
     return {
       de: de!,
-      texto: i === ultimaDaAtendente ? cortarMeio(texto, LIMITE_ULTIMA_PERGUNTA) : cortar(texto, LIMITE_FALA),
+      texto:
+        i === ultimaDaAtendente
+          ? cortarMeio(texto, LIMITE_ULTIMA_PERGUNTA)
+          : cortar(texto, LIMITE_FALA),
     };
   });
 }
 
-export type OpcaoOferecidaJev = { id: string; profissional: string | null; atendimento: string | null };
+export type OpcaoOferecidaJev = {
+  id: string;
+  profissional: string | null;
+  atendimento: string | null;
+};
 
 /** Opções de catálogo já apresentadas nesta sessão (com os IDs do catálogo). */
-export function opcoesOferecidasJev(estado: EstadoFluxoNina | null | undefined): OpcaoOferecidaJev[] {
+export function opcoesOferecidasJev(
+  estado: EstadoFluxoNina | null | undefined,
+): OpcaoOferecidaJev[] {
   const conhecimento = estado?.knowledge_context;
   if (!conhecimento) return [];
   if (estado?.session_id && conhecimento.sessionId !== estado.session_id) return [];
@@ -90,7 +113,11 @@ export function opcoesOferecidasJev(estado: EstadoFluxoNina | null | undefined):
   for (const r of conhecimento.referencias ?? []) {
     if (!r.registro || vistos.has(r.registro)) continue;
     vistos.add(r.registro);
-    opcoes.push({ id: r.registro, profissional: r.medicoNome ?? null, atendimento: r.procedimento ?? null });
+    opcoes.push({
+      id: r.registro,
+      profissional: r.medicoNome ?? null,
+      atendimento: r.procedimento ?? null,
+    });
   }
   return opcoes.slice(0, 20);
 }
@@ -100,7 +127,8 @@ export function contextoAtendimentoJev(estado: EstadoFluxoNina | null | undefine
     etapa: estado?.flow?.stage ?? null,
     especialidade: estado?.appointment?.specialty ?? null,
     atendimento_pesquisado:
-      estado?.knowledge_context && (!estado.session_id || estado.knowledge_context.sessionId === estado.session_id)
+      estado?.knowledge_context &&
+      (!estado.session_id || estado.knowledge_context.sessionId === estado.session_id)
         ? (estado.knowledge_context.consulta?.termo ?? null)
         : null,
     profissional_escolhido: estado?.appointment?.doctor_name ?? null,
@@ -111,8 +139,29 @@ export function contextoAtendimentoJev(estado: EstadoFluxoNina | null | undefine
 }
 
 const IGNORAR = new Set([
-  "com", "que", "quero", "prefiro", "pode", "ser", "esse", "essa", "este", "esta", "pra", "para",
-  "por", "favor", "sim", "dr", "dra", "doutor", "doutora", "medico", "medica", "consulta", "the",
+  "com",
+  "que",
+  "quero",
+  "prefiro",
+  "pode",
+  "ser",
+  "esse",
+  "essa",
+  "este",
+  "esta",
+  "pra",
+  "para",
+  "por",
+  "favor",
+  "sim",
+  "dr",
+  "dra",
+  "doutor",
+  "doutora",
+  "medico",
+  "medica",
+  "consulta",
+  "the",
 ]);
 
 function normalizar(s: string): string {

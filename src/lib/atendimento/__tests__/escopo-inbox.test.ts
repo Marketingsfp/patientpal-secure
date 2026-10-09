@@ -157,8 +157,15 @@ describe("filtros operacionais da Inbox", () => {
   it("uma conversa da pessoa continua em Minhas (Ativas) esteja ou não aguardando resposta", () => {
     // Pendentes é a visualização de espera sobre Minhas: não tira a conversa de Ativas.
     const aguardando = { id: "p", atribuida_user_id: jean, owner_type: "HUMAN", status: "waiting" };
-    expect(conversaVisivelNoEscopo(aguardando, { escopo: "minhas", userId: jean, gestor: false })).toBe(true);
-    expect(conversaVisivelNoEscopo({ ...aguardando, status: "active" }, { escopo: "minhas", userId: jean, gestor: false })).toBe(true);
+    expect(
+      conversaVisivelNoEscopo(aguardando, { escopo: "minhas", userId: jean, gestor: false }),
+    ).toBe(true);
+    expect(
+      conversaVisivelNoEscopo(
+        { ...aguardando, status: "active" },
+        { escopo: "minhas", userId: jean, gestor: false },
+      ),
+    ).toBe(true);
   });
 
   it("Nina mostra somente conversas sob a IA", () => {

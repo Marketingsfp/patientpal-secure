@@ -141,7 +141,6 @@ export type PacoteEvidencias = {
   modulos: string[];
 };
 
-
 /**
  * Coletor de uma execução. Acumula em memória e não grava nada sozinho:
  * observabilidade jamais pode derrubar um atendimento.
@@ -156,10 +155,7 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
       // Cópia profunda no ato: a evidência é um snapshot do momento. Uma
       // alteração posterior no objeto de origem não pode reescrevê-la.
       const dados = Object.fromEntries(
-        Object.entries(e.dados).map(([k, v]) => [
-          k,
-          typeof v === "string" ? corta(v) : clonar(v),
-        ]),
+        Object.entries(e.dados).map(([k, v]) => [k, typeof v === "string" ? corta(v) : clonar(v)]),
       );
       etapas.push({ ...e, em: e.em ?? agora(), dados });
     },
@@ -185,7 +181,6 @@ export function criarColetor(agora: () => string = () => new Date().toISOString(
         modulos: modulosUtilizados(etapas),
       };
     },
-
   };
 }
 

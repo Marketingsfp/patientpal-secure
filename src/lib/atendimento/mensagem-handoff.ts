@@ -154,7 +154,8 @@ export function validarMensagemHandoff(
   const citouSetor = SETORES_MENCIONAVEIS.some((s) => baixo.includes(s));
   if (citouSetor) {
     const permitidoNorm = (permitido ?? "").toLowerCase();
-    if (!permitido || !baixo.includes(permitidoNorm)) problemas.push("menciona setor não estruturado");
+    if (!permitido || !baixo.includes(permitidoNorm))
+      problemas.push("menciona setor não estruturado");
   }
   if (t.length > 400) problemas.push("mensagem longa demais");
 
@@ -232,9 +233,14 @@ export function classificarMotivoHandoff(motivoBruto?: string | null): MotivoHan
   const m = (motivoBruto ?? "").toLowerCase();
   if (!m) return "indefinido";
   if (/(agenda|marca|remarca|consulta|exame|horário|horario)/.test(m)) return "agendamento";
-  if (/(financ|pagam|boleto|valor|preço|preco|cobran|convênio|convenio)/.test(m)) return "financeiro";
+  if (/(financ|pagam|boleto|valor|preço|preco|cobran|convênio|convenio)/.test(m))
+    return "financeiro";
   if (/(human|atendente|pessoa|falar com)/.test(m)) return "pedido_do_paciente";
-  if (/(sem informa|não encontr|nao encontr|indisponí|indisponi|catálogo|catalogo|erro|falha|tool)/.test(m))
+  if (
+    /(sem informa|não encontr|nao encontr|indisponí|indisponi|catálogo|catalogo|erro|falha|tool)/.test(
+      m,
+    )
+  )
     return "informacao_indisponivel";
   return "indefinido";
 }

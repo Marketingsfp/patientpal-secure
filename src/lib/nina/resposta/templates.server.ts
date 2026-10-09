@@ -62,12 +62,14 @@ export async function carregarTemplatesPublicados(args: {
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     // Global primeiro, clínica depois: a clínica sobrescreve o global.
-    const linhas = ((data ?? []) as Array<{
-      clinica_id: string | null;
-      chave: string;
-      texto: string;
-      instrucoes_versao_id: string | null;
-    }>).sort((a, b) => Number(Boolean(a.clinica_id)) - Number(Boolean(b.clinica_id)));
+    const linhas = (
+      (data ?? []) as Array<{
+        clinica_id: string | null;
+        chave: string;
+        texto: string;
+        instrucoes_versao_id: string | null;
+      }>
+    ).sort((a, b) => Number(Boolean(a.clinica_id)) - Number(Boolean(b.clinica_id)));
     for (const l of linhas) {
       if (!MAPA_TEMPLATES[l.chave]) {
         recusadas.push({ chave: l.chave, motivo: "chave desconhecida" });
@@ -92,7 +94,11 @@ export async function carregarTemplatesPublicados(args: {
         recusadas: [{ chave: "*", motivo: "leitura falhou; cache anterior mantido" }],
       };
     }
-    return { textos: {}, versaoInstrucoes: null, recusadas: [{ chave: "*", motivo: "leitura falhou" }] };
+    return {
+      textos: {},
+      versaoInstrucoes: null,
+      recusadas: [{ chave: "*", motivo: "leitura falhou" }],
+    };
   }
 
   cache.set(ck, { textos, carregadoEm: agora, versaoInstrucoes });

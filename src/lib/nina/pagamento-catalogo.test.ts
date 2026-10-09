@@ -10,10 +10,22 @@ describe("pagamento preservado como dado; política no system prompt", () => {
       expect(formaPagamentoSchema.parse({ forma, valor: 90 }).forma).toBe(forma);
   });
   it("preserva meios distintos, preços, condições e descrição para o modelo", () => {
-    const formas = [{ forma: "Dinheiro", valor: 80 }, { forma: "Cartão", valor: 95 }, { forma: "Pix", valor: 88 }];
-    const s = { id: "exame", nome: "Exame", valor: null, valor_observacao: null,
-      descricao_publica: "Cartão: R$ 95,00", preparo: null, restricoes: null,
-      executantes: [], formas_pagamento: formas } satisfies ServicoPublicado;
+    const formas = [
+      { forma: "Dinheiro", valor: 80 },
+      { forma: "Cartão", valor: 95 },
+      { forma: "Pix", valor: 88 },
+    ];
+    const s = {
+      id: "exame",
+      nome: "Exame",
+      valor: null,
+      valor_observacao: null,
+      descricao_publica: "Cartão: R$ 95,00",
+      preparo: null,
+      restricoes: null,
+      executantes: [],
+      formas_pagamento: formas,
+    } satisfies ServicoPublicado;
     const r = montarResultadoCatalogo({ servicos: [s], profissionais: [], hojeISO: "2026-10-04" });
     expect(r.records[0]?.extras?.formas_pagamento).toEqual(formas);
     expect(r.records[0]?.extras?.descricao_publica).toBe(s.descricao_publica);
@@ -27,8 +39,15 @@ describe("pagamento preservado como dado; política no system prompt", () => {
     expect(resumoDePrecos(null, null)).toBeNull();
   });
   it("sincronização editorial altera só o meio solicitado", () => {
-    const antes = { descricao_publica: "EXAME\nEspecialidade: Cardiologia\nProfissional: Ana\nDinheiro: R$ 80,00\nCartão: R$ 95,00\nPix: R$ 88,00",
-      formas_pagamento: [{ forma: "Dinheiro", valor: 80 }, { forma: "Cartão", valor: 95 }, { forma: "Pix", valor: 88 }] };
+    const antes = {
+      descricao_publica:
+        "EXAME\nEspecialidade: Cardiologia\nProfissional: Ana\nDinheiro: R$ 80,00\nCartão: R$ 95,00\nPix: R$ 88,00",
+      formas_pagamento: [
+        { forma: "Dinheiro", valor: 80 },
+        { forma: "Cartão", valor: 95 },
+        { forma: "Pix", valor: 88 },
+      ],
+    };
     const depois = structuredClone(antes);
     depois.formas_pagamento[1]!.valor = 100;
     sincronizarPrecosPublicados("servico", antes, depois);

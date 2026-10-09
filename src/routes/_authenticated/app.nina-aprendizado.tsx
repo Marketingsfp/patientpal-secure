@@ -48,10 +48,7 @@ import {
 } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import {
-  CATEGORIAS_FEEDBACK_NINA,
-  rotuloCategoriaFeedback,
-} from "@/lib/nina/feedback-erros";
+import { CATEGORIAS_FEEDBACK_NINA, rotuloCategoriaFeedback } from "@/lib/nina/feedback-erros";
 import {
   ehReporteRapido,
   rotuloConversaReporte,
@@ -64,10 +61,7 @@ import {
   AnaliseErroIAResultado,
   type AnaliseSalva,
 } from "@/components/nina/AnaliseErroIAResultado";
-import {
-  analisarErroNinaComIA,
-  listarAnalisesErroNina,
-} from "@/lib/nina/analise-erro.functions";
+import { analisarErroNinaComIA, listarAnalisesErroNina } from "@/lib/nina/analise-erro.functions";
 import {
   aplicarCorrecaoComIA,
   execucaoCorrecaoAtual,
@@ -94,7 +88,6 @@ import { TZ_CLINICA } from "@/lib/date-utils";
 import { ConversaAuditoriaDialog } from "@/components/nina/ConversaAuditoriaDialog";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 
-
 import {
   AVISO_ANALISE_NAO_APROVA,
   EXPLICACAO_APROVAR,
@@ -118,11 +111,7 @@ import {
   consultarBaseFeedbackNina,
   salvarDiagnosticoFeedbackNina,
 } from "@/lib/nina/feedback-diagnostico.functions";
-import {
-  ROTULO_ACAO,
-  ROTULO_CAMADA,
-  type PlanoCorrecao,
-} from "@/lib/nina/feedback-aplicacao";
+import { ROTULO_ACAO, ROTULO_CAMADA, type PlanoCorrecao } from "@/lib/nina/feedback-aplicacao";
 import {
   aplicarFeedbackNina,
   concluirAcaoFeedbackNina,
@@ -214,9 +203,6 @@ const FILTROS_AMBIENTE = [
   { valor: "homologation", rotulo: "Homologação" },
   { valor: "automated_test", rotulo: "Teste automatizado" },
 ];
-
-
-
 
 type Comparacao = {
   knowledge_status: "found" | "not_found" | "conflict";
@@ -328,7 +314,6 @@ function fmtDataSegundos(iso: string) {
     timeZone: TZ_CLINICA,
   });
 }
-
 
 function Pagina() {
   const { clinicaAtual } = useClinica();
@@ -465,8 +450,8 @@ function Pagina() {
           analiseId: analise?.id ?? null,
           propostaAssinatura: assinaturaProposta(proposta),
           pacoteHash:
-            ((analise as unknown as { pacote_hash?: string | null } | undefined)?.pacote_hash ??
-              null),
+            (analise as unknown as { pacote_hash?: string | null } | undefined)?.pacote_hash ??
+            null,
         },
       })) as unknown as ResumoExecucao & { relatorio?: RelatorioCorrecao | null };
       setCorrecoes((e) => ({ ...e, [id]: r }));
@@ -567,7 +552,6 @@ function Pagina() {
       void supabase.removeChannel(canal);
     };
   }, [clinicaId, carregar]);
-
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -799,8 +783,6 @@ function Pagina() {
     });
   };
 
-
-
   const abrirDiagnostico = async (item: Item) => {
     if (!clinicaId) return;
     setDiagnosticando(item);
@@ -922,7 +904,9 @@ function Pagina() {
     try {
       await concluirAcao({ data: { acaoId, clinicaId, resultado, observacao: null } });
       toast.success(
-        resultado === "done" ? "Ação concluída. Feedback marcado como aplicado." : "Ação cancelada.",
+        resultado === "done"
+          ? "Ação concluída. Feedback marcado como aplicado."
+          : "Ação cancelada.",
       );
       await Promise.all([carregar(), carregarAcoes()]);
     } catch (e) {
@@ -1209,13 +1193,13 @@ function Pagina() {
                     Erro reportado: {fmtData(it.created_at)} · {pessoas[it.reportado_por] ?? "—"}
                   </p>
 
-
-
                   <p className="text-xs text-muted-foreground">
                     Auditoria:{" "}
-                    {ROTULO_AUDITORIA[
-                      (auditoria[it.id] as keyof typeof ROTULO_AUDITORIA) ?? "unavailable"
-                    ]}{" "}
+                    {
+                      ROTULO_AUDITORIA[
+                        (auditoria[it.id] as keyof typeof ROTULO_AUDITORIA) ?? "unavailable"
+                      ]
+                    }{" "}
                     · Análise com IA: {ROTULO_ANALISE[estadoAnalise(it)]}
                   </p>
 
@@ -1254,11 +1238,7 @@ function Pagina() {
                       ) : null}
                       {analises[it.id]?.status === "done" ? "Reanalisar" : "Analisar com IA"}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => abrirConversa(it)}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => abrirConversa(it)}>
                       <Eye className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
                     </Button>
                   </div>
@@ -1357,15 +1337,17 @@ function Pagina() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           Análise com IA:{" "}
-                          {ROTULO_ANALISE[
-                            analises[it.id]
-                              ? (analises[it.id]!.status === "done"
+                          {
+                            ROTULO_ANALISE[
+                              analises[it.id]
+                                ? analises[it.id]!.status === "done"
                                   ? "done"
                                   : analises[it.id]!.status === "failed"
                                     ? "failed"
-                                    : "processing")
-                              : estadoAnalise(it)
-                          ]}
+                                    : "processing"
+                                : estadoAnalise(it)
+                            ]
+                          }
                         </p>
                         {podeRevisar &&
                           (analises[it.id] ? (
@@ -1374,12 +1356,16 @@ function Pagina() {
                                 {AVISO_ANALISE_NAO_APROVA}
                               </p>
                               {analiseUsouOutroConjunto(
-                                (analises[it.id] as unknown as {
-                                  evidencias_resumo?: { hash?: string | null } | null;
-                                }).evidencias_resumo ?? null,
-                                ((versoesAnalise[it.id]?.[1] as unknown as
-                                  | { evidencias_resumo?: { hash?: string | null } }
-                                  | undefined)?.evidencias_resumo ?? null),
+                                (
+                                  analises[it.id] as unknown as {
+                                    evidencias_resumo?: { hash?: string | null } | null;
+                                  }
+                                ).evidencias_resumo ?? null,
+                                (
+                                  versoesAnalise[it.id]?.[1] as unknown as
+                                    | { evidencias_resumo?: { hash?: string | null } }
+                                    | undefined
+                                )?.evidencias_resumo ?? null,
                               ) && (
                                 <p className="rounded-md border border-border bg-muted/40 p-2 text-xs">
                                   Esta análise usou um conjunto de evidências diferente da versão
@@ -1398,7 +1384,10 @@ function Pagina() {
                                   </summary>
                                   <ul className="mt-1 space-y-1">
                                     {versoesAnalise[it.id]!.slice(1).map((v) => (
-                                      <li key={v.id} className="rounded-md border border-border p-2">
+                                      <li
+                                        key={v.id}
+                                        className="rounded-md border border-border p-2"
+                                      >
                                         <span className="font-medium">v{v.versao}</span> ·{" "}
                                         {new Date(v.created_at).toLocaleString("pt-BR")} ·{" "}
                                         {v.modelo} · critérios {v.criterios_versao}
@@ -1702,14 +1691,16 @@ function Pagina() {
             <DialogTitle>Histórico da correção</DialogTitle>
             <DialogDescription>
               Cada alteração guarda valor anterior, valor novo, motivo, quem reportou, quem aprovou,
-              quem aplicou e a data. Conhecimento corrigido não garante comportamento corrigido:
-              use o teste para conferir.
+              quem aplicou e a data. Conhecimento corrigido não garante comportamento corrigido: use
+              o teste para conferir.
             </DialogDescription>
           </DialogHeader>
           {carregandoHistorico ? (
             <p className="text-sm text-muted-foreground">Carregando…</p>
           ) : !historico?.versoes.length ? (
-            <p className="text-sm text-muted-foreground">Nenhuma versão registrada para este item.</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhuma versão registrada para este item.
+            </p>
           ) : (
             <ul className="space-y-3">
               {historico.versoes.map((v) => (
@@ -1727,7 +1718,9 @@ function Pagina() {
                     ) : v.teste_status === "validado" ? (
                       <Badge>✓ Correção validada</Badge>
                     ) : v.teste_status === "falhou" ? (
-                      <Badge variant="destructive">⚠ Nina continua respondendo incorretamente</Badge>
+                      <Badge variant="destructive">
+                        ⚠ Nina continua respondendo incorretamente
+                      </Badge>
                     ) : (
                       <Badge variant="outline">Teste pendente</Badge>
                     )}
@@ -1764,7 +1757,12 @@ function Pagina() {
                   )}
                   {podeRevisar && v.status !== "reverted" && (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" disabled={salvando} onClick={() => void rodarTeste(v)}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={salvando}
+                        onClick={() => void rodarTeste(v)}
+                      >
                         Testar novamente
                       </Button>
                       <Button
@@ -1793,9 +1791,9 @@ function Pagina() {
           <DialogHeader>
             <DialogTitle>Reverter alteração</DialogTitle>
             <DialogDescription>
-              A versão anterior volta a valer. Quando a correção era de conteúdo oficial, a versão anterior
-              do arquivo oficial é reativada e a busca é atualizada (blocos, embeddings, índices e
-              cache). O item volta para investigação.
+              A versão anterior volta a valer. Quando a correção era de conteúdo oficial, a versão
+              anterior do arquivo oficial é reativada e a busca é atualizada (blocos, embeddings,
+              índices e cache). O item volta para investigação.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -1957,7 +1955,8 @@ function Pagina() {
                     {comparacao?.base_version ? ` (versão ${comparacao.base_version})` : ""}
                   </Label>
                   <div className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-2 text-xs">
-                    {comparacao?.catalogo_atual ?? "Nada encontrado no catálogo para esta pergunta."}
+                    {comparacao?.catalogo_atual ??
+                      "Nada encontrado no catálogo para esta pergunta."}
                   </div>
                 </div>
                 <div>
@@ -1970,7 +1969,8 @@ function Pagina() {
 
               {comparacao && (
                 <Badge variant="outline">
-                  Situação na Base: {ROTULO_KB[comparacao.knowledge_status] ?? comparacao.knowledge_status}
+                  Situação na Base:{" "}
+                  {ROTULO_KB[comparacao.knowledge_status] ?? comparacao.knowledge_status}
                 </Badge>
               )}
 
@@ -2036,7 +2036,10 @@ function Pagina() {
             <Button variant="outline" onClick={() => setDiagnosticando(null)} disabled={salvando}>
               Cancelar
             </Button>
-            <Button onClick={() => void confirmarDiagnostico()} disabled={salvando || consultandoBase}>
+            <Button
+              onClick={() => void confirmarDiagnostico()}
+              disabled={salvando || consultandoBase}
+            >
               Salvar diagnóstico
             </Button>
           </DialogFooter>
@@ -2064,7 +2067,11 @@ function Pagina() {
             <Button variant="outline" onClick={() => setRejeitando(null)} disabled={salvando}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={() => void confirmarRejeicao()} disabled={salvando}>
+            <Button
+              variant="destructive"
+              onClick={() => void confirmarRejeicao()}
+              disabled={salvando}
+            >
               Rejeitar
             </Button>
           </DialogFooter>
@@ -2080,11 +2087,7 @@ function Pagina() {
               A sugestão original de quem reportou continua guardada no registro.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            rows={5}
-            value={textoEdicao}
-            onChange={(e) => setTextoEdicao(e.target.value)}
-          />
+          <Textarea rows={5} value={textoEdicao} onChange={(e) => setTextoEdicao(e.target.value)} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditando(null)} disabled={salvando}>
               Cancelar
@@ -2108,8 +2111,6 @@ function Pagina() {
           if (!v) setConversaAuditoria(null);
         }}
       />
-
-
     </div>
   );
 }

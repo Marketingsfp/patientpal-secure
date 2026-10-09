@@ -63,7 +63,10 @@ function comparar(esperado: EsperadoAgendamento, lido: RegistroAgendamento): str
     d.push("paciente");
   if (!vazio(esperado.medicoId) && String(lido.medico_id ?? "") !== String(esperado.medicoId))
     d.push("profissional");
-  if (!vazio(esperado.procedimento) && String(lido.procedimento ?? "").trim() !== esperado.procedimento!.trim())
+  if (
+    !vazio(esperado.procedimento) &&
+    String(lido.procedimento ?? "").trim() !== esperado.procedimento!.trim()
+  )
     d.push("procedimento");
   if (!vazio(esperado.inicio) && !mesmoInstante(lido.inicio, esperado.inicio)) d.push("inicio");
   if (!vazio(esperado.fim) && !vazio(lido.fim) && !mesmoInstante(lido.fim, esperado.fim))
@@ -85,7 +88,8 @@ export function verificarResultadoAgendamento(
   opcoes?: { jaExistia?: boolean; erro?: string | null },
 ): ResultadoAcaoAgendamento {
   const erro = opcoes?.erro ?? null;
-  if (erro && !lido) return { estado: "FAILED", agendamentoId: null, registro: null, divergencias: [], erro };
+  if (erro && !lido)
+    return { estado: "FAILED", agendamentoId: null, registro: null, divergencias: [], erro };
   if (!lido || vazio(lido.id))
     return {
       estado: "UNCERTAIN",
@@ -99,7 +103,13 @@ export function verificarResultadoAgendamento(
   // Divergência de paciente/profissional/horário: não dá para afirmar nada.
   const graves = divergencias.filter((d) => d !== "fim");
   if (graves.length > 0)
-    return { estado: "UNCERTAIN", agendamentoId: String(lido.id), registro: lido, divergencias, erro };
+    return {
+      estado: "UNCERTAIN",
+      agendamentoId: String(lido.id),
+      registro: lido,
+      divergencias,
+      erro,
+    };
 
   const cancelado = String(lido.status ?? "").toLowerCase() === "cancelado";
   if (cancelado)

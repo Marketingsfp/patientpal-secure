@@ -32,7 +32,8 @@ export function ordenarAtendentesNoFiltro<
     presenca?: string | null;
   },
 >(atendentes: readonly T[]): T[] {
-  const prioridade = (p: T) => (p.presenca === "ONLINE" || p.presenca === "PAUSA" || p.presenca === "PAUSA_SAIDA" ? 0 : 1);
+  const prioridade = (p: T) =>
+    p.presenca === "ONLINE" || p.presenca === "PAUSA" || p.presenca === "PAUSA_SAIDA" ? 0 : 1;
   return [...atendentes].sort(
     (a, b) =>
       prioridade(a) - prioridade(b) ||
@@ -70,8 +71,7 @@ export function lerValorEscopo(valor: string): {
     // responsável é fixado pelo user_id.
     return { base: "equipe", atendenteId: id || null };
   }
-  const base: EscopoBaseInbox =
-    valor === "equipe" || valor === "nina" ? valor : ESCOPO_BASE_PADRAO;
+  const base: EscopoBaseInbox = valor === "equipe" || valor === "nina" ? valor : ESCOPO_BASE_PADRAO;
   return { base, atendenteId: null };
 }
 
@@ -168,10 +168,7 @@ export function conversaNaVisualizacao(
 }
 
 /** Rótulo curto do controle de escopo (o nome do atendente vem de fora). */
-export function rotuloEscopo(
-  base: EscopoBaseInbox,
-  nomeAtendente: string | null,
-): string {
+export function rotuloEscopo(base: EscopoBaseInbox, nomeAtendente: string | null): string {
   if (nomeAtendente) return nomeAtendente;
   return base === "equipe" ? "Todas" : base === "nina" ? "Nina" : "Minhas";
 }

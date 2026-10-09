@@ -38,7 +38,6 @@ import {
   resolverConversaTeste,
   ferramentasUsadasTeste,
   marcarLeadTesteLido,
-
   diagnosticoCiclosLead,
 } from "@/lib/nina/teste-console.functions";
 import {
@@ -48,8 +47,6 @@ import {
   simulacaoAtualTerra,
 } from "@/lib/nina/simulador-terra.functions";
 import { AvaliacaoSol } from "@/components/nina/AvaliacaoSol";
-
-
 
 import {
   CENARIOS_SUGERIDOS,
@@ -68,8 +65,20 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { diaExportacao, periodoExportacaoSchema, rotuloPeriodoExportacao, type PeriodoExportacao } from "@/lib/nina/homologacao-exportacao";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  diaExportacao,
+  periodoExportacaoSchema,
+  rotuloPeriodoExportacao,
+  type PeriodoExportacao,
+} from "@/lib/nina/homologacao-exportacao";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -85,18 +94,14 @@ import {
 } from "@/components/nina/ConversationSystemEvent";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { InspecaoMensagemNina } from "./InspecaoMensagemNina";
-import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens } from "@/lib/nina/inspecao-mensagem";
-
-
 import {
+  idsParaInspecaoNina,
+  marcadorInternoSistema,
+  revisaoInspecaoMensagens,
+} from "@/lib/nina/inspecao-mensagem";
 
-  useSaidasDasMensagens,
-
-} from "@/components/nina/SaidaMensagem";
-import {
-
-  montarMetadadosMensagemNina,
-} from "@/lib/nina/mensagem-meta";
+import { useSaidasDasMensagens } from "@/components/nina/SaidaMensagem";
+import { montarMetadadosMensagemNina } from "@/lib/nina/mensagem-meta";
 
 import { ConversaSkeleton } from "@/components/nina/ConversaSkeleton";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
@@ -114,7 +119,11 @@ import {
   type MensagemResumoRow,
 } from "@/lib/nina/leads-resumo";
 import { supabase } from "@/integrations/supabase/client";
-import { enviarComRetomadaRecuperavel, recuperarHistoricoPendente, temRespostaAoEnvio } from "@/lib/nina/homologacao-retomada";
+import {
+  enviarComRetomadaRecuperavel,
+  recuperarHistoricoPendente,
+  temRespostaAoEnvio,
+} from "@/lib/nina/homologacao-retomada";
 import {
   aceitaMensagemRealtime,
   mesclarMensagemTimeline,
@@ -125,7 +134,6 @@ import {
   waIdDoEnvio,
   type LinhaMensagemRealtime,
 } from "@/lib/nina/homologacao-realtime";
-
 
 type Lead = {
   id: string;
@@ -146,7 +154,6 @@ type Lead = {
   ultimaMensagemEm?: string | null;
   naoLidas?: number;
 };
-
 
 type Msg = {
   id: string;
@@ -197,14 +204,17 @@ function nomeLead(l: Pick<Lead, "indice">): string {
 export const AVISO_TESTE_ENCERRADO =
   "Teste encerrado. Clique em Resolver / Reiniciar teste para iniciar uma nova sessão.";
 
-
-export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConversa, onConversaAberta }: {
+export function HomologacaoInbox({
+  laboratorio = false,
+  ativo = true,
+  abrirConversa,
+  onConversaAberta,
+}: {
   laboratorio?: boolean;
   ativo?: boolean;
   abrirConversa?: ConversaTesteAlvo | null;
   onConversaAberta?: () => void;
 } = {}) {
-
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const podeEscrever = usePodeEscrever("nina");
@@ -217,8 +227,8 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const [modoPdf, setModoPdf] = useState<"periodo" | "todos">("periodo");
   const [inicioPdf, setInicioPdf] = useState(() => diaExportacao(new Date()));
   const [fimPdf, setFimPdf] = useState(() => diaExportacao(new Date()));
-  const periodoPdf: PeriodoExportacao = modoPdf === "todos"
-    ? { modo: "todos" } : { modo: "periodo", inicio: inicioPdf, fim: fimPdf };
+  const periodoPdf: PeriodoExportacao =
+    modoPdf === "todos" ? { modo: "todos" } : { modo: "periodo", inicio: inicioPdf, fim: fimPdf };
   const periodoPdfValido = periodoExportacaoSchema.safeParse(periodoPdf).success;
   const enviar = useServerFn(enviarMensagemTeste);
   const resolver = useServerFn(resolverConversaTeste);
@@ -279,13 +289,15 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const [cenario, setCenario] = useState<string>(CENARIOS_SUGERIDOS[0] ?? "");
   const [persona, setPersona] = useState<Persona>(PERSONA_PADRAO);
   const [limites, setLimites] = useState<Limites>(LIMITES_PADRAO);
-  const [sim, setSim] = useState<
-    { id: string; status: string; turnos: number; maxTurnos: number } | null
-  >(null);
+  const [sim, setSim] = useState<{
+    id: string;
+    status: string;
+    turnos: number;
+    maxTurnos: number;
+  } | null>(null);
   const [simMotivo, setSimMotivo] = useState<string | null>(null);
   const controleRef = useRef<{ parar: boolean; pausar: boolean }>({ parar: false, pausar: false });
   const rodandoRef = useRef(false);
-
 
   // Mesma ordem do chat real: avisos de reabertura antecedem a entrada do novo ciclo.
   const timeline = useMemo<
@@ -303,18 +315,21 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         evento: e,
       })),
     ];
-    const comReabertura = anteciparReabertura(itens.sort((a, b) => a.em.localeCompare(b.em)), (i) => ({
-      em: Date.parse(i.em),
-      ...(i.kind === "msg"
-        ? {
-            mensagem: {
-              id: i.msg.id,
-              direction: i.msg.direction,
-              sistema: i.msg.status === "system" || i.msg.enviada_por === "sistema",
-            },
-          }
-        : { evento: i.evento }),
-    }));
+    const comReabertura = anteciparReabertura(
+      itens.sort((a, b) => a.em.localeCompare(b.em)),
+      (i) => ({
+        em: Date.parse(i.em),
+        ...(i.kind === "msg"
+          ? {
+              mensagem: {
+                id: i.msg.id,
+                direction: i.msg.direction,
+                sistema: i.msg.status === "system" || i.msg.enviada_por === "sistema",
+              },
+            }
+          : { evento: i.evento }),
+      }),
+    );
     const comHandoff = posicionarHandoffAposAviso(comReabertura, (i) => ({
       em: Date.parse(i.em),
       ...(i.kind === "msg" ? { mensagem: i.msg } : { evento: i.evento }),
@@ -367,8 +382,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     },
     [clinicaId, conversaId, saidasPorMensagem, ciclos, leads, leadId],
   );
-
-
 
   const chat = useChatScroll({
     conversaId: leadId,
@@ -499,8 +512,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     };
   }, [clinicaId, carregarLeads]);
 
-
-
   useEffect(() => {
     void carregarLeads();
   }, [carregarLeads]);
@@ -525,18 +536,13 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const otimistasRef = useRef<Map<string, { leadId: string; msg: Msg }>>(new Map());
   const otimistasDoLead = useCallback(
     (id: string | null) =>
-      id
-        ? [...otimistasRef.current.values()].filter((o) => o.leadId === id).map((o) => o.msg)
-        : [],
+      id ? [...otimistasRef.current.values()].filter((o) => o.leadId === id).map((o) => o.msg) : [],
     [],
   );
-  const registrarOtimista = useCallback(
-    (lead: string, msg: Msg) => {
-      otimistasRef.current.set(msg.id.replace("otimista:", ""), { leadId: lead, msg });
-      if (leadSelecionadoRef.current === lead) setMsgs((atuais) => [...atuais, msg]);
-    },
-    [],
-  );
+  const registrarOtimista = useCallback((lead: string, msg: Msg) => {
+    otimistasRef.current.set(msg.id.replace("otimista:", ""), { leadId: lead, msg });
+    if (leadSelecionadoRef.current === lead) setMsgs((atuais) => [...atuais, msg]);
+  }, []);
   /**
    * O envio terminou. A bolha NÃO é removida: quem a substitui é a mensagem
    * oficial que chega pelo Realtime (mesma identidade `wa_message_id`), sem
@@ -566,8 +572,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       const solicitacao = controleHistoricoRef.current.iniciar();
       const geracao = geracaoRef.current;
       const inicio = msgsRef.current;
-      const atual = () => leadSelecionadoRef.current === id &&
-        geracaoRef.current === geracao && controleHistoricoRef.current.aceita(solicitacao);
+      const atual = () =>
+        leadSelecionadoRef.current === id &&
+        geracaoRef.current === geracao &&
+        controleHistoricoRef.current.aceita(solicitacao);
       try {
         const r = (await historico({ data: { clinicaId, leadId: id } })) as {
           mensagens: Msg[];
@@ -575,9 +583,11 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           conversaId: string | null;
         };
         if (!atual()) return false;
-        setMsgs((atuais) => atual()
-          ? reconciliarCargaHistorico(r.mensagens, otimistasDoLead(id), inicio, atuais)
-          : atuais);
+        setMsgs((atuais) =>
+          atual()
+            ? reconciliarCargaHistorico(r.mensagens, otimistasDoLead(id), inicio, atuais)
+            : atuais,
+        );
         // Só retire a bolha local quando a mensagem oficial estiver na carga.
         const confirmadas = new Set(r.mensagens.map((m) => m.wa_message_id).filter(Boolean));
         for (const [chave, o] of otimistasRef.current) {
@@ -598,7 +608,9 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           setFerramentas([]);
           setDebugEstado(null);
         }
-        return waId ? temRespostaAoEnvio(r.mensagens, waId) : r.mensagens.at(-1)?.direction === "out";
+        return waId
+          ? temRespostaAoEnvio(r.mensagens, waId)
+          : r.mensagens.at(-1)?.direction === "out";
       } catch (e: any) {
         if (atual()) mostrarErro(e);
         return false;
@@ -627,8 +639,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     marcadoRef.current = chave;
     // Mensagens ainda não gravadas no banco têm id temporário (não-UUID).
     // Nesse caso marcamos a conversa como lida sem apontar a mensagem.
-    const UUID_RE =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const mensagemId = UUID_RE.test(String(ultima.id)) ? String(ultima.id) : null;
     void (async () => {
       try {
@@ -639,7 +650,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
       }
     })();
   }, [clinicaId, leadId, conversaId, msgs, carregandoConversa, marcarLido, ativo]);
-
 
   /**
    * Rede de segurança: a resposta da Nina é gravada no banco pelo servidor,
@@ -678,7 +688,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
 
   useEffect(() => {
     function abrir(ev: Event) {
-      const d = (ev as CustomEvent).detail as { leadIndice?: number | null; conversaId?: string | null };
+      const d = (ev as CustomEvent).detail as {
+        leadIndice?: number | null;
+        conversaId?: string | null;
+      };
       const alvo =
         leads.find((l) => l.conversaId && l.conversaId === d?.conversaId) ??
         (typeof d?.leadIndice === "number" ? leads.find((l) => l.indice === d.leadIndice) : null);
@@ -711,7 +724,9 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     void carregarHistorico(leadId).finally(() => {
       if (!cancelada) setCarregandoConversa(false);
     });
-    return () => { cancelada = true; };
+    return () => {
+      cancelada = true;
+    };
   }, [clinicaId, leadId, revisaoLeadAberto, carregarHistorico]);
 
   // Trocar de lead interrompe o loop automático do lead anterior e carrega a
@@ -752,7 +767,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     };
   }, [clinicaId, leadId, simAtual, laboratorio]);
 
-
   // Recarga incremental após uma operação feita pela automação (WebMCP).
   useEffect(
     () =>
@@ -774,7 +788,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
   const dispararMensagem = async (
     conteudo: string,
     tipoForcado?: TipoMensagem,
-    audioArquivo?: { base64: string; mime: "audio/ogg" | "audio/mpeg" | "audio/mp4" | "audio/aac" | "audio/amr" | "audio/wav" },
+    audioArquivo?: {
+      base64: string;
+      mime: "audio/ogg" | "audio/mpeg" | "audio/mp4" | "audio/aac" | "audio/amr" | "audio/wav";
+    },
     imagemArquivo?: { base64: string; mime: "image/jpeg" | "image/png" | "image/webp" },
   ): Promise<{ ok: boolean; transferida: boolean; erro: string | null }> => {
     const leadOrigem = leadId;
@@ -821,8 +838,9 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     // O retorno HTTP e o Realtime não são garantias de atualização visual.
     // Recupere a resposta correlacionada sem reenviar a entrada do paciente.
     void recuperarHistoricoPendente(
-      async () => temRespostaAoEnvio(msgsRef.current, waIdDoEnvio(leadOrigem, chave)) ||
-        await carregarHistorico(leadOrigem, waIdDoEnvio(leadOrigem, chave)),
+      async () =>
+        temRespostaAoEnvio(msgsRef.current, waIdDoEnvio(leadOrigem, chave)) ||
+        (await carregarHistorico(leadOrigem, waIdDoEnvio(leadOrigem, chave))),
       meuLead,
     );
 
@@ -842,12 +860,25 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         mensagemPersistida?: boolean;
         recuperavel?: boolean;
       };
-      const entrada = { data: { clinicaId, leadId: leadOrigem, tipo: tipoEnvio, texto: corpo, chave, audioArquivo, imagemArquivo } };
+      const entrada = {
+        data: {
+          clinicaId,
+          leadId: leadOrigem,
+          tipo: tipoEnvio,
+          texto: corpo,
+          chave,
+          audioArquivo,
+          imagemArquivo,
+        },
+      };
       const r = await enviarComRetomadaRecuperavel(
-        async () => (await enviar(entrada)) as ResultadoEnvio, meuLead,
+        async () => (await enviar(entrada)) as ResultadoEnvio,
+        meuLead,
       );
-      const duplicadaRespondida = r.duplicada && !r.reply && !r.erro && meuLead()
-        ? await aguardarResposta(leadOrigem, 8, waIdDoEnvio(leadOrigem, chave)) : false;
+      const duplicadaRespondida =
+        r.duplicada && !r.reply && !r.erro && meuLead()
+          ? await aguardarResposta(leadOrigem, 8, waIdDoEnvio(leadOrigem, chave))
+          : false;
       if (r.mensagemPersistida === false) {
         falharOtimista(chave);
         if (meuLead()) {
@@ -884,14 +915,17 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         }
       }
 
-
       return {
-        ok: agrupada ? true : !r.erro && (!!r.reply || r.semNovaMensagem === true || duplicadaRespondida),
+        ok: agrupada
+          ? true
+          : !r.erro && (!!r.reply || r.semNovaMensagem === true || duplicadaRespondida),
         transferida: !!r.transferida,
         erro: r.erro ?? null,
       };
     } catch (e: any) {
-      const chegou = meuLead() ? await aguardarResposta(leadOrigem, 8, waIdDoEnvio(leadOrigem, chave)) : false;
+      const chegou = meuLead()
+        ? await aguardarResposta(leadOrigem, 8, waIdDoEnvio(leadOrigem, chave))
+        : false;
       if (chegou) concluirOtimista(chave);
       else falharOtimista(chave);
       void carregarLeads();
@@ -953,7 +987,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           setEncerrado(null);
           break;
         }
-
       }
       if (controleRef.current.parar) setSim((s) => (s ? { ...s, status: "parada" } : s));
     } catch (e) {
@@ -1074,7 +1107,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     }
   };
 
-
   const baixarPdf = async () => {
     if (!leadAtual || !clinicaId || !leadId || gerandoPdf || !periodoPdfValido) return;
     setGerandoPdf(true);
@@ -1136,11 +1168,18 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         10,
         false,
       );
-      escrever([sanear(`Período: ${rotuloPeriodoExportacao(periodoPdf)} · horário de Brasília`)], margem, 10, false);
+      escrever(
+        [sanear(`Período: ${rotuloPeriodoExportacao(periodoPdf)} · horário de Brasília`)],
+        margem,
+        10,
+        false,
+      );
       y += 10;
 
       for (const m of mensagens) {
-        const texto = marcadorInternoSistema(m) ? textoMarcadorSistema(m.body) : String(m.body ?? "");
+        const texto = marcadorInternoSistema(m)
+          ? textoMarcadorSistema(m.body)
+          : String(m.body ?? "");
         if (marcadorInternoSistema(m) && !texto) continue;
         const quem =
           m.enviada_por === "sistema"
@@ -1164,8 +1203,12 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
         y += 8;
       }
 
-      const sufixo = periodoPdf.modo === "todos" ? "todo-historico"
-        : periodoPdf.inicio === periodoPdf.fim ? periodoPdf.inicio : `${periodoPdf.inicio}-a-${periodoPdf.fim}`;
+      const sufixo =
+        periodoPdf.modo === "todos"
+          ? "todo-historico"
+          : periodoPdf.inicio === periodoPdf.fim
+            ? periodoPdf.inicio
+            : `${periodoPdf.inicio}-a-${periodoPdf.fim}`;
       const nome = `nina-homologacao-${nomeLead(leadAtual).toLowerCase().replace(/\s+/g, "-")}-${sufixo}.pdf`;
       doc.save(nome);
       toast.success("PDF gerado com as mensagens do lead de teste.");
@@ -1184,7 +1227,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
     resetando || !podeEscrever || !leadId || terraRodando || (tipo !== "text" && tipo !== "audio");
 
   return (
-    <div id="homologacao-inbox" className={`flex gap-3 ${laboratorio ? "h-[calc(100vh-14rem)] min-h-[640px]" : "h-full min-h-0"}`}>
+    <div
+      id="homologacao-inbox"
+      className={`flex gap-3 ${laboratorio ? "h-[calc(100vh-14rem)] min-h-[640px]" : "h-full min-h-0"}`}
+    >
       {/* COLUNA 1 — LEADS DE TESTE */}
       <Card className="flex w-[300px] shrink-0 flex-col overflow-hidden">
         <CardHeader className="gap-2 py-3">
@@ -1204,8 +1250,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
             </Button>
           </div>
           <p className="text-[11px] leading-tight text-muted-foreground">
-            Ambiente de homologação. Nada é enviado para o WhatsApp e nenhum paciente real é
-            usado.
+            Ambiente de homologação. Nada é enviado para o WhatsApp e nenhum paciente real é usado.
           </p>
         </CardHeader>
         <div className="flex-1 overflow-auto border-t">
@@ -1303,7 +1348,10 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                     <span>· sessão {leadAtual.sessao}</span>
                     {leadAtual.cicloId ? (
                       <span className="font-mono">
-                        · ciclo {ciclos.length > 0 ? ciclos[ciclos.length - 1]?.ciclo_seq : leadAtual.cicloId.slice(0, 8)}
+                        · ciclo{" "}
+                        {ciclos.length > 0
+                          ? ciclos[ciclos.length - 1]?.ciclo_seq
+                          : leadAtual.cicloId.slice(0, 8)}
                       </span>
                     ) : null}
                   </p>
@@ -1317,58 +1365,103 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                   >
                     <Download className="mr-1 h-3.5 w-3.5" /> PDF
                   </Button>
-                  <Dialog open={pdfAberto} onOpenChange={(aberto) => { if (!gerandoPdf) setPdfAberto(aberto); }}>
+                  <Dialog
+                    open={pdfAberto}
+                    onOpenChange={(aberto) => {
+                      if (!gerandoPdf) setPdfAberto(aberto);
+                    }}
+                  >
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
                         <DialogTitle>Baixar conversa de teste em PDF</DialogTitle>
                         <DialogDescription>
-                          Escolha os dias de {nomeLead(leadAtual)}. Para baixar um único dia, use a mesma data nos dois campos.
+                          Escolha os dias de {nomeLead(leadAtual)}. Para baixar um único dia, use a
+                          mesma data nos dois campos.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="pdf-periodo">O que deseja baixar?</Label>
-                          <select id="pdf-periodo" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                            disabled={gerandoPdf} value={modoPdf} onChange={(e) => setModoPdf(e.target.value as "periodo" | "todos")}>
+                          <select
+                            id="pdf-periodo"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            disabled={gerandoPdf}
+                            value={modoPdf}
+                            onChange={(e) => setModoPdf(e.target.value as "periodo" | "todos")}
+                          >
                             <option value="periodo">Selecionar período</option>
                             <option value="todos">Todo o histórico disponível</option>
                           </select>
                         </div>
-                        {modoPdf === "periodo" && <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="pdf-inicio">Data inicial</Label>
-                            <Input id="pdf-inicio" type="date" value={inicioPdf} disabled={gerandoPdf} onChange={(e) => setInicioPdf(e.target.value)} />
+                        {modoPdf === "periodo" && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="pdf-inicio">Data inicial</Label>
+                              <Input
+                                id="pdf-inicio"
+                                type="date"
+                                value={inicioPdf}
+                                disabled={gerandoPdf}
+                                onChange={(e) => setInicioPdf(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="pdf-fim">Data final</Label>
+                              <Input
+                                id="pdf-fim"
+                                type="date"
+                                value={fimPdf}
+                                disabled={gerandoPdf}
+                                onChange={(e) => setFimPdf(e.target.value)}
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="pdf-fim">Data final</Label>
-                            <Input id="pdf-fim" type="date" value={fimPdf} disabled={gerandoPdf} onChange={(e) => setFimPdf(e.target.value)} />
-                          </div>
-                        </div>}
-                        {!periodoPdfValido && <p role="alert" className="text-sm text-destructive">Informe datas válidas, com a data final igual ou posterior à inicial.</p>}
-                        <p className="text-xs text-muted-foreground">Inclui os dias completos, no horário de Brasília, com as mensagens ainda disponíveis no histórico.</p>
+                        )}
+                        {!periodoPdfValido && (
+                          <p role="alert" className="text-sm text-destructive">
+                            Informe datas válidas, com a data final igual ou posterior à inicial.
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Inclui os dias completos, no horário de Brasília, com as mensagens ainda
+                          disponíveis no histórico.
+                        </p>
                       </div>
                       <DialogFooter>
-                        <Button variant="outline" disabled={gerandoPdf} onClick={() => setPdfAberto(false)}>Cancelar</Button>
-                        <Button disabled={gerandoPdf || !periodoPdfValido} onClick={() => void baixarPdf()}>
-                          <Download className="mr-2 h-4 w-4" />{gerandoPdf ? "Gerando PDF…" : "Baixar PDF"}
+                        <Button
+                          variant="outline"
+                          disabled={gerandoPdf}
+                          onClick={() => setPdfAberto(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          disabled={gerandoPdf || !periodoPdfValido}
+                          onClick={() => void baixarPdf()}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          {gerandoPdf ? "Gerando PDF…" : "Baixar PDF"}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                  {laboratorio && <><Button
-                    size="sm"
-                    variant="outline"
-                    aria-pressed={painelTecnico}
-                    onClick={() => setPainelTecnico((v) => !v)}
-                  >
-                    <Wrench className="mr-1 h-3.5 w-3.5" /> Diagnóstico
-                  </Button>
-                  <AvaliacaoSol
-                    clinicaId={clinicaId}
-                    leadId={leadId}
-                    podeAvaliar={podeEscrever}
-                  />
-                  </>}
+                  {laboratorio && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-pressed={painelTecnico}
+                        onClick={() => setPainelTecnico((v) => !v)}
+                      >
+                        <Wrench className="mr-1 h-3.5 w-3.5" /> Diagnóstico
+                      </Button>
+                      <AvaliacaoSol
+                        clinicaId={clinicaId}
+                        leadId={leadId}
+                        podeAvaliar={podeEscrever}
+                      />
+                    </>
+                  )}
 
                   <Button
                     size="sm"
@@ -1390,7 +1483,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                       </>
                     )}
                   </Button>
-
                 </div>
               </div>
             </CardHeader>
@@ -1450,7 +1542,9 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                               ].map(([k, v]) => (
                                 <div key={String(k)}>
                                   <span className="text-muted-foreground">{k}:</span>{" "}
-                                  <span>{v === null || v === undefined || v === "" ? "—" : String(v)}</span>
+                                  <span>
+                                    {v === null || v === undefined || v === "" ? "—" : String(v)}
+                                  </span>
                                 </div>
                               ))}
                             </div>
@@ -1533,7 +1627,13 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                   // FASE 3: só a resposta da própria Nina recebe indicador de
                   // confiança e botão de reporte. Envio humano no teste, não.
                   const daNina = out && m.enviada_por === "nina";
-                  const autoria = daNina ? "· Nina" : m.enviada_por === "sistema" ? "· Sistema" : out ? "· Equipe (teste)" : "· Paciente (teste)";
+                  const autoria = daNina
+                    ? "· Nina"
+                    : m.enviada_por === "sistema"
+                      ? "· Sistema"
+                      : out
+                        ? "· Equipe (teste)"
+                        : "· Paciente (teste)";
 
                   const meta = metadadosDaMensagem(m);
                   return (
@@ -1549,11 +1649,16 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                     >
                       {/* Reporte de um clique — mesmo mecanismo do atendimento
                           real, apenas em respostas da Nina neste teste. */}
-                      {clinicaId && meta.test_conversation_id && <InspecaoMensagemNina parte="reporte"
-                        clinicaId={clinicaId} conversaId={meta.test_conversation_id} mensagem={m}
-                        saida={saidasPorMensagem[String(m.id)]} />}
+                      {clinicaId && meta.test_conversation_id && (
+                        <InspecaoMensagemNina
+                          parte="reporte"
+                          clinicaId={clinicaId}
+                          conversaId={meta.test_conversation_id}
+                          mensagem={m}
+                          saida={saidasPorMensagem[String(m.id)]}
+                        />
+                      )}
                       <div
-
                         className={`max-w-[68%] break-words rounded-2xl px-3 py-2 text-sm shadow-sm ${
                           out
                             ? "rounded-br-sm bg-atd-go text-atd-on-strong"
@@ -1561,10 +1666,12 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                         }`}
                       >
                         {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
-                        {textoDaBolha(m) && <NinaMessage
-                          content={textoDaBolha(m)}
-                          variant={daNina ? "assistant" : "user"}
-                        />}
+                        {textoDaBolha(m) && (
+                          <NinaMessage
+                            content={textoDaBolha(m)}
+                            variant={daNina ? "assistant" : "user"}
+                          />
+                        )}
                         <div
                           className={`mt-1 flex items-center justify-between gap-2 text-[11px] ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
                         >
@@ -1573,11 +1680,16 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                             {/* Falha é sempre DESTA mensagem: as outras seguem. */}
                             {m.estado === "failed" && " · ⚠ falhou"}
                           </span>
-                          {clinicaId && meta.test_conversation_id && <InspecaoMensagemNina parte="detalhes"
-                            clinicaId={clinicaId} conversaId={meta.test_conversation_id} mensagem={m}
-                            saida={saidasPorMensagem[String(m.id)]} />}
+                          {clinicaId && meta.test_conversation_id && (
+                            <InspecaoMensagemNina
+                              parte="detalhes"
+                              clinicaId={clinicaId}
+                              conversaId={meta.test_conversation_id}
+                              mensagem={m}
+                              saida={saidasPorMensagem[String(m.id)]}
+                            />
+                          )}
                         </div>
-
                       </div>
                     </div>
                   );
@@ -1619,7 +1731,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
             )}
 
             {erro && (
-
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
                 <span className="min-w-0 break-words">{erro}</span>
                 <Button
@@ -1634,292 +1745,294 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
             )}
 
             {/* FASE 4 — modo do lead: manual ou paciente simulado (Terra). */}
-            {laboratorio && <div className="max-h-[45vh] shrink-0 space-y-2 overflow-y-auto border-t bg-muted/20 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Modo do teste</span>
-                <Select
-                  value={modo}
-                  onValueChange={(v) => setModo(v as "manual" | "terra")}
-                  disabled={terraRodando}
-                >
-                  <SelectTrigger className="h-8 w-[220px] text-xs" aria-label="Modo do teste">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-50">
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="terra">Automático — Terra</SelectItem>
-                  </SelectContent>
-                </Select>
-                {sim && (
-                  <Badge variant={terraRodando ? "default" : "secondary"} className="text-[11px]">
-                    {sim.status} · turno {sim.turnos}/{sim.maxTurnos}
-                  </Badge>
-                )}
-                {simMotivo && (
-                  <span className="text-xs text-muted-foreground">{simMotivo}</span>
+            {laboratorio && (
+              <div className="max-h-[45vh] shrink-0 space-y-2 overflow-y-auto border-t bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">Modo do teste</span>
+                  <Select
+                    value={modo}
+                    onValueChange={(v) => setModo(v as "manual" | "terra")}
+                    disabled={terraRodando}
+                  >
+                    <SelectTrigger className="h-8 w-[220px] text-xs" aria-label="Modo do teste">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-50">
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="terra">Automático — Terra</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {sim && (
+                    <Badge variant={terraRodando ? "default" : "secondary"} className="text-[11px]">
+                      {sim.status} · turno {sim.turnos}/{sim.maxTurnos}
+                    </Badge>
+                  )}
+                  {simMotivo && <span className="text-xs text-muted-foreground">{simMotivo}</span>}
+                </div>
+
+                {modo === "terra" && (
+                  <div className="space-y-2 rounded-md border bg-atd-surface p-2">
+                    <p className="text-[11px] text-muted-foreground">
+                      O paciente é simulado por outra IA (Terra). Ela só vê o cenário, a persona
+                      sintética e as mensagens da conversa — nunca as instruções internas da Nina.
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Select value={cenario} onValueChange={setCenario} disabled={terraRodando}>
+                        <SelectTrigger
+                          className="h-8 min-w-[280px] flex-1 text-xs"
+                          aria-label="Cenário"
+                        >
+                          <SelectValue placeholder="Escolha um cenário" />
+                        </SelectTrigger>
+                        <SelectContent className="z-50">
+                          {CENARIOS_SUGERIDOS.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                          {cenario && !CENARIOS_SUGERIDOS.includes(cenario) && (
+                            <SelectItem value={cenario}>{cenario}</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Textarea
+                      rows={2}
+                      value={cenario}
+                      onChange={(e) => setCenario(e.target.value)}
+                      disabled={terraRodando}
+                      placeholder="Cenário do teste (ex.: Paciente quer marcar cardiologista.)"
+                      className="resize-none text-xs"
+                      aria-label="Cenário do teste"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <Select
+                        value={persona.estilo}
+                        onValueChange={(v) =>
+                          setPersona((p) => ({ ...p, estilo: v as EstiloPersona }))
+                        }
+                        disabled={terraRodando}
+                      >
+                        <SelectTrigger className="h-8 text-xs" aria-label="Comportamento">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-50">
+                          {ESTILOS.map((e) => (
+                            <SelectItem key={e.valor} value={e.valor}>
+                              {e.rotulo}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={persona.detalhe}
+                        onValueChange={(v) =>
+                          setPersona((p) => ({ ...p, detalhe: v as NivelDetalhe }))
+                        }
+                        disabled={terraRodando}
+                      >
+                        <SelectTrigger className="h-8 text-xs" aria-label="Nível de detalhe">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-50">
+                          {DETALHES.map((d) => (
+                            <SelectItem key={d.valor} value={d.valor}>
+                              {d.rotulo}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 accent-current"
+                          checked={persona.errosDigitacao}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setPersona((p) => ({ ...p, errosDigitacao: e.target.checked }))
+                          }
+                        />
+                        Erros de digitação
+                      </label>
+                      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 accent-current"
+                          checked={persona.respondeParcialmente}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setPersona((p) => ({ ...p, respondeParcialmente: e.target.checked }))
+                          }
+                        />
+                        Responde parcialmente
+                      </label>
+                      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 accent-current"
+                          checked={persona.mudaDeAssunto}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setPersona((p) => ({ ...p, mudaDeAssunto: e.target.checked }))
+                          }
+                        />
+                        Muda de assunto
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                      <label className="flex items-center gap-1">
+                        Máx. turnos
+                        <input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={limites.maxTurnos}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({ ...l, maxTurnos: Number(e.target.value) || 1 }))
+                          }
+                          className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        Duração (s)
+                        <input
+                          type="number"
+                          min={30}
+                          max={1800}
+                          value={limites.maxDuracaoS}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({ ...l, maxDuracaoS: Number(e.target.value) || 30 }))
+                          }
+                          className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        Máx. tokens
+                        <input
+                          type="number"
+                          min={500}
+                          max={200000}
+                          step={500}
+                          value={limites.maxTokens}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({ ...l, maxTokens: Number(e.target.value) || 500 }))
+                          }
+                          className="h-7 w-24 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        Timeout (s)
+                        <input
+                          type="number"
+                          min={10}
+                          max={180}
+                          value={limites.timeoutS}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({ ...l, timeoutS: Number(e.target.value) || 10 }))
+                          }
+                          className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        Máx. mensagens
+                        <input
+                          type="number"
+                          min={2}
+                          max={200}
+                          value={limites.maxMensagens}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({ ...l, maxMensagens: Number(e.target.value) || 2 }))
+                          }
+                          className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        Créditos / mil tokens
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          value={limites.creditosPorMilTokens}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({
+                              ...l,
+                              creditosPorMilTokens: Number(e.target.value) || 0,
+                            }))
+                          }
+                          className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1">
+                        Máx. custo (créditos)
+                        <input
+                          type="number"
+                          min={0}
+                          max={1000}
+                          step={0.5}
+                          value={limites.maxCustoCreditos}
+                          disabled={terraRodando}
+                          onChange={(e) =>
+                            setLimites((l) => ({
+                              ...l,
+                              maxCustoCreditos: Number(e.target.value) || 0,
+                            }))
+                          }
+                          className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
+                        />
+                      </label>
+                      <span className="w-full text-[10px] text-muted-foreground">
+                        O custo é estimado a partir dos tokens e da taxa informada acima — o
+                        provedor não devolve preço por chamada. Deixe 0 para não limitar por custo.
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!podeEscrever || terraRodando || !leadId}
+                        onClick={() => void iniciarTerra()}
+                      >
+                        <Bot className="mr-1 h-3.5 w-3.5" /> Iniciar teste
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!terraRodando}
+                        onClick={() => void pausarTerra()}
+                      >
+                        <Pause className="mr-1 h-3.5 w-3.5" /> Pausar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={sim?.status !== "pausada"}
+                        onClick={() => void retomarTerra()}
+                      >
+                        <Play className="mr-1 h-3.5 w-3.5" /> Retomar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!sim || (sim.status !== "executando" && sim.status !== "pausada")}
+                        onClick={() => void pararTerra()}
+                      >
+                        <Square className="mr-1 h-3.5 w-3.5" /> Parar
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {modo === "terra" && (
-                <div className="space-y-2 rounded-md border bg-atd-surface p-2">
-                  <p className="text-[11px] text-muted-foreground">
-                    O paciente é simulado por outra IA (Terra). Ela só vê o cenário, a persona
-                    sintética e as mensagens da conversa — nunca as instruções internas da Nina.
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Select value={cenario} onValueChange={setCenario} disabled={terraRodando}>
-                      <SelectTrigger className="h-8 min-w-[280px] flex-1 text-xs" aria-label="Cenário">
-                        <SelectValue placeholder="Escolha um cenário" />
-                      </SelectTrigger>
-                      <SelectContent className="z-50">
-                        {CENARIOS_SUGERIDOS.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                        {cenario && !CENARIOS_SUGERIDOS.includes(cenario) && (
-                          <SelectItem value={cenario}>{cenario}</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Textarea
-                    rows={2}
-                    value={cenario}
-                    onChange={(e) => setCenario(e.target.value)}
-                    disabled={terraRodando}
-                    placeholder="Cenário do teste (ex.: Paciente quer marcar cardiologista.)"
-                    className="resize-none text-xs"
-                    aria-label="Cenário do teste"
-                  />
-
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <Select
-                      value={persona.estilo}
-                      onValueChange={(v) =>
-                        setPersona((p) => ({ ...p, estilo: v as EstiloPersona }))
-                      }
-                      disabled={terraRodando}
-                    >
-                      <SelectTrigger className="h-8 text-xs" aria-label="Comportamento">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50">
-                        {ESTILOS.map((e) => (
-                          <SelectItem key={e.valor} value={e.valor}>
-                            {e.rotulo}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={persona.detalhe}
-                      onValueChange={(v) =>
-                        setPersona((p) => ({ ...p, detalhe: v as NivelDetalhe }))
-                      }
-                      disabled={terraRodando}
-                    >
-                      <SelectTrigger className="h-8 text-xs" aria-label="Nível de detalhe">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-50">
-                        {DETALHES.map((d) => (
-                          <SelectItem key={d.valor} value={d.valor}>
-                            {d.rotulo}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-current"
-                        checked={persona.errosDigitacao}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setPersona((p) => ({ ...p, errosDigitacao: e.target.checked }))
-                        }
-                      />
-                      Erros de digitação
-                    </label>
-                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-current"
-                        checked={persona.respondeParcialmente}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setPersona((p) => ({ ...p, respondeParcialmente: e.target.checked }))
-                        }
-                      />
-                      Responde parcialmente
-                    </label>
-                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-current"
-                        checked={persona.mudaDeAssunto}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setPersona((p) => ({ ...p, mudaDeAssunto: e.target.checked }))
-                        }
-                      />
-                      Muda de assunto
-                    </label>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    <label className="flex items-center gap-1">
-                      Máx. turnos
-                      <input
-                        type="number"
-                        min={1}
-                        max={30}
-                        value={limites.maxTurnos}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({ ...l, maxTurnos: Number(e.target.value) || 1 }))
-                        }
-                        className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      Duração (s)
-                      <input
-                        type="number"
-                        min={30}
-                        max={1800}
-                        value={limites.maxDuracaoS}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({ ...l, maxDuracaoS: Number(e.target.value) || 30 }))
-                        }
-                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      Máx. tokens
-                      <input
-                        type="number"
-                        min={500}
-                        max={200000}
-                        step={500}
-                        value={limites.maxTokens}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({ ...l, maxTokens: Number(e.target.value) || 500 }))
-                        }
-                        className="h-7 w-24 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      Timeout (s)
-                      <input
-                        type="number"
-                        min={10}
-                        max={180}
-                        value={limites.timeoutS}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({ ...l, timeoutS: Number(e.target.value) || 10 }))
-                        }
-                        className="h-7 w-16 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      Máx. mensagens
-                      <input
-                        type="number"
-                        min={2}
-                        max={200}
-                        value={limites.maxMensagens}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({ ...l, maxMensagens: Number(e.target.value) || 2 }))
-                        }
-                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      Créditos / mil tokens
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        value={limites.creditosPorMilTokens}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({
-                            ...l,
-                            creditosPorMilTokens: Number(e.target.value) || 0,
-                          }))
-                        }
-                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1">
-                      Máx. custo (créditos)
-                      <input
-                        type="number"
-                        min={0}
-                        max={1000}
-                        step={0.5}
-                        value={limites.maxCustoCreditos}
-                        disabled={terraRodando}
-                        onChange={(e) =>
-                          setLimites((l) => ({
-                            ...l,
-                            maxCustoCreditos: Number(e.target.value) || 0,
-                          }))
-                        }
-                        className="h-7 w-20 rounded border border-atd-border bg-atd-surface px-1"
-                      />
-                    </label>
-                    <span className="w-full text-[10px] text-muted-foreground">
-                      O custo é estimado a partir dos tokens e da taxa informada acima — o provedor
-                      não devolve preço por chamada. Deixe 0 para não limitar por custo.
-                    </span>
-                  </div>
-
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      disabled={!podeEscrever || terraRodando || !leadId}
-                      onClick={() => void iniciarTerra()}
-                    >
-                      <Bot className="mr-1 h-3.5 w-3.5" /> Iniciar teste
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!terraRodando}
-                      onClick={() => void pausarTerra()}
-                    >
-                      <Pause className="mr-1 h-3.5 w-3.5" /> Pausar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={sim?.status !== "pausada"}
-                      onClick={() => void retomarTerra()}
-                    >
-                      <Play className="mr-1 h-3.5 w-3.5" /> Retomar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!sim || (sim.status !== "executando" && sim.status !== "pausada")}
-                      onClick={() => void pararTerra()}
-                    >
-                      <Square className="mr-1 h-3.5 w-3.5" /> Parar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>}
+            )}
 
             <div className="space-y-2 border-t p-3">
               <div className="flex gap-2">
@@ -1935,19 +2048,38 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                     <SelectItem value="sticker">Figurinha</SelectItem>
                   </SelectContent>
                 </Select>
-                <label className="flex min-h-9 shrink-0 items-center rounded-md border border-atd-border px-2 text-xs cursor-pointer focus-within:ring-2" title="Enviar arquivo de áudio como paciente de teste">
+                <label
+                  className="flex min-h-9 shrink-0 items-center rounded-md border border-atd-border px-2 text-xs cursor-pointer focus-within:ring-2"
+                  title="Enviar arquivo de áudio como paciente de teste"
+                >
                   Enviar áudio
-                  <input type="file" className="sr-only" aria-label="Enviar arquivo de áudio"
+                  <input
+                    type="file"
+                    className="sr-only"
+                    aria-label="Enviar arquivo de áudio"
                     accept="audio/ogg,audio/mpeg,audio/mp4,audio/aac,audio/amr,audio/wav,.ogg,.mp3,.m4a,.wav,.aac,.amr"
                     disabled={composerBloqueado || processando}
-                    onChange={async e => {
+                    onChange={async (e) => {
                       const arquivo = e.currentTarget.files?.[0];
                       e.currentTarget.value = "";
                       if (!arquivo) return;
-                      if (arquivo.size > 16 * 1024 * 1024) { toast.error("O áudio deve ter até 16 MB."); return; }
-                      const extensoes: Record<string, string> = { ogg: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", aac: "audio/aac", amr: "audio/amr" };
+                      if (arquivo.size > 16 * 1024 * 1024) {
+                        toast.error("O áudio deve ter até 16 MB.");
+                        return;
+                      }
+                      const extensoes: Record<string, string> = {
+                        ogg: "audio/ogg",
+                        mp3: "audio/mpeg",
+                        m4a: "audio/mp4",
+                        wav: "audio/wav",
+                        aac: "audio/aac",
+                        amr: "audio/amr",
+                      };
                       const mime = extensoes[arquivo.name.split(".").at(-1)?.toLowerCase() ?? ""];
-                      if (!mime) { toast.error("Use áudio OGG, MP3, M4A, WAV, AAC ou AMR."); return; }
+                      if (!mime) {
+                        toast.error("Use áudio OGG, MP3, M4A, WAV, AAC ou AMR.");
+                        return;
+                      }
                       try {
                         const base64 = await new Promise<string>((resolve, reject) => {
                           const leitor = new FileReader();
@@ -1955,31 +2087,57 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                           leitor.onerror = reject;
                           leitor.readAsDataURL(arquivo);
                         });
-                        await dispararMensagem("", "audio", { base64, mime: mime as NonNullable<Parameters<typeof dispararMensagem>[2]>["mime"] });
-                      } catch { toast.error("Não foi possível enviar o áudio."); }
-                    }} />
+                        await dispararMensagem("", "audio", {
+                          base64,
+                          mime: mime as NonNullable<Parameters<typeof dispararMensagem>[2]>["mime"],
+                        });
+                      } catch {
+                        toast.error("Não foi possível enviar o áudio.");
+                      }
+                    }}
+                  />
                 </label>
                 <label className="flex min-h-9 shrink-0 items-center rounded-md border border-atd-border px-2 text-xs cursor-pointer focus-within:ring-2">
                   Enviar foto
-                  <input type="file" className="sr-only" aria-label="Enviar foto como paciente de teste"
+                  <input
+                    type="file"
+                    className="sr-only"
+                    aria-label="Enviar foto como paciente de teste"
                     accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                     disabled={composerBloqueado || processando}
-                    onChange={async e => {
-                      const arquivo = e.currentTarget.files?.[0]; e.currentTarget.value = "";
+                    onChange={async (e) => {
+                      const arquivo = e.currentTarget.files?.[0];
+                      e.currentTarget.value = "";
                       if (!arquivo) return;
-                      if (!arquivo.size || arquivo.size > 5 * 1024 * 1024) { toast.error("A foto deve ter até 5 MB."); return; }
-                      const mimes = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
-                      const mime = mimes[arquivo.name.split(".").at(-1)?.toLowerCase() as keyof typeof mimes];
-                      if (!mime) { toast.error("Use foto JPG, PNG ou WebP."); return; }
+                      if (!arquivo.size || arquivo.size > 5 * 1024 * 1024) {
+                        toast.error("A foto deve ter até 5 MB.");
+                        return;
+                      }
+                      const mimes = {
+                        jpg: "image/jpeg",
+                        jpeg: "image/jpeg",
+                        png: "image/png",
+                        webp: "image/webp",
+                      } as const;
+                      const mime =
+                        mimes[arquivo.name.split(".").at(-1)?.toLowerCase() as keyof typeof mimes];
+                      if (!mime) {
+                        toast.error("Use foto JPG, PNG ou WebP.");
+                        return;
+                      }
                       try {
                         const base64 = await new Promise<string>((resolve, reject) => {
                           const leitor = new FileReader();
                           leitor.onload = () => resolve(String(leitor.result).split(",")[1] ?? "");
-                          leitor.onerror = reject; leitor.readAsDataURL(arquivo);
+                          leitor.onerror = reject;
+                          leitor.readAsDataURL(arquivo);
                         });
                         await dispararMensagem("", "image", undefined, { base64, mime });
-                      } catch { toast.error("Não foi possível enviar a foto."); }
-                    }} />
+                      } catch {
+                        toast.error("Não foi possível enviar a foto.");
+                      }
+                    }}
+                  />
                 </label>
                 <Textarea
                   ref={composerRef}
@@ -2004,9 +2162,7 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
                 />
                 <Button
                   onClick={() => void dispararMensagem(texto)}
-                  disabled={
-                    composerBloqueado || (tipo === "text" && !texto.trim())
-                  }
+                  disabled={composerBloqueado || (tipo === "text" && !texto.trim())}
                   className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                 >
                   <Send className="h-4 w-4" />
@@ -2022,8 +2178,6 @@ export function HomologacaoInbox({ laboratorio = false, ativo = true, abrirConve
           </>
         )}
       </Card>
-
-
     </div>
   );
 }

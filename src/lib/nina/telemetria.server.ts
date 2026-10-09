@@ -41,8 +41,7 @@ export async function metricasNina(
   clinicaId: string,
   desdeISO?: string,
 ): Promise<Metricas & { desde: string }> {
-  const desde =
-    desdeISO ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const desde = desdeISO ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabaseAdmin
     .from("nina_execucoes")
     .select(

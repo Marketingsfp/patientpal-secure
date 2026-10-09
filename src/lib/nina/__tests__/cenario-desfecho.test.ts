@@ -20,7 +20,9 @@ const fatosBase = {
 
 describe("handoffEsperado", () => {
   it("usa o campo explícito quando definido", () => {
-    expect(handoffEsperado({ handoff_esperado: true, criterios: [{ tipo: "nao_transferiu" }] })).toBe(true);
+    expect(
+      handoffEsperado({ handoff_esperado: true, criterios: [{ tipo: "nao_transferiu" }] }),
+    ).toBe(true);
     expect(handoffEsperado({ handoff_esperado: false })).toBe(false);
   });
 
@@ -43,7 +45,9 @@ describe("desfechoDoItem", () => {
     expect(desfechoDoItem({ transferida: false, interrompido: true })).toBe("interrompido");
   });
   it("limite de turnos quando esgotou as mensagens", () => {
-    expect(desfechoDoItem({ transferida: false, turnosUsados: 6, maxTurnos: 6 })).toBe("limite_turnos");
+    expect(desfechoDoItem({ transferida: false, turnosUsados: 6, maxTurnos: 6 })).toBe(
+      "limite_turnos",
+    );
   });
   it("concluído no caso normal", () => {
     expect(desfechoDoItem({ transferida: false, turnosUsados: 2, maxTurnos: 6 })).toBe("concluido");

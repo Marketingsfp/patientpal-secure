@@ -55,9 +55,9 @@ describe("FASE 4 — cache e realtime da Inbox individual", () => {
     expect(
       selecaoDeveSair({ selecionada: daMaria, linhas: [], buscando: true, ctx: ctxJean }),
     ).toBe(true);
-    expect(
-      selecaoDeveSair({ selecionada: conv(), linhas: [], buscando: true, ctx: ctxJean }),
-    ).toBe(false);
+    expect(selecaoDeveSair({ selecionada: conv(), linhas: [], buscando: true, ctx: ctxJean })).toBe(
+      false,
+    );
     expect(
       selecaoDeveSair({ selecionada: conv(), linhas: [], buscando: false, ctx: ctxJean }),
     ).toBe(false);

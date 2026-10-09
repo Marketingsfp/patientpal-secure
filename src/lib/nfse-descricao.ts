@@ -38,7 +38,12 @@ export function montarDiscriminacaoNfse(input: DiscriminacaoInput): string {
 }
 
 const normEsp = (s: string) =>
-  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
 
 /**
  * Especialidade que vem no fim do nome do procedimento da agenda, ex.:

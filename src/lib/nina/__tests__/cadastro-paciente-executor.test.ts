@@ -15,16 +15,25 @@ mock.module("@/integrations/supabase/client.server", () => ({
       rpcs.push({ nome, args });
       if (nome === "nina_alterar_telefone_paciente") {
         if (!retornoRpc.ok) return { data: retornoRpc, error: null };
-        const paciente = banco.pacientes!.find(p => p.id === args._paciente_id)!;
+        const paciente = banco.pacientes!.find((p) => p.id === args._paciente_id)!;
         paciente.telefone = args._telefone_novo;
-        return { data: { ok: true, paciente_id: paciente.id, telefone: paciente.telefone }, error: null };
+        return {
+          data: { ok: true, paciente_id: paciente.id, telefone: paciente.telefone },
+          error: null,
+        };
       }
       return { data: retornoRpc, error: null };
     },
     from: (tabela: string) => {
       if (["servicos", "profissionais"].includes(tabela)) {
-        const q = { select: () => q, eq: () => q, ilike: () => q, in: () => q,
-          then: (fn: (r: { data: unknown[]; error: null }) => unknown) => Promise.resolve(fn({ data: [], error: null })) };
+        const q = {
+          select: () => q,
+          eq: () => q,
+          ilike: () => q,
+          in: () => q,
+          then: (fn: (r: { data: unknown[]; error: null }) => unknown) =>
+            Promise.resolve(fn({ data: [], error: null })),
+        };
         return q;
       }
       const filtros: Linha = {};
@@ -128,21 +137,27 @@ beforeEach(() => {
 
 describe("executor do cadastro com banco simulado", () => {
   test("homologação não grava troca de telefone: descarta o pedido sem chamar a RPC", async () => {
-    const ctx = contexto(true); vincular(ctx, { is_mock_data: true, teste: true });
+    const ctx = contexto(true);
+    vincular(ctx, { is_mock_data: true, teste: true });
     registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
     expect((await executarFerramentaPaciente(ctx, "identificar_paciente", {})).ok).toBe(true);
-    expect(rpcs.map(r => r.nome)).not.toContain("nina_alterar_telefone_paciente");
+    expect(rpcs.map((r) => r.nome)).not.toContain("nina_alterar_telefone_paciente");
     expect(ctx.estado!.patient.alteracao_telefone).toBeNull();
     expect(banco.pacientes![0]!.telefone).toBe("21999990000");
   });
   test("correção explícita preserva ID e remetente; confirmação seguinte reutiliza telefone corrigido", async () => {
     const teste = false;
-    const ctx = contexto(teste); vincular(ctx, { is_mock_data: teste, teste });
+    const ctx = contexto(teste);
+    vincular(ctx, { is_mock_data: teste, teste });
     registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
     const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {});
     expect(r.ok).toBe(true);
-    expect(rpcs.map(r => r.nome)).toEqual(["nina_alterar_telefone_paciente"]);
-    expect(rpcs[0]!.args).toMatchObject({ _paciente_id: "paciente", _telefone_anterior: "21999990000", _telefone_novo: "21988887777" });
+    expect(rpcs.map((r) => r.nome)).toEqual(["nina_alterar_telefone_paciente"]);
+    expect(rpcs[0]!.args).toMatchObject({
+      _paciente_id: "paciente",
+      _telefone_anterior: "21999990000",
+      _telefone_novo: "21988887777",
+    });
     expect(ctx.telefone).toBe("5521999990000");
     expect(ctx.estado!.appointment.confirmation!.resumo).toContain("*Telefone:* 21988887777");
     expect(ctx.estado!.appointment.confirmation!.aceita).toBe(false);
@@ -153,7 +168,8 @@ describe("executor do cadastro com banco simulado", () => {
     expect(ctx.estado!.appointment.confirmation!.resumo).toContain("21988887777");
   });
   test("falha na gravação não confirma alteração e mantém pedido para retry", async () => {
-    const ctx = contexto(); vincular(ctx);
+    const ctx = contexto();
+    vincular(ctx);
     registrarPedidoTelefone(ctx.estado!, "troque o telefone para 21988887777");
     retornoRpc = { ok: false };
     expect((await executarFerramentaPaciente(ctx, "identificar_paciente", {})).ok).toBe(false);
@@ -162,30 +178,55 @@ describe("executor do cadastro com banco simulado", () => {
     expect(banco.pacientes![0]!.telefone).toBe("21999990000");
   });
   test("ferramenta não completa o nascimento da filha com o do responsável", async () => {
-    const ctx = contexto(); vincular(ctx);
+    const ctx = contexto();
+    vincular(ctx);
     ctx.estado!.patient.pending = { nome: "Sofia Lima Rocha", data_nascimento: null, cpf: null };
-    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", { nome: "Sofia Lima Rocha" });
-    expect(r).toMatchObject({ ok: false, erro: "PATIENT_DATA_REQUIRED", campos_faltantes: ["data_nascimento"] });
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Sofia Lima Rocha",
+    });
+    expect(r).toMatchObject({
+      ok: false,
+      erro: "PATIENT_DATA_REQUIRED",
+      campos_faltantes: ["data_nascimento"],
+    });
     expect(rpcs).toHaveLength(0);
   });
-  test.each([false, true])("dados coletados da filha substituem vínculo do responsável, mantendo WhatsApp (teste=%s)", async teste => {
-    const ctx = contexto(teste);
-    vincular(ctx, { is_mock_data: teste, teste });
-    ctx.estado!.patient.pending = { nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14", cpf: null };
-    retornoRpc = { ok: true, paciente_id: "filha", criado: true };
-    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14", telefone: "21912345678",
-    });
-    expect(r.ok).toBe(true);
-    expect(rpcs[0]?.args).toMatchObject({ _nome: "SOFIA LIMA ROCHA", _data_nascimento: "2023-02-14", _telefone: "21999990000" });
-    expect(ctx.pacienteId).toBe("filha");
-    expect(ctx.estado!.appointment.confirmation?.resumo).toContain("SOFIA LIMA ROCHA");
-    expect(ctx.estado!.appointment.confirmation?.aceita).toBe(false);
-    expect(banco.pacientes![0]!.nome).toBe("ANA DA SILVA");
-  });
+  test.each([false, true])(
+    "dados coletados da filha substituem vínculo do responsável, mantendo WhatsApp (teste=%s)",
+    async (teste) => {
+      const ctx = contexto(teste);
+      vincular(ctx, { is_mock_data: teste, teste });
+      ctx.estado!.patient.pending = {
+        nome: "Sofia Lima Rocha",
+        data_nascimento: "2023-02-14",
+        cpf: null,
+      };
+      retornoRpc = { ok: true, paciente_id: "filha", criado: true };
+      const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+        nome: "Sofia Lima Rocha",
+        data_nascimento: "2023-02-14",
+        telefone: "21912345678",
+      });
+      expect(r.ok).toBe(true);
+      expect(rpcs[0]?.args).toMatchObject({
+        _nome: "SOFIA LIMA ROCHA",
+        _data_nascimento: "2023-02-14",
+        _telefone: "21999990000",
+      });
+      expect(ctx.pacienteId).toBe("filha");
+      expect(ctx.estado!.appointment.confirmation?.resumo).toContain("SOFIA LIMA ROCHA");
+      expect(ctx.estado!.appointment.confirmation?.aceita).toBe(false);
+      expect(banco.pacientes![0]!.nome).toBe("ANA DA SILVA");
+    },
+  );
   test("telefone fornecido pelo modelo não substitui remetente ausente", async () => {
-    const ctx = contexto(); ctx.telefone = null;
-    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", { nome: "Sofia Lima Rocha", data_nascimento: "2023-02-14", telefone: "21912345678" });
+    const ctx = contexto();
+    ctx.telefone = null;
+    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+      nome: "Sofia Lima Rocha",
+      data_nascimento: "2023-02-14",
+      telefone: "21912345678",
+    });
     expect(r.ok).toBe(false);
     expect(rpcs).toHaveLength(0);
   });
@@ -206,7 +247,8 @@ describe("executor do cadastro com banco simulado", () => {
     const ctx = contexto();
     resumoEntregueFixture(ctx.estado!, "clinica", false);
     const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Ana Silva", data_nascimento: "1990-01-02",
+      nome: "Ana Silva",
+      data_nascimento: "1990-01-02",
     });
     expect(r.ok).toBe(true);
     expect(ctx.estado!.appointment.confirmation?.aceita).toBe(false);
@@ -235,29 +277,63 @@ describe("executor do cadastro com banco simulado", () => {
       campos_faltantes: ["data_nascimento"],
     });
   });
-  test.each(["15 de janeiro de 1979", "15/01/79", "1979-01-15"])("identificação normaliza %s e aceita CPF opcional null", async data => {
-    const ctx = contexto();
-    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Ana da Silva", data_nascimento: data, cpf: null, telefone: null,
-    });
-    expect(r.ok).toBe(true);
-    expect(rpcs[0]?.args).toMatchObject({ _nome: "ANA DA SILVA", _data_nascimento: "1979-01-15", _cpf: null, _telefone: "21999990000" });
-  });
+  test.each(["15 de janeiro de 1979", "15/01/79", "1979-01-15"])(
+    "identificação normaliza %s e aceita CPF opcional null",
+    async (data) => {
+      const ctx = contexto();
+      const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+        nome: "Ana da Silva",
+        data_nascimento: data,
+        cpf: null,
+        telefone: null,
+      });
+      expect(r.ok).toBe(true);
+      expect(rpcs[0]?.args).toMatchObject({
+        _nome: "ANA DA SILVA",
+        _data_nascimento: "1979-01-15",
+        _cpf: null,
+        _telefone: "21999990000",
+      });
+    },
+  );
   test("data impossível não chega à RPC de cadastro", async () => {
-    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", { nome: "Ana da Silva", data_nascimento: "31 de fevereiro de 1979" });
+    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", {
+      nome: "Ana da Silva",
+      data_nascimento: "31 de fevereiro de 1979",
+    });
     expect(r).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
     expect(rpcs).toHaveLength(0);
   });
-  test.each(["", " \t "])("cadastro trata opcionais vazios (%j) como ausentes e preserva o WhatsApp", async vazio => {
-    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", {
-      nome: "Ana da Silva", data_nascimento: "15 de janeiro de 1979", cpf: vazio, telefone: vazio,
-    });
-    expect(r.ok).toBe(true);
-    expect(rpcs[0]?.args).toMatchObject({ _nome: "ANA DA SILVA", _data_nascimento: "1979-01-15", _cpf: null, _telefone: "21999990000" });
-  });
+  test.each(["", " \t "])(
+    "cadastro trata opcionais vazios (%j) como ausentes e preserva o WhatsApp",
+    async (vazio) => {
+      const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", {
+        nome: "Ana da Silva",
+        data_nascimento: "15 de janeiro de 1979",
+        cpf: vazio,
+        telefone: vazio,
+      });
+      expect(r.ok).toBe(true);
+      expect(rpcs[0]?.args).toMatchObject({
+        _nome: "ANA DA SILVA",
+        _data_nascimento: "1979-01-15",
+        _cpf: null,
+        _telefone: "21999990000",
+      });
+    },
+  );
   test("nome e nascimento vazios pedem os dados, sem gravar cadastro", async () => {
-    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", { nome: " ", data_nascimento: "", cpf: "", telefone: "" });
-    expect(r).toMatchObject({ ok: false, erro: "PATIENT_DATA_REQUIRED", campos_faltantes: ["nome", "data_nascimento"] });
+    const r = await executarFerramentaPaciente(contexto(), "identificar_paciente", {
+      nome: " ",
+      data_nascimento: "",
+      cpf: "",
+      telefone: "",
+    });
+    expect(r).toMatchObject({
+      ok: false,
+      erro: "PATIENT_DATA_REQUIRED",
+      campos_faltantes: ["nome", "data_nascimento"],
+    });
     expect(rpcs).toHaveLength(0);
   });
   test("produção usa a função atômica sem CPF e registra identidade", async () => {
@@ -321,28 +397,43 @@ describe("executor do cadastro com banco simulado", () => {
     const ctx = contexto(true);
     ctx.telefone = "55000100391";
     const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Ana Silva", data_nascimento: "1990-01-02", telefone: "21900000000",
+      nome: "Ana Silva",
+      data_nascimento: "1990-01-02",
+      telefone: "21900000000",
     });
     expect(r.ok).toBe(true);
     expect(rpcs).toHaveLength(1);
-    expect(rpcs[0]).toMatchObject({ nome: "nina_resolver_cadastro", args: {
-      _nome: "ANA SILVA", _data_nascimento: "1990-01-02", _telefone: "55000100391", _cpf: null,
-    } });
-    expect(ctx.pacienteId).toBe("paciente");
-    expect(escritos.filter(e => e.tabela === "pacientes")).toHaveLength(0);
-  });
-  test.each([false, true])("cadastro existente usa o ID devolvido para agendar (teste=%s)", async teste => {
-    retornoRpc = { ok: true, paciente_id: "homonimo-correto", criado: false };
-    const ctx = contexto(teste);
-    const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Ana Silva", data_nascimento: "1990-01-02", telefone: "21900000000",
+    expect(rpcs[0]).toMatchObject({
+      nome: "nina_resolver_cadastro",
+      args: {
+        _nome: "ANA SILVA",
+        _data_nascimento: "1990-01-02",
+        _telefone: "55000100391",
+        _cpf: null,
+      },
     });
-    expect(r).toMatchObject({ ok: true, paciente: { cadastro: "existente" } });
-    expect(rpcs[0]?.args._telefone).toBe("21999990000");
-    expect(ctx.pacienteId).toBe("homonimo-correto");
-    expect(ctx.estado!.patient).toMatchObject({ id: "homonimo-correto", validated: true });
-    expect(escritos.find(e => e.tabela === "atend_conversas")?.valor.contato_paciente_id).toBe("homonimo-correto");
+    expect(ctx.pacienteId).toBe("paciente");
+    expect(escritos.filter((e) => e.tabela === "pacientes")).toHaveLength(0);
   });
+  test.each([false, true])(
+    "cadastro existente usa o ID devolvido para agendar (teste=%s)",
+    async (teste) => {
+      retornoRpc = { ok: true, paciente_id: "homonimo-correto", criado: false };
+      const ctx = contexto(teste);
+      const r = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+        nome: "Ana Silva",
+        data_nascimento: "1990-01-02",
+        telefone: "21900000000",
+      });
+      expect(r).toMatchObject({ ok: true, paciente: { cadastro: "existente" } });
+      expect(rpcs[0]?.args._telefone).toBe("21999990000");
+      expect(ctx.pacienteId).toBe("homonimo-correto");
+      expect(ctx.estado!.patient).toMatchObject({ id: "homonimo-correto", validated: true });
+      expect(escritos.find((e) => e.tabela === "atend_conversas")?.valor.contato_paciente_id).toBe(
+        "homonimo-correto",
+      );
+    },
+  );
   test("homologação não lê nem reutiliza paciente real vinculado por engano", async () => {
     const ctx = contexto(true);
     vincular(ctx);

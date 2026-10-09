@@ -41,17 +41,25 @@ inicio.setUTCHours(17, 0, 0, 0);
 const fim = new Date(inicio.getTime() + 30 * 60_000);
 
 function estruturaModalidadeServico(nome: string, modalidade = "hora_marcada") {
-  return { complementos: [{ chave: atendimentosEstruturados(null, null, undefined, nome)[0]!.chave, modalidade }] };
+  return {
+    complementos: [
+      { chave: atendimentosEstruturados(null, null, undefined, nome)[0]!.chave, modalidade },
+    ],
+  };
 }
 
 mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     async rpc(nome: string, args: Linha) {
-      if (nome !== "nina_resolver_cadastro" || !cadastroResolvido) throw new Error("RPC inesperada");
+      if (nome !== "nina_resolver_cadastro" || !cadastroResolvido)
+        throw new Error("RPC inesperada");
       expect(args._telefone).toBe("55000100391");
       expect(args._nome).toBe("PACIENTE HOMONIMO");
       expect(args._data_nascimento).toBe("1990-01-02");
-      return { data: { ok: true, paciente_id: cadastroResolvido.id, criado: cadastroResolvido.criado }, error: null };
+      return {
+        data: { ok: true, paciente_id: cadastroResolvido.id, criado: cadastroResolvido.criado },
+        error: null,
+      };
     },
     from(tabela: string) {
       if (tabela === "audit_log")
@@ -69,14 +77,22 @@ mock.module("@/integrations/supabase/client.server", () => ({
       let limite: number | null = null;
       const ler = () => {
         if (tabela === "medicos" && falharVinculos) throw new Error("Falha simulada de vínculos");
-        if (tabela === "medico_disponibilidades" && falharEscala) throw new Error("Falha simulada de escala");
-        if (tabela === "agendamentos" && falharAgendaMedico &&
-          (filtros.medico_id as string[] | undefined)?.includes(falharAgendaMedico))
+        if (tabela === "medico_disponibilidades" && falharEscala)
+          throw new Error("Falha simulada de escala");
+        if (
+          tabela === "agendamentos" &&
+          falharAgendaMedico &&
+          (filtros.medico_id as string[] | undefined)?.includes(falharAgendaMedico)
+        )
           throw new Error("Falha simulada de agenda");
         leituras.push({ tabela, filtros: { ...filtros } });
         const linhas = banco[tabela]!.filter((r) => predicados.every((p) => p(r)));
         if (atualizacao) for (const linha of linhas) Object.assign(linha, atualizacao);
-        return faixa ? linhas.slice(faixa[0], faixa[1] + 1) : limite != null ? linhas.slice(0, limite) : linhas;
+        return faixa
+          ? linhas.slice(faixa[0], faixa[1] + 1)
+          : limite != null
+            ? linhas.slice(0, limite)
+            : linhas;
       };
       const q = {
         select: (_: string) => q,
@@ -92,9 +108,11 @@ mock.module("@/integrations/supabase/client.server", () => ({
         },
         ilike: (k: string, v: string) => {
           filtros[k] = v;
-          const partes = v.split("%").map(s => s.replace(/\\([%_\\])/g, "$1").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+          const partes = v
+            .split("%")
+            .map((s) => s.replace(/\\([%_\\])/g, "$1").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
           const re = new RegExp(`^${partes.join(".*")}$`, "i");
-          predicados.push(r => re.test(String(r[k] ?? "")));
+          predicados.push((r) => re.test(String(r[k] ?? "")));
           return q;
         },
         neq: (k: string, v: unknown) => {
@@ -111,16 +129,33 @@ mock.module("@/integrations/supabase/client.server", () => ({
           return q;
         },
         or: () => q,
-        is: (k: string, v: unknown) => { predicados.push(r => (r[k] ?? null) === v); return q; },
-        lt: (k: string, v: unknown) => { predicados.push(r => String(r[k]) < String(v)); return q; },
-        gte: (k: string, v: unknown) => { predicados.push((r) => String(r[k]) >= String(v)); return q; },
-        lte: (k: string, v: unknown) => { predicados.push((r) => String(r[k]) <= String(v)); return q; },
+        is: (k: string, v: unknown) => {
+          predicados.push((r) => (r[k] ?? null) === v);
+          return q;
+        },
+        lt: (k: string, v: unknown) => {
+          predicados.push((r) => String(r[k]) < String(v));
+          return q;
+        },
+        gte: (k: string, v: unknown) => {
+          predicados.push((r) => String(r[k]) >= String(v));
+          return q;
+        },
+        lte: (k: string, v: unknown) => {
+          predicados.push((r) => String(r[k]) <= String(v));
+          return q;
+        },
         order: () => q,
         range: (a: number, b: number) => {
-          if (falharLeituraFicha && tabela === "agendamentos") throw new Error("Falha simulada ao ler ficha");
-          faixa = [a, b]; return q;
+          if (falharLeituraFicha && tabela === "agendamentos")
+            throw new Error("Falha simulada ao ler ficha");
+          faixa = [a, b];
+          return q;
         },
-        limit: (n: number) => { limite = n; return q; },
+        limit: (n: number) => {
+          limite = n;
+          return q;
+        },
         maybeSingle: async () => ({ data: ler()[0] ?? null, error: null }),
         then: (resolve: (r: { data: Linha[]; error: null }) => unknown) =>
           Promise.resolve(resolve({ data: ler(), error: null })),
@@ -155,7 +190,8 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
 }));
 
 mock.module("../fonte-operacional.server", () => fonteOperacionalDoBanco(() => banco as never));
-const { executarFerramentaPaciente, consultarDisponibilidadeCore } = await import("../paciente-tools.server");
+const { executarFerramentaPaciente, consultarDisponibilidadeCore } =
+  await import("../paciente-tools.server");
 
 function contexto(mensagemAtual: string, respostaAnterior?: string) {
   const estado = estadoVazio();
@@ -186,8 +222,11 @@ describe("restrição explícita de atendimento humano, sem deduzir pelo nome", 
       banco.profissionais![0]!.nome = " SFP ";
       banco.profissionais![0]!.medico_id = MEDICO;
       banco.profissionais![0]!.estrutura = { encaminhamento_humano: true };
-      const ctx = { ...contextoAgendar(true), teste,
-        origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
+      const ctx = {
+        ...contextoAgendar(true),
+        teste,
+        origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"],
+      };
       const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
       expect(r.erro).toBe("CATALOGO_ATENDIMENTO_HUMANO");
       expect(r.motivo_transferencia).toContain("PROFISSIONAL_SFP");
@@ -195,14 +234,30 @@ describe("restrição explícita de atendimento humano, sem deduzir pelo nome", 
       expect(gravacoes).toHaveLength(0);
     });
     test(`${teste ? "homologação" : "real"}: serviço restrito impede coleta automática após o aceite`, async () => {
-      banco.servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO",
-        nome: "Consulta Cardiologia", executantes: [{ nome: "sfp" }], estrutura: { encaminhamento_humano: true } });
-      const ctx = { ...contextoAgendar(true), teste,
-        origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"] };
+      banco.servicos!.push({
+        id: CATALOGO,
+        clinica_id: CLINICA,
+        status: "PUBLICADO",
+        nome: "Consulta Cardiologia",
+        executantes: [{ nome: "sfp" }],
+        estrutura: { encaminhamento_humano: true },
+      });
+      const ctx = {
+        ...contextoAgendar(true),
+        teste,
+        origem: (teste ? "homologacao" : "whatsapp") as CtxNinaPaciente["origem"],
+      };
       const motivos: string[] = [];
-      const r = await aplicarGateIdentificacao({ mensagem: "Sim", estado: ctx.estado, ctx,
+      const r = await aplicarGateIdentificacao({
+        mensagem: "Sim",
+        estado: ctx.estado,
+        ctx,
         executar: executarFerramentaPaciente,
-        encaminharVagaIndisponivel: async motivo => { motivos.push(motivo); return true; } });
+        encaminharVagaIndisponivel: async (motivo) => {
+          motivos.push(motivo);
+          return true;
+        },
+      });
       expect(r?.texto).toBe("A equipe continuará seu atendimento.");
       expect(r?.fatosConfirmados).toContain("handoff_confirmado");
       expect(motivos).toHaveLength(1);
@@ -217,7 +272,8 @@ describe("restrição explícita de atendimento humano, sem deduzir pelo nome", 
   test("SFP arquivado ou de outra clínica não bloqueia o médico publicado atual", async () => {
     banco.profissionais!.push(
       { id: "externo", clinica_id: OUTRO, status: "PUBLICADO", nome: "SFP", medico_id: MEDICO },
-      { id: "antigo", clinica_id: CLINICA, status: "ARQUIVADO", nome: "SFP", medico_id: MEDICO });
+      { id: "antigo", clinica_id: CLINICA, status: "ARQUIVADO", nome: "SFP", medico_id: MEDICO },
+    );
     const r = await executarFerramentaPaciente(contextoAgendar(true), "agendar", argumentosAgendar);
     expect(r.ok).toBe(true);
     expect(gravacoes).toHaveLength(1);
@@ -333,34 +389,83 @@ beforeEach(() => {
 
 function vincularProcedimentoTeste(servico: Linha) {
   servico.procedimento_id = "procedimento-operacional";
-  banco.procedimentos = [{ id: "procedimento-operacional", clinica_id: CLINICA, ativo: true, tipo: "exame", nome: "Nome operacional diferente" }];
-  banco.medico_agenda_procedimentos = [{ clinica_id: CLINICA, procedimento_id: "procedimento-operacional", agenda_id: "agenda-exame" }];
-  banco.medico_agendas = [{ id: "agenda-exame", clinica_id: CLINICA, medico_id: MEDICO, ativo: true, ordem_chegada: false }];
+  banco.procedimentos = [
+    {
+      id: "procedimento-operacional",
+      clinica_id: CLINICA,
+      ativo: true,
+      tipo: "exame",
+      nome: "Nome operacional diferente",
+    },
+  ];
+  banco.medico_agenda_procedimentos = [
+    { clinica_id: CLINICA, procedimento_id: "procedimento-operacional", agenda_id: "agenda-exame" },
+  ];
+  banco.medico_agendas = [
+    {
+      id: "agenda-exame",
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      ativo: true,
+      ordem_chegada: false,
+    },
+  ];
   banco.agendamentos![0]!.agenda_id = "agenda-exame";
 }
 
 describe("procedimentos do Lead 01 não viram consultas", () => {
   async function iniciar(nome = "Bioimpedância", medico = "Mariana Portugal") {
     banco.medicos![0]!.nome = medico;
-    Object.assign(banco.profissionais![0]!, { nome: medico, tipo_atendimento: "Ordem de chegada",
-      especialidades: [{ nome: "Nutrição" }] });
-    const servico = { id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome,
-      executantes: [{ nome: medico }], estrutura: estruturaModalidadeServico(nome),
-      valor: 100, formas_pagamento: [], descricao_publica: null, valor_observacao: null, preparo: null, restricoes: null };
+    Object.assign(banco.profissionais![0]!, {
+      nome: medico,
+      tipo_atendimento: "Ordem de chegada",
+      especialidades: [{ nome: "Nutrição" }],
+    });
+    const servico = {
+      id: PACIENTE,
+      clinica_id: CLINICA,
+      status: "PUBLICADO",
+      nome,
+      executantes: [{ nome: medico }],
+      estrutura: estruturaModalidadeServico(nome),
+      valor: 100,
+      formas_pagamento: [],
+      descricao_publica: null,
+      valor_observacao: null,
+      preparo: null,
+      restricoes: null,
+    };
     vincularProcedimentoTeste(servico);
     banco.servicos!.push(servico);
-    resultadoCatalogo = { ...resultadoCatalogo, tipo_atendimento: "exame_procedimento", procedure: nome,
-      records: [servicoParaRegistro(servico as ServicoPublicado)], doctors: [medico] };
-    const ctx: CtxNinaPaciente = { ...contexto(`Quero ${nome}`), podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+    resultadoCatalogo = {
+      ...resultadoCatalogo,
+      tipo_atendimento: "exame_procedimento",
+      procedure: nome,
+      records: [servicoParaRegistro(servico as ServicoPublicado)],
+      doctors: [medico],
+    };
+    const ctx: CtxNinaPaciente = {
+      ...contexto(`Quero ${nome}`),
+      podeAgendar: true,
+      pacienteId: PACIENTE,
+      pacienteNome: "Paciente Fictício",
+    };
     Object.assign(ctx.estado!.patient, { id: PACIENTE, identified: true, validated: true });
-    await executarFerramentaPaciente(ctx, "consultar_cadastro", { termo: nome, tipo_atendimento: "exame_procedimento" });
+    await executarFerramentaPaciente(ctx, "consultar_cadastro", {
+      termo: nome,
+      tipo_atendimento: "exame_procedimento",
+    });
     return { ctx, servico };
   }
   async function escolher(ctx: CtxNinaPaciente) {
     const vagas = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(vagas.ok, JSON.stringify(vagas)).toBe(true);
     ctx.consultaAgenda!.mensagemAtual = "14:00";
-    const selecionada = await executarFerramentaPaciente(ctx, "selecionar_horario", argumentosAgendar);
+    const selecionada = await executarFerramentaPaciente(
+      ctx,
+      "selecionar_horario",
+      argumentosAgendar,
+    );
     expect(selecionada.ok, JSON.stringify(selecionada)).toBe(true);
     return selecionada;
   }
@@ -374,60 +479,110 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
   });
   test("recurso genérico permanece no retorno para interpretação pelo prompt", async () => {
     const { ctx } = await iniciar("PREVENTIVO", "Enfermagem");
-    const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Carlos Alberto Varillas" });
+    const r = await executarFerramentaPaciente(ctx, "buscar_medicos", {
+      nome: "Carlos Alberto Varillas",
+    });
     expect(r.ok).toBe(true);
     expect(JSON.stringify(r)).toContain("Enfermagem");
     expect(ctx.esclarecimentoCatalogo).toBeUndefined();
     expect(JSON.stringify(r)).not.toContain("Qual destes profissionais");
     expect(gravacoes).toHaveLength(0);
   });
-  test.each([true, false])("sessão 670 (%s): pesquisas de sangue não apagam vaga/aceite nem trocam médica", async teste => {
-    const { ctx } = await iniciar("USG ABDOMINAL TOTAL", "Isis Serrano Duarte");
-    ctx.teste = teste; ctx.origem = teste ? "homologacao" : "whatsapp";
-    const selecionada = await escolher(ctx);
-    const antes = JSON.stringify(ctx.estado!.appointment);
-    resultadoCatalogo = { ...resultadoCatalogo, procedure: "TSH", records: [{
-      id: CATALOGO, tipo: "servico", procedimento: "TSH", medico: "LABORATORIO",
-    }], doctors: ["LABORATORIO"] };
-    // Inclusive consultas repetidas e restauração do estado entre mensagens.
-    for (const termo of ["HEMOGRAMA COMPLETO", "TSH", "TSH"]) {
-      await executarFerramentaPaciente(ctx, "consultar_cadastro", { termo, tipo_atendimento: "exame_procedimento", nova_solicitacao: true });
-      ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
-      expect(JSON.stringify(ctx.estado!.appointment)).toBe(antes);
-    }
-    const medica = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Isis Serrano Duarte" });
-    expect(medica).toMatchObject({ ok: true, procedure: "USG ABDOMINAL TOTAL" });
-    expect(ctx.esclarecimentoCatalogo).toBeUndefined();
-    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{role:"assistant",content:String(selecionada.resumo_confirmacao)}])).toBe(true);
-    const r = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "USG ABDOMINAL TOTAL" });
-    expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
-    expect(gravacoes).toHaveLength(1);
-    expect(gravacoes[0]!.procedimento).toBe("USG ABDOMINAL TOTAL");
-    expect(gravacoes[0]!.medico_id).toBe(MEDICO);
-  });
-  test.each([true, false])("cadastro %s: identificação e reserva usam o mesmo ID do Clínica OS", async criado => {
-    const { ctx } = await iniciar();
-    const escolha = await escolher(ctx);
-    ctx.pacienteId = null;
-    ctx.pacienteNome = null;
-    Object.assign(ctx.estado!.patient, { id: null, identified: false, validated: false });
-    ctx.telefone = "55000100391";
-    cadastroResolvido = { id: "77777777-7777-4777-8777-777777777777", criado };
-    const cadastro = await executarFerramentaPaciente(ctx, "identificar_paciente", {
-      nome: "Paciente Homonimo", data_nascimento: "02/01/1990", telefone: "21911112222",
-    });
-    expect(cadastro).toMatchObject({ ok: true, paciente: { cadastro: criado ? "novo" : "existente" } });
-    expect(gravacoes).toHaveLength(0);
-    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(escolha.resumo_confirmacao) }])).toBe(false);
-    expect(cadastro.resumo_confirmacao).toContain("PACIENTE HOMONIMO");
-    expect(cadastro.resumo_confirmacao).toContain("02/01/1990");
-    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(cadastro.resumo_confirmacao) }])).toBe(true);
-    const r = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
-    expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
-    expect(gravacoes).toHaveLength(1);
-    expect(gravacoes[0]!.paciente_id).toBe(cadastroResolvido.id);
-    expect(banco.agendamentos!.find(row => row.id === AGENDAMENTO)?.paciente_id).toBe(cadastroResolvido.id);
-  });
+  test.each([true, false])(
+    "sessão 670 (%s): pesquisas de sangue não apagam vaga/aceite nem trocam médica",
+    async (teste) => {
+      const { ctx } = await iniciar("USG ABDOMINAL TOTAL", "Isis Serrano Duarte");
+      ctx.teste = teste;
+      ctx.origem = teste ? "homologacao" : "whatsapp";
+      const selecionada = await escolher(ctx);
+      const antes = JSON.stringify(ctx.estado!.appointment);
+      resultadoCatalogo = {
+        ...resultadoCatalogo,
+        procedure: "TSH",
+        records: [
+          {
+            id: CATALOGO,
+            tipo: "servico",
+            procedimento: "TSH",
+            medico: "LABORATORIO",
+          },
+        ],
+        doctors: ["LABORATORIO"],
+      };
+      // Inclusive consultas repetidas e restauração do estado entre mensagens.
+      for (const termo of ["HEMOGRAMA COMPLETO", "TSH", "TSH"]) {
+        await executarFerramentaPaciente(ctx, "consultar_cadastro", {
+          termo,
+          tipo_atendimento: "exame_procedimento",
+          nova_solicitacao: true,
+        });
+        ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
+        expect(JSON.stringify(ctx.estado!.appointment)).toBe(antes);
+      }
+      const medica = await executarFerramentaPaciente(ctx, "buscar_medicos", {
+        nome: "Isis Serrano Duarte",
+      });
+      expect(medica).toMatchObject({ ok: true, procedure: "USG ABDOMINAL TOTAL" });
+      expect(ctx.esclarecimentoCatalogo).toBeUndefined();
+      expect(
+        aceitarResumoEntregue(ctx.estado!, CLINICA, [
+          { role: "assistant", content: String(selecionada.resumo_confirmacao) },
+        ]),
+      ).toBe(true);
+      const r = await executarFerramentaPaciente(ctx, "agendar", {
+        ...argumentosAgendar,
+        procedimento: "USG ABDOMINAL TOTAL",
+      });
+      expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
+      expect(gravacoes).toHaveLength(1);
+      expect(gravacoes[0]!.procedimento).toBe("USG ABDOMINAL TOTAL");
+      expect(gravacoes[0]!.medico_id).toBe(MEDICO);
+    },
+  );
+  test.each([true, false])(
+    "cadastro %s: identificação e reserva usam o mesmo ID do Clínica OS",
+    async (criado) => {
+      const { ctx } = await iniciar();
+      const escolha = await escolher(ctx);
+      ctx.pacienteId = null;
+      ctx.pacienteNome = null;
+      Object.assign(ctx.estado!.patient, { id: null, identified: false, validated: false });
+      ctx.telefone = "55000100391";
+      cadastroResolvido = { id: "77777777-7777-4777-8777-777777777777", criado };
+      const cadastro = await executarFerramentaPaciente(ctx, "identificar_paciente", {
+        nome: "Paciente Homonimo",
+        data_nascimento: "02/01/1990",
+        telefone: "21911112222",
+      });
+      expect(cadastro).toMatchObject({
+        ok: true,
+        paciente: { cadastro: criado ? "novo" : "existente" },
+      });
+      expect(gravacoes).toHaveLength(0);
+      expect(
+        aceitarResumoEntregue(ctx.estado!, CLINICA, [
+          { role: "assistant", content: String(escolha.resumo_confirmacao) },
+        ]),
+      ).toBe(false);
+      expect(cadastro.resumo_confirmacao).toContain("PACIENTE HOMONIMO");
+      expect(cadastro.resumo_confirmacao).toContain("02/01/1990");
+      expect(
+        aceitarResumoEntregue(ctx.estado!, CLINICA, [
+          { role: "assistant", content: String(cadastro.resumo_confirmacao) },
+        ]),
+      ).toBe(true);
+      const r = await executarFerramentaPaciente(ctx, "agendar", {
+        ...argumentosAgendar,
+        procedimento: "Bioimpedância",
+      });
+      expect(r).toMatchObject({ ok: true, verificado_no_banco: true });
+      expect(gravacoes).toHaveLength(1);
+      expect(gravacoes[0]!.paciente_id).toBe(cadastroResolvido.id);
+      expect(banco.agendamentos!.find((row) => row.id === AGENDAMENTO)?.paciente_id).toBe(
+        cadastroResolvido.id,
+      );
+    },
+  );
   test.each([
     ["Aplicação de varizes", "André Luis", "Angiologia"],
     ["Curva tensional", "João Hélio", "Oftalmologia"],
@@ -438,38 +593,75 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
   ])("%s: preserva fonte, executante, resumo e gravação", async (nome, medico, especialidade) => {
     const { ctx } = await iniciar(nome, medico);
     const quantidadeBuscas = pesquisas.length;
-    const auxiliar = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: medico, especialidade });
-    expect(auxiliar).toMatchObject({ ok: true, tipo_atendimento: "exame_procedimento", procedure: nome,
-      pedido_interpretado: { atendimento: nome }, vinculos_agenda: [{ catalogo_id: PACIENTE, medico_id: MEDICO }] });
+    const auxiliar = await executarFerramentaPaciente(ctx, "buscar_medicos", {
+      nome: medico,
+      especialidade,
+    });
+    expect(auxiliar).toMatchObject({
+      ok: true,
+      tipo_atendimento: "exame_procedimento",
+      procedure: nome,
+      pedido_interpretado: { atendimento: nome },
+      vinculos_agenda: [{ catalogo_id: PACIENTE, medico_id: MEDICO }],
+    });
     expect(pesquisas).toHaveLength(quantidadeBuscas); // não pesquisa uma consulta para resolver o executante
     // Uma pesquisa auxiliar posterior não pode substituir a identidade do pedido.
-    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+    ctx.estado!.knowledge_context = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: ctx.estado!.session_id!,
       consulta: { termo: especialidade, tipo_atendimento: "consulta" },
-      referencias: [{ registro: CATALOGO, versao: null, procedimento: `Consulta ${especialidade}`, medicoNome: medico }] };
+      referencias: [
+        {
+          registro: CATALOGO,
+          versao: null,
+          procedimento: `Consulta ${especialidade}`,
+          medicoNome: medico,
+        },
+      ],
+    };
     ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
     const selecionada = await escolher(ctx);
     expect(selecionada.resumo_confirmacao).toContain(nome);
     expect(selecionada.resumo_confirmacao).not.toContain(`Consulta ${especialidade}`);
-    expect(ctx.estado!.appointment.confirmation!.vaga).toMatchObject({ procedimento: nome, catalogo_id: PACIENTE,
-      tipo_atendimento: "exame_procedimento", modalidade: "hora_marcada" });
+    expect(ctx.estado!.appointment.confirmation!.vaga).toMatchObject({
+      procedimento: nome,
+      catalogo_id: PACIENTE,
+      tipo_atendimento: "exame_procedimento",
+      modalidade: "hora_marcada",
+    });
     expect(gravacoes).toHaveLength(0);
-    expect(aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(selecionada.resumo_confirmacao) }])).toBe(true);
-    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: nome });
-    expect(gravado).toMatchObject({ ok: true, verificado_no_banco: true, agendamento: { procedimento: nome } });
+    expect(
+      aceitarResumoEntregue(ctx.estado!, CLINICA, [
+        { role: "assistant", content: String(selecionada.resumo_confirmacao) },
+      ]),
+    ).toBe(true);
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: nome,
+    });
+    expect(gravado).toMatchObject({
+      ok: true,
+      verificado_no_banco: true,
+      agendamento: { procedimento: nome },
+    });
     expect(gravacoes).toHaveLength(1);
     expect(gravacoes[0]!.procedimento).toBe(nome);
-    expect(banco.agendamentos!.find(r => r.id === AGENDAMENTO)?.procedimento).toBe(nome);
+    expect(banco.agendamentos!.find((r) => r.id === AGENDAMENTO)?.procedimento).toBe(nome);
   });
-  test.each(["arquivado", "outra_clinica", "executante_removido"])("vínculo %s impede oferecer consulta substituta", async modo => {
-    const { ctx, servico } = await iniciar();
-    if (modo === "arquivado") servico.status = "ARQUIVADO";
-    else if (modo === "outra_clinica") servico.clinica_id = OUTRO;
-    else servico.executantes = [];
-    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-    expect(r).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
-    expect(gravacoes).toHaveLength(0);
-    expect(consultasAgenda()).toHaveLength(0);
-  });
+  test.each(["arquivado", "outra_clinica", "executante_removido"])(
+    "vínculo %s impede oferecer consulta substituta",
+    async (modo) => {
+      const { ctx, servico } = await iniciar();
+      if (modo === "arquivado") servico.status = "ARQUIVADO";
+      else if (modo === "outra_clinica") servico.clinica_id = OUTRO;
+      else servico.executantes = [];
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
+      expect(gravacoes).toHaveLength(0);
+      expect(consultasAgenda()).toHaveLength(0);
+    },
+  );
   test("modalidade da consulta não supre modalidade ausente no procedimento", async () => {
     const { ctx, servico } = await iniciar();
     servico.estrutura.complementos = [];
@@ -482,14 +674,22 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
   test("consulta diferente não pode ser gravada com o aceite do procedimento", async () => {
     const { ctx } = await iniciar();
     const r = await escolher(ctx);
-    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
-    const errado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Consulta Nutrição" });
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [
+      { role: "assistant", content: String(r.resumo_confirmacao) },
+    ]);
+    const errado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Consulta Nutrição",
+    });
     expect(errado.ok).toBe(false);
     expect(gravacoes).toHaveLength(0);
     // Mesmo adulterando o nome nos dois campos, o pedido original é independente.
     ctx.estado!.appointment.procedure = "Consulta Nutrição";
     ctx.estado!.appointment.confirmation!.vaga.procedimento = "Consulta Nutrição";
-    const adulterado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Consulta Nutrição" });
+    const adulterado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Consulta Nutrição",
+    });
     expect(adulterado).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
     expect(gravacoes).toHaveLength(0);
   });
@@ -510,38 +710,68 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
   test("nome de executante não reconhecido retorna o fato sem perder o serviço", async () => {
     const { ctx } = await iniciar();
     const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Nome inexistente" });
-    expect(r).toMatchObject({ ok: true, tipo_atendimento: "exame_procedimento", procedure: "Bioimpedância",
-      profissional_solicitado_encontrado: false });
+    expect(r).toMatchObject({
+      ok: true,
+      tipo_atendimento: "exame_procedimento",
+      procedure: "Bioimpedância",
+      profissional_solicitado_encontrado: false,
+    });
     expect(r.esclarecimento).toBeUndefined();
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("remoção de executante depois do aceite impede a gravação", async () => {
     const { ctx, servico } = await iniciar();
     const r = await escolher(ctx);
-    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [
+      { role: "assistant", content: String(r.resumo_confirmacao) },
+    ]);
     servico.executantes = [];
-    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Bioimpedância",
+    });
     expect(gravado).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
     expect(gravacoes).toHaveLength(0);
   });
   test("primeiro disponível não troca procedimento ativo por consulta", async () => {
     const { ctx } = await iniciar();
-    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "consulta", atendimento: "Nutrição" });
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+      tipo: "consulta",
+      atendimento: "Nutrição",
+    });
     expect(r).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO" });
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("sigla CVC preserva ID e exclui outra agenda do mesmo executante", async () => {
     const { ctx } = await iniciar("CVC (CAMPO VISUAL COMPUTADORIZADO)");
-    banco.agendamentos!.unshift({ ...banco.agendamentos![0], id: "outra-vaga", agenda_id: "outra-agenda",
-      inicio: new Date(inicio.getTime() - 3600000).toISOString() });
+    banco.agendamentos!.unshift({
+      ...banco.agendamentos![0],
+      id: "outra-vaga",
+      agenda_id: "outra-agenda",
+      inicio: new Date(inicio.getTime() - 3600000).toISOString(),
+    });
     ctx.consultaAgenda!.mensagemAtual = "o primeiro disponível";
-    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "procedimento", atendimento: "CVC" });
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+      tipo: "procedimento",
+      atendimento: "CVC",
+    });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.proxima).toMatchObject({ inicio: inicio.toISOString() });
-    expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ procedimento_id: "procedimento-operacional", agenda_id: "agenda-exame" });
+    expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({
+      procedimento_id: "procedimento-operacional",
+      agenda_id: "agenda-exame",
+    });
     expect(gravacoes).toHaveLength(0);
   });
-  test.each(["sem_id", "outra_clinica", "inativo", "consulta", "sem_agenda", "agenda_inativa", "vinculo_alterado"])("%s é pendência de vínculo, não falta de vagas", async caso => {
+  test.each([
+    "sem_id",
+    "outra_clinica",
+    "inativo",
+    "consulta",
+    "sem_agenda",
+    "agenda_inativa",
+    "vinculo_alterado",
+  ])("%s é pendência de vínculo, não falta de vagas", async (caso) => {
     const { ctx, servico } = await iniciar();
     if (caso === "sem_id") (servico as Linha).procedimento_id = null;
     if (caso === "outra_clinica") banco.procedimentos![0]!.clinica_id = OUTRO;
@@ -549,16 +779,28 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     if (caso === "consulta") banco.procedimentos![0]!.tipo = "consulta";
     if (caso === "sem_agenda") banco.medico_agenda_procedimentos = [];
     if (caso === "agenda_inativa") banco.medico_agendas![0]!.ativo = false;
-    if (caso === "vinculo_alterado") ctx.estado!.appointment.procedimento_solicitado!.procedimento_id = "outro-id";
+    if (caso === "vinculo_alterado")
+      ctx.estado!.appointment.procedimento_solicitado!.procedimento_id = "outro-id";
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-    expect(r).toMatchObject({ ok: false, codigo: "PROCEDIMENTO_AGENDA_NAO_VINCULADO", encaminhar_para_humano: true });
+    expect(r).toMatchObject({
+      ok: false,
+      codigo: "PROCEDIMENTO_AGENDA_NAO_VINCULADO",
+      encaminhar_para_humano: true,
+    });
     expect(gravacoes).toHaveLength(0);
   });
   test("primeiro disponível com executante genérico sem vínculo informa falha da agenda do procedimento", async () => {
     const { ctx, servico } = await iniciar("Mamografia");
     servico.executantes = [{ nome: "Técnica" }];
-    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "procedimento", atendimento: "Mamografia" });
-    expect(r).toMatchObject({ ok: false, codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO", comparacao_completa: false });
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+      tipo: "procedimento",
+      atendimento: "Mamografia",
+    });
+    expect(r).toMatchObject({
+      ok: false,
+      codigo: "ATENDIMENTO_AGENDA_NAO_VINCULADO",
+      comparacao_completa: false,
+    });
     expect(r.erro).not.toBe("DOCTOR_NOT_FOUND");
     expect(gravacoes).toHaveLength(0);
     expect(consultasAgenda()).toHaveLength(0);
@@ -566,28 +808,46 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
   test("alterar o vínculo após o aceite não grava outra identidade", async () => {
     const { ctx, servico } = await iniciar();
     const r = await escolher(ctx);
-    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [
+      { role: "assistant", content: String(r.resumo_confirmacao) },
+    ]);
     (servico as Linha).procedimento_id = "procedimento-substituto";
-    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Bioimpedância",
+    });
     expect(gravado).toMatchObject({ ok: false, codigo: "PROCEDIMENTO_AGENDA_NAO_VINCULADO" });
     expect(gravacoes).toHaveLength(0);
   });
   test("renomear a publicação não quebra o vínculo operacional já selecionado", async () => {
     const { ctx, servico } = await iniciar();
     const r = await escolher(ctx);
-    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [
+      { role: "assistant", content: String(r.resumo_confirmacao) },
+    ]);
     servico.nome = "Bioimpedância corporal";
     servico.estrutura = estruturaModalidadeServico(servico.nome);
-    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
-    expect(gravado).toMatchObject({ ok: true, atendimento: { procedimento_id: "procedimento-operacional" } });
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Bioimpedância",
+    });
+    expect(gravado).toMatchObject({
+      ok: true,
+      atendimento: { procedimento_id: "procedimento-operacional" },
+    });
     expect(gravacoes).toHaveLength(1);
   });
   test("releitura detecta serviço gravado divergente e não anuncia sucesso", async () => {
     const { ctx } = await iniciar();
     const r = await escolher(ctx);
-    aceitarResumoEntregue(ctx.estado!, CLINICA, [{ role: "assistant", content: String(r.resumo_confirmacao) }]);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [
+      { role: "assistant", content: String(r.resumo_confirmacao) },
+    ]);
     procedimentoGravadoDivergente = true;
-    const gravado = await executarFerramentaPaciente(ctx, "agendar", { ...argumentosAgendar, procedimento: "Bioimpedância" });
+    const gravado = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Bioimpedância",
+    });
     expect(gravado).toMatchObject({ ok: false, erro: "APPOINTMENT_UNCERTAIN" });
     expect(ctx.estado!.appointment.appointment_id).toBeNull();
   });
@@ -596,7 +856,9 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
 describe("pesquisa com atendimento e objetivos separados", () => {
   test("encaminha a categoria de exame até a busca, mesmo quando há intenção de agendar", async () => {
     const r = await executarFerramentaPaciente(contexto("Quero marcar ECG"), "consultar_cadastro", {
-      termo: "ECG", tipo_atendimento: "exame_procedimento", objetivos: ["agendamento"],
+      termo: "ECG",
+      tipo_atendimento: "exame_procedimento",
+      objetivos: ["agendamento"],
     });
     expect(r.ok).toBe(true);
     expect(pesquisas[0]).toMatchObject({ query: "ECG", tipo_atendimento: "exame_procedimento" });
@@ -612,16 +874,32 @@ describe("pesquisa com atendimento e objetivos separados", () => {
   });
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: valor, horários e médicos não viram termos de busca nem intenção de agendar`, async () => {
-      const ctx = { ...contexto("Qual o valor de cardiologia, quais médicos atendem e em quais dias?"), origem };
+      const ctx = {
+        ...contexto("Qual o valor de cardiologia, quais médicos atendem e em quais dias?"),
+        origem,
+      };
       const objetivos = ["valor", "horarios", "medicos"];
       const r = await executarFerramentaPaciente(ctx, "consultar_cadastro", {
-        termo: "cardiologia", objetivos, tipo_atendimento: "consulta",
+        termo: "cardiologia",
+        objetivos,
+        tipo_atendimento: "consulta",
       });
       expect(r.ok).toBe(true);
-      expect(pesquisas).toEqual([{
-        clinicaId: CLINICA, query: "cardiologia", tipo_atendimento: "consulta", medico: null, dia: null, canal: "whatsapp",
-      }]);
-      expect(r.pedido_interpretado).toEqual({ atendimento: "cardiologia", tipo_atendimento: "consulta", objetivos });
+      expect(pesquisas).toEqual([
+        {
+          clinicaId: CLINICA,
+          query: "cardiologia",
+          tipo_atendimento: "consulta",
+          medico: null,
+          dia: null,
+          canal: "whatsapp",
+        },
+      ]);
+      expect(r.pedido_interpretado).toEqual({
+        atendimento: "cardiologia",
+        tipo_atendimento: "consulta",
+        objetivos,
+      });
       expect(ctx.estado.appointment.intent_confirmed).not.toBe(true);
       expect(consultasAgenda()).toHaveLength(0);
       expect(gravacoes).toHaveLength(0);
@@ -630,59 +908,107 @@ describe("pesquisa com atendimento e objetivos separados", () => {
 });
 
 describe("primeiro disponível entre todos os profissionais publicados", () => {
-  const oferta = "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
+  const oferta =
+    "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
   const pedido = { tipo: "consulta", atendimento: "Cardiologia" };
   const chamar = (mensagem = "o primeiro disponível", args: Record<string, unknown> = pedido) => {
     const ctx = contexto(mensagem, oferta);
-    return { ctx, resultado: executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", args) };
+    return {
+      ctx,
+      resultado: executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", args),
+    };
   };
   beforeEach(() => {
     Object.assign(banco.profissionais![0]!, {
-      especialidades: [{ nome: "Cardiologia" }], atende_consultorio: true,
-      formas_pagamento: [{ forma: "Dinheiro", valor: 120 }, { forma: "Cartão", valor: 145 }],
+      especialidades: [{ nome: "Cardiologia" }],
+      atende_consultorio: true,
+      formas_pagamento: [
+        { forma: "Dinheiro", valor: 120 },
+        { forma: "Cartão", valor: 145 },
+      ],
     });
-    banco.profissionais!.push({ ...banco.profissionais![0],
-      id: AGENDAMENTO, nome: "Maria Teste", medico_id: OUTRO,
-      formas_pagamento: [{ forma: "Dinheiro", valor: 200 }, { forma: "Cartão", valor: 230 }],
-      tipo_atendimento: "Ordem de chegada com pré-agendamento" });
-    banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Maria Teste", ativo: true, especialidade_id: null });
-    banco.agendamentos!.push({ ...banco.agendamentos![0], id: "vaga-b", medico_id: OUTRO,
+    banco.profissionais!.push({
+      ...banco.profissionais![0],
+      id: AGENDAMENTO,
+      nome: "Maria Teste",
+      medico_id: OUTRO,
+      formas_pagamento: [
+        { forma: "Dinheiro", valor: 200 },
+        { forma: "Cartão", valor: 230 },
+      ],
+      tipo_atendimento: "Ordem de chegada com pré-agendamento",
+    });
+    banco.medicos!.push({
+      id: OUTRO,
+      clinica_id: CLINICA,
+      nome: "Maria Teste",
+      ativo: true,
+      especialidade_id: null,
+    });
+    banco.agendamentos!.push({
+      ...banco.agendamentos![0],
+      id: "vaga-b",
+      medico_id: OUTRO,
       inicio: new Date(inicio.getTime() - 60 * 60_000).toISOString(),
-      fim: new Date(fim.getTime() - 60 * 60_000).toISOString() });
+      fim: new Date(fim.getTime() - 60 * 60_000).toISOString(),
+    });
   });
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: compara ambos e devolve a médica mais próxima com seus preços e modalidade`, async () => {
-      const ctx = { ...contexto("o primeiro horário", "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?"), origem, teste: origem === "homologacao" };
+      const ctx = {
+        ...contexto(
+          "o primeiro horário",
+          "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?",
+        ),
+        origem,
+        teste: origem === "homologacao",
+      };
       const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
       expect(r.ok).toBe(true);
-      expect(r.proxima).toMatchObject({ medico_id: OUTRO, medico: "Maria Teste",
-        modalidade_atendimento: "chegada_com_pre_agendamento", registro: { preco_dinheiro: 200, preco_cartao: 230 } });
+      expect(r.proxima).toMatchObject({
+        medico_id: OUTRO,
+        medico: "Maria Teste",
+        modalidade_atendimento: "chegada_com_pre_agendamento",
+        registro: { preco_dinheiro: 200, preco_cartao: 230 },
+      });
       expect((r.proxima as Linha).orientacao).not.toContain("30 minutos");
-      expect(leituras.filter(l => l.tabela === "agendamentos").flatMap(l => l.filtros.medico_id)).toContain(MEDICO);
-      expect(ctx.estado.appointment.slot_options?.vagas[0]).toMatchObject({ medico_id: OUTRO, procedimento: "Consulta — Cardiologia" });
+      expect(
+        leituras.filter((l) => l.tabela === "agendamentos").flatMap((l) => l.filtros.medico_id),
+      ).toContain(MEDICO);
+      expect(ctx.estado.appointment.slot_options?.vagas[0]).toMatchObject({
+        medico_id: OUTRO,
+        procedimento: "Consulta — Cardiologia",
+      });
       expect(ctx.estado.appointment.confirmation).toBeNull();
       expect(ctx.estado.appointment.slot_inicio).toBeNull();
       expect(gravacoes).toHaveLength(0);
     });
   }
   test("um médico sem vagas não impede comparar o outro", async () => {
-    banco.agendamentos = banco.agendamentos!.filter(s => s.medico_id === MEDICO);
+    banco.agendamentos = banco.agendamentos!.filter((s) => s.medico_id === MEDICO);
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO, modalidade_atendimento: "hora_marcada" });
     expect((r.proxima as Linha).orientacao).not.toContain("30 minutos");
-    expect(encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido)).toBeNull();
+    expect(
+      encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido),
+    ).toBeNull();
   });
   test("nenhuma vaga em todas as agendas aciona a regra de encaminhamento", async () => {
     banco.agendamentos = [];
     const r = await chamar().resultado;
     expect(r).toMatchObject({ ok: true, reason: "NO_AVAILABILITY" });
-    expect(encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido)).not.toBeNull();
+    expect(
+      encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido),
+    ).not.toBeNull();
   });
   test("empate mostra ambos e não seleciona silenciosamente", async () => {
-    Object.assign(banco.agendamentos![1]!, { inicio: inicio.toISOString(), fim: fim.toISOString() });
+    Object.assign(banco.agendamentos![1]!, {
+      inicio: inicio.toISOString(),
+      fim: fim.toISOString(),
+    });
     const { ctx, resultado } = chamar();
     const r = await resultado;
-    expect((r.empatados as Linha[])).toHaveLength(1);
+    expect(r.empatados as Linha[]).toHaveLength(1);
     expect(ctx.estado.appointment.slot_options?.vagas).toHaveLength(2);
     expect(ctx.estado.appointment.confirmation).toBeNull();
   });
@@ -694,21 +1020,43 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
   test("mantém todos os candidatos, inclusive além dos seis primeiros do catálogo", async () => {
     for (let i = 0; i < 8; i++) {
       const id = `77777777-7777-4777-8777-${String(i).padStart(12, "0")}`;
-      banco.profissionais!.unshift({ ...banco.profissionais![0], id, nome: `Teste ${i}`, medico_id: id });
+      banco.profissionais!.unshift({
+        ...banco.profissionais![0],
+        id,
+        nome: `Teste ${i}`,
+        medico_id: id,
+      });
       banco.medicos!.push({ id, clinica_id: CLINICA, nome: `Teste ${i}`, ativo: true });
     }
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: OUTRO });
   });
   test("paginação não perde a vaga depois de 800 horários ocupados", async () => {
-    banco.agendamentos = [...Array.from({ length: 805 }, (_, i) => ({ ...banco.agendamentos![0], id: `ocupado-${i}`, paciente_nome: "PACIENTE SIMULADO" })), ...banco.agendamentos!];
+    banco.agendamentos = [
+      ...Array.from({ length: 805 }, (_, i) => ({
+        ...banco.agendamentos![0],
+        id: `ocupado-${i}`,
+        paciente_nome: "PACIENTE SIMULADO",
+      })),
+      ...banco.agendamentos!,
+    ];
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: OUTRO });
   });
   test("não inclui especialidade diferente, rascunho ou outra clínica", async () => {
     banco.profissionais![1]!.especialidades = [{ nome: "Dermatologia" }];
-    banco.profissionais!.push({ ...banco.profissionais![0], id: PACIENTE, medico_id: OUTRO, status: "RASCUNHO" });
-    banco.profissionais!.push({ ...banco.profissionais![0], id: OUTRO, medico_id: OUTRO, clinica_id: OUTRO });
+    banco.profissionais!.push({
+      ...banco.profissionais![0],
+      id: PACIENTE,
+      medico_id: OUTRO,
+      status: "RASCUNHO",
+    });
+    banco.profissionais!.push({
+      ...banco.profissionais![0],
+      id: OUTRO,
+      medico_id: OUTRO,
+      clinica_id: OUTRO,
+    });
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO });
   });
@@ -730,7 +1078,10 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
   test("sem pré-agendamento aparece como comparecimento e não como vaga para reservar", async () => {
     banco.profissionais![1]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
     const r = await chamar().resultado;
-    expect((r.sem_pre_agendamento as Linha[])[0]).toMatchObject({ medico: "Maria Teste", sem_agendamento: true });
+    expect((r.sem_pre_agendamento as Linha[])[0]).toMatchObject({
+      medico: "Maria Teste",
+      sem_agendamento: true,
+    });
     expect((r.sem_pre_agendamento as Linha[])[0]!.orientacao).not.toContain("30 minutos");
     expect(r.proxima).toMatchObject({ medico_id: MEDICO });
   });
@@ -740,8 +1091,10 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(r.proxima).toMatchObject({ modalidade_atendimento: "ficha" });
     expect((r.proxima as Linha).orientacao).not.toContain("30 minutos");
   });
-  test.each(["preciso de quem consiga me atender antes da viagem", "tanto faz a pessoa, quanto antes melhor"])(
-    "decisão contextual do modelo chega à comparação sem filtro literal: %s", async (mensagem) => {
+  test.each([
+    "preciso de quem consiga me atender antes da viagem",
+    "tanto faz a pessoa, quanto antes melhor",
+  ])("decisão contextual do modelo chega à comparação sem filtro literal: %s", async (mensagem) => {
     const { ctx, resultado } = chamar(mensagem);
     const r = await resultado;
     expect(r.ok).toBe(true);
@@ -765,9 +1118,16 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
   });
   test("período é respeitado antes de escolher qual profissional está mais próximo", async () => {
     const data = inicio.toISOString().slice(0, 10);
-    Object.assign(banco.agendamentos![0]!, { inicio: `${data}T09:00:00-03:00`, fim: `${data}T09:30:00-03:00` });
-    Object.assign(banco.agendamentos![1]!, { inicio: `${data}T14:00:00-03:00`, fim: `${data}T14:30:00-03:00` });
-    const r = await chamar("primeiro disponível à tarde", { ...pedido, periodo: "tarde" }).resultado;
+    Object.assign(banco.agendamentos![0]!, {
+      inicio: `${data}T09:00:00-03:00`,
+      fim: `${data}T09:30:00-03:00`,
+    });
+    Object.assign(banco.agendamentos![1]!, {
+      inicio: `${data}T14:00:00-03:00`,
+      fim: `${data}T14:30:00-03:00`,
+    });
+    const r = await chamar("primeiro disponível à tarde", { ...pedido, periodo: "tarde" })
+      .resultado;
     expect(r.horarios).toBeUndefined();
     expect(r.seguintes).toBeUndefined();
     expect(String(r.instrucao)).toContain("não faça outra consulta de disponibilidade");
@@ -775,28 +1135,53 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
   });
   test("busca cobre a janela de 60 dias declarada", async () => {
     const distante = new Date(inicio.getTime() + 40 * 86_400_000).toISOString();
-    banco.agendamentos = [{ ...banco.agendamentos![0], inicio: distante, fim: new Date(Date.parse(distante) + 30 * 60_000).toISOString() }];
+    banco.agendamentos = [
+      {
+        ...banco.agendamentos![0],
+        inicio: distante,
+        fim: new Date(Date.parse(distante) + 30 * 60_000).toISOString(),
+      },
+    ];
     const r = await chamar().resultado;
     expect(r.proxima).toMatchObject({ medico_id: MEDICO, inicio: distante });
   });
   test("procedimento considera somente seus executantes e guarda seu nome", async () => {
-    banco.servicos!.push({ id: PACIENTE, clinica_id: CLINICA, status: "PUBLICADO", nome: "Exame Teste",
+    banco.servicos!.push({
+      id: PACIENTE,
+      clinica_id: CLINICA,
+      status: "PUBLICADO",
+      nome: "Exame Teste",
       estrutura: estruturaModalidadeServico("Exame Teste"),
-      executantes: [{ nome: "Alex Louza" }], formas_pagamento: [{ forma: "Dinheiro", valor: 80 }], valor: 80 });
+      executantes: [{ nome: "Alex Louza" }],
+      formas_pagamento: [{ forma: "Dinheiro", valor: 80 }],
+      valor: 80,
+    });
     vincularProcedimentoTeste(banco.servicos![0]!);
-    const { ctx, resultado } = chamar("primeiro disponível", { tipo: "procedimento", atendimento: "Exame Teste" });
+    const { ctx, resultado } = chamar("primeiro disponível", {
+      tipo: "procedimento",
+      atendimento: "Exame Teste",
+    });
     const r = await resultado;
-    expect(r.proxima).toMatchObject({ medico_id: MEDICO, registro: { procedimento: "Exame Teste", preco_dinheiro: 80 } });
+    expect(r.proxima).toMatchObject({
+      medico_id: MEDICO,
+      registro: { procedimento: "Exame Teste", preco_dinheiro: 80 },
+    });
     expect(ctx.estado.appointment.slot_options?.vagas[0]?.procedimento).toBe("Exame Teste");
   });
   test("atendimento inexistente não consulta agendas de outra especialidade", async () => {
-    const r = await chamar("primeiro disponível", { ...pedido, atendimento: "Otorrinolaringologia" }).resultado;
+    const r = await chamar("primeiro disponível", {
+      ...pedido,
+      atendimento: "Otorrinolaringologia",
+    }).resultado;
     expect(r).toMatchObject({ ok: false, encaminhar_para_humano: true });
     expect(consultasAgenda()).toHaveLength(0);
   });
   test("a comparação não modifica uma vaga já confirmada", async () => {
     const ctx = contextoAgendar(true);
-    ctx.consultaAgenda = { mensagemAtual: "primeiro disponível", historico: [{ role: "assistant", content: oferta }] };
+    ctx.consultaAgenda = {
+      mensagemAtual: "primeiro disponível",
+      historico: [{ role: "assistant", content: oferta }],
+    };
     const confirmacao = JSON.stringify(ctx.estado.appointment.confirmation);
     const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
     expect(r.ok).toBe(true);
@@ -810,100 +1195,205 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
   function preparar(variante: "com" | "sem", origem: "homologacao" | "whatsapp" = "homologacao") {
     Object.assign(banco.profissionais![0]!, {
       especialidades: [{ nome: "GINECOLOGIA" }, { nome: "CLÍNICO GERAL" }],
-      observacao_publica: "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado\n\n" +
+      observacao_publica:
+        "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 172,00\nPix/cartão: R$ 205,00\nObservação: Agendado\n\n" +
         "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nDinheiro: R$ 120,00\nPix/cartão: R$ 145,00\nObservação: Agendado\n\n" +
         "CONSULTA CLÍNICO GERAL\nEspecialidade: CLÍNICO GERAL\nDinheiro: R$ 100,00\nObservação: Agendado",
-      formas_pagamento: [{ forma: "Dinheiro", condicao: "Consulta + Preventivo", valor: 172 },
+      formas_pagamento: [
+        { forma: "Dinheiro", condicao: "Consulta + Preventivo", valor: 172 },
         { forma: "Dinheiro", condicao: "Consulta Ginecologia", valor: 120 },
-        { forma: "Dinheiro", condicao: "Consulta Clínico Geral", valor: 100 }],
+        { forma: "Dinheiro", condicao: "Consulta Clínico Geral", valor: 100 },
+      ],
     });
-    const ctx: CtxNinaPaciente = { ...contexto("Primeira data com Alex Louza"), origem,
-      teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
-    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+    const ctx: CtxNinaPaciente = {
+      ...contexto("Primeira data com Alex Louza"),
+      origem,
+      teste: origem === "homologacao",
+      podeAgendar: true,
+      pacienteId: PACIENTE,
+      pacienteNome: "Paciente Fictício",
+    };
+    ctx.estado!.knowledge_context = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: ctx.estado!.session_id!,
       consulta: { termo: "Ginecologia", tipo_atendimento: "consulta" },
-      referencias: [{ registro: CATALOGO, versao: null, procedimento: "Consulta — GINECOLOGIA", medicoNome: "Alex Louza" }],
-      atendimentoConsulta: { especialidade: "GINECOLOGIA", preventivo: variante } };
+      referencias: [
+        {
+          registro: CATALOGO,
+          versao: null,
+          procedimento: "Consulta — GINECOLOGIA",
+          medicoNome: "Alex Louza",
+        },
+      ],
+      atendimentoConsulta: { especialidade: "GINECOLOGIA", preventivo: variante },
+    };
     return ctx;
   }
-  for (const origem of ["homologacao", "whatsapp"] as const) for (const variante of ["com", "sem"] as const) {
-    test(`${origem}: ${variante} preventivo → vaga → dados → resumo → aceite → agenda → conclusão`, async () => {
-      const ctx = preparar(variante, origem);
-      ctx.estado!.knowledge_context!.consulta.termo = `ginecologia ${variante} preventivo`;
-      const procedimento = variante === "com" ? comPreventivo : "CONSULTA GINECOLOGIA";
-      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-      expect(r.ok).toBe(true);
-      expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(procedimento);
-      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-      ctx.opcoesAgendamentoInicioTurno = true;
-      ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
-      const dados = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
-      expect(dados?.camposPendentes).toContain("nome");
-      ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000", historico: [{ role: "assistant", content: dados!.texto }] };
-      const executar: typeof executarFerramentaPaciente = async (c, nome, args) =>
-        nome === "consultar_cadastro_paciente" ? { ok: true, campos_faltantes: [] }
-          : nome === "identificar_paciente" ? { ok: true } : executarFerramentaPaciente(c, nome, args);
-      const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
-      expect(resumo?.texto).toContain(procedimento);
-      expect(gravacoes).toHaveLength(0);
-      ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-      ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo.", historico: [{ role: "assistant", content: resumo!.texto }] };
-      const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
-      expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
-      expect(confirmado?.texto).toContain(procedimento);
-      expect(gravacoes).toHaveLength(1);
-      expect(banco.agendamentos![0]!.procedimento).toBe(procedimento);
-      expect(gravacoes[0]!.forma_pagamento_prevista).toBeNull();
-    });
-  }
+  for (const origem of ["homologacao", "whatsapp"] as const)
+    for (const variante of ["com", "sem"] as const) {
+      test(`${origem}: ${variante} preventivo → vaga → dados → resumo → aceite → agenda → conclusão`, async () => {
+        const ctx = preparar(variante, origem);
+        ctx.estado!.knowledge_context!.consulta.termo = `ginecologia ${variante} preventivo`;
+        const procedimento = variante === "com" ? comPreventivo : "CONSULTA GINECOLOGIA";
+        const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+        expect(r.ok).toBe(true);
+        expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(procedimento);
+        ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+        ctx.opcoesAgendamentoInicioTurno = true;
+        ctx.consultaAgenda = {
+          mensagemAtual: "Escolho 14:00",
+          historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }],
+        };
+        const dados = await aplicarGateIdentificacao({
+          mensagem: "Escolho 14:00",
+          estado: ctx.estado!,
+          ctx,
+          executar: executarFerramentaPaciente,
+        });
+        expect(dados?.camposPendentes).toContain("nome");
+        ctx.consultaAgenda = {
+          mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
+          historico: [{ role: "assistant", content: dados!.texto }],
+        };
+        const executar: typeof executarFerramentaPaciente = async (c, nome, args) =>
+          nome === "consultar_cadastro_paciente"
+            ? { ok: true, campos_faltantes: [] }
+            : nome === "identificar_paciente"
+              ? { ok: true }
+              : executarFerramentaPaciente(c, nome, args);
+        const resumo = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar,
+        });
+        expect(resumo?.texto).toContain(procedimento);
+        expect(gravacoes).toHaveLength(0);
+        ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
+        ctx.consultaAgenda = {
+          mensagemAtual: "Sim, confirmo.",
+          historico: [{ role: "assistant", content: resumo!.texto }],
+        };
+        const confirmado = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar,
+        });
+        expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
+        expect(confirmado?.texto).toContain(procedimento);
+        expect(gravacoes).toHaveLength(1);
+        expect(banco.agendamentos![0]!.procedimento).toBe(procedimento);
+        expect(gravacoes[0]!.forma_pagamento_prevista).toBeNull();
+      });
+    }
   test("primeiro disponível revalida a variante e mantém somente seus preços e condições", async () => {
     preparar("com");
     const { candidatosPrimeiraVaga } = await import("../primeiro-disponivel-catalogo.server");
-    const candidatos = await candidatosPrimeiraVaga(CLINICA, "consulta", "Ginecologia", { especialidade: "GINECOLOGIA", preventivo: "com" });
+    const candidatos = await candidatosPrimeiraVaga(CLINICA, "consulta", "Ginecologia", {
+      especialidade: "GINECOLOGIA",
+      preventivo: "com",
+    });
     expect(candidatos).toHaveLength(1);
-    expect(candidatos[0]!.registro).toMatchObject({ procedimento: comPreventivo, preco_dinheiro: "R$ 172,00", preco_cartao: "R$ 205,00" });
+    expect(candidatos[0]!.registro).toMatchObject({
+      procedimento: comPreventivo,
+      preco_dinheiro: "R$ 172,00",
+      preco_cartao: "R$ 205,00",
+    });
     expect(candidatos[0]!.registro.observacoes).not.toContain("120,00");
     expect(candidatos[0]!.registro.observacoes).not.toContain("CLÍNICO GERAL");
     const ctx = preparar("sem");
-    expect((await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "consulta", atendimento: "Ginecologia" })).ok).toBe(true);
-    expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe("CONSULTA GINECOLOGIA");
+    expect(
+      (
+        await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+          tipo: "consulta",
+          atendimento: "Ginecologia",
+        })
+      ).ok,
+    ).toBe(true);
+    expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(
+      "CONSULTA GINECOLOGIA",
+    );
   });
-  test.each(["ginecologia preventivo", "consulta com preventivo", "consulta + preventivo"])("%s vincula o título composto sem depender de uma busca genérica anterior", async termo => {
-    const ctx = preparar("com");
-    ctx.estado!.knowledge_context!.consulta.termo = termo;
-    delete ctx.estado!.knowledge_context!.atendimentoConsulta;
-    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "consulta", atendimento: termo });
-    expect(r.ok).toBe(true);
-    expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(comPreventivo);
-  });
+  test.each(["ginecologia preventivo", "consulta com preventivo", "consulta + preventivo"])(
+    "%s vincula o título composto sem depender de uma busca genérica anterior",
+    async (termo) => {
+      const ctx = preparar("com");
+      ctx.estado!.knowledge_context!.consulta.termo = termo;
+      delete ctx.estado!.knowledge_context!.atendimentoConsulta;
+      const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+        tipo: "consulta",
+        atendimento: termo,
+      });
+      expect(r.ok).toBe(true);
+      expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(comPreventivo);
+    },
+  );
   test("busca auxiliar de preventivo não transforma o pacote em exame isolado", async () => {
     const ctx = preparar("com");
-    ctx.consultaAgenda = { mensagemAtual: "Quero consulta com preventivo junto. Primeira manhã com Alex Louza.", historico: [] };
+    ctx.consultaAgenda = {
+      mensagemAtual: "Quero consulta com preventivo junto. Primeira manhã com Alex Louza.",
+      historico: [],
+    };
     ctx.estado!.knowledge_context!.consulta.medico = "Alex Louza";
-    const inicial = await executarFerramentaPaciente(ctx, "consultar_cadastro", { termo: "ginecologia", tipo_atendimento: "consulta", medico: "Alex Louza" });
-    expect(inicial.pedido_interpretado).toMatchObject({ atendimento: "consulta com preventivo", tipo_atendimento: "consulta" });
-    const auxiliar = await executarFerramentaPaciente(ctx, "buscar_procedimentos", { termo: "preventivo", nova_solicitacao: false });
+    const inicial = await executarFerramentaPaciente(ctx, "consultar_cadastro", {
+      termo: "ginecologia",
+      tipo_atendimento: "consulta",
+      medico: "Alex Louza",
+    });
+    expect(inicial.pedido_interpretado).toMatchObject({
+      atendimento: "consulta com preventivo",
+      tipo_atendimento: "consulta",
+    });
+    const auxiliar = await executarFerramentaPaciente(ctx, "buscar_procedimentos", {
+      termo: "preventivo",
+      nova_solicitacao: false,
+    });
     expect(auxiliar.ok).toBe(true);
-    expect(auxiliar.pedido_interpretado).toMatchObject({ atendimento: "consulta com preventivo", tipo_atendimento: "consulta" });
+    expect(auxiliar.pedido_interpretado).toMatchObject({
+      atendimento: "consulta com preventivo",
+      tipo_atendimento: "consulta",
+    });
     expect(ctx.estado!.appointment.procedimento_solicitado).toBeFalsy();
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(
+      true,
+    );
     expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(comPreventivo);
     expect(gravacoes).toHaveLength(0);
   });
   test("trocar de médico não autoriza trocar o atendimento", async () => {
     const ctx = preparar("com");
-    banco.profissionais![0]!.observacao_publica = "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
+    banco.profissionais![0]!.observacao_publica =
+      "CONSULTA GINECOLOGIA\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
     // O atendimento ausente agora é bloqueado antes da consulta de vagas:
     // não se usa a modalidade da variante sem preventivo.
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
+    expect(
+      (await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro,
+    ).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(gravacoes).toHaveLength(0);
   });
   test("esclarecimento do paciente remove seleção antiga do preventivo isolado", async () => {
     const ctx = preparar("com");
-    ctx.consultaAgenda = { mensagemAtual: "Eu quero a consulta de ginecologia COM preventivo, não só o exame.", historico: [] };
-    ctx.estado!.appointment.procedimento_solicitado = { clinica_id: CLINICA,
-      session_id: ctx.estado!.session_id!, catalogo_id: "exame-isolado", nome: "PREVENTIVO", tipo_atendimento: "exame_procedimento" };
-    const r = await executarFerramentaPaciente(ctx, "buscar_procedimentos", { termo: "preventivo", nova_solicitacao: false });
-    expect(r.pedido_interpretado).toMatchObject({ tipo_atendimento: "consulta", atendimento: "consulta com preventivo" });
+    ctx.consultaAgenda = {
+      mensagemAtual: "Eu quero a consulta de ginecologia COM preventivo, não só o exame.",
+      historico: [],
+    };
+    ctx.estado!.appointment.procedimento_solicitado = {
+      clinica_id: CLINICA,
+      session_id: ctx.estado!.session_id!,
+      catalogo_id: "exame-isolado",
+      nome: "PREVENTIVO",
+      tipo_atendimento: "exame_procedimento",
+    };
+    const r = await executarFerramentaPaciente(ctx, "buscar_procedimentos", {
+      termo: "preventivo",
+      nova_solicitacao: false,
+    });
+    expect(r.pedido_interpretado).toMatchObject({
+      tipo_atendimento: "consulta",
+      atendimento: "consulta com preventivo",
+    });
     expect(ctx.estado!.appointment.procedimento_solicitado).toBeNull();
     expect(gravacoes).toHaveLength(0);
   });
@@ -917,82 +1407,168 @@ describe("consulta com preventivo conserva o atendimento publicado", () => {
   test("médico com uma única consulta publicada conserva o preventivo mesmo após pesquisa genérica", async () => {
     const ctx = preparar("com");
     delete ctx.estado!.knowledge_context!.atendimentoConsulta;
-    banco.profissionais![0]!.observacao_publica = "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
+    banco.profissionais![0]!.observacao_publica =
+      "CONSULTA + PREVENTIVO\nEspecialidade: GINECOLOGIA\nObservação: Agendado";
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(
+      true,
+    );
     expect(ctx.estado!.appointment.procedure).toBe(comPreventivo);
   });
   test("duas variantes não são reduzidas à mesma especialidade", async () => {
     const ctx = preparar("com");
     delete ctx.estado!.knowledge_context!.atendimentoConsulta;
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).codigo).toBe("ATENDIMENTO_CONSULTA_PENDENTE");
+    expect(
+      (await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).codigo,
+    ).toBe("ATENDIMENTO_CONSULTA_PENDENTE");
   });
   test("mudança para sem preventivo invalida o resumo antigo, sem reservar", async () => {
     const ctx = contextoAgendar(true);
     ctx.estado.appointment.procedure = comPreventivo;
     ctx.estado.appointment.confirmation!.vaga.procedimento = comPreventivo;
-    const r = await aplicarGateIdentificacao({ mensagem: "Agora quero sem preventivo", estado: ctx.estado, ctx, executar: executarFerramentaPaciente });
+    const r = await aplicarGateIdentificacao({
+      mensagem: "Agora quero sem preventivo",
+      estado: ctx.estado,
+      ctx,
+      executar: executarFerramentaPaciente,
+    });
     expect(r).toBeNull();
     expect(ctx.estado.appointment.confirmation).toBeNull();
     expect(ctx.estado.appointment.slot_options).toBeNull();
     expect(gravacoes).toHaveLength(0);
   });
-  test.each([false, true])("procedimento divergente não confirma sucesso nem duplica (existente=%s)", async existente => {
-    const ctx = contextoAgendar(true);
-    procedimentoGravadoDivergente = true;
-    if (existente) banco.agendamentos = [{ ...argumentosAgendar, procedimento: "Consulta — GINECOLOGIA", id: AGENDAMENTO,
-      clinica_id: CLINICA, paciente_id: PACIENTE, status: "agendado" }];
-    const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
-    expect(r.erro).toBe("APPOINTMENT_UNCERTAIN");
-    expect(r.divergencias).toContain("procedimento");
-    expect(ctx.estado.appointment.appointment_id).toBeNull();
-    expect(gravacoes).toHaveLength(existente ? 0 : 1);
-    const repeticao = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
-    expect(repeticao.erro).toBe("APPOINTMENT_UNCERTAIN");
-    expect(gravacoes).toHaveLength(existente ? 0 : 1);
-  });
+  test.each([false, true])(
+    "procedimento divergente não confirma sucesso nem duplica (existente=%s)",
+    async (existente) => {
+      const ctx = contextoAgendar(true);
+      procedimentoGravadoDivergente = true;
+      if (existente)
+        banco.agendamentos = [
+          {
+            ...argumentosAgendar,
+            procedimento: "Consulta — GINECOLOGIA",
+            id: AGENDAMENTO,
+            clinica_id: CLINICA,
+            paciente_id: PACIENTE,
+            status: "agendado",
+          },
+        ];
+      const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+      expect(r.erro).toBe("APPOINTMENT_UNCERTAIN");
+      expect(r.divergencias).toContain("procedimento");
+      expect(ctx.estado.appointment.appointment_id).toBeNull();
+      expect(gravacoes).toHaveLength(existente ? 0 : 1);
+      const repeticao = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
+      expect(repeticao.erro).toBe("APPOINTMENT_UNCERTAIN");
+      expect(gravacoes).toHaveLength(existente ? 0 : 1);
+    },
+  );
 });
 
 describe("regressões dos cadastros publicados: infantil e odontologia", () => {
   const casos = [
-    { publicado: cardiologiaAlex, termo: "cardiologia infantil", procedimento: "CONSULTA CARDIOLOGIA INFANTIL", modo: "hora_marcada", valor: "R$ 160,00" },
-    { publicado: cardiologiaAlex, termo: "cardiologia", procedimento: "CONSULTA CARDIOLOGIA", modo: "hora_marcada", valor: "R$ 120,00" },
-    { publicado: avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"), termo: "odontologia", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_sem_pre_agendamento", valor: "Gratuito" },
-    { publicado: avaliacaoOdontologica("Raiani", "Quarta/sex 08:00h"), termo: "avaliação odontológica", procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA", modo: "chegada_sem_pre_agendamento", valor: "Gratuito" },
+    {
+      publicado: cardiologiaAlex,
+      termo: "cardiologia infantil",
+      procedimento: "CONSULTA CARDIOLOGIA INFANTIL",
+      modo: "hora_marcada",
+      valor: "R$ 160,00",
+    },
+    {
+      publicado: cardiologiaAlex,
+      termo: "cardiologia",
+      procedimento: "CONSULTA CARDIOLOGIA",
+      modo: "hora_marcada",
+      valor: "R$ 120,00",
+    },
+    {
+      publicado: avaliacaoOdontologica("Karen", "Seg/ter/quinta/sab 08:00h"),
+      termo: "odontologia",
+      procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA",
+      modo: "chegada_sem_pre_agendamento",
+      valor: "Gratuito",
+    },
+    {
+      publicado: avaliacaoOdontologica("Raiani", "Quarta/sex 08:00h"),
+      termo: "avaliação odontológica",
+      procedimento: "AVALIAÇÃO ODONTOLÓGICA — ODONTOLOGIA",
+      modo: "chegada_sem_pre_agendamento",
+      valor: "Gratuito",
+    },
   ] as const;
-  function preparar(caso: typeof casos[number], origem: "homologacao" | "whatsapp" = "homologacao") {
+  function preparar(
+    caso: (typeof casos)[number],
+    origem: "homologacao" | "whatsapp" = "homologacao",
+  ) {
     Object.assign(banco.profissionais![0]!, caso.publicado);
     banco.medicos![0]!.nome = caso.publicado.nome;
-    const ctx: CtxNinaPaciente = { ...contexto(`Quero agendar ${caso.termo} com ${caso.publicado.nome}`), origem,
-      teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
-    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+    const ctx: CtxNinaPaciente = {
+      ...contexto(`Quero agendar ${caso.termo} com ${caso.publicado.nome}`),
+      origem,
+      teste: origem === "homologacao",
+      podeAgendar: true,
+      pacienteId: PACIENTE,
+      pacienteNome: "Paciente Fictício",
+    };
+    ctx.estado!.knowledge_context = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: ctx.estado!.session_id!,
       consulta: { termo: caso.termo, tipo_atendimento: "consulta" },
-      referencias: [{ registro: CATALOGO, versao: null, procedimento: caso.procedimento, medicoNome: caso.publicado.nome }] };
+      referencias: [
+        {
+          registro: CATALOGO,
+          versao: null,
+          procedimento: caso.procedimento,
+          medicoNome: caso.publicado.nome,
+        },
+      ],
+    };
     return ctx;
   }
   for (const caso of casos) {
     test(`${caso.publicado.nome}/${caso.termo}: um candidato com preços e condições próprios`, async () => {
       preparar(caso);
       const { candidatosPrimeiraVaga } = await import("../primeiro-disponivel-catalogo.server");
-      for (const pedido of [caso.termo, [{ registro: CATALOGO, procedimento: caso.procedimento }]]) {
+      for (const pedido of [
+        caso.termo,
+        [{ registro: CATALOGO, procedimento: caso.procedimento }],
+      ]) {
         const candidatos = await candidatosPrimeiraVaga(CLINICA, "consulta", pedido);
         expect(candidatos).toHaveLength(1);
-        expect(candidatos[0]).toMatchObject({ medicoId: MEDICO, registro: { procedimento: caso.procedimento, preco_dinheiro: caso.valor } });
+        expect(candidatos[0]).toMatchObject({
+          medicoId: MEDICO,
+          registro: { procedimento: caso.procedimento, preco_dinheiro: caso.valor },
+        });
         expect(candidatos[0]!.registro.extras?.modalidade_atendimento).toBe(caso.modo);
       }
     });
-    for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga", "consultar_primeiro_disponivel"]) {
+    for (const ferramenta of [
+      "consultar_disponibilidade",
+      "verificar_horario",
+      "proxima_vaga",
+      "consultar_primeiro_disponivel",
+    ]) {
       test(`${caso.publicado.nome}/${caso.termo}: ${ferramenta} respeita o atendimento`, async () => {
         const ctx = preparar(caso);
-        const r = await executarFerramentaPaciente(ctx, ferramenta, ferramenta === "consultar_primeiro_disponivel"
-          ? { tipo: "consulta", atendimento: caso.termo } : { ...argumentos, medico_id: MEDICO });
+        const r = await executarFerramentaPaciente(
+          ctx,
+          ferramenta,
+          ferramenta === "consultar_primeiro_disponivel"
+            ? { tipo: "consulta", atendimento: caso.termo }
+            : { ...argumentos, medico_id: MEDICO },
+        );
         expect(r.ok).toBe(true);
         if (caso.modo === "chegada_sem_pre_agendamento") {
           expect(ctx.estado!.appointment.slot_options?.vagas ?? []).toHaveLength(0);
           expect(consultasAgenda()).toHaveLength(0);
-          if (ferramenta === "consultar_primeiro_disponivel") expect(r.sem_pre_agendamento).toHaveLength(1);
+          if (ferramenta === "consultar_primeiro_disponivel")
+            expect(r.sem_pre_agendamento).toHaveLength(1);
           else expect(r.sem_agendamento).toBe(true);
         } else {
-          expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ procedimento: caso.procedimento, modalidade: caso.modo });
+          expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({
+            procedimento: caso.procedimento,
+            modalidade: caso.modo,
+          });
         }
         expect(gravacoes).toHaveLength(0);
       });
@@ -1000,29 +1576,60 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
     for (const origem of ["homologacao", "whatsapp"] as const) {
       test(`${origem}/${caso.publicado.nome}/${caso.termo}: respeita se a modalidade permite agendar`, async () => {
         const ctx = preparar(caso, origem);
-        expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
+        expect(
+          (await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok,
+        ).toBe(true);
         if (caso.modo === "chegada_sem_pre_agendamento") {
-          expect((await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro).toBe("ACTION_NOT_AUTHORIZED");
+          expect(
+            (await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro,
+          ).toBe("ACTION_NOT_AUTHORIZED");
           expect(consultasAgenda()).toHaveLength(0);
           expect(gravacoes).toHaveLength(0);
           return;
         }
         ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
         ctx.opcoesAgendamentoInicioTurno = true;
-        ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
-        const dados = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
+        ctx.consultaAgenda = {
+          mensagemAtual: "Escolho 14:00",
+          historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }],
+        };
+        const dados = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar: executarFerramentaPaciente,
+        });
         expect(dados?.camposPendentes).toContain("nome");
-        ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000", historico: [{ role: "assistant", content: dados!.texto }] };
+        ctx.consultaAgenda = {
+          mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
+          historico: [{ role: "assistant", content: dados!.texto }],
+        };
         const executar: typeof executarFerramentaPaciente = async (c, nome, args) =>
-          nome === "consultar_cadastro_paciente" ? { ok: true, campos_faltantes: [] }
-            : nome === "identificar_paciente" ? { ok: true } : executarFerramentaPaciente(c, nome, args);
-        const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+          nome === "consultar_cadastro_paciente"
+            ? { ok: true, campos_faltantes: [] }
+            : nome === "identificar_paciente"
+              ? { ok: true }
+              : executarFerramentaPaciente(c, nome, args);
+        const resumo = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar,
+        });
         expect(resumo?.texto).toContain(caso.procedimento);
         expect(ctx.estado!.appointment.modalidade_atendimento).toBe(caso.modo);
         expect(gravacoes).toHaveLength(0);
         ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-        ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo.", historico: [{ role: "assistant", content: resumo!.texto }] };
-        const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+        ctx.consultaAgenda = {
+          mensagemAtual: "Sim, confirmo.",
+          historico: [{ role: "assistant", content: resumo!.texto }],
+        };
+        const confirmado = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar,
+        });
         expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
         expect(gravacoes).toHaveLength(1);
         expect(banco.agendamentos![0]!.procedimento).toBe(caso.procedimento);
@@ -1031,26 +1638,43 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
   }
   test("regras divergentes da mesma avaliação continuam bloqueando, sem usar a escala genérica", async () => {
     const ctx = preparar(casos[2]!);
-    banco.profissionais![0]!.observacao_publica += "\n\nAVALIAÇÃO ODONTOLÓGICA\nEspecialidade: ODONTOLOGIA\nProfissional: Karen\nObservação: Agendado";
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
+    banco.profissionais![0]!.observacao_publica +=
+      "\n\nAVALIAÇÃO ODONTOLÓGICA\nEspecialidade: ODONTOLOGIA\nProfissional: Karen\nObservação: Agendado";
+    expect(
+      (await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro,
+    ).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);
     expect(gravacoes).toHaveLength(0);
   });
   test("ordem explícita divergente no atendimento genérico exige esclarecer a consulta", async () => {
     const ctx = preparar(casos[2]!);
-    banco.profissionais![0]!.observacao_publica = String(banco.profissionais![0]!.observacao_publica).replace("Observação: Não informada", "Observação: Agendado");
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro).toBe("MODALIDADE_NAO_DEFINIDA");
+    banco.profissionais![0]!.observacao_publica = String(
+      banco.profissionais![0]!.observacao_publica,
+    ).replace("Observação: Não informada", "Observação: Agendado");
+    expect(
+      (await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).erro,
+    ).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);
     expect(gravacoes).toHaveLength(0);
   });
   test("mudança de modalidade após oferta impede confirmar uma condição antiga", async () => {
     const ctx = preparar(casos[2]!);
-    banco.profissionais![0]!.observacao_publica = String(banco.profissionais![0]!.observacao_publica).replace("Ordem de Chegada", "Ordem de chegada com pré-agendamento");
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(true);
-    banco.profissionais![0]!.observacao_publica = String(banco.profissionais![0]!.observacao_publica).replace("Ordem de chegada com pré-agendamento", "Agendado");
+    banco.profissionais![0]!.observacao_publica = String(
+      banco.profissionais![0]!.observacao_publica,
+    ).replace("Ordem de Chegada", "Ordem de chegada com pré-agendamento");
+    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO })).ok).toBe(
+      true,
+    );
+    banco.profissionais![0]!.observacao_publica = String(
+      banco.profissionais![0]!.observacao_publica,
+    ).replace("Ordem de chegada com pré-agendamento", "Agendado");
     ctx.opcoesAgendamentoInicioTurno = true;
     ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [] };
-    const r = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: inicio.toISOString(), fim: fim.toISOString() });
+    const r = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+      medico_id: MEDICO,
+      inicio: inicio.toISOString(),
+      fim: fim.toISOString(),
+    });
     expect(r.erro).toBe("MODALIDADE_ALTERADA");
     expect(gravacoes).toHaveLength(0);
   });
@@ -1058,11 +1682,25 @@ describe("regressões dos cadastros publicados: infantil e odontologia", () => {
 
 describe("executor real das ferramentas com banco simulado", () => {
   test("período escolhido sem oferta anterior pede horário sem reservar nem gerar falha técnica", async () => {
-    const ctx = { ...contexto("Tem vaga à tarde com Alex Louza?"), opcoesAgendamentoInicioTurno: false };
+    const ctx = {
+      ...contexto("Tem vaga à tarde com Alex Louza?"),
+      opcoesAgendamentoInicioTurno: false,
+    };
     referenciaConsulta(ctx);
-    expect((await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO, periodo: "tarde" })).ok).toBe(true);
+    expect(
+      (
+        await executarFerramentaPaciente(ctx, "proxima_vaga", {
+          medico_id: MEDICO,
+          periodo: "tarde",
+        })
+      ).ok,
+    ).toBe(true);
     ctx.consultaAgenda = { mensagemAtual: "À tarde, o primeiro que tiver.", historico: [] };
-    const r = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: inicio.toISOString(), fim: fim.toISOString() });
+    const r = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+      medico_id: MEDICO,
+      inicio: inicio.toISOString(),
+      fim: fim.toISOString(),
+    });
     expect(r.ok).toBe(false);
     expect(r.codigo).toBe("ESCOLHA_HORARIO_PENDENTE");
     expect(r.aguardando_paciente).toBe(true);
@@ -1076,135 +1714,291 @@ describe("executor real das ferramentas com banco simulado", () => {
     for (const ferramenta of ["consultar_disponibilidade", "proxima_vaga"]) {
       const ctx = contexto("Tem vaga à tarde com Alex Louza?");
       referenciaConsulta(ctx);
-      const r = await executarFerramentaPaciente(ctx, ferramenta, { medico_id: MEDICO, periodo: "tarde" });
+      const r = await executarFerramentaPaciente(ctx, ferramenta, {
+        medico_id: MEDICO,
+        periodo: "tarde",
+      });
       expect(r.ok).toBe(true);
       expect(ctx.estado.appointment.slot_options?.vagas[0]?.inicio).toBe(distante.toISOString());
       expect(gravacoes).toHaveLength(0);
     }
     const ctx = contexto("Só posso nos próximos sete dias à tarde");
     referenciaConsulta(ctx);
-    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, periodo: "tarde", dias: 7 });
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      periodo: "tarde",
+      dias: 7,
+    });
     expect(r.reason).toBe("NO_AVAILABILITY");
     expect(ctx.estado.appointment.slot_options?.vagas ?? []).toHaveLength(0);
   });
   function referenciaConsulta(ctx: CtxNinaPaciente, termo = "cardiologia") {
-    banco.profissionais![0]!.especialidades = [{ nome: "Cardiologia" }, { nome: "Cardiologia Infantil" }];
+    banco.profissionais![0]!.especialidades = [
+      { nome: "Cardiologia" },
+      { nome: "Cardiologia Infantil" },
+    ];
     ctx.estado!.knowledge_context = {
-      versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: ctx.estado!.session_id!,
       consulta: { termo, tipo_atendimento: "consulta" },
-      referencias: [{ registro: CATALOGO, versao: "v1", procedimento: `Consulta — ${termo === "cardiologia infantil" ? "Cardiologia Infantil" : "Cardiologia"}`, medicoNome: "Alex Louza" }],
+      referencias: [
+        {
+          registro: CATALOGO,
+          versao: "v1",
+          procedimento: `Consulta — ${termo === "cardiologia infantil" ? "Cardiologia Infantil" : "Cardiologia"}`,
+          medicoNome: "Alex Louza",
+        },
+      ],
     };
   }
   for (const origem of ["homologacao", "whatsapp"] as const) {
     test(`${origem}: referência entre turnos → vaga → dados → aceite natural → uma reserva`, async () => {
-      const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data com Alex Louza"), origem,
-        teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+      const ctx: CtxNinaPaciente = {
+        ...contexto("Quero a primeira data com Alex Louza"),
+        origem,
+        teste: origem === "homologacao",
+        podeAgendar: true,
+        pacienteId: PACIENTE,
+        pacienteNome: "Paciente Fictício",
+      };
       referenciaConsulta(ctx);
       const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
       expect(r.ok).toBe(true);
       expect(ctx.estado!.appointment.procedure).toBe("Consulta — Cardiologia");
-      expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe("Consulta — Cardiologia");
+      expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe(
+        "Consulta — Cardiologia",
+      );
       expect(gravacoes).toHaveLength(0);
       ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
       ctx.opcoesAgendamentoInicioTurno = true;
-      ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
-      const selecionar = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
+      ctx.consultaAgenda = {
+        mensagemAtual: "Escolho 14:00",
+        historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }],
+      };
+      const selecionar = await aplicarGateIdentificacao({
+        mensagem: "Escolho 14:00",
+        estado: ctx.estado!,
+        ctx,
+        executar: executarFerramentaPaciente,
+      });
       expect(selecionar?.camposPendentes).toContain("nome");
       expect(gravacoes).toHaveLength(0);
       ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-      ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
-        historico: [{ role: "assistant", content: selecionar!.texto }] };
+      ctx.consultaAgenda = {
+        mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
+        historico: [{ role: "assistant", content: selecionar!.texto }],
+      };
       const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
         if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: [] };
         if (nome === "identificar_paciente") return { ok: true };
         return executarFerramentaPaciente(c, nome, args);
       };
-      const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+      const resumo = await aplicarGateIdentificacao({
+        mensagem: ctx.consultaAgenda.mensagemAtual,
+        estado: ctx.estado!,
+        ctx,
+        executar,
+      });
       expect(resumo?.texto).toContain("14:00");
       expect(resumo?.texto).toContain("Cardiologia");
       expect(gravacoes).toHaveLength(0);
       ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-      ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo todos esses dados para concluir o agendamento.",
-        historico: [{ role: "assistant", content: resumo!.texto }] };
-      const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+      ctx.consultaAgenda = {
+        mensagemAtual: "Sim, confirmo todos esses dados para concluir o agendamento.",
+        historico: [{ role: "assistant", content: resumo!.texto }],
+      };
+      const confirmado = await aplicarGateIdentificacao({
+        mensagem: ctx.consultaAgenda.mensagemAtual,
+        estado: ctx.estado!,
+        ctx,
+        executar,
+      });
       expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
       expect(gravacoes).toHaveLength(1);
       expect(gravacoes[0]!.procedimento).toBe("Consulta — Cardiologia");
       expect(gravacoes[0]!.inicio).toBe(inicio.toISOString());
-      await aplicarGateIdentificacao({ mensagem: "Sim, confirmo.", estado: ctx.estado!, ctx, executar });
+      await aplicarGateIdentificacao({
+        mensagem: "Sim, confirmo.",
+        estado: ctx.estado!,
+        ctx,
+        executar,
+      });
       expect(gravacoes).toHaveLength(1);
     });
   }
-  test.each(["cardio", "cardiologia infantil"])("revalida o atendimento publicado: %s", async termo => {
-    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
-    referenciaConsulta(ctx, termo);
-    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-    expect(r.ok).toBe(true);
-    expect(ctx.estado!.appointment.procedure).toBe(termo === "cardio" ? "Consulta — Cardiologia" : "Consulta — Cardiologia Infantil");
-  });
+  test.each(["cardio", "cardiologia infantil"])(
+    "revalida o atendimento publicado: %s",
+    async (termo) => {
+      const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+      referenciaConsulta(ctx, termo);
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r.ok).toBe(true);
+      expect(ctx.estado!.appointment.procedure).toBe(
+        termo === "cardio" ? "Consulta — Cardiologia" : "Consulta — Cardiologia Infantil",
+      );
+    },
+  );
   for (const origem of ["homologacao", "whatsapp"] as const) {
     for (const caso of [
-      { especialidade: "OBSTETRICIA", nome: "Sérgio Satoshi", agenda: "SERGIO SATOSHI OKUDA", termo: "pré-natal",
-        referencias: ["Consulta — OBSTETRICIA", "Consulta Obstétrica", null, "consulta obstetrica", "Consulta OBSTETRICIA"],
-        modalidade: "Hora marcada", codigoModalidade: "hora_marcada", estruturado: true },
-      { especialidade: "OBSTETRICIA", nome: "Sérgio Satoshi", agenda: "SERGIO SATOSHI OKUDA", termo: "Sérgio Satoshi",
-        referencias: ["Consulta — OBSTETRICIA", "Consulta Obstétrica", null, "consulta obstetrica", "Consulta OBSTETRICIA"],
-        modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
-      { especialidade: "OFTALMOLOGIA", nome: "Marina Almeida", agenda: "MARINA ALMEIDA DIAS", termo: "consulta",
-        referencias: ["Consulta — OFTALMOLOGIA", "Consulta Oftalmologia", null, "consulta oftalmologia"],
-        modalidade: "Ordem de chegada com pré-agendamento", codigoModalidade: "chegada_com_pre_agendamento" },
-      { especialidade: "ODONTOLOGIA", nome: "Jean Ferreira", agenda: "JEAN FERREIRA", termo: "avaliação odontológica",
+      {
+        especialidade: "OBSTETRICIA",
+        nome: "Sérgio Satoshi",
+        agenda: "SERGIO SATOSHI OKUDA",
+        termo: "pré-natal",
+        referencias: [
+          "Consulta — OBSTETRICIA",
+          "Consulta Obstétrica",
+          null,
+          "consulta obstetrica",
+          "Consulta OBSTETRICIA",
+        ],
+        modalidade: "Hora marcada",
+        codigoModalidade: "hora_marcada",
+        estruturado: true,
+      },
+      {
+        especialidade: "OBSTETRICIA",
+        nome: "Sérgio Satoshi",
+        agenda: "SERGIO SATOSHI OKUDA",
+        termo: "Sérgio Satoshi",
+        referencias: [
+          "Consulta — OBSTETRICIA",
+          "Consulta Obstétrica",
+          null,
+          "consulta obstetrica",
+          "Consulta OBSTETRICIA",
+        ],
+        modalidade: "Hora marcada",
+        codigoModalidade: "hora_marcada",
+      },
+      {
+        especialidade: "OFTALMOLOGIA",
+        nome: "Marina Almeida",
+        agenda: "MARINA ALMEIDA DIAS",
+        termo: "consulta",
+        referencias: [
+          "Consulta — OFTALMOLOGIA",
+          "Consulta Oftalmologia",
+          null,
+          "consulta oftalmologia",
+        ],
+        modalidade: "Ordem de chegada com pré-agendamento",
+        codigoModalidade: "chegada_com_pre_agendamento",
+      },
+      {
+        especialidade: "ODONTOLOGIA",
+        nome: "Jean Ferreira",
+        agenda: "JEAN FERREIRA",
+        termo: "avaliação odontológica",
         referencias: ["Consulta — ODONTOLOGIA", "Avaliação odontológica", null],
-        modalidade: "Hora marcada", codigoModalidade: "hora_marcada" },
+        modalidade: "Hora marcada",
+        codigoModalidade: "hora_marcada",
+      },
     ]) {
       test(`${origem}: ${caso.especialidade} (${caso.termo}) mantém o vínculo com referências equivalentes até concluir`, async () => {
-        Object.assign(banco.profissionais![0]!, { nome: caso.nome,
-          especialidades: [{ nome: caso.especialidade }], tipo_atendimento: caso.modalidade });
+        Object.assign(banco.profissionais![0]!, {
+          nome: caso.nome,
+          especialidades: [{ nome: caso.especialidade }],
+          tipo_atendimento: caso.modalidade,
+        });
         banco.medicos![0]!.nome = caso.agenda;
-        if ('estruturado' in caso && caso.estruturado) {
-          banco.profissionais![0]!.observacao_publica = 'CONSULTA OBSTÉTRICA\nEspecialidade: OBSTETRICIA\nProfissional: Sérgio Satoshi\nObservação: Hora marcada';
+        if ("estruturado" in caso && caso.estruturado) {
+          banco.profissionais![0]!.observacao_publica =
+            "CONSULTA OBSTÉTRICA\nEspecialidade: OBSTETRICIA\nProfissional: Sérgio Satoshi\nObservação: Hora marcada";
         }
-        const ctx: CtxNinaPaciente = { ...contexto("Quero a primeira data"), origem,
-          teste: origem === "homologacao", podeAgendar: true, pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
-        ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+        const ctx: CtxNinaPaciente = {
+          ...contexto("Quero a primeira data"),
+          origem,
+          teste: origem === "homologacao",
+          podeAgendar: true,
+          pacienteId: PACIENTE,
+          pacienteNome: "Paciente Fictício",
+        };
+        ctx.estado!.knowledge_context = {
+          versao: 1,
+          clinicaId: CLINICA,
+          sessionId: ctx.estado!.session_id!,
           consulta: { termo: caso.termo, tipo_atendimento: "consulta" },
-          referencias: caso.referencias.map(procedimento => ({ registro: CATALOGO, versao: null, procedimento, medicoNome: caso.nome })) };
+          referencias: caso.referencias.map((procedimento) => ({
+            registro: CATALOGO,
+            versao: null,
+            procedimento,
+            medicoNome: caso.nome,
+          })),
+        };
         const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
         expect(r.ok).toBe(true);
-        const procedimento = 'estruturado' in caso && caso.estruturado
-          ? 'CONSULTA OBSTÉTRICA — OBSTETRICIA' : `Consulta — ${caso.especialidade}`;
-        expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({ medico_id: MEDICO, procedimento,
-          modalidade: caso.codigoModalidade });
+        const procedimento =
+          "estruturado" in caso && caso.estruturado
+            ? "CONSULTA OBSTÉTRICA — OBSTETRICIA"
+            : `Consulta — ${caso.especialidade}`;
+        expect(ctx.estado!.appointment.slot_options?.vagas[0]).toMatchObject({
+          medico_id: MEDICO,
+          procedimento,
+          modalidade: caso.codigoModalidade,
+        });
         expect(gravacoes).toHaveLength(0);
         ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
         ctx.opcoesAgendamentoInicioTurno = true;
-        ctx.consultaAgenda = { mensagemAtual: "Escolho 14:00", historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }] };
-        const dados = await aplicarGateIdentificacao({ mensagem: "Escolho 14:00", estado: ctx.estado!, ctx, executar: executarFerramentaPaciente });
+        ctx.consultaAgenda = {
+          mensagemAtual: "Escolho 14:00",
+          historico: [{ role: "assistant", content: "Disponível às 14:00. Qual prefere?" }],
+        };
+        const dados = await aplicarGateIdentificacao({
+          mensagem: "Escolho 14:00",
+          estado: ctx.estado!,
+          ctx,
+          executar: executarFerramentaPaciente,
+        });
         expect(dados?.camposPendentes).toContain("nome");
-        ctx.consultaAgenda = { mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
-          historico: [{ role: "assistant", content: dados!.texto }] };
+        ctx.consultaAgenda = {
+          mensagemAtual: "Paciente Fictício, 02/01/1990, (21) 99999-0000",
+          historico: [{ role: "assistant", content: dados!.texto }],
+        };
         const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
           if (nome === "consultar_cadastro_paciente") return { ok: true, campos_faltantes: [] };
           if (nome === "identificar_paciente") return { ok: true };
           return executarFerramentaPaciente(c, nome, args);
         };
-        const resumo = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+        const resumo = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar,
+        });
         expect(resumo?.texto).toContain(caso.especialidade);
         expect(gravacoes).toHaveLength(0);
         ctx.estado = JSON.parse(JSON.stringify(ctx.estado));
-        ctx.consultaAgenda = { mensagemAtual: "Sim, confirmo.", historico: [{ role: "assistant", content: resumo!.texto }] };
-        const confirmado = await aplicarGateIdentificacao({ mensagem: ctx.consultaAgenda.mensagemAtual, estado: ctx.estado!, ctx, executar });
+        ctx.consultaAgenda = {
+          mensagemAtual: "Sim, confirmo.",
+          historico: [{ role: "assistant", content: resumo!.texto }],
+        };
+        const confirmado = await aplicarGateIdentificacao({
+          mensagem: ctx.consultaAgenda.mensagemAtual,
+          estado: ctx.estado!,
+          ctx,
+          executar,
+        });
         expect(confirmado?.acoesConcluidas[0]?.confirmada).toBe(true);
         expect(gravacoes).toHaveLength(1);
-        expect(gravacoes[0]).toMatchObject({ procedimento, medico_id: MEDICO, inicio: inicio.toISOString() });
+        expect(gravacoes[0]).toMatchObject({
+          procedimento,
+          medico_id: MEDICO,
+          inicio: inicio.toISOString(),
+        });
       });
     }
   }
   test("referências de duas especialidades reais do mesmo médico continuam ambíguas", async () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx, "consulta");
-    ctx.estado!.knowledge_context!.referencias.push({ registro: CATALOGO, versao: null,
-      procedimento: "Consulta Cardiologia Infantil", medicoNome: "Alex Louza" });
+    ctx.estado!.knowledge_context!.referencias.push({
+      registro: CATALOGO,
+      versao: null,
+      procedimento: "Consulta Cardiologia Infantil",
+      medicoNome: "Alex Louza",
+    });
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.codigo).toBe("ATENDIMENTO_CONSULTA_PENDENTE");
     expect(r.consulta_realizada).toBe(false);
@@ -1212,19 +2006,26 @@ describe("executor real das ferramentas com banco simulado", () => {
     expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
     expect(gravacoes).toHaveLength(0);
   });
-  test.each(["registro", "clinica", "publicacao"])("referências equivalentes não contornam a revalidação de %s", async alvo => {
-    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
-    referenciaConsulta(ctx, "consulta");
-    ctx.estado!.knowledge_context!.referencias.push({ registro: CATALOGO, versao: null,
-      procedimento: "Consulta Cardiologia", medicoNome: "Alex Louza" });
-    if (alvo === "registro") banco.profissionais![0]!.id = OUTRO;
-    if (alvo === "clinica") banco.profissionais![0]!.clinica_id = OUTRO;
-    if (alvo === "publicacao") banco.profissionais![0]!.status = "ARQUIVADO";
-    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-    expect(r.ok).toBe(false);
-    expect(ctx.estado!.appointment.slot_options?.vagas ?? []).toEqual([]);
-    expect(gravacoes).toHaveLength(0);
-  });
+  test.each(["registro", "clinica", "publicacao"])(
+    "referências equivalentes não contornam a revalidação de %s",
+    async (alvo) => {
+      const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+      referenciaConsulta(ctx, "consulta");
+      ctx.estado!.knowledge_context!.referencias.push({
+        registro: CATALOGO,
+        versao: null,
+        procedimento: "Consulta Cardiologia",
+        medicoNome: "Alex Louza",
+      });
+      if (alvo === "registro") banco.profissionais![0]!.id = OUTRO;
+      if (alvo === "clinica") banco.profissionais![0]!.clinica_id = OUTRO;
+      if (alvo === "publicacao") banco.profissionais![0]!.status = "ARQUIVADO";
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r.ok).toBe(false);
+      expect(ctx.estado!.appointment.slot_options?.vagas ?? []).toEqual([]);
+      expect(gravacoes).toHaveLength(0);
+    },
+  );
   test("referência antiga não reutiliza atendimento retirado da publicação", async () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx);
@@ -1239,8 +2040,18 @@ describe("executor real das ferramentas com banco simulado", () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx, "consulta");
     ctx.estado!.knowledge_context!.referencias = [
-      { registro: CATALOGO, versao: null, procedimento: "Consulta Oftalmologia", medicoNome: "Alex Louza" },
-      { registro: OUTRO, versao: null, procedimento: "Consulta Cardiologia", medicoNome: "Outro Médico" },
+      {
+        registro: CATALOGO,
+        versao: null,
+        procedimento: "Consulta Oftalmologia",
+        medicoNome: "Alex Louza",
+      },
+      {
+        registro: OUTRO,
+        versao: null,
+        procedimento: "Consulta Cardiologia",
+        medicoNome: "Outro Médico",
+      },
     ];
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
@@ -1251,31 +2062,64 @@ describe("executor real das ferramentas com banco simulado", () => {
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
     referenciaConsulta(ctx, "consulta");
     banco.profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
-    const raizesFonte = [{ fonte: "catalogo_publicado" as const, registro: CATALOGO, versao: null }];
-    ctx.estado!.knowledge_context!.selecao = { versao: 1, clinicaId: CLINICA, sessaoId: ctx.estado!.session_id!,
-      medicoId: MEDICO, medicoNome: "Alex Louza", referenciaProfissional: `medico:${MEDICO}`, raizesFonte,
-      modalidade: { nome: "Cardiologia Infantil", procedimento: "Consulta Cardiologia Infantil", raizesFonte } };
+    const raizesFonte = [
+      { fonte: "catalogo_publicado" as const, registro: CATALOGO, versao: null },
+    ];
+    ctx.estado!.knowledge_context!.selecao = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessaoId: ctx.estado!.session_id!,
+      medicoId: MEDICO,
+      medicoNome: "Alex Louza",
+      referenciaProfissional: `medico:${MEDICO}`,
+      raizesFonte,
+      modalidade: {
+        nome: "Cardiologia Infantil",
+        procedimento: "Consulta Cardiologia Infantil",
+        raizesFonte,
+      },
+    };
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.codigo).toBe("ATENDIMENTO_AGENDA_NAO_VINCULADO");
     expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
     expect(gravacoes).toHaveLength(0);
   });
-  test.each(["sessionId", "clinicaId"])("referência de outra %s não completa a vaga", async campo => {
-    const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
-    referenciaConsulta(ctx);
-    ctx.estado!.knowledge_context![campo] = "outro";
-    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
-    expect(r.ok).toBe(false);
-    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
-  });
+  test.each(["sessionId", "clinicaId"])(
+    "referência de outra %s não completa a vaga",
+    async (campo) => {
+      const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
+      referenciaConsulta(ctx);
+      ctx.estado!.knowledge_context![campo] = "outro";
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r.ok).toBe(false);
+      expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+    },
+  );
   test("procedimento mantém executante e nome próprios entre turnos", async () => {
-    banco.servicos!.push({ id: CATALOGO, clinica_id: CLINICA, status: "PUBLICADO", nome: "USG TRANSVAGINAL",
-      estrutura: estruturaModalidadeServico("USG TRANSVAGINAL"), executantes: [{ nome: "Alex Louza" }] });
+    banco.servicos!.push({
+      id: CATALOGO,
+      clinica_id: CLINICA,
+      status: "PUBLICADO",
+      nome: "USG TRANSVAGINAL",
+      estrutura: estruturaModalidadeServico("USG TRANSVAGINAL"),
+      executantes: [{ nome: "Alex Louza" }],
+    });
     vincularProcedimentoTeste(banco.servicos![0]!);
     const ctx: CtxNinaPaciente = { ...contexto("Primeira data"), podeAgendar: true };
-    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+    ctx.estado!.knowledge_context = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: ctx.estado!.session_id!,
       consulta: { termo: "USG TRANSVAGINAL", tipo_atendimento: "exame_procedimento" },
-      referencias: [{ registro: CATALOGO, versao: "v1", procedimento: "USG TRANSVAGINAL", medicoNome: "Alex Louza" }] };
+      referencias: [
+        {
+          registro: CATALOGO,
+          versao: "v1",
+          procedimento: "USG TRANSVAGINAL",
+          medicoNome: "Alex Louza",
+        },
+      ],
+    };
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.ok).toBe(true);
     expect(ctx.estado!.appointment.slot_options?.vagas[0]?.procedimento).toBe("USG TRANSVAGINAL");
@@ -1283,25 +2127,39 @@ describe("executor real das ferramentas com banco simulado", () => {
   for (const situacao of ["vazia", "dia_divergente", "falha_de_leitura"]) {
     test(`vaga real permanece disponível com escala ${situacao}`, async () => {
       if (situacao === "vazia") banco.medico_disponibilidades = [];
-      if (situacao === "dia_divergente") banco.medico_disponibilidades![0]!.dia_semana = (inicio.getUTCDay() + 1) % 7;
+      if (situacao === "dia_divergente")
+        banco.medico_disponibilidades![0]!.dia_semana = (inicio.getUTCDay() + 1) % 7;
       if (situacao === "falha_de_leitura") falharEscala = true;
-      const r = await executarFerramentaPaciente(contexto("Verifique 14:00"), "verificar_horario", argumentos);
+      const r = await executarFerramentaPaciente(
+        contexto("Verifique 14:00"),
+        "verificar_horario",
+        argumentos,
+      );
       expect(r.ok).toBe(true);
       expect(r.disponivel).toBe(true);
       expect(r.inicio).toBe(inicio.toISOString());
       expect(r.motivo).toBeNull();
-      expect(encaminhamentoSemVagas(validarResultado("verificar_horario", r), argumentos)).toBeNull();
-      expect(leituras.some(l => l.tabela === "medico_disponibilidades")).toBe(false);
+      expect(
+        encaminhamentoSemVagas(validarResultado("verificar_horario", r), argumentos),
+      ).toBeNull();
+      expect(leituras.some((l) => l.tabela === "medico_disponibilidades")).toBe(false);
     });
   }
   test("escala vazia preserva alternativas reais e não afirma que médico não atende", async () => {
     banco.medico_disponibilidades = [];
-    const r = await executarFerramentaPaciente(contexto("Verifique 15:00"), "verificar_horario", { ...argumentos, hora: "15:00" });
+    const r = await executarFerramentaPaciente(contexto("Verifique 15:00"), "verificar_horario", {
+      ...argumentos,
+      hora: "15:00",
+    });
     expect(r.disponivel).toBe(false);
     expect(r.motivo).toBe("HORARIO_OCUPADO");
-    expect((r.alternativas as unknown[])).toHaveLength(1);
+    expect(r.alternativas as unknown[]).toHaveLength(1);
     banco.agendamentos = [];
-    const vazio = await executarFerramentaPaciente(contexto("Verifique 15:00"), "verificar_horario", argumentos);
+    const vazio = await executarFerramentaPaciente(
+      contexto("Verifique 15:00"),
+      "verificar_horario",
+      argumentos,
+    );
     expect(vazio.motivo).toBe("NO_AVAILABILITY");
   });
   test("consulta do dia local inclui a noite após a virada UTC e exclui o dia seguinte", async () => {
@@ -1311,15 +2169,25 @@ describe("executor real das ferramentas com banco simulado", () => {
       "2026-09-18T02:30:00.000Z", // dia 17, 23:30
       "2026-09-18T03:00:00.000Z", // início do dia 18
     ].map((inicio, i) => ({
-      id: String(i), clinica_id: CLINICA, medico_id: MEDICO,
-      inicio, fim: new Date(new Date(inicio).getTime() + 60_000).toISOString(),
-      paciente_nome: "DISPONIVEL", status: "confirmado",
+      id: String(i),
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      inicio,
+      fim: new Date(new Date(inicio).getTime() + 60_000).toISOString(),
+      paciente_nome: "DISPONIVEL",
+      status: "confirmado",
     }));
-    const slots = await consultarDisponibilidadeCore({
-      clinicaId: CLINICA, medicoId: MEDICO, data: "2026-09-17",
-    }, new Date("2026-09-16T12:00:00Z"));
-    expect(slots.map(s => [s.data, s.hora])).toEqual([
-      ["17/09/2026", "00:00"], ["17/09/2026", "23:30"],
+    const slots = await consultarDisponibilidadeCore(
+      {
+        clinicaId: CLINICA,
+        medicoId: MEDICO,
+        data: "2026-09-17",
+      },
+      new Date("2026-09-16T12:00:00Z"),
+    );
+    expect(slots.map((s) => [s.data, s.hora])).toEqual([
+      ["17/09/2026", "00:00"],
+      ["17/09/2026", "23:30"],
     ]);
   });
 
@@ -1329,22 +2197,31 @@ describe("executor real das ferramentas com banco simulado", () => {
       "2026-09-17T15:00:00.000Z",
       "2026-09-17T18:00:00.000Z",
     ].map((inicio, i) => ({
-      id: String(i), clinica_id: CLINICA, medico_id: MEDICO,
-      inicio, fim: new Date(new Date(inicio).getTime() + 60_000).toISOString(),
-      paciente_nome: "DISPONIVEL", status: "confirmado",
+      id: String(i),
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      inicio,
+      fim: new Date(new Date(inicio).getTime() + 60_000).toISOString(),
+      paciente_nome: "DISPONIVEL",
+      status: "confirmado",
     }));
     const pedido = { clinicaId: CLINICA, medicoId: MEDICO, data: "2026-09-17", limite: 1 };
     const futuro = await consultarDisponibilidadeCore(pedido, new Date("2026-09-16T12:00:00Z"));
-    expect(futuro.map(s => s.hora)).toEqual(["12:00"]);
+    expect(futuro.map((s) => s.hora)).toEqual(["12:00"]);
     const hoje = await consultarDisponibilidadeCore(pedido, new Date("2026-09-17T16:00:00Z"));
-    expect(hoje.map(s => s.hora)).toEqual(["15:00"]);
+    expect(hoje.map((s) => s.hora)).toEqual(["15:00"]);
   });
 
   test("consultar_cadastro já entrega o vínculo de agenda sem buscar outros médicos nem consultar vagas", async () => {
-    const r = await executarFerramentaPaciente(contexto("Quero consulta com Alex"), "consultar_cadastro",
-      { termo: "cardiologia", medico: "Alex", tipo_atendimento: "consulta" });
+    const r = await executarFerramentaPaciente(
+      contexto("Quero consulta com Alex"),
+      "consultar_cadastro",
+      { termo: "cardiologia", medico: "Alex", tipo_atendimento: "consulta" },
+    );
     expect(r.ok).toBe(true);
-    expect(r.vinculos_agenda).toEqual([expect.objectContaining({ catalogo_id: CATALOGO, medico_id: MEDICO, situacao: "vinculado" })]);
+    expect(r.vinculos_agenda).toEqual([
+      expect.objectContaining({ catalogo_id: CATALOGO, medico_id: MEDICO, situacao: "vinculado" }),
+    ]);
     expect(r.records).toEqual(resultadoCatalogo.records);
     expect(pesquisas).toHaveLength(1);
     expect(consultasAgenda()).toHaveLength(0);
@@ -1353,7 +2230,11 @@ describe("executor real das ferramentas com banco simulado", () => {
 
   test("falha na leitura do vínculo preserva as informações confirmadas do catálogo", async () => {
     falharVinculos = true;
-    const r = await executarFerramentaPaciente(contexto("Qual o valor de cardiologia?"), "consultar_cadastro", { termo: "cardiologia" });
+    const r = await executarFerramentaPaciente(
+      contexto("Qual o valor de cardiologia?"),
+      "consultar_cadastro",
+      { termo: "cardiologia" },
+    );
     expect(r.ok).toBe(true);
     expect(r.records).toEqual(resultadoCatalogo.records);
     expect(r.vinculos_agenda).toBeUndefined();
@@ -1551,13 +2432,20 @@ describe("executor real das ferramentas com banco simulado", () => {
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Antonio Cobucci", ativo: true });
     banco.profissionais![0]!.nome = "Antonio Cobucci";
     const r = await executarFerramentaPaciente(
-      contexto("pensando melhor, veja o outro profissional", "Temos Alex Louza e Antonio Cobucci. Posso verificar vagas do Dr. Alex Louza?"),
+      contexto(
+        "pensando melhor, veja o outro profissional",
+        "Temos Alex Louza e Antonio Cobucci. Posso verificar vagas do Dr. Alex Louza?",
+      ),
       "proxima_vaga",
       { medico_id: CATALOGO },
     );
     expect(r.ok).toBe(true);
     expect(consultasAgenda().length).toBeGreaterThan(0);
-    expect(consultasAgenda().every(l => JSON.stringify(l.filtros.medico_id) === JSON.stringify([OUTRO]))).toBe(true);
+    expect(
+      consultasAgenda().every(
+        (l) => JSON.stringify(l.filtros.medico_id) === JSON.stringify([OUTRO]),
+      ),
+    ).toBe(true);
     expect(gravacoes).toHaveLength(0);
   });
 
@@ -1573,19 +2461,33 @@ describe("executor real das ferramentas com banco simulado", () => {
   });
 
   for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"]) {
-    test.each(["sim, pra hoje", "nesse dia consigo", "pode olhar pra mim", "se tiver depois do almoço é melhor"])(
-      `${ferramenta}: intenção interpretada pelo modelo não é vetada pela redação: %s`, async (mensagem) => {
-      const ctx = contexto(mensagem, "Qual dia ou turno prefere? Assim já verifico as vagas certinho para você!");
-      ctx.consultaAgenda.historico.unshift({ role: "user", content: "com o Alex Louza" });
-      const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
-      expect(r.ok).toBe(true);
-      expect(consultasAgenda().length).toBeGreaterThan(0);
-      expect(consultasAgenda().every(l => JSON.stringify([l.filtros.medico_id].flat()) === JSON.stringify([MEDICO]))).toBe(true);
-      expect(auditoria.some((r) => r.action === "NINA_TOOL")).toBe(true);
-      expect(ctx.estado.appointment.confirmation).toBeNull();
-      expect(ctx.estado.appointment.slot_inicio).toBeNull();
-      expect(gravacoes).toHaveLength(0);
-    });
+    test.each([
+      "sim, pra hoje",
+      "nesse dia consigo",
+      "pode olhar pra mim",
+      "se tiver depois do almoço é melhor",
+    ])(
+      `${ferramenta}: intenção interpretada pelo modelo não é vetada pela redação: %s`,
+      async (mensagem) => {
+        const ctx = contexto(
+          mensagem,
+          "Qual dia ou turno prefere? Assim já verifico as vagas certinho para você!",
+        );
+        ctx.consultaAgenda.historico.unshift({ role: "user", content: "com o Alex Louza" });
+        const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
+        expect(r.ok).toBe(true);
+        expect(consultasAgenda().length).toBeGreaterThan(0);
+        expect(
+          consultasAgenda().every(
+            (l) => JSON.stringify([l.filtros.medico_id].flat()) === JSON.stringify([MEDICO]),
+          ),
+        ).toBe(true);
+        expect(auditoria.some((r) => r.action === "NINA_TOOL")).toBe(true);
+        expect(ctx.estado.appointment.confirmation).toBeNull();
+        expect(ctx.estado.appointment.slot_inicio).toBeNull();
+        expect(gravacoes).toHaveLength(0);
+      },
+    );
     test(`${ferramenta}: aceite da oferta consulta apenas o médico definido`, async () => {
       const ctx = contexto("sim", "Gostaria que eu verificasse as vagas do Dr. Alex Louza?");
       const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
@@ -1649,11 +2551,11 @@ describe("executor real das ferramentas com banco simulado", () => {
   });
   test("argumentos do modelo não criam aceite do paciente", async () => {
     const ctx = contexto("Quais dias o Dr. Alex atende?");
-    const r = await executarFerramentaPaciente(
-      ctx,
-      "consultar_disponibilidade",
-      { ...argumentos, autorizado: true, paciente_confirmou: true },
-    );
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      ...argumentos,
+      autorizado: true,
+      paciente_confirmou: true,
+    });
     expect(r.ok).toBe(true);
     expect(ctx.estado.appointment.confirmation).toBeNull();
     expect(ctx.estado.appointment.slot_confirmed_by_patient).toBe(false);
@@ -1674,11 +2576,9 @@ describe("executor real das ferramentas com banco simulado", () => {
     banco.medicos!.push({ id: OUTRO, clinica_id: CLINICA, nome: "Alex Silva", ativo: true });
     const ctx = contexto("veja com o Alex");
     ctx.estado.appointment.doctor_id = MEDICO;
-    const r = await executarFerramentaPaciente(
-      ctx,
-      "consultar_disponibilidade",
-      { medico_id: "Alex" },
-    );
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: "Alex",
+    });
     expect(r.ok).toBe(false);
     expect(r.motivo).toBe("MEDICO_NAO_DEFINIDO");
     expect(consultasAgenda()).toHaveLength(0);
@@ -1784,17 +2684,42 @@ describe("modalidades na consulta operacional", () => {
     ] as const) {
       test(`${origem}: escolha após oferta composta e sim consultam sem exigir data (${esperada})`, async () => {
         banco.profissionais![0]!.tipo_atendimento = publicada;
-        const ctx: CtxNinaPaciente = { ...contexto("com o Alex Louza",
-          "Quer verificar vagas na agenda? Se sim, qual profissional prefere?"), origem, teste: origem === "homologacao" };
-        const escolhido = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: "Alex Louza" });
+        const ctx: CtxNinaPaciente = {
+          ...contexto(
+            "com o Alex Louza",
+            "Quer verificar vagas na agenda? Se sim, qual profissional prefere?",
+          ),
+          origem,
+          teste: origem === "homologacao",
+        };
+        const escolhido = await executarFerramentaPaciente(ctx, "proxima_vaga", {
+          medico_id: "Alex Louza",
+        });
         expect(escolhido.ok).toBe(true);
-        ctx.consultaAgenda = { mensagemAtual: "sim", medicoEscolhido: { id: MEDICO, nome: "Alex Louza" },
-          historico: [{ role: "assistant", content: "Gostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?" }] };
-        const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: "Alex Louza" });
+        ctx.consultaAgenda = {
+          mensagemAtual: "sim",
+          medicoEscolhido: { id: MEDICO, nome: "Alex Louza" },
+          historico: [
+            {
+              role: "assistant",
+              content:
+                "Gostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?",
+            },
+          ],
+        };
+        const r = await executarFerramentaPaciente(ctx, "proxima_vaga", {
+          medico_id: "Alex Louza",
+        });
         expect(r.ok).toBe(true);
-        expect(r.proxima).toMatchObject({ medico_id: MEDICO, modalidade_atendimento: esperada,
-          inicio: inicio.toISOString(), fim: fim.toISOString() });
-        expect(String((r.proxima as Record<string, unknown>).orientacao).includes("30 minutos")).toBe(antecedencia);
+        expect(r.proxima).toMatchObject({
+          medico_id: MEDICO,
+          modalidade_atendimento: esperada,
+          inicio: inicio.toISOString(),
+          fim: fim.toISOString(),
+        });
+        expect(
+          String((r.proxima as Record<string, unknown>).orientacao).includes("30 minutos"),
+        ).toBe(antecedencia);
         expect(consultasAgenda().length).toBeGreaterThan(0);
         expect(gravacoes).toHaveLength(0);
         expect(ctx.estado?.appointment.slot_inicio).toBeNull();
@@ -1805,9 +2730,13 @@ describe("modalidades na consulta operacional", () => {
   }
   test("todas as alternativas apresentadas podem ser escolhidas, inclusive a quarta", async () => {
     const base = banco.agendamentos![0]!;
-    for (let i = 1; i <= 4; i++) banco.agendamentos!.push({ ...base, id: `vaga-${i}`,
-      inicio: new Date(inicio.getTime() + i * 3_600_000).toISOString(),
-      fim: new Date(fim.getTime() + i * 3_600_000).toISOString() });
+    for (let i = 1; i <= 4; i++)
+      banco.agendamentos!.push({
+        ...base,
+        id: `vaga-${i}`,
+        inicio: new Date(inicio.getTime() + i * 3_600_000).toISOString(),
+        fim: new Date(fim.getTime() + i * 3_600_000).toISOString(),
+      });
     const ctx = contexto("Tem vaga com Dr. Alex Louza?");
     ctx.estado.appointment.doctor_id = MEDICO;
     ctx.estado.appointment.procedure = "Consulta Cardiologia";
@@ -1818,30 +2747,42 @@ describe("modalidades na consulta operacional", () => {
     expect(ultima.hora).toBe("18:00");
     ctx.consultaAgenda.mensagemAtual = "prefiro 18:00";
     const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", {
-      medico_id: MEDICO, inicio: ultima.inicio, fim: ultima.fim,
+      medico_id: MEDICO,
+      inicio: ultima.inicio,
+      fim: ultima.fim,
     });
     expect(escolha.ok).toBe(true);
     expect(escolha.resumo_confirmacao).toContain("18:00");
   });
   for (const origem of ["whatsapp", "homologacao"] as const)
     for (const modalidade of ["Ordem de chegada", "Ordem de chegada sem pré-agendamento"])
-    for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"])
-      test(`${origem}: ${ferramenta} (${modalidade}) não consulta vagas nem solicita cadastro`, async () => {
-        banco.profissionais![0]!.tipo_atendimento = modalidade;
-        const ctx = { ...contexto("Tem vaga com Dr. Alex Louza?"), origem, teste: origem === "homologacao" };
-        const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
-        expect(r.ok).toBe(true);
-        expect(r.sem_agendamento).toBe(true);
-        expect(r.orientacao_atendimento).toContain("Não é necessário marcar horário");
-        expect(r.orientacao_atendimento).not.toMatch(/15|30|antecedência/);
-        expect(consultasAgenda()).toHaveLength(0);
-        expect(gravacoes).toHaveLength(0);
-        expect(ctx.estado.appointment.slot_options).toBeNull();
-        expect((await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro).toBe("ACTION_NOT_AUTHORIZED");
-      });
+      for (const ferramenta of ["consultar_disponibilidade", "verificar_horario", "proxima_vaga"])
+        test(`${origem}: ${ferramenta} (${modalidade}) não consulta vagas nem solicita cadastro`, async () => {
+          banco.profissionais![0]!.tipo_atendimento = modalidade;
+          const ctx = {
+            ...contexto("Tem vaga com Dr. Alex Louza?"),
+            origem,
+            teste: origem === "homologacao",
+          };
+          const r = await executarFerramentaPaciente(ctx, ferramenta, argumentos);
+          expect(r.ok).toBe(true);
+          expect(r.sem_agendamento).toBe(true);
+          expect(r.orientacao_atendimento).toContain("Não é necessário marcar horário");
+          expect(r.orientacao_atendimento).not.toMatch(/15|30|antecedência/);
+          expect(consultasAgenda()).toHaveLength(0);
+          expect(gravacoes).toHaveLength(0);
+          expect(ctx.estado.appointment.slot_options).toBeNull();
+          expect(
+            (await executarFerramentaPaciente(ctx, "consultar_cadastro_paciente", {})).erro,
+          ).toBe("ACTION_NOT_AUTHORIZED");
+        });
   test("modalidades conflitantes não produzem opções de horário", async () => {
     banco.profissionais![0]!.tipo_atendimento = "Hora marcada / por ficha";
-    const r = await executarFerramentaPaciente(contexto("Tem vaga com Dr. Alex Louza?"), "consultar_disponibilidade", argumentos);
+    const r = await executarFerramentaPaciente(
+      contexto("Tem vaga com Dr. Alex Louza?"),
+      "consultar_disponibilidade",
+      argumentos,
+    );
     expect(r.erro).toBe("MODALIDADE_NAO_DEFINIDA");
     expect(consultasAgenda()).toHaveLength(0);
   });
@@ -1857,7 +2798,9 @@ describe("modalidades na consulta operacional", () => {
     expect(r.ok).toBe(true);
     expect(ctx.estado.appointment.slot_options?.vagas[0]?.modalidade).toBe("hora_marcada");
     banco.medico_agendas![1]!.ordem_chegada = true;
-    expect((await executarFerramentaPaciente(ctx, "consultar_disponibilidade", argumentos)).erro).toBe("MODALIDADE_NAO_DEFINIDA");
+    expect(
+      (await executarFerramentaPaciente(ctx, "consultar_disponibilidade", argumentos)).erro,
+    ).toBe("MODALIDADE_NAO_DEFINIDA");
   });
   test("ficha inclui cancelados e vagas, separa agendas e ignora outras clínicas", async () => {
     banco.profissionais![0]!.tipo_atendimento = "Por ficha";
@@ -1866,14 +2809,32 @@ describe("modalidades na consulta operacional", () => {
     resumoEntregueFixture(ctx.estado, CLINICA, true);
     const base = banco.agendamentos![0]!;
     banco.agendamentos!.push(
-      { ...base, id: "cancelado", inicio: new Date(inicio.getTime() - 3_600_000).toISOString(), status: "cancelado", paciente_nome: "Cancelado" },
-      { ...base, id: "outra-agenda", agenda_id: "outra", inicio: new Date(inicio.getTime() - 7_200_000).toISOString() },
-      { ...base, id: "outra-clinica", clinica_id: OUTRO, inicio: new Date(inicio.getTime() - 10_800_000).toISOString() },
+      {
+        ...base,
+        id: "cancelado",
+        inicio: new Date(inicio.getTime() - 3_600_000).toISOString(),
+        status: "cancelado",
+        paciente_nome: "Cancelado",
+      },
+      {
+        ...base,
+        id: "outra-agenda",
+        agenda_id: "outra",
+        inicio: new Date(inicio.getTime() - 7_200_000).toISOString(),
+      },
+      {
+        ...base,
+        id: "outra-clinica",
+        clinica_id: OUTRO,
+        inicio: new Date(inicio.getTime() - 10_800_000).toISOString(),
+      },
     );
     const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
     expect(r.ok).toBe(true);
     expect(r.ficha_numero).toBe("002");
-    expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain("*Sua ficha:* 002");
+    expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain(
+      "*Sua ficha:* 002",
+    );
   });
   test("leitura de ficha percorre todas as páginas do dia", async () => {
     banco.profissionais![0]!.tipo_atendimento = "Por ficha";
@@ -1881,8 +2842,14 @@ describe("modalidades na consulta operacional", () => {
     ctx.estado.appointment.modalidade_atendimento = "ficha";
     resumoEntregueFixture(ctx.estado, CLINICA, true);
     const base = banco.agendamentos![0]!;
-    for (let i = 1; i <= 1002; i++) banco.agendamentos!.push({ ...base, id: `cancelado-${i}`,
-      inicio: new Date(inicio.getTime() - i * 6000).toISOString(), status: "cancelado", paciente_nome: "Cancelado" });
+    for (let i = 1; i <= 1002; i++)
+      banco.agendamentos!.push({
+        ...base,
+        id: `cancelado-${i}`,
+        inicio: new Date(inicio.getTime() - i * 6000).toISOString(),
+        status: "cancelado",
+        paciente_nome: "Cancelado",
+      });
     const r = await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar);
     expect(r.ok).toBe(true);
     expect(r.ficha_numero).toBe("1003");
@@ -1897,7 +2864,9 @@ describe("modalidades na consulta operacional", () => {
     expect(r.ok).toBe(true);
     expect(r.ficha_numero).toBeNull();
     expect(gravacoes).toHaveLength(1);
-    expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain("Não consegui consultar seu número");
+    expect(resultadoAgendamentoConfirmado(r, ctx.estado, "Clínica")?.texto).toContain(
+      "Não consegui consultar seu número",
+    );
   });
 });
 
@@ -1905,23 +2874,38 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
   async function preparar(teste = true) {
     const data = inicio.toISOString().slice(0, 10);
     banco.agendamentos = ["08:00", "10:20"].map((hora, i) => ({
-      id: `vaga-${i}`, clinica_id: CLINICA, medico_id: MEDICO, paciente_nome: "DISPONIVEL", status: "confirmado",
+      id: `vaga-${i}`,
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      paciente_nome: "DISPONIVEL",
+      status: "confirmado",
       inicio: new Date(`${data}T${hora}:00-03:00`).toISOString(),
       fim: new Date(Date.parse(`${data}T${hora}:00-03:00`) + 20 * 60_000).toISOString(),
     }));
-    const ctx: CtxNinaPaciente = { ...contexto("Tem vaga com Dr. Alex Louza?"), podeAgendar: true,
-      teste, origem: teste ? "homologacao" : "whatsapp", nomeUnidade: "Clínica Teste",
-      pacienteId: PACIENTE, pacienteNome: "Paciente Fictício" };
+    const ctx: CtxNinaPaciente = {
+      ...contexto("Tem vaga com Dr. Alex Louza?"),
+      podeAgendar: true,
+      teste,
+      origem: teste ? "homologacao" : "whatsapp",
+      nomeUnidade: "Clínica Teste",
+      pacienteId: PACIENTE,
+      pacienteNome: "Paciente Fictício",
+    };
     const estado = ctx.estado!;
     Object.assign(estado.appointment, { doctor_id: MEDICO, procedure: "Consulta Cardiologia" });
-    const consulta = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data });
+    const consulta = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data,
+    });
     expect(consulta.ok).toBe(true);
     expect(estado.appointment.time).toBeNull();
     expect(estado.appointment.slot_inicio).toBeNull();
     expect(estado.appointment.slot_confirmed_by_patient).toBe(false);
-    expect(estado.appointment.slot_options?.vagas.map(v => v.hora)).toEqual(["08:00", "10:20"]);
+    expect(estado.appointment.slot_options?.vagas.map((v) => v.hora)).toEqual(["08:00", "10:20"]);
     ctx.opcoesAgendamentoInicioTurno = true;
-    ctx.consultaAgenda!.historico = [{ role: "assistant", content: "Há vagas às 08:00 e 10:20. Qual prefere?" }];
+    ctx.consultaAgenda!.historico = [
+      { role: "assistant", content: "Há vagas às 08:00 e 10:20. Qual prefere?" },
+    ];
     const encaminhamentos: string[] = [];
     let handoffOk = true;
     const executar: typeof executarFerramentaPaciente = async (c, nome, args) => {
@@ -1931,36 +2915,57 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     };
     const turno = async (mensagem: string, entregar = true) => {
       ctx.consultaAgenda!.mensagemAtual = mensagem;
-      const r = await aplicarGateIdentificacao({ mensagem, estado, ctx, executar,
-        encaminharVagaIndisponivel: async motivo => { encaminhamentos.push(motivo); return handoffOk; } });
-      if (entregar && r) ctx.consultaAgenda!.historico.push({ role: "user", content: mensagem }, { role: "assistant", content: r.texto });
+      const r = await aplicarGateIdentificacao({
+        mensagem,
+        estado,
+        ctx,
+        executar,
+        encaminharVagaIndisponivel: async (motivo) => {
+          encaminhamentos.push(motivo);
+          return handoffOk;
+        },
+      });
+      if (entregar && r)
+        ctx.consultaAgenda!.historico.push(
+          { role: "user", content: mensagem },
+          { role: "assistant", content: r.texto },
+        );
       return r;
     };
-    return { ctx, estado, turno, encaminhamentos, falharHandoff: () => { handoffOk = false; } };
+    return {
+      ctx,
+      estado,
+      turno,
+      encaminhamentos,
+      falharHandoff: () => {
+        handoffOk = false;
+      },
+    };
   }
   for (const teste of [false, true]) {
     for (const [rotulo, modo, antecedencia] of [
       ["Hora marcada", "hora_marcada", false],
       ["Ordem de chegada com pré-agendamento", "chegada_com_pre_agendamento", false],
       ["Por numeração (ficha)", "ficha", false],
-    ] as const) test(`${teste ? "homologação" : "real"}: reserva e confirmação respeitam ${rotulo}`, async () => {
-      banco.profissionais![0]!.tipo_atendimento = rotulo;
-      const t = await preparar(teste);
-      const resumo = await t.turno("eu prefiro 10:20");
-      expect(resumo?.texto).toContain("10:20");
-      expect(t.estado.appointment.modalidade_atendimento).toBe(modo);
-      if (modo === "chegada_com_pre_agendamento") {
-        expect(resumo?.texto).toContain("quem chegar primeiro");
-        expect(resumo?.texto).not.toContain("30 minutos");
-      }
-      const r = await t.turno("Sim");
-      expect(r?.texto).toContain("10:20");
-      expect(r?.texto.includes("30 minutos")).toBe(antecedencia);
-      if (modo === "ficha") expect(r?.texto).toContain("*Sua ficha:* 002");
-      expect(gravacoes).toHaveLength(1);
-      expect(new Date(String(gravacoes[0]!.inicio)).getUTCHours()).toBe(13);
-      expect(t.encaminhamentos).toHaveLength(0);
-    });
+    ] as const)
+      test(`${teste ? "homologação" : "real"}: reserva e confirmação respeitam ${rotulo}`, async () => {
+        banco.profissionais![0]!.tipo_atendimento = rotulo;
+        const t = await preparar(teste);
+        const resumo = await t.turno("eu prefiro 10:20");
+        expect(resumo?.texto).toContain("10:20");
+        expect(t.estado.appointment.modalidade_atendimento).toBe(modo);
+        if (modo === "chegada_com_pre_agendamento") {
+          expect(resumo?.texto).toContain("quem chegar primeiro");
+          expect(resumo?.texto).not.toContain("30 minutos");
+        }
+        const r = await t.turno("Sim");
+        expect(r?.texto).toContain("10:20");
+        expect(r?.texto.includes("30 minutos")).toBe(antecedencia);
+        if (modo === "ficha") expect(r?.texto).toContain("*Sua ficha:* 002");
+        expect(gravacoes).toHaveLength(1);
+        expect(new Date(String(gravacoes[0]!.inicio)).getUTCHours()).toBe(13);
+        expect(t.encaminhamentos).toHaveLength(0);
+      });
     test(`${teste ? "homologação" : "real"}: modalidade alterada após resumo transfere sem reservar`, async () => {
       const t = await preparar(teste);
       await t.turno("vou 10:20");
@@ -1971,7 +2976,13 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
       expect(gravacoes).toHaveLength(0);
       expect(t.encaminhamentos[0]).toContain("MODALIDADE_ALTERADA");
     });
-    for (const frase of ["10:20 fica melhor", "eu prefiro 10:20", "marca pra 10:20", "eu vou 10:20", "pode deixar às 10h20"]) {
+    for (const frase of [
+      "10:20 fica melhor",
+      "eu prefiro 10:20",
+      "marca pra 10:20",
+      "eu vou 10:20",
+      "pode deixar às 10h20",
+    ]) {
       test(`${teste ? "homologação" : "real"}: ${frase} → resumo 10:20 → Sim → grava 10:20`, async () => {
         const t = await preparar(teste);
         const resumo = await t.turno(frase);
@@ -1986,7 +2997,9 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
         expect(gravacoes[0]!.inicio).toBe(t.estado.appointment.confirmation!.vaga.inicio);
         expect(gravacoes[0]!.medico_id).toBe(MEDICO);
         expect(gravacoes[0]!.procedimento).toBe("Consulta Cardiologia");
-        expect(banco.agendamentos!.find(v => v.id === "vaga-0")!.paciente_nome).toBe("DISPONIVEL");
+        expect(banco.agendamentos!.find((v) => v.id === "vaga-0")!.paciente_nome).toBe(
+          "DISPONIVEL",
+        );
         expect(t.encaminhamentos).toHaveLength(0);
       });
     }
@@ -1994,7 +3007,7 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
       test(`${teste ? "homologação" : "real"}: vaga perdida ${momento} oferece novas opções, sem transferir nem reservar 08:00`, async () => {
         const t = await preparar(teste);
         if (momento === "apos_resumo") await t.turno("vou 10:20");
-        banco.agendamentos!.find(v => v.id === "vaga-1")!.paciente_nome = "Outra pessoa";
+        banco.agendamentos!.find((v) => v.id === "vaga-1")!.paciente_nome = "Outra pessoa";
         const r = await t.turno(momento === "apos_resumo" ? "Sim" : "vou 10:20");
         // Decisão 02/10/2026: horário ocupado não transfere mais.
         expect(r?.origem).toBe("gate");
@@ -2022,7 +3035,11 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     expect(r.ok).toBe(false);
     expect(t.estado.appointment.confirmation).toBeNull();
   });
-  for (const frase of ["quero dez e vinte", "o segundo horário é melhor", "vou no último horário oferecido"])
+  for (const frase of [
+    "quero dez e vinte",
+    "o segundo horário é melhor",
+    "vou no último horário oferecido",
+  ])
     test(`escolha interpretada pelo modelo também é revalidada: ${frase}`, async () => {
       const t = await preparar();
       t.ctx.consultaAgenda!.mensagemAtual = frase;
@@ -2033,10 +3050,14 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
       expect(gravacoes).toHaveLength(0);
     });
   test("modelo não pode substituir 10:20 por 08:00 nem inventar vaga", async () => {
-    const t = await preparar(); t.ctx.consultaAgenda!.mensagemAtual = "marca pra 10:20";
+    const t = await preparar();
+    t.ctx.consultaAgenda!.mensagemAtual = "marca pra 10:20";
     const vaga = t.estado.appointment.slot_options!.vagas[0]!;
     expect((await executarFerramentaPaciente(t.ctx, "selecionar_horario", vaga)).ok).toBe(false);
-    expect((await executarFerramentaPaciente(t.ctx, "selecionar_horario", { ...vaga, medico_id: OUTRO })).ok).toBe(false);
+    expect(
+      (await executarFerramentaPaciente(t.ctx, "selecionar_horario", { ...vaga, medico_id: OUTRO }))
+        .ok,
+    ).toBe(false);
     expect(gravacoes).toHaveLength(0);
   });
   test("horário fora da lista segue para nova consulta, sem escolher a primeira opção", async () => {
@@ -2047,8 +3068,10 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
     expect(gravacoes).toHaveLength(0);
   });
   test("vaga sumida após o resumo não promete transferência nem reserva", async () => {
-    const t = await preparar(); t.falharHandoff();
-    await t.turno("vou 10:20"); banco.agendamentos = [];
+    const t = await preparar();
+    t.falharHandoff();
+    await t.turno("vou 10:20");
+    banco.agendamentos = [];
     const r = await t.turno("Sim");
     expect(r?.texto).not.toMatch(/Encaminhei|transferi/i);
     expect(r?.texto).toContain("não fiz nenhuma reserva");
@@ -2059,13 +3082,28 @@ describe("regressão 08:00 versus 10:20 — consulta, escolha, resumo, aceite e 
 describe("identificação pendente bloqueia avanço da agenda", () => {
   for (const busca of ["consultar_cadastro", "buscar_procedimentos", "buscar_medicos"]) {
     test(busca + " pede esclarecimento e impede consulta ou reserva no mesmo turno", async () => {
-      resultadoCatalogo.esclarecimento = { tipo: "procedimento", pergunta: "Qual ultrassonografia?", opcoes: [] };
+      resultadoCatalogo.esclarecimento = {
+        tipo: "procedimento",
+        pergunta: "Qual ultrassonografia?",
+        opcoes: [],
+      };
       const ctx: CtxNinaPaciente = { ...contexto("Quero USG"), podeAgendar: true };
-      const r = await executarFerramentaPaciente(ctx, busca, { termo: "USG", nome: "Alex", especialidade: "Cardiologia" });
+      const r = await executarFerramentaPaciente(ctx, busca, {
+        termo: "USG",
+        nome: "Alex",
+        especialidade: "Cardiologia",
+      });
       expect(r.ok).toBe(true);
       expect(ctx.esclarecimentoCatalogo).toBeDefined();
       const antes = leituras.length;
-      for (const nome of ["proxima_vaga", "consultar_disponibilidade", "verificar_horario", "consultar_primeiro_disponivel", "selecionar_horario", "agendar"]) {
+      for (const nome of [
+        "proxima_vaga",
+        "consultar_disponibilidade",
+        "verificar_horario",
+        "consultar_primeiro_disponivel",
+        "selecionar_horario",
+        "agendar",
+      ]) {
         const bloqueado = await executarFerramentaPaciente(ctx, nome, argumentos);
         expect(bloqueado.precisa_esclarecer).toBe(true);
         expect(bloqueado.consulta_realizada).toBe(false);
@@ -2085,76 +3123,153 @@ describe("horários apresentados por período", () => {
   const dataSeguinte = new Date(dia.getTime() + 86_400_000).toISOString().slice(0, 10);
   const depois = (base: Date, min: number) => new Date(base.getTime() + min * 60_000);
   const linha = (id: string, inicio: Date, livre: boolean): Linha => ({
-    id, clinica_id: CLINICA, medico_id: MEDICO, inicio: inicio.toISOString(),
-    fim: depois(inicio, 5).toISOString(), paciente_nome: livre ? "DISPONIVEL" : "PACIENTE FICTICIO", status: "confirmado",
+    id,
+    clinica_id: CLINICA,
+    medico_id: MEDICO,
+    inicio: inicio.toISOString(),
+    fim: depois(inicio, 5).toISOString(),
+    paciente_nome: livre ? "DISPONIVEL" : "PACIENTE FICTICIO",
+    status: "confirmado",
   });
   function agendaDoDia(livresNoDiaSeguinte = 3) {
     const linhas: Linha[] = [];
     // 08:00–10:15 livres (28), 10:20–13:35 ocupados, 13:40–17:45 livres (50).
-    for (let i = 0; i < 118; i++) linhas.push(linha(`d${i}`, depois(dia, i * 5), i < 28 || i >= 68));
-    for (let i = 0; i < livresNoDiaSeguinte; i++) linhas.push(linha(`s${i}`, depois(dia, 24 * 60 + i * 5), true));
+    for (let i = 0; i < 118; i++)
+      linhas.push(linha(`d${i}`, depois(dia, i * 5), i < 28 || i >= 68));
+    for (let i = 0; i < livresNoDiaSeguinte; i++)
+      linhas.push(linha(`s${i}`, depois(dia, 24 * 60 + i * 5), true));
     banco.agendamentos = linhas;
   }
   const horas = (r: Record<string, unknown>) => ((r.horarios ?? []) as Linha[]).map((h) => h.hora);
-  const opcoes = (ctx: { estado?: { appointment: { slot_options?: { vagas: unknown[] } | null } } | null }) =>
-    ctx.estado?.appointment.slot_options?.vagas ?? [];
+  const opcoes = (ctx: {
+    estado?: { appointment: { slot_options?: { vagas: unknown[] } | null } } | null;
+  }) => ctx.estado?.appointment.slot_options?.vagas ?? [];
 
   for (const origem of ["homologacao", "whatsapp"] as const) {
-    test.each([null, "", " \t\n "])(`${origem}: filtros opcionais vazios (%j) consultam agenda sem encaminhar nem reservar`, async vazio => {
-      agendaDoDia();
-      const ctx: CtxNinaPaciente = { ...contexto("sábado de manhã"), origem, teste: origem === "homologacao" };
-      const args = { medico_id: MEDICO, data: dataDia, periodo: "manha", a_partir_da_hora: vazio, especialidade: vazio, mais: vazio, dias: vazio };
-      const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", args);
-      expect(r.ok).toBe(true);
-      expect(horas(r)[0]).toBe("08:00");
-      expect(leituras.some(l => l.tabela === "agendamentos")).toBe(true);
-      expect(encaminhamentoFalhaAgendamento(validarResultado("consultar_disponibilidade", r))).toBeNull();
-      expect(gravacoes).toHaveLength(0);
-      expect(args.a_partir_da_hora).toBe(vazio); // não altera o argumento auditado
-    });
-    test.each([null, "", " \t\n "])(`${origem}: próxima vaga ignora opcionais vazios (%j), inclusive dia da semana numérico`, async vazio => {
-      agendaDoDia();
-      const ctx: CtxNinaPaciente = { ...contexto("o primeiro horário"), origem, teste: origem === "homologacao" };
-      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO,
-        especialidade: vazio, a_partir_de: vazio, periodo: vazio, a_partir_da_hora: vazio, mais: vazio, dia_semana: vazio, dias: vazio });
-      expect(r.ok).toBe(true);
-      expect(r.proxima).toMatchObject({ hora: "08:00" });
-      expect(r.data).toBe(dataDia);
-      expect(encaminhamentoFalhaAgendamento(validarResultado("proxima_vaga", r))).toBeNull();
-      expect(gravacoes).toHaveLength(0);
-    });
+    test.each([null, "", " \t\n "])(
+      `${origem}: filtros opcionais vazios (%j) consultam agenda sem encaminhar nem reservar`,
+      async (vazio) => {
+        agendaDoDia();
+        const ctx: CtxNinaPaciente = {
+          ...contexto("sábado de manhã"),
+          origem,
+          teste: origem === "homologacao",
+        };
+        const args = {
+          medico_id: MEDICO,
+          data: dataDia,
+          periodo: "manha",
+          a_partir_da_hora: vazio,
+          especialidade: vazio,
+          mais: vazio,
+          dias: vazio,
+        };
+        const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", args);
+        expect(r.ok).toBe(true);
+        expect(horas(r)[0]).toBe("08:00");
+        expect(leituras.some((l) => l.tabela === "agendamentos")).toBe(true);
+        expect(
+          encaminhamentoFalhaAgendamento(validarResultado("consultar_disponibilidade", r)),
+        ).toBeNull();
+        expect(gravacoes).toHaveLength(0);
+        expect(args.a_partir_da_hora).toBe(vazio); // não altera o argumento auditado
+      },
+    );
+    test.each([null, "", " \t\n "])(
+      `${origem}: próxima vaga ignora opcionais vazios (%j), inclusive dia da semana numérico`,
+      async (vazio) => {
+        agendaDoDia();
+        const ctx: CtxNinaPaciente = {
+          ...contexto("o primeiro horário"),
+          origem,
+          teste: origem === "homologacao",
+        };
+        const r = await executarFerramentaPaciente(ctx, "proxima_vaga", {
+          medico_id: MEDICO,
+          especialidade: vazio,
+          a_partir_de: vazio,
+          periodo: vazio,
+          a_partir_da_hora: vazio,
+          mais: vazio,
+          dia_semana: vazio,
+          dias: vazio,
+        });
+        expect(r.ok).toBe(true);
+        expect(r.proxima).toMatchObject({ hora: "08:00" });
+        expect(r.data).toBe(dataDia);
+        expect(encaminhamentoFalhaAgendamento(validarResultado("proxima_vaga", r))).toBeNull();
+        expect(gravacoes).toHaveLength(0);
+      },
+    );
     test(`${origem}: mais de 10 em manhã e tarde → pergunta o período sem listar nem encaminhar`, async () => {
       agendaDoDia();
-      const ctx: CtxNinaPaciente = { ...contexto("Tem vaga dia 30?"), origem, teste: origem === "homologacao" };
+      const ctx: CtxNinaPaciente = {
+        ...contexto("Tem vaga dia 30?"),
+        origem,
+        teste: origem === "homologacao",
+      };
       const args = { medico_id: MEDICO, data: dataDia };
       const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", args);
       expect(r.ok).toBe(true);
       expect(r.modo_apresentacao).toBe("escolher_periodo");
       expect(horas(r)).toEqual([]);
-      expect((r.periodos_com_vagas as Linha[]).map((p) => [p.periodo, p.quantidade])).toEqual([["manha", 28], ["tarde", 50]]);
+      expect((r.periodos_com_vagas as Linha[]).map((p) => [p.periodo, p.quantidade])).toEqual([
+        ["manha", 28],
+        ["tarde", 50],
+      ]);
       expect(String(r.instrucao)).toContain("Qual período você prefere?");
-      expect(encaminhamentoSemVagas(validarResultado("consultar_disponibilidade", r), args)).toBeNull();
+      expect(
+        encaminhamentoSemVagas(validarResultado("consultar_disponibilidade", r), args),
+      ).toBeNull();
       expect(opcoes(ctx)).toHaveLength(0);
     });
   }
 
-  test.each([null, "", " \t "])("opcional inválido e horário obrigatório vazio (%j) continuam rejeitados", async vazio => {
-    agendaDoDia();
-    const ctx = contexto("quero o primeiro horário");
-    expect(await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, a_partir_da_hora: "25:99" })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
-    expect(await executarFerramentaPaciente(ctx, "verificar_horario", { medico_id: MEDICO, data: dataDia, hora: vazio })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
-    expect(await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, dias: 0 })).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
-    expect(gravacoes).toHaveLength(0);
-  });
+  test.each([null, "", " \t "])(
+    "opcional inválido e horário obrigatório vazio (%j) continuam rejeitados",
+    async (vazio) => {
+      agendaDoDia();
+      const ctx = contexto("quero o primeiro horário");
+      expect(
+        await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+          medico_id: MEDICO,
+          data: dataDia,
+          a_partir_da_hora: "25:99",
+        }),
+      ).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+      expect(
+        await executarFerramentaPaciente(ctx, "verificar_horario", {
+          medico_id: MEDICO,
+          data: dataDia,
+          hora: vazio,
+        }),
+      ).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+      expect(
+        await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+          medico_id: MEDICO,
+          data: dataDia,
+          dias: 0,
+        }),
+      ).toMatchObject({ ok: false, erro: "VALIDATION_ERROR" });
+      expect(gravacoes).toHaveLength(0);
+    },
+  );
 
   test("zero e false são preservados como filtros: domingo e primeira página", async () => {
     const domingo = new Date(dia);
-    domingo.setUTCDate(domingo.getUTCDate() + (7 - domingo.getUTCDay()) % 7);
+    domingo.setUTCDate(domingo.getUTCDate() + ((7 - domingo.getUTCDay()) % 7));
     const sabado = new Date(domingo.getTime() - 86_400_000);
     banco.agendamentos = [linha("sabado", sabado, true), linha("domingo", domingo, true)];
-    const r = await executarFerramentaPaciente(contexto("primeiro horário de domingo"), "proxima_vaga", {
-      medico_id: MEDICO, dia_semana: 0, mais: false, a_partir_da_hora: "",
-    });
+    const r = await executarFerramentaPaciente(
+      contexto("primeiro horário de domingo"),
+      "proxima_vaga",
+      {
+        medico_id: MEDICO,
+        dia_semana: 0,
+        mais: false,
+        a_partir_da_hora: "",
+      },
+    );
     expect(r.ok).toBe(true);
     expect(r.data).toBe(domingo.toISOString().slice(0, 10));
     expect(r.proxima).toMatchObject({ hora: "08:00" });
@@ -2162,9 +3277,14 @@ describe("horários apresentados por período", () => {
   });
 
   test("até 10 horários: todos, e todos ficam escolhíveis", async () => {
-    banco.agendamentos = Array.from({ length: 6 }, (_, i) => linha(`p${i}`, depois(dia, i * 30), true));
+    banco.agendamentos = Array.from({ length: 6 }, (_, i) =>
+      linha(`p${i}`, depois(dia, i * 30), true),
+    );
     const ctx = contexto("Tem vaga dia 30?");
-    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia });
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+    });
     expect(r.modo_apresentacao).toBe("todos");
     expect(horas(r)).toEqual(["08:00", "08:30", "09:00", "09:30", "10:00", "10:30"]);
     expect(opcoes(ctx)).toHaveLength(6);
@@ -2173,12 +3293,33 @@ describe("horários apresentados por período", () => {
   test("tarde → 10 primeiros; mostrar os próximos continua sem repetir e soma as opções", async () => {
     agendaDoDia();
     const ctx = contexto("à tarde");
-    const tarde = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
-    expect(horas(tarde)).toEqual(["13:40", "13:45", "13:50", "13:55", "14:00", "14:05", "14:10", "14:15", "14:20", "14:25"]);
+    const tarde = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+    });
+    expect(horas(tarde)).toEqual([
+      "13:40",
+      "13:45",
+      "13:50",
+      "13:55",
+      "14:00",
+      "14:05",
+      "14:10",
+      "14:15",
+      "14:20",
+      "14:25",
+    ]);
     expect(tarde.ha_mais).toBe(true);
-    expect(String(tarde.instrucao)).toContain("Esses são os primeiros horários disponíveis nesse período. Se preferir, posso mostrar os próximos.");
+    expect(String(tarde.instrucao)).toContain(
+      "Esses são os primeiros horários disponíveis nesse período. Se preferir, posso mostrar os próximos.",
+    );
     ctx.consultaAgenda.mensagemAtual = "mostra os outros";
-    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, mais: true });
+    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      mais: true,
+    });
     expect(segunda.ok, JSON.stringify(segunda)).toBe(true);
     expect(horas(segunda)[0]).toBe("14:30");
     expect(horas(segunda)).toHaveLength(10);
@@ -2189,18 +3330,28 @@ describe("horários apresentados por período", () => {
 
   test("tanto faz: primeiros horários do dia; depois das 14h", async () => {
     agendaDoDia();
-    const qualquer = await executarFerramentaPaciente(contexto("tanto faz"), "consultar_disponibilidade",
-      { medico_id: MEDICO, data: dataDia, periodo: "qualquer" });
+    const qualquer = await executarFerramentaPaciente(
+      contexto("tanto faz"),
+      "consultar_disponibilidade",
+      { medico_id: MEDICO, data: dataDia, periodo: "qualquer" },
+    );
     expect(horas(qualquer)[0]).toBe("08:00");
     expect(horas(qualquer)).toHaveLength(10);
-    const depoisDas14 = await executarFerramentaPaciente(contexto("depois das 14h"), "consultar_disponibilidade",
-      { medico_id: MEDICO, data: dataDia, a_partir_da_hora: "14:00" });
+    const depoisDas14 = await executarFerramentaPaciente(
+      contexto("depois das 14h"),
+      "consultar_disponibilidade",
+      { medico_id: MEDICO, data: dataDia, a_partir_da_hora: "14:00" },
+    );
     expect(horas(depoisDas14)[0]).toBe("14:00");
   });
 
   test("próxima vaga com período já informado não pergunta de novo", async () => {
     agendaDoDia();
-    const r = await executarFerramentaPaciente(contexto("a primeira data, de tarde"), "proxima_vaga", { medico_id: MEDICO, periodo: "tarde" });
+    const r = await executarFerramentaPaciente(
+      contexto("a primeira data, de tarde"),
+      "proxima_vaga",
+      { medico_id: MEDICO, periodo: "tarde" },
+    );
     expect(r.modo_apresentacao).toBe("primeiro_horario");
     expect((r.proxima as Linha).hora).toBe("13:40");
     expect(r.seguintes).toBeUndefined();
@@ -2209,7 +3360,9 @@ describe("horários apresentados por período", () => {
 
   test("próxima vaga sem período, com mais de 10 no dia: oferece somente a primeira", async () => {
     agendaDoDia();
-    const r = await executarFerramentaPaciente(contexto("a primeira data"), "proxima_vaga", { medico_id: MEDICO });
+    const r = await executarFerramentaPaciente(contexto("a primeira data"), "proxima_vaga", {
+      medico_id: MEDICO,
+    });
     expect(r.modo_apresentacao).toBe("primeiro_horario");
     expect(r.proxima).toMatchObject({ hora: "08:00" });
     expect(r.data).toBe(dataDia);
@@ -2218,7 +3371,9 @@ describe("horários apresentados por período", () => {
   });
 
   test("primeira vaga não abre lista mesmo quando há menos de dez opções", async () => {
-    banco.agendamentos = Array.from({ length: 6 }, (_, i) => linha(`primeira-${i}`, depois(dia, i * 30), true));
+    banco.agendamentos = Array.from({ length: 6 }, (_, i) =>
+      linha(`primeira-${i}`, depois(dia, i * 30), true),
+    );
     const ctx = contexto("o primeiro horário");
     const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
     expect(r.proxima).toMatchObject({ hora: "08:00" });
@@ -2227,17 +3382,30 @@ describe("horários apresentados por período", () => {
   });
 
   test("primeira vaga depois das 14h ignora dia que só tem manhã", async () => {
-    banco.agendamentos = [linha("manha", dia, true), linha("tarde-amanha", depois(dia, 24 * 60 + 7 * 60), true)];
+    banco.agendamentos = [
+      linha("manha", dia, true),
+      linha("tarde-amanha", depois(dia, 24 * 60 + 7 * 60), true),
+    ];
     const ctx = contexto("o primeiro horário depois das 14h");
-    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO, a_partir_da_hora: "14:00" });
-    expect(r.proxima).toMatchObject({ data: dataSeguinte.split("-").reverse().join("/"), hora: "15:00" });
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", {
+      medico_id: MEDICO,
+      a_partir_da_hora: "14:00",
+    });
+    expect(r.proxima).toMatchObject({
+      data: dataSeguinte.split("-").reverse().join("/"),
+      hora: "15:00",
+    });
     expect(opcoes(ctx)).toHaveLength(1);
   });
 
   for (const origem of ["homologacao", "whatsapp"] as const)
     test(`${origem}: primeira vaga registra só uma opção; pedido posterior permite outras sem repetir`, async () => {
       agendaDoDia();
-      const ctx = { ...contexto("pode ser o primeiro horário"), origem, teste: origem === "homologacao" };
+      const ctx = {
+        ...contexto("pode ser o primeiro horário"),
+        origem,
+        teste: origem === "homologacao",
+      };
       const primeira = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
       expect(primeira.proxima).toMatchObject({ hora: "08:00" });
       expect(primeira.seguintes).toBeUndefined();
@@ -2246,7 +3414,10 @@ describe("horários apresentados por período", () => {
       expect(gravacoes).toHaveLength(0);
       ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
       ctx.consultaAgenda.mensagemAtual = "quero ver outros horários";
-      const outras = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO, mais: true });
+      const outras = await executarFerramentaPaciente(ctx, "proxima_vaga", {
+        medico_id: MEDICO,
+        mais: true,
+      });
       expect(outras.ok, JSON.stringify(outras)).toBe(true);
       expect((outras.proxima as Linha).hora).not.toBe("08:00");
       expect(outras.seguintes as Linha[]).toHaveLength(9);
@@ -2257,14 +3428,29 @@ describe("horários apresentados por período", () => {
   test("troca de data e reset recomeçam a lista", async () => {
     agendaDoDia(15);
     const ctx = contexto("à tarde");
-    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
-    const outraData = await executarFerramentaPaciente(ctx, "consultar_disponibilidade",
-      { medico_id: MEDICO, data: dataSeguinte, mais: true });
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+    });
+    const outraData = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataSeguinte,
+      mais: true,
+    });
     expect(horas(outraData)[0]).toBe("08:00");
-    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+    });
     ctx.estado.session_id = "sessao-nova";
-    const aposReset = await executarFerramentaPaciente(ctx, "consultar_disponibilidade",
-      { medico_id: MEDICO, data: dataDia, periodo: "tarde", mais: true });
+    const aposReset = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+      mais: true,
+    });
     expect(horas(aposReset)[0]).toBe("13:40");
   });
 
@@ -2273,22 +3459,38 @@ describe("horários apresentados por período", () => {
     const ctx = contexto("à tarde");
     ctx.estado.appointment.doctor_id = MEDICO;
     ctx.estado.appointment.procedure = "Consulta Cardiologia";
-    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+    });
     const vaga = ctx.estado.appointment.slot_options!.vagas.find((v) => v.hora === "13:40")!;
     banco.agendamentos!.find((l) => l.inicio === vaga.inicio)!.paciente_nome = "OUTRO PACIENTE";
     ctx.consultaAgenda.mensagemAtual = "13:40";
-    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: vaga.inicio, fim: vaga.fim });
+    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+      medico_id: MEDICO,
+      inicio: vaga.inicio,
+      fim: vaga.fim,
+    });
     expect(escolha.erro).toBe("SLOT_UNAVAILABLE");
     expect(gravacoes).toHaveLength(0);
     ctx.consultaAgenda.mensagemAtual = "mostra os outros";
-    const seguinte = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, mais: true });
+    const seguinte = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      mais: true,
+    });
     expect(horas(seguinte)).not.toContain("13:40");
     expect(ctx.estado.appointment.slot_options!.vagas.some((v) => v.hora === "13:40")).toBe(false);
   });
 
   test("horário pedido ocupado: alternativas do mesmo período, até 10, com aviso de mais", async () => {
     agendaDoDia();
-    const r = await executarFerramentaPaciente(contexto("Tem 10:30?"), "verificar_horario", { medico_id: MEDICO, data: dataDia, hora: "10:30" });
+    const r = await executarFerramentaPaciente(contexto("Tem 10:30?"), "verificar_horario", {
+      medico_id: MEDICO,
+      data: dataDia,
+      hora: "10:30",
+    });
     expect(r.disponivel).toBe(false);
     expect((r.alternativas as Linha[]).map((a) => a.hora)[0]).toBe("08:00");
     expect(r.alternativas as Linha[]).toHaveLength(10);
@@ -2302,8 +3504,11 @@ describe("horários apresentados por período", () => {
     test(`${esperada}: lista por período preserva modalidade e orientação`, async () => {
       agendaDoDia();
       banco.profissionais![0]!.tipo_atendimento = publicada;
-      const r = await executarFerramentaPaciente(contexto("à tarde"), "consultar_disponibilidade",
-        { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
+      const r = await executarFerramentaPaciente(contexto("à tarde"), "consultar_disponibilidade", {
+        medico_id: MEDICO,
+        data: dataDia,
+        periodo: "tarde",
+      });
       const primeira = (r.horarios as Linha[])[0]!;
       expect(primeira.modalidade_atendimento).toBe(esperada);
       expect(String(primeira.orientacao)).toContain(trecho);
@@ -2313,7 +3518,11 @@ describe("horários apresentados por período", () => {
     agendaDoDia();
     banco.profissionais![0]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
     const ctx = contexto("Tem vaga dia 30?");
-    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+    });
     expect(r.sem_agendamento).toBe(true);
     expect(r.horarios).toBeUndefined();
     expect(ctx.estado.appointment.slot_options).toBeNull();
@@ -2330,36 +3539,66 @@ describe("regressão 26/09: horário de página anterior continua escolhível", 
   const depois = (base: Date, min: number) => new Date(base.getTime() + min * 60_000);
   test("tanto faz → mais com a_partir_da_hora → escolhe 08:20 da 1ª página", async () => {
     banco.agendamentos = Array.from({ length: 30 }, (_, i) => ({
-      id: `r${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i * 10).toISOString(),
-      fim: depois(dia, i * 10 + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
+      id: `r${i}`,
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      inicio: depois(dia, i * 10).toISOString(),
+      fim: depois(dia, i * 10 + 10).toISOString(),
+      paciente_nome: "DISPONIVEL",
+      status: "confirmado",
     }));
     const ctx = contexto("tanto faz");
     ctx.estado.appointment.doctor_id = MEDICO;
     ctx.estado.appointment.procedure = "Consulta Cardiologia";
-    const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "qualquer" });
+    const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "qualquer",
+    });
     expect(((primeira.horarios as Linha[]) ?? []).map((h) => h.hora)).toContain("08:20");
     expect(String(primeira.instrucao)).toContain("nesse dia");
     ctx.consultaAgenda.mensagemAtual = "mostra os outros";
-    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade",
-      { medico_id: MEDICO, data: dataDia, mais: true, a_partir_da_hora: "09:40" });
+    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      mais: true,
+      a_partir_da_hora: "09:40",
+    });
     expect(((segunda.horarios as Linha[]) ?? []).map((h) => h.hora)[0]).toBe("09:40");
     expect(String(segunda.instrucao)).toContain("Esses são os próximos");
     expect(ctx.estado.appointment.slot_options!.vagas).toHaveLength(20);
     const vaga = ctx.estado.appointment.slot_options!.vagas.find((v) => v.hora === "08:20")!;
     ctx.consultaAgenda.mensagemAtual = "Pensando melhor, vou querer aquele das 08:20.";
-    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: vaga.inicio, fim: vaga.fim });
+    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+      medico_id: MEDICO,
+      inicio: vaga.inicio,
+      fim: vaga.fim,
+    });
     expect(escolha.ok).toBe(true);
     expect(String(escolha.resumo_confirmacao)).toContain("08:20");
   });
 
   test("trocar de período mantém escolhíveis os horários já mostrados", async () => {
     banco.agendamentos = Array.from({ length: 30 }, (_, i) => ({
-      id: `t${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i < 15 ? i * 10 : 300 + i * 10).toISOString(),
-      fim: depois(dia, (i < 15 ? i * 10 : 300 + i * 10) + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
+      id: `t${i}`,
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      inicio: depois(dia, i < 15 ? i * 10 : 300 + i * 10).toISOString(),
+      fim: depois(dia, (i < 15 ? i * 10 : 300 + i * 10) + 10).toISOString(),
+      paciente_nome: "DISPONIVEL",
+      status: "confirmado",
     }));
     const ctx = contexto("de manhã");
-    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "manha" });
-    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "tarde" });
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "manha",
+    });
+    await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "tarde",
+    });
     const horasGuardadas = ctx.estado.appointment.slot_options!.vagas.map((v) => v.hora);
     expect(horasGuardadas).toContain("08:00");
     expect(horasGuardadas.some((h) => h >= "13:00")).toBe(true);
@@ -2369,92 +3608,225 @@ describe("regressão 26/09: horário de página anterior continua escolhível", 
 // Reteste 02 (26/09/2026): entre os turnos o estado é salvo e relido, e o termo
 // da pesquisa do catálogo é refeito a cada mensagem. A lista não pode se perder.
 describe("consultas comuns, revisão e noturna do Lead 01", () => {
-  function preparar(nome: string, especialidade: string, titulos: string[], periodo: "manha" | "noite" = "manha") {
+  function preparar(
+    nome: string,
+    especialidade: string,
+    titulos: string[],
+    periodo: "manha" | "noite" = "manha",
+  ) {
     banco.medicos![0]!.nome = nome;
-    Object.assign(banco.profissionais![0]!, { nome, medico_id: MEDICO, especialidades: [{ nome: especialidade }],
-      observacao_publica: titulos.map((titulo, i) => `${titulo}\nEspecialidade: ${especialidade}\nDias e horários: Sábado 08:00–12:00\nDinheiro: R$ ${120 + i * 10},00\nPix/cartão: R$ ${145 + i * 10},00\nObservação: Hora marcada`).join("\n\n") });
-    const slot = new Date(inicio); slot.setUTCHours(periodo === "manha" ? 12 : 22);
-    Object.assign(banco.agendamentos![0]!, { inicio: slot.toISOString(), fim: new Date(slot.getTime() + 30 * 60000).toISOString() });
+    Object.assign(banco.profissionais![0]!, {
+      nome,
+      medico_id: MEDICO,
+      especialidades: [{ nome: especialidade }],
+      observacao_publica: titulos
+        .map(
+          (titulo, i) =>
+            `${titulo}\nEspecialidade: ${especialidade}\nDias e horários: Sábado 08:00–12:00\nDinheiro: R$ ${120 + i * 10},00\nPix/cartão: R$ ${145 + i * 10},00\nObservação: Hora marcada`,
+        )
+        .join("\n\n"),
+    });
+    const slot = new Date(inicio);
+    slot.setUTCHours(periodo === "manha" ? 12 : 22);
+    Object.assign(banco.agendamentos![0]!, {
+      inicio: slot.toISOString(),
+      fim: new Date(slot.getTime() + 30 * 60000).toISOString(),
+    });
     Object.assign(banco.medico_disponibilidades![0]!, { hora_inicio: "08:00", hora_fim: "23:00" });
-    const ctx: CtxNinaPaciente = { ...contexto(`Quero ${especialidade} com ${nome}`), podeAgendar: true };
-    ctx.estado!.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: ctx.estado!.session_id!,
+    const ctx: CtxNinaPaciente = {
+      ...contexto(`Quero ${especialidade} com ${nome}`),
+      podeAgendar: true,
+    };
+    ctx.estado!.knowledge_context = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: ctx.estado!.session_id!,
       consulta: { termo: especialidade, tipo_atendimento: "consulta", medico: nome },
-      referencias: [{ registro: CATALOGO, versao: null, procedimento: `Consulta — ${especialidade}`, medicoNome: nome }] };
+      referencias: [
+        {
+          registro: CATALOGO,
+          versao: null,
+          procedimento: `Consulta — ${especialidade}`,
+          medicoNome: nome,
+        },
+      ],
+    };
     return { ctx, data: slot.toISOString().slice(0, 10) };
   }
   for (const origem of ["homologacao", "whatsapp"] as const) {
     for (const caso of [
-      { nome: "Sandro da Silva Prinsceswal", especialidade: "CLINICO GERAL", titulos: ["CONSULTA CLINICA MEDICA", "REVISAO"] },
-      { nome: "Marina Almeida Dias", especialidade: "OFTALMOLOGIA", titulos: ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"] },
-    ]) test(`${origem}: ${caso.nome} preserva consulta comum, médico e manhã`, async () => {
-      const { ctx, data } = preparar(caso.nome, caso.especialidade, caso.titulos);
-      ctx.origem = origem; ctx.teste = origem === "homologacao";
-      const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
-      expect(r.ok, JSON.stringify(r)).toBe(true);
-      expect(ctx.estado!.appointment.slot_options!.vagas).toHaveLength(1);
-      expect(ctx.estado!.appointment.slot_options!.vagas[0]).toMatchObject({ medico_id: MEDICO, medico: caso.nome,
-        procedimento: `${caso.titulos[0]} — ${caso.especialidade}`, data, hora: "09:00" });
-      expect(gravacoes).toHaveLength(0);
-      expect((await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar)).ok).toBe(false);
-      expect(gravacoes).toHaveLength(0);
-    });
+      {
+        nome: "Sandro da Silva Prinsceswal",
+        especialidade: "CLINICO GERAL",
+        titulos: ["CONSULTA CLINICA MEDICA", "REVISAO"],
+      },
+      {
+        nome: "Marina Almeida Dias",
+        especialidade: "OFTALMOLOGIA",
+        titulos: ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"],
+      },
+    ])
+      test(`${origem}: ${caso.nome} preserva consulta comum, médico e manhã`, async () => {
+        const { ctx, data } = preparar(caso.nome, caso.especialidade, caso.titulos);
+        ctx.origem = origem;
+        ctx.teste = origem === "homologacao";
+        const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+          medico_id: MEDICO,
+          data,
+          periodo: "manha",
+        });
+        expect(r.ok, JSON.stringify(r)).toBe(true);
+        expect(ctx.estado!.appointment.slot_options!.vagas).toHaveLength(1);
+        expect(ctx.estado!.appointment.slot_options!.vagas[0]).toMatchObject({
+          medico_id: MEDICO,
+          medico: caso.nome,
+          procedimento: `${caso.titulos[0]} — ${caso.especialidade}`,
+          data,
+          hora: "09:00",
+        });
+        expect(gravacoes).toHaveLength(0);
+        expect((await executarFerramentaPaciente(ctx, "agendar", argumentosAgendar)).ok).toBe(
+          false,
+        );
+        expect(gravacoes).toHaveLength(0);
+      });
   }
   test("primeiro disponível também distingue noturna pelo período e conserva o valor da opção", async () => {
-    const { ctx, data } = preparar("Marina Almeida Dias", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"], "noite");
-    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", { tipo: "consulta", atendimento: "OFTALMOLOGIA", data, periodo: "noite" });
+    const { ctx, data } = preparar(
+      "Marina Almeida Dias",
+      "OFTALMOLOGIA",
+      ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"],
+      "noite",
+    );
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+      tipo: "consulta",
+      atendimento: "OFTALMOLOGIA",
+      data,
+      periodo: "noite",
+    });
     expect(r.ok, JSON.stringify(r)).toBe(true);
-    expect(r.proxima).toMatchObject({ registro: { preco_dinheiro: "R$ 130,00", preco_cartao: "R$ 155,00" } });
-    expect(ctx.estado!.appointment.slot_options!.vagas[0]).toMatchObject({ medico_id: MEDICO,
-      procedimento: "CONSULTA NOTURNA — OFTALMOLOGIA", hora: "19:00" });
+    expect(r.proxima).toMatchObject({
+      registro: { preco_dinheiro: "R$ 130,00", preco_cartao: "R$ 155,00" },
+    });
+    expect(ctx.estado!.appointment.slot_options!.vagas[0]).toMatchObject({
+      medico_id: MEDICO,
+      procedimento: "CONSULTA NOTURNA — OFTALMOLOGIA",
+      hora: "19:00",
+    });
     expect(gravacoes).toHaveLength(0);
   });
-  test.each(["proxima_vaga", "consultar_primeiro_disponivel"])("%s: dúvida real esclarece antes da agenda; título escolhido permite continuar", async ferramenta => {
-    const { ctx, data } = preparar("Marina Almeida Dias", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA", "REVISAO"]);
-    const r = await executarFerramentaPaciente(ctx, ferramenta, ferramenta === "proxima_vaga"
-      ? { medico_id: MEDICO } : { tipo: "consulta", atendimento: "OFTALMOLOGIA" });
-    expect(r).toMatchObject({ codigo: "ATENDIMENTO_CONSULTA_PENDENTE", aguardando_paciente: true, consulta_realizada: false });
-    expect(r.atendimentos).toEqual(["CONSULTA OFTALMO — OFTALMOLOGIA", "CONSULTA NOTURNA — OFTALMOLOGIA"]);
-    expect(consultasAgenda()).toHaveLength(0);
-    expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
-    ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
-    ctx.estado.knowledge_context!.consulta.termo = "CONSULTA OFTALMO";
-    const retomada = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
-    expect(retomada.ok, JSON.stringify(retomada)).toBe(true);
-    expect(ctx.estado.appointment.slot_options!.vagas[0]!.procedimento).toBe("CONSULTA OFTALMO — OFTALMOLOGIA");
-    expect(gravacoes).toHaveLength(0);
-  });
-  test.each(["consultar_disponibilidade", "consultar_primeiro_disponivel"])("%s: pedido noturno conflitante com manhã pede esclarecimento sem consultar agenda", async ferramenta => {
-    const { ctx, data } = preparar("Marina", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA"]);
-    ctx.estado!.knowledge_context!.consulta.termo = "CONSULTA NOTURNA";
-    const r = await executarFerramentaPaciente(ctx, ferramenta, ferramenta === "consultar_disponibilidade"
-      ? { medico_id: MEDICO, data, periodo: "manha" }
-      : { tipo: "consulta", atendimento: "CONSULTA NOTURNA", data, periodo: "manha" });
-    expect(r).toMatchObject({ codigo: "ATENDIMENTO_CONSULTA_PENDENTE", aguardando_paciente: true, consulta_realizada: false });
-    expect(consultasAgenda()).toHaveLength(0);
-    expect(gravacoes).toHaveLength(0);
-  });
+  test.each(["proxima_vaga", "consultar_primeiro_disponivel"])(
+    "%s: dúvida real esclarece antes da agenda; título escolhido permite continuar",
+    async (ferramenta) => {
+      const { ctx, data } = preparar("Marina Almeida Dias", "OFTALMOLOGIA", [
+        "CONSULTA OFTALMO",
+        "CONSULTA NOTURNA",
+        "REVISAO",
+      ]);
+      const r = await executarFerramentaPaciente(
+        ctx,
+        ferramenta,
+        ferramenta === "proxima_vaga"
+          ? { medico_id: MEDICO }
+          : { tipo: "consulta", atendimento: "OFTALMOLOGIA" },
+      );
+      expect(r).toMatchObject({
+        codigo: "ATENDIMENTO_CONSULTA_PENDENTE",
+        aguardando_paciente: true,
+        consulta_realizada: false,
+      });
+      expect(r.atendimentos).toEqual([
+        "CONSULTA OFTALMO — OFTALMOLOGIA",
+        "CONSULTA NOTURNA — OFTALMOLOGIA",
+      ]);
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(ctx.estado!.appointment.slot_options?.vagas).toEqual([]);
+      ctx.estado = normalizarEstado(JSON.parse(JSON.stringify(ctx.estado)));
+      ctx.estado.knowledge_context!.consulta.termo = "CONSULTA OFTALMO";
+      const retomada = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+        medico_id: MEDICO,
+        data,
+        periodo: "manha",
+      });
+      expect(retomada.ok, JSON.stringify(retomada)).toBe(true);
+      expect(ctx.estado.appointment.slot_options!.vagas[0]!.procedimento).toBe(
+        "CONSULTA OFTALMO — OFTALMOLOGIA",
+      );
+      expect(gravacoes).toHaveLength(0);
+    },
+  );
+  test.each(["consultar_disponibilidade", "consultar_primeiro_disponivel"])(
+    "%s: pedido noturno conflitante com manhã pede esclarecimento sem consultar agenda",
+    async (ferramenta) => {
+      const { ctx, data } = preparar("Marina", "OFTALMOLOGIA", [
+        "CONSULTA OFTALMO",
+        "CONSULTA NOTURNA",
+      ]);
+      ctx.estado!.knowledge_context!.consulta.termo = "CONSULTA NOTURNA";
+      const r = await executarFerramentaPaciente(
+        ctx,
+        ferramenta,
+        ferramenta === "consultar_disponibilidade"
+          ? { medico_id: MEDICO, data, periodo: "manha" }
+          : { tipo: "consulta", atendimento: "CONSULTA NOTURNA", data, periodo: "manha" },
+      );
+      expect(r).toMatchObject({
+        codigo: "ATENDIMENTO_CONSULTA_PENDENTE",
+        aguardando_paciente: true,
+        consulta_realizada: false,
+      });
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(gravacoes).toHaveLength(0);
+    },
+  );
   test("consulta noturna explícita não oferece vaga diurna mesmo sem filtro de período", async () => {
-    const { ctx, data } = preparar("Marina", "OFTALMOLOGIA", ["CONSULTA OFTALMO", "CONSULTA NOTURNA"], "noite");
-    banco.agendamentos!.push({ ...banco.agendamentos![0]!, id: "diurna", inicio: `${data}T12:00:00.000Z`, fim: `${data}T12:30:00.000Z` });
+    const { ctx, data } = preparar(
+      "Marina",
+      "OFTALMOLOGIA",
+      ["CONSULTA OFTALMO", "CONSULTA NOTURNA"],
+      "noite",
+    );
+    banco.agendamentos!.push({
+      ...banco.agendamentos![0]!,
+      id: "diurna",
+      inicio: `${data}T12:00:00.000Z`,
+      fim: `${data}T12:30:00.000Z`,
+    });
     ctx.estado!.knowledge_context!.consulta.termo = "CONSULTA NOTURNA";
-    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data });
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data,
+    });
     expect(r.ok, JSON.stringify(r)).toBe(true);
-    expect(ctx.estado!.appointment.slot_options!.vagas.map(v => v.hora)).toEqual(["19:00"]);
+    expect(ctx.estado!.appointment.slot_options!.vagas.map((v) => v.hora)).toEqual(["19:00"]);
   });
   test("referência de revisão não substitui consulta comum ausente", async () => {
     const { ctx, data } = preparar("Sandro", "CLINICO GERAL", ["REVISAO"]);
     ctx.estado!.knowledge_context!.referencias[0]!.procedimento = "REVISAO — CLINICO GERAL";
-    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data,
+      periodo: "manha",
+    });
     expect(r.ok).toBe(false);
     expect(consultasAgenda()).toHaveLength(0);
     expect(gravacoes).toHaveLength(0);
   });
   test("revisão explicitamente solicitada não é trocada por consulta comum", async () => {
-    const { ctx, data } = preparar("Sandro", "CLINICO GERAL", ["CONSULTA CLINICA MEDICA", "REVISAO"]);
+    const { ctx, data } = preparar("Sandro", "CLINICO GERAL", [
+      "CONSULTA CLINICA MEDICA",
+      "REVISAO",
+    ]);
     ctx.estado!.knowledge_context!.consulta.termo = "REVISAO — CLINICO GERAL";
-    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data, periodo: "manha" });
+    const r = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data,
+      periodo: "manha",
+    });
     expect(r.ok, JSON.stringify(r)).toBe(true);
-    expect(ctx.estado!.appointment.slot_options!.vagas[0]!.procedimento).toBe("REVISAO — CLINICO GERAL");
+    expect(ctx.estado!.appointment.slot_options!.vagas[0]!.procedimento).toBe(
+      "REVISAO — CLINICO GERAL",
+    );
   });
 });
 
@@ -2468,31 +3840,61 @@ describe("paginação sobrevive entre turnos", () => {
     // Pesquisa válida só quando o termo é a consulta; frases como "mostra os
     // outros" refazem a pesquisa sem achar nada, como no atendimento real.
     const valida = termo === "cardiologia";
-    estado.knowledge_context = { versao: 1, clinicaId: CLINICA, sessionId: estado.session_id!,
+    estado.knowledge_context = {
+      versao: 1,
+      clinicaId: CLINICA,
+      sessionId: estado.session_id!,
       consulta: { termo, tipo_atendimento: "consulta" },
-      referencias: valida ? [{ registro: CATALOGO, versao: "v1", procedimento: "Consulta — Cardiologia", medicoNome: "Alex Louza" }] : [] } as never;
+      referencias: valida
+        ? [
+            {
+              registro: CATALOGO,
+              versao: "v1",
+              procedimento: "Consulta — Cardiologia",
+              medicoNome: "Alex Louza",
+            },
+          ]
+        : [],
+    } as never;
     ctx.estado = estado;
     ctx.consultaAgenda = { mensagemAtual: mensagem, historico: [] };
   }
   test("tanto faz → (novo turno) mais → (novo turno) escolhe horário da 1ª página", async () => {
     banco.agendamentos = Array.from({ length: 30 }, (_, i) => ({
-      id: `u${i}`, clinica_id: CLINICA, medico_id: MEDICO, inicio: depois(dia, i * 10).toISOString(),
-      fim: depois(dia, i * 10 + 10).toISOString(), paciente_nome: "DISPONIVEL", status: "confirmado",
+      id: `u${i}`,
+      clinica_id: CLINICA,
+      medico_id: MEDICO,
+      inicio: depois(dia, i * 10).toISOString(),
+      fim: depois(dia, i * 10 + 10).toISOString(),
+      paciente_nome: "DISPONIVEL",
+      status: "confirmado",
     }));
     banco.profissionais![0]!.especialidades = [{ nome: "Cardiologia" }];
     const ctx = contexto("tanto faz");
     novoTurno(ctx, "tanto faz", "cardiologia");
-    const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, periodo: "qualquer" });
+    const primeira = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      periodo: "qualquer",
+    });
     expect(((primeira.horarios as Linha[]) ?? [])[0]!.hora).toBe("08:00");
     novoTurno(ctx, "mostra os outros", "mostra os outros");
-    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", { medico_id: MEDICO, data: dataDia, mais: true });
+    const segunda = await executarFerramentaPaciente(ctx, "consultar_disponibilidade", {
+      medico_id: MEDICO,
+      data: dataDia,
+      mais: true,
+    });
     expect((segunda.horarios as unknown[]).length, JSON.stringify(segunda)).toBeGreaterThan(0);
     expect(((segunda.horarios as Linha[]) ?? [])[0]!.hora).toBe("09:40");
     expect(String(segunda.instrucao)).toContain("Esses são os próximos");
     novoTurno(ctx, "Pensando melhor, vou querer aquele das 08:20.", "vou querer aquele das 08:20");
     const vaga = ctx.estado.appointment.slot_options!.vagas.find((v) => v.hora === "08:20");
     expect(vaga).toBeDefined();
-    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", { medico_id: MEDICO, inicio: vaga!.inicio, fim: vaga!.fim });
+    const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+      medico_id: MEDICO,
+      inicio: vaga!.inicio,
+      fim: vaga!.fim,
+    });
     expect(escolha.ok, JSON.stringify(escolha)).toBe(true);
   });
 });

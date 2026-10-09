@@ -50,7 +50,8 @@ const PADRAO_MEDIUM =
 const PADRAO_ATENDIMENTO =
   /\b(?:usg|us|usam|ultra\w*|utra\w*|eco\w*|ecg|eletro\w*|rx|raio|eas|urina|preventivo|papanicolau|tomografia|resson\w*|mamografia|exames?|consultas?|\w+logi(?:a|sta)s?|pediatra|ortopedista|nutri\w*|fono\w*|cl[íi]nic[oa] geral|cl[íi]nico|dentista|gastro|neuro|cardio|gineco|dermato|oftalmo|otorrino|endocrino|uro)\b/i;
 /** Sinais de caso realmente complexo → HIGH (deve ser raro). */
-const PADRAO_ALTERNATIVAS = /\b(ou|alternativ|caso n[ãa]o|se n[ãa]o (der|puder|tiver)|qualquer um dos)\b/i;
+const PADRAO_ALTERNATIVAS =
+  /\b(ou|alternativ|caso n[ãa]o|se n[ãa]o (der|puder|tiver)|qualquer um dos)\b/i;
 const PADRAO_RESTRICAO =
   /\b(depois das?|antes das?|a partir das?|at[ée] as?|s[óo] posso|somente|apenas|n[ãa]o posso|preciso que seja|mesmo dia|no mesmo hor[áa]rio|junto com)\b/i;
 

@@ -82,7 +82,8 @@ export async function resolverConversaCore(
     })
     .eq("id", args.conversaId)
     .eq("clinica_id", args.clinicaId);
-  if (error) throw new Error((error as { message?: string }).message ?? "Falha ao resolver conversa");
+  if (error)
+    throw new Error((error as { message?: string }).message ?? "Falha ao resolver conversa");
 
   const { error: errEvento } = await db.from("atend_conversa_eventos").insert({
     clinica_id: args.clinicaId,

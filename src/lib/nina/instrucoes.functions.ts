@@ -295,7 +295,6 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
       if (!identidade.ok) throw new Error(identidade.mensagem);
     }
 
-
     const { data: anterior } = await supabase
       .from(TAB)
       .select("versao")
@@ -317,9 +316,7 @@ export const publicarInstrucoesNina = createServerFn({ method: "POST" })
     await auditar({
       clinicaId: data.clinicaId,
       userId,
-      acao: data.restauradaDe
-        ? "NINA_INSTRUCOES_RESTAURACAO"
-        : "NINA_INSTRUCOES_PUBLICACAO",
+      acao: data.restauradaDe ? "NINA_INSTRUCOES_RESTAURACAO" : "NINA_INSTRUCOES_PUBLICACAO",
       escopo: data.escopo,
       versaoAnterior: (anterior as { versao: number } | null)?.versao ?? null,
       versaoNova: (nova as VersaoInstrucoes)?.versao ?? null,

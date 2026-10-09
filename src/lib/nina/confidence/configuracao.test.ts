@@ -84,9 +84,7 @@ describe("validação dos ajustes", () => {
       proposta({ tipo: "NOVO_BLOQUEADOR", alvo: "categoria.preco", valor: 0 }),
     ]);
     expect(cfg.propostasAplicadas).toHaveLength(0);
-    expect(cfg.propostasComImplementacaoPendente[0]?.motivo).toBe(
-      "exige_implementacao_de_codigo",
-    );
+    expect(cfg.propostasComImplementacaoPendente[0]?.motivo).toBe("exige_implementacao_de_codigo");
     expect(cfg.configId).toBe(configuracaoPadrao().configId);
   });
 

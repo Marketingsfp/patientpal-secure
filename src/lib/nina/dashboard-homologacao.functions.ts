@@ -54,8 +54,12 @@ export const dashboardHomologacao = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const agora = new Date();
-    const de = data.de ? new Date(`${data.de}T00:00:00.000Z`).toISOString() : new Date(agora.getTime() - 30 * 86400000).toISOString();
-    const ate = data.ate ? new Date(`${data.ate}T23:59:59.999Z`).toISOString() : agora.toISOString();
+    const de = data.de
+      ? new Date(`${data.de}T00:00:00.000Z`).toISOString()
+      : new Date(agora.getTime() - 30 * 86400000).toISOString();
+    const ate = data.ate
+      ? new Date(`${data.ate}T23:59:59.999Z`).toISOString()
+      : agora.toISOString();
 
     // 1) Conversas de homologação da clínica (nunca conversas reais).
     const { data: conversasRaw, error: errConv } = await supabaseAdmin
@@ -130,12 +134,15 @@ export const dashboardHomologacao = createServerFn({ method: "POST" })
 
     const tipoPorConversa: Record<string, TipoRelatorio> = {};
     for (const id of conversasComExecucao) tipoPorConversa[id] = "manual";
-    for (const a of ((amostras.data ?? []) as any[])) if (a.conversa_id) tipoPorConversa[String(a.conversa_id)] = "carga";
-    for (const c of ((itensCenario.data ?? []) as any[])) if (c.conversa_id) tipoPorConversa[String(c.conversa_id)] = "cenarios";
-    for (const s of ((simulacoes.data ?? []) as any[])) if (s.conversa_id) tipoPorConversa[String(s.conversa_id)] = "terra";
+    for (const a of (amostras.data ?? []) as any[])
+      if (a.conversa_id) tipoPorConversa[String(a.conversa_id)] = "carga";
+    for (const c of (itensCenario.data ?? []) as any[])
+      if (c.conversa_id) tipoPorConversa[String(c.conversa_id)] = "cenarios";
+    for (const s of (simulacoes.data ?? []) as any[])
+      if (s.conversa_id) tipoPorConversa[String(s.conversa_id)] = "terra";
 
     const custoPorConversa: Record<string, number> = {};
-    for (const c of ((itensCenario.data ?? []) as any[])) {
+    for (const c of (itensCenario.data ?? []) as any[]) {
       if (c.conversa_id && typeof c.custo_estimado === "number") {
         custoPorConversa[String(c.conversa_id)] =
           (custoPorConversa[String(c.conversa_id)] ?? 0) + c.custo_estimado;
@@ -192,7 +199,9 @@ export const dashboardHomologacao = createServerFn({ method: "POST" })
 
     const modelos = [...new Set(todos.flatMap((t) => t.modelos))].sort();
     const versoes = [
-      ...new Set(todos.map((t) => t.promptVersao).filter((v): v is number => typeof v === "number")),
+      ...new Set(
+        todos.map((t) => t.promptVersao).filter((v): v is number => typeof v === "number"),
+      ),
     ].sort((a, b) => b - a);
 
     return {

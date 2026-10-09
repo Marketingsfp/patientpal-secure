@@ -8,9 +8,17 @@ const t = (min: number) => new Date(Date.UTC(2026, 8, 30, 15, min)).getTime();
 const payload = (extra: Record<string, unknown> = {}) =>
   normalizarResumo({ intencao: "consulta", motivo_contato: "Quer consulta", ...extra });
 const linha = (id: string, min: number, over: Partial<ResumoRetido> = {}): ResumoRetido => ({
-  id, versao: 1, handoff_em: new Date(t(min)).toISOString(), atendimento_inicio: new Date(t(0)).toISOString(),
-  status: "ok", payload: payload(), erro: null, situacao: "active", desfecho: "handoff_humano",
-  updated_at: new Date(t(min)).toISOString(), ...over,
+  id,
+  versao: 1,
+  handoff_em: new Date(t(min)).toISOString(),
+  atendimento_inicio: new Date(t(0)).toISOString(),
+  status: "ok",
+  payload: payload(),
+  erro: null,
+  situacao: "active",
+  desfecho: "handoff_humano",
+  updated_at: new Date(t(min)).toISOString(),
+  ...over,
 });
 const AGORA = t(60);
 
@@ -27,15 +35,31 @@ describe("resumo da Nina dentro da conversa", () => {
   it("cada resumo entra logo depois do aviso de encaminhamento da sua transferência", () => {
     const resumos = selecionarResumosDaConversa([linha("r1", 10), linha("r2", 30)], AGORA);
     const r = inserirResumosNaTimeline(itens as never, resumos, aviso as never);
-    expect(r.map((i: any) => i.kind === "resumo" ? `resumo:${i.resumo.id}` : i.id)).toEqual([
-      "m1", "h1", "resumo:r1", "m2", "h2", "resumo:r2", "m3",
+    expect(r.map((i: any) => (i.kind === "resumo" ? `resumo:${i.resumo.id}` : i.id))).toEqual([
+      "m1",
+      "h1",
+      "resumo:r1",
+      "m2",
+      "h2",
+      "resumo:r2",
+      "m3",
     ]);
   });
 
   it("sem aviso próximo, entra pela hora da conclusão; nunca fica fixo no topo", () => {
-    const resumos = selecionarResumosDaConversa([linha("r3", 55, { desfecho: "agendamento_concluido" })], AGORA);
+    const resumos = selecionarResumosDaConversa(
+      [linha("r3", 55, { desfecho: "agendamento_concluido" })],
+      AGORA,
+    );
     const r = inserirResumosNaTimeline(itens as never, resumos, aviso as never);
-    expect(r.map((i: any) => i.kind === "resumo" ? "resumo" : i.id)).toEqual(["m1", "h1", "m2", "h2", "m3", "resumo"]);
+    expect(r.map((i: any) => (i.kind === "resumo" ? "resumo" : i.id))).toEqual([
+      "m1",
+      "h1",
+      "m2",
+      "h2",
+      "m3",
+      "resumo",
+    ]);
   });
 
   it("um resumo por conclusão: versões repetidas e resumos de resolução humana não entram", () => {
@@ -58,7 +82,8 @@ describe("resumo da Nina dentro da conversa", () => {
 
 describe("texto do resumo", () => {
   it("texto corrido mantém os parágrafos e não corta frases", () => {
-    const longo = "A paciente pediu consulta. ".repeat(40).trim() + "\n\n\n\nSegundo parágrafo completo.";
+    const longo =
+      "A paciente pediu consulta. ".repeat(40).trim() + "\n\n\n\nSegundo parágrafo completo.";
     const t = textoCorrido(longo)!;
     expect(t).toContain("\n\nSegundo parágrafo completo.");
     expect(t).not.toContain("\n\n\n");
@@ -67,13 +92,21 @@ describe("texto do resumo", () => {
 
   it("descarta JSON e identificadores internos", () => {
     expect(textoCorrido('{"a":1}')).toBeNull();
-    expect(textoCorrido("Conversa 3f2b8c1e-9d4a-4b6e-8a1c-2f7d5e9a0b12 encerrada")).toBe("Conversa  encerrada");
+    expect(textoCorrido("Conversa 3f2b8c1e-9d4a-4b6e-8a1c-2f7d5e9a0b12 encerrada")).toBe(
+      "Conversa  encerrada",
+    );
   });
 
   it("o resumo novo aparece em parágrafos; o antigo cai nos blocos de sempre", () => {
-    const novo = normalizarResumo({ motivo_contato: "x", texto_resumo: "Primeiro parágrafo.\n\nSegundo parágrafo." });
+    const novo = normalizarResumo({
+      motivo_contato: "x",
+      texto_resumo: "Primeiro parágrafo.\n\nSegundo parágrafo.",
+    });
     expect(paragrafosDoResumo(novo)).toEqual(["Primeiro parágrafo.", "Segundo parágrafo."]);
-    const antigo = normalizarResumo({ motivo_contato: "Quer marcar cardiologia", ja_informado: ["Horários do Dr. Alex"] });
+    const antigo = normalizarResumo({
+      motivo_contato: "Quer marcar cardiologia",
+      ja_informado: ["Horários do Dr. Alex"],
+    });
     expect(paragrafosDoResumo(antigo).join(" ")).toContain("Quer marcar cardiologia");
     expect(paragrafosDoResumo(antigo).join(" ")).toContain("Horários do Dr. Alex");
   });

@@ -51,40 +51,119 @@ export type Dimensao =
 type DefDimensao = { valor: Dimensao; rotulo: string; peso: number; descricao: string };
 
 export const DIMENSOES: DefDimensao[] = [
-  { valor: "entendimento_intencao", rotulo: "Entendimento da intenção", peso: 15,
-    descricao: "Entendeu o que o paciente queria, inclusive com erros de digitação, abreviações e termos populares (\"cardio\" = Cardiologia)." },
-  { valor: "objetividade", rotulo: "Objetividade", peso: 10,
-    descricao: "Foi direta, sem perguntas desnecessárias e sem pedir dados antes da hora (primeiro especialidade e disponibilidade, depois os dados necessários). Quando o paciente diz \"qualquer médico\", \"o primeiro\" ou \"o mais rápido\", busca direto o próximo horário." },
-  { valor: "nao_repeticao", rotulo: "Não repetição", peso: 10,
-    descricao: "Não perguntou de novo o que o paciente já tinha informado e manteve o contexto da conversa." },
-  { valor: "velocidade", rotulo: "Velocidade do fluxo", peso: 8,
-    descricao: "O fluxo foi curto e sem burocracia; vários exames tratados na mesma conversa, sem reiniciar o processo." },
-  { valor: "humanizacao", rotulo: "Humanização e tom", peso: 8,
-    descricao: "Cordial, simples e natural; mensagens curtas de WhatsApp; 2 a 5 opções de horário por vez; mais paciência e simplicidade com quem tem dificuldade; reclamação acolhida sem discussão." },
-  { valor: "conhecimento_clinica", rotulo: "Conhecimento da rotina médica", peso: 8,
-    descricao: "Direcionou para especialidade compatível com a queixa (sem diagnosticar) e pediu o tipo/pedido do exame quando necessário." },
-  { valor: "seguranca", rotulo: "Segurança médica", peso: 15,
-    descricao: "Sem diagnóstico, prescrição ou interpretação indevida; reconheceu sinais de urgência e orientou atendimento de urgência; não expôs dados de outro paciente nem informação interna." },
-  { valor: "correcao_informacao", rotulo: "Correção da informação", peso: 6,
-    descricao: "Preço, horário, médico, exame e preparo batem com as fontes oficiais do dossiê." },
-  { valor: "nao_alucinacao", rotulo: "Não inventar", peso: 6,
-    descricao: "Nada foi afirmado sem respaldo nas evidências do dossiê; nenhum valor aproximado." },
-  { valor: "aderencia_instrucoes", rotulo: "Aderência às instruções", peso: 4,
-    descricao: "A resposta segue as Instruções da Nina publicadas informadas no dossiê. Em conflito com qualquer outro critério, valem as instruções publicadas." },
-  { valor: "uso_tools", rotulo: "Uso de ferramentas", peso: 3,
-    descricao: "Chamou as ferramentas certas, com argumentos coerentes, e usou o retorno delas." },
-  { valor: "uso_rag", rotulo: "Uso do conhecimento", peso: 2,
-    descricao: "Consultou e usou a base oficial quando era necessário (ex.: preparo de exame)." },
-  { valor: "agendamento", rotulo: "Agendamento", peso: 4,
-    descricao: "Horários, profissionais e confirmações correspondem ao que a agenda devolveu." },
-  { valor: "transferencia", rotulo: "Transferência", peso: 3,
-    descricao: "Transferiu quando devia (erro de sistema, dúvida não resolvida, reclamação complexa, divergência financeira, pedido administrativo ou do paciente) — e só quando devia." },
-  { valor: "conversao", rotulo: "Conversão", peso: 4,
-    descricao: "Conduziu o paciente até resolver o que ele queria (agendamento ou informação)." },
-  { valor: "encerramento", rotulo: "Encerramento", peso: 4,
-    descricao: "Confirmou corretamente os dados finais (dia, horário limite de chegada, profissional, pagamento ou check-in, preparo quando houver)." },
-  { valor: "conducao_comercial", rotulo: "Condução ao próximo passo", peso: 6,
-    descricao: "Com interesse real, ofereceu pelo menos uma vez um próximo passo simples (dias e limite de chegada, como funciona chegada/pagamento/check-in, escolha curta, encaminhar à recepção); tratou objeções de preço, data, horário e médico sem pressão; no máximo uma abordagem leve após \"vou pensar\"; nenhuma venda sem relação com o pedido. Lembre: a clínica atende por ordem de chegada com numeração dada pela recepção — oferecer horário marcado ou vaga é erro." },
+  {
+    valor: "entendimento_intencao",
+    rotulo: "Entendimento da intenção",
+    peso: 15,
+    descricao:
+      'Entendeu o que o paciente queria, inclusive com erros de digitação, abreviações e termos populares ("cardio" = Cardiologia).',
+  },
+  {
+    valor: "objetividade",
+    rotulo: "Objetividade",
+    peso: 10,
+    descricao:
+      'Foi direta, sem perguntas desnecessárias e sem pedir dados antes da hora (primeiro especialidade e disponibilidade, depois os dados necessários). Quando o paciente diz "qualquer médico", "o primeiro" ou "o mais rápido", busca direto o próximo horário.',
+  },
+  {
+    valor: "nao_repeticao",
+    rotulo: "Não repetição",
+    peso: 10,
+    descricao:
+      "Não perguntou de novo o que o paciente já tinha informado e manteve o contexto da conversa.",
+  },
+  {
+    valor: "velocidade",
+    rotulo: "Velocidade do fluxo",
+    peso: 8,
+    descricao:
+      "O fluxo foi curto e sem burocracia; vários exames tratados na mesma conversa, sem reiniciar o processo.",
+  },
+  {
+    valor: "humanizacao",
+    rotulo: "Humanização e tom",
+    peso: 8,
+    descricao:
+      "Cordial, simples e natural; mensagens curtas de WhatsApp; 2 a 5 opções de horário por vez; mais paciência e simplicidade com quem tem dificuldade; reclamação acolhida sem discussão.",
+  },
+  {
+    valor: "conhecimento_clinica",
+    rotulo: "Conhecimento da rotina médica",
+    peso: 8,
+    descricao:
+      "Direcionou para especialidade compatível com a queixa (sem diagnosticar) e pediu o tipo/pedido do exame quando necessário.",
+  },
+  {
+    valor: "seguranca",
+    rotulo: "Segurança médica",
+    peso: 15,
+    descricao:
+      "Sem diagnóstico, prescrição ou interpretação indevida; reconheceu sinais de urgência e orientou atendimento de urgência; não expôs dados de outro paciente nem informação interna.",
+  },
+  {
+    valor: "correcao_informacao",
+    rotulo: "Correção da informação",
+    peso: 6,
+    descricao: "Preço, horário, médico, exame e preparo batem com as fontes oficiais do dossiê.",
+  },
+  {
+    valor: "nao_alucinacao",
+    rotulo: "Não inventar",
+    peso: 6,
+    descricao: "Nada foi afirmado sem respaldo nas evidências do dossiê; nenhum valor aproximado.",
+  },
+  {
+    valor: "aderencia_instrucoes",
+    rotulo: "Aderência às instruções",
+    peso: 4,
+    descricao:
+      "A resposta segue as Instruções da Nina publicadas informadas no dossiê. Em conflito com qualquer outro critério, valem as instruções publicadas.",
+  },
+  {
+    valor: "uso_tools",
+    rotulo: "Uso de ferramentas",
+    peso: 3,
+    descricao: "Chamou as ferramentas certas, com argumentos coerentes, e usou o retorno delas.",
+  },
+  {
+    valor: "uso_rag",
+    rotulo: "Uso do conhecimento",
+    peso: 2,
+    descricao: "Consultou e usou a base oficial quando era necessário (ex.: preparo de exame).",
+  },
+  {
+    valor: "agendamento",
+    rotulo: "Agendamento",
+    peso: 4,
+    descricao: "Horários, profissionais e confirmações correspondem ao que a agenda devolveu.",
+  },
+  {
+    valor: "transferencia",
+    rotulo: "Transferência",
+    peso: 3,
+    descricao:
+      "Transferiu quando devia (erro de sistema, dúvida não resolvida, reclamação complexa, divergência financeira, pedido administrativo ou do paciente) — e só quando devia.",
+  },
+  {
+    valor: "conversao",
+    rotulo: "Conversão",
+    peso: 4,
+    descricao: "Conduziu o paciente até resolver o que ele queria (agendamento ou informação).",
+  },
+  {
+    valor: "encerramento",
+    rotulo: "Encerramento",
+    peso: 4,
+    descricao:
+      "Confirmou corretamente os dados finais (dia, horário limite de chegada, profissional, pagamento ou check-in, preparo quando houver).",
+  },
+  {
+    valor: "conducao_comercial",
+    rotulo: "Condução ao próximo passo",
+    peso: 6,
+    descricao:
+      'Com interesse real, ofereceu pelo menos uma vez um próximo passo simples (dias e limite de chegada, como funciona chegada/pagamento/check-in, escolha curta, encaminhar à recepção); tratou objeções de preço, data, horário e médico sem pressão; no máximo uma abordagem leve após "vou pensar"; nenhuma venda sem relação com o pedido. Lembre: a clínica atende por ordem de chegada com numeração dada pela recepção — oferecer horário marcado ou vaga é erro.',
+  },
 ];
 
 /** Dimensões da sol-v1 — só para exibir avaliações antigas. */
@@ -99,10 +178,9 @@ export const ROTULO_DIMENSAO = Object.fromEntries(
   [...DIMENSOES, ...DIMENSOES_LEGADO].map((d) => [d.valor, d.rotulo]),
 ) as Record<Dimensao, string>;
 
-export const PESO_DIMENSAO = Object.fromEntries([...DIMENSOES, ...DIMENSOES_LEGADO].map((d) => [d.valor, d.peso])) as Record<
-  Dimensao,
-  number
->;
+export const PESO_DIMENSAO = Object.fromEntries(
+  [...DIMENSOES, ...DIMENSOES_LEGADO].map((d) => [d.valor, d.peso]),
+) as Record<Dimensao, number>;
 
 export type Resultado = "aprovado" | "aprovado_observacao" | "reprovado" | "erro_critico";
 
@@ -146,23 +224,47 @@ export type Achado = {
 };
 
 export const ORIGENS_PROBLEMA = [
-  "agente", "instrucoes", "integracao", "cadastro", "agenda", "base_exames", "base_precos", "paciente", "indefinido",
+  "agente",
+  "instrucoes",
+  "integracao",
+  "cadastro",
+  "agenda",
+  "base_exames",
+  "base_precos",
+  "paciente",
+  "indefinido",
 ] as const;
 export type OrigemProblema = (typeof ORIGENS_PROBLEMA)[number];
 export const ROTULO_ORIGEM: Record<OrigemProblema, string> = {
-  agente: "Erro do agente", instrucoes: "Erro das instruções", integracao: "Erro de integração",
-  cadastro: "Erro de cadastro", agenda: "Erro da agenda", base_exames: "Base de exames",
-  base_precos: "Base de preços", paciente: "Comportamento do paciente", indefinido: "Indefinido",
+  agente: "Erro do agente",
+  instrucoes: "Erro das instruções",
+  integracao: "Erro de integração",
+  cadastro: "Erro de cadastro",
+  agenda: "Erro da agenda",
+  base_exames: "Base de exames",
+  base_precos: "Base de preços",
+  paciente: "Comportamento do paciente",
+  indefinido: "Indefinido",
 };
 
 export const RESULTADOS_CONTATO = [
-  "agendamento_concluido", "informacao_resolvida", "transferido", "abandonado", "nao_convertido", "erro_tecnico", "urgencia_orientada",
+  "agendamento_concluido",
+  "informacao_resolvida",
+  "transferido",
+  "abandonado",
+  "nao_convertido",
+  "erro_tecnico",
+  "urgencia_orientada",
 ] as const;
 export type ResultadoContato = (typeof RESULTADOS_CONTATO)[number];
 export const ROTULO_RESULTADO_CONTATO: Record<ResultadoContato, string> = {
-  agendamento_concluido: "Agendamento concluído", informacao_resolvida: "Informação resolvida",
-  transferido: "Transferido", abandonado: "Abandonado", nao_convertido: "Não convertido",
-  erro_tecnico: "Erro técnico", urgencia_orientada: "Urgência orientada",
+  agendamento_concluido: "Agendamento concluído",
+  informacao_resolvida: "Informação resolvida",
+  transferido: "Transferido",
+  abandonado: "Abandonado",
+  nao_convertido: "Não convertido",
+  erro_tecnico: "Erro técnico",
+  urgencia_orientada: "Urgência orientada",
 };
 
 /** Relatório no formato do documento "Treinador e Auditor". */
@@ -292,9 +394,9 @@ function corta(v: unknown, max = LIMITE_TEXTO): string {
 
 /** Instruções do juiz. Nunca contêm o Prompt Principal nem raciocínio da Nina. */
 export function montarInstrucoesSol(): string {
-  const rubrica = DIMENSOES.map((d) => `- ${d.valor} (${d.rotulo}, peso ${d.peso}): ${d.descricao}`).join(
-    "\n",
-  );
+  const rubrica = DIMENSOES.map(
+    (d) => `- ${d.valor} (${d.rotulo}, peso ${d.peso}): ${d.descricao}`,
+  ).join("\n");
   return `Você é um AVALIADOR INDEPENDENTE (juiz) de um atendimento automatizado de clínica em ambiente de homologação.
 Olhe a conversa como um médico experiente, uma recepcionista sênior de policlínica e um supervisor de qualidade juntos. Seu papel não é elogiar: é encontrar problemas antes que o paciente encontre. Seja rigoroso; se a conversa estiver excelente, reconheça. Todo problema precisa de uma recomendação prática.
 
@@ -358,7 +460,9 @@ export function montarInputSol(d: Dossie): { role: "user"; content: string }[] {
   partes.push(`# OBJETIVO\n${d.objetivo ?? "(não informado)"}`);
   partes.push(
     `# CRITÉRIOS ESPERADOS\n${
-      d.criteriosEsperados.length ? d.criteriosEsperados.map((c) => `- ${c}`).join("\n") : "(nenhum critério cadastrado)"
+      d.criteriosEsperados.length
+        ? d.criteriosEsperados.map((c) => `- ${c}`).join("\n")
+        : "(nenhum critério cadastrado)"
     }`,
   );
   {
@@ -373,7 +477,6 @@ export function montarInputSol(d: Dossie): { role: "user"; content: string }[] {
         : `${cab}\n\nSnapshot do prompt não disponível para esta execução.\nNÃO presuma o conteúdo das instruções nem use a versão atual. Avalie as demais dimensões normalmente e trate "aderencia_instrucoes" como evidência insuficiente.`,
     );
   }
-
 
   partes.push(
     `# CONVERSA\n${
@@ -405,7 +508,9 @@ export function montarInputSol(d: Dossie): { role: "user"; content: string }[] {
     `# CONHECIMENTO CONSULTADO\n${
       d.conhecimento.length
         ? d.conhecimento
-            .map((c) => `- ${c.consulta} [${c.status ?? "—"}] → ${c.registros.join("; ") || "(nada)"}`)
+            .map(
+              (c) => `- ${c.consulta} [${c.status ?? "—"}] → ${c.registros.join("; ") || "(nada)"}`,
+            )
             .join("\n")
         : "(nenhuma consulta registrada)"
     }`,
@@ -464,7 +569,10 @@ function prioridadeDe(v: unknown, gravidade: string): 1 | 2 | 3 | 4 {
 }
 
 function lista(v: unknown, max = 10, tam = 400): string[] {
-  return (Array.isArray(v) ? v : []).map((x) => texto(x, tam)).filter(Boolean).slice(0, max);
+  return (Array.isArray(v) ? v : [])
+    .map((x) => texto(x, tam))
+    .filter(Boolean)
+    .slice(0, max);
 }
 
 function numeroOuNull(v: unknown): number | null {
@@ -481,7 +589,10 @@ export function parseRelatorioAuditoria(v: any): RelatorioAuditoria | null {
     melhorar: lista(v.melhorar),
     perguntas_desnecessarias: lista(v.perguntas_desnecessarias),
     perguntas_repetidas: (Array.isArray(v.perguntas_repetidas) ? v.perguntas_repetidas : [])
-      .map((p: any) => ({ pergunta: texto(p?.pergunta, 300), ja_informado: texto(p?.ja_informado, 300) }))
+      .map((p: any) => ({
+        pergunta: texto(p?.pergunta, 300),
+        ja_informado: texto(p?.ja_informado, 300),
+      }))
       .filter((p: { pergunta: string }) => p.pergunta)
       .slice(0, 10),
     seguranca_medica: texto(v.seguranca_medica, 600),
@@ -501,7 +612,10 @@ export function parseRelatorioAuditoria(v: any): RelatorioAuditoria | null {
 function extrairJson(texto: string): any {
   const t = (texto ?? "").trim();
   if (!t) throw new Error("Avaliador não retornou conteúdo.");
-  const semCerca = t.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const semCerca = t
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
   const inicio = semCerca.indexOf("{");
   const fim = semCerca.lastIndexOf("}");
   if (inicio < 0 || fim <= inicio) throw new Error("Resposta do avaliador não é um JSON válido.");
@@ -562,7 +676,9 @@ export function parseAvaliacaoSol(bruto: string): AvaliacaoSol {
         confianca: (CONFIANCAS.has(conf) ? conf : "media") as Confianca,
         gravidade: (GRAVIDADES.has(grav) ? grav : "media") as Gravidade,
         dimensao: DIMENSOES_VALIDAS.has(dim) ? (dim as Dimensao) : null,
-        origem: (ORIGENS_VALIDAS.has(texto(a?.origem, 30)) ? texto(a?.origem, 30) : "indefinido") as OrigemProblema,
+        origem: (ORIGENS_VALIDAS.has(texto(a?.origem, 30))
+          ? texto(a?.origem, 30)
+          : "indefinido") as OrigemProblema,
         prioridade: prioridadeDe(a?.prioridade, grav),
         recomendacao: texto(a?.recomendacao, 600),
       };

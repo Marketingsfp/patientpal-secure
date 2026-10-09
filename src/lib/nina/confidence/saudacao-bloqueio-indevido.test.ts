@@ -29,7 +29,10 @@ Na primeira mensagem de cada conversa, apresente-se assim: "Olá! Sou a Nina, as
 const HASH = "publicacao-teste";
 
 function contexto(over: Partial<ContextoConfianca>): ContextoConfianca {
-  const { regras, limitacoes } = extrairRegrasPublicadas(TEXTO_PUBLICADO, { escopo: "atendimento", hash: HASH });
+  const { regras, limitacoes } = extrairRegrasPublicadas(TEXTO_PUBLICADO, {
+    escopo: "atendimento",
+    hash: HASH,
+  });
   return {
     draftText: "Olá! Sou a Nina, assistente da Policlínica Menino Jesus. Como posso ajudar?",
     mensagemPaciente: "oi boa tarde",
@@ -48,7 +51,10 @@ function contexto(over: Partial<ContextoConfianca>): ContextoConfianca {
 }
 
 describe("regra condicionada é lida por frase", () => {
-  const { regras } = extrairRegrasPublicadas(TEXTO_PUBLICADO, { escopo: "atendimento", hash: HASH });
+  const { regras } = extrairRegrasPublicadas(TEXTO_PUBLICADO, {
+    escopo: "atendimento",
+    hash: HASH,
+  });
   const proibicao = regras.find((r) => /n[ãa]o acrescente/i.test(r.descricao));
 
   it("guarda a situação declarada no texto, não a mensagem", () => {

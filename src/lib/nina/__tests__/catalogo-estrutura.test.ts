@@ -132,9 +132,24 @@ describe("organização conservadora do catálogo", () => {
     expect(registroExigeHumano(registro)).toBe(true);
   });
   it("atualiza o estado do preparo sem quebrar a edição existente e recusa contradição", () => {
-    expect(servicoSchema.parse({nome:"Exame",preparo:null,estrutura:{preparo_status:"informado"}}).estrutura?.preparo_status).toBe("nao_informado");
-    expect(servicoSchema.parse({nome:"Exame",preparo:"Orientação confirmada",estrutura:{}}).estrutura?.preparo_status).toBe("informado");
-    expect(() => servicoSchema.parse({nome:"Exame",preparo:"Orientação confirmada",estrutura:{preparo_status:"sem_preparo"}})).toThrow();
+    expect(
+      servicoSchema.parse({
+        nome: "Exame",
+        preparo: null,
+        estrutura: { preparo_status: "informado" },
+      }).estrutura?.preparo_status,
+    ).toBe("nao_informado");
+    expect(
+      servicoSchema.parse({ nome: "Exame", preparo: "Orientação confirmada", estrutura: {} })
+        .estrutura?.preparo_status,
+    ).toBe("informado");
+    expect(() =>
+      servicoSchema.parse({
+        nome: "Exame",
+        preparo: "Orientação confirmada",
+        estrutura: { preparo_status: "sem_preparo" },
+      }),
+    ).toThrow();
   });
   it("ausência de preparo e convênios permanece desconhecida", () => {
     const s = servicoParaRegistro({ id: "1", nome: "Exame", executantes: [] } as any);

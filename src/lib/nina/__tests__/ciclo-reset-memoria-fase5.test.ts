@@ -118,7 +118,10 @@ describe("Teste 6 — leads em paralelo", () => {
 
 describe("Teste 7 — auditoria de ciclo antigo", () => {
   it("ciclos encerrados continuam listados com conversa e sessão originais", () => {
-    const linhas = diagnosticoCiclos([ciclo(1), ciclo(2, { status: "encerrado_handoff", end_reason: "handoff_humano" })]);
+    const linhas = diagnosticoCiclos([
+      ciclo(1),
+      ciclo(2, { status: "encerrado_handoff", end_reason: "handoff_humano" }),
+    ]);
     const antigo = linhas[0]!;
     expect(antigo.cycle_status).toBe("completed");
     expect(antigo.conversa_id).toBe("conv-1");

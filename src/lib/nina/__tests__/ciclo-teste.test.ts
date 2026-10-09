@@ -37,7 +37,6 @@ describe("ciclo de teste da Nina", () => {
       ended_at: "2026-09-07T12:00:00.000Z",
       memory_reset_at: "2026-09-07T12:00:00.000Z",
       resolved_at: "2026-09-07T12:00:00.000Z",
-
     });
     expect(statusPorMotivo("falha_tecnica")).toBe("falhou");
   });

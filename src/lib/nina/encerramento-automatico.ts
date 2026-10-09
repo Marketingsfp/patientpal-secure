@@ -43,7 +43,6 @@ const PADROES_NOVA_SOLICITACAO: RegExp[] = [
   /\b(mas|porem|so que|aproveitando|queria|quero|preciso|gostaria|consegue|tem como|qual|quais|quanto|quando|onde|endereco|valor|preco|horario|remarcar|cancelar|outro|outra|tambem)\b/,
 ];
 
-
 export function pediuEncerramento(mensagem: string): boolean {
   const t = normalizar(mensagem);
   if (!t) return false;
@@ -93,12 +92,10 @@ export function mensagemFinalCompleta(resposta: string, nomeUnidade: string): bo
   const unidade = normalizar(nomeUnidade);
   const temAgradecimento = /(agradec|obrigad|foi um prazer)/.test(t);
   const temUnidade = unidade ? t.includes(unidade) : true;
-  const temEncerramento = /(atendimento foi encerrado|encerramos (o|este) atendimento|atendimento encerrado)/.test(
-    t,
-  );
-  const temRetorno = /(nova mensagem|nos envi|é só (nos )?chamar|e so (nos )?chamar|mande uma mensagem)/.test(
-    t,
-  );
+  const temEncerramento =
+    /(atendimento foi encerrado|encerramos (o|este) atendimento|atendimento encerrado)/.test(t);
+  const temRetorno =
+    /(nova mensagem|nos envi|é só (nos )?chamar|e so (nos )?chamar|mande uma mensagem)/.test(t);
   return temAgradecimento && temUnidade && temEncerramento && temRetorno;
 }
 

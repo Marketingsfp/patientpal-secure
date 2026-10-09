@@ -51,4 +51,3 @@ export function acaoPermitida(params: {
   if (selecaoAtual && alvo !== selecaoAtual) return false;
   return alvo === selecionadaAgora;
 }
-

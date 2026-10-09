@@ -48,7 +48,12 @@ describe("evidências da execução da Nina", () => {
       "resposta_original",
       "mensagem_final",
     ];
-    expect(lacunas(todas.map((t) => etapa(t, "2026-01-01T10:00:00Z")), ["m1"])).toEqual([]);
+    expect(
+      lacunas(
+        todas.map((t) => etapa(t, "2026-01-01T10:00:00Z")),
+        ["m1"],
+      ),
+    ).toEqual([]);
   });
 
   it("registra origem em cache e a versão do registro na ocasião", () => {

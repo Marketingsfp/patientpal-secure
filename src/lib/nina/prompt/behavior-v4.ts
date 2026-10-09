@@ -10,7 +10,11 @@ import { REGRAS_CATALOGO_PROMPT } from "./regras-catalogo";
 import { REGRAS_TEMPORAIS_NINA } from "./regras-temporais";
 import { FORMATACAO_WHATSAPP_NINA } from "./formatacao-whatsapp";
 import { REGRA_PIX_CARTAO, REGRA_FORMA_PAGAMENTO_AUSENTE } from "./pagamento";
-import { CONTINUIDADE_CONSULTA_AGENDA, REGRA_HORARIOS_HABITUAIS_PRIMEIRO, REGRA_SOMENTE_PRIMEIRO_HORARIO } from "./consulta-agenda";
+import {
+  CONTINUIDADE_CONSULTA_AGENDA,
+  REGRA_HORARIOS_HABITUAIS_PRIMEIRO,
+  REGRA_SOMENTE_PRIMEIRO_HORARIO,
+} from "./consulta-agenda";
 import { REGRA_SELECAO_ATENDIMENTO_CONSULTA } from "../atendimento-consulta";
 import { REGRA_SEM_EMOJIS_NINA } from "../resposta/sem-emojis";
 import { REGRA_CONSULTA_CATALOGO, REGRA_INTERPRETACAO_CATALOGO } from "../catalogo-busca";

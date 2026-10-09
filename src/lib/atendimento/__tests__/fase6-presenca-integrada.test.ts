@@ -195,7 +195,11 @@ class Aba {
     versao: number;
     seq?: number;
   }) {
-    const res = aplicarAtualizacao(this.sincronia, { clinicaId: this.clinicaId, userId: this.userId }, a);
+    const res = aplicarAtualizacao(
+      this.sincronia,
+      { clinicaId: this.clinicaId, userId: this.userId },
+      a,
+    );
     this.sincronia = res.estado;
     if (res.aceita && this.controle.carregado) {
       this.controle = { ...this.controle, confirmado: res.estado.estado, salvando: null };
@@ -456,7 +460,13 @@ describe("FASE 6 — cenários integrados de presença manual", () => {
   test("coerência: tela, servidor e distribuição contam a mesma história", () => {
     const aba = new Aba(srv, CLINICA, ANA);
     aba.carregar();
-    for (const estado of ["ONLINE", "PAUSA", "PAUSA_SAIDA", "OFFLINE", "ONLINE"] as EstadoManualPresenca[]) {
+    for (const estado of [
+      "ONLINE",
+      "PAUSA",
+      "PAUSA_SAIDA",
+      "OFFLINE",
+      "ONLINE",
+    ] as EstadoManualPresenca[]) {
       aba.escolher(estado);
       const persistido = srv.ler(CLINICA, ANA).estadoManual;
       const elegivel = poolElegivel([

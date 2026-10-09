@@ -8,7 +8,12 @@
  * as mensagens físicas continuam separadas.
  */
 import { describe, expect, it } from "bun:test";
-import { MAX_BURST_WINDOW_MS, QUIET_WINDOW_MS, decidirEspera, montarTurnoPaciente } from "@/lib/nina/burst";
+import {
+  MAX_BURST_WINDOW_MS,
+  QUIET_WINDOW_MS,
+  decidirEspera,
+  montarTurnoPaciente,
+} from "@/lib/nina/burst";
 
 type Lote = {
   id: string;
@@ -37,7 +42,13 @@ class Banco {
   registrar(mensagemId: string, agoraMs: number) {
     let lote = this.lotes.find((l) => l.status === "COLLECTING");
     if (!lote) {
-      lote = { id: `b${++this.seq}`, status: "COLLECTING", revision: 0, firstMs: agoraMs, mensagens: [] };
+      lote = {
+        id: `b${++this.seq}`,
+        status: "COLLECTING",
+        revision: 0,
+        firstMs: agoraMs,
+        mensagens: [],
+      };
       this.lotes.push(lote);
     }
     lote.revision += 1;

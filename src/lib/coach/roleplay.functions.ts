@@ -8,10 +8,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type {
-  RoleplayScenario,
-  RoleplayTurn,
-} from "./roleplay-tipos";
+import type { RoleplayScenario, RoleplayTurn } from "./roleplay-tipos";
 
 export type {
   RoleplayScenario,

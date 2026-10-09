@@ -94,7 +94,11 @@ export const SEGMENTOS_SEND: Segmento[] = [
   { nome: "pre_meta", de: "SEND_T5_CONFIG_READY", ate: "SEND_T6_META_REQUEST_START" },
   { nome: "meta_api", de: "SEND_T6_META_REQUEST_START", ate: "SEND_T7_META_RESPONSE" },
   { nome: "db_pos_meta", de: "SEND_T7_META_RESPONSE", ate: "SEND_T8_DB_INSERT_DONE" },
-  { nome: "update_conversa", de: "SEND_T8_DB_INSERT_DONE", ate: "SEND_T9_CONVERSATION_UPDATE_DONE" },
+  {
+    nome: "update_conversa",
+    de: "SEND_T8_DB_INSERT_DONE",
+    ate: "SEND_T9_CONVERSATION_UPDATE_DONE",
+  },
   // Tempo do backend ANTES de depender da Meta: é o que está sob nosso controle.
   { nome: "backend_pre_meta", de: "SEND_T3_BACKEND_RECEIVED", ate: "SEND_T6_META_REQUEST_START" },
   { nome: "backend_total", de: "SEND_T3_BACKEND_RECEIVED", ate: "SEND_T10_BACKEND_RESPONSE" },

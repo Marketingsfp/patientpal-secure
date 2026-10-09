@@ -87,30 +87,30 @@ async function gerarJsonCatalogo(
     );
 
   const res = await chamarClaudeComoResponses({
-      model: MODELO_CATALOGO_IA,
-      stream: true,
-      store: false,
-      instructions,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: texto,
-            },
-          ],
-        },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "catalogo_nina",
-          strict: true,
-          schema,
-        },
+    model: MODELO_CATALOGO_IA,
+    stream: true,
+    store: false,
+    instructions,
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: texto,
+          },
+        ],
       },
-    });
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "catalogo_nina",
+        strict: true,
+        schema,
+      },
+    },
+  });
 
   if (!res.ok) {
     const corpo = await res.text().catch(() => "");

@@ -196,7 +196,9 @@ export async function criarAgendamentoCore(
       recursoId
         ? supabase
             .from("medico_agendas")
-            .select("id, nome, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))")
+            .select(
+              "id, nome, ativo, ordem_chegada, medico_agenda_procedimentos(procedimentos(tipo))",
+            )
             .eq("clinica_id", clinica_id)
             .eq("medico_id", recursoId)
             .then((r) => (r.error ? null : (r.data as unknown as AgendaComTipos[])))
@@ -244,13 +246,23 @@ export async function criarAgendamentoCore(
   // o intervalo não mude (edição de DISPONIVEL), revalida a ocupação e passa
   // a condição otimista para a RPC: outro atendimento não pode ser sobrescrito.
   if (ctx.ator.tipo === "integracao" && ctx.ator.api_key_id === "nina-ai") {
-    if (!editing_id || !atual || atual.paciente_id ||
+    if (
+      !editing_id ||
+      !atual ||
+      atual.paciente_id ||
       normalizarLocal(atual.paciente_nome ?? "").trim() !== "disponivel" ||
-      atual.status === "cancelado" || atual.medico_id !== payload.medico_id ||
-      Date.parse(atual.inicio) !== di.getTime() || Date.parse(atual.fim) !== df.getTime()) {
-      return { ok: false, validation_error: {
-        message: "O horário confirmado não está mais disponível. Nenhum outro horário foi reservado.",
-      } };
+      atual.status === "cancelado" ||
+      atual.medico_id !== payload.medico_id ||
+      Date.parse(atual.inicio) !== di.getTime() ||
+      Date.parse(atual.fim) !== df.getTime()
+    ) {
+      return {
+        ok: false,
+        validation_error: {
+          message:
+            "O horário confirmado não está mais disponível. Nenhum outro horário foi reservado.",
+        },
+      };
     }
     slotPacienteNomeNaValidacao = atual.paciente_nome;
   }

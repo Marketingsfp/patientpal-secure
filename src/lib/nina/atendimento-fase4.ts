@@ -90,7 +90,6 @@ export function textoResumo(estado: EstadoFluxoNina, nomeUnidade: string): strin
   return linhas.join("\n");
 }
 
-
 export function blocoPromptFase4({ mensagem, estado, nomeUnidade }: EntradaFase4): string {
   const leitura = lerMensagemFase4(mensagem);
   const falta = faltaParaConsultarAgenda(estado);
@@ -114,7 +113,7 @@ export function blocoPromptFase4({ mensagem, estado, nomeUnidade }: EntradaFase4
   }
 
   linhas.push(
-    "- Ao apresentar as vagas: no máximo 3 opções, em linguagem natural (ex.: \"Segunda-feira às 09:00\"), e termine com \"Qual você prefere?\". Nunca despeje uma lista longa nem mostre ids ou JSON.",
+    '- Ao apresentar as vagas: no máximo 3 opções, em linguagem natural (ex.: "Segunda-feira às 09:00"), e termine com "Qual você prefere?". Nunca despeje uma lista longa nem mostre ids ou JSON.',
     "- Respeite a preferência do paciente (dia, período, profissional). Se não houver vaga na preferência, diga isso e ofereça as alternativas mais próximas devolvidas pela agenda.",
   );
 
@@ -126,7 +125,7 @@ export function blocoPromptFase4({ mensagem, estado, nomeUnidade }: EntradaFase4
 
   if (temVaga && !leitura.confirmouFinal) {
     linhas.push(
-      "- Antes de gravar, mostre o RESUMO exatamente neste formato e pergunte \"Posso confirmar esse agendamento?\":",
+      '- Antes de gravar, mostre o RESUMO exatamente neste formato e pergunte "Posso confirmar esse agendamento?":',
       textoResumo(estado, nomeUnidade),
     );
   }

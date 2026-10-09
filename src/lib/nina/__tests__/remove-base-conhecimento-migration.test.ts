@@ -13,8 +13,10 @@ const MIGRATION = new URL(
 );
 const clinica = "11111111-1111-4111-8111-111111111111";
 let db: PGlite;
-const q = async <T = Record<string, any>>(sql: string, p: unknown[] = []) => (await db.query<T>(sql, p)).rows;
-const existe = async (nome: string) => (await q<{ r: string | null }>("SELECT to_regclass($1)::text AS r", [nome]))[0]!.r !== null;
+const q = async <T = Record<string, any>>(sql: string, p: unknown[] = []) =>
+  (await db.query<T>(sql, p)).rows;
+const existe = async (nome: string) =>
+  (await q<{ r: string | null }>("SELECT to_regclass($1)::text AS r", [nome]))[0]!.r !== null;
 
 beforeEach(async () => {
   db = new PGlite();
@@ -49,33 +51,56 @@ describe("remoção da base de conhecimento", () => {
   });
 
   test("flag desligada também recusa", async () => {
-    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', false)", [clinica]);
+    await q(
+      "INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', false)",
+      [clinica],
+    );
     await expect(db.exec(await readFile(MIGRATION, "utf8"))).rejects.toThrow("Nada foi apagado");
     await db.exec("ROLLBACK"); // a falha deixa a transação aberta, como no executor de migrations
     expect(await existe("public.nina_cat_profissionais")).toBe(true);
   });
 
   test("com a flag ligada: copia o editorial, apaga tudo e remove a função", async () => {
-    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', true)", [clinica]);
+    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', true)", [
+      clinica,
+    ]);
     await db.exec(await readFile(MIGRATION, "utf8"));
 
-    for (const t of ["nina_cat_servicos", "nina_cat_profissionais", "nina_kb_bases", "nina_kb_registros", "nina_kb_consultas"]) {
+    for (const t of [
+      "nina_cat_servicos",
+      "nina_cat_profissionais",
+      "nina_kb_bases",
+      "nina_kb_registros",
+      "nina_kb_consultas",
+    ]) {
       expect(await existe(`public.${t}`)).toBe(false);
     }
     const funcoes = await q("SELECT 1 FROM pg_proc WHERE proname = 'nina_kb_buscar_semantico'");
     expect(funcoes).toHaveLength(0);
 
     // Cópia do que é editorial.
-    expect((await q("SELECT nome FROM arquivo_base_conhecimento.nina_cat_servicos ORDER BY nome")).map((r) => r.nome)).toEqual(["Hemograma", "TSH"]);
-    expect((await q("SELECT nome FROM arquivo_base_conhecimento.nina_cat_profissionais")).map((r) => r.nome)).toEqual(["Dra. Ana"]);
-    expect(await q("SELECT texto FROM arquivo_base_conhecimento.nina_kb_registros")).toEqual([{ texto: "texto" }]);
+    expect(
+      (await q("SELECT nome FROM arquivo_base_conhecimento.nina_cat_servicos ORDER BY nome")).map(
+        (r) => r.nome,
+      ),
+    ).toEqual(["Hemograma", "TSH"]);
+    expect(
+      (await q("SELECT nome FROM arquivo_base_conhecimento.nina_cat_profissionais")).map(
+        (r) => r.nome,
+      ),
+    ).toEqual(["Dra. Ana"]);
+    expect(await q("SELECT texto FROM arquivo_base_conhecimento.nina_kb_registros")).toEqual([
+      { texto: "texto" },
+    ]);
 
     // O log de consultas traz perguntas de pacientes: não é copiado.
     expect(await existe("arquivo_base_conhecimento.nina_kb_consultas")).toBe(false);
   });
 
   test("o arquivo fica fechado para os usuários da aplicação", async () => {
-    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', true)", [clinica]);
+    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', true)", [
+      clinica,
+    ]);
     await db.exec(await readFile(MIGRATION, "utf8"));
     const rls = await q<{ relrowsecurity: boolean }>(
       "SELECT relrowsecurity FROM pg_class WHERE oid = 'arquivo_base_conhecimento.nina_cat_servicos'::regclass",
@@ -86,15 +111,21 @@ describe("remoção da base de conhecimento", () => {
               has_table_privilege('authenticated', 'arquivo_base_conhecimento.nina_cat_servicos', 'SELECT') AS auth`,
     );
     expect(acesso[0]).toEqual({ anon: false, auth: false });
-    const uso = await q<{ r: boolean }>("SELECT has_schema_privilege('authenticated', 'arquivo_base_conhecimento', 'USAGE') AS r");
+    const uso = await q<{ r: boolean }>(
+      "SELECT has_schema_privilege('authenticated', 'arquivo_base_conhecimento', 'USAGE') AS r",
+    );
     expect(uso[0]!.r).toBe(false);
   });
 
   test("rodar de novo não quebra nem apaga a cópia", async () => {
-    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', true)", [clinica]);
+    await q("INSERT INTO public.clinica_feature_flags VALUES ($1, 'nina_informa_cadastro', true)", [
+      clinica,
+    ]);
     const sql = await readFile(MIGRATION, "utf8");
     await db.exec(sql);
     await db.exec(sql);
-    expect(await q("SELECT count(*)::int AS n FROM arquivo_base_conhecimento.nina_cat_servicos")).toEqual([{ n: 2 }]);
+    expect(
+      await q("SELECT count(*)::int AS n FROM arquivo_base_conhecimento.nina_cat_servicos"),
+    ).toEqual([{ n: 2 }]);
   });
 });

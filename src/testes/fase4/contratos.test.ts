@@ -43,9 +43,7 @@ import { conversaResolvida, derivarResponsavel } from "@/lib/atendimento/ciclo-r
  * ------------------------------------------------------------------ */
 describe("cenário 1 — identificação e troca de conversa", () => {
   test("o nome é a identificação principal; telefone continua secundário", () => {
-    expect(tituloConversa(conversas.comPaciente)).toBe(
-      "TESTE Maria Aparecida da Silva Sauro",
-    );
+    expect(tituloConversa(conversas.comPaciente)).toBe("TESTE Maria Aparecida da Silva Sauro");
     expect(tituloConversa(conversas.comNomeDoContato)).toBe("TESTE João Batista");
     // Telefone escrito no campo de nome NÃO vira identificação.
     expect(nomeConversa(conversas.semNome)).toBeNull();
@@ -55,7 +53,11 @@ describe("cenário 1 — identificação e troca de conversa", () => {
   });
 
   test("nome longo é preservado inteiro (a tela é que encurta visualmente)", () => {
-    const longo = { contato_nome: null, contato_telefone: "+5511999990001", pacientes: { nome: "TESTE " + "Ana ".repeat(20).trim() } };
+    const longo = {
+      contato_nome: null,
+      contato_telefone: "+5511999990001",
+      pacientes: { nome: "TESTE " + "Ana ".repeat(20).trim() },
+    };
     expect(tituloConversa(longo).length).toBeGreaterThan(60);
   });
 
@@ -67,15 +69,30 @@ describe("cenário 1 — identificação e troca de conversa", () => {
     expect(cache.obter(CONVERSA_B)?.msgs).toEqual([{ id: "b1" }]);
     // Uma resposta atrasada da conversa A não pode cair na tela da B.
     expect(
-      respostaAindaVale({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_B, pedido: 1, pedidoAtual: 1 }),
+      respostaAindaVale({
+        alvo: CONVERSA_A,
+        selecionadaAgora: CONVERSA_B,
+        pedido: 1,
+        pedidoAtual: 1,
+      }),
     ).toBe(false);
     // A resposta correta e mais recente é aceita.
     expect(
-      respostaAindaVale({ alvo: CONVERSA_B, selecionadaAgora: CONVERSA_B, pedido: 2, pedidoAtual: 2 }),
+      respostaAindaVale({
+        alvo: CONVERSA_B,
+        selecionadaAgora: CONVERSA_B,
+        pedido: 2,
+        pedidoAtual: 2,
+      }),
     ).toBe(true);
     // Pedido superado é descartado.
     expect(
-      respostaAindaVale({ alvo: CONVERSA_B, selecionadaAgora: CONVERSA_B, pedido: 1, pedidoAtual: 2 }),
+      respostaAindaVale({
+        alvo: CONVERSA_B,
+        selecionadaAgora: CONVERSA_B,
+        pedido: 1,
+        pedidoAtual: 2,
+      }),
     ).toBe(false);
   });
 
@@ -89,9 +106,15 @@ describe("cenário 1 — identificação e troca de conversa", () => {
   });
 
   test("uma ação só vale para a conversa que está aberta agora", () => {
-    expect(acaoPermitida({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_B, carregando: false })).toBe(false);
-    expect(acaoPermitida({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_A, carregando: true })).toBe(false);
-    expect(acaoPermitida({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_A, carregando: false })).toBe(true);
+    expect(
+      acaoPermitida({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_B, carregando: false }),
+    ).toBe(false);
+    expect(
+      acaoPermitida({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_A, carregando: true }),
+    ).toBe(false);
+    expect(
+      acaoPermitida({ alvo: CONVERSA_A, selecionadaAgora: CONVERSA_A, carregando: false }),
+    ).toBe(true);
   });
 });
 
@@ -114,16 +137,31 @@ describe("cenário 2 — administrador vê, transfere, mas nunca atende", () => 
   });
 
   test("administrador enxerga a operação inteira; atendente vê o que é dele", () => {
-    const conversaDeOutro = { id: CONVERSA_A, status: "active", owner_type: "HUMAN", atribuida_user_id: ATENDENTE_ONLINE } as never;
+    const conversaDeOutro = {
+      id: CONVERSA_A,
+      status: "active",
+      owner_type: "HUMAN",
+      atribuida_user_id: ATENDENTE_ONLINE,
+    } as never;
     // Gestor no escopo de equipe: enxerga.
-    expect(conversaVisivelNoEscopo(conversaDeOutro, { escopo: "equipe", gestor: true, userId: ADMIN })).toBe(true);
+    expect(
+      conversaVisivelNoEscopo(conversaDeOutro, { escopo: "equipe", gestor: true, userId: ADMIN }),
+    ).toBe(true);
     // Atendente no escopo padrão "minhas": não é dele, não aparece.
     expect(
-      conversaVisivelNoEscopo(conversaDeOutro, { escopo: normalizarEscopo(null), gestor: false, userId: ATENDENTE_PAUSA }),
+      conversaVisivelNoEscopo(conversaDeOutro, {
+        escopo: normalizarEscopo(null),
+        gestor: false,
+        userId: ATENDENTE_PAUSA,
+      }),
     ).toBe(false);
     // É dele: aparece.
     expect(
-      conversaVisivelNoEscopo(conversaDeOutro, { escopo: "minhas", gestor: false, userId: ATENDENTE_ONLINE }),
+      conversaVisivelNoEscopo(conversaDeOutro, {
+        escopo: "minhas",
+        gestor: false,
+        userId: ATENDENTE_ONLINE,
+      }),
     ).toBe(true);
   });
 });
@@ -158,8 +196,19 @@ describe("cenário 3 — presença e elegibilidade na transferência", () => {
     // Ninguém online: nada é distribuído, a conversa espera em "Não atribuídas".
     const semNinguem = apenasDestinatariosValidos(equipe).filter(() => false);
     expect(semNinguem).toHaveLength(0);
-    const aguardando = { id: CONVERSA_B, status: "active", owner_type: "HUMAN", atribuida_user_id: null } as never;
-    expect(conversaVisivelNoEscopo(aguardando, { escopo: "nao_atribuidas", gestor: false, userId: ATENDENTE_ONLINE })).toBe(true);
+    const aguardando = {
+      id: CONVERSA_B,
+      status: "active",
+      owner_type: "HUMAN",
+      atribuida_user_id: null,
+    } as never;
+    expect(
+      conversaVisivelNoEscopo(aguardando, {
+        escopo: "nao_atribuidas",
+        gestor: false,
+        userId: ATENDENTE_ONLINE,
+      }),
+    ).toBe(true);
   });
 });
 
@@ -204,7 +253,11 @@ describe("cenário 4 — catálogo publicado alimenta a Nina", () => {
   });
 
   test("catálogo vazio (rascunho/arquivado não recuperado) não inventa resposta", () => {
-    const vazio = montarResultadoCatalogo({ servicos: [], profissionais: [], hojeISO: "2026-01-15" });
+    const vazio = montarResultadoCatalogo({
+      servicos: [],
+      profissionais: [],
+      hojeISO: "2026-01-15",
+    });
     expect(vazio.found).toBe(false);
     expect(vazio.knowledge_status).toBe("not_found");
     expect(vazio.price).toBeNull();
@@ -213,8 +266,15 @@ describe("cenário 4 — catálogo publicado alimenta a Nina", () => {
   });
 
   test("nota interna nunca faz parte do contexto entregue à Nina", () => {
-    const comNota = { ...servicoPublicado, nota_interna: "combinar desconto com a diretoria" } as never;
-    const r = montarResultadoCatalogo({ servicos: [comNota], profissionais: [], hojeISO: "2026-01-15" });
+    const comNota = {
+      ...servicoPublicado,
+      nota_interna: "combinar desconto com a diretoria",
+    } as never;
+    const r = montarResultadoCatalogo({
+      servicos: [comNota],
+      profissionais: [],
+      hojeISO: "2026-01-15",
+    });
     expect(JSON.stringify(r)).not.toContain("nota_interna");
     expect(JSON.stringify(r)).not.toContain("diretoria");
   });
@@ -262,7 +322,12 @@ describe("cenário 6 — formato e ciclo do protocolo", () => {
  * ------------------------------------------------------------------ */
 describe("cenário 7 — encerrar e reiniciar sem contaminação", () => {
   test("conversa resolvida não é respondida por ninguém até reabrir", () => {
-    const resolvida = { status: "closed", owner_type: "AI", assigned_to: null, resolved_at: new Date().toISOString() } as never;
+    const resolvida = {
+      status: "closed",
+      owner_type: "AI",
+      assigned_to: null,
+      resolved_at: new Date().toISOString(),
+    } as never;
     expect(conversaResolvida(resolvida)).toBe(true);
     expect(derivarResponsavel(resolvida)).toBe("RESOLVIDA");
   });

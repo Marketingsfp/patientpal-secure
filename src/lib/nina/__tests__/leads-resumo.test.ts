@@ -3,9 +3,14 @@ import {
   ehConversacional,
   resumirLeads,
   previaTexto,
-  type MensagemResumoRow, aplicarMensagemRealtime, ordenarPorAtividade } from "@/lib/nina/leads-resumo";
+  type MensagemResumoRow,
+  aplicarMensagemRealtime,
+  ordenarPorAtividade,
+} from "@/lib/nina/leads-resumo";
 
-const msg = (p: Partial<MensagemResumoRow> & { id: string; created_at: string }): MensagemResumoRow => ({
+const msg = (
+  p: Partial<MensagemResumoRow> & { id: string; created_at: string },
+): MensagemResumoRow => ({
   conversa_id: "c1",
   direction: "in",
   body: "oi",
@@ -62,7 +67,9 @@ describe("leads-resumo", () => {
     ]);
     expect(r["L1"]!.lastMessageId).toBe("m1");
     expect(r["L1"]!.totalMensagens).toBe(1);
-    expect(ehConversacional(msg({ id: "x", created_at: "", tipo: "sistema", enviada_por: "sistema" }))).toBe(false);
+    expect(
+      ehConversacional(msg({ id: "x", created_at: "", tipo: "sistema", enviada_por: "sistema" })),
+    ).toBe(false);
   });
 
   it("não mistura leads nem sessões diferentes", () => {
@@ -78,7 +85,9 @@ describe("leads-resumo", () => {
   });
 
   it("lead sem conversa fica vazio e mensagens em branco são ignoradas", () => {
-    const r = resumirLeads({ L1: [] }, [msg({ id: "z", created_at: "2026-09-07T10:00:00Z", body: "   " })]);
+    const r = resumirLeads({ L1: [] }, [
+      msg({ id: "z", created_at: "2026-09-07T10:00:00Z", body: "   " }),
+    ]);
     expect(r["L1"]!.lastMessageId).toBeNull();
     expect(r["L1"]!.unreadCount).toBe(0);
   });

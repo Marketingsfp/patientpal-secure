@@ -345,8 +345,8 @@ describe("motivoDaRevisao isolado", () => {
 
   it("origem desconhecida não impede a revisão", () => {
     const origem: OrigemSaida = "desconhecida";
-    expect(revisarSaida({ origem, textoFinal: "t", etapa: "A", avaliacao: resultado({}) }).revisada).toBe(
-      true,
-    );
+    expect(
+      revisarSaida({ origem, textoFinal: "t", etapa: "A", avaliacao: resultado({}) }).revisada,
+    ).toBe(true);
   });
 });

@@ -33,8 +33,8 @@ export function fonteOperacionalDoBanco(
       registro.push(clinicaId);
       if (falhar()) throw new Error("Falha ao ler o cadastro");
       return {
-      servicos: publicados("servicos", clinicaId),
-      profissionais: publicados("profissionais", clinicaId),
+        servicos: publicados("servicos", clinicaId),
+        profissionais: publicados("profissionais", clinicaId),
       };
     },
   };

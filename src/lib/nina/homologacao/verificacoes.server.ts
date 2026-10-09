@@ -45,8 +45,7 @@ const REGRA_GERAL_SAUDACAO: RestricaoEstruturada = {
   nivel: "regra_geral",
   origem: "comportamento publicado",
   descricao: "apresentação obrigatória na primeira mensagem da sessão",
-  texto:
-    "Na primeira mensagem da sessão, a resposta começa com a apresentação da assistente.",
+  texto: "Na primeira mensagem da sessão, a resposta começa com a apresentação da assistente.",
 };
 
 async function hashTexto(texto: string): Promise<string> {
@@ -213,16 +212,10 @@ export async function verificarRetiradaDaRegra(
     });
     if (error) throw new Error(error.message);
     const row = Array.isArray(data) ? data[0] : data;
-    const { invalidarCacheInstrucoes, promptInstrucoes } = await import(
-      "@/lib/nina/instrucoes-runtime.server"
-    );
+    const { invalidarCacheInstrucoes, promptInstrucoes } =
+      await import("@/lib/nina/instrucoes-runtime.server");
     invalidarCacheInstrucoes("homologacao");
-    const snapshot = await promptInstrucoes(
-      "homologacao",
-      {},
-      "",
-      `verif-retirada-${Date.now()}`,
-    );
+    const snapshot = await promptInstrucoes("homologacao", {}, "", `verif-retirada-${Date.now()}`);
     const precedencia = resolverPrecedencia({
       regrasGerais: [REGRA_GERAL_SAUDACAO],
       excecoes: excecoesDaVerificacaoDeFonte(snapshot.texto),
@@ -292,9 +285,8 @@ export async function verificarAtendimentoCompleto(entrada: {
         .select("metadata, started_at")
         .eq("clinica_id", entrada.clinicaId)
         .eq("node_id", NODE_RESUMO_TURNO);
-      const { data } = await (turnoId
-        ? consulta.eq("trace_id", turnoId)
-        : consulta.eq("execution_id", execucaoId)
+      const { data } = await (
+        turnoId ? consulta.eq("trace_id", turnoId) : consulta.eq("execution_id", execucaoId)
       )
         .order("started_at", { ascending: false })
         .limit(1)

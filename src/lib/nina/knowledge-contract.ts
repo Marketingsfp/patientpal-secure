@@ -52,7 +52,11 @@ export type ResultadoConhecimento = {
   found: boolean;
   knowledge_status: KnowledgeStatus;
   /** Pedido compreendido, mas a fonte não confirma a oferta específica. Não é dúvida de escrita. */
-  limitacao_catalogo?: { codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA"; pedido: string; mensagem: string };
+  limitacao_catalogo?: {
+    codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA";
+    pedido: string;
+    mensagem: string;
+  };
   source: "nina_knowledge_base" | "nina_catalogo";
   source_type: "spreadsheet" | "catalog";
   base_version: number | null;

@@ -16,16 +16,24 @@ describe("resumo sem motor de confiança", () => {
   for (const ambiente of ["producao", "homologacao"]) {
     it(`${ambiente}: preserva prompt e entrega sem exibir avaliações antigas`, () => {
       const metadata = {
-        ambiente, origem_resposta: "modelo", modelo_chamado: true, rodadas: 1,
+        ambiente,
+        origem_resposta: "modelo",
+        modelo_chamado: true,
+        rodadas: 1,
         versao_prompt: { versao: 6, selecao: "publicada" },
         entrega: { mensagemId: "mensagem-final", textoHash: "hash-final", tamanho: 20 },
         confianca: { avaliacao: "answer_confidence", score: 63, nivel: "LOW", decisao: "HANDOFF" },
-        avaliacoes: [{ avaliacao: "answer_confidence", score: 63, nivel: "LOW", decisao: "HANDOFF" }],
+        avaliacoes: [
+          { avaliacao: "answer_confidence", score: 63, nivel: "LOW", decisao: "HANDOFF" },
+        ],
         lacunas: ["confianca"],
       };
-      const html = renderToStaticMarkup(createElement(RegistroTurnoResumo, {
-        compacto: true, eventos: [{ node_id: "turn.summary", metadata }],
-      }));
+      const html = renderToStaticMarkup(
+        createElement(RegistroTurnoResumo, {
+          compacto: true,
+          eventos: [{ node_id: "turn.summary", metadata }],
+        }),
+      );
       expect(html).toContain("mensagem-final");
       expect(html).toContain("versão 6");
       expect(html).toContain(ambiente);

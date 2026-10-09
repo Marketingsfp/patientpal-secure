@@ -1,31 +1,113 @@
 import { describe, expect, test } from "bun:test";
-import { mapearProfissionais, mapearServicos, precosDoProcedimento, type EntradaOperacional } from "../fonte-operacional";
+import {
+  mapearProfissionais,
+  mapearServicos,
+  precosDoProcedimento,
+  type EntradaOperacional,
+} from "../fonte-operacional";
 import { profissionalParaRegistro, servicoParaRegistro } from "../catalogo-conhecimento";
 import { separarAtendimentos } from "../catalogo-estrutura";
 
 const base: EntradaOperacional = {
   hojeISO: "2026-09-30",
   medicos: [
-    { id: "m-alex", nome: "ALEX LOUZA MACEDO", especialidade_id: "e-card", visivel_agendamento_online: true },
-    { id: "m-oculto", nome: "MEDICO PONTE", especialidade_id: "e-card", visivel_agendamento_online: false },
+    {
+      id: "m-alex",
+      nome: "ALEX LOUZA MACEDO",
+      especialidade_id: "e-card",
+      visivel_agendamento_online: true,
+    },
+    {
+      id: "m-oculto",
+      nome: "MEDICO PONTE",
+      especialidade_id: "e-card",
+      visivel_agendamento_online: false,
+    },
     { id: "m-vazio", nome: "SEM DADOS", especialidade_id: null, visivel_agendamento_online: null },
   ],
-  especialidades: [{ id: "e-card", nome: "CARDIOLOGIA" }, { id: "e-inf", nome: "CARDIOLOGIA INFANTIL" }],
+  especialidades: [
+    { id: "e-card", nome: "CARDIOLOGIA" },
+    { id: "e-inf", nome: "CARDIOLOGIA INFANTIL" },
+  ],
   agendas: [{ id: "ag1", medico_id: "m-alex", nome: "CONSULTAS", ordem_chegada: true }],
   disponibilidades: [
-    { medico_id: "m-alex", agenda_id: "ag1", dia_semana: 4, hora_inicio: "08:00:00", hora_fim: "18:00:00", observacoes: null, limite_pacientes: 20 },
-    { medico_id: "m-alex", agenda_id: "ag1", dia_semana: 3, hora_inicio: "13:00:00", hora_fim: "18:00:00" },
+    {
+      medico_id: "m-alex",
+      agenda_id: "ag1",
+      dia_semana: 4,
+      hora_inicio: "08:00:00",
+      hora_fim: "18:00:00",
+      observacoes: null,
+      limite_pacientes: 20,
+    },
+    {
+      medico_id: "m-alex",
+      agenda_id: "ag1",
+      dia_semana: 3,
+      hora_inicio: "13:00:00",
+      hora_fim: "18:00:00",
+    },
     // repetido de propósito: o cadastro não é corrigido, passa como está
-    { medico_id: "m-alex", agenda_id: "ag1", dia_semana: 3, hora_inicio: "13:00:00", hora_fim: "18:00:00" },
+    {
+      medico_id: "m-alex",
+      agenda_id: "ag1",
+      dia_semana: 3,
+      hora_inicio: "13:00:00",
+      hora_fim: "18:00:00",
+    },
     // fora da vigência: não é informado
-    { medico_id: "m-alex", agenda_id: "ag1", dia_semana: 1, hora_inicio: "08:00:00", hora_fim: "12:00:00", vigencia_fim: "2026-09-01" },
+    {
+      medico_id: "m-alex",
+      agenda_id: "ag1",
+      dia_semana: 1,
+      hora_inicio: "08:00:00",
+      hora_fim: "12:00:00",
+      vigencia_fim: "2026-09-01",
+    },
   ],
   procedimentos: [
-    { id: "p-cons", nome: "CONSULTA", tipo: "consulta", valor_padrao: "120", valor_dinheiro_pix: "120", valor_cartao: "145" },
-    { id: "p-inf", nome: "CONSULTA CARDIOLOGIA INFANTIL", tipo: "consulta", valor_padrao: "160", valor_dinheiro_pix: "160", valor_cartao: "190" },
-    { id: "p-rev", nome: "REVISAO", tipo: "consulta", valor_padrao: "0", valor_dinheiro_pix: "0", valor_cartao: "0" },
-    { id: "p-ecg", nome: "ELETROCARDIOGRAMA", tipo: "exame", valor_padrao: "0", valor_dinheiro_pix: "0", valor_cartao: "0", preparo: "  " },
-    { id: "p-lab", nome: "TIREOGLOBULINA", tipo: "exame", valor_padrao: "48.0", valor_dinheiro_pix: "0", valor_cartao: "0", preparo: "Jejum de 8 horas" },
+    {
+      id: "p-cons",
+      nome: "CONSULTA",
+      tipo: "consulta",
+      valor_padrao: "120",
+      valor_dinheiro_pix: "120",
+      valor_cartao: "145",
+    },
+    {
+      id: "p-inf",
+      nome: "CONSULTA CARDIOLOGIA INFANTIL",
+      tipo: "consulta",
+      valor_padrao: "160",
+      valor_dinheiro_pix: "160",
+      valor_cartao: "190",
+    },
+    {
+      id: "p-rev",
+      nome: "REVISAO",
+      tipo: "consulta",
+      valor_padrao: "0",
+      valor_dinheiro_pix: "0",
+      valor_cartao: "0",
+    },
+    {
+      id: "p-ecg",
+      nome: "ELETROCARDIOGRAMA",
+      tipo: "exame",
+      valor_padrao: "0",
+      valor_dinheiro_pix: "0",
+      valor_cartao: "0",
+      preparo: "  ",
+    },
+    {
+      id: "p-lab",
+      nome: "TIREOGLOBULINA",
+      tipo: "exame",
+      valor_padrao: "48.0",
+      valor_dinheiro_pix: "0",
+      valor_cartao: "0",
+      preparo: "Jejum de 8 horas",
+    },
   ],
   vinculos: [
     { medico_id: "m-alex", procedimento_id: "p-cons" },
@@ -51,9 +133,27 @@ describe("fonte operacional — médicos e consultas", () => {
 
   test("horários como estão na aba: repetidos passam, vencidos não, vagas viram observação", () => {
     expect(alex.horarios).toEqual([
-      { dia: "Quarta-feira", inicio: "13:00", fim: "18:00", recorrencia: "Toda semana", observacao: null },
-      { dia: "Quarta-feira", inicio: "13:00", fim: "18:00", recorrencia: "Toda semana", observacao: null },
-      { dia: "Quinta-feira", inicio: "08:00", fim: "18:00", recorrencia: "Toda semana", observacao: "Limite de 20 pacientes" },
+      {
+        dia: "Quarta-feira",
+        inicio: "13:00",
+        fim: "18:00",
+        recorrencia: "Toda semana",
+        observacao: null,
+      },
+      {
+        dia: "Quarta-feira",
+        inicio: "13:00",
+        fim: "18:00",
+        recorrencia: "Toda semana",
+        observacao: null,
+      },
+      {
+        dia: "Quinta-feira",
+        inicio: "08:00",
+        fim: "18:00",
+        recorrencia: "Toda semana",
+        observacao: "Limite de 20 pacientes",
+      },
     ]);
     expect(alex.tipo_atendimento).toBe("Ordem de chegada");
   });
@@ -107,7 +207,9 @@ describe("fonte operacional — exames e procedimentos", () => {
   test("preço sem forma de pagamento definida fica como valor de referência, com o preparo cadastrado", () => {
     const lab = servicos[1]!;
     expect(lab.valor).toBe(48);
-    expect((lab.formas_pagamento as any[]).map((f) => [f.forma, f.valor])).toEqual([["Dinheiro", 48]]);
+    expect((lab.formas_pagamento as any[]).map((f) => [f.forma, f.valor])).toEqual([
+      ["Dinheiro", 48],
+    ]);
     expect(lab.preparo).toBe("Jejum de 8 horas");
     const r = servicoParaRegistro(lab as never);
     expect(r.procedimento).toBe("TIREOGLOBULINA");
@@ -117,7 +219,25 @@ describe("fonte operacional — exames e procedimentos", () => {
   });
 
   test("preços: zero não vale; dinheiro cai para o valor padrão; cartão só o cadastrado", () => {
-    expect(precosDoProcedimento({ id: "x", nome: "x", tipo: "exame", valor_padrao: "225.0", valor_dinheiro_pix: "0", valor_cartao: "0" })).toEqual({ dinheiro: 225, cartao: null });
-    expect(precosDoProcedimento({ id: "x", nome: "x", tipo: "exame", valor_padrao: "0", valor_dinheiro_pix: "1570", valor_cartao: "1727.00" })).toEqual({ dinheiro: 1570, cartao: 1727 });
+    expect(
+      precosDoProcedimento({
+        id: "x",
+        nome: "x",
+        tipo: "exame",
+        valor_padrao: "225.0",
+        valor_dinheiro_pix: "0",
+        valor_cartao: "0",
+      }),
+    ).toEqual({ dinheiro: 225, cartao: null });
+    expect(
+      precosDoProcedimento({
+        id: "x",
+        nome: "x",
+        tipo: "exame",
+        valor_padrao: "0",
+        valor_dinheiro_pix: "1570",
+        valor_cartao: "1727.00",
+      }),
+    ).toEqual({ dinheiro: 1570, cartao: 1727 });
   });
 });

@@ -16,7 +16,6 @@
  */
 import { alteracaoDaTransformacao } from "@/lib/nina/rastreio/turno";
 
-
 /** Par de teste: uma regra publicável e o marcador que ela exige. */
 export type ParMarcador = {
   id: string;
@@ -32,8 +31,16 @@ export type ParMarcador = {
  * dois. Editável pela chamada — estes são apenas os valores padrão.
  */
 export const PARES_MARCADOR_PADRAO: readonly ParMarcador[] = [
-  { id: "par-a", gatilho: "Qual é o código de verificação da unidade?", marcador: "NINA-VERIF-ALFA-7731" },
-  { id: "par-b", gatilho: "Me confirme o selo interno desta verificação.", marcador: "NINA-VERIF-BETA-4902" },
+  {
+    id: "par-a",
+    gatilho: "Qual é o código de verificação da unidade?",
+    marcador: "NINA-VERIF-ALFA-7731",
+  },
+  {
+    id: "par-b",
+    gatilho: "Me confirme o selo interno desta verificação.",
+    marcador: "NINA-VERIF-BETA-4902",
+  },
 ];
 
 /**
@@ -193,9 +200,7 @@ function texto(v: unknown): string | null {
  * modelo produziu do que sobrou depois de confiança/finalização.
  * Sem resumo, o resultado é SEM_EVIDENCIA — nunca "aprovado".
  */
-export function resumirAtendimentoCompleto(
-  resumo: ResumoTurnoBruto,
-): ResultadoAtendimentoCompleto {
+export function resumirAtendimentoCompleto(resumo: ResumoTurnoBruto): ResultadoAtendimentoCompleto {
   if (!resumo) {
     return {
       modeloChamado: false,
@@ -235,9 +240,7 @@ export function resumirAtendimentoCompleto(
   const origem = texto(resumo["origem_resposta"]) ?? "";
   const houveDesfechoSubstituto =
     ["transferencia", "fallback", "fallback_erro", "limite_rodadas"].includes(origem) ||
-    intervencoes.some((i) =>
-      /confianca\.(baixa|regras\.bloqueio)|handoff|encaminh/i.test(i.etapa),
-    );
+    intervencoes.some((i) => /confianca\.(baixa|regras\.bloqueio)|handoff|encaminh/i.test(i.etapa));
 
   let resultado: ResultadoAtendimentoCompleto["resultado"];
   if (!mensagemEntregueId) resultado = "SEM_EVIDENCIA";

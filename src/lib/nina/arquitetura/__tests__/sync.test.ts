@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { NODES_ARQUITETURA } from "../manifesto";
-import {
-  SNAPSHOT_ANTERIOR,
-  assinaturaAtual,
-  calcularDiffArquitetura,
-  diffEmTexto,
-} from "../sync";
+import { SNAPSHOT_ANTERIOR, assinaturaAtual, calcularDiffArquitetura, diffEmTexto } from "../sync";
 
 describe("architecture sync", () => {
   it("compara a foto anterior com o manifesto atual", () => {

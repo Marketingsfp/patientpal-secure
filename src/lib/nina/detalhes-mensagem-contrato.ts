@@ -21,8 +21,17 @@ export type LeituraDetalhesMensagem = {
   fingerprintServidor?: string | null;
   fonteVersaoPrompt?: string | null;
   chamadasAuxiliares?: import("./auditoria-ia").ChamadaIA[];
-  decisoesJev?: Array<{ fase: string; aplicada: boolean | null; resumo: string; erro: string | null }>;
-  encaminhamentos?: Array<{ motivo: string; ferramenta: string | null; registros: Array<{ id: string | null; nome: string | null; campo: string; valor: boolean }> }>;
+  decisoesJev?: Array<{
+    fase: string;
+    aplicada: boolean | null;
+    resumo: string;
+    erro: string | null;
+  }>;
+  encaminhamentos?: Array<{
+    motivo: string;
+    ferramenta: string | null;
+    registros: Array<{ id: string | null; nome: string | null; campo: string; valor: boolean }>;
+  }>;
   rodadas: number | null;
   duracaoMs: number | null;
   avaliacoes: Array<{

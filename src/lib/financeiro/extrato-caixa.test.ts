@@ -8,6 +8,7 @@ import {
   ehSaida,
   favorecidoDaLinha,
   linhasAnaliticas,
+  linhasDeFechamento,
   linhasExtrato,
   linhasSinteticas,
   totaisDaVisao,
@@ -522,8 +523,6 @@ describe("resumoPorForma", () => {
 });
 
 describe("linhasDeFechamento", () => {
-  const { linhasDeFechamento, totaisExtrato, categoriaDaLinha, favorecidoDaLinha } =
-    require("./extrato-caixa") as typeof import("./extrato-caixa");
   const sess = (id: string, abertura = 0) => ({
     id,
     user_id: "u",

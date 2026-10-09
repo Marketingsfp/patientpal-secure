@@ -5,7 +5,8 @@ import { limparEscolhaAgendamento } from "./agendamento-escolha";
 /** Mantém paciente e reservas; referências e escolhas pendentes precisam de nova consulta. */
 export function alinharFonteDaSessao(estado: EstadoFluxoNina, atual: SelecaoFonte): boolean {
   const anterior = estado.fonte_consulta;
-  const mudou = anterior ? anterior.fonte !== atual.fonte || anterior.revisao !== atual.revisao
+  const mudou = anterior
+    ? anterior.fonte !== atual.fonte || anterior.revisao !== atual.revisao
     : atual.fonte !== "clinica_os" || atual.revisao !== null;
   if (mudou) {
     estado.knowledge_context = null;

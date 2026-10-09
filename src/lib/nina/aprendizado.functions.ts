@@ -8,14 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const TIPOS = [
-  "FACT",
-  "RULE",
-  "WORKFLOW",
-  "EXAMPLE",
-  "ERROR_PATTERN",
-  "KNOWLEDGE_GAP",
-] as const;
+const TIPOS = ["FACT", "RULE", "WORKFLOW", "EXAMPLE", "ERROR_PATTERN", "KNOWLEDGE_GAP"] as const;
 const STATUS = ["PENDING", "APPROVED", "REJECTED", "ARCHIVED"] as const;
 
 async function assertMembro(supabase: any, userId: string, clinicaId: string) {
@@ -171,7 +164,15 @@ export const registrarFeedbackNina = createServerFn({ method: "POST" })
         resposta: z.string().min(1).max(8000),
         avaliacao: z.union([z.literal(1), z.literal(-1)]),
         categoria: z
-          .enum(["dado_errado", "tom", "incompleto", "fora_de_escopo", "regra_errada", "otimo", "outro"])
+          .enum([
+            "dado_errado",
+            "tom",
+            "incompleto",
+            "fora_de_escopo",
+            "regra_errada",
+            "otimo",
+            "outro",
+          ])
           .optional(),
         correcao: z.string().max(4000).optional(),
         /** Quando marcado, a correção vira sugestão de aprendizado (PENDING). */
@@ -236,10 +237,7 @@ export const estatisticasAprendizado = createServerFn({ method: "POST" })
 
     const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const [aprR, fbR] = await Promise.all([
-      supabase
-        .from("nina_aprendizados")
-        .select("status, usos")
-        .eq("clinica_id", data.clinicaId),
+      supabase.from("nina_aprendizados").select("status, usos").eq("clinica_id", data.clinicaId),
       supabase
         .from("nina_feedback")
         .select("avaliacao, created_at")

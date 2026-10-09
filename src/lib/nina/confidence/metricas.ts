@@ -251,7 +251,9 @@ const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sáb
 export const NOME_DIA_SEMANA = (d: number): string => DIAS[d] ?? String(d);
 
 /** Nível efetivo: usa o campo gravado; se faltar, deriva do score. */
-export function nivelDa(l: Pick<LinhaDecisaoMetrica, "nivel" | "score">): "HIGH" | "MEDIUM" | "LOW" {
+export function nivelDa(
+  l: Pick<LinhaDecisaoMetrica, "nivel" | "score">,
+): "HIGH" | "MEDIUM" | "LOW" {
   const n = (l.nivel ?? "").toUpperCase();
   if (n === "HIGH" || n === "MEDIUM" || n === "LOW") return n;
   if (l.score >= 90) return "HIGH";
@@ -270,7 +272,14 @@ export function decisaoDa(l: Pick<LinhaDecisaoMetrica, "decisao" | "acao">): str
   return "";
 }
 
-const PADROES_AUSENCIA = ["MISSING", "AUSENTE", "SEM_", "NOT_FOUND", "NAO_ENCONTRAD", "UNCONFIRMED"];
+const PADROES_AUSENCIA = [
+  "MISSING",
+  "AUSENTE",
+  "SEM_",
+  "NOT_FOUND",
+  "NAO_ENCONTRAD",
+  "UNCONFIRMED",
+];
 
 function ehAusencia(code: string): boolean {
   const c = code.toUpperCase();
@@ -317,10 +326,7 @@ const JANELA_ERRO_MS = 48 * 60 * 60 * 1000;
  * "seguida de erro" quando a mesma conversa recebeu um reporte manual
  * até 48h depois da decisão.
  */
-function correlacionar(
-  linhas: LinhaDecisaoMetrica[],
-  erros: ErroReportado[],
-): FaixaCorrelacao[] {
+function correlacionar(linhas: LinhaDecisaoMetrica[], erros: ErroReportado[]): FaixaCorrelacao[] {
   const porConversa = new Map<string, number[]>();
   for (const e of erros) {
     if (!e.conversa_id) continue;
@@ -331,7 +337,11 @@ function correlacionar(
     porConversa.set(e.conversa_id, arr);
   }
 
-  const faixas: Array<{ faixa: FaixaCorrelacao["faixa"]; rotulo: string; teste: (s: number) => boolean }> = [
+  const faixas: Array<{
+    faixa: FaixaCorrelacao["faixa"];
+    rotulo: string;
+    teste: (s: number) => boolean;
+  }> = [
     { faixa: "alta", rotulo: "Acima de 90%", teste: (s) => s >= 90 },
     { faixa: "media", rotulo: "Entre 75% e 89%", teste: (s) => s >= 75 && s < 90 },
     { faixa: "baixa", rotulo: "Abaixo de 75%", teste: (s) => s < 75 },
@@ -495,7 +505,10 @@ export function calcularCalibracaoPorFaixa(
     const qtdErros = doGrupo.filter((l) => foiReportadaComoErro(l, idx)).length;
     const mensagens = doGrupo.length;
     const scorePrevisto = mensagens
-      ? Math.round((doGrupo.reduce((s, l) => s + (Number.isFinite(l.score) ? l.score : 0), 0) / mensagens) * 10) / 10
+      ? Math.round(
+          (doGrupo.reduce((s, l) => s + (Number.isFinite(l.score) ? l.score : 0), 0) / mensagens) *
+            10,
+        ) / 10
       : 0;
     const acertoObservado = mensagens
       ? Math.round(((mensagens - qtdErros) / mensagens) * 1000) / 10
@@ -645,17 +658,15 @@ export function calcularCalibracaoPorTipo(
     const errou = foiReportadaComoErro(l, idx);
     const cats = l.categorias.length > 0 ? l.categorias : [l.intencao || "nao_classificado"];
     for (const tipo of cats) {
-      const atual =
-        base.get(tipo) ??
-        {
-          tipo,
-          mensagens: 0,
-          mensagensAlta: 0,
-          erros: 0,
-          errosAlta: 0,
-          taxaErro: 0,
-          taxaErroAlta: 0,
-        };
+      const atual = base.get(tipo) ?? {
+        tipo,
+        mensagens: 0,
+        mensagensAlta: 0,
+        erros: 0,
+        errosAlta: 0,
+        taxaErro: 0,
+        taxaErroAlta: 0,
+      };
       atual.mensagens += 1;
       if (alta) atual.mensagensAlta += 1;
       if (errou) {

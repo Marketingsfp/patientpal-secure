@@ -33,25 +33,22 @@ import {
 } from "./fixtures/clinica-ficticia";
 
 describe("FASE 1 — evidência real por afirmação", () => {
-  it(
-    "preço divergente do catálogo com a MESMA consulta não pode ser dado como apoiado",
-    () => {
-      // Fato da fixture: R$ 250,00. A Nina escreveu R$ 180,00.
-      const estado = turnoBase({
-        acao: "informar_valor",
-        tipoTurno: "INFORMACAO",
-        catalogoEncontrou: true,
-        ferramentas: [FERRAMENTA_CATALOGO_OK],
-      });
-      const ctx = montarContextoDoTurno(estado);
-      const g = avaliarGrounding(ctx, "O ultrassom de abdome total custa R$ 180,00.");
-      const valor = g.claims.find((c) => c.tipo === "valor");
+  it("preço divergente do catálogo com a MESMA consulta não pode ser dado como apoiado", () => {
+    // Fato da fixture: R$ 250,00. A Nina escreveu R$ 180,00.
+    const estado = turnoBase({
+      acao: "informar_valor",
+      tipoTurno: "INFORMACAO",
+      catalogoEncontrou: true,
+      ferramentas: [FERRAMENTA_CATALOGO_OK],
+    });
+    const ctx = montarContextoDoTurno(estado);
+    const g = avaliarGrounding(ctx, "O ultrassom de abdome total custa R$ 180,00.");
+    const valor = g.claims.find((c) => c.tipo === "valor");
 
-      expect(CATALOGO_PUBLICADO.ultrassomAbdomeTotal.precoParticular).toBe(250);
-      // Hoje basta "o catálogo respondeu algo" para o claim virar apoiado.
-      expect(valor?.suportado).toBe(false);
-    },
-  );
+    expect(CATALOGO_PUBLICADO.ultrassomAbdomeTotal.precoParticular).toBe(250);
+    // Hoje basta "o catálogo respondeu algo" para o claim virar apoiado.
+    expect(valor?.suportado).toBe(false);
+  });
 
   it("endereço afirmado sem nenhuma fonte precisa aparecer como afirmação sem evidência", () => {
     const estado = turnoBase({ acao: "responder_informacao", tipoTurno: "INFORMACAO" });
@@ -212,21 +209,24 @@ describe("FASE 1 — destino do turno e vínculo com a mensagem", () => {
     expect((plano as unknown as { aguardarPaciente?: boolean }).aguardarPaciente).toBe(true);
   });
 
-  it.failing("plano de handoff precisa declarar o texto seguro para quando a transferência falhar", () => {
-    const avaliacao = decidirNoTurno(
-      turnoBase({ acao: "informar_valor", tipoTurno: "INFORMACAO" }),
-    );
-    const plano = decidirHandoff({
-      avaliacaoAcao: avaliacao,
-      decisaoEfetiva: "HANDOFF",
-      tipoTurno: "INFORMACAO",
-      pedidoHumanoExplicito: false,
-    });
-    // Sem isso, falha na ferramenta libera ao paciente o texto reprovado.
-    expect(
-      (plano as unknown as { textoSeFalharHandoff?: string }).textoSeFalharHandoff,
-    ).toBeTruthy();
-  });
+  it.failing(
+    "plano de handoff precisa declarar o texto seguro para quando a transferência falhar",
+    () => {
+      const avaliacao = decidirNoTurno(
+        turnoBase({ acao: "informar_valor", tipoTurno: "INFORMACAO" }),
+      );
+      const plano = decidirHandoff({
+        avaliacaoAcao: avaliacao,
+        decisaoEfetiva: "HANDOFF",
+        tipoTurno: "INFORMACAO",
+        pedidoHumanoExplicito: false,
+      });
+      // Sem isso, falha na ferramenta libera ao paciente o texto reprovado.
+      expect(
+        (plano as unknown as { textoSeFalharHandoff?: string }).textoSeFalharHandoff,
+      ).toBeTruthy();
+    },
+  );
 
   it("score persistido pertence ao texto final: mudar o texto invalida a avaliação", async () => {
     const { avaliacaoValeParaOTexto } = await import("./final-answer");

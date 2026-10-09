@@ -405,7 +405,8 @@ describe("liberacaoDaLinha", () => {
   it("gratuidade do Cartão NÃO zera: quem remunera é a mensalidade do paciente", () => {
     expect(
       liberacaoDaLinha(ctx, {
-        descricao: "MARIA BERNADETE — ELETROCARDIOGRAMA (ECG) — CONVENIO CARTAO CONSULTA (GRATUIDADE)",
+        descricao:
+          "MARIA BERNADETE — ELETROCARDIOGRAMA (ECG) — CONVENIO CARTAO CONSULTA (GRATUIDADE)",
         valorPago: 0,
       }),
     ).toBeNull();

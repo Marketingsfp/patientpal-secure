@@ -55,10 +55,11 @@ export function apresentarEstadoEvento(status: unknown): ApresentacaoEstadoEvent
  * node (started + completed) descrevem uma execução só — o texto deixa isso
  * explícito em vez de mostrar duas conclusões.
  */
-export function descreverEventoRastreio(ev: {
-  event_type?: unknown;
-  status?: unknown;
-}): { simbolo: string; rotulo: string; classe: string } {
+export function descreverEventoRastreio(ev: { event_type?: unknown; status?: unknown }): {
+  simbolo: string;
+  rotulo: string;
+  classe: string;
+} {
   const estado = apresentarEstadoEvento(ev.status);
   if (ev.event_type === "started") {
     return {

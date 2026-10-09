@@ -250,7 +250,10 @@ export async function processarMensagemTeste(
   const { lead, conversaId, cicloId, waId, agora, entradaPersistida } =
     await comSessaoTesteExclusiva(data, async (conferirSessao) => {
       const lead = await carregarLead(supabaseAdmin, data.clinicaId, data.leadId);
-      if (retomada && (lead.ciclo_id !== retomada.cicloId || lead.conversa_id !== retomada.mensagem.conversa_id))
+      if (
+        retomada &&
+        (lead.ciclo_id !== retomada.cicloId || lead.conversa_id !== retomada.mensagem.conversa_id)
+      )
         throw new Error("TEST_SESSION_CHANGED");
       const { conversaId, cicloId } = retomada
         ? { conversaId: lead.conversa_id!, cicloId: retomada.cicloId }
@@ -258,44 +261,79 @@ export async function processarMensagemTeste(
       const waId = retomada?.mensagem.wa_message_id ?? `test-${lead.id}-${data.chave}`;
       const agora = new Date().toISOString();
       const chamadasIA: import("./auditoria-ia").ChamadaIA[] = [];
-      const registrarIA = (c: import("./auditoria-ia").ChamadaIA) => { chamadasIA.push(c); };
-      let leituraImagem: import("./leitura-imagem").LeituraImagem = { tipo: "falha_tecnica", motivo: "download" };
+      const registrarIA = (c: import("./auditoria-ia").ChamadaIA) => {
+        chamadasIA.push(c);
+      };
+      let leituraImagem: import("./leitura-imagem").LeituraImagem = {
+        tipo: "falha_tecnica",
+        motivo: "download",
+      };
       let media_url: string | null = null;
       let media_mime: string | null = null;
       if (ehAudio && data.audioArquivo && !retomada) {
-        const { data: existente, error: erroExistente } = await supabaseAdmin.from("whatsapp_mensagens")
-          .select("id").eq("clinica_id", data.clinicaId).eq("wa_message_id", waId).maybeSingle();
+        const { data: existente, error: erroExistente } = await supabaseAdmin
+          .from("whatsapp_mensagens")
+          .select("id")
+          .eq("clinica_id", data.clinicaId)
+          .eq("wa_message_id", waId)
+          .maybeSingle();
         if (erroExistente) throw new Error("Não foi possível verificar o envio anterior do áudio");
         if (!existente) {
-          const { tipoMimeAceito, LIMITE_BYTES_AUDIO, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } = await import("@/lib/whatsapp-midia-armazenamento");
+          const { tipoMimeAceito, LIMITE_BYTES_AUDIO, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } =
+            await import("@/lib/whatsapp-midia-armazenamento");
           const bytes = Buffer.from(data.audioArquivo.base64, "base64");
           media_mime = tipoMimeAceito("audio", data.audioArquivo.mime);
-          if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_AUDIO) throw new Error("Áudio inválido ou acima de 16 MB");
+          if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_AUDIO)
+            throw new Error("Áudio inválido ou acima de 16 MB");
           const { transcreverAudioBase64 } = await import("@/lib/whatsapp-midia.server");
-          const transcrita = await transcreverAudioBase64(data.audioArquivo.base64, media_mime, registrarIA);
+          const transcrita = await transcreverAudioBase64(
+            data.audioArquivo.base64,
+            media_mime,
+            registrarIA,
+          );
           textoPaciente = bloquearLinksRecebidos(transcrita.texto);
           audioFalhou = !textoPaciente;
           body = textoPaciente ? `🎤 ${textoPaciente}` : "🎤 [áudio não transcrito]";
-          const caminho = caminhoDaMidia({ clinicaId: data.clinicaId, waMessageId: waId, mime: media_mime });
-          const { error: erroUpload } = await supabaseAdmin.storage.from(BUCKET_MIDIA_WHATSAPP)
+          const caminho = caminhoDaMidia({
+            clinicaId: data.clinicaId,
+            waMessageId: waId,
+            mime: media_mime,
+          });
+          const { error: erroUpload } = await supabaseAdmin.storage
+            .from(BUCKET_MIDIA_WHATSAPP)
             .upload(caminho, bytes, { contentType: media_mime, upsert: true });
           if (!erroUpload) media_url = caminho;
         }
       }
       if (data.tipo === "image" && !retomada) {
-        const { data: existente, error: erroExistente } = await supabaseAdmin.from("whatsapp_mensagens")
-          .select("id").eq("clinica_id", data.clinicaId).eq("wa_message_id", waId).maybeSingle();
+        const { data: existente, error: erroExistente } = await supabaseAdmin
+          .from("whatsapp_mensagens")
+          .select("id")
+          .eq("clinica_id", data.clinicaId)
+          .eq("wa_message_id", waId)
+          .maybeSingle();
         if (erroExistente) throw new Error("Não foi possível conferir a foto anterior");
         if (!existente) {
           if (data.imagemArquivo) {
-            const { tipoMimeAceito, LIMITE_BYTES_IMAGEM, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } = await import("@/lib/whatsapp-midia-armazenamento");
+            const { tipoMimeAceito, LIMITE_BYTES_IMAGEM, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } =
+              await import("@/lib/whatsapp-midia-armazenamento");
             const bytes = Buffer.from(data.imagemArquivo.base64, "base64");
             media_mime = tipoMimeAceito("image", data.imagemArquivo.mime);
-            if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_IMAGEM) throw new Error("Foto inválida ou acima de 5 MB");
+            if (!media_mime || !bytes.length || bytes.length > LIMITE_BYTES_IMAGEM)
+              throw new Error("Foto inválida ou acima de 5 MB");
             const { lerPedidoNaImagem } = await import("@/lib/whatsapp-midia.server");
-            leituraImagem = await lerPedidoNaImagem(data.imagemArquivo.base64, media_mime, registrarIA);
-            const caminho = caminhoDaMidia({ clinicaId: data.clinicaId, waMessageId: waId, mime: media_mime });
-            const { error: erroUpload } = await supabaseAdmin.storage.from(BUCKET_MIDIA_WHATSAPP)
+            leituraImagem = await lerPedidoNaImagem(
+              data.imagemArquivo.base64,
+              media_mime,
+              registrarIA,
+            );
+            const caminho = caminhoDaMidia({
+              clinicaId: data.clinicaId,
+              waMessageId: waId,
+              mime: media_mime,
+            });
+            const { error: erroUpload } = await supabaseAdmin.storage
+              .from(BUCKET_MIDIA_WHATSAPP)
               .upload(caminho, bytes, { contentType: media_mime, upsert: true });
             if (!erroUpload) media_url = caminho;
           }
@@ -318,7 +356,10 @@ export async function processarMensagemTeste(
             body,
             tipo: data.tipo,
             transcricao: (ehAudio || data.tipo === "image") && textoPaciente ? textoPaciente : null,
-            raw: { ...(data.tipo === "image" ? { nina_leitura_imagem: leituraImagem } : {}), nina_chamadas_ia: chamadasIA },
+            raw: {
+              ...(data.tipo === "image" ? { nina_leitura_imagem: leituraImagem } : {}),
+              nina_chamadas_ia: chamadasIA,
+            },
             media_url,
             media_mime,
             status: "received",
@@ -342,7 +383,7 @@ export async function processarMensagemTeste(
     };
   if (entradaPersistida.repetida)
     textoPaciente =
-      (msgEntrada.tipo === "audio" || msgEntrada.tipo === "image")
+      msgEntrada.tipo === "audio" || msgEntrada.tipo === "image"
         ? (msgEntrada.transcricao ?? "")
         : msgEntrada.tipo === "text"
           ? (msgEntrada.body ?? "")
@@ -785,13 +826,29 @@ export async function processarMensagemTeste(
     let precisaTextoCompleto = true;
     if (reply.trim()) {
       try {
-        const { prepararAudioResposta, guardarAudioMensagem } = await import("@/lib/nina-audio.server");
+        const { prepararAudioResposta, guardarAudioMensagem } =
+          await import("@/lib/nina-audio.server");
         const { registrarChamadaIATurno } = await import("./auditoria-ia.server");
         const chamadasVoz: import("./auditoria-ia").ChamadaIA[] = [];
-        const sintetizado = await prepararAudioResposta(data.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: textoDoTurno },
-          c => { chamadasVoz.push(c); });
-        if (auditoriaNina.traceId) await Promise.all(chamadasVoz.map(c => registrarChamadaIATurno(c, {
-            clinicaId: data.clinicaId, conversaId, traceId: auditoriaNina.traceId!, execucaoId: auditoriaNina.execucaoId })));
+        const sintetizado = await prepararAudioResposta(
+          data.clinicaId,
+          reply,
+          { recebeuAudio: recebeuAudioNoTurno, mensagem: textoDoTurno },
+          (c) => {
+            chamadasVoz.push(c);
+          },
+        );
+        if (auditoriaNina.traceId)
+          await Promise.all(
+            chamadasVoz.map((c) =>
+              registrarChamadaIATurno(c, {
+                clinicaId: data.clinicaId,
+                conversaId,
+                traceId: auditoriaNina.traceId!,
+                execucaoId: auditoriaNina.execucaoId,
+              }),
+            ),
+          );
         if (sintetizado) {
           const { longa, texto: falado } = sintetizado;
           const { avaliarFala } = await import("@/lib/nina-audio.server");
@@ -851,15 +908,33 @@ export async function processarMensagemTeste(
             if (idAudio) {
               try {
                 const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
-                await registrarEntregaSaida({ clinicaId: data.clinicaId, conversaId, outgoingMessageId: idAudio,
-                  execucaoId: auditoriaNina.execucaoId ?? null, ...avaliacaoAudio, estado: "persistida" });
+                await registrarEntregaSaida({
+                  clinicaId: data.clinicaId,
+                  conversaId,
+                  outgoingMessageId: idAudio,
+                  execucaoId: auditoriaNina.execucaoId ?? null,
+                  ...avaliacaoAudio,
+                  estado: "persistida",
+                });
                 const { gravarEntregaDoTurno } = await import("@/lib/nina/rastreio/turno.server");
-                await gravarEntregaDoTurno({ clinicaId: data.clinicaId, conversaId, outgoingMessageId: idAudio,
-                  turnoId: auditoriaNina.traceId ?? null, execucaoId: auditoriaNina.execucaoId ?? null,
-                  canal: CANAL_TESTE, estado: "persistida", textoHash: avaliacaoAudio.textoHash });
-              } catch (erroAudit) { console.error("[NINA_TESTE] vínculo de áudio indisponível", erroAudit); }
-              try { await guardarAudioMensagem(data.clinicaId, idAudio, sintetizado); }
-              catch (erroMidia) { console.error("[NINA_TESTE] arquivo de áudio indisponível", erroMidia); }
+                await gravarEntregaDoTurno({
+                  clinicaId: data.clinicaId,
+                  conversaId,
+                  outgoingMessageId: idAudio,
+                  turnoId: auditoriaNina.traceId ?? null,
+                  execucaoId: auditoriaNina.execucaoId ?? null,
+                  canal: CANAL_TESTE,
+                  estado: "persistida",
+                  textoHash: avaliacaoAudio.textoHash,
+                });
+              } catch (erroAudit) {
+                console.error("[NINA_TESTE] vínculo de áudio indisponível", erroAudit);
+              }
+              try {
+                await guardarAudioMensagem(data.clinicaId, idAudio, sintetizado);
+              } catch (erroMidia) {
+                console.error("[NINA_TESTE] arquivo de áudio indisponível", erroMidia);
+              }
             }
           }
         }
@@ -1202,17 +1277,24 @@ async function executarResetLeadTeste(
     const { devolverVagasDaConversa } = await import("@/lib/nina/carga-bateria.server");
     let texto: string | null = null;
     try {
-      const { devolvidas, pendentes } = await devolverVagasDaConversa(admin, entrada.clinicaId, conversaId);
+      const { devolvidas, pendentes } = await devolverVagasDaConversa(
+        admin,
+        entrada.clinicaId,
+        conversaId,
+      );
       agendamentosRemovidos = devolvidas;
       if (devolvidas > 0) texto = `🧹 ${devolvidas} vaga(s) de teste devolvida(s) à agenda.`;
-      if (pendentes > 0) texto = `⚠️ ${pendentes} agendamento(s) de teste não voltaram a ficar livres. Confira na agenda.`;
+      if (pendentes > 0)
+        texto = `⚠️ ${pendentes} agendamento(s) de teste não voltaram a ficar livres. Confira na agenda.`;
     } catch (e) {
       // A vaga fica ocupada pelo teste (não se perde); o reset segue e avisa.
       console.error("[NINA_TESTE] falha ao devolver vagas de teste", e);
       texto = "⚠️ Não foi possível devolver as vagas de teste à agenda. Confira na agenda.";
     }
     if (texto)
-      await registrarMarcadorSistema({ clinicaId: entrada.clinicaId, conversaId, texto }).catch(() => {});
+      await registrarMarcadorSistema({ clinicaId: entrada.clinicaId, conversaId, texto }).catch(
+        () => {},
+      );
   }
 
   // Nova sessão = novo telefone virtual → a Nina não alcança nada do histórico

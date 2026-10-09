@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  conversasDesatualizadas,
-  criarCacheConversas,
-  respostaAindaVale,
-} from "../conversa-cache";
+import { conversasDesatualizadas, criarCacheConversas, respostaAindaVale } from "../conversa-cache";
 import {
   JANELA_ANTERIOR,
   JANELA_INICIAL,
@@ -106,9 +102,9 @@ describe("cache por conversa", () => {
     cache.guardar("A", { msgs: historico(3, "a"), contato: { id: "ca" }, notas: [], eventos: [] });
     expect(cache.obter("B")).toBeUndefined();
     // Resposta atrasada de A não entra na tela de B.
-    expect(
-      respostaAindaVale({ alvo: "A", selecionadaAgora: "B", pedido: 1, pedidoAtual: 2 }),
-    ).toBe(false);
+    expect(respostaAindaVale({ alvo: "A", selecionadaAgora: "B", pedido: 1, pedidoAtual: 2 })).toBe(
+      false,
+    );
   });
 
   it("mensagem nova em conversa cacheada tira o conteúdo velho do cache", () => {

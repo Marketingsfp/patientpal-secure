@@ -52,11 +52,29 @@ function entrada(): EntradaDashboard {
       },
     ],
     ferramentas: [
-      { conversaId: "c1", nome: "agendar_consulta", ok: true, erro: null, quando: "2026-09-01T10:01:00Z" },
-      { conversaId: "c2", nome: "transferir_atendente_humano", ok: true, erro: null, quando: "2026-09-02T10:01:00Z" },
+      {
+        conversaId: "c1",
+        nome: "agendar_consulta",
+        ok: true,
+        erro: null,
+        quando: "2026-09-01T10:01:00Z",
+      },
+      {
+        conversaId: "c2",
+        nome: "transferir_atendente_humano",
+        ok: true,
+        erro: null,
+        quando: "2026-09-02T10:01:00Z",
+      },
     ],
     avaliacoes: [
-      { conversaId: "c1", quando: "2026-09-01T11:00:00Z", resultado: "aprovado", score: 96, achados: [] },
+      {
+        conversaId: "c1",
+        quando: "2026-09-01T11:00:00Z",
+        resultado: "aprovado",
+        score: 96,
+        achados: [],
+      },
       {
         conversaId: "c2",
         quando: "2026-09-02T11:00:00Z",

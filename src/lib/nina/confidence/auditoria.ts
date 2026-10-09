@@ -177,7 +177,10 @@ export function extrairConflitos(
         const origem = escalar(achar(linha, CHAVE_ORIGEM), true);
         const valor = escalar(achar(linha, CHAVE_VALOR), true);
         if (origem == null && valor == null) continue;
-        origens.push({ origem: String(origem ?? "origem não informada"), valor: String(valor ?? "—") });
+        origens.push({
+          origem: String(origem ?? "origem não informada"),
+          valor: String(valor ?? "—"),
+        });
       }
       if (origens.length > 0) {
         saida.push({ campo: String(campo ?? "campo não informado"), origens });
@@ -344,7 +347,6 @@ export const ROTULO_TIPO_TURNO: Record<string, string> = {
   HANDOFF: "Transferência",
 };
 
-
 /** FASE 5 — como o painel nomeia a decisão do turno e o motivo dela. */
 export const ROTULO_DECISAO_TURNO: Record<string, string> = {
   CONTINUE: "Continuar com a Nina",
@@ -393,35 +395,33 @@ export type LinhaConfiabilidade = {
 export function linhasConfiabilidade(
   registro: Pick<RegistroAuditoriaConfianca, "validadores" | "ferramentas" | "fontes">,
 ): LinhaConfiabilidade[] {
-  const linhas: LinhaConfiabilidade[] = registro.validadores
-    .map((v) => {
-      const detalhes = Object.entries(v.evidence)
-        .map(([k, val]) => `${k}: ${val}`)
-        .slice(0, 4);
-      const detalhe =
+  const linhas: LinhaConfiabilidade[] = registro.validadores.map((v) => {
+    const detalhes = Object.entries(v.evidence)
+      .map(([k, val]) => `${k}: ${val}`)
+      .slice(0, 4);
+    const detalhe =
+      v.status === "PASS"
+        ? (detalhes[0] ?? null)
+        : v.status === "NOT_APPLICABLE"
+          ? null
+          : [v.reasonCode, ...detalhes].filter(Boolean).join(" — ");
+    return {
+      // PENDING é etapa de coleta: não é acerto, mas também não é erro.
+      ok: v.status === "PASS",
+      rotulo: ROTULO_VALIDADOR[v.validator] ?? v.validator,
+      detalhe: detalhe || null,
+      grupo: "validador" as const,
+      reasonCode: v.reasonCode ? String(v.reasonCode) : null,
+      estado:
         v.status === "PASS"
-          ? (detalhes[0] ?? null)
-          : v.status === "NOT_APPLICABLE"
-            ? null
-            : [v.reasonCode, ...detalhes].filter(Boolean).join(" — ");
-      return {
-        // PENDING é etapa de coleta: não é acerto, mas também não é erro.
-        ok: v.status === "PASS",
-        rotulo: ROTULO_VALIDADOR[v.validator] ?? v.validator,
-        detalhe: detalhe || null,
-        grupo: "validador" as const,
-        reasonCode: v.reasonCode ? String(v.reasonCode) : null,
-        estado:
-          v.status === "PASS"
-            ? ("ok" as const)
-            : v.status === "PENDING"
-              ? ("pendente" as const)
-              : v.status === "NOT_APPLICABLE"
-                ? ("nao_aplicavel" as const)
-                : ("falha" as const),
-      };
-    });
-
+          ? ("ok" as const)
+          : v.status === "PENDING"
+            ? ("pendente" as const)
+            : v.status === "NOT_APPLICABLE"
+              ? ("nao_aplicavel" as const)
+              : ("falha" as const),
+    };
+  });
 
   // FASE 6 — conflito auditável: campo, origem A/valor A, origem B/valor B.
   for (const v of registro.validadores) {
@@ -435,7 +435,6 @@ export function linhasConfiabilidade(
       });
     }
   }
-
 
   for (const f of registro.ferramentas) {
     linhas.push({

@@ -220,7 +220,12 @@ describe("dicionário por cadastro", () => {
     }
   });
   test("aceita mais de três buscas e deduplica fontes reais", async () => {
-    const r = await lerRespostaDicionario(resposta(saida, Array.from({ length: 10 }, () => pesquisa)));
+    const r = await lerRespostaDicionario(
+      resposta(
+        saida,
+        Array.from({ length: 10 }, () => pesquisa),
+      ),
+    );
     expect(r.pesquisa.chamadas).toBe(10);
     expect(r.pesquisa.fontes).toHaveLength(1);
   });

@@ -7,7 +7,6 @@ import {
   Loader2,
   Mic,
   MicOff,
-
   Search,
   Send,
   Sparkles,
@@ -43,7 +42,6 @@ import {
   setNinaVozOn,
 } from "@/lib/nina-voz";
 import { supabase } from "@/integrations/supabase/client";
-
 
 import { cn } from "@/lib/utils";
 
@@ -102,7 +100,6 @@ export function InformacoesRapidasCard({ className }: { className?: string }) {
     </section>
   );
 }
-
 
 function TabelaRapidaDrawer({
   open,
@@ -276,8 +273,6 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
   /** `parar()` da conversa por voz, para encerrar ao fechar o chat. */
   const conversaRef = useRef<(() => void) | null>(null);
 
-
-
   useEffect(() => {
     setVoz(isNinaVozOn());
   }, []);
@@ -385,7 +380,6 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     // Libera o áudio dentro do clique: depois o navegador atrasaria o começo da fala.
     void prepararAudioNina();
     conversa.iniciar();
-
   };
 
   useEffect(() => {
@@ -397,7 +391,6 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
     "Quais médicos atendem hoje?",
     "Horários da cardiologia",
   ];
-
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -432,11 +425,7 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
                 title={voz ? "Desativar voz da Nina" : "Ativar voz da Nina"}
                 aria-label="Voz da Nina"
               >
-                {voz ? (
-                  <Volume2 className="h-4 w-4" />
-                ) : (
-                  <VolumeX className="h-4 w-4 opacity-60" />
-                )}
+                {voz ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-60" />}
               </Button>
             </div>
           </div>
@@ -444,7 +433,6 @@ function NinaDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             {conversa.ativo
               ? "Fale normalmente — a Nina escuta, responde em voz alta e volta a ouvir."
               : "Pergunte sobre valores, especialidades e horários dos médicos."}
-
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">

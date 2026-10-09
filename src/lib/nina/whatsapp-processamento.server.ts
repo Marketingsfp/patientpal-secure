@@ -313,10 +313,25 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
           const { prepararAudioResposta } = await import("@/lib/nina-audio.server");
           const { registrarChamadaIATurno } = await import("./auditoria-ia.server");
           const chamadasVoz: import("./auditoria-ia").ChamadaIA[] = [];
-          const audio = await prepararAudioResposta(params.clinicaId, reply, { recebeuAudio: recebeuAudioNoTurno, mensagem: mensagemDoTurno },
-            c => { chamadasVoz.push(c); });
-          if (auditoriaNina.traceId) await Promise.all(chamadasVoz.map(c => registrarChamadaIATurno(c, {
-            clinicaId: params.clinicaId, conversaId: convId, traceId: auditoriaNina.traceId!, execucaoId: auditoriaNina.execucaoId })));
+          const audio = await prepararAudioResposta(
+            params.clinicaId,
+            reply,
+            { recebeuAudio: recebeuAudioNoTurno, mensagem: mensagemDoTurno },
+            (c) => {
+              chamadasVoz.push(c);
+            },
+          );
+          if (auditoriaNina.traceId)
+            await Promise.all(
+              chamadasVoz.map((c) =>
+                registrarChamadaIATurno(c, {
+                  clinicaId: params.clinicaId,
+                  conversaId: convId,
+                  traceId: auditoriaNina.traceId!,
+                  execucaoId: auditoriaNina.execucaoId,
+                }),
+              ),
+            );
           if (audio) {
             const { longa, texto: falado } = audio;
             {
@@ -334,7 +349,11 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               // recebe o seu próprio registro.
               const { registrarEntregaSaida } = await import("@/lib/nina/entrega-saida.server");
               const { avaliarFala } = await import("@/lib/nina-audio.server");
-              const { decisaoId: decisaoIdAudio, textoHash: hashFalado, representacao: representacaoAudio } = await avaliarFala(audio, auditoriaNina);
+              const {
+                decisaoId: decisaoIdAudio,
+                textoHash: hashFalado,
+                representacao: representacaoAudio,
+              } = await avaliarFala(audio, auditoriaNina);
               await registrarEntregaSaida({
                 clinicaId: params.clinicaId,
                 decisaoId: decisaoIdAudio,
@@ -398,9 +417,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
               const idMsgAudio = (msgAudio as { id?: string } | null)?.id ?? null;
               if (idMsgAudio && audioId) {
                 try {
-                  const { tipoMimeAceito, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } = await import(
-                    "@/lib/whatsapp-midia-armazenamento"
-                  );
+                  const { tipoMimeAceito, caminhoDaMidia, BUCKET_MIDIA_WHATSAPP } =
+                    await import("@/lib/whatsapp-midia-armazenamento");
                   const mimeOk = tipoMimeAceito("audio", audio.mime);
                   if (mimeOk) {
                     const caminho = caminhoDaMidia({
@@ -605,7 +623,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       // Conclusão da Nina: se esta resposta encerrou com uma transferência, o resumo interno é escrito
       // agora, DEPOIS de o paciente já ter recebido a mensagem (nunca atrasa o atendimento).
       if (convId) {
-        const { gerarResumoDaConclusaoDaNina } = await import("@/lib/atendimento/handoff-resumo.server");
+        const { gerarResumoDaConclusaoDaNina } =
+          await import("@/lib/atendimento/handoff-resumo.server");
         await gerarResumoDaConclusaoDaNina(params.clinicaId, convId);
       }
 

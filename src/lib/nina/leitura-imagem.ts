@@ -12,7 +12,10 @@ export type LeituraImagem =
   | { tipo: "marcacao_incerta" }
   | { tipo: "receita_remedio" }
   | { tipo: "ilegivel" }
-  | { tipo: "falha_tecnica"; motivo: "configuracao" | "download" | "provedor" | "resposta_invalida" | "limite_itens" }
+  | {
+      tipo: "falha_tecnica";
+      motivo: "configuracao" | "download" | "provedor" | "resposta_invalida" | "limite_itens";
+    }
   | { tipo: "outro" };
 
 // Um pedido laboratorial comum pode ultrapassar 15 exames. Limite de carga não é ilegibilidade.
@@ -40,6 +43,8 @@ Responda SOMENTE com JSON, sem comentários: {"tipo":"pedido_medico","itens":["n
 function limparItem(bruto: unknown): string | null {
   if (typeof bruto !== "string") return null;
   const texto = bruto
+    // Remover controles C0 e DEL da leitura do modelo é intencional.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -67,13 +72,15 @@ export function interpretarLeituraImagem(bruto: string | null | undefined): Leit
   if (tipo === "receita_remedio") return { tipo: "receita_remedio" };
   if (tipo === "outro") return { tipo: "outro" };
   if (tipo === "ilegivel") return { tipo: "ilegivel" };
-  if (tipo !== "pedido_medico" || !Array.isArray(itens)) return { tipo: "falha_tecnica", motivo: "resposta_invalida" };
+  if (tipo !== "pedido_medico" || !Array.isArray(itens))
+    return { tipo: "falha_tecnica", motivo: "resposta_invalida" };
   if (itens.length > MAX_ITENS_IMAGEM) return { tipo: "falha_tecnica", motivo: "limite_itens" };
   const vistos = new Set<string>();
   const limpos: string[] = [];
   for (const item of itens) {
     const limpo = limparItem(item);
-    if (!limpo || (typeof item === "string" && item.length > MAX_CARACTERES_ITEM)) return { tipo: "ilegivel" };
+    if (!limpo || (typeof item === "string" && item.length > MAX_CARACTERES_ITEM))
+      return { tipo: "ilegivel" };
     const chave = limpo.toLocaleLowerCase("pt-BR");
     if (vistos.has(chave)) continue;
     vistos.add(chave);
@@ -84,17 +91,24 @@ export function interpretarLeituraImagem(bruto: string | null | undefined): Leit
 
 /** Texto de entrada para reservar o lote mesmo quando a leitura falhou. Não é prova do pedido. */
 export function textoDaImagem(leitura: LeituraImagem, legenda?: string | null): string {
-  return leitura.tipo === "pedido_medico" ? textoDoPedidoLido(leitura.itens, legenda)
-    : leitura.tipo === "marcacao_incerta" ? "[Foto recebida: nomes legíveis, mas os exames marcados precisam de confirmação do paciente.]"
-    : leitura.tipo === "falha_tecnica" ? "[Foto recebida: falha técnica no processamento da imagem; legibilidade não avaliada.]"
-    : leitura.tipo === "ilegivel" ? "[Foto recebida: não foi possível ler com segurança.]"
-    : "[Foto recebida: precisa de avaliação pela equipe.]";
+  return leitura.tipo === "pedido_medico"
+    ? textoDoPedidoLido(leitura.itens, legenda)
+    : leitura.tipo === "marcacao_incerta"
+      ? "[Foto recebida: nomes legíveis, mas os exames marcados precisam de confirmação do paciente.]"
+      : leitura.tipo === "falha_tecnica"
+        ? "[Foto recebida: falha técnica no processamento da imagem; legibilidade não avaliada.]"
+        : leitura.tipo === "ilegivel"
+          ? "[Foto recebida: não foi possível ler com segurança.]"
+          : "[Foto recebida: precisa de avaliação pela equipe.]";
 }
 
 /** Texto que a Nina recebe no lugar da imagem (na voz do paciente, como uma mensagem escrita). */
 export function textoDoPedidoLido(itens: readonly string[], legenda?: string | null): string {
   const base = `Enviei a foto de um pedido médico com: ${itens.join("; ")}.`;
-  const extra = String(legenda ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+  const extra = String(legenda ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
   // Separar a legenda permite preservar pontos de siglas como M.A.P.A. e I.T.B.
   return extra ? `${base}\nLegenda do paciente: ${extra}` : base;
 }

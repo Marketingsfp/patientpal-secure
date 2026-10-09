@@ -10,10 +10,7 @@
  *
  * Módulo PURO: sem banco, sem rede.
  */
-import {
-  REGRA_SAUDACAO,
-  type RestricaoEstruturada,
-} from "../prompt/precedencia";
+import { REGRA_SAUDACAO, type RestricaoEstruturada } from "../prompt/precedencia";
 import type { AmbienteQA } from "../confianca-execucao";
 
 /** Canal exclusivo da homologação. WhatsApp real nunca é aceito aqui. */
@@ -71,7 +68,8 @@ export function excecoesDaVerificacaoDeFonte(regraPublicada: string): RestricaoE
       nivel: "inegociavel",
       origem: "homologação",
       descricao: "nenhuma ação real é executada nesta verificação",
-      texto: "Nenhuma ferramenta é declarada nesta requisição; nenhuma operação pode ser executada.",
+      texto:
+        "Nenhuma ferramenta é declarada nesta requisição; nenhuma operação pode ser executada.",
     },
   ];
 }

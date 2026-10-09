@@ -43,9 +43,8 @@ export const validarFonteEAderencia = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
     const pares: ParMarcador[] = (data.pares ?? [...PARES_MARCADOR_PADRAO]) as ParMarcador[];
-    const { verificarFonteEAderencia, verificarRetiradaDaRegra } = await import(
-      "@/lib/nina/homologacao/verificacoes.server"
-    );
+    const { verificarFonteEAderencia, verificarRetiradaDaRegra } =
+      await import("@/lib/nina/homologacao/verificacoes.server");
 
     const resultados = [];
     for (const par of pares) {
@@ -88,9 +87,8 @@ export const validarAtendimentoCompleto = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
-    const { verificarAtendimentoCompleto } = await import(
-      "@/lib/nina/homologacao/verificacoes.server"
-    );
+    const { verificarAtendimentoCompleto } =
+      await import("@/lib/nina/homologacao/verificacoes.server");
     const r = await verificarAtendimentoCompleto({
       clinicaId: data.clinicaId,
       leadId: data.leadId,

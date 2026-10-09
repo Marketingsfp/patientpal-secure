@@ -30,7 +30,9 @@ import { garantirPapel, PROVEDOR_IA } from "@/lib/nina/papeis-modelos";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 
 const personaSchema = z.object({
-  estilo: z.enum(["objetivo", "confuso", "apressado", "educado", "desconfiado"]).default("objetivo"),
+  estilo: z
+    .enum(["objetivo", "confuso", "apressado", "educado", "desconfiado"])
+    .default("objetivo"),
   detalhe: z.enum(["curto", "medio", "detalhado"]).default("curto"),
   errosDigitacao: z.boolean().default(false),
   mudaDeAssunto: z.boolean().default(false),
@@ -47,7 +49,6 @@ const limitesSchema = z.object({
   creditosPorMilTokens: z.number().min(0).max(LIMITES_MAXIMOS.creditosPorMilTokens).default(0),
   timeoutS: z.number().int().min(10).max(LIMITES_MAXIMOS.timeoutS).default(60),
 });
-
 
 type Ctx = { supabase: any; userId: string };
 
@@ -261,7 +262,10 @@ export const controlarSimulacaoTerra = createServerFn({ method: "POST" })
     const sim = await carregarSimulacao(supabaseAdmin, data.clinicaId, data.simulacaoId);
 
     if (data.acao === "pausar") {
-      await supabaseAdmin.from("nina_teste_simulacoes").update({ status: "pausada" }).eq("id", sim.id);
+      await supabaseAdmin
+        .from("nina_teste_simulacoes")
+        .update({ status: "pausada" })
+        .eq("id", sim.id);
       return { status: "pausada", motivo: null };
     }
     if (data.acao === "retomar") {

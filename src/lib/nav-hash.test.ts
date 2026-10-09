@@ -84,7 +84,7 @@ describe("menu lateral usa a construção genérica", () => {
       SHELL.indexOf("const navRows"),
       SHELL.indexOf("export function AppShell()"),
     );
-    const secoes = navRows.split(/\n  \{\n    label: "/).slice(1);
+    const secoes = navRows.split(/\n {2}\{\n {4}label: "/).slice(1);
     const repetidos: string[] = [];
     for (const secao of secoes) {
       const destinos = [...secao.matchAll(/to:\s*"([^"]+)"(?:,\s*hash:\s*"([^"]+)")?/g)].map(

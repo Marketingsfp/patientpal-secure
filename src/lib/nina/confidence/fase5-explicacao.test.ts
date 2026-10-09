@@ -222,7 +222,10 @@ describe("FASE 5 — blocos separados e conta detalhada", () => {
           },
         ],
       }),
-      avaliacao: avaliacao([regra(), regra({ identificador: "NOME_PACIENTE", status: "UNKNOWN", nota: null })]),
+      avaliacao: avaliacao([
+        regra(),
+        regra({ identificador: "NOME_PACIENTE", status: "UNKNOWN", nota: null }),
+      ]),
     });
     const linha = e.regras[0]!;
     expect(linha.identificador).toBe("PRECO_COM_FONTE");
@@ -263,7 +266,10 @@ describe("FASE 5 — blocos separados e conta detalhada", () => {
     expect(sem.indice.nota).toBeNull();
     expect(sem.indice.texto).toBe("—");
 
-    const falha = explicarResposta({ pontuacao: null, falhaDeAvaliacao: "verificador indisponível" });
+    const falha = explicarResposta({
+      pontuacao: null,
+      falhaDeAvaliacao: "verificador indisponível",
+    });
     expect(falha.estado).toBe("avaliacao_indisponivel");
     expect(falha.rotuloEstado).toBe("Avaliação indisponível");
     expect(falha.indice.nota).toBeNull();
@@ -400,7 +406,10 @@ describe("FASE 5 — aceite dos cinco cenários", () => {
 // ------------------------------------------------------------- 4. auditoria
 
 describe("FASE 5 — trilha de eventos vinculada", () => {
-  const base = (tipo: EntradaEvento["tipo"], extra: Partial<EntradaEvento> = {}): EntradaEvento => ({
+  const base = (
+    tipo: EntradaEvento["tipo"],
+    extra: Partial<EntradaEvento> = {},
+  ): EntradaEvento => ({
     tipo,
     conversaId: "c1",
     turnoId: "t1",
@@ -414,11 +423,33 @@ describe("FASE 5 — trilha de eventos vinculada", () => {
 
   it("preserva conteúdo, hash e ordem dos eventos", () => {
     const t = trilhaEmMemoria();
-    t.registrar(base("candidato_avaliado", { conteudo: "texto A", hashConteudo: "hA", dados: { decisao: "ALLOW", origem: "action_safety" } }));
+    t.registrar(
+      base("candidato_avaliado", {
+        conteudo: "texto A",
+        hashConteudo: "hA",
+        dados: { decisao: "ALLOW", origem: "action_safety" },
+      }),
+    );
     t.registrar(base("correcao_de_texto", { conteudo: "texto B", hashConteudo: "hB" }));
     t.registrar(base("decisao_final", { dados: { decisao: "BLOQUEAR_E_ENCAMINHAR" } }));
-    t.registrar(base("operacao_fila", { modo: { observacao: false, aplicacao: true, ambiente: "producao", efeito: "fila_confirmada" }, dados: { comprovante: "fila-7" } }));
-    t.registrar(base("saida_enviada", { conteudo: "aviso", hashConteudo: "hC", modo: { observacao: false, aplicacao: true, ambiente: "producao", efeito: "aviso_enviado" } }));
+    t.registrar(
+      base("operacao_fila", {
+        modo: {
+          observacao: false,
+          aplicacao: true,
+          ambiente: "producao",
+          efeito: "fila_confirmada",
+        },
+        dados: { comprovante: "fila-7" },
+      }),
+    );
+    t.registrar(
+      base("saida_enviada", {
+        conteudo: "aviso",
+        hashConteudo: "hC",
+        modo: { observacao: false, aplicacao: true, ambiente: "producao", efeito: "aviso_enviado" },
+      }),
+    );
 
     const eventos = t.eventos("c1:t1");
     expect(eventos.map((x) => x.sequencia)).toEqual([1, 2, 3, 4, 5]);
@@ -430,14 +461,33 @@ describe("FASE 5 — trilha de eventos vinculada", () => {
   it("não reescreve evento já gravado", () => {
     const t = trilhaEmMemoria();
     t.registrar(base("decisao_final", { hashConteudo: "h1" }));
-    expect(() => t.registrar(base("decisao_final", { hashConteudo: "h1" }))).toThrow(TrilhaImutavel);
+    expect(() => t.registrar(base("decisao_final", { hashConteudo: "h1" }))).toThrow(
+      TrilhaImutavel,
+    );
   });
 
   it("efeito final vem da operação confirmada, e a decisão intermediária fica identificada", () => {
     const t = trilhaEmMemoria();
-    t.registrar(base("candidato_avaliado", { hashConteudo: "h1", dados: { decisao: "ALLOW", origem: "action_safety" } }));
-    t.registrar(base("decisao_final", { hashConteudo: "h2", dados: { decisao: "BLOQUEAR_E_ENCAMINHAR" } }));
-    t.registrar(base("operacao_fila", { hashConteudo: "h3", modo: { observacao: false, aplicacao: true, ambiente: "producao", efeito: "fila_confirmada" } }));
+    t.registrar(
+      base("candidato_avaliado", {
+        hashConteudo: "h1",
+        dados: { decisao: "ALLOW", origem: "action_safety" },
+      }),
+    );
+    t.registrar(
+      base("decisao_final", { hashConteudo: "h2", dados: { decisao: "BLOQUEAR_E_ENCAMINHAR" } }),
+    );
+    t.registrar(
+      base("operacao_fila", {
+        hashConteudo: "h3",
+        modo: {
+          observacao: false,
+          aplicacao: true,
+          ambiente: "producao",
+          efeito: "fila_confirmada",
+        },
+      }),
+    );
 
     const r = apurarEfeitoFinal(t.eventos("c1:t1"));
     expect(r.efeito).toBe("fila_confirmada");
@@ -447,8 +497,15 @@ describe("FASE 5 — trilha de eventos vinculada", () => {
   });
 
   it("observação, aplicação, ambiente e efeito são campos distintos", () => {
-    const m = { observacao: false, aplicacao: true, ambiente: "producao" as const, efeito: "fila_confirmada" as const };
-    expect(descreverModo(m)).toBe("decisão com autoridade · aplicada · ambiente=producao · efeito=fila_confirmada");
+    const m = {
+      observacao: false,
+      aplicacao: true,
+      ambiente: "producao" as const,
+      efeito: "fila_confirmada" as const,
+    };
+    expect(descreverModo(m)).toBe(
+      "decisão com autoridade · aplicada · ambiente=producao · efeito=fila_confirmada",
+    );
   });
 
   it("snapshot histórico 'shadow' com efeito real vira divergência, sem reescrita", () => {
@@ -475,15 +532,23 @@ describe("FASE 5 — trilha de eventos vinculada", () => {
 
 describe("FASE 5 — revisão, indicadores e propostas", () => {
   it("reporte e parecer de IA não fecham o caso; só confirmação humana", () => {
-    expect(vereditoConclusivo({ ...humana(), procedencia: "reporte_inicial" })).toBe("NAO_REVISADA");
+    expect(vereditoConclusivo({ ...humana(), procedencia: "reporte_inicial" })).toBe(
+      "NAO_REVISADA",
+    );
     expect(vereditoConclusivo({ ...humana(), procedencia: "analise_ia" })).toBe("NAO_REVISADA");
-    expect(vereditoConclusivo(humana({ qualidade: "INADEQUADA", motivo: "preço errado" }))).toBe("INADEQUADA");
+    expect(vereditoConclusivo(humana({ qualidade: "INADEQUADA", motivo: "preço errado" }))).toBe(
+      "INADEQUADA",
+    );
     expect(vereditoConclusivo(null)).toBe("NAO_REVISADA");
   });
 
   it("resposta inadequada exige motivo", () => {
-    expect(() => validarRevisao(humana({ qualidade: "INADEQUADA", motivo: null }))).toThrow(RevisaoInvalida);
-    expect(validarRevisao(humana({ qualidade: "INADEQUADA", motivo: "preço errado" })).motivo).toBe("preço errado");
+    expect(() => validarRevisao(humana({ qualidade: "INADEQUADA", motivo: null }))).toThrow(
+      RevisaoInvalida,
+    );
+    expect(validarRevisao(humana({ qualidade: "INADEQUADA", motivo: "preço errado" })).motivo).toBe(
+      "preço errado",
+    );
   });
 
   it("amostra inclui LOW bloqueado e resposta liberada, por tipo e versão", () => {
@@ -517,9 +582,27 @@ describe("FASE 5 — revisão, indicadores e propostas", () => {
     const r = calcularIndicadores({
       ambiente: "producao",
       itens: [
-        item({ id: "1", nivel: "LOW", destino: "BLOQUEADA", filaConfirmada: true, avisoEnviado: true }),
-        item({ id: "2", nivel: "LOW", destino: "BLOQUEADA", filaConfirmada: false, avisoEnviado: null }),
-        item({ id: "3", nivel: "LOW", destino: "BLOQUEADA", filaConfirmada: true, avisoEnviado: false }),
+        item({
+          id: "1",
+          nivel: "LOW",
+          destino: "BLOQUEADA",
+          filaConfirmada: true,
+          avisoEnviado: true,
+        }),
+        item({
+          id: "2",
+          nivel: "LOW",
+          destino: "BLOQUEADA",
+          filaConfirmada: false,
+          avisoEnviado: null,
+        }),
+        item({
+          id: "3",
+          nivel: "LOW",
+          destino: "BLOQUEADA",
+          filaConfirmada: true,
+          avisoEnviado: false,
+        }),
         item({ id: "4", ambiente: "homologacao", nivel: "LOW", destino: "SIMULADA" }),
       ],
       regras: [{ regra: "PRECO_COM_FONTE", unknown: 2, falhasTecnicas: 1, avaliacoes: 10 }],
@@ -535,7 +618,10 @@ describe("FASE 5 — revisão, indicadores e propostas", () => {
   it("indeterminado e em processamento ficam em categoria própria", () => {
     const r = calcularIndicadores({
       itens: [
-        item({ id: "1", revisao: humana({ qualidade: "EVIDENCIA_INSUFICIENTE", encaminhamento: "INDETERMINADO" }) }),
+        item({
+          id: "1",
+          revisao: humana({ qualidade: "EVIDENCIA_INSUFICIENTE", encaminhamento: "INDETERMINADO" }),
+        }),
         item({ id: "2", emProcessamento: true }),
       ],
     });

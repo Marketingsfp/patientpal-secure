@@ -92,8 +92,18 @@ describe("FASE 7 — separação de escopo", () => {
 
   it("conta a mesma saída uma vez só quando há registro repetido", () => {
     const s = separarAvaliacoes([
-      { id: "1", avaliacao: "answer_confidence", outgoing_message_id: "o1", created_at: "2026-01-01T10:00:00Z" },
-      { id: "2", avaliacao: "answer_confidence", outgoing_message_id: "o1", created_at: "2026-01-01T11:00:00Z" },
+      {
+        id: "1",
+        avaliacao: "answer_confidence",
+        outgoing_message_id: "o1",
+        created_at: "2026-01-01T10:00:00Z",
+      },
+      {
+        id: "2",
+        avaliacao: "answer_confidence",
+        outgoing_message_id: "o1",
+        created_at: "2026-01-01T11:00:00Z",
+      },
     ]);
     expect(s.respostas).toHaveLength(1);
     expect(s.respostas[0]!.id).toBe("2");

@@ -99,7 +99,14 @@ function res(
   evidence: Record<string, unknown> = {},
   blocker: Bloqueador | null = null,
 ): ResultadoValidador {
-  return { validator, status, score: Math.max(0, Math.min(100, score)), reasonCode, evidence, blocker };
+  return {
+    validator,
+    status,
+    score: Math.max(0, Math.min(100, score)),
+    reasonCode,
+    evidence,
+    blocker,
+  };
 }
 
 // ---------------------------------------------------------------- 1. intenção
@@ -119,10 +126,15 @@ export function IntentClarityValidator(ctx: ContextoConfianca): ResultadoValidad
   const houveConsulta = ctx.toolResults.some(ferramentaOk) || ctx.retrievedSources.some(fonteUtil);
 
   if (ctx.intentAmbiguo === true) {
-    return res(nome, "FAIL", 30, "INTENCAO_AMBIGUA", { intent: ctx.intent ?? null, sinal: "runtime" });
+    return res(nome, "FAIL", 30, "INTENCAO_AMBIGUA", {
+      intent: ctx.intent ?? null,
+      sinal: "runtime",
+    });
   }
   if (confianca !== null && confianca < 0.5) {
-    return res(nome, "FAIL", Math.round(confianca * 100), "INTENCAO_BAIXA_CONFIANCA", { intentConfidence: confianca });
+    return res(nome, "FAIL", Math.round(confianca * 100), "INTENCAO_BAIXA_CONFIANCA", {
+      intentConfidence: confianca,
+    });
   }
   // FASE 2: ação desconhecida NUNCA sai do denominador. Ter rodado ferramenta
   // não prova que o sistema entendeu o pedido — apenas reduz um pouco o risco.
@@ -139,7 +151,9 @@ export function IntentClarityValidator(ctx: ContextoConfianca): ResultadoValidad
         });
   }
   if (confianca !== null && confianca < 0.75) {
-    return res(nome, "WARNING", Math.round(confianca * 100), "INTENCAO_PARCIAL", { intentConfidence: confianca });
+    return res(nome, "WARNING", Math.round(confianca * 100), "INTENCAO_PARCIAL", {
+      intentConfidence: confianca,
+    });
   }
   return res(nome, "PASS", 100, "INTENCAO_CLARA", {
     intent: ctx.intent ?? acaoOuNenhuma(ctx.requestedAction),
@@ -163,17 +177,15 @@ export function EntityResolutionValidator(ctx: ContextoConfianca): ResultadoVali
   }
 
   const opcoesInformativas = camposDeOpcoesInformativas(ctx);
-  const ambiguos = campos.filter((c) => (candidatos[c] ?? []).length > 1 && !opcoesInformativas.includes(c));
+  const ambiguos = campos.filter(
+    (c) => (candidatos[c] ?? []).length > 1 && !opcoesInformativas.includes(c),
+  );
   const vazios = campos.filter((c) => (candidatos[c] ?? []).length === 0);
 
   if (ambiguos.length > 0) {
-    return res(
-      nome,
-      "FAIL",
-      30,
-      "ENTIDADE_AMBIGUA",
-      { ambiguos: ambiguos.map((c) => ({ campo: c, opcoes: candidatos[c] })) },
-    );
+    return res(nome, "FAIL", 30, "ENTIDADE_AMBIGUA", {
+      ambiguos: ambiguos.map((c) => ({ campo: c, opcoes: candidatos[c] })),
+    });
   }
   if (vazios.length > 0) {
     return res(nome, "WARNING", 50, "ENTIDADE_NAO_ENCONTRADA", { campos: vazios });
@@ -210,7 +222,8 @@ export function RequiredDataValidator(ctx: ContextoConfianca): ResultadoValidado
     const v = e[campo];
     return v === undefined || v === null || String(v).trim() === "";
   });
-  if (faltantes.length === 0) return res(nome, "PASS", 100, "DADOS_COMPLETOS", { requiredFields: req });
+  if (faltantes.length === 0)
+    return res(nome, "PASS", 100, "DADOS_COMPLETOS", { requiredFields: req });
 
   const escrita = ACOES_DE_ESCRITA.has(acao);
   if (escrita) {
@@ -294,7 +307,14 @@ export function OfficialSourceValidator(
       : faltantes.some((r) => r.tipoClaim === "preparo")
         ? "PREPARO_SEM_FONTE"
         : "FONTE_OFICIAL_AUSENTE";
-  return res(nome, "BLOCK", 0, blocker === "AFIRMACAO_OPERACIONAL_SEM_PROVA" ? blocker : "FONTE_OFICIAL_AUSENTE", { requisitos, presentes, faltantes }, blocker);
+  return res(
+    nome,
+    "BLOCK",
+    0,
+    blocker === "AFIRMACAO_OPERACIONAL_SEM_PROVA" ? blocker : "FONTE_OFICIAL_AUSENTE",
+    { requisitos, presentes, faltantes },
+    blocker,
+  );
 }
 
 // ---------------------------------------------------------------- 5. atualidade
@@ -338,17 +358,11 @@ export function SourceFreshnessValidator(
       turnType: ctx.turnType ?? null,
     });
   }
-  if (problemas.length === 0) return res(nome, "PASS", 100, "FONTES_VIGENTES", { fontes: usadas.length });
+  if (problemas.length === 0)
+    return res(nome, "PASS", 100, "FONTES_VIGENTES", { fontes: usadas.length });
 
   const vigentes = usadas.length - problemas.length;
-  return res(
-    nome,
-    "BLOCK",
-    0,
-    "FONTE_NAO_VIGENTE",
-    { problemas, vigentes },
-    "FONTE_NAO_VIGENTE",
-  );
+  return res(nome, "BLOCK", 0, "FONTE_NAO_VIGENTE", { problemas, vigentes }, "FONTE_NAO_VIGENTE");
 }
 
 // ---------------------------------------------------------------- 6. ferramentas
@@ -449,7 +463,8 @@ export function ConflictValidator(ctx: ContextoConfianca): ResultadoValidador {
     return distintos.size > 1;
   });
   if (avaliados.length === 0) return res(nome, "NOT_APPLICABLE", 100, "SEM_CONFLITOS", {});
-  if (conflitos.length === 0) return res(nome, "PASS", 100, "ORIGENS_CONCORDAM", { avaliados: avaliados.length });
+  if (conflitos.length === 0)
+    return res(nome, "PASS", 100, "ORIGENS_CONCORDAM", { avaliados: avaliados.length });
 
   return res(
     nome,
@@ -596,7 +611,10 @@ export { InstructionComplianceValidator } from "./obrigacoes";
 export function riscoDaAcao(ctx: ContextoConfianca): NivelRiscoAcao {
   const acao = acaoOuNenhuma(ctx.requestedAction);
   // FASE 1 — turno sem ação executável não carrega risco de ação.
-  if (!aplicabilidadeDoTurno(ctx.turnType).requiresActionSafety && !acaoExecutavel(ctx.requestedAction)) {
+  if (
+    !aplicabilidadeDoTurno(ctx.turnType).requiresActionSafety &&
+    !acaoExecutavel(ctx.requestedAction)
+  ) {
     return "LOW";
   }
   return RISCO_POR_ACAO[acao] ?? "MEDIUM";

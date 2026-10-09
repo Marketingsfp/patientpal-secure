@@ -122,9 +122,7 @@ describe("representações e entrega", () => {
       estado: "confirmada",
     });
     expect(
-      saidasSemVinculo([texto, audio], [
-        { representacao: "texto_completo", estado: "confirmada" },
-      ]),
+      saidasSemVinculo([texto, audio], [{ representacao: "texto_completo", estado: "confirmada" }]),
     ).toEqual(["audio_resumo"]);
   });
 });

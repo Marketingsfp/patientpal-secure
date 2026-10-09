@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { categoriaDoMotivo, decidirCategoria, motivoComCategoria, pesoCategoriaMotivo } from "./jev-motivo";
+import {
+  categoriaDoMotivo,
+  decidirCategoria,
+  motivoComCategoria,
+  pesoCategoriaMotivo,
+} from "./jev-motivo";
 import { calcularAtencao } from "@/lib/atendimento/central-atencao";
 
 describe("Jev Fase 8 — motivo da transferência", () => {
@@ -11,7 +16,9 @@ describe("Jev Fase 8 — motivo da transferência", () => {
   });
   test("sem certeza ou erro = sem decisão, motivo intacto", () => {
     expect(decidirCategoria(undefined)).toBeNull();
-    expect(decidirCategoria({ choice: "financeiro", probabilities: { financeiro: 0.4 } })).toBeNull();
+    expect(
+      decidirCategoria({ choice: "financeiro", probabilities: { financeiro: 0.4 } }),
+    ).toBeNull();
     expect(decidirCategoria({ choice: "inventada", confidence: 0.99 })).toBeNull();
     expect(motivoComCategoria("Quer boleto", null)).toBe("Quer boleto");
   });
@@ -23,12 +30,19 @@ describe("Jev Fase 8 — motivo da transferência", () => {
     expect(motivoComCategoria("JEV_IRRITACAO: x", "financeiro")).toBe("JEV_IRRITACAO: x");
   });
   test("urgência e insatisfação sobem sem mudar a faixa de espera", () => {
-    expect(pesoCategoriaMotivo("urgencia_clinica")).toBeLessThan(pesoCategoriaMotivo("insatisfacao"));
+    expect(pesoCategoriaMotivo("urgencia_clinica")).toBeLessThan(
+      pesoCategoriaMotivo("insatisfacao"),
+    );
     const agora = Date.parse("2026-10-03T12:00:00Z");
     const r = calcularAtencao({
       naoAtribuidas: [
         { id: "a", handoff_motivo: "[Financeiro] x", owner_type: "HUMAN", status: "waiting" },
-        { id: "b", handoff_motivo: "JEV_URGENCIA_CLINICA: y", owner_type: "HUMAN", status: "waiting" },
+        {
+          id: "b",
+          handoff_motivo: "JEV_URGENCIA_CLINICA: y",
+          owner_type: "HUMAN",
+          status: "waiting",
+        },
       ],
       espera: {},
       agora,

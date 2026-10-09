@@ -82,9 +82,7 @@ export function fatosRemetente(id: IdentidadeResolvida) {
       identidade_confirmada: true,
       nome: id.paciente.nome ?? null,
       associado: Boolean(id.paciente.associado),
-      convenio: id.paciente.associado
-        ? (id.paciente.convenio_nome ?? "Cartão Benefícios")
-        : null,
+      convenio: id.paciente.associado ? (id.paciente.convenio_nome ?? "Cartão Benefícios") : null,
       candidatos: 1,
     };
   }

@@ -109,7 +109,8 @@ export function camadaDaCausa(causa: string | null | undefined): {
   if (CAUSAS_DE_CATALOGO.has(causa)) {
     return {
       alvo: "catalogo",
-      texto: "A correção é no registro do catálogo, pelo fluxo de edição e publicação já existente.",
+      texto:
+        "A correção é no registro do catálogo, pelo fluxo de edição e publicação já existente.",
     };
   }
   return {

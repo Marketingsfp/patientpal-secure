@@ -1,5 +1,17 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { carregarLotesAtivas, TAMANHO_LOTE_ATIVAS, type CursorInbox } from "@/lib/atendimento/paginacao-inbox";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  carregarLotesAtivas,
+  TAMANHO_LOTE_ATIVAS,
+  type CursorInbox,
+} from "@/lib/atendimento/paginacao-inbox";
 import { ordenarInbox } from "@/lib/atendimento/ordem-inbox";
 import { ConsultaBaseChat } from "./ConsultaBaseChat";
 import { AssistenteEscritaChat } from "./AssistenteEscritaChat";
@@ -7,7 +19,11 @@ import { acrescentarBaseAoRascunho } from "@/lib/atendimento/consulta-base-chat"
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { deveEnviarPorTecla } from "@/lib/atendimento/teclado-envio";
-import { ListaRespostasRapidas, useRespostasFiltradas, useRespostasRapidas } from "@/components/nina/RespostasRapidas";
+import {
+  ListaRespostasRapidas,
+  useRespostasFiltradas,
+  useRespostasRapidas,
+} from "@/components/nina/RespostasRapidas";
 import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
 import { mensagemDoFrancisco } from "@/lib/francisco/autoria";
 import {
@@ -49,7 +65,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { EVENTO_FILTRAR_NAO_ATRIBUIDAS, FILTRO_NAO_ATRIBUIDAS_KEY } from "@/components/nina/BannerNaoAtribuidas";
+import {
+  EVENTO_FILTRAR_NAO_ATRIBUIDAS,
+  FILTRO_NAO_ATRIBUIDAS_KEY,
+} from "@/components/nina/BannerNaoAtribuidas";
 import {
   ABRIR_CONVERSA_KEY,
   ABRIR_MENSAGEM_KEY,
@@ -59,8 +78,20 @@ import {
 } from "@/lib/atendimento/central-atencao";
 import { faixaEsperaDesde, minutosDesde } from "@/lib/atendimento/espera";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Send,
   ArrowLeft,
@@ -85,9 +116,18 @@ import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-rotea
 // FASE 3 — a linha entregue pelo tempo real é usada direto (sem nova consulta).
 import { normalizarMensagemRealtime } from "@/lib/atendimento/mensagem-realtime";
 // FASE 1 — telemetria de latência (só medição; desligada por padrão).
-import { abrirTrace, anexarMarcasDoServidor, marcarEtapa, obterTrace } from "@/lib/atendimento/latencia-cliente";
+import {
+  abrirTrace,
+  anexarMarcasDoServidor,
+  marcarEtapa,
+  obterTrace,
+} from "@/lib/atendimento/latencia-cliente";
 import { criarReconciliadorRetomada, motivoDeRetomada } from "@/lib/atendimento/retomada";
-import { criarWatchdog, registrarDiagnostico, INTERVALO_FALLBACK_MS } from "@/lib/atendimento/watchdog-realtime";
+import {
+  criarWatchdog,
+  registrarDiagnostico,
+  INTERVALO_FALLBACK_MS,
+} from "@/lib/atendimento/watchdog-realtime";
 import {
   aplicarPreviaLocalEnvio,
   atualizarMensagemNoCache,
@@ -109,8 +149,15 @@ import { anteciparReabertura } from "@/lib/atendimento/timeline-reabertura";
 import { posicionarEncerramentoAposConclusao } from "@/lib/atendimento/timeline-encerramento";
 import { posicionarHandoffAposAviso } from "@/lib/atendimento/timeline-handoff";
 
-import { incorporarEsperaDaLista, mesclarEspera, mesclarListaConversas } from "@/lib/atendimento/inbox-merge";
-import { ConversationSystemEvent, type ConversaEvento } from "@/components/nina/ConversationSystemEvent";
+import {
+  incorporarEsperaDaLista,
+  mesclarEspera,
+  mesclarListaConversas,
+} from "@/lib/atendimento/inbox-merge";
+import {
+  ConversationSystemEvent,
+  type ConversaEvento,
+} from "@/components/nina/ConversationSystemEvent";
 import {
   agruparTimeline,
   handoffsAguardandoAtendente,
@@ -149,7 +196,8 @@ import {
 } from "@/lib/atendimento.functions";
 import {
   entradaAtendimento,
-  deveRegistrarPrimeiraAbertura, aplicarAberturaConfirmada,
+  deveRegistrarPrimeiraAbertura,
+  aplicarAberturaConfirmada,
 } from "@/lib/atendimento/conversa-nova";
 import { BadgeConversaNova } from "@/components/nina/BadgeConversaNova";
 import { aplicarReconciliacao, deveRegistrarLeituraVisivel } from "@/lib/atendimento/leitura-inbox";
@@ -160,13 +208,23 @@ import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AvatarContato } from "@/components/nina/AvatarContato";
 import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
-import { conversasDesatualizadas, criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
+import {
+  conversasDesatualizadas,
+  criarCacheConversas,
+  respostaAindaVale,
+} from "@/lib/atendimento/conversa-cache";
 import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
 
 import { CacheContatos, planoAberturaContato } from "@/lib/atendimento/contato-cache";
 import { mesclarAnteriores } from "@/lib/atendimento/mensagens-janela";
 import { criarMedidorConversa, type MedidorConversa } from "@/lib/atendimento/perf-conversa";
-import { contarCicloInbox, iniciarTroca, marcarCache, marcarTroca, medirRequest } from "@/lib/atendimento/perf-troca";
+import {
+  contarCicloInbox,
+  iniciarTroca,
+  marcarCache,
+  marcarTroca,
+  medirRequest,
+} from "@/lib/atendimento/perf-troca";
 import {
   acaoPermitida,
   gravarRascunho,
@@ -186,7 +244,10 @@ import {
 } from "@/lib/atendimento/envio-otimista";
 import { criarFilaEnvio } from "@/lib/atendimento/fila-envio";
 import { useResumosDaConversa } from "@/components/nina/use-resumos-conversa";
-import { casarResumosComAvisos, inserirResumosNaTimeline } from "@/lib/atendimento/timeline-resumos";
+import {
+  casarResumosComAvisos,
+  inserirResumosNaTimeline,
+} from "@/lib/atendimento/timeline-resumos";
 import type { ResumoNaConversa as ResumoDaConversa } from "@/lib/atendimento/resumo-retencao";
 
 import { BadgeEspera, RelogioEsperaProvider } from "@/components/nina/BadgeEspera";
@@ -245,7 +306,11 @@ import {
 } from "@/lib/atendimento/rotulo-conversa";
 import { InspecaoMensagemNina } from "./InspecaoMensagemNina";
 import { useSaidasDasMensagens } from "./SaidaMensagem";
-import { idsParaInspecaoNina, marcadorInternoSistema, revisaoInspecaoMensagens } from "@/lib/nina/inspecao-mensagem";
+import {
+  idsParaInspecaoNina,
+  marcadorInternoSistema,
+  revisaoInspecaoMensagens,
+} from "@/lib/nina/inspecao-mensagem";
 
 import { devoAutoSelecionarComSelecao, escopoParaConversa } from "@/lib/atendimento/deep-link";
 import { devoAutoSelecionar, type LinhaInbox } from "@/lib/atendimento/inbox-realtime";
@@ -294,7 +359,11 @@ function fmtData(s?: string | null) {
 /* ============================================================
  *  INBOX UNIFICADO — 3 colunas
  * ========================================================== */
-export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSelecionarConversa }: {
+export function AtendInbox({
+  modoCentral = false,
+  conversaIdExterna = null,
+  onSelecionarConversa,
+}: {
   modoCentral?: boolean;
   conversaIdExterna?: string | null;
   onSelecionarConversa?: (id: string | null) => void;
@@ -356,10 +425,15 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const [erroPaginaConvs, setErroPaginaConvs] = useState(false);
   const listaScrollRef = useRef<HTMLDivElement | null>(null);
   const maisConvsEmVoo = useRef(false);
-  const paginaConvsRef = useRef<{ cursor: CursorInbox | null; quantidade: number }>({ cursor: null, quantidade: 0 });
+  const paginaConvsRef = useRef<{ cursor: CursorInbox | null; quantidade: number }>({
+    cursor: null,
+    quantidade: 0,
+  });
   const [sel, setSel] = useState<any>(null);
   const [listaMobile, setListaMobile] = useState(true);
-  useEffect(() => { if (sel?.id) setListaMobile(false); }, [sel?.id]);
+  useEffect(() => {
+    if (sel?.id) setListaMobile(false);
+  }, [sel?.id]);
   const [msgs, setMsgs] = useState<any[]>([]);
   const [eventos, setEventos] = useState<ConversaEvento[]>([]);
   const [contato, setContato] = useState<any>(null);
@@ -397,7 +471,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // FASE 5 — revisão manual (e confirmada) do cadastro vinculado à conversa.
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [autores, setAutores] = useState<{ clinicaId: string; nomes: Record<string, string | null> } | null>(null);
+  const [autores, setAutores] = useState<{
+    clinicaId: string;
+    nomes: Record<string, string | null>;
+  } | null>(null);
   // Supervisão mantém os dois eixos; atendentes usam três filtros operacionais.
   const [escopoBase, setEscopoBase] = useState<EscopoBaseInbox>(ESCOPO_BASE_PADRAO);
   const [visualizacaoEscolhida, setVisualizacao] = useState<VisualizacaoInbox>(VISUALIZACAO_PADRAO);
@@ -411,7 +488,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const [menuAtendentesAberto, setMenuAtendentesAberto] = useState(false);
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
-  const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(null);
+  const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(
+    null,
+  );
   // A fila global sem responsável só existe para a gestão; para atendente comum o
   // filtro é sempre ignorado (mesmo que tenha ficado guardado no navegador).
   const naoAtribuidasAtivo = souGestor && naoAtribuidasFiltro;
@@ -435,10 +514,14 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     // FASE 4 — ao trocar de clínica (ou recarregar) o filtro volta ao que foi
     // usado NAQUELA clínica; nunca a um atendente de outra.
     setBuscaAtendente("");
-    const salvo = lerFiltrosInbox(typeof window === "undefined" ? null : window.localStorage, clinicaId, {
-      gestor: souGestor,
-      usuariosIds: usuarios.map((u: any) => String(u.user_id)),
-    });
+    const salvo = lerFiltrosInbox(
+      typeof window === "undefined" ? null : window.localStorage,
+      clinicaId,
+      {
+        gestor: souGestor,
+        usuariosIds: usuarios.map((u: any) => String(u.user_id)),
+      },
+    );
     setEscopoBase(salvo.base);
     setVisualizacao(salvo.visualizacao);
     setAtendenteEscolhidoId(salvo.atendenteId);
@@ -507,15 +590,18 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // não cria, altera nem lê endereço individual.
   const [selecaoId, setSelecaoId] = useState<string | null>(null);
 
-  const abrirConversa = useCallback((id: string | null) => {
-    // Caminho único de abertura: lista, busca por número, Central de Atenção,
-    // fila, alertas e atalhos passam todos por aqui.
-    const selecionada = id ? (idConversaValido(id) ?? null) : null;
-    setSelecaoId(selecionada);
-    // Mantém a Central sincronizada com atalhos internos. Uma falha de
-    // acesso deve conservar o painel aberto para mostrar o erro ao usuário.
-    if (selecionada) onSelecionarConversa?.(selecionada);
-  }, [onSelecionarConversa]);
+  const abrirConversa = useCallback(
+    (id: string | null) => {
+      // Caminho único de abertura: lista, busca por número, Central de Atenção,
+      // fila, alertas e atalhos passam todos por aqui.
+      const selecionada = id ? (idConversaValido(id) ?? null) : null;
+      setSelecaoId(selecionada);
+      // Mantém a Central sincronizada com atalhos internos. Uma falha de
+      // acesso deve conservar o painel aberto para mostrar o erro ao usuário.
+      if (selecionada) onSelecionarConversa?.(selecionada);
+    },
+    [onSelecionarConversa],
+  );
 
   useEffect(() => {
     if (modoCentral) abrirConversa(conversaIdExterna);
@@ -565,7 +651,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // hora em qualquer conversa vinculada, sem lookup por telefone.
   const cacheContatos = useRef(new CacheContatos<any>());
   // Cursores da página conjunta, separados dos registros recebidos por Realtime.
-  const historicoRef = useRef<Pick<PaginaHistorico, "anterior" | "posterior" | "temMais"> | null>(null);
+  const historicoRef = useRef<Pick<PaginaHistorico, "anterior" | "posterior" | "temMais"> | null>(
+    null,
+  );
   const cicloHistoricoRef = useRef(0);
   const historicoExpandidoRef = useRef(false);
   // FASE 2 — buscas de pré-carregamento em andamento. Elas são reaproveitadas
@@ -648,11 +736,21 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         .limit(3000);
       if (!vale || !data) return;
       const novo: Record<string, string> = {};
-      for (const m of data as Array<{ conversa_id: string | null; body: string | null; tipo: string | null }>) {
+      for (const m of data as Array<{
+        conversa_id: string | null;
+        body: string | null;
+        tipo: string | null;
+      }>) {
         const id = String(m.conversa_id ?? "");
         if (!id || id in novo) continue;
         const texto = (m.body ?? "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
-        novo[id] = texto || (m.tipo === "image" ? "📷 Imagem" : m.tipo === "audio" ? "🎤 Áudio" : `[${m.tipo ?? "mensagem"}]`);
+        novo[id] =
+          texto ||
+          (m.tipo === "image"
+            ? "📷 Imagem"
+            : m.tipo === "audio"
+              ? "🎤 Áudio"
+              : `[${m.tipo ?? "mensagem"}]`);
       }
       setPrevias((prev) => ({ ...prev, ...novo }));
     }, 400);
@@ -693,7 +791,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const [rascunhos, setRascunhos] = useState<Rascunhos>({});
   const [consultaBaseAberta, setConsultaBaseAberta] = useState(false);
   const [escritaAberta, setEscritaAberta] = useState(false);
-  useEffect(() => { setConsultaBaseAberta(false); setEscritaAberta(false); }, [clinicaId, sel?.id]);
+  useEffect(() => {
+    setConsultaBaseAberta(false);
+    setEscritaAberta(false);
+  }, [clinicaId, sel?.id]);
   const draft = lerRascunho(rascunhos, sel?.id ?? null);
   const setDraft = useCallback((valor: string | ((anterior: string) => string)) => {
     const id = selIdRef.current;
@@ -721,7 +822,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   const [pausaAtiva, setPausaAtiva] = useState<any>(null);
   const [cronometroPausa, setCronometroPausa] = useState<EstadoCronometroPausa | null>(null);
   const inicioCronometroPausa =
-    cronometroPausa?.clinicaId === clinicaId && cronometroPausa?.userId === meuId ? cronometroPausa.inicio : null;
+    cronometroPausa?.clinicaId === clinicaId && cronometroPausa?.userId === meuId
+      ? cronometroPausa.inicio
+      : null;
   // Painel esquerdo: encolhe ao tirar o mouse, expande ao passar; pode ser fixado.
   // O hover usa zona de tolerância + atraso e não recolhe durante arrasto da
   // barra de rolagem (ver use-hover-tolerante).
@@ -794,7 +897,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     if (!clinicaId || !meuId) return;
     const seq = ++seqPresenca.current;
     try {
-      const [s, p] = await Promise.all([meuStatusFn({ data: { clinicaId } }), pausaAtualFn({ data: { clinicaId } })]);
+      const [s, p] = await Promise.all([
+        meuStatusFn({ data: { clinicaId } }),
+        pausaAtualFn({ data: { clinicaId } }),
+      ]);
       if (`${clinicaId}:${meuId}` !== escopoPresencaAtual.current) return;
       const estado = (s as { estadoManual?: EstadoManualPresenca | null }).estadoManual ?? null;
       const versao = (s as { estadoManualVersao?: number }).estadoManualVersao ?? 0;
@@ -897,7 +1003,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       .channel(`presenca-atend:${clinicaId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "atend_agente_presenca", filter: `clinica_id=eq.${clinicaId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "atend_agente_presenca",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
         () => carregarStatusAgente(),
       )
       .subscribe();
@@ -1006,7 +1117,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         if (!vivo) return;
         setSouGestor(!!r?.gestor);
         setSouAdmin(!!r?.admin);
-        setPerfilLeitura({ chave: `${clinicaId}:${meuId}`, permitida: r?.leituraOperacional === true });
+        setPerfilLeitura({
+          chave: `${clinicaId}:${meuId}`,
+          permitida: r?.leituraOperacional === true,
+        });
         // Administrador não tem conversas próprias: abre já na visão da equipe.
         if (r?.admin) setEscopoBase((b) => (b === ESCOPO_BASE_PADRAO ? "equipe" : b));
       })
@@ -1065,194 +1179,216 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     setCarregandoLista(!!clinicaId && !modoCentral);
   }, [chaveAtual]);
 
-  const carregarConvs = useCallback(async (mais = false) => {
-    if (!clinicaId || modoCentral) return;
-    if (mais && (visualizacao !== "recentes" || maisConvsEmVoo.current)) return;
-    if (mais) maisConvsEmVoo.current = true;
-    const pedido = ++seqConvs.current;
-    setCarregandoLista(true);
-    setErroPaginaConvs(false);
-    const chavePedido = chaveInbox({
-      clinicaId,
-      userId: meuId,
-      escopo,
-      atendenteId: atendenteSelecionadoId,
-      visualizacao,
-    });
-    try {
-      const buscarPagina = (apos: CursorInbox | null) => medirRequest(
-        "listarConversas",
-        listarConvs({
-          data: {
-            clinicaId,
-            status: filtroStatus,
-            canal: "todos",
-            escopo,
-            atendenteId: atendenteSelecionadoId,
-            visualizacao,
-            limit: visualizacao === "recentes" ? TAMANHO_LOTE_ATIVAS : 100,
-            apos,
-          },
-        }),
-      );
-      const vigente = () => pedido === seqConvs.current && chavePedido === chaveAtualRef.current;
-      const pagina = visualizacao === "recentes" ? await carregarLotesAtivas({
-        buscar: buscarPagina,
-        cursor: mais ? paginaConvsRef.current.cursor : null,
-        quantidade: mais ? TAMANHO_LOTE_ATIVAS : Math.max(TAMANHO_LOTE_ATIVAS, paginaConvsRef.current.quantidade),
-        vigente,
-      }) : null;
-      const novas = visualizacao === "recentes" ? pagina?.linhas : await buscarPagina(null);
-      if (!novas || !vigente()) return;
-      const idsNovos = new Set(novas.map((c: any) => c.id));
-      const brutas = mais ? ordenarInbox([...convsRef.current.filter(c => !idsNovos.has(c.id)), ...novas]) : novas;
-      if (pagina) {
-        paginaConvsRef.current = { cursor: pagina.cursor,
-          quantidade: mais ? paginaConvsRef.current.quantidade + novas.length : novas.length };
-      }
-      setTemMaisConvs(pagina?.temMais ?? false);
-      // Resposta atrasada de uma recarga anterior não pode sobrescrever a
-      // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
-      if (pedido !== seqConvs.current) return;
-      // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
-      if (chavePedido !== chaveAtualRef.current) return;
-      // FASE 4 — segunda conferência no navegador: só entra na lista o que
-      // realmente pertence a este filtro, mesmo que um evento em tempo real
-      // traga uma conversa que acabou de mudar de responsável.
-      const ctxEscopo = {
+  const carregarConvs = useCallback(
+    async (mais = false) => {
+      if (!clinicaId || modoCentral) return;
+      if (mais && (visualizacao !== "recentes" || maisConvsEmVoo.current)) return;
+      if (mais) maisConvsEmVoo.current = true;
+      const pedido = ++seqConvs.current;
+      setCarregandoLista(true);
+      setErroPaginaConvs(false);
+      const chavePedido = chaveInbox({
         clinicaId,
-        escopo,
         userId: meuId,
-        gestor: souGestor,
+        escopo,
         atendenteId: atendenteSelecionadoId,
-      };
-      const rows = filtrarPorEscopo(brutas as any[], ctxEscopo).map((c: any) => {
-        const confirmada = aberturasConfirmadasRef.current.get(`${clinicaId}:${meuId}:${c.id}:${entradaAtendimento(c)}`);
-        // Uma lista iniciada antes da confirmação não faz o selo voltar.
-        return confirmada ? aplicarAberturaConfirmada(c, confirmada) : c;
+        visualizacao,
       });
-      // Os cards autorizados aparecem antes da conferência secundária do chat aberto.
-      if (visualizacao === "espera") {
-        // Esta resposta já contém a espera canônica: não depende de outro request
-        // para mostrar os cards. Descarta consultas auxiliares anteriores à lista.
-        seqEspera.current++;
-        esperaRef.current = incorporarEsperaDaLista(esperaRef.current, rows);
-        setEspera(prev => incorporarEsperaDaLista(prev, rows));
-      }
-      setConvs((prev: any[]) => {
-        // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
-        // aberta)? O conteúdo dela sai do cache para não voltar desatualizado.
-        // Cada conversa é tratada pelo próprio id: uma nunca invalida a outra.
-        const vencidas = conversasDesatualizadas({
-          anteriores: prev as any,
-          atuais: rows as any,
-          emCache: cacheConversas.current.chaves(),
+      try {
+        const buscarPagina = (apos: CursorInbox | null) =>
+          medirRequest(
+            "listarConversas",
+            listarConvs({
+              data: {
+                clinicaId,
+                status: filtroStatus,
+                canal: "todos",
+                escopo,
+                atendenteId: atendenteSelecionadoId,
+                visualizacao,
+                limit: visualizacao === "recentes" ? TAMANHO_LOTE_ATIVAS : 100,
+                apos,
+              },
+            }),
+          );
+        const vigente = () => pedido === seqConvs.current && chavePedido === chaveAtualRef.current;
+        const pagina =
+          visualizacao === "recentes"
+            ? await carregarLotesAtivas({
+                buscar: buscarPagina,
+                cursor: mais ? paginaConvsRef.current.cursor : null,
+                quantidade: mais
+                  ? TAMANHO_LOTE_ATIVAS
+                  : Math.max(TAMANHO_LOTE_ATIVAS, paginaConvsRef.current.quantidade),
+                vigente,
+              })
+            : null;
+        const novas = visualizacao === "recentes" ? pagina?.linhas : await buscarPagina(null);
+        if (!novas || !vigente()) return;
+        const idsNovos = new Set(novas.map((c: any) => c.id));
+        const brutas = mais
+          ? ordenarInbox([...convsRef.current.filter((c) => !idsNovos.has(c.id)), ...novas])
+          : novas;
+        if (pagina) {
+          paginaConvsRef.current = {
+            cursor: pagina.cursor,
+            quantidade: mais ? paginaConvsRef.current.quantidade + novas.length : novas.length,
+          };
+        }
+        setTemMaisConvs(pagina?.temMais ?? false);
+        // Resposta atrasada de uma recarga anterior não pode sobrescrever a
+        // atual — era isso que fazia o cartão mudar e "voltar" sozinho.
+        if (pedido !== seqConvs.current) return;
+        // Se o filtro/usuário mudou enquanto a resposta vinha, ela é descartada.
+        if (chavePedido !== chaveAtualRef.current) return;
+        // FASE 4 — segunda conferência no navegador: só entra na lista o que
+        // realmente pertence a este filtro, mesmo que um evento em tempo real
+        // traga uma conversa que acabou de mudar de responsável.
+        const ctxEscopo = {
+          clinicaId,
+          escopo,
+          userId: meuId,
+          gestor: souGestor,
+          atendenteId: atendenteSelecionadoId,
+        };
+        const rows = filtrarPorEscopo(brutas as any[], ctxEscopo).map((c: any) => {
+          const confirmada = aberturasConfirmadasRef.current.get(
+            `${clinicaId}:${meuId}:${c.id}:${entradaAtendimento(c)}`,
+          );
+          // Uma lista iniciada antes da confirmação não faz o selo voltar.
+          return confirmada ? aplicarAberturaConfirmada(c, confirmada) : c;
         });
-        for (const id of vencidas) {
-          if (id === selIdRef.current) continue;
-          cacheConversas.current.invalidar(id);
-          prefetchMsgs.current.invalidar(id);
+        // Os cards autorizados aparecem antes da conferência secundária do chat aberto.
+        if (visualizacao === "espera") {
+          // Esta resposta já contém a espera canônica: não depende de outro request
+          // para mostrar os cards. Descarta consultas auxiliares anteriores à lista.
+          seqEspera.current++;
+          esperaRef.current = incorporarEsperaDaLista(esperaRef.current, rows);
+          setEspera((prev) => incorporarEsperaDaLista(prev, rows));
         }
-        // Quem saiu deste filtro não pode continuar guardado em cache.
-        for (const id of idsQueSairam(prev as any, rows as any)) {
-          if (id === selIdRef.current) continue;
-          cacheConversas.current.invalidar(id);
-          prefetchMsgs.current.invalidar(id);
+        setConvs((prev: any[]) => {
+          // Chegou mensagem nova numa conversa guardada em cache (mesmo sem estar
+          // aberta)? O conteúdo dela sai do cache para não voltar desatualizado.
+          // Cada conversa é tratada pelo próprio id: uma nunca invalida a outra.
+          const vencidas = conversasDesatualizadas({
+            anteriores: prev as any,
+            atuais: rows as any,
+            emCache: cacheConversas.current.chaves(),
+          });
+          for (const id of vencidas) {
+            if (id === selIdRef.current) continue;
+            cacheConversas.current.invalidar(id);
+            prefetchMsgs.current.invalidar(id);
+          }
+          // Quem saiu deste filtro não pode continuar guardado em cache.
+          for (const id of idsQueSairam(prev as any, rows as any)) {
+            if (id === selIdRef.current) continue;
+            cacheConversas.current.invalidar(id);
+            prefetchMsgs.current.invalidar(id);
+          }
+          // O servidor já ordena a visualização antes do LIMIT, inclusive espera
+          // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
+          return mesclarListaConversas(prev as any, rows as any) as any[];
+        });
+        setCarregandoLista(false);
+        const selecionadaParaConferir = selRef.current;
+        let confirmadaForaLista: any = undefined;
+        if (
+          podeRevalidarChatEntreFiltros(selecionadaParaConferir, ctxEscopo) &&
+          !rows.some((r: any) => r.id === selecionadaParaConferir.id)
+        ) {
+          // Trocar de aba ou responder na fila pode tirar o card da lista.
+          // A leitura autenticada confirma que o chat ainda pertence à atendente.
+          confirmadaForaLista = await revalidarChatSelecionado(() =>
+            obterConversaFn({
+              data: { clinicaId, conversaId: selecionadaParaConferir.id },
+            }),
+          );
+          if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
+          if (
+            selIdRef.current !== selecionadaParaConferir.id ||
+            selecaoIdRef.current !== selecionadaParaConferir.id
+          )
+            return;
         }
-        // O servidor já ordena a visualização antes do LIMIT, inclusive espera
-        // e resolvidas. Mesclar a prévia não deve aplicar uma segunda ordem.
-        return mesclarListaConversas(prev as any, rows as any) as any[];
-      });
-      setCarregandoLista(false);
-      const selecionadaParaConferir = selRef.current;
-      let confirmadaForaLista: any = undefined;
-      if (
-        podeRevalidarChatEntreFiltros(selecionadaParaConferir, ctxEscopo) &&
-        !rows.some((r: any) => r.id === selecionadaParaConferir.id)
-      ) {
-        // Trocar de aba ou responder na fila pode tirar o card da lista.
-        // A leitura autenticada confirma que o chat ainda pertence à atendente.
-        confirmadaForaLista = await revalidarChatSelecionado(() =>
-          obterConversaFn({
-            data: { clinicaId, conversaId: selecionadaParaConferir.id },
-          }),
-        );
-        if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
-        if (selIdRef.current !== selecionadaParaConferir.id || selecaoIdRef.current !== selecionadaParaConferir.id)
-          return;
-      }
-      // Filtro e status não encerram a seleção. Só uma perda comprovada de
-      // acesso ou de contexto pode retirar uma conversa já aberta.
-      if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current) deepLinkPendente.current = null;
-      const removeu = selecaoDeveSair({
-        selecionada: (selRef.current as any) ?? null,
-        linhas: rows as any,
-        buscando: false,
-        ctx: ctxEscopo,
-        confirmadaForaLista,
-      });
-      if (!removeu && confirmadaForaLista) {
-        setSel((atual: any) => (atual?.id === confirmadaForaLista.id ? { ...atual, ...confirmadaForaLista } : atual));
-      }
-      if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
-        deepLinkPendente.current = null;
-      if (removeu && selIdRef.current === deepLinkPendente.current) {
-        // Link direto: aguarda a lista do filtro certo antes de decidir.
-      } else if (removeu) {
-        const idFora = selIdRef.current!;
-        cacheConversas.current.invalidar(idFora);
-        prefetchMsgs.current.invalidar(idFora);
-        setSel(null);
-        setConversaCarregadaId(null);
-        setSecundariosCarregadosId(null);
-        setMsgs([]);
-        setContato(null);
-        setEventos([]);
-        // Sem aviso: a conversa apenas sai da tela e volta a "Selecione uma
-        // conversa". O motivo continua visível na lista e nos eventos.
-        abrirConversa(null);
-      }
-      // Os totais vêm do servidor; Ativas carrega em lotes, demais filtros mantêm 100 cards.
-      // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
-      // nunca troca sozinha para outra.
-      if (
-        devoAutoSelecionarComSelecao({
-          selecaoAtual: selecaoIdRef.current,
-          temSelecao: !!selRef.current,
-          removeuAgora: removeu,
-          temPrimeiraLinha: devoAutoSelecionar({
+        // Filtro e status não encerram a seleção. Só uma perda comprovada de
+        // acesso ou de contexto pode retirar uma conversa já aberta.
+        if (deepLinkPendente.current && selIdRef.current !== deepLinkPendente.current)
+          deepLinkPendente.current = null;
+        const removeu = selecaoDeveSair({
+          selecionada: (selRef.current as any) ?? null,
+          linhas: rows as any,
+          buscando: false,
+          ctx: ctxEscopo,
+          confirmadaForaLista,
+        });
+        if (!removeu && confirmadaForaLista) {
+          setSel((atual: any) =>
+            atual?.id === confirmadaForaLista.id ? { ...atual, ...confirmadaForaLista } : atual,
+          );
+        }
+        if (deepLinkPendente.current && rows.some((r: any) => r.id === deepLinkPendente.current))
+          deepLinkPendente.current = null;
+        if (removeu && selIdRef.current === deepLinkPendente.current) {
+          // Link direto: aguarda a lista do filtro certo antes de decidir.
+        } else if (removeu) {
+          const idFora = selIdRef.current!;
+          cacheConversas.current.invalidar(idFora);
+          prefetchMsgs.current.invalidar(idFora);
+          setSel(null);
+          setConversaCarregadaId(null);
+          setSecundariosCarregadosId(null);
+          setMsgs([]);
+          setContato(null);
+          setEventos([]);
+          // Sem aviso: a conversa apenas sai da tela e volta a "Selecione uma
+          // conversa". O motivo continua visível na lista e nos eventos.
+          abrirConversa(null);
+        }
+        // Os totais vêm do servidor; Ativas carrega em lotes, demais filtros mantêm 100 cards.
+        // Com uma conversa já escolhida (ou pedida por outro módulo), a tela
+        // nunca troca sozinha para outra.
+        if (
+          devoAutoSelecionarComSelecao({
+            selecaoAtual: selecaoIdRef.current,
             temSelecao: !!selRef.current,
             removeuAgora: removeu,
-            primeiraLinha: rows[0] as LinhaInbox,
-          }),
-        })
-      )
-        // A seleção automática usa o mesmo caminho central de abertura.
-        abrirConversa((rows[0] as any)?.id ?? null);
-      // Os números de cada filtro acompanham a movimentação em tempo real.
-      void carregarContadores();
-    } catch (e: any) {
-      if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
-      setErroPaginaConvs(true);
-      mostrarErro(e);
-    } finally {
-      if (mais) maisConvsEmVoo.current = false;
-      if (pedido === seqConvs.current && chavePedido === chaveAtualRef.current) setCarregandoLista(false);
-    }
-  }, [
-    clinicaId,
-    filtroStatus,
-    escopo,
-    atendenteSelecionadoId,
-    visualizacao,
-    listarConvs,
-    carregarContadores,
-    meuId,
-    souGestor,
-    abrirConversa,
-    obterConversaFn,
-    modoCentral,
-  ]);
+            temPrimeiraLinha: devoAutoSelecionar({
+              temSelecao: !!selRef.current,
+              removeuAgora: removeu,
+              primeiraLinha: rows[0] as LinhaInbox,
+            }),
+          })
+        )
+          // A seleção automática usa o mesmo caminho central de abertura.
+          abrirConversa((rows[0] as any)?.id ?? null);
+        // Os números de cada filtro acompanham a movimentação em tempo real.
+        void carregarContadores();
+      } catch (e: any) {
+        if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
+        setErroPaginaConvs(true);
+        mostrarErro(e);
+      } finally {
+        if (mais) maisConvsEmVoo.current = false;
+        if (pedido === seqConvs.current && chavePedido === chaveAtualRef.current)
+          setCarregandoLista(false);
+      }
+    },
+    [
+      clinicaId,
+      filtroStatus,
+      escopo,
+      atendenteSelecionadoId,
+      visualizacao,
+      listarConvs,
+      carregarContadores,
+      meuId,
+      souGestor,
+      abrirConversa,
+      obterConversaFn,
+      modoCentral,
+    ],
+  );
 
   // A conversa aberta é sempre a da seleção interna. Quando ela muda (clique
   // na lista, busca por número, Central de Atenção, alerta), o conteúdo
@@ -1297,7 +1433,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           setSel(row);
           return;
         }
-        const destino = escopoParaConversa(row, { escopoAtual: escopo, userId: meuId, gestor: souGestor });
+        const destino = escopoParaConversa(row, {
+          escopoAtual: escopo,
+          userId: meuId,
+          gestor: souGestor,
+        });
         if (!destino || (!souGestor && destino === "nina")) {
           // Nenhum filtro desta lista mostra a conversa, mas o backend já
           // liberou a leitura (administração/supervisão abrindo pela aba
@@ -1306,7 +1446,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           deepLinkTentado.current.delete(idPedido);
           deepLinkPendente.current = idPedido;
           setSel(row);
-          setConvs((prev: any[]) => (prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev]));
+          setConvs((prev: any[]) =>
+            prev.some((x: any) => x.id === row.id) ? prev : [row, ...prev],
+          );
           return;
         }
         deepLinkTentado.current.delete(idPedido);
@@ -1334,7 +1476,17 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         abrirConversa(null);
       }
     })();
-  }, [selecaoId, convs, clinicaId, meuId, escopo, souGestor, obterConversaFn, abrirConversa, modoCentral]);
+  }, [
+    selecaoId,
+    convs,
+    clinicaId,
+    meuId,
+    escopo,
+    souGestor,
+    obterConversaFn,
+    abrirConversa,
+    modoCentral,
+  ]);
 
   // Abrir uma conversa a partir da Central de Atenção ou da Revisão de
   // aprendizados, sem trocar de página e sem mexer em filtros/rascunho de quem
@@ -1395,7 +1547,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           // Se a conversa foi invalidada (mensagem nova, transferência) ou a
           // clínica/usuário mudou enquanto a busca vinha, o resultado é
           // descartado — nunca repovoa o cache com conteúdo velho.
-          if (!prefetchMsgs.current.resultadoValido(id, entrada, chavePrefetch(clinicaId, meuId))) return;
+          if (!prefetchMsgs.current.resultadoValido(id, entrada, chavePrefetch(clinicaId, meuId)))
+            return;
           if (!cacheConversas.current.obter(id)) {
             cacheConversas.current.guardar(id, {
               msgs: m.mensagens,
@@ -1478,14 +1631,22 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     marcarCache("mensagens_cache", !!cacheConversas.current.obter(alvo), alvo);
     const pMensagens = entradaEmVoo
       ? entradaEmVoo.promise
-      : medirRequest("listarPaginaHistorico", listarHistorico({ data: { clinicaId, conversaId: alvo } }), alvo);
+      : medirRequest(
+          "listarPaginaHistorico",
+          listarHistorico({ data: { clinicaId, conversaId: alvo } }),
+          alvo,
+        );
     // A busca fica registrada com a versão atual da conversa. Se a conversa for
     // invalidada (mensagem nova, transferência) ou a clínica/usuário mudarem
     // enquanto a resposta vem, ela não pode mais gravar no cache.
     const entradaMsgs = entradaEmVoo ?? prefetchMsgs.current.registrar(alvo, chavePf, pMensagens);
     const podeGravarCache = () =>
       prefetchMsgs.current.resultadoValido(alvo, entradaMsgs, chavePrefetch(clinicaId, meuId));
-    const pContato = medirRequest("obterDadosContato", obterContato({ data: { clinicaId, conversaId: alvo } }), alvo);
+    const pContato = medirRequest(
+      "obterDadosContato",
+      obterContato({ data: { clinicaId, conversaId: alvo } }),
+      alvo,
+    );
 
     // Guarda o que as mensagens devolveram: `null` significa que a busca
     // falhou. Falha nunca é gravada no cache como conversa vazia.
@@ -1514,7 +1675,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
               (msg) =>
                 expandido ||
                 msg.optimistic ||
-                manterNaJanelaRecente({ em: msg.recebida_em, id: msg.id, tipo: "mensagem" }, pagina),
+                manterNaJanelaRecente(
+                  { em: msg.recebida_em, id: msg.id, tipo: "mensagem" },
+                  pagina,
+                ),
             ),
           ),
         );
@@ -1526,7 +1690,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         setTemMaisAntigas(historicoRef.current.temMais);
         setEventos((prev) =>
           mesclarEventos(prev, pagina.eventos).filter(
-            (ev) => expandido || manterNaJanelaRecente({ em: ev.created_at, id: ev.id, tipo: "evento" }, pagina),
+            (ev) =>
+              expandido ||
+              manterNaJanelaRecente({ em: ev.created_at, id: ev.id, tipo: "evento" }, pagina),
           ),
         );
         setConversaCarregadaId(alvo);
@@ -1651,7 +1817,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       try {
         let cursor: CursorHistorico = inicio;
         while (selIdRef.current === alvo && cicloHistoricoRef.current === ciclo) {
-          const pagina = await listarHistorico({ data: { clinicaId, conversaId: alvo, depois: cursor } });
+          const pagina = await listarHistorico({
+            data: { clinicaId, conversaId: alvo, depois: cursor },
+          });
           if (selIdRef.current !== alvo || cicloHistoricoRef.current !== ciclo) return;
           if (selecaoIdRef.current && selecaoIdRef.current !== alvo) return;
           if (!pagina.posterior) break;
@@ -1706,35 +1874,71 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // "Novo" é a primeira abertura desta atribuição, independente de ler até o fim.
   useEffect(() => {
     const c = sel;
-    if (!clinicaId || !meuId || !c || !deveRegistrarPrimeiraAbertura(c, {
-      userId: meuId,
-      operacional: perfilLeitura?.chave === `${clinicaId}:${meuId}` && perfilLeitura.permitida && !souGestor && !souAdmin,
-      carregadaId: conversaCarregadaId, visivel: abaVisivel, carregando: carregandoConversa,
-    })) return;
+    if (
+      !clinicaId ||
+      !meuId ||
+      !c ||
+      !deveRegistrarPrimeiraAbertura(c, {
+        userId: meuId,
+        operacional:
+          perfilLeitura?.chave === `${clinicaId}:${meuId}` &&
+          perfilLeitura.permitida &&
+          !souGestor &&
+          !souAdmin,
+        carregadaId: conversaCarregadaId,
+        visivel: abaVisivel,
+        carregando: carregandoConversa,
+      })
+    )
+      return;
     const entradaEm = entradaAtendimento(c)!;
     const chave = `${clinicaId}:${meuId}:${c.id}:${entradaEm}`;
-    if (aberturasPendentesRef.current.has(chave) || aberturasConfirmadasRef.current.has(chave)) return;
+    if (aberturasPendentesRef.current.has(chave) || aberturasConfirmadasRef.current.has(chave))
+      return;
     aberturasPendentesRef.current.add(chave);
     void registrarAberturaFn({ data: { clinicaId, conversaId: c.id, entradaEm } })
       .then((r) => {
-        if (!r.marcada) { agrupadores.current?.lista.agendar(); return; }
+        if (!r.marcada) {
+          agrupadores.current?.lista.agendar();
+          return;
+        }
         aberturasConfirmadasRef.current.set(chave, { userId: r.userId, entradaEm: r.entradaEm });
-        setConvs(prev => prev.map(item => item.id === c.id ? aplicarAberturaConfirmada(item, r) : item));
-        setSel((atual: any) => atual?.id === c.id ? aplicarAberturaConfirmada(atual, r) : atual);
+        setConvs((prev) =>
+          prev.map((item) => (item.id === c.id ? aplicarAberturaConfirmada(item, r) : item)),
+        );
+        setSel((atual: any) => (atual?.id === c.id ? aplicarAberturaConfirmada(atual, r) : atual));
       })
       .catch(() => agrupadores.current?.lista.agendar())
       .finally(() => aberturasPendentesRef.current.delete(chave));
-  }, [clinicaId, meuId, sel, perfilLeitura, souGestor, souAdmin, conversaCarregadaId,
-    abaVisivel, carregandoConversa, registrarAberturaFn]);
+  }, [
+    clinicaId,
+    meuId,
+    sel,
+    perfilLeitura,
+    souGestor,
+    souAdmin,
+    conversaCarregadaId,
+    abaVisivel,
+    carregandoConversa,
+    registrarAberturaFn,
+  ]);
   useEffect(() => {
     const conversa = sel;
     const alvo = conversa?.id as string | undefined;
     const chavePerfil = `${clinicaId}:${meuId}`;
-    if (!clinicaId || !alvo || carregandoConversa || perfilLeitura?.chave !== chavePerfil || !perfilLeitura.permitida)
+    if (
+      !clinicaId ||
+      !alvo ||
+      carregandoConversa ||
+      perfilLeitura?.chave !== chavePerfil ||
+      !perfilLeitura.permitida
+    )
       return;
     const chaveLeitura = `${chavePerfil}:${alvo}`;
     // Mensagens otimistas ainda não existem no banco e não comprovam leitura.
-    const ultima = msgs.filter((m: any) => !m.optimistic && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(m.id ?? "")).at(-1);
+    const ultima = msgs
+      .filter((m: any) => !m.optimistic && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(m.id ?? ""))
+      .at(-1);
     const mensagemId = (ultima?.id as string | undefined) ?? null;
     const base = {
       userId: meuId ?? "",
@@ -1775,7 +1979,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           agrupadores.current?.lista.agendar();
           return;
         }
-        setConvs((prev) => prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: r.valor } : c)));
+        setConvs((prev) =>
+          prev.map((c: any) => (c.id === alvo ? { ...c, nao_lidas: r.valor } : c)),
+        );
       };
       void marcarLidaFn({ data: { clinicaId, conversaId: alvo, mensagemId } })
         .then((r: any) => {
@@ -1877,11 +2083,15 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       contactId: (sel as any)?.contato_paciente_id ?? null,
       telefone: (sel as any)?.contato_telefone ?? null,
     });
-    const contatoEmCache = plano.via === "id" ? cacheContatos.current.obter(plano.contactId) : undefined;
+    const contatoEmCache =
+      plano.via === "id" ? cacheContatos.current.obter(plano.contactId) : undefined;
     const emCache = id ? cacheConversas.current.obter(id) : undefined;
     if (id && emCache) {
       const pagina = montarPaginaHistorico(emCache.msgs, emCache.eventos);
-      historicoRef.current = { ...pagina, temMais: pagina.temMais || emCache.historico?.temMais === true };
+      historicoRef.current = {
+        ...pagina,
+        temMais: pagina.temMais || emCache.historico?.temMais === true,
+      };
       cacheConversas.current.guardar(id, {
         ...emCache,
         msgs: pagina.mensagens,
@@ -1990,10 +2200,18 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     let vale = true;
     listarAutoresFn({ data: { clinicaId } })
       .then((lista) => {
-        if (vale) setAutores({ clinicaId, nomes: Object.fromEntries(lista.map((a) => [a.user_id, a.nome])) });
+        if (vale)
+          setAutores({
+            clinicaId,
+            nomes: Object.fromEntries(lista.map((a) => [a.user_id, a.nome])),
+          });
       })
-      .catch(() => { if (vale) setAutores(null); });
-    return () => { vale = false; };
+      .catch(() => {
+        if (vale) setAutores(null);
+      });
+    return () => {
+      vale = false;
+    };
   }, [clinicaId, listarAutoresFn]);
 
   // Ao abrir a transferência ou o filtro, só a lista de atendentes é relida
@@ -2023,7 +2241,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     if (!clinicaId || !session) return;
     const pedido = ++seqEspera.current;
     try {
-      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<string, string>;
+      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
+        string,
+        string
+      >;
       if (pedido !== seqEspera.current) return;
       setEspera((prev) => mesclarEspera(prev, m ?? {}));
     } catch {
@@ -2053,7 +2274,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     const pedido = ++seqContatoRef.current;
     try {
       const c: any = await obterContato({ data: { clinicaId, conversaId: id } });
-      if (pedido !== seqContatoRef.current || perfil !== perfilContatoRef.current || selIdRef.current !== id) return;
+      if (
+        pedido !== seqContatoRef.current ||
+        perfil !== perfilContatoRef.current ||
+        selIdRef.current !== id
+      )
+        return;
       cacheContatos.current.guardar(c?.paciente?.id, c);
       const guardado = cacheConversas.current.obter(id);
       if (guardado) cacheConversas.current.guardar(id, { ...guardado, contato: c });
@@ -2078,7 +2304,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   } | null>(null);
   if (agrupadores.current === null) {
     agrupadores.current = {
-      contato: criarAgrupador({ executar: () => void atualizarContatoRef.current(), atrasoMs: 300, tetoMs: 1000 }),
+      contato: criarAgrupador({
+        executar: () => void atualizarContatoRef.current(),
+        atrasoMs: 300,
+        tetoMs: 1000,
+      }),
       lista: criarAgrupador({
         executar: () => void carregarConvsAgrup.current(),
         atrasoMs: 400,
@@ -2220,11 +2450,16 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       watchdog.current.aoEvento();
       if (
         evento.table === "atend_leitura_operacional" ||
-        (evento.table === "whatsapp_mensagens" && evento.eventType === "INSERT" && evento.new?.direction === "in")
+        (evento.table === "whatsapp_mensagens" &&
+          evento.eventType === "INSERT" &&
+          evento.new?.direction === "in")
       ) {
         const conversaLida = String(evento.new?.conversa_id ?? "");
         if (conversaLida) {
-          seqLeituraRef.current.set(conversaLida, (seqLeituraRef.current.get(conversaLida) ?? 0) + 1);
+          seqLeituraRef.current.set(
+            conversaLida,
+            (seqLeituraRef.current.get(conversaLida) ?? 0) + 1,
+          );
         }
       }
       // Chegada de mensagem por tempo real: abre/atualiza o trace de recebimento.
@@ -2248,7 +2483,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           clinicaId: clinicaId ?? null,
           conversaAberta: selIdRef.current,
         });
-        if (r.usar && (evento.eventType !== "UPDATE" || msgsRef.current.some((m) => m.id === r.mensagem.id))) {
+        if (
+          r.usar &&
+          (evento.eventType !== "UPDATE" || msgsRef.current.some((m) => m.id === r.mensagem.id))
+        ) {
           // Mesma mensagem chegando duas vezes (ou junto da resposta do envio)
           // não vira duas bolhas: a chave lógica reconcilia.
           setMsgs((prev) => mesclarNovas(prev, [r.mensagem]));
@@ -2282,7 +2520,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
         // saem da lista na hora, respeitando o atendente e o estado escolhidos.
         const atualizada = evento.new;
         const contextoChat = { clinicaId, escopo, userId: meuId, gestor: souGestor };
-        if (atualizada?.id === selIdRef.current && podeRevalidarChatEntreFiltros(selRef.current, contextoChat)) {
+        if (
+          atualizada?.id === selIdRef.current &&
+          podeRevalidarChatEntreFiltros(selRef.current, contextoChat)
+        ) {
           if (
             chatContinuaEntreFiltros({
               selecionada: selRef.current,
@@ -2292,7 +2533,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           ) {
             // Atualiza o cabeçalho mesmo quando o card sai da lista; mantém
             // seleção, mensagens, rascunho e posição de rolagem do mesmo chat.
-            setSel((atual: any) => (atual?.id === atualizada.id ? { ...atual, ...atualizada } : atual));
+            setSel((atual: any) =>
+              atual?.id === atualizada.id ? { ...atual, ...atualizada } : atual,
+            );
           } else {
             // Confere perda de acesso/transferência mesmo se o patch já retirou o card.
             g.lista.agendar();
@@ -2350,7 +2593,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // Confiança REAL registrada pelo motor para cada resposta da Nina desta
   // conversa. Leitura em lote; nada é calculado na tela.
   const idsInspecao = useMemo(() => idsParaInspecaoNina(msgs), [msgs]);
-  const saidasPorMensagem = useSaidasDasMensagens(clinicaId, sel?.id, idsInspecao, revisaoInspecaoMensagens(msgs));
+  const saidasPorMensagem = useSaidasDasMensagens(
+    clinicaId,
+    sel?.id,
+    idsInspecao,
+    revisaoInspecaoMensagens(msgs),
+  );
 
   // Ordem cronológica, com avisos de reabertura antes da entrada que abriu o ciclo.
   // FASE 3 — eventos internos do mesmo processo viram um bloco compacto único.
@@ -2403,7 +2651,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
             mensagem: {
               id: String(i.msg.id),
               direction: i.msg.direction,
-              sistema: i.msg.status === "system" || (i.msg.enviada_por === "sistema" && !mensagemDoFrancisco(i.msg.raw)),
+              sistema:
+                i.msg.status === "system" ||
+                (i.msg.enviada_por === "sistema" && !mensagemDoFrancisco(i.msg.raw)),
             },
           }
         : i.item.tipo === "EVENTO"
@@ -2425,7 +2675,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
   // O resumo e o aviso de encaminhamento da mesma transferência formam UM cartão; o que não tem aviso
   // próximo (conclusão por agendamento) entra como cartão próprio, pela hora da conclusão.
   const timelineComResumos = useMemo(() => {
-    const ehAviso = (i: (typeof timeline)[number]) => i.kind === "grupo" && i.item.tipo === "HANDOFF";
+    const ehAviso = (i: (typeof timeline)[number]) =>
+      i.kind === "grupo" && i.item.tipo === "HANDOFF";
     const { anexos, soltos } = casarResumosComAvisos(timeline, resumosDaConversa, ehAviso);
     const base = timeline.map((i) => (anexos.has(i) ? { ...i, resumo: anexos.get(i) } : i));
     return inserirResumosNaTimeline(base, soltos, () => false);
@@ -2546,7 +2797,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
           data: { clinicaId, conversaId: alvo.conversaId, mensagemId: alvo.mensagemId },
         })) as { encontrada: boolean; mensagens: any[] };
         // Troca rápida entre reportes: resposta antiga não mexe na tela.
-        if (cancelado || seqAlvo.current !== alvo.pedido || selIdRef.current !== alvo.conversaId) return;
+        if (cancelado || seqAlvo.current !== alvo.pedido || selIdRef.current !== alvo.conversaId)
+          return;
         if (!r.encontrada) {
           setAlvoIndisponivel(true);
           setAlvoMensagem(null);
@@ -2568,7 +2820,15 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     return () => {
       cancelado = true;
     };
-  }, [alvoMensagem, conteudoDaConversa, conversaCarregadaId, msgs, clinicaId, chat, carregarJanela]);
+  }, [
+    alvoMensagem,
+    conteudoDaConversa,
+    conversaCarregadaId,
+    msgs,
+    clinicaId,
+    chat,
+    carregarJanela,
+  ]);
 
   const janela24hExpirada = (() => {
     if (!sel || sel.canal !== "whatsapp") return false;
@@ -2641,7 +2901,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     const ags: any[] = contato?.agendamentos ?? [];
     const agora = Date.now();
     const ag = ags
-      .filter((a) => String(a?.status ?? "") === "confirmado" && a?.inicio && new Date(a.inicio).getTime() >= agora)
+      .filter(
+        (a) =>
+          String(a?.status ?? "") === "confirmado" &&
+          a?.inicio &&
+          new Date(a.inicio).getTime() >= agora,
+      )
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())[0];
     const dt = ag?.inicio ? new Date(ag.inicio) : null;
     return {
@@ -2650,7 +2915,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       "patient.phone": p?.telefone ?? "",
       "doctor.name": ag?.medico_nome ?? "",
       "appointment.date": dt ? dt.toLocaleDateString("pt-BR") : "",
-      "appointment.time": dt ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "",
+      "appointment.time": dt
+        ? dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+        : "",
       "unit.name": (clinicaAtual as any)?.clinica?.nome ?? "",
       "procedure.name": ag?.procedimento ?? "",
       "attendant.name": nomeUsuario(meuId) ?? "",
@@ -2674,7 +2941,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       setDraft(texto);
       setSlash(null);
       if (faltantes.length > 0)
-        toast.warning(`Não foi possível preencher “${faltantes.join("”, “")}”. Complete antes de enviar.`);
+        toast.warning(
+          `Não foi possível preencher “${faltantes.join("”, “")}”. Complete antes de enviar.`,
+        );
       requestAnimationFrame(() => {
         el?.focus();
         try {
@@ -2706,34 +2975,38 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       status: sel.status,
     });
   const respondendoComoSupervisao =
-    !!meuPerfilSupervisao && !!sel && !souResponsavel && !conversaEncerrada && (!!responsavelId || conversaLivre);
+    !!meuPerfilSupervisao &&
+    !!sel &&
+    !souResponsavel &&
+    !conversaEncerrada &&
+    (!!responsavelId || conversaLivre);
   const motivoBloqueio = !sel
     ? null
     : !carregandoConversa && conversaComNina({ owner_type: sel.owner_type, status: sel.status })
       ? // Conversa com a Nina: ninguém envia; para responder, atribui-se a conversa.
         MSG_CONVERSA_DA_NINA
-    : souAdmin &&
-        !carregandoConversa &&
-        !adminPodeResponder({
-          atribuida_user_id: sel.atribuida_user_id,
-          owner_type: sel.owner_type,
-          status: sel.status,
-        })
-      ? motivoAdminNaoResponde({ owner_type: sel.owner_type, status: sel.status })
-      : carregandoConversa
-        ? "Carregando conversa…"
-        : conversaEncerrada
-          ? "Conversa encerrada. Não é possível enviar mensagens."
-          : responsavelId && !souResponsavel && !meuPerfilSupervisao
-            ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
-            : !podeAtender
-              ? "Você tem acesso somente de leitura no atendimento."
-              : !filaAberta && !emPausa
-                ? // Só o Offline (ou a falta de escolha) bloqueia o envio; as duas pausas podem responder.
-                  "Você está offline. Fique online para enviar mensagens."
-                : janela24hExpirada
-                  ? MSG_JANELA_24H_META
-                  : null;
+      : souAdmin &&
+          !carregandoConversa &&
+          !adminPodeResponder({
+            atribuida_user_id: sel.atribuida_user_id,
+            owner_type: sel.owner_type,
+            status: sel.status,
+          })
+        ? motivoAdminNaoResponde({ owner_type: sel.owner_type, status: sel.status })
+        : carregandoConversa
+          ? "Carregando conversa…"
+          : conversaEncerrada
+            ? "Conversa encerrada. Não é possível enviar mensagens."
+            : responsavelId && !souResponsavel && !meuPerfilSupervisao
+              ? `Em atendimento por ${nomeUsuario(responsavelId)}. Assuma a conversa para responder.`
+              : !podeAtender
+                ? "Você tem acesso somente de leitura no atendimento."
+                : !filaAberta && !emPausa
+                  ? // Só o Offline (ou a falta de escolha) bloqueia o envio; as duas pausas podem responder.
+                    "Você está offline. Fique online para enviar mensagens."
+                  : janela24hExpirada
+                    ? MSG_JANELA_24H_META
+                    : null;
 
   /**
    * Assume a conversa. O servidor decide de forma atômica: se outra pessoa
@@ -2755,7 +3028,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
       } else if (r?.motivo === "NAO_ENCONTRADA") {
         toast.error("Conversa não encontrada nesta clínica.");
       } else {
-        toast.error(`Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`);
+        toast.error(
+          `Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`,
+        );
       }
       await carregarConvs();
       await carregarConversa();
@@ -2837,7 +3112,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     const origem = String(m.conversa_id ?? selIdRef.current ?? "");
     if (!origem) return;
     const voltarAEnviando = (lista: any[]) =>
-      lista.map((x) => (x?.client_message_id === m.client_message_id ? { ...x, status: "sending" } : x));
+      lista.map((x) =>
+        x?.client_message_id === m.client_message_id ? { ...x, status: "sending" } : x,
+      );
     if (selIdRef.current === origem) setMsgs((prev) => voltarAEnviando(prev));
     const c = cacheConversas.current.obter(origem);
     if (c) cacheConversas.current.guardar(origem, { ...c, msgs: voltarAEnviando(c.msgs) });
@@ -2978,7 +3255,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
 
   const statusBadge = (s: string, opts?: { ocultarNina?: boolean }) => {
     if (s === "active")
-      return <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">● Ativa</Badge>;
+      return (
+        <Badge className="bg-atd-ok-bg text-atd-ok-ink hover:bg-atd-ok-bg border border-atd-ok/30">
+          ● Ativa
+        </Badge>
+      );
     if (s === "waiting")
       return (
         <Badge className="bg-atd-warn-bg text-atd-warn-ink hover:bg-atd-warn-bg border border-atd-warn/40">
@@ -2988,7 +3269,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
     if (statusEhRepresentacaoDaNina(s)) {
       // O indicador canônico da Nina é renderizado uma única vez pelo card.
       if (opts?.ocultarNina) return null;
-      return <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">✦ Nina</Badge>;
+      return (
+        <Badge className="bg-atd-ai-bg text-atd-ai-ink hover:bg-atd-ai-bg border border-atd-ai/30">
+          ✦ Nina
+        </Badge>
+      );
     }
     if (s === "closed" || s === "finished")
       return (
@@ -3001,326 +3286,409 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
 
   return (
     <RelogioEsperaProvider>
-      <div className={`oszap-inbox h-full overflow-hidden ${modoCentral ? "" : "-mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3"}`} data-mobile-view={modoCentral ? "conversa" : listaMobile || !sel ? "lista" : "conversa"}>
+      <div
+        className={`oszap-inbox h-full overflow-hidden ${modoCentral ? "" : "-mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3"}`}
+        data-mobile-view={modoCentral ? "conversa" : listaMobile || !sel ? "lista" : "conversa"}
+      >
         <div className="oszap-columns flex h-full gap-2 overflow-hidden">
           {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
           {!modoCentral && (
-          <Card
-            data-a11y-secundario="true"
-            ref={painelRef}
-            className={`oszap-queue shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
-              painelAberto ? "w-[300px]" : "w-[52px]"
-            }`}
-          >
-            {!painelAberto && (
-              <button type="button" aria-label="Abrir lista de conversas" onClick={alternarFixado} className="oszap-queue-rail flex h-full w-[52px] flex-col items-center gap-2 py-3">
-                <MessageSquare className="h-5 w-5 text-muted-foreground" />
-                <Badge variant="outline" className="px-1 text-[10px]">
-                  {convs.length}
-                </Badge>
-                <Circle
-                  className={`h-3 w-3 fill-current ${
-                    emPausa ? "text-atd-warn" : filaAberta ? "text-atd-ok" : "text-atd-idle"
-                  }`}
-                />
-              </button>
-            )}
-            <div className={`${painelAberto ? "flex" : "hidden"} oszap-queue-content w-[300px] flex-1 flex-col overflow-hidden`}>
-              <div className="shrink-0 border-b px-3 py-2 space-y-1">
-                {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
-                <div className="flex items-center gap-1.5">
-                  <SeletorStatusPresenca
-                    selecionado={controle.carregado ? controle.confirmado : null}
-                    salvando={controle.salvando}
-                    desabilitado={presDesabilitada(controle)}
-                    carregando={!controle.carregado}
-                    inicioPausa={ehEstadoPausa(estadoManual) ? inicioCronometroPausa : null}
-                    onEscolher={(alvo) => void definirStatus(alvo)}
+            <Card
+              data-a11y-secundario="true"
+              ref={painelRef}
+              className={`oszap-queue shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+                painelAberto ? "w-[300px]" : "w-[52px]"
+              }`}
+            >
+              {!painelAberto && (
+                <button
+                  type="button"
+                  aria-label="Abrir lista de conversas"
+                  onClick={alternarFixado}
+                  className="oszap-queue-rail flex h-full w-[52px] flex-col items-center gap-2 py-3"
+                >
+                  <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                  <Badge variant="outline" className="px-1 text-[10px]">
+                    {convs.length}
+                  </Badge>
+                  <Circle
+                    className={`h-3 w-3 fill-current ${
+                      emPausa ? "text-atd-warn" : filaAberta ? "text-atd-ok" : "text-atd-idle"
+                    }`}
                   />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 shrink-0 p-0"
-                    aria-label={painelFixado ? "Desafixar lista de conversas" : "Fixar lista de conversas"}
-                    title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
-                    onClick={alternarFixado}
-                  >
-                    {painelFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
-                <p aria-live="polite" className="sr-only">
-                  {presTexto(controle)}
-                </p>
-                {controle.erro && !controle.salvando && <p className="text-[11px] text-destructive">{controle.erro}</p>}
-                {presPrecisaEscolher(controle) && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Escolha Online, Em pausa, Em pausa para almoço ou Offline. Só quem está Online recebe novas
-                    conversas.
+                </button>
+              )}
+              <div
+                className={`${painelAberto ? "flex" : "hidden"} oszap-queue-content w-[300px] flex-1 flex-col overflow-hidden`}
+              >
+                <div className="shrink-0 border-b px-3 py-2 space-y-1">
+                  {/* Seletor único: o estado mostrado é sempre o confirmado pelo servidor; a lista abre para trocar. */}
+                  <div className="flex items-center gap-1.5">
+                    <SeletorStatusPresenca
+                      selecionado={controle.carregado ? controle.confirmado : null}
+                      salvando={controle.salvando}
+                      desabilitado={presDesabilitada(controle)}
+                      carregando={!controle.carregado}
+                      inicioPausa={ehEstadoPausa(estadoManual) ? inicioCronometroPausa : null}
+                      onEscolher={(alvo) => void definirStatus(alvo)}
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0 p-0"
+                      aria-label={
+                        painelFixado ? "Desafixar lista de conversas" : "Fixar lista de conversas"
+                      }
+                      title={painelFixado ? "Desafixar painel" : "Fixar painel aberto"}
+                      onClick={alternarFixado}
+                    >
+                      {painelFixado ? (
+                        <PinOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Pin className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                  <p aria-live="polite" className="sr-only">
+                    {presTexto(controle)}
                   </p>
-                )}
-                {controle.erro && !controle.salvando && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 w-full text-[11px]"
-                    onClick={() => setControle((c) => ({ ...c, erro: null }))}
-                  >
-                    Tentar de novo
-                  </Button>
-                )}
-              </div>
-              <CardHeader className="py-2 space-y-2">
-                {!souGestor ? (
-                  <FiltrosAtendente
-                    valor={filtroAtendente}
-                    contagens={{
-                      ativas: contadores.minhas,
-                      pendentes,
-                      fechadas: contadores.fechadas,
-                    }}
-                    onChange={(valor) => {
-                      const alvo = estadoFiltroAtendente(valor);
-                      setEscopoBase(alvo.base);
-                      setAtendenteEscolhidoId(alvo.atendenteId);
-                      setVisualizacao(alvo.visualizacao);
-                      setNaoAtribuidasFiltro(alvo.naoAtribuidas);
-                      setSoCriticas(false);
-                    }}
-                  />
-                ) : (
-                  <>
-                    {/* FASE 1 — dois eixos compactos na mesma linha:
+                  {controle.erro && !controle.salvando && (
+                    <p className="text-[11px] text-destructive">{controle.erro}</p>
+                  )}
+                  {presPrecisaEscolher(controle) && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Escolha Online, Em pausa, Em pausa para almoço ou Offline. Só quem está Online
+                      recebe novas conversas.
+                    </p>
+                  )}
+                  {controle.erro && !controle.salvando && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 w-full text-[11px]"
+                      onClick={() => setControle((c) => ({ ...c, erro: null }))}
+                    >
+                      Tentar de novo
+                    </Button>
+                  )}
+                </div>
+                <CardHeader className="py-2 space-y-2">
+                  {!souGestor ? (
+                    <FiltrosAtendente
+                      valor={filtroAtendente}
+                      contagens={{
+                        ativas: contadores.minhas,
+                        pendentes,
+                        fechadas: contadores.fechadas,
+                      }}
+                      onChange={(valor) => {
+                        const alvo = estadoFiltroAtendente(valor);
+                        setEscopoBase(alvo.base);
+                        setAtendenteEscolhidoId(alvo.atendenteId);
+                        setVisualizacao(alvo.visualizacao);
+                        setNaoAtribuidasFiltro(alvo.naoAtribuidas);
+                        setSoCriticas(false);
+                      }}
+                    />
+                  ) : (
+                    <>
+                      {/* FASE 1 — dois eixos compactos na mesma linha:
                 [ Escopo ▾ ] [ Visualização ▾ ]. Atendentes ficam dentro do
                 Escopo (por user_id); a supervisão continua sendo decidida no
                 backend, o menu só reflete a permissão que já existe. */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Select
-                        value={soNaoAtribuidas ? "fila_global" : valorEscopoControle(escopoBase, atendenteEscolhidoId)}
-                        onValueChange={(v) => {
-                          if (v === "fila_global") {
-                            setSoNaoAtribuidas(true);
-                            return;
-                          }
-                          const alvo = lerValorEscopo(v);
-                          setEscopoBase(alvo.base);
-                          setAtendenteEscolhidoId(alvo.atendenteId);
-                          setNaoAtribuidasFiltro(false);
-                        }}
-                        onOpenChange={(aberto) => {
-                          setPainelMenuAberto(aberto);
-                          setMenuAtendentesAberto(aberto);
-                          if (!aberto) setBuscaAtendente("");
-                        }}
-                      >
-                        <SelectTrigger
-                          className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
-                          aria-label="Escopo das conversas"
-                          title={
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Select
+                          value={
                             soNaoAtribuidas
-                              ? "Não atribuídas global"
-                              : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)
+                              ? "fila_global"
+                              : valorEscopoControle(escopoBase, atendenteEscolhidoId)
                           }
+                          onValueChange={(v) => {
+                            if (v === "fila_global") {
+                              setSoNaoAtribuidas(true);
+                              return;
+                            }
+                            const alvo = lerValorEscopo(v);
+                            setEscopoBase(alvo.base);
+                            setAtendenteEscolhidoId(alvo.atendenteId);
+                            setNaoAtribuidasFiltro(false);
+                          }}
+                          onOpenChange={(aberto) => {
+                            setPainelMenuAberto(aberto);
+                            setMenuAtendentesAberto(aberto);
+                            if (!aberto) setBuscaAtendente("");
+                          }}
                         >
-                          <span className="truncate">
-                            {soNaoAtribuidas
-                              ? "Não atribuídas global"
-                              : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                          <SelectItem value="minhas">Minhas conversas ({contadores.minhas})</SelectItem>
-                          {souGestor && (
-                            <SelectItem value="equipe">Todas as conversas ({contadores.equipe})</SelectItem>
-                          )}
-                          <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
-                          <SelectItem value="fila_global">
-                            Não atribuídas global ({contadores.nao_atribuidas})
-                          </SelectItem>
-                          {souGestor && (
-                            <>
-                              <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                Atendentes
-                              </div>
-                              {/* Com equipe grande, dá para achar pelo nome sem rolar a
+                          <SelectTrigger
+                            className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                            aria-label="Escopo das conversas"
+                            title={
+                              soNaoAtribuidas
+                                ? "Não atribuídas global"
+                                : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)
+                            }
+                          >
+                            <span className="truncate">
+                              {soNaoAtribuidas
+                                ? "Não atribuídas global"
+                                : rotuloEscopo(escopoBase, nomeAtendenteSelecionado)}
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                            <SelectItem value="minhas">
+                              Minhas conversas ({contadores.minhas})
+                            </SelectItem>
+                            {souGestor && (
+                              <SelectItem value="equipe">
+                                Todas as conversas ({contadores.equipe})
+                              </SelectItem>
+                            )}
+                            <SelectItem value="nina">Nina ({contadores.nina})</SelectItem>
+                            <SelectItem value="fila_global">
+                              Não atribuídas global ({contadores.nao_atribuidas})
+                            </SelectItem>
+                            {souGestor && (
+                              <>
+                                <div className="mt-1 border-t px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  Atendentes
+                                </div>
+                                {/* Com equipe grande, dá para achar pelo nome sem rolar a
                           lista inteira. Nada é buscado no servidor por isto. */}
-                              {usuarios.length > 8 && (
-                                <div className="px-2 pb-1">
-                                  <Input
-                                    value={buscaAtendente}
-                                    onChange={(e) => setBuscaAtendente(e.target.value)}
-                                    onKeyDown={(e) => e.stopPropagation()}
-                                    placeholder="Pesquisar atendente"
-                                    className="h-7 text-xs"
-                                    aria-label="Pesquisar atendente"
-                                  />
-                                </div>
-                              )}
-                              {atendentesFiltrados.map((u: any) => (
-                                <SelectItem key={u.user_id} value={valorEscopoControle("equipe", u.user_id)}>
-                                  <span className="flex items-center gap-2">
-                                    {u.presenca === "ONLINE" && (
-                                      <span
-                                        aria-hidden="true"
-                                        className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
-                                      />
-                                    )}
-                                    <span>
-                                      {u.nome}
-                                      {u.presenca ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}` : ""}
+                                {usuarios.length > 8 && (
+                                  <div className="px-2 pb-1">
+                                    <Input
+                                      value={buscaAtendente}
+                                      onChange={(e) => setBuscaAtendente(e.target.value)}
+                                      onKeyDown={(e) => e.stopPropagation()}
+                                      placeholder="Pesquisar atendente"
+                                      className="h-7 text-xs"
+                                      aria-label="Pesquisar atendente"
+                                    />
+                                  </div>
+                                )}
+                                {atendentesFiltrados.map((u: any) => (
+                                  <SelectItem
+                                    key={u.user_id}
+                                    value={valorEscopoControle("equipe", u.user_id)}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      {u.presenca === "ONLINE" && (
+                                        <span
+                                          aria-hidden="true"
+                                          className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                                        />
+                                      )}
+                                      <span>
+                                        {u.nome}
+                                        {u.presenca
+                                          ? ` · ${ROTULO_PRESENCA[u.presenca as PresencaAtendente]}`
+                                          : ""}
+                                      </span>
                                     </span>
-                                  </span>
-                                </SelectItem>
-                              ))}
-                              {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
-                                <div className="px-2 py-2 text-xs text-muted-foreground">
-                                  Nenhum atendente com esse nome.
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={visualizacao}
-                        onValueChange={(v) => setVisualizacao(v as VisualizacaoInbox)}
-                        onOpenChange={setPainelMenuAberto}
-                      >
-                        <SelectTrigger
-                          className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
-                          aria-label="Visualização das conversas"
-                          title={ROTULO_VISUALIZACAO[visualizacao]}
+                                  </SelectItem>
+                                ))}
+                                {usuarios.length > 8 && atendentesFiltrados.length === 0 && (
+                                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                                    Nenhum atendente com esse nome.
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={visualizacao}
+                          onValueChange={(v) => setVisualizacao(v as VisualizacaoInbox)}
+                          onOpenChange={setPainelMenuAberto}
                         >
-                          <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
-                        </SelectTrigger>
-                        <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
-                          <SelectItem value="recentes">{ROTULO_VISUALIZACAO.recentes}</SelectItem>
-                          <SelectItem value="resolvidas">Resolvidas ({contadores.fechadas})</SelectItem>
-                          <SelectItem value="espera">Maior tempo esperando</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {soNaoAtribuidas && (
-                      <button
-                        type="button"
-                        onClick={() => setSoNaoAtribuidas(false)}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
-                        title="Mostrar todas as conversas"
-                      >
-                        Não atribuídas global ({convsVisiveis.length}) ✕
-                      </button>
-                    )}
-                  </>
-                )}
-                {soCriticas && souGestor && <button type="button" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" onClick={() => setSoCriticas(false)}>Espera crítica · Limpar filtro ×</button>}
-              </CardHeader>
-              <div ref={listaScrollRef} className="min-h-0 flex-1 overflow-auto" aria-label="Lista de conversas" aria-busy={carregandoLista}
-                onScroll={(e) => {
-                  const lista = e.currentTarget;
-                  if (visualizacao === "recentes" && temMaisConvs && !carregandoLista && !erroPaginaConvs &&
-                    lista.scrollHeight - lista.scrollTop - lista.clientHeight <= 80) void carregarConvs(true);
-                }}>
-                {convsVisiveis.length === 0 && (carregandoLista
-                  ? <p role="status" className="p-4 text-sm text-muted-foreground">Carregando conversas…</p>
-                  : <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>)}
-                {convsVisiveis.map((c) => (
-                  <button
-                    key={c.id}
-                    data-testid="item-conversa"
-                    data-conversa-id={c.id}
-                    aria-current={sel?.id === c.id ? "true" : undefined}
-                    onClick={() => {
-                      setListaMobile(false);
-                      iniciarTroca(c.id, "clique");
-                      // Abertura normal pela Inbox: volta a valer a leitura
-                      // automática, mesmo que antes tenha vindo de um erro.
-                      aberturaPorAlvoRef.current.delete(c.id);
-
-                      medidor.current = criarMedidorConversa(`conversa ${c.id}`);
-                      medidor.current.marcar("click");
-                      // Seleção interna: a conversa aberta é escolhida aqui mesmo.
-                      abrirConversa(c.id);
-                    }}
-                    onMouseEnter={() => agendarPrefetch(c.id)}
-                    onMouseLeave={() => cancelarPrefetch(c.id)}
-                    onFocus={() => agendarPrefetch(c.id)}
-                    onBlur={() => cancelarPrefetch(c.id)}
-                    className={`oszap-conversation relative w-full border-b border-atd-border py-1.5 pl-3 pr-2 text-left transition-colors hover:bg-atd-blue-hover ${
-                      sel?.id === c.id
-                        ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
-                        : "bg-atd-surface"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm truncate flex-1" title={tituloConversa(c)}>
-                        {tituloConversa(c)}
-                      </span>
-                      <BadgeConversaNova conversa={c} />
-                      {Number(c.nao_lidas ?? 0) > 0 && (
-                        <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
-                          {Number(c.nao_lidas ?? 0)}
-                        </Badge>
+                          <SelectTrigger
+                            className="h-8 min-w-0 flex-1 basis-[7.5rem] text-xs"
+                            aria-label="Visualização das conversas"
+                            title={ROTULO_VISUALIZACAO[visualizacao]}
+                          >
+                            <span className="truncate">{ROTULO_VISUALIZACAO[visualizacao]}</span>
+                          </SelectTrigger>
+                          <SelectContent className="z-50 min-w-[--radix-select-trigger-width]">
+                            <SelectItem value="recentes">{ROTULO_VISUALIZACAO.recentes}</SelectItem>
+                            <SelectItem value="resolvidas">
+                              Resolvidas ({contadores.fechadas})
+                            </SelectItem>
+                            <SelectItem value="espera">Maior tempo esperando</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {soNaoAtribuidas && (
+                        <button
+                          type="button"
+                          onClick={() => setSoNaoAtribuidas(false)}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-atd-danger px-2 py-1 text-[11px] font-bold text-atd-on-strong"
+                          title="Mostrar todas as conversas"
+                        >
+                          Não atribuídas global ({convsVisiveis.length}) ✕
+                        </button>
                       )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
-                      {/* Lista canônica e já deduplicada por chave semântica. */}
-                      {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
-                        // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
-                        if (tipo === "status" || tipo === "timeout-nina") return null;
-                        if (tipo === "sem-responsavel")
-                          return (
-                            <Badge key={tipo} className="bg-atd-danger text-atd-on-strong text-[11px]">
-                              Sem responsável
-                            </Badge>
-                          );
-                        if (tipo === "nina")
+                    </>
+                  )}
+                  {soCriticas && souGestor && (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
+                      onClick={() => setSoCriticas(false)}
+                    >
+                      Espera crítica · Limpar filtro ×
+                    </button>
+                  )}
+                </CardHeader>
+                <div
+                  ref={listaScrollRef}
+                  className="min-h-0 flex-1 overflow-auto"
+                  aria-label="Lista de conversas"
+                  aria-busy={carregandoLista}
+                  onScroll={(e) => {
+                    const lista = e.currentTarget;
+                    if (
+                      visualizacao === "recentes" &&
+                      temMaisConvs &&
+                      !carregandoLista &&
+                      !erroPaginaConvs &&
+                      lista.scrollHeight - lista.scrollTop - lista.clientHeight <= 80
+                    )
+                      void carregarConvs(true);
+                  }}
+                >
+                  {convsVisiveis.length === 0 &&
+                    (carregandoLista ? (
+                      <p role="status" className="p-4 text-sm text-muted-foreground">
+                        Carregando conversas…
+                      </p>
+                    ) : (
+                      <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>
+                    ))}
+                  {convsVisiveis.map((c) => (
+                    <button
+                      key={c.id}
+                      data-testid="item-conversa"
+                      data-conversa-id={c.id}
+                      aria-current={sel?.id === c.id ? "true" : undefined}
+                      onClick={() => {
+                        setListaMobile(false);
+                        iniciarTroca(c.id, "clique");
+                        // Abertura normal pela Inbox: volta a valer a leitura
+                        // automática, mesmo que antes tenha vindo de um erro.
+                        aberturaPorAlvoRef.current.delete(c.id);
+
+                        medidor.current = criarMedidorConversa(`conversa ${c.id}`);
+                        medidor.current.marcar("click");
+                        // Seleção interna: a conversa aberta é escolhida aqui mesmo.
+                        abrirConversa(c.id);
+                      }}
+                      onMouseEnter={() => agendarPrefetch(c.id)}
+                      onMouseLeave={() => cancelarPrefetch(c.id)}
+                      onFocus={() => agendarPrefetch(c.id)}
+                      onBlur={() => cancelarPrefetch(c.id)}
+                      className={`oszap-conversation relative w-full border-b border-atd-border py-1.5 pl-3 pr-2 text-left transition-colors hover:bg-atd-blue-hover ${
+                        sel?.id === c.id
+                          ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
+                          : "bg-atd-surface"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="font-semibold text-sm truncate flex-1"
+                          title={tituloConversa(c)}
+                        >
+                          {tituloConversa(c)}
+                        </span>
+                        <BadgeConversaNova conversa={c} />
+                        {Number(c.nao_lidas ?? 0) > 0 && (
+                          <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
+                            {Number(c.nao_lidas ?? 0)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
+                        {/* Lista canônica e já deduplicada por chave semântica. */}
+                        {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
+                          // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
+                          if (tipo === "status" || tipo === "timeout-nina") return null;
+                          if (tipo === "sem-responsavel")
+                            return (
+                              <Badge
+                                key={tipo}
+                                className="bg-atd-danger text-atd-on-strong text-[11px]"
+                              >
+                                Sem responsável
+                              </Badge>
+                            );
+                          if (tipo === "nina")
+                            return (
+                              <Badge
+                                key={tipo}
+                                className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30"
+                              >
+                                ✦ Nina
+                              </Badge>
+                            );
                           return (
                             <Badge
                               key={tipo}
-                              className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30"
+                              className="text-[11px] bg-muted text-muted-foreground border border-border"
                             >
-                              ✦ Nina
+                              {nomeUsuario(c.atribuida_user_id)}
                             </Badge>
                           );
-                        return (
-                          <Badge
-                            key={tipo}
-                            className="text-[11px] bg-muted text-muted-foreground border border-border"
-                          >
-                            {nomeUsuario(c.atribuida_user_id)}
+                        })}
+                        {c.is_teste && (
+                          <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
+                            Teste
                           </Badge>
-                        );
-                      })}
-                      {c.is_teste && (
-                        <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
-                          Teste
-                        </Badge>
-                      )}
-                      <BadgeEspera desde={espera[c.id]} />
-                    </div>
-                    {previas[c.id] && (
-                      <div className="mt-1 truncate text-xs leading-4 text-muted-foreground" title={previas[c.id]}>
-                        {previas[c.id]}
+                        )}
+                        <BadgeEspera desde={espera[c.id]} />
                       </div>
-                    )}
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtData(c.ultima_msg_em)}</div>
-                  </button>
-                ))}
-                {visualizacao === "recentes" && (temMaisConvs || erroPaginaConvs) && (
-                  <div className="p-3 text-center text-xs text-muted-foreground">
-                    {carregandoLista ? <span role="status" className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Carregando mais conversas…</span> : (
-                      <button type="button" className="underline" onClick={() => void carregarConvs(paginaConvsRef.current.quantidade > 0)}>
-                        {erroPaginaConvs ? "Não foi possível carregar. Tentar novamente" : "Carregar mais conversas"}
-                      </button>
-                    )}
-                  </div>
-                )}
+                      {previas[c.id] && (
+                        <div
+                          className="mt-1 truncate text-xs leading-4 text-muted-foreground"
+                          title={previas[c.id]}
+                        >
+                          {previas[c.id]}
+                        </div>
+                      )}
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        {fmtData(c.ultima_msg_em)}
+                      </div>
+                    </button>
+                  ))}
+                  {visualizacao === "recentes" && (temMaisConvs || erroPaginaConvs) && (
+                    <div className="p-3 text-center text-xs text-muted-foreground">
+                      {carregandoLista ? (
+                        <span role="status" className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          Carregando mais conversas…
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => void carregarConvs(paginaConvsRef.current.quantidade > 0)}
+                        >
+                          {erroPaginaConvs
+                            ? "Não foi possível carregar. Tentar novamente"
+                            : "Carregar mais conversas"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
           )}
 
           {/* COLUNA 2 — CHAT */}
-          <Card data-a11y-principal="true" ref={colunaChatRef} className="oszap-chat flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Card
+            data-a11y-principal="true"
+            ref={colunaChatRef}
+            className="oszap-chat flex min-w-0 flex-1 flex-col overflow-hidden"
+          >
             {!sel ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
                 {erroAcesso ? (
@@ -3331,13 +3699,31 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     </Button>
                   </>
                 ) : (
-                  <><div className="grid h-16 w-16 place-items-center rounded-2xl bg-atd-blue-soft text-atd-blue"><MessageSquare className="h-7 w-7" aria-hidden /></div><h2 className="text-xl font-semibold text-foreground">Vamos atender?</h2><p className="max-w-xs leading-6">Selecione uma conversa na fila para ler as mensagens e continuar o atendimento.</p></>
+                  <>
+                    <div className="grid h-16 w-16 place-items-center rounded-2xl bg-atd-blue-soft text-atd-blue">
+                      <MessageSquare className="h-7 w-7" aria-hidden />
+                    </div>
+                    <h2 className="text-xl font-semibold text-foreground">Vamos atender?</h2>
+                    <p className="max-w-xs leading-6">
+                      Selecione uma conversa na fila para ler as mensagens e continuar o
+                      atendimento.
+                    </p>
+                  </>
                 )}
               </div>
             ) : (
               <>
                 <CardHeader className="oszap-chat-heading px-3 py-1.5 border-b">
-                  {!modoCentral && <button type="button" className="oszap-back items-center gap-2 text-sm font-medium text-atd-blue" onClick={() => setListaMobile(true)}><ArrowLeft className="h-4 w-4" />Voltar às conversas</button>}
+                  {!modoCentral && (
+                    <button
+                      type="button"
+                      className="oszap-back items-center gap-2 text-sm font-medium text-atd-blue"
+                      onClick={() => setListaMobile(true)}
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Voltar às conversas
+                    </button>
+                  )}
                   <div className="oszap-chat-actions flex flex-wrap items-center justify-between gap-1.5">
                     <div className="min-w-0 flex-1 basis-48">
                       <CardTitle
@@ -3393,38 +3779,57 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-1">
-                      <Button size="sm" variant="outline" disabled={carregandoConversa}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={carregandoConversa}
                         aria-expanded={consultaBaseAberta}
-                        onClick={() => { setConsultaBaseAberta(v => !v); setEscritaAberta(false); }}>
+                        onClick={() => {
+                          setConsultaBaseAberta((v) => !v);
+                          setEscritaAberta(false);
+                        }}
+                      >
                         Consultar base
                       </Button>
-                      <Button size="sm" variant="outline" disabled={!!motivoBloqueio}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!motivoBloqueio}
                         aria-expanded={escritaAberta}
-                        onClick={() => { setEscritaAberta(v => !v); setConsultaBaseAberta(false); }}>
+                        onClick={() => {
+                          setEscritaAberta((v) => !v);
+                          setConsultaBaseAberta(false);
+                        }}
+                      >
                         Assistente de escrita
                       </Button>
-                      {!conversaEncerrada && !souResponsavel && podeAtender && (!souAdmin || conversaLivre) && (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          disabled={assumindo || carregandoConversa}
-                          className="bg-atd-blue text-atd-on-strong hover:bg-atd-blue/90"
-                          onClick={() => (responsavelId ? setAssumirOpen(true) : assumir(false))}
-                        >
-                          {assumindo ? (
-                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <UserCheck className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          Assumir conversa
-                        </Button>
-                      )}
+                      {!conversaEncerrada &&
+                        !souResponsavel &&
+                        podeAtender &&
+                        (!souAdmin || conversaLivre) && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={assumindo || carregandoConversa}
+                            className="bg-atd-blue text-atd-on-strong hover:bg-atd-blue/90"
+                            onClick={() => (responsavelId ? setAssumirOpen(true) : assumir(false))}
+                          >
+                            {assumindo ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <UserCheck className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            Assumir conversa
+                          </Button>
+                        )}
                       {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={(!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa}
+                        disabled={
+                          (!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa
+                        }
                         className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                         onClick={() => setTransferOpen(true)}
                       >
@@ -3434,7 +3839,16 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={!podeEncerrarConversa({ userId: meuId, responsavelId: responsavelId, admin: souAdmin, gestor: souGestor }) || carregandoConversa || fechando}
+                          disabled={
+                            !podeEncerrarConversa({
+                              userId: meuId,
+                              responsavelId: responsavelId,
+                              admin: souAdmin,
+                              gestor: souGestor,
+                            }) ||
+                            carregandoConversa ||
+                            fechando
+                          }
                           aria-busy={fechando}
                           className="border-atd-border text-atd-ink-soft hover:bg-atd-danger-bg hover:text-atd-danger-ink"
                           onClick={() => void fechar()}
@@ -3451,33 +3865,53 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                   </div>
                 </CardHeader>
                 {escritaAberta && clinicaId && conteudoDaConversa && (
-                  <AssistenteEscritaChat key={`${clinicaId}:${sel.id}`} clinicaId={clinicaId}
-                    conversaId={sel.id} rascunho={draft} contextoVersao={`${msgs.length}:${msgs.at(-1)?.id ?? ""}`}
-                    bloqueio={motivoBloqueio} onFechar={() => setEscritaAberta(false)}
+                  <AssistenteEscritaChat
+                    key={`${clinicaId}:${sel.id}`}
+                    clinicaId={clinicaId}
+                    conversaId={sel.id}
+                    rascunho={draft}
+                    contextoVersao={`${msgs.length}:${msgs.at(-1)?.id ?? ""}`}
+                    bloqueio={motivoBloqueio}
+                    onFechar={() => setEscritaAberta(false)}
                     onAplicar={(texto, original) => {
-                      if (selIdRef.current !== sel.id || motivoBloqueio || !conteudoDaConversa || draft !== original) return false;
-                      setDraft(anterior => anterior === original ? texto : anterior);
+                      if (
+                        selIdRef.current !== sel.id ||
+                        motivoBloqueio ||
+                        !conteudoDaConversa ||
+                        draft !== original
+                      )
+                        return false;
+                      setDraft((anterior) => (anterior === original ? texto : anterior));
                       setSlash(null);
                       requestAnimationFrame(() => composerRef.current?.focus());
                       return true;
-                    }} />
+                    }}
+                  />
                 )}
                 {consultaBaseAberta && clinicaId && conteudoDaConversa && (
-                  <ConsultaBaseChat key={`${clinicaId}:${sel.id}`} clinicaId={clinicaId}
-                    conversaId={sel.id} bloqueio={motivoBloqueio}
+                  <ConsultaBaseChat
+                    key={`${clinicaId}:${sel.id}`}
+                    clinicaId={clinicaId}
+                    conversaId={sel.id}
+                    bloqueio={motivoBloqueio}
                     onFechar={() => setConsultaBaseAberta(false)}
                     onInserir={(texto) => {
-                      if (selIdRef.current !== sel.id || motivoBloqueio || !conteudoDaConversa) return false;
-                      setDraft(anterior => acrescentarBaseAoRascunho(anterior, texto));
+                      if (selIdRef.current !== sel.id || motivoBloqueio || !conteudoDaConversa)
+                        return false;
+                      setDraft((anterior) => acrescentarBaseAoRascunho(anterior, texto));
                       setConsultaBaseAberta(false);
                       setSlash(null);
                       requestAnimationFrame(() => composerRef.current?.focus());
                       toast.success("Informação acrescentada ao rascunho. Revise antes de enviar.");
                       return true;
-                    }} />
+                    }}
+                  />
                 )}
                 <div className="relative flex-1 min-h-0">
-                  <div ref={chat.containerRef} className="oszap-timeline h-full overflow-auto p-4 space-y-4 bg-atd-bg">
+                  <div
+                    ref={chat.containerRef}
+                    className="oszap-timeline h-full overflow-auto p-4 space-y-4 bg-atd-bg"
+                  >
                     {buscandoAlvo && (
                       <div className="sticky top-0 z-10 mb-2 rounded-md border border-atd-border bg-atd-surface px-3 py-1.5 text-xs text-atd-ink-soft">
                         Localizando mensagem reportada…
@@ -3486,10 +3920,14 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     {alvoIndisponivel && (
                       <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs">
                         <span>
-                          Não foi possível localizar a mensagem original. O conteúdo reportado continua disponível na
-                          revisão.
+                          Não foi possível localizar a mensagem original. O conteúdo reportado
+                          continua disponível na revisão.
                         </span>
-                        <button type="button" className="underline" onClick={() => setAlvoIndisponivel(false)}>
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => setAlvoIndisponivel(false)}
+                        >
                           Fechar
                         </button>
                       </div>
@@ -3498,7 +3936,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     {conteudoDaConversa && temMaisAntigas && (
                       <div className="flex min-h-8 justify-center pb-1" aria-live="polite">
                         {historicoAnterior.carregando ? (
-                          <span role="status" className="inline-flex items-center gap-2 text-xs text-atd-ink-soft">
+                          <span
+                            role="status"
+                            className="inline-flex items-center gap-2 text-xs text-atd-ink-soft"
+                          >
                             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                             Carregando mensagens anteriores…
                           </span>
@@ -3520,7 +3961,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     {erroMsgs && (
                       <div className="text-center text-sm text-muted-foreground">
                         <p>Não foi possível carregar as mensagens desta conversa.</p>
-                        <Button size="sm" variant="outline" className="mt-2" onClick={() => void carregarConversa()}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => void carregarConversa()}
+                        >
                           Tentar novamente
                         </Button>
                       </div>
@@ -3533,7 +3979,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
                       if (item.kind === "resumo") {
                         return (
-                          <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
+                          <div
+                            key={`resumo-${item.resumo.id}`}
+                            data-historico-id={`resumo-${item.resumo.id}`}
+                          >
                             <ResumoAvulsoCard resumo={item.resumo} />
                           </div>
                         );
@@ -3543,7 +3992,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                         if (g.tipo === "HANDOFF") {
                           return (
                             <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                              <HandoffGroupCard grupo={g} resumo={(item as { resumo?: ResumoDaConversa }).resumo} />
+                              <HandoffGroupCard
+                                grupo={g}
+                                resumo={(item as { resumo?: ResumoDaConversa }).resumo}
+                              />
                               {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
                             </div>
                           );
@@ -3560,26 +4012,38 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                         if (g.evento.evento === "RESUMO_IA_GERADO") return null;
                         return (
                           <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
-                            <ConversationSystemEvent evento={g.evento as unknown as ConversaEvento} />
+                            <ConversationSystemEvent
+                              evento={g.evento as unknown as ConversaEvento}
+                            />
                           </div>
                         );
                       }
                       const m = item.msg;
                       const out = m.direction === "out";
-                      const autorSupervisao = out ? rotuloAutorSupervisao(
-                        m.enviada_por_perfil,
-                        autores && autores.clinicaId === clinicaId ? autores.nomes[m.enviada_por_user_id] : null,
-                      ) : null;
+                      const autorSupervisao = out
+                        ? rotuloAutorSupervisao(
+                            m.enviada_por_perfil,
+                            autores && autores.clinicaId === clinicaId
+                              ? autores.nomes[m.enviada_por_user_id]
+                              : null,
+                          )
+                        : null;
                       // Só marcador interno vira faixa central. Mensagem real
                       // enviada ao paciente (status de envio) fica como conversa.
                       if (marcadorInternoSistema(m)) {
                         const texto = textoMarcadorSistema(m.body);
                         if (!texto) return null;
                         return (
-                          <div key={`m-${m.id}`} data-historico-id={`m-${m.id}`} className="flex justify-center">
+                          <div
+                            key={`m-${m.id}`}
+                            data-historico-id={`m-${m.id}`}
+                            className="flex justify-center"
+                          >
                             <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
                               {texto}
-                              <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
+                              <div className="mt-1 text-[10px] opacity-70">
+                                {fmtHora(m.recebida_em)}
+                              </div>
                             </div>
                           </div>
                         );
@@ -3621,7 +4085,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                             }`}
                           >
                             {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
-                            {textoDaBolha(m) && <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>}
+                            {textoDaBolha(m) && (
+                              <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>
+                            )}
                             {ehOtimista(m) && m.status === "failed" && (
                               <div className="mt-1 flex items-center gap-2 text-[11px]">
                                 <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
@@ -3640,7 +4106,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                               {/* Envio otimista: durante o envio normal a bolha não
                               exibe nenhum status — só a hora. Falha aparece acima. */}
                               <span className="min-w-0 break-words">
-                                {fmtHora(m.recebida_em)} {mensagemDoFrancisco(m.raw) ? "· Francisco" : m.enviada_por === "nina" && "· Nina"}
+                                {fmtHora(m.recebida_em)}{" "}
+                                {mensagemDoFrancisco(m.raw)
+                                  ? "· Francisco"
+                                  : m.enviada_por === "nina" && "· Nina"}
                                 {autorSupervisao && (
                                   <span
                                     data-testid="autor-supervisao"
@@ -3713,7 +4182,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       value={draft}
                       onChange={(e) => {
                         setDraft(e.target.value);
-                        setSlash(detectarComandoNoTexto(e.target.value, e.target.selectionStart ?? 0));
+                        setSlash(
+                          detectarComandoNoTexto(e.target.value, e.target.selectionStart ?? 0),
+                        );
                       }}
                       onBlur={() => setSlash(null)}
                       onKeyDown={(e) => {
@@ -3747,7 +4218,12 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                           setSlash(null);
                           return;
                         }
-                        if (deveEnviarPorTecla({ ...e, isComposing: e.nativeEvent.isComposing }, prefsAcessibilidade.oszap.enterEnvia)) {
+                        if (
+                          deveEnviarPorTecla(
+                            { ...e, isComposing: e.nativeEvent.isComposing },
+                            prefsAcessibilidade.oszap.enterEnvia,
+                          )
+                        ) {
                           e.preventDefault();
                           // O atalho global não pode enviar novamente o mesmo rascunho.
                           e.stopPropagation();
@@ -3764,7 +4240,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                               : "Envio bloqueado (veja o motivo acima)"
                       }
                       rows={1}
-                      title={prefsAcessibilidade.oszap.enterEnvia ? "Enter envia; Shift+Enter quebra a linha" : "Ctrl+Enter envia; Enter quebra a linha"}
+                      title={
+                        prefsAcessibilidade.oszap.enterEnvia
+                          ? "Enter envia; Shift+Enter quebra a linha"
+                          : "Ctrl+Enter envia; Enter quebra a linha"
+                      }
                       className="min-h-9 resize-none border-atd-border bg-atd-surface focus-visible:border-atd-blue focus-visible:ring-2 focus-visible:ring-atd-blue/30"
                       disabled={!!motivoBloqueio}
                     />
@@ -3775,7 +4255,8 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       disabled={!draft.trim() || !!motivoBloqueio}
                       className="bg-atd-go text-atd-on-strong hover:bg-atd-go-hover disabled:bg-atd-idle-bg disabled:text-atd-ink-soft"
                     >
-                      <Send className="h-4 w-4" /><span className="hidden sm:inline">Enviar</span>
+                      <Send className="h-4 w-4" />
+                      <span className="hidden sm:inline">Enviar</span>
                     </Button>
                   </div>
                 </div>
@@ -3794,7 +4275,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
             {!contatoAberto && (
               <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
                 <Users className="h-5 w-5 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground [writing-mode:vertical-rl]">Contato</span>
+                <span className="text-[10px] text-muted-foreground [writing-mode:vertical-rl]">
+                  Contato
+                </span>
               </div>
             )}
             <div
@@ -3810,7 +4293,11 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                     title={contatoFixado ? "Desafixar painel" : "Fixar painel aberto"}
                     onClick={alternarContatoFixado}
                   >
-                    {contatoFixado ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                    {contatoFixado ? (
+                      <PinOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Pin className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 </div>
               </CardHeader>
@@ -3830,27 +4317,39 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       <div className="flex items-center gap-3">
                         <AvatarContato nome={nomeContato(contatoAtual.conversa)} />
                         <div className="min-w-0">
-                          <div className="font-medium break-words">{tituloConversa(contatoAtual.conversa) || SEM_NOME}</div>
+                          <div className="font-medium break-words">
+                            {tituloConversa(contatoAtual.conversa) || SEM_NOME}
+                          </div>
                           {contatoAtual.conversa?.contato_telefone && (
-                            <div className="text-xs text-muted-foreground">📱 {contatoAtual.conversa.contato_telefone}</div>
+                            <div className="text-xs text-muted-foreground">
+                              📱 {contatoAtual.conversa.contato_telefone}
+                            </div>
                           )}
                         </div>
                       </div>
                       <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
-                        {contatoAtual.paciente?.email && <div>✉️ {contatoAtual.paciente.email}</div>}
+                        {contatoAtual.paciente?.email && (
+                          <div>✉️ {contatoAtual.paciente.email}</div>
+                        )}
                         {contatoAtual.paciente?.cpf && <div>CPF: {contatoAtual.paciente.cpf}</div>}
                         {contatoAtual.paciente?.cidade && (
                           <div>
                             📍 {contatoAtual.paciente.cidade}/{contatoAtual.paciente.estado}
                           </div>
                         )}
-                        {contatoAtual.conversa?.canal && <div>Canal: {contatoAtual.conversa.canal}</div>}
-                        {contatoAtual.conversa?.status && <div>Status: {contatoAtual.conversa.status}</div>}
+                        {contatoAtual.conversa?.canal && (
+                          <div>Canal: {contatoAtual.conversa.canal}</div>
+                        )}
+                        {contatoAtual.conversa?.status && (
+                          <div>Status: {contatoAtual.conversa.status}</div>
+                        )}
                         {contatoAtual.conversa?.atend_departamentos?.nome && (
                           <div>Depto: {contatoAtual.conversa.atend_departamentos.nome}</div>
                         )}
                         {contatoAtual.conversa?.ultima_mensagem_em && (
-                          <div>Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}</div>
+                          <div>
+                            Última mensagem: {fmtData(contatoAtual.conversa.ultima_mensagem_em)}
+                          </div>
                         )}
                       </div>
                     </section>
@@ -3859,7 +4358,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
 
                     {contatoAtual.contratos?.length > 0 && (
                       <section>
-                        <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">Contratos</div>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
+                          Contratos
+                        </div>
                         {contatoAtual.contratos.map((c: any) => (
                           <div key={c.id} className="text-xs border rounded p-2 mb-1">
                             <div className="font-medium">#{c.numero}</div>
@@ -3873,7 +4374,10 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
 
                     {contatoAtual.atribuido_nome && (
                       <section className="text-xs text-muted-foreground">
-                        Atribuída a <span className="font-medium text-foreground">{contatoAtual.atribuido_nome}</span>
+                        Atribuída a{" "}
+                        <span className="font-medium text-foreground">
+                          {contatoAtual.atribuido_nome}
+                        </span>
                       </section>
                     )}
                   </>
@@ -3898,8 +4402,9 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                 className="space-y-3"
               >
                 <p className="text-sm text-muted-foreground">
-                  Esta conversa está sendo atendida por <strong>{nomeUsuario(responsavelId)}</strong>. Ao assumir, essa
-                  pessoa passa a somente leitura e a troca fica registrada no histórico.
+                  Esta conversa está sendo atendida por{" "}
+                  <strong>{nomeUsuario(responsavelId)}</strong>. Ao assumir, essa pessoa passa a
+                  somente leitura e a troca fica registrada no histórico.
                 </p>
                 <div className="space-y-1">
                   <Label htmlFor="motivo-assumir">Motivo (opcional)</Label>
@@ -3944,10 +4449,18 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                       {(() => {
                         const alvo = normalizarNomeBusca(buscaAgente);
                         const lista = usuarios.filter((u: any) =>
-                          !alvo ? true : normalizarNomeBusca(`${u.nome ?? ""} ${u.email ?? ""}`).includes(alvo),
+                          !alvo
+                            ? true
+                            : normalizarNomeBusca(`${u.nome ?? ""} ${u.email ?? ""}`).includes(
+                                alvo,
+                              ),
                         );
                         if (lista.length === 0)
-                          return <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum agente encontrado.</p>;
+                          return (
+                            <p className="px-3 py-2 text-xs text-muted-foreground">
+                              Nenhum agente encontrado.
+                            </p>
+                          );
                         return lista.map((u: any) => {
                           const st: PresencaAtendente = u.presenca ?? "OFFLINE";
                           const cor =
@@ -3966,9 +4479,14 @@ export function AtendInbox({ modoCentral = false, conversaIdExterna = null, onSe
                               title={emPausaDestino ? MSG_DESTINO_EM_PAUSA : undefined}
                             >
                               <span className="flex items-center gap-2">
-                                <span aria-hidden="true" className={`h-2 w-2 rounded-full ${cor}`} />
+                                <span
+                                  aria-hidden="true"
+                                  className={`h-2 w-2 rounded-full ${cor}`}
+                                />
                                 <span>{u.nome ?? u.email ?? u.user_id}</span>
-                                <span className="text-xs text-muted-foreground">— {ROTULO_PRESENCA[st]}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  — {ROTULO_PRESENCA[st]}
+                                </span>
                               </span>
                             </SelectItem>
                           );

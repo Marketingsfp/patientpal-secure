@@ -28,7 +28,10 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
         const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
         expect(linha, output).toBeDefined();
         const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
-        const tipo_atendimento = caso.startsWith("cardiologia") || caso === "odontologia" ? "consulta" : "exame_procedimento";
+        const tipo_atendimento =
+          caso.startsWith("cardiologia") || caso === "odontologia"
+            ? "consulta"
+            : "exame_procedimento";
         expect(r.ordem).toEqual([
           ...(caso.endsWith("_recuperacao") ? ["modelo"] : []),
           "modelo",
@@ -58,9 +61,16 @@ describe("interpretação precede a busca no núcleo real da Nina", () => {
         expect(retornoAoModelo).toContain('"nome_medico"');
         expect(catalogo.tipo_atendimento).toBe(tipo_atendimento);
         expect(catalogo.esclarecimento).toBeUndefined();
-        expect(catalogo.records).toHaveLength(caso === "odontologia" ? 3 : tipo_atendimento === "consulta" ? 4 : 1);
-        expect(catalogo.records.every((item: { categoria: string }) => item.categoria ===
-          (tipo_atendimento === "consulta" ? "CONSULTA" : "EXAME_PROCEDIMENTO"))).toBe(true);
+        expect(catalogo.records).toHaveLength(
+          caso === "odontologia" ? 3 : tipo_atendimento === "consulta" ? 4 : 1,
+        );
+        expect(
+          catalogo.records.every(
+            (item: { categoria: string }) =>
+              item.categoria ===
+              (tipo_atendimento === "consulta" ? "CONSULTA" : "EXAME_PROCEDIMENTO"),
+          ),
+        ).toBe(true);
         expect(r.encaminhamentos).toHaveLength(0);
         expect(r.rede).toBe(0);
         expect(r.motorChamado).toBe(0);

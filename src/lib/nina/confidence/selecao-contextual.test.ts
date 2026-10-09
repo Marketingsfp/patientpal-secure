@@ -66,9 +66,19 @@ describe("seleção contextual com fatos oficiais reconsultados", () => {
     expect(r.selecao?.medicoNome).toBe("Bruno Costa");
     expect(r.estado).toBe("selecionado");
     expect(r.aceiteAgendamento).toBe(false);
-    expect(resolver("isso", null, { profissionalConfirmado, fatosOficiais: [] }).selecao).toBeNull();
-    expect(resolver("isso", null, { profissionalConfirmado: { ...profissionalConfirmado, nome: "Outro nome" } }).selecao).toBeNull();
-    expect(resolver("isso", null, { profissionalConfirmado: { ...profissionalConfirmado, registro: "id-obsoleto" } }).selecao).toBeNull();
+    expect(
+      resolver("isso", null, { profissionalConfirmado, fatosOficiais: [] }).selecao,
+    ).toBeNull();
+    expect(
+      resolver("isso", null, {
+        profissionalConfirmado: { ...profissionalConfirmado, nome: "Outro nome" },
+      }).selecao,
+    ).toBeNull();
+    expect(
+      resolver("isso", null, {
+        profissionalConfirmado: { ...profissionalConfirmado, registro: "id-obsoleto" },
+      }).selecao,
+    ).toBeNull();
   });
   it("escolhe Alex único, guarda raízes opacas e pede modalidade sem reservar", () => {
     const r = resolver("vou fazer com o dr alex");

@@ -67,7 +67,6 @@ const criarSchema = z.object({
   observacoes: z.string().max(2000).nullish(),
 });
 
-
 const reagendarSchema = z.object({
   inicio: isoDatetime,
   fim: isoDatetime,
@@ -270,8 +269,13 @@ async function resolverProcedimentoPadrao(
       .eq("id", espAlvo)
       .maybeSingle();
     const norm = (s: string) =>
-      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
-    const nomeEsp = norm(((espRow as { nome: string | null } | null)?.nome) ?? "");
+      s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+    const nomeEsp = norm((espRow as { nome: string | null } | null)?.nome ?? "");
     // Desempate entre consultas: "CONSULTA" exato > começa com "CONSULTA" >
     // contém o nome da especialidade > alfabética. Exames não têm heurística.
     const rankConsulta = (p: ProcedimentoResolvido) => {
@@ -417,7 +421,6 @@ async function handleCriar(
   // Token de verificação identifica um paciente que JÁ existe: exige o escopo
   // da verificação e nunca o de cadastro.
   if (body.verificacao_token) exigirEscopo(ctx, "patients:verify");
-
 
   if (Date.parse(body.fim) <= Date.parse(body.inicio)) {
     throw new ApiError({
@@ -938,9 +941,8 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
   const idempotencyKey = request.headers.get("idempotency-key");
   let bodyTexto = "";
 
-  const { ehConsultaDeStatusVerificacao, rotearVerificacaoV1 } = await import(
-    "./verificacao-v1.server"
-  );
+  const { ehConsultaDeStatusVerificacao, rotearVerificacaoV1 } =
+    await import("./verificacao-v1.server");
 
   try {
     ctx = await autenticarApiKey(db, lerApiKeyDoRequest(request));
@@ -949,7 +951,6 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
     if (!ehConsultaDeStatusVerificacao(request.method, partes)) {
       await consumirRateLimit(db, ctx);
     }
-
 
     const ator: AtorAgenda = {
       tipo: "integracao",
@@ -1036,8 +1037,6 @@ export async function handleIntegracoesV1(request: Request, splat: string): Prom
         resultado = cartao;
       }
     }
-
-
 
     status = resultado.status;
     idExterno = resultado.idExterno ?? null;

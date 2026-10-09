@@ -104,7 +104,11 @@ describe("fila de transporte por conversa", () => {
 
 describe("reconciliação e falha", () => {
   it("a mensagem oficial mescla na bolha, sem duplicar no tempo real", () => {
-    const otimista = criarMensagemOtimista({ conversaId: "c1", texto: "oi", clientMessageId: "u1" });
+    const otimista = criarMensagemOtimista({
+      conversaId: "c1",
+      texto: "oi",
+      clientMessageId: "u1",
+    });
     let msgs = inserirOtimista([], otimista);
     const oficial = {
       id: "db-1",
@@ -125,7 +129,11 @@ describe("reconciliação e falha", () => {
   });
 
   it("falha mantém a mensagem na tela como não enviada", () => {
-    const otimista = criarMensagemOtimista({ conversaId: "c1", texto: "oi", clientMessageId: "u2" });
+    const otimista = criarMensagemOtimista({
+      conversaId: "c1",
+      texto: "oi",
+      clientMessageId: "u2",
+    });
     const msgs = marcarFalhaOtimista(inserirOtimista([], otimista), "u2");
     expect(msgs).toHaveLength(1);
     expect(msgs[0].status).toBe("failed");
@@ -146,7 +154,11 @@ describe("reconciliação e falha", () => {
 
 describe("troca de lead", () => {
   it("a bolha pertence à conversa de origem, nunca à conversa aberta depois", () => {
-    const otimista = criarMensagemOtimista({ conversaId: "c1", texto: "oi", clientMessageId: "u4" });
+    const otimista = criarMensagemOtimista({
+      conversaId: "c1",
+      texto: "oi",
+      clientMessageId: "u4",
+    });
     const listaOutroLead = inserirOtimista([], otimista).filter((m) => m.conversa_id === "c2");
     expect(listaOutroLead).toHaveLength(0);
     expect(otimista.conversa_id).toBe("c1");

@@ -30,7 +30,14 @@ const base = (over: Partial<EntradaRelatorio> = {}): EntradaRelatorio => ({
   valorAnterior: "150,00",
   motivo: "Correção aplicada.",
   passos: [
-    { ordem: 1, ferramenta: "sistema", titulo: "Proposta autorizada", detalhe: "…", ok: true, em: "2026-09-12T01:00:00Z" },
+    {
+      ordem: 1,
+      ferramenta: "sistema",
+      titulo: "Proposta autorizada",
+      detalhe: "…",
+      ok: true,
+      em: "2026-09-12T01:00:00Z",
+    },
   ],
   teste: {
     executado: true,
@@ -39,7 +46,12 @@ const base = (over: Partial<EntradaRelatorio> = {}): EntradaRelatorio => ({
     resposta: "R$ 180,00",
     motivo: "A resposta passou a trazer a informação corrigida.",
   },
-  verificacao: { conferido: true, alvo: "Catálogo", motivo: "Valor efetivo confere.", revisao: "12" },
+  verificacao: {
+    conferido: true,
+    alvo: "Catálogo",
+    motivo: "Valor efetivo confere.",
+    revisao: "12",
+  },
   codigo: null,
   evidencias: {
     analiseId: "an-1",
@@ -69,7 +81,12 @@ describe("relatório da correção", () => {
     const r = montarRelatorio(base());
     expect(r.resultado).toBe("corrigido_verificado");
     expect(r.alteracoes).toHaveLength(1);
-    expect(r.alteracoes[0]).toMatchObject({ tipo: "catalogo", antes: "150,00", depois: "180,00", efetivada: true });
+    expect(r.alteracoes[0]).toMatchObject({
+      tipo: "catalogo",
+      antes: "150,00",
+      depois: "180,00",
+      efetivada: true,
+    });
     expect(r.trabalho.duracaoMs).toBe(42000);
     expect(r.reversao).toMatchObject({ possivel: true, tipo: "catalogo" });
     expect(r.versao.publicacaoConfirmada).toBe(true);
@@ -89,7 +106,13 @@ describe("relatório da correção", () => {
         status: "pendente_tecnico",
         resultadoFinal: "aguardando_publicacao",
         verificacao: null,
-        teste: { executado: false, aprovado: false, pergunta: null, resposta: null, motivo: "Teste ainda não executado." },
+        teste: {
+          executado: false,
+          aprovado: false,
+          pergunta: null,
+          resposta: null,
+          motivo: "Teste ainda não executado.",
+        },
         codigo: {
           disponivel: false,
           aplicado: false,
@@ -110,7 +133,9 @@ describe("relatório da correção", () => {
   });
 
   it("falha do executor não vira sucesso mesmo com proposta preenchida", () => {
-    const r = montarRelatorio(base({ status: "falhou", resultadoFinal: "falhou", publicado: false }));
+    const r = montarRelatorio(
+      base({ status: "falhou", resultadoFinal: "falhou", publicado: false }),
+    );
     expect(r.resultado).toBe("falhou");
     expect(r.explicacao.comportamentoEsperado).toContain("Nada mudou");
   });

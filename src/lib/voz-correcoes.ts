@@ -162,7 +162,9 @@ export function melhorAlternativa(alternativas: string[]): string {
   let melhorPontos = -1;
   for (const alt of alternativas) {
     if (!alt) continue;
-    const palavras = semAcento(alt.toLowerCase()).split(/[^a-z0-9]+/).filter(Boolean);
+    const palavras = semAcento(alt.toLowerCase())
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
     const pontos = palavras.filter((p) => VOCAB_NORM.some((v) => v.norm === p)).length;
     if (pontos > melhorPontos) {
       melhorPontos = pontos;

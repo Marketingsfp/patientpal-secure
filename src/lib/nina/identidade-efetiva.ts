@@ -27,10 +27,7 @@ import { extrairIdentidade, type IdentidadeAtendimento } from "./identidade-aten
 
 export type OrigemIdentidade = "publicada" | "cache" | "indisponivel";
 
-export type MotivoIdentidadeEfetiva =
-  | "OK"
-  | "PROMPT_DE_RESERVA"
-  | "BLOCO_INVALIDO";
+export type MotivoIdentidadeEfetiva = "OK" | "PROMPT_DE_RESERVA" | "BLOCO_INVALIDO";
 
 /** Textos neutros: sem marca, sem persona inventada. */
 export const IDENTIDADE_NEUTRA = {
@@ -95,9 +92,7 @@ function neutra(
  * Resolve a identidade EFETIVA do turno a partir do mesmo snapshot que gerou
  * as instruções. Não recebe (e não aceita) dados do cadastro da clínica.
  */
-export function resolverIdentidadeEfetiva(
-  snapshot: SnapshotParaIdentidade,
-): IdentidadeEfetiva {
+export function resolverIdentidadeEfetiva(snapshot: SnapshotParaIdentidade): IdentidadeEfetiva {
   if (snapshot.origem === "codigo") {
     return neutra(
       snapshot,
@@ -157,9 +152,7 @@ export function nomeCompletoEstabelecimento(apresentacao: {
   return `${tipo} ${nome}`;
 }
 
-export function valoresIdentidade(
-  efetiva: IdentidadeEfetiva,
-): Record<string, string> {
+export function valoresIdentidade(efetiva: IdentidadeEfetiva): Record<string, string> {
   const a = efetiva.apresentacao;
   const completo = efetiva.ok ? nomeCompletoEstabelecimento(a) : a.estabelecimento;
   return {

@@ -54,9 +54,8 @@ export function protocoloFormatoValido(protocolo: string | null | undefined): bo
 export function ehMensagemDeTransferencia(texto: string): boolean {
   const t = texto.toLowerCase();
   if (t.startsWith("🧾")) return false; // marcador interno da timeline
-  const fala = /(encaminh|transferir|transferindo|passar seu atendimento|nossa equipe|equipe )/.test(
-    t,
-  );
+  const fala =
+    /(encaminh|transferir|transferindo|passar seu atendimento|nossa equipe|equipe )/.test(t);
   return fala && /protocolo/.test(t);
 }
 
@@ -134,7 +133,6 @@ export function criteriosDeHandoff(v: VerificacaoHandoff): CriterioAvaliado[] {
     detalhe: v[chave] ? ROTULOS[chave].ok : ROTULOS[chave].falha,
   }));
 }
-
 
 /**
  * Setor: só pode ser mencionado quando existe destino estruturado. Sem

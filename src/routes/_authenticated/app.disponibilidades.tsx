@@ -919,13 +919,17 @@ function Page() {
   const agendaFilaAlvo = useMemo(() => {
     if (!gerar.medico_id || gerar.medico_id === "all") return null;
     const doMedico = agendas.filter(
-      (a) => a.medico_id === gerar.medico_id && a.ativo && (!gerar.agenda_id || a.id === gerar.agenda_id),
+      (a) =>
+        a.medico_id === gerar.medico_id &&
+        a.ativo &&
+        (!gerar.agenda_id || a.id === gerar.agenda_id),
     );
     return doMedico.find((a) => a.ordem_chegada) ?? null;
   }, [gerar.medico_id, gerar.agenda_id, agendas]);
 
   const medicoFilaAlvo = useMemo(
-    () => (agendaFilaAlvo ? (medicos.find((m) => m.id === agendaFilaAlvo.medico_id) ?? null) : null),
+    () =>
+      agendaFilaAlvo ? (medicos.find((m) => m.id === agendaFilaAlvo.medico_id) ?? null) : null,
     [agendaFilaAlvo, medicos],
   );
 
@@ -1448,10 +1452,9 @@ function Page() {
     if (!gerar.medico_id) return "Selecione um médico para ver a estimativa.";
     if (modoFila) {
       if (agendasMistasSemEscolha)
-        return "Este médico tem agenda por ordem de chegada e outras agendas. Escolha uma agenda por vez para gerar os horários — com \"todas as agendas\" as outras ficariam sem horário.";
+        return 'Este médico tem agenda por ordem de chegada e outras agendas. Escolha uma agenda por vez para gerar os horários — com "todas as agendas" as outras ficariam sem horário.';
       const qtd = parseInt(gerar.fichas_fila || "0", 10);
-      if (!qtd || qtd < 1)
-        return "Informe quantas fichas quer acrescentar em cada dia (1 a 500).";
+      if (!qtd || qtd < 1) return "Informe quantas fichas quer acrescentar em cada dia (1 a 500).";
       const erro = geracaoPreview.errosFila[0];
       if (erro) {
         const [ano, mes, dia] = erro.data.split("-");
@@ -2254,7 +2257,9 @@ function Page() {
               {/* Grupo 2 — Horários e regras de vaga */}
               <section className="rounded-lg border bg-muted/30 p-3">
                 <p className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {modoFila ? "2 · Fichas por ordem de chegada" : "2 · Recortar horário (opcional) e fichas"}
+                  {modoFila
+                    ? "2 · Fichas por ordem de chegada"
+                    : "2 · Recortar horário (opcional) e fichas"}
                 </p>
                 {modoFila ? (
                   <>
@@ -2281,78 +2286,78 @@ function Page() {
                     </div>
                   </>
                 ) : (
-                <>
-                <p className="mb-2 text-xs text-muted-foreground">
-                  {gradeMedicoSel.length > 0 ? (
-                    <>
-                      <strong>Deixe em branco para usar a grade completa do médico.</strong>{" "}
-                      Preencher aqui só encurta o atendimento do dia — nunca cria ficha fora da
-                      grade cadastrada.
-                    </>
-                  ) : (
-                    <>
-                      Em branco, a geração usa a grade cadastrada do médico. Preencher aqui só
-                      encurta o horário — nunca cria ficha fora da grade.
-                    </>
-                  )}
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground">
-                      Recortar horário — início (opcional)
-                    </label>
-                    <Input
-                      type="time"
-                      className="w-full"
-                      value={gerar.hora_inicio}
-                      onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground">
-                      Recortar horário — fim (opcional)
-                    </label>
-                    <Input
-                      type="time"
-                      className="w-full"
-                      value={gerar.hora_fim}
-                      onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground">
-                      Duração de cada atendimento (min)
-                    </label>
-                    <Input
-                      type="number"
-                      min={5}
-                      step={5}
-                      placeholder="15 (padrão)"
-                      className="w-full"
-                      value={gerar.intervalo_min}
-                      onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })}
-                    />
-                    {duracaoInvalida && (
-                      <p className="mt-1 text-[12px] font-medium text-destructive">
-                        A duração mínima deve ser de 5 minutos
-                      </p>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <label className="text-xs text-muted-foreground">
-                      Limite de fichas por dia
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      placeholder="padrão do médico"
-                      className="w-full"
-                      value={gerar.limite_fichas}
-                      onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
-                    />
-                  </div>
-                </div>
-                </>
+                  <>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      {gradeMedicoSel.length > 0 ? (
+                        <>
+                          <strong>Deixe em branco para usar a grade completa do médico.</strong>{" "}
+                          Preencher aqui só encurta o atendimento do dia — nunca cria ficha fora da
+                          grade cadastrada.
+                        </>
+                      ) : (
+                        <>
+                          Em branco, a geração usa a grade cadastrada do médico. Preencher aqui só
+                          encurta o horário — nunca cria ficha fora da grade.
+                        </>
+                      )}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="min-w-0">
+                        <label className="text-xs text-muted-foreground">
+                          Recortar horário — início (opcional)
+                        </label>
+                        <Input
+                          type="time"
+                          className="w-full"
+                          value={gerar.hora_inicio}
+                          onChange={(e) => setGerar({ ...gerar, hora_inicio: e.target.value })}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <label className="text-xs text-muted-foreground">
+                          Recortar horário — fim (opcional)
+                        </label>
+                        <Input
+                          type="time"
+                          className="w-full"
+                          value={gerar.hora_fim}
+                          onChange={(e) => setGerar({ ...gerar, hora_fim: e.target.value })}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <label className="text-xs text-muted-foreground">
+                          Duração de cada atendimento (min)
+                        </label>
+                        <Input
+                          type="number"
+                          min={5}
+                          step={5}
+                          placeholder="15 (padrão)"
+                          className="w-full"
+                          value={gerar.intervalo_min}
+                          onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })}
+                        />
+                        {duracaoInvalida && (
+                          <p className="mt-1 text-[12px] font-medium text-destructive">
+                            A duração mínima deve ser de 5 minutos
+                          </p>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <label className="text-xs text-muted-foreground">
+                          Limite de fichas por dia
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="padrão do médico"
+                          className="w-full"
+                          value={gerar.limite_fichas}
+                          onChange={(e) => setGerar({ ...gerar, limite_fichas: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
               </section>
 

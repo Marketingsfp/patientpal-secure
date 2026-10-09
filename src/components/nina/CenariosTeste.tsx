@@ -201,7 +201,9 @@ export function CenariosTeste() {
         let houveHandoff = false;
         let turnosUsados = 0;
         try {
-          const inicio: any = await iniciarItem({ data: { clinicaId: clinicaId!, itemId: item.id } });
+          const inicio: any = await iniciarItem({
+            data: { clinicaId: clinicaId!, itemId: item.id },
+          });
           const maxTurnos = inicio.maxTurnos ?? 6;
           for (let turno = 0; turno < maxTurnos; turno++) {
             if (pararRef.current) break;
@@ -321,7 +323,12 @@ export function CenariosTeste() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => void recarregar()} disabled={carregando}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void recarregar()}
+            disabled={carregando}
+          >
             <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
           </Button>
           <Button
@@ -361,11 +368,7 @@ export function CenariosTeste() {
                   setSelecionados((s) => (v ? [...s, c.id] : s.filter((x) => x !== c.id)))
                 }
               />
-              <button
-                type="button"
-                className="flex-1 text-left"
-                onClick={() => abrirEdicao(c)}
-              >
+              <button type="button" className="flex-1 text-left" onClick={() => abrirEdicao(c)}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{c.nome}</span>
                   <Badge variant="secondary">{ROTULO_CATEGORIA[c.categoria]}</Badge>
@@ -391,7 +394,11 @@ export function CenariosTeste() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => void executar()} disabled={rodando || !selecionados.length}>
-            {rodando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
+            {rodando ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-1 h-4 w-4" />
+            )}
             Executar {selecionados.length || ""} cenário(s)
           </Button>
           {rodando && (
@@ -465,7 +472,10 @@ export function CenariosTeste() {
           <div className="space-y-3">
             <div>
               <Label>Nome</Label>
-              <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+              <Input
+                value={form.nome}
+                onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -500,7 +510,11 @@ export function CenariosTeste() {
                 <Label>Transferência para humano</Label>
                 <Select
                   value={
-                    form.handoffEsperado === null ? "indiferente" : form.handoffEsperado ? "sim" : "nao"
+                    form.handoffEsperado === null
+                      ? "indiferente"
+                      : form.handoffEsperado
+                        ? "sim"
+                        : "nao"
                   }
                   onValueChange={(v) =>
                     setForm({

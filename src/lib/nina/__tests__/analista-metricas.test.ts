@@ -60,7 +60,15 @@ describe("ferramentas autorizadas", () => {
       expect(f.parameters.additionalProperties).toBe(false);
     }
     const texto = JSON.stringify(FERRAMENTAS_ANALISTA).toLowerCase();
-    for (const proibido of ["sql", "shell", "fetch", "enviar", "agendar", "transferir", "atualizar"]) {
+    for (const proibido of [
+      "sql",
+      "shell",
+      "fetch",
+      "enviar",
+      "agendar",
+      "transferir",
+      "atualizar",
+    ]) {
       expect(texto).not.toContain(proibido);
     }
   });
@@ -115,10 +123,13 @@ describe("continuidade entre perguntas", () => {
   });
 
   it("informar horário desliga o dia inteiro", () => {
-    const novo = mesclarRecorte({ ...base, diaInteiro: true, horaInicio: null, horaFim: null }, {
-      horaInicio: "08:00",
-      horaFim: "12:00",
-    });
+    const novo = mesclarRecorte(
+      { ...base, diaInteiro: true, horaInicio: null, horaFim: null },
+      {
+        horaInicio: "08:00",
+        horaFim: "12:00",
+      },
+    );
     expect(novo.diaInteiro).toBe(false);
   });
 });
@@ -143,8 +154,20 @@ describe("validação da resposta", () => {
     const r = validarResposta(
       respostaBase({
         indicadores: [
-          { chave: "mensagensTotais", rotulo: "Mensagens", valor: 200, consulta_id: "consulta_1", periodo: "set" },
-          { chave: "taxaErro", rotulo: "Taxa", valor: 1.5, consulta_id: "consulta_1", periodo: "set" },
+          {
+            chave: "mensagensTotais",
+            rotulo: "Mensagens",
+            valor: 200,
+            consulta_id: "consulta_1",
+            periodo: "set",
+          },
+          {
+            chave: "taxaErro",
+            rotulo: "Taxa",
+            valor: 1.5,
+            consulta_id: "consulta_1",
+            periodo: "set",
+          },
         ],
         evidencias: [{ afirmacao: "x", consulta_id: "consulta_1", indicadores: ["taxaErro"] }],
       }),
@@ -157,7 +180,13 @@ describe("validação da resposta", () => {
     const r = validarResposta(
       respostaBase({
         indicadores: [
-          { chave: "mensagensTotais", rotulo: "Mensagens", valor: 250, consulta_id: "consulta_1", periodo: "set" },
+          {
+            chave: "mensagensTotais",
+            rotulo: "Mensagens",
+            valor: 250,
+            consulta_id: "consulta_1",
+            periodo: "set",
+          },
         ],
       }),
       permitidos,
@@ -180,7 +209,13 @@ describe("validação da resposta", () => {
     const r = validarResposta(
       respostaBase({
         indicadores: [
-          { chave: "mensagensTotais", rotulo: "Mensagens", valor: 10, consulta_id: "x", periodo: "p" },
+          {
+            chave: "mensagensTotais",
+            rotulo: "Mensagens",
+            valor: 10,
+            consulta_id: "x",
+            periodo: "p",
+          },
         ] as any,
       }),
       new Map(),
@@ -197,7 +232,10 @@ describe("validação da resposta", () => {
     const permitidosAlias = valoresPermitidos([
       {
         id: "consulta_1",
-        dados: { ...dadosConsulta, periodos: [{ ...dadosConsulta.periodos[0], consultaId: "rpc_42" }] },
+        dados: {
+          ...dadosConsulta,
+          periodos: [{ ...dadosConsulta.periodos[0], consultaId: "rpc_42" }],
+        },
       },
     ]);
     const r = validarResposta(
@@ -220,7 +258,10 @@ describe("validação da resposta", () => {
   it("aceita pedido de esclarecimento sem consulta, desde que a pergunta exista", () => {
     expect(
       validarResposta(
-        respostaBase({ precisa_esclarecimento: true, pergunta_ao_usuario: "Qual intervalo é manhã?" }),
+        respostaBase({
+          precisa_esclarecimento: true,
+          pergunta_ao_usuario: "Qual intervalo é manhã?",
+        }),
         new Map(),
       ).valida,
     ).toBe(true);
@@ -257,8 +298,16 @@ describe("comparações determinísticas", () => {
         id: "consulta_1",
         dados: {
           periodos: [
-            { indicadores: { errosReportados: 4 }, taxaErro: { valor: 2, numerador: 4, denominador: 200 }, cobertura: { dias: 1, horas: 5 } },
-            { indicadores: { errosReportados: 5 }, taxaErro: { valor: 3, numerador: 5, denominador: 167 }, cobertura: { dias: 1, horas: 5 } },
+            {
+              indicadores: { errosReportados: 4 },
+              taxaErro: { valor: 2, numerador: 4, denominador: 200 },
+              cobertura: { dias: 1, horas: 5 },
+            },
+            {
+              indicadores: { errosReportados: 5 },
+              taxaErro: { valor: 3, numerador: 5, denominador: 167 },
+              cobertura: { dias: 1, horas: 5 },
+            },
           ],
           comparacao: {
             indicadores: compararIndicadores({ errosReportados: 4 }, { errosReportados: 5 }),
@@ -280,7 +329,9 @@ describe("comparações determinísticas", () => {
 
     const ruim = validarResposta(
       respostaBase({
-        comparacoes: [{ descricao: "erros", tipo: "percentual", valor: 80, consulta_id: "consulta_1" }],
+        comparacoes: [
+          { descricao: "erros", tipo: "percentual", valor: 80, consulta_id: "consulta_1" },
+        ],
       }),
       permitidos,
     );

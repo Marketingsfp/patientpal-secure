@@ -2980,7 +2980,9 @@ function Page() {
       <Card
         aria-busy={loading}
         className={
-          loading && displayItems.length > 0 ? "relative pointer-events-none opacity-60" : "relative"
+          loading && displayItems.length > 0
+            ? "relative pointer-events-none opacity-60"
+            : "relative"
         }
       >
         {loading && displayItems.length > 0 ? (

@@ -30,7 +30,6 @@ import {
   type MensagemAuditoria as Mensagem,
 } from "@/lib/nina/conversa-auditoria";
 
-
 type Dados = {
   conversa: {
     id: string;
@@ -45,7 +44,6 @@ type Dados = {
   mensagemEncontrada: boolean | null;
   eventos: ConversaEvento[];
 };
-
 
 export function ConversaAuditoriaDialog({
   clinicaId,
@@ -133,8 +131,8 @@ export function ConversaAuditoriaDialog({
             {dados?.conversa.is_teste && <Badge variant="secondary">Homologação</Badge>}
           </DialogTitle>
           <DialogDescription>
-            Auditoria da conversa exata do erro reportado. Nenhuma ação de atendimento é
-            possível aqui.
+            Auditoria da conversa exata do erro reportado. Nenhuma ação de atendimento é possível
+            aqui.
           </DialogDescription>
         </DialogHeader>
 
@@ -169,8 +167,8 @@ export function ConversaAuditoriaDialog({
           <>
             {mensagemId && dados.mensagemEncontrada === false && (
               <div className="rounded-md border border-atd-warn bg-atd-warn-bg px-3 py-2 text-xs text-atd-warn-ink">
-                Conversa localizada, mas a mensagem original do reporte não foi encontrada.
-                Nenhuma outra mensagem é destacada por aproximação.
+                Conversa localizada, mas a mensagem original do reporte não foi encontrada. Nenhuma
+                outra mensagem é destacada por aproximação.
               </div>
             )}
             {!mensagemId && (
@@ -198,7 +196,9 @@ export function ConversaAuditoriaDialog({
                       ref={destacada ? alvoRef : undefined}
                       data-msg-id={m.id}
                       className={`flex justify-center ${
-                        destacada ? "rounded-xl bg-destructive/10 px-1 py-1 ring-2 ring-destructive" : ""
+                        destacada
+                          ? "rounded-xl bg-destructive/10 px-1 py-1 ring-2 ring-destructive"
+                          : ""
                       }`}
                     >
                       <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">

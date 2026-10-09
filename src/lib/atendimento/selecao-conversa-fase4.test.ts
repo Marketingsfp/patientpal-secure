@@ -68,9 +68,9 @@ describe("Fase 4 — carregamento seguro a partir da URL", () => {
 
   it("resumo e contato atrasados de outra conversa não são aplicados", () => {
     for (const alvo of ["A", "outro"]) {
-      expect(
-        respostaAindaVale({ ...base, alvo, selecionadaAgora: "B", selecaoAtual: "B" }),
-      ).toBe(false);
+      expect(respostaAindaVale({ ...base, alvo, selecionadaAgora: "B", selecaoAtual: "B" })).toBe(
+        false,
+      );
     }
   });
 });

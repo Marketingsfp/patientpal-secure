@@ -41,7 +41,6 @@ async function flush(
   return true;
 }
 
-
 /**
  * Conta o tempo ativo (aba visível) que a pessoa passa em uma atividade
  * e envia o acumulado para o banco a cada 30s.
@@ -71,7 +70,6 @@ export function useStudyTimer(atendente: string, atividade: Atividade, clinicaId
         if (!ok) pendente.current += acc;
       });
     };
-
 
     const sync = setInterval(send, 30000);
     const onHide = () => {

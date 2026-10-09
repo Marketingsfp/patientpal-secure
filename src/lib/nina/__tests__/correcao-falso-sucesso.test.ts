@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mensagemCorrecaoFalsoSucesso } from "../correcao-falso-sucesso";
 
-const rascunho = "Perfeito, reservei a opção de quinta às 15:30. Me informe o nome completo e a data de nascimento.";
+const rascunho =
+  "Perfeito, reservei a opção de quinta às 15:30. Me informe o nome completo e a data de nascimento.";
 
 describe("correção de reserva afirmada sem gravação", () => {
   test("o rascunho é marcado como não enviado e a nova resposta não pede desculpas", () => {
@@ -17,7 +18,9 @@ describe("correção de reserva afirmada sem gravação", () => {
     expect(m).not.toContain("iniciar coleta de dados");
   });
   test("aguardando confirmação final, não pede novos dados", () => {
-    expect(mensagemCorrecaoFalsoSucesso(rascunho, "aguardando_confirmacao")).toContain("não peça novos dados");
+    expect(mensagemCorrecaoFalsoSucesso(rascunho, "aguardando_confirmacao")).toContain(
+      "não peça novos dados",
+    );
   });
   test("sem horário escolhido, a correção não inicia agendamento nem coleta", () => {
     const m = mensagemCorrecaoFalsoSucesso("Já agendei sua consulta.", "sem_escolha");

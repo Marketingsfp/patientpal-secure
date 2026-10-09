@@ -1,10 +1,7 @@
 import { eventoDoMotor } from "./fluxo-direto";
 import { complementarAuditoria } from "./detalhes-auditoria-ia";
 /** Apresentação somente de fatos registrados; não decide nem altera atendimento. */
-import type {
-  EstadoFerramentaRodada,
-  LeituraDetalhesMensagem,
-} from "./detalhes-mensagem-contrato";
+import type { EstadoFerramentaRodada, LeituraDetalhesMensagem } from "./detalhes-mensagem-contrato";
 import { hashDoTexto } from "./confidence/hash";
 import { representacaoDaMensagem, selecionarAvaliacaoDaSaida } from "./confidence/identidade-saida";
 
@@ -191,7 +188,9 @@ export function consolidarPassosDetalhes(
       e.node_id,
       e.cycle_id ?? null,
       inicio ? instante(inicio) : `ausente-${i}`,
-      ...(e.node_id === "ai.auxiliary" || e.node_id === "jev.decision" ? [meta.id ?? meta.chamada_id ?? null, meta.fase ?? null] : []),
+      ...(e.node_id === "ai.auxiliary" || e.node_id === "jev.decision"
+        ? [meta.id ?? meta.chamada_id ?? null, meta.fase ?? null]
+        : []),
     ];
     const baseChave = JSON.stringify(base);
     const irmaos = porBase.get(baseChave) ?? [];
@@ -583,7 +582,11 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
         ? `Os registros técnicos desta mensagem foram apagados pela limpeza automática (são guardados por ${DIAS_RETENCAO_REGISTROS} dias). O texto da conversa continua preservado.`
         : "Execução da Nina não vinculada a esta mensagem.",
     );
-  if (!respostaOriginal && p.execucao && !p.etapas.some(e => e.tipo === "resposta_original" && lista(o(e.dados).tool_calls).length))
+  if (
+    !respostaOriginal &&
+    p.execucao &&
+    !p.etapas.some((e) => e.tipo === "resposta_original" && lista(o(e.dados).tool_calls).length)
+  )
     alertas.push("Texto original do modelo não encontrado na captura do gateway.");
   if (hashEntregue && vinculo?.texto_hash && vinculo.texto_hash !== hashEntregue)
     alertas.push(
@@ -670,8 +673,12 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
       : null,
     entradas: p.entradas
       .filter((e) => doEscopo(e) && e.direction === "in")
-      .map((e) => [...new Set([s(e.body), s(e.transcricao)].filter(Boolean))].join("\n\nTranscrição / leitura da mídia:\n"))
-      .filter(v => v.length > 0),
+      .map((e) =>
+        [...new Set([s(e.body), s(e.transcricao)].filter(Boolean))].join(
+          "\n\nTranscrição / leitura da mídia:\n",
+        ),
+      )
+      .filter((v) => v.length > 0),
     respostaOriginal,
     protocolo: s(aviso?.protocolo) ?? s(avisoRegistrado?.protocolo),
     modelo: s(p.execucao?.model),

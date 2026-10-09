@@ -12,7 +12,11 @@ describe("backfill ISS pelo XML", () => {
     if (!r.ok) return;
     expect(r.aliquota_iss).toBe(0.03);
     expect(r.valor_iss).toBe(10.89);
-    expect(r.conferencia).toMatchObject({ anterior: { aliquota: 0.02, iss: 7.26 }, divergencia_aliquota: { gravada: 0.02, autorizada: 0.03 }, divergencia_servicos: null });
+    expect(r.conferencia).toMatchObject({
+      anterior: { aliquota: 0.02, iss: 7.26 },
+      divergencia_aliquota: { gravada: 0.02, autorizada: 0.03 },
+      divergencia_servicos: null,
+    });
   });
   test("XML sem campos vira falha", () => {
     const r = resultadoBackfill("<NFSe/>", gravado, null);

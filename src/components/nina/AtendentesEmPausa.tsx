@@ -4,7 +4,11 @@ import { TempoPausa } from "./CronometroPausa";
 
 const SECOES: { tipo: PausaAtencao["tipo"]; titulo: string; rotulo: string }[] = [
   { tipo: "PAUSA", titulo: "Atendentes em pausa", rotulo: "em pausa" },
-  { tipo: "PAUSA_SAIDA", titulo: "Atendentes em pausa para almoço", rotulo: "em pausa para almoço" },
+  {
+    tipo: "PAUSA_SAIDA",
+    titulo: "Atendentes em pausa para almoço",
+    rotulo: "em pausa para almoço",
+  },
 ];
 
 export function AtendentesEmPausa({ pausas }: { pausas: PausaAtencao[] }) {

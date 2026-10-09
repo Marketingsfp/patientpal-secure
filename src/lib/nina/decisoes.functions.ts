@@ -15,11 +15,7 @@ type ClienteRpc = {
   ) => PromiseLike<{ data: boolean | null; error: { message: string } | null }>;
 };
 
-export async function assertRevisorFeedback(
-  supabase: unknown,
-  userId: string,
-  clinicaId: string,
-) {
+export async function assertRevisorFeedback(supabase: unknown, userId: string, clinicaId: string) {
   const { data, error } = await (supabase as ClienteRpc).rpc("nina_fb_pode_revisar", {
     _user_id: userId,
     _clinica_id: clinicaId,
@@ -141,7 +137,8 @@ export const decidirProblemaFeedbackNina = createServerFn({ method: "POST" })
         ...(falso
           ? {
               status: "rejected",
-              motivo_rejeicao: data.observacao?.trim() || "Falso positivo: a resposta estava adequada.",
+              motivo_rejeicao:
+                data.observacao?.trim() || "Falso positivo: a resposta estava adequada.",
               revisado_por: context.userId,
               revisado_em: new Date().toISOString(),
             }

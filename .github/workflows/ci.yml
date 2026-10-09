@@ -26,7 +26,20 @@ jobs:
         run: python3 scripts/test-zap-leitura-postgres.py --pg-bin "$(pg_config --bindir)"
 
   verificar:
+    name: ${{ matrix.nome }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nome: Lint
+            comando: bun run lint
+          - nome: Typecheck
+            comando: bun run typecheck
+          - nome: Testes
+            comando: bun run test
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
 
@@ -37,11 +50,5 @@ jobs:
       - name: Instalar dependências
         run: bun install --frozen-lockfile
 
-      - name: Lint
-        run: bun run lint
-
-      - name: Typecheck
-        run: bun run typecheck
-
-      - name: Testes
-        run: bun run test
+      - name: ${{ matrix.nome }}
+        run: ${{ matrix.comando }}

@@ -14,23 +14,37 @@ describe("especialidade na descrição da NFS-e", () => {
     expect(acrescentarEspecialidade("CONSULTA", null)).toBe("CONSULTA");
   });
   it("formato do portal", () => {
-    expect(acrescentarEspecialidade("CONSULTA", "PEDIATRIA", ["CONSULTA (PEDIATRIA)"])).toBe("CONSULTA (PEDIATRIA)");
-    expect(acrescentarEspecialidade("CONSULTA — Nota parcial (R$ 10,00 de R$ 20,00)", "PEDIATRIA", ["CONSULTA"])).toBe(
-      "CONSULTA (PEDIATRIA) — Nota parcial (R$ 10,00 de R$ 20,00)",
+    expect(acrescentarEspecialidade("CONSULTA", "PEDIATRIA", ["CONSULTA (PEDIATRIA)"])).toBe(
+      "CONSULTA (PEDIATRIA)",
     );
+    expect(
+      acrescentarEspecialidade("CONSULTA — Nota parcial (R$ 10,00 de R$ 20,00)", "PEDIATRIA", [
+        "CONSULTA",
+      ]),
+    ).toBe("CONSULTA (PEDIATRIA) — Nota parcial (R$ 10,00 de R$ 20,00)");
   });
   it("não repete quando a descrição já cita a especialidade", () => {
-    expect(acrescentarEspecialidade("ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)", "CARDIOLOGIA", ["ECOCARDIOGRAMA (ADULTO)"])).toBe(
-      "ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)",
-    );
+    expect(
+      acrescentarEspecialidade("ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)", "CARDIOLOGIA", [
+        "ECOCARDIOGRAMA (ADULTO)",
+      ]),
+    ).toBe("ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)");
   });
   it("só acrescenta quando a descrição começa pelo procedimento (sem o sufixo)", () => {
-    expect(acrescentarEspecialidade("CONSULTA", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe("CONSULTA (ORTOPEDIA)");
-    expect(acrescentarEspecialidade("  consúlta ", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe("  consúlta (ORTOPEDIA)");
-    expect(acrescentarEspecialidade("Serviços laboratoriais", "GINECOLOGIA", ["PREVENTIVO (GINECOLOGIA)"])).toBe(
-      "Serviços laboratoriais",
+    expect(acrescentarEspecialidade("CONSULTA", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe(
+      "CONSULTA (ORTOPEDIA)",
     );
-    expect(acrescentarEspecialidade("CONSULTAS DIVERSAS", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe("CONSULTAS DIVERSAS");
+    expect(acrescentarEspecialidade("  consúlta ", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"])).toBe(
+      "  consúlta (ORTOPEDIA)",
+    );
+    expect(
+      acrescentarEspecialidade("Serviços laboratoriais", "GINECOLOGIA", [
+        "PREVENTIVO (GINECOLOGIA)",
+      ]),
+    ).toBe("Serviços laboratoriais");
+    expect(
+      acrescentarEspecialidade("CONSULTAS DIVERSAS", "ORTOPEDIA", ["CONSULTA (ORTOPEDIA)"]),
+    ).toBe("CONSULTAS DIVERSAS");
     expect(acrescentarEspecialidade("CONSULTA", "ORTOPEDIA")).toBe("CONSULTA");
   });
 });

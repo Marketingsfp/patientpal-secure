@@ -53,9 +53,7 @@ export function PipelineHomologacao({
               )}
               {f.rotulo}
             </div>
-            {i < geracao.length - 1 && (
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
+            {i < geracao.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />}
           </div>
         ))}
       </div>

@@ -22,10 +22,7 @@ import {
   scoreExibido,
   textoIndiceEvidencia,
 } from "@/lib/nina/confianca-badge";
-import {
-  snapshotDoPrompt,
-  type SnapshotPromptView,
-} from "@/lib/nina/prompt-snapshot.functions";
+import { snapshotDoPrompt, type SnapshotPromptView } from "@/lib/nina/prompt-snapshot.functions";
 
 import {
   assinarInvalidacaoConfianca,
@@ -88,7 +85,9 @@ export function useConfiancaMensagens(
 
   return useMemo(
     () => {
-      const mapa: MapaConfianca = clinicaId ? mapaDoCache(cache.current, clinicaId, chave ? chave.split(",") : []) : {};
+      const mapa: MapaConfianca = clinicaId
+        ? mapaDoCache(cache.current, clinicaId, chave ? chave.split(",") : [])
+        : {};
       if (falhas && falhas.clinicaId === clinicaId) for (const id of falhas.ids) mapa[id] = "falha";
       return mapa;
     },
@@ -173,7 +172,12 @@ function Grupo({
           const estado = l.estado ?? (l.ok ? "ok" : "falha");
           const simbolo =
             estado === "ok" ? "✓" : estado === "falha" ? "✕" : estado === "pendente" ? "…" : "—";
-          const cor = estado === "falha" ? "text-destructive" : estado === "ok" ? "" : "text-muted-foreground";
+          const cor =
+            estado === "falha"
+              ? "text-destructive"
+              : estado === "ok"
+                ? ""
+                : "text-muted-foreground";
           const sufixo =
             estado === "pendente"
               ? " (em coleta)"
@@ -195,7 +199,6 @@ function Grupo({
     </Secao>
   );
 }
-
 
 export function ConfiancaMensagemBadge({
   clinicaId,
@@ -361,7 +364,9 @@ export function ConfiancaMensagemBadge({
         <Secao titulo="Segurança da ação">
           <p
             className={
-              detalhe?.seguranca?.status === "BLOCKED" ? "text-destructive" : "text-muted-foreground"
+              detalhe?.seguranca?.status === "BLOCKED"
+                ? "text-destructive"
+                : "text-muted-foreground"
             }
           >
             {detalhe?.seguranca?.status === "BLOCKED"
@@ -414,8 +419,8 @@ export function ConfiancaMensagemBadge({
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive">
             <p className="font-medium">Alta confiança + erro (HIGH_CONFIDENCE_ERROR)</p>
             <p>
-              A resposta foi dada com alta confiança e mesmo assim foi reportada como erro.
-              Caso prioritário de investigação de fonte, validador, regra, peso, identificação da
+              A resposta foi dada com alta confiança e mesmo assim foi reportada como erro. Caso
+              prioritário de investigação de fonte, validador, regra, peso, identificação da
               entidade ou ferramenta.
             </p>
           </div>
@@ -426,10 +431,7 @@ export function ConfiancaMensagemBadge({
               SIM — registrado em{" "}
               {new Date(confianca.erro_reportado.created_at).toLocaleString("pt-BR")} (situação:{" "}
               {confianca.erro_reportado.status}
-              {confianca.erro_reportado.categoria
-                ? `, ${confianca.erro_reportado.categoria}`
-                : ""}
-              )
+              {confianca.erro_reportado.categoria ? `, ${confianca.erro_reportado.categoria}` : ""})
             </p>
           ) : (
             <p className="text-muted-foreground">NÃO</p>
@@ -447,7 +449,10 @@ export function ConfiancaMensagemBadge({
               )}
             </Secao>
 
-            <Grupo titulo="Validações" linhas={detalhe.linhas.filter((l) => l.grupo === "validador")} />
+            <Grupo
+              titulo="Validações"
+              linhas={detalhe.linhas.filter((l) => l.grupo === "validador")}
+            />
             {detalhe.validadores.length > 0 && (
               <Secao titulo="Dimensões">
                 <ul className="text-muted-foreground">
@@ -460,9 +465,15 @@ export function ConfiancaMensagemBadge({
                 </ul>
               </Secao>
             )}
-            <Grupo titulo="Ferramentas" linhas={detalhe.linhas.filter((l) => l.grupo === "ferramenta")} />
+            <Grupo
+              titulo="Ferramentas"
+              linhas={detalhe.linhas.filter((l) => l.grupo === "ferramenta")}
+            />
             <Grupo titulo="Fontes" linhas={detalhe.linhas.filter((l) => l.grupo === "fonte")} />
-            <Grupo titulo="Conflitos" linhas={detalhe.linhas.filter((l) => l.grupo === "conflito")} />
+            <Grupo
+              titulo="Conflitos"
+              linhas={detalhe.linhas.filter((l) => l.grupo === "conflito")}
+            />
             {detalhe.reasonCodes.length > 0 && (
               <Secao titulo="Motivos registrados">
                 <p className="text-muted-foreground">{detalhe.reasonCodes.join(", ")}</p>
@@ -480,7 +491,6 @@ export function ConfiancaMensagemBadge({
           <p className="text-muted-foreground">Carregando detalhes…</p>
         )}
         <InstrucoesUtilizadas clinicaId={clinicaId} execucaoId={confianca.execucao_id} />
-
       </PopoverContent>
     </Popover>
   );
@@ -560,7 +570,6 @@ function InstrucoesUtilizadas({
     </Secao>
   );
 }
-
 
 /**
  * Mensagem da Nina anterior ao registro de confiança (ou sem avaliação

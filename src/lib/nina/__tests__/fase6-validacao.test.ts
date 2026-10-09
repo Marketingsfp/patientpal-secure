@@ -60,9 +60,7 @@ describe("FASE 6 — reporte e vínculo", () => {
 
 describe("FASE 6 — estados da auditoria", () => {
   test("auditoria ainda em processamento registra o erro e atualiza depois", () => {
-    expect(
-      estadoAuditoria({ execucaoId: "exec-1", execucao: null }),
-    ).toBe("processing");
+    expect(estadoAuditoria({ execucaoId: "exec-1", execucao: null })).toBe("processing");
     expect(
       estadoAuditoria({
         execucaoId: "exec-1",

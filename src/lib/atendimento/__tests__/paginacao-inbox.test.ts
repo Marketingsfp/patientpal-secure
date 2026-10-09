@@ -1,5 +1,11 @@
 import { expect, it } from "bun:test";
-import { carregarLotesAtivas, cursorInboxSchema, filtroAposCursor, TAMANHO_LOTE_ATIVAS, type CursorInbox } from "../paginacao-inbox";
+import {
+  carregarLotesAtivas,
+  cursorInboxSchema,
+  filtroAposCursor,
+  TAMANHO_LOTE_ATIVAS,
+  type CursorInbox,
+} from "../paginacao-inbox";
 import { compararEntradaInbox } from "../ordem-inbox";
 
 const linhas = Array.from({ length: 127 }, (_, i) => ({
@@ -10,7 +16,12 @@ function banco(dados = linhas) {
   const chamadas: Array<CursorInbox | null> = [];
   const buscar = async (cursor: CursorInbox | null) => {
     chamadas.push(cursor);
-    return dados.filter(c => !cursor || compararEntradaInbox(c, { id: cursor.id, inbox_entrada_em: cursor.entrada }) > 0)
+    return dados
+      .filter(
+        (c) =>
+          !cursor ||
+          compararEntradaInbox(c, { id: cursor.id, inbox_entrada_em: cursor.entrada }) > 0,
+      )
       .slice(0, TAMANHO_LOTE_ATIVAS);
   };
   return { buscar, chamadas };
@@ -19,21 +30,26 @@ it("primeiro carregamento traz 20; cada descida traz mais 20, ultrapassando 100 
   const { buscar, chamadas } = banco();
   let cursor: CursorInbox | null = null;
   const recebidas: string[] = [];
+  let temMais: boolean;
   do {
     const pagina: { linhas: typeof linhas; cursor: CursorInbox | null; temMais: boolean } | null =
       await carregarLotesAtivas({ buscar, cursor, vigente: () => true });
     expect(pagina!.linhas.length).toBeLessThanOrEqual(20);
-    recebidas.push(...pagina!.linhas.map(c => c.id));
+    recebidas.push(...pagina!.linhas.map((c) => c.id));
     cursor = pagina!.cursor;
-    if (!pagina!.temMais) break;
-  } while (true);
+    temMais = pagina!.temMais;
+  } while (temMais);
   expect(chamadas).toHaveLength(7);
-  expect(recebidas).toEqual(linhas.map(c => c.id));
+  expect(recebidas).toEqual(linhas.map((c) => c.id));
   expect(new Set(recebidas).size).toBe(127);
 });
 it("saída de uma conversa já carregada não pula a primeira da próxima página", async () => {
   const primeira = await carregarLotesAtivas({ ...banco(), vigente: () => true });
-  const seguinte = await carregarLotesAtivas({ ...banco(linhas.slice(1)), cursor: primeira!.cursor, vigente: () => true });
+  const seguinte = await carregarLotesAtivas({
+    ...banco(linhas.slice(1)),
+    cursor: primeira!.cursor,
+    vigente: () => true,
+  });
   expect(seguinte!.linhas[0]!.id).toBe(linhas[20]!.id);
 });
 it("reconexão reconcilia apenas os lotes já abertos e mantém a fila", async () => {
@@ -51,11 +67,22 @@ it("troca de filtro descarta resposta antiga e interrompe lotes restantes", asyn
 it("fim vazio encerra carregamento e erro permite tentar o mesmo cursor novamente", async () => {
   const vazio = await carregarLotesAtivas({ ...banco([]), vigente: () => true });
   expect(vazio).toEqual({ linhas: [], cursor: null, temMais: false });
-  await expect(carregarLotesAtivas({ buscar: async () => { throw new Error("rede"); }, vigente: () => true })).rejects.toThrow("rede");
+  await expect(
+    carregarLotesAtivas({
+      buscar: async () => {
+        throw new Error("rede");
+      },
+      vigente: () => true,
+    }),
+  ).rejects.toThrow("rede");
 });
 it("cursor valida timestamp e UUID antes de construir o filtro de continuidade", () => {
   const cursor = { entrada: linhas[19]!.inbox_entrada_em, id: linhas[19]!.id };
-  expect(filtroAposCursor(cursor)).toBe(`inbox_entrada_em.gt.${cursor.entrada},and(inbox_entrada_em.eq.${cursor.entrada},id.gt.${cursor.id})`);
-  expect(cursorInboxSchema.safeParse({ ...cursor, id: "id),owner_type.eq.AI" }).success).toBe(false);
+  expect(filtroAposCursor(cursor)).toBe(
+    `inbox_entrada_em.gt.${cursor.entrada},and(inbox_entrada_em.eq.${cursor.entrada},id.gt.${cursor.id})`,
+  );
+  expect(cursorInboxSchema.safeParse({ ...cursor, id: "id),owner_type.eq.AI" }).success).toBe(
+    false,
+  );
   expect(cursorInboxSchema.safeParse({ ...cursor, entrada: "inválido" }).success).toBe(false);
 });

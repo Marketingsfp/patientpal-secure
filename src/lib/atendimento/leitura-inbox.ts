@@ -112,7 +112,9 @@ export function deveRegistrarLeituraDeNovas(ctx: ContextoNovasMensagens): boolea
 }
 
 /** Uma abertura já lida passa a exigir acompanhar o fim para ler novas mensagens. */
-export function deveRegistrarLeituraVisivel(ctx: ContextoAbertura & { seguindoFim: boolean }): boolean {
+export function deveRegistrarLeituraVisivel(
+  ctx: ContextoAbertura & { seguindoFim: boolean },
+): boolean {
   if (ctx.aberturaPorAlvo) return false;
   return ctx.ultimaRegistradaId
     ? deveRegistrarLeituraDeNovas(ctx)
@@ -133,7 +135,8 @@ export function aplicarReconciliacao(args: {
   naoLidasBackend: number | null | undefined;
   naoLidasAnterior: number;
 }): { aplicar: boolean; valor: number } {
-  if (args.sequenciaResposta !== args.sequenciaAtual) return { aplicar: false, valor: args.naoLidasAnterior };
+  if (args.sequenciaResposta !== args.sequenciaAtual)
+    return { aplicar: false, valor: args.naoLidasAnterior };
   if (args.naoLidasBackend === null || args.naoLidasBackend === undefined) {
     return { aplicar: true, valor: args.naoLidasAnterior };
   }

@@ -132,9 +132,9 @@ export const baixarBackupDoDia = createServerFn({ method: "POST" })
       urls: (signed ?? [])
         .filter((s) => s.path?.startsWith(`${prefix}/`))
         .map((s) => ({
-        nome: s.path?.split("/").pop() ?? "arquivo.csv",
-        url: s.signedUrl,
-      })),
+          nome: s.path?.split("/").pop() ?? "arquivo.csv",
+          url: s.signedUrl,
+        })),
     };
   });
 

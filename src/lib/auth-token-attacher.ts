@@ -11,16 +11,14 @@ import { createMiddleware } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { lerSessaoEmCache } from "@/lib/sessao-cache";
 
-export const anexarTokenSessao = createMiddleware({ type: "function" }).client(
-  async ({ next }) => {
-    let token: string | undefined;
-    try {
-      const { data } = await supabase.auth.getSession();
-      token = data.session?.access_token;
-    } catch {
-      /* rede instável — cai no plano B abaixo */
-    }
-    if (!token) token = lerSessaoEmCache()?.access_token;
-    return next({ headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  },
-);
+export const anexarTokenSessao = createMiddleware({ type: "function" }).client(async ({ next }) => {
+  let token: string | undefined;
+  try {
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token;
+  } catch {
+    /* rede instável — cai no plano B abaixo */
+  }
+  if (!token) token = lerSessaoEmCache()?.access_token;
+  return next({ headers: token ? { Authorization: `Bearer ${token}` } : {} });
+});

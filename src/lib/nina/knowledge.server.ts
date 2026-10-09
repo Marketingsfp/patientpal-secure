@@ -34,7 +34,9 @@ export type PedidoConhecimento = {
 export async function searchKnowledgeBase(
   pedido: PedidoConhecimento,
 ): Promise<ResultadoConhecimento> {
-  const query = String(pedido.query ?? "").trim().slice(0, 200);
+  const query = String(pedido.query ?? "")
+    .trim()
+    .slice(0, 200);
 
   const { buscarNoCatalogo } = await import("./catalogo-retrieval.server");
   const resultado = await buscarNoCatalogo({

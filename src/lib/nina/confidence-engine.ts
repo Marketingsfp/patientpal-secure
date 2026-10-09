@@ -109,7 +109,8 @@ const PADROES: Array<{ categoria: CategoriaConfianca; re: RegExp }> = [
 export function detectarCategorias(texto: string): CategoriaConfianca[] {
   const t = texto ?? "";
   const achadas: CategoriaConfianca[] = [];
-  for (const p of PADROES) if (p.re.test(t) && !achadas.includes(p.categoria)) achadas.push(p.categoria);
+  for (const p of PADROES)
+    if (p.re.test(t) && !achadas.includes(p.categoria)) achadas.push(p.categoria);
   return achadas;
 }
 
@@ -117,7 +118,9 @@ const CAP_CATALOGO = new Set(["searchKnowledgeBase", "listCatalog"]);
 const CAP_AGENDA = new Set(["checkAvailability", "createAppointment"]);
 
 function houve(ferramentas: EvidenciaFerramenta[], caps: Set<string>): boolean {
-  return ferramentas.some((f) => f.capacidade !== null && caps.has(f.capacidade) && f.success && !f.erro);
+  return ferramentas.some(
+    (f) => f.capacidade !== null && caps.has(f.capacidade) && f.success && !f.erro,
+  );
 }
 
 /** Alguma ferramenta falhou, deu erro ou não respondeu. */
@@ -162,7 +165,9 @@ export function avaliarConfianca(params: {
     motivos.push("valor informado sem registro publicado no catálogo");
   } else if (
     (categorias.includes("agendamento") && !ev.agendamentoConfirmado) ||
-    ((categorias.includes("disponibilidade") || categorias.includes("horario")) && !temAgenda && !temCatalogo) ||
+    ((categorias.includes("disponibilidade") || categorias.includes("horario")) &&
+      !temAgenda &&
+      !temCatalogo) ||
     (categorias.includes("profissional") && !temCatalogo && !temAgenda)
   ) {
     bloqueio = "AGENDA_SEM_CONFIRMACAO";

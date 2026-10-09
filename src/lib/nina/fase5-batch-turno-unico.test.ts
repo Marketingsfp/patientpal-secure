@@ -7,10 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { montarTurnoPaciente } from "@/lib/nina/burst";
 import { detectarIntencoes, intencaoAmbigua } from "@/lib/nina/atendimento-fase1";
-import {
-  montarContextoCanonicoTurno,
-  tamanhoDoLote,
-} from "@/lib/nina/confidence/contexto-turno";
+import { montarContextoCanonicoTurno, tamanhoDoLote } from "@/lib/nina/confidence/contexto-turno";
 import { montarRegistroAuditoria } from "@/lib/nina/confidence/auditoria";
 import type { ResultadoConfianca } from "@/lib/nina/confidence/types";
 

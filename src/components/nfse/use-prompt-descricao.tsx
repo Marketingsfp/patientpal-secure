@@ -28,14 +28,17 @@ export function usePromptDescricaoNfse() {
   const [info, setInfo] = useState<string | null>(null);
   const resolverRef = useRef<((v: string | null) => void) | null>(null);
 
-  const prompt = useCallback(async (sugestao: string, infoLeitura?: string): Promise<string | null> => {
-    return new Promise<string | null>((resolve) => {
-      setTexto(sugestao ?? "");
-      setInfo(infoLeitura ?? null);
-      resolverRef.current = resolve;
-      setOpen(true);
-    });
-  }, []);
+  const prompt = useCallback(
+    async (sugestao: string, infoLeitura?: string): Promise<string | null> => {
+      return new Promise<string | null>((resolve) => {
+        setTexto(sugestao ?? "");
+        setInfo(infoLeitura ?? null);
+        resolverRef.current = resolve;
+        setOpen(true);
+      });
+    },
+    [],
+  );
 
   const confirm = () => {
     const r = resolverRef.current;

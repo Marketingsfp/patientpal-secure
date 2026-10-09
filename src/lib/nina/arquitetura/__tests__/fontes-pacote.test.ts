@@ -5,8 +5,8 @@ import { codigoFontesArquitetura } from "../../../../../scripts/nina-arquitetura
 
 test("o pacote contém exatamente as fontes permitidas, com imports lazy", () => {
   const codigo = codigoFontesArquitetura();
-  const imports = [...codigo.matchAll(/import\("\/([^"?]+)\?raw"\)/g)].map(m => m[1]!);
-  const permitidos = [...arquivosPermitidos()].filter(p => /^src\/.*\.tsx?$/.test(p)).sort();
+  const imports = [...codigo.matchAll(/import\("\/([^"?]+)\?raw"\)/g)].map((m) => m[1]!);
+  const permitidos = [...arquivosPermitidos()].filter((p) => /^src\/.*\.tsx?$/.test(p)).sort();
   expect(imports).toEqual(permitidos);
   for (const arquivo of imports) expect(existsSync(arquivo)).toBe(true);
   expect(codigo).not.toContain("import.meta.glob");

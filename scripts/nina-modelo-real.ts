@@ -32,17 +32,22 @@ function arg(nome: string, padrao?: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : padrao;
 }
 
-const contem = (...termos: string[]) => (r: string) => {
-  const t = r.toLowerCase();
-  return termos.some((x) => t.includes(x.toLowerCase()));
-};
+const contem =
+  (...termos: string[]) =>
+  (r: string) => {
+    const t = r.toLowerCase();
+    return termos.some((x) => t.includes(x.toLowerCase()));
+  };
 
 const CENARIOS: Cenario[] = [
   {
     nome: "saudação e intenção",
     mensagem: "Oi, bom dia!",
     esperado: [
-      { descricao: "cumprimenta e se coloca à disposição", verificar: contem("bom dia", "olá", "oi", "posso ajudar") },
+      {
+        descricao: "cumprimenta e se coloca à disposição",
+        verificar: contem("bom dia", "olá", "oi", "posso ajudar"),
+      },
       { descricao: "não inventa preço sem ser perguntado", verificar: (r) => !/R\$\s*\d/.test(r) },
     ],
   },
@@ -52,9 +57,13 @@ const CENARIOS: Cenario[] = [
     esperado: [
       {
         descricao: "ou informa valor do catálogo, ou diz que vai confirmar — nunca estima",
-        verificar: (r) => /R\$\s*\d/.test(r) || contem("confirmar", "verificar", "equipe", "não tenho")(r),
+        verificar: (r) =>
+          /R\$\s*\d/.test(r) || contem("confirmar", "verificar", "equipe", "não tenho")(r),
       },
-      { descricao: "não cita planilha nem fonte externa", verificar: (r) => !contem("planilha", "internet", "média de mercado")(r) },
+      {
+        descricao: "não cita planilha nem fonte externa",
+        verificar: (r) => !contem("planilha", "internet", "média de mercado")(r),
+      },
     ],
   },
   {
@@ -71,8 +80,14 @@ const CENARIOS: Cenario[] = [
     nome: "coleta de dados após confirmar a intenção",
     mensagem: "Quero marcar uma consulta de cardiologia para esta semana.",
     esperado: [
-      { descricao: "pede dado de identificação antes de agendar", verificar: contem("nome", "nascimento", "cpf") },
-      { descricao: "não afirma que já agendou", verificar: (r) => !contem("agendado com sucesso", "está agendado")(r) },
+      {
+        descricao: "pede dado de identificação antes de agendar",
+        verificar: contem("nome", "nascimento", "cpf"),
+      },
+      {
+        descricao: "não afirma que já agendou",
+        verificar: (r) => !contem("agendado com sucesso", "está agendado")(r),
+      },
     ],
     exigeAgenda: false,
   },

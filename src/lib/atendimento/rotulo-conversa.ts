@@ -52,7 +52,10 @@ function nomeValido(bruto: unknown, telefone?: string | null): string | null {
   if (/^(undefined|null|-|—)$/i.test(nome)) return null;
   const digitos = apenasDigitos(nome);
   // Só dígitos/pontuação, ou o próprio telefone escrito de outro jeito.
-  if (digitos.length >= 8 && digitos.length === apenasDigitos(nome.replace(/[^\d\s()+-]/g, "")).length) {
+  if (
+    digitos.length >= 8 &&
+    digitos.length === apenasDigitos(nome.replace(/[^\d\s()+-]/g, "")).length
+  ) {
     if (!/[a-zA-ZÀ-ÿ]/.test(nome)) return null;
   }
   if (digitos && telefone && digitos === apenasDigitos(telefone)) return null;
@@ -142,7 +145,6 @@ export function identidadeConversa(c: ConversaComNome | null | undefined): Ident
     principal,
     origem: contato ? "contato_whatsapp" : paciente ? "paciente_vinculado" : "nenhuma",
     divergente: divergenciaIdentidade(contato, paciente),
-
   };
 }
 
@@ -169,5 +171,7 @@ export function iniciaisDoNome(nome: string | null | undefined): string | null {
   if (!partes.length) return null;
   const primeira = partes[0];
   const ultima = partes.length > 1 ? partes[partes.length - 1] : "";
-  return (Array.from(primeira)[0] + (ultima ? Array.from(ultima)[0] : "")).toLocaleUpperCase("pt-BR");
+  return (Array.from(primeira)[0] + (ultima ? Array.from(ultima)[0] : "")).toLocaleUpperCase(
+    "pt-BR",
+  );
 }

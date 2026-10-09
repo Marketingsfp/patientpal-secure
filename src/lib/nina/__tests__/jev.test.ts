@@ -14,12 +14,20 @@ describe("Jev na Nina", () => {
     expect(jevPermitido(false, false)).toBe(false);
   });
   test("aceita respostas completas", () => {
-    const r = validarRespostas(perguntas, { answers: { intencao: { choice: "agendar", confidence: 0.9 }, humano: { noul: 0.1 } } });
+    const r = validarRespostas(perguntas, {
+      answers: { intencao: { choice: "agendar", confidence: 0.9 }, humano: { noul: 0.1 } },
+    });
     expect(r?.["intencao"]?.choice).toBe("agendar");
   });
   test("recusa resposta faltando ou opção desconhecida (sem decisão)", () => {
-    expect(validarRespostas(perguntas, { answers: { intencao: { choice: "agendar" } } })).toBeNull();
-    expect(validarRespostas(perguntas, { answers: { intencao: { choice: "xyz" }, humano: { noul: 0.1 } } })).toBeNull();
+    expect(
+      validarRespostas(perguntas, { answers: { intencao: { choice: "agendar" } } }),
+    ).toBeNull();
+    expect(
+      validarRespostas(perguntas, {
+        answers: { intencao: { choice: "xyz" }, humano: { noul: 0.1 } },
+      }),
+    ).toBeNull();
     expect(validarRespostas(perguntas, null)).toBeNull();
   });
 });

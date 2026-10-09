@@ -267,9 +267,7 @@ export const concluirAcaoFeedbackNina = createServerFn({ method: "POST" })
       if (erroAtual) throw new Error(erroAtual.message);
       const exigeHomologacao = atual.camada !== "planilha";
       if (exigeHomologacao && !atual.homologado)
-        throw new Error(
-          "Esta mudança precisa passar pela homologação antes de ser concluída.",
-        );
+        throw new Error("Esta mudança precisa passar pela homologação antes de ser concluída.");
     }
 
     const { data: acao, error } = await context.supabase

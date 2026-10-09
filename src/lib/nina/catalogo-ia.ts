@@ -150,7 +150,8 @@ export function instrucoesCatalogoIA(tipo: TipoCatalogo): string {
     "- Horas no formato HH:mm (24h). Datas no formato AAAA-MM-DD; sem ano informado, use null.",
     "- Valores como número em reais (ex.: 130.5). Sem valor no texto, use null.",
     "- Vários registros no mesmo texto: um item por registro.",
-    "- Preserve nomes e marcadores da fonte sem renomear profissionais. Preserve modalidades diferentes por atendimento. " + REGRA_MODALIDADES_CONFIRMADAS,
+    "- Preserve nomes e marcadores da fonte sem renomear profissionais. Preserve modalidades diferentes por atendimento. " +
+      REGRA_MODALIDADES_CONFIRMADAS,
     "- Valor de anestesia separado é adicional ao procedimento. Preserve os dois valores separados; não substitua o preço-base pelo total nem invente adicional onde não foi informado.",
     "- `pendencias`: informações do texto que não couberam em nenhum campo (não descarte nada).",
     "- `ambiguidades`: pontos que precisam de confirmação humana (nome parcial, preço condicional, data sem ano).",
@@ -254,7 +255,8 @@ export function paraEstadoProfissional(
     if (v.id) especialidadesIds.push(v.id);
     else {
       especialidadesLivres.push(alvo);
-      if (v.ambiguo) ambiguidades.push(`Especialidade "${alvo}" não tem correspondência única no cadastro.`);
+      if (v.ambiguo)
+        ambiguidades.push(`Especialidade "${alvo}" não tem correspondência única no cadastro.`);
     }
   }
 
@@ -269,7 +271,9 @@ export function paraEstadoProfissional(
 
   const medico = vincularPorNome(txt(item?.nome), opcoes.medicos);
   if (!medico.id && medico.ambiguo)
-    ambiguidades.push(`Profissional "${txt(item?.nome)}" não tem correspondência única no cadastro.`);
+    ambiguidades.push(
+      `Profissional "${txt(item?.nome)}" não tem correspondência única no cadastro.`,
+    );
 
   const horarios = (Array.isArray(item?.horarios) ? item.horarios : [])
     .map((h: any) => ({

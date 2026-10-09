@@ -73,7 +73,6 @@ export function decidirScroll(args: {
   return { tipo: "manter", novas: args.novasAtuais + quantidade };
 }
 
-
 export function rotuloNovasMensagens(n: number): string {
   return n === 1 ? "1 nova mensagem" : `${n} novas mensagens`;
 }

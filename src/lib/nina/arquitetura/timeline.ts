@@ -76,11 +76,7 @@ export type EntradaSaida = {
 
 const NODES_IA = new Set(["llm.generate", "llm.model_flag"]);
 
-function primeiroTexto(
-  eventos: EventoTrace[],
-  nodeId: string,
-  chaves: string[],
-): string | null {
+function primeiroTexto(eventos: EventoTrace[], nodeId: string, chaves: string[]): string | null {
   for (const evento of eventos) {
     if (evento.node_id !== nodeId) continue;
     const m = metadataSegura(evento.metadata);
@@ -96,15 +92,17 @@ export function montarEntradaSaida(eventos: EventoTrace[]): EntradaSaida {
   const usados = new Set(eventos.map((e) => e.node_id));
   const houveIA = [...usados].some((id) => NODES_IA.has(id));
   const houveTool = [...usados].some((id) => id.startsWith("tool."));
-  const enviou = eventos.some(
-    (e) => e.node_id === "message.outbound" && e.status === "ok",
-  );
+  const enviou = eventos.some((e) => e.node_id === "message.outbound" && e.status === "ok");
 
   return {
     mensagemOriginal: primeiroTexto(eventos, "message.inbound", ["mensagem", "texto"]),
     respostaFinal: primeiroTexto(eventos, "message.outbound", ["resposta", "texto"]),
     jornada: [
-      { rotulo: "Paciente", descricao: "Mensagem recebida", ocorreu: usados.has("message.inbound") },
+      {
+        rotulo: "Paciente",
+        descricao: "Mensagem recebida",
+        ocorreu: usados.has("message.inbound"),
+      },
       {
         rotulo: "Backend",
         descricao: "Registro, conversa e contexto",
@@ -117,7 +115,11 @@ export function montarEntradaSaida(eventos: EventoTrace[]): EntradaSaida {
         descricao: "Validação e persistência da resposta",
         ocorreu: usados.has("response.validate") || usados.has("message.persist"),
       },
-      { rotulo: "Resposta", descricao: "Envio solicitado", ocorreu: usados.has("message.outbound") },
+      {
+        rotulo: "Resposta",
+        descricao: "Envio solicitado",
+        ocorreu: usados.has("message.outbound"),
+      },
       { rotulo: "Paciente", descricao: "Resposta entregue", ocorreu: enviou },
     ],
     entregue: enviou,
@@ -327,7 +329,8 @@ export function estadosPorNode(eventos: EventoTrace[]): Record<string, EstadoNod
       tentativas: tentativas[evento.node_id] ?? null,
       erro: typeof m["erro"] === "string" ? m["erro"] : (anterior?.erro ?? null),
       entrada: typeof m["entrada"] === "string" ? m["entrada"] : (anterior?.entrada ?? null),
-      resultado: typeof m["resultado"] === "string" ? m["resultado"] : (anterior?.resultado ?? null),
+      resultado:
+        typeof m["resultado"] === "string" ? m["resultado"] : (anterior?.resultado ?? null),
       metadata: { ...(anterior?.metadata ?? {}), ...m },
     };
   }

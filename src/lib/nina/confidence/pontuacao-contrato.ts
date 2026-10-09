@@ -46,11 +46,7 @@ export const ORCAMENTO_INSTRUCOES_PADRAO = 15;
 
 export type NivelFinal = "HIGH" | "MEDIUM" | "LOW";
 
-export type DecisaoFinal =
-  | "ENTREGAR"
-  | "BUSCAR_EVIDENCIA"
-  | "ESCLARECER"
-  | "BLOQUEAR_E_ENCAMINHAR";
+export type DecisaoFinal = "ENTREGAR" | "BUSCAR_EVIDENCIA" | "ESCLARECER" | "BLOQUEAR_E_ENCAMINHAR";
 
 export type CodigoBloqueio =
   | "AFIRMACAO_SEM_FONTE"
@@ -210,7 +206,9 @@ const PIOR: Record<StatusRegra, number> = {
   NOT_APPLICABLE: 4,
 };
 
-function agruparEquivalentes(rs: ResultadoRegra[]): Array<{ chave: string; itens: ResultadoRegra[] }> {
+function agruparEquivalentes(
+  rs: ResultadoRegra[],
+): Array<{ chave: string; itens: ResultadoRegra[] }> {
   const mapa = new Map<string, ResultadoRegra[]>();
   for (const r of rs) {
     const k = chaveEquivalencia(r);
@@ -354,7 +352,11 @@ export function pontuarContrato(e: EntradaPontuacao): PontuacaoContrato {
 
   // ------------------------------------------------------- nível e decisão
   let nivel: NivelFinal =
-    notaFinal >= politica.limites.HIGH ? "HIGH" : notaFinal >= politica.limites.MEDIUM ? "MEDIUM" : "LOW";
+    notaFinal >= politica.limites.HIGH
+      ? "HIGH"
+      : notaFinal >= politica.limites.MEDIUM
+        ? "MEDIUM"
+        : "LOW";
   if (bloqueadores.length > 0) nivel = "LOW";
 
   let decisao: DecisaoFinal;

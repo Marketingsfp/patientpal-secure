@@ -121,9 +121,9 @@ describe("categoriaDoAtendimento", () => {
       adesoes: 0,
       cortesias: 1,
     });
-    expect(
-      p.consultasCartao + p.consultasParticulares + p.exames + p.outros + p.cortesias,
-    ).toBe(p.total);
+    expect(p.consultasCartao + p.consultasParticulares + p.exames + p.outros + p.cortesias).toBe(
+      p.total,
+    );
   });
 });
 
@@ -165,7 +165,6 @@ describe("resumoPainel", () => {
     // Ticket médio = (500 + 50) / 3.
     expect(r.ticketMedio).toBe(183.33);
   });
-
 
   it("despesa é a do caixa: repasse pago, complemento pago e operacionais", () => {
     expect(r.despesasOperacionais).toBe(100);
@@ -233,7 +232,6 @@ describe("resumoPainel", () => {
     expect(r.saldoMeios.especie.entradas).toBe(250);
     expect(r.saldoMeios.banco.entradas).toBe(170);
   });
-
 });
 
 describe("agrupamentos do detalhamento", () => {

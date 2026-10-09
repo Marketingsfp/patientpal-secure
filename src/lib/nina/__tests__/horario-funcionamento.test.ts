@@ -14,7 +14,6 @@ import {
   versaoAplicavel,
 } from "../horario-funcionamento";
 
-
 const dia = (fechado: boolean, faixas: Array<[string, string]>) => ({
   dia_semana: 1,
   fechado,
@@ -75,11 +74,21 @@ describe("Horário de funcionamento — validações", () => {
   it("valida exceções por data", () => {
     expect(validarExcecao({ data: "2026-12-25", tipo: "fechado" })).toEqual([]);
     expect(
-      validarExcecao({ data: "2026-12-24", tipo: "especial", hora_inicio: "08:00", hora_fim: "12:00" }),
+      validarExcecao({
+        data: "2026-12-24",
+        tipo: "especial",
+        hora_inicio: "08:00",
+        hora_fim: "12:00",
+      }),
     ).toEqual([]);
     expect(validarExcecao({ data: "2026-12-24", tipo: "especial" })).toHaveLength(1);
     expect(
-      validarExcecao({ data: "2026-12-24", tipo: "especial", hora_inicio: "20:00", hora_fim: "02:00" })[0],
+      validarExcecao({
+        data: "2026-12-24",
+        tipo: "especial",
+        hora_inicio: "20:00",
+        hora_fim: "02:00",
+      })[0],
     ).toContain("meia-noite");
     expect(validarExcecao({ data: "", tipo: "fechado" })).toHaveLength(1);
   });
@@ -93,7 +102,10 @@ describe("Horário de funcionamento — validações", () => {
 });
 
 describe("Horário de funcionamento — backend", () => {
-  const src = readFileSync(resolve(process.cwd(), "src/lib/nina/horario-funcionamento.functions.ts"), "utf8");
+  const src = readFileSync(
+    resolve(process.cwd(), "src/lib/nina/horario-funcionamento.functions.ts"),
+    "utf8",
+  );
 
   it("reutiliza o calendário existente, sem criar tabela nova", () => {
     expect(src).toContain("nina_calendario_atendimento");
@@ -122,12 +134,26 @@ const V = (o: Partial<any>) => ({
 
 describe("Horário — versões e histórico", () => {
   it("rascunho nunca é usado como horário oficial", () => {
-    const versoes = [V({ id: "r", versao: 2, status: "rascunho", publicado_em: null, vigencia_inicio: "2026-01-01" })];
+    const versoes = [
+      V({
+        id: "r",
+        versao: 2,
+        status: "rascunho",
+        publicado_em: null,
+        vigencia_inicio: "2026-01-01",
+      }),
+    ];
     expect(versaoAplicavel(versoes as any, "2026-06-01")).toBeNull();
   });
 
   it("usa a versão que valia na data do atendimento", () => {
-    const v1 = V({ id: "v1", versao: 1, status: "substituido", vigencia_inicio: "2026-01-01", vigencia_fim: "2026-05-31" });
+    const v1 = V({
+      id: "v1",
+      versao: 1,
+      status: "substituido",
+      vigencia_inicio: "2026-01-01",
+      vigencia_fim: "2026-05-31",
+    });
     const v2 = V({ id: "v2", versao: 2, vigencia_inicio: "2026-06-01" });
     expect(versaoAplicavel([v1, v2] as any, "2026-03-10")?.id).toBe("v1");
     expect(versaoAplicavel([v1, v2] as any, "2026-07-10")?.id).toBe("v2");
@@ -140,12 +166,13 @@ describe("Horário — versões e histórico", () => {
 
   it("detecta conflito de vigência entre versões oficiais", () => {
     const atual = V({ id: "v1", versao: 1, vigencia_inicio: "2026-01-01" });
-    const conflitos = conflitosDeVigencia({ id: "v2", vigencia_inicio: "2026-06-01" }, [atual] as any);
+    const conflitos = conflitosDeVigencia({ id: "v2", vigencia_inicio: "2026-06-01" }, [
+      atual,
+    ] as any);
     expect(conflitos.map((c) => c.id)).toEqual(["v1"]);
-    const semConflito = conflitosDeVigencia(
-      { id: "v3", vigencia_inicio: "2026-06-01" },
-      [V({ id: "v1", vigencia_inicio: "2026-01-01", vigencia_fim: "2026-05-31" })] as any,
-    );
+    const semConflito = conflitosDeVigencia({ id: "v3", vigencia_inicio: "2026-06-01" }, [
+      V({ id: "v1", vigencia_inicio: "2026-01-01", vigencia_fim: "2026-05-31" }),
+    ] as any);
     expect(semConflito).toHaveLength(0);
   });
 
@@ -182,14 +209,27 @@ describe("Horário — versões e histórico", () => {
 
   it("não publica versão vazia nem sem permissão", () => {
     expect(
-      validarPublicacao({ vigenciaInicio: "2026-06-01", hoje: "2026-06-01", role: "admin", temDiaConfigurado: false }).join(" "),
+      validarPublicacao({
+        vigenciaInicio: "2026-06-01",
+        hoje: "2026-06-01",
+        role: "admin",
+        temDiaConfigurado: false,
+      }).join(" "),
     ).toContain("pelo menos um dia");
     expect(
-      validarPublicacao({ vigenciaInicio: "2026-06-01", hoje: "2026-06-01", role: "recepcao", temDiaConfigurado: true }).join(" "),
+      validarPublicacao({
+        vigenciaInicio: "2026-06-01",
+        hoje: "2026-06-01",
+        role: "recepcao",
+        temDiaConfigurado: true,
+      }).join(" "),
     ).toContain("administradores e gestores");
   });
 
-  const src = readFileSync(resolve(process.cwd(), "src/lib/nina/horario-funcionamento.functions.ts"), "utf8");
+  const src = readFileSync(
+    resolve(process.cwd(), "src/lib/nina/horario-funcionamento.functions.ts"),
+    "utf8",
+  );
 
   it("backend publica por versão, com confirmação de conflito e bloqueio de edição após publicar", () => {
     expect(src).toContain("nina_calendario_publicar");

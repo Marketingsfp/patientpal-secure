@@ -25,7 +25,10 @@ export type DesempenhoPeriodo = {
   buckets: Partial<Record<ClassePeriodo, Bucket>>;
   total: Bucket;
   tempoResposta: Partial<
-    Record<ClassePeriodo, { amostras: number; medianaSegundos: number | null; mediaSegundos: number | null }>
+    Record<
+      ClassePeriodo,
+      { amostras: number; medianaSegundos: number | null; mediaSegundos: number | null }
+    >
   >;
   conversas: {
     unicasTotal: number;
@@ -62,7 +65,11 @@ export function taxa(numerador: number, denominador: number) {
   };
 }
 
-export function formatarTaxa(t: { numerador: number; denominador: number; percentual: number | null }) {
+export function formatarTaxa(t: {
+  numerador: number;
+  denominador: number;
+  percentual: number | null;
+}) {
   if (t.percentual === null) return "Sem dados";
   return `${t.percentual.toFixed(1)}% (${t.numerador}/${t.denominador})`;
 }
@@ -94,7 +101,8 @@ export function rotuloMotivo(motivo: string) {
 export const EXPLICACOES: Record<string, string> = {
   mensagem: "Todas as mensagens do atendimento, classificadas pelo horário de cada mensagem.",
   resposta_nina: "Respostas enviadas pela Nina, pelo horário de cada resposta.",
-  agendamento: "Agendamentos registrados pela Nina, pelo momento da criação do registro — não pela data da consulta.",
+  agendamento:
+    "Agendamentos registrados pela Nina, pelo momento da criação do registro — não pela data da consulta.",
   encaminhamento:
     "Encaminhamentos para atendente, pelo horário real do evento. Fora do expediente não é falha da Nina.",
   resposta_avaliada: "Respostas que passaram por avaliação, pelo horário da mensagem avaliada.",

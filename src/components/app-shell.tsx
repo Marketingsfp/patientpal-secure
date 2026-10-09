@@ -185,7 +185,10 @@ import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { AcessibilidadeProvider } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { AtalhosAcessibilidade } from "@/components/acessibilidade/AtalhosAcessibilidade";
-import { BotaoAcessibilidade, PainelAcessibilidade } from "@/components/acessibilidade/BotaoAcessibilidade";
+import {
+  BotaoAcessibilidade,
+  PainelAcessibilidade,
+} from "@/components/acessibilidade/BotaoAcessibilidade";
 import { aplicarCaixaAlta } from "@/components/ui/caixa-alta";
 
 const VoiceInput = lazy(() =>
@@ -1130,7 +1133,6 @@ function AppShellInner() {
     };
   }, [modoTodas, nomeClinicaAtual]);
 
-
   const subsystem = useSyncExternalStore(subscribeSubsystem, getSubsystem, () => null);
   const seletorPortaisAberto = useSeletorPortaisAberto();
   // Trocar de portal não desmonta a tela atual: o seletor entra como camada
@@ -1287,7 +1289,11 @@ function AppShellInner() {
   // Nina e Francisco têm permissões independentes dentro do OS ZAP.
   const portaisOcultos = useMemo<SubsystemId[]>(() => {
     const ocultos: SubsystemId[] = [];
-    if (!leafAllowed("/app/nina", allowedModules, configuredModules) && !leafAllowed("/app/francisco", allowedModules, configuredModules)) ocultos.push("os-zap");
+    if (
+      !leafAllowed("/app/nina", allowedModules, configuredModules) &&
+      !leafAllowed("/app/francisco", allowedModules, configuredModules)
+    )
+      ocultos.push("os-zap");
     // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
     if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
     return ocultos;
@@ -1544,7 +1550,9 @@ function AppShellInner() {
       : location.pathname;
   const areaConversas =
     pathAtual === "/app/nina" &&
-    ["", "chat", "atend-inbox", "homologacao", "pesquisa-conversas"].includes((location.hash ?? "").replace(/^#/, ""));
+    ["", "chat", "atend-inbox", "homologacao", "pesquisa-conversas"].includes(
+      (location.hash ?? "").replace(/^#/, ""),
+    );
   const destinoPortal =
     !permsLoading && !rotaPermitida && ROTAS_HOME_PORTAL.has(pathAtual)
       ? primeiraRotaVisivel(visibleNavRows)
@@ -2193,15 +2201,18 @@ function AppShellInner() {
           Francisco), e no celular sobrava apenas o hambúrguer para navegar.
           Ela some enquanto a gaveta está aberta: é fixa no rodapé e cobriria o
           menu do usuário dentro da gaveta. */}
-      {!isChooser && !sidebarAberta && !(subsystem === "os-zap" && acessibilidadeAberta) && bottomNavItens.length > 0 && (
-        <LiquidBottomNav
-          pathname={location.pathname}
-          onNavigate={irPara}
-          cor={corSidebar}
-          onMais={() => setSidebarAberta(true)}
-          itens={bottomNavItens}
-        />
-      )}
+      {!isChooser &&
+        !sidebarAberta &&
+        !(subsystem === "os-zap" && acessibilidadeAberta) &&
+        bottomNavItens.length > 0 && (
+          <LiquidBottomNav
+            pathname={location.pathname}
+            onNavigate={irPara}
+            cor={corSidebar}
+            onMais={() => setSidebarAberta(true)}
+            itens={bottomNavItens}
+          />
+        )}
       {seletorPortaisAberto && !isChooser && (
         <div
           className="fixed inset-0 z-[60] overflow-y-auto bg-background"

@@ -202,7 +202,6 @@ export type ClaimEstruturado = {
   chave?: import("./evidencia").ChaveFato | null;
 };
 
-
 /**
  * FASE 5 — o que está sendo avaliado.
  *
@@ -371,10 +370,7 @@ export type StatusValidador =
 /** Um validador que não passou nem foi dispensado conta contra a nota. */
 export function contaContraANota(status: StatusValidador): boolean {
   return (
-    status !== "PASS" &&
-    status !== "NOT_APPLICABLE" &&
-    status !== "UNKNOWN" &&
-    status !== "PENDING"
+    status !== "PASS" && status !== "NOT_APPLICABLE" && status !== "UNKNOWN" && status !== "PENDING"
   );
 }
 
@@ -464,7 +460,6 @@ export type MemoriaInstrucoes = {
   };
 };
 
-
 /** Resultado de um validador individual (auditável). */
 export type Verificacao = {
   id: string;
@@ -535,5 +530,4 @@ export type ResultadoConfianca = {
    * publicadas conferíveis.
    */
   instrucoes?: MemoriaInstrucoes;
-
 };

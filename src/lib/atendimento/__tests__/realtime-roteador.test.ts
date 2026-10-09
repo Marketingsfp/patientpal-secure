@@ -6,7 +6,11 @@ const ctx = { clinicaId: "cl-1", conversaAberta: "A" };
 describe("Fase 3 — roteamento de eventos do atendimento", () => {
   it("mensagem no lead B atualiza a lista, mas não o histórico de A", () => {
     const alvos = classificarEvento(
-      { table: "whatsapp_mensagens", eventType: "INSERT", new: { clinica_id: "cl-1", conversa_id: "B" } },
+      {
+        table: "whatsapp_mensagens",
+        eventType: "INSERT",
+        new: { clinica_id: "cl-1", conversa_id: "B" },
+      },
       ctx,
     );
     expect(alvos.sort()).toEqual(["lista"]);
@@ -14,7 +18,11 @@ describe("Fase 3 — roteamento de eventos do atendimento", () => {
 
   it("mensagem na conversa aberta também sincroniza o histórico", () => {
     const alvos = classificarEvento(
-      { table: "whatsapp_mensagens", eventType: "INSERT", new: { clinica_id: "cl-1", conversa_id: "A" } },
+      {
+        table: "whatsapp_mensagens",
+        eventType: "INSERT",
+        new: { clinica_id: "cl-1", conversa_id: "A" },
+      },
       ctx,
     );
     expect(alvos).toContain("conversa");
@@ -40,8 +48,16 @@ describe("Fase 3 — roteamento de eventos do atendimento", () => {
 
   it("transferência, encerramento e exclusão continuam atualizando a lista", () => {
     for (const ev of [
-      { table: "atend_conversas", eventType: "UPDATE", new: { clinica_id: "cl-1", id: "Z", atribuida_user_id: "u2" } },
-      { table: "atend_conversas", eventType: "UPDATE", new: { clinica_id: "cl-1", id: "Z", status: "closed" } },
+      {
+        table: "atend_conversas",
+        eventType: "UPDATE",
+        new: { clinica_id: "cl-1", id: "Z", atribuida_user_id: "u2" },
+      },
+      {
+        table: "atend_conversas",
+        eventType: "UPDATE",
+        new: { clinica_id: "cl-1", id: "Z", status: "closed" },
+      },
       { table: "atend_conversas", eventType: "INSERT", new: { clinica_id: "cl-1", id: "novo" } },
       { table: "atend_conversas", eventType: "DELETE", old: { clinica_id: "cl-1", id: "Z" } },
     ]) {
@@ -51,7 +67,11 @@ describe("Fase 3 — roteamento de eventos do atendimento", () => {
 
   it("mudança na própria conversa aberta atualiza lista e conversa", () => {
     const alvos = classificarEvento(
-      { table: "atend_conversas", eventType: "UPDATE", new: { clinica_id: "cl-1", id: "A", status: "closed" } },
+      {
+        table: "atend_conversas",
+        eventType: "UPDATE",
+        new: { clinica_id: "cl-1", id: "A", status: "closed" },
+      },
       ctx,
     );
     expect(alvos).toContain("lista");
@@ -102,12 +122,16 @@ describe("Fase 3 — agrupamento com teto", () => {
       cancelarTimer: (id: any) => timers.delete(id),
       avancar(ms: number) {
         const fim = t + ms;
-        let proximo = [...timers.entries()].filter(([, x]) => x.em <= fim).sort((a, b) => a[1].em - b[1].em)[0];
+        let proximo = [...timers.entries()]
+          .filter(([, x]) => x.em <= fim)
+          .sort((a, b) => a[1].em - b[1].em)[0];
         while (proximo) {
           t = proximo[1].em;
           timers.delete(proximo[0]);
           proximo[1].fn();
-          proximo = [...timers.entries()].filter(([, x]) => x.em <= fim).sort((a, b) => a[1].em - b[1].em)[0];
+          proximo = [...timers.entries()]
+            .filter(([, x]) => x.em <= fim)
+            .sort((a, b) => a[1].em - b[1].em)[0];
         }
         t = fim;
       },

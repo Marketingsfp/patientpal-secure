@@ -74,7 +74,15 @@ export type EntradaOperacional = {
 
 export type ProfissionalOperacional = ProfissionalPublicado & { medico_id: string | null };
 
-const DIAS = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+const DIAS = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
 const SEM_ESPECIALIDADE = "não informada no cadastro";
 
 const hhmm = (v: string | null | undefined) => (v ? v.slice(0, 5) : null);
@@ -92,7 +100,10 @@ const maior0 = (v: unknown): number | null => {
  * Preços do cadastro. Dinheiro = o primeiro valor maior que zero entre dinheiro/PIX, dinheiro e
  * padrão; cartão = só o valor de cartão cadastrado (nunca inventado). Zero = não informado.
  */
-export function precosDoProcedimento(p: ProcedimentoOp): { dinheiro: number | null; cartao: number | null } {
+export function precosDoProcedimento(p: ProcedimentoOp): {
+  dinheiro: number | null;
+  cartao: number | null;
+} {
   return {
     dinheiro: maior0(p.valor_dinheiro_pix) ?? maior0(p.valor_dinheiro) ?? maior0(p.valor_padrao),
     cartao: maior0(p.valor_cartao),
@@ -107,13 +118,21 @@ export function temValor(p: ProcedimentoOp): boolean {
 function formas(p: ProcedimentoOp, condicao: string | null) {
   const { dinheiro, cartao } = precosDoProcedimento(p);
   return [
-    ...(dinheiro !== null ? [{ condicao, forma: "Dinheiro", observacao: null, valor: dinheiro }] : []),
+    ...(dinheiro !== null
+      ? [{ condicao, forma: "Dinheiro", observacao: null, valor: dinheiro }]
+      : []),
     // Preserva o rótulo da origem; a política de apresentação pertence ao system prompt.
     ...(cartao !== null ? [{ condicao, forma: "Cartão", observacao: null, valor: cartao }] : []),
   ];
 }
 
-type Horario = { dia: string; inicio: string | null; fim: string | null; recorrencia: string; observacao: string | null };
+type Horario = {
+  dia: string;
+  inicio: string | null;
+  fim: string | null;
+  recorrencia: string;
+  observacao: string | null;
+};
 
 function vigente(d: DisponibilidadeOp, hojeISO: string): boolean {
   if (d.vigencia_inicio && d.vigencia_inicio > hojeISO) return false;
@@ -131,21 +150,36 @@ export function horariosDoMedico(
   const agendasDoMedico = e.agendas.filter((a) => a.medico_id === medicoId);
   const porAgenda = new Map(agendasDoMedico.map((a) => [a.id, a]));
   const mostrarAgenda = agendasDoMedico.length > 1;
-  const comVinculo = procedimentoId && agendasDoMedico.some(a => a.medico_agenda_procedimentos?.length);
+  const comVinculo =
+    procedimentoId && agendasDoMedico.some((a) => a.medico_agenda_procedimentos?.length);
   return e.disponibilidades
     .filter((d) => d.medico_id === medicoId && vigente(d, e.hojeISO))
-    .filter(d => {
+    .filter((d) => {
       if (!tipo) return true;
       const agenda = d.agenda_id ? porAgenda.get(d.agenda_id) : undefined;
-      if (comVinculo) return !!agenda?.medico_agenda_procedimentos?.some(v => v.procedimento_id === procedimentoId);
+      if (comVinculo)
+        return !!agenda?.medico_agenda_procedimentos?.some(
+          (v) => v.procedimento_id === procedimentoId,
+        );
       if (!procedimentoId && agenda?.medico_agenda_procedimentos?.length) {
-        return agenda.medico_agenda_procedimentos.some(v => e.procedimentos.some(p => p.id === v.procedimento_id &&
-          (tipo === "consulta" ? p.tipo === "consulta" : p.tipo === "exame" || p.tipo === "procedimento")));
+        return agenda.medico_agenda_procedimentos.some((v) =>
+          e.procedimentos.some(
+            (p) =>
+              p.id === v.procedimento_id &&
+              (tipo === "consulta"
+                ? p.tipo === "consulta"
+                : p.tipo === "exame" || p.tipo === "procedimento"),
+          ),
+        );
       }
       const categoria = tipoDaAgenda(agenda?.nome);
       return !categoria || categoria === tipo;
     })
-    .sort((a, b) => a.dia_semana - b.dia_semana || String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? "")))
+    .sort(
+      (a, b) =>
+        a.dia_semana - b.dia_semana ||
+        String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? "")),
+    )
     .map((d) => {
       const agenda = d.agenda_id ? porAgenda.get(d.agenda_id) : undefined;
       const partes = [
@@ -153,7 +187,9 @@ export function horariosDoMedico(
         d.limite_pacientes !== null && d.limite_pacientes !== undefined
           ? `Limite de ${d.limite_pacientes} paciente${d.limite_pacientes === 1 ? "" : "s"}`
           : null,
-        mostrarAgenda && agenda ? `Agenda: ${agenda.nome}${agenda.ordem_chegada ? " (ordem de chegada)" : ""}` : null,
+        mostrarAgenda && agenda
+          ? `Agenda: ${agenda.nome}${agenda.ordem_chegada ? " (ordem de chegada)" : ""}`
+          : null,
       ].filter(Boolean);
       return {
         ...(tipo && agenda?.medico_agenda_procedimentos?.length ? { tipo_escala: tipo } : {}),
@@ -169,7 +205,10 @@ export function horariosDoMedico(
 function resumoDosHorarios(h: Horario[]): string {
   if (!h.length) return "não informado no cadastro";
   return h
-    .map((x) => `${x.dia}${x.inicio ? (x.fim ? ` ${x.inicio}–${x.fim}` : ` a partir de ${x.inicio}`) : ""}`)
+    .map(
+      (x) =>
+        `${x.dia}${x.inicio ? (x.fim ? ` ${x.inicio}–${x.fim}` : ` a partir de ${x.inicio}`) : ""}`,
+    )
     .join(" · ");
 }
 
@@ -198,7 +237,8 @@ function bloco(args: {
   ].join("\n");
 }
 
-const nomeDe = (mapa: Map<string, string>, id: string | null | undefined) => (id ? (mapa.get(id) ?? null) : null);
+const nomeDe = (mapa: Map<string, string>, id: string | null | undefined) =>
+  id ? (mapa.get(id) ?? null) : null;
 
 /** Consultas primeiro pelo nome exato "CONSULTA"; o resto em ordem alfabética. */
 function ordemConsultas(a: ProcedimentoOp, b: ProcedimentoOp): number {
@@ -212,7 +252,10 @@ export function visivelAoPaciente(m: MedicoOp): boolean {
 }
 
 /** Médicos do cadastro → profissionais no formato da Nina (um por médico, sem deduplicar). */
-export function mapearProfissionais(e: EntradaOperacional, incluirConsultasSemValor = false): ProfissionalOperacional[] {
+export function mapearProfissionais(
+  e: EntradaOperacional,
+  incluirConsultasSemValor = false,
+): ProfissionalOperacional[] {
   const nomesEsp = new Map(e.especialidades.map((x) => [x.id, x.nome]));
   const proc = new Map(e.procedimentos.map((p) => [p.id, p]));
   return e.medicos.filter(visivelAoPaciente).map((m) => {
@@ -221,18 +264,28 @@ export function mapearProfissionais(e: EntradaOperacional, incluirConsultasSemVa
     const vinculos = e.vinculos.filter((v) => v.medico_id === m.id);
     const consultas = vinculos
       .map((v) => ({ v, p: proc.get(v.procedimento_id) }))
-      .filter((x): x is { v: VinculoOp; p: ProcedimentoOp } => !!x.p && x.p.tipo === "consulta" && (incluirConsultasSemValor || temValor(x.p)))
+      .filter(
+        (x): x is { v: VinculoOp; p: ProcedimentoOp } =>
+          !!x.p && x.p.tipo === "consulta" && (incluirConsultasSemValor || temValor(x.p)),
+      )
       .sort((a, b) => ordemConsultas(a.p, b.p));
 
     const idsEsp = [
-      ...new Set([m.especialidade_id, ...vinculos.map((v) => v.especialidade_id ?? null)].filter((x): x is string => !!x)),
+      ...new Set(
+        [m.especialidade_id, ...vinculos.map((v) => v.especialidade_id ?? null)].filter(
+          (x): x is string => !!x,
+        ),
+      ),
     ];
-    const especialidades = m.especialidades_cadastro ?? idsEsp
-      .map((id) => ({ id, nome: nomeDe(nomesEsp, id) }))
-      .filter((x): x is { id: string; nome: string } => !!x.nome);
-    const espPadrao = m.especialidades_cadastro !== undefined
-      ? m.especialidades_cadastro.map(x => x.nome).join(", ") || null
-      : nomeDe(nomesEsp, m.especialidade_id);
+    const especialidades =
+      m.especialidades_cadastro ??
+      idsEsp
+        .map((id) => ({ id, nome: nomeDe(nomesEsp, id) }))
+        .filter((x): x is { id: string; nome: string } => !!x.nome);
+    const espPadrao =
+      m.especialidades_cadastro !== undefined
+        ? m.especialidades_cadastro.map((x) => x.nome).join(", ") || null
+        : nomeDe(nomesEsp, m.especialidade_id);
 
     return {
       id: m.id,
@@ -291,7 +344,10 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
     .filter((p) => p.tipo !== "consulta")
     .map((p) => {
       const preco = precosDoProcedimento(p);
-      const executantes = (vinculosPorProc.get(p.id) ?? []).map((v) => ({ v, m: medicos.get(v.medico_id)! }));
+      const executantes = (vinculosPorProc.get(p.id) ?? []).map((v) => ({
+        v,
+        m: medicos.get(v.medico_id)!,
+      }));
       return {
         id: p.id,
         procedimento_id: p.id,
@@ -303,8 +359,11 @@ export function mapearServicos(e: EntradaOperacional): ServicoPublicado[] {
               .map(({ v, m }) =>
                 bloco({
                   atendimento: p.nome,
-                  especialidade: nomeDe(nomesEsp, v.especialidade_id) ?? (m.especialidades_cadastro !== undefined
-                    ? m.especialidades_cadastro.map(x => x.nome).join(", ") || null : nomeDe(nomesEsp, m.especialidade_id)),
+                  especialidade:
+                    nomeDe(nomesEsp, v.especialidade_id) ??
+                    (m.especialidades_cadastro !== undefined
+                      ? m.especialidades_cadastro.map((x) => x.nome).join(", ") || null
+                      : nomeDe(nomesEsp, m.especialidade_id)),
                   profissional: m.nome,
                   horarios: resumoDe(m.id, p.id),
                   preco,

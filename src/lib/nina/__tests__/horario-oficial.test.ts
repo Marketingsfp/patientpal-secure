@@ -23,7 +23,14 @@ function cal(over: Partial<CalendarioPublicado> = {}): CalendarioPublicado {
     unidade_id: null,
     dias: [
       // segunda: manhã + tarde
-      { dia_semana: 1, fechado: false, faixas: [{ hora_inicio: "08:00", hora_fim: "12:00" }, { hora_inicio: "13:00", hora_fim: "18:00" }] },
+      {
+        dia_semana: 1,
+        fechado: false,
+        faixas: [
+          { hora_inicio: "08:00", hora_fim: "12:00" },
+          { hora_inicio: "13:00", hora_fim: "18:00" },
+        ],
+      },
       { dia_semana: 0, fechado: true, faixas: [] },
     ],
     excecoes: [],
@@ -38,7 +45,11 @@ describe("horário oficial da Nina", () => {
   });
 
   it("devolve as duas faixas de um dia com manhã e tarde", () => {
-    const r = horarioOficialDoDia({ data: "2026-03-02", escopo: { clinica_id: CLINICA }, calendarios: [cal()] });
+    const r = horarioOficialDoDia({
+      data: "2026-03-02",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [cal()],
+    });
     expect(r.encontrado).toBe(true);
     expect(r.fechado).toBe(false);
     expect(r.faixas).toEqual([
@@ -49,11 +60,19 @@ describe("horário oficial da Nina", () => {
   });
 
   it("dia fechado é diferente de dia não configurado", () => {
-    const fechado = horarioOficialDoDia({ data: "2026-03-01", escopo: { clinica_id: CLINICA }, calendarios: [cal()] });
+    const fechado = horarioOficialDoDia({
+      data: "2026-03-01",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [cal()],
+    });
     expect(fechado.fechado).toBe(true);
     expect(fechado.motivo).toBe("dia_fechado");
 
-    const semConfig = horarioOficialDoDia({ data: "2026-03-04", escopo: { clinica_id: CLINICA }, calendarios: [cal()] });
+    const semConfig = horarioOficialDoDia({
+      data: "2026-03-04",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [cal()],
+    });
     expect(semConfig.encontrado).toBe(false);
     expect(semConfig.fechado).toBeNull();
     expect(semConfig.motivo).toBe("dia_nao_configurado");
@@ -61,18 +80,32 @@ describe("horário oficial da Nina", () => {
 
   it("exceção por data prevalece sobre a semana", () => {
     const c = cal({ excecoes: [{ data: "2026-03-02", tipo: "fechado" }] });
-    const r = horarioOficialDoDia({ data: "2026-03-02", escopo: { clinica_id: CLINICA }, calendarios: [c] });
+    const r = horarioOficialDoDia({
+      data: "2026-03-02",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [c],
+    });
     expect(r.fechado).toBe(true);
     expect(r.excecao).toBe(true);
 
-    const esp = cal({ excecoes: [{ data: "2026-03-02", tipo: "especial", hora_inicio: "09:00", hora_fim: "11:00" }] });
-    const r2 = horarioOficialDoDia({ data: "2026-03-02", escopo: { clinica_id: CLINICA }, calendarios: [esp] });
+    const esp = cal({
+      excecoes: [{ data: "2026-03-02", tipo: "especial", hora_inicio: "09:00", hora_fim: "11:00" }],
+    });
+    const r2 = horarioOficialDoDia({
+      data: "2026-03-02",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [esp],
+    });
     expect(r2.faixas).toEqual([{ inicio: "09:00", fim: "11:00" }]);
     expect(r2.excecao).toBe(true);
   });
 
   it("sem calendário publicado nunca vira fechado", () => {
-    const r = horarioOficialDoDia({ data: "2026-03-02", escopo: { clinica_id: CLINICA }, calendarios: [] });
+    const r = horarioOficialDoDia({
+      data: "2026-03-02",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [],
+    });
     expect(r.encontrado).toBe(false);
     expect(r.fechado).toBeNull();
     expect(r.motivo).toBe("sem_calendario_publicado");
@@ -95,21 +128,35 @@ describe("horário oficial da Nina", () => {
       status: "substituido",
       vigencia_inicio: "2026-01-01",
       vigencia_fim: "2026-02-28",
-      dias: [{ dia_semana: 1, fechado: false, faixas: [{ hora_inicio: "07:00", hora_fim: "11:00" }] }],
+      dias: [
+        { dia_semana: 1, fechado: false, faixas: [{ hora_inicio: "07:00", hora_fim: "11:00" }] },
+      ],
     });
     const nova = cal({ versao_id: "v2", versao: 2, vigencia_inicio: "2026-03-01" });
-    const r = horarioOficialDoDia({ data: "2026-02-02", escopo: { clinica_id: CLINICA }, calendarios: [antiga, nova] });
+    const r = horarioOficialDoDia({
+      data: "2026-02-02",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [antiga, nova],
+    });
     expect(r.versao_id).toBe("v0");
     expect(r.faixas).toEqual([{ inicio: "07:00", fim: "11:00" }]);
   });
 
   it("escopo desconhecido não afirma horário", () => {
-    const r = horarioOficialDoDia({ data: "2026-03-02", escopo: { clinica_id: null }, calendarios: [cal()] });
+    const r = horarioOficialDoDia({
+      data: "2026-03-02",
+      escopo: { clinica_id: null },
+      calendarios: [cal()],
+    });
     expect(r.motivo).toBe("escopo_nao_identificavel");
   });
 
   it("semana devolve os 7 dias, marcando não configurado como null", () => {
-    const s = semanaOficial({ referencia: "2026-03-02", escopo: { clinica_id: CLINICA }, calendarios: [cal()] });
+    const s = semanaOficial({
+      referencia: "2026-03-02",
+      escopo: { clinica_id: CLINICA },
+      calendarios: [cal()],
+    });
     expect(s.encontrado).toBe(true);
     expect(s.dias).toHaveLength(7);
     expect(s.dias[0]?.fechado).toBe(true);

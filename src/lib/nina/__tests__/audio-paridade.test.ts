@@ -2,10 +2,22 @@ import { expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
 
 it("arquivo de homologação é transcrito e guardado uma vez, sem aceitar links na transcrição", () => {
-  const p = Bun.spawnSync([process.execPath, fileURLToPath(new URL("./fixtures/teste-console-mj53.fixture.ts", import.meta.url)), "audio-arquivo"],
-    { stdout: "pipe", stderr: "pipe", timeout: 15000 });
+  const p = Bun.spawnSync(
+    [
+      process.execPath,
+      fileURLToPath(new URL("./fixtures/teste-console-mj53.fixture.ts", import.meta.url)),
+      "audio-arquivo",
+    ],
+    { stdout: "pipe", stderr: "pipe", timeout: 15000 },
+  );
   expect(p.exitCode, p.stderr.toString()).toBe(0);
-  const r = JSON.parse(p.stdout.toString().split(/\r?\n/).find(l => l.startsWith("MJ53_RESULTADO="))!.slice(15));
+  const r = JSON.parse(
+    p.stdout
+      .toString()
+      .split(/\r?\n/)
+      .find((l) => l.startsWith("MJ53_RESULTADO="))!
+      .slice(15),
+  );
   expect(r.transcricoes).toBe(1);
   expect(r.chamadasModelo).toBe(1);
   expect(r.entradas).toHaveLength(1);
@@ -18,10 +30,19 @@ it("arquivo de homologação é transcrito e guardado uma vez, sem aceitar links
 for (const cenario of ["audio-recebido", "audio-pedido", "audio-falha"]) {
   it(`${cenario}: real e homologação entregam formato e transcrição equivalentes`, () => {
     const executar = (arquivo: string, prefixo: string) => {
-      const p = Bun.spawnSync([process.execPath, fileURLToPath(new URL(`./fixtures/${arquivo}`, import.meta.url)), cenario],
-        { stdout: "pipe", stderr: "pipe", timeout: 15000 });
+      const p = Bun.spawnSync(
+        [
+          process.execPath,
+          fileURLToPath(new URL(`./fixtures/${arquivo}`, import.meta.url)),
+          cenario,
+        ],
+        { stdout: "pipe", stderr: "pipe", timeout: 15000 },
+      );
       expect(p.exitCode, p.stderr.toString()).toBe(0);
-      const linha = p.stdout.toString().split(/\r?\n/).find(l => l.startsWith(prefixo));
+      const linha = p.stdout
+        .toString()
+        .split(/\r?\n/)
+        .find((l) => l.startsWith(prefixo));
       return JSON.parse(linha!.slice(prefixo.length));
     };
     const real = executar("webhook-agrupamento.fixture.ts", "WEBHOOK_RESULTADO=");

@@ -7,11 +7,24 @@
  *
  * A fonte escolhida na clínica fica fixa durante a resposta, sem fallback.
  */
-import { COLUNAS_SERVICO, COLUNAS_PROFISSIONAL, TAMANHO_PAGINA, lerPublicados, temCatalogoDoTurno, comCatalogoDoTurno, contagemCatalogoDoTurno } from "./catalogo-turno.server";
+import {
+  COLUNAS_SERVICO,
+  COLUNAS_PROFISSIONAL,
+  TAMANHO_PAGINA,
+  lerPublicados,
+  temCatalogoDoTurno,
+  comCatalogoDoTurno,
+  contagemCatalogoDoTurno,
+} from "./catalogo-turno.server";
 import { agoraNaClinica } from "@/lib/nina-agora";
 import { normalizarBuscaCatalogo } from "./catalogo-sem-registro";
 import { perguntaCandidatoCatalogo } from "./identificacao-catalogo";
-import { pedidoVacinaGripe, escritaVacinaGripe, registroVacinaGripe, REGRA_FINALIDADE_VACINA } from "./finalidade-vacina";
+import {
+  pedidoVacinaGripe,
+  escritaVacinaGripe,
+  registroVacinaGripe,
+  REGRA_FINALIDADE_VACINA,
+} from "./finalidade-vacina";
 import {
   montarResultadoCatalogo,
   type ProfissionalPublicado,
@@ -33,16 +46,22 @@ import {
 
 /** Projeções para pesquisar e selecionar; no turno, vêm da leitura compartilhada.
  * O modelo continua recebendo somente os detalhes dos registros relevantes. */
-const INDICE_SERVICO = "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
-const INDICE_PROFISSIONAL = "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
-type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & { aliases?: unknown };
+const INDICE_SERVICO =
+  "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
+const INDICE_PROFISSIONAL =
+  "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
+type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & {
+  aliases?: unknown;
+};
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
   "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios" | "observacao_publica"
 > & { aliases?: unknown; medico_id?: string | null };
 
 function aliasesDoIndice(i: { aliases?: unknown }): string[] {
-  return Array.isArray(i.aliases) ? i.aliases.filter((v): v is string => typeof v === "string") : [];
+  return Array.isArray(i.aliases)
+    ? i.aliases.filter((v): v is string => typeof v === "string")
+    : [];
 }
 
 function semAcento(v: unknown): string {
@@ -65,19 +84,30 @@ function atendimentosTexto(p: IndiceProfissional, preventivo: "com" | "sem" | nu
   // Indexa apenas título e especialidade de cada bloco público. Não combina
   // palavras de consultas diferentes nem pesquisa preços, notas ou instruções.
   const itens = separarAtendimentos(p.observacao_publica ?? "", p.nome);
-  const titulos = itens.filter(i => {
-    if (!preventivo) return true;
-    const nome = semAcento(i.atendimento);
-    const inclui = /\bpreventivo\b/.test(nome) && !/\bsem\s+preventivo\b/.test(nome);
-    return preventivo === "com" ? inclui : !inclui && semAcento(i.especialidade) === "ginecologia";
-  }).map(i => [i.atendimento, i.especialidade, preventivo === "sem" ? "sem preventivo" : ""].filter(Boolean).join(" "));
+  const titulos = itens
+    .filter((i) => {
+      if (!preventivo) return true;
+      const nome = semAcento(i.atendimento);
+      const inclui = /\bpreventivo\b/.test(nome) && !/\bsem\s+preventivo\b/.test(nome);
+      return preventivo === "com"
+        ? inclui
+        : !inclui && semAcento(i.especialidade) === "ginecologia";
+    })
+    .map((i) =>
+      [i.atendimento, i.especialidade, preventivo === "sem" ? "sem preventivo" : ""]
+        .filter(Boolean)
+        .join(" "),
+    );
   return preventivo && itens.length ? titulos : [legado, ...titulos];
 }
 
 /** O profissional atende no dia pedido? Sem horário cadastrado, não exclui. */
 function atendeNoDia(p: IndiceProfissional, dia: string | null): boolean {
   if (!dia) return true;
-  const horarios = horariosPorTipo(Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [], "consulta");
+  const horarios = horariosPorTipo(
+    Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [],
+    "consulta",
+  );
   if (!horarios.length) return true;
   const alvo = semAcento(dia);
   return horarios.some(
@@ -114,50 +144,86 @@ async function buscarNaFonteDoTurno(
   // Não usar ILIKE como pré-filtro: ele exclui nomes acentuados antes da
   // normalização. Não cortar em 40/60: qualquer publicado pode ser o correto.
   const [brutosServicos, brutosProfissionais] = await Promise.all([
-    tipoAtendimento === "consulta" ? [] : lerPublicados<IndiceServico>("servicos", INDICE_SERVICO, pedido.clinicaId),
-    tipoAtendimento === "exame_procedimento" ? [] : lerPublicados<IndiceProfissional>(
-      "profissionais",
-      INDICE_PROFISSIONAL,
-      pedido.clinicaId,
-    ),
+    tipoAtendimento === "consulta"
+      ? []
+      : lerPublicados<IndiceServico>("servicos", INDICE_SERVICO, pedido.clinicaId),
+    tipoAtendimento === "exame_procedimento"
+      ? []
+      : lerPublicados<IndiceProfissional>("profissionais", INDICE_PROFISSIONAL, pedido.clinicaId),
   ]);
   const preventivo = pedidoPreventivo(pedido.query);
-  const textosProfissionais = new Map(brutosProfissionais.map(p => [p.id, atendimentosTexto(p, preventivo)]));
+  const textosProfissionais = new Map(
+    brutosProfissionais.map((p) => [p.id, atendimentosTexto(p, preventivo)]),
+  );
   const escrita = vacinaGripe ? escritaVacinaGripe : (texto: string) => texto;
-  const busca = prepararBuscaCatalogo(escrita(pedido.query), [
-    ...brutosServicos.flatMap((s) => [s.nome, ...aliasesDoIndice(s), String(s.descricao_publica ?? "")]),
-    ...brutosProfissionais.flatMap((p) => [p.nome, ...aliasesDoIndice(p), ...textosProfissionais.get(p.id)!]),
-  ].map(escrita));
+  const busca = prepararBuscaCatalogo(
+    escrita(pedido.query),
+    [
+      ...brutosServicos.flatMap((s) => [
+        s.nome,
+        ...aliasesDoIndice(s),
+        String(s.descricao_publica ?? ""),
+      ]),
+      ...brutosProfissionais.flatMap((p) => [
+        p.nome,
+        ...aliasesDoIndice(p),
+        ...textosProfissionais.get(p.id)!,
+      ]),
+    ].map(escrita),
+  );
   const pontuarProfissional = (p: IndiceProfissional, nome = "") =>
-    Math.max(0, ...textosProfissionais.get(p.id)!.map(texto => busca.pontuar(nome, texto)));
+    Math.max(0, ...textosProfissionais.get(p.id)!.map((texto) => busca.pontuar(nome, texto)));
   const termos = busca.termos;
   const expandidos = busca.ajustes;
   // Um título genérico publicado ("PROCEDIMENTOS") perde seus termos na
   // limpeza da pesquisa. Isso exige identificar o procedimento específico,
   // não declarar que o atendimento não existe nem reservar o grupo inteiro.
   if (!termos.length && tipoAtendimento === "exame_procedimento") {
-    const genericos = brutosServicos.filter(s => semAcento(s.nome) === semAcento(pedido.query));
+    const genericos = brutosServicos.filter((s) => semAcento(s.nome) === semAcento(pedido.query));
     if (genericos.length) {
-      const detalhes = await lerPublicados<ServicoPublicado>("servicos", COLUNAS_SERVICO,
-        pedido.clinicaId, genericos.map(s => s.id));
+      const detalhes = await lerPublicados<ServicoPublicado>(
+        "servicos",
+        COLUNAS_SERVICO,
+        pedido.clinicaId,
+        genericos.map((s) => s.id),
+      );
       const resultado = montarResultadoCatalogo({ servicos: detalhes, profissionais: [], hojeISO });
-      return { ...resultado, tipo_atendimento: tipoAtendimento,
-        esclarecimento: { tipo: "procedimento", pergunta: "Qual procedimento você deseja realizar? Informe o nome do procedimento.", opcoes: [] },
-        instrucao: "O termo publicado é genérico. Esclareça qual procedimento o paciente deseja antes de consultar vagas; não substitua por consulta." };
+      return {
+        ...resultado,
+        tipo_atendimento: tipoAtendimento,
+        esclarecimento: {
+          tipo: "procedimento",
+          pergunta: "Qual procedimento você deseja realizar? Informe o nome do procedimento.",
+          opcoes: [],
+        },
+        instrucao:
+          "O termo publicado é genérico. Esclareça qual procedimento o paciente deseja antes de consultar vagas; não substitua por consulta.",
+      };
     }
   }
   if (tipoAtendimento === "nao_identificado") {
     // "Cardiologia" no cadastro de especialidades é uma consulta. A mera
     // menção na descrição de um exame não transforma a especialidade em exame.
-    const nomeDeServico = brutosServicos.some((s) => [s.nome, ...aliasesDoIndice(s)].some(n => busca.pontuar(n, "") > 0));
-    const nomeOuEspecialidade = brutosProfissionais.some((p) => [p.nome, ...aliasesDoIndice(p)].some(n => pontuarProfissional(p, n) > 0));
+    const nomeDeServico = brutosServicos.some((s) =>
+      [s.nome, ...aliasesDoIndice(s)].some((n) => busca.pontuar(n, "") > 0),
+    );
+    const nomeOuEspecialidade = brutosProfissionais.some((p) =>
+      [p.nome, ...aliasesDoIndice(p)].some((n) => pontuarProfissional(p, n) > 0),
+    );
     if (nomeOuEspecialidade && !nomeDeServico) tipoAtendimento = "consulta";
     else if (nomeDeServico && !nomeOuEspecialidade) tipoAtendimento = "exame_procedimento";
   }
   const perguntaSobreConsulta = tipoAtendimento === "consulta";
   const pontuados = (perguntaSobreConsulta ? [] : brutosServicos)
-    .filter(s => !vacinaGripe || registroVacinaGripe(s.nome, aliasesDoIndice(s)))
-    .map((s) => ({ s, score: Math.max(...[s.nome, ...aliasesDoIndice(s)].map(n => busca.pontuar(escrita(n), escrita(String(s.descricao_publica ?? ""))))) }))
+    .filter((s) => !vacinaGripe || registroVacinaGripe(s.nome, aliasesDoIndice(s)))
+    .map((s) => ({
+      s,
+      score: Math.max(
+        ...[s.nome, ...aliasesDoIndice(s)].map((n) =>
+          busca.pontuar(escrita(n), escrita(String(s.descricao_publica ?? ""))),
+        ),
+      ),
+    }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
   const termosCorrigidos =
@@ -191,58 +257,90 @@ async function buscarNaFonteDoTurno(
     : pontuados;
   const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
   let medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
-  const profissionaisDaConsulta = brutosProfissionais.filter((p) =>
-    pontuarProfissional(p) > 0,
-  );
+  const profissionaisDaConsulta = brutosProfissionais.filter((p) => pontuarProfissional(p) > 0);
   // Um nome não pode trocar a especialidade já localizada por outra.
-  const universoProfissionais = tipoAtendimento === "exame_procedimento" ? []
-    : medico && (profissionaisDaConsulta.length || preventivo) ? profissionaisDaConsulta : brutosProfissionais;
+  const universoProfissionais =
+    tipoAtendimento === "exame_procedimento"
+      ? []
+      : medico && (profissionaisDaConsulta.length || preventivo)
+        ? profissionaisDaConsulta
+        : brutosProfissionais;
   // A agenda pode devolver um nome mais completo que o nome público. Revalida
   // o cadastro operacional pela mesma vinculação usada na leitura da agenda.
   // Não aceita semelhança, nome oficial abreviado, outra especialidade ou homônimo.
-  if (medico &&
-      !universoProfissionais.some(p => p.id === medico || compararNomeProfissional(medico, p.nome) === "exato")) {
-    const publicado = await publicacaoDoMedicoAgenda(pedido.clinicaId, medico,
-      universoProfissionais.map(p => ({ id: p.id, nome: p.nome, medico_id: p.medico_id ?? null })));
+  if (
+    medico &&
+    !universoProfissionais.some(
+      (p) => p.id === medico || compararNomeProfissional(medico, p.nome) === "exato",
+    )
+  ) {
+    const publicado = await publicacaoDoMedicoAgenda(
+      pedido.clinicaId,
+      medico,
+      universoProfissionais.map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        medico_id: p.medico_id ?? null,
+      })),
+    );
     if (publicado) medico = publicado;
   }
   const candidatosPorNome = universoProfissionais
-    .map((p) => ({ p, score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map(n => pontuarProfissional(p, n))) }))
+    .map((p) => ({
+      p,
+      score: Math.max(...[p.nome, ...aliasesDoIndice(p)].map((n) => pontuarProfissional(p, n))),
+    }))
     .filter(({ p, score }) =>
       medico ? p.id === medico || compararNomeProfissional(medico, p.nome) !== null : score > 0,
     )
     .sort((a, b) => b.score - a.score)
     .map(({ p }) => p);
-  const nomesExatos = medico ? candidatosPorNome.filter(p =>
-    p.id === medico || compararNomeProfissional(medico, p.nome) === "exato") : [];
+  const nomesExatos = medico
+    ? candidatosPorNome.filter(
+        (p) => p.id === medico || compararNomeProfissional(medico, p.nome) === "exato",
+      )
+    : [];
   const profissionaisPorNome = nomesExatos.length ? nomesExatos : candidatosPorNome;
-  const escolhaMedicoPendente = Boolean(medico) && profissionaisDaConsulta.length > 0 &&
-    (profissionaisPorNome.length !== 1 || profissionaisPorNome.some((p) =>
-      p.id !== medico && compararNomeProfissional(medico, p.nome) !== "exato"));
+  const escolhaMedicoPendente =
+    Boolean(medico) &&
+    profissionaisDaConsulta.length > 0 &&
+    (profissionaisPorNome.length !== 1 ||
+      profissionaisPorNome.some(
+        (p) => p.id !== medico && compararNomeProfissional(medico, p.nome) !== "exato",
+      ));
   // Reapresenta os nomes da consulta, sem transformar nenhum deles em seleção.
   // O dia não filtra a correção do nome: escala não comprova identidade.
-  const profissionaisRelevantes = escolhaMedicoPendente ? (profissionaisPorNome.length ? profissionaisPorNome : profissionaisDaConsulta)
+  const profissionaisRelevantes = escolhaMedicoPendente
+    ? profissionaisPorNome.length
+      ? profissionaisPorNome
+      : profissionaisDaConsulta
     : profissionaisPorNome.filter((p) => atendeNoDia(p, pedido.dia ?? null));
   // Lista da especialidade (sem nome de médico): todos os profissionais com
   // horário publicado, sem o corte de 6; quem não tem horário fica fora da
   // lista (decisão do usuário em 08/10/2026). Pedido pelo nome segue igual.
   // Se ninguém da especialidade tiver horário, mantém o resultado para a
   // regra de encaminhamento por falta de escala.
-  const listaDaEspecialidade = !medico && !escolhaMedicoPendente &&
+  const listaDaEspecialidade =
+    !medico &&
+    !escolhaMedicoPendente &&
     !profissionaisRelevantes.some((p) => busca.pontuar(p.nome, "") > 0);
-  const comHorario = profissionaisRelevantes.filter((p) =>
-    horariosPorTipo(Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [], "consulta").length > 0);
-  const profissionaisListados = listaDaEspecialidade && comHorario.length ? comHorario : profissionaisRelevantes;
+  const comHorario = profissionaisRelevantes.filter(
+    (p) =>
+      horariosPorTipo(
+        Array.isArray(p.horarios) ? (p.horarios as Array<Record<string, unknown>>) : [],
+        "consulta",
+      ).length > 0,
+  );
+  const profissionaisListados =
+    listaDaEspecialidade && comHorario.length ? comHorario : profissionaisRelevantes;
   const idsProfissionais = profissionaisListados
-    .slice(0, escolhaMedicoPendente || listaDaEspecialidade ? 40 : medico ? Math.max(6, limite) : limite)
+    .slice(
+      0,
+      escolhaMedicoPendente || listaDaEspecialidade ? 40 : medico ? Math.max(6, limite) : limite,
+    )
     .map((p) => p.id);
   const [detalhesServicos, detalhesProfissionais] = await Promise.all([
-    lerPublicados<ServicoPublicado>(
-      "servicos",
-      COLUNAS_SERVICO,
-      pedido.clinicaId,
-      idsServicos,
-    ),
+    lerPublicados<ServicoPublicado>("servicos", COLUNAS_SERVICO, pedido.clinicaId, idsServicos),
     lerPublicados<ProfissionalPublicado>(
       "profissionais",
       COLUNAS_PROFISSIONAL,
@@ -275,14 +373,20 @@ async function buscarNaFonteDoTurno(
   });
   resultado.tipo_atendimento = tipoAtendimento;
   if (vacinaGripe && resultado.knowledge_status === "not_found") {
-    resultado.limitacao_catalogo = { codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA", pedido: pedido.query,
-      mensagem: `Entendi o pedido de ${pedido.query}. O cadastro consultado não permite confirmar se essa vacina está disponível na clínica.` };
+    resultado.limitacao_catalogo = {
+      codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA",
+      pedido: pedido.query,
+      mensagem: `Entendi o pedido de ${pedido.query}. O cadastro consultado não permite confirmar se essa vacina está disponível na clínica.`,
+    };
     resultado.instrucao = REGRA_FINALIDADE_VACINA;
   }
   if (registrosEquivalentes && listaServicos.length > 1) {
-    resultado.instrucao = [resultado.instrucao,
+    resultado.instrucao = [
+      resultado.instrucao,
       `O cadastro tem ${listaServicos.length} registros com nomes equivalentes ao pedido (${listaServicos.map((s) => s.nome).join("; ")}). Não pergunte qual deles o paciente deseja: informe os dados de cada registro como estão no cadastro, com o nome de cada um, sem escolher, somar ou corrigir valores.`,
-    ].filter(Boolean).join(" ");
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   // Esclarecimento é um resultado próprio, não ausência nem escolha do primeiro.
@@ -290,20 +394,27 @@ async function buscarNaFonteDoTurno(
   const perguntaPorNome =
     Boolean(medico) || profissionaisRelevantes.some((p) => busca.pontuar(p.nome, "") > 0);
   const medicosAmbiguos =
-    escolhaMedicoPendente || perguntaPorNome &&
-    (profissionaisRelevantes.length > 1 ||
-      // Ajuste de escrita na especialidade não torna
-      // ambíguo um médico identificado por nome exato ou ID confirmado.
-      (!medico && busca.ajustes.length > 0) ||
-      profissionaisRelevantes.some(
-        (p) => compararNomeProfissional(medico, p.nome) === "aproximado",
-      ));
+    escolhaMedicoPendente ||
+    (perguntaPorNome &&
+      (profissionaisRelevantes.length > 1 ||
+        // Ajuste de escrita na especialidade não torna
+        // ambíguo um médico identificado por nome exato ou ID confirmado.
+        (!medico && busca.ajustes.length > 0) ||
+        profissionaisRelevantes.some(
+          (p) => compararNomeProfissional(medico, p.nome) === "aproximado",
+        )));
   const familiaSemTipo = familiaGenerica && listaServicos.length > 0;
-  const consultaAproximada = perguntaSobreConsulta && !perguntaPorNome && busca.ajustes.length > 0 && listaProfissionais.length > 0;
+  const consultaAproximada =
+    perguntaSobreConsulta &&
+    !perguntaPorNome &&
+    busca.ajustes.length > 0 &&
+    listaProfissionais.length > 0;
   const pedirServico =
-    (ambiguo || familiaSemTipo || busca.ajustes.length > 0 && listaServicos.length > 0) && !(perguntaSobreConsulta && listaProfissionais.length);
+    (ambiguo || familiaSemTipo || (busca.ajustes.length > 0 && listaServicos.length > 0)) &&
+    !(perguntaSobreConsulta && listaProfissionais.length);
   if (
-    !resultado.limitacao_catalogo && resultado.knowledge_status !== "conflict" &&
+    !resultado.limitacao_catalogo &&
+    resultado.knowledge_status !== "conflict" &&
     (medicosAmbiguos || consultaAproximada || pedirServico || busca.siglasDesconhecidas.length)
   ) {
     const opcoes = medicosAmbiguos
@@ -319,35 +430,52 @@ async function buscarNaFonteDoTurno(
           unidade: p.unidades?.nome ?? null,
         }))
       : consultaAproximada
-        ? listaProfissionais.flatMap(p => {
-          const todas = Array.isArray(p.especialidades) ? p.especialidades : [];
-          const correspondentes = todas.filter(e => busca.pontuar(String(e.nome ?? ""), "") > 0);
-          return (correspondentes.length ? correspondentes : todas).map(e => ({ id: p.id, nome: String(e.nome ?? "") }));
-        })
-          .filter((o, i, todos) => o.nome && todos.findIndex(a => a.nome === o.nome) === i)
-      : pedirServico
-        ? servicosRelevantes
-            .filter((x) => x.score === melhor)
-            .slice(0, 6)
-            .map(({ s }) => ({ id: s.id, nome: s.nome }))
-        : [];
-    const tipo = medicosAmbiguos ? "profissional" : pedirServico || consultaAproximada ? "procedimento" : "sigla";
+        ? listaProfissionais
+            .flatMap((p) => {
+              const todas = Array.isArray(p.especialidades) ? p.especialidades : [];
+              const correspondentes = todas.filter(
+                (e) => busca.pontuar(String(e.nome ?? ""), "") > 0,
+              );
+              return (correspondentes.length ? correspondentes : todas).map((e) => ({
+                id: p.id,
+                nome: String(e.nome ?? ""),
+              }));
+            })
+            .filter((o, i, todos) => o.nome && todos.findIndex((a) => a.nome === o.nome) === i)
+        : pedirServico
+          ? servicosRelevantes
+              .filter((x) => x.score === melhor)
+              .slice(0, 6)
+              .map(({ s }) => ({ id: s.id, nome: s.nome }))
+          : [];
+    const tipo = medicosAmbiguos
+      ? "profissional"
+      : pedirServico || consultaAproximada
+        ? "procedimento"
+        : "sigla";
     const nomes = opcoes.map((p) =>
       [p.nome, "especialidade" in p ? p.especialidade : null, "unidade" in p ? p.unidade : null]
         .filter(Boolean)
         .join(" — "),
     );
-    const pergunta = opcoes.length === 1 || consultaAproximada || pedirServico && busca.ajustes.length > 0
-      ? perguntaCandidatoCatalogo(opcoes, tipo === "profissional")
-      : escolhaMedicoPendente
-        ? `${profissionaisPorNome.length === 0 ? "Não encontrei esse nome entre os médicos desta consulta." : "Não consegui identificar com segurança qual médico você escolheu."} Pode informar novamente qual deseja?\n${nomes.join("\n")}`
-        : tipo === "profissional"
-        ? perguntaIdentificacaoProfissional(opcoes)
-        : tipo === "procedimento"
-          ? `Qual exame ou procedimento você deseja?\n${nomes.join("\n")}`
-          : `Pode informar por extenso o nome do atendimento ou como está escrito no pedido? Não consegui identificar a sigla ${busca.siglasDesconhecidas.join(", ").toUpperCase()}.`;
-    resultado.esclarecimento = { tipo, pergunta, opcoes,
-      ...(escolhaMedicoPendente ? { motivo: "medico_nao_identificado" as const, atendimento: pedido.query } : {}) };
+    const pergunta =
+      opcoes.length === 1 || consultaAproximada || (pedirServico && busca.ajustes.length > 0)
+        ? perguntaCandidatoCatalogo(opcoes, tipo === "profissional")
+        : escolhaMedicoPendente
+          ? `${profissionaisPorNome.length === 0 ? "Não encontrei esse nome entre os médicos desta consulta." : "Não consegui identificar com segurança qual médico você escolheu."} Pode informar novamente qual deseja?\n${nomes.join("\n")}`
+          : tipo === "profissional"
+            ? perguntaIdentificacaoProfissional(opcoes)
+            : tipo === "procedimento"
+              ? `Qual exame ou procedimento você deseja?\n${nomes.join("\n")}`
+              : `Pode informar por extenso o nome do atendimento ou como está escrito no pedido? Não consegui identificar a sigla ${busca.siglasDesconhecidas.join(", ").toUpperCase()}.`;
+    resultado.esclarecimento = {
+      tipo,
+      pergunta,
+      opcoes,
+      ...(escolhaMedicoPendente
+        ? { motivo: "medico_nao_identificado" as const, atendimento: pedido.query }
+        : {}),
+    };
     resultado.procedure = null;
     resultado.price = null;
     resultado.instrucao = `O atendimento ou profissional ainda precisa ser identificado. Faça esta pergunta ao paciente: ${pergunta} Não escolha pelo primeiro resultado, não informe valores ou preparo nem consulte/reserve agenda até esclarecer. A dúvida de identificação não comprova ausência na base e não aciona transferência por item não encontrado. Depois da resposta, reconsulte a base com o contexto e os qualificadores confirmados.`;
@@ -447,7 +575,10 @@ async function buscarNaFonteDoTurno(
 }
 
 /** A pesquisa avulsa também usa uma única fonte para índice e detalhes. */
-export function buscarNoCatalogo(pedido: Parameters<typeof buscarNaFonteDoTurno>[0], agora = new Date()): Promise<ResultadoConhecimento> {
+export function buscarNoCatalogo(
+  pedido: Parameters<typeof buscarNaFonteDoTurno>[0],
+  agora = new Date(),
+): Promise<ResultadoConhecimento> {
   return comCatalogoDoTurno(pedido.clinicaId, async () => {
     const { selecao } = await contagemCatalogoDoTurno(pedido.clinicaId);
     const resultado = await buscarNaFonteDoTurno(pedido, agora);

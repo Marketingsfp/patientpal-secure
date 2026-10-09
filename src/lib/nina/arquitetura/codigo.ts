@@ -66,17 +66,15 @@ const LINHAS_DEPOIS = 45;
  * Recorta o trecho em volta da função informada. Sem função (ou sem
  * correspondência), devolve o começo do arquivo.
  */
-export function extrairTrecho(
-  arquivo: string,
-  conteudo: string,
-  funcao?: string,
-): TrechoCodigo {
+export function extrairTrecho(arquivo: string, conteudo: string, funcao?: string): TrechoCodigo {
   const todas = conteudo.split("\n");
   const nomeLimpo = funcao?.replace(/\(.*\)$/, "").trim();
 
   let indice = -1;
   if (nomeLimpo) {
-    const alvo = new RegExp(`(function|const|let|var|export|async|\\.)\\s*${escaparRegex(nomeLimpo)}\\b`);
+    const alvo = new RegExp(
+      `(function|const|let|var|export|async|\\.)\\s*${escaparRegex(nomeLimpo)}\\b`,
+    );
     indice = todas.findIndex((linha) => alvo.test(linha));
     if (indice < 0) indice = todas.findIndex((linha) => linha.includes(nomeLimpo));
   }

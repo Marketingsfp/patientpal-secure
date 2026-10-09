@@ -5,7 +5,8 @@ describe("falha de consulta na Focus", () => {
   it("limite_excedido sem status é falha de consulta", () => {
     const b = {
       codigo: "limite_excedido",
-      mensagem: "Número máximo de requisições por minuto (100) excedido. Tente novamente em 2 segundos",
+      mensagem:
+        "Número máximo de requisições por minuto (100) excedido. Tente novamente em 2 segundos",
     };
     expect(falhaDeConsultaFocus(b)?.codigo).toBe("limite_excedido");
     expect(segundosPedidosPelaFocus(b.mensagem)).toBe(2);

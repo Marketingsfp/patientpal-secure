@@ -225,25 +225,48 @@ describe("baixa confiabilidade — incerteza pura na etapa A", () => {
   it.each([
     [{ ...incertezaPura, falhaComprovada: true }, [] as string[], semRisco, "FALHA_COMPROVADA"],
     [incertezaPura, ["CLAIM_CONTRADICTS_SOURCE"], semRisco, "BLOQUEADOR_ABSOLUTO"],
-    [incertezaPura, [] as string[], { ...semRisco, afirmacaoSemFonte: true }, "AFIRMACAO_SEM_FONTE"],
-    [incertezaPura, [] as string[], { ...semRisco, pedidoDeHumano: true }, "PEDIDO_DE_ATENDIMENTO_HUMANO"],
-    [incertezaPura, [] as string[], { ...semRisco, conflitoDeIdentidade: true }, "CONFLITO_DE_IDENTIDADE"],
-    [incertezaPura, [] as string[], { ...semRisco, conformidadeBloqueante: true }, "CONFORMIDADE_BLOQUEANTE"],
-  ])("qualquer sinal de risco devolve a decisão à regra obrigatória (%#)", (incerteza, bloqueadores, saudacao, impedimento) => {
-    const d = decidirBloqueioBaixaConfianca({
-      nivel: "LOW",
-      score: 70,
-      decisaoMotor: "CLARIFY",
-      etapa: "A",
-      ambiente: "homologacao",
-      incerteza,
-      bloqueadoresAbsolutos: bloqueadores,
-      saudacao,
-    });
-    expect(d.bloquear).toBe(true);
-    expect(d.isencaoIncertezaEtapaA).toBe(false);
-    expect(d.impedimentoIncerteza).toBe(impedimento);
-  });
+    [
+      incertezaPura,
+      [] as string[],
+      { ...semRisco, afirmacaoSemFonte: true },
+      "AFIRMACAO_SEM_FONTE",
+    ],
+    [
+      incertezaPura,
+      [] as string[],
+      { ...semRisco, pedidoDeHumano: true },
+      "PEDIDO_DE_ATENDIMENTO_HUMANO",
+    ],
+    [
+      incertezaPura,
+      [] as string[],
+      { ...semRisco, conflitoDeIdentidade: true },
+      "CONFLITO_DE_IDENTIDADE",
+    ],
+    [
+      incertezaPura,
+      [] as string[],
+      { ...semRisco, conformidadeBloqueante: true },
+      "CONFORMIDADE_BLOQUEANTE",
+    ],
+  ])(
+    "qualquer sinal de risco devolve a decisão à regra obrigatória (%#)",
+    (incerteza, bloqueadores, saudacao, impedimento) => {
+      const d = decidirBloqueioBaixaConfianca({
+        nivel: "LOW",
+        score: 70,
+        decisaoMotor: "CLARIFY",
+        etapa: "A",
+        ambiente: "homologacao",
+        incerteza,
+        bloqueadoresAbsolutos: bloqueadores,
+        saudacao,
+      });
+      expect(d.bloquear).toBe(true);
+      expect(d.isencaoIncertezaEtapaA).toBe(false);
+      expect(d.impedimentoIncerteza).toBe(impedimento);
+    },
+  );
 
   it("regra publicada aplicável não verificada NÃO impede a isenção (é incerteza, não falha)", () => {
     const r = isencaoIncertezaAplicavel({

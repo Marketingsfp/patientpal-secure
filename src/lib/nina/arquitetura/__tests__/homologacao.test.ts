@@ -2,11 +2,7 @@
  * FASE 10 — Execução de homologação na aba Arquitetura (testes puros).
  */
 import { describe, expect, it } from "bun:test";
-import {
-  agregarCargaLuna,
-  ehExecucaoHomologacao,
-  montarPipelineHomologacao,
-} from "../homologacao";
+import { agregarCargaLuna, ehExecucaoHomologacao, montarPipelineHomologacao } from "../homologacao";
 import type { EventoTrace } from "../tracing";
 
 function evento(node: string, extra: Partial<EventoTrace> = {}): EventoTrace {
@@ -49,7 +45,15 @@ describe("execução de homologação", () => {
     const p = montarPipelineHomologacao(execucaoTeste);
     expect(p.origem).toBe("homologacao");
     const geracao = p.fases.filter((f) => f.momento === "geracao").map((f) => f.id);
-    expect(geracao).toEqual(["entrada", "contexto", "prompt", "conhecimento", "modelo", "tools", "resposta"]);
+    expect(geracao).toEqual([
+      "entrada",
+      "contexto",
+      "prompt",
+      "conhecimento",
+      "modelo",
+      "tools",
+      "resposta",
+    ]);
     const sol = p.fases.at(-1)!;
     expect(sol.id).toBe("avaliacao");
     expect(sol.momento).toBe("posterior");

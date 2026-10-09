@@ -97,7 +97,9 @@ function PrivacyPage() {
                 Comunicar-se com o paciente por WhatsApp, e-mail ou telefone sobre seu atendimento.
               </li>
               <li>Cumprir obrigações legais, regulatórias e sanitárias.</li>
-              <li>Garantir a segurança do sistema, prevenir fraudes e manter trilha de auditoria.</li>
+              <li>
+                Garantir a segurança do sistema, prevenir fraudes e manter trilha de auditoria.
+              </li>
             </ul>
           </Secao>
 
@@ -113,8 +115,8 @@ function PrivacyPage() {
                 para prestação do serviço de atendimento e agendamento.
               </li>
               <li>
-                <strong className="text-foreground">Cumprimento de obrigação legal</strong> (art. 7º,
-                II) — guarda de prontuários e obrigações fiscais.
+                <strong className="text-foreground">Cumprimento de obrigação legal</strong> (art.
+                7º, II) — guarda de prontuários e obrigações fiscais.
               </li>
               <li>
                 <strong className="text-foreground">Legítimo interesse</strong> (art. 7º, IX) —
@@ -134,7 +136,9 @@ function PrivacyPage() {
             </p>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                <strong className="text-foreground">Meta Platforms (WhatsApp Business Platform):</strong>{" "}
+                <strong className="text-foreground">
+                  Meta Platforms (WhatsApp Business Platform):
+                </strong>{" "}
                 o sistema utiliza a WhatsApp Business Platform (Cloud API) da Meta para envio e
                 recebimento de mensagens com pacientes. O número de telefone e o conteúdo das
                 mensagens são processados pela Meta conforme as políticas dela.
@@ -179,14 +183,16 @@ function PrivacyPage() {
               <li>correção de dados incompletos, inexatos ou desatualizados;</li>
               <li>anonimização, bloqueio ou eliminação de dados desnecessários ou excessivos;</li>
               <li>portabilidade dos dados a outro fornecedor;</li>
-              <li>eliminação dos dados tratados com consentimento, respeitadas as guardas legais;</li>
+              <li>
+                eliminação dos dados tratados com consentimento, respeitadas as guardas legais;
+              </li>
               <li>informação sobre com quem os dados foram compartilhados;</li>
               <li>revogação do consentimento e oposição a tratamentos considerados irregulares.</li>
             </ul>
             <p>
               Para exercer esses direitos, envie a solicitação para o encarregado indicado abaixo.
-              Podemos solicitar documentos para confirmar a identidade do titular antes de atender ao
-              pedido. Responderemos no menor prazo possível, observados os limites legais.
+              Podemos solicitar documentos para confirmar a identidade do titular antes de atender
+              ao pedido. Responderemos no menor prazo possível, observados os limites legais.
             </p>
           </Secao>
 
@@ -195,8 +201,8 @@ function PrivacyPage() {
               Utilizamos cookies e armazenamento local estritamente necessários para manter a sessão
               do usuário autenticado, lembrar preferências de exibição (como tema e densidade) e
               garantir a segurança do acesso. Não utilizamos cookies de publicidade comportamental.
-              O usuário pode bloquear cookies nas configurações do navegador, ciente de que isso pode
-              impedir o funcionamento do login e de partes do sistema.
+              O usuário pode bloquear cookies nas configurações do navegador, ciente de que isso
+              pode impedir o funcionamento do login e de partes do sistema.
             </p>
           </Secao>
 

@@ -19,8 +19,7 @@ const pendente = lembrarConsultaComprovada({
   fatos: [],
   esclarecimento: { tipo: "sigla", pergunta: "Qual é o nome por extenso?", opcoes: [] },
 })!;
-const resultado = (dados: object) =>
-  validarResultado("consultar_cadastro", { ok: true, ...dados });
+const resultado = (dados: object) => validarResultado("consultar_cadastro", { ok: true, ...dados });
 const segunda = prepararSegundaPergunta(
   pendente,
   resultado({ esclarecimento: pendente.esclarecimento }),
@@ -57,7 +56,9 @@ describe("encaminhamento após uma reformulação inconclusiva", () => {
     { esclarecimento: pendente.esclarecimento },
     { found: false, knowledge_status: "not_found", records: [] },
   ])("resposta ainda não identificada vai para humano com motivo interno", (dados) => {
-    expect(encaminharAposEsclarecimento(pendente, resultado(dados), "Não sei explicar")).not.toBeNull();
+    expect(
+      encaminharAposEsclarecimento(pendente, resultado(dados), "Não sei explicar"),
+    ).not.toBeNull();
     const r = encaminharAposEsclarecimento(duas, resultado(dados), "Não sei explicar");
     expect(r?.motivo).toBe(MOTIVO_IDENTIFICACAO_PENDENTE);
     expect(r?.resumo).toContain("XYZ");

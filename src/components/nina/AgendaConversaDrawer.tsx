@@ -37,8 +37,18 @@ type Paciente = {
 };
 
 type Catalogo = {
-  procedimentos: Array<{ id: string; nome: string; tipo: string | null; duracao_minutos: number | null }>;
-  medicos: Array<{ id: string; nome: string; especialidade_id: string | null; ordem_chegada: boolean }>;
+  procedimentos: Array<{
+    id: string;
+    nome: string;
+    tipo: string | null;
+    duracao_minutos: number | null;
+  }>;
+  medicos: Array<{
+    id: string;
+    nome: string;
+    especialidade_id: string | null;
+    ordem_chegada: boolean;
+  }>;
   especialidades: Array<{ id: string; nome: string }>;
 };
 
@@ -109,7 +119,13 @@ export function AgendaConversaDrawer({
     sugestao?.periodo ?? "todos",
   );
   const [futuros, setFuturos] = useState<
-    Array<{ id: string; data: string; hora: string; procedimento: string | null; medico_nome: string | null }>
+    Array<{
+      id: string;
+      data: string;
+      hora: string;
+      procedimento: string | null;
+      medico_nome: string | null;
+    }>
   >([]);
   const [etapa, setEtapa] = useState<"form" | "confirmar" | "ok">("form");
   const [salvando, setSalvando] = useState(false);
@@ -188,7 +204,9 @@ export function AgendaConversaDrawer({
     if (!open || !clinicaId) return;
     const de = new Date(dia.getFullYear(), dia.getMonth(), 1);
     const ate = new Date(dia.getFullYear(), dia.getMonth() + 1, 0);
-    void fnDias({ data: { clinicaId, de: isoDia(de), ate: isoDia(ate), medicoId: medicoId || null } })
+    void fnDias({
+      data: { clinicaId, de: isoDia(de), ate: isoDia(ate), medicoId: medicoId || null },
+    })
       .then((r) => setDiasComVaga(new Set(r as string[])))
       .catch(() => setDiasComVaga(new Set()));
   }, [open, clinicaId, dia, medicoId, fnDias]);
@@ -226,7 +244,8 @@ export function AgendaConversaDrawer({
   if (!slotSel) faltando.push("horário");
   if (paciente && !paciente.data_nascimento) faltando.push("data de nascimento do paciente");
 
-  const medicoNome = slotSel?.medico_nome ?? catalogo?.medicos.find((m) => m.id === medicoId)?.nome ?? "";
+  const medicoNome =
+    slotSel?.medico_nome ?? catalogo?.medicos.find((m) => m.id === medicoId)?.nome ?? "";
 
   /* ------------------------------------------------------------ confirmação */
   async function confirmar() {
@@ -329,11 +348,28 @@ export function AgendaConversaDrawer({
               <CheckCircle2 className="h-4 w-4" /> Agendamento realizado com sucesso
             </p>
             <dl className="space-y-1 rounded border border-atd-border p-3 text-xs">
-              <div><dt className="inline font-semibold">Paciente: </dt><dd className="inline">{paciente?.nome}</dd></div>
-              <div><dt className="inline font-semibold">Procedimento: </dt><dd className="inline">{procedimento}</dd></div>
-              {medicoNome && <div><dt className="inline font-semibold">Profissional: </dt><dd className="inline">{medicoNome}</dd></div>}
-              <div><dt className="inline font-semibold">Data: </dt><dd className="inline">{br(isoDia(dia))}</dd></div>
-              <div><dt className="inline font-semibold">Horário: </dt><dd className="inline">{slotSel?.hora}</dd></div>
+              <div>
+                <dt className="inline font-semibold">Paciente: </dt>
+                <dd className="inline">{paciente?.nome}</dd>
+              </div>
+              <div>
+                <dt className="inline font-semibold">Procedimento: </dt>
+                <dd className="inline">{procedimento}</dd>
+              </div>
+              {medicoNome && (
+                <div>
+                  <dt className="inline font-semibold">Profissional: </dt>
+                  <dd className="inline">{medicoNome}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="inline font-semibold">Data: </dt>
+                <dd className="inline">{br(isoDia(dia))}</dd>
+              </div>
+              <div>
+                <dt className="inline font-semibold">Horário: </dt>
+                <dd className="inline">{slotSel?.hora}</dd>
+              </div>
             </dl>
             <div className="flex gap-2">
               <Button
@@ -354,18 +390,44 @@ export function AgendaConversaDrawer({
           <div className="mt-4 space-y-3 text-sm">
             <p className="font-medium">Confirmar agendamento</p>
             <dl className="space-y-1 rounded border border-atd-border p-3 text-xs">
-              <div><dt className="inline font-semibold">Paciente: </dt><dd className="inline">{paciente?.nome}</dd></div>
-              <div><dt className="inline font-semibold">Procedimento: </dt><dd className="inline">{procedimento}</dd></div>
-              {medicoNome && <div><dt className="inline font-semibold">Profissional: </dt><dd className="inline">{medicoNome}</dd></div>}
-              <div><dt className="inline font-semibold">Data: </dt><dd className="inline">{br(isoDia(dia))}</dd></div>
-              <div><dt className="inline font-semibold">Horário: </dt><dd className="inline">{slotSel?.hora}</dd></div>
+              <div>
+                <dt className="inline font-semibold">Paciente: </dt>
+                <dd className="inline">{paciente?.nome}</dd>
+              </div>
+              <div>
+                <dt className="inline font-semibold">Procedimento: </dt>
+                <dd className="inline">{procedimento}</dd>
+              </div>
+              {medicoNome && (
+                <div>
+                  <dt className="inline font-semibold">Profissional: </dt>
+                  <dd className="inline">{medicoNome}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="inline font-semibold">Data: </dt>
+                <dd className="inline">{br(isoDia(dia))}</dd>
+              </div>
+              <div>
+                <dt className="inline font-semibold">Horário: </dt>
+                <dd className="inline">{slotSel?.hora}</dd>
+              </div>
             </dl>
             {erro && <p className="text-xs text-atd-danger-ink">{erro}</p>}
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setEtapa("form")} disabled={salvando}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEtapa("form")}
+                disabled={salvando}
+              >
                 Voltar
               </Button>
-              <Button size="sm" onClick={() => void confirmar()} disabled={salvando || !podeAgendar}>
+              <Button
+                size="sm"
+                onClick={() => void confirmar()}
+                disabled={salvando || !podeAgendar}
+              >
                 {salvando ? (
                   <>
                     <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> Confirmando agendamento…
@@ -390,7 +452,8 @@ export function AgendaConversaDrawer({
                   </p>
                   {!paciente.data_nascimento && (
                     <p className="mt-1 flex items-center gap-1 text-atd-warn-ink">
-                      <AlertTriangle className="h-3 w-3" /> Data de nascimento necessária no cadastro
+                      <AlertTriangle className="h-3 w-3" /> Data de nascimento necessária no
+                      cadastro
                     </p>
                   )}
                   <Button
@@ -524,7 +587,13 @@ export function AgendaConversaDrawer({
                     className="h-7 text-xs"
                     onClick={() => setPeriodo(p)}
                   >
-                    {p === "todos" ? "Todos" : p === "manha" ? "Manhã" : p === "tarde" ? "Tarde" : "Noite"}
+                    {p === "todos"
+                      ? "Todos"
+                      : p === "manha"
+                        ? "Manhã"
+                        : p === "tarde"
+                          ? "Tarde"
+                          : "Noite"}
                   </Button>
                 ))}
                 <Button
@@ -573,7 +642,12 @@ export function AgendaConversaDrawer({
                       onClick={async () => {
                         const r = (await fnProxima({
                           data: { clinicaId, medicoId: null },
-                        })) as Array<{ medico_id: string; medico_nome: string; data: string; hora: string }>;
+                        })) as Array<{
+                          medico_id: string;
+                          medico_nome: string;
+                          data: string;
+                          hora: string;
+                        }>;
                         setOutros(Array.isArray(r) ? r.slice(0, 6) : []);
                       }}
                     >
@@ -608,7 +682,11 @@ export function AgendaConversaDrawer({
                           <Button
                             key={s.inicio + s.medico_id}
                             size="sm"
-                            variant={slotSel?.inicio === s.inicio && slotSel.medico_id === s.medico_id ? "default" : "outline"}
+                            variant={
+                              slotSel?.inicio === s.inicio && slotSel.medico_id === s.medico_id
+                                ? "default"
+                                : "outline"
+                            }
                             className="h-8 text-xs"
                             title={s.medico_nome}
                             onClick={() => setSlotSel(s)}
@@ -635,7 +713,9 @@ export function AgendaConversaDrawer({
 
             {erro && <p className="text-xs text-atd-danger-ink">{erro}</p>}
             {faltando.length > 0 && (
-              <p className="text-xs text-atd-ink-soft">Para agendar, informe: {faltando.join(", ")}.</p>
+              <p className="text-xs text-atd-ink-soft">
+                Para agendar, informe: {faltando.join(", ")}.
+              </p>
             )}
 
             <Button

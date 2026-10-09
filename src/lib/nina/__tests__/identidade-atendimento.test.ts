@@ -123,11 +123,15 @@ describe("identidade do atendimento", () => {
       estabelecimento: "Menino Jesus",
       tipoEstabelecimento: "Policlínica",
     });
-    expect(novo.startsWith(montarBlocoIdentidade({
-      assistente: "Nina",
-      estabelecimento: "Menino Jesus",
-      tipoEstabelecimento: "Policlínica",
-    }))).toBe(true);
+    expect(
+      novo.startsWith(
+        montarBlocoIdentidade({
+          assistente: "Nina",
+          estabelecimento: "Menino Jesus",
+          tipoEstabelecimento: "Policlínica",
+        }),
+      ),
+    ).toBe(true);
     expect(novo).toContain("Texto antigo.");
   });
 

@@ -152,10 +152,14 @@ export function CentralAtencao() {
   const pausas = dados?.chave === chaveContexto ? (dados.pausas ?? []) : [];
 
   // Prioridades: só esperas críticas (8 primeiras), ou a categoria escolhida.
-  const baseCategoria = useMemo(() => itensDaCategoria(resumo.itens, categoria), [resumo.itens, categoria]);
+  const baseCategoria = useMemo(
+    () => itensDaCategoria(resumo.itens, categoria),
+    [resumo.itens, categoria],
+  );
   const motivosPresentes = useMemo(() => {
     const cont = new Map<CategoriaMotivo, number>();
-    for (const i of baseCategoria) if (i.motivoCategoria) cont.set(i.motivoCategoria, (cont.get(i.motivoCategoria) ?? 0) + 1);
+    for (const i of baseCategoria)
+      if (i.motivoCategoria) cont.set(i.motivoCategoria, (cont.get(i.motivoCategoria) ?? 0) + 1);
     return [...cont.entries()];
   }, [baseCategoria]);
   const lista = useMemo(() => {
@@ -217,9 +221,7 @@ export function CentralAtencao() {
           className={cn(
             "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold",
             "will-change-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60",
-            alerta
-              ? "text-white shadow-sm"
-              : "bg-muted text-foreground hover:bg-accent",
+            alerta ? "text-white shadow-sm" : "bg-muted text-foreground hover:bg-accent",
             // Só transform/box-shadow/background: nada no cabeçalho se desloca.
             alerta && resumo.nivel === 1 && "central-atencao-n1",
             alerta && resumo.nivel === 2 && "central-atencao-n2",
@@ -307,7 +309,10 @@ export function CentralAtencao() {
             )}
           </div>
           {motivosPresentes.length > 0 && (
-            <div className="mb-1.5 flex flex-wrap gap-1" aria-label="Filtrar pelo motivo da transferência">
+            <div
+              className="mb-1.5 flex flex-wrap gap-1"
+              aria-label="Filtrar pelo motivo da transferência"
+            >
               {motivosPresentes.map(([c, n]) => (
                 <button
                   key={c}
@@ -316,7 +321,9 @@ export function CentralAtencao() {
                   aria-pressed={motivo === c}
                   className={cn(
                     "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                    motivo === c ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted",
+                    motivo === c
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border hover:bg-muted",
                   )}
                 >
                   {CATEGORIAS_MOTIVO[c]} · {n}
@@ -417,7 +424,9 @@ function ItemLinha({ item, onClick }: { item: ItemAtencao; onClick: () => void }
         aria-hidden
         className={cn(
           "h-2 w-2 shrink-0 rounded-full",
-          critico || item.motivoCategoria === "urgencia_clinica" ? "bg-destructive" : "bg-amber-500",
+          critico || item.motivoCategoria === "urgencia_clinica"
+            ? "bg-destructive"
+            : "bg-amber-500",
         )}
       />
       <span className="min-w-0 flex-1">

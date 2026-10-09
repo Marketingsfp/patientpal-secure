@@ -507,7 +507,10 @@ export async function listarResumosDaConversa(args: {
  * o paciente receber a resposta, então nunca atrasa o atendimento. Idempotente (um resumo pronto
  * não é gerado de novo) e nunca lança.
  */
-export async function gerarResumoDaConclusaoDaNina(clinicaId: string, conversaId: string): Promise<void> {
+export async function gerarResumoDaConclusaoDaNina(
+  clinicaId: string,
+  conversaId: string,
+): Promise<void> {
   try {
     const { data } = await supabaseAdmin
       .from("atend_conversas")

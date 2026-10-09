@@ -22,10 +22,7 @@
  *   - a revisão é textual: ela nunca reexecuta operação com efeito externo
  *     (gravar agendamento, transferir, enviar) para "tentar de novo".
  */
-import {
-  conformidadeDasInstrucoes,
-  type ConformidadeInstrucoes,
-} from "./conformidade-entrega";
+import { conformidadeDasInstrucoes, type ConformidadeInstrucoes } from "./conformidade-entrega";
 import { etapaAtinge, type EtapaAtivacao } from "./etapas";
 import type { ResultadoConfianca } from "./types";
 
@@ -230,11 +227,7 @@ export type PoliticaRevisao = {
 export const POLITICA_REVISAO_PADRAO: PoliticaRevisao = { maxTentativasCorrecao: 2 };
 
 /** Ações que consomem uma tentativa de correção (mexem no texto ou consultam de novo). */
-const ACOES_COM_TENTATIVA: AcaoRevisao[] = [
-  "CORRIGIR_E_REAVALIAR",
-  "NOVA_CONSULTA",
-  "ESCLARECER",
-];
+const ACOES_COM_TENTATIVA: AcaoRevisao[] = ["CORRIGIR_E_REAVALIAR", "NOVA_CONSULTA", "ESCLARECER"];
 
 /**
  * Capacidades que a revisão pode repetir: SOMENTE leitura. Gravar agendamento,
@@ -309,10 +302,7 @@ export type RevisaoFinal = {
   podeTentarCorrecao: boolean;
   /** A revisão é textual: efeito externo nunca é repetido por causa dela. */
   efeitosExternosPermitidos: false;
-  degradado:
-    | "nenhum"
-    | "liberacao_registrada_sem_aprovacao"
-    | "desfecho_por_falha_do_avaliador";
+  degradado: "nenhum" | "liberacao_registrada_sem_aprovacao" | "desfecho_por_falha_do_avaliador";
   aprovada: boolean;
   explicacao: string;
 };
@@ -368,11 +358,9 @@ export function revisarSaida(e: EntradaRevisaoFinal): RevisaoFinal {
   // e são identificadas como tais — é isso que elimina a contradição entre
   // "apenas observa" e intervenção realmente feita.
   const protecaoObrigatoria =
-    PROTECOES_OBRIGATORIAS.includes(motivo) ||
-    degradado === "desfecho_por_falha_do_avaliador";
+    PROTECOES_OBRIGATORIAS.includes(motivo) || degradado === "desfecho_por_falha_do_avaliador";
   const etapaPermite = etapaAtinge(e.etapa, etapaMinima(acaoRecomendada));
-  const aplicar =
-    acaoRecomendada === "LIBERAR" || protecaoObrigatoria || etapaPermite;
+  const aplicar = acaoRecomendada === "LIBERAR" || protecaoObrigatoria || etapaPermite;
   const acaoAplicada: AcaoRevisao = aplicar ? acaoRecomendada : "LIBERAR";
   const aplicada = aplicar && acaoRecomendada !== "LIBERAR";
   const motivoNaoAplicacao = aplicar

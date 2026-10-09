@@ -130,7 +130,6 @@ export async function vincularSnapshotMensagemEnviada(params: {
   });
 }
 
-
 export async function registrarDecisaoConfianca(params: {
   clinicaId: string;
   conversaId: string | null;
@@ -197,63 +196,66 @@ export async function registrarDecisaoConfianca(params: {
 }): Promise<ResultadoRegistro> {
   try {
     const a = params.auditoria ?? null;
-    const { data, error } = await supabaseAdmin.from("nina_confianca_decisoes").insert({
-      revisao_conversa: params.revisaoConversa ?? a?.conversationRevision ?? null,
-      evidencias_hash: params.evidenciasHash ?? null,
-      origem_resposta: params.origemResposta ?? null,
-      rodadas: params.rodadas ?? null,
-      representacao: params.representacao ?? "texto_completo",
-      config_id: params.configId ?? null,
-      config_origem: params.configOrigem ?? null,
-      etapa_ativacao: params.etapaAtivacao ?? null,
+    const { data, error } = await supabaseAdmin
+      .from("nina_confianca_decisoes")
+      .insert({
+        revisao_conversa: params.revisaoConversa ?? a?.conversationRevision ?? null,
+        evidencias_hash: params.evidenciasHash ?? null,
+        origem_resposta: params.origemResposta ?? null,
+        rodadas: params.rodadas ?? null,
+        representacao: params.representacao ?? "texto_completo",
+        config_id: params.configId ?? null,
+        config_origem: params.configOrigem ?? null,
+        etapa_ativacao: params.etapaAtivacao ?? null,
 
+        clinica_id: params.clinicaId,
+        conversation_id: params.conversaId ?? a?.conversationId ?? null,
+        execucao_id: params.execucaoId,
+        trace_id: params.traceId ?? null,
+        ambiente: params.ambiente ?? (params.teste ? "homologacao" : "producao"),
+        score: params.decisao.score,
+        acao: params.decisao.acao,
+        bloqueio: params.decisao.bloqueio,
+        categorias: params.decisao.categorias,
+        motivos: params.decisao.motivos,
+        modo: params.modo ?? "shadow",
+        teria_permitido: params.teriaPermitido ?? null,
+        policy_version: params.policyVersion ?? VERSAO_POLITICA,
+        engine_version: params.engineVersion ?? VERSAO_MOTOR,
+        outgoing_message_id: params.outgoingMessageId ?? a?.outgoingMessageId ?? null,
+        nina_session_id: params.ninaSessionId ?? a?.ninaSessionId ?? null,
+        avaliacao: params.avaliacao ?? "action_safety",
+        texto_final_hash: params.textoFinalHash ?? null,
+        handoff_decision: params.handoffDecision ?? null,
+        handoff_reason: params.handoffReason ?? null,
+        handoff_ocorreu: params.handoffOcorreu ?? null,
+        claims: params.claims ?? null,
+        ...(a
+          ? {
+              message_id: a.messageId,
+              intencao: a.intencao,
+              acao_solicitada: a.acaoSolicitada,
+              // FASE 3 — o tipo do turno explica QUAIS critérios se aplicavam.
+              turn_type: a.tipoTurno ?? null,
 
-      clinica_id: params.clinicaId,
-      conversation_id: params.conversaId ?? a?.conversationId ?? null,
-      execucao_id: params.execucaoId,
-      trace_id: params.traceId ?? null,
-      ambiente: params.ambiente ?? (params.teste ? "homologacao" : "producao"),
-      score: params.decisao.score,
-      acao: params.decisao.acao,
-      bloqueio: params.decisao.bloqueio,
-      categorias: params.decisao.categorias,
-      motivos: params.decisao.motivos,
-      modo: params.modo ?? "shadow",
-      teria_permitido: params.teriaPermitido ?? null,
-      policy_version: params.policyVersion ?? VERSAO_POLITICA,
-      engine_version: params.engineVersion ?? VERSAO_MOTOR,
-      outgoing_message_id: params.outgoingMessageId ?? a?.outgoingMessageId ?? null,
-      nina_session_id: params.ninaSessionId ?? a?.ninaSessionId ?? null,
-      avaliacao: params.avaliacao ?? "action_safety",
-      texto_final_hash: params.textoFinalHash ?? null,
-      handoff_decision: params.handoffDecision ?? null,
-      handoff_reason: params.handoffReason ?? null,
-      handoff_ocorreu: params.handoffOcorreu ?? null,
-      claims: params.claims ?? null,
-      ...(a
-        ? {
-            message_id: a.messageId,
-            intencao: a.intencao,
-            acao_solicitada: a.acaoSolicitada,
-            // FASE 3 — o tipo do turno explica QUAIS critérios se aplicavam.
-            turn_type: a.tipoTurno ?? null,
-
-            nivel: a.nivel,
-            decisao: a.decisao,
-            validadores: a.validadores,
-            reason_codes: a.reasonCodes,
-            fontes: a.fontes,
-            ferramentas: a.ferramentas,
-            bloqueadores: a.bloqueadores,
-            resultado_final: a.resultadoFinal,
-            // FASE 6 — cobertura e conflitos auditáveis junto do snapshot.
-            evidence_coverage: a.evidenceCoverage ?? null,
-            conflitos: a.validadores.flatMap((v) =>
-              (v.conflitos ?? []).map((c) => ({ validator: v.validator, ...c })),
-            ),
-          }
-        : {}),
-    } as never).select("id").maybeSingle();
+              nivel: a.nivel,
+              decisao: a.decisao,
+              validadores: a.validadores,
+              reason_codes: a.reasonCodes,
+              fontes: a.fontes,
+              ferramentas: a.ferramentas,
+              bloqueadores: a.bloqueadores,
+              resultado_final: a.resultadoFinal,
+              // FASE 6 — cobertura e conflitos auditáveis junto do snapshot.
+              evidence_coverage: a.evidenceCoverage ?? null,
+              conflitos: a.validadores.flatMap((v) =>
+                (v.conflitos ?? []).map((c) => ({ validator: v.validator, ...c })),
+              ),
+            }
+          : {}),
+      } as never)
+      .select("id")
+      .maybeSingle();
     // Erro do Supabase vem no objeto: sem checar, a gravação "some" em silêncio.
     if (error) return falha("registro da decisão de confiança", error);
     return { ok: true, id: (data as { id?: string } | null)?.id ?? null, erro: null };

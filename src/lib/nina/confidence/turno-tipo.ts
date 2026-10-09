@@ -108,12 +108,22 @@ export function ehSaudacaoPura(mensagem: string): boolean {
   // "oi bom dia", "ola boa tarde" — composições de cumprimentos.
   const partes = texto.split(" ");
   if (partes.length > 4) return false;
-  const combinacoes = [
-    texto,
-    partes.join(" "),
-  ];
+  const combinacoes = [texto, partes.join(" ")];
   if (combinacoes.some((c) => SAUDACOES.test(c))) return true;
-  const tokens = new Set(["oi", "ola", "opa", "bom", "boa", "dia", "tarde", "noite", "alo", "tudo", "bem", "bom"]);
+  const tokens = new Set([
+    "oi",
+    "ola",
+    "opa",
+    "bom",
+    "boa",
+    "dia",
+    "tarde",
+    "noite",
+    "alo",
+    "tudo",
+    "bem",
+    "bom",
+  ]);
   return partes.every((p) => tokens.has(p));
 }
 

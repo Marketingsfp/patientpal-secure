@@ -89,9 +89,7 @@ function limpar(valor: unknown, profundidade: number, pessoal: boolean): unknown
   if (typeof valor === "string") return pessoal ? mascarar(valor) : truncar(valor);
   if (Array.isArray(valor)) {
     if (profundidade >= LIMITES.profundidade) return `[${valor.length} itens]`;
-    return valor
-      .slice(0, LIMITES.itens)
-      .map((item) => limpar(item, profundidade + 1, pessoal));
+    return valor.slice(0, LIMITES.itens).map((item) => limpar(item, profundidade + 1, pessoal));
   }
   if (typeof valor === "object") {
     if (profundidade >= LIMITES.profundidade) return "[objeto]";
@@ -235,9 +233,7 @@ export function criarRastro(opcoes: OpcoesRastro): Rastro {
     falhar(nodeId, erro, metadata) {
       seguro(() => {
         const mensagem = erro instanceof Error ? erro.message : String(erro ?? "erro");
-        empurrar(
-          base(nodeId, "failed", "error", { ...(metadata ?? {}), erro: truncar(mensagem) }),
-        );
+        empurrar(base(nodeId, "failed", "error", { ...(metadata ?? {}), erro: truncar(mensagem) }));
         abertos.delete(chaveAberta(nodeId));
       });
     },

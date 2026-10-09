@@ -122,19 +122,42 @@ async function gravarComFallback(
 ): Promise<{ ok: true } | { ok: false; erro: string }> {
   const tentar = async (c: ClienteNfse) => {
     const { data, error } = await executar(c);
-    return error ? error.message : Array.isArray(data) && data.length > 0 ? null : "nenhuma linha gravada";
+    return error
+      ? error.message
+      : Array.isArray(data) && data.length > 0
+        ? null
+        : "nenhuma linha gravada";
   };
   const erroUsuario = await tentar(usuario);
   if (!erroUsuario) return { ok: true };
   const erroAdmin = await tentar(admin);
   if (!erroAdmin) return { ok: true };
-  console.error("[nfse] gravação falhou nos dois clientes", { ...contexto, erroUsuario, erroAdmin });
+  console.error("[nfse] gravação falhou nos dois clientes", {
+    ...contexto,
+    erroUsuario,
+    erroAdmin,
+  });
   return { ok: false, erro: erroAdmin };
 }
 
-function gravarNfse(usuario: ClienteNfse, admin: ClienteNfse, id: string, campos: Record<string, unknown>, onde: string) {
-  return gravarComFallback(usuario, admin,
-    (c) => c.from("nfse").update(campos as never).eq("id", id).select("id"), { id, onde });
+function gravarNfse(
+  usuario: ClienteNfse,
+  admin: ClienteNfse,
+  id: string,
+  campos: Record<string, unknown>,
+  onde: string,
+) {
+  return gravarComFallback(
+    usuario,
+    admin,
+    (c) =>
+      c
+        .from("nfse")
+        .update(campos as never)
+        .eq("id", id)
+        .select("id"),
+    { id, onde },
+  );
 }
 
 async function pollFocusTerminal(
@@ -716,7 +739,8 @@ export const emitirNfse = createServerFn({ method: "POST" })
       isNacional && attempts > 1
         ? `DPS renumerada: a prefeitura recusou por número repetido (E0014); ${attempts} tentativas, última enviada nº ${numeroEnviado}.`
         : null;
-    if (notaRenumerada) console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
+    if (notaRenumerada)
+      console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
     const observacoesComRenumeracao = notaRenumerada
       ? [nota.observacoes, notaRenumerada].filter(Boolean).join(" ")
       : nota.observacoes;
@@ -724,7 +748,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
     if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
-      await gravarNfse(supabase, supabaseAdmin, nota.id, {
+      await gravarNfse(
+        supabase,
+        supabaseAdmin,
+        nota.id,
+        {
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
@@ -734,7 +762,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_envio: payload,
           payload_resposta: body,
-        }, "emissao-erro");
+        },
+        "emissao-erro",
+      );
       return {
         ok: false,
         id: nota.id,
@@ -747,7 +777,11 @@ export const emitirNfse = createServerFn({ method: "POST" })
     }
 
     // A nota já foi aceita pela Focus com esta ref; sem gravá-la ninguém consegue consultá-la depois.
-    await gravarNfse(supabase, supabaseAdmin, nota.id, {
+    await gravarNfse(
+      supabase,
+      supabaseAdmin,
+      nota.id,
+      {
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
         // Polling terminou só com falha de consulta (ex.: limite_excedido):
@@ -756,7 +790,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
         observacoes: observacoesComRenumeracao,
         payload_envio: payload,
         payload_resposta: body,
-      }, "emissao");
+      },
+      "emissao",
+    );
 
     // Vincula todos os agendamentos selecionados (agrupamento no mesmo dia).
     // Inclui o agendamento principal para que a consulta por nfse_agendamentos
@@ -776,9 +812,16 @@ export const emitirNfse = createServerFn({ method: "POST" })
         agendamento_id: ag,
         clinica_id: emitente.clinica_id,
       }));
-      const vinculo = await gravarComFallback(supabase, supabaseAdmin,
-        (c) => c.from("nfse_agendamentos").insert(linhas as never).select("nfse_id"),
-        { id: nota.id, onde: "emissao-vinculo-agendamentos" });
+      const vinculo = await gravarComFallback(
+        supabase,
+        supabaseAdmin,
+        (c) =>
+          c
+            .from("nfse_agendamentos")
+            .insert(linhas as never)
+            .select("nfse_id"),
+        { id: nota.id, onde: "emissao-vinculo-agendamentos" },
+      );
       if (!vinculo.ok)
         avisoVinculo = `A nota foi enviada, mas o vínculo com ${idsVinculo.length} agendamento(s) não foi gravado (${vinculo.erro}).`;
     }
@@ -832,8 +875,13 @@ export const consultarNfse = createServerFn({ method: "POST" })
     // status da nota, registra o erro em campo próprio e devolve para a tela.
     if (consultaFocus.falha) {
       // A falha da consulta precisa ficar registrada mesmo que a RLS barre o usuário.
-      await gravarNfse(supabase, supabaseAdmin, nota.id,
-        { payload_resposta: body, ...camposDaConsulta(consultaFocus.falha) }, "consulta-falha");
+      await gravarNfse(
+        supabase,
+        supabaseAdmin,
+        nota.id,
+        { payload_resposta: body, ...camposDaConsulta(consultaFocus.falha) },
+        "consulta-falha",
+      );
       return {
         ok: false,
         status: null,
@@ -1294,7 +1342,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
 
     // Sem a ref nova gravada, uma nota aceita pela Focus fica impossível de
     // consultar depois. Se o registro local não atualizar, não envia.
-    const preEnvio = await gravarNfse(supabase, supabaseAdmin, nota.id, {
+    const preEnvio = await gravarNfse(
+      supabase,
+      supabaseAdmin,
+      nota.id,
+      {
         focus_ref: ref,
         focus_status: "enviando",
         status: "processando",
@@ -1306,7 +1358,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         // Idem para o endereço: se o CEP foi corrigido no cadastro e o reenvio
         // usou a ficha, a nota passa a guardar o endereço que realmente saiu.
         tomador_endereco: enderecoTomadorAtual as Json,
-      }, "reenvio-pre-envio");
+      },
+      "reenvio-pre-envio",
+    );
     if (!preEnvio.ok)
       return {
         ok: false,
@@ -1369,7 +1423,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       isNacional && attempts > 1
         ? `DPS renumerada: a prefeitura recusou por número repetido (E0014); ${attempts} tentativas, última enviada nº ${numeroEnviado}.`
         : null;
-    if (notaRenumerada) console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
+    if (notaRenumerada)
+      console.warn("[nfse] renumeração", { nota: nota.id, attempts, numeroEnviado });
     const observacoesComRenumeracao = notaRenumerada
       ? [nota.observacoes, notaRenumerada].filter(Boolean).join(" ")
       : nota.observacoes;
@@ -1377,7 +1432,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const errosFinal = Array.isArray(body?.erros) ? body.erros! : [];
     const e0014Final = errosFinal.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
     if (!resp.ok || (body?.status === "erro_autorizacao" && e0014Final)) {
-      await gravarNfse(supabase, supabaseAdmin, nota.id, {
+      await gravarNfse(
+        supabase,
+        supabaseAdmin,
+        nota.id,
+        {
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
@@ -1386,7 +1445,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
             ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
             : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_resposta: body,
-        }, "reenvio-erro");
+        },
+        "reenvio-erro",
+      );
       return {
         ok: false,
         id: nota.id,
@@ -1398,7 +1459,11 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     }
 
     // A nota já foi aceita pela Focus com esta ref; sem gravá-la ninguém consegue consultá-la depois.
-    await gravarNfse(supabase, supabaseAdmin, nota.id, {
+    await gravarNfse(
+      supabase,
+      supabaseAdmin,
+      nota.id,
+      {
         focus_ref: currentRef,
         focus_status: body?.status ?? "processando_autorizacao",
         // Polling terminou só com falha de consulta (ex.: limite_excedido):
@@ -1406,7 +1471,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         ...(falhaDeConsultaFocus(body) ? camposDaConsulta(falhaDeConsultaFocus(body)) : {}),
         observacoes: observacoesComRenumeracao,
         payload_resposta: body,
-      }, "reenvio");
+      },
+      "reenvio",
+    );
 
     return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts, avisoCep };
   });

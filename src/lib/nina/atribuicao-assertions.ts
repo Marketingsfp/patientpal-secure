@@ -84,10 +84,10 @@ export function verificarAtribuicao(
       escolhido.em_pausa !== true
     : auditoria.presence_status === "ONLINE";
   const estado = escolhido?.estado_manual ?? auditoria.estado_manual;
-  const elegivel = escolhido?.elegivel !== false && (
-    (estado ? estado === "ONLINE" : online) ||
-    (estado === "PAUSA" && auditoria.destino === "fila_individual")
-  );
+  const elegivel =
+    escolhido?.elegivel !== false &&
+    ((estado ? estado === "ONLINE" : online) ||
+      (estado === "PAUSA" && auditoria.destino === "fila_individual"));
   const admin = escolhido ? escolhido.admin : false;
 
   const atribuicoes = eventosDaConversa.filter((e) => e.selected_user_id);
@@ -116,7 +116,12 @@ export function verificarAtribuicao(
   };
 }
 
-export type CriterioAtribuicao = { criterio: string; esperado: boolean; obtido: boolean; ok: boolean };
+export type CriterioAtribuicao = {
+  criterio: string;
+  esperado: boolean;
+  obtido: boolean;
+  ok: boolean;
+};
 
 /** Lista PASS/FAIL pronta para o relatório do Test Runner. */
 export function criteriosDeAtribuicao(v: VerificacaoAtribuicao): CriterioAtribuicao[] {

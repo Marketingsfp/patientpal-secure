@@ -105,9 +105,7 @@ describe("eventos persistidos do turno levam a medição", () => {
       broker.executar("consultar_cadastro", { termo: "cardiologia" }),
     );
     for (const nome of ["TOOL_STARTED", "TOOL_FINISHED"]) {
-      expect(eventos.find((e) => e.nome === nome)?.dados?.ferramenta).toBe(
-        "consultar_cadastro",
-      );
+      expect(eventos.find((e) => e.nome === nome)?.dados?.ferramenta).toBe("consultar_cadastro");
       expect(recursosDe(eventos, nome)).toMatchObject({ memoria_medida: true });
     }
   });

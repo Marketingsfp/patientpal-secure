@@ -89,8 +89,10 @@ const EXPLICACOES: Record<MotivoClassificacao, string> = {
   sem_versao_para_a_data: "Não há versão do horário oficial válida para a data do evento.",
   dia_nao_configurado: "O dia da semana do evento não foi configurado nessa versão do horário.",
   timestamp_ausente_ou_invalido: "A data e hora do evento estão ausentes ou inválidas.",
-  escopo_nao_identificavel: "Não foi possível identificar com segurança a clínica/unidade do evento.",
-  conflito_de_configuracao: "Há mais de um horário oficial aplicável a esta data — conflito não resolvido.",
+  escopo_nao_identificavel:
+    "Não foi possível identificar com segurança a clínica/unidade do evento.",
+  conflito_de_configuracao:
+    "Há mais de um horário oficial aplicável a esta data — conflito não resolvido.",
   excecao_fechado: "Data cadastrada como fechada (exceção).",
   excecao_especial_dentro: "Dentro do horário especial cadastrado para essa data.",
   excecao_especial_fora: "Fora do horário especial cadastrado para essa data.",
@@ -175,7 +177,9 @@ export function calendarioAplicavel(
   const candidatos = (calendarios ?? [])
     .filter((c) => c.clinica_id === escopo.clinica_id)
     .filter((c) => c.status !== undefined && !!c.publicado_em)
-    .filter((c) => c.vigencia_inicio <= dataLocal && (!c.vigencia_fim || c.vigencia_fim >= dataLocal))
+    .filter(
+      (c) => c.vigencia_inicio <= dataLocal && (!c.vigencia_fim || c.vigencia_fim >= dataLocal),
+    )
     .filter((c) => {
       const geral = c.unidade_id === null || c.unidade_id === undefined;
       if (geral) return true; // geral só vale por estar explicitamente definido como geral
@@ -192,12 +196,14 @@ export function calendarioAplicavel(
   // (a substituída permanece apenas como registro histórico do período anterior).
   const publicadosVigentes = efetivos.filter((c) => c.status === "publicado");
   if (publicadosVigentes.length > 1) return { calendario: null, conflito: true };
-  if (publicadosVigentes.length === 1) return { calendario: publicadosVigentes[0] ?? null, conflito: false };
+  if (publicadosVigentes.length === 1)
+    return { calendario: publicadosVigentes[0] ?? null, conflito: false };
 
   if (efetivos.length > 1) {
     // Somente versões substituídas: usa a mais recente aplicável àquela data.
     const ordenados = [...efetivos].sort((a, b) => (b.versao ?? 0) - (a.versao ?? 0));
-    if ((ordenados[0]?.versao ?? 0) === (ordenados[1]?.versao ?? 0)) return { calendario: null, conflito: true };
+    if ((ordenados[0]?.versao ?? 0) === (ordenados[1]?.versao ?? 0))
+      return { calendario: null, conflito: true };
     return { calendario: ordenados[0] ?? null, conflito: false };
   }
   return { calendario: efetivos[0] ?? null, conflito: false };
@@ -233,7 +239,12 @@ export function classificarPeriodo(params: {
   if (conflito) return resultado("NAO_CLASSIFICAVEL", "conflito_de_configuracao", base);
   if (!calendario) return resultado("NAO_CLASSIFICAVEL", "sem_versao_para_a_data", base);
 
-  const comVersao = { ...base, fuso: calendario.fuso || fuso, versao_id: calendario.versao_id, versao: calendario.versao };
+  const comVersao = {
+    ...base,
+    fuso: calendario.fuso || fuso,
+    versao_id: calendario.versao_id,
+    versao: calendario.versao,
+  };
 
   // 1) Exceções por data prevalecem sobre a programação semanal.
   const excecoes = (calendario.excecoes ?? []).filter((e) => e.data === local.data);
@@ -243,7 +254,10 @@ export function classificarPeriodo(params: {
   const especiais = excecoes.filter((e) => e.tipo === "especial" && e.hora_inicio && e.hora_fim);
   if (especiais.length > 0) {
     const dentro = especiais.some((e) =>
-      dentroDaFaixa(local.hora, { hora_inicio: e.hora_inicio as string, hora_fim: e.hora_fim as string }),
+      dentroDaFaixa(local.hora, {
+        hora_inicio: e.hora_inicio as string,
+        hora_fim: e.hora_fim as string,
+      }),
     );
     return dentro
       ? resultado("DENTRO_DO_HORARIO", "excecao_especial_dentro", comVersao)

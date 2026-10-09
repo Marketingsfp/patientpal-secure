@@ -16,11 +16,7 @@ import { normalizarComando, validarComando } from "@/lib/atendimento/respostas-r
 
 const MODULO = "nina";
 
-async function assertMember(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  clinicaId: string,
-) {
+async function assertMember(supabase: SupabaseClient<Database>, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("is_member", {
     _user_id: userId,
     _clinica_id: clinicaId,
@@ -134,21 +130,14 @@ export const listarRespostasRapidas = createServerFn({ method: "POST" })
 export const salvarRespostaRapida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    camposSchema
-      .extend({ clinicaId: z.string().uuid(), id: z.string().uuid().nullish() })
-      .parse(i),
+    camposSchema.extend({ clinicaId: z.string().uuid(), id: z.string().uuid().nullish() }).parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
 
     if (data.escopo === "clinica") {
-      const ok = await podeEscreverAtendimento(
-        context.supabase,
-        context.userId,
-        data.clinicaId,
-      );
-      if (!ok)
-        throw new Error("Você não tem permissão para editar mensagens rápidas da clínica.");
+      const ok = await podeEscreverAtendimento(context.supabase, context.userId, data.clinicaId);
+      if (!ok) throw new Error("Você não tem permissão para editar mensagens rápidas da clínica.");
     }
 
     const erro = validarComando(data.comando);
@@ -236,13 +225,8 @@ export const excluirRespostaRapida = createServerFn({ method: "POST" })
       if (atual.owner_user_id !== context.userId)
         throw new Error("Esta mensagem rápida é pessoal de outro atendente.");
     } else {
-      const ok = await podeEscreverAtendimento(
-        context.supabase,
-        context.userId,
-        data.clinicaId,
-      );
-      if (!ok)
-        throw new Error("Você não tem permissão para excluir mensagens rápidas da clínica.");
+      const ok = await podeEscreverAtendimento(context.supabase, context.userId, data.clinicaId);
+      if (!ok) throw new Error("Você não tem permissão para excluir mensagens rápidas da clínica.");
     }
     const { error } = await context.supabase
       .from("atend_respostas_rapidas")
@@ -270,16 +254,14 @@ export const alternarFavoritoResposta = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
     if (data.favorito) {
-      const { error } = await context.supabase
-        .from("atend_resposta_favoritos")
-        .upsert(
-          {
-            resposta_id: data.respostaId,
-            user_id: context.userId,
-            clinica_id: data.clinicaId,
-          },
-          { onConflict: "resposta_id,user_id" },
-        );
+      const { error } = await context.supabase.from("atend_resposta_favoritos").upsert(
+        {
+          resposta_id: data.respostaId,
+          user_id: context.userId,
+          clinica_id: data.clinicaId,
+        },
+        { onConflict: "resposta_id,user_id" },
+      );
       if (error) throw new Error(error.message);
     } else {
       const { error } = await context.supabase

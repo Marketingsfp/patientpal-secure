@@ -17,7 +17,6 @@ import {
   ambienteDoReporte,
 } from "@/lib/nina/erro-rapido";
 
-
 const CONVERSA = "11111111-1111-4111-8111-111111111111";
 const OUTRA = "22222222-2222-4222-8222-222222222222";
 const MENSAGEM = "33333333-3333-4333-8333-333333333333";
@@ -111,9 +110,9 @@ describe("botão de reporte rápido no chat", () => {
   });
 
   it("não usa a palavra 'Nina' no texto para decidir a autoria", () => {
-    expect(
-      deveMostrarBotaoReporte({ direction: "in", enviada_por: "paciente" } as never),
-    ).toBe(false);
+    expect(deveMostrarBotaoReporte({ direction: "in", enviada_por: "paciente" } as never)).toBe(
+      false,
+    );
   });
 
   it("mostra o aviso certo para sucesso e para reporte já pendente", () => {
@@ -261,7 +260,13 @@ describe("FASE 1 — vínculo exato do erro", () => {
 
   it("bloqueia mensagem que pertence a outra conversa", () => {
     const v = validarMensagemNina(
-      { id: "msg-B2", conversa_id: "conversa-B", direction: "out", enviada_por: "nina", body: "oi" },
+      {
+        id: "msg-B2",
+        conversa_id: "conversa-B",
+        direction: "out",
+        enviada_por: "nina",
+        body: "oi",
+      },
       "conversa-C",
     );
     expect(v.ok).toBe(false);

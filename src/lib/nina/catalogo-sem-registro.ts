@@ -1,7 +1,9 @@
 import type { ResultadoBroker } from "./tool-broker";
 
-export const MOTIVO_SEM_REGISTRO = "CATALOGO_SEM_REGISTRO: atendimento solicitado não encontrado na base publicada";
-export const MOTIVO_MEDICO_SEM_REGISTRO = "CATALOGO_MEDICO_SEM_REGISTRO: médico informado não encontrado na base publicada";
+export const MOTIVO_SEM_REGISTRO =
+  "CATALOGO_SEM_REGISTRO: atendimento solicitado não encontrado na base publicada";
+export const MOTIVO_MEDICO_SEM_REGISTRO =
+  "CATALOGO_MEDICO_SEM_REGISTRO: médico informado não encontrado na base publicada";
 export const REGRA_SEM_REGISTRO_PROMPT = `INSTRUÇÃO FAT-04 — ATENDIMENTO NÃO ENCONTRADO NA BASE DE CONHECIMENTOS
 Tipo: ESSENCIAL.
 Aplica-se: consulta, especialidade, exame ou procedimento solicitado não encontrado após busca na base publicada.
@@ -15,56 +17,91 @@ Conduta:
 Resultado esperado: continuidade humana obrigatória quando o item solicitado não for encontrado na base, sem negar a oferta do serviço nem substituir por outro atendimento.`;
 
 export function normalizarBuscaCatalogo(texto: string): string {
-  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 // Termos de conversa não podem fazer uma consulta inexistente casar apenas
 // com a palavra "consulta" de outro serviço. Mantém qualificadores do item.
-const GENERICOS = new Set(("gostaria quero queria preciso saber poderia pode podem voces voce favor gentileza " +
-  "bom boa dia tarde noite ola por uma umas uns para pra com que qual quais quanto custa custam preco precos valor valores " +
-  "informacao informacoes sobre como funciona funcionam funcionamento consulta consultas exame exames procedimento procedimentos medico medica medicos medicas " +
-  "dr dra doutor doutora profissional profissionais especialista especialistas especialidade especialidades unidade unidades " +
-  "marcar marca agendar fazer realiza realizam fazem tem temos atende atendem atendimento atendimento horario horarios " +
-  "preparo preparos dias hoje amanha segunda terca quarta quinta sexta sabado domingo feira").split(/\s+/));
+const GENERICOS = new Set(
+  (
+    "gostaria quero queria preciso saber poderia pode podem voces voce favor gentileza " +
+    "bom boa dia tarde noite ola por uma umas uns para pra com que qual quais quanto custa custam preco precos valor valores " +
+    "informacao informacoes sobre como funciona funcionam funcionamento consulta consultas exame exames procedimento procedimentos medico medica medicos medicas " +
+    "dr dra doutor doutora profissional profissionais especialista especialistas especialidade especialidades unidade unidades " +
+    "marcar marca agendar fazer realiza realizam fazem tem temos atende atendem atendimento atendimento horario horarios " +
+    "preparo preparos dias hoje amanha segunda terca quarta quinta sexta sabado domingo feira"
+  ).split(/\s+/),
+);
 
 export function termosItemCatalogo(query: string): string[] {
-  return normalizarBuscaCatalogo(query).split(/[^a-z0-9]+/)
-    .filter(t => t.length >= 3 && !GENERICOS.has(t) && !/^\d+$/.test(t));
+  return normalizarBuscaCatalogo(query)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3 && !GENERICOS.has(t) && !/^\d+$/.test(t));
 }
 
 /** A leitura preventiva também recebe nomes/CPF/endereço: não são pedidos de serviço. */
 export function pedidoDeItemCatalogo(query: string): boolean {
   const q = normalizarBuscaCatalogo(query);
   if (!termosItemCatalogo(query).length) return false;
-  return /\b(?:consultas?|exames?|procedimentos?|especialidades?|especialistas?|medicos?|medicas?|doutor(?:a)?|dr|dra|preparos?|agendar|marcar|marca)\b/.test(q)
-    || /\b[a-z]+(?:ologista|ologia|grafia|scopia|metria|grama)\b/.test(q);
+  return (
+    /\b(?:consultas?|exames?|procedimentos?|especialidades?|especialistas?|medicos?|medicas?|doutor(?:a)?|dr|dra|preparos?|agendar|marcar|marca)\b/.test(
+      q,
+    ) || /\b[a-z]+(?:ologista|ologia|grafia|scopia|metria|grama)\b/.test(q)
+  );
 }
 
 /** Regra operacional por ausência confirmada; não calcula nota de confiança. */
 export function encaminhamentoSemRegistro(r: ResultadoBroker, args: unknown, automatica = false) {
-  if (!["consultar_cadastro", "buscar_medicos", "buscar_procedimentos", "listar_especialidades"].includes(r.ferramenta)) return null;
+  if (
+    ![
+      "consultar_cadastro",
+      "buscar_medicos",
+      "buscar_procedimentos",
+      "listar_especialidades",
+    ].includes(r.ferramenta)
+  )
+    return null;
   const d = r.dados as Record<string, unknown> | null;
   if (!d || typeof d !== "object") return null;
   if (d.esclarecimento || d.limitacao_catalogo) return null;
-  const ausente = r.success && !r.erro && d.knowledge_status === "not_found" && d.found === false &&
-    Array.isArray(d.records) && d.records.length === 0;
-  const ausenciaTipada = ["DOCTOR_NOT_FOUND", "PROCEDURE_NOT_FOUND"].includes(r.erro ?? "") &&
-    d.fonte === "catalogo_publicado" && d.encaminhar_para_humano === true;
+  const ausente =
+    r.success &&
+    !r.erro &&
+    d.knowledge_status === "not_found" &&
+    d.found === false &&
+    Array.isArray(d.records) &&
+    d.records.length === 0;
+  const ausenciaTipada =
+    ["DOCTOR_NOT_FOUND", "PROCEDURE_NOT_FOUND"].includes(r.erro ?? "") &&
+    d.fonte === "catalogo_publicado" &&
+    d.encaminhar_para_humano === true;
   if (!ausente && !ausenciaTipada) return null;
   let parametros: Record<string, unknown> = {};
   try {
     const p = typeof args === "string" ? JSON.parse(args) : args;
     if (p && typeof p === "object" && !Array.isArray(p)) parametros = p;
-  } catch { /* Só o retorno oficial comprova a ausência. */ }
-  const termo = String(parametros.termo ?? parametros.especialidade ?? parametros.nome ?? "").slice(0, 200);
+  } catch {
+    /* Só o retorno oficial comprova a ausência. */
+  }
+  const termo = String(parametros.termo ?? parametros.especialidade ?? parametros.nome ?? "").slice(
+    0,
+    200,
+  );
   // Uma consulta solicitada pelo modelo já identificou a intenção. A busca
   // preventiva não pode transferir só porque o paciente informou seus dados.
   if (automatica && !pedidoDeItemCatalogo(termo)) return null;
-  if (r.erro === "DOCTOR_NOT_FOUND" || typeof parametros.medico === "string" && parametros.medico.trim()) return {
-    motivo: MOTIVO_MEDICO_SEM_REGISTRO,
-    resumo: `Não foi encontrado o médico informado. Médico: ${String(parametros.medico ?? parametros.nome ?? termo).slice(0, 160)}. Consulta pesquisada: ${termo}. A equipe deve conferir a identificação do profissional; esse resultado não comprova ausência da consulta.`,
-    urgencia: "normal" as const,
-  };
+  if (
+    r.erro === "DOCTOR_NOT_FOUND" ||
+    (typeof parametros.medico === "string" && parametros.medico.trim())
+  )
+    return {
+      motivo: MOTIVO_MEDICO_SEM_REGISTRO,
+      resumo: `Não foi encontrado o médico informado. Médico: ${String(parametros.medico ?? parametros.nome ?? termo).slice(0, 160)}. Consulta pesquisada: ${termo}. A equipe deve conferir a identificação do profissional; esse resultado não comprova ausência da consulta.`,
+      urgencia: "normal" as const,
+    };
   return {
     motivo: MOTIVO_SEM_REGISTRO,
     resumo: `O atendimento solicitado não foi encontrado na base publicada. Busca: ${termo || "catálogo de especialidades"}. A equipe deve conferir e continuar a conversa; a ausência no catálogo não comprova que a clínica não oferece o serviço.`,
@@ -81,9 +118,10 @@ export const AVISO_SIMULACAO_ENCAMINHAMENTO =
   "Nesta simulação, nenhuma transferência para uma atendente real foi realizada.";
 
 export function respostaSemRegistro(confirmado: boolean, teste = false): string {
-  if (teste) return confirmado
-    ? "Nesta simulação, registrei que este atendimento deve continuar com a equipe humana. Nenhuma transferência para uma atendente real foi realizada."
-    : "Não consegui registrar o encaminhamento desta simulação. Nenhuma transferência real foi realizada.";
+  if (teste)
+    return confirmado
+      ? "Nesta simulação, registrei que este atendimento deve continuar com a equipe humana. Nenhuma transferência para uma atendente real foi realizada."
+      : "Não consegui registrar o encaminhamento desta simulação. Nenhuma transferência real foi realizada.";
   return confirmado
     ? "Vou contar com nossa equipe para te ajudar com esse atendimento. Encaminhei sua conversa para um atendente, que continuará por aqui."
     : "Preciso do apoio da nossa equipe para te ajudar com esse atendimento. Não consegui transferir sua conversa neste momento; por favor, entre em contato com a recepção.";
@@ -105,18 +143,29 @@ export function confirmarAntesDeEncaminhar(
   let termo = "";
   try {
     const p = typeof args === "string" ? JSON.parse(args) : args;
-    termo = String(p?.medico ?? p?.nome ?? p?.termo ?? p?.especialidade ?? "").trim().slice(0, 120);
-  } catch { /* sem termo legível */ }
+    termo = String(p?.medico ?? p?.nome ?? p?.termo ?? p?.especialidade ?? "")
+      .trim()
+      .slice(0, 120);
+  } catch {
+    /* sem termo legível */
+  }
   const profissional = ausencia.motivo === MOTIVO_MEDICO_SEM_REGISTRO;
-  const pergunta = profissional ? `Não consegui identificar o profissional "${termo}". Pode escrever o nome novamente ou informar a especialidade?` : termo
-    ? `Não encontrei "${termo}" no nosso cadastro. Você quis dizer outro nome? Pode escrever de outro jeito ou como está no pedido médico (por exemplo: ultrassom de abdome, cardiologista)?`
-    : "Não consegui identificar o atendimento. Pode escrever o nome do exame ou da especialidade de outro jeito, ou como está no pedido médico?";
+  const pergunta = profissional
+    ? `Não consegui identificar o profissional "${termo}". Pode escrever o nome novamente ou informar a especialidade?`
+    : termo
+      ? `Não encontrei "${termo}" no nosso cadastro. Você quis dizer outro nome? Pode escrever de outro jeito ou como está no pedido médico (por exemplo: ultrassom de abdome, cardiologista)?`
+      : "Não consegui identificar o atendimento. Pode escrever o nome do exame ou da especialidade de outro jeito, ou como está no pedido médico?";
   const dados = (r.dados ?? {}) as Record<string, unknown>;
   return {
     ...r,
     dados: {
       ...dados,
-      esclarecimento: { tipo: profissional ? "profissional" : "sigla", motivo: "sem_registro_confirmar", pergunta, opcoes: [] },
+      esclarecimento: {
+        tipo: profissional ? "profissional" : "sigla",
+        motivo: "sem_registro_confirmar",
+        pergunta,
+        opcoes: [],
+      },
       instrucao: `Busca sem resultado na primeira tentativa. Não transfira ainda. Peça para escrever o nome de outro jeito. Sem candidato publicado, não invente uma hipótese. Base sugerida: ${pergunta} Se o paciente pedir atendente, use solicitar_atendente_humano. Depois da resposta, consulte a base novamente.`,
     },
   };

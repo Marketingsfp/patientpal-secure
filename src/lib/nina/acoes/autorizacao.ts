@@ -88,7 +88,12 @@ export type EntradaAutorizacao = {
   /** Só para operações sobre uma reserva já existente. */
   agendamentoId?: string | null;
   /** Dados obrigatórios do Clínica OS; CPF permanece opcional. */
-  dadosIdentificacao?: { nome?: string | null; cpf?: string | null; data_nascimento?: string | null; telefone?: string | null };
+  dadosIdentificacao?: {
+    nome?: string | null;
+    cpf?: string | null;
+    data_nascimento?: string | null;
+    telefone?: string | null;
+  };
   /** Base opcional da chave de idempotência (conversa/telefone). */
   idempotenciaBase?: string | null;
 };

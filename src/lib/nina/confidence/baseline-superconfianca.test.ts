@@ -10,7 +10,13 @@
  */
 import { describe, expect, it } from "bun:test";
 import { decidirConfianca } from "./engine";
-import { decidirNoTurno, garantirScoreDoTextoEnviado, montarContextoDoTurno, verificarRespostaFinalDoTurno, type EstadoDoTurno } from "./runtime";
+import {
+  decidirNoTurno,
+  garantirScoreDoTextoEnviado,
+  montarContextoDoTurno,
+  verificarRespostaFinalDoTurno,
+  type EstadoDoTurno,
+} from "./runtime";
 import { avaliacaoCorrespondeAoTexto } from "./hash";
 import { medirEvidencia, pontuarValidadores, POLITICA_PADRAO } from "./policy";
 import { IntentClarityValidator, ToolIntegrityValidator } from "./validators";
@@ -98,7 +104,12 @@ describe("BASELINE 1 — ausência de sinal é tratada como certeza", () => {
         acao: "desconhecida",
         intent: null,
         ferramentas: [
-          { nome: "buscar_medicos", capacidade: "listProfessionals", fonte: "agenda", success: true },
+          {
+            nome: "buscar_medicos",
+            capacidade: "listProfessionals",
+            fonte: "agenda",
+            success: true,
+          },
         ],
       }),
     );
@@ -146,7 +157,12 @@ describe("BASELINE 2 — intenção ausente é convertida em intenção observad
           intent: null,
           acao: "desconhecida",
           ferramentas: [
-            { nome: "buscar_medicos", capacidade: "listProfessionals", fonte: "agenda", success: true },
+            {
+              nome: "buscar_medicos",
+              capacidade: "listProfessionals",
+              fonte: "agenda",
+              success: true,
+            },
           ],
         }),
       ),
@@ -264,9 +280,13 @@ describe("BASELINE 4 — a confiança fica presa ao texto avaliado, não ao envi
     const r = verificarRespostaFinalDoTurno({ ...base }, "texto final entregue ao paciente");
     expect(r.tipoAvaliacao).toBe("answer_confidence");
     expect(r.textoAvaliadoHash).toBeTruthy();
-    expect(avaliacaoCorrespondeAoTexto(r.textoAvaliadoHash, "texto final entregue ao paciente")).toBe(true);
+    expect(
+      avaliacaoCorrespondeAoTexto(r.textoAvaliadoHash, "texto final entregue ao paciente"),
+    ).toBe(true);
     // Qualquer alteração posterior invalida o score.
-    expect(avaliacaoCorrespondeAoTexto(r.textoAvaliadoHash, "texto final entregue ao paciente!")).toBe(false);
+    expect(
+      avaliacaoCorrespondeAoTexto(r.textoAvaliadoHash, "texto final entregue ao paciente!"),
+    ).toBe(false);
   });
 });
 

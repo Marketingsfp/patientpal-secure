@@ -104,9 +104,7 @@ export function buildUserPrompt(
             .join("\n")}`,
         );
       if (e.checklist?.length)
-        parts.push(
-          `Checklist:\n${e.checklist.map((c) => `- ${c.item}: ${c.status}`).join("\n")}`,
-        );
+        parts.push(`Checklist:\n${e.checklist.map((c) => `- ${c.item}: ${c.status}`).join("\n")}`);
       if (e.transcricao) parts.push(`Trecho da conversa:\n${e.transcricao.slice(0, 2500)}`);
       return parts.join("\n");
     })
@@ -134,7 +132,8 @@ export function normalize(raw: unknown, quantidade: number): ProvaGerada {
       origem: String(q.origem ?? ""),
     }))
     .slice(0, quantidade);
-  if (questoes.length === 0) throw new Error("A IA não retornou questões válidas. Tente novamente.");
+  if (questoes.length === 0)
+    throw new Error("A IA não retornou questões válidas. Tente novamente.");
   return { titulo: String(data.titulo ?? "Prova de conversão de agendamento"), questoes };
 }
 
@@ -207,7 +206,13 @@ export const FEEDBACK_TOOL = {
 
 export function buildFeedbackPrompt(
   atendente: string,
-  questoes: { pergunta: string; alternativas: string[]; correta: number; explicacao?: string; origem?: string }[],
+  questoes: {
+    pergunta: string;
+    alternativas: string[];
+    correta: number;
+    explicacao?: string;
+    origem?: string;
+  }[],
   respostas: number[],
   tabela?: string,
   scripts?: string,

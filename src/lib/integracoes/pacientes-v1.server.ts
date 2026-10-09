@@ -123,7 +123,9 @@ export async function resolverPaciente(
   const novoTel = somenteDigitos(entrada.telefone ?? "");
   const telAtual = somenteDigitos(pac.telefone ?? "");
   const telefone_divergente =
-    !r.criado && novoTel && telAtual && novoTel !== telAtual ? (entrada.telefone ?? "").trim() : null;
+    !r.criado && novoTel && telAtual && novoTel !== telAtual
+      ? (entrada.telefone ?? "").trim()
+      : null;
 
   return {
     paciente_id: pac.id,
@@ -196,7 +198,11 @@ export async function consultarPaciente(
       message: "Não foi possível consultar agora.",
     });
   }
-  const r = (data ?? {}) as { encontrado?: boolean; nome?: string | null; telefone?: string | null };
+  const r = (data ?? {}) as {
+    encontrado?: boolean;
+    nome?: string | null;
+    telefone?: string | null;
+  };
   const achou = r.encontrado === true && Boolean(r.nome);
   const nome = nomeExibicao(achou ? (r.nome as string) : "PACIENTE NAO ENCONTRADO");
   const tel = r.telefone ? telefoneMascarado(achou ? r.telefone : "00000000000") : null;

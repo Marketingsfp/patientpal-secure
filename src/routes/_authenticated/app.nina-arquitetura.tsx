@@ -31,7 +31,6 @@ import { historicoInstrucoesNina } from "@/lib/nina/instrucoes.functions";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 import { useAuth } from "@/hooks/use-auth";
 
-
 export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
   head: () => ({
     meta: [
@@ -90,7 +89,6 @@ function Pagina() {
     }
   }, []);
 
-
   const buscarCapacidades = useServerFn(capacidadesArquitetura);
   const { data: permissao } = useQuery({
     queryKey: ["arquitetura-capacidades", clinicaId, session?.user.id],
@@ -109,8 +107,7 @@ function Pagina() {
   const nivelAcesso = nivelAcessoDe(capacidades);
   const chavePosicoes = `nina-arquitetura-posicoes:${clinicaId ?? "sem-clinica"}`;
   const status = statusArquitetura(NODES_ARQUITETURA);
-  const sinal =
-    status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
+  const sinal = status.cor === "verde" ? "🟢" : status.cor === "amarelo" ? "🟡" : "🔴";
 
   if (permissao && !podeVer) {
     return (
@@ -196,12 +193,13 @@ function Pagina() {
               />
             ) : null}
           </div>
-
         </TabsContent>
 
-
         <TabsContent value="alteracoes" className="mt-4">
-          <PainelAlteracoes clinicaId={clinicaId ?? null} podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")} />
+          <PainelAlteracoes
+            clinicaId={clinicaId ?? null}
+            podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")}
+          />
         </TabsContent>
 
         <TabsContent value="execucao" className="mt-4">
@@ -367,10 +365,9 @@ function PainelAlteracoes({
       {clinicaId && podeHistorico ? <MudancasDoPrompt clinicaId={clinicaId} /> : null}
 
       <p className="text-xs text-muted-foreground">
-        Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova
-        da arquitetura.
+        Mover ou reorganizar componentes no mapa muda apenas o desenho e não cria uma versão nova da
+        arquitetura.
       </p>
-
     </div>
   );
 }

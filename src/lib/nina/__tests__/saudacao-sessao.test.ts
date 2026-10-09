@@ -72,8 +72,10 @@ describe("Saudação obrigatória por sessão da Nina", () => {
 
 describe("Validação semântica da apresentação", () => {
   it("aceita variações de texto com todos os elementos", () => {
-    const a = "Olá, boa tarde! 😊 Sou a Nina, assistente virtual da Policlínica Menino Jesus. Como posso te ajudar?";
-    const b = "Boa tarde! Sou a Nina, assistente virtual da Policlinica Menino Jesus. Em que posso te ajudar hoje?";
+    const a =
+      "Olá, boa tarde! 😊 Sou a Nina, assistente virtual da Policlínica Menino Jesus. Como posso te ajudar?";
+    const b =
+      "Boa tarde! Sou a Nina, assistente virtual da Policlinica Menino Jesus. Em que posso te ajudar hoje?";
     expect(saudacaoCompleta(a, UNIDADE)).toBe(true);
     expect(saudacaoCompleta(b, UNIDADE)).toBe(true);
   });

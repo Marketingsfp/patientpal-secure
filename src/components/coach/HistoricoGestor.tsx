@@ -108,8 +108,7 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
         items,
         conversas: items.filter((i) => (i.modo ?? "voz") === "texto").length,
         ligacoes: items.filter((i) => (i.modo ?? "voz") !== "texto").length,
-        media:
-          items.reduce((s, i) => s + (Number(i.nota) || 0), 0) / Math.max(items.length, 1),
+        media: items.reduce((s, i) => s + (Number(i.nota) || 0), 0) / Math.max(items.length, 1),
         ultima: items[0]?.created_at,
       }))
       .filter((a) => a.nome.toLowerCase().includes(busca.trim().toLowerCase()))
@@ -151,13 +150,11 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
             </div>
           </div>
           <div className="flex gap-1.5">
-            {(
-              [
-                { id: "tudo" as Filtro, label: "Tudo" },
-                { id: "texto" as Filtro, label: "Conversas" },
-                { id: "voz" as Filtro, label: "Ligações" },
-              ]
-            ).map((f) => (
+            {[
+              { id: "tudo" as Filtro, label: "Tudo" },
+              { id: "texto" as Filtro, label: "Conversas" },
+              { id: "voz" as Filtro, label: "Ligações" },
+            ].map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFiltro(f.id)}
@@ -204,9 +201,7 @@ export function HistoricoGestor({ clinicaId }: { clinicaId: string | null }) {
                         {r.duracao_seg ? ` · ${formatDuracao(r.duracao_seg)}` : ""}
                       </span>
                     </span>
-                    <span
-                      className={`text-lg font-bold shrink-0 ${notaCor(Number(r.nota) || 0)}`}
-                    >
+                    <span className={`text-lg font-bold shrink-0 ${notaCor(Number(r.nota) || 0)}`}>
                       {(Number(r.nota) || 0).toFixed(1)}
                     </span>
                     <ChevronDown

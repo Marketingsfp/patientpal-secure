@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  avisoSaidaEscopo,
-  devoAutoSelecionar,
-  selecaoSaiuDoEscopo,
-} from "../inbox-realtime";
+import { avisoSaidaEscopo, devoAutoSelecionar, selecaoSaiuDoEscopo } from "../inbox-realtime";
 import { conversaVisivelNoEscopo } from "../escopo-inbox";
 
 const jean = "11111111-1111-1111-1111-111111111111";

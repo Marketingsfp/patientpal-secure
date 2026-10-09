@@ -67,9 +67,7 @@ describe("Criar com IA — conversão para o formulário", () => {
         nome: "Dra. Ana Paula",
         especialidades: ["Cardiologia"],
         convenios: ["Unimed"],
-        horarios: [
-          { dia: "Quinta-feira", inicio: "14:00", fim: null, recorrencia: "Quinzenal" },
-        ],
+        horarios: [{ dia: "Quinta-feira", inicio: "14:00", fim: null, recorrencia: "Quinzenal" }],
         aviso_dia: "No dia 12/03 chega às 10:00",
         aviso_valido_de: "12/03",
       },

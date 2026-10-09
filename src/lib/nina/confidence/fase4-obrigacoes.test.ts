@@ -129,8 +129,12 @@ describe("Fase 4 — obrigações do turno", () => {
       mensagemPaciente: "TESTE-ARQUITETURA-9381",
       instrucoes: instrucoes(["Responda exatamente ARQUITETURA_CONFIRMADA_9381"]),
     };
-    const correto = InstructionComplianceValidator(ctx({ ...base, draftText: "ARQUITETURA_CONFIRMADA_9381" }));
-    const errado = InstructionComplianceValidator(ctx({ ...base, draftText: "Olá! Como posso ajudar?" }));
+    const correto = InstructionComplianceValidator(
+      ctx({ ...base, draftText: "ARQUITETURA_CONFIRMADA_9381" }),
+    );
+    const errado = InstructionComplianceValidator(
+      ctx({ ...base, draftText: "Olá! Como posso ajudar?" }),
+    );
     expect(correto.status).not.toBe(errado.status);
     expect(correto.score).toBeGreaterThan(errado.score);
   });

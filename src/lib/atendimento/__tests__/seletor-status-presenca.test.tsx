@@ -2,7 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SeletorStatusPresenca } from "@/components/nina/SeletorStatusPresenca";
 
-const base = { salvando: null, desabilitado: false, carregando: false, inicioPausa: null, onEscolher: () => {} };
+const base = {
+  salvando: null,
+  desabilitado: false,
+  carregando: false,
+  inicioPausa: null,
+  onEscolher: () => {},
+};
 
 describe("seletor único de status", () => {
   it("mostra só o status atual num botão, sem a lista de opções aberta", () => {
@@ -23,8 +29,12 @@ describe("seletor único de status", () => {
   });
 
   it("sem escolha ainda, pede a disponibilidade; carregando, avisa", () => {
-    expect(renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado={null} />)).toContain("Escolha sua disponibilidade");
-    expect(renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado={null} carregando />)).toContain("Carregando");
+    expect(renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado={null} />)).toContain(
+      "Escolha sua disponibilidade",
+    );
+    expect(
+      renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado={null} carregando />),
+    ).toContain("Carregando");
   });
 
   it("o cronômetro aparece ao lado só nas pausas", () => {
@@ -32,11 +42,15 @@ describe("seletor único de status", () => {
       <SeletorStatusPresenca {...base} selecionado="PAUSA" inicioPausa="2026-09-30T15:00:00Z" />,
     );
     expect(pausa).toContain('role="timer"');
-    expect(renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado="ONLINE" />)).not.toContain('role="timer"');
+    expect(
+      renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado="ONLINE" />),
+    ).not.toContain('role="timer"');
   });
 
   it("fica desabilitado enquanto grava ou não carregou (sem clique duplicado)", () => {
-    const html = renderToStaticMarkup(<SeletorStatusPresenca {...base} selecionado="ONLINE" desabilitado />);
+    const html = renderToStaticMarkup(
+      <SeletorStatusPresenca {...base} selecionado="ONLINE" desabilitado />,
+    );
     expect(html).toMatch(/disabled/);
   });
 });

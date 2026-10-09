@@ -27,7 +27,20 @@ describe("extração íntegra das regras", () => {
     expect(contrato.regras).toHaveLength(23);
     expect(contrato.diagnostico.duplicados).toEqual([]);
     const ids = contrato.regras.map((r) => r.identificador);
-    for (const id of ["ID-01", "CONV-05", "FAT-03", "DAD-01", "OP-03", "CONF-02", "HUM-03", "AMB-01", "ESC-01", "SEG-01", "LING-01", "TESTE-01"]) {
+    for (const id of [
+      "ID-01",
+      "CONV-05",
+      "FAT-03",
+      "DAD-01",
+      "OP-03",
+      "CONF-02",
+      "HUM-03",
+      "AMB-01",
+      "ESC-01",
+      "SEG-01",
+      "LING-01",
+      "TESTE-01",
+    ]) {
       expect(ids).toContain(id);
     }
   });
@@ -68,7 +81,9 @@ describe("extração íntegra das regras", () => {
   it("separa orientação geral de regra: instrução de ferramenta não vira exigência", () => {
     const ferramenta = contrato.orientacoes.find((o) => o.texto.includes("ferramenta"));
     expect(ferramenta).toBeDefined();
-    expect(contrato.regras.some((r) => r.textoIntegral.includes("solicite a ferramenta"))).toBe(false);
+    expect(contrato.regras.some((r) => r.textoIntegral.includes("solicite a ferramenta"))).toBe(
+      false,
+    );
   });
 });
 
@@ -89,12 +104,20 @@ describe("condição falsa versus indeterminada", () => {
     const c = compilarCondicoes("quando o paciente estiver de bom humor");
     expect(c[0]!.tipo).toBe("nao_compilada");
     const solto = compilarContratoRegras(
-      ["XYZ-01 — Teste", "Tipo: ESSENCIAL", "Aplica-se: quando fizer sentido", "Conduta: seja breve.", "Resultado esperado: resposta breve."].join("\n"),
+      [
+        "XYZ-01 — Teste",
+        "Tipo: ESSENCIAL",
+        "Aplica-se: quando fizer sentido",
+        "Conduta: seja breve.",
+        "Resultado esperado: resposta breve.",
+      ].join("\n"),
       { escopo: "homologacao" },
     );
     expect(solto.diagnostico.condicoesNaoCompiladas).toHaveLength(1);
     expect(solto.limitacoes).toContain("CONDICAO_NAO_COMPILADA");
-    expect(avaliarAplicabilidade(solto.regras[0]!, { primeiraResposta: true })).toBe("indeterminada");
+    expect(avaliarAplicabilidade(solto.regras[0]!, { primeiraResposta: true })).toBe(
+      "indeterminada",
+    );
   });
 });
 
@@ -135,13 +158,19 @@ describe("marcador exato só no ambiente e na entrada previstos", () => {
 
   it("não se aplica em produção nem com outra mensagem", () => {
     expect(
-      avaliarAplicabilidade(r(), { ambiente: "producao", mensagemPaciente: "verificar fonte 9381" }),
+      avaliarAplicabilidade(r(), {
+        ambiente: "producao",
+        mensagemPaciente: "verificar fonte 9381",
+      }),
     ).toBe("falsa");
     expect(
       avaliarAplicabilidade(r(), { ambiente: "homologacao", mensagemPaciente: "bom dia" }),
     ).toBe("falsa");
     expect(
-      avaliarAplicabilidade(r(), { ambiente: "homologacao", mensagemPaciente: "verificar fonte 9381" }),
+      avaliarAplicabilidade(r(), {
+        ambiente: "homologacao",
+        mensagemPaciente: "verificar fonte 9381",
+      }),
     ).toBe("verdadeira");
     expect(avaliarAplicabilidade(r(), { mensagemPaciente: "verificar fonte 9381" })).toBe(
       "indeterminada",

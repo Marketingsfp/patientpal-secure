@@ -32,10 +32,7 @@ export function loadEstadoRoleplay(atendente: string): EstadoRoleplay | null {
   }
 }
 
-export function saveEstadoRoleplay(
-  atendente: string,
-  estado: Omit<EstadoRoleplay, "dia">,
-) {
+export function saveEstadoRoleplay(atendente: string, estado: Omit<EstadoRoleplay, "dia">) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(

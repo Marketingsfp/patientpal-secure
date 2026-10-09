@@ -1234,9 +1234,7 @@ export function MedicoFormDialog({
             <Checkbox
               id="medico-visivel-online"
               checked={form.visivel_agendamento_online}
-              onCheckedChange={(v) =>
-                setForm({ ...form, visivel_agendamento_online: v === true })
-              }
+              onCheckedChange={(v) => setForm({ ...form, visivel_agendamento_online: v === true })}
             />
             <Label htmlFor="medico-visivel-online" className="cursor-pointer">
               Aparece no agendamento online

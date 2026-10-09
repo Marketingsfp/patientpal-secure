@@ -169,19 +169,14 @@ export function estadoAplicabilidadeDoContexto(c: ContextoCanonico): EstadoAplic
     mensagemPaciente: c.mensagemRecebida,
     primeiraResposta:
       c.estadoSessao.primeiraResposta ??
-      (c.estadoSessao.apresentacaoEntregue == null
-        ? null
-        : !c.estadoSessao.apresentacaoEntregue),
+      (c.estadoSessao.apresentacaoEntregue == null ? null : !c.estadoSessao.apresentacaoEntregue),
     apresentacaoEntregue: c.estadoSessao.apresentacaoEntregue,
     saudacaoSimples: c.pedido.saudacaoSimples,
     pedidoConcreto: c.pedido.concreto,
     operacaoIminente: c.operacao ? !c.operacao.executada : c.operacao === null ? false : null,
     resultadoOperacional: c.operacao ? c.operacao.executada : false,
     afirmacaoFactual: c.candidato === "" ? null : factuais.length > 0,
-    pedidoDeHumano:
-      c.mensagemRecebida === ""
-        ? null
-        : PEDIDO_DE_HUMANO.test(c.mensagemRecebida),
+    pedidoDeHumano: c.mensagemRecebida === "" ? null : PEDIDO_DE_HUMANO.test(c.mensagemRecebida),
     avaliandoCandidato: true,
     posClassificacao: c.posClassificacao,
   };

@@ -51,7 +51,9 @@ export type ResumoRelatorio = {
 export const listarRelatoriosTeste = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), limite: z.number().int().min(1).max(50).optional() }).parse(i),
+    z
+      .object({ clinicaId: z.string().uuid(), limite: z.number().int().min(1).max(50).optional() })
+      .parse(i),
   )
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
@@ -83,10 +85,7 @@ export const listarRelatoriosTeste = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .order("created_at", { ascending: false })
         .limit(limite * 2),
-      supabaseAdmin
-        .from("nina_teste_leads")
-        .select("id,indice")
-        .eq("clinica_id", data.clinicaId),
+      supabaseAdmin.from("nina_teste_leads").select("id,indice").eq("clinica_id", data.clinicaId),
     ]);
 
     const indicePorLead = new Map<string, number>(
@@ -438,8 +437,15 @@ export const detalheRelatorioTeste = createServerFn({ method: "POST" })
       for (const t of tools) {
         if (!t.ok) {
           erros.push({
-            categoria: classificarErroRelatorio({ ferramenta: t.nome, texto: String(t.erro ?? "") }),
-            descricao: `Ferramenta ${t.nome ?? "desconhecida"} retornou erro: ${String(t.erro ?? "sem detalhe")}`.slice(0, 400),
+            categoria: classificarErroRelatorio({
+              ferramenta: t.nome,
+              texto: String(t.erro ?? ""),
+            }),
+            descricao:
+              `Ferramenta ${t.nome ?? "desconhecida"} retornou erro: ${String(t.erro ?? "sem detalhe")}`.slice(
+                0,
+                400,
+              ),
             origem: "ferramenta",
             quando: t.quando,
             conversaId: b.conversaId,

@@ -424,8 +424,6 @@ export function saldoPorMeio(linhas: LinhaClassificada[]): SaldoPorMeio {
   return fecharSaldoPorMeio(out);
 }
 
-
-
 /**
  * Quantidade de PAGAMENTOS: as partes de um pagamento misto contam uma vez
  * só, pelo lançamento de origem.
@@ -525,7 +523,9 @@ export function resumoMovimento(linhas: LinhaClassificada[]): ResumoMovimento {
   // Dinheiro, PIX e Cartão sempre aparecem, mesmo zerados — são as três
   // colunas que a recepção confere. As demais formas só quando têm valor, para
   // a lista fechar com o total.
-  const quebraPorForma = (linhas: LinhaClassificada[]): Array<{ rotulo: string; valor: number }> => {
+  const quebraPorForma = (
+    linhas: LinhaClassificada[],
+  ): Array<{ rotulo: string; valor: number }> => {
     const porForma = new Map<FormaCanonica, number>();
     for (const l of linhas) porForma.set(l.forma, (porForma.get(l.forma) ?? 0) + Number(l.valor));
     const saida: Array<{ rotulo: string; valor: number }> = [
@@ -544,7 +544,6 @@ export function resumoMovimento(linhas: LinhaClassificada[]): ResumoMovimento {
     return saida;
   };
   const formas = quebraPorForma(atend);
-
 
   const porGrupo = Object.fromEntries(
     (["consulta", "exame_procedimento", ...GRUPOS_OUTRAS] as GrupoMovimento[]).map((g) => [

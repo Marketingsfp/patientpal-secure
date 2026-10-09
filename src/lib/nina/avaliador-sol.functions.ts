@@ -26,7 +26,6 @@ import {
 } from "@/lib/nina/avaliador-sol";
 import { TIPOS_CRITERIO } from "@/lib/nina/cenarios";
 
-
 type Ctx = { supabase: any; userId: string };
 
 async function assertMembership(supabase: any, userId: string, clinicaId: string) {
@@ -49,14 +48,16 @@ async function chamarSol(
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new Error("Avaliação indisponível: chave do provedor de IA não configurada.");
 
-  const res = await (await import("@/lib/nina/claude-messages.server")).chamarClaudeComoResponses({
-      model: garantirPapel("avaliador", MODELO_SOL),
-      instructions: instrucoes,
-      input,
-      stream: true,
-      store: false,
-      max_output_tokens: 4000,
-    });
+  const res = await (
+    await import("@/lib/nina/claude-messages.server")
+  ).chamarClaudeComoResponses({
+    model: garantirPapel("avaliador", MODELO_SOL),
+    instructions: instrucoes,
+    input,
+    stream: true,
+    store: false,
+    max_output_tokens: 4000,
+  });
 
   if (!res.ok || !res.body) {
     const corpo = await res.text().catch(() => "");
@@ -111,7 +112,12 @@ async function montarDossie(
   clinicaId: string,
   conversaId: string,
   cenario: { texto: string | null; objetivo: string | null; criterios: string[] },
-): Promise<{ dossie: Dossie; execucaoIds: string[]; promptVersao: number | null; promptVersaoId: string | null }> {
+): Promise<{
+  dossie: Dossie;
+  execucaoIds: string[];
+  promptVersao: number | null;
+  promptVersaoId: string | null;
+}> {
   const { data: msgs } = await admin
     .from("whatsapp_mensagens")
     .select("id, direction, body, created_at, execucao_id")
@@ -200,7 +206,6 @@ async function montarDossie(
       .maybeSingle();
     snapshotPrompt = snap ?? null;
   }
-
 
   // Consultas ao conhecimento/catálogo registradas nas evidências (sem
   // raciocínio interno: só o que foi consultado e o que voltou).
@@ -295,24 +300,51 @@ async function avaliarComJev(
     const mod = await import("@/lib/nina/jev-avaliacao");
     const perguntas = mod.perguntasAvaliacao();
     if (dossieTexto.length > mod.LIMITE_ESTADO_CARACTERES) {
-      await registrarDecisaoJev({ clinicaId, conversationId: conversaId, fase: "fase5_avaliacao", teste: true,
-        perguntas, resultado: { ok: false, motivo: "dossie_grande_demais", latencyMs: 0 }, aplicada: false });
+      await registrarDecisaoJev({
+        clinicaId,
+        conversationId: conversaId,
+        fase: "fase5_avaliacao",
+        teste: true,
+        perguntas,
+        resultado: { ok: false, motivo: "dossie_grande_demais", latencyMs: 0 },
+        aplicada: false,
+      });
       return null;
     }
     const resultado = await perguntarJev({ dossie: dossieTexto }, perguntas, 60_000);
     if (!resultado.ok) {
-      await registrarDecisaoJev({ clinicaId, conversationId: conversaId, fase: "fase5_avaliacao", teste: true,
-        perguntas, resultado, aplicada: false });
+      await registrarDecisaoJev({
+        clinicaId,
+        conversationId: conversaId,
+        fase: "fase5_avaliacao",
+        teste: true,
+        perguntas,
+        resultado,
+        aplicada: false,
+      });
       return null;
     }
     const a = mod.interpretarAvaliacao(resultado.respostas);
     const precisaOpus = mod.precisaOpus(a.resultado);
-    await registrarDecisaoJev({ clinicaId, conversationId: conversaId, fase: "fase5_avaliacao", teste: true,
-      perguntas, resultado, aplicada: !precisaOpus });
+    await registrarDecisaoJev({
+      clinicaId,
+      conversationId: conversaId,
+      fase: "fase5_avaliacao",
+      teste: true,
+      perguntas,
+      resultado,
+      aplicada: !precisaOpus,
+    });
     return {
       precisaOpus,
-      avaliacao: { resultado: a.resultado, score: a.score, resumo: mod.resumoJev(a), dimensoes: a.dimensoes,
-        achados: [], lacunas: [] },
+      avaliacao: {
+        resultado: a.resultado,
+        score: a.score,
+        resumo: mod.resumoJev(a),
+        dimensoes: a.dimensoes,
+        achados: [],
+        lacunas: [],
+      },
     };
   } catch (e) {
     console.warn("[nina-jev] avaliação pelo Jev falhou:", e instanceof Error ? e.message : e);
@@ -358,7 +390,7 @@ export const avaliarComSol = createServerFn({ method: "POST" })
     let cenarioTexto: string | null = data.cenarioTexto ?? null;
     let objetivo: string | null = null;
     let criterios: string[] = [];
-    let cenarioId: string | null = data.cenarioId ?? null;
+    const cenarioId: string | null = data.cenarioId ?? null;
 
     if (cenarioId) {
       const { data: cen } = await supabaseAdmin

@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { alteracaoExplicita, alteracaoPeloJev, motivoAlteracao, REGRA_CANCELAMENTO_REMARCACAO } from "../cancelamento-remarcacao";
+import {
+  alteracaoExplicita,
+  alteracaoPeloJev,
+  motivoAlteracao,
+  REGRA_CANCELAMENTO_REMARCACAO,
+} from "../cancelamento-remarcacao";
 import { motivoParaAtendimento } from "../../atendimento/texto-interno-apresentacao";
 import { categoriaDoMotivo } from "../jev-motivo";
 
@@ -37,10 +42,16 @@ test("decisão semântica exige confiança e motivos têm categoria e explicaç�
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
 function simular(ambiente: string, caso: string, mensagem: string) {
   const p = Bun.spawnSync([process.execPath, fixture, ambiente, `alteracao_${caso}`, mensagem], {
-    cwd: fileURLToPath(new URL("../../../../../", import.meta.url)), stdout: "pipe", stderr: "pipe", timeout: 15_000,
+    cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 15_000,
   });
   expect(p.exitCode, p.stdout.toString() + p.stderr.toString()).toBe(0);
-  const linha = p.stdout.toString().split(/\r?\n/).find(l => l.startsWith("DIRETA_RESULTADO="));
+  const linha = p.stdout
+    .toString()
+    .split(/\r?\n/)
+    .find((l) => l.startsWith("DIRETA_RESULTADO="));
   expect(linha).toBeDefined();
   return JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
 }
@@ -48,7 +59,11 @@ function simular(ambiente: string, caso: string, mensagem: string) {
 for (const ambiente of ["producao", "homologacao"]) {
   test.each([
     ["nova_fallback", "quero cancelar minha consulta", "CANCELAMENTO_SOLICITADO"],
-    ["retomada_fallback", "ih moça esqueci q amanha ela tem fisio, da pra muda pra sabado de manha?", "REMARCACAO_SOLICITADA"],
+    [
+      "retomada_fallback",
+      "ih moça esqueci q amanha ela tem fisio, da pra muda pra sabado de manha?",
+      "REMARCACAO_SOLICITADA",
+    ],
     ["retomada", "pode ser 8h. ai cancela o de amanha ne", "CANCELAMENTO_SOLICITADO"],
     ["semantica", "aquela reserva vai ter que ficar pra semana que vem", "REMARCACAO_SOLICITADA"],
   ])(`${ambiente}: %s encaminha antes de catálogo e agenda`, (caso, mensagem, motivo) => {
@@ -68,7 +83,11 @@ for (const ambiente of ["producao", "homologacao"]) {
     expect(JSON.stringify(r.requests[0].messages)).toContain(REGRA_CANCELAMENTO_REMARCACAO);
   });
   test(`${ambiente}: fallback conversacional encaminha e não executa reserva posterior`, () => {
-    const r = simular(ambiente, "fallback_modelo", "aquela reserva vai ter que ficar pra semana que vem");
+    const r = simular(
+      ambiente,
+      "fallback_modelo",
+      "aquela reserva vai ter que ficar pra semana que vem",
+    );
     expect(r.encaminhamentos).toHaveLength(1);
     expect(r.ferramentas).not.toContain("agendar");
   });
@@ -113,7 +132,11 @@ for (const ambiente of ["producao", "homologacao"]) {
     expect(r.requests).toHaveLength(1);
   });
   test(`${ambiente}: cancelamento junto de outro pedido mantém o motivo de cancelamento`, () => {
-    const r = simular(ambiente, "semantica_multiplos", "aquela reserva vai ter que ficar pra semana que vem");
+    const r = simular(
+      ambiente,
+      "semantica_multiplos",
+      "aquela reserva vai ter que ficar pra semana que vem",
+    );
     expect(r.encaminhamentos).toHaveLength(1);
     expect(r.encaminhamentos[0].motivo).toContain("REMARCACAO_SOLICITADA");
     expect(r.encaminhamentos[0].setor).toBe("Agendamento");

@@ -323,9 +323,15 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
   useEffect(() => {
     if (callStart) callStartRef.current = callStart;
   }, [callStart]);
-  useEffect(() => { pontosFracosRef.current = pontosFracos; }, [pontosFracos]);
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
-  useEffect(() => { convAtivaRef.current = convAtiva; }, [convAtiva]);
+  useEffect(() => {
+    pontosFracosRef.current = pontosFracos;
+  }, [pontosFracos]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  useEffect(() => {
+    convAtivaRef.current = convAtiva;
+  }, [convAtiva]);
 
   /** Guarda o andamento local para sobreviver a troca de aba, queda de conexão ou recarregamento. */
   function persistirEstado() {
@@ -373,7 +379,6 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   /** Troca de conversa na lista lateral, preservando o histórico de cada uma. */
   async function trocarConversa(i: number) {
     if (i === convAtiva || thinking) return;
@@ -406,9 +411,15 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     if (convAtivaRef.current !== i) return;
     if (sc) setMessages([{ role: "cliente", content: sc.primeira_mensagem }]);
   }
-  useEffect(() => { usadoMsRef.current = usadoMs; }, [usadoMs]);
-  useEffect(() => { feitasVozRef.current = feitasVoz; }, [feitasVoz]);
-  useEffect(() => { feitasTextoRef.current = feitasTexto; }, [feitasTexto]);
+  useEffect(() => {
+    usadoMsRef.current = usadoMs;
+  }, [usadoMs]);
+  useEffect(() => {
+    feitasVozRef.current = feitasVoz;
+  }, [feitasVoz]);
+  useEffect(() => {
+    feitasTextoRef.current = feitasTexto;
+  }, [feitasTexto]);
 
   /** Tempo restante do orçamento geral, considerando a sessão atual em andamento. */
   const restanteMs = Math.max(0, LIMITE_MS - usadoMs - callElapsed);
@@ -456,13 +467,32 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
       console.error("Falha ao salvar sessão de roleplay:", insErr);
       toast.error("Não foi possível salvar este treino no histórico.");
     });
-  }, [feedback, scenario, atendente, clinicaId, alvo.userId, simulacaoGestor, pontosFracos, salvarSessao]);
+  }, [
+    feedback,
+    scenario,
+    atendente,
+    clinicaId,
+    alvo.userId,
+    simulacaoGestor,
+    pontosFracos,
+    salvarSessao,
+  ]);
 
-  useEffect(() => { modeRef.current = mode; }, [mode]);
-  useEffect(() => { speakEnabledRef.current = speakEnabled; }, [speakEnabled]);
-  useEffect(() => { thinkingRef.current = thinking; }, [thinking]);
-  useEffect(() => { feedbackRef.current = feedback; }, [feedback]);
-  useEffect(() => { listeningRef.current = listening; }, [listening]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  useEffect(() => {
+    speakEnabledRef.current = speakEnabled;
+  }, [speakEnabled]);
+  useEffect(() => {
+    thinkingRef.current = thinking;
+  }, [thinking]);
+  useEffect(() => {
+    feedbackRef.current = feedback;
+  }, [feedback]);
+  useEffect(() => {
+    listeningRef.current = listening;
+  }, [listening]);
 
   useEffect(() => {
     if (!callStart || feedback) return;
@@ -533,8 +563,7 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const SR =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       setVoiceSupported(false);
     }
@@ -1061,7 +1090,6 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     }
   }
 
-
   useEffect(() => {
     let cancelled = false;
     async function boot() {
@@ -1109,10 +1137,7 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
           .gte("created_at", inicioDoDiaRio())
           .limit(1000);
         if (!cancelled) {
-          const total = (sess ?? []).reduce(
-            (acc, s) => acc + (s.duracao_seg ?? 0) * 1000,
-            0,
-          );
+          const total = (sess ?? []).reduce((acc, s) => acc + (s.duracao_seg ?? 0) * 1000, 0);
           usadoMsRef.current = total;
           setUsadoMs(total);
           const validas = (sess ?? []).filter((s) => contaParaMeta(s.nota as number));
@@ -1244,7 +1269,6 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
     await sendWithText(input, encerrar);
   }
 
-
   return (
     <div className="bg-gradient-to-b from-secondary/40 to-background">
       {/* Modo foco: barra fina no lugar do banner, como um softphone */}
@@ -1308,48 +1332,46 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
                   )}
                 </div>
                 {TRAVA_TEMPO_ATIVA && (
-                <div className="text-right">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Restante do total (20 min)
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Restante do total (20 min)
+                    </div>
+                    <div
+                      className={`text-2xl font-bold tabular-nums ${
+                        restanteMs <= 2 * 60 * 1000 ? "text-destructive" : "text-primary"
+                      }`}
+                    >
+                      {formatDuration(restanteMs)}
+                    </div>
                   </div>
-                  <div
-                    className={`text-2xl font-bold tabular-nums ${
-                      restanteMs <= 2 * 60 * 1000 ? "text-destructive" : "text-primary"
-                    }`}
-                  >
-                    {formatDuration(restanteMs)}
-                  </div>
-                </div>
                 )}
               </div>
               {TRAVA_TEMPO_ATIVA && (
-              <div className="mt-2 h-2 w-full rounded-full bg-secondary overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{
-                    width: `${Math.min(100, ((usadoMs + callElapsed) / LIMITE_MS) * 100)}%`,
-                  }}
-                />
-              </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{
+                      width: `${Math.min(100, ((usadoMs + callElapsed) / LIMITE_MS) * 100)}%`,
+                    }}
+                  />
+                </div>
               )}
               {TRAVA_TEMPO_ATIVA ? (
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                {formatDuration(Math.min(LIMITE_MS, usadoMs + callElapsed))} de 20 min usados ·
-                WhatsApp {Math.min(feitasTexto, META_WHATSAPP)}/{META_WHATSAPP} · ligações{" "}
-                {Math.min(feitasVoz, META_LIGACOES)}/{META_LIGACOES} · os 20 min são divididos
-                automaticamente entre as {META_LIGACOES + META_WHATSAPP} conversas e a prova (
-                {formatDuration(COTA_ATIVIDADE_MS)} cada)
-              </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  {formatDuration(Math.min(LIMITE_MS, usadoMs + callElapsed))} de 20 min usados ·
+                  WhatsApp {Math.min(feitasTexto, META_WHATSAPP)}/{META_WHATSAPP} · ligações{" "}
+                  {Math.min(feitasVoz, META_LIGACOES)}/{META_LIGACOES} · os 20 min são divididos
+                  automaticamente entre as {META_LIGACOES + META_WHATSAPP} conversas e a prova (
+                  {formatDuration(COTA_ATIVIDADE_MS)} cada)
+                </div>
               ) : (
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                Sem limite de tempo · WhatsApp {Math.min(feitasTexto, META_WHATSAPP)}/
-                {META_WHATSAPP} · ligações {Math.min(feitasVoz, META_LIGACOES)}/
-                {META_LIGACOES} · só conta com nota {NOTA_MINIMA} ou mais
-              </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  Sem limite de tempo · WhatsApp {Math.min(feitasTexto, META_WHATSAPP)}/
+                  {META_WHATSAPP} · ligações {Math.min(feitasVoz, META_LIGACOES)}/{META_LIGACOES} ·
+                  só conta com nota {NOTA_MINIMA} ou mais
+                </div>
               )}
-              {avisoPlano && (
-                <div className="mt-2 text-[11px] text-primary">{avisoPlano}</div>
-              )}
+              {avisoPlano && <div className="mt-2 text-[11px] text-primary">{avisoPlano}</div>}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] text-muted-foreground mr-1">Dificuldade:</span>
                 {DIFICULDADES.map((d) => (
@@ -1376,8 +1398,8 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
                   {feitasVoz < META_LIGACOES ? (
                     <>
                       <p className="text-xs text-muted-foreground mr-auto">
-                        Conversas de WhatsApp concluídas. Próxima etapa: as {META_LIGACOES}{" "}
-                        ligações ({Math.min(feitasVoz, META_LIGACOES)}/{META_LIGACOES} feitas).
+                        Conversas de WhatsApp concluídas. Próxima etapa: as {META_LIGACOES} ligações
+                        ({Math.min(feitasVoz, META_LIGACOES)}/{META_LIGACOES} feitas).
                       </p>
                       <Button
                         size="sm"
@@ -1463,298 +1485,306 @@ function RoleplayPage({ ctx, alvo }: { ctx: CoachContexto; alvo: AlvoAtendente }
                   "Aguardando você iniciar…"
                 }
               />
-            <div className="rounded-3xl border bg-card shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
-              {/* Barra de contato estilo WhatsApp */}
-              <div
-                className="flex items-center gap-3 px-4 py-2.5 text-white"
-                style={{ backgroundColor: "var(--wa-header)" }}
-              >
-                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold leading-tight">
-                    {scenario?.nome_paciente ?? "Paciente"} (simulação)
+              <div className="rounded-3xl border bg-card shadow-[var(--shadow-card)] overflow-hidden flex flex-col">
+                {/* Barra de contato estilo WhatsApp */}
+                <div
+                  className="flex items-center gap-3 px-4 py-2.5 text-white"
+                  style={{ backgroundColor: "var(--wa-header)" }}
+                >
+                  <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <User className="h-5 w-5" />
                   </div>
-                  <div className="truncate text-[11px] text-white/75 leading-tight">
-                    {gerandoCenario
-                      ? "abrindo conversa…"
-                      : thinking
-                      ? "digitando…"
-                      : mode === "voz"
-                        ? callStart
-                          ? `em ligação · ${formatDuration(callElapsed)}`
-                          : "online"
-                        : "online"}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold leading-tight">
+                      {scenario?.nome_paciente ?? "Paciente"} (simulação)
+                    </div>
+                    <div className="truncate text-[11px] text-white/75 leading-tight">
+                      {gerandoCenario
+                        ? "abrindo conversa…"
+                        : thinking
+                          ? "digitando…"
+                          : mode === "voz"
+                            ? callStart
+                              ? `em ligação · ${formatDuration(callElapsed)}`
+                              : "online"
+                            : "online"}
+                    </div>
                   </div>
+                  <PhoneCall
+                    className={`h-4 w-4 shrink-0 ${mode === "voz" && callStart ? "text-[color:var(--accent-bright)]" : "text-white/70"}`}
+                  />
                 </div>
-                <PhoneCall
-                  className={`h-4 w-4 shrink-0 ${mode === "voz" && callStart ? "text-[color:var(--accent-bright)]" : "text-white/70"}`}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-2 border-b bg-secondary/30 px-4 py-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-                  {mode === "texto" ? (
-                    <>
-                      <Keyboard className="h-3.5 w-3.5 text-primary" /> Conversa de WhatsApp
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="h-3.5 w-3.5 text-primary" /> Ligação por voz
-                    </>
-                  )}
-                </div>
-                {mode === "texto" && TRAVA_TEMPO_ATIVA && (
-                  <div
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-semibold tabular-nums"
-                    title="Tempo restante do total de 20 minutos de treinamento"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                    {formatDuration(restanteMs)} restantes de 20 min
-                  </div>
-                )}
-                {mode === "voz" && (
-                  <div className="flex items-center gap-3">
-                    {callStart && (
-                      <div
-                        className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--success)]/10 text-[color:var(--success)] px-2.5 py-1 text-xs font-semibold tabular-nums"
-                        title="Duração desta ligação"
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--success)] animate-pulse" />
-                        {formatDuration(callElapsed)}
-                      </div>
+                <div className="flex items-center justify-between gap-2 border-b bg-secondary/30 px-4 py-2">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {mode === "texto" ? (
+                      <>
+                        <Keyboard className="h-3.5 w-3.5 text-primary" /> Conversa de WhatsApp
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-3.5 w-3.5 text-primary" /> Ligação por voz
+                      </>
                     )}
-                    {TRAVA_TEMPO_ATIVA && (
+                  </div>
+                  {mode === "texto" && TRAVA_TEMPO_ATIVA && (
                     <div
                       className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-semibold tabular-nums"
                       title="Tempo restante do total de 20 minutos de treinamento"
                     >
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                       {formatDuration(restanteMs)} restantes de 20 min
                     </div>
-                    )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !speakEnabled;
-                      setSpeakEnabled(next);
-                      if (!next) stopAudio();
-                    }}
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                    title={speakEnabled ? "Silenciar cliente" : "Ativar voz do cliente"}
-                  >
-                    {speakEnabled ? (
-                      <>
-                        <Volume2 className="h-3.5 w-3.5" /> Voz do cliente
-                      </>
-                    ) : (
-                      <>
-                        <VolumeX className="h-3.5 w-3.5" /> Mudo
-                      </>
-                    )}
-                  </button>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <Settings2 className="h-3.5 w-3.5" />
-                    Voz do sistema
-                  </span>
-                  </div>
-                )}
-              </div>
-              {ttsWarn && (
-                <div className="border-b bg-secondary/20 px-4 py-2">
-                  <p className="text-[11px] text-destructive">{ttsWarn}</p>
-                </div>
-              )}
-              <div
-                ref={scrollRef}
-                className="wa-chat-bg px-3 py-5 space-y-1.5 min-h-[420px] max-h-[60vh] overflow-y-auto"
-              >
-                <div className="mx-auto mb-3 w-fit rounded-lg bg-white/70 px-2.5 py-1 text-[10px] text-muted-foreground shadow-sm">
-                  Hoje
-                </div>
-                {messages.map((m, i) => (
-                  <Bubble key={i} msg={m} mostrarCorrecao={!!feedback} />
-                ))}
-                {thinking && (
-                  <div className="flex justify-start">
-                    <div className="wa-bubble-in rounded-lg px-3 py-2 shadow-sm">
-                      <span className="wa-bubble-in-tail" />
-                      <span className="flex gap-1">
-                        {[0, 150, 300].map((d) => (
-                          <span
-                            key={d}
-                            className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
-                            style={{ animationDelay: `${d}ms` }}
-                          />
-                        ))}
+                  )}
+                  {mode === "voz" && (
+                    <div className="flex items-center gap-3">
+                      {callStart && (
+                        <div
+                          className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--success)]/10 text-[color:var(--success)] px-2.5 py-1 text-xs font-semibold tabular-nums"
+                          title="Duração desta ligação"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--success)] animate-pulse" />
+                          {formatDuration(callElapsed)}
+                        </div>
+                      )}
+                      {TRAVA_TEMPO_ATIVA && (
+                        <div
+                          className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-semibold tabular-nums"
+                          title="Tempo restante do total de 20 minutos de treinamento"
+                        >
+                          {formatDuration(restanteMs)} restantes de 20 min
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !speakEnabled;
+                          setSpeakEnabled(next);
+                          if (!next) stopAudio();
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        title={speakEnabled ? "Silenciar cliente" : "Ativar voz do cliente"}
+                      >
+                        {speakEnabled ? (
+                          <>
+                            <Volume2 className="h-3.5 w-3.5" /> Voz do cliente
+                          </>
+                        ) : (
+                          <>
+                            <VolumeX className="h-3.5 w-3.5" /> Mudo
+                          </>
+                        )}
+                      </button>
+                      <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Voz do sistema
                       </span>
                     </div>
+                  )}
+                </div>
+                {ttsWarn && (
+                  <div className="border-b bg-secondary/20 px-4 py-2">
+                    <p className="text-[11px] text-destructive">{ttsWarn}</p>
                   </div>
                 )}
-                {feedback && <FeedbackCard fb={feedback} />}
-              </div>
-
-              {!feedback && (
                 <div
-                  className="border-t p-3 md:p-4"
-                  style={{ backgroundColor: "var(--wa-composer)" }}
+                  ref={scrollRef}
+                  className="wa-chat-bg px-3 py-5 space-y-1.5 min-h-[420px] max-h-[60vh] overflow-y-auto"
                 >
-                  {error && (
-                    <div className="mb-2 text-xs text-destructive">{error}</div>
-                  )}
-                  {mode === "texto" ? (
-                  <div className="flex items-end gap-2">
-                    <Textarea
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          send();
-                        }
-                      }}
-                      placeholder="Digite uma mensagem"
-                      className="min-h-[48px] max-h-40 resize-none rounded-3xl border-transparent bg-card px-4 py-3 shadow-sm focus-visible:ring-1"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => send(false)}
-                        disabled={thinking || !input.trim() || semTempo}
-                        size="icon"
-                        className="h-11 w-11 rounded-full bg-[color:var(--accent-bright)] hover:bg-primary text-white shadow-md"
-                      >
-                        <Send className="h-5 w-5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-11 w-11 rounded-full bg-card"
-                        onClick={() => send(true)}
-                        disabled={thinking || messages.filter((m) => m.role === "atendente").length === 0}
-                        title="Encerrar e receber feedback"
-                      >
-                        <Flag className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="mx-auto mb-3 w-fit rounded-lg bg-white/70 px-2.5 py-1 text-[10px] text-muted-foreground shadow-sm">
+                    Hoje
                   </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-3 py-3">
-                      {!callStart ? (
-                        <>
-                          <button
+                  {messages.map((m, i) => (
+                    <Bubble key={i} msg={m} mostrarCorrecao={!!feedback} />
+                  ))}
+                  {thinking && (
+                    <div className="flex justify-start">
+                      <div className="wa-bubble-in rounded-lg px-3 py-2 shadow-sm">
+                        <span className="wa-bubble-in-tail" />
+                        <span className="flex gap-1">
+                          {[0, 150, 300].map((d) => (
+                            <span
+                              key={d}
+                              className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
+                              style={{ animationDelay: `${d}ms` }}
+                            />
+                          ))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {feedback && <FeedbackCard fb={feedback} />}
+                </div>
+
+                {!feedback && (
+                  <div
+                    className="border-t p-3 md:p-4"
+                    style={{ backgroundColor: "var(--wa-composer)" }}
+                  >
+                    {error && <div className="mb-2 text-xs text-destructive">{error}</div>}
+                    {mode === "texto" ? (
+                      <div className="flex items-end gap-2">
+                        <Textarea
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              send();
+                            }
+                          }}
+                          placeholder="Digite uma mensagem"
+                          className="min-h-[48px] max-h-40 resize-none rounded-3xl border-transparent bg-card px-4 py-3 shadow-sm focus-visible:ring-1"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
                             type="button"
-                            onClick={startCall}
-                            className="relative h-20 w-20 rounded-full flex items-center justify-center text-white bg-[color:var(--success)] hover:opacity-90 transition shadow-lg"
-                            title="Iniciar ligação"
+                            onClick={() => send(false)}
+                            disabled={thinking || !input.trim() || semTempo}
+                            size="icon"
+                            className="h-11 w-11 rounded-full bg-[color:var(--accent-bright)] hover:bg-primary text-white shadow-md"
                           >
-                            <PhoneCall className="h-8 w-8" />
-                          </button>
-                          <div className="text-xs text-muted-foreground text-center">
-                            Toque para atender. Você se apresenta primeiro.
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div
-                            className={`relative h-20 w-20 rounded-full flex items-center justify-center text-white transition shadow-lg ${
-                              listening
-                                ? "bg-destructive animate-pulse"
-                                : thinking
-                                  ? "bg-muted-foreground"
-                                  : "bg-primary"
-                            }`}
+                            <Send className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11 rounded-full bg-card"
+                            onClick={() => send(true)}
+                            disabled={
+                              thinking ||
+                              messages.filter((m) => m.role === "atendente").length === 0
+                            }
+                            title="Encerrar e receber feedback"
                           >
-                            {listening ? (
-                              <Mic className="h-8 w-8" />
-                            ) : thinking ? (
-                              <Loader2 className="h-8 w-8 animate-spin" />
-                            ) : (
-                              <Volume2 className="h-8 w-8" />
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground text-center min-h-[1.25rem]">
-                            {thinking
-                              ? "Cliente pensando…"
-                              : listening
-                                ? input
-                                  ? `"${input}"`
-                                  : "Ouvindo… pode falar"
-                                : falando
-                                  ? "Cliente falando…"
-                                  : "Aguardando…"}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
+                            <Flag className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 py-3">
+                        {!callStart ? (
+                          <>
+                            <button
                               type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={toggleMic}
-                              disabled={thinking}
+                              onClick={startCall}
+                              className="relative h-20 w-20 rounded-full flex items-center justify-center text-white bg-[color:var(--success)] hover:opacity-90 transition shadow-lg"
+                              title="Iniciar ligação"
+                            >
+                              <PhoneCall className="h-8 w-8" />
+                            </button>
+                            <div className="text-xs text-muted-foreground text-center">
+                              Toque para atender. Você se apresenta primeiro.
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div
+                              className={`relative h-20 w-20 rounded-full flex items-center justify-center text-white transition shadow-lg ${
+                                listening
+                                  ? "bg-destructive animate-pulse"
+                                  : thinking
+                                    ? "bg-muted-foreground"
+                                    : "bg-primary"
+                              }`}
                             >
                               {listening ? (
-                                <><MicOff className="h-4 w-4 mr-1.5" /> Pausar mic</>
+                                <Mic className="h-8 w-8" />
+                              ) : thinking ? (
+                                <Loader2 className="h-8 w-8 animate-spin" />
                               ) : (
-                                <><Mic className="h-4 w-4 mr-1.5" /> Retomar mic</>
+                                <Volume2 className="h-8 w-8" />
                               )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                endCall();
-                                send(true);
-                              }}
-                              disabled={thinking || messages.filter((m) => m.role === "atendente").length === 0}
-                            >
-                              <PhoneOff className="h-4 w-4 mr-1.5" /> Encerrar ligação
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  <p className="mt-2 text-[11px] text-muted-foreground text-center">
-                    {semTempo
-                      ? "Seus 20 minutos totais de treinamento já foram usados."
-                      : mode === "texto"
-                        ? "Enter envia · Shift+Enter quebra linha · sem limite de tempo"
-                        : "Ligação contínua · você se apresenta primeiro · sem limite de tempo"}
-                  </p>
-                </div>
-              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground text-center min-h-[1.25rem]">
+                              {thinking
+                                ? "Cliente pensando…"
+                                : listening
+                                  ? input
+                                    ? `"${input}"`
+                                    : "Ouvindo… pode falar"
+                                  : falando
+                                    ? "Cliente falando…"
+                                    : "Aguardando…"}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={toggleMic}
+                                disabled={thinking}
+                              >
+                                {listening ? (
+                                  <>
+                                    <MicOff className="h-4 w-4 mr-1.5" /> Pausar mic
+                                  </>
+                                ) : (
+                                  <>
+                                    <Mic className="h-4 w-4 mr-1.5" /> Retomar mic
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  endCall();
+                                  send(true);
+                                }}
+                                disabled={
+                                  thinking ||
+                                  messages.filter((m) => m.role === "atendente").length === 0
+                                }
+                              >
+                                <PhoneOff className="h-4 w-4 mr-1.5" /> Encerrar ligação
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <p className="mt-2 text-[11px] text-muted-foreground text-center">
+                      {semTempo
+                        ? "Seus 20 minutos totais de treinamento já foram usados."
+                        : mode === "texto"
+                          ? "Enter envia · Shift+Enter quebra linha · sem limite de tempo"
+                          : "Ligação contínua · você se apresenta primeiro · sem limite de tempo"}
+                    </p>
+                  </div>
+                )}
 
-              {feedback && (
-                <div className="border-t bg-card p-4 flex flex-wrap gap-2 justify-end">
-                  <p className="mr-auto text-xs text-muted-foreground self-center">
-                    {proximaAtividade(feitasVoz, feitasTexto) === "prova"
-                      ? "Leia o feedback com calma. Quando quiser, abra a prova."
-                      : "Leia o feedback com calma. Quando quiser, comece o próximo treino."}
-                  </p>
-                  <Link to="/app/coach">
-                    <Button variant="outline">Voltar</Button>
-                  </Link>
-                  <Button
-                    onClick={() => {
-                      setProximoEm(null);
-                      const prox = proximaAtividade(feitasVozRef.current, feitasTextoRef.current);
-                      if (prox === "prova") {
-                        navigate({ to: "/app/coach/prova/$nome", params: { nome } });
-                        return;
-                      }
-                      novaSessao(prox);
-                    }}
-                    className="bg-primary hover:bg-primary-deep text-primary-foreground"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />{" "}
-                    {proximaAtividade(feitasVoz, feitasTexto) === "prova"
-                      ? "Abrir a prova"
-                      : "Próximo treino"}
-                  </Button>
-                </div>
-              )}
-             </div>
+                {feedback && (
+                  <div className="border-t bg-card p-4 flex flex-wrap gap-2 justify-end">
+                    <p className="mr-auto text-xs text-muted-foreground self-center">
+                      {proximaAtividade(feitasVoz, feitasTexto) === "prova"
+                        ? "Leia o feedback com calma. Quando quiser, abra a prova."
+                        : "Leia o feedback com calma. Quando quiser, comece o próximo treino."}
+                    </p>
+                    <Link to="/app/coach">
+                      <Button variant="outline">Voltar</Button>
+                    </Link>
+                    <Button
+                      onClick={() => {
+                        setProximoEm(null);
+                        const prox = proximaAtividade(feitasVozRef.current, feitasTextoRef.current);
+                        if (prox === "prova") {
+                          navigate({ to: "/app/coach/prova/$nome", params: { nome } });
+                          return;
+                        }
+                        novaSessao(prox);
+                      }}
+                      className="bg-primary hover:bg-primary-deep text-primary-foreground"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />{" "}
+                      {proximaAtividade(feitasVoz, feitasTexto) === "prova"
+                        ? "Abrir a prova"
+                        : "Próximo treino"}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         ) : null}
@@ -1811,51 +1841,51 @@ function ChatList({
           const emAtendimento = atendendo && ativo;
           return (
             <li key={i}>
-             <button
-              type="button"
-              onClick={() => onSelect(i)}
-              disabled={bloqueado}
-              className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-70 ${
-                atendendo ? "bg-secondary/50" : "bg-card"
-              }`}
-             >
-              <div className="relative h-11 w-11 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-5 w-5 text-primary" />
-                {!concluida && !atendendo && (
-                  <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-[color:var(--accent-bright)] ring-2 ring-card" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">
-                    {nomePorIndice(i) ?? `Paciente ${i + 1}`}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{hora}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`truncate text-xs ${
-                      concluida ? "text-muted-foreground" : "text-foreground/80"
-                    }`}
-                  >
-                    {concluida
-                      ? "✓✓ Atendimento finalizado"
-                        : emAtendimento
-                        ? digitando
-                          ? "digitando…"
-                          : ultima
-                        : atendendo
-                          ? ultima
-                          : "Aguardando sua resposta"}
-                  </span>
+              <button
+                type="button"
+                onClick={() => onSelect(i)}
+                disabled={bloqueado}
+                className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-70 ${
+                  atendendo ? "bg-secondary/50" : "bg-card"
+                }`}
+              >
+                <div className="relative h-11 w-11 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
                   {!concluida && !atendendo && (
-                    <span className="shrink-0 rounded-full bg-[color:var(--accent-bright)] px-1.5 text-[10px] font-bold text-white">
-                      1
-                    </span>
+                    <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-[color:var(--accent-bright)] ring-2 ring-card" />
                   )}
                 </div>
-              </div>
-             </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold">
+                      {nomePorIndice(i) ?? `Paciente ${i + 1}`}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{hora}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`truncate text-xs ${
+                        concluida ? "text-muted-foreground" : "text-foreground/80"
+                      }`}
+                    >
+                      {concluida
+                        ? "✓✓ Atendimento finalizado"
+                        : emAtendimento
+                          ? digitando
+                            ? "digitando…"
+                            : ultima
+                          : atendendo
+                            ? ultima
+                            : "Aguardando sua resposta"}
+                    </span>
+                    {!concluida && !atendendo && (
+                      <span className="shrink-0 rounded-full bg-[color:var(--accent-bright)] px-1.5 text-[10px] font-bold text-white">
+                        1
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
             </li>
           );
         })}
@@ -1882,44 +1912,40 @@ function Bubble({ msg, mostrarCorrecao }: { msg: Msg; mostrarCorrecao?: boolean 
       {partes.map((parte, i) => {
         const ultima = i === partes.length - 1;
         return (
-          <div
-            key={i}
-            className={`flex px-1 ${isCliente ? "justify-start" : "justify-end"}`}
-          >
+          <div key={i} className={`flex px-1 ${isCliente ? "justify-start" : "justify-end"}`}>
             <div
               className={`relative max-w-[80%] rounded-lg px-2.5 pt-1.5 pb-1 text-[14px] leading-[1.35] text-foreground shadow-sm ${
                 isCliente ? "wa-bubble-in ml-2" : "wa-bubble-out mr-2"
               }`}
             >
               {ultima && (
-                <span
-                  className={isCliente ? "wa-bubble-in-tail" : "wa-bubble-out-tail"}
-                />
+                <span className={isCliente ? "wa-bubble-in-tail" : "wa-bubble-out-tail"} />
               )}
               <span className="whitespace-pre-wrap break-words">{parte}</span>
               <span className="float-right ml-2 mt-1 flex items-center gap-0.5 text-[10px] text-muted-foreground/80">
                 {hora}
-                {!isCliente && (
-                  <CheckCheck className="h-3 w-3 text-[color:var(--wa-tick)]" />
-                )}
+                {!isCliente && <CheckCheck className="h-3 w-3 text-[color:var(--wa-tick)]" />}
               </span>
             </div>
           </div>
         );
       })}
-      {!isCliente && mostrarCorrecao && msg.avaliacao && (
-        <AvaliacaoTurnoCard av={msg.avaliacao} />
-      )}
+      {!isCliente && mostrarCorrecao && msg.avaliacao && <AvaliacaoTurnoCard av={msg.avaliacao} />}
     </div>
   );
 }
 
-const NIVEL_ESTILO: Record<
-  TurnoAvaliacao["nivel"],
-  { bg: string; label: string; icon: string }
-> = {
-  bom: { bg: "border-emerald-300 bg-emerald-50 text-emerald-900", label: "Boa resposta", icon: "✓" },
-  atencao: { bg: "border-amber-300 bg-amber-50 text-amber-900", label: "Dá para melhorar", icon: "!" },
+const NIVEL_ESTILO: Record<TurnoAvaliacao["nivel"], { bg: string; label: string; icon: string }> = {
+  bom: {
+    bg: "border-emerald-300 bg-emerald-50 text-emerald-900",
+    label: "Boa resposta",
+    icon: "✓",
+  },
+  atencao: {
+    bg: "border-amber-300 bg-amber-50 text-amber-900",
+    label: "Dá para melhorar",
+    icon: "!",
+  },
   ruim: { bg: "border-rose-300 bg-rose-50 text-rose-900", label: "Corrigir", icon: "×" },
 };
 
@@ -1936,9 +1962,7 @@ function AvaliacaoTurnoCard({ av }: { av: TurnoAvaliacao }) {
           {est.label}
         </p>
         <p className="mt-0.5">{av.comentario}</p>
-        {av.sugestao && (
-          <p className="mt-1 italic opacity-90">Melhor assim: “{av.sugestao}”</p>
-        )}
+        {av.sugestao && <p className="mt-1 italic opacity-90">Melhor assim: “{av.sugestao}”</p>}
       </div>
     </div>
   );

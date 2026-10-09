@@ -89,13 +89,15 @@ export function ConfiancaRespostas({ clinicaId }: { clinicaId: string | null | u
 
       <CardContent className="space-y-4">
         {total === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma decisão registrada neste período.
-          </p>
+          <p className="text-sm text-muted-foreground">Nenhuma decisão registrada neste período.</p>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Bloco titulo="Respondeu" valor={dados!.responder} sufixo={`${pct(dados!.responder)}%`} />
+              <Bloco
+                titulo="Respondeu"
+                valor={dados!.responder}
+                sufixo={`${pct(dados!.responder)}%`}
+              />
               <Bloco
                 titulo="Pediu esclarecimento"
                 valor={dados!.esclarecer}
@@ -115,7 +117,9 @@ export function ConfiancaRespostas({ clinicaId }: { clinicaId: string | null | u
               {dados!.resultados.transferenciasEmObservacao > 0
                 ? ` ${dados!.resultados.transferenciasEmObservacao} recomendações em modo observação não transferiram o atendimento.`
                 : ""}
-              {dados!.amostra.truncado ? " Recorte parcial: leitura limitada ao teto do período." : ""}
+              {dados!.amostra.truncado
+                ? " Recorte parcial: leitura limitada ao teto do período."
+                : ""}
             </p>
 
             {dados!.porBloqueio.length > 0 && (

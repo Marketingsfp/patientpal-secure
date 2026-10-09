@@ -47,9 +47,11 @@ export type ResumoEntradas = {
  * Entradas ENVIADAS ao modelo, lidas da etapa `contexto_modelo`. Sem etapa
  * registrada, devolve `null` nas contagens — não presume zero.
  */
-export function resumirEntradasDoModelo(etapa?: {
-  dados?: Record<string, unknown> | null;
-} | null): ResumoEntradas {
+export function resumirEntradasDoModelo(
+  etapa?: {
+    dados?: Record<string, unknown> | null;
+  } | null,
+): ResumoEntradas {
   const brutas = etapa?.dados?.["mensagens"];
   if (!Array.isArray(brutas)) {
     return { total: null, user: null, duplicados: [], texto: TEXTO_NAO_REGISTRADO };

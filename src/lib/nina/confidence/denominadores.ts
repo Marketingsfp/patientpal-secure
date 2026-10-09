@@ -13,11 +13,7 @@
 
 // ---------------------------------------------------------------- ambiente
 
-export type AmbienteCanonico =
-  | "producao"
-  | "homologacao"
-  | "teste_automatizado"
-  | "desconhecido";
+export type AmbienteCanonico = "producao" | "homologacao" | "teste_automatizado" | "desconhecido";
 
 const VARIANTES: Record<Exclude<AmbienteCanonico, "desconhecido">, string[]> = {
   producao: ["producao", "produção", "production", "prod", "atendimento", "live"],
@@ -418,10 +414,6 @@ export type Amostra = {
   mensagensDeSaida: number;
 };
 
-export function descreverAmostra(
-  lidas: number,
-  limite: number,
-  mensagensDeSaida: number,
-): Amostra {
+export function descreverAmostra(lidas: number, limite: number, mensagensDeSaida: number): Amostra {
   return { lidas, limite, truncado: lidas >= limite, mensagensDeSaida };
 }

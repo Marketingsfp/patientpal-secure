@@ -47,21 +47,21 @@ describe("cache por conversa", () => {
 
 describe("respostas fora de ordem", () => {
   it("aceita a resposta da conversa selecionada e do pedido mais recente", () => {
-    expect(
-      respostaAindaVale({ alvo: "B", selecionadaAgora: "B", pedido: 3, pedidoAtual: 3 }),
-    ).toBe(true);
+    expect(respostaAindaVale({ alvo: "B", selecionadaAgora: "B", pedido: 3, pedidoAtual: 3 })).toBe(
+      true,
+    );
   });
 
   it("descarta resposta da conversa anterior que chegou atrasada", () => {
-    expect(
-      respostaAindaVale({ alvo: "A", selecionadaAgora: "B", pedido: 1, pedidoAtual: 2 }),
-    ).toBe(false);
+    expect(respostaAindaVale({ alvo: "A", selecionadaAgora: "B", pedido: 1, pedidoAtual: 2 })).toBe(
+      false,
+    );
   });
 
   it("descarta pedido superado da mesma conversa", () => {
-    expect(
-      respostaAindaVale({ alvo: "B", selecionadaAgora: "B", pedido: 2, pedidoAtual: 5 }),
-    ).toBe(false);
+    expect(respostaAindaVale({ alvo: "B", selecionadaAgora: "B", pedido: 2, pedidoAtual: 5 })).toBe(
+      false,
+    );
   });
 
   it("descarta quando não há conversa selecionada", () => {

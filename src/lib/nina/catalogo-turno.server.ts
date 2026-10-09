@@ -28,7 +28,8 @@ const escopo = new AsyncLocalStorage<{ clinicaId: string; leitura?: Promise<Cata
 export function comCatalogoDoTurno<T>(clinicaId: string, fn: () => Promise<T>): Promise<T> {
   const atual = escopo.getStore();
   if (atual) {
-    if (atual.clinicaId !== clinicaId) throw new Error("Fonte solicitada fora da clínica deste turno.");
+    if (atual.clinicaId !== clinicaId)
+      throw new Error("Fonte solicitada fora da clínica deste turno.");
     return fn();
   }
   return escopo.run({ clinicaId }, fn);
@@ -36,12 +37,24 @@ export function comCatalogoDoTurno<T>(clinicaId: string, fn: () => Promise<T>): 
 
 async function lerFonteSelecionada(clinicaId: string): Promise<Catalogo> {
   const selecao = await lerSelecaoFonte(clinicaId);
-  const dados = selecao.fonte === "base_conhecimento"
-    ? await lerFonteEditorial(clinicaId) : await lerFonteOperacional(clinicaId);
-  registrarEtapa({ tipo: "consulta", fonte: "sistema", titulo: `Fonte de consulta: ${ROTULOS_FONTE[selecao.fonte]}`,
-    dados: { clinica_id: clinicaId, fonte_consulta: selecao.fonte, revisao: selecao.revisao,
-      servicos: dados.servicos.length, profissionais: dados.profissionais.length, escopo: "resposta" },
-    codigo: { arquivo: "src/lib/nina/catalogo-turno.server.ts", funcao: "lerFonteSelecionada" } });
+  const dados =
+    selecao.fonte === "base_conhecimento"
+      ? await lerFonteEditorial(clinicaId)
+      : await lerFonteOperacional(clinicaId);
+  registrarEtapa({
+    tipo: "consulta",
+    fonte: "sistema",
+    titulo: `Fonte de consulta: ${ROTULOS_FONTE[selecao.fonte]}`,
+    dados: {
+      clinica_id: clinicaId,
+      fonte_consulta: selecao.fonte,
+      revisao: selecao.revisao,
+      servicos: dados.servicos.length,
+      profissionais: dados.profissionais.length,
+      escopo: "resposta",
+    },
+    codigo: { arquivo: "src/lib/nina/catalogo-turno.server.ts", funcao: "lerFonteSelecionada" },
+  });
   return { ...dados, selecao };
 }
 
@@ -53,7 +66,8 @@ export function temCatalogoDoTurno(): boolean {
 function leituraDoTurno(clinicaId: string): Promise<Catalogo> | null {
   const turno = escopo.getStore();
   if (!turno) return null;
-  if (turno.clinicaId !== clinicaId) throw new Error("O catálogo solicitado não pertence à clínica deste turno.");
+  if (turno.clinicaId !== clinicaId)
+    throw new Error("O catálogo solicitado não pertence à clínica deste turno.");
   // Memoriza a promessa ANTES de aguardar: chamadas concorrentes e falhas não
   // provocam outra leitura. Uma nova resposta sempre cria outro escopo.
   turno.leitura ??= lerFonteSelecionada(clinicaId);
@@ -62,12 +76,14 @@ function leituraDoTurno(clinicaId: string): Promise<Catalogo> | null {
 
 /** Fonte completa da clínica; fora de um turno, confere novamente a seleção. */
 export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> {
-  return (leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId)).then(catalogo => structuredClone(catalogo));
+  return (leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId)).then((catalogo) =>
+    structuredClone(catalogo),
+  );
 }
 
 /** A contagem não precisa criar uma cópia de todos os registros. */
 export function contagemCatalogoDoTurno(clinicaId: string) {
-  return (leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId)).then(catalogo => ({
+  return (leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId)).then((catalogo) => ({
     selecao: { ...catalogo.selecao },
     servicos: catalogo.servicos.length,
     profissionais: catalogo.profissionais.length,
@@ -75,19 +91,32 @@ export function contagemCatalogoDoTurno(clinicaId: string) {
 }
 
 export async function lerPublicados<T extends { id: string }>(
-  tabela: Tabela, colunas: string, clinicaId: string, ids?: string[],
+  tabela: Tabela,
+  colunas: string,
+  clinicaId: string,
+  ids?: string[],
 ): Promise<T[]> {
   const catalogo = await (leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId));
   const linhas = tabela === "servicos" ? catalogo.servicos : catalogo.profissionais;
   // Filtra e projeta ANTES da cópia. Um pedido por nome/id não deve duplicar
   // serviços, profissionais e estruturas que nem serão usados. A cópia do
   // resultado preserva o isolamento de campos aninhados entre consumidores.
-  return structuredClone(linhas.filter(r => !ids || ids.includes(r.id)).map(r => {
-    const fonte = r as unknown as Record<string, unknown>;
-    return Object.fromEntries(colunas.split(",").map(c => c.trim()).map(c => {
-      if (c === "aliases:estrutura->aliases") return ["aliases", (fonte.estrutura as { aliases?: unknown } | null)?.aliases];
-      const campo = c === "unidades(nome)" ? "unidades" : c;
-      return [campo, fonte[campo]];
-    })) as T;
-  }));
+  return structuredClone(
+    linhas
+      .filter((r) => !ids || ids.includes(r.id))
+      .map((r) => {
+        const fonte = r as unknown as Record<string, unknown>;
+        return Object.fromEntries(
+          colunas
+            .split(",")
+            .map((c) => c.trim())
+            .map((c) => {
+              if (c === "aliases:estrutura->aliases")
+                return ["aliases", (fonte.estrutura as { aliases?: unknown } | null)?.aliases];
+              const campo = c === "unidades(nome)" ? "unidades" : c;
+              return [campo, fonte[campo]];
+            }),
+        ) as T;
+      }),
+  );
 }

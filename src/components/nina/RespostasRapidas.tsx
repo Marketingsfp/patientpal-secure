@@ -8,10 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Star, Zap } from "lucide-react";
-import {
-  filtrarRespostas,
-  type RespostaRapida,
-} from "@/lib/atendimento/respostas-rapidas";
+import { filtrarRespostas, type RespostaRapida } from "@/lib/atendimento/respostas-rapidas";
 import {
   alternarFavoritoResposta,
   listarRespostasRapidas,
@@ -180,10 +177,17 @@ export function ListaRespostasRapidas({
         aria-live="polite"
         className="sr-only"
       >{`${itens.length} respostas rápidas encontradas. Use as setas para navegar.`}</div>
-      <div ref={ref} role="listbox" aria-label="Lista de respostas rápidas" className="max-h-72 overflow-auto py-1">
+      <div
+        ref={ref}
+        role="listbox"
+        aria-label="Lista de respostas rápidas"
+        className="max-h-72 overflow-auto py-1"
+      >
         {itens.length === 0 && (
           <p className="px-3 py-3 text-sm text-atd-ink-soft">
-            {termo ? `Nenhuma resposta rápida para “/${termo}”.` : "Nenhuma resposta rápida cadastrada."}
+            {termo
+              ? `Nenhuma resposta rápida para “/${termo}”.`
+              : "Nenhuma resposta rápida cadastrada."}
           </p>
         )}
         {itens.map((r, i) => {

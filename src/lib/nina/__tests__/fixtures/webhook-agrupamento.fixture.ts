@@ -219,7 +219,12 @@ mock.module("@/lib/whatsapp-midia.server", () => ({
     erro: null,
   }),
   transcreverAudioBase64: async () => ({ texto: "Bom dia", erro: null }),
-  lerPedidoNaImagem: async () => { leiturasFoto++; return cenario === "foto-legivel" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" }; },
+  lerPedidoNaImagem: async () => {
+    leiturasFoto++;
+    return cenario === "foto-legivel"
+      ? { tipo: "pedido_medico", itens: ["ECG"] }
+      : { tipo: "ilegivel" };
+  },
   limparMidiasExpiradasSeChegouAHora: async () => {},
   RESPOSTA_AUDIO_FALHOU: "Áudio indisponível",
   respostaMidiaNaoSuportada: () => "Mídia indisponível",
@@ -243,7 +248,11 @@ mock.module("@/lib/nina/burst.server", () => ({
       lerMensagens: async (ids) =>
         db
           .whatsapp_mensagens!.filter((m) => ids.includes(m.id))
-          .map((m) => ({ id: m.id, texto: m.tipo === "image" ? m.transcricao : m.body, tipo: m.tipo })),
+          .map((m) => ({
+            id: m.id,
+            texto: m.tipo === "image" ? m.transcricao : m.body,
+            tipo: m.tipo,
+          })),
       lerRevisao: async () => revisao,
       iniciar: async () => true,
       concluir: async (id) => {
@@ -304,8 +313,16 @@ mock.module("@/lib/nina/resposta/finalizacao.server", () => ({
 }));
 mock.module("@/lib/nina-audio.server", () => ({
   guardarAudioMensagem: async () => {},
-  avaliarFala: async () => ({ decisaoId: null, textoHash: "hash-audio", representacao: "audio_integral" }),
-  prepararAudioResposta: async (_clinica: string, texto: string, entrada: { recebeuAudio: boolean; mensagem: string }) => {
+  avaliarFala: async () => ({
+    decisaoId: null,
+    textoHash: "hash-audio",
+    representacao: "audio_integral",
+  }),
+  prepararAudioResposta: async (
+    _clinica: string,
+    texto: string,
+    entrada: { recebeuAudio: boolean; mensagem: string },
+  ) => {
     if (!deveResponderEmAudio(entrada)) return null;
     tts++;
     if (cenario === "audio-falha") return null;

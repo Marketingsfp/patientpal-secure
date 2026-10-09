@@ -34,172 +34,115 @@ export type DiffArquitetura = {
 /** Foto do manifesto na versão 1 (antes desta sincronização). */
 export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
   {
-    "id": "message.inbound",
-    "categoria": "ENTRADA",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "Route",
-    "anteriores": [],
-    "seguintes": [
-      "message.log_raw"
-    ]
+    id: "message.inbound",
+    categoria: "ENTRADA",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "Route",
+    anteriores: [],
+    seguintes: ["message.log_raw"],
   },
   {
-    "id": "message.log_raw",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "registrarLogWebhook",
-    "anteriores": [
-      "message.inbound"
-    ],
-    "seguintes": [
-      "message.validate"
-    ]
+    id: "message.log_raw",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "registrarLogWebhook",
+    anteriores: ["message.inbound"],
+    seguintes: ["message.validate"],
   },
   {
-    "id": "message.validate",
-    "categoria": "VALIDACAO",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "verifySignature",
-    "anteriores": [
-      "message.log_raw"
-    ],
-    "seguintes": [
-      "message.deduplicate",
-      "status.update"
-    ]
+    id: "message.validate",
+    categoria: "VALIDACAO",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "verifySignature",
+    anteriores: ["message.log_raw"],
+    seguintes: ["message.deduplicate", "status.update"],
   },
   {
-    "id": "status.update",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "registrarStatusWhatsapp",
-    "anteriores": [
-      "message.validate"
-    ],
-    "seguintes": []
+    id: "status.update",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "registrarStatusWhatsapp",
+    anteriores: ["message.validate"],
+    seguintes: [],
   },
   {
-    "id": "message.deduplicate",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNina",
-    "anteriores": [
-      "message.validate"
-    ],
-    "seguintes": [
-      "conversation.ensure"
-    ]
+    id: "message.deduplicate",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNina",
+    anteriores: ["message.validate"],
+    seguintes: ["conversation.ensure"],
   },
   {
-    "id": "conversation.ensure",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "carregarEstadoIdentidade",
-    "anteriores": [
-      "message.deduplicate"
-    ],
-    "seguintes": [
-      "conversation.reopen",
-      "routing.decide"
-    ]
+    id: "conversation.ensure",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "carregarEstadoIdentidade",
+    anteriores: ["message.deduplicate"],
+    seguintes: ["conversation.reopen", "routing.decide"],
   },
   {
-    "id": "conversation.reopen",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "reabrirConversaPorMensagemPaciente",
-    "anteriores": [
-      "conversation.ensure"
-    ],
-    "seguintes": [
-      "routing.decide"
-    ]
+    id: "conversation.reopen",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "reabrirConversaPorMensagemPaciente",
+    anteriores: ["conversation.ensure"],
+    seguintes: ["routing.decide"],
   },
   {
-    "id": "routing.decide",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "ninaPodeResponder",
-    "anteriores": [
-      "conversation.ensure",
-      "conversation.reopen"
-    ],
-    "seguintes": [
-      "handoff.queue",
-      "session.resolve"
-    ]
+    id: "routing.decide",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "ninaPodeResponder",
+    anteriores: ["conversation.ensure", "conversation.reopen"],
+    seguintes: ["handoff.queue", "session.resolve"],
   },
   {
-    "id": "session.resolve",
-    "categoria": "MEMORIA",
-    "arquivo": "src/lib/nina/sessao.server.ts",
-    "funcao": "resolverSessao",
-    "anteriores": [
-      "routing.decide"
-    ],
-    "seguintes": [
-      "context.load"
-    ]
+    id: "session.resolve",
+    categoria: "MEMORIA",
+    arquivo: "src/lib/nina/sessao.server.ts",
+    funcao: "resolverSessao",
+    anteriores: ["routing.decide"],
+    seguintes: ["context.load"],
   },
   {
-    "id": "context.load",
-    "categoria": "CONTEXTO",
-    "arquivo": "src/lib/nina-contexto.server.ts",
-    "funcao": "contextoClinicaTexto",
-    "anteriores": [
-      "session.resolve"
-    ],
-    "seguintes": [
-      "instructions.catalog",
-      "instructions.learnings",
-      "prompt.compose"
-    ]
+    id: "context.load",
+    categoria: "CONTEXTO",
+    arquivo: "src/lib/nina-contexto.server.ts",
+    funcao: "contextoClinicaTexto",
+    anteriores: ["session.resolve"],
+    seguintes: ["instructions.catalog", "instructions.learnings", "prompt.compose"],
   },
   {
-    "id": "instructions.catalog",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/catalogo-prompt.server.ts",
-    "funcao": "blocoPromptCatalogo",
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "instructions.catalog",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/catalogo-prompt.server.ts",
+    funcao: "blocoPromptCatalogo",
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "instructions.learnings",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina/aprendizado.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "context.load"
-    ],
-    "seguintes": [
-      "prompt.compose"
-    ]
+    id: "instructions.learnings",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina/aprendizado.server.ts",
+    funcao: null,
+    anteriores: ["context.load"],
+    seguintes: ["prompt.compose"],
   },
   {
-    "id": "prompt.compose",
-    "categoria": "INSTRUCOES",
-    "arquivo": "src/lib/nina-contexto.server.ts",
-    "funcao": "systemPromptNina",
-    "anteriores": [
-      "context.load",
-      "instructions.catalog",
-      "instructions.learnings"
-    ],
-    "seguintes": [
-      "llm.generate",
-      "llm.model_flag"
-    ]
+    id: "prompt.compose",
+    categoria: "INSTRUCOES",
+    arquivo: "src/lib/nina-contexto.server.ts",
+    funcao: "systemPromptNina",
+    anteriores: ["context.load", "instructions.catalog", "instructions.learnings"],
+    seguintes: ["llm.generate", "llm.model_flag"],
   },
   {
-    "id": "llm.generate",
-    "categoria": "IA",
-    "arquivo": "src/lib/nina/ai-gateway.server.ts",
-    "funcao": "ninaAIGateway",
-    "anteriores": [
+    id: "llm.generate",
+    categoria: "IA",
+    arquivo: "src/lib/nina/ai-gateway.server.ts",
+    funcao: "ninaAIGateway",
+    anteriores: [
       "llm.model_flag",
       "prompt.compose",
       "tool.business_hours",
@@ -208,35 +151,25 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.knowledge.lookup",
       "tool.patient.lookup",
       "tool.schedule.availability",
-      "tool.schedule.book"
+      "tool.schedule.book",
     ],
-    "seguintes": [
-      "error.handle",
-      "response.validate",
-      "tool.execute"
-    ]
+    seguintes: ["error.handle", "response.validate", "tool.execute"],
   },
   {
-    "id": "llm.model_flag",
-    "categoria": "IA",
-    "arquivo": "src/lib/nina/modelo-flag.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "prompt.compose"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "llm.model_flag",
+    categoria: "IA",
+    arquivo: "src/lib/nina/modelo-flag.server.ts",
+    funcao: null,
+    anteriores: ["prompt.compose"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.execute",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/tool-broker.server.ts",
-    "funcao": "criarToolBroker",
-    "anteriores": [
-      "llm.generate"
-    ],
-    "seguintes": [
+    id: "tool.execute",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/tool-broker.server.ts",
+    funcao: "criarToolBroker",
+    anteriores: ["llm.generate"],
+    seguintes: [
       "llm.generate",
       "tool.business_hours",
       "tool.catalog.lookup",
@@ -244,275 +177,185 @@ export const SNAPSHOT_ANTERIOR: AssinaturaNode[] = [
       "tool.knowledge.lookup",
       "tool.patient.lookup",
       "tool.schedule.availability",
-      "tool.schedule.book"
-    ]
+      "tool.schedule.book",
+    ],
   },
   {
-    "id": "tool.catalog.lookup",
-    "categoria": "CONHECIMENTO",
-    "arquivo": "src/lib/nina/catalogo-retrieval.server.ts",
-    "funcao": "buscarNoCatalogo",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.catalog.lookup",
+    categoria: "CONHECIMENTO",
+    arquivo: "src/lib/nina/catalogo-retrieval.server.ts",
+    funcao: "buscarNoCatalogo",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.knowledge.lookup",
-    "categoria": "CONHECIMENTO",
-    "arquivo": "src/lib/nina/knowledge.server.ts",
-    "funcao": "searchKnowledgeBase",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.knowledge.lookup",
+    categoria: "CONHECIMENTO",
+    arquivo: "src/lib/nina/knowledge.server.ts",
+    funcao: "searchKnowledgeBase",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.business_hours",
-    "categoria": "CONHECIMENTO",
-    "arquivo": "src/lib/nina/horario-oficial.ts",
-    "funcao": "horarioOficialDoDia",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.business_hours",
+    categoria: "CONHECIMENTO",
+    arquivo: "src/lib/nina/horario-oficial.ts",
+    funcao: "horarioOficialDoDia",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.schedule.availability",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "consultarDisponibilidadeCore",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.schedule.availability",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "consultarDisponibilidadeCore",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.schedule.book",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/paciente-tools.server.ts",
-    "funcao": "executarFerramentaPaciente",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.schedule.book",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/paciente-tools.server.ts",
+    funcao: "executarFerramentaPaciente",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.patient.lookup",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "identificarPaciente",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "llm.generate"
-    ]
+    id: "tool.patient.lookup",
+    categoria: "TOOLS",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "identificarPaciente",
+    anteriores: ["tool.execute"],
+    seguintes: ["llm.generate"],
   },
   {
-    "id": "tool.handoff",
-    "categoria": "TOOLS",
-    "arquivo": "src/lib/nina/handoff-tool.server.ts",
-    "funcao": "executarHandoffTool",
-    "anteriores": [
-      "tool.execute"
-    ],
-    "seguintes": [
-      "handoff.queue"
-    ]
+    id: "tool.handoff",
+    categoria: "TOOLS",
+    arquivo: "src/lib/nina/handoff-tool.server.ts",
+    funcao: "executarHandoffTool",
+    anteriores: ["tool.execute"],
+    seguintes: ["handoff.queue"],
   },
   {
-    "id": "handoff.queue",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "encaminharParaHumano",
-    "anteriores": [
-      "routing.decide",
-      "tool.handoff",
-      "wait.timeout"
-    ],
-    "seguintes": [
-      "handoff.assign",
-      "handoff.summary"
-    ]
+    id: "handoff.queue",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "encaminharParaHumano",
+    anteriores: ["routing.decide", "tool.handoff", "wait.timeout"],
+    seguintes: ["handoff.assign", "handoff.summary"],
   },
   {
-    "id": "handoff.summary",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff-resumo.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "handoff.queue"
-    ],
-    "seguintes": []
+    id: "handoff.summary",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff-resumo.server.ts",
+    funcao: null,
+    anteriores: ["handoff.queue"],
+    seguintes: [],
   },
   {
-    "id": "handoff.assign",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/handoff.server.ts",
-    "funcao": "atribuirAtendenteOnline",
-    "anteriores": [
-      "handoff.queue"
-    ],
-    "seguintes": [
-      "protocol.generate"
-    ]
+    id: "handoff.assign",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/handoff.server.ts",
+    funcao: "atribuirAtendenteOnline",
+    anteriores: ["handoff.queue"],
+    seguintes: ["protocol.generate"],
   },
   {
-    "id": "protocol.generate",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/atendimento/protocolo-atendimento.server.ts",
-    "funcao": "protocoloAoAtribuirHumano",
-    "anteriores": [
-      "handoff.assign"
-    ],
-    "seguintes": []
+    id: "protocol.generate",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/atendimento/protocolo-atendimento.server.ts",
+    funcao: "protocoloAoAtribuirHumano",
+    anteriores: ["handoff.assign"],
+    seguintes: [],
   },
   {
-    "id": "response.validate",
-    "categoria": "VALIDACAO",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNinaInterno",
-    "anteriores": [
-      "llm.generate"
-    ],
-    "seguintes": [
-      "message.outbound"
-    ]
+    id: "response.validate",
+    categoria: "VALIDACAO",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNinaInterno",
+    anteriores: ["llm.generate"],
+    seguintes: ["message.outbound"],
   },
   {
-    "id": "message.outbound",
-    "categoria": "SAIDA",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "metaSendText",
-    "anteriores": [
-      "response.validate"
-    ],
-    "seguintes": [
-      "audio.fallback",
-      "message.persist"
-    ]
+    id: "message.outbound",
+    categoria: "SAIDA",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "metaSendText",
+    anteriores: ["response.validate"],
+    seguintes: ["audio.fallback", "message.persist"],
   },
   {
-    "id": "audio.fallback",
-    "categoria": "ERRO_FALLBACK",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "metaSendAudio",
-    "anteriores": [
-      "message.outbound"
-    ],
-    "seguintes": [
-      "message.persist"
-    ]
+    id: "audio.fallback",
+    categoria: "ERRO_FALLBACK",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "metaSendAudio",
+    anteriores: ["message.outbound"],
+    seguintes: ["message.persist"],
   },
   {
-    "id": "message.persist",
-    "categoria": "SAIDA",
-    "arquivo": "src/lib/whatsapp.server.ts",
-    "funcao": "gerarRespostaNinaInterno",
-    "anteriores": [
-      "audio.fallback",
-      "message.outbound"
-    ],
-    "seguintes": [
-      "conversation.close",
-      "metrics.record",
-      "wait.start"
-    ]
+    id: "message.persist",
+    categoria: "SAIDA",
+    arquivo: "src/lib/whatsapp.server.ts",
+    funcao: "gerarRespostaNinaInterno",
+    anteriores: ["audio.fallback", "message.outbound"],
+    seguintes: ["conversation.close", "metrics.record", "wait.start"],
   },
   {
-    "id": "wait.start",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/espera-paciente.server.ts",
-    "funcao": null,
-    "anteriores": [
-      "message.persist"
-    ],
-    "seguintes": [
-      "wait.timeout"
-    ]
+    id: "wait.start",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/espera-paciente.server.ts",
+    funcao: null,
+    anteriores: ["message.persist"],
+    seguintes: ["wait.timeout"],
   },
   {
-    "id": "wait.timeout",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/espera-timeout.server.ts",
-    "funcao": "processarTimeoutsEsperaPaciente",
-    "anteriores": [
-      "wait.start"
-    ],
-    "seguintes": [
-      "conversation.close",
-      "handoff.queue"
-    ]
+    id: "wait.timeout",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/espera-timeout.server.ts",
+    funcao: "processarTimeoutsEsperaPaciente",
+    anteriores: ["wait.start"],
+    seguintes: ["conversation.close", "handoff.queue"],
   },
   {
-    "id": "conversation.close",
-    "categoria": "PROCESSAMENTO",
-    "arquivo": "src/lib/nina/encerramento-automatico.server.ts",
-    "funcao": "avaliarEncerramentoAutomatico",
-    "anteriores": [
-      "message.persist",
-      "wait.timeout"
-    ],
-    "seguintes": [
-      "metrics.record"
-    ]
+    id: "conversation.close",
+    categoria: "PROCESSAMENTO",
+    arquivo: "src/lib/nina/encerramento-automatico.server.ts",
+    funcao: "avaliarEncerramentoAutomatico",
+    anteriores: ["message.persist", "wait.timeout"],
+    seguintes: ["metrics.record"],
   },
   {
-    "id": "metrics.record",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/telemetria.server.ts",
-    "funcao": "registrarExecucao",
-    "anteriores": [
-      "conversation.close",
-      "message.persist"
-    ],
-    "seguintes": [
-      "evidence.record"
-    ]
+    id: "metrics.record",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/telemetria.server.ts",
+    funcao: "registrarExecucao",
+    anteriores: ["conversation.close", "message.persist"],
+    seguintes: ["evidence.record"],
   },
   {
-    "id": "evidence.record",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/evidencias.server.ts",
-    "funcao": "gravarEvidencias",
-    "anteriores": [
-      "metrics.record"
-    ],
-    "seguintes": [
-      "metrics.period"
-    ]
+    id: "evidence.record",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/evidencias.server.ts",
+    funcao: "gravarEvidencias",
+    anteriores: ["metrics.record"],
+    seguintes: ["metrics.period"],
   },
   {
-    "id": "metrics.period",
-    "categoria": "OBSERVABILIDADE",
-    "arquivo": "src/lib/nina/desempenho-periodo.ts",
-    "funcao": null,
-    "anteriores": [
-      "evidence.record"
-    ],
-    "seguintes": []
+    id: "metrics.period",
+    categoria: "OBSERVABILIDADE",
+    arquivo: "src/lib/nina/desempenho-periodo.ts",
+    funcao: null,
+    anteriores: ["evidence.record"],
+    seguintes: [],
   },
   {
-    "id": "error.handle",
-    "categoria": "ERRO_FALLBACK",
-    "arquivo": "src/routes/api/public/whatsapp.$clinicaId.ts",
-    "funcao": "marcarResultado",
-    "anteriores": [
-      "llm.generate"
-    ],
-    "seguintes": []
-  }
+    id: "error.handle",
+    categoria: "ERRO_FALLBACK",
+    arquivo: "src/routes/api/public/whatsapp.$clinicaId.ts",
+    funcao: "marcarResultado",
+    anteriores: ["llm.generate"],
+    seguintes: [],
+  },
 ];
 
 export function assinaturaDe(node: NodeArquitetura): AssinaturaNode {
@@ -560,8 +403,18 @@ export function calcularDiffArquitetura(
       alterados.push({
         id: node.id,
         campos,
-        de: { categoria: velho.categoria, funcao: velho.funcao, anteriores: velho.anteriores, seguintes: velho.seguintes },
-        para: { categoria: node.categoria, funcao: node.funcao, anteriores: node.anteriores, seguintes: node.seguintes },
+        de: {
+          categoria: velho.categoria,
+          funcao: velho.funcao,
+          anteriores: velho.anteriores,
+          seguintes: velho.seguintes,
+        },
+        para: {
+          categoria: node.categoria,
+          funcao: node.funcao,
+          anteriores: node.anteriores,
+          seguintes: node.seguintes,
+        },
       });
   }
 

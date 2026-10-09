@@ -120,7 +120,10 @@ describe("faixas de confiança", () => {
       ferramentas: [tool({ capacidade: "getPatient" })],
       esclarecimentoUsado: true,
     };
-    const d = avaliarConfianca({ texto: "Seu cadastro está atualizado por aqui", evidencias: evid });
+    const d = avaliarConfianca({
+      texto: "Seu cadastro está atualizado por aqui",
+      evidencias: evid,
+    });
     expect(d.acao).toBe("transferir");
   });
 

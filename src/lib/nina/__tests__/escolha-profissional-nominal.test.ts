@@ -13,19 +13,30 @@ test("referência mantém o contrato de publicação com escolha apenas de médi
 // legada, preservação da fonte e ausência de efeitos extras; não mede adesão do modelo real.
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
 for (const ambiente of ["producao", "homologacao"])
-  for (const [cenario, nome] of [["catalogo_laboratorio", "LABORATÓRIO"],
-    ["catalogo_enfermagem", "ENFERMAGEM"], ["catalogo_nome_proprio", "DRA. ANA SOUZA"]])
+  for (const [cenario, nome] of [
+    ["catalogo_laboratorio", "LABORATÓRIO"],
+    ["catalogo_enfermagem", "ENFERMAGEM"],
+    ["catalogo_nome_proprio", "DRA. ANA SOUZA"],
+  ])
     test(`${ambiente}: ${nome} recebe a regra efetiva preservando o executante`, () => {
       const p = Bun.spawnSync([process.execPath, fixture, ambiente, cenario], {
-        stdout: "pipe", stderr: "pipe", timeout: 15000,
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 15000,
       });
       expect(p.exitCode, p.stdout.toString() + p.stderr.toString()).toBe(0);
-      const linha = p.stdout.toString().split(/\r?\n/).find(l => l.startsWith("DIRETA_RESULTADO="))!;
+      const linha = p.stdout
+        .toString()
+        .split(/\r?\n/)
+        .find((l) => l.startsWith("DIRETA_RESULTADO="))!;
       const r = JSON.parse(linha.slice("DIRETA_RESULTADO=".length));
       expect(r.prompt).not.toContain(REGRA_ESCOLHA_PROFISSIONAL_NOMINAL);
       expect(r.requests).toHaveLength(2);
       for (const request of r.requests) {
-        const sistema = request.messages.filter((m: any) => m.role === "system").map((m: any) => m.content).join("\n");
+        const sistema = request.messages
+          .filter((m: any) => m.role === "system")
+          .map((m: any) => m.content)
+          .join("\n");
         expect(sistema).toContain(REGRA_ESCOLHA_PROFISSIONAL_NOMINAL);
         expect(sistema).toContain("ESCOLHA_PROFISSIONAL_NOMINAL");
       }

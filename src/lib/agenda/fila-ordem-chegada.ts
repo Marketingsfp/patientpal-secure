@@ -15,7 +15,6 @@
 // ou 1 segundo — nunca uma fração calculada do espaço restante, que fazia cada
 // clique dividir o dia pela metade. Todos os horários têm ms = 0.
 
-
 export type PosicoesDaFilaInput = {
   /** "YYYY-MM-DD" (dia civil local). */
   diaIso: string;
@@ -75,7 +74,10 @@ export function posicoesDaFila(input: PosicoesDaFilaInput): PosicoesDaFilaResult
     };
   }
 
-  const fimTurnoMs = Math.min(new Date(`${diaIso}T${fimTurno}:00`).getTime(), limiteInicio.getTime());
+  const fimTurnoMs = Math.min(
+    new Date(`${diaIso}T${fimTurno}:00`).getTime(),
+    limiteInicio.getTime(),
+  );
 
   // Um passo só para o lote inteiro, escolhido entre três opções fixas.
   const ultimoInicioCom = (p: number) => origem + fator * p;
@@ -95,14 +97,12 @@ export function posicoesDaFila(input: PosicoesDaFilaInput): PosicoesDaFilaResult
     // 3) Passo fixo de 1 segundo, até 23:59:58.
     passo = MS_SEG;
   } else {
-    const cabem =
-      Math.floor((limiteInicio.getTime() - origem) / MS_SEG) + (temAnterior ? 0 : 1);
+    const cabem = Math.floor((limiteInicio.getTime() - origem) / MS_SEG) + (temAnterior ? 0 : 1);
     return {
       ok: false,
       erro: `Não cabem ${n} fichas nesta data. O máximo que ainda cabe é ${Math.max(0, cabem)}.`,
     };
   }
-
 
   const duracao = Math.min(dur, passo);
   const fichas: Array<{ inicio: Date; fim: Date }> = [];

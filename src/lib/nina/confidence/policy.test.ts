@@ -58,10 +58,7 @@ describe("configuração central", () => {
 
 describe("pontuação ponderada", () => {
   it("tudo aprovado dá 100", () => {
-    const score = pontuarValidadores([
-      v("IntentClarityValidator"),
-      v("OfficialSourceValidator"),
-    ]);
+    const score = pontuarValidadores([v("IntentClarityValidator"), v("OfficialSourceValidator")]);
     expect(score).toBe(100);
   });
 
@@ -138,7 +135,12 @@ describe("política: score x bloqueadores", () => {
   it("ação crítica exige mais que a faixa HIGH mínima", () => {
     const r = aplicarPolitica({ ...base, scoreValidadores: 92, risco: "CRITICAL" });
     expect(r.decision).toBe("ALLOW");
-    const r2 = aplicarPolitica({ ...base, scoreValidadores: 92, penalidade: 15, risco: "CRITICAL" });
+    const r2 = aplicarPolitica({
+      ...base,
+      scoreValidadores: 92,
+      penalidade: 15,
+      risco: "CRITICAL",
+    });
     expect(r2.decision).not.toBe("ALLOW");
   });
 });
@@ -146,7 +148,10 @@ describe("política: score x bloqueadores", () => {
 describe("motor completo com a política", () => {
   it("ferramenta quebrada nunca vira resposta ao paciente", () => {
     const r = decidirConfianca(
-      ctx({ draftText: "Não temos horários", toolResults: [tool({ success: false, erro: "timeout" })] }),
+      ctx({
+        draftText: "Não temos horários",
+        toolResults: [tool({ success: false, erro: "timeout" })],
+      }),
     );
     expect(r.blockers).toContain("FERRAMENTA_FALHOU");
     expect(r.hardBlockers).toContain("TOOL_FAILURE_ON_CRITICAL_ACTION");

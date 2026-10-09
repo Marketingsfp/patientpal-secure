@@ -106,7 +106,6 @@ describe("posicoesDaFila", () => {
     expect(r.erro).toBe("Não cabem 1 fichas nesta data. O máximo que ainda cabe é 0.");
   });
 
-
   it("continuação após o último início 23:51: 20 fichas em segundos, terminando no dia", () => {
     const r = posicoesDaFila({
       diaIso: DIA,

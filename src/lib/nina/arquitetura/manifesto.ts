@@ -210,7 +210,10 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["turn.batch"],
     seguintes: ["session.resolve"],
     tabelas: ["atend_conversas", "pacientes"],
-    erros: ["conversa não localizada", "falha ao ler a identidade (segue sem paciente identificado)"],
+    erros: [
+      "conversa não localizada",
+      "falha ao ler a identidade (segue sem paciente identificado)",
+    ],
   },
   {
     id: "conversation.reopen",
@@ -239,7 +242,10 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["verification.code", "conversation.reopen"],
     seguintes: ["turn.batch", "handoff.assign"],
     tabelas: ["atend_conversas", "clinica_feature_flags"],
-    erros: ["estado inconsistente da conversa", "ninguém online (a conversa fica em Não atribuídas)"],
+    erros: [
+      "estado inconsistente da conversa",
+      "ninguém online (a conversa fica em Não atribuídas)",
+    ],
   },
   {
     id: "turn.batch",
@@ -312,7 +318,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Quantidade de serviços e profissionais do cadastro",
     anteriores: ["context.load"],
     seguintes: ["prompt.compose"],
-    tabelas: ["medicos", "medico_disponibilidades", "medico_agendas", "medico_procedimentos", "procedimentos", "especialidades"],
+    tabelas: [
+      "medicos",
+      "medico_disponibilidades",
+      "medico_agendas",
+      "medico_procedimentos",
+      "procedimentos",
+      "especialidades",
+    ],
     erros: ["cadastro sem registros"],
   },
   {
@@ -481,7 +494,12 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Resultados de ferramenta já executados",
     anteriores: ["tool.execute"],
     seguintes: [],
-    erros: ["termo não identificado com segurança", "passou do prazo de 2 s", "ferramenta falhou", "flag desligada"],
+    erros: [
+      "termo não identificado com segurança",
+      "passou do prazo de 2 s",
+      "ferramenta falhou",
+      "flag desligada",
+    ],
   },
   {
     id: "tool.catalog.lookup",
@@ -495,7 +513,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Registros do cadastro",
     anteriores: ["tool.execute", "tool.knowledge.lookup"],
     seguintes: ["llm.generate"],
-    tabelas: ["medicos", "medico_disponibilidades", "medico_agendas", "medico_procedimentos", "procedimentos", "especialidades"],
+    tabelas: [
+      "medicos",
+      "medico_disponibilidades",
+      "medico_agendas",
+      "medico_procedimentos",
+      "procedimentos",
+      "especialidades",
+    ],
     erros: ["nenhum registro no cadastro", "termo sem correspondência"],
   },
   {
@@ -510,7 +535,14 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Registros do cadastro",
     anteriores: ["tool.execute"],
     seguintes: ["llm.generate", "tool.catalog.lookup"],
-    tabelas: ["medicos", "medico_disponibilidades", "medico_agendas", "medico_procedimentos", "procedimentos", "especialidades"],
+    tabelas: [
+      "medicos",
+      "medico_disponibilidades",
+      "medico_agendas",
+      "medico_procedimentos",
+      "procedimentos",
+      "especialidades",
+    ],
     erros: ["pergunta sem correspondência no cadastro", "cadastro sem registros"],
     ferramentas: ["consultar_cadastro"],
   },
@@ -885,7 +917,10 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["llm.generate"],
     seguintes: ["turn.watchdog"],
     tabelas: ["whatsapp_webhook_logs", "whatsapp_configs"],
-    erros: ["erro não classificado (registrado no log)", "reenvio pela Meta só quando nada foi processado"],
+    erros: [
+      "erro não classificado (registrado no log)",
+      "reenvio pela Meta só quando nada foi processado",
+    ],
   },
   {
     id: "turn.watchdog",
@@ -1030,7 +1065,12 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     seguintes: ["llm.generate"],
     tabelas: ["medicos", "procedimentos", "especialidades", "clinicas", "unidades"],
     erros: ["cadastro sem registros", "filtro sem correspondência"],
-    ferramentas: ["listar_especialidades", "buscar_medicos", "buscar_procedimentos", "dados_da_clinica"],
+    ferramentas: [
+      "listar_especialidades",
+      "buscar_medicos",
+      "buscar_procedimentos",
+      "dados_da_clinica",
+    ],
   },
   {
     id: "tool.doctor_schedule",

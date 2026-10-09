@@ -38,11 +38,7 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
   });
 
   it("cenário 2: conversa transferida para Maria sai da lista de Jean", () => {
-    const r = patchListaPorConversa(
-      [conversa()],
-      conversa({ atribuida_user_id: MARIA }),
-      ctx(),
-    );
+    const r = patchListaPorConversa([conversa()], conversa({ atribuida_user_id: MARIA }), ctx());
     expect(r.aplicado).toBe(true);
     expect(r.reconciliar).toBe(false);
     expect(r.lista).toEqual([]);
@@ -86,11 +82,12 @@ describe("FASE 3 — realtime do filtro por atendente", () => {
   });
 
   it("atendente comum não recebe conversa de terceiro pelo tempo real", () => {
-    const r = patchListaPorConversa(
-      [],
-      conversa({ atribuida_user_id: JEAN }),
-      { escopo: "minhas", userId: MARIA, gestor: false, atendenteId: JEAN },
-    );
+    const r = patchListaPorConversa([], conversa({ atribuida_user_id: JEAN }), {
+      escopo: "minhas",
+      userId: MARIA,
+      gestor: false,
+      atendenteId: JEAN,
+    });
     expect(r.lista).toEqual([]);
     expect(r.reconciliar).toBe(false);
   });

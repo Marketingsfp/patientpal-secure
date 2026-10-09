@@ -30,21 +30,73 @@ export type IntencaoNina =
 
 const PADROES: Array<{ intencao: IntencaoNina; termos: RegExp }> = [
   { intencao: "cancelamento", termos: /\b(cancelar|cancelamento|desmarcar|nao vou poder ir)\b/ },
-  { intencao: "remarcacao", termos: /\b(remarcar|remarcacao|reagendar|mudar (o )?(dia|horario)|trocar (o )?(dia|horario)|adiar)\b/ },
-  { intencao: "agendamento", termos: /\b(agendar|marcar|agendamento|quero marcar|posso marcar|marcacao)\b/ },
-  { intencao: "disponibilidade", termos: /\b(tem vaga|vagas?|disponibilidade|disponivel|tem horario|encaixe|consegue (hoje|amanha|sabado))\b/ },
-  { intencao: "valor", termos: /\b(valor|valores|preco|precos|quanto custa|quanto e|quanto fica|custa|tabela|formas? de pagamento)\b|\b(?:aceitam?|posso pagar|pode pagar|pagar)\s+(?:(?:no|em|por|via|com)\s+)?(?:pix|dinheiro|cartao|boleto|cheque)\b|^(?:e\s+)?(?:no|em|por|via)\s+(?:pix|dinheiro|cartao|boleto|cheque)\s*\??$/ },
-  { intencao: "preparo", termos: /\b(preparo|jejum|precisa de jejum|como me preparo|posso comer)\b/ },
-  { intencao: "documentos", termos: /\b(documento|documentos|rg|carteirinha|pedido medico|encaminhamento|o que levar|preciso levar)\b/ },
-  { intencao: "endereco", termos: /\b(endereco|onde fica|localizacao|como chego|rua|bairro|mapa|referencia)\b/ },
-  { intencao: "horario", termos: /\b(horario de funcionamento|que horas abre|que horas fecha|abre|fecha|atende ate|funciona)\b/ },
-  { intencao: "medico", termos: /\b(medicos?|medicas?|doutor|doutora|dr|dra|profissiona(?:l|is)|quem atende|especialistas?)\b|[a-z]+ologista/ },
-  { intencao: "exame", termos: /\b(exame|exames|ultrassom|ultrassonografia|raio ?x|rx|laboratorio|sangue|eletro|tomografia|resultado)\b/ },
+  {
+    intencao: "remarcacao",
+    termos:
+      /\b(remarcar|remarcacao|reagendar|mudar (o )?(dia|horario)|trocar (o )?(dia|horario)|adiar)\b/,
+  },
+  {
+    intencao: "agendamento",
+    termos: /\b(agendar|marcar|agendamento|quero marcar|posso marcar|marcacao)\b/,
+  },
+  {
+    intencao: "disponibilidade",
+    termos:
+      /\b(tem vaga|vagas?|disponibilidade|disponivel|tem horario|encaixe|consegue (hoje|amanha|sabado))\b/,
+  },
+  {
+    intencao: "valor",
+    termos:
+      /\b(valor|valores|preco|precos|quanto custa|quanto e|quanto fica|custa|tabela|formas? de pagamento)\b|\b(?:aceitam?|posso pagar|pode pagar|pagar)\s+(?:(?:no|em|por|via|com)\s+)?(?:pix|dinheiro|cartao|boleto|cheque)\b|^(?:e\s+)?(?:no|em|por|via)\s+(?:pix|dinheiro|cartao|boleto|cheque)\s*\??$/,
+  },
+  {
+    intencao: "preparo",
+    termos: /\b(preparo|jejum|precisa de jejum|como me preparo|posso comer)\b/,
+  },
+  {
+    intencao: "documentos",
+    termos:
+      /\b(documento|documentos|rg|carteirinha|pedido medico|encaminhamento|o que levar|preciso levar)\b/,
+  },
+  {
+    intencao: "endereco",
+    termos: /\b(endereco|onde fica|localizacao|como chego|rua|bairro|mapa|referencia)\b/,
+  },
+  {
+    intencao: "horario",
+    termos:
+      /\b(horario de funcionamento|que horas abre|que horas fecha|abre|fecha|atende ate|funciona)\b/,
+  },
+  {
+    intencao: "medico",
+    termos:
+      /\b(medicos?|medicas?|doutor|doutora|dr|dra|profissiona(?:l|is)|quem atende|especialistas?)\b|[a-z]+ologista/,
+  },
+  {
+    intencao: "exame",
+    termos:
+      /\b(exame|exames|ultrassom|ultrassonografia|raio ?x|rx|laboratorio|sangue|eletro|tomografia|resultado)\b/,
+  },
   { intencao: "consulta", termos: /\b(consulta|consultar|avaliacao|retorno)\b/ },
-  { intencao: "procedimento", termos: /\b(procedimento|cirurgia|curativo|aplicacao|injecao|vacina)\b/ },
-  { intencao: "financeiro", termos: /\b(boleto|pagamento|pagar|mensalidade|fatura|segunda via|nota fiscal|nfse|reembolso|convenio (cobre|cobra))\b/ },
-  { intencao: "falar_humano", termos: /\b(atendente|humano|pessoa de verdade|falar com alguem|recepcao|nao entendi nada|quero falar com)\b/ },
-  { intencao: "administrativo", termos: /\b(convenio|plano de saude|cadastro|contrato|associado|trabalhar|curriculo|reclamacao)\b/ },
+  {
+    intencao: "procedimento",
+    termos: /\b(procedimento|cirurgia|curativo|aplicacao|injecao|vacina)\b/,
+  },
+  {
+    intencao: "financeiro",
+    termos:
+      /\b(boleto|pagamento|pagar|mensalidade|fatura|segunda via|nota fiscal|nfse|reembolso|convenio (cobre|cobra))\b/,
+  },
+  {
+    intencao: "falar_humano",
+    termos:
+      /\b(atendente|humano|pessoa de verdade|falar com alguem|recepcao|nao entendi nada|quero falar com)\b/,
+  },
+  {
+    intencao: "administrativo",
+    termos:
+      /\b(convenio|plano de saude|cadastro|contrato|associado|trabalhar|curriculo|reclamacao)\b/,
+  },
 ];
 
 /** Lê as intenções presentes na mensagem. Pode retornar mais de uma. */
@@ -65,7 +117,8 @@ export function detectarIntencoes(mensagem: string): IntencaoNina[] {
  */
 export function querAgendar(intencoes: IntencaoNina[]): boolean {
   return intencoes.some(
-    (i) => i === "agendamento" || i === "disponibilidade" || i === "remarcacao" || i === "cancelamento",
+    (i) =>
+      i === "agendamento" || i === "disponibilidade" || i === "remarcacao" || i === "cancelamento",
   );
 }
 
@@ -78,11 +131,20 @@ export function perguntaGeralSobreAtendimento(mensagem: string): boolean {
   const texto = normalizar(mensagem ?? "");
   if (querAgendar(detectarIntencoes(texto))) return false;
   // Datas, uma hora exata e um profissional nomeado delimitam outro pedido.
-  if (/\b(hoje|amanha|proxim[oa]|nesta|neste|essa semana|esta semana|semana que vem|dia \d{1,2}|as \d{1,2}|dr|dra|doutor|doutora)\b|\d{1,2}[:/]\d{2}/.test(texto)) return false;
-  const assunto = pareceCitarEspecialidade(texto) !== null || /\b(medicos?|medicas?|profissiona(?:l|is)|especialistas?|especialidades?)\b/.test(texto);
+  if (
+    /\b(hoje|amanha|proxim[oa]|nesta|neste|essa semana|esta semana|semana que vem|dia \d{1,2}|as \d{1,2}|dr|dra|doutor|doutora)\b|\d{1,2}[:/]\d{2}/.test(
+      texto,
+    )
+  )
+    return false;
+  const assunto =
+    pareceCitarEspecialidade(texto) !== null ||
+    /\b(medicos?|medicas?|profissiona(?:l|is)|especialistas?|especialidades?)\b/.test(texto);
   if (!assunto) return false;
   // "cardiologia" ou "cardiologista?" isolados continuam sendo só o assunto.
-  return /\b(tem|possuem?|oferecem?|atendem?|quais|quem|informacoes|quero saber|gostaria de saber|me fale|me informe|pode informar)\b/.test(texto);
+  return /\b(tem|possuem?|oferecem?|atendem?|quais|quem|informacoes|quero saber|gostaria de saber|me fale|me informe|pode informar)\b/.test(
+    texto,
+  );
 }
 
 /** Mensagem sem intenção legível (ou só um nome solto de especialidade). */
@@ -92,7 +154,9 @@ export function intencaoAmbigua(mensagem: string, intencoes: IntencaoNina[]): bo
   if (intencoes.length === 0) return true;
   if (perguntaGeralSobreAtendimento(texto)) return false;
   // "cardiologia", "ultrassom" — só o assunto, sem dizer o que quer saber.
-  const soAssunto = intencoes.every((i) => i === "consulta" || i === "exame" || i === "procedimento" || i === "medico");
+  const soAssunto = intencoes.every(
+    (i) => i === "consulta" || i === "exame" || i === "procedimento" || i === "medico",
+  );
   return soAssunto && texto.split(/\s+/).length <= 3;
 }
 

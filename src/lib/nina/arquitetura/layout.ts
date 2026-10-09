@@ -240,9 +240,7 @@ export function calcularLayout(
     }
     const media = (itens: NodeArquitetura[]) =>
       itens.reduce((soma, n) => soma + (ordem.get(n.id) ?? 0), 0) / Math.max(itens.length, 1);
-    const ordenados = [...grupos.values()]
-      .sort((a, b) => media(a) - media(b))
-      .flat();
+    const ordenados = [...grupos.values()].sort((a, b) => media(a) - media(b)).flat();
     lista.splice(0, lista.length, ...ordenados);
     lista.forEach((node, indice) => ordem.set(node.id, indice));
   }
@@ -302,10 +300,7 @@ export function calcularLayout(
     }
   }
 
-  const largura = Math.max(
-    ...posicionados.map((p) => p.x + LARGURA_NODE),
-    LARGURA_NODE,
-  ) + MARGEM;
+  const largura = Math.max(...posicionados.map((p) => p.x + LARGURA_NODE), LARGURA_NODE) + MARGEM;
   const altura = Math.max(...posicionados.map((p) => p.y + ALTURA_NODE), ALTURA_NODE) + MARGEM;
 
   return {

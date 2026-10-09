@@ -37,7 +37,9 @@ const ctxCom = (
 ): ContextoConfianca => ({
   requestedAction: null,
   fatos,
-  retrievedSources: [{ tipo: "catalogo_publicado", referencia: "cat", temConteudo: true, publicado: true }],
+  retrievedSources: [
+    { tipo: "catalogo_publicado", referencia: "cat", temConteudo: true, publicado: true },
+  ],
   toolResults: [
     {
       nome: "buscar_conhecimento",
@@ -58,7 +60,8 @@ const ctxCom = (
   ...extras,
 });
 
-const do_ = (r: { claims: ClaimAvaliado[] }, tipo: string) => r.claims.filter((c) => c.tipo === tipo);
+const do_ = (r: { claims: ClaimAvaliado[] }, tipo: string) =>
+  r.claims.filter((c) => c.tipo === tipo);
 
 describe("leitura da afirmação", () => {
   it("cada afirmação é lida no seu próprio segmento", () => {
@@ -197,7 +200,9 @@ describe("versões corretas e equivalências legítimas", () => {
 
   it("preparo em formato equivalente é confirmado", () => {
     const r = avaliarGrounding(
-      ctxCom([fato({ campo: "preparo", valor: "jejum de 6 horas", chave: { procedimento: "Ultrassom" } })]),
+      ctxCom([
+        fato({ campo: "preparo", valor: "jejum de 6 horas", chave: { procedimento: "Ultrassom" } }),
+      ]),
       "Para o ultrassom, jejum de 6h.",
     );
     expect(do_(r, "preparo")[0]!.situacao).toBe("confirmado");

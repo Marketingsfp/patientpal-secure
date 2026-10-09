@@ -55,7 +55,11 @@ export function classificarAmbiente(host: string): AmbienteWebmcp {
   const h = (host || "").toLowerCase();
   if (!h) return "desconhecido";
   if (h === "localhost" || h.startsWith("localhost:") || h.startsWith("127.0.0.1")) return "local";
-  if (h.includes("id-preview--") || h.endsWith("-dev.lovable.app") || h.includes(".lovableproject.com")) {
+  if (
+    h.includes("id-preview--") ||
+    h.endsWith("-dev.lovable.app") ||
+    h.includes(".lovableproject.com")
+  ) {
     return "preview";
   }
   if (h.endsWith(".lovable.app")) return "producao";
@@ -67,7 +71,10 @@ export function classificarAmbiente(host: string): AmbienteWebmcp {
  * A escrita só é liberada fora de produção e apenas quando há uma conversa de
  * homologação selecionada — jamais sobre uma conversa real.
  */
-export function escritaPermitida(ambiente: AmbienteWebmcp, selecao: SelecaoTesteWebmcp | null): boolean {
+export function escritaPermitida(
+  ambiente: AmbienteWebmcp,
+  selecao: SelecaoTesteWebmcp | null,
+): boolean {
   if (ambiente === "producao" || ambiente === "desconhecido") return false;
   return Boolean(selecao?.conversaId);
 }
@@ -81,9 +88,7 @@ export function montarContextoWebmcp(entrada: EntradaContextoWebmcp): ContextoWe
     ambiente,
     dentro_do_editor: entrada.dentroDeIframe,
     autenticado: entrada.autenticado,
-    perfil: entrada.autenticado
-      ? { email: entrada.usuarioEmail, papel: entrada.papel }
-      : null,
+    perfil: entrada.autenticado ? { email: entrada.usuarioEmail, papel: entrada.papel } : null,
     clinica_autorizada:
       entrada.autenticado && entrada.clinicaId
         ? { id: entrada.clinicaId, nome: entrada.clinicaNome }

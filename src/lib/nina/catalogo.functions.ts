@@ -81,16 +81,26 @@ export const listarCatalogoNina = createServerFn({ method: "POST" })
     await exigirMembro(context.supabase, context.userId, data.clinicaId);
     const { lerPaginasCatalogo } = await import("./catalogo-importacao.server");
     const [servicos, profissionais] = await Promise.all([
-      lerPaginasCatalogo<any>(() => context.supabase
-        .from(TABELA.servico)
-        .select(COLUNAS_SERVICO)
-        .eq("clinica_id", data.clinicaId)
-        .order("nome").order("id")).catch(e => { throw erroLeituraCatalogo(e); }),
-      lerPaginasCatalogo<any>(() => context.supabase
-        .from(TABELA.profissional)
-        .select(COLUNAS_PROFISSIONAL)
-        .eq("clinica_id", data.clinicaId)
-        .order("nome").order("id")).catch(e => { throw erroLeituraCatalogo(e); }),
+      lerPaginasCatalogo<any>(() =>
+        context.supabase
+          .from(TABELA.servico)
+          .select(COLUNAS_SERVICO)
+          .eq("clinica_id", data.clinicaId)
+          .order("nome")
+          .order("id"),
+      ).catch((e) => {
+        throw erroLeituraCatalogo(e);
+      }),
+      lerPaginasCatalogo<any>(() =>
+        context.supabase
+          .from(TABELA.profissional)
+          .select(COLUNAS_PROFISSIONAL)
+          .eq("clinica_id", data.clinicaId)
+          .order("nome")
+          .order("id"),
+      ).catch((e) => {
+        throw erroLeituraCatalogo(e);
+      }),
     ]);
     return { servicos, profissionais };
   });
@@ -103,12 +113,27 @@ export const informacoesPublicasBase = createServerFn({ method: "POST" })
     await exigirMembro(context.supabase, context.userId, data.clinicaId);
     const { lerPaginasCatalogo } = await import("./catalogo-importacao.server");
     const [clinica, unidades, convenios] = await Promise.all([
-      context.supabase.from("clinicas").select("nome, endereco, cidade, estado, cep, telefone, email")
-        .eq("id", data.clinicaId).maybeSingle(),
-      lerPaginasCatalogo<any>(() => context.supabase.from("unidades").select("id, nome")
-        .eq("clinica_id", data.clinicaId).eq("ativo", true).order("id")),
-      lerPaginasCatalogo<any>(() => context.supabase.from("cb_convenios").select("id, nome")
-        .eq("clinica_id", data.clinicaId).eq("ativo", true).order("id")),
+      context.supabase
+        .from("clinicas")
+        .select("nome, endereco, cidade, estado, cep, telefone, email")
+        .eq("id", data.clinicaId)
+        .maybeSingle(),
+      lerPaginasCatalogo<any>(() =>
+        context.supabase
+          .from("unidades")
+          .select("id, nome")
+          .eq("clinica_id", data.clinicaId)
+          .eq("ativo", true)
+          .order("id"),
+      ),
+      lerPaginasCatalogo<any>(() =>
+        context.supabase
+          .from("cb_convenios")
+          .select("id, nome")
+          .eq("clinica_id", data.clinicaId)
+          .eq("ativo", true)
+          .order("id"),
+      ),
     ]);
     if (clinica.error) throw Error(clinica.error.message);
     return { clinica: clinica.data, unidades, convenios };

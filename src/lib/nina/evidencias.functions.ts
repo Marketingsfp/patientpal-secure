@@ -28,7 +28,6 @@ export async function carregarEvidenciasExecucao(
     };
     const data = { clinicaId, execucaoId };
 
-
     const { data: execucao, error: e1 } = await supabase
       .from("nina_execucoes")
       .select(

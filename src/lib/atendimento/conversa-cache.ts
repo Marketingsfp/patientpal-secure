@@ -94,7 +94,6 @@ export function respostaAindaVale(params: {
   return pedido === pedidoAtual;
 }
 
-
 /**
  * Quais conversas em cache ficaram desatualizadas depois de uma atualização da
  * lista (realtime). Comparamos o instante da última mensagem: se mudou, o

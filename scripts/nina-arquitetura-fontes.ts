@@ -10,18 +10,24 @@ const RESOLVIDO = `\0${MODULO_FONTES_NINA}`;
  * pelo endpoint em runtime. Imports continuam lazy, sem ler disco no worker. */
 export function codigoFontesArquitetura(): string {
   const arquivos = [...arquivosPermitidos()]
-    .filter(arquivo => /^src\/.*\.tsx?$/.test(arquivo))
+    .filter((arquivo) => /^src\/.*\.tsx?$/.test(arquivo))
     .sort();
-  return `export default {\n${arquivos.map(arquivo => {
-    const caminho = `/${arquivo}`;
-    return `${JSON.stringify(caminho)}: () => import(${JSON.stringify(`${caminho}?raw`)}).then(m => m.default)`;
-  }).join(",\n")}\n};`;
+  return `export default {\n${arquivos
+    .map((arquivo) => {
+      const caminho = `/${arquivo}`;
+      return `${JSON.stringify(caminho)}: () => import(${JSON.stringify(`${caminho}?raw`)}).then(m => m.default)`;
+    })
+    .join(",\n")}\n};`;
 }
 
 export function fontesArquiteturaNina(): Plugin {
   return {
     name: "nina-arquitetura-fontes-permitidas",
-    resolveId(id) { if (id === MODULO_FONTES_NINA) return RESOLVIDO; },
-    load(id) { if (id === RESOLVIDO) return codigoFontesArquitetura(); },
+    resolveId(id) {
+      if (id === MODULO_FONTES_NINA) return RESOLVIDO;
+    },
+    load(id) {
+      if (id === RESOLVIDO) return codigoFontesArquitetura();
+    },
   };
 }

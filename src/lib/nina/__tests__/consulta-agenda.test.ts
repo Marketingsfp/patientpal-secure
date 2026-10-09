@@ -26,68 +26,130 @@ const ofertaGeral =
   "O Dr. Alex Louza atende às quartas às 13h e o Dr. Antonio Cobucci às quintas às 13:30. Qual médico prefere para verificar vagas?";
 
 describe("escolha entre médico e primeiro disponível", () => {
-  const ofertaCurta = "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?";
-  it.each(["o primeiro horário", "o primeiro horário disponível", "pode ser a primeira vaga", "primeira data disponível"])(
-    "oferta curta sem lista anterior permite comparar agendas: %s", mensagem => {
-      expect(preferePrimeiroDisponivel(contexto(mensagem, ofertaCurta))).toBe(true);
-      expect(interesseEmConsultarAgenda(contexto(mensagem, ofertaCurta))).toBe(true);
-    });
-  it.each(["sim", "quero escolher os profissionais", "mostre a lista", "não quero o primeiro horário", "qual o preço?"])(
-    "oferta curta não presume primeira vaga: %s", mensagem => {
-      expect(preferePrimeiroDisponivel(contexto(mensagem, ofertaCurta))).toBe(false);
-    });
-  const oferta = "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
-  it.each(["o primeiro disponível", "o mais próximo", "quem tiver antes", "qualquer um",
-    "não tenho preferência", "quero quem puder me atender mais cedo", "primeiro disponível pra hoje"])("interpreta %s", mensagem => {
+  const ofertaCurta =
+    "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?";
+  it.each([
+    "o primeiro horário",
+    "o primeiro horário disponível",
+    "pode ser a primeira vaga",
+    "primeira data disponível",
+  ])("oferta curta sem lista anterior permite comparar agendas: %s", (mensagem) => {
+    expect(preferePrimeiroDisponivel(contexto(mensagem, ofertaCurta))).toBe(true);
+    expect(interesseEmConsultarAgenda(contexto(mensagem, ofertaCurta))).toBe(true);
+  });
+  it.each([
+    "sim",
+    "quero escolher os profissionais",
+    "mostre a lista",
+    "não quero o primeiro horário",
+    "qual o preço?",
+  ])("oferta curta não presume primeira vaga: %s", (mensagem) => {
+    expect(preferePrimeiroDisponivel(contexto(mensagem, ofertaCurta))).toBe(false);
+  });
+  const oferta =
+    "Você prefere escolher um desses profissionais ou quer que eu consulte quem tem a disponibilidade mais próxima?";
+  it.each([
+    "o primeiro disponível",
+    "o mais próximo",
+    "quem tiver antes",
+    "qualquer um",
+    "não tenho preferência",
+    "quero quem puder me atender mais cedo",
+    "primeiro disponível pra hoje",
+  ])("interpreta %s", (mensagem) => {
     expect(preferePrimeiroDisponivel(contexto(mensagem, oferta))).toBe(true);
     expect(interesseEmConsultarAgenda(contexto(mensagem, oferta))).toBe(true);
   });
-  it.each(["sim", "com Alex Louza", "não quero o primeiro disponível", "qual o valor do mais próximo?",
-    "agora não", "mais barato"])("não escolhe pela paciente: %s", mensagem => {
+  it.each([
+    "sim",
+    "com Alex Louza",
+    "não quero o primeiro disponível",
+    "qual o valor do mais próximo?",
+    "agora não",
+    "mais barato",
+  ])("não escolhe pela paciente: %s", (mensagem) => {
     expect(preferePrimeiroDisponivel(contexto(mensagem, oferta))).toBe(false);
   });
   it("não reutiliza oferta de outro assunto", () => {
-    expect(preferePrimeiroDisponivel(contexto("qualquer um", "Qual pagamento prefere?"))).toBe(false);
-    expect(preferePrimeiroDisponivel(contexto("primeiro disponível", oferta, { mudancaTema: true }))).toBe(false);
+    expect(preferePrimeiroDisponivel(contexto("qualquer um", "Qual pagamento prefere?"))).toBe(
+      false,
+    );
+    expect(
+      preferePrimeiroDisponivel(contexto("primeiro disponível", oferta, { mudancaTema: true })),
+    ).toBe(false);
   });
   it("aceita pedido direto pela primeira vaga sem médico escolhido", () => {
-    expect(preferePrimeiroDisponivel(contexto("Quero marcar consulta com o primeiro disponível"))).toBe(true);
+    expect(
+      preferePrimeiroDisponivel(contexto("Quero marcar consulta com o primeiro disponível")),
+    ).toBe(true);
   });
   it("preserva a busca entre médicos ao acrescentar hoje, sem herdar outra escolha", () => {
-    const historico = [{ role: "assistant", content: oferta }, { role: "user", content: "o primeiro disponível" },
-      { role: "assistant", content: "Você prefere algum dia? Assim verifico as vagas." }];
+    const historico = [
+      { role: "assistant", content: oferta },
+      { role: "user", content: "o primeiro disponível" },
+      { role: "assistant", content: "Você prefere algum dia? Assim verifico as vagas." },
+    ];
     expect(preferePrimeiroDisponivel({ mensagemAtual: "sim, pra hoje", historico })).toBe(true);
-    expect(preferePrimeiroDisponivel({ mensagemAtual: "amanhã", historico: [...historico,
-      { role: "user", content: "prefiro Alex Louza" }, { role: "assistant", content: "Qual dia prefere?" }] })).toBe(false);
+    expect(
+      preferePrimeiroDisponivel({
+        mensagemAtual: "amanhã",
+        historico: [
+          ...historico,
+          { role: "user", content: "prefiro Alex Louza" },
+          { role: "assistant", content: "Qual dia prefere?" },
+        ],
+      }),
+    ).toBe(false);
   });
   it("não troca uma solicitação específica pelo primeiro médico da clínica", () => {
-    expect(preferePrimeiroDisponivel(contexto("a primeira disponível com Dr. Alex", oferta))).toBe(false);
-    expect(preferePrimeiroDisponivel(contexto("a primeira disponível com Alex Louza", oferta))).toBe(false);
-    expect(preferePrimeiroDisponivel(contexto("a primeira disponível", "Posso ver a agenda dele?", { medicoEscolhido: alex }))).toBe(false);
+    expect(preferePrimeiroDisponivel(contexto("a primeira disponível com Dr. Alex", oferta))).toBe(
+      false,
+    );
+    expect(
+      preferePrimeiroDisponivel(contexto("a primeira disponível com Alex Louza", oferta)),
+    ).toBe(false);
+    expect(
+      preferePrimeiroDisponivel(
+        contexto("a primeira disponível", "Posso ver a agenda dele?", { medicoEscolhido: alex }),
+      ),
+    ).toBe(false);
   });
 });
 
 describe("oferta de agenda seguida da pergunta de escolha do profissional", () => {
   const joao = { id: "8cd0109d-7d28-46c4-895f-f120ea0cd333", nome: "João Hélio" };
-  const composta = "Você gostaria de verificar as vagas disponíveis na agenda? Se sim, qual dos profissionais você prefere?";
+  const composta =
+    "Você gostaria de verificar as vagas disponíveis na agenda? Se sim, qual dos profissionais você prefere?";
   it.each(["com o joao helio", "prefiro João Hélio", "com Dr. João Hélio"])(
-    "a escolha responde à oferta e permite consultar somente o médico indicado: %s", mensagem => {
+    "a escolha responde à oferta e permite consultar somente o médico indicado: %s",
+    (mensagem) => {
       const ctx = contexto(mensagem, composta);
       expect(interesseEmConsultarAgenda(ctx)).toBe(true);
       expect(autorizarConsultaAgenda(ctx, joao, [joao, alex]).permitido).toBe(true);
       expect(autorizarConsultaAgenda(ctx, alex, [joao, alex]).permitido).toBe(false);
-    });
+    },
+  );
   it("sim após a oferta específica permite consultar sem data e não cria reserva", () => {
-    const ctx = contexto("sim", "Ótimo! O Dr. João Hélio atende às terças, quintas e sextas-feiras (por agendamento).\nGostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?", {
-      medicoEscolhido: joao,
-    });
+    const ctx = contexto(
+      "sim",
+      "Ótimo! O Dr. João Hélio atende às terças, quintas e sextas-feiras (por agendamento).\nGostaria que eu consulte vagas e horários disponíveis na agenda para a sua consulta com ele?",
+      {
+        medicoEscolhido: joao,
+      },
+    );
     expect(autorizarConsultaAgenda(ctx, joao, [joao, alex]).permitido).toBe(true);
     expect(autorizarConsultaAgenda(ctx, alex, [joao, alex]).permitido).toBe(false);
   });
   it("sim à oferta geral não escolhe médico; assunto novo não herda a oferta", () => {
     expect(autorizarConsultaAgenda(contexto("sim", composta), joao).permitido).toBe(false);
-    for (const final of ["Qual é seu nome?", "Qual forma de pagamento prefere?", "Informe seu nome. Qual profissional prefere?"]) {
-      expect(interesseEmConsultarAgenda(contexto("João Hélio", `${composta} ${final}`))).toBe(false);
+    for (const final of [
+      "Qual é seu nome?",
+      "Qual forma de pagamento prefere?",
+      "Informe seu nome. Qual profissional prefere?",
+    ]) {
+      expect(interesseEmConsultarAgenda(contexto("João Hélio", `${composta} ${final}`))).toBe(
+        false,
+      );
     }
     expect(interesseEmConsultarAgenda(contexto("não quero consultar vagas", composta))).toBe(false);
   });

@@ -203,4 +203,3 @@ export async function carregarRepassePago(
 ): Promise<number> {
   return (await carregarRepassePagoDetalhado(ctx, clinicaId, de, ate)).total;
 }
-

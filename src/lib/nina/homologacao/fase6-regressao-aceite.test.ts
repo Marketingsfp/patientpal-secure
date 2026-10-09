@@ -79,8 +79,7 @@ function tabela() {
     const linhas = banco.filter((l) => {
       for (const [c, v] of eqs) if ((l as any)[c] !== v) return false;
       if (somenteGlobal) return l.clinica_id === null;
-      if (clinicaAlvo !== undefined)
-        return l.clinica_id === null || l.clinica_id === clinicaAlvo;
+      if (clinicaAlvo !== undefined) return l.clinica_id === null || l.clinica_id === clinicaAlvo;
       return true;
     });
     return { data: linhas, error: null };
@@ -110,12 +109,10 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: { from: () => tabela() },
 }));
 
-const { carregarTemplatesPublicados, invalidarCacheTemplates } = await import(
-  "@/lib/nina/resposta/templates.server"
-);
-const { finalizarResposta, finalizarTemplate, limparFinalizacoes } = await import(
-  "@/lib/nina/resposta/finalizacao.server"
-);
+const { carregarTemplatesPublicados, invalidarCacheTemplates } =
+  await import("@/lib/nina/resposta/templates.server");
+const { finalizarResposta, finalizarTemplate, limparFinalizacoes } =
+  await import("@/lib/nina/resposta/finalizacao.server");
 
 function publicar(chave: string, texto: string, clinicaId: string | null = null) {
   for (const l of banco)
@@ -193,9 +190,9 @@ describe("2. validação, falha de banco e convergência entre instâncias", () 
     expect(validarTemplatePublicado("handoff.aviso", "Olá {nome}")).toMatchObject({ ok: false });
     expect(validarTemplatePublicado("chave.que.nao.existe", "oi")).toMatchObject({ ok: false });
     expect(validarTemplatePublicado("handoff.aviso", "   ")).toMatchObject({ ok: false });
-    expect(
-      validarTemplatePublicado("fluxo.coleta.faltando", "Falta {lista}."),
-    ).toMatchObject({ ok: true });
+    expect(validarTemplatePublicado("fluxo.coleta.faltando", "Falta {lista}.")).toMatchObject({
+      ok: true,
+    });
   });
 
   it("template inválido publicado não é usado e o padrão assume, com motivo", async () => {

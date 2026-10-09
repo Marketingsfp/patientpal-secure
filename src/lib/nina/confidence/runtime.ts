@@ -199,7 +199,6 @@ export function garantirScoreDoTextoEnviado(
   });
 }
 
-
 const LEGADOS = new Set([
   "VALOR_SEM_CATALOGO",
   "AGENDA_SEM_CONFIRMACAO",
@@ -237,10 +236,10 @@ export function instrucaoEsclarecimentoDirigida(r: ResultadoConfianca): string {
     (v) => v.status !== "PASS" && v.status !== "NOT_APPLICABLE",
   );
   const nomes = falhou.map((v) => v.validator);
-  let alvo =
-    "o que exatamente ele precisa (procedimento, convênio, unidade ou profissional)";
+  let alvo = "o que exatamente ele precisa (procedimento, convênio, unidade ou profissional)";
   if (nomes.includes("EntityResolutionValidator")) {
-    alvo = "QUAL item específico ele quer, citando as opções encontradas (ex.: qual ultrassonografia)";
+    alvo =
+      "QUAL item específico ele quer, citando as opções encontradas (ex.: qual ultrassonografia)";
   } else if (nomes.includes("RequiredDataValidator")) {
     const faltam = r.evidence.camposFaltantes;
     if (faltam.length > 0) alvo = `apenas o dado que falta: ${faltam.join(", ")}`;
@@ -352,6 +351,9 @@ export function validarAgendamentoAntesDoCommit(
   return {
     liberado: faltas.length === 0,
     faltas,
-    motivo: faltas.length === 0 ? "validação final aprovada" : `validação final reprovada: ${faltas.join(", ")}`,
+    motivo:
+      faltas.length === 0
+        ? "validação final aprovada"
+        : `validação final reprovada: ${faltas.join(", ")}`,
   };
 }

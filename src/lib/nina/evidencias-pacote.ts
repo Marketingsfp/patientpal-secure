@@ -287,7 +287,9 @@ const ROTULO_LACUNA_PACOTE: Record<string, string> = {
  * Lacunas do pacote. Cada lacuna diz que NÃO HÁ REGISTRO — nunca que a
  * operação deixou de acontecer.
  */
-export function lacunasDoPacote(p: Omit<PacoteInvestigacao, "lacunas" | "hash">): LacunaEvidencia[] {
+export function lacunasDoPacote(
+  p: Omit<PacoteInvestigacao, "lacunas" | "hash">,
+): LacunaEvidencia[] {
   const faltas: LacunaEvidencia[] = [];
   const falta = (chave: string, motivo: string) =>
     faltas.push({ chave, rotulo: ROTULO_LACUNA_PACOTE[chave] ?? chave, motivo });
@@ -301,7 +303,10 @@ export function lacunasDoPacote(p: Omit<PacoteInvestigacao, "lacunas" | "hash">)
   if (!p.prompt) falta("prompt", "O snapshot do prompt desta execução não está disponível.");
   if (!p.etapas.length) falta("etapas", "Nenhuma etapa foi capturada nesta execução.");
   if (!p.ferramentas.length) {
-    falta("ferramentas", "Não há registro de ferramenta nesta execução — não é prova de que nenhuma rodou.");
+    falta(
+      "ferramentas",
+      "Não há registro de ferramenta nesta execução — não é prova de que nenhuma rodou.",
+    );
   }
   if (!p.confianca.length) falta("confianca", "Não há avaliação de confiança registrada.");
   if (!p.entrega) falta("entrega", "A mensagem entregue não está vinculada a esta execução.");

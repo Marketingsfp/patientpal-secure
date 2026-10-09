@@ -56,12 +56,7 @@ export function useSaidasDasMensagens(
             return false;
           const linhas = Object.values(dados);
           if (linhas.some((linha) => linha === "falha")) return false;
-          return linhas.some(
-            (linha) =>
-              linha !== "falha" && !linha.inspecionavel,
-          )
-            ? 1500
-            : false;
+          return linhas.some((linha) => linha !== "falha" && !linha.inspecionavel) ? 1500 : false;
         },
         queryFn: async ({ signal }): Promise<MapaSaidas> => {
           const mapa: MapaSaidas = {};

@@ -246,8 +246,22 @@ describe("FASE 2 — avaliações de confiança", () => {
   it("o novo resumo omite avaliações sem alterar o registro histórico", () => {
     const r = criarRegistroTurno({ turnoId: "t1" });
     r.avaliacoes = [
-      { ...base, avaliacao: "action_safety", decisao: "ALLOW", modo: "enforce", score: 90, aplicada: true },
-      { ...base, avaliacao: "answer_confidence", decisao: "CLARIFY", modo: "shadow", score: 65, aplicada: false },
+      {
+        ...base,
+        avaliacao: "action_safety",
+        decisao: "ALLOW",
+        modo: "enforce",
+        score: 90,
+        aplicada: true,
+      },
+      {
+        ...base,
+        avaliacao: "answer_confidence",
+        decisao: "CLARIFY",
+        modo: "shadow",
+        score: 65,
+        aplicada: false,
+      },
     ];
     const resumo = resumoTurnoParaTrace(r) as Record<string, unknown>;
     expect(resumo["modo_resposta"]).toBe("direta");
@@ -275,7 +289,15 @@ describe("FASE 3 — evidência da saída", () => {
   it("evento posterior completa o resumo gravado com mensagemId nulo", () => {
     const s = evidenciaSaidaDoTurno({
       entregaDoResumo: { mensagemId: null, canal: "whatsapp", tamanho: 10, textoHash: "h" },
-      eventos: [{ turnoId: "t", mensagemId: "m2", canal: "whatsapp", estado: "confirmada", transporteId: "wamid" }],
+      eventos: [
+        {
+          turnoId: "t",
+          mensagemId: "m2",
+          canal: "whatsapp",
+          estado: "confirmada",
+          transporteId: "wamid",
+        },
+      ],
     });
     expect(s.estado).toBe("confirmada");
     expect(s.mensagemId).toBe("m2");
@@ -314,12 +336,18 @@ describe("FASE 3 — evidência da saída", () => {
   });
 
   it("não associa saída de outro turno/conversa", () => {
+    expect(eventoEntregaDoTurno({ turnoId: "t2" }, { turnoId: "t1" })).toBe(false);
     expect(
-      eventoEntregaDoTurno({ turnoId: "t2" }, { turnoId: "t1" }),
+      eventoEntregaDoTurno(
+        { turnoId: "t1", conversaId: "c2" },
+        { turnoId: "t1", conversaId: "c1" },
+      ),
     ).toBe(false);
     expect(
-      eventoEntregaDoTurno({ turnoId: "t1", conversaId: "c2" }, { turnoId: "t1", conversaId: "c1" }),
-    ).toBe(false);
-    expect(eventoEntregaDoTurno({ turnoId: "t1", conversaId: "c1" }, { turnoId: "t1", conversaId: "c1" })).toBe(true);
+      eventoEntregaDoTurno(
+        { turnoId: "t1", conversaId: "c1" },
+        { turnoId: "t1", conversaId: "c1" },
+      ),
+    ).toBe(true);
   });
 });

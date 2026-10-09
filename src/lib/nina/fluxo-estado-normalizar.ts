@@ -8,7 +8,10 @@ import {
   pendenciaVazia,
   type PendenciaEsclarecimento,
 } from "./confidence/esclarecimento";
-import { normalizarConhecimentoSessao, type ConhecimentoSessao } from "./confidence/conhecimento-sessao";
+import {
+  normalizarConhecimentoSessao,
+  type ConhecimentoSessao,
+} from "./confidence/conhecimento-sessao";
 import type { OpcoesAgendamento, ConfirmacaoAgendamento } from "./agendamento-escolha";
 import type { ModalidadeAtendimento } from "./modalidade-atendimento";
 
@@ -40,13 +43,16 @@ export type EtapaFluxoNina =
   | "HANDOFF"
   | "COMPLETED";
 
-
 export type EstadoFluxoNina = {
   /** Contato do remetente registrado pelo transporte; pode pertencer ao responsável. */
   whatsapp_remetente?: string | null;
   patient: {
     /** Pedido explícito, separado do remetente e dos argumentos produzidos pelo modelo. */
-    alteracao_telefone?: { telefone: string | null; paciente_id: string | null; mensagem: string } | null;
+    alteracao_telefone?: {
+      telefone: string | null;
+      paciente_id: string | null;
+      mensagem: string;
+    } | null;
     telefone_confirmado?: { paciente_id: string; telefone: string } | null;
     id: string | null;
     /** Primeiro nome apenas — o suficiente para tratar a pessoa pelo nome. */
@@ -87,7 +93,6 @@ export type EstadoFluxoNina = {
     confirmation?: ConfirmacaoAgendamento | null;
     modalidade_atendimento?: ModalidadeAtendimento | null;
     agenda_id?: string | null;
-
   };
   flow: { stage: EtapaFluxoNina };
   /**
@@ -159,14 +164,16 @@ export function estadoVazio(): EstadoFluxoNina {
   };
 }
 
-
 /** Normaliza qualquer JSON gravado para o formato atual (tolerante a versões). */
 export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
   const base = estadoVazio();
   if (!bruto || typeof bruto !== "object") return base;
   const o = bruto as Record<string, any>;
   return {
-    whatsapp_remetente: typeof o.whatsapp_remetente === "string" && /^\d{10,13}$/.test(o.whatsapp_remetente) ? o.whatsapp_remetente : null,
+    whatsapp_remetente:
+      typeof o.whatsapp_remetente === "string" && /^\d{10,13}$/.test(o.whatsapp_remetente)
+        ? o.whatsapp_remetente
+        : null,
     patient: {
       ...base.patient,
       ...(o["patient"] ?? {}),
@@ -178,7 +185,10 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     clarification: normalizarPendencia(o["clarification"]),
     knowledge_context: normalizarConhecimentoSessao(o["knowledge_context"]),
     fonte_consulta: ["clinica_os", "base_conhecimento"].includes(o.fonte_consulta?.fonte)
-      ? { fonte: o.fonte_consulta.fonte, revisao: typeof o.fonte_consulta.revisao === "string" ? o.fonte_consulta.revisao : null }
+      ? {
+          fonte: o.fonte_consulta.fonte,
+          revisao: typeof o.fonte_consulta.revisao === "string" ? o.fonte_consulta.revisao : null,
+        }
       : null,
     updated_at: o["updated_at"] ?? null,
     session_id: o["session_id"] ?? null,

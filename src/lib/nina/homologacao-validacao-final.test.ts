@@ -248,10 +248,16 @@ describe("cenário 12 — isolamento produção x homologação", () => {
 
   it("produção nunca recebe mensagem de teste", () => {
     expect(
-      aceitaMensagemRealtime({ ...base, is_teste: true, canal: CANAL_HOMOLOGACAO }, { ambiente: "producao", clinicaId: "cli-1", conversaId: "conv-1" }),
+      aceitaMensagemRealtime(
+        { ...base, is_teste: true, canal: CANAL_HOMOLOGACAO },
+        { ambiente: "producao", clinicaId: "cli-1", conversaId: "conv-1" },
+      ),
     ).toBe(false);
     expect(
-      aceitaMensagemRealtime({ ...base, is_teste: false, canal: "whatsapp" }, { ambiente: "producao", clinicaId: "cli-1", conversaId: "conv-1" }),
+      aceitaMensagemRealtime(
+        { ...base, is_teste: false, canal: "whatsapp" },
+        { ambiente: "producao", clinicaId: "cli-1", conversaId: "conv-1" },
+      ),
     ).toBe(true);
   });
 });

@@ -11,11 +11,13 @@ describe("geração real: ferramentas disponíveis e continuidade contextual (mo
       test(`${ambiente}: ${cenario}`, () => {
         const p = Bun.spawnSync([process.execPath, fixture, ambiente, cenario], {
           cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
-          stdout: "pipe", stderr: "pipe", timeout: 15_000,
+          stdout: "pipe",
+          stderr: "pipe",
+          timeout: 15_000,
         });
         const output = p.stdout.toString();
         expect(p.exitCode, output + p.stderr.toString()).toBe(0);
-        const linha = output.split(/\r?\n/).find(l => l.startsWith("DIRETA_RESULTADO="));
+        const linha = output.split(/\r?\n/).find((l) => l.startsWith("DIRETA_RESULTADO="));
         expect(linha).toBeDefined();
         const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
         expect(r.requests).toHaveLength(entrada.ferramenta ? 2 : 1);
@@ -26,21 +28,24 @@ describe("geração real: ferramentas disponíveis e continuidade contextual (mo
           expect(ferramentas).toContain("consultar_cadastro");
           expect(ferramentas).not.toContain("agendar"); // flag de escrita continua separada
           const contexto = JSON.stringify(req.messages);
-          expect(contexto).not.toContain('interesse_confirmado');
-          expect(contexto).toContain('modelo_com_historico_da_sessao');
-          expect(contexto).toContain('pergunta pendente e resposta atual');
-          expect(contexto).not.toContain('RESPOSTA_FALHOU');
-          expect(contexto).not.toContain('OUTRA_SESSAO');
-          expect(contexto).not.toContain('OUTRO_AMBIENTE');
-          expect(contexto).not.toContain('OUTRA_CONVERSA');
+          expect(contexto).not.toContain("interesse_confirmado");
+          expect(contexto).toContain("modelo_com_historico_da_sessao");
+          expect(contexto).toContain("pergunta pendente e resposta atual");
+          expect(contexto).not.toContain("RESPOSTA_FALHOU");
+          expect(contexto).not.toContain("OUTRA_SESSAO");
+          expect(contexto).not.toContain("OUTRO_AMBIENTE");
+          expect(contexto).not.toContain("OUTRA_CONVERSA");
         }
-        const historico = r.requests[0].messages.filter((m: any) => ["assistant", "user"].includes(m.role));
+        const historico = r.requests[0].messages.filter((m: any) =>
+          ["assistant", "user"].includes(m.role),
+        );
         const textos = historico.map((m: any) => m.content);
         expect(textos).toContain("Gostaria de marcar oftalmologista"); // além das dez últimas
         expect(textos).toContain("com o joao helio");
         expect(textos).toContain(entrada.oferta);
         expect(textos.filter((texto: string) => texto === entrada.pergunta)).toHaveLength(
-          entrada.pergunta === "com o joao helio" ? 2 : 1); // repetições legítimas preservadas
+          entrada.pergunta === "com o joao helio" ? 2 : 1,
+        ); // repetições legítimas preservadas
         const executadas = r.ferramentas.filter((nome: string) => FERRAMENTAS_DE_VAGAS.has(nome));
         expect(executadas).toEqual(entrada.ferramenta ? [entrada.ferramenta] : []);
         expect(r.encaminhamentos).toHaveLength(0);

@@ -4,7 +4,14 @@ import { CENARIOS_SHADOW, executarMatrizShadow, resumoMatriz } from "./shadow-ma
 import type { ResultadoConfianca } from "./types";
 
 const fake = (decision: ResultadoConfianca["decision"]) =>
-  ({ decision, score: 50, level: "LOW", blockers: [], hardBlockers: [], evidence: {} }) as unknown as ResultadoConfianca;
+  ({
+    decision,
+    score: 50,
+    level: "LOW",
+    blockers: [],
+    hardBlockers: [],
+    evidence: {},
+  }) as unknown as ResultadoConfianca;
 
 describe("shadow mode", () => {
   test("shadow nunca interfere na resposta", () => {

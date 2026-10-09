@@ -6,12 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { lerEvidenciasExecucaoNina } from "@/lib/nina/evidencias.functions";
-import {
-  ROTULO_ETAPA,
-  ROTULO_FONTE,
-  ROTULO_LACUNA,
-  type Etapa,
-} from "@/lib/nina/evidencias";
+import { ROTULO_ETAPA, ROTULO_FONTE, ROTULO_LACUNA, type Etapa } from "@/lib/nina/evidencias";
 
 type Resultado = Awaited<ReturnType<typeof lerEvidenciasExecucaoNina>>;
 
@@ -53,8 +48,7 @@ export function EvidenciasExecucao({
   if (carregando) return <p className="text-sm text-muted-foreground">Carregando evidências…</p>;
   if (erro) return <p className="text-sm text-destructive">{erro}</p>;
   if (!dados) return null;
-  if (!dados.disponivel)
-    return <p className="text-sm text-muted-foreground">{dados.motivo}</p>;
+  if (!dados.disponivel) return <p className="text-sm text-muted-foreground">{dados.motivo}</p>;
 
   const ex = dados.execucao as Record<string, unknown>;
 
