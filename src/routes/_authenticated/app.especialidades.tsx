@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { useAdminPlataforma } from "@/hooks/use-admin-plataforma";
+import { useAdminPlataforma, useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,7 +59,9 @@ interface Esp {
 }
 
 function EspecialidadesPage() {
-  const podeEscrever = usePodeEscrever("especialidades");
+  const podeEscreverModulo = usePodeEscrever("especialidades");
+  const editaCatalogo = useEditaCatalogoGlobal();
+  const podeEscrever = podeEscreverModulo && editaCatalogo;
   const adminPlataforma = useAdminPlataforma();
   const queryClient = useQueryClient();
 
@@ -236,6 +238,12 @@ function EspecialidadesPage() {
           <p className="text-sm text-muted-foreground">
             Cadastro global de especialidades médicas — vale para todas as clínicas.
           </p>
+          {podeEscreverModulo && !editaCatalogo && (
+            <p className="text-sm text-muted-foreground">
+              Como esta lista vale para todas as unidades, só as pessoas autorizadas podem criar,
+              renomear ou desativar. Peça a uma delas.
+            </p>
+          )}
         </div>
         {podeEscrever && (
           <Button onClick={openNew}>

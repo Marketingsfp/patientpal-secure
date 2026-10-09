@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +40,9 @@ interface Tipo {
 }
 
 function TiposServicoPage() {
-  const podeEscrever = usePodeEscrever("tipos-servico");
+  const podeEscreverModulo = usePodeEscrever("tipos-servico");
+  const editaCatalogo = useEditaCatalogoGlobal();
+  const podeEscrever = podeEscreverModulo && editaCatalogo;
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -119,6 +122,12 @@ function TiposServicoPage() {
             Cadastro das categorias de serviços (Consulta, Exames / Procedimentos, Cirurgia…) —
             compartilhado por todas as clínicas.
           </p>
+          {podeEscreverModulo && !editaCatalogo && (
+            <p className="text-sm text-muted-foreground">
+              Como esta lista vale para todas as unidades, só as pessoas autorizadas podem criar,
+              renomear ou desativar. Peça a uma delas.
+            </p>
+          )}
         </div>
         {podeEscrever && (
           <Button onClick={openNew}>

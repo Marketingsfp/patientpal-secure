@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { ExigeUnidadeEscolhida } from "@/components/exige-unidade-escolhida";
+import { useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import { confirmDialog } from "@/lib/confirm";
@@ -185,7 +186,10 @@ function ImportarServicosPage() {
   const [especialidades, setEspecialidades] = useState<string[]>([]);
   const [carregandoCatalogo, setCarregandoCatalogo] = useState(false);
 
-  const [criarEspecialidades, setCriarEspecialidades] = useState(false);
+  const [criarEspecialidadesMarcado, setCriarEspecialidades] = useState(false);
+  // A lista de especialidades é global: só quem está na lista nominal cria.
+  const editaCatalogo = useEditaCatalogoGlobal();
+  const criarEspecialidades = criarEspecialidadesMarcado && editaCatalogo;
   const [quandoExiste, setQuandoExiste] = useState<"pular" | "atualizar">("pular");
 
   const [importando, setImportando] = useState(false);
@@ -802,13 +806,19 @@ function ImportarServicosPage() {
                     criar uma nova aqui faz ela aparecer também na Menino Jesus. Os serviços são
                     importados mesmo sem criar — a especialidade fica escrita no serviço.
                   </p>
-                  <label className="flex items-center gap-2">
-                    <Checkbox
-                      checked={criarEspecialidades}
-                      onCheckedChange={(v) => setCriarEspecialidades(v === true)}
-                    />
-                    <span>Criar as especialidades que faltam</span>
-                  </label>
+                  {editaCatalogo ? (
+                    <label className="flex items-center gap-2">
+                      <Checkbox
+                        checked={criarEspecialidades}
+                        onCheckedChange={(v) => setCriarEspecialidades(v === true)}
+                      />
+                      <span>Criar as especialidades que faltam</span>
+                    </label>
+                  ) : (
+                    <p className="font-medium">
+                      Só as pessoas autorizadas criam especialidades; peça a uma delas se precisar.
+                    </p>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

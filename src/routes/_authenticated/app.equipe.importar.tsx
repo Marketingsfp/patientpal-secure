@@ -58,6 +58,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
 import {
   Table,
   TableBody,
@@ -138,7 +139,10 @@ function ImportarMedicosPage() {
   const [carregando, setCarregando] = useState(false);
   const [versaoCadastro, setVersaoCadastro] = useState(0);
 
-  const [criarEspecialidades, setCriarEspecialidades] = useState(true);
+  const [criarEspecialidadesMarcado, setCriarEspecialidades] = useState(true);
+  // A lista de especialidades é global: só quem está na lista nominal cria.
+  const editaCatalogo = useEditaCatalogoGlobal();
+  const criarEspecialidades = criarEspecialidadesMarcado && editaCatalogo;
   /** Repasse para todos, quando a planilha não traz a coluna de repasse. */
   const [repasseGeralTipo, setRepasseGeralTipo] = useState<TipoRepasse>("percentual");
   const [repasseGeralTexto, setRepasseGeralTexto] = useState("");
@@ -659,13 +663,20 @@ function ImportarMedicosPage() {
                         criar uma nova aqui faz ela aparecer também nas outras. Sem criar, os
                         médicos com essas especialidades ficam de fora.
                       </p>
-                      <label className="flex items-center gap-2">
-                        <Checkbox
-                          checked={criarEspecialidades}
-                          onCheckedChange={(v) => setCriarEspecialidades(v === true)}
-                        />
-                        <span>Criar as especialidades que faltam</span>
-                      </label>
+                      {editaCatalogo ? (
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={criarEspecialidades}
+                            onCheckedChange={(v) => setCriarEspecialidades(v === true)}
+                          />
+                          <span>Criar as especialidades que faltam</span>
+                        </label>
+                      ) : (
+                        <p className="font-medium">
+                          Só as pessoas autorizadas criam especialidades. Peça a uma delas para
+                          cadastrar antes de importar esses médicos.
+                        </p>
+                      )}
                     </AlertDescription>
                   </Alert>
                 )}

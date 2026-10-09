@@ -18227,6 +18227,10 @@ export type Database = {
               type: string
             }[]
           }
+      pode_editar_catalogo_global: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       pode_escrever_modulo: {
         Args: { _clinica_id: string; _modulos: string[]; _user_id: string }
         Returns: boolean
