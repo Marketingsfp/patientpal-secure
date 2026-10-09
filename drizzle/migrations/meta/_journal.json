@@ -29,6 +29,13 @@
       "when": 1791565529442,
       "tag": "0003_fechar_acesso_visitante_funcoes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791566364737,
+      "tag": "0004_catalogos_leitura_so_admin",
+      "breakpoints": true
     }
   ]
 }
