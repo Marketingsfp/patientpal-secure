@@ -165,8 +165,6 @@ restringir o alcance de uma mudança.
 
 ## 2. Outras regras herdadas
 
-Antes de começar alterações, seguir `mem/preferences/git-pull-antes-de-alterar.md`: conferir o estado e executar `git pull`; se houver bloqueio ou conflito, parar e avisar sem descartar trabalho local.
-
 As regras contidas em `mem/preferences/governanca.md`,
 `mem/constraints/governanca-dados-imutaveis.md` continuam válidas e
 complementam este arquivo. Em caso de conflito, prevalece a interpretação
