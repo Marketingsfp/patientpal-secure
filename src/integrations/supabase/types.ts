@@ -487,6 +487,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agendamentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "agendamentos_medico_id_fkey"
             columns: ["medico_id"]
             isOneToOne: false
@@ -2779,6 +2786,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cb_beneficios_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cb_beneficios_procedimento_id_fkey"
             columns: ["procedimento_id"]
             isOneToOne: false
@@ -2930,6 +2944,13 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_convenio_regras_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
             referencedColumns: ["id"]
           },
           {
@@ -4809,30 +4830,6 @@ export type Database = {
           },
         ]
       }
-      especialidades: {
-        Row: {
-          ativo: boolean
-          created_at: string
-          descricao: string | null
-          id: string
-          nome: string
-        }
-        Insert: {
-          ativo?: boolean
-          created_at?: string
-          descricao?: string | null
-          id?: string
-          nome: string
-        }
-        Update: {
-          ativo?: boolean
-          created_at?: string
-          descricao?: string | null
-          id?: string
-          nome?: string
-        }
-        Relationships: []
-      }
       especialidade_unidade: {
         Row: {
           ativo: boolean
@@ -4854,6 +4851,52 @@ export type Database = {
           created_at?: string
           especialidade_id?: string
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "especialidade_unidade_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialidade_unidade_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialidade_unidade_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      especialidades: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
         }
         Relationships: []
       }
@@ -8096,6 +8139,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "medico_especialidades_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "medico_especialidades_medico_id_fkey"
             columns: ["medico_id"]
             isOneToOne: false
@@ -8177,6 +8227,13 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_procedimentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
             referencedColumns: ["id"]
           },
           {
@@ -8436,6 +8493,13 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medicos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
             referencedColumns: ["id"]
           },
           {
@@ -13403,6 +13467,13 @@ export type Database = {
             referencedRelation: "especialidades"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orcamentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
         ]
       }
       paciente_alertas: {
@@ -14317,6 +14388,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "procedimento_especialidades_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "procedimento_especialidades_procedimento_id_fkey"
             columns: ["procedimento_id"]
             isOneToOne: false
@@ -14903,6 +14981,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "regras_rateio_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "regras_rateio_medico_id_fkey"
             columns: ["medico_id"]
             isOneToOne: false
@@ -15115,30 +15200,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tipos_servico: {
-        Row: {
-          ativo: boolean
-          created_at: string
-          id: string
-          nome: string
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          created_at?: string
-          id?: string
-          nome: string
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          created_at?: string
-          id?: string
-          nome?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       tipo_servico_unidade: {
         Row: {
           ativo: boolean
@@ -15159,6 +15220,52 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           tipo_servico_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tipo_servico_unidade_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tipo_servico_unidade_tipo_servico_id_fkey"
+            columns: ["tipo_servico_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tipo_servico_unidade_tipo_servico_id_fkey"
+            columns: ["tipo_servico_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_servico_da_unidade"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tipos_servico: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
           updated_at?: string
         }
         Relationships: []
@@ -15793,16 +15900,15 @@ export type Database = {
           id: string | null
           nome: string | null
         }
-        Relationships: []
-      }
-      tipos_servico_da_unidade: {
-        Row: {
-          ativo: boolean | null
-          clinica_id: string | null
-          id: string | null
-          nome: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "especialidade_unidade_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nfse_emitentes_publico: {
         Row: {
@@ -15843,6 +15949,23 @@ export type Database = {
           usar_ambiente_nacional: boolean | null
         }
         Relationships: []
+      }
+      tipos_servico_da_unidade: {
+        Row: {
+          ativo: boolean | null
+          clinica_id: string | null
+          id: string | null
+          nome: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tipo_servico_unidade_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_pacientes_duplicados_suspeitos: {
         Row: {
