@@ -197,6 +197,7 @@ function AutoatendimentoPage() {
         _clinica_id: clinicaAtual.clinica_id,
         _descriptor: Array.from(descritor),
         _threshold: FACE_MATCH_THRESHOLD,
+        _token: null,
       });
       stopCamera();
       const match = (Array.isArray(matchData) ? matchData[0] : matchData) as
