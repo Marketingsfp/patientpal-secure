@@ -140,6 +140,8 @@ export type CenarioBateria = ConsultaCatalogo & {
   esperado: EsperadoBateria;
   vagasPrevistas: number | null;
   paciente: { nome: string; nascimento: string; idadeAnos: number };
+  /** Dia real: instante de chegada (ms desde o início do teste). Sem valor = chega já. */
+  chegadaMs?: number;
 };
 
 export type ConfigBateria = {
@@ -151,7 +153,7 @@ export type ConfigBateria = {
   cenarios: CenarioBateria[];
 };
 
-export type TipoItemBateria = "turno" | "verificar" | "devolver";
+export type TipoItemBateria = "turno" | "verificar" | "devolver" | "reiniciar";
 export type ItemBateria = {
   indice: number;
   leadId: string;
@@ -359,7 +361,9 @@ export function configBateria(config: unknown): ConfigBateria | null {
 
 export function itemBateria(item: unknown): ItemBateria | null {
   const i = item as ItemBateria | null;
-  return i && ["turno", "verificar", "devolver"].includes(i.tipo) && typeof i.cenarioId === "string"
+  return i &&
+    ["turno", "verificar", "devolver", "reiniciar"].includes(i.tipo) &&
+    typeof i.cenarioId === "string"
     ? i
     : null;
 }

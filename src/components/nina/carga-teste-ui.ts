@@ -2,7 +2,7 @@ import { normalizarConfig, PERFIS, type ConfigCarga } from "@/lib/nina/carga";
 import { validarPlanoCarga, type PlanoCarga } from "@/lib/nina/carga-planejamento";
 
 export type RascunhoCarga = {
-  modo: "ia" | "manual" | "profissional";
+  modo: "ia" | "manual" | "profissional" | "dia_real";
   pedido: string;
   config: ConfigCarga;
   cenariosManuais: string;
@@ -135,6 +135,8 @@ export type CargaPersistida = {
   total_planejado: number;
   controle?: ControleCarga;
   config?: unknown;
+  /** Dia real: progresso das conversas (só no teste ativo). */
+  diaReal?: import("@/lib/nina/carga-dia-real").ResumoDiaReal | null;
 };
 export const cargaAtiva = (c: CargaPersistida) =>
   Boolean(

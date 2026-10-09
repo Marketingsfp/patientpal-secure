@@ -124,6 +124,12 @@ export async function decidirTurnoBateria(e: {
         : null;
   if (fim) return { tipo: "dispensar", resultado: { ...base, fim } };
   if (e.item.ordemNoCenario === 0) {
+    // Dia real: a conversa só começa no horário de chegada sorteado.
+    const inicioCarga = Date.parse(e.carga.iniciado_em ?? "");
+    if (cenario.chegadaMs != null && Number.isFinite(inicioCarga)) {
+      const chegada = inicioCarga + cenario.chegadaMs;
+      if (chegada > e.agora) return { tipo: "aguardar", ms: chegada - e.agora };
+    }
     // Primeira mensagem só numa conversa nova, e só depois da espera após o reinício da carga.
     if (e.lead.conversa_id)
       throw new Error(
@@ -143,6 +149,78 @@ export async function decidirTurnoBateria(e: {
   if (r.acao === "encerrar")
     return { tipo: "dispensar", resultado: { ...base, fim: r.motivo, luna } };
   return { tipo: "enviar", texto: r.texto, resultado: { ...base, luna } };
+}
+
+export type DecisaoReinicioDiaReal =
+  | { tipo: "aguardar"; ms: number }
+  | { tipo: "ok"; amostra: Record<string, unknown>; sessao: number | null };
+
+/**
+ * Dia real — passo "reiniciar": o lead termina a conversa anterior e fica pronto para a
+ * próxima chegada. Uma conversa transferida espera `manterTransferidasMin` na fila antes
+ * do reinício, para a equipe ver o card chegar. O reset é o mesmo do botão
+ * "Resolver / Reiniciar teste" (nunca envia nada ao WhatsApp).
+ */
+export async function reiniciarLeadDiaReal(e: {
+  admin: any;
+  carga: CargaPersistida;
+  bateria: ConfigBateria;
+  item: ItemBateria;
+  manterTransferidasMs: number;
+  agora: number;
+}): Promise<DecisaoReinicioDiaReal> {
+  const cenario = cenarioDoItem(e.bateria, e.item);
+  const { carregarLead, resetarLeadTeste } = await import("./teste-console.server");
+  const lead = await carregarLead(e.admin, e.carga.clinica_id, e.item.leadId);
+  const base = { tipo: "reiniciar", cenarioId: cenario.id };
+  if (!lead.conversa_id)
+    return {
+      tipo: "ok",
+      sessao: Number(lead.sessao_seq),
+      amostra: {
+        status: "dispensado",
+        conversa_id: null,
+        erro: null,
+        mensagem: "Lead já estava livre para a próxima conversa",
+        resultado: { ...base, jaLimpo: true, sessao: Number(lead.sessao_seq) },
+      },
+    };
+  const { data: conversa, error } = await e.admin
+    .from("atend_conversas")
+    .select("id, owner_type, status, handoff_em")
+    .eq("clinica_id", e.carga.clinica_id)
+    .eq("id", lead.conversa_id)
+    .maybeSingle();
+  if (error) throw new Error("Não foi possível conferir a conversa antes de reiniciar o lead.");
+  const transferidaEm = Date.parse(conversa?.handoff_em ?? "");
+  if (
+    conversa &&
+    conversa.owner_type !== "AI" &&
+    !["closed", "finished"].includes(String(conversa.status)) &&
+    Number.isFinite(transferidaEm) &&
+    transferidaEm + e.manterTransferidasMs > e.agora
+  )
+    return { tipo: "aguardar", ms: transferidaEm + e.manterTransferidasMs - e.agora };
+  const r = await resetarLeadTeste(e.admin, {
+    clinicaId: e.carga.clinica_id,
+    leadId: e.item.leadId,
+    conversaId: lead.conversa_id,
+    userId: e.carga.criado_por ?? null,
+    manual: true,
+    origem: "dia_real_reuso_lead",
+    removerAgendamentos: false,
+  });
+  return {
+    tipo: "ok",
+    sessao: Number(r.sessao),
+    amostra: {
+      status: "dispensado",
+      conversa_id: lead.conversa_id,
+      erro: null,
+      mensagem: `Lead reiniciado para a próxima conversa: ${cenario.titulo}`.slice(0, 300),
+      resultado: { ...base, jaLimpo: r.jaResolvida, sessao: Number(r.sessao) },
+    },
+  };
 }
 
 async function agendamentosDaConversa(admin: any, clinicaId: string, conversaId: string) {

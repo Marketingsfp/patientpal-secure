@@ -45,6 +45,17 @@ import {
   VERSAO_BATERIA,
 } from "./carga-bateria";
 import { MODALIDADES_ATENDIMENTO } from "./modalidade-atendimento";
+import {
+  LIMITES_DIA_REAL,
+  configDiaReal,
+  criarRng,
+  duracaoDiaRealS,
+  gerarChegadasMs,
+  montarCenariosDiaReal,
+  montarItensDiaReal,
+  normalizarConfigDiaReal,
+  resumoDiaReal,
+} from "./carga-dia-real";
 import { validarPlanoCarga } from "./carga-planejamento";
 import { estadoControleCarga, VERSAO_EXECUTOR_CARGA } from "./carga-controle";
 import { lerAmostrasCarga, totaisAmostrasCarga } from "./carga-itens.server";
@@ -243,6 +254,112 @@ const bateriaSchema = z
   })
   .strict();
 
+const diaRealSchema = z
+  .object({
+    conversas: z
+      .number()
+      .int()
+      .min(LIMITES_DIA_REAL.conversasMin)
+      .max(LIMITES_DIA_REAL.conversasMax),
+    duracaoMin: z
+      .number()
+      .int()
+      .min(LIMITES_DIA_REAL.duracaoMinMin)
+      .max(LIMITES_DIA_REAL.duracaoMaxMin),
+    perfilPico: z.enum(["uniforme", "pico_inicio", "dois_picos", "aleatorio"]),
+    turnos: z
+      .number()
+      .int()
+      .min(LIMITES_BATERIA.turnosMin)
+      .max(LIMITES_BATERIA.turnosMax)
+      .default(LIMITES_DIA_REAL.turnosPadrao),
+    manterTransferidasMin: z
+      .number()
+      .int()
+      .min(0)
+      .max(LIMITES_DIA_REAL.manterTransferidasMinMax)
+      .default(LIMITES_DIA_REAL.manterTransferidasMinPadrao),
+  })
+  .strict();
+
+/**
+ * Modo treinamento — "Dia real": conversas espalhadas no tempo, com leads reaproveitados.
+ * Usa o executor do servidor (continua com a página fechada) e os mesmos passos da bateria.
+ */
+async function criarDiaRealCarga(
+  data: { clinicaId: string; confirmado: boolean; diaReal: z.infer<typeof diaRealSchema> },
+  userId: string,
+) {
+  if (!data.confirmado)
+    throw new Error(
+      "O dia real agenda consultas de teste na agenda real e precisa de confirmação.",
+    );
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { confirmarServidorCargaDisponivel } = await import("./carga-servidor.server");
+  await confirmarServidorCargaDisponivel(supabaseAdmin);
+  await exigirResultadoBateria(supabaseAdmin);
+  if ((await cargasQueReservamExecutor(supabaseAdmin, data.clinicaId)).length)
+    throw new Error(MENSAGEM_TESTE_ATIVO);
+  const { consultasPublicadasBateria, vagasPorMedicoBateria } =
+    await import("./carga-bateria.server");
+  const diaReal = normalizarConfigDiaReal(data.diaReal);
+  const consultas = await consultasPublicadasBateria(data.clinicaId);
+  if (!consultas.length)
+    throw new Error("Nenhuma consulta publicada foi encontrada para montar as conversas.");
+  const vagas = await vagasPorMedicoBateria(
+    supabaseAdmin,
+    data.clinicaId,
+    consultas.map((c) => c.medicoId).filter((id): id is string => Boolean(id)),
+    LIMITES_BATERIA.janelaVagasDias,
+  );
+  const rng = criarRng(diaReal.seed);
+  const chegadasMs = gerarChegadasMs(
+    diaReal.conversas,
+    diaReal.duracaoMin * 60_000,
+    diaReal.perfilPico,
+    rng,
+  );
+  const cenarios = montarCenariosDiaReal({ consultas, vagasPorMedico: vagas, chegadasMs, rng });
+  const config = normalizarConfig({
+    perfil: "customizado",
+    modoEnvio: "simultaneo",
+    leadsAtivos: LIMITES_DIA_REAL.leads,
+    conversasSimultaneas: LIMITES_DIA_REAL.leads,
+    totalMensagens: cenarios.length * diaReal.turnos,
+    mensagensPorMinuto: LIMITE_ABSOLUTO.mensagensPorMinuto,
+    duracaoMaxS: LIMITE_ABSOLUTO.duracaoMaxS,
+    intervaloMs: 0,
+    timeoutS: LIMITE_ABSOLUTO.timeoutS,
+    retriesMax: 0,
+    maxTokens: LIMITE_ABSOLUTO.maxTokens,
+    maxCustoCreditos: 0,
+    creditosPorMilTokens: 0,
+    distribuicao: [],
+  });
+  return await inserirCarga(supabaseAdmin, {
+    clinicaId: data.clinicaId,
+    userId,
+    nome: `Dia real · ${cenarios.length} conversa(s) em ${diaReal.duracaoMin} min`,
+    config,
+    extras: {
+      concorrenciaEfetiva: LIMITES_DIA_REAL.leads,
+      _diaReal: diaReal,
+      _bateria: {
+        versao: VERSAO_BATERIA,
+        turnos: diaReal.turnos,
+        esperaAposReinicioMs: LIMITES_BATERIA.esperaAposReinicioMs,
+        janelaVagasDias: LIMITES_BATERIA.janelaVagasDias,
+        duracaoMaxS: duracaoDiaRealS(diaReal),
+        cenarios,
+      },
+    },
+    confirmado: true,
+    variacoes: {},
+    comLuna: true,
+    montarPlano: (leads) => montarItensDiaReal(cenarios, leads, diaReal.turnos),
+  });
+}
+
 /** A coluna `resultado` guarda a verificação de cada cenário. */
 async function exigirResultadoBateria(admin: any) {
   const { error } = await admin.from("nina_teste_carga_amostras").select("resultado").limit(1);
@@ -343,11 +460,17 @@ export const criarTesteCarga = createServerFn({ method: "POST" })
         usarLuna: z.boolean().default(true),
         planoIA: z.unknown().optional(),
         bateria: bateriaSchema.optional(),
+        diaReal: diaRealSchema.optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }: { data: any; context: Ctx }) => {
     await assertMembership(context.supabase, context.userId, data.clinicaId);
+    if (data.diaReal) {
+      if (data.planoIA !== undefined || data.bateria)
+        throw new Error("Escolha o dia real, a bateria por profissional ou o plano do Sol.");
+      return await criarDiaRealCarga(data, context.userId);
+    }
     if (data.bateria) {
       if (data.planoIA !== undefined)
         throw new Error("Escolha a bateria por profissional ou o plano do Sol, não os dois.");
@@ -586,15 +709,35 @@ export const listarTestesCarga = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(20);
     if (error) throw new Error(error.message);
-    return {
-      versaoExecutor: EXECUTOR_CARGA_SERVIDOR,
-      testes: (linhas ?? []).map((c: any) => ({
+    const testes = [];
+    for (const c of (linhas ?? []) as any[]) {
+      // Só o teste ativo do dia real precisa do progresso ao vivo na tela.
+      const diaReal = configDiaReal(c.config);
+      const bateria = configBateria(c.config);
+      let resumo = null;
+      if (diaReal && bateria && ["preparando", "executando"].includes(c.status)) {
+        const { data: passos } = await supabaseAdmin
+          .from("nina_teste_carga_amostras")
+          .select("indice, status, resultado")
+          .eq("clinica_id", data.clinicaId)
+          .eq("carga_id", c.id);
+        resumo = resumoDiaReal(
+          diaReal,
+          bateria,
+          c.plano ?? [],
+          (passos ?? []) as any[],
+          c.iniciado_em,
+        );
+      }
+      testes.push({
         ...c,
         plano: undefined,
         variacoes: undefined,
         controle: estadoControleCarga(c),
-      })),
-    };
+        diaReal: resumo,
+      });
+    }
+    return { versaoExecutor: EXECUTOR_CARGA_SERVIDOR, testes };
   });
 
 /** Detalhe com métricas medidas (p50/p95/p99 só com volume suficiente). */
@@ -649,7 +792,9 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
       totalParticipantes || undefined,
     );
     const bateria = configBateria(carga.config);
+    const diaReal = configDiaReal(carga.config);
     let relatorio: ReturnType<typeof relatorioBateria> | null = null;
+    let resumoDia: ReturnType<typeof resumoDiaReal> | null = null;
     if (bateria) {
       const { data: passos, error: erroPassos } = await supabaseAdmin
         .from("nina_teste_carga_amostras")
@@ -664,9 +809,18 @@ export const detalheTesteCarga = createServerFn({ method: "POST" })
         (passos ?? []) as any[],
         await vagasPendentesBateria(supabaseAdmin, carga),
       );
+      if (diaReal)
+        resumoDia = resumoDiaReal(
+          diaReal,
+          bateria,
+          planoDetalhe,
+          (passos ?? []) as any[],
+          carga.iniciado_em,
+        );
     }
     return {
       bateria: relatorio,
+      diaReal: resumoDia,
       versaoExecutor: (carga.config as any)?.executor ?? VERSAO_EXECUTOR_CARGA,
       carga: {
         ...carga,

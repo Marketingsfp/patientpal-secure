@@ -5,9 +5,11 @@ import {
   decidirTurnoBateria,
   devolverCenarioBateria,
   devolverVagasBateria,
+  reiniciarLeadDiaReal,
   verificarCenarioBateria,
   type PacienteLuna,
 } from "./carga-bateria.server";
+import { configDiaReal } from "./carga-dia-real";
 import { cargaParalela } from "./carga-paralela";
 import { comReservaParalela } from "./carga-paralela.server";
 import { chaveMensagemCarga, estadoControleCarga } from "./carga-controle";
@@ -127,6 +129,34 @@ export async function executarCargaControlada(e: {
               resultado: { tipo: "turno", cenarioId: passo.cenarioId, recuperado: true },
             }
           : existente.resultado;
+      } else if (bateria && passo && passo.tipo === "reiniciar") {
+        // Dia real: lead reaproveitado para a próxima chegada.
+        const diaReal = configDiaReal(inicial.config);
+        const r = await reiniciarLeadDiaReal({
+          admin: e.admin,
+          carga: inicial,
+          bateria,
+          item: passo,
+          manterTransferidasMs: (diaReal?.manterTransferidasMin ?? 0) * 60_000,
+          agora: agora(),
+        });
+        if (r.tipo === "aguardar") {
+          // Transferida ainda na fila: volta a tentar quando o prazo de permanência vencer.
+          await dono.alterar({ retomarEmMs: r.ms });
+          return;
+        }
+        amostra = r.amostra;
+        // A sessão do lead mudou: o baseline do preflight acompanha, senão a próxima
+        // mensagem seria recusada como "sessão mudou".
+        if (r.sessao !== null) {
+          const preflight = (Array.isArray(inicial.preflight) ? inicial.preflight : []).map(
+            (b: any) =>
+              b.leadId === passo.leadId
+                ? { ...b, sessao: r.sessao, preparedAt: new Date(agora()).toISOString() }
+                : b,
+          );
+          if (!(await dono.alterar({ preflight }))) return;
+        }
       } else if (bateria && passo && passo.tipo !== "turno") {
         const entrada = { admin: e.admin, carga: inicial, bateria, item: passo, amostras };
         amostra =
@@ -168,8 +198,12 @@ export async function executarCargaControlada(e: {
             agora: agora(),
             paciente: e.paciente ?? pacienteLunaPadrao,
           });
-          // Liberar sem resultado agenda uma nova tentativa deste mesmo passo.
-          if (decisao.tipo === "aguardar") return;
+          // Liberar sem resultado agenda uma nova tentativa deste mesmo passo
+          // (no dia real, só no horário de chegada sorteado).
+          if (decisao.tipo === "aguardar") {
+            await dono.alterar({ retomarEmMs: decisao.ms });
+            return;
+          }
           if (decisao.tipo === "dispensar")
             amostra = {
               status: "dispensado",

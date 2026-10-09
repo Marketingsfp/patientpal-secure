@@ -106,7 +106,12 @@ export async function comReservaParalela(e: Entrada) {
         const tempo = { ...tempos[reservado]! };
         if (indices?.length && tempo.iniciadoEm == null) tempo.iniciadoEm = agora();
         if (terminou && tempo.finalizadoEm == null) tempo.finalizadoEm = agora();
-        if (liberando && !terminou) tempo.retomarApos = agora() + 5000;
+        // Espera pedida pelo executor (chegada do dia real, permanência na fila):
+        // o item só volta a ser reservado depois desse prazo.
+        if (typeof patch.retomarEmMs === "number" && patch.retomarEmMs > 0)
+          tempo.retomarApos = agora() + patch.retomarEmMs;
+        if (liberando && !terminou)
+          tempo.retomarApos = Math.max(tempo.retomarApos ?? 0, agora() + 5000);
         if (liberando) tempo.falhas = falha ? (tempo.falhas ?? 0) + 1 : 0;
         if (typeof patch.retriesDoItem === "number")
           tempo.retries = Math.max(0, patch.retriesDoItem);
@@ -131,6 +136,7 @@ export async function comReservaParalela(e: Entrada) {
                   : "executando";
         const salva = await atualizarCargaCAS(e.admin, atual, {
           ...total,
+          ...(patch.preflight !== undefined ? { preflight: patch.preflight } : {}),
           retries: Object.values(tempos).reduce((n, t) => n + (t.retries ?? 0), 0),
           status,
           cancelar: atual.cancelar || patch.cancelar === true || !!erroFatal,

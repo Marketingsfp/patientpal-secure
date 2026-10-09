@@ -39,6 +39,9 @@ import { configBateria, type relatorioBateria } from "@/lib/nina/carga-bateria";
 import { CargaPlano } from "./CargaPlano";
 import { CargaConfiguracao } from "./CargaConfiguracao";
 import { CargaBateria, type SelecaoBateria } from "./CargaBateria";
+import { CargaDiaReal, type SelecaoDiaReal } from "./CargaDiaReal";
+import { CargaDiaRealProgresso } from "./CargaDiaRealProgresso";
+import type { ResumoDiaReal } from "@/lib/nina/carga-dia-real";
 import { CargaBateriaResultado } from "./CargaBateriaResultado";
 import { PromptsSalvosCarga } from "./PromptsSalvosCarga";
 import {
@@ -80,6 +83,7 @@ type DetalheCarga = {
   preflight?: { leadsPreparados: number; leadsTotal: number; falhas: number };
   versaoExecutor?: string;
   bateria?: ReturnType<typeof relatorioBateria> | null;
+  diaReal?: ResumoDiaReal | null;
 };
 type DisparoRevisado = {
   config: ConfigCarga;
@@ -87,6 +91,7 @@ type DisparoRevisado = {
   usarLuna: boolean;
   bateria?: SelecaoBateria;
   cenarios?: number;
+  diaReal?: SelecaoDiaReal;
 };
 const ms = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v)} ms`);
 
@@ -302,14 +307,17 @@ function CargaTesteClinica({
       const criada = await criar({
         data: {
           clinicaId,
-          nome: revisado.bateria
-            ? "Bateria por profissional"
-            : `Carga ${revisado.planoIA ? "Luna · plano Sol" : "manual"} · ${revisado.config.totalMensagens} mensagens`,
+          nome: revisado.diaReal
+            ? "Dia real"
+            : revisado.bateria
+              ? "Bateria por profissional"
+              : `Carga ${revisado.planoIA ? "Luna · plano Sol" : "manual"} · ${revisado.config.totalMensagens} mensagens`,
           config: revisado.config,
           confirmado,
           usarLuna: revisado.usarLuna,
           ...(revisado.planoIA ? { planoIA: revisado.planoIA } : {}),
           ...(revisado.bateria ? { bateria: revisado.bateria } : {}),
+          ...(revisado.diaReal ? { diaReal: revisado.diaReal } : {}),
         },
       });
       if (!vivo.current || !vigente()) return;
@@ -445,6 +453,7 @@ function CargaTesteClinica({
               {configBateria(ativo.config) ? "passos" : "mensagens"} · {ativo.status}
             </p>
             {ativo.controle?.erro && <p className="text-sm">{ativo.controle.erro}</p>}
+            {ativo.diaReal && <CargaDiaRealProgresso resumo={ativo.diaReal} />}
             <p className="text-xs text-muted-foreground">
               {ativo.controle?.servidor
                 ? ativo.controle.ativo
@@ -506,7 +515,22 @@ function CargaTesteClinica({
           >
             Por profissional
           </Button>
+          <Button
+            variant={rascunho.modo === "dia_real" ? "default" : "outline"}
+            disabled={edicaoBloqueada}
+            onClick={() => setRascunho((r) => ({ ...r, modo: "dia_real" }))}
+            data-testid="modo-dia-real"
+          >
+            Dia real
+          </Button>
         </div>
+        {rascunho.modo === "dia_real" && (
+          <CargaDiaReal
+            disabled={!carregado || ocupado || Boolean(confirmacao)}
+            disparando={rodando}
+            onDisparar={(diaReal) => setConfirmacao({ config: cfgPrevia, usarLuna: true, diaReal })}
+          />
+        )}
         {rascunho.modo === "profissional" && (
           <CargaBateria
             clinicaId={clinicaId}
@@ -718,6 +742,7 @@ function CargaTesteClinica({
                   )}
               </div>
             )}
+            {detalhe.diaReal && <CargaDiaRealProgresso resumo={detalhe.diaReal} />}
             {detalhe.bateria && (
               <CargaBateriaResultado
                 clinicaId={clinicaId}
@@ -874,7 +899,20 @@ function CargaTesteClinica({
         }}
       >
         <DialogContent>
-          {confirmacao?.bateria ? (
+          {confirmacao?.diaReal ? (
+            <DialogHeader>
+              <DialogTitle>Confirmar dia real</DialogTitle>
+              <DialogDescription>
+                {confirmacao.diaReal.conversas} conversa(s) de teste vão chegar ao longo de{" "}
+                {confirmacao.diaReal.duracaoMin} minuto(s), com até {confirmacao.diaReal.turnos}{" "}
+                mensagens cada, pelo canal de homologação (nada sai para o WhatsApp). Os 10 leads de
+                teste são reiniciados antes da primeira mensagem e reaproveitados em rodízio. A Nina
+                agenda de verdade na agenda real, com a marca [TESTE NINA], e a vaga volta a ficar
+                livre no fim de cada conversa. O processamento consome o modelo de IA e continua no
+                servidor com a página fechada.
+              </DialogDescription>
+            </DialogHeader>
+          ) : confirmacao?.bateria ? (
             <DialogHeader>
               <DialogTitle>Confirmar bateria por profissional</DialogTitle>
               <DialogDescription>
