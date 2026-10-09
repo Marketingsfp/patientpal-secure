@@ -112,6 +112,7 @@ export const ETAPAS_VISAO_SIMPLES: EtapaVisaoSimples[] = [
       "llm.model_flag",
       "llm.generate",
       "tool.execute",
+      "tool.prefetch",
       "tool.catalog.lookup",
       "tool.catalog.list",
       "tool.knowledge.lookup",
