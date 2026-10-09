@@ -4,13 +4,22 @@ import { ehConfirmacaoDeAgendamento } from "../confirmacao-agendamento";
 import { ehNegacao } from "../identificacao-gate.server";
 import { PROMPT_NINA_WHATSAPP_V4 } from "../prompt/behavior-v4";
 import { validarTemplateInstrucoes } from "../instrucoes-template";
+import { conteudoInstrucoesSchema, LIMITE_CARACTERES_INSTRUCOES } from "../instrucoes-limites";
 
 describe("concordância e recusa informais brasileiras", () => {
   test("instruções completas cabem na publicação com identidade e marcadores válidos", () => {
     const identidade =
       "[IDENTIDADE DO ATENDIMENTO]\nNome da atendente virtual: Nina\nNome do estabelecimento: Policlínica Menino Jesus\nTipo do estabelecimento: Policlínica\n[/IDENTIDADE DO ATENDIMENTO]\n\n";
     const conteudo = identidade + PROMPT_NINA_WHATSAPP_V4;
-    expect(conteudo.length).toBeLessThanOrEqual(60000);
+    expect(conteudo.length).toBeLessThanOrEqual(LIMITE_CARACTERES_INSTRUCOES);
+    expect(conteudoInstrucoesSchema.safeParse(conteudo).success).toBe(true);
+    expect(conteudoInstrucoesSchema.safeParse("").success).toBe(false);
+    expect(
+      conteudoInstrucoesSchema.safeParse("x".repeat(LIMITE_CARACTERES_INSTRUCOES)).success,
+    ).toBe(true);
+    expect(
+      conteudoInstrucoesSchema.safeParse("x".repeat(LIMITE_CARACTERES_INSTRUCOES + 1)).success,
+    ).toBe(false);
     expect(validarTemplateInstrucoes("whatsapp", conteudo).ok).toBe(true);
   });
   test.each([

@@ -117,7 +117,7 @@ describe("continuidade comprovada para a regra publicada integral", () => {
     return preparado;
   }
 
-  it("negativa de PIX comprovada pelo catálogo responde à pergunta curta", () => {
+  it("ausência de PIX na lista não comprova uma negativa como continuidade resolvida", () => {
     const { obrigacao, ctx } = pagamento();
     expect(
       avaliarObrigacaoContinuidade(
@@ -125,7 +125,7 @@ describe("continuidade comprovada para a regra publicada integral", () => {
         ctx,
         "Para a consulta de Cardiologia, não aceitamos PIX.",
       )?.status,
-    ).toBe("cumprida");
+    ).not.toBe("cumprida");
   });
 
   it("não comprova continuidade de uma recusa de PIX sem consulta vinculada", () => {

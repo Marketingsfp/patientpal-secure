@@ -218,6 +218,7 @@ for (const teste of [false, true]) {
         { clinicaId: "cl1", conversaId: "c1" },
         JSON.stringify({
           motivo: "Profissional SFP exige atendimento humano para Anestesia da Videohisteroscopia",
+          avisar_paciente: false,
           resumo: "Paciente pediu informações sobre a anestesia.",
         }),
       );
@@ -231,7 +232,7 @@ for (const teste of [false, true]) {
       ).toHaveLength(antes);
       expect(
         tabelas.whatsapp_mensagens!.some(
-          (m) => m.status === "system" && m.body.includes("Motivo: Profissional SFP"),
+          (m) => m.status === "system" && m.body.includes("Anestesia da Videohisteroscopia"),
         ),
       ).toBe(true);
       expect(conv().ai_enabled).toBe(false);

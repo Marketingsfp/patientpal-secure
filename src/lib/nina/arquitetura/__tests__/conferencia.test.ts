@@ -81,7 +81,7 @@ describe("aviso do topo da Arquitetura", () => {
     expect(status.cor).toBe("verde");
     expect(status.titulo).toBe("Mapa conferido com o código");
     expect(status.detalhe).toContain(`${FATOS_DO_CODIGO.ferramentas.length} ferramentas`);
-    expect(status.detalhe).toContain("25/09/2026");
+    expect(status.detalhe).toContain("09/10/2026");
   });
 
   test("qualquer diferença com o código deixa amarelo, nunca verde", () => {

@@ -93,6 +93,7 @@ describe("Auditoria das decisões do Jev", () => {
       const registros: Array<Record<string, unknown>> = [];
       const registrar = runInNewContext(`${js}\nregistrarDecisaoJev`, {
         perguntasComAuditoriaJev,
+        registrarEventoIATurno: async () => {},
         console,
         supabaseAdmin: {
           from: (tabela: string) => {

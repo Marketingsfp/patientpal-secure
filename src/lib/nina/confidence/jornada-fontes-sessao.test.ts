@@ -179,7 +179,8 @@ describe("jornada com fontes reconsultadas a cada turno", () => {
       expect(atual.resposta.claims?.semEvidencia).toEqual([]);
       expect(atual.resposta.hardBlockers).not.toContain("MISSING_REQUIRED_OFFICIAL_SOURCE");
       expect(atual.resposta.hardBlockers).not.toContain("INCONSISTENT_SCHEDULE");
-      expect(atual.resposta.decision).toBe("ALLOW");
+      // Uma lista sem PIX não comprova a recusa, mesmo com catálogo reconsultado.
+      expect(atual.resposta.decision).toBe(mensagem === "Aceita PIX?" ? "CLARIFY" : "ALLOW");
       expect(atual.fonteRecebidaPelaIASimulada).toEqual(retornoCatalogo());
       anterior = atual.memoria;
     }

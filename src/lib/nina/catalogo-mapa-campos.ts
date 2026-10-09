@@ -70,12 +70,6 @@ const comuns: CampoCatalogo[] = [
     orientacao: "Aplicar ao atendimento solicitado, conforme as regras já existentes.",
   },
   {
-    campo: "ocultar_nome_profissional",
-    rotulo: "Proteção de nomes de equipe",
-    caminho: "extras.omitir_nome_profissional",
-    orientacao: "Respeitar antes de citar executantes ou nomes de equipe ao paciente.",
-  },
-  {
     campo: "observacoes_completas",
     rotulo: "Condições públicas em conjunto",
     caminho: "observacoes",

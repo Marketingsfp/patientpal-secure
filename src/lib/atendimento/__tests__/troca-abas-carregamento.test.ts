@@ -53,6 +53,8 @@ function ambiente() {
     setCarregandoLista: (v: boolean) => {
       carregando = v;
     },
+    setErroPaginaConvs() {},
+    setTemMaisConvs() {},
     listarConvs: () => new Promise((resolve) => consultas.push(resolve)),
     medirRequest: (_n: string, p: unknown) => p,
     filtrarPorEscopo: (r: unknown) => r,

@@ -196,6 +196,7 @@ export const SAIDAS_VISAO_SIMPLES: SaidaVisaoSimples[] = [
     componentes: [
       "tool.handoff",
       "handoff.queue",
+      "handoff.reason",
       "handoff.summary",
       "handoff.assign",
       "protocol.generate",
