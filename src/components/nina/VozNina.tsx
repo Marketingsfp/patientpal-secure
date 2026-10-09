@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mic, Play, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useAuth } from "@/hooks/use-auth";
 import { invalidateClinicFlags } from "@/lib/cache/clinic-flags-cache";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -47,6 +48,7 @@ const selectClass =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50";
 
 function ConfiguracaoVoz({ clinicaId, usuarioId }: { clinicaId: string; usuarioId: string }) {
+  const podeEscrever = usePodeEscrever("nina-voz");
   const carregar = useServerFn(carregarVozNina);
   const salvar = useServerFn(salvarVozNina);
   const ouvir = useServerFn(ouvirPreviaVozNina);
@@ -82,7 +84,8 @@ function ConfiguracaoVoz({ clinicaId, usuarioId }: { clinicaId: string; usuarioI
   const config = rascunho?.configuracao ?? data?.configuracao ?? VOZ_PADRAO;
   const audioAtivo = rascunho?.audioAtivo ?? data?.audioAtivo ?? true;
   const valido = vozConfigSchema.safeParse(config).success;
-  const bloqueado = salvando || gerando || isFetching || !data?.podeEditar;
+  const podeEditar = podeEscrever && !!data?.podeEditar;
+  const bloqueado = salvando || gerando || isFetching || !podeEditar;
   const alterado =
     data &&
     (JSON.stringify(config) !== JSON.stringify(data.configuracao) ||
@@ -176,7 +179,7 @@ function ConfiguracaoVoz({ clinicaId, usuarioId }: { clinicaId: string; usuarioI
               : "Respostas por texto"}
         </Badge>
       </header>
-      {!data.podeEditar && (
+      {!podeEditar && (
         <p className="text-sm text-muted-foreground">
           Você pode consultar a configuração. Somente administradores podem alterar ou gerar
           prévias.
@@ -418,7 +421,7 @@ function ConfiguracaoVoz({ clinicaId, usuarioId }: { clinicaId: string; usuarioI
         </p>
       )}
       <footer className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
-        {data.podeEditar && (
+        {podeEditar && (
           <>
             <Button
               disabled={

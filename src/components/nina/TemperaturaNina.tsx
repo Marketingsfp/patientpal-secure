@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { carregarTemperaturaNina, salvarTemperaturaNina } from "@/lib/nina/temperatura.functions";
 import { TEMPERATURA_PADRAO, temperaturaSchema } from "@/lib/nina/temperatura";
 
 export function TemperaturaNina({ clinicaId }: { clinicaId: string }) {
+  const podeEscrever = usePodeEscrever("nina-arquitetura");
   const carregar = useServerFn(carregarTemperaturaNina);
   const salvar = useServerFn(salvarTemperaturaNina);
   const cache = useQueryClient();
@@ -27,7 +29,8 @@ export function TemperaturaNina({ clinicaId }: { clinicaId: string }) {
   const [salvando, setSalvando] = useState(false);
   const valor = rascunho ?? String(data?.temperatura ?? TEMPERATURA_PADRAO);
   const valido = valor.trim() !== "" && temperaturaSchema.safeParse(Number(valor)).success;
-  const bloqueado = salvando || isFetching || !data?.podeEditar || !!error;
+  const podeEditar = podeEscrever && !!data?.podeEditar;
+  const bloqueado = salvando || isFetching || !podeEditar || !!error;
 
   async function aplicar() {
     if (bloqueado || !valido || !data) return;
@@ -100,7 +103,7 @@ export function TemperaturaNina({ clinicaId }: { clinicaId: string }) {
               aria-invalid={!valido}
             />
           </div>
-          {data?.podeEditar ? (
+          {data && podeEditar ? (
             <>
               <Button
                 variant="outline"

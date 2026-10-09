@@ -3,6 +3,7 @@ import { FlaskConical, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 const CargaTeste = lazy(() => import("./CargaTeste").then((m) => ({ default: m.CargaTeste })));
 const CenariosTeste = lazy(() =>
@@ -37,6 +38,7 @@ export function LaboratorioNina({
   onAbrirChat: () => void;
   onVerConversa: (alvo: ConversaTesteAlvo) => void;
 }) {
+  const podeEscrever = usePodeEscrever("nina-laboratorio");
   const [aba, setAba] = useState("carga");
   const [visitadas, setVisitadas] = useState(() => new Set(["carga"]));
   return (
@@ -85,10 +87,22 @@ export function LaboratorioNina({
                 </p>
               }
             >
-              {item.id === "carga" && <CargaTeste />}
-              {item.id === "cenarios" && <CenariosTeste />}
+              {item.id === "carga" && (
+                <fieldset disabled={!podeEscrever}>
+                  <CargaTeste />
+                </fieldset>
+              )}
+              {item.id === "cenarios" && (
+                <fieldset disabled={!podeEscrever}>
+                  <CenariosTeste />
+                </fieldset>
+              )}
               {item.id === "individual" && <HomologacaoInbox laboratorio ativo={aba === item.id} />}
-              {item.id === "verificacoes" && <VerificacoesHomologacao />}
+              {item.id === "verificacoes" && (
+                <fieldset disabled={!podeEscrever}>
+                  <VerificacoesHomologacao />
+                </fieldset>
+              )}
               {item.id === "metricas" && <DashboardHomologacao />}
               {item.id === "relatorios" && <RelatorioHomologacao onVerConversa={onVerConversa} />}
             </Suspense>

@@ -91,12 +91,13 @@ import { useCatalogoAtualizado } from "@/hooks/use-catalogo-atualizado";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import {
   ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE,
-  moduloDaRota,
+  moduloDaTela,
   moduloPermitido,
   rotaSomenteAdmin,
 } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { podeAbrirTelaOsZap } from "@/lib/atendimento/acesso-telas-oszap";
+import { moduloTelaOsZap, TELAS_OSZAP } from "@/lib/permissoes-oszap";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getSubsystem,
@@ -459,9 +460,10 @@ function leafAllowed(
   to: string,
   allowed: Set<string> | null,
   configured?: Set<string> | null,
+  hash = "",
 ): boolean {
   if (!allowed) return true;
-  const mod = ROUTE_TO_MODULE[to];
+  const mod = moduloTelaOsZap(to, hash) ?? ROUTE_TO_MODULE[to];
   if (mod === undefined) return false; // rota não mapeada → ocultar
   return moduloPermitido(mod, allowed, configured);
 }
@@ -652,8 +654,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   // ---------------------------------------------------------------------
   // Portal "OS ZAP" (atendimento por WhatsApp). As três seções abaixo só aparecem
   // nesse portal (o filtro do menu é por rótulo de seção). Nenhum endereço
-  // mudou: são os mesmos itens que antes ficavam em "Inteligência" e
-  // "Configurações", e o módulo de permissão continua sendo "nina".
+  // mudou: cada opção usa a matriz do OS ZAP, inclusive os fragmentos das abas.
   // ---------------------------------------------------------------------
   {
     label: "Atendimento",
@@ -1211,13 +1212,13 @@ function AppShellInner() {
             // apenas o primeiro filho, e fechar a tela principal escondia
             // junto a tela de orçamentos/pacotes que continuava liberada.
             const filhos = item.children.filter((c) =>
-              leafAllowed(c.to, allowedModules, configuredModules),
+              leafAllowed(c.to, allowedModules, configuredModules, c.hash),
             );
             if (filhos.length === 0) return null;
             return { ...item, children: filhos };
           }
           if (!podeAbrirTelaOsZap(clinicaAtual?.role, item.to, item.hash)) return null;
-          return leafAllowed(item.to, allowedModules, configuredModules) ? item : null;
+          return leafAllowed(item.to, allowedModules, configuredModules, item.hash) ? item : null;
         })
         .filter((it): it is NavItem => it !== null);
       return { ...row, items };
@@ -1290,14 +1291,17 @@ function AppShellInner() {
   const portaisOcultos = useMemo<SubsystemId[]>(() => {
     const ocultos: SubsystemId[] = [];
     if (
-      !leafAllowed("/app/nina", allowedModules, configuredModules) &&
-      !leafAllowed("/app/francisco", allowedModules, configuredModules)
+      !TELAS_OSZAP.some(
+        (t) =>
+          podeAbrirTelaOsZap(clinicaAtual?.role, t.to, t.hash) &&
+          leafAllowed(t.to, allowedModules, configuredModules, t.hash),
+      )
     )
       ocultos.push("os-zap");
     // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
     if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
     return ocultos;
-  }, [allowedModules, configuredModules]);
+  }, [allowedModules, configuredModules, clinicaAtual?.role]);
 
   // Resultado da busca do menu lateral (sem acento, case-insensitive).
   const termoMenu = buscaMenu.trim();
@@ -1416,20 +1420,33 @@ function AppShellInner() {
       },
     ];
     return opcoes
-      .map((o) => ({
-        ...o,
-        destino:
-          o.portal === null
-            ? "/app"
-            : o.candidatas.find((c) => leafAllowed(c, allowedModules, configuredModules)),
-      }))
+      .map((o) => {
+        const tela =
+          o.portal === "os-zap"
+            ? TELAS_OSZAP.find(
+                (t) =>
+                  podeAbrirTelaOsZap(clinicaAtual?.role, t.to, t.hash) &&
+                  leafAllowed(t.to, allowedModules, configuredModules, t.hash),
+              )
+            : undefined;
+        return {
+          ...o,
+          destino:
+            o.portal === "os-zap"
+              ? tela?.to
+              : o.portal === null
+                ? "/app"
+                : o.candidatas.find((c) => leafAllowed(c, allowedModules, configuredModules)),
+          hash: tela?.hash,
+        };
+      })
       .filter((o): o is typeof o & { destino: string } => Boolean(o.destino));
-  }, [allowedModules, configuredModules]);
+  }, [allowedModules, configuredModules, clinicaAtual?.role]);
 
-  const irParaAmbiente = (portal: SubsystemId | null, destino: string) => {
+  const irParaAmbiente = (portal: SubsystemId | null, destino: string, hash?: string) => {
     fecharSidebar();
     if (portal) setSubsystem(portal);
-    navigate({ to: destino });
+    navigate({ to: destino, hash });
   };
 
   // Cabeçalho recolhido (modo foco) — só existe no OS ZAP, onde a conversa
@@ -1525,7 +1542,7 @@ function AppShellInner() {
   // permitido pelo perfil do usuário. Admin (allowedModules === null) passa
   // por padrão. Enquanto as permissões carregam, mostramos o próprio outlet
   // para evitar flash de "Acesso negado".
-  const currentModulo = moduloDaRota(location.pathname);
+  const currentModulo = moduloDaTela(location.pathname, location.hash);
   const rotaPermitida = (() => {
     // Mesma restrição do menu, inclusive para favoritos e links com hash.
     if (!podeAbrirTelaOsZap(clinicaAtual?.role, location.pathname, location.hash)) return false;
@@ -1554,7 +1571,10 @@ function AppShellInner() {
       (location.hash ?? "").replace(/^#/, ""),
     );
   const destinoPortal =
-    !permsLoading && !rotaPermitida && ROTAS_HOME_PORTAL.has(pathAtual)
+    !permsLoading &&
+    !rotaPermitida &&
+    !location.hash &&
+    (ROTAS_HOME_PORTAL.has(pathAtual) || pathAtual === "/app/francisco")
       ? primeiraRotaVisivel(visibleNavRows)
       : null;
   const guardedOutlet = permsLoading ? (
@@ -1566,7 +1586,7 @@ function AppShellInner() {
   ) : // A comparação com `pathAtual` é só uma trava contra laço infinito: se o
   // menu devolvesse a própria rota bloqueada, cairíamos no redirecionamento
   // para sempre.
-  destinoPortal && destinoPortal.to !== pathAtual ? (
+  destinoPortal && (destinoPortal.to !== pathAtual || destinoPortal.hash !== location.hash) ? (
     <Navigate to={destinoPortal.to} hash={destinoPortal.hash} replace />
   ) : (
     <SemPermissao modulo={currentModulo ?? undefined} />
@@ -1668,7 +1688,7 @@ function AppShellInner() {
                   {ambientesRapidos.map((a) => (
                     <DropdownMenuItem
                       key={a.key}
-                      onSelect={() => irParaAmbiente(a.portal, a.destino)}
+                      onSelect={() => irParaAmbiente(a.portal, a.destino, a.hash)}
                       className="flex h-auto flex-col items-center justify-center gap-1.5 rounded-lg border border-border px-2 py-3 text-center text-xs font-medium leading-tight text-foreground cursor-pointer focus:bg-accent"
                     >
                       <a.icon className="h-5 w-5 text-foreground" />

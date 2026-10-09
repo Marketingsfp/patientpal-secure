@@ -217,7 +217,7 @@ export function HomologacaoInbox({
 } = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
-  const podeEscrever = usePodeEscrever("nina");
+  const podeEscrever = usePodeEscrever(laboratorio ? "nina-laboratorio" : "nina-homologacao");
 
   const listar = useServerFn(listarLeadsTeste);
   const historico = useServerFn(historicoLeadTeste);

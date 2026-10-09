@@ -1,6 +1,7 @@
 // Fonte única de verdade que mapeia rotas do app (client-side) para
 // chaves de módulo da tela de Perfis de Acesso. Consumida tanto pelo
 // filtro do menu lateral quanto pelo guard de rota no AppShell.
+import { moduloTelaOsZap, PAIS_OSZAP } from "./permissoes-oszap";
 
 /**
  * Mapa exato rota → módulo. Rotas com parâmetros usam o prefixo raiz
@@ -79,6 +80,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/tabela-valores": "consulta-rapida-valores",
   "/app/nina": "nina",
   "/app/francisco": "francisco",
+  "/app/painel-tv-atendimento": "painel-tv-atendimento",
   // Telas de aprendizado/métricas da Nina. Sem estas entradas exatas o mapa
   // devolvia `undefined` (a rota "/app/nina" não casa por prefixo com
   // "/app/nina-..."), escondendo o menu e mostrando "Acesso negado" para
@@ -89,8 +91,9 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // "nina" enquanto não forem configuradas.
   "/app/nina-aprendizado": "nina-aprendizado",
   "/app/nina-metricas": "nina-metricas",
+  "/app/nina-jev": "nina-jev",
   "/app/nina-arquitetura": "nina-arquitetura",
-  "/app/configuracoes/respostas-rapidas": "nina",
+  "/app/configuracoes/respostas-rapidas": "oszap-mensagens-prontas",
   "/app/odontologia": "odontologia",
   "/app/odontologia/orcamentos": "odontologia-orcamentos",
   "/app/fisioterapia": "fisioterapia",
@@ -244,9 +247,7 @@ export const SUBMODULE_PARENT: Record<string, string> = {
   "nfse-config": "nfse",
   "odontologia-orcamentos": "odontologia",
   "fisioterapia-pacotes": "fisioterapia",
-  "nina-aprendizado": "nina",
-  "nina-metricas": "nina",
-  "nina-arquitetura": "nina",
+  ...PAIS_OSZAP,
 };
 
 /**
@@ -327,6 +328,23 @@ export function moduloDaRota(pathname: string): string | null | undefined {
     if (p === rota || p.startsWith(rota + "/")) return modulo;
   }
   return undefined;
+}
+
+/** A tela inclui o fragmento: duas abas da mesma rota podem ter acessos diferentes. */
+export function moduloDaTela(pathname: string, hash = ""): string | null | undefined {
+  return moduloTelaOsZap(pathname, hash) ?? moduloDaRota(pathname);
+}
+
+/** Nível da mesma permissão usada pelo menu, incluindo a herança não configurada. */
+export function nivelDoModulo(
+  modulo: string,
+  allowed: Set<string> | null,
+  nivel: Map<string, "read" | "write"> | null,
+  configured?: Set<string> | null,
+): "none" | "read" | "write" {
+  if (allowed === null) return "write";
+  if (!moduloPermitido(modulo, allowed, configured)) return "none";
+  return nivel?.get(modulo) ?? nivel?.get(SUBMODULE_PARENT[modulo]!) ?? "none";
 }
 
 /**

@@ -358,7 +358,7 @@ interface WppCfg {
 
 function ConfiguracaoWhatsApp() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("nina");
+  const podeEscrever = usePodeEscrever("whatsapp-config");
   const obter = useServerFn(obterWhatsappConfig);
   const salvar = useServerFn(salvarWhatsappConfig);
   const testar = useServerFn(testarConexaoWhatsapp);
@@ -1099,7 +1099,7 @@ interface TplRow {
 
 function TemplatesWhatsapp() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("nina");
+  const podeEscrever = usePodeEscrever("whatsapp-templates");
   const clinicaId = clinicaAtual?.clinica_id;
   const listar = useServerFn(listarTemplatesWhatsapp);
   const criar = useServerFn(criarTemplateWhatsapp);
