@@ -114,7 +114,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         )
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
-      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      // Só as especialidades ativas nesta unidade.
+      supabase
+        .from("especialidades_da_unidade")
+        .select("id,nome")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("nome"),
     ]);
     // Paginar procedimentos — PostgREST corta em db-max-rows=1000, o que
     // ocultava serviços (ex.: "Preventivo") em clínicas com catálogo grande.

@@ -5,6 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
+import { useClinica } from "@/hooks/use-clinica";
+import { ExigeUnidadeEscolhida, FaixaUnidadeAtual } from "@/components/exige-unidade-escolhida";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,56 +38,110 @@ export const Route = createFileRoute("/_authenticated/app/tipos-servico")({
 interface Tipo {
   id: string;
   nome: string;
-  ativo: boolean;
+  /** Lista única: só a plataforma muda. */
+  ativoGlobal: boolean;
+  /** Ligada nesta unidade (sem linha = não aparece aqui). */
+  ativoUnidade: boolean;
 }
 
+const ativoAqui = (t: Tipo) => t.ativoGlobal && t.ativoUnidade;
+
 function TiposServicoPage() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual!.clinica_id;
+  // Ligar/desligar vale só para esta unidade: basta poder editar o módulo.
   const podeEscreverModulo = usePodeEscrever("tipos-servico");
+  // Criar e renomear mexem na lista de nomes que as unidades compartilham.
   const editaCatalogo = useEditaCatalogoGlobal();
-  const podeEscrever = podeEscreverModulo && editaCatalogo;
+  const podeEditarNome = podeEscreverModulo && editaCatalogo;
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tipo | null>(null);
-  const [form, setForm] = useState({ nome: "", ativo: true });
+  const [form, setForm] = useState({ nome: "" });
   const [saving, setSaving] = useState(false);
+  const [alternando, setAlternando] = useState<string | null>(null);
 
-  // Catálogo de baixo risco (raramente muda) — cache de 5min via React Query.
-  // Revisitar a tela mostra os dados na hora; invalidamos ao salvar.
   const {
     data: rows = [],
     isLoading: loading,
     error,
   } = useQuery({
-    queryKey: ["tipos-servico"],
+    queryKey: ["tipos-servico-unidade", clinicaId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tipos_servico")
-        .select("id,nome,ativo")
-        .order("nome");
-      if (error) throw error;
-      return (data ?? []) as Tipo[];
+      const [tipos, daUnidade] = await Promise.all([
+        supabase.from("tipos_servico").select("id,nome,ativo").order("nome"),
+        supabase
+          .from("tipo_servico_unidade")
+          .select("tipo_servico_id,ativo")
+          .eq("clinica_id", clinicaId),
+      ]);
+      if (tipos.error) throw tipos.error;
+      if (daUnidade.error) throw daUnidade.error;
+      const ligado = new Map(
+        (daUnidade.data ?? []).map((r) => [r.tipo_servico_id, r.ativo] as const),
+      );
+      return (tipos.data ?? []).map(
+        (t): Tipo => ({
+          id: t.id,
+          nome: t.nome,
+          ativoGlobal: t.ativo,
+          ativoUnidade: ligado.get(t.id) ?? false,
+        }),
+      );
     },
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
   useEffect(() => {
     if (error) mostrarErro(error);
   }, [error]);
-  const load = () => queryClient.invalidateQueries({ queryKey: ["tipos-servico"] });
+  const load = () => {
+    void queryClient.invalidateQueries({ queryKey: ["tipos-servico-unidade", clinicaId] });
+    void queryClient.invalidateQueries({ queryKey: ["tipos-servico"] });
+  };
+
+  async function ligarNestaUnidade(tipoId: string, ativo: boolean) {
+    return supabase
+      .from("tipo_servico_unidade")
+      .upsert(
+        { clinica_id: clinicaId, tipo_servico_id: tipoId, ativo },
+        { onConflict: "clinica_id,tipo_servico_id" },
+      );
+  }
+
+  async function alternar(t: Tipo) {
+    if (!podeEscreverModulo) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    setAlternando(t.id);
+    const { error } = await ligarNestaUnidade(t.id, !t.ativoUnidade);
+    setAlternando(null);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success(
+      t.ativoUnidade
+        ? `${cap(t.nome)} desativada em ${clinicaAtual!.clinica.nome}`
+        : `${cap(t.nome)} ativada em ${clinicaAtual!.clinica.nome}`,
+    );
+    load();
+  }
 
   function openNew() {
     setEditing(null);
-    setForm({ nome: "", ativo: true });
+    setForm({ nome: "" });
     setOpen(true);
   }
   function openEdit(t: Tipo) {
     setEditing(t);
-    setForm({ nome: t.nome, ativo: t.ativo });
+    setForm({ nome: t.nome });
     setOpen(true);
   }
 
   async function salvar() {
-    if (!podeEscrever) {
+    if (!podeEditarNome) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -95,22 +151,39 @@ function TiposServicoPage() {
       return;
     }
     setSaving(true);
-    const payload = { nome, ativo: form.ativo };
-    const { error } = editing
-      ? await supabase.from("tipos_servico").update(payload).eq("id", editing.id)
-      : await supabase.from("tipos_servico").insert(payload);
-    setSaving(false);
-    if (error) {
-      mostrarErro(error);
-      return;
+    if (editing) {
+      const { error } = await supabase.from("tipos_servico").update({ nome }).eq("id", editing.id);
+      setSaving(false);
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      toast.success("Categoria atualizada");
+    } else {
+      // Nasce ligada só nesta unidade; a outra liga se quiser.
+      const { data, error } = await supabase
+        .from("tipos_servico")
+        .insert({ nome, ativo: true })
+        .select("id")
+        .single();
+      if (error || !data) {
+        setSaving(false);
+        mostrarErro(error);
+        return;
+      }
+      const { error: errUnidade } = await ligarNestaUnidade(data.id, true);
+      setSaving(false);
+      if (errUnidade) {
+        mostrarErro(errUnidade);
+        return;
+      }
+      toast.success(`Categoria criada em ${clinicaAtual!.clinica.nome}`);
     }
-    toast.success(editing ? "Categoria atualizada" : "Categoria criada");
     setOpen(false);
-    void load();
+    load();
   }
 
   const filtered = rows.filter((r) => r.nome.toLowerCase().includes(q.toLowerCase()));
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <div className="p-6 space-y-4">
@@ -119,22 +192,24 @@ function TiposServicoPage() {
         <div className="flex-1">
           <h1 className="text-xl font-bold">Categorias de Serviço</h1>
           <p className="text-sm text-muted-foreground">
-            Cadastro das categorias de serviços (Consulta, Exames / Procedimentos, Cirurgia…) —
-            compartilhado por todas as clínicas.
+            Categorias de serviços (Consulta, Exames / Procedimentos, Cirurgia…). Ativar ou
+            desativar vale só para esta unidade; uma categoria nova nasce ativa só na unidade que
+            criou.
           </p>
           {podeEscreverModulo && !editaCatalogo && (
             <p className="text-sm text-muted-foreground">
-              Como esta lista vale para todas as unidades, só as pessoas autorizadas podem criar,
-              renomear ou desativar. Peça a uma delas.
+              Criar ou renomear categoria é só para as pessoas autorizadas. Peça a uma delas.
             </p>
           )}
         </div>
-        {podeEscrever && (
+        {podeEditarNome && (
           <Button onClick={openNew}>
             <Plus className="h-4 w-4 mr-1" /> Novo
           </Button>
         )}
       </div>
+
+      <FaixaUnidadeAtual />
 
       <Card className="p-3">
         <div className="relative">
@@ -153,8 +228,8 @@ function TiposServicoPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead className="w-32">Situação</TableHead>
-              <TableHead className="w-20 text-right">Ações</TableHead>
+              <TableHead className="w-44">Nesta unidade</TableHead>
+              <TableHead className="w-56 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -176,17 +251,33 @@ function TiposServicoPage() {
                   <TableCell className="font-medium">{cap(r.nome)}</TableCell>
                   <TableCell>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${r.ativo ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
+                      className={`text-xs px-2 py-0.5 rounded-full ${ativoAqui(r) ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
                     >
-                      {r.ativo ? "Ativo" : "Inativo"}
+                      {!r.ativoGlobal
+                        ? "Desativada pela plataforma"
+                        : r.ativoUnidade
+                          ? "Ativo"
+                          : "Inativo"}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    {podeEscrever && (
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {podeEscreverModulo && r.ativoGlobal && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={alternando === r.id}
+                          onClick={() => void alternar(r)}
+                        >
+                          {r.ativoUnidade ? "Desativar nesta unidade" : "Ativar nesta unidade"}
+                        </Button>
+                      )}
+                      {podeEditarNome && (
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -206,18 +297,15 @@ function TiposServicoPage() {
               <Input
                 uppercase
                 value={form.nome}
-                onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+                onChange={(e) => setForm({ nome: e.target.value })}
                 placeholder="Ex: Cirurgia"
               />
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.ativo}
-                onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))}
-              />
-              Ativo
-            </label>
+            <p className="text-xs text-muted-foreground">
+              {editing
+                ? "Renomear só é permitido se a categoria não estiver em uso em outra unidade."
+                : `Ela será ativada só em ${clinicaAtual!.clinica.nome}.`}
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
@@ -232,11 +320,16 @@ function TiposServicoPage() {
     </div>
   );
 }
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 function TiposServicoPageWithTabs() {
   return (
     <>
       <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
-      <TiposServicoPage />
+      <ExigeUnidadeEscolhida oQue="ativar ou desativar categorias">
+        <TiposServicoPage />
+      </ExigeUnidadeEscolhida>
     </>
   );
 }

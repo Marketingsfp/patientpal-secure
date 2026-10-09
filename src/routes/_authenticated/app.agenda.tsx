@@ -3423,7 +3423,13 @@ function AgendaPage() {
     if (!clinicaAtual) return;
     const [m, e, me, pr, sr, mcRows, mp, agendasRes, gradesRes] = await Promise.all([
       getMedicosAgenda(clinicaAtual.clinica_id),
-      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      // Só as especialidades ativas nesta unidade.
+      supabase
+        .from("especialidades_da_unidade")
+        .select("id,nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("nome"),
       supabase
         .from("medico_especialidades")
         .select("medico_id,especialidade_id,medicos!inner(clinica_id)")

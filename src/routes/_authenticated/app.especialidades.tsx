@@ -5,6 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useAdminPlataforma, useEditaCatalogoGlobal } from "@/hooks/use-admin-plataforma";
+import { useClinica } from "@/hooks/use-clinica";
+import { ExigeUnidadeEscolhida, FaixaUnidadeAtual } from "@/components/exige-unidade-escolhida";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,13 +57,23 @@ interface Esp {
   id: string;
   nome: string;
   descricao: string | null;
-  ativo: boolean;
+  /** Lista única: só a plataforma muda. */
+  ativoGlobal: boolean;
+  /** Ligada nesta unidade (sem linha = não aparece aqui). */
+  ativoUnidade: boolean;
 }
 
+/** Aparece nas listas de escolha desta unidade? */
+const ativaAqui = (e: Esp) => e.ativoGlobal && e.ativoUnidade;
+
 function EspecialidadesPage() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual!.clinica_id;
+  // Ligar/desligar vale só para esta unidade: basta poder editar o módulo.
   const podeEscreverModulo = usePodeEscrever("especialidades");
+  // Criar e renomear mexem na lista de nomes que as unidades compartilham.
   const editaCatalogo = useEditaCatalogoGlobal();
-  const podeEscrever = podeEscreverModulo && editaCatalogo;
+  const podeEditarNome = podeEscreverModulo && editaCatalogo;
   const adminPlataforma = useAdminPlataforma();
   const queryClient = useQueryClient();
 
@@ -70,46 +82,93 @@ function EspecialidadesPage() {
   const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo">("todos");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Esp | null>(null);
-  const [form, setForm] = useState({ nome: "", descricao: "", ativo: true });
+  const [form, setForm] = useState({ nome: "", descricao: "" });
   const [saving, setSaving] = useState(false);
+  const [alternando, setAlternando] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Esp | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Catálogo global de baixo risco (raramente muda) — cache de 5min.
   const {
     data: rows = [],
     isLoading: loading,
     error,
   } = useQuery({
-    queryKey: ["especialidades"],
+    queryKey: ["especialidades-unidade", clinicaId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("especialidades")
-        .select("id,nome,descricao,ativo")
-        .order("nome");
-      if (error) throw error;
-      return (data ?? []) as Esp[];
+      const [esps, daUnidade] = await Promise.all([
+        supabase.from("especialidades").select("id,nome,descricao,ativo").order("nome"),
+        supabase
+          .from("especialidade_unidade")
+          .select("especialidade_id,ativo")
+          .eq("clinica_id", clinicaId),
+      ]);
+      if (esps.error) throw esps.error;
+      if (daUnidade.error) throw daUnidade.error;
+      const ligada = new Map(
+        (daUnidade.data ?? []).map((r) => [r.especialidade_id, r.ativo] as const),
+      );
+      return (esps.data ?? []).map(
+        (e): Esp => ({
+          id: e.id,
+          nome: e.nome,
+          descricao: e.descricao,
+          ativoGlobal: e.ativo,
+          ativoUnidade: ligada.get(e.id) ?? false,
+        }),
+      );
     },
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
   useEffect(() => {
     if (error) mostrarErro(error);
   }, [error]);
-  const load = () => queryClient.invalidateQueries({ queryKey: ["especialidades"] });
+  const load = () => {
+    void queryClient.invalidateQueries({ queryKey: ["especialidades-unidade", clinicaId] });
+    void queryClient.invalidateQueries({ queryKey: ["especialidades"] });
+  };
+
+  async function ligarNestaUnidade(especialidadeId: string, ativo: boolean) {
+    return supabase
+      .from("especialidade_unidade")
+      .upsert(
+        { clinica_id: clinicaId, especialidade_id: especialidadeId, ativo },
+        { onConflict: "clinica_id,especialidade_id" },
+      );
+  }
+
+  async function alternar(e: Esp) {
+    if (!podeEscreverModulo) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    setAlternando(e.id);
+    const { error } = await ligarNestaUnidade(e.id, !e.ativoUnidade);
+    setAlternando(null);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success(
+      e.ativoUnidade
+        ? `${e.nome} desativada em ${clinicaAtual!.clinica.nome}`
+        : `${e.nome} ativada em ${clinicaAtual!.clinica.nome}`,
+    );
+    load();
+  }
 
   function openNew() {
     setEditing(null);
-    setForm({ nome: "", descricao: "", ativo: true });
+    setForm({ nome: "", descricao: "" });
     setOpen(true);
   }
   function openEdit(e: Esp) {
     setEditing(e);
-    setForm({ nome: e.nome, descricao: e.descricao ?? "", ativo: e.ativo });
+    setForm({ nome: e.nome, descricao: e.descricao ?? "" });
     setOpen(true);
   }
 
   async function salvar() {
-    if (!podeEscrever) {
+    if (!podeEditarNome) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -129,32 +188,50 @@ function EspecialidadesPage() {
     const payload = {
       nome: toTitle(form.nome.trim()),
       descricao: form.descricao.trim() || null,
-      ativo: form.ativo,
     };
-    const { error } = editing
-      ? await supabase.from("especialidades").update(payload).eq("id", editing.id)
-      : await supabase.from("especialidades").insert(payload);
-    setSaving(false);
-    if (error) {
-      mostrarErro(error);
-      return;
+    if (editing) {
+      const { error } = await supabase.from("especialidades").update(payload).eq("id", editing.id);
+      setSaving(false);
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      toast.success("Especialidade atualizada");
+    } else {
+      // Nasce ligada só nesta unidade; a outra liga se quiser.
+      const { data, error } = await supabase
+        .from("especialidades")
+        .insert({ ...payload, ativo: true })
+        .select("id")
+        .single();
+      if (error || !data) {
+        setSaving(false);
+        mostrarErro(error);
+        return;
+      }
+      const { error: errUnidade } = await ligarNestaUnidade(data.id, true);
+      setSaving(false);
+      if (errUnidade) {
+        mostrarErro(errUnidade);
+        return;
+      }
+      toast.success(`Especialidade criada em ${clinicaAtual!.clinica.nome}`);
     }
-    toast.success(editing ? "Especialidade atualizada" : "Especialidade criada");
     setOpen(false);
-    void load();
+    load();
   }
 
   const filtered = rows.filter((r) => {
     const matchNome = r.nome.toLowerCase().includes(q.toLowerCase());
     const matchStatus =
       statusFiltro === "todos" ||
-      (statusFiltro === "ativo" && r.ativo) ||
-      (statusFiltro === "inativo" && !r.ativo);
+      (statusFiltro === "ativo" && ativaAqui(r)) ||
+      (statusFiltro === "inativo" && !ativaAqui(r));
     return matchNome && matchStatus;
   });
 
   async function confirmarExclusao() {
-    if (!podeEscrever) {
+    if (!podeEditarNome) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
@@ -226,7 +303,7 @@ function EspecialidadesPage() {
     }
     toast.success("Especialidade excluída");
     setToDelete(null);
-    void load();
+    load();
   }
 
   return (
@@ -236,21 +313,23 @@ function EspecialidadesPage() {
         <div className="flex-1">
           <h1 className="text-xl font-bold">Especialidades</h1>
           <p className="text-sm text-muted-foreground">
-            Cadastro global de especialidades médicas — vale para todas as clínicas.
+            Ativar ou desativar vale só para esta unidade. Os nomes são compartilhados: uma
+            especialidade nova nasce ativa só na unidade que criou.
           </p>
           {podeEscreverModulo && !editaCatalogo && (
             <p className="text-sm text-muted-foreground">
-              Como esta lista vale para todas as unidades, só as pessoas autorizadas podem criar,
-              renomear ou desativar. Peça a uma delas.
+              Criar ou renomear especialidade é só para as pessoas autorizadas. Peça a uma delas.
             </p>
           )}
         </div>
-        {podeEscrever && (
+        {podeEditarNome && (
           <Button onClick={openNew}>
             <Plus className="h-4 w-4 mr-1" /> Nova
           </Button>
         )}
       </div>
+
+      <FaixaUnidadeAtual />
 
       <Card className="p-3">
         <form
@@ -281,8 +360,8 @@ function EspecialidadesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas as situações</SelectItem>
-              <SelectItem value="ativo">Ativos</SelectItem>
-              <SelectItem value="inativo">Inativos</SelectItem>
+              <SelectItem value="ativo">Ativas nesta unidade</SelectItem>
+              <SelectItem value="inativo">Inativas nesta unidade</SelectItem>
             </SelectContent>
           </Select>
         </form>
@@ -293,8 +372,8 @@ function EspecialidadesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead className="w-32">Situação</TableHead>
-              <TableHead className="w-32 text-right">Ações</TableHead>
+              <TableHead className="w-44">Nesta unidade</TableHead>
+              <TableHead className="w-56 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -316,14 +395,28 @@ function EspecialidadesPage() {
                   <TableCell className="font-medium">{r.nome}</TableCell>
                   <TableCell>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${r.ativo ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
+                      className={`text-xs px-2 py-0.5 rounded-full ${ativaAqui(r) ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
                     >
-                      {r.ativo ? "Ativo" : "Inativo"}
+                      {!r.ativoGlobal
+                        ? "Desativada pela plataforma"
+                        : r.ativoUnidade
+                          ? "Ativa"
+                          : "Inativa"}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {podeEscrever && (
+                      {podeEscreverModulo && r.ativoGlobal && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={alternando === r.id}
+                          onClick={() => void alternar(r)}
+                        >
+                          {r.ativoUnidade ? "Desativar nesta unidade" : "Ativar nesta unidade"}
+                        </Button>
+                      )}
+                      {podeEditarNome && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -333,7 +426,7 @@ function EspecialidadesPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
-                      {podeEscrever && adminPlataforma && (
+                      {podeEditarNome && adminPlataforma && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -375,14 +468,11 @@ function EspecialidadesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.ativo}
-                onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))}
-              />
-              Ativo
-            </label>
+            <p className="text-xs text-muted-foreground">
+              {editing
+                ? "Renomear só é permitido se a especialidade não estiver em uso em outra unidade."
+                : `Ela será ativada só em ${clinicaAtual!.clinica.nome}.`}
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
@@ -425,7 +515,9 @@ function EspecialidadesPageWithTabs() {
   return (
     <>
       <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
-      <EspecialidadesPage />
+      <ExigeUnidadeEscolhida oQue="ativar ou desativar especialidades">
+        <EspecialidadesPage />
+      </ExigeUnidadeEscolhida>
     </>
   );
 }

@@ -438,10 +438,13 @@ function ProcedimentosPage() {
   const [openTipoPicker, setOpenTipoPicker] = useState(false);
 
   useEffect(() => {
+    if (!clinicaAtual) return;
     void (async () => {
+      // Só as categorias ativas nesta unidade.
       const { data, error } = await supabase
-        .from("tipos_servico")
+        .from("tipos_servico_da_unidade")
         .select("id,nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome");
       if (error) {
@@ -457,9 +460,12 @@ function ProcedimentosPage() {
   // Especialidades marcadas no diálogo (apenas para tipo === 'consulta')
   const [formEspIds, setFormEspIds] = useState<string[]>([]);
   const loadEspecialidades = async () => {
+    if (!clinicaAtual) return;
+    // Só as especialidades ativas nesta unidade.
     const { data, error } = await supabase
-      .from("especialidades")
+      .from("especialidades_da_unidade")
       .select("id,nome")
+      .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
     if (error) {

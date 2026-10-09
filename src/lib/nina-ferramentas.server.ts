@@ -522,8 +522,9 @@ async function executarFerramentaNinaInterno(
         : null;
       if (!especialidadeId && args.especialidade) {
         const { data: esps } = await supabase
-          .from("especialidades")
+          .from("especialidades_da_unidade")
           .select("id, nome")
+          .eq("clinica_id", clinicaId)
           .eq("ativo", true);
         const alvo = String(args.especialidade)
           .normalize("NFD")

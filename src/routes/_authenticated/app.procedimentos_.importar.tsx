@@ -562,10 +562,22 @@ function ImportarServicosPage() {
     try {
       // 1. especialidades que faltam (lista compartilhada entre as clínicas)
       if (criarEspecialidades && faltamEspecialidades.length) {
-        const { error } = await supabase
+        const { data: criadas, error } = await supabase
           .from("especialidades")
-          .insert(faltamEspecialidades.map((nome) => ({ nome, ativo: true })));
-        if (error) {
+          .insert(faltamEspecialidades.map((nome) => ({ nome, ativo: true })))
+          .select("id");
+        // Nasce ativa só nesta unidade.
+        const { error: errUnidade } = error
+          ? { error: null }
+          : await supabase.from("especialidade_unidade").upsert(
+              (criadas ?? []).map((e) => ({
+                clinica_id: clinicaId,
+                especialidade_id: e.id,
+                ativo: true,
+              })),
+              { onConflict: "clinica_id,especialidade_id" },
+            );
+        if (error || errUnidade) {
           toast.error("Não consegui criar as especialidades que faltavam. Os serviços seguiram.");
         } else {
           especialidadesCriadas = faltamEspecialidades.length;

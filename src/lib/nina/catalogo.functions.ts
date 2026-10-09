@@ -134,7 +134,12 @@ export const opcoesCatalogoNina = createServerFn({ method: "POST" })
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true)
         .order("nome"),
-      sb.from("especialidades").select("id, nome").eq("ativo", true).order("nome"),
+      sb
+        .from("especialidades_da_unidade")
+        .select("id, nome")
+        .eq("clinica_id", data.clinicaId)
+        .eq("ativo", true)
+        .order("nome"),
       sb
         .from("unidades")
         .select("id, nome")

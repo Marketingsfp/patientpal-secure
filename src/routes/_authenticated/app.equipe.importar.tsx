@@ -379,6 +379,19 @@ function ImportarMedicosPage() {
           mostrarErro(error, "criar as especialidades que faltavam");
           return;
         }
+        // Nasce ativa só nesta unidade.
+        const { error: errUnidade } = await supabase.from("especialidade_unidade").upsert(
+          ((data ?? []) as Opcao[]).map((e) => ({
+            clinica_id: clinicaId!,
+            especialidade_id: e.id,
+            ativo: true,
+          })),
+          { onConflict: "clinica_id,especialidade_id" },
+        );
+        if (errUnidade) {
+          mostrarErro(errUnidade, "ativar as especialidades novas nesta unidade");
+          return;
+        }
         for (const e of (data ?? []) as Opcao[]) idPorEspecialidade.set(chaveTexto(e.nome), e.id);
         res.especialidadesCriadas = data?.length ?? 0;
         gravou = true;

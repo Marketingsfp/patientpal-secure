@@ -261,8 +261,9 @@ function dentroDoPeriodo(iso: string, periodo?: string | null) {
 
 async function listarEspecialidades(clinicaId: string) {
   const { data } = await supabaseAdmin
-    .from("especialidades")
+    .from("especialidades_da_unidade")
     .select("id, nome")
+    .eq("clinica_id", clinicaId)
     .eq("ativo", true)
     .order("nome");
   const todas = (data ?? []) as Array<{ id: string; nome: string }>;

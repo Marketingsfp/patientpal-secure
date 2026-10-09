@@ -4833,6 +4833,30 @@ export type Database = {
         }
         Relationships: []
       }
+      especialidade_unidade: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          especialidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          especialidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          especialidade_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       estoque_lotes: {
         Row: {
           clinica_id: string
@@ -15115,6 +15139,30 @@ export type Database = {
         }
         Relationships: []
       }
+      tipo_servico_unidade: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          tipo_servico_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          tipo_servico_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          tipo_servico_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       totem_checkin_tentativas: {
         Row: {
           clinica_id: string
@@ -15737,6 +15785,25 @@ export type Database = {
       }
     }
     Views: {
+      especialidades_da_unidade: {
+        Row: {
+          ativo: boolean | null
+          clinica_id: string | null
+          descricao: string | null
+          id: string | null
+          nome: string | null
+        }
+        Relationships: []
+      }
+      tipos_servico_da_unidade: {
+        Row: {
+          ativo: boolean | null
+          clinica_id: string | null
+          id: string | null
+          nome: string | null
+        }
+        Relationships: []
+      }
       nfse_emitentes_publico: {
         Row: {
           aliquota_iss: number | null
