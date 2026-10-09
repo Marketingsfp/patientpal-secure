@@ -98,6 +98,15 @@ describe("POST WhatsApp real com serviços simulados", () => {
   }
   for (const [cenario, motivo] of [
     ["assinatura-invalida", "não confere"],
+    ["assinatura-ausente", "não confere"],
+    ["assinatura-curta", "não confere"],
+    ["assinatura-sufixo-invalido", "não confere"],
+    ["assinatura-nibble-extra", "não confere"],
+    ["assinatura-duplicada", "não confere"],
+    ["assinatura-corpo-alterado", "não confere"],
+    ["assinatura-bom-alterado", "não confere"],
+    ["assinatura-registrar", "não confere"],
+    ["assinatura-status-invalida", "não confere"],
     ["assinatura-sem-secret", "App Secret não configurado"],
   ] as const) {
     it(`${cenario}: aviso recusado com 401 antes de gravar, reabrir ou chamar a Nina`, () => {
@@ -109,16 +118,27 @@ describe("POST WhatsApp real com serviços simulados", () => {
       expect(r.transporte).toBe(0);
       expect(r.reaberturas).toBe(0);
       expect(r.revisao).toBe(0);
+      expect(r.recibosFrancisco).toBe(0);
+      expect(r.recibosConfirmacao).toBe(0);
+      expect(r.respostasFrancisco).toBe(0);
       expect(r.logs).toHaveLength(2);
       for (const l of r.logs) expect(l).toContain(motivo);
     });
   }
-  it("assinatura-registrar: reversão global volta a registrar e processar", () => {
-    const r = executar("assinatura-registrar");
+  it("recibo de entrega assinado continua sendo processado", () => {
+    const r = executar("assinatura-status-valida");
+    expect([r.primeira, r.segunda]).toEqual([200, 200]);
+    expect(r.recibosFrancisco).toBe(2);
+    expect(r.recibosConfirmacao).toBe(2);
+    expect(r.entradas).toHaveLength(0);
+    expect(r.modelo).toBe(0);
+  });
+  it("assinatura válida sobre os bytes completos, incluindo BOM, preserva o atendimento", () => {
+    const r = executar("sucesso-bom");
     expect([r.primeira, r.segunda]).toEqual([200, 200]);
     expect(r.entradas).toHaveLength(1);
     expect(r.modelo).toBe(1);
     expect(r.transporte).toBe(1);
-    expect(r.logs[0]).toBe("assinatura_invalida");
+    expect(r.reaberturas).toBe(1);
   });
 });
