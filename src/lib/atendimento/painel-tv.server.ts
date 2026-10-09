@@ -3,6 +3,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { lerInicioCronometroPausa } from "./cronometro-pausa.server";
 import { ehPerfilAdmin } from "./perfil-atendimento";
+import { atendenteVisivelNaTv } from "./painel-tv-presenca";
 
 const PAGINA = 1000;
 
@@ -212,12 +213,10 @@ export async function carregarPainelTv(
     estados.set(p.user_id, { estado, versao: p.estado_manual_versao });
   }
 
-  const ids = [
-    ...new Set([
-      ...[...estados.entries()].filter(([, v]) => v.estado !== "OFFLINE").map(([id]) => id),
-      ...atribuidas.keys(),
-    ]),
-  ].filter((id) => ativos.has(id));
+  // Conversas atribuídas não tornam uma pessoa offline visível na equipe.
+  const ids = [...estados.entries()]
+    .filter(([, v]) => atendenteVisivelNaTv(v.estado))
+    .map(([id]) => id);
   const perfis = ids.length
     ? await supabase.from("profiles").select("id, nome").in("id", ids)
     : { data: [], error: null };

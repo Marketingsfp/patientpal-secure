@@ -5,8 +5,10 @@ apresentação à equipe. Registros operacionais marcados como teste continuam
 excluídos das métricas reais.
 
 Agora, o botão **Demonstração** abre o mesmo painel com dados fictícios gerados
-somente em memória: 13 conversas aguardando, seis atendentes (online, em pausa,
-no almoço e offline), volume por hora e contagens de respostas e resoluções.
+somente em memória: 13 conversas aguardando, cinco atendentes visíveis (online,
+em pausa ou no almoço), volume por hora e contagens de respostas e resoluções.
+Uma sexta pessoa offline fica oculta na equipe; suas conversas e resultados
+permanecem nas contagens gerais, como no painel real.
 O cenário inclui as três faixas de espera existentes. Os tempos avançam com o
 relógio, como no painel real; abrir novamente a demonstração reinicia o cenário.
 

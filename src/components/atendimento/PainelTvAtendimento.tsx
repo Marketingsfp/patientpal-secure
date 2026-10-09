@@ -8,6 +8,7 @@ import {
   type FaixaEsperaAtd,
 } from "@/lib/atendimento/espera";
 import { formatarTempoPausa } from "@/lib/atendimento/cronometro-pausa";
+import { atendenteVisivelNaTv } from "@/lib/atendimento/painel-tv-presenca";
 import type { AtendenteTv } from "@/lib/atendimento/painel-tv.server";
 import {
   criarDemonstracaoPainelTv,
@@ -351,16 +352,18 @@ function ReguaEspera({
 }
 
 function Equipe({ atendentes, agora }: { atendentes: AtendenteTv[]; agora: number }) {
-  const ordem = (a: AtendenteTv) => (a.estado === "ONLINE" ? 0 : a.estado === "OFFLINE" ? 2 : 1);
-  const lista = [...atendentes].sort(
-    (a, b) =>
-      ordem(a) - ordem(b) ||
-      b.esperas.length - a.esperas.length ||
-      b.atribuidas - a.atribuidas ||
-      a.nome.localeCompare(b.nome, "pt-BR"),
-  );
-  const online = atendentes.filter((a) => a.estado === "ONLINE").length;
-  const pausa = atendentes.filter((a) => a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA").length;
+  const ordem = (a: AtendenteTv) => (a.estado === "ONLINE" ? 0 : 1);
+  const lista = atendentes
+    .filter((a) => atendenteVisivelNaTv(a.estado))
+    .sort(
+      (a, b) =>
+        ordem(a) - ordem(b) ||
+        b.esperas.length - a.esperas.length ||
+        b.atribuidas - a.atribuidas ||
+        a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+  const online = lista.filter((a) => a.estado === "ONLINE").length;
+  const pausa = lista.filter((a) => a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA").length;
   // Até 7 linhas no tamanho cheio; acima disso a lista encolhe para caber sem rolagem.
   const denso = lista.length > 7;
   const colunas = "minmax(0,1fr) repeat(4, 5.2vw)";
@@ -410,15 +413,11 @@ function Equipe({ atendentes, agora }: { atendentes: AtendenteTv[]; agora: numbe
                   <i
                     className={cn(
                       "block h-[0.9vh] w-[0.9vh] shrink-0 rounded-full",
-                      a.estado === "ONLINE" ? "bg-atd-ok" : emPausa ? "bg-atd-warn" : "bg-atd-idle",
+                      a.estado === "ONLINE" ? "bg-atd-ok" : "bg-atd-warn",
                     )}
                   />
                   <span
-                    className={cn(
-                      "truncate",
-                      denso ? "text-[2vh]" : "text-[2.5vh]",
-                      a.estado === "OFFLINE" && "text-atd-ink-soft",
-                    )}
+                    className={cn("truncate", denso ? "text-[2vh]" : "text-[2.5vh]")}
                     title={a.nome}
                   >
                     {nomeCurto(a.nome)}
@@ -435,9 +434,6 @@ function Equipe({ atendentes, agora }: { atendentes: AtendenteTv[]; agora: numbe
                       )}
                       {a.inicioPausa ? formatarTempoPausa(a.inicioPausa, agora) : ""}
                     </span>
-                  )}
-                  {a.estado === "OFFLINE" && (
-                    <span className="shrink-0 text-[1.5vh] text-atd-ink-soft">offline</span>
                   )}
                 </div>
                 <Contador valor={a.atribuidas} denso={denso} />

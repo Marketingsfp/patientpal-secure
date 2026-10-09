@@ -29,10 +29,12 @@ describe("Equipe do painel TV — somente telefonia", () => {
       { id: "c2", atribuida_user_id: "admin", owner_type: "HUMAN" },
       { id: "c3", atribuida_user_id: "inativo", owner_type: "HUMAN" },
       { id: "c4", atribuida_user_id: "tel-offline", owner_type: "HUMAN" },
+      { id: "c5", atribuida_user_id: "tel-sem-presenca", owner_type: "HUMAN" },
     ];
     const membros = [
       { user_id: "tel-online", role: "telefonia", ativo: true },
       { user_id: "tel-pausa", role: "telefonia", ativo: true },
+      { user_id: "tel-almoco", role: "telefonia", ativo: true },
       { user_id: "tel-offline", role: "telefonia", ativo: true },
       { user_id: "tel-sem-presenca", role: "telefonia", ativo: true },
       { user_id: "admin", role: "admin", ativo: true },
@@ -47,10 +49,26 @@ describe("Equipe do painel TV — somente telefonia", () => {
       estado_manual_versao: 1,
     }));
     presencas.push({ user_id: "tel-pausa", estado_manual: "PAUSA", estado_manual_versao: 1 });
+    presencas.push({
+      user_id: "tel-almoco",
+      estado_manual: "PAUSA_SAIDA",
+      estado_manual_versao: 1,
+    });
+    presencas.push({ user_id: "tel-offline", estado_manual: "OFFLINE", estado_manual_versao: 1 });
+    const aguardando = new Date(Date.now() - 15 * 60_000).toISOString();
     const consultas: { tabela: string; campos: string; filtros: [string, unknown][] }[] = [];
     const db = {
       async rpc(nome: string) {
-        return { data: nome === "can_manage_clinica" ? true : [], error: null };
+        return {
+          data:
+            nome === "can_manage_clinica"
+              ? true
+              : [
+                  { conversa_id: "c1", aguardando_desde: aguardando },
+                  { conversa_id: "c4", aguardando_desde: aguardando },
+                ],
+          error: null,
+        };
       },
       from(tabela: string) {
         const chamada = { tabela, campos: "", filtros: [] as [string, unknown][] };
@@ -103,6 +121,8 @@ describe("Equipe do painel TV — somente telefonia", () => {
             let data: unknown = [];
             if (tabela === "atend_conversas" && chamada.campos.includes("owner_type"))
               data = abertas;
+            if (tabela === "atend_conversas" && chamada.campos === "resolved_by")
+              data = [{ resolved_by: "tel-online" }, { resolved_by: "tel-offline" }];
             if (tabela === "atend_agente_presenca") data = presencas;
             if (tabela === "clinica_memberships")
               data = membros.filter((m) =>
@@ -120,14 +140,18 @@ describe("Equipe do painel TV — somente telefonia", () => {
     } as never;
     const painel = await carregarPainelTv(db, db, "clinica", "gestor");
     expect(painel.atendentes.map((a) => a.id).sort()).toEqual([
-      "tel-offline",
+      "tel-almoco",
       "tel-online",
       "tel-pausa",
     ]);
     expect(painel.atendentes.filter((a) => a.estado === "ONLINE")).toHaveLength(1);
     expect(painel.atendentes.filter((a) => a.estado === "PAUSA")).toHaveLength(1);
-    expect(painel.atendentes.find((a) => a.id === "tel-offline")?.atribuidas).toBe(1);
-    expect(painel.emAndamento).toBe(4);
+    expect(painel.atendentes.filter((a) => a.estado === "PAUSA_SAIDA")).toHaveLength(1);
+    expect(painel.atendentes.some((a) => a.estado === "OFFLINE")).toBe(false);
+    expect(painel.emAndamento).toBe(5);
+    expect(painel.espera).toHaveLength(2);
+    expect(painel.resolvidasHoje).toBe(2);
+    expect(painel.atendentes.find((a) => a.id === "tel-online")?.resolvidasHoje).toBe(1);
     expect(consultas.find((c) => c.tabela === "clinica_memberships")?.campos).toBe("user_id, role");
     expect(
       consultas
