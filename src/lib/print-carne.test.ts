@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { isSaoFranciscoDePaula, parcelasCarneSaoFrancisco } from "./print-carne";
+import {
+  dadosClinicaSfp,
+  folhasDeFichas,
+  isSaoFranciscoDePaula,
+  layoutCarne,
+  parcelasCarneSaoFrancisco,
+} from "./print-carne";
 
 const parcela = (numero_parcela: number, status = "pendente") => ({
   numero_parcela,
@@ -34,5 +40,34 @@ describe("carnê da São Francisco de Paula", () => {
   it("taxas em aberto vêm antes das mensalidades; taxas pagas não saem", () => {
     const itens = parcelasCarneSaoFrancisco([parcela(-1), parcela(0, "pago"), parcela(1)]);
     expect(itens.map((p) => p.rotulo)).toEqual(["Inclusão", "1/1"]);
+  });
+});
+
+describe("layout e dados do carnê", () => {
+  it("SFP sai em A4; as outras clínicas continuam na bobina 80mm", () => {
+    expect(layoutCarne("POLICLINICA SAO FRANCISCO DE PAULA")).toBe("a4");
+    expect(layoutCarne("POLICLINICA MENINO JESUS")).toBe("bobina-80mm");
+  });
+
+  it("3 fichas por folha", () => {
+    expect(folhasDeFichas([1, 2, 3, 4, 5, 6, 7]).map((f) => f.length)).toEqual([3, 3, 1]);
+  });
+
+  it("campo vazio no cadastro cai na reserva; logo do branding tem prioridade", () => {
+    const vazio = dadosClinicaSfp({ nome: " ", telefone: null, endereco: "" });
+    expect(vazio.nome).toBe("Policlínica São Francisco de Paula");
+    expect(vazio.whatsapp).toBe("(21) 96736-5396");
+    expect(vazio.logo).toBe("/cartao-beneficios/logo-policardmed.png");
+    const cheio = dadosClinicaSfp({
+      nome: "SFP Cadastro",
+      telefone: "(21) 1111-2222",
+      endereco: "Rua A, 1",
+      cidade: "Meriti",
+      estado: "RJ",
+      branding: { logo_url: "https://x/logo.png" },
+    });
+    expect(cheio.nome).toBe("SFP Cadastro");
+    expect(cheio.endereco).toBe("Rua A, 1, Meriti RJ");
+    expect(cheio.logo).toBe("https://x/logo.png");
   });
 });
