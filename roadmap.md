@@ -32,3 +32,6 @@
 - [ ] Etapa C — painel de decisões e limites ajustáveis
 - [ ] Etapa D — motivo da transferência, filtro e prioridade na Central
 - [ ] Etapa E — remarcação e sinais de urgência (aguarda regras da clínica)
+
+## Latência da Nina
+- [x] Pré-busca do cadastro antes da 1ª chamada ao modelo (flag `nina_prefetch_cadastro`, padrão ligada) — não publicado
