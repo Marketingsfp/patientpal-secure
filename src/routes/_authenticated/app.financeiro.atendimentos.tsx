@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useMatch } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -254,7 +255,7 @@ interface PacFull {
 }
 
 const EMPTY = {
-  data: new Date().toISOString().slice(0, 10),
+  data: hojeBR(),
   medico_id: "",
   paciente_id: "",
   procedimento: "",
@@ -344,7 +345,7 @@ function AtendimentosPage() {
   const [editing, setEditing] = useState<Atend | null>(null);
   const [form, setForm] = useState(EMPTY);
   // Filtros do relatório
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeBR();
   // Sem `throw`: no painel direito do modo Comparar a tela é desenhada fora
   // do próprio endereço, e aí não há `?de=&ate=` — abre em hoje.
   const buscaUrl = useMatch({ from: Route.id, shouldThrow: false })?.search ?? {};
@@ -2947,7 +2948,7 @@ function AtendimentosPage() {
       // A mesma regra é reforçada no banco pela RPC pagar_repasse_medico.
       // A mensalidade do Cartão Terapêutico fica fora desta checagem: ela não
       // tem agendamento de propósito (o banco aceita esse caso específico).
-      const hojeIso = new Date().toISOString().slice(0, 10);
+      const hojeIso = hojeBR();
       const agendaIdsCheck = selectedItems
         .filter((x) => x.origem === "agenda" && !x.mensalidade_ct)
         .map((x) => x.id);
@@ -3328,7 +3329,7 @@ function AtendimentosPage() {
                       forma_pagamento: a.forma_pagamento ?? "",
                       status: a.status,
                     })),
-                    `atendimentos-${new Date().toISOString().slice(0, 10)}`,
+                    `atendimentos-${hojeBR()}`,
                     isMedicoOnly
                       ? [
                           { key: "data", label: "Data" },

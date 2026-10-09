@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { AlertasAtivosBanner } from "@/components/medico/paciente-dialogs";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -805,7 +806,7 @@ function AtendimentoEditorPage() {
           // uma no mesmo dia.
           agendamento_id: agendamentoId,
           procedimento: procNome || null,
-          data: new Date().toISOString().slice(0, 10),
+          data: hojeBR(),
           valor_total: valorTotal,
           valor_medico: valorMedico,
           valor_clinica: valorClinica,

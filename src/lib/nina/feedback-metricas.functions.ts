@@ -10,6 +10,7 @@
  * (grupo) e datas. A trilha de auditoria devolve apenas metadados e valores
  * de correção — nunca a conversa do paciente.
  */
+import { hojeBR } from "@/lib/date-utils";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -97,7 +98,7 @@ export const metricasAprendizadoNina = createServerFn({ method: "POST" })
     // Recorte comum (data + faixa de horário + fuso da clínica). Uma única
     // consulta cobre do primeiro ao último instante e o filtro por faixa de
     // horário é aplicado dia a dia, sem incluir tardes/noites intermediárias.
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const recorte = resolverRecorte({
       de: (data.de ?? hoje).slice(0, 10),
       ate: (data.ate ?? hoje).slice(0, 10),

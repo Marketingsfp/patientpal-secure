@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { getPreferenciasUi, updatePreferenciasUi } from "@/lib/cache/prefs-cache";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -618,7 +619,7 @@ function ClientesPage() {
                   cep: p.cep ?? "",
                   ativo: p.ativo ? "Sim" : "Não",
                 })),
-                `clientes-${new Date().toISOString().slice(0, 10)}`,
+                `clientes-${hojeBR()}`,
                 [
                   { key: "prontuario", label: "Prontuário" },
                   { key: "prontuario_interno", label: "Prontuário (interno)" },

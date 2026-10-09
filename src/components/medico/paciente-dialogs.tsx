@@ -2,6 +2,7 @@
  * Janelas do menu "Opções" da fila do médico (Agenda do Profissional).
  * Cada uma recebe o paciente e a clínica; as regras de acesso ficam no banco.
  */
+import { hojeBR } from "@/lib/date-utils";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Download, Printer, Plus, Trash2, Upload } from "lucide-react";
@@ -328,7 +329,7 @@ export function AvaliacoesCorporaisDialog({
     const reg: Record<string, unknown> = {
       clinica_id: clinicaId,
       paciente_id: pacienteId,
-      data: form["data"] || new Date().toISOString().slice(0, 10),
+      data: form["data"] || hojeBR(),
       observacao: form["observacao"]?.trim() || null,
       profissional_nome: nomeDoUsuario(user),
     };
@@ -575,7 +576,7 @@ export function ArquivosPacienteDialog({
         mime: arquivo.type || null,
         tamanho_bytes: arquivo.size,
         descricao: descricao.trim() || null,
-        data: data || new Date().toISOString().slice(0, 10),
+        data: data || hojeBR(),
         enviado_por_nome: nomeDoUsuario(user),
       });
       if (error) {

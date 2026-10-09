@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,7 +119,7 @@ function EditarFuncionarioPage() {
     regime: "clt",
     carga_horaria_semanal: "44",
     salario: "0",
-    data_admissao: new Date().toISOString().slice(0, 10),
+    data_admissao: hojeBR(),
     data_demissao: "",
     status: "ativo",
     sexo: "nao_informar",
@@ -191,7 +192,7 @@ function EditarFuncionarioPage() {
             regime: (c.regime as string) ?? "clt",
             carga_horaria_semanal: String(c.carga_horaria_semanal ?? "44"),
             salario: String(c.salario ?? "0"),
-            data_admissao: (c.data_admissao as string) ?? new Date().toISOString().slice(0, 10),
+            data_admissao: (c.data_admissao as string) ?? hojeBR(),
             data_demissao: (c.data_demissao as string) ?? "",
             status: (c.status as string) ?? "ativo",
             sexo: (c.sexo as string) ?? "nao_informar",

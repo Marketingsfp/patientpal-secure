@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Barcode, Copy, FileDown, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
@@ -140,7 +141,7 @@ function naAba(status: string, aba: Aba) {
 
 const FORM_VAZIO: Form = {
   valor: "0",
-  vencimento: new Date().toISOString().slice(0, 10),
+  vencimento: hojeBR(),
   nosso_numero: "",
   linha_digitavel: "",
   status: "pendente",

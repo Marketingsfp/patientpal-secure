@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { contratoDoProduto, moduloDoProduto, type ProdutoCartao } from "@/lib/cartao/produto";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -485,7 +486,7 @@ export function ConferenciaPage({ produto }: { produto: ProdutoCartao }) {
           .join(", "),
         candidatos_sugeridos: l.candidatos.map((c) => c.nome).join(" | "),
       })),
-      `conferencia-vidas-${new Date().toISOString().slice(0, 10)}`,
+      `conferencia-vidas-${hojeBR()}`,
     );
   };
 
@@ -511,7 +512,7 @@ export function ConferenciaPage({ produto }: { produto: ProdutoCartao }) {
           observacao: `Faixa paga cobre ${l.diag.vidasEsperadas} pessoa(s)`,
         })),
       ],
-      `auditoria-financeira-convenios-${new Date().toISOString().slice(0, 10)}`,
+      `auditoria-financeira-convenios-${hojeBR()}`,
     );
   };
 

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
 import { AlertTriangle, Plus, Receipt, Trash2, UserPlus } from "lucide-react";
@@ -257,7 +258,7 @@ export function PagamentoAvulsoMensalidadeDialog({
    */
   const confirmarSeJaExiste = async () => {
     if (!criarContrato || !paciente) return true;
-    const hojeISO = new Date().toISOString().slice(0, 10);
+    const hojeISO = hojeBR();
     const { data } = await supabase
       .from("contratos_assinatura")
       .select("numero, observacoes, created_at")
@@ -332,7 +333,7 @@ export function PagamentoAvulsoMensalidadeDialog({
         valor: valorNum,
         status: paga || historico ? "pago" : "pendente",
         pago_em: paga
-          ? dadosPagamento.data || new Date().toISOString().slice(0, 10)
+          ? dadosPagamento.data || hojeBR()
           : historico
             ? venc
             : null,

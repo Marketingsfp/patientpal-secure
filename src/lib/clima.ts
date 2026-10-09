@@ -13,6 +13,7 @@
 // cache é ignorado silenciosamente e tudo funciona só com a API.
 // ============================================================================
 
+import { hojeBR } from "@/lib/date-utils";
 import { supabase } from "@/integrations/supabase/client";
 
 export type ClimaDia = {
@@ -34,7 +35,7 @@ const DAILY_VARS = "precipitation_sum,weather_code,temperature_2m_max,temperatur
 const tabelaClima = () => (supabase as any).from("clima_diario");
 
 function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hojeBR();
 }
 
 function listarDias(ini: string, fim: string): string[] {

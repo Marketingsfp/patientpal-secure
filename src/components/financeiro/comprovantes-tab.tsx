@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { hojeBR } from "@/lib/date-utils";
 import {
   calcRepasseFull,
   normRepasse,
@@ -119,11 +120,13 @@ export function ComprovantesTab() {
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "—";
   const clinicaId = clinicaAtual?.clinica_id ?? null;
 
-  const hoje = new Date();
-  const trintaDias = new Date();
-  trintaDias.setDate(hoje.getDate() - 30);
+  // Período padrão pelo calendário da clínica: `toISOString()` dá o dia em
+  // UTC, que depois das 21h já é amanhã.
+  const hoje = hojeBR();
+  const trintaDias = new Date(`${hoje}T12:00:00Z`);
+  trintaDias.setUTCDate(trintaDias.getUTCDate() - 30);
   const [de, setDe] = useState(trintaDias.toISOString().slice(0, 10));
-  const [ate, setAte] = useState(hoje.toISOString().slice(0, 10));
+  const [ate, setAte] = useState(hoje);
   const [busca, setBusca] = useState("");
   const [medicoFiltro, setMedicoFiltro] = useState<string>("todos");
   const [loading, setLoading] = useState(false);

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
@@ -414,7 +415,7 @@ Posso registrar o estorno agora SEM mexer em gaveta nenhuma? ` +
         resposta: s.resposta ?? "",
         resolvido_em: s.resolvido_em ? new Date(s.resolvido_em).toLocaleString("pt-BR") : "",
       })),
-      `estornos-${new Date().toISOString().slice(0, 10)}`,
+      `estornos-${hojeBR()}`,
       [
         { key: "solicitado_em", label: "Solicitado em" },
         { key: "paciente", label: "Paciente" },

@@ -5,6 +5,7 @@
  * Rascunho não tem efeito nenhum; só a versão publicada é usada pela Nina e
  * pelas métricas. Publicar cria uma versão nova e preserva a anterior.
  */
+import { hojeBR } from "@/lib/date-utils";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -97,7 +98,7 @@ export function HorarioFuncionamento({ clinicaId, podeEditar }: Props) {
   const rascunho = (data as any)?.rascunho ?? null;
   const vigente = (data as any)?.vigente ?? null;
   const versoes: any[] = (data as any)?.versoes ?? [];
-  const hoje: string = (data as any)?.hoje ?? new Date().toISOString().slice(0, 10);
+  const hoje: string = (data as any)?.hoje ?? hojeBR();
   const role: string = (data as any)?.role ?? "";
 
   const [edicao, setEdicao] = useState<Record<number, DiaHorario>>({});

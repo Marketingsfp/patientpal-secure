@@ -658,7 +658,7 @@ function Page() {
   >([]);
   const loadRepasseHoje = useCallback(async () => {
     if (!clinicaAtual) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const { data, error } = await supabase
       .from("fin_lancamentos")
       .select("valor, medico_id, repasse_pago, agendamento_id, data")
@@ -799,8 +799,8 @@ function Page() {
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
-  const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [meuDataIni, setMeuDataIni] = useState<string>(() => hojeBR());
+  const [meuDataFim, setMeuDataFim] = useState<string>(() => hojeBR());
   const [meuMedico, setMeuMedico] = useState<string>("__all__");
   const [meuPaciente, setMeuPaciente] = useState<string>("");
   const [openCal, setOpenCal] = useState(false);
@@ -912,7 +912,7 @@ function Page() {
     setMeuPeriodo("hoje");
     setMeuMedico("__all__");
     setMeuPaciente("");
-    const hj = new Date().toISOString().slice(0, 10);
+    const hj = hojeBR();
     setMeuDataIni(hj);
     setMeuDataFim(hj);
   };
@@ -934,7 +934,7 @@ function Page() {
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
   const [fIni, setFIni] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [fFim, setFFim] = useState(new Date().toISOString().slice(0, 10));
+  const [fFim, setFFim] = useState(hojeBR());
   const [fUserId, setFUserId] = useState<string>("");
   const [usersList, setUsersList] = useState<Array<{ user_id: string; nome: string }>>([]);
 
@@ -1063,7 +1063,7 @@ function Page() {
       setCartaoEdit({
         bandeira: prefill.bandeira ?? "",
         parcelas: prefill.parcelas ?? "1",
-        data: prefill.data ?? new Date().toISOString().slice(0, 10),
+        data: prefill.data ?? hojeBR(),
         autorizacao: prefill.autorizacao ?? "",
         valorLiquido: prefill.valorLiquido ?? String(m.valor ?? ""),
       });
@@ -1313,7 +1313,7 @@ function Page() {
   );
   const [obsFechamento, setObsFechamento] = useState("");
   const [dataFechamento, setDataFechamento] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
+    hojeBR(),
   );
   const [saving, setSaving] = useState(false);
   const lancandoMovRef = useRef(false);
@@ -1325,7 +1325,7 @@ function Page() {
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
   const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
+    hojeBR(),
   );
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
@@ -2119,7 +2119,7 @@ function Page() {
         .eq("id", openCobranca.id)
         .maybeSingle();
       const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
-      const hoje = new Date().toISOString().slice(0, 10);
+      const hoje = hojeBR();
       // Carimbo do convênio na descrição, no mesmo formato da Agenda. Serve à
       // contagem de cota do benefício: um atendimento gravado como "particular"
       // só conta como uso do convênio quando o lançamento registra que o
@@ -3656,7 +3656,7 @@ function Page() {
       ? `Dias ${diasComMovimento.join(" + ")}`
       : `Dia ${dataFechamento}`;
     // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const fechadoEmISO =
       dataFechamento && dataFechamento !== hoje
         ? new Date(`${dataFechamento}T23:59:59`).toISOString()
@@ -3698,7 +3698,7 @@ function Page() {
     // Fechou um caixa pendente de outro dia: a tela volta sozinha para o caixa
     // de hoje, senão ficaria presa numa sessão que não existe mais como aberta.
     setSessaoAtivaId(null);
-    setDataFechamento(new Date().toISOString().slice(0, 10));
+    setDataFechamento(hojeBR());
     toast.success("Caixa fechado");
     // Comprovante escopado ao dia selecionado.
     // Entradas e saídas de cada forma no dia. Nada é removido aqui: quem
@@ -3765,7 +3765,7 @@ function Page() {
     const breakdownStr = Object.entries(conferidoNum)
       .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
       .join("; ");
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const fechadoEmISO =
       dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
         ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
@@ -3804,7 +3804,7 @@ function Page() {
     setInformadoTerceiro("");
     setObsTerceiro("");
     setConferidoTerceiro({});
-    setDataFechamentoTerceiro(new Date().toISOString().slice(0, 10));
+    setDataFechamentoTerceiro(hojeBR());
     toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
     printComprovanteCaixa({
       tipo: "fechamento",
@@ -5215,7 +5215,7 @@ function Page() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const hoje = new Date().toISOString().slice(0, 10);
+                    const hoje = hojeBR();
                     setFIni(hoje);
                     setFFim(hoje);
                   }}
@@ -6262,7 +6262,7 @@ function Page() {
               <Label>Data do fechamento</Label>
               <DateInputBR
                 value={dataFechamentoTerceiro}
-                max={new Date().toISOString().slice(0, 10)}
+                max={hojeBR()}
                 onChange={(e) => setDataFechamentoTerceiro(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">

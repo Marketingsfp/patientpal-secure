@@ -384,7 +384,7 @@ function FluxoPage() {
     if (
       reais.length === 0 &&
       !fallbackAplicado &&
-      dataRef === new Date().toISOString().slice(0, 10)
+      dataRef === hojeBR()
     ) {
       const { data: ult } = await supabase
         .from("agendamentos")

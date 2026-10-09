@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { contratoDoProduto, produtoDoModulo, type ProdutoCartao } from "@/lib/cartao/produto";
 import {
@@ -810,7 +811,7 @@ export function ContratosPage({
       // Buscar mensalidades em lotes de contratos para evitar o teto de 1000
       // linhas por request do PostgREST (ex.: 500 contratos × 12 parcelas
       // ≈ 6000 linhas retornariam truncadas, deixando contratos com "0/0").
-      const hojeStr = new Date().toISOString().slice(0, 10);
+      const hojeStr = hojeBR();
       const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
       for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
       const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
@@ -905,7 +906,7 @@ export function ContratosPage({
     // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
     // truncado, então filtrar por ele aqui esconderia resultados válidos.
     const base = list;
-    const hojeStr = new Date().toISOString().slice(0, 10);
+    const hojeStr = hojeBR();
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
     const dHoje = new Date(hojeStr + "T00:00:00").getTime();
@@ -1943,7 +1944,7 @@ function NovoContratoForm({
   const [taxa, setTaxa] = useState(0);
   const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [dataInicio, setDataInicio] = useState(hojeBR());
   const [mensalidadesJaPagas, setMensalidadesJaPagas] = useState(0);
   const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne" | null>(null);
   const [obs, setObs] = useState("");
@@ -1990,7 +1991,7 @@ function NovoContratoForm({
   const emailValido = (e?: string | null) => !!e && /.+@.+\..+/.test(e);
   const OBS_MAX = 1000;
   const obsSanitizedLen = obs.trim().length;
-  const dataHoje = new Date().toISOString().slice(0, 10);
+  const dataHoje = hojeBR();
   const dataAvisoExtrema = (() => {
     if (!dataInicio) return null;
     const d = new Date(dataInicio + "T00:00:00").getTime();
@@ -3129,7 +3130,7 @@ function DetalheContrato({
   const [incCobrarTaxa, setIncCobrarTaxa] = useState<boolean>(true);
   const [incTaxaValor, setIncTaxaValor] = useState<string>("0.00");
   const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
+    hojeBR(),
   );
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
@@ -4376,7 +4377,7 @@ function DetalheContrato({
     const patch = paga
       ? {
           status: "pago",
-          pago_em: pagoEm && pagoEm.length > 0 ? pagoEm : new Date().toISOString().slice(0, 10),
+          pago_em: pagoEm && pagoEm.length > 0 ? pagoEm : hojeBR(),
           ...(forma !== undefined ? { forma_pagamento: forma } : {}),
           ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
           ...(valorPago != null ? { valor_pago: valorPago } : {}),
@@ -5238,7 +5239,7 @@ function DetalheContrato({
       DEPENDENTE_CPF: dep.cpf ?? "",
       DEPENDENTE_TIPO: dep.tipo,
       TIPO_MOVIMENTO: movimento,
-      DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
+      DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? hojeBR()),
     };
     let out = tpl.replace(
       /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
@@ -5420,7 +5421,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       return;
     }
     if (!excAlvo) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const { error } = await supabase
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: hoje })
@@ -6652,7 +6653,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const hoje = new Date().toISOString().slice(0, 10);
+                          const hoje = hojeBR();
                           const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
                           const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
                           const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;
@@ -7344,7 +7345,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 // Segue a mesma data escolhida no diálogo (permite retroativo):
                 // se o operador pagou 20/07, tanto a mensalidade quanto a taxa
                 // de adesão vinculada vão para 20/07 no financeiro e no caixa.
-                const dataLanc = dados.data || new Date().toISOString().slice(0, 10);
+                const dataLanc = dados.data || hojeBR();
                 const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
                 const { data: rpcData, error: rpcErr } = await supabase.rpc(
                   "fn_registrar_lancamento_e_caixa",
@@ -7475,7 +7476,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             // da venda (data_inicio do contrato). Nos demais casos, taxa vem
             // marcada. Valor sugerido: cb_convenios.taxa_inclusao_dependente
             // (0 quando ainda não configurado no convênio) — sempre editável.
-            const hoje = new Date().toISOString().slice(0, 10);
+            const hoje = hojeBR();
             const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
             const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
             const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;

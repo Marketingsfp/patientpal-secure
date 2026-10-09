@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { contratoDoProduto, moduloDoProduto, type ProdutoCartao } from "@/lib/cartao/produto";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
@@ -194,7 +195,7 @@ export function DependentesPage({ produto }: { produto: ProdutoCartao }) {
     if (!(await confirmDialog("Excluir este dependente?"))) return;
     const { error } = await supabase
       .from("contrato_dependentes")
-      .update({ ativo: false, excluido_em: new Date().toISOString().slice(0, 10) })
+      .update({ ativo: false, excluido_em: hojeBR() })
       .eq("id", depId);
     if (error) {
       mostrarErro(error);

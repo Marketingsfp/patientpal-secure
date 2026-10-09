@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Printer, Pencil, Trash2, FileSpreadsheet, FileText } from "lucide-react";
@@ -291,7 +292,7 @@ export function OrcamentoTab({
   };
 
   const nomeDoArquivo = () => {
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const alvo = (pacienteId ? (pacienteNome ?? "paciente") : "clinica")
       .normalize("NFD")
       .replace(/\p{Diacritic}/gu, "")

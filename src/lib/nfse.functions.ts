@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -638,7 +639,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
               ? [data.pagamentoId]
               : [],
         agendamento_id: data.agendamentoId ?? null,
-        data_emissao: new Date().toISOString().slice(0, 10),
+        data_emissao: hojeBR(),
         valor_servicos: data.valorServicos,
         valor_iss: valorIss,
         aliquota_iss: aliquota,

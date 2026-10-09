@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useState } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,7 +48,7 @@ export function UploadImagemDialog({
 }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [categoria, setCategoria] = useState<OdontoImagemCategoria>("foto_documentacao");
-  const [dataExame, setDataExame] = useState(new Date().toISOString().slice(0, 10));
+  const [dataExame, setDataExame] = useState(hojeBR());
   const [dentesStr, setDentesStr] = useState(denteSugerido ? String(denteSugerido) : "");
   const [descricao, setDescricao] = useState("");
   const [tagsStr, setTagsStr] = useState("");
@@ -57,7 +58,7 @@ export function UploadImagemDialog({
   function reset() {
     setFiles([]);
     setCategoria("foto_documentacao");
-    setDataExame(new Date().toISOString().slice(0, 10));
+    setDataExame(hojeBR());
     setDentesStr(denteSugerido ? String(denteSugerido) : "");
     setDescricao("");
     setTagsStr("");

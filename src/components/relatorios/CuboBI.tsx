@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1026,7 +1027,7 @@ export function CuboBI({
         : "";
     exportToExcel(
       linhas,
-      `cubo-${cube.id}${sufixoFiltro}-${new Date().toISOString().slice(0, 10)}`,
+      `cubo-${cube.id}${sufixoFiltro}-${hojeBR()}`,
       headers,
     );
   }

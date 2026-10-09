@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Pencil } from "lucide-react";
@@ -63,7 +64,7 @@ export function EditarEstornoDialog({ open, onOpenChange, solicitacao, onSaved }
   // Recarrega os campos toda vez que o dialog abre com outra solicitação.
   useEffect(() => {
     if (!open || !solicitacao) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     setTipo(solicitacao.tipo === "devolucao" ? "devolucao" : "erro_caixa");
     setMotivo(solicitacao.motivo ?? "");
     setDataPagamentoOriginal(solicitacao.data_pagamento_original ?? hoje);

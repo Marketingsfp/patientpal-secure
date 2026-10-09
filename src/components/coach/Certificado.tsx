@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { Award, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDuracao } from "@/lib/coach/study-time";
@@ -26,7 +27,7 @@ export function notaFinal(d: DadosCertificado): number {
 }
 
 function codigo(atendente: string) {
-  const base = `${atendente}-${new Date().toISOString().slice(0, 10)}`;
+  const base = `${atendente}-${hojeBR()}`;
   let h = 0;
   for (let i = 0; i < base.length; i++) h = (h * 31 + base.charCodeAt(i)) >>> 0;
   return h.toString(36).toUpperCase().padStart(7, "0").slice(0, 7);

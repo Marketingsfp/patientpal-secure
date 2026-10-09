@@ -7,6 +7,7 @@
  * agendamento, `observacoes` nunca é tocado, e o registro de repasse só é
  * criado quando ainda não existe cobrança nem registro para o agendamento.
  */
+import { hojeBR } from "@/lib/date-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { textoDoProntuario } from "@/lib/prontuario/html";
 
@@ -120,7 +121,7 @@ export async function finalizarAtendimento(p: {
       medico_id: p.medico?.id ?? null,
       agendamento_id: p.agendamentoId,
       procedimento: p.procedimento || null,
-      data: new Date().toISOString().slice(0, 10),
+      data: hojeBR(),
       valor_total: valorTotal,
       valor_medico: valorMedico,
       valor_clinica: Math.max(0, valorTotal - valorMedico),

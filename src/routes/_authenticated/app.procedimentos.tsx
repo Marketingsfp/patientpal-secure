@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
@@ -1249,7 +1250,7 @@ function ProcedimentosPage() {
                   preparo: p.preparo ?? "",
                   ativo: p.ativo ? "Sim" : "Não",
                 })),
-                `servicos-${new Date().toISOString().slice(0, 10)}`,
+                `servicos-${hojeBR()}`,
                 [
                   { key: "nome", label: "Nome" },
                   { key: "grupo", label: "Especialidade" },

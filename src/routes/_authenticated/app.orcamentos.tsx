@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useState } from "react";
@@ -460,7 +461,7 @@ function OrcamentosPage() {
   const [periodo, setPeriodo] = useState<
     "hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos"
   >("todos");
-  const hojeIso = new Date().toISOString().slice(0, 10);
+  const hojeIso = hojeBR();
   const [dataIni, setDataIni] = useState<string>(hojeIso);
   const [dataFim, setDataFim] = useState<string>(hojeIso);
   // Modo compacto: usado quando a tela roda embutida no split
@@ -643,7 +644,7 @@ function OrcamentosPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `orcamentos-${filtroRealizacao}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `orcamentos-${filtroRealizacao}-${hojeBR()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

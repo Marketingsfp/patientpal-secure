@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PlusCircle,
@@ -471,7 +472,7 @@ export function CaixaShellV2({
   const loadFila = useCallback(async () => {
     if (!clinicaAtual) return;
     setFilaLoading(true);
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeBR();
     const { data, error } = await supabase.rpc("fila_caixa_hoje", {
       _clinica_id: clinicaAtual.clinica_id,
       _data: hoje,

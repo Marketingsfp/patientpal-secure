@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
@@ -36,7 +37,7 @@ interface Props {
   onSaved: () => void;
 }
 
-const hojeISO = () => new Date().toISOString().slice(0, 10);
+const hojeISO = () => hojeBR();
 
 /**
  * Registro de uma queixa/achado numa região do mapa corporal.

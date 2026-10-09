@@ -33,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { formatDatePura } from "@/lib/date-utils";
+import { formatDatePura, hojeBR } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-holerites")({
   component: HoleritesPage,
@@ -165,7 +165,7 @@ function HoleritesPage() {
       .from("hr_holerites")
       .update({
         status: "pago",
-        pago_em: new Date().toISOString().slice(0, 10),
+        pago_em: hojeBR(),
       })
       .eq("id", id);
     if (error) {

@@ -1,3 +1,4 @@
+import { hojeBR } from "@/lib/date-utils";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { confirmDialog } from "@/lib/confirm";
 import {
@@ -1612,7 +1613,7 @@ export function ClienteForm({
                       required
                       value={form.data_nascimento}
                       min="1900-01-01"
-                      max={new Date().toISOString().slice(0, 10)}
+                      max={hojeBR()}
                       onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
                     />
                   </div>
