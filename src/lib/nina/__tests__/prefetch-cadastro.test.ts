@@ -65,3 +65,16 @@ describe("intenção dividida com histórico", () => {
       .toEqual(["valor", "disponibilidade", "agendamento"]);
   });
 });
+describe("especialidades no formato do cadastro publicado", () => {
+  const catObj = { servicos: [], profissionais: [
+    { nome: "Fulana Teste", especialidades: [{ id: "1", nome: "DERMATOLOGIA" }] },
+    { nome: "Beltrano Teste", especialidades: [{ id: "2", nome: "CLÍNICA GERAL" }] },
+  ] };
+  it("usa o nome da especialidade, nunca '[object Object]'", () => {
+    const p = planejarPrefetch("quanto ta a consulta com dermatologista?", ["valor"], catObj);
+    expect(p?.termo).toBe("DERMATOLOGIA");
+  });
+  it("mensagem sem atendimento não pré-busca", () => {
+    expect(planejarPrefetch("bom dia, tudo bem?", ["valor"], catObj)).toBeNull();
+  });
+});

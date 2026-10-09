@@ -78,7 +78,11 @@ const NOMES_COMUNS = new Set([
 ]);
 
 function listaEspecialidades(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map(String).filter(Boolean);
+  // O cadastro publicado guarda [{ id, nome }]; versões antigas, só o texto.
+  if (Array.isArray(v))
+    return v.map((e) => typeof e === "string" ? e
+      : e && typeof e === "object" && typeof (e as { nome?: unknown }).nome === "string" ? (e as { nome: string }).nome : "")
+      .map((e) => e.trim()).filter(Boolean);
   if (typeof v === "string") return v.split(/[,;/]/).map((s) => s.trim()).filter(Boolean);
   return [];
 }
@@ -89,7 +93,7 @@ function palavras(texto: string): string[] {
 
 /** A especialidade aparece na mensagem? Aceita raiz ("cardio") e 1ª palavra ("clinico" ~ "clinica geral"). */
 function citaEspecialidade(texto: string, nome: string): boolean {
-  const n = normalizar(nome);
+  const n = normalizar(nome).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   if (n.length >= 4 && texto.includes(n)) return true;
   const raiz = raizEspecialidade(nome);
   if (raiz.length >= 5 && texto.includes(raiz)) return true;
