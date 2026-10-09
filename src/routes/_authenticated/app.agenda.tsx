@@ -121,8 +121,7 @@ import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
-import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
+import { setTurboMode } from "@/lib/turbo-mode";
 import {
   DividirOrcamentoDialog,
   type DividirItem,
@@ -1087,7 +1086,12 @@ function AgendaPage() {
   const { clinicaAtual } = useClinica();
   // Undo em exclusões em lote — só São Francisco de Paula (flag ux_melhorias).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  const turboDisabled = useTurboDisabled();
+  // Modo Turbo (atalhos F2/F3…) saiu da Agenda em todas as unidades — o
+  // cabeçalho da São Francisco ficou igual ao da Menino Jesus, que já não tinha
+  // o botão. Desliga quem ficou com o modo salvo no navegador.
+  useEffect(() => {
+    setTurboMode(false);
+  }, []);
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   // Escopo por profissional: quem foi restrito na tela de Equipe (por exemplo,
@@ -9751,11 +9755,6 @@ function AgendaPage() {
           </div>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1">
-          {!turboDisabled && (
-            <span className="hidden lg:contents">
-              <TurboModeToggle />
-            </span>
-          )}
           <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold text-slate-600">
             <button
               type="button"
