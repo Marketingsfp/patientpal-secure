@@ -194,6 +194,28 @@ describe("Francisco — elegibilidade, isolamento e reserva", () => {
       (await db.query<{ estado: string }>("SELECT estado FROM francisco_contatos")).rows[0]!.estado,
     ).toBe("recusado");
   });
+  it("resposta pausada pode virar recusa sem duplicar o evento legado", async () => {
+    await reservar();
+    await db.query("SELECT francisco_registrar_resposta($1,$2,false,'wamid.classificacao')", [
+      clinica,
+      telefone,
+    ]);
+    expect((await avaliar()).motivo).toBe("resposta_recebida");
+    await db.query("SELECT francisco_registrar_resposta($1,$2,true,'wamid.classificacao')", [
+      clinica,
+      telefone,
+    ]);
+    expect(
+      (await db.query<{ estado: string }>("SELECT estado FROM francisco_contatos")).rows[0]!.estado,
+    ).toBe("recusado");
+    expect(
+      (
+        await db.query(
+          "SELECT * FROM francisco_eventos WHERE dados->>'wa_message_id'='wamid.classificacao'",
+        )
+      ).rows,
+    ).toHaveLength(1);
+  });
   it("D4 é contado desde a criação e exige D1 enviado", async () => {
     await db.query("UPDATE orcamentos SET created_at=now()-interval '97 hours' WHERE id=$1", [
       orcamento,

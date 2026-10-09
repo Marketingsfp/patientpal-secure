@@ -4,7 +4,12 @@ import { carregarAcessosOsZap } from "@/lib/permissoes-oszap.server";
 import { acessosFrancisco } from "./permissoes";
 import type { AbaFrancisco } from "./config";
 import { celularParaEnvio } from "@/lib/agenda/confirmacao-whatsapp";
-import { configPadraoFrancisco, franciscoConfigSchema, type FranciscoConfig } from "./config";
+import {
+  configPadraoFrancisco,
+  franciscoConfigSchema,
+  MODELO_FRANCISCO,
+  type FranciscoConfig,
+} from "./config";
 
 export type CursorFrancisco = { em: string; id: string };
 export type CandidatoFrancisco = {
@@ -106,7 +111,7 @@ export async function salvarRegistro(
   valor: unknown,
   publicar: boolean,
 ) {
-  const config = franciscoConfigSchema.parse(valor);
+  const config = { ...franciscoConfigSchema.parse(valor), modelo: MODELO_FRANCISCO };
   if (publicar && config.ativo && config.modo === "real") {
     if (!envioRealLiberado())
       throw new Error("Envio real bloqueado no servidor. Homologue antes de ativar.");

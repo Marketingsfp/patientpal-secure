@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { conferirErro, type CursorFrancisco } from "./service.server";
+import { classificarRespostaFrancisco, type ClassificadorFrancisco } from "./intencao.server";
+import { decisaoFranciscoSchema, type DecisaoFrancisco } from "./intencao";
+import { textoTemplateFrancisco } from "./config";
 import {
   aplicarAcaoTesteFrancisco,
   iniciarTesteFrancisco,
@@ -13,7 +16,13 @@ type Db = SupabaseClient<any>;
 type EventoTeste = {
   id: string;
   created_at: string;
-  dados: { sessao: string; inicio?: InicioTesteFrancisco; acao?: AcaoTesteFrancisco };
+  dados: {
+    sessao: string;
+    inicio?: InicioTesteFrancisco;
+    acao?: AcaoTesteFrancisco;
+    decisao?: DecisaoFrancisco;
+    regras?: string;
+  };
 };
 const INICIO = "homologacao_chat_inicio";
 const ACAO = "homologacao_chat_acao";
@@ -85,7 +94,14 @@ export async function carregarTesteFrancisco(
       // Ações D4 concorrentes são descartadas na projeção após interrupção.
       if (evento.dados.acao?.tipo === "d4" && (sessao.estado !== "aguardando" || sessao.d4Enviado))
         continue;
-      sessao = aplicarAcaoTesteFrancisco(sessao, evento.id, evento.created_at, evento.dados.acao!);
+      sessao = aplicarAcaoTesteFrancisco(
+        sessao,
+        evento.id,
+        evento.created_at,
+        evento.dados.acao!,
+        evento.dados.decisao ? decisaoFranciscoSchema.parse(evento.dados.decisao) : undefined,
+        evento.dados.regras !== "francisco-respostas-v2",
+      );
     }
     if (eventos.length < 100) return sessao;
     const ultimo = eventos.at(-1)!;
@@ -119,6 +135,7 @@ export async function agirConversaTesteFrancisco(
   id: string,
   sessaoId: string,
   acao: AcaoTesteFrancisco,
+  classificar: ClassificadorFrancisco = classificarRespostaFrancisco,
 ) {
   const sessao = await carregarTesteFrancisco(db, clinicaId, ator, sessaoId);
   // Retomada idempotente após perda de resposta: o mesmo comando não duplica bolhas.
@@ -133,13 +150,30 @@ export async function agirConversaTesteFrancisco(
     .maybeSingle();
   conferirErro(existente.error);
   if (existente.data) return sessao;
-  aplicarAcaoTesteFrancisco(sessao, id, new Date().toISOString(), acao);
+  const decisao =
+    acao.tipo === "paciente" && sessao.estado === "aguardando"
+      ? await classificar(
+          acao.texto,
+          sessao.inicio.config,
+          textoTemplateFrancisco(
+            sessao.inicio.config,
+            sessao.d4Enviado ? "d4" : "d1",
+            sessao.inicio.clinicaNome,
+          ),
+        )
+      : undefined;
+  aplicarAcaoTesteFrancisco(sessao, id, new Date().toISOString(), acao, decisao);
   const { error } = await db.from("francisco_eventos").insert({
     id,
     clinica_id: clinicaId,
     ator,
     tipo: ACAO,
-    dados: { sessao: sessaoId, acao },
+    dados: {
+      sessao: sessaoId,
+      acao,
+      regras: "francisco-respostas-v2",
+      ...(decisao ? { decisao } : {}),
+    },
   });
   if (error?.code === "23505") {
     const retomada = await db

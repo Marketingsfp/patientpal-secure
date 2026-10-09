@@ -159,6 +159,8 @@ mock.module("@/lib/nina/revisao-conversa.server", () => ({
 mock.module("@/lib/francisco/replies.server", () => ({
   processarRespostaFrancisco: async () => {
     respostasFrancisco++;
+    if (cenario === "francisco-recusa") return { destino: "encerrado" };
+    if (cenario === "francisco-humano") return { destino: "humano" };
     return false;
   },
   registrarEntregaFrancisco: async () => {

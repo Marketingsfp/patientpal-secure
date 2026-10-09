@@ -20,6 +20,22 @@ function executar(cenario: string) {
   return r;
 }
 describe("POST WhatsApp real com serviços simulados", () => {
+  for (const [cenario, status] of [
+    ["francisco-recusa", "completed"],
+    ["francisco-humano", "handoff"],
+  ]) {
+    it(`${cenario}: consome resposta e retry sem chamar Nina nem enviar fechamento`, () => {
+      const r = executar(cenario);
+      expect([r.primeira, r.segunda]).toEqual([200, 200]);
+      expect(r.respostasFrancisco).toBe(1);
+      expect(r.modelo).toBe(0);
+      expect(r.transporte).toBe(0);
+      expect(r.reaberturas).toBe(0);
+      expect(r.saidas).toHaveLength(0);
+      expect(r.entradas[0].nina_status).toBe(status);
+      if (cenario === "francisco-recusa") expect(r.entradas[0].tratada_internamente).toBe(true);
+    });
+  }
   for (const cenario of [
     "reserva-perdida-tts",
     "reserva-perdida-upload",

@@ -41,6 +41,8 @@ import { Badge } from "@/components/ui/badge";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 import {
   ABAS_FRANCISCO,
+  MODELO_FRANCISCO,
+  PROMPT_FRANCISCO,
   configPadraoFrancisco,
   franciscoConfigSchema,
   textoTemplateFrancisco,
@@ -168,9 +170,7 @@ export function FranciscoWorkspace({
   const [telefone, setTelefone] = useState("");
   const [evidencia, setEvidencia] = useState("");
   const [contato, setContato] = useState("");
-  const [cenario, setCenario] = useState(
-    "Paciente fez um orçamento ontem, ainda não pagou e autorizou o contato. Proponha uma mensagem breve de apresentação e ajuda.",
-  );
+  const [cenario, setCenario] = useState("Quero pagar meu orçamento. Posso usar cartão?");
   const [textoVoz, setTextoVoz] = useState(
     "Olá! Sou Francisco, assistente de orçamentos da clínica. Nossa equipe está à disposição para ajudar você.",
   );
@@ -311,7 +311,7 @@ export function FranciscoWorkspace({
           {campo("Nome do agente", <Input value="Francisco" disabled />)}
           <p className="text-sm text-muted-foreground">
             Assistente dedicado ao acompanhamento de orçamentos. Apresenta-se no primeiro contato e
-            encaminha respostas para a equipe humana.
+            encaminha interesse e dúvidas à equipe humana. Recusas encerram em silêncio.
           </p>
           {campo(
             "Departamento que recebe as respostas",
@@ -328,12 +328,8 @@ export function FranciscoWorkspace({
         <div className="space-y-4">
           {campo(
             "Modelo",
-            <Input
-              value={config.modelo}
-              onChange={(e) => set("modelo", e.target.value)}
-              disabled={!podeEditar}
-            />,
-            "Identificador do gateway usado na homologação.",
+            <Input value={MODELO_FRANCISCO} readOnly />,
+            "Gemini 3.8 Flash interpreta respostas no atendimento e na homologação.",
           )}
           {campo(
             "Temperatura",
@@ -356,7 +352,15 @@ export function FranciscoWorkspace({
               onChange={(e) => set("systemPrompt", e.target.value)}
               disabled={!podeEditar}
             />,
+            "As regras obrigatórias de recusa silenciosa, encaminhamento e cadência prevalecem sobre personalizações.",
           )}
+          <Button
+            variant="outline"
+            disabled={!podeEditar}
+            onClick={() => set("systemPrompt", PROMPT_FRANCISCO)}
+          >
+            Restaurar prompt do Francisco
+          </Button>
         </div>
       );
     if (node === "cadencia")
@@ -475,8 +479,8 @@ export function FranciscoWorkspace({
             />,
           )}
           <p className="text-sm text-muted-foreground">
-            A resposta interrompe os próximos contatos. A equipe continua o atendimento e trata o
-            pagamento. O orçamento permanece no módulo atual.
+            Interesse e dúvidas seguem à equipe humana, que trata o pagamento. A recusa encerra os
+            contatos em silêncio, sem encaminhamento. O orçamento permanece no módulo atual.
           </p>
         </div>
       );
@@ -639,7 +643,7 @@ export function FranciscoWorkspace({
                         {
                           n: "04",
                           t: "Continuar com uma pessoa",
-                          d: "Quando o paciente responde, a sequência para e o atendimento humano assume.",
+                          d: "Interesse e dúvidas seguem ao humano. Recusas encerram em silêncio. Qualquer resposta interrompe a sequência.",
                         },
                       ].map((x) => (
                         <div key={x.n} className="flex gap-4">
@@ -1070,10 +1074,10 @@ export function FranciscoWorkspace({
                   <div className="grid gap-5 lg:grid-cols-2">
                     <Card>
                       <CardHeader>
-                        <CardTitle>Testar proposta do modelo</CardTitle>
+                        <CardTitle>Testar interpretação da resposta</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          Este teste separado avalia o tom de uma proposta. Não representa uma
-                          resposta automática após o paciente responder ao template.
+                          Escreva a resposta do paciente para conferir a decisão do Gemini 3.8
+                          Flash. Nenhuma mensagem será enviada ao WhatsApp.
                         </p>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -1093,12 +1097,12 @@ export function FranciscoWorkspace({
                             ) : (
                               <FlaskConical className="size-4" />
                             )}
-                            Testar resposta do modelo
+                            Interpretar resposta
                           </Button>
                           {botaoAba("acompanhamento", "Conferir elegibilidade")}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Modelo: {config.modelo} · temperatura: {config.temperatura.toFixed(1)}
+                          Modelo: {MODELO_FRANCISCO} · temperatura: {config.temperatura.toFixed(1)}
                           <br />
                           As mensagens reais continuam usando os templates aprovados.
                         </div>
@@ -1111,7 +1115,7 @@ export function FranciscoWorkspace({
                       <CardContent>
                         <p role="status" className="whitespace-pre-wrap text-sm leading-relaxed">
                           {resultado ||
-                            "Execute um cenário para conferir apresentação, tom e encaminhamento para a equipe humana."}
+                            "Teste interesse, recusa e dúvida para conferir o destino do atendimento."}
                         </p>
                       </CardContent>
                     </Card>

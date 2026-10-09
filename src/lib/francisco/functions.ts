@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { configPadraoFrancisco, franciscoConfigSchema } from "./config";
+import { configPadraoFrancisco, franciscoConfigSchema, MODELO_FRANCISCO } from "./config";
 import { conferirEdicaoFrancisco } from "./permissoes";
 
 const clinica = z.object({ clinicaId: z.string().uuid() });
@@ -162,33 +162,21 @@ export const homologarFrancisco = createServerFn({ method: "POST" })
       mime = audio.mime;
       texto = "Prévia de voz gerada. Nenhum áudio foi enviado ao WhatsApp.";
     } else {
-      // Usa somente o transporte do modelo. Não consulta prompt, memória ou configuração da Nina.
-      const { chamarModeloGemini } = await import("@/lib/nina/adapters/gemini-adapter.server");
-      const resultado = await chamarModeloGemini({
-        modelo: data.config.modelo,
-        temperature: data.config.temperatura,
-        messages: [
-          { role: "system", content: data.config.systemPrompt },
-          {
-            role: "user",
-            content: `HOMOLOGAÇÃO SEM ENVIO. Não acione ferramentas. Cenário fictício: ${data.texto}`,
-          },
-        ],
-        maxTokens: 600,
-        timeoutMs: 30000,
-      });
-      if (!resultado.ok)
-        throw new Error(
-          resultado.erro?.replaceAll("Nina", "Francisco") ?? "Falha no modelo do Francisco.",
-        );
-      texto = resultado.conteudo;
+      const { classificarRespostaFrancisco } = await import("./intencao.server");
+      const { textoTemplateFrancisco } = await import("./config");
+      const decisao = await classificarRespostaFrancisco(
+        data.texto,
+        data.config,
+        textoTemplateFrancisco(data.config, "d1", "Clínica de teste"),
+      );
+      texto = JSON.stringify(decisao, null, 2);
     }
     const log = await db.from("francisco_eventos").insert({
       clinica_id: data.clinicaId,
       ator: context.userId,
       tipo: `homologacao_${data.tipo}`,
       dados: {
-        modelo: data.config.modelo,
+        modelo: MODELO_FRANCISCO,
         temperatura: data.config.temperatura,
         configuracao: data.config,
         cenario: data.texto,
