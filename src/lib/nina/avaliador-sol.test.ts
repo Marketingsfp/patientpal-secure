@@ -1,11 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import {
   DIMENSOES,
+  VERSAO_RUBRICA,
   calcularScore,
   classificar,
+  classificacaoAuditoria,
   montarInputSol,
   montarInstrucoesSol,
   parseAvaliacaoSol,
+  parseRelatorioAuditoria,
   type Achado,
   type Dossie,
   type NotaDimensao,
@@ -188,12 +191,6 @@ describe("dossiê", () => {
 });
 
 describe("sol-v2 — critérios do Treinador e Auditor", () => {
-  const {
-    classificacaoAuditoria,
-    parseRelatorioAuditoria,
-    parseAvaliacaoSol,
-    VERSAO_RUBRICA,
-  } = require("./avaliador-sol");
   it("usa a nova rubrica", () => expect(VERSAO_RUBRICA).toBe("sol-v2"));
   it("escala do documento; erro crítico sempre Crítico", () => {
     expect(classificacaoAuditoria(97)).toBe("Excelente");
@@ -208,6 +205,8 @@ describe("sol-v2 — critérios do Treinador e Auditor", () => {
       resultado_contato: "xyz",
       eficiencia: { mensagens: 12, ideal: 7 },
     });
+    expect(r).not.toBeNull();
+    if (!r) throw new Error("O relatório enviado deve ser reconhecido");
     expect(r.resultado_contato).toBeNull();
     expect(r.eficiencia.mensagens).toBe(12);
   });
@@ -234,7 +233,6 @@ describe("sol-v2 — critérios do Treinador e Auditor", () => {
 });
 
 describe("sol-v2 — condução comercial", () => {
-  const { DIMENSOES, montarInstrucoesSol } = require("./avaliador-sol");
   it("pede a dimensão de condução e cobra ética comercial", () => {
     expect(DIMENSOES.some((d: { valor: string }) => d.valor === "conducao_comercial")).toBe(true);
     expect(montarInstrucoesSol()).toContain("urgência falsa");

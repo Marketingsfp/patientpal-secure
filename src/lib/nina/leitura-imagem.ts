@@ -43,6 +43,8 @@ Responda SOMENTE com JSON, sem comentários: {"tipo":"pedido_medico","itens":["n
 function limparItem(bruto: unknown): string | null {
   if (typeof bruto !== "string") return null;
   const texto = bruto
+    // Remover controles C0 e DEL da leitura do modelo é intencional.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()

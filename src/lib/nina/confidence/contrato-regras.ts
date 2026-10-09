@@ -243,7 +243,7 @@ const DETECTORES: Detector[] = [
 ];
 
 const TEXTO_EXATO =
-  /\b(?:for|seja|e)\s+exatamente\s*[:\-]?\s*["“']([^"”'\n]+)["”']|\bexatamente\s+["“']([^"”'\n]+)["”']/i;
+  /\b(?:for|seja|e)\s+exatamente\s*[:-]?\s*["“']([^"”'\n]+)["”']|\bexatamente\s+["“']([^"”'\n]+)["”']/i;
 
 const NEGACAO = /\b(nao|exceto|salvo|fora de)\b/;
 

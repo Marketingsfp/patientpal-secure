@@ -285,7 +285,9 @@ describe("integração no sistema", () => {
     expect(webhook).toContain("media_url: caminhoMidia");
     const verificacao = webhook.indexOf("podeAntes(estado)");
     expect(verificacao).toBeGreaterThan(-1);
-    expect(verificacao).toBeLessThan(webhook.indexOf("lerPedidoNaImagem(recebida.base64"));
+    const leitura = /lerPedidoNaImagem\(\s*recebida\.base64/.exec(webhook);
+    expect(leitura).not.toBeNull();
+    expect(verificacao).toBeLessThan(leitura!.index);
   });
 
   it("o agrupamento da Nina usa a leitura da imagem como texto", () => {

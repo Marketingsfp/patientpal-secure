@@ -28,3 +28,4 @@ complementam este arquivo. Em caso de conflito, prevalece a interpretação
 
 - Superfícies públicas (horarios_disponiveis_publico, API v1 /doctors, /specialties, POST /appointments) respeitam `medicos.visivel_agendamento_online`; telas internas ignoram o campo — por quê: agendas-ponte de outra unidade não podem ser marcadas pelo paciente, mas a recepção continua usando.
 - Decisões técnicas de uma pasta ficam no `AGENTS.md` dela (`src/lib/nina`, `src/lib/prontuario`, `src/components/medico`) — por quê: este arquivo carrega em toda conversa.
+- CI executa lint, tipos e testes em jobs independentes, sem cancelamento entre eles; uma falha não pode esconder os resultados dos outros checks. Formatação segue `.prettierrc`; cópias locais ignoradas em `output/` e `outputs/` não entram no lint.

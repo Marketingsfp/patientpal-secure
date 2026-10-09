@@ -73,7 +73,7 @@ const admin = {
           op === "is"
             ? campo(l, k) !== v
             : !v
-                .replace(/[()\"]/g, "")
+                .replace(/[()\\"]/g, "")
                 .split(",")
                 .includes(campo(l, k)),
         );

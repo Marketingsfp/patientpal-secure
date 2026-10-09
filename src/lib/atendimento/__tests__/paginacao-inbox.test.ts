@@ -30,14 +30,15 @@ it("primeiro carregamento traz 20; cada descida traz mais 20, ultrapassando 100 
   const { buscar, chamadas } = banco();
   let cursor: CursorInbox | null = null;
   const recebidas: string[] = [];
+  let temMais: boolean;
   do {
     const pagina: { linhas: typeof linhas; cursor: CursorInbox | null; temMais: boolean } | null =
       await carregarLotesAtivas({ buscar, cursor, vigente: () => true });
     expect(pagina!.linhas.length).toBeLessThanOrEqual(20);
     recebidas.push(...pagina!.linhas.map((c) => c.id));
     cursor = pagina!.cursor;
-    if (!pagina!.temMais) break;
-  } while (true);
+    temMais = pagina!.temMais;
+  } while (temMais);
   expect(chamadas).toHaveLength(7);
   expect(recebidas).toEqual(linhas.map((c) => c.id));
   expect(new Set(recebidas).size).toBe(127);

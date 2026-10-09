@@ -660,7 +660,7 @@ function parseConversa(texto: string): ConversaTurn[] {
   };
 
   // Normaliza: remove timestamps tipo [00:12] ou (00:12) soltos
-  const limpo = texto.replace(/[\[\(]\d{1,2}:\d{2}(?::\d{2})?[\]\)]/g, " ");
+  const limpo = texto.replace(/[[(]\d{1,2}:\d{2}(?::\d{2})?[\])]/g, " ");
 
   // 1) Tenta achar marcadores de fala em qualquer ponto do texto.
   //    Aceita: "Atendente:", "- Atendente:", "Atendente —", "Atendente -"
@@ -697,7 +697,7 @@ function parseConversa(texto: string): ConversaTurn[] {
   // 2) Fallback: nenhum marcador encontrado. Divide por sentenças e alterna falantes.
   const sentences = limpo
     .replace(/\s+/g, " ")
-    .split(/(?<=[.!?…])\s+(?=[A-ZÀ-Ý"“\-])/)
+    .split(/(?<=[.!?…])\s+(?=[A-ZÀ-Ý"“-])/)
     .map((s) => s.trim())
     .filter(Boolean);
 

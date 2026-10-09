@@ -26,6 +26,12 @@ const pedido: MensagemFoto = {
   enviada_por: "nina",
   raw: null,
 };
+it("remove controles C0 e DEL dos nomes lidos sem perder o exame", () => {
+  const leitura = interpretarLeituraImagem(
+    JSON.stringify({ tipo: "pedido_medico", itens: ["  Doppler\u0000de\u001fCarótidas\u007f  "] }),
+  );
+  expect(leitura).toEqual({ tipo: "pedido_medico", itens: ["Doppler de Carótidas"] });
+});
 it("marcação incerta não libera opções impressas nem consome tentativas de foto ilegível", () => {
   const leitura = interpretarLeituraImagem(
     JSON.stringify({ tipo: "marcacao_incerta", itens: ["ECG", "TSH"] }),

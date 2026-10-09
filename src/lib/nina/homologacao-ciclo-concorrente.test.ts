@@ -69,7 +69,6 @@ class Banco {
     })) as any;
 
   from() {
-    const self = this;
     const filtro: any = { lead_id: "", status: "" };
     const api: any = {
       select: () => api,
@@ -78,7 +77,7 @@ class Banco {
         return api;
       },
       maybeSingle: async () => {
-        const c = self.ciclos.find((x) => x.lead_id === filtro.lead_id && x.status === "ativo");
+        const c = this.ciclos.find((x) => x.lead_id === filtro.lead_id && x.status === "ativo");
         return { data: c ? { id: c.id, conversa_id: c.conversa_id } : null, error: null };
       },
       insert: () => api,

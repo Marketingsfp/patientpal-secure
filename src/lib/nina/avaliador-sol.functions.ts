@@ -390,7 +390,7 @@ export const avaliarComSol = createServerFn({ method: "POST" })
     let cenarioTexto: string | null = data.cenarioTexto ?? null;
     let objetivo: string | null = null;
     let criterios: string[] = [];
-    let cenarioId: string | null = data.cenarioId ?? null;
+    const cenarioId: string | null = data.cenarioId ?? null;
 
     if (cenarioId) {
       const { data: cen } = await supabaseAdmin

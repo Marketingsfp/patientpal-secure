@@ -124,7 +124,7 @@ export function textoCorrido(v: unknown, max = 6000): string | null {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  if (!t || /^[{\[]/.test(t)) return null;
+  if (!t || /^[{[]/.test(t)) return null;
   return t.length > max ? `${t.slice(0, max).replace(/\s+\S*$/, "")}…` : t;
 }
 

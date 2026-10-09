@@ -245,15 +245,15 @@ export function exigenciaLiteral(
 ): { literal: string; operador: OperadorLiteral } | null {
   const padroes: Array<[RegExp, OperadorLiteral]> = [
     [
-      /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      /(?:responda|responder|envie|enviar|retorne|retornar|escreva|escrever)\s+(?:exatamente|apenas|somente|literalmente)\s*[:-]?\s*["“']?([^"”'\n.;]+)/i,
       "igualdade",
     ],
     [
-      /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      /(?:inclua|incluir|use|usar)\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:-]?\s*["“']?([^"”'\n.;]+)/i,
       "inclusao",
     ],
     [
-      /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:\-]?\s*["“']?([^"”'\n.;]+)/i,
+      /(?:responda|responder)\s+com\s+(?:o\s+)?(?:marcador|codigo|código|texto|token)\s*[:-]?\s*["“']?([^"”'\n.;]+)/i,
       "inclusao",
     ],
   ];

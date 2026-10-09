@@ -159,7 +159,7 @@ const NOMES_FEMININOS_EXCECAO = [
 /** Decide o gênero do personagem a partir do nome, para escolher a voz. */
 export function personagemPorNome(nomeCompleto: string): VozPersonagem {
   const limpo = (nomeCompleto ?? "")
-    .replace(/paciente|cliente|·|\-|\|/gi, " ")
+    .replace(/paciente|cliente|·|-|\|/gi, " ")
     .trim()
     .toLowerCase();
   const primeiro = limpo.split(/\s+/)[0] ?? "";
