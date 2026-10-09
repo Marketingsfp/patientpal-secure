@@ -5682,7 +5682,7 @@ function AgendaPage() {
       // Lido AGORA: outra recepcionista pode ter marcado alguém nesse meio tempo.
       const { data: existentes, error: eLer } = await supabase
         .from("agendamentos")
-        .select("agenda_id, inicio, status, fluxo_etapa")
+        .select("agenda_id, inicio, fim, status, fluxo_etapa")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("medico_id", filtroMedico)
         .eq("agenda_id", ag.id)

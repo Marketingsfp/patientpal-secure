@@ -13,14 +13,19 @@
 // - nada passa do fim do turno.
 //
 // Encaixe lançado DEPOIS do fim do turno (ex.: 16:30 de quem termina às
-// 16:00) vai para o fim da sequência — só não pode quando esse paciente já
-// passou pela recepção, porque a ficha dele pode estar impressa.
+// 16:00) vai para o fim da sequência. Se algum paciente marcado depois da
+// última ficha do turno já passou pela recepção (dia esticado além da grade —
+// caso real: grade 08:00–11:00 com fichas até 15:20), as extras entram depois
+// da ÚLTIMA ficha do dia, até o fim dela: a ficha dele pode estar impressa e
+// não pode mudar de número.
 
 export type LinhaExistente = {
   /** Instante do `inicio` da linha (ms). */
   ms: number;
   /** Paciente já passou pela recepção (check-in, atendimento): número travado. */
   travada: boolean;
+  /** Instante do `fim` da linha (ms), quando conhecido. */
+  fimMs?: number;
 };
 
 export type FichasExtrasInput = {
@@ -51,15 +56,18 @@ export function posicoesFichasExtras(input: FichasExtrasInput): FichasExtrasResu
   if (!Number.isFinite(n) || n < 1 || dentro.length === 0) {
     return { ok: false, motivo: "dia_sem_fichas" };
   }
-  const base = Math.max(...dentro.map((l) => l.ms));
+  let base = Math.max(...dentro.map((l) => l.ms));
+  let limite = fimMs;
   if (input.linhas.some((l) => l.ms > base && l.travada)) {
-    return { ok: false, motivo: "paciente_na_recepcao" };
+    base = Math.max(...input.linhas.map((l) => l.ms));
+    limite = Math.max(...input.linhas.filter((l) => l.ms === base).map((l) => l.fimMs ?? 0));
+    if (limite <= base) return { ok: false, motivo: "paciente_na_recepcao" };
   }
   const fichas: Array<{ inicio: Date; fim: Date }> = [];
   for (let k = 1; k <= n; k++) {
     const ini = base + k * MS_SEG;
-    if (ini >= fimMs) break;
-    fichas.push({ inicio: new Date(ini), fim: new Date(fimMs) });
+    if (ini >= limite) break;
+    fichas.push({ inicio: new Date(ini), fim: new Date(limite) });
   }
   if (fichas.length === 0) return { ok: false, motivo: "sem_espaco" };
   return { ok: true, fichas, naoCouberam: n - fichas.length };
@@ -69,6 +77,7 @@ export function posicoesFichasExtras(input: FichasExtrasInput): FichasExtrasResu
 export type LinhaDoDia = {
   agenda_id: string | null;
   inicio: string;
+  fim?: string | null;
   status: string | null;
   fluxo_etapa: string | null;
 };
@@ -99,7 +108,11 @@ export function montarFichasExtras(input: {
   for (const r of input.existentes) {
     const key = `${r.agenda_id ?? ""}|${input.diaLocal(r.inicio)}`;
     const arr = porDia.get(key) ?? [];
-    arr.push({ ms: new Date(r.inicio).getTime(), travada: linhaTravada(r) });
+    arr.push({
+      ms: new Date(r.inicio).getTime(),
+      travada: linhaTravada(r),
+      ...(r.fim ? { fimMs: new Date(r.fim).getTime() } : {}),
+    });
     porDia.set(key, arr);
   }
   const fichas: Array<{ agendaId: string; diaIso: string; inicio: Date; fim: Date }> = [];
