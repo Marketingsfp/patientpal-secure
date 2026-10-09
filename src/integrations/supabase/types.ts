@@ -2653,6 +2653,24 @@ export type Database = {
         }
         Relationships: []
       }
+      catalogo_global_editores: {
+        Row: {
+          created_at: string
+          observacao: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          observacao?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          observacao?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       cb_beneficios: {
         Row: {
           ativo: boolean
@@ -18227,6 +18245,10 @@ export type Database = {
               type: string
             }[]
           }
+      pode_editar_catalogo_global: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       pode_escrever_modulo: {
         Args: { _clinica_id: string; _modulos: string[]; _user_id: string }
         Returns: boolean
