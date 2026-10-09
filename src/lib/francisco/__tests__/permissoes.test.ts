@@ -60,7 +60,7 @@ function contexto({
   };
   return {
     ctx: {
-      supabase: supabase as Parameters<typeof autorizarFrancisco>[0]["supabase"],
+      supabase: supabase as unknown as Parameters<typeof autorizarFrancisco>[0]["supabase"],
       userId: "pessoa-1",
     },
     consultas,
