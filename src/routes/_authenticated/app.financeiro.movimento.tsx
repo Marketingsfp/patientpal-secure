@@ -1441,7 +1441,7 @@ function Page() {
       return;
     }
     // Despesa confirmada sem forma some das duas contas de onde o dinheiro
-    // está: não entra em "Em espécie (gaveta)" nem em "Em banco", cai em
+    // está: não entra em "Em dinheiro (resultado do dia)" nem em "Em banco", cai em
     // "Outros" e faz o saldo da gaveta parecer maior do que é. Foi o caso da
     // despesa de R$ 910,00 de 18/09/2026, que deixou a gaveta do dia
     // aparecendo com R$ 985,80 em vez de R$ 75,80.

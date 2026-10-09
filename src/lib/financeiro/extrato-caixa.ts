@@ -32,6 +32,7 @@ import type { ColunaRateio } from "./rateio-colunas";
 import { LABEL_FORMA, type FormaCanonica, type ParteMisto } from "./formas-pagamento";
 import { receitaPorForma, type FatiaDaReceita } from "./receita-por-forma";
 import { SEM_CATEGORIA } from "./filtro-categoria";
+import { brl } from "./format";
 import {
   resumoOperadoras,
   type MovOperadora,
@@ -631,6 +632,27 @@ export type FechamentoBruto = {
 };
 
 /**
+ * Texto do fechamento como aparece no extrato. O "Calculado" gravado é a soma
+ * de todas as formas (dinheiro + cartão + PIX), e a recepção o lia como
+ * dinheiro: na Mayara de 03/09/2026 o texto dizia R$ 5.261,89 ao lado de uma
+ * linha de R$ 1.349,40. Por isso a sobra em dinheiro vem primeiro e o
+ * "Calculado" ganha o nome do que ele é. Só a exibição muda: o texto gravado
+ * no fechamento continua o mesmo, e a troca vale também para os antigos.
+ */
+export function observacaoDoFechamento(
+  descricao: string | null | undefined,
+  gaveta: number,
+): string {
+  const texto = descricao?.trim() ?? "";
+  const naGaveta = `Dinheiro na gaveta: ${brl(gaveta)}`;
+  const total = "Total do caixa (dinheiro + cartão + PIX):";
+  if (/calculado:?/i.test(texto)) {
+    return texto.replace(/calculado:?/i, `${naGaveta} | ${total}`);
+  }
+  return texto ? `${naGaveta} | ${texto}` : naGaveta;
+}
+
+/**
  * Linhas de "Fechamento de caixa" para o extrato: SÓ o dinheiro físico que
  * sobrou na gaveta, nunca o `valor` gravado no fechamento.
  *
@@ -666,7 +688,7 @@ export function linhasDeFechamento(
       categoriaNome: CATEGORIA_TRANSFERENCIA,
       formaPagamento: LABEL_FORMA.dinheiro,
       formaCanonica: "dinheiro",
-      observacoes: f.descricao?.trim() || null,
+      observacoes: observacaoDoFechamento(f.descricao, valor),
       usuarioNome: f.usuarioNome,
       status: "confirmado",
     });

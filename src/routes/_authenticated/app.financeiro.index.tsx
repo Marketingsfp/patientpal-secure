@@ -549,14 +549,21 @@ function FinDashboard() {
                 : "Receitas − despesas pagas no caixa"
             }
           >
-            {/* A mesma quebra do Movimento de Caixa: onde o dinheiro está. */}
+            {/* A mesma quebra do Movimento de Caixa: onde o dinheiro está.
+                Mesmo nome e mesmo aviso de lá — a linha de espécie é o
+                resultado do dia em dinheiro, não notas numa gaveta. */}
             {resumo && !carregando && (
               <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
                 <li className="flex items-center justify-between gap-2 text-[13px]">
-                  <span className="text-foreground/75">Em espécie (gaveta)</span>
+                  <span className="text-foreground/75">Em dinheiro (resultado do dia)</span>
                   <span className="shrink-0 tabular-nums">
                     {brl(resumo.saldoMeios.especie.saldo)}
                   </span>
+                </li>
+                <li className="text-[11px] leading-snug text-muted-foreground">
+                  {brl(resumo.saldoMeios.especie.entradas)} em dinheiro −{" "}
+                  {brl(resumo.saldoMeios.especie.saidas)} pagos em dinheiro. Não é contagem de
+                  notas: para conferir a gaveta, use o fechamento de cada operador.
                 </li>
                 <li className="flex items-center justify-between gap-2 text-[13px]">
                   <span className="text-foreground/75">Em banco (PIX, cartão, boleto)</span>

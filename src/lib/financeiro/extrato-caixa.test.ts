@@ -14,6 +14,7 @@ import {
   totaisDaVisao,
   fatiasDeEntrada,
   obsDaLinha,
+  observacaoDoFechamento,
   ordenarCronologico,
   resumoPorForma,
   totaisExtrato,
@@ -566,6 +567,19 @@ describe("linhasDeFechamento", () => {
     expect(t.transferFechamento).toBe(181);
     expect(t.transferSaida).toBe(181);
     expect(t.resultado).toBe(100);
+  });
+
+  it("fechamento mostra a gaveta antes do total de todas as formas", () => {
+    const t = observacaoDoFechamento(
+      "FECHAMENTO DO DIA 2026-09-03. CALCULADO: R$ 5.261,89 | INFORMADO: R$ 5.261,89 | DIFERENCA: R$ 0,00",
+      1349.4,
+    ).replace(/ /g, " ");
+    expect(t).toBe(
+      "FECHAMENTO DO DIA 2026-09-03. Dinheiro na gaveta: R$ 1.349,40 | Total do caixa (dinheiro + cartão + PIX): R$ 5.261,89 | INFORMADO: R$ 5.261,89 | DIFERENCA: R$ 0,00",
+    );
+    expect(observacaoDoFechamento(null, 10).replace(/ /g, " ")).toBe(
+      "Dinheiro na gaveta: R$ 10,00",
+    );
   });
 
   it("sessão sem sobra não gera linha", () => {

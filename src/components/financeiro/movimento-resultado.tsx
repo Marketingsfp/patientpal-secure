@@ -570,6 +570,15 @@ export function MovimentoResultado({
                   <span className="tabular-nums">{brl(0)}</span>
                 </li>
               )}
+              {/* A recepção comparava o Dinheiro daqui com o "Calculado" do
+                  fechamento de uma operadora (que mistura cartão e PIX) e
+                  pedia para somar as sangrias — o que contaria a mesma nota
+                  duas vezes. A frase fica na tela para não depender de quem
+                  explica (03/09/2026). */}
+              <li className="pt-1 text-[11px] leading-snug text-muted-foreground">
+                Dinheiro: soma de todos os caixas da clínica. Sangria não entra: é a mesma nota indo
+                para a tesouraria.
+              </li>
             </ul>
           )}
         </KpiCard>
@@ -691,17 +700,27 @@ export function MovimentoResultado({
           label="Saldo líquido do caixa"
           value={brl(r.saldo)}
           accent={r.saldo < 0 ? "destructive" : "primary"}
-          detalhe="Receitas − despesas · sangria e suprimento não contam"
+          detalhe={
+            pronto
+              ? `${brl(r.receitaBruta.total)} recebidos − ${brl(round2(r.repassePago.total + r.complementoMedico.total))} de repasse − ${brl(r.operacionais.total)} de despesas · sangria e suprimento não contam`
+              : "Receitas − despesas · sangria e suprimento não contam"
+          }
         >
-          {/* O mesmo saldo separado por onde o dinheiro está: a gaveta
-              (espécie) e a conta do banco (PIX, cartões, boleto,
-              transferência). Sem isso não dava para conferir a sobra em
-              dinheiro no fechamento. */}
+          {/* O mesmo saldo separado por onde o dinheiro está: espécie e a
+              conta do banco (PIX, cartões, boleto, transferência). A linha de
+              espécie se chamava "Em espécie (gaveta)" e era lida como notas
+              guardadas numa gaveta; é o resultado do dia em dinheiro, por
+              isso o nome e o aviso abaixo dela (03/09/2026). */}
           {pronto && (
             <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
               <li className="flex items-center justify-between gap-2 text-[13px]">
-                <span className="text-foreground/75">Em espécie (gaveta)</span>
+                <span className="text-foreground/75">Em dinheiro (resultado do dia)</span>
                 <span className="tabular-nums">{brl(r.saldoMeios.especie.saldo)}</span>
+              </li>
+              <li className="text-[11px] leading-snug text-muted-foreground">
+                {brl(r.saldoMeios.especie.entradas)} em dinheiro −{" "}
+                {brl(r.saldoMeios.especie.saidas)} pagos em dinheiro. Não é contagem de notas: para
+                conferir a gaveta, use o fechamento de cada operador.
               </li>
               <li className="flex items-center justify-between gap-2 text-[13px]">
                 <span className="text-foreground/75">Em banco (PIX, cartão, boleto)</span>
