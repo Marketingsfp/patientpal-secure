@@ -68,6 +68,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { ExigeUnidadeEscolhida, FaixaUnidadeAtual } from "@/components/exige-unidade-escolhida";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
@@ -1194,6 +1195,7 @@ function ProcedimentosPage() {
     <div className="space-y-6">
       {/* ============ SERVIÇOS (unificado) ============ */}
       <div className="space-y-4 pt-4 pb-16">
+        <FaixaUnidadeAtual />
         <div className="flex flex-wrap gap-2 justify-end">
           {podeEscrever && (
             <DropdownMenu>
@@ -1606,7 +1608,15 @@ function ProcedimentosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0 bg-background">
-            <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Editar serviço" : "Novo serviço"}
+              {clinicaAtual && (
+                <span className="font-normal text-muted-foreground">
+                  {" "}
+                  — {clinicaAtual.clinica.nome}
+                </span>
+              )}
+            </DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
@@ -2116,7 +2126,9 @@ function ProcedimentosPageWithTabs() {
   return (
     <>
       <SectionTabs title={SERVICOS_META.title} icon={SERVICOS_META.icon} tabs={SERVICOS_TABS} />
-      <ProcedimentosPage />
+      <ExigeUnidadeEscolhida oQue="editar serviços">
+        <ProcedimentosPage />
+      </ExigeUnidadeEscolhida>
     </>
   );
 }

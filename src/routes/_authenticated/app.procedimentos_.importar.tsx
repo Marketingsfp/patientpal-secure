@@ -32,6 +32,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { ExigeUnidadeEscolhida } from "@/components/exige-unidade-escolhida";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { mostrarErro, traduzirErro } from "@/lib/traduzir-erro";
 import { confirmDialog } from "@/lib/confirm";
@@ -71,7 +72,11 @@ import {
 } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos_/importar")({
-  component: ImportarServicosPage,
+  component: () => (
+    <ExigeUnidadeEscolhida oQue="importar serviços">
+      <ImportarServicosPage />
+    </ExigeUnidadeEscolhida>
+  ),
   head: () => ({
     meta: [
       { title: "Importar serviços por planilha — Catálogo de Serviços" },
