@@ -35,8 +35,8 @@ export function intencaoPermitePrefetch(intencao: IntencaoNina | null): boolean 
 
 /** Soma mínima das probabilidades das intenções elegíveis (mesmo limiar do Jev). */
 export const CONFIANCA_MINIMA_PREFETCH = 0.8;
-/** Intenções abaixo disso não entram na lista (ruído). */
-const PROB_MINIMA_INTENCAO = 0.15;
+/** Intenções abaixo disso somam na confiança, mas não definem objetivos (ruído). */
+const PROB_MINIMA_INTENCAO = 0.1;
 
 /**
  * Intenções do Jev que liberam a pré-busca. Uma mensagem com dois pedidos
@@ -50,10 +50,11 @@ export function intencoesParaPrefetch(r: {
 } | undefined): IntencaoNina[] {
   if (!r) return [];
   const probs = r.probabilities ?? {};
-  const elegiveis = Object.entries(probs)
-    .filter(([k, p]) => k in OBJETIVOS_POR_INTENCAO && typeof p === "number" && p >= PROB_MINIMA_INTENCAO)
+  const todas = Object.entries(probs)
+    .filter(([k, p]) => k in OBJETIVOS_POR_INTENCAO && typeof p === "number" && p > 0)
     .sort((a, b) => b[1] - a[1]);
-  const soma = elegiveis.reduce((s, [, p]) => s + p, 0);
+  const soma = todas.reduce((s, [, p]) => s + p, 0);
+  const elegiveis = todas.filter(([, p]) => p >= PROB_MINIMA_INTENCAO);
   if (elegiveis.length && soma >= CONFIANCA_MINIMA_PREFETCH) return elegiveis.map(([k]) => k as IntencaoNina);
   if (typeof r.choice === "string" && r.choice in OBJETIVOS_POR_INTENCAO &&
       typeof r.confidence === "number" && r.confidence >= CONFIANCA_MINIMA_PREFETCH)

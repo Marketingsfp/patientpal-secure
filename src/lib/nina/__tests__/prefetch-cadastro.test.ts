@@ -58,3 +58,10 @@ describe("intenção dividida do Jev", () => {
       ["disponibilidade", "agendamento"], cat)?.termo).toBe("CLÍNICA GERAL");
   });
 });
+describe("intenção dividida com histórico", () => {
+  it("valor 0,42 + disponibilidade 0,34 + agendamento 0,10 + consulta 0,03 libera", () => {
+    expect(intencoesParaPrefetch({ choice: "valor", confidence: 0.39, probabilities: {
+      valor: 0.42, disponibilidade: 0.34, agendamento: 0.1, consulta: 0.03, continuacao: 0.11 } }))
+      .toEqual(["valor", "disponibilidade", "agendamento"]);
+  });
+});
