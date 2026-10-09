@@ -33,6 +33,34 @@ export function intencaoPermitePrefetch(intencao: IntencaoNina | null): boolean 
   return intencao !== null && intencao in OBJETIVOS_POR_INTENCAO;
 }
 
+/** Soma mínima das probabilidades das intenções elegíveis (mesmo limiar do Jev). */
+export const CONFIANCA_MINIMA_PREFETCH = 0.8;
+/** Intenções abaixo disso não entram na lista (ruído). */
+const PROB_MINIMA_INTENCAO = 0.15;
+
+/**
+ * Intenções do Jev que liberam a pré-busca. Uma mensagem com dois pedidos
+ * compatíveis ("quanto custa? tem vaga?") divide a probabilidade entre valor,
+ * agendamento e disponibilidade, e nenhuma passa sozinha de 0,8. Quando a SOMA
+ * das elegíveis passa do limiar, a pré-busca usa todas elas. Só serve à
+ * pré-busca: não muda a intenção aplicada ao turno.
+ */
+export function intencoesParaPrefetch(r: {
+  choice?: unknown; confidence?: unknown; probabilities?: Record<string, number>;
+} | undefined): IntencaoNina[] {
+  if (!r) return [];
+  const probs = r.probabilities ?? {};
+  const elegiveis = Object.entries(probs)
+    .filter(([k, p]) => k in OBJETIVOS_POR_INTENCAO && typeof p === "number" && p >= PROB_MINIMA_INTENCAO)
+    .sort((a, b) => b[1] - a[1]);
+  const soma = elegiveis.reduce((s, [, p]) => s + p, 0);
+  if (elegiveis.length && soma >= CONFIANCA_MINIMA_PREFETCH) return elegiveis.map(([k]) => k as IntencaoNina);
+  if (typeof r.choice === "string" && r.choice in OBJETIVOS_POR_INTENCAO &&
+      typeof r.confidence === "number" && r.confidence >= CONFIANCA_MINIMA_PREFETCH)
+    return [r.choice as IntencaoNina];
+  return [];
+}
+
 export type CatalogoPrefetch = {
   servicos: Array<{ nome: string }>;
   profissionais: Array<{ nome: string; especialidades: unknown }>;
@@ -78,12 +106,13 @@ function citaEspecialidade(texto: string, nome: string): boolean {
  */
 export function planejarPrefetch(
   mensagem: string,
-  intencao: IntencaoNina | null,
+  intencao: IntencaoNina | IntencaoNina[] | null,
   catalogo: CatalogoPrefetch,
   nomePopular?: { especialidade: string } | null,
 ): PlanoPrefetch | null {
-  if (!intencaoPermitePrefetch(intencao)) return null;
-  const objetivos = OBJETIVOS_POR_INTENCAO[intencao!]!;
+  const lista = (Array.isArray(intencao) ? intencao : [intencao]).filter(intencaoPermitePrefetch) as IntencaoNina[];
+  if (!lista.length) return null;
+  const objetivos = [...new Set(lista.flatMap((i) => OBJETIVOS_POR_INTENCAO[i]!))];
   const texto = palavras(mensagem).join(" ");
   if (!texto) return null;
 
