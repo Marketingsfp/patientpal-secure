@@ -8,6 +8,9 @@ globalThis.fetch = Object.assign(async (_url: unknown, opcoes: any) => {
   if (caso === "indisponivel") return new Response("indisponível", { status: 503 });
   if (caso === "timeout") throw new DOMException("Tempo esgotado", "TimeoutError");
   const content = caso === "legivel" ? '{"tipo":"pedido_medico","itens":["ECG"]}'
+    : caso === "um_marcado" ? '{"tipo":"pedido_medico","itens":["Doppler de Carótidas e Vértebrais"]}'
+    : caso === "varios_marcados" ? '{"tipo":"pedido_medico","itens":["Doppler de Carótidas e Vértebrais","ECG"]}'
+    : caso === "marcacao_incerta" ? '{"tipo":"marcacao_incerta","itens":[]}'
     : caso === "ilegivel" ? '{"tipo":"ilegivel","itens":[]}' : "resposta inválida";
   return Response.json({ choices: [{ message: { content } }] });
 }, { preconnect: () => {} }) as typeof fetch;

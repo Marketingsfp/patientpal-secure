@@ -2,10 +2,11 @@ import { expect, it } from "bun:test";
 import { avaliarPedidoMedico, atualizarSolicitacoesPedido, acrescentarSolicitacaoPedido } from "../pedido-medico";
 import type { ResultadoConhecimento } from "../knowledge-contract";
 import { formatarTextoMobile } from "../resposta/formato-mobile";
+import { textoDoPedidoLido, textoDaImagem } from "../leitura-imagem";
 
 const resultado = (nome = "Eletrocardiograma", campo = "obrigatorio"): Partial<ResultadoConhecimento> => ({
   fonte_consulta: "base_conhecimento", found: true, knowledge_status: "found",
-  records: [{ id: "item-1", procedimento: nome, extras: { estrutura: { pedido_medico: campo, aliases: ["ECG"] } } }],
+  records: [{ id: "item-1", procedimento: nome, extras: { estrutura: { pedido_medico: campo, aliases: nome === "Eletrocardiograma" ? ["ECG"] : [] } } }],
 });
 const ctx = { conversaId: "conversa-1", inicioSessao: "2026-10-04T10:00:00Z", teste: false, mensagens: [] as any[] };
 const foto = { conversa_id: ctx.conversaId, created_at: "2026-10-04T10:01:00Z", is_teste: false,
@@ -29,6 +30,12 @@ it("não generaliza requisito de um médico para outro", () => {
 });
 it("reconhece foto do mesmo exame por alias publicado", () => {
   expect(avaliarPedidoMedico(resultado(), { ...ctx, mensagens: [foto] })[0]?.acao).toBe("foto_recebida");
+});
+it("reconhece siglas completas e não usa legenda nem seleção incerta como prova do pedido", () => {
+  const transcricao = textoDoPedidoLido(["M.A.P.A. 24h", "ECG"], "Também quero Hemograma. Dr. Silva pediu.");
+  expect(avaliarPedidoMedico(resultado("M.A.P.A. 24h"), { ...ctx, mensagens: [{ ...foto, transcricao }] })[0]?.acao).toBe("foto_recebida");
+  expect(avaliarPedidoMedico(resultado("Hemograma"), { ...ctx, mensagens: [{ ...foto, transcricao }] })[0]?.acao).toBe("solicitar_foto");
+  expect(avaliarPedidoMedico(resultado(), { ...ctx, mensagens: [{ ...foto, transcricao: textoDaImagem({ tipo: "marcacao_incerta" }) }] })[0]?.acao).toBe("solicitar_foto");
 });
 for (const [caso, patch] of Object.entries({
   texto: { tipo: "text", body: "Já enviei" }, imagemSemLeitura: { transcricao: "Foto anexada" },

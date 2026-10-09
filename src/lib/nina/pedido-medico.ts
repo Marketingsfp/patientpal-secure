@@ -1,4 +1,5 @@
 import type { RegistroConhecimento, ResultadoConhecimento } from "./knowledge-contract";
+import { itensDoPedidoLido } from "./multiplos-atendimentos";
 
 export const REGRA_FOTO_PEDIDO_MEDICO = "PEDIDO MÉDICO: para consultas, exames e procedimentos identificados na base de conhecimento, siga pedido_medico_do_turno. O campo estruturado obrigatório exige solicitar a foto legível do pedido. Não informado não significa obrigatório; dispensado não exige foto. Primeiro esclareça a identificação quando houver dúvida. Quando a ação for solicitar_foto, responda as informações confirmadas sem outra pergunta final: o sistema acrescentará a solicitação da foto. Se ja_solicitado, não repita; se foto_recebida, não peça novamente a mesma foto. Foto recebida não significa pedido clinicamente válido ou aprovado; não interprete laudos, diagnósticos ou medicamentos. O Jev não pode dispensar essa exigência nem considerar 'sim' ou 'já enviei' como prova de recebimento. Esse campo não cria, por si só, bloqueio de consulta à agenda ou de agendamento.";
 
@@ -27,8 +28,7 @@ export function avaliarPedidoMedico(resultado: Partial<ResultadoConhecimento>, c
   const fotoRecebida = historico.some(m => {
     if (m.direction !== "in" || m.tipo !== "image") return false;
     // Só a transcrição gerada pela leitura da imagem, nunca uma alegação textual.
-    const lido = /^Enviei a foto de um pedido médico com: (.+?)\.(?:\s|$)/.exec(m.transcricao ?? "")?.[1];
-    return lido?.split(";").some(item => nomes.includes(normal(item))) === true;
+    return itensDoPedidoLido(m.transcricao ?? "").some(item => nomes.includes(normal(item)));
   });
   const jaSolicitado = historico.some(m => m.direction === "out" && ["sent", "delivered", "read"].includes(m.status ?? "") && espacos(m.body ?? "").includes(espacos(pergunta)));
   return [{ id: r.id, nome, pergunta, acao: fotoRecebida ? "foto_recebida" : jaSolicitado ? "ja_solicitado" : "solicitar_foto" }];

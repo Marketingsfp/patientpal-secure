@@ -11,12 +11,18 @@ import { cenariosContextuais } from "./consulta-contextual-cenarios";
 import { recusarFraseComoPesquisa } from "../../catalogo-pesquisa";
 import { apresentarPerguntaEsclarecimento } from "../../esclarecimento-apresentacao";
 import { montarBlocoIdentidade } from "../../identidade-atendimento";
+import { textoDaImagem, type LeituraImagem } from "../../leitura-imagem";
 
 process.env.LOVABLE_API_KEY = "chave-ficticia-sem-rede";
 const fotoCenario = process.argv[3]?.startsWith("foto_");
 const { PEDIR_NOVA_FOTO } = await import("../../fotos");
 const teste = process.argv[2] === "homologacao";
 const cenario = process.argv[3] ?? "direta";
+const leituraFoto: LeituraImagem = cenario === "foto_tecnica" ? { tipo: "falha_tecnica", motivo: "provedor" }
+  : cenario === "foto_marcacao_incerta" ? { tipo: "marcacao_incerta" }
+  : cenario === "foto_doppler_marcado" ? { tipo: "pedido_medico", itens: ["Doppler de Carótidas e Vértebrais"] }
+  : cenario === "foto_varios_marcados" ? { tipo: "pedido_medico", itens: ["Doppler de Carótidas e Vértebrais", "M.A.P.A. 24h"] }
+  : cenario === "foto_resolvida" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" };
 const vacinaCenario = cenario.startsWith("vacina_");
 const escopoEscala = ({
   clinico: ["Clínico Geral", "Claudia Maria Rodrigues dos Santos", "Nicolas Cesar Alves Nunes"],
@@ -320,12 +326,11 @@ const mensagensContextuais = semNomeCenario ? [
 ] : fotoCenario ? [
   ...(cenario.startsWith("foto_apresentacao_") ? [{ ...registroMensagem("Olá! Me chamo Aurora, atendente virtual da Policlínica Vale Verde.", 0),
     clinica_id: "clinica-simulada", enviada_por: "nina", status: cenario.endsWith("falhou") ? "failed" : "sent" }] : []),
-  ...(cenario === "foto_primeira" || cenario.startsWith("foto_apresentacao_") || cenario === "foto_tecnica" ? [] : [{ ...registroMensagem(PEDIR_NOVA_FOTO, 1), enviada_por: "nina",
+  ...(cenario === "foto_primeira" || cenario.startsWith("foto_apresentacao_") || cenario === "foto_tecnica" || cenario === "foto_marcacao_incerta" ? [] : [{ ...registroMensagem(PEDIR_NOVA_FOTO, 1), enviada_por: "nina",
     clinica_id: "clinica-simulada", status: cenario === "foto_pedido_pendente" ? "pending" : "sent" }]),
   { ...registroMensagem("Foto", 18, "in", "received"), id: "entrada-simulada", clinica_id: "clinica-simulada", tipo: "image",
-    transcricao: cenario === "foto_resolvida" ? "Enviei a foto de um pedido médico com: ECG." : "[Foto recebida: não foi possível ler com segurança.]",
-    raw: { nina_leitura_imagem: cenario === "foto_tecnica" ? { tipo: "falha_tecnica", motivo: "provedor" }
-      : cenario === "foto_resolvida" ? { tipo: "pedido_medico", itens: ["ECG"] } : { tipo: "ilegivel" } } },
+    transcricao: textoDaImagem(leituraFoto),
+    raw: { nina_leitura_imagem: leituraFoto } },
 ] : unificado ? [
   ...(cenario.endsWith("primeiro") ? [] : [registroMensagem(cenario.includes("fechamento")
     ? apresentarPerguntaEsclarecimento(perguntaEsclarecimento, { tipo: "procedimento", tipoAtendimento: "exame_procedimento" })
@@ -733,6 +738,11 @@ mock.module("@/lib/nina/tool-broker.server", () => ({ criarToolBroker: (params: 
 mock.module("@/lib/nina/ai-gateway.server", () => ({ ninaAIGateway: async (req: any) => {
   ordem.push("modelo");
   requests.push(structuredClone(req));
+  // Este cenário verifica a leitura de seleção, sem a agenda cheia do cenário padrão.
+  if (cenario === "foto_doppler_marcado") return {
+    ok: true, modelo: "modelo-simulado", execucaoId: "execucao-foto-marcada", nivel: "low", toolCalls: [],
+    conteudo: "Olá! Me chamo Aurora, atendente virtual da Policlínica Vale Verde. Recebi o pedido de Doppler de Carótidas e Vértebrais. Como posso ajudar com esse exame?",
+  };
   if (vacinaCenario) {
     const termos = cenario.endsWith("repetida") ? ["vacina da gripe", "VACINA", "gripe", "influenza"] : ["vacina da gripe"];
     const termo = req.tools ? termos[requests.length - 1] : undefined;

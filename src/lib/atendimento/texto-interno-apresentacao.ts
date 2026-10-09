@@ -35,6 +35,7 @@ export const MOTIVO_TRANSFERENCIA_AUSENTE = "Motivo não registrado neste atendi
 export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const motivos: Array<[RegExp, string]> = [
+    [/\bMULTIPLOS_ATENDIMENTOS\b/i, "A Nina identificou dois ou mais atendimentos solicitados na mesma mensagem. Pela regra da clínica, a equipe dará continuidade ao pedido."],
     [/^\s*(?:\[[^\]]+\]\s*)?CANCELAMENTO_SOLICITADO\b/i, "O paciente solicitou cancelamento. A Nina encaminhou para a equipe humana realizar o atendimento; não executou o cancelamento."],
     [/^\s*(?:\[[^\]]+\]\s*)?REMARCACAO_SOLICITADA\b/i, "O paciente solicitou remarcação. A Nina encaminhou para a equipe humana realizar a alteração; não remarcou nem cancelou a reserva anterior."],
     [/\bLISTA_PROFISSIONAIS_EXTENSA\b/i, "A especialidade pedida tem mais de 8 profissionais para apresentar. Pela regra da clínica, a equipe apresenta as opções ao paciente."],
