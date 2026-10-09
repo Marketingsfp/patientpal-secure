@@ -1933,7 +1933,7 @@ async function gerarRespostaNinaInterno(
   const nomesFerramentas = (ferramentas as Array<{ function?: { name?: string } }>)
     .map(f => f.function?.name ?? "").filter(Boolean);
   const motivoSemPrefetch = !ctxFerramentas ? "ferramentas do paciente indisponíveis"
-    : !intencaoJevSegura ? "Jev sem intenção segura"
+    : !intencaoJevSegura.length ? "Jev sem intenção segura"
     : nomeAtendimentoAusente || alteracaoSolicitada || multiplosAtendimentos || jevEncaminhamento
       ? "turno com encaminhamento, alteração ou pedido múltiplo" : null;
   if (motivoSemPrefetch) rastro?.pular("tool.prefetch", motivoSemPrefetch);
