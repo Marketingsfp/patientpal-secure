@@ -22,6 +22,13 @@
       "when": 1791544068376,
       "tag": "0002_totem_exige_token",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791565529442,
+      "tag": "0003_fechar_acesso_visitante_funcoes",
+      "breakpoints": true
     }
   ]
 }
