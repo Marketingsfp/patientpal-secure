@@ -16,7 +16,7 @@ async function dependencias(
     import("./homologacao.server"),
     import("@/integrations/supabase/client.server"),
   ]);
-  await srv.autorizarFrancisco(context, clinicaId, editar);
+  await srv.autorizarFrancisco(context, clinicaId, editar, false, "homologacao");
   return { srv, chat, db: supabaseAdmin as import("@supabase/supabase-js").SupabaseClient<any> };
 }
 export const listarConversasTesteFrancisco = createServerFn({ method: "POST" })

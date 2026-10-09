@@ -1,5 +1,6 @@
 // Compartilhado entre a tela de Perfis e o filtro de menu da AppShell.
 // Define os módulos do sistema e os acessos padrão por perfil.
+import { TELAS_OSZAP } from "./permissoes-oszap";
 
 export type PerfilKey =
   | "admin"
@@ -128,9 +129,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "nfse-config",
   "odontologia-orcamentos",
   "fisioterapia-pacotes",
-  "nina-aprendizado",
-  "nina-metricas",
-  "nina-arquitetura",
+  ...TELAS_OSZAP.map((t) => t.key),
   "financeiro-movcaixa",
   "financeiro-atendimentos",
   "financeiro-estorno",

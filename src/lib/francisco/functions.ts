@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { franciscoConfigSchema } from "./config";
+import { configPadraoFrancisco, franciscoConfigSchema } from "./config";
+import { conferirEdicaoFrancisco } from "./permissoes";
 
 const clinica = z.object({ clinicaId: z.string().uuid() });
 const cursor = z
@@ -36,7 +37,13 @@ export const salvarFrancisco = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { srv, db } = await dependencias();
-    await srv.autorizarFrancisco(context, data.clinicaId, true, data.publicar);
+    const acesso = await srv.autorizarFrancisco(context, data.clinicaId, true, data.publicar);
+    const anterior = await srv.carregarRegistro(db, data.clinicaId);
+    conferirEdicaoFrancisco(
+      acesso.acessos,
+      anterior?.rascunho ?? configPadraoFrancisco(),
+      data.config,
+    );
     return srv.salvarRegistro(
       db,
       data.clinicaId,
@@ -53,7 +60,13 @@ export const listarFrancisco = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { srv, db } = await dependencias();
-    await srv.autorizarFrancisco(context, data.clinicaId);
+    await srv.autorizarFrancisco(
+      context,
+      data.clinicaId,
+      false,
+      false,
+      data.tipo === "historico" ? "historico" : "acompanhamento",
+    );
     if (data.tipo === "candidatos")
       return srv.candidatos(
         db,
@@ -76,7 +89,7 @@ export const contatoFrancisco = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { srv, db } = await dependencias();
-    await srv.autorizarFrancisco(context, data.clinicaId, true);
+    await srv.autorizarFrancisco(context, data.clinicaId, true, false, "acompanhamento");
     return srv.registrarContato(
       db,
       data.clinicaId,
@@ -91,7 +104,7 @@ export const consultarContatoFrancisco = createServerFn({ method: "POST" })
   .inputValidator((v: unknown) => clinica.extend({ telefone: z.string().min(10).max(30) }).parse(v))
   .handler(async ({ data, context }) => {
     const { srv, db } = await dependencias();
-    await srv.autorizarFrancisco(context, data.clinicaId);
+    await srv.autorizarFrancisco(context, data.clinicaId, false, false, "acompanhamento");
     const { celularParaEnvio } = await import("@/lib/agenda/confirmacao-whatsapp");
     const telefone = celularParaEnvio(data.telefone);
     if (!telefone) throw new Error("Telefone inválido.");
@@ -122,7 +135,13 @@ export const homologarFrancisco = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { srv, db } = await dependencias();
-    await srv.autorizarFrancisco(context, data.clinicaId, true);
+    await srv.autorizarFrancisco(
+      context,
+      data.clinicaId,
+      true,
+      false,
+      data.tipo === "voz" ? "voz" : data.tipo === "templates" ? "mensagens" : "homologacao",
+    );
     if (data.tipo === "templates") {
       const { validarTemplates } = await import("./transport.server");
       await validarTemplates(data.clinicaId, data.config);

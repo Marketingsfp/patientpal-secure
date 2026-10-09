@@ -112,7 +112,7 @@ export function RelatorioHomologacao({
 } = {}) {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
-  const podeEscrever = usePodeEscrever("nina");
+  const podeEscrever = usePodeEscrever("nina-laboratorio");
   const navigate = useNavigate();
 
   const listar = useServerFn(listarRelatoriosTeste);

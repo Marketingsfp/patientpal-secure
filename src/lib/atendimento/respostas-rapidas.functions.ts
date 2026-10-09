@@ -3,18 +3,14 @@
  *
  * Todo acesso passa por RLS (cliente autenticado do usuário) e pela checagem
  * de membro da clínica. Criar/editar/excluir exige permissão de ESCRITA no
- * módulo de atendimento ("nina") — a mesma permissão usada para responder
- * conversas. Mensagens pessoais são do próprio atendente e não exigem isso.
+ * módulo de mensagens prontas, inclusive para mensagens pessoais.
  */
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
-import { PRESETS } from "@/lib/permissoes-presets";
 import { normalizarComando, validarComando } from "@/lib/atendimento/respostas-rapidas";
-
-const MODULO = "nina";
 
 async function assertMember(supabase: SupabaseClient<Database>, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("is_member", {
@@ -31,34 +27,9 @@ async function podeEscreverAtendimento(
   userId: string,
   clinicaId: string,
 ): Promise<boolean> {
-  const { data: membro } = await supabase
-    .from("clinica_memberships")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("clinica_id", clinicaId)
-    .maybeSingle();
-  const role = membro?.role ?? null;
-  if (!role) return false;
-  if (role === "admin") return true;
-
-  const { data: perfil } = await supabase
-    .from("perfis_acesso")
-    .select("id")
-    .eq("clinica_id", clinicaId)
-    .eq("chave", role)
-    .maybeSingle();
-
-  if (perfil?.id) {
-    const { data: perm } = await supabase
-      .from("perfil_permissoes")
-      .select("acesso")
-      .eq("perfil_id", perfil.id)
-      .eq("modulo", MODULO)
-      .maybeSingle();
-    if (perm) return perm.acesso === "write";
-  }
-  const preset = (PRESETS as Record<string, Record<string, string | undefined>>)[role] ?? {};
-  return preset[MODULO] === "write";
+  const { carregarAcessosOsZap } = await import("@/lib/permissoes-oszap.server");
+  const acessos = await carregarAcessosOsZap(supabase, userId, clinicaId);
+  return acessos["oszap-mensagens-prontas"] === "write";
 }
 
 const camposSchema = z.object({
@@ -135,10 +106,8 @@ export const salvarRespostaRapida = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
 
-    if (data.escopo === "clinica") {
-      const ok = await podeEscreverAtendimento(context.supabase, context.userId, data.clinicaId);
-      if (!ok) throw new Error("Você não tem permissão para editar mensagens rápidas da clínica.");
-    }
+    const ok = await podeEscreverAtendimento(context.supabase, context.userId, data.clinicaId);
+    if (!ok) throw new Error("Você não tem permissão para editar mensagens rápidas.");
 
     const erro = validarComando(data.comando);
     if (erro) throw new Error(erro);
@@ -214,6 +183,12 @@ export const excluirRespostaRapida = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const podeExcluir = await podeEscreverAtendimento(
+      context.supabase,
+      context.userId,
+      data.clinicaId,
+    );
+    if (!podeExcluir) throw new Error("Você não tem permissão para excluir mensagens rápidas.");
     const { data: atual } = await context.supabase
       .from("atend_respostas_rapidas")
       .select("id, escopo, owner_user_id")
@@ -224,9 +199,6 @@ export const excluirRespostaRapida = createServerFn({ method: "POST" })
     if (atual.escopo === "pessoal") {
       if (atual.owner_user_id !== context.userId)
         throw new Error("Esta mensagem rápida é pessoal de outro atendente.");
-    } else {
-      const ok = await podeEscreverAtendimento(context.supabase, context.userId, data.clinicaId);
-      if (!ok) throw new Error("Você não tem permissão para excluir mensagens rápidas da clínica.");
     }
     const { error } = await context.supabase
       .from("atend_respostas_rapidas")

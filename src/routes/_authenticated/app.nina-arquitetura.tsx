@@ -21,6 +21,7 @@ import { TemperaturaNina } from "@/components/nina/TemperaturaNina";
 import { VisaoSimplesNina } from "@/components/nina/VisaoSimplesNina";
 
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { capacidadesArquitetura } from "@/lib/nina/arquitetura/permissoes.functions";
 import { nivelAcessoDe, podeArquitetura } from "@/lib/nina/arquitetura/permissoes";
 import { NODES_ARQUITETURA } from "@/lib/nina/arquitetura/manifesto";
@@ -59,6 +60,7 @@ export const Route = createFileRoute("/_authenticated/app/nina-arquitetura")({
 });
 
 function Pagina() {
+  const podeEscrever = usePodeEscrever("nina-arquitetura");
   const { clinicaAtual } = useClinica();
   const { session, loading: authLoading } = useAuth();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
@@ -187,8 +189,10 @@ function Pagina() {
             {clinicaId && podeArquitetura(capacidades, "nina.instrucoes.ver") ? (
               <InstrucoesNina
                 clinicaId={clinicaId}
-                podeEditar={podeArquitetura(capacidades, "nina.instrucoes.editar")}
-                podePublicar={podeArquitetura(capacidades, "nina.instrucoes.publicar")}
+                podeEditar={podeEscrever && podeArquitetura(capacidades, "nina.instrucoes.editar")}
+                podePublicar={
+                  podeEscrever && podeArquitetura(capacidades, "nina.instrucoes.publicar")
+                }
                 podeHistorico={podeArquitetura(capacidades, "nina.instrucoes.historico")}
               />
             ) : null}

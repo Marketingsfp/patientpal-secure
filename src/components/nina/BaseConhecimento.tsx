@@ -1,4 +1,5 @@
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { BookOpen, Building2, FlaskConical, Stethoscope } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
@@ -16,7 +17,8 @@ import { useState } from "react";
 export function BaseConhecimento() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
-  const podeEditar = ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
+  const podeEscrever = usePodeEscrever("nina-base-conhecimento");
+  const podeEditar = podeEscrever && ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
   const [revisao, setRevisao] = useState(0);
 
   return (

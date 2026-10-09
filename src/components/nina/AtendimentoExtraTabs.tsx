@@ -396,7 +396,7 @@ export function AtendInbox({
   const obterConversaFn = useServerFn(obterConversa);
   const { user, session } = useAuth();
   const meuId = user?.id ?? null;
-  const podeAtender = usePodeEscrever("nina");
+  const podeAtender = usePodeEscrever(modoCentral ? "oszap-central-conversas" : "oszap-conversas");
   // Nome de quem está logado: a bolha otimista já nasce com a assinatura que o
   // servidor põe no texto. Se ainda não carregou, a bolha sai sem e a
   // assinatura aparece quando o servidor confirma (como antes).
@@ -3014,7 +3014,7 @@ export function AtendInbox({
    * responsável real.
    */
   const assumir = async (forcar: boolean, motivo?: string) => {
-    if (!sel || !clinicaId || assumindo) return;
+    if (!podeAtender || !sel || !clinicaId || assumindo) return;
     setAssumindo(true);
     try {
       const r: any = await assumirFn({
@@ -3177,7 +3177,7 @@ export function AtendInbox({
 
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!sel || !clinicaId) return;
+    if (!podeAtender || !sel || !clinicaId) return;
     if (
       !acaoPermitida({
         alvo: sel.id,
@@ -3214,7 +3214,7 @@ export function AtendInbox({
   };
 
   const fechar = async () => {
-    if (!sel || !clinicaId || fechandoRef.current) return;
+    if (!podeAtender || !sel || !clinicaId || fechandoRef.current) return;
     if (
       !acaoPermitida({
         alvo: sel.id,
@@ -3828,7 +3828,9 @@ export function AtendInbox({
                         size="sm"
                         variant="outline"
                         disabled={
-                          (!!responsavelId && !souResponsavel && !souAdmin) || carregandoConversa
+                          !podeAtender ||
+                          (!!responsavelId && !souResponsavel && !souAdmin) ||
+                          carregandoConversa
                         }
                         className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
                         onClick={() => setTransferOpen(true)}
@@ -3840,6 +3842,7 @@ export function AtendInbox({
                           size="sm"
                           variant="outline"
                           disabled={
+                            !podeAtender ||
                             !podeEncerrarConversa({
                               userId: meuId,
                               responsavelId: responsavelId,
