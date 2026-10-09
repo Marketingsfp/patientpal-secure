@@ -1,30 +1,37 @@
-# Revisão de segurança — 08/10/2026 (somente leitura, nada foi alterado)
+# Revisão de segurança completa — 09/10/2026 (somente leitura, nada foi alterado)
 
-## Situação do banco hoje
-- A migração do Francisco (20261008193000) **ainda não está aplicada**: tabelas e funções `francisco_*` não existem no banco. Os achados do Francisco valem para quando ela for aplicada.
-- `sistema_job_tokens` (onde ficará o token do job do Francisco): proteção ligada, sem acesso para visitantes ou usuários logados. OK.
+## O que foi conferido agora
+- Proteção por linha (RLS): ligada em **todas** as tabelas do banco (nenhuma tabela sem proteção).
+- Funções com privilégio elevado (SECURITY DEFINER): 297 no total; **75 podem ser chamadas por visitante sem login**.
+- Scanner do banco (última rodada 08/10 20:52, desatualizado): 3 achados de leitura liberada.
+- Dependências: 1 crítica e várias altas, todas indiretas.
+- Rotas públicas e webhook: usada a revisão de ontem (whatsapp, francisco, focusnfe, backup, nina watchdog/timeout, integrações v1).
 
 ## Achados
 
 | # | Sev. | Onde | Achado | Correção sugerida |
 |---|---|---|---|---|
-| 1 | Alta | `src/routes/api/public/whatsapp.$clinicaId.ts` (~l.147) | Mensagem com assinatura da Meta inválida ou ausente é registrada e **segue para a Nina** (decisão antiga: "nunca descartar"). Quem souber o endereço pode injetar mensagens falsas em nome de qualquer telefone, gerar agendamentos/handoffs e consumir IA. Anterior a hoje. | Com `app_secret` configurado, recusar (401) ou apenas guardar sem processar. Antes, confirmar que as 3 clínicas têm o App Secret correto. |
-| 2 | Média | mesmo arquivo, l.183 e l.365 (mudança de hoje) | Francisco só age com assinatura válida — correto. Mas, se o `app_secret` estiver vazio, a resposta "SAIR" do paciente **não é registrada** e ele pode continuar recebendo mensagens (descumprimento de pedido de descadastro/LGPD). | Garantir App Secret antes de ligar o modo real; mostrar alerta na tela do Francisco quando faltar. |
-| 3 | Média | mesmo arquivo, l.365–380 | Se `processarRespostaFrancisco` falhar por qualquer motivo, lança erro de agrupamento — a mensagem do paciente fica aguardando e a Nina não responde. | Validar que existe reprocessamento e alerta para a equipe nesse caso. |
-| 4 | Média | `20261008150000_perfil_financeiro_opera_como_gestao.sql` | Financeiro ganha **exclusão** em 15 tabelas de dinheiro (lançamentos, caixa, NFS-e, pagamentos, boletos) e controle total de `nfse_emitentes` (certificado/dados fiscais). Aprovado pelo dono, mas exclusão apaga rastro. | Confirmar que `audit_log` grava exclusões nessas tabelas; preferir cancelamento a exclusão física em `nfse` e `fin_lancamentos`. |
-| 5 | Média | `is_financeiro_clinica` (banco) | Usa `clinica_memberships.role`, enquanto as demais regras usam `user_roles`/`has_any_role`. Os dois cadastros podem divergir: alguém tirado do Financeiro em um lugar continua com acesso pelo outro. | Unificar a fonte do papel ou conferir as duas na mesma regra. |
-| 6 | Baixa | `20261008170000_financeiro_da_baixa_na_agenda.sql` | Financeiro pode alterar **qualquer campo** do agendamento (horário, médico, paciente), não só o status da baixa. | Restringir por gatilho ou função específica de baixa. |
-| 7 | Baixa | `20261008180000_financeiro_ve_historico_financeiro.sql` | Financeiro lê o histórico de `agendamentos` no `audit_log`, que pode trazer nome/telefone/observações do paciente nos "antes/depois". | Aceitável se for intencional; senão, tirar `agendamentos` da lista. |
-| 8 | Baixa | Francisco — `functions.ts` (homologação) | Guarda o texto do cenário e o resultado em `francisco_eventos`. Se alguém digitar dados reais de paciente, ficam salvos. Leitura já é restrita ao módulo. | Aviso na tela: "use só dados fictícios". |
-| 9 | Baixa | `src/routes/api/public/hooks/francisco.ts` | Token comparado de forma segura (OK). Sem limite de chamadas; rodada pode ser disparada várias vezes. | Trava contra rodadas simultâneas (já há reserva por orçamento — risco baixo). |
-| 10 | Info (OK) | migração Francisco | Pontos positivos: proteção ligada nas 4 tabelas, leitura exige módulo + vínculo ativo, nenhuma escrita liberada ao navegador, funções só para o servidor, publicação só por administrador, envio real desligado por padrão. | — |
-| 11 | Alta (scanner) | tabela `permissions` | Qualquer usuário logado lê toda a tabela. Provável catálogo, mas o scanner marca como erro. | Confirmar que não há dado sensível; se for catálogo, registrar como intencional. |
-| 12 | Baixa (scanner) | `tipos_servico`, `especialidades` | Leitura liberada a qualquer logado. Provavelmente catálogo. | Confirmar e marcar como intencional. |
-| 13 | Alta | Dependências | 1 crítica (`proxy-addr` via `@lovable.dev/mcp-js`) e várias altas (`undici`, `sharp`, `ws`, `seroval`, `js-yaml`, `fast-uri`) — todas indiretas. Maioria afeta ferramentas de build; `seroval` e `undici` rodam no servidor. | Atualizar `@tanstack/react-start`/`react-router` e `@lovable.dev/mcp-js` para versões que tragam as correções, com testes. |
+| 1 | Alta (confirmar) | funções `listar_duplicados_pacientes`, `credito_clinica_situacao`, `dashboard_blocos_periodo`, `rel_agendamentos_marcados`, `rel_marcacoes_por_atendente` | Chamáveis por visitante sem login e leem dados de pacientes/produção. Não conferi o corpo de cada uma: se não exigirem usuário logado e vínculo com a clínica, expõem dados. | Ler o corpo; tirar o acesso de visitante (`REVOKE ... FROM anon, PUBLIC`) das que não são telas públicas. |
+| 2 | Alta (confirmar) | `pagar_cobranca_credito_clinica`, `revisar_limite_credito_clinica`, `integracao_criar_api_key`, `nina_instrucoes_publicar` | Funções que **gravam** e estão liberadas para visitante. Ontem já foi visto que o pagamento do Crédito não confere o papel de quem paga. | Tirar acesso de visitante; conferir papel e vínculo dentro de cada uma. |
+| 3 | Média | `nina_trace_purgar`, `nina_execucoes_expurgo`, `integracao_verificacoes_limpar`, `coach_limpar_eventos_antigos` | Rotinas de limpeza liberadas para visitante; se não checarem quem chama, alguém de fora pode apagar registros de auditoria. | Deixar só para o servidor (service role). |
+| 4 | Média | `coach_*` (registrar uso/tempo, vincular atendente, resumo) | Liberadas para visitante; dependem de checagem interna. | Restringir a usuários logados. |
+| 5 | Baixa | gatilhos `fn_*`, `tg_*`, `pacientes_*` | Funções de gatilho com execução liberada; normalmente não fazem nada fora do gatilho, mas aparecem no scanner. | Retirar EXECUTE de anon/authenticated em lote. |
+| 6 | Info (OK) | `consulta_publica`, `contrato_publico`, `assinar_contrato_publico`, `emitir_senha_publica`, `painel_senhas_publicas`, `totem_*`, `checkin_agendamento`, `salvar_anamnese_publica`, `resolver_clinica_*`, `tts_config_publico`, `verificar_certificado` | Públicas de propósito (totem, painel, check-in, contrato, anamnese). | Conferir que cada uma exige token e devolve só o mínimo. |
+| 7 | Alta (scanner) | tabela `permissions` | Qualquer logado lê a tabela inteira. Provável catálogo de permissões. | Confirmar sem dado sensível e marcar como intencional. |
+| 8 | Baixa (scanner) | `tipos_servico`, `especialidades` | Leitura liberada a qualquer logado; catálogo. | Marcar como intencional. |
+| 9 | Média | `pagar_cobranca_credito_clinica` | (de ontem) não confere o papel de quem recebe. | Exigir caixa/financeiro/gestor/admin. |
+| 10 | Média | `is_financeiro_clinica` | (de ontem) usa `clinica_memberships.role`, divergente de `user_roles`. | Unificar fonte do papel. |
+| 11 | Média | migração do perfil financeiro | (de ontem) Financeiro pode **excluir** em 15 tabelas de dinheiro. | Confirmar registro de exclusão no `audit_log`; preferir cancelamento. |
+| 12 | Baixa | baixa do Financeiro na agenda | (de ontem) pode mudar qualquer campo do agendamento. | Restringir por gatilho. |
+| 13 | Baixa | `src/routes/api/public/hooks/francisco.ts` | Token seguro, sem limite de chamadas. | Trava contra rodadas simultâneas. |
+| 14 | OK | webhook WhatsApp | Agora recusa aviso com assinatura inválida ou sem App Secret (`whatsapp-assinatura.ts`). Achado alto de ontem resolvido. | Confirmar App Secret nas 3 clínicas. |
+| 15 | Crítica (indireta) | dependências | `proxy-addr` (via `@lovable.dev/mcp-js`). Altas: `undici`, `sharp`, `ws` (ferramentas de build), `seroval` e `fast-uri` (rodam no servidor), `js-yaml`, `browserslist`. | Atualizar `@tanstack/react-start`, `@tanstack/react-router` e `@lovable.dev/mcp-js`, com testes. |
+| 16 | OK | segredos | Chave de serviço só no servidor; `.env.example` sem valores reais; prefixo VITE_ só para chaves públicas. | — |
 
-## Não coberto nesta revisão
-- Varredura completa das ~250 tabelas e ~550 funções: foi usado o resultado do último scanner automático (de hoje, 17:20), que não inclui as migrações de hoje à tarde. Recomendo rodar o scanner de novo depois de aplicar o Francisco.
-- Não há Edge Functions no projeto (tudo roda nas funções do servidor do app).
+## Não coberto
+- Corpo de cada uma das 75 funções liberadas para visitante (itens 1–5 marcados "confirmar").
+- Políticas das ~250 tabelas linha a linha: usado o scanner, que está desatualizado. Recomendo rodar o scanner de novo.
+- Não há Edge Functions no projeto.
 
-## Próximo passo sugerido (se aprovar)
-Nada é alterado automaticamente. Ao aprovar, sugiro começar pelo item 1 (assinatura do webhook), depois 5 e 4, um de cada vez, cada um com seu próprio pedido.
+## Próximo passo (se aprovar)
+Nada é alterado automaticamente. Ao aprovar, começo por ler o corpo das funções dos itens 1 e 2 e confirmar quais realmente expõem dados, antes de propor qualquer bloqueio.
