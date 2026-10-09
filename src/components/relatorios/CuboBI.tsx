@@ -1025,11 +1025,7 @@ export function CuboBI({
             .replace(/[^a-zA-Z0-9]+/g, "-")
             .toLowerCase()
         : "";
-    exportToExcel(
-      linhas,
-      `cubo-${cube.id}${sufixoFiltro}-${hojeBR()}`,
-      headers,
-    );
+    exportToExcel(linhas, `cubo-${cube.id}${sufixoFiltro}-${hojeBR()}`, headers);
   }
 
   return (

@@ -3129,9 +3129,7 @@ function DetalheContrato({
   // vem de cb_convenios.taxa_inclusao_dependente e permanece editável.
   const [incCobrarTaxa, setIncCobrarTaxa] = useState<boolean>(true);
   const [incTaxaValor, setIncTaxaValor] = useState<string>("0.00");
-  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() =>
-    hojeBR(),
-  );
+  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() => hojeBR());
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
@@ -5074,7 +5072,7 @@ function DetalheContrato({
       return;
     }
     abrirFormaPag(proxima);
-  }, [acaoInicial, loading, cancelado, podeEscrever, mensalidades]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [acaoInicial, loading, cancelado, podeEscrever, mensalidades]);
 
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens

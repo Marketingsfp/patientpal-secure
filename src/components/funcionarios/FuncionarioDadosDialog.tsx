@@ -113,8 +113,7 @@ export function FuncionarioDadosDialog({
           regime: (contrato.regime as string) ?? "clt",
           carga_horaria_semanal: String(contrato.carga_horaria_semanal ?? "44"),
           salario: String(contrato.salario ?? "0"),
-          data_admissao:
-            (contrato.data_admissao as string) ?? hojeBR(),
+          data_admissao: (contrato.data_admissao as string) ?? hojeBR(),
           data_demissao: (contrato.data_demissao as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
           sexo: (contrato.sexo as string) ?? "nao_informar",

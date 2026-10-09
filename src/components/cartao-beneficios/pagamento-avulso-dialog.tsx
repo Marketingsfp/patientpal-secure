@@ -332,11 +332,7 @@ export function PagamentoAvulsoMensalidadeDialog({
         vencimento: venc,
         valor: valorNum,
         status: paga || historico ? "pago" : "pendente",
-        pago_em: paga
-          ? dadosPagamento.data || hojeBR()
-          : historico
-            ? venc
-            : null,
+        pago_em: paga ? dadosPagamento.data || hojeBR() : historico ? venc : null,
         valor_pago: paga ? dadosPagamento.valor : historico ? valorNum : null,
         forma_pagamento: paga ? (dadosPagamento.forma_pagamento ?? "misto") : null,
         lancamento_id: paga ? (dadosPagamento.lancamento_id ?? null) : null,

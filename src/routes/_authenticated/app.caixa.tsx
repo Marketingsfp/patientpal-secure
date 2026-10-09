@@ -1312,9 +1312,7 @@ function Page() {
     [],
   );
   const [obsFechamento, setObsFechamento] = useState("");
-  const [dataFechamento, setDataFechamento] = useState<string>(() =>
-    hojeBR(),
-  );
+  const [dataFechamento, setDataFechamento] = useState<string>(() => hojeBR());
   const [saving, setSaving] = useState(false);
   const lancandoMovRef = useRef(false);
   // Conferência por forma de pagamento no fechamento do próprio caixa.
@@ -1324,9 +1322,7 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
-  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() =>
-    hojeBR(),
-  );
+  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() => hojeBR());
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor

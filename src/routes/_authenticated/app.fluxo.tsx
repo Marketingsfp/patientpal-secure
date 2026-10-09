@@ -381,11 +381,7 @@ function FluxoPage() {
     } else {
       setPagos(new Set());
     }
-    if (
-      reais.length === 0 &&
-      !fallbackAplicado &&
-      dataRef === hojeBR()
-    ) {
+    if (reais.length === 0 && !fallbackAplicado && dataRef === hojeBR()) {
       const { data: ult } = await supabase
         .from("agendamentos")
         .select("inicio")
