@@ -14,7 +14,16 @@
  */
 const ESPERA_FECHAR_MODAL_MS = 400;
 
-export function printHtmlViaIframe(html: string) {
+/** Teto para esperar imagens (ex.: logo): imprime mesmo se alguma travar. */
+const TETO_ESPERA_IMAGENS_MS = 2500;
+
+/**
+ * `esperarImagens`: só dispara a impressão depois que todas as imagens do
+ * documento carregarem (ou falharem), com teto de 2,5s — mesmo critério de
+ * `print-gr.ts`. Desligado por padrão para não mudar os papéis que já usam
+ * este helper.
+ */
+export function printHtmlViaIframe(html: string, opts: { esperarImagens?: boolean } = {}) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
@@ -46,7 +55,10 @@ export function printHtmlViaIframe(html: string) {
   doc.write(html);
   doc.close();
 
+  let jaImprimiu = false;
   const triggerPrint = () => {
+    if (jaImprimiu) return;
+    jaImprimiu = true;
     try {
       win.focus();
       win.print();
@@ -61,11 +73,26 @@ export function printHtmlViaIframe(html: string) {
     setTimeout(cleanup, 60000);
   };
 
-  if (doc.readyState === "complete") {
-    setTimeout(triggerPrint, ESPERA_FECHAR_MODAL_MS);
-  } else {
-    iframe.addEventListener("load", () => setTimeout(triggerPrint, ESPERA_FECHAR_MODAL_MS), {
-      once: true,
+  const aposImagens = (fn: () => void) => {
+    if (!opts.esperarImagens) return fn();
+    const pendentes = Array.from(doc.images ?? []).filter((im) => !im.complete);
+    if (pendentes.length === 0) return fn();
+    let restantes = pendentes.length;
+    const done = () => {
+      restantes -= 1;
+      if (restantes <= 0) fn();
+    };
+    pendentes.forEach((im) => {
+      im.addEventListener("load", done, { once: true });
+      im.addEventListener("error", done, { once: true });
     });
+    setTimeout(fn, TETO_ESPERA_IMAGENS_MS);
+  };
+  const agendar = () => aposImagens(() => setTimeout(triggerPrint, ESPERA_FECHAR_MODAL_MS));
+
+  if (doc.readyState === "complete") {
+    agendar();
+  } else {
+    iframe.addEventListener("load", agendar, { once: true });
   }
 }
