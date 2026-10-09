@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  interpretarLeituraPedidoBalcao,
-  medicosComNomeLido,
-  servicoUnicoDoItemLido,
-} from "./leitura-pedido";
+import { interpretarLeituraPedidoBalcao, medicosComNomeLido } from "./leitura-pedido";
 
 describe("interpretarLeituraPedidoBalcao", () => {
   it("lê exames, paciente e médico (sem o Dr.) em maiúsculas", () => {
@@ -58,19 +54,5 @@ describe("medicosComNomeLido", () => {
 
   it("nome que não está no cadastro não acha ninguém", () => {
     expect(medicosComNomeLido("Pedro Alves", medicos)).toEqual([]);
-  });
-});
-
-describe("servicoUnicoDoItemLido", () => {
-  it("único resultado da busca entra sozinho", () => {
-    expect(servicoUnicoDoItemLido("TSH", [{ nome: "TSH ULTRA SENSÍVEL" }])?.nome).toBe(
-      "TSH ULTRA SENSÍVEL",
-    );
-  });
-
-  it("entre vários, só entra o de nome idêntico", () => {
-    const c = [{ nome: "HEMOGRAMA COMPLETO" }, { nome: "HEMOGRAMA" }];
-    expect(servicoUnicoDoItemLido("Hemograma", c)?.nome).toBe("HEMOGRAMA");
-    expect(servicoUnicoDoItemLido("Hemo", c)).toBeNull();
   });
 });

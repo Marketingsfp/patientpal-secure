@@ -85,17 +85,3 @@ export function medicosComNomeLido<T extends { nome: string | null }>(
     return lidas.every((p) => cadastro.has(p));
   });
 }
-
-/**
- * Serviço do catálogo que pode entrar sozinho no orçamento: o único achado pela busca ou o de
- * nome idêntico ao lido. Fora isso, a recepção escolhe entre as opções.
- */
-export function servicoUnicoDoItemLido<T extends { nome: string }>(
-  itemLido: string,
-  candidatos: readonly T[],
-): T | null {
-  if (candidatos.length === 1) return candidatos[0];
-  const lido = normalizarBusca(itemLido).replace(/\s+/g, " ");
-  const iguais = candidatos.filter((c) => normalizarBusca(c.nome).replace(/\s+/g, " ") === lido);
-  return iguais.length === 1 ? iguais[0] : null;
-}

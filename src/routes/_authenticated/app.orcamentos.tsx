@@ -62,7 +62,9 @@ import type { ReactNode } from "react";
 import { primeiroValorValido } from "@/lib/convenio/info-convenio-paciente";
 import { comprimirImagem } from "@/lib/odonto-imagens";
 import { lerPedidoMedicoParaOrcamento } from "@/lib/orcamentos/ler-pedido-medico.functions";
-import { medicosComNomeLido, servicoUnicoDoItemLido } from "@/lib/orcamentos/leitura-pedido";
+import { medicosComNomeLido } from "@/lib/orcamentos/leitura-pedido";
+import { escolhaSegura, ordenarServicosDoPedido } from "@/lib/orcamentos/correspondencia-servico";
+import { normalizarBusca } from "@/lib/busca/relevancia";
 
 const ICON_BTN =
   "p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center";
@@ -340,7 +342,10 @@ type ItemDoPedido = {
   lido: string;
   situacao: "adicionado" | "escolher" | "outra_categoria" | "nao_encontrado";
   servico?: Procedimento;
-  opcoes?: Procedimento[];
+  /** Melhores cadastros da tabela, do mais provável ao menos. */
+  sugestoes: { servico: Procedimento; usos: number }[];
+  /** Mostrando as outras opções para trocar o que entrou sozinho. */
+  trocando?: boolean;
 };
 
 type PedidoLido = {
@@ -1495,26 +1500,34 @@ function NovoOrcamentoDialog({
         }
       }
 
-      // Exames: entra sozinho só o serviço inequívoco; o resto fica para escolher.
+      // Exames: compara com a tabela inteira da categoria e com o que a recepção
+      // já escolheu antes. Entra sozinho só o cadastro claramente à frente.
       const lidos = leitura.tipo === "pedido_medico" ? leitura.itens : [];
       const outra = categoria === "laboratorio" ? "demais" : "laboratorio";
+      const [catalogo, usos] = lidos.length
+        ? await Promise.all([carregarCatalogo(categoria), carregarUsos()])
+        : [[], new Map<string, number>()];
+      const usosDe = (p: Procedimento) =>
+        (usos.get(p.id) ?? 0) + (usos.get(normalizarBusca(p.nome)) ?? 0);
       const resultado: ItemDoPedido[] = [];
-      for (let i = 0; i < lidos.length; i += 5) {
-        const lote = await Promise.all(
-          lidos.slice(i, i + 5).map(async (lido): Promise<ItemDoPedido> => {
-            const { data } = await buscarServicos(categoria, lido).order("nome").limit(8);
-            const candidatos = (data ?? []) as Procedimento[];
-            if (candidatos.length === 0) {
-              const { data: d2 } = await buscarServicos(outra, lido).limit(1);
-              return { lido, situacao: (d2 ?? []).length ? "outra_categoria" : "nao_encontrado" };
-            }
-            const unico = servicoUnicoDoItemLido(lido, candidatos);
-            return unico
-              ? { lido, situacao: "adicionado", servico: unico }
-              : { lido, situacao: "escolher", opcoes: candidatos };
-          }),
+      for (const lido of lidos) {
+        const ordenados = ordenarServicosDoPedido(lido, catalogo, usosDe, valorDoProc);
+        const sugestoes = ordenados.slice(0, 4).map((o) => ({ servico: o.servico, usos: o.usos }));
+        if (sugestoes.length === 0) {
+          const { data: d2 } = await buscarServicos(outra, lido).limit(1);
+          resultado.push({
+            lido,
+            situacao: (d2 ?? []).length ? "outra_categoria" : "nao_encontrado",
+            sugestoes,
+          });
+          continue;
+        }
+        const escolhido = escolhaSegura(ordenados, valorDoProc);
+        resultado.push(
+          escolhido
+            ? { lido, situacao: "adicionado", servico: escolhido, sugestoes }
+            : { lido, situacao: "escolher", sugestoes },
         );
-        resultado.push(...lote);
       }
       const noOrcamento = new Set(itens.map((it) => it.procedimento_id));
       let adicionados = 0;
@@ -1546,19 +1559,67 @@ function NovoOrcamentoDialog({
     }
   };
 
+  // Tabela inteira da categoria (o PostgREST entrega 1000 linhas por vez).
+  const carregarCatalogo = async (cat: typeof categoria) => {
+    const todos: Procedimento[] = [];
+    for (let de = 0; de < 10_000; de += 1000) {
+      const { data, error } = await buscarServicos(cat, "")
+        .order("nome")
+        .range(de, de + 999);
+      if (error) throw error;
+      todos.push(...((data ?? []) as Procedimento[]));
+      if ((data ?? []).length < 1000) break;
+    }
+    return todos;
+  };
+
+  // Quantas vezes a recepção já escolheu cada serviço em orçamentos da clínica
+  // (pelo vínculo com a tabela ou, nos itens antigos, pelo nome).
+  const carregarUsos = async () => {
+    const usos = new Map<string, number>();
+    for (let de = 0; de < 5000; de += 1000) {
+      const { data } = await supabase
+        .from("orcamento_itens")
+        .select("descricao, procedimento_id, orcamentos!inner(clinica_id)")
+        .eq("orcamentos.clinica_id", clinicaId)
+        .order("created_at", { ascending: false })
+        .range(de, de + 999);
+      for (const it of data ?? []) {
+        const chave = it.procedimento_id ?? normalizarBusca(it.descricao ?? "");
+        if (chave) usos.set(chave, (usos.get(chave) ?? 0) + 1);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
+    return usos;
+  };
+
   const escolherServicoDoPedido = (idx: number, p: Procedimento) => {
+    const anterior = pedidoLido?.itens[idx]?.servico;
+    // Trocar a sugestão: sai o cadastro que tinha entrado pela foto.
+    if (anterior && anterior.id !== p.id)
+      setItens((arr) => arr.filter((it) => it.procedimento_id !== anterior.id));
     adicionarProc(p);
     setPedidoLido((atual) =>
       atual
         ? {
             ...atual,
             itens: atual.itens.map((it, i) =>
-              i === idx ? { ...it, situacao: "adicionado", servico: p, opcoes: undefined } : it,
+              i === idx ? { ...it, situacao: "adicionado", servico: p, trocando: false } : it,
             ),
           }
         : atual,
     );
   };
+
+  const alternarTrocaDoPedido = (idx: number) =>
+    setPedidoLido((atual) =>
+      atual
+        ? {
+            ...atual,
+            itens: atual.itens.map((it, i) => (i === idx ? { ...it, trocando: !it.trocando } : it)),
+          }
+        : atual,
+    );
 
   const subtotal = itens.reduce(
     (s, i) => s + Number(i.quantidade || 0) * Number(i.valor_unitario || 0),
@@ -1873,27 +1934,63 @@ function NovoOrcamentoDialog({
                           )}
                           <span>{it.lido}</span>
                           {it.situacao === "adicionado" && it.servico && (
-                            <span className="text-xs text-muted-foreground">
-                              → {it.servico.nome}
-                              {it.servico.valor_variavel && " (valor variável: informe o valor)"}
-                            </span>
+                            <>
+                              <span className="text-xs text-muted-foreground">
+                                → <b className="text-foreground">{it.servico.nome}</b>{" "}
+                                {BRL(valorDoProc(it.servico))}
+                                {it.servico.valor_variavel && " (valor variável: informe o valor)"}
+                              </span>
+                              {it.sugestoes.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-primary underline"
+                                  onClick={() => alternarTrocaDoPedido(idx)}
+                                >
+                                  {it.trocando ? "manter" : "trocar"}
+                                </button>
+                              )}
+                            </>
                           )}
                           {it.situacao === "escolher" && (
-                            <>
-                              <span className="text-xs text-muted-foreground">qual serviço?</span>
-                              {(it.opcoes ?? []).map((p) => (
-                                <Button
-                                  key={p.id}
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-6 px-2 text-[11px]"
-                                  onClick={() => escolherServicoDoPedido(idx, p)}
-                                >
-                                  {p.nome}
-                                </Button>
-                              ))}
-                            </>
+                            <span className="text-xs text-muted-foreground">
+                              qual destes? (o primeiro é o mais provável)
+                            </span>
+                          )}
+                          {(it.situacao === "escolher" ||
+                            (it.situacao === "adicionado" && it.trocando)) && (
+                            <div className="basis-full flex flex-wrap gap-1 pl-5">
+                              {it.sugestoes
+                                .filter((sg) => sg.servico.id !== it.servico?.id)
+                                .map((sg, i) => (
+                                  <Button
+                                    key={sg.servico.id}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className={`h-auto min-h-6 px-2 py-0.5 text-[11px] text-left whitespace-normal ${
+                                      i === 0 && it.situacao === "escolher"
+                                        ? "border-primary bg-primary/10"
+                                        : ""
+                                    }`}
+                                    onClick={() => escolherServicoDoPedido(idx, sg.servico)}
+                                  >
+                                    {i === 0 && it.situacao === "escolher" && "★ "}
+                                    {sg.servico.nome} · {BRL(valorDoProc(sg.servico))}
+                                    {sg.usos > 0 && (
+                                      <span className="ml-1 text-muted-foreground">
+                                        · usado {sg.usos}× em orçamentos
+                                      </span>
+                                    )}
+                                  </Button>
+                                ))}
+                              <button
+                                type="button"
+                                className="text-[11px] font-semibold text-primary underline"
+                                onClick={() => setProcQuery(it.lido)}
+                              >
+                                outro…
+                              </button>
+                            </div>
                           )}
                           {(it.situacao === "nao_encontrado" ||
                             it.situacao === "outra_categoria") && (
