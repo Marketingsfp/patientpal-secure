@@ -34,7 +34,7 @@ export type MotivoSemPrefetch = { motivo: string; duracaoMs: number; termo?: str
 export async function executarPrefetchCadastro(p: {
   clinicaId: string;
   mensagem: string;
-  intencao: IntencaoNina | null;
+  intencao: IntencaoNina | IntencaoNina[] | null;
   nomePopular: { especialidade: string } | null;
   ferramentasDisponiveis: string[];
   executar: (nome: string, args: string) => Promise<ResultadoBroker>;
