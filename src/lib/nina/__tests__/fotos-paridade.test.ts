@@ -1,6 +1,6 @@
 import { expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { PEDIR_NOVA_FOTO, FALHA_TECNICA_FOTO } from "../fotos";
+import { PEDIR_NOVA_FOTO, FALHA_TECNICA_FOTO, CONFIRMAR_MARCACAO_FOTO } from "../fotos";
 function executar(arquivo: string, args: string[], prefixo: string) {
   const p = Bun.spawnSync([process.execPath, fileURLToPath(new URL(`./fixtures/${arquivo}`, import.meta.url)), ...args], { stdout: "pipe", stderr: "pipe", timeout: 15000 });
   expect(p.exitCode, p.stderr.toString()).toBe(0);
@@ -18,7 +18,36 @@ for (const caso of ["legivel", "ilegivel", "invalida", "indisponivel", "timeout"
   expect(r.auditoria[0].finalidade).toBe("leitura_imagem");
   expect(r.auditoria[0].estado).toBe(["indisponivel", "timeout"].includes(caso) ? "falhou" : "concluido");
 });
+for (const caso of ["um_marcado", "varios_marcados", "marcacao_incerta"]) it(`contrato do leitor para seleção: ${caso}`, () => {
+  const r = executar("fotos-leitura.fixture.ts", [caso], "FOTO=");
+  expect(r.resultado).toEqual(caso === "marcacao_incerta" ? { tipo: "marcacao_incerta" }
+    : { tipo: "pedido_medico", itens: caso === "um_marcado" ? ["Doppler de Carótidas e Vértebrais"] : ["Doppler de Carótidas e Vértebrais", "ECG"] });
+  const prompt = r.requisicao.messages[0].content;
+  expect(prompt).toContain("Opções com quadrinhos vazios NÃO são exames solicitados");
+  expect(prompt).toContain('tipo "marcacao_incerta"');
+  expect(prompt).toContain("não precisa de quadrinhos");
+  expect(r.auditoria).toHaveLength(1);
+});
 for (const ambiente of ["producao", "homologacao"]) {
+  it(`${ambiente}: marcação incerta pede os exames sem nova foto, transferência ou chamada de conversa`, () => {
+    const r = executar("resposta-direta.fixture.ts", [ambiente, "foto_marcacao_incerta"], "DIRETA_RESULTADO=");
+    expect(r.resposta.replace(/\s+/g, " ")).toContain(CONFIRMAR_MARCACAO_FOTO);
+    expect(r.resposta).toContain("Me chamo Aurora");
+    expect(r.resposta).not.toContain("mais nítida");
+    expect(r.encaminhamentos).toHaveLength(0);
+    expect(r.requests).toHaveLength(0);
+  });
+  it(`${ambiente}: um exame marcado segue; dois realmente marcados preservam encaminhamento`, () => {
+    const unico = executar("resposta-direta.fixture.ts", [ambiente, "foto_doppler_marcado"], "DIRETA_RESULTADO=");
+    expect(unico.requests.length).toBeGreaterThan(0);
+    expect(unico.encaminhamentos).toHaveLength(0);
+    expect(unico.requests[0].messages.at(-1).content).toBe("Enviei a foto de um pedido médico com: Doppler de Carótidas e Vértebrais.");
+    const varios = executar("resposta-direta.fixture.ts", [ambiente, "foto_varios_marcados"], "DIRETA_RESULTADO=");
+    expect(varios.requests).toHaveLength(0);
+    expect(varios.encaminhamentos).toHaveLength(1);
+    expect(varios.encaminhamentos[0].motivo).toContain("MULTIPLOS_ATENDIMENTOS");
+    expect(varios.encaminhamentos[0].motivo).toContain("2 exames (Doppler de Carótidas e Vértebrais; M.A.P.A. 24h)");
+  });
   for (const cenario of ["foto_apresentacao_entregue", "foto_apresentacao_falhou", "foto_tecnica"]) it(`${ambiente}: ${cenario}`, () => {
     const r = executar("resposta-direta.fixture.ts", [ambiente, cenario], "DIRETA_RESULTADO=");
     expect(r.resposta.replace(/\s+/g, " ")).toContain((cenario === "foto_tecnica" ? FALHA_TECNICA_FOTO : PEDIR_NOVA_FOTO).replace(/\s+/g, " "));

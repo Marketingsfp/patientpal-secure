@@ -16,6 +16,21 @@ test("Jev só decide com confiança de 80% ou mais", () => {
   expect(multiplosPeloJev(undefined)).toBe(false);
 });
 
+test("pontos de siglas e legenda não interrompem nem ampliam a lista da foto", () => {
+  const itens = ["Doppler de Carótidas e Vértebrais", "Doppler Arterial de Membros", "Doppler Venoso de Membros",
+    "Eletrocardiograma", "Ecocardiograma Collor Doppler", "I.T.B", "HOLTER 24h", "M.A.P.A. 24h",
+    "Eletroencefalograma", "Mapeamento Cerebral", "Ressonância Magnética", "Radiografia",
+    "Teste Ergométrico", "Tomografia Computadorizada", "Ultrassonografia"];
+  expect(itensDoPedidoLido(textoDoPedidoLido(itens))).toEqual(itens);
+  expect(motivoMultiplos(itensDoPedidoLido(textoDoPedidoLido(itens)))).toContain("15 exames");
+  expect(itensDoPedidoLido(textoDoPedidoLido(["M.A.P.A. 24h"], "Dr. Silva pediu. Quero o preço de TSH também."))).toEqual(["M.A.P.A. 24h"]);
+  expect(itensDoPedidoLido(textoDoPedidoLido(["I.T.B."]))).toEqual(["I.T.B."]);
+  expect(itensDoPedidoLido("Enviei a foto de um pedido médico com: ECG. Bom dia. Quero saber o preço."))
+    .toEqual(["ECG"]);
+  expect(itensDoPedidoLido("Enviei a foto de um pedido médico com: M.A.P.A. 24h; ECG. Dr. Silva pediu."))
+    .toEqual(["M.A.P.A. 24h", "ECG"]);
+});
+
 test("motivo identifica a regra e, na foto, os exames lidos", () => {
   expect(motivoMultiplos([])).toStartWith("MULTIPLOS_ATENDIMENTOS:");
   expect(motivoMultiplos(["TSH", "T4 LIVRE"])).toContain("2 exames (TSH; T4 LIVRE)");

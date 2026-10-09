@@ -2,6 +2,7 @@ import { interpretarLeituraImagem, type LeituraImagem } from "./leitura-imagem";
 
 export const PEDIR_NOVA_FOTO = "Não consegui ler a foto com segurança.\n\nPode enviar outra foto mais nítida, com boa iluminação e o documento inteiro, sem cortes?";
 export const FALHA_TECNICA_FOTO = "Recebi a foto, mas houve uma falha ao processá-la. Pode reenviar a mesma imagem para eu tentar novamente?";
+export const CONFIRMAR_MARCACAO_FOTO = "Consegui ler os nomes na foto, mas não ficou claro quais exames estão marcados. Pode me dizer quais exames foram selecionados no pedido?";
 export const FOTO_SEGUNDA_FALHA = "FOTO_NAO_LIDA_APOS_NOVA_TENTATIVA";
 export type MensagemFoto = {
   id: string; direction: string; tipo?: string | null; body?: string | null;
@@ -58,6 +59,8 @@ export function decidirFotos(entradas: MensagemFoto[], historico: MensagemFoto[]
       leituraSalvaDaFoto(m.raw)?.tipo === "pedido_medico" && Date.parse(m.created_at) > Date.parse(pedido.created_at));
     return { acao: novaTentativa && !leituraResolvida ? "encaminhar" : "nova_foto", motivo: FOTO_SEGUNDA_FALHA } as const;
   }
+  if (fotos.some(m => leituraSalvaDaFoto(m.raw)?.tipo === "marcacao_incerta"))
+    return { acao: "confirmar_marcacao", motivo: "FOTO_MARCACAO_INCERTA" } as const;
   if (fotos.some(m => ["outro", "receita_remedio"].includes(leituraSalvaDaFoto(m.raw)?.tipo ?? "")))
     return { acao: "encaminhar", motivo: "FOTO_REQUER_AVALIACAO_HUMANA" } as const;
   return { acao: "continuar", motivo: null } as const;

@@ -2,11 +2,22 @@ import { expect, it } from "bun:test";
 import { decidirFotos, PEDIR_NOVA_FOTO, FALHA_TECNICA_FOTO, apresentarRespostaDeFoto, leituraSalvaDaFoto, type MensagemFoto } from "../fotos";
 import { interpretarLeituraImagem, textoDaImagem, MAX_ITENS_IMAGEM } from "../leitura-imagem";
 import { montarHistoricoJev } from "../jev-contexto";
+import { CONFIRMAR_MARCACAO_FOTO } from "../fotos";
 const foto = (id: string, segundo: number, tipo = "ilegivel"): MensagemFoto => ({
   id, created_at: `2026-10-04T12:00:${String(segundo).padStart(2, "0")}Z`, direction: "in", tipo: "image",
   raw: { nina_leitura_imagem: tipo === "pedido_medico" ? { tipo, itens: ["ECG"] } : { tipo } },
 });
 const pedido: MensagemFoto = { ...foto("pedido", 10), tipo: "text", direction: "out", body: PEDIR_NOVA_FOTO, status: "sent", enviada_por: "nina", raw: null };
+it("marcação incerta não libera opções impressas nem consome tentativas de foto ilegível", () => {
+  const leitura = interpretarLeituraImagem(JSON.stringify({ tipo: "marcacao_incerta", itens: ["ECG", "TSH"] }));
+  expect(leitura).toEqual({ tipo: "marcacao_incerta" });
+  expect(leituraSalvaDaFoto({ nina_leitura_imagem: leitura })).toEqual(leitura);
+  expect(textoDaImagem(leitura)).not.toContain("pedido médico com:");
+  expect(textoDaImagem(leitura)).not.toContain("ECG");
+  for (const historico of [[], [pedido], [{ ...pedido, body: CONFIRMAR_MARCACAO_FOTO }]])
+    expect(decidirFotos([foto("selecao", 20, "marcacao_incerta")], historico).acao).toBe("confirmar_marcacao");
+  expect(decidirFotos([foto("resposta", 30, "pedido_medico")], [pedido]).acao).toBe("continuar");
+});
 it("primeira foto e duas fotos do mesmo lote pedem somente uma nova tentativa", () => {
   expect(decidirFotos([foto("a", 1)], []).acao).toBe("nova_foto");
   expect(decidirFotos([foto("a", 1), foto("b", 2)], [pedido]).acao).toBe("nova_foto");

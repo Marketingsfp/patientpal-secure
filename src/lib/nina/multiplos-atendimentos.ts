@@ -20,12 +20,21 @@ export function multiplosPeloJev(r: RespostaJev | undefined): boolean {
   return typeof r?.confidence === "number" && r.confidence >= 0.8 && r.choice === "varios";
 }
 
-const PEDIDO_LIDO = /^Enviei a foto de um pedido médico com: (.+?)\.(?:\s|$)/;
+const PEDIDO_LIDO = /^Enviei a foto de um pedido médico com: (.+)/;
 
 /** Itens do pedido médico lido da foto (texto gerado pelo sistema, não pelo paciente). */
 export function itensDoPedidoLido(mensagem: string): string[] {
   const m = PEDIDO_LIDO.exec(mensagem.trim());
-  return m ? m[1]!.split(";").map((i) => i.trim()).filter(Boolean) : [];
+  if (!m) return [];
+  // A legenda nova ocupa outra linha. Transcrições anteriores podem tê-la na
+  // mesma linha: encerrar na primeira frase, preservando pontos internos de siglas.
+  const lista = m[1]!;
+  for (const ponto of lista.matchAll(/\.(?=\s|$)/g)) {
+    const antes = lista.slice(0, ponto.index);
+    if (/(?:^|[\s;])(?:[A-Za-z]\.)+[A-Za-z]$/.test(antes)) continue;
+    return antes.split(";").map((i) => i.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 export const MOTIVO_MULTIPLOS = "MULTIPLOS_ATENDIMENTOS";

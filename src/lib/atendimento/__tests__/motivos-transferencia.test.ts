@@ -10,6 +10,7 @@ import {
 describe("causa interna de transferência", () => {
   for (const [codigo, explicacao] of [
     ["PROFISSIONAL_SFP", "Regra SFP"],
+    ["MULTIPLOS_ATENDIMENTOS", "dois ou mais atendimentos"],
     ["CATALOGO_ATENDIMENTO_HUMANO", "cadastro consultado exige"],
     ["JEV_URGENCIA_CLINICA", "possível urgência"],
     ["JEV_PEDIDO_ATENDENTE", "pedido do paciente"],
@@ -34,6 +35,8 @@ describe("causa interna de transferência", () => {
     it(codigo!, () => expect(motivoParaAtendimento("[Outro] " + codigo)).toContain(explicacao!));
 
   it("preserva detalhes úteis e não vaza erros ou payloads", () => {
+    expect(motivoParaAtendimento("MULTIPLOS_ATENDIMENTOS: o paciente enviou pedido médico com 2 exames (ECG; TSH)."))
+      .toContain("2 exames (ECG; TSH)");
     expect(motivoParaAtendimento("PROFISSIONAL_SFP: Eletrocardiograma")).toContain(
       "Eletrocardiograma",
     );
