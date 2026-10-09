@@ -47,6 +47,7 @@ function ambiente() {
     atendenteSelecionadoId: null,
     visualizacao: "espera",
     souGestor: false,
+    mostrarTestes: false,
     seqConvs: { current: 0 },
     chaveAtualRef: { current: "espera" },
     chaveInbox: (p: { visualizacao: string }) => p.visualizacao,

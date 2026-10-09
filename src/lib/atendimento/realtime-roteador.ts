@@ -14,6 +14,8 @@
  * filtro, e nada aqui concede acesso a dado nenhum.
  */
 
+import { linhaDeTesteOculta } from "./conversas-teste";
+
 export type AlvoAtualizacao =
   /** Lista/inbox (cartões, ordenação, entrada e saída de escopo). */
   | "lista"
@@ -38,6 +40,8 @@ export type ContextoTela = {
   conversaAberta: string | null;
   pacienteAberto?: string | null;
   agendamentosAbertos?: readonly string[];
+  /** Modo treinamento: admin com "Mostrar conversas de teste" ligado. */
+  incluirTeste?: boolean;
 };
 
 /** Linha útil do evento: DELETE só traz o registro antigo. */
@@ -51,8 +55,8 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
   // Outra clínica: nada a fazer nesta tela. Quando o evento não traz a
   // clínica, o tratamento continua sendo o conservador (não descarta).
   if (linha.clinica_id && ctx.clinicaId && linha.clinica_id !== ctx.clinicaId) return [];
-  // Console de homologação nunca mexe no atendimento real.
-  if (linha.is_teste === true) return [];
+  // Console de homologação nunca mexe no atendimento real (salvo modo treinamento).
+  if (linhaDeTesteOculta(linha, ctx.incluirTeste)) return [];
 
   const aberta = ctx.conversaAberta;
 

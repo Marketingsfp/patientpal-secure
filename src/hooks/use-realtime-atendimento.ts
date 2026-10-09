@@ -47,8 +47,12 @@ export function useRealtimeAtendimento(params: {
   /** Estado da conexão (para telemetria/diagnóstico; sem tela nesta fase). */
   onEstado?: (estado: EstadoConexao) => void;
   enabled?: boolean;
+  /** Modo treinamento: admin com "Mostrar conversas de teste" ligado. */
+  incluirTeste?: boolean;
 }) {
   const { clinicaId, conversaAberta, onAlvos, onReconectar, onEstado, enabled = true } = params;
+  const incluirTesteRef = useRef(params.incluirTeste);
+  incluirTesteRef.current = params.incluirTeste;
 
   // As referências mais recentes ficam em refs: trocar de conversa não pode
   // derrubar e recriar o canal (isso reiniciava a conexão a cada lead).
@@ -94,6 +98,7 @@ export function useRealtimeAtendimento(params: {
             conversaAberta: abertaRef.current,
             pacienteAberto: pacienteRef.current,
             agendamentosAbertos: agendamentosRef.current,
+            incluirTeste: incluirTesteRef.current,
           });
           if (alvos.length === 0) return;
           onAlvosRef.current(alvos, ev);

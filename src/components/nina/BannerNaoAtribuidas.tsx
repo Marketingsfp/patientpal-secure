@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { listarFilaHumana } from "@/lib/atendimento.functions";
+import { useMostrarConversasTeste } from "@/hooks/use-mostrar-conversas-teste";
 import { cn } from "@/lib/utils";
 
 /** Chave lida pela caixa de entrada quando a tela abre pelo banner. */
@@ -19,6 +20,7 @@ export function BannerNaoAtribuidas() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const listarFn = useServerFn(listarFilaHumana);
+  const { ligado: mostrarTestes } = useMostrarConversasTeste(clinicaAtual?.role === "admin");
   const navigate = useNavigate();
   const [total, setTotal] = useState(0);
 
@@ -28,12 +30,14 @@ export function BannerNaoAtribuidas() {
       return;
     }
     try {
-      const r = (await listarFn({ data: { clinicaId, limit: 200 } })) as unknown as unknown[];
+      const r = (await listarFn({
+        data: { clinicaId, limit: 200, incluirTeste: mostrarTestes },
+      })) as unknown as unknown[];
       setTotal(Array.isArray(r) ? r.length : 0);
     } catch {
       /* silencioso: é um indicador, não pode atrapalhar o cabeçalho */
     }
-  }, [clinicaId, listarFn]);
+  }, [clinicaId, listarFn, mostrarTestes]);
 
   useEffect(() => {
     void carregar();

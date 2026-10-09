@@ -65,6 +65,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { useMostrarConversasTeste } from "@/hooks/use-mostrar-conversas-teste";
+import { MOTIVO_CONVERSA_TESTE } from "@/lib/atendimento/conversas-teste";
 import {
   EVENTO_FILTRAR_NAO_ATRIBUIDAS,
   FILTRO_NAO_ATRIBUIDAS_KEY,
@@ -488,6 +491,12 @@ export function AtendInbox({
   const [menuAtendentesAberto, setMenuAtendentesAberto] = useState(false);
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
+  // Modo treinamento: só administrador vê o controle; a preferência é lembrada por usuário.
+  const {
+    ligado: mostrarTestes,
+    carregado: mostrarTestesCarregado,
+    alternar: alternarMostrarTestes,
+  } = useMostrarConversasTeste(souAdmin);
   const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(
     null,
   );
@@ -1137,7 +1146,7 @@ export function AtendInbox({
   const carregarContadores = useCallback(async () => {
     if (!clinicaId) return;
     try {
-      const r: any = await contarInboxFn({ data: { clinicaId } });
+      const r: any = await contarInboxFn({ data: { clinicaId, incluirTeste: mostrarTestes } });
       setContadores({
         minhas: r?.minhas ?? 0,
         nina: r?.nina ?? 0,
@@ -1149,7 +1158,7 @@ export function AtendInbox({
     } catch {
       /* contadores são informativos; falha não bloqueia a lista */
     }
-  }, [clinicaId, contarInboxFn]);
+  }, [clinicaId, contarInboxFn, mostrarTestes]);
 
   // FASE 4 — os números dos filtros são conferidos ao entrar na tela, ao
   // trocar de filtro e depois de cada carga da lista. O tamanho da lista não
@@ -1208,6 +1217,7 @@ export function AtendInbox({
                 visualizacao,
                 limit: visualizacao === "recentes" ? TAMANHO_LOTE_ATIVAS : 100,
                 apos,
+                incluirTeste: mostrarTestes,
               },
             }),
           );
@@ -1250,6 +1260,7 @@ export function AtendInbox({
           userId: meuId,
           gestor: souGestor,
           atendenteId: atendenteSelecionadoId,
+          incluirTeste: mostrarTestes,
         };
         const rows = filtrarPorEscopo(brutas as any[], ctxEscopo).map((c: any) => {
           const confirmada = aberturasConfirmadasRef.current.get(
@@ -1301,7 +1312,11 @@ export function AtendInbox({
           // A leitura autenticada confirma que o chat ainda pertence à atendente.
           confirmadaForaLista = await revalidarChatSelecionado(() =>
             obterConversaFn({
-              data: { clinicaId, conversaId: selecionadaParaConferir.id },
+              data: {
+                clinicaId,
+                conversaId: selecionadaParaConferir.id,
+                incluirTeste: mostrarTestes,
+              },
             }),
           );
           if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
@@ -1387,6 +1402,7 @@ export function AtendInbox({
       abrirConversa,
       obterConversaFn,
       modoCentral,
+      mostrarTestes,
     ],
   );
 
@@ -1421,7 +1437,9 @@ export function AtendInbox({
     const idPedido = selecaoId;
     void (async () => {
       try {
-        const row: any = await obterConversaFn({ data: { clinicaId, conversaId: idPedido } });
+        const row: any = await obterConversaFn({
+          data: { clinicaId, conversaId: idPedido, incluirTeste: mostrarTestes },
+        });
         if (selecaoIdRef.current !== idPedido) return;
         if (!row) {
           setErroAcesso("Conversa não encontrada.");
@@ -2034,7 +2052,16 @@ export function AtendInbox({
   carregarConvsRef.current = carregarConvs;
   useEffect(() => {
     void carregarConvsRef.current();
-  }, [clinicaId, filtroStatus, escopo, atendenteSelecionadoId, visualizacao, meuId, souGestor]);
+  }, [
+    clinicaId,
+    filtroStatus,
+    escopo,
+    atendenteSelecionadoId,
+    visualizacao,
+    meuId,
+    souGestor,
+    mostrarTestes,
+  ]);
   // O responsável pode mudar a qualquer momento (transferência, distribuição
   // automática, tomada por outra pessoa). A lista chega por Realtime, então a
   // conversa aberta sempre acompanha o que está gravado no banco.
@@ -2241,16 +2268,15 @@ export function AtendInbox({
     if (!clinicaId || !session) return;
     const pedido = ++seqEspera.current;
     try {
-      const m = (await esperaFn({ data: { clinicaId, isTeste: false } })) as unknown as Record<
-        string,
-        string
-      >;
+      const m = (await esperaFn({
+        data: { clinicaId, isTeste: false, incluirTeste: mostrarTestes },
+      })) as unknown as Record<string, string>;
       if (pedido !== seqEspera.current) return;
       setEspera((prev) => mesclarEspera(prev, m ?? {}));
     } catch {
       /* indicador auxiliar: falha não pode atrapalhar o atendimento */
     }
-  }, [clinicaId, session, esperaFn]);
+  }, [clinicaId, session, esperaFn, mostrarTestes]);
 
   useEffect(() => {
     void carregarEspera();
@@ -2428,6 +2454,7 @@ export function AtendInbox({
     agendamentosAbertos: contatoAtual?.agendamentos?.map((a: { id: string }) => a.id) ?? [],
     // O canal depende do RLS: só é aberto com clínica E sessão já disponíveis.
     enabled: !!clinicaId && !!meuId,
+    incluirTeste: mostrarTestes,
     onEstado: (estado) => {
       const decisao = watchdog.current.aoEstado(estado);
       registrarDiagnostico("atendimento-realtime", { status: estado });
@@ -2482,6 +2509,7 @@ export function AtendInbox({
         const r = normalizarMensagemRealtime(evento, {
           clinicaId: clinicaId ?? null,
           conversaAberta: selIdRef.current,
+          incluirTeste: mostrarTestes,
         });
         if (
           r.usar &&
@@ -2519,7 +2547,13 @@ export function AtendInbox({
         // FASE 3 — transferência, handoff da Nina ou encerramento entram e
         // saem da lista na hora, respeitando o atendente e o estado escolhidos.
         const atualizada = evento.new;
-        const contextoChat = { clinicaId, escopo, userId: meuId, gestor: souGestor };
+        const contextoChat = {
+          clinicaId,
+          escopo,
+          userId: meuId,
+          gestor: souGestor,
+          incluirTeste: mostrarTestes,
+        };
         if (
           atualizada?.id === selIdRef.current &&
           podeRevalidarChatEntreFiltros(selRef.current, contextoChat)
@@ -2550,6 +2584,7 @@ export function AtendInbox({
           buscando: false,
           visualizacao,
           espera: esperaRef.current,
+          incluirTeste: mostrarTestes,
         });
         if (r.aplicado) {
           listaPorPatch = true;
@@ -3027,6 +3062,8 @@ export function AtendInbox({
         toast.error("Conversa encerrada. Não é possível assumir.");
       } else if (r?.motivo === "NAO_ENCONTRADA") {
         toast.error("Conversa não encontrada nesta clínica.");
+      } else if (r?.motivo === MOTIVO_CONVERSA_TESTE) {
+        toast.error("Conversa de teste: assumir e responder ficam para a próxima etapa.");
       } else {
         toast.error(
           `Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`,
@@ -3361,6 +3398,20 @@ export function AtendInbox({
                       recebe novas conversas.
                     </p>
                   )}
+                  {souAdmin && (
+                    <label
+                      className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
+                      data-testid="inbox-mostrar-testes"
+                    >
+                      <span>Mostrar conversas de teste</span>
+                      <Switch
+                        checked={mostrarTestes}
+                        disabled={!mostrarTestesCarregado}
+                        onCheckedChange={(v) => void alternarMostrarTestes(v)}
+                        aria-label="Mostrar conversas de teste"
+                      />
+                    </label>
+                  )}
                   {controle.erro && !controle.salvando && (
                     <Button
                       size="sm"
@@ -3639,8 +3690,11 @@ export function AtendInbox({
                           );
                         })}
                         {c.is_teste && (
-                          <Badge className="bg-atd-warn-bg text-atd-warn-ink text-[11px] border border-atd-warn">
-                            Teste
+                          <Badge
+                            className="bg-atd-warn-bg text-atd-warn-ink text-[11px] font-bold tracking-wide border border-atd-warn"
+                            data-testid="etiqueta-teste"
+                          >
+                            TESTE
                           </Badge>
                         )}
                         <BadgeEspera desde={espera[c.id]} />
@@ -3753,7 +3807,14 @@ export function AtendInbox({
                             </button>
                           </span>
                         )}
-                        {sel.is_teste && <span>· Teste (homologação)</span>}
+                        {sel.is_teste && (
+                          <Badge
+                            className="bg-atd-warn-bg text-atd-warn-ink text-[11px] font-bold tracking-wide border border-atd-warn"
+                            data-testid="etiqueta-teste-cabecalho"
+                          >
+                            TESTE · homologação
+                          </Badge>
+                        )}
                         {sel.protocolo_atendimento && (
                           <span className="inline-flex items-center gap-1">
                             · <code>Protocolo {sel.protocolo_atendimento}</code>

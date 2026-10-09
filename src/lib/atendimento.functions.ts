@@ -7,6 +7,12 @@ import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
 import { periodoCentralSchema, aplicarPeriodoCentral } from "@/lib/atendimento/periodo-central";
 import { z } from "zod";
+import {
+  MOTIVO_CONVERSA_TESTE,
+  MSG_CONVERSA_DE_TESTE,
+  conversaEhDeTeste,
+  mesclarEsperaTeste,
+} from "./atendimento/conversas-teste";
 import { cursorInboxSchema, filtroAposCursor } from "./atendimento/paginacao-inbox";
 import {
   STATUS_FECHADOS,
@@ -78,6 +84,56 @@ async function ehAdminClinica(
   return !!data;
 }
 /**
+ * Modo treinamento — "Mostrar conversas de teste". O pedido do navegador só vale
+ * para administrador: qualquer outro perfil continua sem ver teste, mesmo que
+ * mande `incluirTeste: true`.
+ */
+async function incluirTesteAutorizado(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  clinicaId: string,
+  pedido: boolean | undefined,
+): Promise<boolean> {
+  if (!pedido) return false;
+  try {
+    return await ehAdminClinica(supabase, userId, clinicaId);
+  } catch {
+    return false;
+  }
+}
+/** Sem o controle ligado, toda consulta da tela continua descartando `is_teste`. */
+function semConversasDeTeste<Q extends { eq: (c: string, v: boolean) => Q }>(
+  q: Q,
+  incluirTeste: boolean,
+): Q {
+  return incluirTeste ? q : q.eq("is_teste", false);
+}
+/**
+ * Espera canônica por conversa. A RPC filtra por igualdade de `is_teste`, então
+ * com o controle ligado ela é chamada duas vezes (reais + teste) e o resultado
+ * é juntado — nunca uma consulta diferente da de produção.
+ */
+async function mapaEsperaPorConversa(
+  supabase: SupabaseClient<Database>,
+  clinicaId: string,
+  incluirTeste: boolean,
+): Promise<Record<string, string>> {
+  const ler = async (teste: boolean) => {
+    const { data, error } = await supabase.rpc("atend_espera_por_conversa", {
+      _clinica_id: clinicaId,
+      _is_teste: teste,
+    });
+    if (error) throw new Error(error.message);
+    const mapa: Record<string, string> = {};
+    for (const e of (data ?? []) as { conversa_id?: string; aguardando_desde?: string }[]) {
+      if (e.conversa_id && e.aguardando_desde) mapa[e.conversa_id] = e.aguardando_desde;
+    }
+    return mapa;
+  };
+  const reais = await ler(false);
+  return mesclarEsperaTeste(reais, incluirTeste ? await ler(true) : null, incluirTeste);
+}
+/**
  * Transferência/atribuição manual não vai para quem está em Pausa ou Pausa para almoço.
  * (Offline não entra nesta barreira: a regra pedida vale só para as duas pausas.)
  */
@@ -109,16 +165,16 @@ async function idsPendentesDoAtendente(
   clinicaId: string,
   userId: string,
   espera: Record<string, string>,
+  incluirTeste = false,
 ): Promise<string[]> {
   if (!Object.keys(espera).length) return [];
   const minhas = new Set<string>();
   const PAGINA = 1000;
   for (let de = 0; ; de += PAGINA) {
-    const { data, error } = await supabase
-      .from("atend_conversas")
-      .select("id")
-      .eq("clinica_id", clinicaId)
-      .eq("is_teste", false)
+    const { data, error } = await semConversasDeTeste(
+      supabase.from("atend_conversas").select("id").eq("clinica_id", clinicaId),
+      incluirTeste,
+    )
       .eq("atribuida_user_id", userId)
       .neq("owner_type", "AI")
       .not("status", "in", `(${STATUS_FECHADOS.join(",")})`)
@@ -135,18 +191,11 @@ async function contarPendentesDoAtendente(
   supabase: SupabaseClient<Database>,
   clinicaId: string,
   userId: string,
+  incluirTeste = false,
 ): Promise<number> {
   try {
-    const { data: esperas, error } = await supabase.rpc("atend_espera_por_conversa", {
-      _clinica_id: clinicaId,
-      _is_teste: false,
-    });
-    if (error) throw new Error(error.message);
-    const mapa: Record<string, string> = {};
-    for (const e of (esperas ?? []) as { conversa_id?: string; aguardando_desde?: string }[]) {
-      if (e.conversa_id && e.aguardando_desde) mapa[e.conversa_id] = e.aguardando_desde;
-    }
-    return (await idsPendentesDoAtendente(supabase, clinicaId, userId, mapa)).length;
+    const mapa = await mapaEsperaPorConversa(supabase, clinicaId, incluirTeste);
+    return (await idsPendentesDoAtendente(supabase, clinicaId, userId, mapa, incluirTeste)).length;
   } catch {
     // Contador é informativo: falha não derruba a tela.
     return 0;
@@ -220,6 +269,8 @@ export const listarConversas = createServerFn({ method: "POST" })
         visualizacao: z.enum(["recentes", "resolvidas", "espera"]).default("recentes"),
         limit: z.number().int().min(1).max(500).default(100),
         apos: cursorInboxSchema.nullish(),
+        // Modo treinamento: só administrador, e só com "Mostrar conversas de teste" ligado.
+        incluirTeste: z.boolean().default(false),
       })
       .parse(i),
   )
@@ -235,7 +286,7 @@ export const listarConversas = createServerFn({ method: "POST" })
     };
 
     // Autorização e permissão de gestão não dependem uma da outra: saem juntas.
-    const [, podeGerirRes] = await Promise.all([
+    const [, podeGerirRes, incluirTeste] = await Promise.all([
       assertMember(context.supabase, context.userId, data.clinicaId),
       (async () => {
         try {
@@ -248,6 +299,7 @@ export const listarConversas = createServerFn({ method: "POST" })
           return false;
         }
       })(),
+      incluirTesteAutorizado(context.supabase, context.userId, data.clinicaId, data.incluirTeste),
     ]);
     marcar("autorizacao");
 
@@ -280,14 +332,12 @@ export const listarConversas = createServerFn({ method: "POST" })
     // (`atend_espera_por_conversa`): conversa em que a clínica é que aguarda
     // o paciente fica de fora. O conjunto vem antes do corte da lista.
     let idsEspera: string[] | null = null;
-    const mapaEspera: Record<string, string> = {};
+    let mapaEspera: Record<string, string> = {};
     if (plano.exigeEsperaPaciente) {
-      const { data: esperas } = await context.supabase.rpc("atend_espera_por_conversa", {
-        _clinica_id: data.clinicaId,
-        _is_teste: false,
-      });
-      for (const e of (esperas ?? []) as any[]) {
-        if (e?.conversa_id && e?.aguardando_desde) mapaEspera[e.conversa_id] = e.aguardando_desde;
+      try {
+        mapaEspera = await mapaEsperaPorConversa(context.supabase, data.clinicaId, incluirTeste);
+      } catch {
+        mapaEspera = {};
       }
       // Pendentes de uma pessoa: só as conversas que estão com ela agora. O recorte
       // precisa vir ANTES do teto da lista, senão as dela poderiam ficar de fora.
@@ -300,6 +350,7 @@ export const listarConversas = createServerFn({ method: "POST" })
           data.clinicaId,
           responsavelEspera,
           mapaEspera,
+          incluirTeste,
         );
         esperaConsiderada = Object.fromEntries(doResponsavel.map((id) => [id, mapaEspera[id]!]));
         for (const id of Object.keys(mapaEspera))
@@ -314,14 +365,15 @@ export const listarConversas = createServerFn({ method: "POST" })
       }
     }
 
-    let q = context.supabase
-      .from("atend_conversas")
-      // O nome do paciente vinculado vem embutido na MESMA consulta (sem
-      // consulta por item da lista). Sem vínculo, vem null.
-      .select("*, pacientes:contato_paciente_id(nome)")
-      // Conversas do console de homologação nunca aparecem no atendimento real.
-      .eq("is_teste", false)
-      .eq("clinica_id", data.clinicaId);
+    let q = semConversasDeTeste(
+      context.supabase
+        .from("atend_conversas")
+        // O nome do paciente vinculado vem embutido na MESMA consulta (sem
+        // consulta por item da lista). Sem vínculo, vem null.
+        .select("*, pacientes:contato_paciente_id(nome)"),
+      // Conversas do console de homologação só aparecem no modo treinamento (admin).
+      incluirTeste,
+    ).eq("clinica_id", data.clinicaId);
 
     // --- Escopo (de quem é a conversa) -------------------------------------
     // Filtro por responsável direto no banco, antes de ordenar e cortar a
@@ -429,7 +481,13 @@ export const listarConversas = createServerFn({ method: "POST" })
 export const obterConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        conversaId: z.string().uuid(),
+        incluirTeste: z.boolean().default(false),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
@@ -437,12 +495,18 @@ export const obterConversa = createServerFn({ method: "POST" })
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
-    const { data: row, error } = await context.supabase
-      .from("atend_conversas")
-      .select("*, pacientes:contato_paciente_id(nome)")
+    const incluirTeste = await incluirTesteAutorizado(
+      context.supabase,
+      context.userId,
+      data.clinicaId,
+      data.incluirTeste,
+    );
+    const { data: row, error } = await semConversasDeTeste(
+      context.supabase.from("atend_conversas").select("*, pacientes:contato_paciente_id(nome)"),
+      incluirTeste,
+    )
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
-      .eq("is_teste", false)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return null;
@@ -474,17 +538,24 @@ export const buscarConversaPorNumero = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         numero: z.number().int().positive().max(1_000_000_000_000),
+        incluirTeste: z.boolean().default(false),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
-    const { data: row, error } = await context.supabase
-      .from("atend_conversas")
-      .select("*, pacientes:contato_paciente_id(nome)")
+    const incluirTeste = await incluirTesteAutorizado(
+      context.supabase,
+      context.userId,
+      data.clinicaId,
+      data.incluirTeste,
+    );
+    const { data: row, error } = await semConversasDeTeste(
+      context.supabase.from("atend_conversas").select("*, pacientes:contato_paciente_id(nome)"),
+      incluirTeste,
+    )
       .eq("clinica_id", data.clinicaId)
       .eq("numero_conversa", data.numero)
-      .eq("is_teste", false)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return null;
@@ -504,9 +575,17 @@ export const buscarConversaPorNumero = createServerFn({ method: "POST" })
  */
 export const contarConversasInbox = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .inputValidator((i: unknown) =>
+    z.object({ clinicaId: z.string().uuid(), incluirTeste: z.boolean().default(false) }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    const incluirTeste = await incluirTesteAutorizado(
+      context.supabase,
+      context.userId,
+      data.clinicaId,
+      data.incluirTeste,
+    );
     let gestor = false;
     try {
       const { data: podeGerir } = await context.supabase.rpc("can_manage_clinica", {
@@ -519,11 +598,10 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
     }
 
     const base = () =>
-      context.supabase
-        .from("atend_conversas")
-        .select("id", { count: "exact", head: true })
-        .eq("is_teste", false)
-        .eq("clinica_id", data.clinicaId);
+      semConversasDeTeste(
+        context.supabase.from("atend_conversas").select("id", { count: "exact", head: true }),
+        incluirTeste,
+      ).eq("clinica_id", data.clinicaId);
     const abertas = () => base().not("status", "in", `(${STATUS_FECHADOS.join(",")})`);
     const filtroFechadas = filtroResponsavel(context.userId, { somenteResolvidas: true });
     let minhasFechadas = base().in("status", [...STATUS_FECHADOS]);
@@ -538,7 +616,7 @@ export const contarConversasInbox = createServerFn({ method: "POST" })
         : Promise.resolve({ count: 0 } as { count: number | null }),
       gestor ? base().in("status", [...STATUS_FECHADOS]) : minhasFechadas,
       gestor ? abertas() : Promise.resolve({ count: null } as { count: number | null }),
-      contarPendentesDoAtendente(context.supabase, data.clinicaId, context.userId),
+      contarPendentesDoAtendente(context.supabase, data.clinicaId, context.userId, incluirTeste),
     ]);
 
     return {
@@ -2169,7 +2247,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const { data: conv, error: cErr } = await context.supabase
       .from("atend_conversas")
       .select(
-        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status, owner_type",
+        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status, owner_type, is_teste",
       )
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
@@ -2178,6 +2256,9 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // A conversa pode ter sido encerrada/removida enquanto estava selecionada
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
     if (!conv) return null;
+    // Modo treinamento: conversa de teste nunca sai pela Meta. A resposta da
+    // atendente em teste é a etapa 2 (fica só no sistema).
+    if (conversaEhDeTeste(conv)) throw new Error(MSG_CONVERSA_DE_TESTE);
     if (!conv.contato_telefone) throw new Error("Conversa sem telefone");
     // Bloqueio de atendimento duplicado: só o responsável atual pode responder.
     if (conv.status === "closed")
@@ -2822,23 +2903,29 @@ export const listarFilaHumana = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         departamentoId: z.string().uuid().nullable().optional(),
         limit: z.number().int().min(1).max(200).default(100),
+        incluirTeste: z.boolean().default(false),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
     const { usuarioEhGestor } = await import("./atendimento/acesso-conversa.server");
-    const gestor = await usuarioEhGestor(context.supabase, context.userId, data.clinicaId);
-    let q = context.supabase
-      .from("atend_conversas")
-      .select(
-        "id, contato_nome, whatsapp_profile_name, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, pacientes:contato_paciente_id(nome)",
-      )
+    const [gestor, incluirTeste] = await Promise.all([
+      usuarioEhGestor(context.supabase, context.userId, data.clinicaId),
+      incluirTesteAutorizado(context.supabase, context.userId, data.clinicaId, data.incluirTeste),
+    ]);
+    let q = semConversasDeTeste(
+      context.supabase
+        .from("atend_conversas")
+        .select(
+          "id, contato_nome, whatsapp_profile_name, contato_telefone, canal, status, departamento_id, prioridade, aguardando_desde, handoff_motivo, handoff_resumo, ultima_msg_preview, ultima_msg_em, unread_count, is_teste, pacientes:contato_paciente_id(nome)",
+        ),
+      incluirTeste,
+    )
       .eq("clinica_id", data.clinicaId)
       // Mesma fila da Inbox: a fila global sem responsável é só da gestão.
       .in("status", ["waiting", "active", "in_progress"])
       .neq("owner_type", "AI")
-      .eq("is_teste", false)
       .order("prioridade", { ascending: false })
       .order("aguardando_desde", { ascending: true })
       .limit(data.limit);
@@ -2879,12 +2966,14 @@ export const assumirConversa = createServerFn({ method: "POST" })
     await assertConversaDaClinica(context.supabase, data.conversaId, data.clinicaId);
     const { data: conv, error: eConv } = await context.supabase
       .from("atend_conversas")
-      .select("id, atribuida_user_id, status, departamento_id, owner_type")
+      .select("id, atribuida_user_id, status, departamento_id, owner_type, is_teste")
       .eq("id", data.conversaId)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
     if (eConv) throw new Error(eConv.message);
     if (!conv) return { ok: false as const, motivo: "NAO_ENCONTRADA" as const };
+    // Modo treinamento: assumir conversa de teste fica para a etapa 2.
+    if (conversaEhDeTeste(conv)) return { ok: false as const, motivo: MOTIVO_CONVERSA_TESTE };
     if (conv.status === "closed") return { ok: false as const, motivo: "ENCERRADA" as const };
     // O admin assume só conversa sem responsável (fila global), por clique; nunca toma a de uma
     // atendente nem a da Nina.
@@ -3332,10 +3421,26 @@ export const listarPresenca = createServerFn({ method: "POST" })
 export const esperaConversas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ clinicaId: z.string().uuid(), isTeste: z.boolean().default(false) }).parse(i),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        isTeste: z.boolean().default(false),
+        // Modo treinamento: reais + teste no mesmo mapa (só administrador).
+        incluirTeste: z.boolean().default(false),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    if (!data.isTeste) {
+      const incluirTeste = await incluirTesteAutorizado(
+        context.supabase,
+        context.userId,
+        data.clinicaId,
+        data.incluirTeste,
+      );
+      return mapaEsperaPorConversa(context.supabase, data.clinicaId, incluirTeste);
+    }
     const { data: rows, error } = await context.supabase.rpc("atend_espera_por_conversa", {
       _clinica_id: data.clinicaId,
       _is_teste: data.isTeste,

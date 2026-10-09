@@ -21,6 +21,7 @@ import {
   type ConversaEscopo,
 } from "./escopo-inbox";
 import { ordenarInbox } from "./ordem-inbox";
+import { linhaDeTesteOculta } from "./conversas-teste";
 
 export type LinhaLista = {
   id: string;
@@ -149,6 +150,8 @@ export function patchListaPorConversa(
     visualizacao?: VisualizacaoPatch;
     /** Métrica canônica de paciente aguardando (`atend_espera_por_conversa`). */
     espera?: Record<string, string>;
+    /** Modo treinamento: admin com "Mostrar conversas de teste" ligado. */
+    incluirTeste?: boolean;
   },
 ): ResultadoPatch {
   const id = String(linha?.["id"] ?? "");
@@ -200,7 +203,8 @@ export function patchListaPorConversa(
     // Durante uma busca a lista é um recorte do servidor: não dá para saber
     // localmente se a conversa pertence ao resultado.
     if (ctx.buscando) return { lista, aplicado: false, reconciliar: true };
-    if (linha?.["is_teste"] === true) return { lista, aplicado: true, reconciliar: false };
+    if (linhaDeTesteOculta(linha as { is_teste?: boolean | null }, ctx.incluirTeste))
+      return { lista, aplicado: true, reconciliar: false };
     return {
       lista: ordenarInbox([...lista, { ...(linha as LinhaLista) }], visualizacao, espera),
       aplicado: true,

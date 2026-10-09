@@ -12,6 +12,7 @@ import { Inbox, RefreshCw, AlertTriangle } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { listarFilaHumana } from "@/lib/atendimento.functions";
+import { useMostrarConversasTeste } from "@/hooks/use-mostrar-conversas-teste";
 import { tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 
 type ConversaFila = {
@@ -45,6 +46,8 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
   const listarFn = useServerFn(listarFilaHumana);
+  // Modo treinamento: a fila mostra teste só para admin com o controle ligado.
+  const { ligado: mostrarTestes } = useMostrarConversasTeste(clinicaAtual?.role === "admin");
   const [rows, setRows] = useState<ConversaFila[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -52,14 +55,16 @@ export function FilaHumana(_props: { onAssumida?: (conversaId: string) => void }
     if (!clinicaId) return;
     setLoading(true);
     try {
-      const r = (await listarFn({ data: { clinicaId, limit: 100 } })) as unknown as ConversaFila[];
+      const r = (await listarFn({
+        data: { clinicaId, limit: 100, incluirTeste: mostrarTestes },
+      })) as unknown as ConversaFila[];
       setRows(r ?? []);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao carregar a fila");
     } finally {
       setLoading(false);
     }
-  }, [clinicaId, listarFn]);
+  }, [clinicaId, listarFn, mostrarTestes]);
 
   useEffect(() => {
     void carregar();

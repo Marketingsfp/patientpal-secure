@@ -15,6 +15,7 @@
  * validação do servidor deixa de existir por causa deste atalho.
  */
 
+import { linhaDeTesteOculta } from "./conversas-teste";
 import type { EventoRealtime } from "./realtime-roteador";
 
 /** Campos que a conversa realmente usa para desenhar a mensagem. */
@@ -44,6 +45,8 @@ export type ResultadoRealtime =
 export type ContextoMensagem = {
   clinicaId: string | null;
   conversaAberta: string | null;
+  /** Modo treinamento: admin com "Mostrar conversas de teste" ligado. */
+  incluirTeste?: boolean;
 };
 
 export function normalizarMensagemRealtime(
@@ -57,7 +60,7 @@ export function normalizarMensagemRealtime(
 
   const linha = evento.new;
   if (!linha || typeof linha !== "object") return { usar: false, motivo: "sem_linha" };
-  if (linha.is_teste === true) return { usar: false, motivo: "homologacao" };
+  if (linhaDeTesteOculta(linha, ctx.incluirTeste)) return { usar: false, motivo: "homologacao" };
 
   // Sem a clínica na linha não dá para provar a origem: cai no fallback.
   if (!linha.clinica_id || !ctx.clinicaId) return { usar: false, motivo: "clinica_ausente" };

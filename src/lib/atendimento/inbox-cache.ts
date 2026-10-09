@@ -19,6 +19,7 @@ import {
   type EscopoInbox,
 } from "./escopo-inbox";
 import { erroConfirmaConversaIndisponivel } from "./acesso-conversa-erros";
+import { linhaDeTesteOculta } from "./conversas-teste";
 
 export type LinhaCache = ConversaEscopo & {
   id: string;
@@ -27,6 +28,8 @@ export type LinhaCache = ConversaEscopo & {
 };
 
 export interface ContextoEscopo {
+  /** Modo treinamento: admin com "Mostrar conversas de teste" ligado. */
+  incluirTeste?: boolean;
   clinicaId?: string | null;
   escopo: EscopoInbox;
   userId: string | null;
@@ -106,7 +109,7 @@ export function podeRevalidarChatEntreFiltros(
     ctx.clinicaId &&
     ctx.userId &&
     selecionada.clinica_id === ctx.clinicaId &&
-    selecionada.is_teste !== true,
+    !linhaDeTesteOculta(selecionada, ctx.incluirTeste),
   );
 }
 
