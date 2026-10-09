@@ -1129,7 +1129,7 @@ async function gerarRespostaNinaInterno(
   let jevPontuacoes: Record<string, number | null> | null = null;
   let orientacaoIntencaoJev: import("@/lib/nina/jev-orientacao-intencao").OrientacaoIntencaoJev | null = null;
   /** Intenção do Jev com confiança alta (usada só para decidir a pré-busca). */
-  let intencaoJevSegura: import("@/lib/nina/atendimento-fase1").IntencaoNina | null = null;
+  let intencaoJevSegura: import("@/lib/nina/atendimento-fase1").IntencaoNina[] = [];
   try {
     const jev = await import("@/lib/nina/jev.server");
     const [f1, f2] = await Promise.all([
@@ -1167,7 +1167,11 @@ async function gerarRespostaNinaInterno(
       alteracaoSolicitada = alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
-      intencaoJevSegura = escolhida;
+      // Pré-busca: aceita também o pedido dividido entre intenções compatíveis.
+      if (f1 && respostas) {
+        const { intencoesParaPrefetch } = await import("@/lib/nina/prefetch-cadastro");
+        intencaoJevSegura = intencoesParaPrefetch(respostas["intencao"] as never);
+      }
       if (escolhida) {
         intencoesTurno = [escolhida];
         intencaoAmbiguaTurno = false;
@@ -1929,7 +1933,7 @@ async function gerarRespostaNinaInterno(
   const nomesFerramentas = (ferramentas as Array<{ function?: { name?: string } }>)
     .map(f => f.function?.name ?? "").filter(Boolean);
   const motivoSemPrefetch = !ctxFerramentas ? "ferramentas do paciente indisponíveis"
-    : !intencaoJevSegura ? "Jev sem intenção segura"
+    : !intencaoJevSegura.length ? "Jev sem intenção segura"
     : nomeAtendimentoAusente || alteracaoSolicitada || multiplosAtendimentos || jevEncaminhamento
       ? "turno com encaminhamento, alteração ou pedido múltiplo" : null;
   if (motivoSemPrefetch) rastro?.pular("tool.prefetch", motivoSemPrefetch);
