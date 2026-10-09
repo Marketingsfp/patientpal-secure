@@ -125,6 +125,7 @@ import {
   fecharConversa,
   listarDepartamentos,
   listarUsuariosClinica,
+  listarAutoresMensagensClinica,
   travarMinhaFila,
   pausaAtual,
   meuStatusAgente,
@@ -142,6 +143,7 @@ import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimen
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AvatarContato } from "@/components/nina/AvatarContato";
 import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
+import { TranscricaoAudioMensagem } from "@/components/nina/TranscricaoAudioMensagem";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import { conversasDesatualizadas, criarCacheConversas, respostaAindaVale } from "@/lib/atendimento/conversa-cache";
 import { criarPrefetchStore, chavePrefetch } from "@/lib/atendimento/prefetch-cache";
@@ -281,6 +283,7 @@ export function AtendInbox() {
   const fecharFn = useServerFn(fecharConversa);
   const listarDeptosFn = useServerFn(listarDepartamentos);
   const listarUsuariosFn = useServerFn(listarUsuariosClinica);
+  const listarAutoresFn = useServerFn(listarAutoresMensagensClinica);
   const travarFilaFn = useServerFn(travarMinhaFila);
   const devolverFn = useServerFn(devolverParaNina);
   const pausaAtualFn = useServerFn(pausaAtual);
@@ -332,6 +335,7 @@ export function AtendInbox() {
   // FASE 5 — revisão manual (e confirmada) do cadastro vinculado à conversa.
   const [deptos, setDeptos] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [autores, setAutores] = useState<{ clinicaId: string; nomes: Record<string, string | null> } | null>(null);
   // Supervisão mantém os dois eixos; atendentes usam três filtros operacionais.
   const [escopoBase, setEscopoBase] = useState<EscopoBaseInbox>(ESCOPO_BASE_PADRAO);
   const [visualizacaoEscolhida, setVisualizacao] = useState<VisualizacaoInbox>(VISUALIZACAO_PADRAO);
@@ -1788,6 +1792,18 @@ export function AtendInbox() {
       }
     })();
   }, [clinicaId, listarDeptosFn, listarUsuariosFn]);
+
+  // A autoria é independente da lista de destinatários (que exclui administradores).
+  useEffect(() => {
+    if (!clinicaId) return;
+    let vale = true;
+    listarAutoresFn({ data: { clinicaId } })
+      .then((lista) => {
+        if (vale) setAutores({ clinicaId, nomes: Object.fromEntries(lista.map((a) => [a.user_id, a.nome])) });
+      })
+      .catch(() => { if (vale) setAutores(null); });
+    return () => { vale = false; };
+  }, [clinicaId, listarAutoresFn]);
 
   // Ao abrir a transferência ou o filtro, só a lista de atendentes é relida
   // (para o status ficar atual). Não recarrega a conversa nem transfere nada.
@@ -3284,6 +3300,10 @@ export function AtendInbox() {
                       }
                       const m = item.msg;
                       const out = m.direction === "out";
+                      const autorSupervisao = out ? rotuloAutorSupervisao(
+                        m.enviada_por_perfil,
+                        autores && autores.clinicaId === clinicaId ? autores.nomes[m.enviada_por_user_id] : null,
+                      ) : null;
                       // Só marcador interno vira faixa central. Mensagem real
                       // enviada ao paciente (status de envio) fica como conversa.
                       if (marcadorInternoSistema(m)) {
@@ -3335,6 +3355,7 @@ export function AtendInbox() {
                             }`}
                           >
                             {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
+                            <TranscricaoAudioMensagem key={m.id} mensagem={m} />
                             {textoDaBolha(m) && <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>}
                             {ehOtimista(m) && m.status === "failed" && (
                               <div className="mt-1 flex items-center gap-2 text-[11px]">
@@ -3353,18 +3374,14 @@ export function AtendInbox() {
                             >
                               {/* Envio otimista: durante o envio normal a bolha não
                               exibe nenhum status — só a hora. Falha aparece acima. */}
-                              <span className="whitespace-nowrap">
+                              <span className="min-w-0 break-words">
                                 {fmtHora(m.recebida_em)} {m.enviada_por === "nina" && "· Nina"}
-                                {out && rotuloAutorSupervisao(m.enviada_por_perfil) && (
+                                {autorSupervisao && (
                                   <span
                                     data-testid="autor-supervisao"
-                                    title={`Resposta da supervisão (${rotuloAutorSupervisao(m.enviada_por_perfil)})${
-                                      usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome
-                                        ? ` — ${usuarios.find((u: any) => u.user_id === m.enviada_por_user_id)?.nome}`
-                                        : ""
-                                    }`}
+                                    title={`Resposta da supervisão (${autorSupervisao})`}
                                   >
-                                    · {rotuloAutorSupervisao(m.enviada_por_perfil)}
+                                    · {autorSupervisao}
                                   </span>
                                 )}
                               </span>

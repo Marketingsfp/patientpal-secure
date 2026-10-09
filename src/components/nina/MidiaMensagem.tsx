@@ -16,6 +16,7 @@ type MensagemComMidia = {
   id: string;
   tipo?: string | null;
   body?: string | null;
+  direction?: string | null;
   media_url?: string | null;
 };
 
@@ -36,9 +37,10 @@ function legendaDoDocumento(corpo: string): string {
 
 /**
  * Texto da bolha: com o arquivo à mostra, o texto padrão ("📷 Imagem", "🎞️ Vídeo", "📎 nome") some;
- * a legenda e a transcrição do áudio ficam.
+ * a legenda fica; a transcrição do áudio do paciente tem seu próprio botão.
  */
 export function textoDaBolha(m: MensagemComMidia): string {
+  if (m.tipo === "audio" && m.direction === "in") return "";
   const corpo = String(m.body ?? "");
   if (temMidiaVisivel(m)) {
     if (m.tipo === "image" && corpo === TEXTO_PADRAO_IMAGEM) return "";

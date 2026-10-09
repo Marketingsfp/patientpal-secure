@@ -25,12 +25,17 @@ import {
   type VinculoOp,
 } from "./fonte-operacional";
 import type { ServicoPublicado } from "./catalogo-conhecimento";
+import type { CbRegra } from "@/lib/cb-regras";
+import type { ValorManualConvenio } from "@/lib/tabela-valores/calcular";
 
 export const FLAG_NINA_INFORMA_CADASTRO = "nina_informa_cadastro";
 export const VALIDADE_CACHE_MS = 60_000;
 const PAGINA = 1000;
 
-export type FonteOperacional = { servicos: ServicoPublicado[]; profissionais: ProfissionalOperacional[] };
+export type FonteOperacional = {
+  servicos: ServicoPublicado[];
+  profissionais: ProfissionalOperacional[];
+};
 
 const VAZIA = (): FonteOperacional => ({ servicos: [], profissionais: [] });
 
@@ -46,7 +51,12 @@ export async function ninaInformaPeloCadastro(clinicaId: string): Promise<boolea
   return data?.ativo === true;
 }
 
-type Consulta = { range: (de: number, ate: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }> };
+type Consulta = {
+  range: (
+    de: number,
+    ate: number,
+  ) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>;
+};
 
 /** Lê todas as páginas (o servidor limita a 1000 linhas por resposta). */
 async function todasAsPaginas<T>(montar: () => Consulta): Promise<T[]> {
@@ -62,30 +72,115 @@ async function todasAsPaginas<T>(montar: () => Consulta): Promise<T[]> {
 
 async function lerCadastro(clinicaId: string): Promise<FonteOperacional> {
   const db = supabaseAdmin as unknown as { from: (t: string) => any };
-  const [medicos, disponibilidades, agendas, procedimentos, vinculos, especialidades] = await Promise.all([
+  const [
+    medicos,
+    disponibilidades,
+    agendas,
+    procedimentos,
+    vinculos,
+    especialidades,
+    convenios,
+    regrasConvenio,
+    valoresManuais,
+    especialidadesProcedimento,
+  ] = await Promise.all([
     todasAsPaginas<MedicoOp>(() =>
-      db.from("medicos").select("id, nome, especialidade_id, visivel_agendamento_online")
-        .eq("clinica_id", clinicaId).eq("ativo", true).order("id", { ascending: true })),
+      db
+        .from("medicos")
+        .select("id, nome, especialidade_id, visivel_agendamento_online")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("id", { ascending: true }),
+    ),
     todasAsPaginas<DisponibilidadeOp>(() =>
-      db.from("medico_disponibilidades")
-        .select("id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, vigencia_inicio, vigencia_fim")
-        .eq("clinica_id", clinicaId).eq("ativo", true).order("id", { ascending: true })),
+      db
+        .from("medico_disponibilidades")
+        .select(
+          "id, medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes, limite_pacientes, vigencia_inicio, vigencia_fim",
+        )
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("id", { ascending: true }),
+    ),
     todasAsPaginas<AgendaOp>(() =>
-      db.from("medico_agendas").select("id, medico_id, nome, ordem_chegada")
-        .eq("clinica_id", clinicaId).eq("ativo", true).order("id", { ascending: true })),
+      db
+        .from("medico_agendas")
+        .select("id, medico_id, nome, ordem_chegada")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("id", { ascending: true }),
+    ),
     todasAsPaginas<ProcedimentoOp>(() =>
-      db.from("procedimentos")
-        .select("id, nome, tipo, valor_padrao, valor_dinheiro_pix, valor_dinheiro, valor_cartao, preparo")
-        .eq("clinica_id", clinicaId).eq("ativo", true).order("id", { ascending: true })),
+      db
+        .from("procedimentos")
+        .select(
+          "id, nome, tipo, codigo, grupo, valor_padrao, valor_dinheiro_pix, valor_dinheiro, valor_cartao, valor_cartao_credito, valor_cartao_debito, valor_variavel, preparo, observacoes, duracao_minutos, sessoes_incluidas, ciclo_dias, agenda_obrigatoria, permite_venda_direta, permite_encaixe",
+        )
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("id", { ascending: true }),
+    ),
     todasAsPaginas<VinculoOp & { medicos?: unknown }>(() =>
-      db.from("medico_procedimentos")
+      db
+        .from("medico_procedimentos")
         .select("id, medico_id, procedimento_id, especialidade_id, medicos!inner(clinica_id)")
-        .eq("medicos.clinica_id", clinicaId).order("id", { ascending: true })),
-    todasAsPaginas<EspecialidadeOp>(() => db.from("especialidades").select("id, nome").order("id", { ascending: true })),
+        .eq("medicos.clinica_id", clinicaId)
+        .order("id", { ascending: true }),
+    ),
+    todasAsPaginas<EspecialidadeOp>(() =>
+      db.from("especialidades").select("id, nome").order("id", { ascending: true }),
+    ),
+    todasAsPaginas<{ id: string; nome: string }>(() =>
+      db
+        .from("cb_convenios")
+        .select("id, nome")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("id", { ascending: true }),
+    ),
+    todasAsPaginas<CbRegra>(() =>
+      db
+        .from("cb_convenio_regras")
+        .select(
+          "id, convenio_id, especialidade_id, procedimento_id, tipo, modo, valor, valor_cartao, percentual, percentual_cartao, prioridade, ativo, limite_qtd, limite_periodo, carencia_mensalidades, gratuito",
+        )
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("id", { ascending: true }),
+    ),
+    todasAsPaginas<ValorManualConvenio & { procedimento_id: string; convenio_id: string }>(() =>
+      db
+        .from("procedimento_cb_convenio_valores")
+        .select("procedimento_id, convenio_id, valor_dinheiro, valor_outros")
+        .eq("clinica_id", clinicaId)
+        .eq("origem", "manual")
+        .order("procedimento_id", { ascending: true })
+        .order("convenio_id", { ascending: true }),
+    ),
+    todasAsPaginas<{ procedimento_id: string; especialidade_id: string }>(() =>
+      db
+        .from("procedimento_especialidades")
+        .select("procedimento_id, especialidade_id")
+        .eq("clinica_id", clinicaId)
+        .order("procedimento_id", { ascending: true })
+        .order("especialidade_id", { ascending: true }),
+    ),
   ]);
   const entrada = {
-    medicos, disponibilidades, agendas, procedimentos, especialidades,
-    vinculos: vinculos.map(({ medico_id, procedimento_id, especialidade_id }) => ({ medico_id, procedimento_id, especialidade_id })),
+    medicos,
+    disponibilidades,
+    agendas,
+    procedimentos,
+    especialidades,
+    convenios,
+    regrasConvenio,
+    valoresManuais,
+    especialidadesProcedimento,
+    vinculos: vinculos.map(({ medico_id, procedimento_id, especialidade_id }) => ({
+      medico_id,
+      procedimento_id,
+      especialidade_id,
+    })),
     hojeISO: hojeBR(),
   };
   return { profissionais: mapearProfissionais(entrada), servicos: mapearServicos(entrada) };
@@ -106,7 +201,8 @@ export async function lerFonteOperacional(clinicaId: string): Promise<FonteOpera
   const agora = Date.now();
   const guardada = cache.get(clinicaId);
   if (guardada && agora - guardada.em < VALIDADE_CACHE_MS) return guardada.leitura;
-  const leitura = (async () => ((await ninaInformaPeloCadastro(clinicaId)) ? await lerCadastro(clinicaId) : VAZIA()))();
+  const leitura = (async () =>
+    (await ninaInformaPeloCadastro(clinicaId)) ? await lerCadastro(clinicaId) : VAZIA())();
   cache.set(clinicaId, { em: agora, leitura });
   try {
     return await leitura;

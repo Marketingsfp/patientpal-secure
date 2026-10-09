@@ -65,6 +65,20 @@ export type NodeArquitetura = {
   ferramentas?: string[];
 };
 
+/** Mesmas fontes administrativas de Informações rápidas e Tabela de valores. */
+const TABELAS_CADASTRO_NINA = [
+  "medicos",
+  "medico_disponibilidades",
+  "medico_agendas",
+  "medico_procedimentos",
+  "procedimentos",
+  "especialidades",
+  "procedimento_especialidades",
+  "cb_convenios",
+  "cb_convenio_regras",
+  "procedimento_cb_convenio_valores",
+];
+
 export const NODES_ARQUITETURA: NodeArquitetura[] = [
   // ───────────────────────── ENTRADA ─────────────────────────
   {
@@ -210,7 +224,10 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["turn.batch"],
     seguintes: ["session.resolve"],
     tabelas: ["atend_conversas", "pacientes"],
-    erros: ["conversa não localizada", "falha ao ler a identidade (segue sem paciente identificado)"],
+    erros: [
+      "conversa não localizada",
+      "falha ao ler a identidade (segue sem paciente identificado)",
+    ],
   },
   {
     id: "conversation.reopen",
@@ -239,7 +256,10 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["verification.code", "conversation.reopen"],
     seguintes: ["turn.batch", "handoff.assign"],
     tabelas: ["atend_conversas", "clinica_feature_flags"],
-    erros: ["estado inconsistente da conversa", "ninguém online (a conversa fica em Não atribuídas)"],
+    erros: [
+      "estado inconsistente da conversa",
+      "ninguém online (a conversa fica em Não atribuídas)",
+    ],
   },
   {
     id: "turn.batch",
@@ -312,7 +332,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Quantidade de serviços e profissionais do cadastro",
     anteriores: ["context.load"],
     seguintes: ["prompt.compose"],
-    tabelas: ["medicos", "medico_disponibilidades", "medico_agendas", "medico_procedimentos", "procedimentos", "especialidades"],
+    tabelas: TABELAS_CADASTRO_NINA,
     erros: ["cadastro sem registros"],
   },
   {
@@ -470,17 +490,17 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
   },
   {
     id: "tool.catalog.lookup",
-    nome: "Consulta ao catálogo",
+    nome: "Consulta aos cadastros oficiais",
     categoria: "CONHECIMENTO",
     descricao:
-      "Busca estruturada nos serviços e profissionais do cadastro do sistema; é a fonte oficial de informação usada em produção.",
+      "Busca nos cadastros que alimentam Informações rápidas e Tabela de valores: médicos, vínculos, escala semanal com observações, preços particulares e de convênios, preparo e regras administrativas. Escala não comprova vaga; benefício individual exige confirmação.",
     arquivo: "src/lib/nina/catalogo-retrieval.server.ts",
     funcao: "buscarNoCatalogo",
     entrada: "Termo e filtros",
     saida: "Registros do cadastro",
     anteriores: ["tool.execute", "tool.knowledge.lookup"],
     seguintes: ["llm.generate"],
-    tabelas: ["medicos", "medico_disponibilidades", "medico_agendas", "medico_procedimentos", "procedimentos", "especialidades"],
+    tabelas: TABELAS_CADASTRO_NINA,
     erros: ["nenhum registro no cadastro", "termo sem correspondência"],
   },
   {
@@ -495,7 +515,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     saida: "Registros do cadastro",
     anteriores: ["tool.execute"],
     seguintes: ["llm.generate", "tool.catalog.lookup"],
-    tabelas: ["medicos", "medico_disponibilidades", "medico_agendas", "medico_procedimentos", "procedimentos", "especialidades"],
+    tabelas: TABELAS_CADASTRO_NINA,
     erros: ["pergunta sem correspondência no cadastro", "cadastro sem registros"],
     ferramentas: ["consultar_cadastro"],
   },
@@ -870,7 +890,10 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     anteriores: ["llm.generate"],
     seguintes: ["turn.watchdog"],
     tabelas: ["whatsapp_webhook_logs", "whatsapp_configs"],
-    erros: ["erro não classificado (registrado no log)", "reenvio pela Meta só quando nada foi processado"],
+    erros: [
+      "erro não classificado (registrado no log)",
+      "reenvio pela Meta só quando nada foi processado",
+    ],
   },
   {
     id: "turn.watchdog",
@@ -1015,7 +1038,12 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     seguintes: ["llm.generate"],
     tabelas: ["medicos", "procedimentos", "especialidades", "clinicas", "unidades"],
     erros: ["cadastro sem registros", "filtro sem correspondência"],
-    ferramentas: ["listar_especialidades", "buscar_medicos", "buscar_procedimentos", "dados_da_clinica"],
+    ferramentas: [
+      "listar_especialidades",
+      "buscar_medicos",
+      "buscar_procedimentos",
+      "dados_da_clinica",
+    ],
   },
   {
     id: "tool.doctor_schedule",

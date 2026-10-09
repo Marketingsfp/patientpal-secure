@@ -146,6 +146,12 @@ export function adminPodeResponder(conversa: {
 }
 
 /** Etiqueta exibida na bolha quando a resposta foi de um supervisor; null nos demais casos. */
-export function rotuloAutorSupervisao(perfil: string | null | undefined): string | null {
-  return perfil === "admin" || perfil === "gestor" ? ROTULO_PERFIL_SUPERVISAO[perfil] : null;
+export function rotuloAutorSupervisao(
+  perfil: string | null | undefined,
+  nome?: string | null,
+): string | null {
+  if (perfil !== "admin" && perfil !== "gestor") return null;
+  const rotulo = ROTULO_PERFIL_SUPERVISAO[perfil];
+  const autor = nome?.trim();
+  return autor ? `${rotulo} ${autor}` : rotulo;
 }

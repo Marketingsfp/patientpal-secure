@@ -1774,6 +1774,27 @@ export const salvarBotConfig = createServerFn({ method: "POST" })
 /* =========================================================
  *  USUÁRIOS DA CLÍNICA (para selects)
  * ======================================================= */
+/** Autores das mensagens: inclui supervisão e vínculos inativos, sem torná-los destinatários. */
+export const listarAutoresMensagensClinica = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => clinIdSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertMember(context.supabase, context.userId, data.clinicaId);
+    const { data: vinculos, error } = await context.supabase
+      .from("clinica_memberships")
+      .select("user_id")
+      .eq("clinica_id", data.clinicaId);
+    if (error) throw new Error(error.message);
+    const ids = [...new Set((vinculos ?? []).map((v) => v.user_id))];
+    if (!ids.length) return [];
+    const { data: perfis, error: erroPerfis } = await context.supabase
+      .from("profiles")
+      .select("id, nome")
+      .in("id", ids);
+    if (erroPerfis) throw new Error(erroPerfis.message);
+    return (perfis ?? []).map((p) => ({ user_id: p.id, nome: p.nome }));
+  });
+
 export const listarUsuariosClinica = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => clinIdSchema.parse(i))
@@ -1912,7 +1933,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
+        "id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);
