@@ -100,6 +100,23 @@ describe("escolha do cadastro", () => {
     expect(escolher("Hemograma completo com plaquetas", HEMOGRAMA)).toBeNull();
   });
 
+  it("sigla com pontos é uma palavra só e acha o MAPA de Demais Serviços", () => {
+    expect(palavrasDoExame("M.A.P.A. 24h")).toEqual(["MAPA", "24H"]);
+    expect(escolher("M.A.P.A. 24h", [s("MAPA 24 HORAS", 167), s("HOLTER 24 HORAS", 178)])).toBe(
+      "MAPA 24 HORAS",
+    );
+  });
+
+  it("letra solta ou 24h sozinhos não viram sugestão (caso real: MAPA no Laboratório)", () => {
+    const laboratorio = [
+      s("ANCA-P", 40),
+      s("ZINCO 24H", 80),
+      s("FOSFORO (P)", 8),
+      s("IMUNOGLOBULINA M", 20),
+    ];
+    expect(ordenar("M.A.P.A. 24h", laboratorio)).toEqual([]);
+  });
+
   it("nada em comum fica de fora", () => {
     expect(ordenar("Ferritina", POTASSIO)).toEqual([]);
   });
