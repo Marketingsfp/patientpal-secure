@@ -284,7 +284,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
             </TabsContent>
 
             <TabsContent value="telefonia" className="mt-5">
-              <TelefoniaSufficit clinicaId={clinicaId} />
+              <TelefoniaSufficit clinicaId={clinicaId} clinicaNome={clinicaNome} />
             </TabsContent>
 
             <TabsContent value="analise" className="mt-5 space-y-6">

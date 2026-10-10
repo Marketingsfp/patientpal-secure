@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { confirmDialog } from "@/lib/confirm";
 import {
   amostrarChamadasTelefonia,
+  estadoConfigTelefonia,
   estadoSegredoTelefonia,
   removerTokenTelefonia,
   salvarTokenTelefonia,
@@ -30,7 +31,19 @@ const ROTULOS: Record<string, string> = {
   sufficit_object_id: "Identificador da central",
 };
 
-export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
+type EstadoConfig = Awaited<ReturnType<typeof estadoConfigTelefonia>>;
+
+export function TelefoniaSufficit({
+  clinicaId,
+  clinicaNome,
+}: {
+  clinicaId: string | null;
+  clinicaNome: string | null;
+}) {
+  const nomeClinica = clinicaNome?.trim() || "clínica selecionada";
+  const lerConfig = useServerFn(estadoConfigTelefonia);
+  const [cfg, setCfg] = useState<EstadoConfig | null>(null);
+  const [salvoEm, setSalvoEm] = useState<{ quando: string; clinica: string } | null>(null);
   const testar = useServerFn(testarConexaoTelefonia);
   const amostrar = useServerFn(amostrarChamadasTelefonia);
   const [teste, setTeste] = useState<Teste | null>(null);
@@ -49,15 +62,36 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
   const [salvandoToken, setSalvandoToken] = useState(false);
   const [erroToken, setErroToken] = useState<string | null>(null);
 
+  const recarregarConfig = (id: string) =>
+    lerConfig({ data: { clinicaId: id } })
+      .then(setCfg)
+      .catch(() => setCfg(null));
+
   useEffect(() => {
+    // Troca de clínica: nada do estado anterior pode ficar na tela.
+    setCfg(null);
+    setEstadoToken(null);
+    setSalvoEm(null);
+    setTeste(null);
+    setAmostra(null);
+    setToken("");
+    setErroToken(null);
     if (!clinicaId) return;
+    void recarregarConfig(clinicaId);
     lerEstado({ data: { clinicaId, chave: "sufficit_api_token" } })
       .then(setEstadoToken)
       .catch((e) => setErroToken((e as Error)?.message || "Falha ao ler o estado do token."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaId, lerEstado]);
 
   async function onSalvarToken() {
     if (!clinicaId || !token.trim()) return;
+    const destino = nomeClinica;
+    const ok = await confirmDialog({
+      title: "Confirmar clínica",
+      description: `Salvar o token da Sufficit na clínica ${destino}?`,
+    });
+    if (!ok) return;
     const valor = token;
     setToken(""); // limpa o campo na hora
     setErroToken(null);
@@ -66,6 +100,8 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
       setEstadoToken(
         await salvarToken({ data: { clinicaId, chave: "sufficit_api_token", valor } }),
       );
+      setSalvoEm({ quando: new Date().toISOString(), clinica: destino });
+      void recarregarConfig(clinicaId);
     } catch {
       setErroToken("Não foi possível salvar o token. Tente novamente.");
     } finally {
@@ -84,6 +120,8 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
     setSalvandoToken(true);
     try {
       setEstadoToken(await removerToken({ data: { clinicaId, chave: "sufficit_api_token" } }));
+      setSalvoEm(null);
+      void recarregarConfig(clinicaId);
     } catch {
       setErroToken("Não foi possível remover o token. Tente novamente.");
     } finally {
@@ -114,6 +152,49 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
       <p className="text-sm text-muted-foreground">
         Só testa a conexão e mostra uma amostra crua. Nada é gravado; a amostra some ao recarregar.
       </p>
+
+      <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-3">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          Configuração da telefonia — lendo e gravando em
+        </div>
+        <div className="text-lg font-bold">{nomeClinica}</div>
+      </div>
+
+      {cfg && (
+        <div className="space-y-2 text-sm">
+          <ul className="space-y-1">
+            {Object.entries(cfg.config).map(([k, presente]) => (
+              <li key={k}>
+                {ROTULOS[k] ?? k}:{" "}
+                <span className={presente ? "text-primary" : "text-destructive"}>
+                  {presente ? "presente" : "ausente"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {(() => {
+            const v = Object.values(cfg.config);
+            const algumas = v.some(Boolean) && v.some((x) => !x);
+            return algumas ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                A configuração da telefonia está pela metade em {nomeClinica}: só parte das chaves
+                está cadastrada aqui. As três chaves (endereço da API, token e identificador da
+                central) precisam estar na mesma clínica — confira se alguma foi gravada em outra
+                clínica por engano.
+              </div>
+            ) : null;
+          })()}
+          {cfg.outras.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Há chaves desta integração cadastradas também em:{" "}
+              {cfg.outras
+                .map((o) => `${o.nome} (${o.chaves.map((c) => ROTULOS[c] ?? c).join(", ")})`)
+                .join("; ")}
+              .
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2 rounded-lg border p-4">
         <Label htmlFor="sufficit-token">Token de API da Sufficit (Bearer)</Label>
@@ -155,6 +236,13 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
             Remover token
           </Button>
         </div>
+        {salvoEm && (
+          <p className="text-sm text-primary">
+            Token salvo em{" "}
+            {new Date(salvoEm.quando).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} na
+            clínica {salvoEm.clinica}.
+          </p>
+        )}
         {erroToken && <p className="text-sm text-destructive">{erroToken}</p>}
       </div>
 
