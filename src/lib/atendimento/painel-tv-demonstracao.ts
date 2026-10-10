@@ -19,62 +19,64 @@ export type DadosPainelTv = {
 /** Somente memória: não cria conversas, presenças, mensagens nem registros no banco. */
 export function criarDemonstracaoPainelTv(agora: number): DadosPainelTv {
   const antes = (minutos: number) => new Date(agora - minutos * 60_000).toISOString();
-  const atendentes: AtendenteTv[] = [
-    {
-      id: "demo-ana",
-      nome: "Ana Martins",
-      estado: "ONLINE",
-      inicioPausa: null,
-      atribuidas: 8,
-      esperas: [18, 11, 6, 2].map(antes),
-      resolvidasHoje: 17,
-    },
-    {
-      id: "demo-bruna",
-      nome: "Bruna Lima",
-      estado: "ONLINE",
-      inicioPausa: null,
-      atribuidas: 6,
-      esperas: [8, 4, 1].map(antes),
-      resolvidasHoje: 21,
-    },
-    {
-      id: "demo-carla",
-      nome: "Carla Souza",
-      estado: "ONLINE",
-      inicioPausa: null,
-      atribuidas: 5,
-      esperas: [7, 3].map(antes),
-      resolvidasHoje: 14,
-    },
-    {
-      id: "demo-diana",
-      nome: "Diana Alves",
-      estado: "PAUSA",
-      inicioPausa: antes(9.75),
-      atribuidas: 3,
-      esperas: [9].map(antes),
-      resolvidasHoje: 12,
-    },
-    {
-      id: "demo-elisa",
-      nome: "Elisa Santos",
-      estado: "PAUSA_SAIDA",
-      inicioPausa: antes(25.2),
-      atribuidas: 2,
-      esperas: [],
-      resolvidasHoje: 8,
-    },
-    {
-      id: "demo-fernanda",
-      nome: "Fernanda Costa",
-      estado: "OFFLINE",
-      inicioPausa: null,
-      atribuidas: 1,
-      esperas: [14].map(antes),
-      resolvidasHoje: 6,
-    },
-  ];
+  const nomes = [
+    "Ana Martins",
+    "Bruna Lima",
+    "Carla Souza",
+    "Daniela Alves",
+    "Elisa Santos",
+    "Fernanda Costa",
+    "Gabriela Rocha",
+    "Helena Ribeiro",
+    "Isabela Gomes",
+    "Juliana Freitas",
+    "Karina Mendes",
+    "Larissa Nunes",
+    "Mariana Lopes",
+    "Natalia Barros",
+    "Olivia Teixeira",
+    "Patricia Moreira",
+    "Renata Cardoso",
+    "Sabrina Ferreira",
+    "Talita Oliveira",
+    "Ursula Pereira",
+    "Valeria Ramos",
+    "Aline Moura",
+    "Beatriz Campos",
+    "Camila Duarte",
+    "Debora Castro",
+    "Erica Monteiro",
+    "Flavia Correia",
+    "Giovana Araujo",
+    "Heloisa Vieira",
+    "Ingrid Batista",
+  ] as const;
+  const atendentes: AtendenteTv[] = nomes.map((nome, indice) => {
+    const estado: AtendenteTv["estado"] =
+      indice < 18
+        ? "ONLINE"
+        : indice < 26
+          ? indice % 2 === 0
+            ? "PAUSA"
+            : "PAUSA_SAIDA"
+          : "OFFLINE";
+    const atribuidas = estado === "ONLINE" ? 3 + (indice % 6) : 1 + (indice % 4);
+    const quantidadeEsperas = Math.min(atribuidas, indice % 5);
+    const esperas = Array.from({ length: quantidadeEsperas }, (_, posicao) =>
+      antes(1 + ((indice * 3 + posicao * 5) % 24)),
+    );
+    return {
+      id: `demo-${String(indice + 1).padStart(2, "0")}`,
+      nome,
+      estado,
+      inicioPausa:
+        estado === "PAUSA" || estado === "PAUSA_SAIDA" ? antes(6 + (indice % 6) * 5) : null,
+      atribuidas,
+      esperas,
+      resolvidasHoje: 6 + ((indice * 3) % 19),
+      tempoMedioRespostaSeg: indice % 9 === 0 ? null : 48 + ((indice * 37) % 260),
+    };
+  });
   const semAtendente = [16, 2].map(antes);
   return {
     atendentes,

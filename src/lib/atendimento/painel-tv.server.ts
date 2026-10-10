@@ -27,6 +27,8 @@ export type AtendenteTv = {
   esperas: string[];
   /** Conversas que esta pessoa resolveu hoje. */
   resolvidasHoje: number;
+  /** Média de resposta humana desta pessoa nos intervalos medidos hoje. */
+  tempoMedioRespostaSeg: number | null;
 };
 
 /**
@@ -112,6 +114,7 @@ export async function carregarPainelTv(
   // contar (a métrica é só das atendentes).
   const inicioPendente = new Map<string, number>();
   const tempos: number[] = [];
+  const temposPorAtendente = new Map<string, number[]>();
   // Respostas enviadas hoje: somente atendentes e Nina. Avisos automáticos,
   // lembretes e outras mensagens do sistema não entram no painel da TV.
   const respostas = { equipe: 0, nina: 0 };
@@ -128,7 +131,13 @@ export async function carregarPainelTv(
       if (m.enviada_por_user_id) {
         doDia.add(conv);
         const ini = inicioPendente.get(conv);
-        if (ini !== undefined) tempos.push(Date.parse(m.created_at) - ini);
+        if (ini !== undefined) {
+          const tempo = Date.parse(m.created_at) - ini;
+          tempos.push(tempo);
+          const intervalos = temposPorAtendente.get(m.enviada_por_user_id);
+          if (intervalos) intervalos.push(tempo);
+          else temposPorAtendente.set(m.enviada_por_user_id, [tempo]);
+        }
       }
       inicioPendente.delete(conv);
     }
@@ -212,10 +221,11 @@ export async function carregarPainelTv(
     estados.set(p.user_id, { estado, versao: p.estado_manual_versao });
   }
 
-  // Conversas atribuídas não tornam uma pessoa offline visível na equipe.
-  const ids = [...estados.entries()]
-    .filter(([, v]) => atendenteVisivelNaTv(v.estado))
-    .map(([id]) => id);
+  // Offline continua na TV enquanto houver conversa aberta atribuída. A união
+  // parte dos membros de Telefonia para também cobrir ausência de presença.
+  const ids = [...ativos].filter((id) =>
+    atendenteVisivelNaTv(estados.get(id)?.estado ?? "OFFLINE", atribuidas.get(id) ?? 0),
+  );
   const perfis = ids.length
     ? await supabase.from("profiles").select("id, nome").in("id", ids)
     : { data: [], error: null };
@@ -242,6 +252,14 @@ export async function carregarPainelTv(
         atribuidas: atribuidas.get(id) ?? 0,
         esperas: esperasPorAtendente.get(id) ?? [],
         resolvidasHoje: resolvidasPor.get(id) ?? 0,
+        tempoMedioRespostaSeg: (() => {
+          const intervalos = temposPorAtendente.get(id) ?? [];
+          return intervalos.length
+            ? Math.round(
+                intervalos.reduce((soma, valor) => soma + valor, 0) / intervalos.length / 1000,
+              )
+            : null;
+        })(),
       };
     }),
   );

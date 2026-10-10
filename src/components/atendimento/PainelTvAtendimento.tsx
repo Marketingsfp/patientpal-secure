@@ -4,11 +4,13 @@ import { ArrowLeft, CircleHelp, Coffee, DoorOpen, Expand, X } from "lucide-react
 import { useRelogioPausa } from "@/hooks/use-relogio-pausa";
 import {
   faixaEsperaDesde,
+  formatarEspera,
   LIMITES_ESPERA_ATD,
+  minutosDesde,
   type FaixaEsperaAtd,
 } from "@/lib/atendimento/espera";
 import { formatarTempoPausa } from "@/lib/atendimento/cronometro-pausa";
-import { atendenteVisivelNaTv } from "@/lib/atendimento/painel-tv-presenca";
+import { atendenteVisivelNaTv, colunasEquipeNaTv } from "@/lib/atendimento/painel-tv-presenca";
 import type { AtendenteTv } from "@/lib/atendimento/painel-tv.server";
 import {
   criarDemonstracaoPainelTv,
@@ -79,6 +81,10 @@ export function PainelTvAtendimentoVisual({
       : espera.length
         ? "normal"
         : null;
+  const totalEquipeVisivel = (dados?.atendentes ?? []).filter((a) =>
+    atendenteVisivelNaTv(a.estado, a.atribuidas),
+  ).length;
+  const colunasEquipe = colunasEquipeNaTv(totalEquipeVisivel);
 
   const telaCheia = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -157,24 +163,50 @@ export function PainelTvAtendimentoVisual({
         </div>
       ) : (
         <>
-          <section className="mt-[3.6vh] grid h-[44vh] shrink-0 grid-cols-[62fr_38fr] gap-[4.2vw]">
+          <section
+            className="mt-[3.6vh] grid h-[44vh] shrink-0"
+            style={{
+              gridTemplateColumns:
+                colunasEquipe === 1 ? "62fr 38fr" : colunasEquipe === 2 ? "42fr 58fr" : "28fr 72fr",
+              columnGap: colunasEquipe === 1 ? "4.2vw" : colunasEquipe === 2 ? "2.8vw" : "2vw",
+            }}
+          >
             {/* 1. FILA AGORA */}
             <div className="flex min-h-0 min-w-0 flex-col">
               <Rotulo>Esperando resposta da equipe</Rotulo>
-              <div className="flex min-h-0 flex-1 items-start gap-[3vw]">
+              <div
+                className={cn(
+                  "flex min-h-0 flex-1 items-start",
+                  colunasEquipe === 1
+                    ? "gap-[3vw]"
+                    : colunasEquipe === 2
+                      ? "gap-[1.8vw]"
+                      : "gap-[1vw]",
+                )}
+              >
                 <span
                   className={cn(
-                    "shrink-0 text-[29vh] font-black leading-[0.82] tabular-nums tracking-tight",
+                    "shrink-0 font-black leading-[0.82] tabular-nums tracking-tight",
+                    colunasEquipe === 1
+                      ? "text-[29vh]"
+                      : colunasEquipe === 2
+                        ? "text-[22vh]"
+                        : "text-[18vh]",
                     piorFaixa ? COR_FAIXA[piorFaixa] : "text-atd-ink-soft",
                   )}
                 >
                   {espera.length}
                 </span>
-                <div className="min-w-0 pt-[3.4vh]">
+                <div className={cn("min-w-0", colunasEquipe === 1 ? "pt-[3.4vh]" : "pt-[2vh]")}>
                   <Rotulo>Mais antiga sem resposta</Rotulo>
                   <p
                     className={cn(
-                      "mt-[1.6vh] truncate text-[14vh] font-black leading-[0.9] tabular-nums tracking-tight",
+                      "mt-[1.6vh] truncate font-black leading-[0.9] tabular-nums tracking-tight",
+                      colunasEquipe === 1
+                        ? "text-[14vh]"
+                        : colunasEquipe === 2
+                          ? "text-[10vh]"
+                          : "text-[7.5vh]",
                       minAntiga == null
                         ? "text-atd-ink-soft"
                         : COR_FAIXA[faixaEsperaDesde(maisAntiga, relogio)],
@@ -215,7 +247,7 @@ export function PainelTvAtendimentoVisual({
                 }),
               )}
             />
-            <Respostas dados={dados} />
+            <ResumoDia dados={dados} />
           </section>
 
           <footer className="mt-[2.2vh] flex shrink-0 justify-between text-[1.3vh] tabular-nums tracking-[0.06em] text-atd-ink-soft">
@@ -277,13 +309,19 @@ const SECOES_AJUDA = [
     titulo: "Equipe agora",
     itens: [
       {
-        termo: "Online / em pausa",
+        termo: "Online / em pausa / offline",
         definicao:
-          "Quantidade de pessoas do perfil Telefonia disponíveis ou pausadas agora. Pessoas offline não aparecem na lista.",
+          "Quantidade de pessoas do perfil Telefonia por estado. Quem está offline continua na lista enquanto tiver conversa aberta atribuída.",
+      },
+      {
+        termo: "Lista adaptável",
+        definicao:
+          "A equipe usa uma, duas ou três colunas conforme a quantidade de atendentes visíveis, acomodando até 30 pessoas sem rolagem e voltando ao formato espaçado quando a equipe diminui.",
       },
       {
         termo: "Ponto ao lado do nome",
-        definicao: "Verde significa online; amarelo significa em pausa ou em saída/almoço.",
+        definicao:
+          "Verde significa online; amarelo significa em pausa ou em saída/almoço; cinza significa offline com conversa atribuída.",
       },
       {
         termo: "Ícone e cronômetro amarelos",
@@ -303,7 +341,12 @@ const SECOES_AJUDA = [
       {
         termo: "Crít.",
         definicao:
-          "Parte das pendentes que já passou de 10 minutos sem resposta humana. Por isso esse número também está incluído em Pend.",
+          "Quantidade de conversas críticas daquela atendente. Abaixo do número aparece o tempo da conversa crítica mais antiga, ou seja, a que está há mais tempo sem resposta humana.",
+      },
+      {
+        termo: "Média",
+        definicao:
+          "Tempo médio daquela atendente para responder após a primeira mensagem pendente do paciente, considerando os intervalos medidos hoje. Um traço significa que ainda não houve resposta mensurável.",
       },
       {
         termo: "Resolv.",
@@ -323,21 +366,6 @@ const SECOES_AJUDA = [
         termo: "Pico às ...h",
         definicao:
           "Hora com maior quantidade de mensagens recebidas hoje. A barra clara destaca a hora atual.",
-      },
-      {
-        termo: "Quem respondeu",
-        definicao:
-          "Total de respostas registradas hoje pela Nina e pela equipe. Mensagens automáticas do sistema não entram. Os 40 blocos mostram visualmente a proporção entre as duas origens.",
-      },
-      {
-        termo: "Nina / Equipe",
-        definicao:
-          "Nina são respostas da assistente; Equipe são mensagens enviadas por usuários da clínica.",
-      },
-      {
-        termo: "Passadas à equipe",
-        definicao:
-          "Quantidade de conversas que entraram no fluxo de atendimento humano hoje. Não significa que já foram assumidas ou respondidas.",
       },
       {
         termo: "Resolvidas",
@@ -572,9 +600,10 @@ function ReguaEspera({
 }
 
 function Equipe({ atendentes, agora }: { atendentes: AtendenteTv[]; agora: number }) {
-  const ordem = (a: AtendenteTv) => (a.estado === "ONLINE" ? 0 : 1);
+  const ordem = (a: AtendenteTv) =>
+    a.estado === "ONLINE" ? 0 : a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA" ? 1 : 2;
   const lista = atendentes
-    .filter((a) => atendenteVisivelNaTv(a.estado))
+    .filter((a) => atendenteVisivelNaTv(a.estado, a.atribuidas))
     .sort(
       (a, b) =>
         ordem(a) - ordem(b) ||
@@ -584,9 +613,14 @@ function Equipe({ atendentes, agora }: { atendentes: AtendenteTv[]; agora: numbe
     );
   const online = lista.filter((a) => a.estado === "ONLINE").length;
   const pausa = lista.filter((a) => a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA").length;
-  // Até 7 linhas no tamanho cheio; acima disso a lista encolhe para caber sem rolagem.
+  const offline = lista.filter((a) => a.estado === "OFFLINE").length;
+  const quantidadeColunas = colunasEquipeNaTv(lista.length);
+  const itensPorColuna = Math.ceil(lista.length / quantidadeColunas);
+  const grupos = Array.from({ length: quantidadeColunas }, (_, indice) =>
+    lista.slice(indice * itensPorColuna, (indice + 1) * itensPorColuna),
+  ).filter((grupo) => grupo.length > 0);
   const denso = lista.length > 7;
-  const colunas = "minmax(0,1fr) repeat(4, 5.2vw)";
+  const compacto = quantidadeColunas > 1;
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
       <div className="flex shrink-0 items-baseline justify-between">
@@ -597,82 +631,160 @@ function Equipe({ atendentes, agora }: { atendentes: AtendenteTv[]; agora: numbe
         >
           <b className="font-bold text-atd-ok">{online}</b> online ·{" "}
           <b className={cn("font-bold", pausa ? "text-atd-warn" : "")}>{pausa}</b> em pausa
+          {offline > 0 && (
+            <>
+              {" · "}
+              <b className="font-bold">{offline}</b> offline
+            </>
+          )}
         </span>
-      </div>
-      <div
-        className="mt-[2.6vh] grid shrink-0 border-b border-atd-border pb-[1.2vh]"
-        style={{ gridTemplateColumns: colunas }}
-      >
-        <span />
-        {["Atrib.", "Pend.", "Crít.", "Resolv."].map((t) => (
-          <span
-            key={t}
-            className="text-right text-[1.15vh] uppercase tracking-[0.2em] text-atd-ink-soft"
-          >
-            {t}
-          </span>
-        ))}
       </div>
       {lista.length === 0 ? (
         <p className="grid flex-1 place-items-center text-[2.2vh] text-atd-ink-soft">
-          Ninguém online agora
+          Nenhuma atendente com conversa ou presença ativa
         </p>
       ) : (
-        <ul className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {lista.map((a) => {
-            const emPausa = a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA";
-            const pend = a.esperas.length;
-            const crit = a.esperas.filter((d) => faixaEsperaDesde(d, agora) === "critico").length;
-            return (
-              <li
-                key={a.id}
-                className="grid min-h-0 flex-1 items-center border-b border-atd-border"
-                style={{ gridTemplateColumns: colunas, maxHeight: denso ? undefined : "7.2vh" }}
-              >
-                <div className="flex min-w-0 items-center gap-[0.9vw]">
-                  <i
-                    className={cn(
-                      "block h-[0.9vh] w-[0.9vh] shrink-0 rounded-full",
-                      a.estado === "ONLINE" ? "bg-atd-ok" : "bg-atd-warn",
-                    )}
-                  />
-                  <span
-                    className={cn("truncate", denso ? "text-[2vh]" : "text-[2.5vh]")}
-                    title={a.nome}
-                  >
-                    {nomeCurto(a.nome)}
-                  </span>
-                  {emPausa && (
-                    <span
-                      className="flex shrink-0 items-center gap-[0.3vw] text-[1.6vh] tabular-nums text-atd-warn-ink"
-                      title={a.estado === "PAUSA_SAIDA" ? "Almoço" : "Pausa"}
-                    >
-                      {a.estado === "PAUSA_SAIDA" ? (
-                        <DoorOpen className="h-[1.7vh] w-[1.7vh]" />
-                      ) : (
-                        <Coffee className="h-[1.7vh] w-[1.7vh]" />
-                      )}
-                      {a.inicioPausa ? formatarTempoPausa(a.inicioPausa, agora) : ""}
-                    </span>
-                  )}
-                </div>
-                <Contador valor={a.atribuidas} denso={denso} />
-                <Contador valor={pend} denso={denso} cor={pend ? "text-atd-ink" : undefined} />
-                <Contador
-                  valor={crit}
-                  denso={denso}
-                  cor={crit ? "text-atd-danger font-bold" : undefined}
-                />
-                <Contador
-                  valor={a.resolvidasHoje ?? 0}
-                  denso={denso}
-                  cor={a.resolvidasHoje ? "text-atd-ok" : undefined}
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <div
+          className={cn("mt-[2.6vh] grid min-h-0 flex-1", compacto ? "gap-[1.2vw]" : "")}
+          style={{ gridTemplateColumns: `repeat(${quantidadeColunas}, minmax(0, 1fr))` }}
+        >
+          {grupos.map((grupo, indice) => (
+            <TabelaEquipe
+              key={grupo[0]!.id}
+              atendentes={grupo}
+              agora={agora}
+              denso={denso}
+              compacto={compacto}
+              separador={indice > 0}
+            />
+          ))}
+        </div>
       )}
+    </div>
+  );
+}
+
+function TabelaEquipe({
+  atendentes,
+  agora,
+  denso,
+  compacto,
+  separador,
+}: {
+  atendentes: AtendenteTv[];
+  agora: number;
+  denso: boolean;
+  compacto: boolean;
+  separador: boolean;
+}) {
+  const colunas = "minmax(0, 1.5fr) repeat(5, minmax(0, 0.45fr))";
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 min-w-0 flex-col",
+        separador && "border-l border-atd-border pl-[1.2vw]",
+      )}
+    >
+      <div
+        className="grid shrink-0 border-b border-atd-border pb-[1.2vh]"
+        style={{ gridTemplateColumns: colunas }}
+      >
+        <span />
+        {["Atrib.", "Pend.", "Crít.", "Média", "Resolv."].map((titulo) => (
+          <span
+            key={titulo}
+            className={cn(
+              "text-right uppercase text-atd-ink-soft",
+              compacto ? "text-[0.95vh] tracking-[0.08em]" : "text-[1.15vh] tracking-[0.2em]",
+            )}
+          >
+            {titulo}
+          </span>
+        ))}
+      </div>
+      <ul className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {atendentes.map((a) => {
+          const emPausa = a.estado === "PAUSA" || a.estado === "PAUSA_SAIDA";
+          const pend = a.esperas.length;
+          return (
+            <li
+              key={a.id}
+              className="grid min-h-0 flex-1 items-center border-b border-atd-border"
+              style={{ gridTemplateColumns: colunas, maxHeight: denso ? undefined : "7.2vh" }}
+            >
+              <div
+                className={cn(
+                  "flex min-w-0 items-center",
+                  compacto ? "gap-[0.4vw]" : "gap-[0.9vw]",
+                )}
+              >
+                <i
+                  title={
+                    a.estado === "ONLINE"
+                      ? "Online"
+                      : emPausa
+                        ? "Em pausa"
+                        : "Offline com conversa atribuída"
+                  }
+                  className={cn(
+                    "block shrink-0 rounded-full",
+                    compacto ? "h-[0.65vh] w-[0.65vh]" : "h-[0.9vh] w-[0.9vh]",
+                    a.estado === "ONLINE"
+                      ? "bg-atd-ok"
+                      : emPausa
+                        ? "bg-atd-warn"
+                        : "bg-atd-ink-soft opacity-50",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "truncate",
+                    compacto ? "text-[1.55vh]" : denso ? "text-[2vh]" : "text-[2.5vh]",
+                  )}
+                  title={a.nome}
+                >
+                  {nomeCurto(a.nome)}
+                </span>
+                {emPausa && (
+                  <span
+                    className={cn(
+                      "flex shrink-0 items-center tabular-nums text-atd-warn-ink",
+                      compacto ? "gap-[0.15vw] text-[1.05vh]" : "gap-[0.3vw] text-[1.6vh]",
+                    )}
+                    title={a.estado === "PAUSA_SAIDA" ? "Almoço" : "Pausa"}
+                  >
+                    {a.estado === "PAUSA_SAIDA" ? (
+                      <DoorOpen
+                        className={compacto ? "h-[1.1vh] w-[1.1vh]" : "h-[1.7vh] w-[1.7vh]"}
+                      />
+                    ) : (
+                      <Coffee
+                        className={compacto ? "h-[1.1vh] w-[1.1vh]" : "h-[1.7vh] w-[1.7vh]"}
+                      />
+                    )}
+                    {a.inicioPausa ? formatarTempoPausa(a.inicioPausa, agora) : ""}
+                  </span>
+                )}
+              </div>
+              <Contador valor={a.atribuidas} denso={denso} compacto={compacto} />
+              <Contador
+                valor={pend}
+                denso={denso}
+                compacto={compacto}
+                cor={pend ? "text-atd-ink" : undefined}
+              />
+              <Criticas esperas={a.esperas} agora={agora} denso={denso} compacto={compacto} />
+              <MediaResposta segundos={a.tempoMedioRespostaSeg} denso={denso} compacto={compacto} />
+              <Contador
+                valor={a.resolvidasHoje ?? 0}
+                denso={denso}
+                compacto={compacto}
+                cor={a.resolvidasHoje ? "text-atd-ok" : undefined}
+              />
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -686,16 +798,108 @@ function nomeCurto(nome: string): string {
   return partes.slice(0, 2).join(" ");
 }
 
-function Contador({ valor, denso, cor }: { valor: number; denso: boolean; cor?: string }) {
+function Contador({
+  valor,
+  denso,
+  compacto,
+  cor,
+}: {
+  valor: number;
+  denso: boolean;
+  compacto: boolean;
+  cor?: string;
+}) {
   return (
     <span
       className={cn(
         "text-right tabular-nums",
-        denso ? "text-[2.4vh]" : "text-[3vh]",
+        compacto ? "text-[1.65vh]" : denso ? "text-[2.4vh]" : "text-[3vh]",
         valor ? (cor ?? "text-atd-ink") : "text-atd-ink-soft opacity-40",
       )}
     >
       {valor}
+    </span>
+  );
+}
+
+function Criticas({
+  esperas,
+  agora,
+  denso,
+  compacto,
+}: {
+  esperas: string[];
+  agora: number;
+  denso: boolean;
+  compacto: boolean;
+}) {
+  const criticas = esperas.filter((data) => faixaEsperaDesde(data, agora) === "critico");
+  if (criticas.length === 0)
+    return (
+      <span
+        className={cn(
+          "text-right tabular-nums text-atd-ink-soft opacity-40",
+          compacto ? "text-[1.65vh]" : denso ? "text-[2vh]" : "text-[2.4vh]",
+        )}
+      >
+        0
+      </span>
+    );
+
+  const maisAntiga = criticas.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
+  const tempo = formatarEspera(minutosDesde(maisAntiga, agora));
+  return (
+    <div
+      className="flex flex-col items-end justify-center tabular-nums text-atd-danger"
+      title={`${criticas.length} crítica(s). Mais antiga sem resposta: ${tempo}`}
+    >
+      <b
+        className={cn(
+          "font-bold leading-none",
+          compacto ? "text-[1.55vh]" : denso ? "text-[2vh]" : "text-[2.4vh]",
+        )}
+      >
+        {criticas.length}
+      </b>
+      <span
+        className={cn(
+          "whitespace-nowrap",
+          compacto
+            ? "mt-[0.25vh] text-[0.85vh]"
+            : denso
+              ? "mt-[0.45vh] text-[1vh]"
+              : "mt-[0.45vh] text-[1.15vh]",
+        )}
+      >
+        {tempo}
+      </span>
+    </div>
+  );
+}
+
+function MediaResposta({
+  segundos,
+  denso,
+  compacto,
+}: {
+  segundos: number | null;
+  denso: boolean;
+  compacto: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "whitespace-nowrap text-right tabular-nums",
+        compacto ? "text-[1.2vh]" : denso ? "text-[1.65vh]" : "text-[1.9vh]",
+        segundos == null ? "text-atd-ink-soft opacity-40" : "text-atd-ink",
+      )}
+      title={
+        segundos == null
+          ? "Sem resposta mensurável hoje"
+          : `Média de resposta: ${duracao(segundos / 60)}`
+      }
+    >
+      {segundos == null ? "—" : duracao(segundos / 60)}
     </span>
   );
 }
@@ -767,73 +971,14 @@ function VolumePorHora({ valores, horaAtual }: { valores: number[]; horaAtual: n
   );
 }
 
-/** Distribui 40 marcas entre Nina e equipe na proporção real. */
-function marcas(valores: number[], total = 40): number[] {
-  const soma = valores.reduce((s, v) => s + v, 0);
-  if (!soma) return valores.map(() => 0);
-  const brutas = valores.map((v) => (v / soma) * total);
-  const inteiras = brutas.map((b, i) => (valores[i]! > 0 ? Math.max(1, Math.floor(b)) : 0));
-  let falta = total - inteiras.reduce((s, v) => s + v, 0);
-  const ordem = brutas.map((b, i) => [b - Math.floor(b), i] as const).sort((a, b) => b[0] - a[0]);
-  for (let k = 0; falta > 0 && k < ordem.length * 2; k++) {
-    const i = ordem[k % ordem.length]![1];
-    if (valores[i]! > 0) {
-      inteiras[i]!++;
-      falta--;
-    }
-  }
-  while (falta < 0) {
-    const i = inteiras.indexOf(Math.max(...inteiras));
-    inteiras[i]!--;
-    falta++;
-  }
-  return inteiras;
-}
-
-function Respostas({ dados }: { dados: DadosPainelTv | null }) {
-  const r = dados?.respostas ?? { equipe: 0, nina: 0 };
-  const total = r.nina + r.equipe;
-  const [mNina, mEquipe] = marcas([r.nina, r.equipe]);
-  const cores = [
-    ...Array<string>(mNina).fill("bg-atd-ai"),
-    ...Array<string>(mEquipe).fill("bg-atd-ok"),
-  ];
+function ResumoDia({ dados }: { dados: DadosPainelTv | null }) {
   const tempo = dados?.tempoMedioRespostaSeg;
   return (
-    <div className="flex min-h-0 min-w-0 flex-col">
-      <Rotulo>
-        Quem respondeu · <b className="font-bold text-atd-ink">hoje</b> · {total}
-      </Rotulo>
-      <div
-        className="mt-[2.4vh] grid h-[3.6vh] shrink-0 gap-[0.2vw]"
-        style={{ gridTemplateColumns: "repeat(40, minmax(0, 1fr))" }}
-      >
-        {total === 0
-          ? Array.from({ length: 40 }, (_, k) => (
-              <i key={k} className="block rounded-[0.3vh] bg-atd-border" />
-            ))
-          : cores.map((c, k) => <i key={k} className={cn("block rounded-[0.3vh]", c)} />)}
-      </div>
-      <div className="mt-[1.8vh] grid shrink-0 grid-cols-2">
-        <Legenda valor={r.nina} rotulo="Nina" cor="text-atd-ai-ink" />
-        <Legenda valor={r.equipe} rotulo="Equipe" cor="text-atd-ok" />
-      </div>
-      <div className="mt-auto grid shrink-0 grid-cols-3 border-t border-atd-border pt-[2.2vh]">
-        <Grande valor={String(dados?.encaminhadasHoje ?? 0)} rotulo="Passadas à equipe" />
+    <div className="flex min-h-0 min-w-0 flex-col justify-end">
+      <div className="grid shrink-0 grid-cols-2 border-t border-atd-border pt-[2.2vh]">
         <Grande valor={String(dados?.resolvidasHoje ?? 0)} rotulo="Resolvidas" />
         <Grande valor={tempo == null ? "—" : duracao(tempo / 60)} rotulo="Resposta da equipe" />
       </div>
-    </div>
-  );
-}
-
-function Legenda({ valor, rotulo, cor }: { valor: number; rotulo: string; cor: string }) {
-  return (
-    <div className="flex min-w-0 items-baseline gap-[0.7vw]">
-      <b className={cn("text-[3vh] font-normal tabular-nums", cor)}>{valor}</b>
-      <span className="truncate text-[1.2vh] uppercase tracking-[0.2em] text-atd-ink-soft">
-        {rotulo}
-      </span>
     </div>
   );
 }

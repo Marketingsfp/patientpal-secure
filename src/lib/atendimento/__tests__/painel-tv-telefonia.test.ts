@@ -1,7 +1,31 @@
 import { describe, expect, it } from "bun:test";
+import { criarDemonstracaoPainelTv } from "../painel-tv-demonstracao";
+import { atendenteVisivelNaTv, colunasEquipeNaTv } from "../painel-tv-presenca";
 import { carregarPainelTv, idsTelefoniaTv } from "../painel-tv.server";
 
 describe("Equipe do painel TV — somente telefonia", () => {
+  it("distribui até 30 atendentes em no máximo dez linhas por coluna", () => {
+    expect(colunasEquipeNaTv(0)).toBe(1);
+    expect(colunasEquipeNaTv(10)).toBe(1);
+    expect(colunasEquipeNaTv(11)).toBe(2);
+    expect(colunasEquipeNaTv(20)).toBe(2);
+    expect(colunasEquipeNaTv(21)).toBe(3);
+    expect(colunasEquipeNaTv(30)).toBe(3);
+  });
+
+  it("demonstra as 30 atendentes e todas as métricas novas do painel", () => {
+    const painel = criarDemonstracaoPainelTv(Date.parse("2026-10-10T16:00:00-03:00"));
+    expect(painel.atendentes).toHaveLength(30);
+    expect(painel.atendentes.every((a) => atendenteVisivelNaTv(a.estado, a.atribuidas))).toBe(true);
+    expect(painel.atendentes.filter((a) => a.estado === "ONLINE")).toHaveLength(18);
+    expect(painel.atendentes.filter((a) => a.estado === "PAUSA")).toHaveLength(4);
+    expect(painel.atendentes.filter((a) => a.estado === "PAUSA_SAIDA")).toHaveLength(4);
+    expect(painel.atendentes.filter((a) => a.estado === "OFFLINE")).toHaveLength(4);
+    expect(painel.atendentes.some((a) => a.esperas.length > 0)).toBe(true);
+    expect(painel.atendentes.some((a) => a.tempoMedioRespostaSeg != null)).toBe(true);
+    expect(painel.atendentes.some((a) => a.tempoMedioRespostaSeg == null)).toBe(true);
+  });
+
   it("exclui administrador, supervisão e outros perfis", () => {
     expect([
       ...idsTelefoniaTv([
@@ -36,6 +60,7 @@ describe("Equipe do painel TV — somente telefonia", () => {
       { user_id: "tel-pausa", role: "telefonia", ativo: true },
       { user_id: "tel-almoco", role: "telefonia", ativo: true },
       { user_id: "tel-offline", role: "telefonia", ativo: true },
+      { user_id: "tel-offline-vazio", role: "telefonia", ativo: true },
       { user_id: "tel-sem-presenca", role: "telefonia", ativo: true },
       { user_id: "admin", role: "admin", ativo: true },
       { user_id: "duplo", role: "admin", ativo: true },
@@ -55,28 +80,69 @@ describe("Equipe do painel TV — somente telefonia", () => {
       estado_manual_versao: 1,
     });
     presencas.push({ user_id: "tel-offline", estado_manual: "OFFLINE", estado_manual_versao: 1 });
+    presencas.push({
+      user_id: "tel-offline-vazio",
+      estado_manual: "OFFLINE",
+      estado_manual_versao: 1,
+    });
     const aguardando = new Date(Date.now() - 15 * 60_000).toISOString();
+    const inicioMensagens = Date.now() - 10 * 60_000;
     const mensagens = [
+      {
+        conversa_id: "c1",
+        direction: "in",
+        enviada_por: "paciente",
+        enviada_por_user_id: null,
+        created_at: new Date(inicioMensagens).toISOString(),
+      },
       {
         conversa_id: "c1",
         direction: "out",
         enviada_por: "humano",
         enviada_por_user_id: "tel-online",
-        created_at: new Date().toISOString(),
+        created_at: new Date(inicioMensagens + 60_000).toISOString(),
+      },
+      {
+        conversa_id: "c1",
+        direction: "in",
+        enviada_por: "paciente",
+        enviada_por_user_id: null,
+        created_at: new Date(inicioMensagens + 120_000).toISOString(),
+      },
+      {
+        conversa_id: "c1",
+        direction: "out",
+        enviada_por: "humano",
+        enviada_por_user_id: "tel-online",
+        created_at: new Date(inicioMensagens + 300_000).toISOString(),
+      },
+      {
+        conversa_id: "c4",
+        direction: "in",
+        enviada_por: "paciente",
+        enviada_por_user_id: null,
+        created_at: new Date(inicioMensagens + 310_000).toISOString(),
+      },
+      {
+        conversa_id: "c4",
+        direction: "out",
+        enviada_por: "humano",
+        enviada_por_user_id: "tel-offline",
+        created_at: new Date(inicioMensagens + 610_000).toISOString(),
       },
       {
         conversa_id: "c1",
         direction: "out",
         enviada_por: "nina",
         enviada_por_user_id: null,
-        created_at: new Date().toISOString(),
+        created_at: new Date(inicioMensagens + 620_000).toISOString(),
       },
       {
         conversa_id: "c1",
         direction: "out",
         enviada_por: "sistema",
         enviada_por_user_id: null,
-        created_at: new Date().toISOString(),
+        created_at: new Date(inicioMensagens + 630_000).toISOString(),
       },
     ];
     const consultas: { tabela: string; campos: string; filtros: [string, unknown][] }[] = [];
@@ -165,17 +231,26 @@ describe("Equipe do painel TV — somente telefonia", () => {
     const painel = await carregarPainelTv(db, db, "clinica", "gestor");
     expect(painel.atendentes.map((a) => a.id).sort()).toEqual([
       "tel-almoco",
+      "tel-offline",
       "tel-online",
       "tel-pausa",
+      "tel-sem-presenca",
     ]);
     expect(painel.atendentes.filter((a) => a.estado === "ONLINE")).toHaveLength(1);
     expect(painel.atendentes.filter((a) => a.estado === "PAUSA")).toHaveLength(1);
     expect(painel.atendentes.filter((a) => a.estado === "PAUSA_SAIDA")).toHaveLength(1);
-    expect(painel.atendentes.some((a) => a.estado === "OFFLINE")).toBe(false);
+    expect(painel.atendentes.filter((a) => a.estado === "OFFLINE")).toHaveLength(2);
+    expect(painel.atendentes.find((a) => a.id === "tel-offline")?.atribuidas).toBe(1);
+    expect(painel.atendentes.find((a) => a.id === "tel-sem-presenca")?.atribuidas).toBe(1);
+    expect(painel.atendentes.some((a) => a.id === "tel-offline-vazio")).toBe(false);
     expect(painel.emAndamento).toBe(5);
     expect(painel.espera).toHaveLength(2);
     expect(painel.resolvidasHoje).toBe(2);
-    expect(painel.respostas).toEqual({ equipe: 1, nina: 1 });
+    expect(painel.respostas).toEqual({ equipe: 3, nina: 1 });
+    expect(painel.tempoMedioRespostaSeg).toBe(180);
+    expect(painel.atendentes.find((a) => a.id === "tel-online")?.tempoMedioRespostaSeg).toBe(120);
+    expect(painel.atendentes.find((a) => a.id === "tel-offline")?.tempoMedioRespostaSeg).toBe(300);
+    expect(painel.atendentes.find((a) => a.id === "tel-pausa")?.tempoMedioRespostaSeg).toBeNull();
     expect(painel.atendentes.find((a) => a.id === "tel-online")?.resolvidasHoje).toBe(1);
     expect(consultas.find((c) => c.tabela === "clinica_memberships")?.campos).toBe("user_id, role");
     expect(

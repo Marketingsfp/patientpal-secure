@@ -12,7 +12,7 @@
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { BotOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { reportarErroRapidoMensagemNina } from "@/lib/nina/feedback-erros.functions";
 import { invalidarConfianca } from "@/lib/nina/confianca-cache";
@@ -83,7 +83,7 @@ export function ReportarErroNinaBotao({
               "mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-destructive text-destructive-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             }
           >
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            <BotOff className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="left">{ROTULO_REPORTE}</TooltipContent>
