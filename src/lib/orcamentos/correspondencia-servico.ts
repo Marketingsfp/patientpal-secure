@@ -32,6 +32,8 @@ const EXPRESSOES: Array<[RegExp, string]> = [
   [/\bRESSONANCIA MAGNETICA\b/g, "RM"],
   [/\bTOMOGRAFIA COMPUTADORIZADA\b/g, "TC"],
   [/\bRAIO[\s-]*X\b/g, "RX"],
+  // "24h", "24 hs", "24 hrs", "24 horas" → "24H".
+  [/\b(\d+)\s*(?:H|HS|HRS|HORAS?)\b/g, "$1H"],
 ];
 
 /** Palavra → forma única usada na comparação. */
@@ -79,6 +81,8 @@ function singular(p: string): string {
 /** Palavras do nome já na forma de comparação, sem repetição. */
 export function palavrasDoExame(texto: string): string[] {
   let t = ` ${semAcento(texto ?? "").toUpperCase()} `;
+  // Sigla com pontos é uma palavra só: "M.A.P.A." → "MAPA", "I.T.B." → "ITB".
+  t = t.replace(/\b(?:[A-Z]\.\s?){2,}(?:[A-Z]\b\.?)?/g, (m) => `${m.replace(/[.\s]/g, "")} `);
   t = t.replace(/[^A-Z0-9]+/g, " ");
   for (const [re, para] of EXPRESSOES) t = t.replace(re, para);
   const out: string[] = [];
@@ -129,6 +133,10 @@ export function ordenarServicosDoPedido<T extends { nome: string }>(
 ): ServicoComNota<T>[] {
   const pedidas = palavrasDoExame(lido).filter((p) => !NEUTRAS.has(p));
   if (pedidas.length === 0) return [];
+  // Palavras que dizem qual é o exame (não letra solta nem "24H"): o cadastro precisa ter
+  // pelo menos metade delas. Sem isso "MAPA 24H" sugeria "ZINCO 24H".
+  const nucleo = pedidas.filter((p) => p.length >= 3 && /^[A-Z]/.test(p));
+  const minimoNucleo = Math.ceil(nucleo.length / 2);
   const lidoExato = semAcento(lido).toUpperCase().replace(/\s+/g, " ").trim();
   const out: (ServicoComNota<T> & { base: number })[] = [];
   for (const s of servicos) {
@@ -136,6 +144,8 @@ export function ordenarServicosDoPedido<T extends { nome: string }>(
     if (doCadastro.length === 0) continue;
     const achadas = pedidas.filter((p) => doCadastro.some((c) => mesmaPalavra(p, c))).length;
     if (achadas === 0) continue;
+    const nucleoAchado = nucleo.filter((p) => doCadastro.some((c) => mesmaPalavra(p, c))).length;
+    if (nucleoAchado < minimoNucleo) continue;
     const cobertura = achadas / pedidas.length;
     const sobra = doCadastro.filter((c) => !pedidas.some((p) => mesmaPalavra(p, c)));
     const precisao = 1 - sobra.length / doCadastro.length;

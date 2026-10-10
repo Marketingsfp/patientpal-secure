@@ -1509,17 +1509,20 @@ function NovoOrcamentoDialog({
         : [[], new Map<string, number>()];
       const usosDe = (p: Procedimento) =>
         (usos.get(p.id) ?? 0) + (usos.get(normalizarBusca(p.nome)) ?? 0);
+      // A outra categoria só é carregada se algum exame não estiver nesta.
+      let catalogoOutra: Procedimento[] | null = null;
       const resultado: ItemDoPedido[] = [];
       for (const lido of lidos) {
         const ordenados = ordenarServicosDoPedido(lido, catalogo, usosDe, valorDoProc);
         const sugestoes = ordenados.slice(0, 4).map((o) => ({ servico: o.servico, usos: o.usos }));
         if (sugestoes.length === 0) {
-          const { data: d2 } = await buscarServicos(outra, lido).limit(1);
-          resultado.push({
-            lido,
-            situacao: (d2 ?? []).length ? "outra_categoria" : "nao_encontrado",
-            sugestoes,
-          });
+          catalogoOutra ??= await carregarCatalogo(outra);
+          const naOutra = ordenarServicosDoPedido(lido, catalogoOutra, usosDe, valorDoProc)[0];
+          resultado.push(
+            naOutra
+              ? { lido, situacao: "outra_categoria", servico: naOutra.servico, sugestoes }
+              : { lido, situacao: "nao_encontrado", sugestoes },
+          );
           continue;
         }
         const escolhido = escolhaSegura(ordenados, valorDoProc);
@@ -1997,7 +2000,7 @@ function NovoOrcamentoDialog({
                             <>
                               <span className="text-xs text-muted-foreground">
                                 {it.situacao === "outra_categoria"
-                                  ? `está em ${categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"} — faça outro orçamento para ele`
+                                  ? `está em ${categoria === "laboratorio" ? "Demais Serviços" : "Laboratório"}${it.servico ? ` (${it.servico.nome})` : ""} — faça outro orçamento para ele`
                                   : "não encontrado na tabela"}
                               </span>
                               {it.situacao === "nao_encontrado" && (
