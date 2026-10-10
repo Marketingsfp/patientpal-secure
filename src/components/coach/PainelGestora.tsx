@@ -38,8 +38,9 @@ import {
 } from "@/components/coach/painel-views";
 import { HistoricoSemUsuario } from "@/components/coach/HistoricoSemUsuario";
 import { BaseConhecimentoEditor } from "@/components/coach/BaseConhecimentoEditor";
+import { TelefoniaSufficit } from "@/components/coach/TelefoniaSufficit";
 
-type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise";
+type Aba = "progresso" | "conversas" | "perfis" | "vozes" | "analise" | "telefonia";
 
 export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
   const { clinicaId, clinicaNome, clinicas, atendente: nomeUsuario } = ctx;
@@ -53,7 +54,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
 
   // A aba visível é escolhida pelo menu lateral, via hash da URL.
   const hash = useLocation({ select: (l) => l.hash });
-  const abaDaUrl = (["progresso", "conversas", "perfis", "vozes", "analise"] as const).includes(
+  const abaDaUrl = (["progresso", "conversas", "perfis", "vozes", "analise", "telefonia"] as const).includes(
     (hash ?? "") as Aba,
   )
     ? ((hash ?? "") as Aba)
@@ -280,6 +281,10 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
                   void salvar({ vozConfig: next });
                 }}
               />
+            </TabsContent>
+
+            <TabsContent value="telefonia" className="mt-5">
+              <TelefoniaSufficit clinicaId={clinicaId} />
             </TabsContent>
 
             <TabsContent value="analise" className="mt-5 space-y-6">
