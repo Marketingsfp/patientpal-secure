@@ -161,12 +161,13 @@ export async function carregarResumoDashboardOsZap(
     francisco,
     webhook,
   ] = await Promise.all([
-    lerPaginasDashboard<{ created_at: string; nota: number }>((de, ate) =>
+    lerPaginasDashboard<{ created_at: string; nota: number | null }>((de, ate) =>
       db
         .from("atend_avaliacoes")
         .select("created_at, nota, atend_conversas!inner(is_teste)")
         .eq("clinica_id", clinicaId)
         .eq("atend_conversas.is_teste", false)
+        .not("nota", "is", null)
         .gte("created_at", inicioAnterior)
         .lt("created_at", fim)
         .order("id")
@@ -292,7 +293,9 @@ export async function carregarResumoDashboardOsZap(
       mensagens: msgs,
       eventos: evs,
       seguintes: { eventos: seguintesEventos, mensagens: seguintesMensagens },
-      avaliacoes,
+      avaliacoes: avaliacoes.flatMap((a) =>
+        a.nota == null ? [] : [{ created_at: a.created_at, nota: a.nota }],
+      ),
       transferencias,
       departamentos,
       presencas,
