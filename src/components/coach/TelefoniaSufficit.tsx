@@ -6,11 +6,20 @@
  * quem tem acesso de escrita no Coach, e some ao recarregar. NÃO gravar em
  * tabela, localStorage, log nem console.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, PhoneCall, Activity, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { amostrarChamadasTelefonia, testarConexaoTelefonia } from "@/lib/coach/telefonia.functions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { confirmDialog } from "@/lib/confirm";
+import {
+  amostrarChamadasTelefonia,
+  estadoSegredoTelefonia,
+  removerTokenTelefonia,
+  salvarTokenTelefonia,
+  testarConexaoTelefonia,
+} from "@/lib/coach/telefonia.functions";
 
 type Teste = Awaited<ReturnType<typeof testarConexaoTelefonia>>;
 type Amostra = Awaited<ReturnType<typeof amostrarChamadasTelefonia>>;
@@ -28,6 +37,59 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
   const [amostra, setAmostra] = useState<Amostra | null>(null);
   const [carregando, setCarregando] = useState<"teste" | "amostra" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  // Token: o valor só existe no campo até salvar; o servidor nunca o devolve.
+  const lerEstado = useServerFn(estadoSegredoTelefonia);
+  const salvarToken = useServerFn(salvarTokenTelefonia);
+  const removerToken = useServerFn(removerTokenTelefonia);
+  const [token, setToken] = useState("");
+  const [estadoToken, setEstadoToken] = useState<{
+    configurado: boolean;
+    atualizadoEm: string | null;
+  } | null>(null);
+  const [salvandoToken, setSalvandoToken] = useState(false);
+  const [erroToken, setErroToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    lerEstado({ data: { clinicaId, chave: "sufficit_api_token" } })
+      .then(setEstadoToken)
+      .catch((e) => setErroToken((e as Error)?.message || "Falha ao ler o estado do token."));
+  }, [clinicaId, lerEstado]);
+
+  async function onSalvarToken() {
+    if (!clinicaId || !token.trim()) return;
+    const valor = token;
+    setToken(""); // limpa o campo na hora
+    setErroToken(null);
+    setSalvandoToken(true);
+    try {
+      setEstadoToken(
+        await salvarToken({ data: { clinicaId, chave: "sufficit_api_token", valor } }),
+      );
+    } catch {
+      setErroToken("Não foi possível salvar o token. Tente novamente.");
+    } finally {
+      setSalvandoToken(false);
+    }
+  }
+
+  async function onRemoverToken() {
+    if (!clinicaId) return;
+    const ok = await confirmDialog({
+      title: "Remover token da Sufficit?",
+      description: "A conexão com a telefonia deixa de funcionar até um novo token ser salvo.",
+    });
+    if (!ok) return;
+    setErroToken(null);
+    setSalvandoToken(true);
+    try {
+      setEstadoToken(await removerToken({ data: { clinicaId, chave: "sufficit_api_token" } }));
+    } catch {
+      setErroToken("Não foi possível remover o token. Tente novamente.");
+    } finally {
+      setSalvandoToken(false);
+    }
+  }
 
   async function rodar(tipo: "teste" | "amostra") {
     if (!clinicaId) return;
@@ -52,6 +114,49 @@ export function TelefoniaSufficit({ clinicaId }: { clinicaId: string | null }) {
       <p className="text-sm text-muted-foreground">
         Só testa a conexão e mostra uma amostra crua. Nada é gravado; a amostra some ao recarregar.
       </p>
+
+      <div className="space-y-2 rounded-lg border p-4">
+        <Label htmlFor="sufficit-token">Token de API da Sufficit (Bearer)</Label>
+        <Input
+          id="sufficit-token"
+          type="password"
+          autoComplete="off"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          disabled={!clinicaId || salvandoToken}
+        />
+        <p className="text-xs text-muted-foreground">
+          O token é gravado no servidor e não volta mais para a tela.
+        </p>
+        <p className="text-sm">
+          {estadoToken === null
+            ? "Verificando…"
+            : estadoToken.configurado
+              ? `Token configurado${
+                  estadoToken.atualizadoEm
+                    ? ` · atualizado em ${new Date(estadoToken.atualizadoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+                    : ""
+                }`
+              : "Token ausente"}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => void onSalvarToken()}
+            disabled={!clinicaId || salvandoToken || !token.trim()}
+          >
+            {salvandoToken && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar token
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void onRemoverToken()}
+            disabled={!clinicaId || salvandoToken || !estadoToken?.configurado}
+          >
+            Remover token
+          </Button>
+        </div>
+        {erroToken && <p className="text-sm text-destructive">{erroToken}</p>}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => void rodar("teste")} disabled={!clinicaId || !!carregando}>
