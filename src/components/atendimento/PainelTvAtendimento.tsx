@@ -237,40 +237,153 @@ export function PainelTvAtendimentoVisual({
   );
 }
 
-const ITENS_AJUDA = [
+const SECOES_AJUDA = [
   {
-    titulo: "Fila agora",
-    texto: "Total esperando uma resposta humana e tempo da conversa que aguarda há mais tempo.",
+    titulo: "Fila e tempo de espera",
+    itens: [
+      {
+        termo: "Esperando resposta da equipe",
+        definicao:
+          "O número grande é a quantidade de conversas abertas que já estão no atendimento humano e aguardam uma resposta da equipe. Entram conversas atribuídas e ainda sem atendente. Conversas que estão com a Nina ou aguardando o paciente não entram.",
+      },
+      {
+        termo: "Mais antiga sem resposta",
+        definicao:
+          "Mostra há quanto tempo espera a conversa mais atrasada desse total. A contagem começa na primeira mensagem do paciente ainda não respondida ou no momento em que a conversa foi passada à equipe.",
+      },
+      {
+        termo: "Desde",
+        definicao:
+          "É o horário em que começou a espera mais antiga. Se ela começou em outro dia, também aparecem o dia da semana e a data.",
+      },
+      {
+        termo: "0, 5 min e 10 min",
+        definicao:
+          "São os limites da régua: normal abaixo de 5 min; atenção de 5 até 10 min; crítica quando passa de 10 min.",
+      },
+      {
+        termo: "Blocos e totais coloridos",
+        definicao:
+          "Cada bloco representa uma conversa esperando. Os números abaixo somam quantas estão em normal, atenção e crítica.",
+      },
+      {
+        termo: "Sem atendente",
+        definicao:
+          "Conversas abertas no fluxo humano que ainda não foram atribuídas a nenhuma atendente. Elas também podem estar nas faixas de espera.",
+      },
+    ],
   },
   {
-    titulo: "Faixas de espera",
-    texto:
-      "Verde: até 5 min; amarelo: 5–10 min; vermelho: acima de 10 min. Cada bloco é uma conversa; sem atendente ainda não foi atribuída.",
+    titulo: "Equipe agora",
+    itens: [
+      {
+        termo: "Online / em pausa",
+        definicao:
+          "Quantidade de pessoas do perfil Telefonia disponíveis ou pausadas agora. Pessoas offline não aparecem na lista.",
+      },
+      {
+        termo: "Ponto ao lado do nome",
+        definicao: "Verde significa online; amarelo significa em pausa ou em saída/almoço.",
+      },
+      {
+        termo: "Ícone e cronômetro amarelos",
+        definicao:
+          "Identificam o tipo de pausa e mostram há quanto tempo a atendente está nesse estado.",
+      },
+      {
+        termo: "Atrib.",
+        definicao:
+          "Quantidade de conversas humanas abertas que estão atribuídas àquela atendente, tenham ou não mensagem pendente.",
+      },
+      {
+        termo: "Pend.",
+        definicao:
+          "Das conversas atribuídas, quantas estão aguardando uma resposta da atendente neste momento.",
+      },
+      {
+        termo: "Crít.",
+        definicao:
+          "Parte das pendentes que já passou de 10 minutos sem resposta humana. Por isso esse número também está incluído em Pend.",
+      },
+      {
+        termo: "Resolv.",
+        definicao: "Quantidade de conversas marcadas como resolvidas hoje por aquela atendente.",
+      },
+    ],
   },
   {
-    titulo: "Equipe",
-    texto:
-      "Atrib.: conversas com a pessoa; Pend.: sem resposta; Crít.: acima de 10 min; Resolv.: encerradas hoje.",
+    titulo: "Movimento de hoje",
+    itens: [
+      {
+        termo: "Mensagens de pacientes por hora",
+        definicao:
+          "As barras mostram quantas mensagens recebidas de pacientes foram registradas em cada hora de hoje. O número no título é o total do dia.",
+      },
+      {
+        termo: "Pico às ...h",
+        definicao:
+          "Hora com maior quantidade de mensagens recebidas hoje. A barra clara destaca a hora atual.",
+      },
+      {
+        termo: "Quem respondeu",
+        definicao:
+          "Total de mensagens de saída registradas hoje, separado por origem. Os 40 blocos mostram visualmente a proporção entre as origens.",
+      },
+      {
+        termo: "Nina / Automático / Equipe",
+        definicao:
+          "Nina são respostas da assistente; Automático são avisos e mensagens do sistema; Equipe são mensagens enviadas por usuários da clínica.",
+      },
+      {
+        termo: "Passadas à equipe",
+        definicao:
+          "Quantidade de conversas que entraram no fluxo de atendimento humano hoje. Não significa que já foram assumidas ou respondidas.",
+      },
+      {
+        termo: "Resolvidas",
+        definicao:
+          "Total de conversas reais marcadas como resolvidas hoje, independentemente de quando começaram.",
+      },
+      {
+        termo: "Resposta da equipe",
+        definicao:
+          "Tempo médio entre a primeira mensagem pendente do paciente e a próxima resposta humana, nos intervalos medidos hoje. Exemplo: 2 min significa que a equipe levou, em média, cerca de 2 minutos para responder.",
+      },
+    ],
   },
   {
-    titulo: "Presença",
-    texto: "Ponto verde indica online. Amarelo e o relógio indicam pausa e sua duração.",
-  },
-  {
-    titulo: "Mensagens por hora",
-    texto: "Quantidade recebida dos pacientes em cada hora de hoje; destaca a hora atual e o pico.",
-  },
-  {
-    titulo: "Quem respondeu",
-    texto: "Divide as respostas de hoje entre Nina, mensagens automáticas e equipe humana.",
-  },
-  {
-    titulo: "Resumo do dia",
-    texto: "Passadas à equipe, resolvidas e tempo médio até a primeira resposta humana.",
-  },
-  {
-    titulo: "Origem dos dados",
-    texto: "Ao vivo usa dados reais. Demonstração usa números fictícios e não altera atendimentos.",
+    titulo: "Cabeçalho e atualização",
+    itens: [
+      {
+        termo: "Clínica · WhatsApp",
+        definicao: "Identifica a clínica selecionada e o canal acompanhado por este painel.",
+      },
+      {
+        termo: "Ao vivo",
+        definicao:
+          "Mostra dados reais e indica conexão ativa. Reconectando significa que o painel está tentando restabelecer as atualizações em tempo real.",
+      },
+      {
+        termo: "Demonstração · dados fictícios",
+        definicao:
+          "Exibe somente um cenário ilustrativo. Não lê pacientes reais e não cria nem altera atendimentos.",
+      },
+      {
+        termo: "Relógio e tela cheia",
+        definicao:
+          "O relógio mostra a hora atual do painel; o botão ao lado entra ou sai da visualização em tela cheia.",
+      },
+      {
+        termo: "Atualizado",
+        definicao:
+          "No modo real, o rodapé mostra o horário da última consulta concluída. O painel também relê os dados quando recebe mudanças e, por segurança, a cada 30 segundos.",
+      },
+      {
+        termo: "Dados considerados",
+        definicao:
+          "No modo real, os números usam somente conversas e mensagens reais da clínica; registros de teste ficam fora.",
+      },
+    ],
   },
 ];
 
@@ -280,7 +393,7 @@ function AjudaPainel({ onFechar }: { onFechar: () => void }) {
       id="ajuda-painel-tv"
       role="dialog"
       aria-label="Como ler o painel"
-      className="absolute right-[3.6vw] top-[10.5vh] z-20 w-[min(58vw,58rem)] rounded-2xl border border-atd-border bg-atd-surface/95 p-[2.2vh_1.5vw] shadow-2xl backdrop-blur"
+      className="absolute right-[3.6vw] top-[10.5vh] z-20 max-h-[82vh] w-[min(84vw,88rem)] overflow-y-auto rounded-2xl border border-atd-border bg-atd-surface/95 p-[2.2vh_1.5vw] shadow-2xl backdrop-blur"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -288,7 +401,7 @@ function AjudaPainel({ onFechar }: { onFechar: () => void }) {
             Como ler este painel
           </p>
           <p className="mt-[0.5vh] text-[1.35vh] text-atd-ink-soft">
-            As definições são iguais nos dados reais e na demonstração.
+            O modo real e a demonstração usam a mesma leitura; muda apenas a origem dos dados.
           </p>
         </div>
         <button
@@ -300,16 +413,33 @@ function AjudaPainel({ onFechar }: { onFechar: () => void }) {
           <X className="h-[1.8vh] w-[1.8vh]" />
         </button>
       </div>
-      <dl className="mt-[1.8vh] grid grid-cols-2 gap-x-[1.8vw] gap-y-[1.5vh]">
-        {ITENS_AJUDA.map((item) => (
-          <div key={item.titulo} className="border-t border-atd-border pt-[1vh]">
-            <dt className="text-[1.45vh] font-semibold text-atd-ink">{item.titulo}</dt>
-            <dd className="mt-[0.35vh] text-[1.3vh] leading-relaxed text-atd-ink-soft">
-              {item.texto}
-            </dd>
-          </div>
+      <div className="mt-[1.8vh] grid grid-cols-1 gap-[1.6vh_1.5vw] xl:grid-cols-2">
+        {SECOES_AJUDA.map((secao) => (
+          <section
+            key={secao.titulo}
+            className="rounded-xl border border-atd-border bg-atd-bg/50 p-[1.4vh_1vw]"
+          >
+            <h3 className="text-[1.45vh] font-bold uppercase tracking-[0.14em] text-atd-ink">
+              {secao.titulo}
+            </h3>
+            <dl className="mt-[0.8vh] divide-y divide-atd-border">
+              {secao.itens.map((item) => (
+                <div
+                  key={item.termo}
+                  className="grid gap-[0.35vw] py-[0.75vh] 2xl:grid-cols-[10.5vw_1fr]"
+                >
+                  <dt className="text-[1.28vh] font-semibold leading-relaxed text-atd-ink">
+                    {item.termo}
+                  </dt>
+                  <dd className="text-[1.22vh] leading-relaxed text-atd-ink-soft">
+                    {item.definicao}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         ))}
-      </dl>
+      </div>
     </aside>
   );
 }
