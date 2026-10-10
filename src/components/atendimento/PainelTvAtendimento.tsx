@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Coffee, DoorOpen, Expand } from "lucide-react";
+import { ArrowLeft, CircleHelp, Coffee, DoorOpen, Expand, X } from "lucide-react";
 import { useRelogioPausa } from "@/hooks/use-relogio-pausa";
 import {
   faixaEsperaDesde,
@@ -59,6 +59,7 @@ export function PainelTvAtendimentoVisual({
   demonstracao = false,
   onAlternarDemonstracao,
 }: Props) {
+  const [ajudaAberta, setAjudaAberta] = useState(false);
   const agora = useRelogioPausa();
   const relogio = agora || Date.now();
   const espera = dados?.espera ?? [];
@@ -123,6 +124,16 @@ export function PainelTvAtendimentoVisual({
               {demonstracao ? "Voltar aos dados reais" : "Demonstração"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setAjudaAberta((aberta) => !aberta)}
+            className="flex h-[4.6vh] items-center gap-[0.45vw] rounded-xl border border-atd-border px-[0.8vw] text-[1.35vh] font-semibold text-atd-ink-soft"
+            aria-expanded={ajudaAberta}
+            aria-controls="ajuda-painel-tv"
+          >
+            <CircleHelp className="h-[2vh] w-[2vh]" />
+            Como ler
+          </button>
           <span className="text-[4.6vh] font-semibold tabular-nums leading-none">
             {new Date(relogio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
           </span>
@@ -137,6 +148,8 @@ export function PainelTvAtendimentoVisual({
         </div>
       </header>
       <div className="mt-[2.4vh] h-px shrink-0 bg-atd-border" />
+
+      {ajudaAberta && <AjudaPainel onFechar={() => setAjudaAberta(false)} />}
 
       {erro && !dados ? (
         <div className="grid flex-1 place-items-center text-center text-[3vh] text-atd-danger-ink">
@@ -221,6 +234,83 @@ export function PainelTvAtendimentoVisual({
         </>
       )}
     </div>
+  );
+}
+
+const ITENS_AJUDA = [
+  {
+    titulo: "Fila agora",
+    texto: "Total esperando uma resposta humana e tempo da conversa que aguarda há mais tempo.",
+  },
+  {
+    titulo: "Faixas de espera",
+    texto:
+      "Verde: até 5 min; amarelo: 5–10 min; vermelho: acima de 10 min. Cada bloco é uma conversa; sem atendente ainda não foi atribuída.",
+  },
+  {
+    titulo: "Equipe",
+    texto:
+      "Atrib.: conversas com a pessoa; Pend.: sem resposta; Crít.: acima de 10 min; Resolv.: encerradas hoje.",
+  },
+  {
+    titulo: "Presença",
+    texto: "Ponto verde indica online. Amarelo e o relógio indicam pausa e sua duração.",
+  },
+  {
+    titulo: "Mensagens por hora",
+    texto: "Quantidade recebida dos pacientes em cada hora de hoje; destaca a hora atual e o pico.",
+  },
+  {
+    titulo: "Quem respondeu",
+    texto: "Divide as respostas de hoje entre Nina, mensagens automáticas e equipe humana.",
+  },
+  {
+    titulo: "Resumo do dia",
+    texto: "Passadas à equipe, resolvidas e tempo médio até a primeira resposta humana.",
+  },
+  {
+    titulo: "Origem dos dados",
+    texto: "Ao vivo usa dados reais. Demonstração usa números fictícios e não altera atendimentos.",
+  },
+];
+
+function AjudaPainel({ onFechar }: { onFechar: () => void }) {
+  return (
+    <aside
+      id="ajuda-painel-tv"
+      role="dialog"
+      aria-label="Como ler o painel"
+      className="absolute right-[3.6vw] top-[10.5vh] z-20 w-[min(58vw,58rem)] rounded-2xl border border-atd-border bg-atd-surface/95 p-[2.2vh_1.5vw] shadow-2xl backdrop-blur"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[1.35vh] font-bold uppercase tracking-[0.22em] text-atd-ink-soft">
+            Como ler este painel
+          </p>
+          <p className="mt-[0.5vh] text-[1.35vh] text-atd-ink-soft">
+            As definições são iguais nos dados reais e na demonstração.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onFechar}
+          className="grid h-[3.6vh] w-[3.6vh] shrink-0 place-items-center rounded-lg border border-atd-border text-atd-ink-soft"
+          aria-label="Fechar explicação"
+        >
+          <X className="h-[1.8vh] w-[1.8vh]" />
+        </button>
+      </div>
+      <dl className="mt-[1.8vh] grid grid-cols-2 gap-x-[1.8vw] gap-y-[1.5vh]">
+        {ITENS_AJUDA.map((item) => (
+          <div key={item.titulo} className="border-t border-atd-border pt-[1vh]">
+            <dt className="text-[1.45vh] font-semibold text-atd-ink">{item.titulo}</dt>
+            <dd className="mt-[0.35vh] text-[1.3vh] leading-relaxed text-atd-ink-soft">
+              {item.texto}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </aside>
   );
 }
 
