@@ -188,7 +188,10 @@ export type SegredoGravavel = (typeof SEGREDOS_GRAVAVEIS)[number];
 
 export type EstadoSegredo = { configurado: boolean; atualizadoEm: string | null };
 
-export async function estadoSegredo(clinicaId: string, chave: SegredoGravavel): Promise<EstadoSegredo> {
+export async function estadoSegredo(
+  clinicaId: string,
+  chave: SegredoGravavel,
+): Promise<EstadoSegredo> {
   const { data, error } = await supabaseAdmin
     .from("integration_secrets")
     .select("updated_at")
@@ -215,7 +218,10 @@ export async function salvarSegredo(
   return estadoSegredo(clinicaId, chave);
 }
 
-export async function removerSegredo(clinicaId: string, chave: SegredoGravavel): Promise<EstadoSegredo> {
+export async function removerSegredo(
+  clinicaId: string,
+  chave: SegredoGravavel,
+): Promise<EstadoSegredo> {
   const { error } = await supabaseAdmin
     .from("integration_secrets")
     .delete()
