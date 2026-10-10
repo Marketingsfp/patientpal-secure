@@ -36,6 +36,13 @@
       "when": 1791566364737,
       "tag": "0004_catalogos_leitura_so_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791651401841,
+      "tag": "0005_atend_avaliacoes_pesquisa_satisfacao",
+      "breakpoints": true
     }
   ]
 }
