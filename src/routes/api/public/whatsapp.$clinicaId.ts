@@ -587,6 +587,58 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   }
                 }
 
+                // Pesquisa de satisfação do atendimento encerrado. Confirmações
+                // de consulta e códigos do portal mantêm prioridade acima. Aqui,
+                // só uma nota isolada de 1 a 5 é consumida; qualquer pedido ou
+                // conteúdo adicional segue abaixo e reabre o atendimento normal.
+                try {
+                  const { processarRespostaPesquisaSatisfacao } =
+                    await import("@/lib/atendimento/pesquisa-satisfacao.server");
+                  const pesquisa = await processarRespostaPesquisaSatisfacao({
+                    db: supabaseAdmin as never,
+                    clinicaId: params.clinicaId,
+                    conversaId: msgInserida.conversa_id ?? null,
+                    texto: textoPaciente,
+                    mensagemId: msgInserida.id,
+                    waMessageId: wa_message_id,
+                  });
+                  if (pesquisa.tratada) {
+                    if ("resposta" in pesquisa && pesquisa.resposta && phoneNumberId) {
+                      try {
+                        const { wa_message_id: respostaId } = await metaSendText(
+                          phoneNumberId,
+                          cfg.access_token,
+                          from,
+                          pesquisa.resposta,
+                        );
+                        await supabaseAdmin.from("whatsapp_mensagens").insert({
+                          clinica_id: params.clinicaId,
+                          conversa_id: msgInserida.conversa_id,
+                          wa_message_id: respostaId,
+                          direction: "out",
+                          from_number: displayPhoneNumber,
+                          to_number: from,
+                          body: pesquisa.resposta,
+                          tipo: "text",
+                          status: "sent",
+                          enviada_por: "sistema",
+                          tratada_internamente: true,
+                        });
+                      } catch (e) {
+                        // A nota já foi registrada. Falhar no agradecimento não
+                        // pode reabrir a conversa nem mandar a resposta à Nina.
+                        console.error("[pesquisa-satisfacao] agradecimento não enviado", e);
+                      }
+                    }
+                    resultado = "pesquisa_satisfacao:respondida";
+                    continue;
+                  }
+                } catch (e) {
+                  // Sem confirmação no banco, a mensagem segue para o fluxo
+                  // normal; nunca é descartada por uma falha da pesquisa.
+                  console.error("[pesquisa-satisfacao] reconhecimento falhou", e);
+                }
+
                 // Mensagem nova do paciente reabre automaticamente a conversa
                 // encerrada e devolve o atendimento ao fluxo inicial da Nina.
                 const fromDigits = String(from ?? "").replace(/\D/g, "");

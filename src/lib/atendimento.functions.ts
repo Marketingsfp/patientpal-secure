@@ -812,19 +812,23 @@ export const transferirConversa = createServerFn({ method: "POST" })
       const acessos = await carregarAcessosOsZap(context.supabase, context.userId, data.clinicaId);
       if (acessos["oszap-conversas"] !== "write")
         throw new Error("Sem permissão para transferir conversas.");
-      const { data: destinatario, error } = await (context.supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc(
-        "atend_transferir_departamento",
-        {
-          _clinica_id: data.clinicaId,
-          _conversa_id: data.conversaId,
-          _departamento_id: data.paraDepartamentoId,
-          _responsavel_esperado: data.responsavelEsperado,
-          _motivo: data.motivo,
-          _ip_origem: (
-            await import("./atendimento/departamentos-auditoria.server")
-          ).ipOrigemDepartamentos(),
-        },
-      );
+      const { data: destinatario, error } = await (
+        context.supabase as unknown as {
+          rpc: (
+            fn: string,
+            args: Record<string, unknown>,
+          ) => Promise<{ data: unknown; error: { message: string } | null }>;
+        }
+      ).rpc("atend_transferir_departamento", {
+        _clinica_id: data.clinicaId,
+        _conversa_id: data.conversaId,
+        _departamento_id: data.paraDepartamentoId,
+        _responsavel_esperado: data.responsavelEsperado,
+        _motivo: data.motivo,
+        _ip_origem: (
+          await import("./atendimento/departamentos-auditoria.server")
+        ).ipOrigemDepartamentos(),
+      });
       if (error) throw new Error(error.message);
       if (!destinatario)
         throw new Error("Não foi possível confirmar a transferência. Atualize a conversa.");
@@ -984,7 +988,23 @@ export const fecharConversa = createServerFn({ method: "POST" })
       // seguida por `atualizarResumoEncerramento`, chamado pela tela.
       adiarResumo: true,
     });
-    return { ok: true, protocol: r.protocol as string };
+    const atendenteAvaliada = dono.atribuida_user_id ?? dono.last_assigned_user_id ?? null;
+    const { solicitarPesquisaSatisfacao } =
+      await import("@/lib/atendimento/pesquisa-satisfacao.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const pesquisa = await solicitarPesquisaSatisfacao({
+      db: supabaseAdmin,
+      clinicaId: data.clinicaId,
+      conversaId: data.conversaId,
+      atendenteUserId: atendenteAvaliada,
+      solicitadaPorUserId: context.userId,
+    });
+    return {
+      ok: true,
+      protocol: r.protocol as string,
+      pesquisaEnviada: pesquisa.enviada,
+      pesquisaMotivo: pesquisa.enviada ? null : pesquisa.motivo,
+    };
   });
 
 /** Atualiza o resumo vigente com o desfecho "resolvida" após o encerramento manual. */
@@ -2115,7 +2135,9 @@ export const dashboardAtendimento = createServerFn({ method: "POST" })
         .from("atend_avaliacoes")
         .select("nota")
         .eq("clinica_id", data.clinicaId)
-        .gte("created_at", isoHoje),
+        .eq("status", "respondida")
+        .not("nota", "is", null)
+        .gte("respondida_em", isoHoje),
     ]);
     const csat = (csatRows ?? []).length
       ? (csatRows!.reduce((s: number, r: any) => s + r.nota, 0) / csatRows!.length).toFixed(2)
@@ -2826,10 +2848,12 @@ export const relatorioAtendimento = createServerFn({ method: "POST" })
         .lte("created_at", data.ate),
       context.supabase
         .from("atend_avaliacoes")
-        .select("nota, created_at")
+        .select("nota, respondida_em")
         .eq("clinica_id", data.clinicaId)
-        .gte("created_at", data.de)
-        .lte("created_at", data.ate),
+        .eq("status", "respondida")
+        .not("nota", "is", null)
+        .gte("respondida_em", data.de)
+        .lte("respondida_em", data.ate),
     ]);
 
     const userIds = Array.from(

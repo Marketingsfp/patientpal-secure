@@ -861,7 +861,7 @@ export function DashboardOsZapView({
             <TabsContent value="equipe" className="space-y-5">
               <Secao
                 titulo="Desempenho por atendente"
-                descricao="Somente quem tem o perfil Telefonia na clínica. Mensagens, conversas assumidas, finalizadas e transferidas no período, por quem fez a ação. Presença e conversas abertas são de agora."
+                descricao="Somente quem tem o perfil Telefonia na clínica. A nota e a quantidade de avaliações são vinculadas à atendente responsável no encerramento. Presença e conversas abertas são de agora."
               >
                 <Tabela
                   linhas={resumo.equipe}
@@ -885,6 +885,12 @@ export function DashboardOsZapView({
                     { campo: "mensagens", titulo: "Mensagens" },
                     { campo: "assumidas", titulo: "Assumidas" },
                     { campo: "finalizadas", titulo: "Finalizadas" },
+                    { campo: "avaliacoes", titulo: "Avaliações" },
+                    {
+                      campo: "notaMedia",
+                      titulo: "Nota média",
+                      formato: (v) => (v == null ? "—" : Number(v).toFixed(2)),
+                    },
                     { campo: "transferencias", titulo: "Transferências" },
                     { campo: "abertasAgora", titulo: "Abertas agora" },
                     { campo: "pausas", titulo: "Pausas" },

@@ -3316,12 +3316,17 @@ function AtendInboxOperacional({
     fechandoRef.current = true;
     setFechando(true);
     try {
-      await fecharFn({
+      const resultado = await fecharFn({
         data: {
           clinicaId,
           conversaId: origem,
         },
       });
+      if (!resultado.pesquisaEnviada && resultado.pesquisaMotivo)
+        toast.warning(
+          `Conversa encerrada, mas a pesquisa não foi enviada: ${resultado.pesquisaMotivo}`,
+        );
+      else toast.success("Conversa encerrada e pesquisa de satisfação enviada.");
       void resumoEncerramentoFn({ data: { clinicaId, conversaId: origem } }).catch((e) =>
         console.error("[encerrar] resumo não atualizado", e),
       );

@@ -60,7 +60,11 @@ export type EntradaDashboard = {
   eventos: EventoDashboard[];
   /** Eventos e respostas posteriores, só das conversas que entraram na fila ou foram assumidas. */
   seguintes: { eventos: EventoDashboard[]; mensagens: MensagemDashboard[] };
-  avaliacoes: { created_at: string; nota: number }[];
+  avaliacoes: {
+    respondida_em: string | null;
+    nota: number | null;
+    atendente_user_id: string | null;
+  }[];
   transferencias: { created_at: string; para_departamento_id: string | null }[];
   departamentos: { id: string; nome: string }[];
   presencas: { user_id: string; status: string; estado_manual: string | null }[];
@@ -319,12 +323,19 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   // Avaliações
   const notas = [0, 0, 0, 0, 0];
   const somaNotas = { atual: [] as number[], anterior: [] as number[] };
+  const avaliacoesPorPessoa = new Map<string, number[]>();
   for (const a of e.avaliacoes) {
-    const j = janela(a.created_at);
+    if (a.nota == null || !a.respondida_em) continue;
+    const j = janela(a.respondida_em);
     if (!j) continue;
-    contar("avaliacoes", a.created_at);
+    contar("avaliacoes", a.respondida_em);
     somaNotas[j].push(a.nota);
     if (j === "atual" && a.nota >= 1 && a.nota <= 5) notas[a.nota - 1]++;
+    if (j === "atual" && a.atendente_user_id)
+      avaliacoesPorPessoa.set(a.atendente_user_id, [
+        ...(avaliacoesPorPessoa.get(a.atendente_user_id) ?? []),
+        a.nota,
+      ]);
   }
   ind.notaMedia = { atual: media(somaNotas.atual, 2), anterior: media(somaNotas.anterior, 2) };
 
@@ -410,6 +421,8 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
       assumidas: acoes.get(id)?.assumidas ?? 0,
       finalizadas: acoes.get(id)?.finalizadas ?? 0,
       transferencias: acoes.get(id)?.transferencias ?? 0,
+      avaliacoes: avaliacoesPorPessoa.get(id)?.length ?? 0,
+      notaMedia: media(avaliacoesPorPessoa.get(id) ?? [], 2),
       abertasAgora: abertasPorPessoa.get(id) ?? 0,
       pausas: pausasPessoa.get(id)?.pausas ?? 0,
       minutosPausa: Math.round(pausasPessoa.get(id)?.minutos ?? 0),

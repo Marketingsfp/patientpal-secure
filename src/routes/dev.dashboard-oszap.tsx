@@ -180,7 +180,11 @@ function dadosFicticios(periodo: { de: string; ate: string }) {
     seguintes: { eventos: [], mensagens: [] },
     avaliacoes: conversas
       .filter(() => r() < 0.15)
-      .map((c) => ({ created_at: c.created_at, nota: [5, 5, 4, 4, 3, 2, 1][Math.floor(r() * 7)] })),
+      .map((c) => ({
+        respondida_em: c.created_at,
+        nota: [5, 5, 4, 4, 3, 2, 1][Math.floor(r() * 7)],
+        atendente_user_id: r() > 0.5 ? "ana" : "bia",
+      })),
     transferencias: eventos
       .filter((e) => e.evento === "TRANSFERIDA")
       .map((e) => ({ created_at: e.created_at, para_departamento_id: "dep-orc" })),

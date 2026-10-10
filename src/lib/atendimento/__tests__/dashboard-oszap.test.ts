@@ -129,6 +129,31 @@ describe("Calendário do dashboard", () => {
 });
 
 describe("Números do dashboard", () => {
+  it("atribui quantidade e nota média à atendente responsável", () => {
+    const r = montarDashboardOsZap(
+      base({
+        nomes: new Map([
+          ["ana", "Ana"],
+          ["bia", "Bia"],
+        ]),
+        avaliacoes: [
+          { respondida_em: "2024-10-01T12:00:00Z", nota: 5, atendente_user_id: "ana" },
+          { respondida_em: "2024-10-01T13:00:00Z", nota: 3, atendente_user_id: "ana" },
+          { respondida_em: "2024-10-01T14:00:00Z", nota: 4, atendente_user_id: null },
+        ],
+      }),
+    );
+    expect(r.equipe.find((p) => p.id === "ana")).toMatchObject({
+      avaliacoes: 2,
+      notaMedia: 4,
+    });
+    expect(r.equipe.find((p) => p.id === "bia")).toMatchObject({
+      avaliacoes: 0,
+      notaMedia: null,
+    });
+    expect(r.indicadores.avaliacoes.atual).toBe(3);
+  });
+
   it("separa respostas da equipe e da Nina; só conta envio confirmado", () => {
     const r = montarDashboardOsZap(
       base({
