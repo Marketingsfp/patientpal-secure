@@ -25,6 +25,10 @@ test("prompt de referência pergunta a preferência antes de listar informaçõe
   );
   expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain("PERGUNTA SE O ATENDIMENTO EXISTE");
   expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain(
+    "mesmo que existam horários ou vagas livres na agenda desse profissional",
+  );
+  expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain("Se todos atenderem sem pré-agendamento");
+  expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain(
     "LIMITE SOMENTE PARA APRESENTAR PROFISSIONAIS",
   );
   expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain(

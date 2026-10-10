@@ -15,6 +15,11 @@ já existente de perguntar pela primeira vaga ou pela escolha de profissional.
 - Primeira vaga: comparar todas as agendas elegíveis do atendimento, mesmo
   acima de oito, apresentar somente a opção mais próxima e continuar com
   seu profissional, respeitando filtros, modalidade, cadastro e aceite final.
+- Ordem de chegada sem pré-agendamento não participa da comparação, mesmo
+  com horários livres na agenda. Hora marcada e ordem de chegada com
+  pré-agendamento permitem a busca de vaga. Para atendimento sem
+  pré-agendamento, informar os dias/períodos e orientar comparecimento.
+  Se todos atenderem dessa forma, não oferecer a escolha da primeira vaga.
 - Ver/escolher a lista: até oito, apresentar; acima de oito, encaminhar para
   a equipe apresentar as opções. Pedido explícito de lista dispensa a pergunta inicial.
 - Médico já escolhido: preservar sua escolha; quantidade total não encaminha.
@@ -44,6 +49,14 @@ lint dos arquivos alterados ficou sem erros (há avisos preexistentes de
 conferiu pergunta inicial, primeira vaga com nove, encaminhamento da lista
 com nove e apresentação com oito, além de mobile sem rolagem horizontal,
 zero erros de JavaScript e nenhuma requisição externa.
+
+Conferência adicional da modalidade: seis cenários em WhatsApp/homologação
+comprovam que a agenda do profissional por ordem de chegada não é consultada,
+mesmo contendo um horário mais cedo; quando todos atendem sem pré-agendamento,
+o retorno não oferece vagas nem inicia reserva. O bloqueio já existia no
+executor; o prompt recebeu a ressalva explícita sobre horários cadastrados.
+Após esse reforço, as três suítes direcionadas passaram com 16 testes,
+incluindo o processo isolado do executor com 316 testes, sem falhas.
 
 Não foram alterados cadastros, reservas, preços, permissões, histórico,
 auditoria antiga ou versões de prompt publicadas no banco. O encaminhamento

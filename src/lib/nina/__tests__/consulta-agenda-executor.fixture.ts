@@ -1282,16 +1282,60 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
     expect(r.proxima).toBeUndefined();
     expect(ctx.estado.appointment.slot_options).toBeNull();
   });
-  test("sem pré-agendamento aparece como comparecimento e não como vaga para reservar", async () => {
-    banco.profissionais![1]!.tipo_atendimento = "Ordem de chegada sem pré-agendamento";
-    const r = await chamar().resultado;
-    expect((r.sem_pre_agendamento as Linha[])[0]).toMatchObject({
-      medico: "Maria Teste",
-      sem_agendamento: true,
+  for (const origem of ["homologacao", "whatsapp"] as const)
+    for (const modalidade of ["Ordem de chegada", "Ordem de chegada sem pré-agendamento"])
+      test(`${origem}: ${modalidade} ignora sua vaga mais cedo e orienta comparecimento`, async () => {
+        banco.profissionais![1]!.tipo_atendimento = modalidade;
+        const ctx = {
+          ...contexto("o primeiro disponível", oferta),
+          origem,
+          teste: origem === "homologacao",
+        };
+        // Maria tem uma vaga anterior à de Alex, mas a modalidade impede ofertá-la.
+        expect(Date.parse(String(banco.agendamentos![1]!.inicio))).toBeLessThan(
+          Date.parse(String(banco.agendamentos![0]!.inicio)),
+        );
+        const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
+        expect((r.sem_pre_agendamento as Linha[])[0]).toMatchObject({
+          medico: "Maria Teste",
+          sem_agendamento: true,
+        });
+        expect((r.sem_pre_agendamento as Linha[])[0]!.orientacao).not.toContain("30 minutos");
+        expect(r.proxima).toMatchObject({
+          medico_id: MEDICO,
+          modalidade_atendimento: "hora_marcada",
+        });
+        const consultados = consultasAgenda().flatMap((l) => l.filtros.medico_id);
+        expect(consultados).toContain(MEDICO);
+        expect(consultados).not.toContain(OUTRO);
+        expect(
+          ctx.estado.appointment.slot_options?.vagas.every((v) => v.medico_id === MEDICO),
+        ).toBe(true);
+        expect(gravacoes).toHaveLength(0);
+      });
+  for (const origem of ["homologacao", "whatsapp"] as const)
+    test(`${origem}: todos por ordem de chegada não consultam vagas, apesar dos horários existentes`, async () => {
+      for (const p of banco.profissionais!) p.tipo_atendimento = "Ordem de chegada";
+      expect(banco.agendamentos).toHaveLength(2);
+      const ctx = {
+        ...contexto("o primeiro disponível", oferta),
+        origem,
+        teste: origem === "homologacao",
+      };
+      const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
+      expect(r).toMatchObject({
+        ok: true,
+        consulta_realizada: false,
+        proxima: null,
+        empatados: [],
+      });
+      expect(r.sem_pre_agendamento).toHaveLength(2);
+      expect(consultasAgenda()).toHaveLength(0);
+      expect(ctx.estado.appointment.slot_options?.vagas ?? []).toHaveLength(0);
+      expect(ctx.estado.appointment.slot_inicio).toBeNull();
+      expect(ctx.estado.appointment.confirmation).toBeNull();
+      expect(gravacoes).toHaveLength(0);
     });
-    expect((r.sem_pre_agendamento as Linha[])[0]!.orientacao).not.toContain("30 minutos");
-    expect(r.proxima).toMatchObject({ medico_id: MEDICO });
-  });
   test("ficha traz modalidade sem acrescentar antecedência comercial", async () => {
     banco.profissionais![1]!.tipo_atendimento = "Por ficha";
     const r = await chamar().resultado;
