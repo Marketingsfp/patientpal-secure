@@ -11,39 +11,88 @@ import { motivoLegivel } from "../jev-encaminhamento";
 const nomes = (n: number) => Array.from({ length: n }, (_, i) => `Dr. ${i}`);
 const args = (o: Record<string, unknown>) => JSON.stringify(o);
 
-test("mais de 8 profissionais na lista da especialidade vai para a equipe (08/10/2026)", () => {
+test("pedido para ver/escolher a lista com mais de 8 profissionais vai para a equipe", () => {
   expect(LIMITE_LISTA_PROFISSIONAIS).toBe(8);
   expect(
-    listaProfissionaisExtensa("consultar_cadastro", args({ termo: "cardiologia" }), {
-      doctors: nomes(9),
-    }),
+    listaProfissionaisExtensa(
+      "consultar_cadastro",
+      args({ termo: "cardiologia", objetivos: ["medicos"] }),
+      {
+        doctors: nomes(9),
+      },
+    ),
   ).toEqual({ total: 9, especialidade: "cardiologia" });
   expect(
-    listaProfissionaisExtensa("consultar_cadastro", args({ termo: "cardiologia" }), {
-      doctors: nomes(8),
+    listaProfissionaisExtensa(
+      "consultar_cadastro",
+      args({ termo: "cardiologia", objetivos: ["medicos"] }),
+      {
+        doctors: nomes(8),
+      },
+    ),
+  ).toBeNull();
+});
+
+test.each([
+  { objetivos: ["informacoes_gerais"] },
+  { objetivos: ["agendamento"] },
+  { objetivos: ["informacoes_gerais", "agendamento"] },
+  { objetivos: ["horarios", "agendamento"] },
+  { objetivos: ["valor", "horarios"] },
+])("existência, agendamento e primeira vaga não pedem lista: %j", ({ objetivos }) => {
+  expect(
+    listaProfissionaisExtensa("consultar_cadastro", args({ termo: "cardiologia", objetivos }), {
+      doctors: nomes(9),
     }),
   ).toBeNull();
+});
+
+test.each([null, "{", "{}", '{"objetivos":"medicos"}'])(
+  "sem objetivo de lista válido não atribui um pedido ao paciente: %s",
+  (argumentos) => {
+    expect(
+      listaProfissionaisExtensa("consultar_cadastro", argumentos, { doctors: nomes(9) }),
+    ).toBeNull();
+  },
+);
+
+test("pedido misto que inclui ver a lista mantém o limite", () => {
+  expect(
+    listaProfissionaisExtensa(
+      "consultar_cadastro",
+      args({ termo: "cardiologia", objetivos: ["valor", "medicos", "agendamento"] }),
+      { doctors: nomes(9) },
+    ),
+  ).toEqual({ total: 9, especialidade: "cardiologia" });
 });
 
 test("pedido pelo nome, esclarecimento, exame e outras ferramentas não entram na regra", () => {
   expect(
     listaProfissionaisExtensa(
       "consultar_cadastro",
-      args({ termo: "cardiologia", medico: "Dr. 1" }),
+      args({ termo: "cardiologia", medico: "Dr. 1", objetivos: ["medicos"] }),
       { doctors: nomes(9) },
     ),
   ).toBeNull();
   expect(
-    listaProfissionaisExtensa("consultar_cadastro", args({ termo: "cardio" }), {
-      doctors: nomes(9),
-      esclarecimento: { pergunta: "?" },
-    }),
+    listaProfissionaisExtensa(
+      "consultar_cadastro",
+      args({ termo: "cardio", objetivos: ["medicos"] }),
+      {
+        doctors: nomes(9),
+        esclarecimento: { pergunta: "?" },
+      },
+    ),
   ).toBeNull();
   expect(
-    listaProfissionaisExtensa("consultar_cadastro", args({ termo: "ecg" }), {
-      doctors: nomes(9),
-      tipo_atendimento: "exame_procedimento",
-    }),
+    listaProfissionaisExtensa(
+      "consultar_cadastro",
+      args({ termo: "ecg", objetivos: ["medicos"] }),
+      {
+        doctors: nomes(9),
+        tipo_atendimento: "exame_procedimento",
+      },
+    ),
   ).toBeNull();
   expect(listaProfissionaisExtensa("proxima_vaga", args({}), { doctors: nomes(9) })).toBeNull();
 });

@@ -3613,13 +3613,17 @@ async function gerarRespostaNinaInterno(
           )
         : null;
       if (listaExtensa) {
-        // Regra de 08/10/2026: mais de 8 profissionais na lista → a equipe apresenta as opções.
+        // Só a lista pedida pelo paciente entra no limite; existência/primeira vaga continuam.
         const { motivoListaExtensa } = await import("@/lib/nina/lista-profissionais-extensa");
         registrarEtapa({
           tipo: "consulta",
           fonte: "sistema",
-          titulo: "Lista com mais de 8 profissionais: equipe",
-          dados: { total: listaExtensa.total, termo: listaExtensa.especialidade },
+          titulo: "Apresentação solicitada com mais de 8 profissionais: equipe",
+          dados: {
+            total: listaExtensa.total,
+            termo: listaExtensa.especialidade,
+            objetivo: "medicos",
+          },
           codigo: {
             arquivo: "src/lib/nina/lista-profissionais-extensa.ts",
             funcao: "listaProfissionaisExtensa",

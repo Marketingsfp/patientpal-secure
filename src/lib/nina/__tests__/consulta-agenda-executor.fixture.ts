@@ -1143,6 +1143,63 @@ describe("primeiro disponível entre todos os profissionais publicados", () => {
       encaminhamentoSemVagas(validarResultado("consultar_primeiro_disponivel", r), pedido),
     ).toBeNull();
   });
+  for (const origem of ["homologacao", "whatsapp"] as const)
+    test(`${origem}: nove médicos não limitam a comparação; a primeira vaga é do último publicado`, async () => {
+      const ids = [MEDICO, OUTRO];
+      for (let i = 0; i < 7; i++) {
+        const id = `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
+        ids.push(id);
+        const nome = `Profissional Teste ${i + 3}`;
+        banco.profissionais!.push({
+          ...banco.profissionais![0],
+          id: `publicacao-${i}`,
+          nome,
+          medico_id: id,
+        });
+        banco.medicos!.push({ ...banco.medicos![0], id, nome });
+        const deslocamento = i === 6 ? -90 * 60_000 : (i + 1) * 60 * 60_000;
+        banco.agendamentos!.push({
+          ...banco.agendamentos![0],
+          id: `vaga-extra-${i}`,
+          medico_id: id,
+          inicio: new Date(inicio.getTime() + deslocamento).toISOString(),
+          fim: new Date(fim.getTime() + deslocamento).toISOString(),
+        });
+      }
+      const ctx = {
+        ...contexto(
+          "o primeiro horário",
+          "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?",
+        ),
+        origem,
+        teste: origem === "homologacao",
+        opcoesAgendamentoInicioTurno: false,
+      };
+      const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", pedido);
+      expect(r.ok).toBe(true);
+      expect(r.proxima).toMatchObject({ medico_id: ids[8], medico: "Profissional Teste 9" });
+      const consultados = consultasAgenda().flatMap((l) => l.filtros.medico_id);
+      for (const id of ids) expect(consultados).toContain(id);
+      expect(ctx.estado.appointment.slot_options?.vagas).toHaveLength(1);
+      expect(ctx.estado.appointment.slot_inicio).toBeNull();
+      expect(ctx.estado.appointment.confirmation).toBeNull();
+      const vaga = ctx.estado.appointment.slot_options!.vagas[0]!;
+      ctx.opcoesAgendamentoInicioTurno = true;
+      ctx.consultaAgenda.mensagemAtual = "Esse horário serve, quero esse.";
+      const escolha = await executarFerramentaPaciente(ctx, "selecionar_horario", {
+        medico_id: vaga.medico_id,
+        inicio: vaga.inicio,
+        fim: vaga.fim,
+      });
+      expect(escolha.ok, JSON.stringify(escolha)).toBe(true);
+      expect(ctx.estado.appointment.doctor_id).toBe(ids[8]);
+      expect(ctx.estado.appointment.slot_inicio).toBe(vaga.inicio);
+      expect(ctx.estado.appointment.confirmation).toMatchObject({
+        aceita: false,
+        vaga: { medico_id: ids[8] },
+      });
+      expect(gravacoes).toHaveLength(0);
+    });
   test("nenhuma vaga em todas as agendas aciona a regra de encaminhamento", async () => {
     banco.agendamentos = [];
     const r = await chamar().resultado;

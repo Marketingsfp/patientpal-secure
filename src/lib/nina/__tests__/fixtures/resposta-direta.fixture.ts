@@ -175,6 +175,29 @@ const reservaIndependente = cenario.startsWith("catalogo_multiplas_reserva");
 const transferenciaFicticia = cenario === "catalogo_multiplas_transferencia_ficticia";
 let estadoPerguntas: any = null;
 const regraCatalogo = cenario.startsWith("catalogo_");
+const listaCenario = cenario.startsWith("catalogo_lista_");
+const listaPrimeiro = listaCenario && cenario.includes("primeiro");
+const listaEscolha = listaCenario && cenario.includes("escolher");
+const nomesLista = [
+  "Amanda Souza",
+  "Bruno Lima",
+  "Carla Duarte",
+  "Daniel Rocha",
+  "Elisa Alves",
+  "Fabio Costa",
+  "Giovana Dias",
+  "Hugo Moreira",
+  "Isabel Martins",
+].slice(0, cenario.endsWith("oito") ? 8 : 9);
+const ofertaLista =
+  "Temos atendimento em Cardiologia, sim. Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?";
+const entradaLista = listaPrimeiro
+  ? cenario.endsWith("inicial")
+    ? "Quero marcar Cardiologia no primeiro horário disponível."
+    : "o primeiro horário"
+  : listaEscolha
+    ? "quero escolher os profissionais"
+    : "oi boa tarde quero marcar cardiologia, vcs fazem?";
 const sfp = cenario.startsWith("catalogo_sfp");
 const ausente = cenario.startsWith("catalogo_ausente");
 const unificado = cenario.startsWith("catalogo_identificacao_");
@@ -728,7 +751,7 @@ if (confirmacaoMedico)
   };
 if (cenario === "foto_sessao_nova")
   estadoContextual.session_started_at = new Date(agora - 3 * 60_000).toISOString();
-const mensagensContextuais = semNomeCenario
+const mensagensDoCenario = semNomeCenario
   ? [
       {
         ...registroMensagem("Tenho dor, qual médico?", 0, "in", "received"),
@@ -874,7 +897,10 @@ const mensagensContextuais = semNomeCenario
                     registroMensagem("Qual profissional você prefere?", 1),
                     registroMensagem("Quero o dr Sandro por favor", 2, "in", "received"),
                     registroMensagem(perguntaMedico, 3),
-                    { ...registroMensagem(pergunta, 18, "in", "received"), id: "entrada-simulada" },
+                    {
+                      ...registroMensagem(pergunta, 18, "in", "received"),
+                      id: "entrada-simulada",
+                    },
                   ]
                 : contextual
                   ? [
@@ -907,6 +933,17 @@ const mensagensContextuais = semNomeCenario
                       },
                     ]
                   : [];
+const mensagensContextuais = listaCenario
+  ? [
+      ...((listaPrimeiro && !cenario.endsWith("inicial")) || listaEscolha
+        ? [
+            registroMensagem("quero marcar cardiologia, vcs fazem?", 0, "in", "received"),
+            registroMensagem(ofertaLista, 1),
+          ]
+        : []),
+      { ...registroMensagem(entradaLista, 18, "in", "received"), id: "entrada-simulada" },
+    ]
+  : mensagensDoCenario;
 const consultas: string[] = [];
 const gravacoes: Array<{ tabela: string; valor: any }> = [];
 const requests: any[] = [];
@@ -1034,7 +1071,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
                           ).slice(0, limiteCatalogo)
                         : tabela === "clinicas"
                           ? { nome: "Clínica simulada", base_importada: false }
-                          : (alteracaoCenario ||
+                          : (listaCenario ||
+                                alteracaoCenario ||
                                 semNomeCenario ||
                                 duvidaCenario ||
                                 perguntasMultiplas ||
@@ -1051,7 +1089,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
                                 unificado) &&
                               tabela === "atend_conversas"
                             ? { id: "conversa-contextual", nina_fluxo_estado: estadoContextual }
-                            : (alteracaoCenario ||
+                            : (listaCenario ||
+                                  alteracaoCenario ||
                                   semNomeCenario ||
                                   duvidaCenario ||
                                   perguntasMultiplas ||
@@ -1072,7 +1111,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
                                 : [],
               error: null,
               count:
-                (fotoCenario ||
+                (listaCenario ||
+                  fotoCenario ||
                   contextual ||
                   confirmacaoMedico ||
                   pedidoCenario ||
@@ -1106,6 +1146,7 @@ mock.module("@/lib/nina/pedido-medico-flag", () => ({
 }));
 mock.module("@/lib/nina/agenda-flag.server", () => ({
   ferramentasAgendaAtivas: async () =>
+    listaCenario ||
     escolhaHorario ||
     Boolean(modoConfirmacao) ||
     clinicoGeral ||
@@ -1202,6 +1243,52 @@ mock.module("@/lib/nina/tool-broker.server", () => ({
         args: typeof args === "string" ? JSON.parse(args) : args,
       });
       ferramentas.push(nome);
+      if (listaCenario && ["consultar_cadastro", "consultar_primeiro_disponivel"].includes(nome)) {
+        const primeira = nome === "consultar_primeiro_disponivel";
+        const r = {
+          ferramenta: nome,
+          capacidade: primeira ? "checkAvailability" : "searchKnowledgeBase",
+          fonte: primeira ? "agenda" : "catalogo_publicado",
+          success: true,
+          reused: false,
+          dados: primeira
+            ? {
+                ok: true,
+                proxima: {
+                  medico: nomesLista.at(-1),
+                  medico_id: "medico-isabel",
+                  inicio: "2030-01-21T13:20:00Z",
+                  fim: "2030-01-21T13:40:00Z",
+                  modalidade_atendimento: "hora_marcada",
+                  registro: {
+                    procedimento: "Consulta Cardiologia",
+                    preco_dinheiro: 120,
+                    preco_cartao: 145,
+                  },
+                },
+              }
+            : {
+                ok: true,
+                found: true,
+                knowledge_status: "found",
+                tipo_atendimento: "consulta",
+                doctors: nomesLista,
+                records: nomesLista.map((medico, i) => ({
+                  id: `cardio-${i}`,
+                  tipo: "profissional",
+                  medico,
+                  procedimento: "Consulta Cardiologia",
+                  dia: "Segunda-feira",
+                  horario: "08:00 às 12:00",
+                  preco_dinheiro: 120,
+                  preco_cartao: 145,
+                  extras: { horarios: [{ dia: "segunda-feira", inicio: "08:00", fim: "12:00" }] },
+                })),
+              },
+        };
+        resultados.push(r);
+        return r;
+      }
       if (vacinaCenario) {
         estadoPerguntas = params.ctxPaciente.estado;
         const a = argumentosFerramentas.at(-1)!.args;
@@ -1915,6 +2002,49 @@ mock.module("@/lib/nina/ai-gateway.server", () => ({
   ninaAIGateway: async (req: any) => {
     ordem.push("modelo");
     requests.push(structuredClone(req));
+    if (listaCenario) {
+      const primeira = listaPrimeiro && requests.length === 2;
+      const pesquisar = requests.length === 1 || primeira;
+      return {
+        ok: true,
+        modelo: "modelo-simulado",
+        execucaoId: "execucao-direta",
+        nivel: "low",
+        conteudo: pesquisar
+          ? ""
+          : listaPrimeiro
+            ? "Isabel Martins — Consulta Cardiologia. Segunda-feira, 21/01/2030, às 10:20. Hora marcada. Dinheiro: R$ 120,00. Pix/cartão: R$ 145,00. Esse horário serve?"
+            : listaEscolha
+              ? nomesLista
+                  .map((n) => `${n}: Cardiologia, segunda-feira das 08:00 às 12:00.`)
+                  .join("\n\n") + "\n\nCom qual deseja agendar?"
+              : ofertaLista,
+        toolCalls: pesquisar
+          ? [
+              {
+                id: `lista-${requests.length}`,
+                type: "function",
+                function: {
+                  name: primeira ? "consultar_primeiro_disponivel" : "consultar_cadastro",
+                  arguments: JSON.stringify(
+                    primeira
+                      ? { tipo: "consulta", atendimento: "Consulta Cardiologia" }
+                      : {
+                          termo: "cardiologia",
+                          tipo_atendimento: "consulta",
+                          objetivos: listaEscolha
+                            ? ["medicos"]
+                            : listaPrimeiro
+                              ? ["agendamento", "horarios"]
+                              : ["informacoes_gerais", "agendamento"],
+                        },
+                  ),
+                },
+              },
+            ]
+          : [],
+      };
+    }
     // Este cenário verifica a leitura de seleção, sem a agenda cheia do cenário padrão.
     if (cenario === "foto_doppler_marcado")
       return {
@@ -2751,8 +2881,15 @@ const textoFoto =
   ultimaEntrada && "transcricao" in ultimaEntrada ? String(ultimaEntrada.transcricao) : "";
 const resposta = await gerarRespostaNina(
   "clinica-simulada",
-  fotoCenario ? textoFoto : procedimentoExecutante ? "Quero com Mariana Portugal" : entradaPaciente,
-  alteracaoCenario ||
+  fotoCenario
+    ? textoFoto
+    : listaCenario
+      ? entradaLista
+      : procedimentoExecutante
+        ? "Quero com Mariana Portugal"
+        : entradaPaciente,
+  listaCenario ||
+    alteracaoCenario ||
     semNomeCenario ||
     duvidaCenario ||
     perguntasMultiplas ||

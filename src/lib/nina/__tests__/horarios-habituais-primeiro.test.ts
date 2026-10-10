@@ -24,6 +24,12 @@ test("prompt de referência pergunta a preferência antes de listar informaçõe
     "pedido misto de preço e agendamento responde ao preço pedido",
   );
   expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain("PERGUNTA SE O ATENDIMENTO EXISTE");
+  expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain(
+    "LIMITE SOMENTE PARA APRESENTAR PROFISSIONAIS",
+  );
+  expect(REGRA_HORARIOS_HABITUAIS_PRIMEIRO).toContain(
+    "sem medicos apenas pela necessidade de ler vários profissionais",
+  );
   expect(PROMPT_NINA_WHATSAPP_V4).toContain("perguntar se o atendimento existe");
   expect(PROMPT_NINA_WHATSAPP_V4).not.toContain(
     "apresente primeiro os médicos e seus dias/horários habituais",
