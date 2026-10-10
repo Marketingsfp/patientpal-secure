@@ -206,6 +206,8 @@ function dadosFicticios(periodo: { de: string; ate: string }) {
       { id: "almoco", nome: "Almoço" },
       { id: "cafe", nome: "Café" },
     ],
+    // Duda faz papel de supervisora (não é telefonia): some da tabela e das contagens.
+    telefonia: new Set(["ana", "bia", "caio"]),
     nomes: new Map([
       ["ana", "Ana (fictícia)"],
       ["bia", "Bia (fictícia)"],

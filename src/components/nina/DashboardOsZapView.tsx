@@ -539,27 +539,31 @@ const INDICADORES: {
 }[] = [
   { m: "conversasNovas", nome: "Conversas novas" },
   { m: "mensagensRecebidas", nome: "Mensagens recebidas" },
-  { m: "respostasEquipe", nome: "Respostas da equipe", ajuda: "Com envio confirmado" },
+  {
+    m: "respostasEquipe",
+    nome: "Respostas das atendentes",
+    ajuda: "Perfil Telefonia, envio confirmado",
+  },
   { m: "respostasNina", nome: "Respostas da Nina", ajuda: "Com envio confirmado" },
   { m: "encaminhadas", nome: "Encaminhadas à equipe", melhor: "neutro", ajuda: "Pela Nina" },
   { m: "assumidas", nome: "Assumidas por atendentes" },
-  { m: "finalizadas", nome: "Atendimentos finalizados" },
+  { m: "finalizadas", nome: "Atendimentos finalizados", ajuda: "Por atendentes" },
   {
     m: "conversasRespondidas",
     nome: "Conversas respondidas",
-    ajuda: "Com ao menos uma resposta da equipe",
+    ajuda: "Com ao menos uma resposta de atendente",
   },
-  { m: "transferencias", nome: "Transferências", melhor: "neutro" },
+  { m: "transferencias", nome: "Transferências", melhor: "neutro", ajuda: "Feitas por atendentes" },
   {
     m: "esperaFilaMin",
     nome: "Espera média na fila",
     melhor: "baixo",
     unidade: "min",
-    ajuda: "Da entrada na fila até ser assumida",
+    ajuda: "Da entrada na fila até uma atendente assumir",
   },
   {
     m: "primeiraRespostaMin",
-    nome: "1ª resposta humana",
+    nome: "1ª resposta de atendente",
     melhor: "baixo",
     unidade: "min",
     ajuda: "Média desde a entrada na fila",
@@ -569,7 +573,7 @@ const INDICADORES: {
     nome: "Tempo até encerrar",
     melhor: "baixo",
     unidade: "min",
-    ajuda: "Média de assumida a finalizada",
+    ajuda: "Média de assumida por atendente a finalizada",
   },
   { m: "avaliacoes", nome: "Avaliações recebidas" },
   { m: "notaMedia", nome: "Nota média (1 a 5)" },
@@ -827,13 +831,13 @@ export function DashboardOsZapView({
               <div className="grid gap-5 xl:grid-cols-2">
                 <Secao
                   titulo="Mensagens"
-                  descricao="Recebidas dos pacientes e respostas enviadas pela equipe e pela Nina."
+                  descricao="Recebidas dos pacientes e respostas enviadas pelas atendentes e pela Nina."
                 >
                   <Grafico
                     rotulos={rotulos}
                     series={[
                       serie("Recebidas", CORES[0], (g) => g.recebidas),
-                      serie("Respostas da equipe", CORES[1], (g) => g.respostasEquipe),
+                      serie("Respostas das atendentes", CORES[1], (g) => g.respostasEquipe),
                       serie("Respostas da Nina", CORES[2], (g) => g.respostasNina),
                     ]}
                   />
@@ -857,13 +861,13 @@ export function DashboardOsZapView({
             <TabsContent value="equipe" className="space-y-5">
               <Secao
                 titulo="Desempenho por atendente"
-                descricao="Mensagens, conversas assumidas, finalizadas e transferidas no período, por quem fez a ação. Presença e conversas abertas são de agora."
+                descricao="Somente quem tem o perfil Telefonia na clínica. Mensagens, conversas assumidas, finalizadas e transferidas no período, por quem fez a ação. Presença e conversas abertas são de agora."
               >
                 <Tabela
                   linhas={resumo.equipe}
                   chave={(l) => l.id}
                   busca="Buscar atendente"
-                  vazio="Nenhum atendente com presença ou atividade."
+                  vazio="Nenhuma pessoa com perfil Telefonia nesta clínica."
                   colunas={[
                     { campo: "nome", titulo: "Atendente" },
                     {
@@ -908,7 +912,7 @@ export function DashboardOsZapView({
                 </Secao>
                 <Secao
                   titulo="Pausas por motivo"
-                  descricao="Minutos em pausa no período, somando a equipe."
+                  descricao="Minutos em pausa no período, somando as atendentes."
                 >
                   <BarrasH
                     vazio="Nenhuma pausa no período."
@@ -1193,9 +1197,12 @@ export function DashboardOsZapView({
             </TabsContent>
           </Tabs>
           <footer className="rounded-lg border border-atd-border p-4 text-xs leading-relaxed text-atd-ink-soft">
-            Como contamos: respostas só com envio confirmado pela Meta; ações da equipe pertencem a
-            quem as executou, não a quem está com a conversa hoje; tempos só são medidos quando o
-            começo e o fim foram registrados. Conversas de teste e homologação não entram.
+            Como contamos: atendentes são somente as pessoas com perfil Telefonia na clínica (quem
+            também é administrador fica de fora); respostas, conversas assumidas, finalizadas,
+            transferências, pausas e tempos de atendimento só contam quando feitos por elas.
+            Respostas só com envio confirmado pela Meta; cada ação pertence a quem a executou, não a
+            quem está com a conversa hoje; tempos só são medidos quando o começo e o fim foram
+            registrados. Conversas de teste e homologação não entram.
           </footer>
         </>
       )}

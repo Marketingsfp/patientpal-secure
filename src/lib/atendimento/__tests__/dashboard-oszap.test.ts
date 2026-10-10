@@ -66,6 +66,7 @@ const base = (patch: Partial<EntradaDashboard> = {}): EntradaDashboard => ({
   pausas: [],
   motivosPausa: [],
   nomes: new Map(),
+  telefonia: new Set(["ana", "bia"]),
   nina: [],
   francisco: [],
   webhook: [],
@@ -189,11 +190,49 @@ describe("Números do dashboard", () => {
     expect(r.indicadores.finalizadas.atual).toBe(0);
     expect(r.equipe.find((p) => p.id === "ana")).toMatchObject({ assumidas: 1, finalizadas: 0 });
   });
+  it("atendentes são só o perfil telefonia: ações, presença e pausas de outros perfis ficam fora", () => {
+    const r = montarDashboardOsZap(
+      base({
+        mensagens: [
+          mensagem("ana"),
+          mensagem("admin", { enviada_por_user_id: "admin" }),
+          mensagem("sem-autor", { enviada_por_user_id: null }),
+        ],
+        eventos: [
+          evento("fila", "ENTROU_NA_FILA", "2024-10-01T12:00:00Z"),
+          evento("a-admin", "ASSUMIDA", "2024-10-01T12:05:00Z", { user_id: "admin" }),
+          evento("a-ana", "ASSUMIDA", "2024-10-01T12:15:00Z", { user_id: "ana" }),
+          evento("f-admin", "FINALIZADA", "2024-10-01T13:00:00Z", { user_id: "admin" }),
+          evento("t-admin", "TRANSFERIDA", "2024-10-01T13:00:00Z", { user_id: "admin" }),
+        ],
+        presencas: [
+          { user_id: "admin", status: "ONLINE", estado_manual: "ONLINE" },
+          { user_id: "ana", status: "ONLINE", estado_manual: "ONLINE" },
+        ],
+        pausas: [
+          {
+            user_id: "admin",
+            reason_id: null,
+            iniciada_em: "2024-10-01T14:00:00Z",
+            finalizada_em: "2024-10-01T14:30:00Z",
+          },
+        ],
+      }),
+    );
+    expect(r.equipe.map((p) => p.id).sort()).toEqual(["ana", "bia"]);
+    expect(r.equipe.find((p) => p.id === "bia")?.presenca).toBe("Offline");
+    expect(r.indicadores.respostasEquipe.atual).toBe(1);
+    expect(r.indicadores.assumidas.atual).toBe(1);
+    expect(r.indicadores.finalizadas.atual).toBe(0);
+    expect(r.indicadores.transferencias.atual).toBe(0);
+    expect(r.indicadores.esperaFilaMin.atual).toBe(15);
+    expect(r.pausas).toEqual([]);
+  });
   it("atribui ações a quem executou e mostra a situação de agora", () => {
     const r = montarDashboardOsZap(
       base({
         eventos: [
-          evento("f", "FINALIZADA", "2024-10-01T13:00:00Z", { user_id: "supervisor" }),
+          evento("f", "FINALIZADA", "2024-10-01T13:00:00Z", { user_id: "bia" }),
           evento("t", "TRANSFERIDA", "2024-10-01T13:00:00Z", { user_id: "ana" }),
           evento("h", "HANDOFF_SOLICITADO"),
         ],
@@ -214,13 +253,10 @@ describe("Números do dashboard", () => {
           },
         ],
         presencas: [{ user_id: "ana", status: "ONLINE", estado_manual: "PAUSA" }],
-        nomes: new Map([["supervisor", "Supervisão"]]),
+        nomes: new Map([["bia", "Bia"]]),
       }),
     );
-    expect(r.equipe.find((p) => p.id === "supervisor")).toMatchObject({
-      nome: "Supervisão",
-      finalizadas: 1,
-    });
+    expect(r.equipe.find((p) => p.id === "bia")).toMatchObject({ nome: "Bia", finalizadas: 1 });
     expect(r.equipe.find((p) => p.id === "ana")).toMatchObject({
       transferencias: 1,
       presenca: "Em pausa",
@@ -312,7 +348,7 @@ describe("Consulta do dashboard", () => {
             if (tabela === "whatsapp_mensagens" && !posterior)
               data = [mensagem("m"), entrada("e", "2024-10-01T11:30:00Z")];
             if (tabela === "atend_conversa_eventos" && !posterior)
-              data = [evento("f", "FINALIZADA", "2024-10-01T13:00:00Z", { user_id: "supervisor" })];
+              data = [evento("f", "FINALIZADA", "2024-10-01T13:00:00Z", { user_id: "ana" })];
             if (tabela === "nina_execucoes")
               data = [
                 {
@@ -329,7 +365,14 @@ describe("Consulta do dashboard", () => {
                 },
               ];
             if (tabela === "francisco_envios") error = { message: "sem permissão" };
-            if (tabela === "profiles") data = [{ id: "supervisor", nome: "Supervisão" }];
+            if (tabela === "clinica_memberships")
+              data = [
+                { user_id: "ana", role: "telefonia" },
+                { user_id: "supervisor", role: "admin" },
+                { user_id: "dupla", role: "telefonia" },
+                { user_id: "dupla", role: "admin" },
+              ];
+            if (tabela === "profiles") data = [{ id: "ana", nome: "Ana" }];
             return Promise.resolve({ data: error ? null : data, error }).then(resolve, reject);
           },
         };
@@ -349,7 +392,7 @@ describe("Consulta do dashboard", () => {
     const r = await carregarResumoDashboardOsZap(db as any, "user", "clinica", periodo);
     expect(r.indicadores.respostasEquipe.atual).toBe(1);
     expect(r.indicadores.finalizadas.atual).toBe(1);
-    expect(r.equipe.find((p) => p.id === "supervisor")?.nome).toBe("Supervisão");
+    expect(r.equipe.map((p) => p.nome)).toEqual(["Ana"]);
     expect(r.nina?.execucoes).toBe(1);
     expect(r.francisco).toBeNull();
     expect(r.avisos.join(" ")).toContain("Francisco");

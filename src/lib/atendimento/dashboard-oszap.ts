@@ -72,6 +72,8 @@ export type EntradaDashboard = {
   }[];
   motivosPausa: { id: string; nome: string }[];
   nomes: Map<string, string>;
+  /** Atendentes: perfil telefonia ativo na clínica (admin em vínculo duplo fica fora). */
+  telefonia: Set<string>;
   nina: ExecucaoNinaDashboard[] | null;
   francisco: { etapa: string; status: string; respondido_em: string | null }[] | null;
   webhook: { recebido_em: string; resultado: string | null }[] | null;
@@ -169,6 +171,10 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     return t >= ini && t < fim ? "atual" : t >= iniAnt && t < ini ? "anterior" : null;
   };
   const noPeriodo = (iso: string) => janela(iso) === "atual";
+  // Ações de pessoas só contam quando feitas por atendentes (perfil telefonia).
+  const daTelefonia = (id: string | null) => !!id && e.telefonia.has(id);
+  const respostaTelefonia = (m: MensagemDashboard) =>
+    respostaEquipe(m) && daTelefonia(m.enviada_por_user_id);
 
   const ind = Object.fromEntries(
     METRICAS_DASHBOARD.map((m) => [m, { atual: 0 as number | null, anterior: 0 as number | null }]),
@@ -215,7 +221,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
         horas[diaSemana * 24 + hora].recebidas++;
       }
     }
-    if (respostaEquipe(m)) {
+    if (respostaTelefonia(m)) {
       contar("respostasEquipe", m.created_at);
       somarDia(m.created_at, "respostasEquipe");
       if (m.conversa_id) respondidas[j].add(m.conversa_id);
@@ -255,14 +261,20 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     lista.sort((a, b) => a.created_at.localeCompare(b.created_at));
   const respostasPorConversa = new Map<string, string[]>();
   for (const m of [...e.mensagens, ...e.seguintes.mensagens])
-    if (m.conversa_id && respostaEquipe(m))
+    if (m.conversa_id && respostaTelefonia(m))
       respostasPorConversa.set(m.conversa_id, [
         ...(respostasPorConversa.get(m.conversa_id) ?? []),
         m.created_at,
       ]);
   for (const l of respostasPorConversa.values()) l.sort();
-  const proximo = (conversa: string, tipo: string, desde: string) =>
-    porConversa.get(conversa)?.find((x) => x.evento === tipo && x.created_at >= desde)?.created_at;
+  const proximo = (conversa: string, tipo: string, desde: string, porTelefonia = false) =>
+    porConversa
+      .get(conversa)
+      ?.find(
+        (x) =>
+          x.evento === tipo && x.created_at >= desde && (!porTelefonia || daTelefonia(x.user_id)),
+      )?.created_at;
+  const PESSOAIS = new Set(["ASSUMIDA", "FINALIZADA", "TRANSFERIDA"]);
   const tempos = {
     esperaFilaMin: { atual: [] as number[], anterior: [] as number[] },
     primeiraRespostaMin: { atual: [] as number[], anterior: [] as number[] },
@@ -281,7 +293,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   };
   for (const ev of e.eventos) {
     const j = janela(ev.created_at);
-    if (!j) continue;
+    if (!j || (PESSOAIS.has(ev.evento) && !daTelefonia(ev.user_id))) continue;
     if (metricaEvento[ev.evento]) contar(metricaEvento[ev.evento], ev.created_at);
     if (campoEvento[ev.evento]) somarDia(ev.created_at, campoEvento[ev.evento]);
     if (j === "atual" && ev.user_id) {
@@ -290,7 +302,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
       if (ev.evento === "TRANSFERIDA") pessoa(ev.user_id).transferencias++;
     }
     if (ev.evento === "ENTROU_NA_FILA") {
-      const assumida = proximo(ev.conversa_id, "ASSUMIDA", ev.created_at);
+      const assumida = proximo(ev.conversa_id, "ASSUMIDA", ev.created_at, true);
       if (assumida) tempos.esperaFilaMin[j].push(minutos(ev.created_at, assumida));
       const resposta = respostasPorConversa.get(ev.conversa_id)?.find((t) => t >= ev.created_at);
       if (resposta) tempos.primeiraRespostaMin[j].push(minutos(ev.created_at, resposta));
@@ -360,6 +372,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   const pausasMotivo = new Map<string, { pausas: number; minutos: number }>();
   const nomeMotivo = new Map(e.motivosPausa.map((m) => [m.id, m.nome]));
   for (const p of e.pausas) {
+    if (!daTelefonia(p.user_id)) continue;
     const dur = (fimPausa(p) - Math.max(Date.parse(p.iniciada_em), ini)) / 60000;
     if (dur <= 0) continue;
     for (const [mapa, chave] of [
@@ -376,6 +389,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   // Equipe
   const presenca = new Map<string, "Online" | "Em pausa" | "Offline">();
   for (const p of e.presencas) {
+    if (!daTelefonia(p.user_id)) continue;
     const estado = p.estado_manual ?? p.status;
     const atual = presenca.get(p.user_id);
     const novo =
@@ -386,13 +400,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
           : "Offline";
     if (!atual || atual === "Offline" || novo === "Em pausa") presenca.set(p.user_id, novo);
   }
-  const ids = new Set([
-    ...presenca.keys(),
-    ...msgPorPessoa.keys(),
-    ...acoes.keys(),
-    ...abertasPorPessoa.keys(),
-    ...pausasPessoa.keys(),
-  ]);
+  const ids = e.telefonia;
   const equipe = [...ids]
     .map((id) => ({
       id,

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { janelaDiaClinica } from "@/lib/date-utils";
+import { idsTelefoniaTv } from "./painel-tv.server";
 import {
   montarDashboardOsZap,
   type ConversaDashboard,
@@ -155,6 +156,7 @@ export async function carregarResumoDashboardOsZap(
     presencas,
     pausas,
     motivosPausa,
+    membros,
     nina,
     francisco,
     webhook,
@@ -211,6 +213,14 @@ export async function carregarResumoDashboardOsZap(
         .range(de, ate),
     ),
     ler(db.from("atend_pause_reasons").select("id, nome").eq("clinica_id", clinicaId)),
+    // Atendentes = perfil telefonia ativo, a mesma regra do pool e do Painel da TV.
+    ler(
+      db
+        .from("clinica_memberships")
+        .select("user_id, role")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true),
+    ),
     // Só execuções ligadas a conversas reais com mensagens no período: homologação e testes ficam fora.
     opcional(avisos, "Os números da Nina não puderam ser carregados.", () =>
       emLotes(conversasReais, 100, (lote) =>
@@ -260,17 +270,8 @@ export async function carregarResumoDashboardOsZap(
   ]);
 
   const nomes = new Map<string, string>();
-  const pessoas = [
-    ...new Set(
-      [
-        ...presencas.map((p) => p.user_id),
-        ...msgs.map((m) => m.enviada_por_user_id),
-        ...evs.map((e) => e.user_id),
-        ...abertas.map((c) => c.atribuida_user_id),
-        ...pausas.map((p) => p.user_id),
-      ].filter((id): id is string => !!id),
-    ),
-  ];
+  const telefonia = idsTelefoniaTv(membros);
+  const pessoas = [...telefonia];
   try {
     const perfis = await emLotes(pessoas, 200, (lote) =>
       ler(db.from("profiles").select("id, nome").in("id", lote)),
@@ -298,6 +299,7 @@ export async function carregarResumoDashboardOsZap(
       pausas,
       motivosPausa,
       nomes,
+      telefonia,
       nina,
       francisco,
       webhook,
