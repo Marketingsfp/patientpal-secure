@@ -224,3 +224,49 @@ export async function removerSegredo(clinicaId: string, chave: SegredoGravavel):
   if (error) throw new Error("Não foi possível remover o segredo. Tente novamente.");
   return { configurado: false, atualizadoEm: null };
 }
+
+export type OutraClinicaSufficit = { clinicaId: string; nome: string; chaves: ChaveSufficit[] };
+
+/**
+ * Onde mais esta integração tem chaves, entre as clínicas em que a pessoa é
+ * membro ativo E tem gestão do Coach. Só nomes de clínica e de chave — nunca valores.
+ */
+export async function outrasClinicasComSufficit(
+  db: import("./guard.server").ClienteCoach,
+  userId: string,
+  clinicaAtual: string,
+): Promise<OutraClinicaSufficit[]> {
+  const { data: mems } = await supabaseAdmin
+    .from("clinica_memberships")
+    .select("clinica_id")
+    .eq("user_id", userId)
+    .eq("ativo", true);
+  const candidatas = [...new Set((mems ?? []).map((m) => m.clinica_id))].filter(
+    (id) => id !== clinicaAtual,
+  );
+  const permitidas: string[] = [];
+  for (const id of candidatas) {
+    const { data } = await db.rpc("has_module_access", {
+      _user_id: userId,
+      _clinica_id: id,
+      _modulo: "coach",
+      _nivel: "write",
+    });
+    if (data) permitidas.push(id);
+  }
+  if (!permitidas.length) return [];
+  const { data: linhas, error } = await supabaseAdmin
+    .from("integration_secrets")
+    .select("clinica_id, chave")
+    .in("clinica_id", permitidas)
+    .in("chave", [...CHAVES_SUFFICIT]);
+  if (error || !linhas?.length) return [];
+  const ids = [...new Set(linhas.map((l) => l.clinica_id))];
+  const { data: clinicas } = await supabaseAdmin.from("clinicas").select("id, nome").in("id", ids);
+  const nomes = new Map((clinicas ?? []).map((c) => [c.id, c.nome as string]));
+  return ids.map((id) => ({
+    clinicaId: id,
+    nome: nomes.get(id) ?? "Clínica sem nome",
+    chaves: linhas.filter((l) => l.clinica_id === id).map((l) => l.chave as ChaveSufficit),
+  }));
+}
