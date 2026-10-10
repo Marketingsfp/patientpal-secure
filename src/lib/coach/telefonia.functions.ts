@@ -82,3 +82,19 @@ export const removerTokenTelefonia = createServerFn({ method: "POST" })
     const s = await import("./telefonia-sufficit.server");
     return s.removerSegredo(data.clinicaId, data.chave);
   });
+
+/** Estado das chaves nesta clínica + outras clínicas com chaves (sem valores). */
+export const estadoConfigTelefonia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(entrada)
+  .handler(async ({ data, context }) => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    const userId = await guard.garantirAcessoCoach(db, data.clinicaId, "write");
+    const s = await import("./telefonia-sufficit.server");
+    const [config, outras] = await Promise.all([
+      s.estadoConfigSufficit(data.clinicaId),
+      s.outrasClinicasComSufficit(db, userId, data.clinicaId),
+    ]);
+    return { config, outras };
+  });
