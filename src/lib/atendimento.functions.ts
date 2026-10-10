@@ -812,7 +812,7 @@ export const transferirConversa = createServerFn({ method: "POST" })
       const acessos = await carregarAcessosOsZap(context.supabase, context.userId, data.clinicaId);
       if (acessos["oszap-conversas"] !== "write")
         throw new Error("Sem permissão para transferir conversas.");
-      const { data: destinatario, error } = await context.supabase.rpc(
+      const { data: destinatario, error } = await (context.supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc(
         "atend_transferir_departamento",
         {
           _clinica_id: data.clinicaId,
@@ -834,7 +834,7 @@ export const transferirConversa = createServerFn({ method: "POST" })
         await protocoloAoAtribuirHumano({
           clinicaId: data.clinicaId,
           conversaId: data.conversaId,
-          userId: destinatario,
+          userId: destinatario as string,
         });
       } catch (e) {
         console.error("[atendimento] protocolo ao transferir por departamento", e);

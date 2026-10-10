@@ -39,7 +39,7 @@ export const consultarDepartamentosZap = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => clinicaSchema.parse(i))
   .handler(async ({ data, context }) => {
     const podeEditar = await assertAcesso(context.supabase, context.userId, data.clinicaId);
-    const { data: resultado, error } = await context.supabase.rpc("atend_listar_departamentos", {
+    const { data: resultado, error } = await (context.supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc("atend_listar_departamentos", {
       _clinica_id: data.clinicaId,
       _ip_origem: ipOrigemDepartamentos(),
     });
@@ -56,14 +56,14 @@ export const salvarDepartamentoZap = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAcesso(context.supabase, context.userId, data.clinicaId, true);
-    const { data: id, error } = await context.supabase.rpc("atend_salvar_departamento", {
+    const { data: id, error } = await (context.supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc("atend_salvar_departamento", {
       _clinica_id: data.clinicaId,
       _nome: data.nome,
       _id: data.id,
       _ip_origem: ipOrigemDepartamentos(),
     });
     if (error) throw new Error(error.message);
-    return { id };
+    return { id: id as string | null };
   });
 
 export const vincularDepartamentoZap = createServerFn({ method: "POST" })
@@ -75,7 +75,7 @@ export const vincularDepartamentoZap = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAcesso(context.supabase, context.userId, data.clinicaId, true);
-    const { error } = await context.supabase.rpc("atend_vincular_departamento", {
+    const { error } = await (context.supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc("atend_vincular_departamento", {
       _clinica_id: data.clinicaId,
       _user_id: data.userId,
       _departamento_id: data.departamentoId,

@@ -34,6 +34,7 @@ import {
   ClipboardCheck,
   MessageCircle,
   Mic,
+  PhoneCall,
   Network,
   Target,
   Clock,
@@ -728,6 +729,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/coach", hash: "perfis", label: "Perfis & evolução", icon: Users },
       { to: "/app/coach", hash: "vozes", label: "Vozes", icon: Mic },
       { to: "/app/coach", hash: "analise", label: "Analisar atendimento", icon: Sparkles },
+      { to: "/app/coach", hash: "telefonia", label: "Telefonia (Sufficit)", icon: PhoneCall },
     ],
   },
 ];
