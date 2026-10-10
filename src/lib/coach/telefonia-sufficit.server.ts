@@ -177,3 +177,50 @@ export async function amostraChamadasSufficit(
     camposPrimeiroRegistro: campos,
   };
 }
+
+/**
+ * Segredos de integração que a tela pode gravar/apagar. Lista fechada: o nome
+ * da chave é parâmetro (reuso pelo Megazap), mas só entra o que estiver aqui.
+ * O VALOR nunca é devolvido, registrado em log ou em mensagem de erro.
+ */
+export const SEGREDOS_GRAVAVEIS = ["sufficit_api_token"] as const;
+export type SegredoGravavel = (typeof SEGREDOS_GRAVAVEIS)[number];
+
+export type EstadoSegredo = { configurado: boolean; atualizadoEm: string | null };
+
+export async function estadoSegredo(clinicaId: string, chave: SegredoGravavel): Promise<EstadoSegredo> {
+  const { data, error } = await supabaseAdmin
+    .from("integration_secrets")
+    .select("updated_at")
+    .eq("clinica_id", clinicaId)
+    .eq("chave", chave)
+    .maybeSingle();
+  if (error) throw new Error("Não foi possível ler o estado do segredo.");
+  return { configurado: !!data, atualizadoEm: data?.updated_at ?? null };
+}
+
+export async function salvarSegredo(
+  clinicaId: string,
+  chave: SegredoGravavel,
+  valor: string,
+): Promise<EstadoSegredo> {
+  const { error } = await supabaseAdmin
+    .from("integration_secrets")
+    .upsert(
+      { clinica_id: clinicaId, chave, valor, updated_at: new Date().toISOString() },
+      { onConflict: "clinica_id,chave" },
+    );
+  // Sem detalhes do erro: podem ecoar o valor enviado.
+  if (error) throw new Error("Não foi possível salvar o segredo. Tente novamente.");
+  return estadoSegredo(clinicaId, chave);
+}
+
+export async function removerSegredo(clinicaId: string, chave: SegredoGravavel): Promise<EstadoSegredo> {
+  const { error } = await supabaseAdmin
+    .from("integration_secrets")
+    .delete()
+    .eq("clinica_id", clinicaId)
+    .eq("chave", chave);
+  if (error) throw new Error("Não foi possível remover o segredo. Tente novamente.");
+  return { configurado: false, atualizadoEm: null };
+}
