@@ -63,7 +63,7 @@ export const salvarDepartamentoZap = createServerFn({ method: "POST" })
       _ip_origem: ipOrigemDepartamentos(),
     });
     if (error) throw new Error(error.message);
-    return { id };
+    return { id: id as string | null };
   });
 
 export const vincularDepartamentoZap = createServerFn({ method: "POST" })
