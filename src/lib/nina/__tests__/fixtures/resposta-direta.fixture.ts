@@ -1101,6 +1101,9 @@ mock.module("@/lib/nina/fonte-operacional.server", () => ({
     return { servicos: publicados("servicos"), profissionais: publicados("profissionais") };
   },
 }));
+mock.module("@/lib/nina/pedido-medico-flag", () => ({
+  pedidoMedicoAntesAgendaAtivo: () => pedidoCenario && !cenario.includes("legado"),
+}));
 mock.module("@/lib/nina/agenda-flag.server", () => ({
   ferramentasAgendaAtivas: async () =>
     escolhaHorario ||

@@ -1799,9 +1799,12 @@ async function gerarRespostaNinaInterno(
   const { REGRA_DICIONARIO_PUBLICADO } = await import("@/lib/nina/dicionario-leitura");
   const { REGRA_FOTO_PEDIDO_MEDICO, atualizarSolicitacoesPedido, acrescentarSolicitacaoPedido } =
     await import("@/lib/nina/pedido-medico");
+  const { pedidoMedicoAntesAgendaAtivo } = await import("@/lib/nina/pedido-medico-flag");
+  const pedidoMedicoAntesAgenda = pedidoMedicoAntesAgendaAtivo(opcoes?.teste === true);
   if (catalogoPublicado.selecao?.fonte === "base_conhecimento")
     instrucoesAdicionaisTurno.push({
       codigo: "SOLICITAR_FOTO_PEDIDO_MEDICO",
+      nivel: "inegociavel",
       origem: "src/lib/nina/pedido-medico.ts",
       motivo: "Solicitar foto quando o atendimento identificado exige pedido na base publicada.",
       texto: REGRA_FOTO_PEDIDO_MEDICO,
@@ -1878,6 +1881,7 @@ async function gerarRespostaNinaInterno(
   const runtimeContext = {
     identificacao_pendente: conhecimentoAnterior?.esclarecimento ?? null,
     pedido_medico_do_turno: [] as import("@/lib/nina/pedido-medico").SolicitacaoPedidoMedico[],
+    pedido_medico_antes_agenda_ativo: pedidoMedicoAntesAgenda,
     dicionario_da_mensagem: dicionarioDaMensagem,
     canal: "whatsapp",
     // O modelo vê sempre "producao": mesma conduta nos dois ambientes. O
@@ -2051,7 +2055,9 @@ async function gerarRespostaNinaInterno(
     // vem da interpretação do modelo; expressões literais não removem tools.
     executar = async (...args) => {
       await conferirReserva();
-      return mod.executarFerramentaPaciente(...args);
+      const resultado = await mod.executarFerramentaPaciente(...args);
+      lembrarPedidoPendente(resultado);
+      return resultado;
     };
     ctxFerramentas = {
       clinicaId,
@@ -2066,6 +2072,8 @@ async function gerarRespostaNinaInterno(
       estado: fluxoEstado,
       teste: opcoes?.teste === true,
       consultaAgenda: contextoConsultaAgenda,
+      mensagensPedidoMedico: historicoFluxoCompleto ? mensagensFluxo : msgsMemoria,
+      pedidoMedicoAntesAgenda,
       nomeUnidade: identidadeEfetiva.ok
         ? nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)
         : "nossa clínica",
@@ -2108,8 +2116,32 @@ async function gerarRespostaNinaInterno(
     }).catch(() => ({ textos: {}, versaoInstrucoes: null, recusadas: [] }));
     const contextoGate = ctxFerramentas;
     const executarGate = executar;
-    continuarAgendamento = (aposSelecao = false) =>
-      aplicarGateIdentificacao({
+    continuarAgendamento = async (aposSelecao = false) => {
+      const { confirmacaoDaEscolha } = await import("@/lib/nina/agendamento-escolha");
+      const vaga = confirmacaoDaEscolha(fluxoEstado, clinicaId)?.vaga;
+      // Uma escolha antiga não autoriza coletar cadastro/reservar sem o pedido exigido hoje.
+      if (
+        pedidoMedicoAntesAgenda &&
+        vaga?.tipo_atendimento === "exame_procedimento" &&
+        !fluxoEstado.appointment.appointment_id
+      ) {
+        const { procedimentoDaSessao } = await import("@/lib/nina/procedimento-sessao");
+        const pedido = procedimentoDaSessao(fluxoEstado, clinicaId);
+        const { modalidadePublicadaDoMedico } =
+          await import("@/lib/nina/vinculo-catalogo-agenda.server");
+        const modalidade = await modalidadePublicadaDoMedico(clinicaId, vaga.medico_id, {
+          atendimento: vaga.procedimento!,
+          procedimentoId: pedido?.catalogo_id ?? vaga.catalogo_id ?? undefined,
+        });
+        const { conferirPedidoMedicoAgenda } =
+          await import("@/lib/nina/pedido-medico-agenda.server");
+        const pendente = await conferirPedidoMedicoAgenda(contextoGate, modalidade);
+        if (pendente) {
+          lembrarPedidoPendente(pendente);
+          return null;
+        }
+      }
+      return aplicarGateIdentificacao({
         mensagem: mensagemPaciente,
         estado: fluxoEstado,
         ctx: contextoGate,
@@ -2154,6 +2186,7 @@ async function gerarRespostaNinaInterno(
         console.error("[NINA_BOOKING_FLOW] gate falhou", e);
         return null;
       });
+    };
     const respostaGate = await continuarAgendamento();
     if (respostaGate?.origem === "handoff" && avisoGate.atual) {
       const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
@@ -2499,6 +2532,20 @@ async function gerarRespostaNinaInterno(
         registros: evidencia ?? [],
       });
   }
+  function lembrarPedidoPendente(resultado: Record<string, unknown>) {
+    if (
+      resultado.codigo !== "PEDIDO_MEDICO_PENDENTE" ||
+      !Array.isArray(resultado.pedido_medico_do_turno)
+    )
+      return;
+    const pedidos =
+      resultado.pedido_medico_do_turno as import("@/lib/nina/pedido-medico").SolicitacaoPedidoMedico[];
+    const ids = new Set(pedidos.map((p) => p.id));
+    runtimeContext.pedido_medico_do_turno = [
+      ...runtimeContext.pedido_medico_do_turno.filter((p) => !ids.has(p.id)),
+      ...pedidos,
+    ];
+  }
   async function compartilharResultado(
     nome: string,
     args: unknown,
@@ -2542,6 +2589,7 @@ async function gerarRespostaNinaInterno(
           inicioSessao: fluxoEstado.session_started_at ?? null,
           teste: opcoes?.teste === true,
           mensagens: historicoFluxoCompleto ? mensagensFluxo : msgsMemoria,
+          bloquearAgenda: pedidoMedicoAntesAgenda,
         },
         parametros.nova_solicitacao === true,
       );

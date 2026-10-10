@@ -28,6 +28,7 @@ import { encontrarDataNascimento } from "./data-nascimento";
 import { REGRA_CONSULTA_CATALOGO } from "./catalogo-busca";
 import { REGRA_SOMENTE_PRIMEIRO_HORARIO } from "./prompt/consulta-agenda";
 import { mapaCamposResultado } from "./catalogo-mapa-campos";
+import { conferirPedidoMedicoAgenda } from "./pedido-medico-agenda.server";
 import {
   consultarDadosClinicasGrupo,
   consultarHorariosClinicasGrupo,
@@ -182,6 +183,10 @@ export type CtxNinaPaciente = {
    * removível ao resolver a sessão.
    */
   teste?: boolean;
+  /** Histórico recebido/entregue da sessão, carregado pelo servidor; nunca por argumentos do modelo. */
+  mensagensPedidoMedico?: import("./pedido-medico").ContextoPedidoMedico["mensagens"];
+  /** Controle global resolvido pelo servidor, ativo na prévia/homologação. */
+  pedidoMedicoAntesAgenda?: boolean;
   /** Pedido e histórico entregue da sessão; nunca fornecidos pelos argumentos do modelo. */
   consultaAgenda?: ContextoConsultaAgenda;
   nomeUnidade?: string;
@@ -1685,6 +1690,8 @@ async function executarFerramentaInterna(
       if (modalidade === "chegada_sem_pre_agendamento")
         return orientarSemPreAgendamento(ctx, resolvido.nome);
       if (modalidade === "nao_definida") return modalidadePendente();
+      const pedidoPendente = await conferirPedidoMedicoAgenda(ctx, modalidade);
+      if (pedidoPendente) return pedidoPendente;
     }
     switch (nome) {
       case "consultar_primeiro_disponivel": {
@@ -1801,6 +1808,8 @@ async function executarFerramentaInterna(
         const primeiras: SlotNina[] = [];
         const semAgendamento: Record<string, unknown>[] = [];
         const consultados: Record<string, unknown>[] = [];
+        const modalidades = new Map<string, ModalidadeResolvida | null>();
+        // Confira todos os candidatos antes de ler qualquer vaga na comparação.
         for (const [medicoId, c] of porMedico) {
           await processamentoWatchdogAtual()?.checkpoint("generating");
           const escopo =
@@ -1811,6 +1820,21 @@ async function executarFerramentaInterna(
                 }
               : { atendimento: c.registro.procedimento!, procedimentoId: c.registro.id };
           const modo = await modalidadePublicadaDoMedico(ctx.clinicaId, medicoId, escopo);
+          if (modo === "nao_definida") return modalidadePendente();
+          const pedidoPendente = await conferirPedidoMedicoAgenda(ctx, modo, c.registro);
+          if (pedidoPendente) return pedidoPendente;
+          modalidades.set(medicoId, modo);
+        }
+        for (const [medicoId, c] of porMedico) {
+          await processamentoWatchdogAtual()?.checkpoint("generating");
+          const escopo =
+            p.tipo === "consulta"
+              ? {
+                  atendimento: c.registro.procedimento!,
+                  preferencia: conhecimento?.atendimentoConsulta,
+                }
+              : { atendimento: c.registro.procedimento!, procedimentoId: c.registro.id };
+          const modo = modalidades.get(medicoId)!;
           if (modo === "chegada_sem_pre_agendamento") {
             semAgendamento.push({
               medico: c.medicoNome,
@@ -1921,7 +1945,16 @@ async function executarFerramentaInterna(
           existente.vaga.medico_id === p.medico_id &&
           Date.parse(existente.vaga.inicio) === Date.parse(p.inicio) &&
           Date.parse(existente.vaga.fim) === Date.parse(p.fim)
-        )
+        ) {
+          if (ctx.pedidoMedicoAntesAgenda) {
+            const publicada = await modalidadePublicadaDoMedico(
+              ctx.clinicaId,
+              existente.vaga.medico_id,
+              escopoModalidade(ctx, existente.vaga.procedimento),
+            );
+            const pedidoPendente = await conferirPedidoMedicoAgenda(ctx, publicada);
+            if (pedidoPendente) return pedidoPendente;
+          }
           return {
             ok: true,
             selecao_preservada: true,
@@ -1930,6 +1963,7 @@ async function executarFerramentaInterna(
               ? "O paciente já confirmou esta vaga. Continue com os dados faltantes e a gravação autorizada; não peça confirmação novamente."
               : "A escolha desta vaga está preservada. Complete os dados cadastrais faltantes antes de pedir a confirmação final; não reinicie a escolha.",
           };
+        }
         if (!estado || estado.appointment.appointment_id || estado.appointment.confirmation?.aceita)
           return falha(
             "ACTION_NOT_AUTHORIZED",
@@ -1958,6 +1992,8 @@ async function executarFerramentaInterna(
         if (publicada === "chegada_sem_pre_agendamento")
           return orientarSemPreAgendamento(ctx, vaga.medico);
         if (publicada === "nao_definida") return modalidadePendente();
+        const pedidoPendente = await conferirPedidoMedicoAgenda(ctx, publicada);
+        if (pedidoPendente) return pedidoPendente;
         const mensagem = ctx.consultaAgenda?.mensagemAtual ?? "";
         const escolha = lerEscolhaHorario(mensagem);
         if (escolha) {
@@ -3181,6 +3217,8 @@ async function executarFerramentaInterna(
             "MODALIDADE_ALTERADA",
             "A modalidade difere do resumo confirmado. A equipe precisa conferir antes de reservar.",
           );
+        const pedidoPendente = await conferirPedidoMedicoAgenda(ctx, modalidade);
+        if (pedidoPendente) return pedidoPendente;
         const lerFicha = (id: string, inicio: string) =>
           modalidade === "ficha"
             ? fichaDoAgendamento(ctx.clinicaId, medicoIdReal, inicio, id).catch(() => null)

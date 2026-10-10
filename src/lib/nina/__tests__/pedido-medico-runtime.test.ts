@@ -10,6 +10,7 @@ for (const ambiente of ["producao", "homologacao"]) {
     "solicitado",
     "dispensado",
     "os",
+    "legado",
   ]) {
     it(`${ambiente}/${caso}: foto de pedido no núcleo compartilhado`, () => {
       const p = Bun.spawnSync(
@@ -34,9 +35,23 @@ for (const ambiente of ["producao", "homologacao"]) {
       expect(linha).toBeDefined();
       const r = JSON.parse(linha!.slice("DIRETA_RESULTADO=".length));
       const entrada = JSON.stringify(r.requests);
-      if (caso !== "os") expect(entrada).toContain("SOLICITAR_FOTO_PEDIDO_MEDICO");
-      else expect(entrada).not.toContain("SOLICITAR_FOTO_PEDIDO_MEDICO");
-      const solicita = caso === "consulta" || caso.startsWith("obrigatorio");
+      const mensagens = r.requests
+        .flatMap((request: { messages: { content: unknown }[] }) =>
+          request.messages.map((m) =>
+            typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          ),
+        )
+        .join("\n");
+      expect(mensagens).toMatch(
+        new RegExp(`"pedido_medico_antes_agenda_ativo"\\s*:\\s*${caso !== "legado"}`),
+      );
+      if (caso !== "os") {
+        expect(entrada).toContain("SOLICITAR_FOTO_PEDIDO_MEDICO");
+        expect(entrada).toContain("antes de consultar ou oferecer vagas");
+        expect(entrada).toContain("sem perguntar de novo se quer agendar");
+        expect(entrada).not.toContain("não cria, por si só, bloqueio");
+      } else expect(entrada).not.toContain("SOLICITAR_FOTO_PEDIDO_MEDICO");
+      const solicita = caso === "consulta" || caso.startsWith("obrigatorio") || caso === "legado";
       expect(r.resposta.includes("Pode enviar uma foto legível do pedido médico por aqui?")).toBe(
         solicita,
       );

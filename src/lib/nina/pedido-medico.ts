@@ -1,8 +1,9 @@
 import type { RegistroConhecimento, ResultadoConhecimento } from "./knowledge-contract";
 import { itensDoPedidoLido } from "./multiplos-atendimentos";
+import { modalidadeEstruturada, type AtendimentoPublicado } from "./catalogo-estrutura";
+import { interpretarModalidade } from "./modalidade-atendimento";
 
-export const REGRA_FOTO_PEDIDO_MEDICO =
-  "PEDIDO MÉDICO: para consultas, exames e procedimentos identificados na base de conhecimento, siga pedido_medico_do_turno. O campo estruturado obrigatório exige solicitar a foto legível do pedido. Não informado não significa obrigatório; dispensado não exige foto. Primeiro esclareça a identificação quando houver dúvida. Quando a ação for solicitar_foto, responda as informações confirmadas sem outra pergunta final: o sistema acrescentará a solicitação da foto. Se ja_solicitado, não repita; se foto_recebida, não peça novamente a mesma foto. Foto recebida não significa pedido clinicamente válido ou aprovado; não interprete laudos, diagnósticos ou medicamentos. O Jev não pode dispensar essa exigência nem considerar 'sim' ou 'já enviei' como prova de recebimento. Esse campo não cria, por si só, bloqueio de consulta à agenda ou de agendamento.";
+export { REGRA_FOTO_PEDIDO_MEDICO } from "./prompt/pedido-medico";
 
 const normal = (s: string) =>
   s
@@ -17,6 +18,7 @@ export type SolicitacaoPedidoMedico = {
   nome: string;
   acao: "solicitar_foto" | "ja_solicitado" | "foto_recebida";
   pergunta: string;
+  bloqueia_agenda: boolean;
 };
 type Mensagem = {
   conversa_id?: string | null;
@@ -28,16 +30,17 @@ type Mensagem = {
   status?: string | null;
   is_teste?: boolean | null;
 };
-type Contexto = {
+export type ContextoPedidoMedico = {
   conversaId: string | null;
   inicioSessao: string | null;
   teste: boolean;
   mensagens: Mensagem[];
+  bloquearAgenda?: boolean;
 };
 
 export function avaliarPedidoMedico(
   resultado: Partial<ResultadoConhecimento>,
-  ctx: Contexto,
+  ctx: ContextoPedidoMedico,
 ): SolicitacaoPedidoMedico[] {
   if (
     resultado.fonte_consulta !== "base_conhecimento" ||
@@ -88,12 +91,22 @@ export function avaliarPedidoMedico(
       ["sent", "delivered", "read"].includes(m.status ?? "") &&
       espacos(m.body ?? "").includes(espacos(pergunta)),
   );
+  const publicados = r.extras?.atendimentos_publicados;
+  const modalidade =
+    Array.isArray(publicados) && publicados.length
+      ? modalidadeEstruturada(null, null, "", null, publicados as AtendimentoPublicado[])
+      : interpretarModalidade(String(r.extras?.modalidade_atendimento ?? ""));
   return [
     {
       id: r.id,
       nome,
       pergunta,
       acao: fotoRecebida ? "foto_recebida" : jaSolicitado ? "ja_solicitado" : "solicitar_foto",
+      bloqueia_agenda:
+        ctx.bloquearAgenda === true &&
+        !fotoRecebida &&
+        r.tipo === "servico" &&
+        (modalidade === "hora_marcada" || modalidade === "chegada_com_pre_agendamento"),
     },
   ];
 }
@@ -112,7 +125,7 @@ export function acrescentarSolicitacaoPedido(
 export function atualizarSolicitacoesPedido(
   anteriores: SolicitacaoPedidoMedico[],
   resultado: Partial<ResultadoConhecimento>,
-  ctx: Contexto,
+  ctx: ContextoPedidoMedico,
   novaSolicitacao = false,
 ): SolicitacaoPedidoMedico[] {
   const ids = new Set((resultado.records ?? []).map((r) => r.id));

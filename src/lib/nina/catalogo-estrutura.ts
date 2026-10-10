@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { interpretarModalidade } from "./modalidade-atendimento";
+import { REGRA_FOTO_PEDIDO_MEDICO } from "./prompt/pedido-medico";
 import {
   REGRA_ANESTESIA_ADICIONAL,
   REGRA_HORARIOS_PUBLICADOS,
@@ -340,7 +341,8 @@ export const INSTRUCAO_DADOS_CATALOGO =
   "Pedido médico: quando obrigatório na base de conhecimento, solicite uma foto legível do pedido para o exame, procedimento ou consulta identificado; " +
   "quando dispensado, informe que não precisa se o paciente perguntar. Não informado não significa dispensado: " +
   "não presuma a exigência ou a dispensa. Se perguntarem e não houver regra publicada explícita, confirme com a equipe. " +
-  "Siga o controle pedido_medico_do_turno para não repetir a solicitação nem pedir uma foto já recebida para o mesmo atendimento. Esse campo não bloqueia o agendamento por si só. " +
+  REGRA_FOTO_PEDIDO_MEDICO +
+  " " +
   "Se a opção de pedido médico contradisser requisitos em texto, confirme com a equipe antes de orientar. " +
   "'40 kg' não é idade. 'Manhã e tarde' não estabelece um limite numérico de chegada. Quinzenal sem data de referência não identifica o próximo dia. " +
   REGRA_HORARIOS_PUBLICADOS +

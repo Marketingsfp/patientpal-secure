@@ -31,6 +31,7 @@ let falharEscala = false;
 let falharVinculos = false;
 let procedimentoGravadoDivergente = false;
 let resultadoCatalogo: ResultadoConhecimento;
+let fonteTeste: "clinica_os" | "base_conhecimento" = "clinica_os";
 let cadastroResolvido: { id: string; criado: boolean } | null = null;
 const pesquisas: unknown[] = [];
 const leituras: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
@@ -190,6 +191,13 @@ mock.module("@/lib/agenda/criar-agendamento.core.server", () => ({
 }));
 
 mock.module("../fonte-operacional.server", () => fonteOperacionalDoBanco(() => banco as never));
+mock.module("../fonte-consulta-config.server", () => ({
+  lerSelecaoFonte: async () => ({ fonte: fonteTeste, revisao: null }),
+}));
+mock.module("../fonte-editorial.server", () => ({
+  lerFonteEditorial: async (clinicaId: string) =>
+    fonteOperacionalDoBanco(() => banco as never).lerFonteOperacional(clinicaId),
+}));
 const { executarFerramentaPaciente, consultarDisponibilidadeCore } =
   await import("../paciente-tools.server");
 
@@ -310,6 +318,7 @@ function contextoAgendar(confirmado = false) {
 }
 
 beforeEach(() => {
+  fonteTeste = "clinica_os";
   cadastroResolvido = null;
   procedimentoGravadoDivergente = false;
   falharEscala = false;
@@ -469,6 +478,147 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
     expect(selecionada.ok, JSON.stringify(selecionada)).toBe(true);
     return selecionada;
   }
+  function exigirPedido(ctx: CtxNinaPaciente, servico: Linha, modalidade = "hora_marcada") {
+    fonteTeste = "base_conhecimento";
+    ctx.pedidoMedicoAntesAgenda = true;
+    servico.estrutura = {
+      ...estruturaModalidadeServico(String(servico.nome), modalidade),
+      pedido_medico: "obrigatorio",
+      aliases: ["BIO"],
+    };
+    ctx.conversaId = "conversa-pedido-medico";
+    ctx.estado!.session_started_at = "2026-10-10T10:00:00Z";
+    ctx.mensagensPedidoMedico = [];
+  }
+  function receberPedido(ctx: CtxNinaPaciente) {
+    ctx.mensagensPedidoMedico = [
+      {
+        conversa_id: ctx.conversaId,
+        created_at: "2026-10-10T10:01:00Z",
+        direction: "in",
+        tipo: "image",
+        status: "received",
+        is_teste: ctx.teste === true,
+        transcricao: "Enviei a foto de um pedido médico com: BIO.",
+      },
+    ];
+  }
+  for (const modalidade of ["hora_marcada", "chegada_com_pre_agendamento"])
+    for (const teste of [false, true])
+      test(`${modalidade}/${teste ? "homologação" : "WhatsApp"}: nenhuma ferramenta lê vagas sem pedido e foto reconhecida libera`, async () => {
+        const { ctx, servico } = await iniciar();
+        ctx.teste = teste;
+        ctx.origem = teste ? "homologacao" : "whatsapp";
+        exigirPedido(ctx, servico, modalidade);
+        ctx.consultaAgenda!.mensagemAtual = "Quero agendar e já tenho pedido médico";
+        const chamadas = [
+          ["proxima_vaga", { medico_id: MEDICO }],
+          ["consultar_disponibilidade", { ...argumentos, medico_id: MEDICO }],
+          ["verificar_horario", { ...argumentos, medico_id: MEDICO }],
+          ["consultar_primeiro_disponivel", { tipo: "procedimento", atendimento: "Bioimpedância" }],
+        ] as const;
+        for (const [nome, args] of chamadas) {
+          const r = await executarFerramentaPaciente(ctx, nome, args);
+          expect(r, JSON.stringify(r)).toMatchObject({
+            codigo: "PEDIDO_MEDICO_PENDENTE",
+            consulta_realizada: false,
+            aguardando_paciente: true,
+          });
+          expect(r.proxima).toBeUndefined();
+          expect(r.horarios).toBeUndefined();
+        }
+        expect(consultasAgenda()).toHaveLength(0);
+        expect(gravacoes).toHaveLength(0);
+        receberPedido(ctx);
+        const liberado = await executarFerramentaPaciente(ctx, "proxima_vaga", {
+          medico_id: MEDICO,
+        });
+        expect(liberado.ok, JSON.stringify(liberado)).toBe(true);
+        expect(liberado.proxima, JSON.stringify(liberado)).toBeDefined();
+        expect(consultasAgenda().length).toBeGreaterThan(0);
+        expect(gravacoes).toHaveLength(0);
+      });
+  test("pedido já solicitado continua bloqueando vagas sem repetir a pergunta", async () => {
+    const { ctx, servico } = await iniciar();
+    exigirPedido(ctx, servico);
+    ctx.mensagensPedidoMedico = [
+      {
+        conversa_id: ctx.conversaId,
+        created_at: "2026-10-10T10:01:00Z",
+        direction: "out",
+        status: "sent",
+        is_teste: true,
+        body: "Para Bioimpedância, é necessário pedido médico. Pode enviar uma foto legível do pedido médico por aqui?",
+      },
+    ];
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.pedido_medico_do_turno).toMatchObject([
+      { acao: "ja_solicitado", bloqueia_agenda: true },
+    ]);
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("controle desligado mantém as vagas disponíveis sem exigir foto antes da agenda", async () => {
+    const { ctx, servico } = await iniciar();
+    exigirPedido(ctx, servico);
+    ctx.pedidoMedicoAntesAgenda = false;
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.codigo).not.toBe("PEDIDO_MEDICO_PENDENTE");
+    expect(r.proxima, JSON.stringify(r)).toBeDefined();
+    expect(gravacoes).toHaveLength(0);
+  });
+  test("foto de outra conversa não libera agenda nem primeira vaga", async () => {
+    const { ctx, servico } = await iniciar();
+    exigirPedido(ctx, servico);
+    receberPedido(ctx);
+    ctx.mensagensPedidoMedico![0]!.conversa_id = "outra-conversa";
+    const r = await executarFerramentaPaciente(ctx, "consultar_primeiro_disponivel", {
+      tipo: "procedimento",
+      atendimento: "Bioimpedância",
+    });
+    expect(r.codigo).toBe("PEDIDO_MEDICO_PENDENTE");
+    expect(consultasAgenda()).toHaveLength(0);
+  });
+  test("horário de turno antigo não permite selecionar nem reservar sem o pedido", async () => {
+    const { ctx, servico } = await iniciar();
+    exigirPedido(ctx, servico);
+    receberPedido(ctx);
+    const selecionada = await escolher(ctx);
+    aceitarResumoEntregue(ctx.estado!, CLINICA, [
+      { role: "assistant", content: String(selecionada.resumo_confirmacao) },
+    ]);
+    ctx.mensagensPedidoMedico = [];
+    leituras.length = 0;
+    const selecionar = await executarFerramentaPaciente(
+      ctx,
+      "selecionar_horario",
+      argumentosAgendar,
+    );
+    expect(selecionar.codigo).toBe("PEDIDO_MEDICO_PENDENTE");
+    const agendar = await executarFerramentaPaciente(ctx, "agendar", {
+      ...argumentosAgendar,
+      procedimento: "Bioimpedância",
+    });
+    expect(agendar.codigo, JSON.stringify(agendar)).toBe("PEDIDO_MEDICO_PENDENTE");
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
+  });
+  for (const campo of ["dispensado", "nao_informado"])
+    test(`${campo}: não cria exigência de foto para consultar vagas`, async () => {
+      const { ctx, servico } = await iniciar();
+      exigirPedido(ctx, servico);
+      (servico.estrutura as Linha).pedido_medico = campo;
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      expect(r.proxima, JSON.stringify(r)).toBeDefined();
+    });
+  test("ordem de chegada sem pré-agendamento orienta comparecimento sem consultar vagas", async () => {
+    const { ctx, servico } = await iniciar();
+    exigirPedido(ctx, servico, "chegada_sem_pre_agendamento");
+    const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+    expect(r.sem_agendamento, JSON.stringify(r)).toBe(true);
+    expect(r.codigo).not.toBe("PEDIDO_MEDICO_PENDENTE");
+    expect(consultasAgenda()).toHaveLength(0);
+    expect(gravacoes).toHaveLength(0);
+  });
   test("nome incorreto retorna os executantes sem selecionar substituto nem impor pergunta", async () => {
     const { ctx } = await iniciar();
     const r = await executarFerramentaPaciente(ctx, "buscar_medicos", { nome: "Nome Incorreto" });

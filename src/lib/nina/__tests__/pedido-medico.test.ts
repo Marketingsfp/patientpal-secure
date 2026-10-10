@@ -29,6 +29,7 @@ const ctx = {
   conversaId: "conversa-1",
   inicioSessao: "2026-10-04T10:00:00Z",
   teste: false,
+  bloquearAgenda: true,
   mensagens: [] as any[],
 };
 const foto = {
@@ -157,4 +158,59 @@ it("homologação reconhece foto apenas no seu ambiente", () => {
       mensagens: [{ ...foto, is_teste: true }],
     })[0]?.acao,
   ).toBe("foto_recebida");
+});
+
+for (const modalidade of ["hora_marcada", "chegada_com_pre_agendamento"])
+  it(`${modalidade}: sem foto bloqueia agenda; foto do mesmo exame libera e não repete pergunta`, () => {
+    const exame = resultado();
+    exame.records![0]!.tipo = "servico";
+    exame.records![0]!.extras!.modalidade_atendimento = modalidade;
+    const falta = avaliarPedidoMedico(exame, ctx);
+    expect(falta[0]).toMatchObject({ acao: "solicitar_foto", bloqueia_agenda: true });
+    const recebido = avaliarPedidoMedico(exame, { ...ctx, mensagens: [foto] });
+    expect(recebido[0]).toMatchObject({ acao: "foto_recebida", bloqueia_agenda: false });
+    expect(acrescentarSolicitacaoPedido("Informações do exame.", recebido)).toBe(
+      "Informações do exame.",
+    );
+    const solicitado = avaliarPedidoMedico(exame, {
+      ...ctx,
+      mensagens: [
+        { ...foto, tipo: "text", direction: "out", status: "sent", body: falta[0]!.pergunta },
+      ],
+    });
+    expect(solicitado[0]).toMatchObject({ acao: "ja_solicitado", bloqueia_agenda: true });
+  });
+
+it("escala estruturada usa a modalidade do exame sem converter dias habituais em vagas", () => {
+  const exame = resultado();
+  exame.records![0]!.tipo = "servico";
+  exame.records![0]!.extras!.atendimentos_publicados = [
+    { modalidade: "chegada_com_pre_agendamento" },
+  ];
+  expect(avaliarPedidoMedico(exame, ctx)[0]?.bloqueia_agenda).toBe(true);
+});
+it("publicação desligada conserva a solicitação da foto sem bloquear a agenda", () => {
+  const exame = resultado();
+  exame.records![0]!.tipo = "servico";
+  exame.records![0]!.extras!.modalidade_atendimento = "hora_marcada";
+  expect(avaliarPedidoMedico(exame, { ...ctx, bloquearAgenda: false })[0]).toMatchObject({
+    acao: "solicitar_foto",
+    bloqueia_agenda: false,
+  });
+});
+for (const modalidade of ["chegada_sem_pre_agendamento", "ficha", "nao_definida"])
+  it(`${modalidade}: preserva a regra própria de atendimento`, () => {
+    const exame = resultado();
+    exame.records![0]!.tipo = "servico";
+    exame.records![0]!.extras!.modalidade_atendimento = modalidade;
+    expect(avaliarPedidoMedico(exame, ctx)[0]?.bloqueia_agenda).toBe(false);
+  });
+it("consulta obrigatória conserva a solicitação de foto sem herdar o bloqueio dos exames", () => {
+  const consulta = resultado("Consulta — Cardiologia");
+  consulta.records![0]!.tipo = "profissional";
+  consulta.records![0]!.extras!.modalidade_atendimento = "hora_marcada";
+  expect(avaliarPedidoMedico(consulta, ctx)[0]).toMatchObject({
+    acao: "solicitar_foto",
+    bloqueia_agenda: false,
+  });
 });

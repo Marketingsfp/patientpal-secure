@@ -558,6 +558,7 @@ export async function aplicarGateIdentificacao(params: {
       inicio: vaga.inicio,
       fim: vaga.fim,
     });
+    if (r.codigo === "PEDIDO_MEDICO_PENDENTE") return null;
     if (!r.ok && r.erro === "CATALOGO_ATENDIMENTO_HUMANO")
       return encaminharRestricaoCatalogo(r.motivo_transferencia);
     if (!r.ok && r.erro === "SLOT_UNAVAILABLE") return vagaOcupada(estado);
@@ -839,6 +840,7 @@ export async function aplicarGateIdentificacao(params: {
     fim: a.slot_fim,
     procedimento: a.procedure ?? a.specialty ?? "Consulta",
   });
+  if (ag.codigo === "PEDIDO_MEDICO_PENDENTE") return null;
   if (ag.ok && (ag as unknown as { appointment_id?: string }).appointment_id) {
     log("agendamento_criado", {
       conversa: ctx.conversaId,
