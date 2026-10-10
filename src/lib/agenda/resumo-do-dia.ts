@@ -9,7 +9,8 @@
 // Vocabulário (o mesmo do balcão e o mesmo que a lista da Agenda já usa):
 //   • FICHA GERADA — toda linha da grade daquele dia, ocupada ou não. É o
 //     tamanho da grade que o médico abriu.
-//   • LIVRE        — ficha sem paciente ("DISPONÍVEL"/"BLOQUEIO").
+//   • LIVRE        — ficha sem paciente ("DISPONÍVEL"). BLOQUEIO (médico
+//     ausente) não é vaga: conta à parte, em `bloqueadas`.
 //   • AGENDADA     — ficha com paciente alocado, qualquer que seja o status.
 //     É o mesmo sentido do filtro "agendado" da lista.
 //   • Os demais números dividem as fichas ocupadas em situações — ver
@@ -26,6 +27,7 @@
 // ocupada, o paciente é que não foi atendido.
 
 import { ficouSemDesfecho, ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
+import { ehBloqueioAgenda } from "@/lib/agenda/bloqueio";
 
 export type LinhaResumo = {
   id: string;
@@ -43,6 +45,8 @@ export type ResumoDoDia = {
   fichasGeradas: number;
   /** Fichas ainda sem paciente. */
   livres: number;
+  /** Fichas bloqueadas (médico ausente): nem vaga, nem atendimento. */
+  bloqueadas: number;
   /** Fichas com paciente alocado, em qualquer status. */
   agendados: number;
   /** Sem check-in e o dia ainda não acabou (a clínica fecha às 19h). */
@@ -156,6 +160,7 @@ export function resumirDia(
   const resumo: ResumoDoDia = {
     fichasGeradas: linhas.length,
     livres: 0,
+    bloqueadas: 0,
     agendados: 0,
     aguardando: 0,
     confirmados: 0,
@@ -166,6 +171,10 @@ export function resumirDia(
     encaixes: contarEncaixes(linhas),
   };
   for (const a of linhas) {
+    if (ehBloqueioAgenda(a)) {
+      resumo.bloqueadas += 1;
+      continue;
+    }
     if (ehLivre(a.paciente_nome)) {
       resumo.livres += 1;
       continue;

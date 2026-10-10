@@ -74,7 +74,7 @@ import { hojeBR } from "@/lib/date-utils";
 import { buscarPaginado, type ConsultaPaginavel } from "@/lib/financeiro/paginacao";
 import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
 import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
-import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
+import { ehLinhaSemAtendimento, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
 });
@@ -145,7 +145,7 @@ const RELATORIOS: Relatorio[] = [
           .order("id"),
       );
       return data
-        .filter((r: any) => !ehVagaLivre(r))
+        .filter((r: any) => !ehLinhaSemAtendimento(r))
         .map((r: any) => ({
           Inicio: r.inicio,
           Fim: r.fim,
@@ -1025,7 +1025,7 @@ function DashboardView({
               .order("id"),
           ),
         ]);
-        const agendRows = agendTodas.filter((r) => !ehVagaLivre(r));
+        const agendRows = agendTodas.filter((r) => !ehLinhaSemAtendimento(r));
         const [nomesPront, nomesMedico, nomesCategoria] = await Promise.all([
           nomesPorId(
             "pacientes",

@@ -8,6 +8,7 @@
 
 import { ultimoDiaEncerrado } from "@/lib/painel/sem-desfecho";
 import { ehLivre, situacaoDaFicha, type LinhaResumo, type SituacaoFicha } from "./resumo-do-dia";
+import { ehBloqueioAgenda } from "./bloqueio";
 import { detectarCheckupRosa, itemCheckupRosa } from "./checkup-rosa";
 
 export type CategoriaResumo =
@@ -71,7 +72,7 @@ export function linhasDaCategoria<T extends LinhaResumo>(
     case "fichasGeradas":
       return [...linhas];
     case "livres":
-      return linhas.filter((a) => ehLivre(a.paciente_nome));
+      return linhas.filter((a) => ehLivre(a.paciente_nome) && !ehBloqueioAgenda(a));
     case "agendados":
       return linhas.filter((a) => !ehLivre(a.paciente_nome));
     case "encaixes":

@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ehBloqueioAgenda } from "@/lib/agenda/bloqueio";
 import { ChevronLeft, ChevronRight, Columns3, Loader2, Search, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/agenda-medicos")({
@@ -213,11 +214,12 @@ function AgendaMedicosPage() {
         fim: a.fim,
         procedimento: a.procedimento,
         status: a.status,
-        livre: isSlotLivre(a.paciente_nome),
+        // Bloqueio (médico ausente) não é vaga: aparece ocupado, com o nome BLOQUEIO.
+        livre: isSlotLivre(a.paciente_nome) && !ehBloqueioAgenda(a),
       }));
   }, [ags, medicosFiltrados]);
 
-  const totalAgendados = items.filter((i) => !i.livre).length;
+  const totalAgendados = items.filter((i) => !i.livre && !ehBloqueioAgenda(i)).length;
 
   const alterarStatus = async (novo: Status) => {
     if (!detalhe) return;

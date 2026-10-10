@@ -1,3 +1,5 @@
+import { ehBloqueioAgenda } from "./bloqueio";
+
 /**
  * Vaga vazia da grade.
  *
@@ -20,3 +22,14 @@ export const ehVagaLivre = (a: { paciente_nome: string | null; paciente_id?: str
  * nome vazio nem variações de caixa — sempre aplicar `ehVagaLivre` depois.
  */
 export const FILTRO_SEM_VAGA_LIVRE = "paciente_nome.is.null,paciente_nome.neq.DISPONIVEL";
+
+/**
+ * Linha da grade que não é atendimento: vaga livre ou bloqueio ("médico
+ * ausente"). Relatórios contam atendimentos — nenhuma das duas entra.
+ * O Dashboard operacional usa só `ehVagaLivre`, porque mostra o bloqueio no
+ * cartão do médico de propósito.
+ */
+export const ehLinhaSemAtendimento = (a: {
+  paciente_nome: string | null;
+  paciente_id?: string | null;
+}) => ehVagaLivre(a) || ehBloqueioAgenda(a);

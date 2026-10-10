@@ -75,6 +75,13 @@ import {
 import { DateTimeField } from "@/components/agenda/datetime-field";
 import { AgendaPorMedicoDia } from "@/components/agenda/agenda-por-medico-dia";
 import { ResumoDoDiaBar } from "@/components/agenda/resumo-do-dia-bar";
+import { BloqueioAgendaDialog } from "@/components/agenda/bloqueio-agenda-dialog";
+import {
+  ehBloqueioAgenda,
+  faixasDeBloqueio,
+  type FaixaBloqueio as FaixaBloqueioTipo,
+  mensagemHorarioBloqueado,
+} from "@/lib/agenda/bloqueio";
 import { MarcacoesPorAtendente } from "@/components/relatorios/marcacoes-por-atendente";
 import {
   Select,
@@ -508,7 +515,10 @@ const mapAgendaRows = (rows: AgendaRowBruta[]): Agendamento[] =>
     ...a,
     // O nome gravado no agendamento é mantido em dia pelo gatilho
     // trg_sync_paciente_nome_agendamentos (não há FK para embed).
-    paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
+    // BLOQUEIO mantém o nome: antes virava "DISPONÍVEL" aqui e a recepção
+    // marcava paciente por cima (ver `@/lib/agenda/bloqueio`).
+    paciente_nome:
+      isSlotLivre(a.paciente_nome) && !ehBloqueioAgenda(a) ? "DISPONÍVEL" : a.paciente_nome,
     medico_id: a.medico_id ?? null,
     medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
     medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
@@ -1968,6 +1978,10 @@ function AgendaPage() {
     if (!origem || reagSalvando) return;
     if (slot.id === origem.id) {
       toast.info("Esse já é o horário atual.");
+      return;
+    }
+    if (ehBloqueioAgenda(slot)) {
+      toast.error(mensagemHorarioBloqueado(slot));
       return;
     }
     if (!isSlotLivre(slot.paciente_nome)) {
@@ -4492,6 +4506,30 @@ function AgendaPage() {
     // filtros aplicados — é o que alimenta o aviso no topo da lista.
     const ocultos: Agendamento[] = [];
     const lista = items.filter((a) => {
+      // Bloqueio (médico ausente) aparece sempre como faixa na visão geral,
+      // mesmo com os livres escondidos — é o aviso que a recepção precisa ver.
+      // Some quando se filtra por situação ou por nome de paciente.
+      if (ehBloqueioAgenda(a)) {
+        if (filtroStatus !== "todos" || filtroCliente || filtroFicha) return false;
+        if (filtroApenasMultiplo) return false;
+        if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
+        if (filtroDiaSemana !== "todos" && String(new Date(a.inicio).getDay()) !== filtroDiaSemana)
+          return false;
+        if (filtroEspecialidade !== "todos") {
+          const set = a.medico_id ? medicoEspec.get(a.medico_id) : null;
+          if (!set || !set.has(filtroEspecialidade)) return false;
+        }
+        if (filtroAgenda !== "todos") {
+          const nomeAg = (a.agenda_id ? agendaNomePorId.get(a.agenda_id) : "") ?? "";
+          if (
+            filtroAgenda.startsWith("nome:")
+              ? chaveNomeAgenda(nomeAg) !== filtroAgenda.slice(5)
+              : a.agenda_id !== filtroAgenda
+          )
+            return false;
+        }
+        return true;
+      }
       if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       const ehLivre = isSlotLivre(a.paciente_nome);
@@ -4585,15 +4623,16 @@ function AgendaPage() {
     semDesfecho,
   ]);
 
-  const totais = useMemo(
-    () => ({
-      total: filtrados.length,
-      confirmados: filtrados.filter((i) => i.status === "confirmado").length,
-      realizados: filtrados.filter((i) => i.status === "realizado").length,
-      pendentes: filtrados.filter((i) => i.status === "agendado").length,
-    }),
-    [filtrados],
-  );
+  const totais = useMemo(() => {
+    // Ficha de bloqueio não é atendimento: fica fora das contagens.
+    const contaveis = filtrados.filter((i) => !ehBloqueioAgenda(i));
+    return {
+      total: contaveis.length,
+      confirmados: contaveis.filter((i) => i.status === "confirmado").length,
+      realizados: contaveis.filter((i) => i.status === "realizado").length,
+      pendentes: contaveis.filter((i) => i.status === "agendado").length,
+    };
+  }, [filtrados]);
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const filtradosOrdenados = useMemo(
@@ -4608,6 +4647,29 @@ function AgendaPage() {
     [filtrados],
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Faixas de "médico ausente": cada trecho de bloqueio vira uma faixa, desenhada
+  // na primeira ficha dele que estiver nesta página (ver `faixasDeBloqueio`).
+  const faixaBloqueioPorId = useMemo(
+    () =>
+      faixasDeBloqueio(
+        filtradosOrdenados
+          .filter((a) => ehBloqueioAgenda(a))
+          .map((a) => ({ ...a, diaIso: chaveDiaLocal(a.inicio) })),
+      ),
+    [filtradosOrdenados],
+  );
+  const cabecasBloqueioNaPagina = useMemo(() => {
+    const vistas = new Set<FaixaBloqueioTipo>();
+    const cabecas = new Set<string>();
+    for (const a of paginados) {
+      const f = faixaBloqueioPorId.get(a.id);
+      if (!f || vistas.has(f)) continue;
+      vistas.add(f);
+      cabecas.add(a.id);
+    }
+    return cabecas;
+  }, [paginados, faixaBloqueioPorId]);
 
   // Intervalos (almoço) de cada médico/agenda em cada dia, calculados sobre
   // TODAS as fichas carregadas — nunca sobre a lista já filtrada. Esconder os
@@ -5319,6 +5381,10 @@ function AgendaPage() {
       toast.error("Slot sem médico definido.");
       return;
     }
+    if (ehBloqueioAgenda(slot)) {
+      toast.error(mensagemHorarioBloqueado(slot));
+      return;
+    }
     if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
@@ -5382,7 +5448,7 @@ function AgendaPage() {
     // Slots disponíveis a partir da ficha inicial, excluindo as próprias fontes
     const idsFonte = new Set(fontes.map((f) => f.id));
     const candidatos = destino.slice(fichaInicial - 1).filter((s) => !idsFonte.has(s.id));
-    const livres = candidatos.filter((s) => isSlotLivre(s.paciente_nome));
+    const livres = candidatos.filter((s) => isSlotLivre(s.paciente_nome) && !ehBloqueioAgenda(s));
     if (livres.length < fontes.length) {
       toast.error(
         `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} ` +
@@ -5643,6 +5709,34 @@ function AgendaPage() {
   // gerar horários: aumentar a agenda do médico não é decisão do balcão comum.
   const podeGerirHorarios =
     usePodeEscrever("disponibilidades") || !!clinicaAtual?.pode_gerir_horarios;
+  // "Médico ausente": bloqueia horários livres com motivo obrigatório. Quem
+  // pode marcar na Agenda pode bloquear — é a recepção que recebe o aviso do
+  // médico (antes ela marcava o paciente fictício "NAO MARCAR").
+  const [bloqueioAberto, setBloqueioAberto] = useState(false);
+  const [desfazendoBloqueio, setDesfazendoBloqueio] = useState<string | null>(null);
+  const desfazerBloqueio = async (ids: string[], cabecaId: string) => {
+    if (!podeEscrever) {
+      avisoSemPermissaoAgenda();
+      return;
+    }
+    if (desfazendoBloqueio) return;
+    setDesfazendoBloqueio(cabecaId);
+    try {
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ paciente_nome: "DISPONÍVEL", observacoes: null } as never)
+        .in("id", ids)
+        .is("paciente_id", null)
+        .eq("paciente_nome", "BLOQUEIO");
+      if (error) throw error;
+      toast.success("Bloqueio desfeito — os horários voltaram a ficar livres.");
+      await load();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setDesfazendoBloqueio(null);
+    }
+  };
   const [maisFichasAberto, setMaisFichasAberto] = useState(false);
   const [maisFichasQtd, setMaisFichasQtd] = useState("");
   const [criandoMaisFichas, setCriandoMaisFichas] = useState(false);
@@ -6293,6 +6387,12 @@ function AgendaPage() {
     setOpen(false);
   };
   const openSlot = async (a: Agendamento) => {
+    // Médico ausente: não abre marcação nem reagendamento por cima. Desfazer
+    // o bloqueio é pela faixa da lista.
+    if (ehBloqueioAgenda(a)) {
+      toast.error(mensagemHorarioBloqueado(a));
+      return;
+    }
     if (reagendandoAg) {
       void confirmarReagendamentoNoSlot(a);
       return;
@@ -9950,6 +10050,28 @@ function AgendaPage() {
                 {criandoFichaExtra ? "Criando..." : "Ficha extra"}
               </Button>
             )}
+          {podeEscrever && !isMedicoOnly && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBloqueioAberto(true)}
+              disabled={!clinicaAtual}
+              title="O médico não vai atender: bloqueia os horários livres com o motivo, para ninguém marcar"
+              className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold"
+            >
+              <Ban className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" />
+              Médico ausente
+            </Button>
+          )}
+          <BloqueioAgendaDialog
+            open={bloqueioAberto}
+            onOpenChange={setBloqueioAberto}
+            clinicaId={clinicaAtual?.clinica_id ?? null}
+            medicos={medicos}
+            medicoInicial={filtroMedico !== "todos" ? filtroMedico : null}
+            dataInicial={dataRef}
+            onConcluido={() => void load()}
+          />
           {podeGerirHorarios &&
             !agendaDeFila(filtroMedico) &&
             agendasParaMaisFichas.length > 0 &&
@@ -13743,6 +13865,98 @@ function AgendaPage() {
                           null
                         );
                       })();
+                      const divisoriaDia = abreDia ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={11}
+                            className="border-y-2 border-slate-300 bg-slate-200 px-3 py-2 text-[13px] font-bold uppercase tracking-wide text-slate-800"
+                          >
+                            {rotuloDiaExtenso(a.inicio)}
+                          </TableCell>
+                        </TableRow>
+                      ) : null;
+                      const faixaIntervalo = intervalo ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={11}
+                            className="border-y-2 border-amber-300 bg-amber-100 px-3 py-3 text-center dark:border-amber-700 dark:bg-amber-950/40"
+                          >
+                            <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                              <UtensilsCrossed className="h-6 w-6 shrink-0 text-amber-700 dark:text-amber-400" />
+                              <span className="text-2xl font-bold tabular-nums text-amber-900 dark:text-amber-200">
+                                {intervalo.inicio} – {intervalo.fim}
+                              </span>
+                              <span className="text-xl font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                                {rotuloDoVao(intervalo)}
+                              </span>
+                              <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                o médico não atende nesse período
+                              </span>
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ) : null;
+
+                      // Médico ausente: as fichas de bloqueio seguidas viram UMA
+                      // faixa cinza com o motivo, no lugar das linhas — nunca a
+                      // linha verde de "confirmado" do paciente "NAO MARCAR".
+                      const faixaBloq = ehBloqueioAgenda(a)
+                        ? (faixaBloqueioPorId.get(a.id) ?? null)
+                        : null;
+                      if (faixaBloq) {
+                        if (!cabecasBloqueioNaPagina.has(a.id)) {
+                          return divisoriaDia ? (
+                            <Fragment key={a.id}>{divisoriaDia}</Fragment>
+                          ) : null;
+                        }
+                        const desfazendo = desfazendoBloqueio === faixaBloq.cabecaId;
+                        return (
+                          <Fragment key={a.id}>
+                            {divisoriaDia}
+                            {faixaIntervalo}
+                            <TableRow data-ag-id={a.id} className="hover:bg-transparent">
+                              <TableCell
+                                colSpan={11}
+                                className="border-y-2 border-slate-400 bg-slate-300 px-3 py-2 text-center dark:border-slate-500 dark:bg-slate-700/60"
+                              >
+                                <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                                  <Ban className="h-5 w-5 shrink-0 text-slate-700 dark:text-slate-300" />
+                                  <span className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                                    {fmtHora(faixaBloq.inicio)} – {fmtHora(faixaBloq.fim)}
+                                  </span>
+                                  <span className="text-lg font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
+                                    Médico ausente
+                                  </span>
+                                  {filtroMedico === "todos" && a.medico_nome && (
+                                    <span className="text-sm font-semibold uppercase text-slate-800 dark:text-slate-200">
+                                      {a.medico_nome}
+                                    </span>
+                                  )}
+                                  <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                                    {faixaBloq.motivo
+                                      ? `Motivo: ${faixaBloq.motivo}`
+                                      : "não marcar pacientes"}
+                                  </span>
+                                  {podeEscrever && !isMedicoOnly && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs"
+                                      disabled={!!desfazendoBloqueio}
+                                      onClick={() =>
+                                        void desfazerBloqueio(faixaBloq.ids, faixaBloq.cabecaId)
+                                      }
+                                    >
+                                      {desfazendo ? "Desfazendo..." : "Desfazer bloqueio"}
+                                    </Button>
+                                  )}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          </Fragment>
+                        );
+                      }
+
                       const fichaNum = fichaPorId.get(a.id) ?? "";
                       // Fichas 1..30 são hora marcada mesmo em agenda de fila.
                       const nFicha = parseInt(fichaNum || "0", 10);
@@ -13814,37 +14028,8 @@ function AgendaPage() {
 
                       return (
                         <Fragment key={a.id}>
-                          {abreDia && (
-                            <TableRow className="hover:bg-transparent">
-                              <TableCell
-                                colSpan={11}
-                                className="border-y-2 border-slate-300 bg-slate-200 px-3 py-2 text-[13px] font-bold uppercase tracking-wide text-slate-800"
-                              >
-                                {rotuloDiaExtenso(a.inicio)}
-                              </TableCell>
-                            </TableRow>
-                          )}
-                          {intervalo && (
-                            <TableRow className="hover:bg-transparent">
-                              <TableCell
-                                colSpan={11}
-                                className="border-y-2 border-amber-300 bg-amber-100 px-3 py-3 text-center dark:border-amber-700 dark:bg-amber-950/40"
-                              >
-                                <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-                                  <UtensilsCrossed className="h-6 w-6 shrink-0 text-amber-700 dark:text-amber-400" />
-                                  <span className="text-2xl font-bold tabular-nums text-amber-900 dark:text-amber-200">
-                                    {intervalo.inicio} – {intervalo.fim}
-                                  </span>
-                                  <span className="text-xl font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-                                    {rotuloDoVao(intervalo)}
-                                  </span>
-                                  <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                                    o médico não atende nesse período
-                                  </span>
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          )}
+                          {divisoriaDia}
+                          {faixaIntervalo}
                           <TableRow data-ag-id={a.id} className={linhaClass}>
                             {/* Checkbox — horário livre TAMBÉM é selecionável: sem
                           isso uma grade aberta por engano não tinha como ser
@@ -14627,7 +14812,7 @@ function AgendaPage() {
                   ? "EXAMES LABORATORIAIS"
                   : a.procedimento,
                 status: a.status,
-                livre: isSlotLivre(a.paciente_nome),
+                livre: isSlotLivre(a.paciente_nome) && !ehBloqueioAgenda(a),
                 pagamento: ehSemFaturamento(a)
                   ? ("sem_faturamento" as const)
                   : a.origem_externa
@@ -15626,7 +15811,7 @@ function FragmentDayCell({
   ocultarPaciente: boolean;
   procedimentoFallback?: string;
 }) {
-  const ehLivre = ag && isSlotLivre(ag.paciente_nome);
+  const ehLivre = ag && isSlotLivre(ag.paciente_nome) && !ehBloqueioAgenda(ag);
   // Slot travado por alguém digitando (≤ 3 min). O próprio usuário que travou
   // fica com o diálogo aberto; para todos os demais o slot vira "em digitação".
   const lockNome =

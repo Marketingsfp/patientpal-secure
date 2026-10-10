@@ -13,6 +13,7 @@
 // executado_por, executado_em.
 
 import { assertEscopoRegistro, type CtxAgenda } from "./ator.server";
+import { bloqueioNoIntervalo, mensagemHorarioBloqueado } from "./bloqueio";
 import { motivoFinal } from "./motivo-final";
 import type { PgErrorLike } from "./criar-agendamento.types";
 
@@ -25,7 +26,8 @@ const normalizar = (s: string) =>
     .toLowerCase();
 const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
-  return nome === "disponivel" || nome === "bloqueio";
+  // "BLOQUEIO" não é vaga: o médico avisou que não atende (ver bloqueio.ts).
+  return nome === "disponivel";
 };
 
 export type ReagendarAgendamentoCoreInput = {
@@ -120,7 +122,7 @@ export async function reagendarAgendamentoCore(
   const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
   const { data: slotsDia, error: eSlots } = await supabase
     .from("agendamentos")
-    .select("id,paciente_nome,inicio,fim,agenda_id")
+    .select("id,paciente_nome,paciente_id,status,observacoes,inicio,fim,agenda_id")
     .eq("clinica_id", clinica_id)
     .eq("medico_id", novoMedicoId)
     .gte("inicio", inicioDia)
@@ -130,12 +132,19 @@ export async function reagendarAgendamentoCore(
   const lista = (slotsDia ?? []) as {
     id: string;
     paciente_nome: string;
+    paciente_id: string | null;
+    status: string | null;
+    observacoes: string | null;
     inicio: string;
     fim: string;
     agenda_id: string | null;
   }[];
   // Regra C — excluir o próprio id (equivalente ao excludingEditing).
   const outros = lista.filter((x) => x.id !== agendamento_id);
+  const bloqueio = bloqueioNoIntervalo(outros, novo_inicio, novo_fim);
+  if (bloqueio) {
+    return { ok: false, validation_error: { message: mensagemHorarioBloqueado(bloqueio) } };
+  }
   if (outros.length === 0) {
     return {
       ok: false,

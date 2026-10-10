@@ -25,6 +25,7 @@
 
 import { dataClinicaDe, hojeBR, janelaDiaClinica, TZ_CLINICA } from "@/lib/date-utils";
 import { assertEscopoClinica, type CtxAgenda } from "./ator.server";
+import { bloqueioNoIntervalo, diaTodoBloqueado, mensagemHorarioBloqueado } from "./bloqueio";
 import { posicionarEncaixe } from "./encaixe-posicao";
 import type {
   CriarAgendamentoInput,
@@ -55,9 +56,10 @@ export async function criarAgendamentoCore(
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
+  // "BLOQUEIO" não é vaga: o médico avisou que não atende (ver bloqueio.ts).
   const isSlotLivreLocal = (pacienteNome: string | null | undefined) => {
     const nome = normalizarLocal(pacienteNome ?? "").trim();
-    return nome === "disponivel" || nome === "bloqueio";
+    return nome === "disponivel";
   };
   const toPgErrorLikeLocal = (err: unknown): PgErrorLike => {
     const e = (err ?? {}) as { message?: string; details?: string; hint?: string; code?: string };
@@ -175,7 +177,7 @@ export async function criarAgendamentoCore(
       recursoId
         ? supabase
             .from("agendamentos")
-            .select("id,paciente_nome,inicio,fim,agenda_id")
+            .select("id,paciente_nome,paciente_id,status,observacoes,inicio,fim,agenda_id")
             .eq("clinica_id", clinica_id)
             .eq("medico_id", recursoId)
             .gte("inicio", inicioDia)
@@ -383,6 +385,9 @@ export async function criarAgendamentoCore(
     const lista = (slotsDia ?? []) as {
       id: string;
       paciente_nome: string;
+      paciente_id: string | null;
+      status: string | null;
+      observacoes: string | null;
       inicio: string;
       fim: string;
       agenda_id: string | null;
@@ -391,6 +396,20 @@ export async function criarAgendamentoCore(
       slotPacienteNomeNaValidacao = lista.find((x) => x.id === editing_id)?.paciente_nome ?? null;
     }
     const excluindoEditing = editing_id ? lista.filter((x) => x.id !== editing_id) : lista;
+    // Bloqueio da agenda (médico ausente) é trava dura, sem confirmação: nem o
+    // encaixe passa por cima. Vale para recepção, Nina, API e site — todos
+    // chegam aqui. Para marcar, a recepção desfaz o bloqueio antes.
+    const bloqueio =
+      bloqueioNoIntervalo(excluindoEditing, payload.inicio, payload.fim) ??
+      (diaTodoBloqueado(excluindoEditing)
+        ? (excluindoEditing.find((x) => x.status !== "cancelado") ?? null)
+        : null);
+    if (bloqueio) {
+      return {
+        ok: false,
+        validation_error: { message: mensagemHorarioBloqueado(bloqueio), toast_duration: 12000 },
+      };
+    }
     if (excluindoEditing.length === 0 && !agendaOrdemChegada) {
       return {
         ok: false,

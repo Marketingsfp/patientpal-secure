@@ -35,7 +35,7 @@ import { carregarMapaConvenioPacientes } from "@/lib/convenio/modalidade";
 import { buscarPaginado } from "@/lib/financeiro/paginacao";
 import { buscarPorIds, nomesPorId } from "@/lib/relatorios/buscar-por-ids";
 import { buscarPorDia } from "@/lib/relatorios/buscar-por-dia";
-import { ehVagaLivre, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
+import { ehLinhaSemAtendimento, FILTRO_SEM_VAGA_LIVRE } from "@/lib/agenda/vaga-livre";
 import {
   Download,
   Save,
@@ -121,7 +121,7 @@ const CUBOS: CubeSpec[] = [
         // o Rateio usa quando o lançamento não tem a marca do cartão.
         carregarMapaConvenioPacientes(clinicaId),
       ]);
-      const rows = agendTodas.filter((r) => !ehVagaLivre(r));
+      const rows = agendTodas.filter((r) => !ehLinhaSemAtendimento(r));
       // Modalidade e forma de pagamento vêm do lançamento de receita
       // confirmado do atendimento, pela mesma regra do Rateio da Receita —
       // a marcação "Particular/Convênio" da agenda não serve para separar o
