@@ -6,20 +6,22 @@ import { FLAG_INBOX_MOSTRAR_TESTES, incluirTesteEfetivo } from "@/lib/atendiment
  * "Mostrar conversas de teste" — preferência lembrada por usuário
  * (`profiles.preferencias_ui.flags.inbox_mostrar_testes`).
  *
- * `admin = false` devolve sempre desligado, sem ler nem gravar nada: o controle
- * só existe para administrador. O servidor confere o perfil de novo.
+ * Sem autorização devolve desligado, sem ler nem gravar a preferência.
+ * O servidor confere o perfil de novo e conserva o escopo da atendente.
  */
-export function useMostrarConversasTeste(admin: boolean) {
+export function useMostrarConversasTeste(autorizado: boolean, usuarioId?: string | null) {
   const [salvo, setSalvo] = useState(false);
   const [carregado, setCarregado] = useState(false);
 
   useEffect(() => {
-    if (!admin) {
+    if (!autorizado) {
       setSalvo(false);
       setCarregado(false);
       return;
     }
     let vale = true;
+    setSalvo(false);
+    setCarregado(false);
     getFlagUsuario(FLAG_INBOX_MOSTRAR_TESTES)
       .then((v) => {
         if (!vale) return;
@@ -32,11 +34,11 @@ export function useMostrarConversasTeste(admin: boolean) {
     return () => {
       vale = false;
     };
-  }, [admin]);
+  }, [autorizado, usuarioId]);
 
   const alternar = useCallback(
     async (valor: boolean) => {
-      if (!admin) return;
+      if (!autorizado) return;
       setSalvo(valor);
       try {
         await setFlagUsuario(FLAG_INBOX_MOSTRAR_TESTES, valor);
@@ -44,8 +46,8 @@ export function useMostrarConversasTeste(admin: boolean) {
         /* preferência é conveniência: falha ao gravar não derruba a tela */
       }
     },
-    [admin],
+    [autorizado],
   );
 
-  return { ligado: incluirTesteEfetivo(salvo, admin), carregado, alternar };
+  return { ligado: incluirTesteEfetivo(salvo, autorizado), carregado, alternar };
 }

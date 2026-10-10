@@ -94,6 +94,47 @@ describe("Apresentação dos registros internos para atendimento real e homologa
     expect(agrupado.marcadorParaItem.has(reserva.id)).toBe(true);
     expect(textoMarcadorSistema(reserva.body)).toBe("");
   });
+  test.each([
+    ["FOTO_NAO_LIDA_APOS_NOVA_TENTATIVA", "Foto não identificada", "imagem mais nítida"],
+    [
+      "FOTO_FALHA_TECNICA_PERSISTENTE",
+      "Falha técnica no processamento da foto",
+      "legibilidade não foi confirmada",
+    ],
+  ])(
+    "foto: motivo %s é legível em evento, grupo e marcador e preserva auditoria",
+    (motivo, titulo, detalhe) => {
+      const ev = evento({ motivo });
+      const antes = structuredClone(ev);
+      const grupo = agruparTimeline({ eventos: [ev] }).itens[0] as GrupoHandoff;
+      for (const apresentacao of [
+        renderizar(ev),
+        renderToStaticMarkup(<HandoffGroupCard grupo={grupo} />),
+        textoMarcadorSistema(
+          `🔁 Conversa transferida da Nina para atendimento humano · Motivo: ${motivo}`,
+        ),
+        textoMarcadorSistema(
+          `🧾 Handoff realizado pela Nina · Protocolo: MJ-867 · Motivo: ${motivo}`,
+        ),
+      ]) {
+        expect(apresentacao).toContain(titulo);
+        expect(apresentacao).toContain(detalhe);
+        expect(apresentacao).not.toContain(motivo);
+        expect(apresentacao).not.toContain("contém informações técnicas");
+        expect(apresentacao).not.toContain("paciente pediu");
+      }
+      expect(ev).toEqual(antes);
+      expect(grupo.motivo).toBe(motivo);
+    },
+  );
+  test("motivo do MAPA não afirma que o exame é um profissional ou que a foto não foi identificada", () => {
+    const motivo = "HORARIOS_HABITUAIS_NAO_INFORMADOS: MAPA";
+    const texto = renderizar(evento({ motivo }));
+    expect(texto).toContain("atendimento identificado");
+    expect(texto).toContain("MAPA");
+    expect(texto).not.toContain("para o profissional");
+    expect(texto).not.toContain("Foto não identificada");
+  });
   test("consulta ausente na base informa a causa no banner e no grupo, preservando o diagnóstico", () => {
     const ev = evento({ motivo: MOTIVO_SEM_REGISTRO });
     const antes = structuredClone(ev);

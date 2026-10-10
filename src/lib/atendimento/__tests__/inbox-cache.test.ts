@@ -24,6 +24,32 @@ const conv = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("FASE 4 — cache e realtime da Inbox individual", () => {
+  it("controle desligado oculta teste imediatamente, inclusive sem usuário carregado", () => {
+    const teste = conv({ is_teste: true });
+    expect(filtrarPorEscopo([teste], ctxJean)).toHaveLength(0);
+    expect(filtrarPorEscopo([teste], { ...ctxJean, userId: null })).toHaveLength(0);
+    expect(filtrarPorEscopo([teste], { ...ctxJean, incluirTeste: true })).toHaveLength(1);
+    expect(podeEntrarNaLista(teste, ctxJean)).toBe(false);
+  });
+
+  it("permitir teste não revela conversa de outra atendente nem a fila global", () => {
+    const ctx = { ...ctxJean, incluirTeste: true };
+    expect(
+      filtrarPorEscopo([conv({ is_teste: true, atribuida_user_id: MARIA })], ctx),
+    ).toHaveLength(0);
+    expect(
+      filtrarPorEscopo(
+        [conv({ is_teste: true, atribuida_user_id: null, owner_type: "NONE" })],
+        ctx,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("trocar a visibilidade de teste muda a chave e invalida uma consulta anterior", () => {
+    const ctx = { clinicaId: "cl", userId: JEAN, escopo: "minhas" as const };
+    expect(chaveInbox(ctx)).toBe(chaveInbox({ ...ctx, incluirTeste: false }));
+    expect(chaveInbox(ctx)).not.toBe(chaveInbox({ ...ctx, incluirTeste: true }));
+  });
   it("cache após transferência: conversa de Maria sai da lista de Jean", () => {
     const antes = [conv()];
     const depois = filtrarPorEscopo([conv({ atribuida_user_id: MARIA })], ctxJean);

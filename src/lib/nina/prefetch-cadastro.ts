@@ -12,6 +12,7 @@
 import { normalizar, raizEspecialidade } from "../nina-especialidade";
 import type { IntencaoNina } from "./atendimento-fase1";
 import type { OBJETIVOS_PESQUISA_CATALOGO } from "./catalogo-pesquisa";
+import { itensDoPedidoLido } from "./multiplos-atendimentos";
 
 export const FLAG_PREFETCH_CADASTRO = "nina_prefetch_cadastro";
 export const PRAZO_PREFETCH_MS = 2000;
@@ -199,6 +200,12 @@ export function planejarPrefetch(
   const servicosMax = servicos.filter(
     (a) => !servicos.some((b) => b !== a && normalizar(b).includes(normalizar(a))),
   );
+
+  // A foto identifica itens solicitados, não escolhe o executante. Ex.: MAPA
+  // 24h não corresponde literalmente a MAPA 24 HORAS, mas pode coincidir com
+  // o recurso MAPA entre os profissionais. Essa dúvida segue ao catálogo no
+  // fluxo normal; buscar_medicos antecipadamente geraria uma falsa seleção.
+  if (itensDoPedidoLido(mensagem).length && !servicosMax.length) return null;
 
   // 2) Especialidades distintas publicadas.
   const todas = [

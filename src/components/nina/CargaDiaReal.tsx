@@ -78,7 +78,10 @@ export function CargaDiaReal({
           </li>
           <li>
             Para ver os cards chegando, ligue &quot;Mostrar conversas de teste&quot; na tela de
-            conversas (só administrador). O teste roda no servidor: pode fechar esta página.
+            conversas, conforme seu perfil e filtro. Esse controle apenas exibe testes já criados;
+            para treinar a fila pessoal sem usar a agenda, use &quot;Iniciar simulação&quot; no
+            atendimento quando o recurso estiver habilitado. Esta carga roda no servidor: pode
+            fechar esta página.
           </li>
         </ul>
       </div>

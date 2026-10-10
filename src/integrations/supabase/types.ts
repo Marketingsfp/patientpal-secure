@@ -16132,6 +16132,20 @@ export type Database = {
         }
         Returns: string
       }
+      atend_departamentos_habilitados: { Args: Record<PropertyKey, never>; Returns: boolean }
+      atend_listar_departamentos: { Args: { _clinica_id: string; _ip_origem?: string }; Returns: Json }
+      atend_salvar_departamento: {
+        Args: { _clinica_id: string; _nome: string; _id?: string | null; _ip_origem?: string }
+        Returns: string
+      }
+      atend_vincular_departamento: {
+        Args: { _clinica_id: string; _user_id: string; _departamento_id?: string | null; _ip_origem?: string }
+        Returns: undefined
+      }
+      atend_transferir_departamento: {
+        Args: { _clinica_id: string; _conversa_id: string; _departamento_id: string; _responsavel_esperado: string | null; _motivo?: string; _ip_origem?: string }
+        Returns: string
+      }
       atend_auto_assign_conversa_interno: {
         Args: {
           _clinica_id: string

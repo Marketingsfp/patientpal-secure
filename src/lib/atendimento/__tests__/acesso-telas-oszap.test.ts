@@ -2,6 +2,15 @@ import { describe, expect, it } from "bun:test";
 import { podeAbrirTelaOsZap } from "../acesso-telas-oszap";
 
 describe("Telefonia — menu e links diretos do OS ZAP", () => {
+  it("departamentos somente para Admin/Supervisor, com publicação global habilitada", () => {
+    for (const perfil of ["admin", "supervisor"]) {
+      expect(podeAbrirTelaOsZap(perfil, "/app/nina/", "#atend-departamentos", true)).toBe(true);
+      expect(podeAbrirTelaOsZap(perfil, "/app/nina", "atend-departamentos", false)).toBe(false);
+    }
+    for (const perfil of ["telefonia", "gestor", "recepcao", "medico", undefined]) {
+      expect(podeAbrirTelaOsZap(perfil, "/app/nina", "atend-departamentos", true)).toBe(false);
+    }
+  });
   it("bloqueia todas as abas da imagem e o link antigo da base", () => {
     for (const hash of [
       "dashboard-oszap",

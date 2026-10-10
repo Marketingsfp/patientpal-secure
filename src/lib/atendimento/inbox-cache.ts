@@ -28,7 +28,7 @@ export type LinhaCache = ConversaEscopo & {
 };
 
 export interface ContextoEscopo {
-  /** Modo treinamento: admin com "Mostrar conversas de teste" ligado. */
+  /** Modo treinamento: perfil autorizado com o controle ligado. */
   incluirTeste?: boolean;
   clinicaId?: string | null;
   escopo: EscopoInbox;
@@ -50,6 +50,7 @@ export function chaveInbox(args: {
   atendenteId?: string | null;
   /** FASE 2 — o segundo eixo (estado/ordenação) também separa a caixa. */
   visualizacao?: string | null;
+  incluirTeste?: boolean;
 }): string {
   return [
     "inbox",
@@ -58,6 +59,7 @@ export function chaveInbox(args: {
     args.escopo,
     args.atendenteId ?? "-",
     args.visualizacao ?? "-",
+    args.incluirTeste === true ? "com-testes" : "reais",
   ].join("|");
 }
 
@@ -67,10 +69,11 @@ export function chaveInbox(args: {
  * servidor (que já filtrou), para não esvaziar a tela por engano.
  */
 export function filtrarPorEscopo<T extends LinhaCache>(linhas: T[], ctx: ContextoEscopo): T[] {
-  if (!ctx.userId) return linhas;
+  const permitidas = linhas.filter((l) => !linhaDeTesteOculta(l, ctx.incluirTeste));
+  if (!ctx.userId) return permitidas.length === linhas.length ? linhas : permitidas;
   const atendente = atendenteFiltroEfetivo(ctx.atendenteId, ctx.gestor);
   const escopo = escopoComAtendente(ctx.escopo, ctx.atendenteId, ctx.gestor);
-  const visiveis = linhas.filter(
+  const visiveis = permitidas.filter(
     (l) =>
       conversaVisivelNoEscopo(l, {
         escopo,
@@ -83,6 +86,7 @@ export function filtrarPorEscopo<T extends LinhaCache>(linhas: T[], ctx: Context
 
 /** Um registro recebido em tempo real pode entrar na lista deste filtro? */
 export function podeEntrarNaLista(linha: LinhaCache, ctx: ContextoEscopo): boolean {
+  if (linhaDeTesteOculta(linha, ctx.incluirTeste)) return false;
   if (!ctx.userId) return true;
   return (
     conversaVisivelNoEscopo(linha, {

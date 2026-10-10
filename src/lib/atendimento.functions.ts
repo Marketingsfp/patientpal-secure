@@ -7,6 +7,10 @@ import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
 import { periodoCentralSchema, aplicarPeriodoCentral } from "@/lib/atendimento/periodo-central";
 import { z } from "zod";
+import { DEPARTAMENTOS_HABILITADOS } from "./atendimento/departamentos-flag";
+import { TREINAMENTO_HABILITADO } from "./atendimento/treinamento-flag";
+import { usuarioPodeSimularAtendimento } from "./atendimento/conversas-teste-acesso.server";
+import { carregarAcessosOsZap } from "./permissoes-oszap.server";
 import {
   MOTIVO_CONVERSA_TESTE,
   MSG_CONVERSA_DE_TESTE,
@@ -85,8 +89,7 @@ async function ehAdminClinica(
 }
 /**
  * Modo treinamento — "Mostrar conversas de teste". O pedido do navegador só vale
- * para administrador: qualquer outro perfil continua sem ver teste, mesmo que
- * mande `incluirTeste: true`.
+ * para perfis autorizados. O escopo das conversas continua sendo conferido.
  */
 async function incluirTesteAutorizado(
   supabase: SupabaseClient<Database>,
@@ -96,6 +99,8 @@ async function incluirTesteAutorizado(
 ): Promise<boolean> {
   if (!pedido) return false;
   try {
+    if (TREINAMENTO_HABILITADO)
+      return await usuarioPodeSimularAtendimento(supabase, userId, clinicaId);
     return await ehAdminClinica(supabase, userId, clinicaId);
   } catch {
     return false;
@@ -269,7 +274,7 @@ export const listarConversas = createServerFn({ method: "POST" })
         visualizacao: z.enum(["recentes", "resolvidas", "espera"]).default("recentes"),
         limit: z.number().int().min(1).max(500).default(100),
         apos: cursorInboxSchema.nullish(),
-        // Modo treinamento: só administrador, e só com "Mostrar conversas de teste" ligado.
+        // Modo treinamento: perfil autorizado e controle ligado; mantém o escopo da pessoa.
         incluirTeste: z.boolean().default(false),
       })
       .parse(i),
@@ -653,7 +658,16 @@ export const souGestorAtendimento = createServerFn({ method: "POST" })
       },
     );
     if (error) throw new Error(error.message);
-    return { gestor: !!podeGerir, admin, leituraOperacional: leituraOperacional === true };
+    const podeSimular =
+      TREINAMENTO_HABILITADO &&
+      (await usuarioPodeSimularAtendimento(context.supabase, context.userId, data.clinicaId));
+    return {
+      gestor: !!podeGerir,
+      admin,
+      leituraOperacional: leituraOperacional === true,
+      podeSimular,
+      podeMostrarTestes: admin || podeSimular,
+    };
   });
 
 /**
@@ -764,12 +778,15 @@ export const transferirConversa = createServerFn({ method: "POST" })
         conversaId: z.string().uuid(),
         paraUserId: z.string().uuid().nullable().optional(),
         paraDepartamentoId: z.string().uuid().nullable().optional(),
+        responsavelEsperado: z.string().uuid().nullable().optional(),
         motivo: z.string().trim().max(500).optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    if (DEPARTAMENTOS_HABILITADOS && !data.paraUserId && !data.paraDepartamentoId)
+      throw new Error("Selecione uma atendente ou um departamento para transferir.");
     if (
       data.paraUserId &&
       (await ehAdminClinica(context.supabase, data.paraUserId, data.clinicaId))
@@ -787,6 +804,43 @@ export const transferirConversa = createServerFn({ method: "POST" })
     // A conversa pode ter sido encerrada/removida enquanto estava selecionada
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
     if (!conv) return null;
+    if (DEPARTAMENTOS_HABILITADOS && data.paraDepartamentoId) {
+      if (data.paraUserId)
+        throw new Error("Escolha transferência por atendente ou por departamento.");
+      if (data.responsavelEsperado === undefined)
+        throw new Error("Atualize a conversa antes de transferir por departamento.");
+      const acessos = await carregarAcessosOsZap(context.supabase, context.userId, data.clinicaId);
+      if (acessos["oszap-conversas"] !== "write")
+        throw new Error("Sem permissão para transferir conversas.");
+      const { data: destinatario, error } = await context.supabase.rpc(
+        "atend_transferir_departamento",
+        {
+          _clinica_id: data.clinicaId,
+          _conversa_id: data.conversaId,
+          _departamento_id: data.paraDepartamentoId,
+          _responsavel_esperado: data.responsavelEsperado,
+          _motivo: data.motivo,
+          _ip_origem: (
+            await import("./atendimento/departamentos-auditoria.server")
+          ).ipOrigemDepartamentos(),
+        },
+      );
+      if (error) throw new Error(error.message);
+      if (!destinatario)
+        throw new Error("Não foi possível confirmar a transferência. Atualize a conversa.");
+      try {
+        const { protocoloAoAtribuirHumano } =
+          await import("./atendimento/protocolo-atendimento.server");
+        await protocoloAoAtribuirHumano({
+          clinicaId: data.clinicaId,
+          conversaId: data.conversaId,
+          userId: destinatario,
+        });
+      } catch (e) {
+        console.error("[atendimento] protocolo ao transferir por departamento", e);
+      }
+      return { ok: true };
+    }
     // Repetir a responsável atual, sem setor novo, não é transferência.
     if (
       data.paraUserId &&
@@ -3425,7 +3479,7 @@ export const esperaConversas = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         isTeste: z.boolean().default(false),
-        // Modo treinamento: reais + teste no mesmo mapa (só administrador).
+        // Modo treinamento: reais + teste no mesmo mapa, com autorização do servidor.
         incluirTeste: z.boolean().default(false),
       })
       .parse(i),

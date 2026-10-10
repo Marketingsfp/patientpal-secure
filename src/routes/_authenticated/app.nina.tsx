@@ -77,6 +77,9 @@ import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManag
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 import { PesquisaConversas } from "@/components/nina/PesquisaConversas";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
+const Departamentos = lazy(() =>
+  import("@/components/atendimento/Departamentos").then((m) => ({ default: m.Departamentos })),
+);
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   // A tela de atendimento tem sempre o mesmo endereço (/app/nina): a conversa
@@ -112,6 +115,7 @@ function NinaPage() {
     "laboratorio-nina",
     "atend-macros",
     "atend-inbox",
+    "atend-departamentos",
     "pesquisa-conversas",
     "informacoes-clinica",
     "base-conhecimento",
@@ -199,6 +203,17 @@ function NinaPage() {
         {/* ============ ATENDIMENTO — Dashboard ============ */}
         <TabsContent value="atend-macros">
           <RespostasRapidasManager />
+        </TabsContent>
+        <TabsContent value="atend-departamentos">
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm">
+                Carregando departamentos…
+              </p>
+            }
+          >
+            <Departamentos key={clinicaId} />
+          </Suspense>
         </TabsContent>
         <TabsContent value="pesquisa-conversas" className="mt-0 h-full">
           <PesquisaConversas />

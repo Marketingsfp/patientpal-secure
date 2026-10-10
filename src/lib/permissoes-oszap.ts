@@ -55,6 +55,15 @@ export const TELAS_OSZAP: TelaOsZap[] = [
     pai: "nina",
   },
   {
+    key: "oszap-departamentos",
+    nome: "Departamentos",
+    descricao: "Equipe de Telefonia e transferências por departamento; Administrador e Supervisor",
+    grupo: "Atendimento",
+    to: "/app/nina",
+    hash: "atend-departamentos",
+    pai: "nina",
+  },
+  {
     key: "nina-voz",
     nome: "Voz da Nina",
     descricao: "Consulta e configuração da voz da Nina",

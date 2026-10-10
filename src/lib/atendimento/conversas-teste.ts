@@ -2,11 +2,11 @@
  * Modo treinamento — conversas de teste na tela de conversas.
  *
  * As conversas do console de homologação (`is_teste = true`) ficam fora do
- * atendimento real. O administrador pode ligar "Mostrar conversas de teste"
+ * atendimento real. Perfis autorizados podem ligar "Mostrar conversas de teste"
  * para vê-las na mesma lista, fila e contadores, com a etiqueta TESTE.
  *
  * Regras puras, sem acesso a banco:
- * - o pedido só vale para administrador (o servidor confere de novo);
+ * - o servidor confere o perfil ativo e mantém o escopo de cada atendente;
  * - desligado, nada muda: todo filtro continua descartando teste;
  * - relatórios, métricas e distribuição automática nunca passam por aqui.
  */
@@ -21,9 +21,16 @@ export const MOTIVO_CONVERSA_TESTE = "CONVERSA_TESTE";
 export const MSG_CONVERSA_DE_TESTE =
   "Conversa de teste: a resposta da atendente fica para a próxima etapa do modo treinamento. Nada é enviado ao WhatsApp.";
 
-/** Só o administrador vê conversas de teste, e só quando pediu. */
-export function incluirTesteEfetivo(pedido: boolean | null | undefined, admin: boolean): boolean {
-  return pedido === true && admin === true;
+export function perfilPodeSimularAtendimento(perfil: string | null | undefined): boolean {
+  return perfil === "admin" || perfil === "supervisor" || perfil === "telefonia";
+}
+
+/** O controle só inclui testes com autorização confirmada pelo servidor. */
+export function incluirTesteEfetivo(
+  pedido: boolean | null | undefined,
+  autorizado: boolean,
+): boolean {
+  return pedido === true && autorizado === true;
 }
 
 /** Linha de evento/registro que deve ser descartada na tela: teste sem o controle ligado. */

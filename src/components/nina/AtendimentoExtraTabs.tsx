@@ -197,16 +197,18 @@ import {
   marcarLida,
   registrarPrimeiraAbertura,
 } from "@/lib/atendimento.functions";
+import { DEPARTAMENTOS_HABILITADOS } from "@/lib/atendimento/departamentos-flag";
 import {
   entradaAtendimento,
   deveRegistrarPrimeiraAbertura,
   aplicarAberturaConfirmada,
 } from "@/lib/atendimento/conversa-nova";
-import { BadgeConversaNova } from "@/components/nina/BadgeConversaNova";
+import { InboxConversationCard } from "./InboxConversationCard";
+import { SimulacaoAtendimento } from "./SimulacaoAtendimento";
 import { aplicarReconciliacao, deveRegistrarLeituraVisivel } from "@/lib/atendimento/leitura-inbox";
 
 import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
-import { statusEhRepresentacaoDaNina, tiposDeBadgeDoCard } from "@/lib/atendimento/badge-nina";
+import { statusEhRepresentacaoDaNina } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AvatarContato } from "@/components/nina/AvatarContato";
 import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
@@ -362,15 +364,24 @@ function fmtData(s?: string | null) {
 /* ============================================================
  *  INBOX UNIFICADO — 3 colunas
  * ========================================================== */
-export function AtendInbox({
-  modoCentral = false,
-  conversaIdExterna = null,
-  onSelecionarConversa,
-}: {
+type AtendInboxProps = {
   modoCentral?: boolean;
   conversaIdExterna?: string | null;
   onSelecionarConversa?: (id: string | null) => void;
-} = {}) {
+};
+
+export function AtendInbox(props: AtendInboxProps = {}) {
+  const [simulando, setSimulando] = useState(false);
+  if (simulando) return <SimulacaoAtendimento onEncerrar={() => setSimulando(false)} />;
+  return <AtendInboxOperacional {...props} onSimular={() => setSimulando(true)} />;
+}
+
+function AtendInboxOperacional({
+  modoCentral = false,
+  conversaIdExterna = null,
+  onSelecionarConversa,
+  onSimular,
+}: AtendInboxProps & { onSimular: () => void }) {
   const { prefs: prefsAcessibilidade } = useAcessibilidade();
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
@@ -491,12 +502,19 @@ export function AtendInbox({
   const [menuAtendentesAberto, setMenuAtendentesAberto] = useState(false);
   // Administrador acompanha tudo, mas não atende: só supervisão.
   const [souAdmin, setSouAdmin] = useState(false);
-  // Modo treinamento: só administrador vê o controle; a preferência é lembrada por usuário.
+  const [permissaoTreinamento, setPermissaoTreinamento] = useState<{
+    chave: string;
+    mostrar: boolean;
+    simular: boolean;
+  } | null>(null);
+  const treinamentoAtual =
+    permissaoTreinamento?.chave === `${clinicaId}:${meuId}` ? permissaoTreinamento : null;
+  // Treinamento não concede poderes de administrador.
   const {
     ligado: mostrarTestes,
     carregado: mostrarTestesCarregado,
     alternar: alternarMostrarTestes,
-  } = useMostrarConversasTeste(souAdmin);
+  } = useMostrarConversasTeste(treinamentoAtual?.mostrar === true, meuId);
   const [perfilLeitura, setPerfilLeitura] = useState<{ chave: string; permitida: boolean } | null>(
     null,
   );
@@ -706,6 +724,7 @@ export function AtendInbox({
       userId: meuId,
       gestor: souGestor,
       atendenteId: atendenteSelecionadoId,
+      incluirTeste: mostrarTestes,
     });
     if (souGestor && soCriticas) {
       base = base.filter((c: any) => faixaEsperaDesde(espera[c.id]) === "critico");
@@ -822,6 +841,9 @@ export function AtendInbox({
   }, []);
   const [transferOpen, setTransferOpen] = useState(false);
   const [buscaAgente, setBuscaAgente] = useState("");
+  const [tipoTransferencia, setTipoTransferencia] = useState("atendente");
+  const [transferindo, setTransferindo] = useState(false);
+  const transferindoRef = useRef(false);
   const [fechando, setFechando] = useState(false);
   const fechandoRef = useRef(false);
   // Começa fechada: só entra em "online" depois de ler o status real gravado,
@@ -1120,12 +1142,18 @@ export function AtendInbox({
   useEffect(() => {
     let vivo = true;
     setPerfilLeitura(null);
+    setPermissaoTreinamento(null);
     if (!clinicaId || !meuId) return;
     souGestorFn({ data: { clinicaId } })
       .then((r: any) => {
         if (!vivo) return;
         setSouGestor(!!r?.gestor);
         setSouAdmin(!!r?.admin);
+        setPermissaoTreinamento({
+          chave: `${clinicaId}:${meuId}`,
+          mostrar: r?.podeMostrarTestes === true,
+          simular: r?.podeSimular === true,
+        });
         setPerfilLeitura({
           chave: `${clinicaId}:${meuId}`,
           permitida: r?.leituraOperacional === true,
@@ -1175,6 +1203,7 @@ export function AtendInbox({
     escopo,
     atendenteId: atendenteSelecionadoId,
     visualizacao,
+    incluirTeste: mostrarTestes,
   });
   const chaveAtualRef = useRef(chaveAtual);
   chaveAtualRef.current = chaveAtual;
@@ -1202,6 +1231,7 @@ export function AtendInbox({
         escopo,
         atendenteId: atendenteSelecionadoId,
         visualizacao,
+        incluirTeste: mostrarTestes,
       });
       try {
         const buscarPagina = (apos: CursorInbox | null) =>
@@ -1504,6 +1534,7 @@ export function AtendInbox({
     obterConversaFn,
     abrirConversa,
     modoCentral,
+    mostrarTestes,
   ]);
 
   // Abrir uma conversa a partir da Central de Atenção ou da Revisão de
@@ -2248,8 +2279,16 @@ export function AtendInbox({
     let vale = true;
     (async () => {
       try {
-        const u = await listarUsuariosFn({ data: { clinicaId } });
-        if (vale) setUsuarios(u);
+        const [u, d] = await Promise.all([
+          listarUsuariosFn({ data: { clinicaId } }),
+          DEPARTAMENTOS_HABILITADOS && transferOpen
+            ? listarDeptosFn({ data: { clinicaId } })
+            : Promise.resolve(null),
+        ]);
+        if (vale) {
+          setUsuarios(u);
+          if (d) setDeptos(d);
+        }
       } catch {
         // Mantém a lista anterior se a releitura falhar.
       }
@@ -2257,7 +2296,7 @@ export function AtendInbox({
     return () => {
       vale = false;
     };
-  }, [transferOpen, menuAtendentesAberto, clinicaId, listarUsuariosFn]);
+  }, [transferOpen, menuAtendentesAberto, clinicaId, listarUsuariosFn, listarDeptosFn]);
 
   // Tempo de espera: uma única consulta para toda a lista. O relógio da tela
   // atualiza o texto sozinho; o banco só é consultado quando algo muda
@@ -3214,7 +3253,7 @@ export function AtendInbox({
 
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!podeAtender || !sel || !clinicaId) return;
+    if (!podeAtender || !sel || !clinicaId || transferindoRef.current) return;
     if (
       !acaoPermitida({
         alvo: sel.id,
@@ -3229,8 +3268,14 @@ export function AtendInbox({
     const fd = new FormData(e.currentTarget);
     const userId = String(fd.get("userId") || "");
     const departamentoId = String(fd.get("departamentoId") || "") || undefined;
+    if (DEPARTAMENTOS_HABILITADOS && !userId && !departamentoId) {
+      toast.error("Selecione o destino da transferência.");
+      return;
+    }
     // O formulário foi aberto sobre esta conversa: a transferência é dela.
     const origem = sel.id;
+    transferindoRef.current = true;
+    setTransferindo(true);
     try {
       await transferirFn({
         data: {
@@ -3238,6 +3283,7 @@ export function AtendInbox({
           conversaId: origem,
           paraUserId: userId || null,
           paraDepartamentoId: departamentoId ?? null,
+          responsavelEsperado: sel.atribuida_user_id ?? null,
         },
       });
       cacheConversas.current.invalidar(origem);
@@ -3247,6 +3293,9 @@ export function AtendInbox({
       if (selIdRef.current === origem) await carregarConversa();
     } catch (e: any) {
       mostrarErro(e);
+    } finally {
+      transferindoRef.current = false;
+      setTransferindo(false);
     }
   };
 
@@ -3398,7 +3447,7 @@ export function AtendInbox({
                       recebe novas conversas.
                     </p>
                   )}
-                  {souAdmin && (
+                  {treinamentoAtual?.mostrar && (
                     <label
                       className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
                       data-testid="inbox-mostrar-testes"
@@ -3411,6 +3460,28 @@ export function AtendInbox({
                         aria-label="Mostrar conversas de teste"
                       />
                     </label>
+                  )}
+                  {treinamentoAtual?.simular && !modoCentral && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-auto w-full whitespace-normal text-xs"
+                      onClick={onSimular}
+                    >
+                      Iniciar simulação
+                    </Button>
+                  )}
+                  {treinamentoAtual?.simular && !souAdmin && online && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Para treinar durante o expediente, escolha Em pausa no atendimento antes de
+                      iniciar. O status da simulação é fictício.
+                    </p>
+                  )}
+                  {treinamentoAtual?.mostrar && mostrarTestes && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Mostra testes existentes no seu escopo. Para gerar cards fictícios, use
+                      Iniciar simulação.
+                    </p>
                   )}
                   {controle.erro && !controle.salvando && (
                     <Button
@@ -3616,11 +3687,14 @@ export function AtendInbox({
                       <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>
                     ))}
                   {convsVisiveis.map((c) => (
-                    <button
+                    <InboxConversationCard
                       key={c.id}
-                      data-testid="item-conversa"
-                      data-conversa-id={c.id}
-                      aria-current={sel?.id === c.id ? "true" : undefined}
+                      conversa={c}
+                      selecionada={sel?.id === c.id}
+                      meuId={meuId}
+                      nomeUsuario={nomeUsuario}
+                      esperaDesde={espera[c.id]}
+                      previa={previas[c.id]}
                       onClick={() => {
                         setListaMobile(false);
                         iniciarTroca(c.id, "clique");
@@ -3637,80 +3711,7 @@ export function AtendInbox({
                       onMouseLeave={() => cancelarPrefetch(c.id)}
                       onFocus={() => agendarPrefetch(c.id)}
                       onBlur={() => cancelarPrefetch(c.id)}
-                      className={`oszap-conversation relative w-full border-b border-atd-border py-1.5 pl-3 pr-2 text-left transition-colors hover:bg-atd-blue-hover ${
-                        sel?.id === c.id
-                          ? "bg-atd-blue-soft before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-atd-blue before:content-['']"
-                          : "bg-atd-surface"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="font-semibold text-sm truncate flex-1"
-                          title={tituloConversa(c)}
-                        >
-                          {tituloConversa(c)}
-                        </span>
-                        <BadgeConversaNova conversa={c} />
-                        {Number(c.nao_lidas ?? 0) > 0 && (
-                          <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
-                            {Number(c.nao_lidas ?? 0)}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
-                        {/* Lista canônica e já deduplicada por chave semântica. */}
-                        {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
-                          // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
-                          if (tipo === "status" || tipo === "timeout-nina") return null;
-                          if (tipo === "sem-responsavel")
-                            return (
-                              <Badge
-                                key={tipo}
-                                className="bg-atd-danger text-atd-on-strong text-[11px]"
-                              >
-                                Sem responsável
-                              </Badge>
-                            );
-                          if (tipo === "nina")
-                            return (
-                              <Badge
-                                key={tipo}
-                                className="bg-atd-ai-bg text-atd-ai-ink text-[11px] border border-atd-ai/30"
-                              >
-                                ✦ Nina
-                              </Badge>
-                            );
-                          return (
-                            <Badge
-                              key={tipo}
-                              className="text-[11px] bg-muted text-muted-foreground border border-border"
-                            >
-                              {nomeUsuario(c.atribuida_user_id)}
-                            </Badge>
-                          );
-                        })}
-                        {c.is_teste && (
-                          <Badge
-                            className="bg-atd-warn-bg text-atd-warn-ink text-[11px] font-bold tracking-wide border border-atd-warn"
-                            data-testid="etiqueta-teste"
-                          >
-                            TESTE
-                          </Badge>
-                        )}
-                        <BadgeEspera desde={espera[c.id]} />
-                      </div>
-                      {previas[c.id] && (
-                        <div
-                          className="mt-1 truncate text-xs leading-4 text-muted-foreground"
-                          title={previas[c.id]}
-                        >
-                          {previas[c.id]}
-                        </div>
-                      )}
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">
-                        {fmtData(c.ultima_msg_em)}
-                      </div>
-                    </button>
+                    />
                   ))}
                   {visualizacao === "recentes" && (temMaisConvs || erroPaginaConvs) && (
                     <div className="p-3 text-center text-xs text-muted-foreground">
@@ -4487,98 +4488,137 @@ export function AtendInbox({
             </DialogContent>
           </Dialog>
 
-          <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+          <Dialog
+            open={transferOpen}
+            onOpenChange={(aberto) => {
+              if (!transferindo) setTransferOpen(aberto);
+            }}
+          >
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Transferir conversa</DialogTitle>
               </DialogHeader>
               <form onSubmit={transferir} className="space-y-3">
-                <div>
-                  <Label>Agente</Label>
-                  <Select name="userId">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="p-1 sticky top-0 bg-popover z-10">
-                        <Input
-                          autoFocus
-                          value={buscaAgente}
-                          onChange={(e) => setBuscaAgente(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          placeholder="Digite o nome do agente…"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      {(() => {
-                        const alvo = normalizarNomeBusca(buscaAgente);
-                        const lista = usuarios.filter((u: any) =>
-                          !alvo
-                            ? true
-                            : normalizarNomeBusca(`${u.nome ?? ""} ${u.email ?? ""}`).includes(
-                                alvo,
-                              ),
-                        );
-                        if (lista.length === 0)
-                          return (
-                            <p className="px-3 py-2 text-xs text-muted-foreground">
-                              Nenhum agente encontrado.
-                            </p>
+                {DEPARTAMENTOS_HABILITADOS && (
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo-transferencia">Transferir por</Label>
+                    <select
+                      id="tipo-transferencia"
+                      value={tipoTransferencia}
+                      disabled={transferindo}
+                      onChange={(e) => setTipoTransferencia(e.target.value)}
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="atendente">Atendente</option>
+                      <option value="departamento">Departamento</option>
+                    </select>
+                  </div>
+                )}
+                {(!DEPARTAMENTOS_HABILITADOS || tipoTransferencia === "atendente") && (
+                  <div>
+                    <Label>Agente</Label>
+                    <Select name="userId">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <div className="p-1 sticky top-0 bg-popover z-10">
+                          <Input
+                            autoFocus
+                            value={buscaAgente}
+                            onChange={(e) => setBuscaAgente(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder="Digite o nome do agente…"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        {(() => {
+                          const alvo = normalizarNomeBusca(buscaAgente);
+                          const lista = usuarios.filter((u: any) =>
+                            !alvo
+                              ? true
+                              : normalizarNomeBusca(`${u.nome ?? ""} ${u.email ?? ""}`).includes(
+                                  alvo,
+                                ),
                           );
-                        return lista.map((u: any) => {
-                          const st: PresencaAtendente = u.presenca ?? "OFFLINE";
-                          const cor =
-                            st === "ONLINE"
-                              ? "bg-emerald-500"
-                              : st === "PAUSA" || st === "PAUSA_SAIDA"
-                                ? "bg-amber-500"
-                                : "bg-muted-foreground";
-                          // Quem está em pausa não recebe transferência manual (o servidor também recusa).
-                          const emPausaDestino = estadoBloqueiaTransferencia(st);
-                          return (
-                            <SelectItem
-                              key={u.user_id}
-                              value={u.user_id}
-                              disabled={emPausaDestino}
-                              title={emPausaDestino ? MSG_DESTINO_EM_PAUSA : undefined}
-                            >
-                              <span className="flex items-center gap-2">
-                                <span
-                                  aria-hidden="true"
-                                  className={`h-2 w-2 rounded-full ${cor}`}
-                                />
-                                <span>{u.nome ?? u.email ?? u.user_id}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  — {ROTULO_PRESENCA[st]}
+                          if (lista.length === 0)
+                            return (
+                              <p className="px-3 py-2 text-xs text-muted-foreground">
+                                Nenhum agente encontrado.
+                              </p>
+                            );
+                          return lista.map((u: any) => {
+                            const st: PresencaAtendente = u.presenca ?? "OFFLINE";
+                            const cor =
+                              st === "ONLINE"
+                                ? "bg-emerald-500"
+                                : st === "PAUSA" || st === "PAUSA_SAIDA"
+                                  ? "bg-amber-500"
+                                  : "bg-muted-foreground";
+                            // Quem está em pausa não recebe transferência manual (o servidor também recusa).
+                            const emPausaDestino = estadoBloqueiaTransferencia(st);
+                            return (
+                              <SelectItem
+                                key={u.user_id}
+                                value={u.user_id}
+                                disabled={emPausaDestino}
+                                title={emPausaDestino ? MSG_DESTINO_EM_PAUSA : undefined}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span
+                                    aria-hidden="true"
+                                    className={`h-2 w-2 rounded-full ${cor}`}
+                                  />
+                                  <span>{u.nome ?? u.email ?? u.user_id}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    — {ROTULO_PRESENCA[st]}
+                                  </span>
                                 </span>
-                              </span>
+                              </SelectItem>
+                            );
+                          });
+                        })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {(!DEPARTAMENTOS_HABILITADOS || tipoTransferencia === "departamento") && (
+                  <div>
+                    <Label>Departamento</Label>
+                    <Select name="departamentoId">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o departamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {deptos
+                          .filter((d: any) => !DEPARTAMENTOS_HABILITADOS || d.ativo)
+                          .map((d: any) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.nome}
                             </SelectItem>
-                          );
-                        });
-                      })()}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Departamento</Label>
-                  <Select name="departamentoId">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {deptos.map((d: any) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {DEPARTAMENTOS_HABILITADOS && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Sorteio entre as atendentes online deste departamento. Sem ninguém
+                        disponível, a conversa permanece com você.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setTransferOpen(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={transferindo}
+                    onClick={() => setTransferOpen(false)}
+                  >
                     Cancelar
                   </Button>
-                  <Button type="submit">Transferir</Button>
+                  <Button type="submit" disabled={transferindo}>
+                    {transferindo ? "Transferindo…" : "Transferir"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>

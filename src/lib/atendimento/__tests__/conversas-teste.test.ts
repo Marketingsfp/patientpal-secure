@@ -4,6 +4,7 @@ import {
   incluirTesteEfetivo,
   linhaDeTesteOculta,
   mesclarEsperaTeste,
+  perfilPodeSimularAtendimento,
 } from "../conversas-teste";
 import { classificarEvento } from "../realtime-roteador";
 import { normalizarMensagemRealtime } from "../mensagem-realtime";
@@ -13,11 +14,18 @@ import { podeRevalidarChatEntreFiltros } from "../inbox-cache";
 const ctxTela = { clinicaId: "cl-1", conversaAberta: "A" };
 
 describe("modo treinamento — regras puras", () => {
-  it("só o administrador com o controle ligado inclui teste", () => {
+  it("só o perfil autorizado com o controle ligado inclui teste", () => {
     expect(incluirTesteEfetivo(true, true)).toBe(true);
     expect(incluirTesteEfetivo(true, false)).toBe(false);
     expect(incluirTesteEfetivo(false, true)).toBe(false);
     expect(incluirTesteEfetivo(undefined, true)).toBe(false);
+  });
+
+  it("treinamento aceita Administração, Supervisão e Telefonia, sem aceitar outros perfis", () => {
+    for (const perfil of ["admin", "supervisor", "telefonia"])
+      expect(perfilPodeSimularAtendimento(perfil)).toBe(true);
+    for (const perfil of ["medico", "recepcao", "financeiro", "gestor", "", null, undefined])
+      expect(perfilPodeSimularAtendimento(perfil)).toBe(false);
   });
 
   it("linha de teste fica oculta sem o controle e aparece com ele", () => {

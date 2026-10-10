@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { planejarPrefetch } from "../prefetch-cadastro";
+import { textoDoPedidoLido } from "../leitura-imagem";
 
 const cat = {
   servicos: [
@@ -119,5 +120,37 @@ describe("especialidades no formato do cadastro publicado", () => {
   });
   it("mensagem sem atendimento não pré-busca", () => {
     expect(planejarPrefetch("bom dia, tudo bem?", ["valor"], catObj)).toBeNull();
+  });
+});
+
+describe("foto de pedido não seleciona recurso como profissional (MJ-867)", () => {
+  const catalogo = {
+    servicos: [{ nome: "MAPA 24 HORAS" }, { nome: "Eletrocardiograma" }],
+    profissionais: [{ nome: "MAPA", especialidades: [] }],
+  };
+  it("sigla e duração da foto seguem à identificação normal, sem buscar o profissional MAPA", () => {
+    for (const nome of ["MAPA 24h", "M.A.P.A. 24h", "MAPA"])
+      for (const intencao of ["exame", "agendamento", "valor"] as const)
+        expect(planejarPrefetch(textoDoPedidoLido([nome]), intencao, catalogo)).toBeNull();
+  });
+  it("legenda não transforma um item não identificado em escolha de profissional", () => {
+    expect(
+      planejarPrefetch(textoDoPedidoLido(["MAPA 24h"], "Pedido do Brandão"), "exame", {
+        ...catalogo,
+        profissionais: cat.profissionais,
+      }),
+    ).toBeNull();
+  });
+  it("exame inequívoco ainda usa a pré-busca de serviços", () => {
+    const p = planejarPrefetch(textoDoPedidoLido(["Eletrocardiograma"]), "exame", catalogo);
+    expect(p?.tipo).toBe("servico");
+    expect(p?.chamadas[0]).toEqual({
+      nome: "consultar_cadastro",
+      args: {
+        termo: "Eletrocardiograma",
+        objetivos: ["informacoes_gerais"],
+        tipo_atendimento: "exame_procedimento",
+      },
+    });
   });
 });

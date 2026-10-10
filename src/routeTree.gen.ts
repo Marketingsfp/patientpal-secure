@@ -28,8 +28,10 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as ApiNinaFalaRouteImport } from './routes/api/nina-fala'
 import { Route as ApiNinaVozRouteImport } from './routes/api/nina-voz'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as DevDepartamentosRouteImport } from './routes/dev.departamentos'
 import { Route as DevFranciscoRouteImport } from './routes/dev.francisco'
 import { Route as DevPainelTvRouteImport } from './routes/dev.painel-tv'
+import { Route as DevSimulacaoAtendimentoRouteImport } from './routes/dev.simulacao-atendimento'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
@@ -297,6 +299,11 @@ const CheckinTokenRoute = CheckinTokenRouteImport.update({
   path: '/checkin/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevDepartamentosRoute = DevDepartamentosRouteImport.update({
+  id: '/dev/departamentos',
+  path: '/dev/departamentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevFranciscoRoute = DevFranciscoRouteImport.update({
   id: '/dev/francisco',
   path: '/dev/francisco',
@@ -305,6 +312,11 @@ const DevFranciscoRoute = DevFranciscoRouteImport.update({
 const DevPainelTvRoute = DevPainelTvRouteImport.update({
   id: '/dev/painel-tv',
   path: '/dev/painel-tv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevSimulacaoAtendimentoRoute = DevSimulacaoAtendimentoRouteImport.update({
+  id: '/dev/simulacao-atendimento',
+  path: '/dev/simulacao-atendimento',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LpSlugRoute = LpSlugRouteImport.update({
@@ -1302,8 +1314,10 @@ export interface FileRoutesByFullPath {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/departamentos': typeof DevDepartamentosRoute
   '/dev/francisco': typeof DevFranciscoRoute
   '/dev/painel-tv': typeof DevPainelTvRoute
+  '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1493,8 +1507,10 @@ export interface FileRoutesByTo {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/departamentos': typeof DevDepartamentosRoute
   '/dev/francisco': typeof DevFranciscoRoute
   '/dev/painel-tv': typeof DevPainelTvRoute
+  '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1684,8 +1700,10 @@ export interface FileRoutesById {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/departamentos': typeof DevDepartamentosRoute
   '/dev/francisco': typeof DevFranciscoRoute
   '/dev/painel-tv': typeof DevPainelTvRoute
+  '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
@@ -1878,8 +1896,10 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/departamentos'
     | '/dev/francisco'
     | '/dev/painel-tv'
+    | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2069,8 +2089,10 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/departamentos'
     | '/dev/francisco'
     | '/dev/painel-tv'
+    | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2259,8 +2281,10 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/departamentos'
     | '/dev/francisco'
     | '/dev/painel-tv'
+    | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
@@ -2452,8 +2476,10 @@ export interface RootRouteChildren {
   ApiNinaFalaRoute: typeof ApiNinaFalaRoute
   ApiNinaVozRoute: typeof ApiNinaVozRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
+  DevDepartamentosRoute: typeof DevDepartamentosRoute
   DevFranciscoRoute: typeof DevFranciscoRoute
   DevPainelTvRoute: typeof DevPainelTvRoute
+  DevSimulacaoAtendimentoRoute: typeof DevSimulacaoAtendimentoRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
@@ -2621,6 +2647,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckinTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/departamentos': {
+      id: '/dev/departamentos'
+      path: '/dev/departamentos'
+      fullPath: '/dev/departamentos'
+      preLoaderRoute: typeof DevDepartamentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/francisco': {
       id: '/dev/francisco'
       path: '/dev/francisco'
@@ -2633,6 +2666,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/painel-tv'
       fullPath: '/dev/painel-tv'
       preLoaderRoute: typeof DevPainelTvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/simulacao-atendimento': {
+      id: '/dev/simulacao-atendimento'
+      path: '/dev/simulacao-atendimento'
+      fullPath: '/dev/simulacao-atendimento'
+      preLoaderRoute: typeof DevSimulacaoAtendimentoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lp/$slug': {
@@ -4286,8 +4326,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNinaFalaRoute: ApiNinaFalaRoute,
   ApiNinaVozRoute: ApiNinaVozRoute,
   CheckinTokenRoute: CheckinTokenRoute,
+  DevDepartamentosRoute: DevDepartamentosRoute,
   DevFranciscoRoute: DevFranciscoRoute,
   DevPainelTvRoute: DevPainelTvRoute,
+  DevSimulacaoAtendimentoRoute: DevSimulacaoAtendimentoRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,

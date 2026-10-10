@@ -17,6 +17,7 @@ describe("causa interna de transferência", () => {
     ["JEV_IRRITACAO", "irritação"],
     ["JEV_DUVIDA_REPETIDA", "dificuldade persistente"],
     ["FOTO_NAO_LIDA_APOS_NOVA_TENTATIVA", "nova foto"],
+    ["FOTO_FALHA_TECNICA_PERSISTENTE", "Falha técnica no processamento da foto"],
     ["FOTO_REQUER_AVALIACAO_HUMANA", "avaliação humana"],
     ["VAGA_ESCOLHIDA_INDISPONIVEL", "reserva da vaga"],
     ["NINA_PROCESSING_FAILED", "falhou definitivamente"],

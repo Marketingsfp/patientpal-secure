@@ -57,7 +57,7 @@ export function motivoParaAtendimento(valor: unknown): string | null {
     ],
     [
       /\bHORARIOS_HABITUAIS_NAO_INFORMADOS\b/i,
-      "Faltam dias e horários habituais cadastrados para o profissional. A equipe precisa confirmar esses horários para continuar o atendimento.",
+      "Faltam dias e horários habituais cadastrados para o atendimento identificado. A equipe precisa confirmar esses horários para continuar o atendimento.",
     ],
     [
       /^(?:\[[^\]]+\]\s*)?(?:CATALOGO_ATENDIMENTO_HUMANO\s*\/\s*)?PROFISSIONAL[_\s]+(?:[EÉ]\s+)?SFP\b/i,
@@ -85,7 +85,11 @@ export function motivoParaAtendimento(valor: unknown): string | null {
     ],
     [
       /\bFOTO_NAO_LIDA_APOS_NOVA_TENTATIVA\b/i,
-      "A Nina não conseguiu ler a nova foto enviada após pedir outra imagem. A equipe precisa conferir o documento.",
+      "Foto não identificada: a Nina não conseguiu identificar com segurança o pedido na nova foto enviada após solicitar uma imagem mais nítida. A equipe precisa conferir o documento anexado à conversa.",
+    ],
+    [
+      /\bFOTO_FALHA_TECNICA_PERSISTENTE\b/i,
+      "Falha técnica no processamento da foto: o sistema não conseguiu processar a imagem após o reenvio ou o pedido excedeu o limite de itens. A legibilidade não foi confirmada; a equipe precisa conferir o anexo.",
     ],
     [
       /\bFOTO_REQUER_AVALIACAO_HUMANA\b/i,
