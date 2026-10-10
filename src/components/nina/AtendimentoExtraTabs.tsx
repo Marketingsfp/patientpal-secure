@@ -203,7 +203,7 @@ import {
   deveRegistrarPrimeiraAbertura,
   aplicarAberturaConfirmada,
 } from "@/lib/atendimento/conversa-nova";
-import { InboxConversationCard } from "./InboxConversationCard";
+import { InboxConversationCard, type AutorPreviaConversa } from "./InboxConversationCard";
 import { SimulacaoAtendimento } from "./SimulacaoAtendimento";
 import { aplicarReconciliacao, deveRegistrarLeituraVisivel } from "@/lib/atendimento/leitura-inbox";
 
@@ -743,7 +743,9 @@ function AtendInboxOperacional({
 
   // Prévia do card: última mensagem trocada com o paciente (recebida ou
   // enviada). Avisos internos do sistema (status "system") ficam de fora.
-  const [previas, setPrevias] = useState<Record<string, string>>({});
+  const [previas, setPrevias] = useState<
+    Record<string, { texto: string; autor: AutorPreviaConversa }>
+  >({});
   const chavePrevias = convsVisiveis
     .slice(0, 200)
     .map((c) => `${c.id}:${c.ultima_msg_em ?? ""}`)
@@ -756,29 +758,34 @@ function AtendInboxOperacional({
       const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
       const { data } = await supabase
         .from("whatsapp_mensagens")
-        .select("conversa_id, body, tipo, created_at")
+        .select("conversa_id, body, tipo, direction, enviada_por, created_at")
         .in("conversa_id", ids)
         .neq("status", "system")
         .gte("created_at", desde)
         .order("created_at", { ascending: false })
         .limit(3000);
       if (!vale || !data) return;
-      const novo: Record<string, string> = {};
+      const novo: Record<string, { texto: string; autor: AutorPreviaConversa }> = {};
       for (const m of data as Array<{
         conversa_id: string | null;
         body: string | null;
         tipo: string | null;
+        direction: string | null;
+        enviada_por: string | null;
       }>) {
         const id = String(m.conversa_id ?? "");
         if (!id || id in novo) continue;
         const texto = (m.body ?? "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
-        novo[id] =
-          texto ||
-          (m.tipo === "image"
-            ? "📷 Imagem"
-            : m.tipo === "audio"
-              ? "🎤 Áudio"
-              : `[${m.tipo ?? "mensagem"}]`);
+        novo[id] = {
+          texto:
+            texto ||
+            (m.tipo === "image"
+              ? "📷 Imagem"
+              : m.tipo === "audio"
+                ? "🎤 Áudio"
+                : `[${m.tipo ?? "mensagem"}]`),
+          autor: m.direction === "in" ? "paciente" : m.enviada_por === "nina" ? "nina" : "equipe",
+        };
       }
       setPrevias((prev) => ({ ...prev, ...novo }));
     }, 400);
@@ -3699,7 +3706,8 @@ function AtendInboxOperacional({
                       meuId={meuId}
                       nomeUsuario={nomeUsuario}
                       esperaDesde={espera[c.id]}
-                      previa={previas[c.id]}
+                      previa={previas[c.id]?.texto}
+                      autorPrevia={previas[c.id]?.autor}
                       onClick={() => {
                         setListaMobile(false);
                         iniciarTroca(c.id, "clique");

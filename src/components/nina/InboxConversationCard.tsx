@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import { ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BadgeConversaNova } from "./BadgeConversaNova";
 import { BadgeEspera } from "./BadgeEspera";
@@ -13,6 +14,29 @@ export type ConversaCardData = ConversaComNome &
     handoff_motivo?: string | null;
   };
 
+export type AutorPreviaConversa = "paciente" | "equipe" | "nina";
+
+const INDICADOR_PREVIA = {
+  paciente: {
+    Icone: ArrowDownLeft,
+    classe: "text-amber-400",
+    descricao: "Mensagem recebida do paciente",
+  },
+  equipe: {
+    Icone: ArrowUpRight,
+    classe: "text-cyan-400",
+    descricao: "Mensagem enviada",
+  },
+  nina: {
+    Icone: Sparkles,
+    classe: "text-violet-400",
+    descricao: "Mensagem enviada pela Nina",
+  },
+} satisfies Record<
+  AutorPreviaConversa,
+  { Icone: typeof ArrowUpRight; classe: string; descricao: string }
+>;
+
 /** Mesmo card na Inbox operacional e na simulação local. */
 export function InboxConversationCard({
   conversa: c,
@@ -21,6 +45,7 @@ export function InboxConversationCard({
   nomeUsuario,
   esperaDesde,
   previa,
+  autorPrevia,
   simulada = false,
   ...eventos
 }: {
@@ -30,12 +55,15 @@ export function InboxConversationCard({
   nomeUsuario: (id: string | null | undefined) => string;
   esperaDesde?: string | null;
   previa?: string;
+  autorPrevia?: AutorPreviaConversa;
   simulada?: boolean;
 } & Pick<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "onClick" | "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
 >) {
   const fmtData = (s?: string | null) => (s ? new Date(s).toLocaleString("pt-BR") : "—");
+  const indicadorPrevia = autorPrevia ? INDICADOR_PREVIA[autorPrevia] : null;
+  const IconePrevia = indicadorPrevia?.Icone;
   return (
     <button
       type="button"
@@ -100,8 +128,20 @@ export function InboxConversationCard({
         <BadgeEspera desde={esperaDesde} />
       </div>
       {previa && (
-        <div className="mt-1 truncate text-xs leading-4 text-muted-foreground" title={previa}>
-          {previa}
+        <div
+          className="mt-1 flex min-w-0 items-center gap-1 text-xs leading-4 text-muted-foreground"
+          title={indicadorPrevia ? `${indicadorPrevia.descricao}: ${previa}` : previa}
+        >
+          {IconePrevia && indicadorPrevia && (
+            <>
+              <IconePrevia
+                className={`h-3.5 w-3.5 shrink-0 ${indicadorPrevia.classe}`}
+                aria-hidden="true"
+              />
+              <span className="sr-only">{indicadorPrevia.descricao}: </span>
+            </>
+          )}
+          <span className="truncate">{previa}</span>
         </div>
       )}
       <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtData(c.ultima_msg_em)}</div>

@@ -234,6 +234,7 @@ export function SimulacaoAtendimento({
                       nomeUsuario={() => "Você"}
                       esperaDesde={c.esperaDesde}
                       previa={c.mensagens.at(-1)?.body}
+                      autorPrevia={c.mensagens.at(-1)?.direction === "in" ? "paciente" : "equipe"}
                       onClick={() => {
                         setSelecionada(c.id);
                         setListaMobile(false);
