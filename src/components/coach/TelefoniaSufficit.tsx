@@ -81,7 +81,6 @@ export function TelefoniaSufficit({
     lerEstado({ data: { clinicaId, chave: "sufficit_api_token" } })
       .then(setEstadoToken)
       .catch((e) => setErroToken((e as Error)?.message || "Falha ao ler o estado do token."));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaId, lerEstado]);
 
   async function onSalvarToken() {
