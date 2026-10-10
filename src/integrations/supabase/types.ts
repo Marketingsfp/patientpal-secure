@@ -2299,6 +2299,75 @@ export type Database = {
           },
         ]
       }
+      backup_nina_cat_servicos_20261010_pedido: {
+        Row: {
+          clinica_id: string | null
+          created_at: string | null
+          criado_por: string | null
+          descricao_publica: string | null
+          estrutura: Json | null
+          executantes: Json | null
+          formas_pagamento: Json | null
+          id: string | null
+          nome: string | null
+          nota_interna: string | null
+          preparo: string | null
+          procedimento_id: string | null
+          publicado_em: string | null
+          publicado_por: string | null
+          rascunho: Json | null
+          restricoes: string | null
+          status: string | null
+          updated_at: string | null
+          valor: number | null
+          valor_observacao: string | null
+        }
+        Insert: {
+          clinica_id?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          descricao_publica?: string | null
+          estrutura?: Json | null
+          executantes?: Json | null
+          formas_pagamento?: Json | null
+          id?: string | null
+          nome?: string | null
+          nota_interna?: string | null
+          preparo?: string | null
+          procedimento_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          rascunho?: Json | null
+          restricoes?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor?: number | null
+          valor_observacao?: string | null
+        }
+        Update: {
+          clinica_id?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          descricao_publica?: string | null
+          estrutura?: Json | null
+          executantes?: Json | null
+          formas_pagamento?: Json | null
+          id?: string | null
+          nome?: string | null
+          nota_interna?: string | null
+          preparo?: string | null
+          procedimento_id?: string | null
+          publicado_em?: string | null
+          publicado_por?: string | null
+          rascunho?: Json | null
+          restricoes?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor?: number | null
+          valor_observacao?: string | null
+        }
+        Relationships: []
+      }
       boletos: {
         Row: {
           banco: string | null
@@ -16130,20 +16199,6 @@ export type Database = {
           _departamento_id?: string
           _origem?: string
         }
-        Returns: string
-      }
-      atend_departamentos_habilitados: { Args: Record<PropertyKey, never>; Returns: boolean }
-      atend_listar_departamentos: { Args: { _clinica_id: string; _ip_origem?: string }; Returns: Json }
-      atend_salvar_departamento: {
-        Args: { _clinica_id: string; _nome: string; _id?: string | null; _ip_origem?: string }
-        Returns: string
-      }
-      atend_vincular_departamento: {
-        Args: { _clinica_id: string; _user_id: string; _departamento_id?: string | null; _ip_origem?: string }
-        Returns: undefined
-      }
-      atend_transferir_departamento: {
-        Args: { _clinica_id: string; _conversa_id: string; _departamento_id: string; _responsavel_esperado: string | null; _motivo?: string; _ip_origem?: string }
         Returns: string
       }
       atend_auto_assign_conversa_interno: {
