@@ -767,30 +767,61 @@ export type Database = {
       }
       atend_avaliacoes: {
         Row: {
+          atendente_user_id: string | null
           clinica_id: string
           comentario: string | null
           conversa_id: string
           created_at: string
+          falha_envio: string | null
           id: string
-          nota: number
+          nota: number | null
+          respondida_em: string | null
+          resposta_wa_message_id: string | null
+          solicitacao_wa_message_id: string | null
+          solicitada_em: string
+          solicitada_por_user_id: string | null
+          status: string
         }
         Insert: {
+          atendente_user_id?: string | null
           clinica_id: string
           comentario?: string | null
           conversa_id: string
           created_at?: string
+          falha_envio?: string | null
           id?: string
-          nota: number
+          nota?: number | null
+          respondida_em?: string | null
+          resposta_wa_message_id?: string | null
+          solicitacao_wa_message_id?: string | null
+          solicitada_em?: string
+          solicitada_por_user_id?: string | null
+          status?: string
         }
         Update: {
+          atendente_user_id?: string | null
           clinica_id?: string
           comentario?: string | null
           conversa_id?: string
           created_at?: string
+          falha_envio?: string | null
           id?: string
-          nota?: number
+          nota?: number | null
+          respondida_em?: string | null
+          resposta_wa_message_id?: string | null
+          solicitacao_wa_message_id?: string | null
+          solicitada_em?: string
+          solicitada_por_user_id?: string | null
+          status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "atend_avaliacoes_atendente_user_id_fkey"
+            columns: ["atendente_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "atend_avaliacoes_clinica_id_fkey"
             columns: ["clinica_id"]
@@ -803,6 +834,13 @@ export type Database = {
             columns: ["conversa_id"]
             isOneToOne: false
             referencedRelation: "atend_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_avaliacoes_solicitada_por_user_id_fkey"
+            columns: ["solicitada_por_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
