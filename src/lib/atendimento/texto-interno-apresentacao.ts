@@ -1,4 +1,6 @@
 /** Apresentação para a equipe. Nunca altera o registro original de diagnóstico. */
+import { CAUSA_SFP_OUTRA_UNIDADE, motivoIndicaSfp } from "./motivo-sfp";
+
 export function contemRegistroTecnico(texto: string): boolean {
   const semEmails = texto.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "");
   return (
@@ -34,6 +36,10 @@ export const MOTIVO_TRANSFERENCIA_AUSENTE = "Motivo não registrado neste atendi
 
 export function motivoParaAtendimento(valor: unknown): string | null {
   if (typeof valor !== "string" || !valor.trim()) return null;
+  if (motivoIndicaSfp(valor)) {
+    const contexto = valor.replace(CAUSA_SFP_OUTRA_UNIDADE, "").replace(/:\s*Detalhe:\s*/i, ": ");
+    return `Regra SFP: ${CAUSA_SFP_OUTRA_UNIDADE}${complementoMotivo(contexto)}`;
+  }
   const motivos: Array<[RegExp, string]> = [
     [
       /\bMULTIPLOS_ATENDIMENTOS\b/i,
@@ -58,10 +64,6 @@ export function motivoParaAtendimento(valor: unknown): string | null {
     [
       /\bHORARIOS_HABITUAIS_NAO_INFORMADOS\b/i,
       "Faltam dias e horários habituais cadastrados para o atendimento identificado. A equipe precisa confirmar esses horários para continuar o atendimento.",
-    ],
-    [
-      /^(?:\[[^\]]+\]\s*)?(?:CATALOGO_ATENDIMENTO_HUMANO\s*\/\s*)?PROFISSIONAL[_\s]+(?:[EÉ]\s+)?SFP\b/i,
-      "Regra SFP: atendimento encaminhado para a equipe humana por estar vinculado ao profissional SFP.",
     ],
     [
       /\bCATALOGO_ATENDIMENTO_HUMANO\b/i,

@@ -32,6 +32,6 @@ Foto recebida não significa pedido clinicamente válido. A prova vem da mensage
 
 Regressões automatizadas verificam o bloqueio das quatro ferramentas de consulta, liberação após foto do mesmo exame, modalidades, ambientes, isolamento de sessão/conversa, pedido já solicitado e retomada de escolha/reserva. As execuções usam serviços e mensagens simulados, sem pacientes, consultas ou reservas reais. Os testes do núcleo comprovam a entrega da nova instrução ao modelo nos dois ambientes.
 
-O comportamento conversacional do Gemini com uma foto real deve ser conferido na homologação após implantação; modelos são simulados nos testes automatizados. Push para `main` não comprova implantação.
+A prévia visual foi aprovada pelo usuário em 10/10/2026. O comportamento conversacional do Gemini com uma foto real ainda deve ser conferido na homologação após implantação; modelos são simulados nos testes automatizados. Push para `main` não comprova implantação nem ativa a chave global de produção.
 
 A prévia local isolada em `output/nina-pedido-medico-previa.html` executa o avaliador real com dados fictícios no navegador. Playwright conferiu ausência de foto, recebimento correto, outro exame, sessão anterior, foto ilegível, duas modalidades com reserva, comparecimento sem reserva, dispensa e controle desligado. Não houve requisições externas, leitura de vagas ou gravações reais. Os artefatos de prévia e os relatórios locais ficam em `output/`, ignorado pelo Git.

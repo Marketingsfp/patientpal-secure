@@ -46,6 +46,7 @@ describe("Políticas no prompt, execução compartilhada (modelo/banco simulados
         ) {
           expect(r.encaminhamentos).toHaveLength(1);
           expect(r.encaminhamentos[0].motivo).toContain("PROFISSIONAL_SFP");
+          expect(r.encaminhamentos[0].motivo).toContain("realizado em outra unidade (SFP)");
           expect(r.encaminhamentos[0].motivo.toLowerCase()).toContain("eletrocardiograma");
         } else if (cenario.includes("handoff_modelo")) {
           expect(r.encaminhamentos).toHaveLength(1);

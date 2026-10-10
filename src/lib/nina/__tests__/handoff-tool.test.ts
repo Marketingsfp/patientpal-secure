@@ -54,3 +54,22 @@ it("ausência de motivo não inventa um pedido do paciente", async () => {
     });
   }
 });
+
+it("motivo SFP gravado explica a outra unidade sem mudar a opção de aviso", async () => {
+  retorno = { ok: true };
+  await executarHandoffTool(
+    contexto,
+    JSON.stringify({
+      motivo: "PROFISSIONAL_SFP: Consulta do Dr. Alexandre exige atendimento humano",
+      resumo: "Paciente deseja informações da consulta",
+      avisar_paciente: false,
+    }),
+  );
+  const enviado = encaminhar.mock.calls.at(-1)?.[0] as { motivo: string };
+  expect(enviado.motivo).toContain("realizado em outra unidade (SFP)");
+  expect(enviado.motivo).toContain("Alexandre");
+  expect(enviado).toMatchObject({
+    resumo: "Paciente deseja informações da consulta",
+    avisarPaciente: false,
+  });
+});

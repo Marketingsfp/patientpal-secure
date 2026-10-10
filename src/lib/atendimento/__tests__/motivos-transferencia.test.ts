@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { motivoParaAtendimento } from "../texto-interno-apresentacao";
 import { textoMarcadorSistema } from "../marcador-handoff";
+import { explicitarMotivoSfp } from "../motivo-sfp";
 import {
   evidenciaRegraHumano,
   motivoRegraHumano,
@@ -9,7 +10,7 @@ import {
 
 describe("causa interna de transferência", () => {
   for (const [codigo, explicacao] of [
-    ["PROFISSIONAL_SFP", "Regra SFP"],
+    ["PROFISSIONAL_SFP", "outra unidade"],
     ["MULTIPLOS_ATENDIMENTOS", "dois ou mais atendimentos"],
     ["CATALOGO_ATENDIMENTO_HUMANO", "cadastro consultado exige"],
     ["JEV_URGENCIA_CLINICA", "possível urgência"],
@@ -77,6 +78,9 @@ describe("causa interna de transferência", () => {
     expect(motivoRegraHumano(evidenciaRegraHumano({ records }, ["sfp"]))).toContain(
       "PROFISSIONAL_SFP",
     );
+    expect(motivoRegraHumano(evidenciaRegraHumano({ records }, ["sfp"]))).toContain(
+      "realizado em outra unidade",
+    );
     expect(motivoRegraHumano(evidenciaRegraHumano({ records }, ["ana"]))).not.toContain("SFP");
     expect(motivoRegraHumano(evidenciaRegraHumano({ records }))).not.toContain("SFP");
     expect(motivoRegraHumano([{ nome: "Exame", profissional: "SFP, Ana" }])).not.toContain("SFP");
@@ -90,10 +94,46 @@ describe("causa interna de transferência", () => {
       "🧾 Handoff realizado pela Nina",
     ]) {
       expect(textoMarcadorSistema(prefixo + " · Motivo: PROFISSIONAL_SFP: ECG")).toContain(
-        "Regra SFP",
+        "outra unidade",
       );
     }
   });
+});
+
+for (const motivo of [
+  "PROFISSIONAL_SFP: Consulta — Cardiologia",
+  "[Outra unidade] CATALOGO_ATENDIMENTO_HUMANO / PROFISSIONAL_SFP: Dr. Alexandre",
+  "CATALOGO_ATENDIMENTO_HUMANO: Consulta do Dr. Alexandre com profissional SFP",
+  "Consulta do Dr. Alexandre (SFP) exige atendimento humano",
+  "Profissional é SFP: Consulta — Cardiologia",
+])
+  it(`SFP explica outra unidade em vez de motivo genérico: ${motivo}`, () => {
+    const exibido = motivoParaAtendimento(motivo)!;
+    expect(exibido).toContain("realizado em outra unidade (SFP)");
+    expect(exibido).not.toStartWith("O cadastro consultado exige atendimento humano");
+    const novo = explicitarMotivoSfp(motivo);
+    expect(novo).toContain("realizado em outra unidade (SFP)");
+    expect(novo).toContain(motivo.includes("Alexandre") ? "Alexandre" : "Cardiologia");
+    expect(explicitarMotivoSfp(novo)).toBe(novo);
+    expect(motivoParaAtendimento(novo)?.match(/realizado em outra unidade/g)).toHaveLength(1);
+  });
+
+it("menção incidental a SFP não substitui uma causa específica nem cria equivalência com SPF", () => {
+  for (const motivo of [
+    "JEV_URGENCIA_CLINICA: paciente buscava profissional SFP",
+    "CANCELAMENTO_SOLICITADO: consulta com profissional SFP",
+    "AGENDA_SEM_VAGAS: busca incluía SFP",
+    "CATALOGO_ATENDIMENTO_HUMANO: profissional SPF",
+    "CATALOGO_ATENDIMENTO_HUMANO: profissional Ana",
+  ]) {
+    expect(explicitarMotivoSfp(motivo)).toBe(motivo);
+    expect(motivoParaAtendimento(motivo)).not.toContain("realizado em outra unidade");
+  }
+});
+
+it("causa SFP permanece no começo quando o detalhe é extenso", () => {
+  const novo = explicitarMotivoSfp("PROFISSIONAL_SFP: " + "Detalhes da consulta. ".repeat(50));
+  expect(novo.slice(0, 500)).toContain("realizado em outra unidade");
 });
 
 it("motivo livre do SFP conserva o procedimento e não sobrepõe outra causa", () => {

@@ -1,3 +1,5 @@
+import { CAUSA_SFP_OUTRA_UNIDADE } from "@/lib/atendimento/motivo-sfp";
+
 /** Só normaliza critérios de idade explícitos, não datas, preços ou periodicidade. */
 export function apresentarIdadeMinima(texto: string | null): string | null {
   if (!texto) return texto;
@@ -61,8 +63,10 @@ export function motivoRegraHumano(
     "CATALOGO_ATENDIMENTO_HUMANO" +
     (sfp ? " / PROFISSIONAL_SFP" : "") +
     ": " +
-    (nomes.length ? nomes.join("; ") + ". " : "") +
-    "Encaminhamento humano obrigatório no cadastro consultado."
+    (sfp
+      ? CAUSA_SFP_OUTRA_UNIDADE + (nomes.length ? ` Atendimento: ${nomes.join("; ")}.` : "")
+      : (nomes.length ? nomes.join("; ") + ". " : "") +
+        "Encaminhamento humano obrigatório no cadastro consultado.")
   ).slice(0, 500);
 }
 

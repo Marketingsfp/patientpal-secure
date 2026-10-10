@@ -6,6 +6,7 @@
  * server-side e escopada por clínica.
  */
 import { encaminharParaHumano } from "@/lib/atendimento/handoff.server";
+import { explicitarMotivoSfp } from "@/lib/atendimento/motivo-sfp";
 
 export const NOME_FERRAMENTA_HANDOFF = "solicitar_atendente_humano";
 
@@ -26,7 +27,7 @@ export const FERRAMENTA_HANDOFF = {
         motivo: {
           type: "string",
           description:
-            "Informe a causa concreta da transferência e o atendimento ou profissional envolvido. Se decorrer da regra SFP das instruções publicadas, identifique com PROFISSIONAL_SFP e descreva o item. Não atribua o pedido ao paciente se ele não pediu atendente.",
+            "Informe a causa concreta da transferência e o atendimento ou profissional envolvido. Se decorrer da regra SFP das instruções publicadas, identifique com PROFISSIONAL_SFP e diga claramente que a consulta ou o procedimento é realizado em outra unidade. Descreva o item; não invente o nome da unidade e não use apenas 'exige atendimento humano'. Não atribua o pedido ao paciente se ele não pediu atendente.",
         },
         resumo: {
           type: "string",
@@ -67,10 +68,10 @@ export async function executarHandoffTool(
   } catch {
     args = {};
   }
-  const motivoMaria = (
+  const motivoMaria = explicitarMotivoSfp(
     typeof args.motivo === "string" && args.motivo.trim()
       ? args.motivo.trim()
-      : "MOTIVO_NAO_INFORMADO: Nina solicitou transferência sem detalhar a causa"
+      : "MOTIVO_NAO_INFORMADO: Nina solicitou transferência sem detalhar a causa",
   ).slice(0, 500);
   const resumo = args.resumo ? String(args.resumo).slice(0, 2000) : null;
   // Jev Fase 8: categoria fixa como prefixo "[Rótulo]"; sem decisão = motivo da Maria.

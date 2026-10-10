@@ -2469,7 +2469,9 @@ async function gerarRespostaNinaInterno(
         return;
       }
     }
-    const argumentos = ausencia ?? {
+    const { explicitarMotivoSfp, motivoIndicaSfp, CAUSA_SFP_OUTRA_UNIDADE } =
+      await import("@/lib/atendimento/motivo-sfp");
+    const argumentosOriginais = ausencia ?? {
       motivo:
         typeof motivoRegistrado === "string" && motivoRegistrado.trim()
           ? motivoRegistrado
@@ -2477,6 +2479,13 @@ async function gerarRespostaNinaInterno(
       resumo:
         "O cadastro exige atendimento humano para este item. A equipe deve continuar o atendimento.",
       urgencia: "normal",
+    };
+    const argumentos = {
+      ...argumentosOriginais,
+      motivo: explicitarMotivoSfp(argumentosOriginais.motivo),
+      ...(!ausencia && motivoIndicaSfp(argumentosOriginais.motivo)
+        ? { resumo: `${CAUSA_SFP_OUTRA_UNIDADE} A equipe deve continuar o atendimento.` }
+        : {}),
     };
     const origem =
       ausencia &&
