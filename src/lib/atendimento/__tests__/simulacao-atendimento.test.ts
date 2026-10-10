@@ -90,6 +90,9 @@ describe("simulação isolada da Inbox", () => {
   it("conclui o ciclo com no máximo 24 cards; reinício cria estado vazio", () => {
     const e = avancarSimulacao(criarSimulacao(100), 100000, INICIO + 100000);
     expect(e.conversas).toHaveLength(24);
+    const nomes = e.conversas.map((c) => c.contato_nome?.split(" · ")[0]);
+    expect(new Set(nomes).size).toBe(24);
+    expect(nomes.every((nome) => nome && !/\d/.test(nome))).toBe(true);
     expect(e.executando).toBe(false);
     expect(e.chegadas).toHaveLength(0);
     expect(criarSimulacao().conversas).toEqual([]);

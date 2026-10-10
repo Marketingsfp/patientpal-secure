@@ -32,33 +32,39 @@ export type Simulacao = {
   decorridoMs: number;
   presenca: "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE";
 };
+const NOMES_FICTICIOS = [
+  "Ana Martins",
+  "Bruno Lima",
+  "Carla Souza",
+  "Daniel Alves",
+  "Elisa Santos",
+  "Felipe Costa",
+  "Gabriela Rocha",
+  "Henrique Oliveira",
+  "Isabel Pereira",
+  "João Ferreira",
+  "Karina Ribeiro",
+  "Lucas Carvalho",
+  "Mariana Barbosa",
+  "Nicolas Almeida",
+  "Olívia Teixeira",
+  "Paulo Moreira",
+  "Renata Nascimento",
+  "Samuel Azevedo",
+  "Tatiana Mendes",
+  "Ulisses Cardoso",
+  "Vanessa Castro",
+  "William Batista",
+  "Yasmin Duarte",
+  "Zeca Monteiro",
+];
 const CENARIOS = [
-  [
-    "Ana Martins",
-    "Olá, gostaria de informações sobre uma consulta.",
-    "Vocês têm horário pela manhã?",
-  ],
-  [
-    "Bruno Lima",
-    "Bom dia! Preciso saber o preparo de um exame.",
-    "Posso tomar água antes do exame?",
-  ],
-  [
-    "Carla Souza",
-    "Olá! Quero confirmar o horário do meu atendimento.",
-    "Preciso chegar com antecedência?",
-  ],
-  ["Daniel Alves", "Gostaria de falar com o laboratório.", "Quais documentos devo levar?"],
-  [
-    "Elisa Santos",
-    "Boa tarde! Tenho uma dúvida sobre tomografia.",
-    "Como recebo as orientações de preparo?",
-  ],
-  [
-    "Felipe Costa",
-    "Olá, gostaria de informações sobre ressonância.",
-    "Posso falar com a equipe responsável?",
-  ],
+  ["Olá, gostaria de informações sobre uma consulta.", "Vocês têm horário pela manhã?"],
+  ["Bom dia! Preciso saber o preparo de um exame.", "Posso tomar água antes do exame?"],
+  ["Olá! Quero confirmar o horário do meu atendimento.", "Preciso chegar com antecedência?"],
+  ["Gostaria de falar com o laboratório.", "Quais documentos devo levar?"],
+  ["Boa tarde! Tenho uma dúvida sobre tomografia.", "Como recebo as orientações de preparo?"],
+  ["Olá, gostaria de informações sobre ressonância.", "Posso falar com a equipe responsável?"],
 ];
 
 /** Somente memória. Nenhum identificador ou telefone de paciente real. */
@@ -66,14 +72,15 @@ export function criarSimulacao(quantidade = 6, intervaloMs = 3000): Simulacao {
   const total = Math.max(1, Math.min(24, Math.trunc(quantidade)));
   const intervalo = Math.max(1000, Math.min(10000, intervaloMs));
   const chegadas = Array.from({ length: total }, (_, i) => {
-    const [nome, texto, retorno] = CENARIOS[i % CENARIOS.length];
+    const nome = `${NOMES_FICTICIOS[i]} · fictício`;
+    const [texto, retorno] = CENARIOS[i % CENARIOS.length];
     const conversaId = `simulada-${i + 1}`;
     return [
       {
         id: i * 2,
         emMs: i * intervalo,
         conversaId,
-        nome: `${nome} · fictício ${i + 1}`,
+        nome,
         texto,
         nova: true,
       },

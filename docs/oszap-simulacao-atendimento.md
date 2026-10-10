@@ -21,6 +21,7 @@ portanto liberar somente o controle não faria esses cards chegarem à fila pess
 - Reutiliza `InboxConversationCard`, `FiltrosAtendente`, `useHoverTolerante`, o seletor de presença,
   a indicação de espera e a ordenação por entrada da Inbox.
 - Gera de 6 a 24 cards, em intervalos configuráveis de 1, 3 ou 5 segundos.
+  Cada card tem um nome fictício distinto, sem reutilizar nomes com números.
   Cada contato envia uma mensagem inicial e uma segunda mensagem programada.
 - Abrir tira o selo Novo e as não lidas. Responder tira de Pendentes; nova
   mensagem do paciente volta a Pendentes. Resolver coloca em Fechadas.
