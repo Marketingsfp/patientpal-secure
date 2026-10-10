@@ -28,6 +28,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as ApiNinaFalaRouteImport } from './routes/api/nina-fala'
 import { Route as ApiNinaVozRouteImport } from './routes/api/nina-voz'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as DevDashboardOszapRouteImport } from './routes/dev.dashboard-oszap'
 import { Route as DevDepartamentosRouteImport } from './routes/dev.departamentos'
 import { Route as DevFranciscoRouteImport } from './routes/dev.francisco'
 import { Route as DevPainelTvRouteImport } from './routes/dev.painel-tv'
@@ -297,6 +298,11 @@ const ApiNinaVozRoute = ApiNinaVozRouteImport.update({
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
   id: '/checkin/$token',
   path: '/checkin/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevDashboardOszapRoute = DevDashboardOszapRouteImport.update({
+  id: '/dev/dashboard-oszap',
+  path: '/dev/dashboard-oszap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevDepartamentosRoute = DevDepartamentosRouteImport.update({
@@ -1314,6 +1320,7 @@ export interface FileRoutesByFullPath {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/dashboard-oszap': typeof DevDashboardOszapRoute
   '/dev/departamentos': typeof DevDepartamentosRoute
   '/dev/francisco': typeof DevFranciscoRoute
   '/dev/painel-tv': typeof DevPainelTvRoute
@@ -1507,6 +1514,7 @@ export interface FileRoutesByTo {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/dashboard-oszap': typeof DevDashboardOszapRoute
   '/dev/departamentos': typeof DevDepartamentosRoute
   '/dev/francisco': typeof DevFranciscoRoute
   '/dev/painel-tv': typeof DevPainelTvRoute
@@ -1700,6 +1708,7 @@ export interface FileRoutesById {
   '/api/nina-fala': typeof ApiNinaFalaRoute
   '/api/nina-voz': typeof ApiNinaVozRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/dev/dashboard-oszap': typeof DevDashboardOszapRoute
   '/dev/departamentos': typeof DevDepartamentosRoute
   '/dev/francisco': typeof DevFranciscoRoute
   '/dev/painel-tv': typeof DevPainelTvRoute
@@ -1896,6 +1905,7 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/dashboard-oszap'
     | '/dev/departamentos'
     | '/dev/francisco'
     | '/dev/painel-tv'
@@ -2089,6 +2099,7 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/dashboard-oszap'
     | '/dev/departamentos'
     | '/dev/francisco'
     | '/dev/painel-tv'
@@ -2281,6 +2292,7 @@ export interface FileRouteTypes {
     | '/api/nina-fala'
     | '/api/nina-voz'
     | '/checkin/$token'
+    | '/dev/dashboard-oszap'
     | '/dev/departamentos'
     | '/dev/francisco'
     | '/dev/painel-tv'
@@ -2476,6 +2488,7 @@ export interface RootRouteChildren {
   ApiNinaFalaRoute: typeof ApiNinaFalaRoute
   ApiNinaVozRoute: typeof ApiNinaVozRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
+  DevDashboardOszapRoute: typeof DevDashboardOszapRoute
   DevDepartamentosRoute: typeof DevDepartamentosRoute
   DevFranciscoRoute: typeof DevFranciscoRoute
   DevPainelTvRoute: typeof DevPainelTvRoute
@@ -2645,6 +2658,13 @@ declare module '@tanstack/react-router' {
       path: '/checkin/$token'
       fullPath: '/checkin/$token'
       preLoaderRoute: typeof CheckinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/dashboard-oszap': {
+      id: '/dev/dashboard-oszap'
+      path: '/dev/dashboard-oszap'
+      fullPath: '/dev/dashboard-oszap'
+      preLoaderRoute: typeof DevDashboardOszapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/departamentos': {
@@ -4326,6 +4346,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNinaFalaRoute: ApiNinaFalaRoute,
   ApiNinaVozRoute: ApiNinaVozRoute,
   CheckinTokenRoute: CheckinTokenRoute,
+  DevDashboardOszapRoute: DevDashboardOszapRoute,
   DevDepartamentosRoute: DevDepartamentosRoute,
   DevFranciscoRoute: DevFranciscoRoute,
   DevPainelTvRoute: DevPainelTvRoute,

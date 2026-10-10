@@ -46,36 +46,34 @@ export function periodoAnterior(tipo: AgrupamentoDashboard, hoje = hojeBR()) {
 export function periodoPadraoDashboard(hoje = hojeBR()): PeriodoDashboard {
   return { de: deslocarDia(hoje, -30), ate: deslocarDia(hoje, -1) };
 }
-export type TotaisDashboard = {
-  recebidas: number;
-  enviadas: number;
-  total: number;
-  encerradas: number;
-  transferencias: number;
-};
-export const totaisVazios = (): TotaisDashboard => ({
-  recebidas: 0,
-  enviadas: 0,
-  total: 0,
-  encerradas: 0,
-  transferencias: 0,
-});
-export type DiaDashboard = TotaisDashboard & { dia: string };
-/** Inclui os dias sem movimento e recorta semanas/meses pelas datas escolhidas. */
-export function agruparDiasDashboard(
-  dias: DiaDashboard[],
+/** Período imediatamente anterior, com o mesmo número de dias, para comparação. */
+export function periodoComparacao(p: PeriodoDashboard): PeriodoDashboard {
+  return { de: deslocarDia(p.de, -contarDias(p)), ate: deslocarDia(p.de, -1) };
+}
+export function contarDias(p: PeriodoDashboard) {
+  return (Date.parse(`${p.ate}T12:00:00Z`) - Date.parse(`${p.de}T12:00:00Z`)) / 864e5 + 1;
+}
+export function diasDoPeriodo(p: PeriodoDashboard) {
+  const dias: string[] = [];
+  for (let dia = p.de; dia <= p.ate; dia = deslocarDia(dia, 1)) dias.push(dia);
+  return dias;
+}
+/** Inclui os dias sem movimento e recorta semanas/meses pelas datas escolhidas. Soma os campos de `vazio`. */
+export function agruparDiasDashboard<C extends string>(
+  dias: ({ dia: string } & Record<C, number>)[],
   periodo: PeriodoDashboard,
   tipo: AgrupamentoDashboard,
+  vazio: () => Record<C, number>,
 ) {
   const fonte = new Map(dias.map((d) => [d.dia, d]));
   const grupos = new Map<
     string,
-    TotaisDashboard & { de: string; ate: string; parcial: boolean; dias: number }
+    Record<C, number> & { de: string; ate: string; parcial: boolean; dias: number }
   >();
-  for (let dia = periodo.de; dia <= periodo.ate; dia = deslocarDia(dia, 1)) {
+  for (const dia of diasDoPeriodo(periodo)) {
     const limites = limitesAgrupamento(dia, tipo);
     const grupo = grupos.get(limites.de) ?? {
-      ...totaisVazios(),
+      ...vazio(),
       de: dia,
       ate: dia,
       dias: 0,
@@ -85,18 +83,9 @@ export function agruparDiasDashboard(
     grupo.dias++;
     const valores = fonte.get(dia);
     if (valores)
-      for (const chave of Object.keys(totaisVazios()) as (keyof TotaisDashboard)[])
-        grupo[chave] += valores[chave];
+      for (const chave of Object.keys(vazio()) as C[])
+        (grupo as Record<C, number>)[chave] += valores[chave];
     grupos.set(limites.de, grupo);
   }
   return [...grupos.values()];
-}
-export function extremosVolume<T extends { total: number }>(linhas: T[]) {
-  if (!linhas.length || linhas.every((l) => l.total === 0)) return null;
-  const max = Math.max(...linhas.map((l) => l.total));
-  const min = Math.min(...linhas.map((l) => l.total));
-  return {
-    maiores: linhas.filter((l) => l.total === max),
-    menores: linhas.filter((l) => l.total === min),
-  };
 }
