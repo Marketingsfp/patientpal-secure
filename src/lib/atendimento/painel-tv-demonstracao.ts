@@ -10,7 +10,7 @@ export type DadosPainelTv = {
   tempoMedioRespostaSeg: number | null;
   respostasMedidas: number;
   volumePorHora: number[];
-  respostas: { equipe: number; nina: number; automaticas: number };
+  respostas: { equipe: number; nina: number };
   encaminhadasHoje: number;
   resolvidasHoje: number;
   atualizadoEm: string;
@@ -88,7 +88,7 @@ export function criarDemonstracaoPainelTv(agora: number): DadosPainelTv {
     volumePorHora: [
       0, 0, 0, 0, 0, 0, 0, 8, 26, 44, 57, 39, 24, 31, 48, 61, 46, 33, 19, 10, 4, 0, 0, 0,
     ],
-    respostas: { equipe: 194, nina: 312, automaticas: 46 },
+    respostas: { equipe: 194, nina: 312 },
     encaminhadasHoje: 94,
     resolvidasHoje: atendentes.reduce((total, a) => total + a.resolvidasHoje, 0),
     atualizadoEm: new Date(agora).toISOString(),

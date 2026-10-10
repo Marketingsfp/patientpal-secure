@@ -56,6 +56,29 @@ describe("Equipe do painel TV — somente telefonia", () => {
     });
     presencas.push({ user_id: "tel-offline", estado_manual: "OFFLINE", estado_manual_versao: 1 });
     const aguardando = new Date(Date.now() - 15 * 60_000).toISOString();
+    const mensagens = [
+      {
+        conversa_id: "c1",
+        direction: "out",
+        enviada_por: "humano",
+        enviada_por_user_id: "tel-online",
+        created_at: new Date().toISOString(),
+      },
+      {
+        conversa_id: "c1",
+        direction: "out",
+        enviada_por: "nina",
+        enviada_por_user_id: null,
+        created_at: new Date().toISOString(),
+      },
+      {
+        conversa_id: "c1",
+        direction: "out",
+        enviada_por: "sistema",
+        enviada_por_user_id: null,
+        created_at: new Date().toISOString(),
+      },
+    ];
     const consultas: { tabela: string; campos: string; filtros: [string, unknown][] }[] = [];
     const db = {
       async rpc(nome: string) {
@@ -123,6 +146,7 @@ describe("Equipe do painel TV — somente telefonia", () => {
               data = abertas;
             if (tabela === "atend_conversas" && chamada.campos === "resolved_by")
               data = [{ resolved_by: "tel-online" }, { resolved_by: "tel-offline" }];
+            if (tabela === "whatsapp_mensagens") data = mensagens;
             if (tabela === "atend_agente_presenca") data = presencas;
             if (tabela === "clinica_memberships")
               data = membros.filter((m) =>
@@ -151,6 +175,7 @@ describe("Equipe do painel TV — somente telefonia", () => {
     expect(painel.emAndamento).toBe(5);
     expect(painel.espera).toHaveLength(2);
     expect(painel.resolvidasHoje).toBe(2);
+    expect(painel.respostas).toEqual({ equipe: 1, nina: 1 });
     expect(painel.atendentes.find((a) => a.id === "tel-online")?.resolvidasHoje).toBe(1);
     expect(consultas.find((c) => c.tabela === "clinica_memberships")?.campos).toBe("user_id, role");
     expect(

@@ -112,15 +112,14 @@ export async function carregarPainelTv(
   // contar (a métrica é só das atendentes).
   const inicioPendente = new Map<string, number>();
   const tempos: number[] = [];
-  // Respostas enviadas hoje: atendente (tem usuário), Nina, ou automáticas
-  // do sistema (lembretes, avisos de protocolo e afins).
-  const respostas = { equipe: 0, nina: 0, automaticas: 0 };
+  // Respostas enviadas hoje: somente atendentes e Nina. Avisos automáticos,
+  // lembretes e outras mensagens do sistema não entram no painel da TV.
+  const respostas = { equipe: 0, nina: 0 };
   for (const m of msgs) {
     const conv = m.conversa_id;
     if (m.direction !== "in") {
       if (m.enviada_por_user_id) respostas.equipe++;
       else if (m.enviada_por === "nina") respostas.nina++;
-      else respostas.automaticas++;
     }
     if (m.direction === "in") {
       volumePorHora[Number(horaBR.format(new Date(m.created_at))) % 24]++;

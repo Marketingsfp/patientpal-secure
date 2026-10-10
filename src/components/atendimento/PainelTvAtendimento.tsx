@@ -327,12 +327,12 @@ const SECOES_AJUDA = [
       {
         termo: "Quem respondeu",
         definicao:
-          "Total de mensagens de saída registradas hoje, separado por origem. Os 40 blocos mostram visualmente a proporção entre as origens.",
+          "Total de respostas registradas hoje pela Nina e pela equipe. Mensagens automáticas do sistema não entram. Os 40 blocos mostram visualmente a proporção entre as duas origens.",
       },
       {
-        termo: "Nina / Automático / Equipe",
+        termo: "Nina / Equipe",
         definicao:
-          "Nina são respostas da assistente; Automático são avisos e mensagens do sistema; Equipe são mensagens enviadas por usuários da clínica.",
+          "Nina são respostas da assistente; Equipe são mensagens enviadas por usuários da clínica.",
       },
       {
         termo: "Passadas à equipe",
@@ -767,7 +767,7 @@ function VolumePorHora({ valores, horaAtual }: { valores: number[]; horaAtual: n
   );
 }
 
-/** Distribui 40 marcas entre Nina, automáticas e equipe na proporção real. */
+/** Distribui 40 marcas entre Nina e equipe na proporção real. */
 function marcas(valores: number[], total = 40): number[] {
   const soma = valores.reduce((s, v) => s + v, 0);
   if (!soma) return valores.map(() => 0);
@@ -791,12 +791,11 @@ function marcas(valores: number[], total = 40): number[] {
 }
 
 function Respostas({ dados }: { dados: DadosPainelTv | null }) {
-  const r = dados?.respostas ?? { equipe: 0, nina: 0, automaticas: 0 };
-  const total = r.nina + r.automaticas + r.equipe;
-  const [mNina, mAuto, mEquipe] = marcas([r.nina, r.automaticas, r.equipe]);
+  const r = dados?.respostas ?? { equipe: 0, nina: 0 };
+  const total = r.nina + r.equipe;
+  const [mNina, mEquipe] = marcas([r.nina, r.equipe]);
   const cores = [
     ...Array<string>(mNina).fill("bg-atd-ai"),
-    ...Array<string>(mAuto).fill("bg-atd-ink-soft opacity-50"),
     ...Array<string>(mEquipe).fill("bg-atd-ok"),
   ];
   const tempo = dados?.tempoMedioRespostaSeg;
@@ -815,9 +814,8 @@ function Respostas({ dados }: { dados: DadosPainelTv | null }) {
             ))
           : cores.map((c, k) => <i key={k} className={cn("block rounded-[0.3vh]", c)} />)}
       </div>
-      <div className="mt-[1.8vh] grid shrink-0 grid-cols-3">
+      <div className="mt-[1.8vh] grid shrink-0 grid-cols-2">
         <Legenda valor={r.nina} rotulo="Nina" cor="text-atd-ai-ink" />
-        <Legenda valor={r.automaticas} rotulo="Automático" cor="text-atd-ink-soft" />
         <Legenda valor={r.equipe} rotulo="Equipe" cor="text-atd-ok" />
       </div>
       <div className="mt-auto grid shrink-0 grid-cols-3 border-t border-atd-border pt-[2.2vh]">
