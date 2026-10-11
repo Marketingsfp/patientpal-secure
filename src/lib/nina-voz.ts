@@ -123,9 +123,27 @@ async function falarGemini(texto: string): Promise<boolean> {
   };
 
   try {
+    // A rota exige login: envia o token da sessão atual (mesmo plano B de
+    // `anexarTokenSessao` quando getSession() falha). Sem token, o servidor
+    // responde 401 e caímos na voz do navegador, como em qualquer falha.
+    let token: string | undefined;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await supabase.auth.getSession();
+      token = data.session?.access_token;
+    } catch {
+      /* segue para o cache */
+    }
+    if (!token) {
+      const { lerSessaoEmCache } = await import("@/lib/sessao-cache");
+      token = lerSessaoEmCache()?.access_token;
+    }
     const res = await fetch("/api/nina-voz", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ text: texto }),
       signal: sinal,
     });

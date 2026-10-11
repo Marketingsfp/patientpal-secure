@@ -19,6 +19,29 @@ export const Route = createFileRoute("/api/nina-voz")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Exige login no próprio handler: não há middleware de autenticação
+        // para rotas /api. Sem token válido, 401 antes de tocar no gateway pago.
+        const naoAutorizado = () =>
+          new Response(JSON.stringify({ error: "não autorizado" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
+        const auth = request.headers.get("authorization") ?? "";
+        const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+        if (!token) return naoAutorizado();
+        try {
+          const { requireSupabasePublicEnv } = await import("@/integrations/supabase/env");
+          const { createClient } = await import("@supabase/supabase-js");
+          const { url, publishableKey } = requireSupabasePublicEnv();
+          const sb = createClient(url, publishableKey, {
+            auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+          });
+          const { data, error } = await sb.auth.getClaims(token);
+          if (error || !data?.claims?.sub) return naoAutorizado();
+        } catch {
+          return naoAutorizado();
+        }
+
         const key = process.env["LOVABLE_API_KEY"];
         if (!key) {
           return new Response(JSON.stringify({ error: "voz indisponível" }), {
