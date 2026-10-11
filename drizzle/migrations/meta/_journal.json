@@ -43,6 +43,13 @@
       "when": 1791651401841,
       "tag": "0005_atend_avaliacoes_pesquisa_satisfacao",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791683712661,
+      "tag": "0006_oszap_departamentos_base",
+      "breakpoints": true
     }
   ]
 }
