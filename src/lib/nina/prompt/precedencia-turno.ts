@@ -39,6 +39,7 @@ import {
   type ResultadoPrecedencia,
   type RestricaoEstruturada,
 } from "@/lib/nina/prompt/precedencia";
+import { REGRA_LGPD_NINA } from "@/lib/nina/lgpd";
 
 /** Regra geral publicada de apresentação — o caso comum do atendimento. */
 export const REGRA_GERAL_APRESENTACAO: RestricaoEstruturada = {
@@ -157,7 +158,16 @@ export function resolverPrecedenciaDoTurno(e: EntradaPrecedenciaTurno): Preceden
   // proíbe saudação nesta resposta.
   const dispensa = interpretadas.find((r) => proibeSaudacao(r) && r.condicao.tipo !== "sempre");
 
-  const excecoes: RestricaoEstruturada[] = [];
+  const excecoes: RestricaoEstruturada[] = [
+    {
+      codigo: "PRIVACIDADE_PACIENTE",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/lgpd.ts",
+      motivo: "Proteção de dados pessoais e sensíveis em todos os atendimentos.",
+      descricao: "LGPD, sigilo, coleta mínima e revisão humana",
+      texto: REGRA_LGPD_NINA,
+    },
+  ];
   const regrasGerais: RestricaoEstruturada[] = [REGRA_GERAL_APRESENTACAO];
 
   for (const r of interpretadas) {

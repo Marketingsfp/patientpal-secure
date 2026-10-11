@@ -202,11 +202,29 @@ export async function sugerirAprendizado(entrada: {
   if (error) console.error("[Nina] falha ao sugerir aprendizado", error.message);
 }
 
-/** Remove dados pessoais antes de qualquer texto virar memória (LGPD). */
+/**
+ * Remove identificadores explícitos antes de uma sugestão virar memória.
+ * É uma barreira complementar: toda sugestão continua PENDING e exige revisão
+ * humana, pois texto livre nunca oferece garantia absoluta de anonimização.
+ */
 export function anonimizar(texto: string): string {
   return texto
+    .replace(
+      /\b((?:nome(?:\s+completo)?|paciente|respons[aá]vel)\s*[:=-]\s*)[^\n,;.]{2,120}/gi,
+      "$1[NOME]",
+    )
+    .replace(
+      /\b((?:rg|prontu[aá]rio|cns|cart[aã]o\s+sus)\s*[:#=-]?\s*)[a-z0-9.-]{4,30}\b/gi,
+      "$1[IDENTIFICADOR]",
+    )
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+      "[IDENTIFICADOR]",
+    )
     .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "[CPF]")
     .replace(/\b\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}\b/g, "[TELEFONE]")
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[EMAIL]")
-    .replace(/\b\d{2}\/\d{2}\/\d{4}\b/g, "[DATA]");
+    .replace(/\b\d{2}\/\d{2}\/\d{4}\b/g, "[DATA]")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, "[DATA]")
+    .replace(/\b\d{5}-?\d{3}\b/g, "[CEP]");
 }
