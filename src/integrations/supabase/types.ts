@@ -1307,6 +1307,51 @@ export type Database = {
           },
         ]
       }
+      atend_departamento_atendentes: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          clinica_id: string
+          created_at: string
+          departamento_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id: string
+          created_at?: string
+          departamento_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id?: string
+          created_at?: string
+          departamento_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_departamento_atendentes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atend_departamento_atendentes_departamento_id_fkey"
+            columns: ["departamento_id"]
+            isOneToOne: false
+            referencedRelation: "atend_departamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_departamento_membros: {
         Row: {
           clinica_id: string
@@ -16230,6 +16275,10 @@ export type Database = {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
       }
+      atend_acesso_departamentos: {
+        Args: { _clinica_id: string; _escrita?: boolean; _user_id: string }
+        Returns: boolean
+      }
       atend_auto_assign_conversa: {
         Args: {
           _clinica_id: string
@@ -16280,6 +16329,7 @@ export type Database = {
         }
         Returns: Json
       }
+      atend_departamentos_habilitados: { Args: never; Returns: boolean }
       atend_diagnostico_distribuicao: {
         Args: { _clinica_id: string }
         Returns: Json
@@ -16323,6 +16373,10 @@ export type Database = {
         }[]
       }
       atend_expurgar_resumos_vencidos: { Args: never; Returns: number }
+      atend_garantir_setores_fixos: {
+        Args: { _clinica_id: string }
+        Returns: undefined
+      }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       atend_gerar_protocolo_atendimento: {
         Args: {
@@ -16335,6 +16389,18 @@ export type Database = {
           protocolo: string
         }[]
       }
+      atend_gerencia_departamentos: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
+      atend_inicializar_departamentos: {
+        Args: { _clinica_id: string }
+        Returns: undefined
+      }
+      atend_listar_departamentos: {
+        Args: { _clinica_id: string; _ip_origem?: string }
+        Returns: Json
+      }
       atend_nao_lidas: {
         Args: { _clinica_id: string; _conversa_ids: string[] }
         Returns: {
@@ -16342,6 +16408,7 @@ export type Database = {
           nao_lidas: number
         }[]
       }
+      atend_nome_departamento: { Args: { _nome: string }; Returns: string }
       atend_permite_leitura_operacional: {
         Args: { _clinica_id: string }
         Returns: boolean
@@ -16398,13 +16465,42 @@ export type Database = {
         Args: { _ate: string; _clinica_id: string; _conversa_id: string }
         Returns: string
       }
+      atend_salvar_departamento: {
+        Args: {
+          _clinica_id: string
+          _id?: string
+          _ip_origem?: string
+          _nome: string
+        }
+        Returns: string
+      }
       atend_tem_perfil_telefonia: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
+      atend_transferir_departamento: {
+        Args: {
+          _clinica_id: string
+          _conversa_id: string
+          _departamento_id: string
+          _ip_origem?: string
+          _motivo?: string
+          _responsavel_esperado: string
+        }
+        Returns: string
+      }
       atend_usuario_e_admin: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
+      }
+      atend_vincular_departamento: {
+        Args: {
+          _clinica_id: string
+          _departamento_id?: string
+          _ip_origem?: string
+          _user_id: string
+        }
+        Returns: undefined
       }
       buscar_contratos: {
         Args: {
