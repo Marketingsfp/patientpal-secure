@@ -25,6 +25,24 @@ export const OBJETIVOS_PESQUISA_CATALOGO = [
 
 export const PESQUISA_NAO_INTERPRETADA = "CATALOGO_QUERY_NAO_INTERPRETADA";
 
+const DIAS_SEMANA_MENSAGEM: ReadonlyArray<[RegExp, string]> = [
+  [/\bsegunda(?:-feira)?\b/, "segunda-feira"],
+  [/\bterca(?:-feira)?\b/, "terça-feira"],
+  [/\bquarta(?:-feira)?\b/, "quarta-feira"],
+  [/\bquinta(?:-feira)?\b/, "quinta-feira"],
+  [/\bsexta(?:-feira)?\b/, "sexta-feira"],
+  [/\bsabado\b/, "sábado"],
+  [/\bdomingo\b/, "domingo"],
+];
+
+/** Preserva o filtro explícito e recupera da mensagem quando o modelo o omite. */
+export function diaPesquisaCatalogo(dia: unknown, mensagem: string): string | null {
+  const informado = typeof dia === "string" ? dia.trim() : "";
+  if (informado) return informado;
+  const texto = normalizarBuscaCatalogo(mensagem);
+  return DIAS_SEMANA_MENSAGEM.find(([padrao]) => padrao.test(texto))?.[1] ?? null;
+}
+
 /** Valida o formato da pesquisa; a interpretação semântica continua com o modelo. */
 export function recusarFraseComoPesquisa(nome: string, args: unknown) {
   const campos =

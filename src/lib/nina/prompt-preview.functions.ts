@@ -167,7 +167,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       }
     })();
 
-    const { agoraNaClinica } = await import("@/lib/nina-agora");
+    const { agoraParaNina } = await import("@/lib/nina-agora");
     const { dadosPublicosClinicaGrupo } = await import("./clinicas-grupo");
 
     // Exemplo REPRESENTATIVO do contexto dinâmico: mesma estrutura do runtime,
@@ -185,7 +185,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
         email: clinica?.email ?? null,
         ...dadosPublicosClinicaGrupo(entrada.clinicaId),
       },
-      data_hora_atual: agoraNaClinica(),
+      data_hora_atual: agoraParaNina(),
       intencoes: ["informacao"],
       intencao_ambigua: false,
       sessao: { nova_sessao: true, expirou: false, continuacao: false, saudacao_obrigatoria: true },
@@ -200,12 +200,30 @@ export const previewRequestNina = createServerFn({ method: "POST" })
         profissionais: catalogo.profissionais,
       },
       ferramentas: { pode_agendar: podeAgendar },
+      consulta_agenda: {
+        ferramentas_de_consulta_disponiveis: podeAgendar,
+        permite_reservar: false,
+        modo_operacional: podeAgendar ? "agendamento_ativo" : "informar_e_encaminhar",
+        intencao_de_agendar_identificada: false,
+      },
       aprendizados: [],
     };
 
     // FASE 4 — mesmo contrato de precedência que entra no runtime: regras
     // publicadas aplicáveis, exceções e prioridade. Nada é omitido na prévia.
+    const instrucoesAdicionais: import("./prompt/precedencia-turno").InstrucaoAdicionalTurno[] = [];
+    if (!podeAgendar) {
+      const { REGRA_TRANSICAO_AGENDAMENTO } = await import("./transicao-agendamento");
+      instrucoesAdicionais.push({
+        codigo: "TRANSICAO_AGENDAMENTO_HUMANO",
+        nivel: "inegociavel",
+        origem: "src/lib/nina/transicao-agendamento.ts",
+        motivo: "Exibir na previa a mesma transicao aplicada no atendimento.",
+        texto: REGRA_TRANSICAO_AGENDAMENTO,
+      });
+    }
     const precedencia = resolverPrecedenciaDoTurno({
+      instrucoesAdicionais,
       textoPublicado: template,
       escopo: "whatsapp",
       versao: versao?.versao != null ? String(versao.versao) : null,

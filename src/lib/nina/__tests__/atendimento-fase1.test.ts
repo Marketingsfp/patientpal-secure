@@ -7,15 +7,20 @@ import {
   saudacaoPorHorario,
 } from "../atendimento-fase1";
 
-const em = (isoUtc: string) => new Date(isoUtc);
+const noServidor = (hora: number, minuto = 0) => new Date(2026, 8, 5, hora, minuto);
 
-describe("saudação por horário (fuso da clínica)", () => {
-  it("manhã", () =>
-    expect(saudacaoPorHorario(undefined, em("2026-09-05T12:00:00Z"))).toBe("Bom dia"));
-  it("tarde", () =>
-    expect(saudacaoPorHorario(undefined, em("2026-09-05T18:00:00Z"))).toBe("Boa tarde"));
-  it("noite", () =>
-    expect(saudacaoPorHorario(undefined, em("2026-09-05T23:00:00Z"))).toBe("Boa noite"));
+describe("saudação pelo relógio atual do servidor", () => {
+  it("usa noite até 04:59", () => expect(saudacaoPorHorario(noServidor(4, 59))).toBe("Boa noite"));
+  it("usa manhã das 05:00 às 11:59", () => {
+    expect(saudacaoPorHorario(noServidor(5))).toBe("Bom dia");
+    expect(saudacaoPorHorario(noServidor(11, 59))).toBe("Bom dia");
+  });
+  it("usa tarde das 12:00 às 17:59", () => {
+    expect(saudacaoPorHorario(noServidor(12))).toBe("Boa tarde");
+    expect(saudacaoPorHorario(noServidor(17, 59))).toBe("Boa tarde");
+  });
+  it("usa noite a partir das 18:00", () =>
+    expect(saudacaoPorHorario(noServidor(18))).toBe("Boa noite"));
 });
 
 describe("identificação de intenção", () => {
@@ -30,6 +35,11 @@ describe("identificação de intenção", () => {
   it("múltiplas intenções são preservadas", () => {
     const i = detectarIntencoes("Quanto custa Cardiologia e tem vaga sábado?");
     expect(i).toContain("valor");
+    expect(i).toContain("disponibilidade");
+  });
+
+  it("aceite contextual pelo primeiro horário disponível", () => {
+    const i = detectarIntencoes("quero com a dra elair no sabado msm, o mais cedo q tiver");
     expect(i).toContain("disponibilidade");
   });
 });

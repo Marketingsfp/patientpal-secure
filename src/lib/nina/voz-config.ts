@@ -45,7 +45,7 @@ export const VOZ_PADRAO: VozConfig = {
   limiteResumo: 350,
 };
 export const TEXTO_PREVIA_VOZ =
-  "Olá! Sou uma inteligência artificial da clínica. Posso ajudar você com informações sobre consultas e exames. Como posso ajudar?";
+  "Olá! Eu sou inteligência artificial da clínica. Posso ajudar você com informações sobre consultas e exames. Como posso ajudar?";
 export const previaVozSchema = z.string().trim().min(1).max(600);
 
 export function selecaoVoz(linha: any) {

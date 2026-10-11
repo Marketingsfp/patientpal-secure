@@ -41,9 +41,9 @@ describe("modalidades oficiais de atendimento", () => {
       "nao_definida",
     );
   });
-  test("booleano de chegada e conflitos não inventam modalidade", () => {
+  test("campo legado da agenda e conflitos não inventam modalidade", () => {
     expect(resolverModalidade(null, true)).toBe("nao_definida");
-    expect(resolverModalidade(null, false)).toBe("hora_marcada");
+    expect(resolverModalidade(null, false)).toBe("nao_definida");
     expect(resolverModalidade(null, null)).toBe("nao_definida");
     expect(modalidadeDoCatalogo(["Hora marcada", "Por ficha"])).toBe("nao_definida");
     expect(resolverModalidade("ficha", false)).toBe("ficha");

@@ -7,7 +7,7 @@
  * não pede dados do paciente e não altera Base de Conhecimentos, regras ou
  * ferramentas.
  */
-import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
+import { saudacaoPorHorarioServidor } from "@/lib/nina-agora";
 import { normalizar, pareceCitarEspecialidade } from "@/lib/nina-especialidade";
 
 export type IntencaoNina =
@@ -42,7 +42,7 @@ const PADROES: Array<{ intencao: IntencaoNina; termos: RegExp }> = [
   {
     intencao: "disponibilidade",
     termos:
-      /\b(tem vaga|vagas?|disponibilidade|disponivel|tem horario|encaixe|consegue (hoje|amanha|sabado))\b/,
+      /\b(tem vaga|vagas?|disponibilidade|disponivel|tem horario|encaixe|primeir[ao] (?:vaga|horario)|(?:o )?mais cedo(?: que| q)? (?:tiver|houver|puder)|consegue (hoje|amanha|sabado))\b/,
   },
   {
     intencao: "valor",
@@ -160,9 +160,9 @@ export function intencaoAmbigua(mensagem: string, intencoes: IntencaoNina[]): bo
   return soAssunto && texto.split(/\s+/).length <= 3;
 }
 
-/** "Bom dia" / "Boa tarde" / "Boa noite" conforme o horário da clínica. */
-export function saudacaoPorHorario(fuso: string = FUSO_PADRAO, now: Date = new Date()): string {
-  return agoraNaClinica(fuso, now).saudacao_do_periodo;
+/** "Bom dia" / "Boa tarde" / "Boa noite" conforme o relógio atual do servidor. */
+export function saudacaoPorHorario(now: Date = new Date()): string {
+  return saudacaoPorHorarioServidor(now);
 }
 
 /**

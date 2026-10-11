@@ -24,6 +24,7 @@
  * Módulo puro: sem banco, sem rede, sem estado.
  */
 import { extrairIdentidade, type IdentidadeAtendimento } from "./identidade-atendimento";
+import { saudacaoPorHorarioServidor } from "@/lib/nina-agora";
 
 export type OrigemIdentidade = "publicada" | "cache" | "indisponivel";
 
@@ -153,18 +154,21 @@ export function nomeCompletoEstabelecimento(apresentacao: {
 }
 
 /** Apresentação clara e única para todos os canais voltados ao paciente. */
-export function textoApresentacaoIA(apresentacao: {
-  assistente: string;
-  estabelecimento: string;
-  tipoEstabelecimento?: string;
-}): string {
+export function textoApresentacaoIA(
+  apresentacao: {
+    assistente: string;
+    estabelecimento: string;
+    tipoEstabelecimento?: string;
+  },
+  agoraServidor: Date = new Date(),
+): string {
   const unidade = apresentacao.tipoEstabelecimento
     ? nomeCompletoEstabelecimento({
         estabelecimento: apresentacao.estabelecimento,
         tipoEstabelecimento: apresentacao.tipoEstabelecimento,
       })
     : apresentacao.estabelecimento.trim();
-  return `Olá! Me chamo ${apresentacao.assistente.trim()} e sou uma inteligência artificial da ${unidade}.`;
+  return `${saudacaoPorHorarioServidor(agoraServidor)}! Me chamo ${apresentacao.assistente.trim()} e eu sou inteligência artificial da ${unidade}.`;
 }
 
 export function valoresIdentidade(efetiva: IdentidadeEfetiva): Record<string, string> {

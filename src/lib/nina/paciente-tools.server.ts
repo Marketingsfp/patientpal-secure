@@ -35,7 +35,11 @@ import {
   selecionarClinicasGrupo,
   PARAMETRO_CLINICA_INFORMATIVA,
 } from "./clinicas-grupo";
-import { OBJETIVOS_PESQUISA_CATALOGO, TIPOS_ATENDIMENTO_CATALOGO } from "./catalogo-pesquisa";
+import {
+  diaPesquisaCatalogo,
+  OBJETIVOS_PESQUISA_CATALOGO,
+  TIPOS_ATENDIMENTO_CATALOGO,
+} from "./catalogo-pesquisa";
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
 import { diaDaSemanaISO } from "./horario-oficial";
@@ -1146,7 +1150,11 @@ export const FERRAMENTAS_NINA_CONSULTA = [
               "Categoria identificada na mensagem completa e no histórico: consulta para atendimento com médico/especialidade (ex.: consulta com cardiologista → termo cardiologia, tipo consulta); exame_procedimento para exame ou procedimento (ex.: ECG, MAPA, nebulização); nao_identificado somente se ainda não houver informação suficiente. Consulta não é exame: sintomas não autorizam substituir a consulta por exames nem pedir pedido médico. Após identificar a consulta, pedido_medico obrigatório na base publicada exige solicitar a foto conforme pedido_medico_do_turno. Agendamento é objetivo e pode existir nas duas categorias. Para consulta e exame na mesma mensagem, faça pesquisas separadas. Preserve a categoria nas continuações da mesma solicitação.",
           },
           medico: { type: "string", description: "Filtrar por nome do profissional (opcional)." },
-          dia: { type: "string", description: "Filtrar por dia da semana (opcional)." },
+          dia: {
+            type: "string",
+            description:
+              "Dia da semana pedido pelo paciente. Informe sempre que ele perguntar quais profissionais atendem em um dia específico; a resposta deve omitir quem não atende nesse dia.",
+          },
         },
         required: ["termo", "objetivos", "tipo_atendimento"],
       },
@@ -2095,12 +2103,13 @@ async function executarFerramentaInterna(
             p.nova_solicitacao = true;
         }
         const { searchKnowledgeBase } = await import("@/lib/nina/knowledge.server");
+        const diaPedido = diaPesquisaCatalogo(p.dia, ctx.consultaAgenda?.mensagemAtual ?? "");
         let resultado = await searchKnowledgeBase({
           clinicaId: ctx.clinicaId,
           query: p.termo,
           tipo_atendimento: p.tipo_atendimento,
           medico: p.medico ?? null,
-          dia: p.dia ?? null,
+          dia: diaPedido,
           canal: "whatsapp",
         });
         // JEV — Fase 3 (produção e homologação, flag `nina_jev_fase3`): a busca
@@ -2151,7 +2160,7 @@ async function executarFerramentaInterna(
                     query: escolhida,
                     tipo_atendimento: p.tipo_atendimento,
                     medico: null,
-                    dia: p.dia ?? null,
+                    dia: diaPedido,
                     canal: "whatsapp",
                   });
                   if (novo.knowledge_status !== "not_found") {

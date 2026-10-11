@@ -2,28 +2,18 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { numerarFichasFormatadas, type LinhaParaFicha } from "@/lib/agenda/ficha-numero";
 import { janelaDiaClinica, dataClinicaDe } from "@/lib/date-utils";
 import { modalidadePublicadaDoMedico } from "./vinculo-catalogo-agenda.server";
-import { resolverModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
+import type { ModalidadeResolvida } from "./modalidade-atendimento";
 import type { SlotNina } from "./paciente-tools.server";
 import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 
 export async function modalidadeAtualDaAgenda(
   clinicaId: string,
   medicoId: string,
-  agendaId: string | null,
+  _agendaId: string | null,
   escopo?: EscopoAtendimentoConsulta,
 ) {
   const publicada = await modalidadePublicadaDoMedico(clinicaId, medicoId, escopo);
-  if (publicada) return publicada;
-  if (!agendaId) return "nao_definida" as const;
-  const { data, error } = await supabaseAdmin
-    .from("medico_agendas")
-    .select("ordem_chegada")
-    .eq("id", agendaId)
-    .eq("clinica_id", clinicaId)
-    .eq("medico_id", medicoId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return resolverModalidade(null, data?.ordem_chegada);
+  return publicada ?? ("nao_definida" as const);
 }
 
 export async function enriquecerModalidades(

@@ -31,6 +31,25 @@ export interface AgoraClinica {
   };
 }
 
+export type SaudacaoPeriodo = "Bom dia" | "Boa tarde" | "Boa noite";
+
+/** Saudação pelo relógio local do processo servidor, sem converter para o fuso da clínica. */
+export function saudacaoPorHorarioServidor(now: Date = new Date()): SaudacaoPeriodo {
+  const hora = now.getHours();
+  return hora >= 5 && hora < 12 ? "Bom dia" : hora >= 12 && hora < 18 ? "Boa tarde" : "Boa noite";
+}
+
+/**
+ * Datas da agenda permanecem no fuso clínico; somente a saudação acompanha o
+ * relógio local do servidor, conforme a regra operacional do atendimento.
+ */
+export function agoraParaNina(fuso: string = FUSO_PADRAO, now: Date = new Date()): AgoraClinica {
+  return {
+    ...agoraNaClinica(fuso, now),
+    saudacao_do_periodo: saudacaoPorHorarioServidor(now),
+  };
+}
+
 export function agoraNaClinica(fuso: string = FUSO_PADRAO, now: Date = new Date()): AgoraClinica {
   const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: fuso,

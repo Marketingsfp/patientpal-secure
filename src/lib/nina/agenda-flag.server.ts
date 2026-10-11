@@ -1,17 +1,16 @@
 /**
  * Liga/desliga a Nina "que agenda" por clínica.
  *
- * Desde 02/09/2026 o agendamento pela Nina vale para TODAS as clínicas
- * (decisão do time). A flag `nina_agenda_ativa` continua existindo, mas
- * agora só serve para DESLIGAR: se a clínica tiver a linha gravada com
- * `ativo = false`, a Nina volta a ser apenas informativa naquela unidade.
- * Sem linha nenhuma = ligado.
+ * Durante a transicao iniciada em 11/10/2026, a Nina e somente informativa em
+ * todas as clinicas. A flag por clinica foi preservada para a retomada futura.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { TRANSICAO_AGENDAMENTO_ATIVA } from "./transicao-agendamento";
 
 export const FLAG_NINA_AGENDA = "nina_agenda_ativa";
 
 export async function ferramentasAgendaAtivas(clinicaId: string): Promise<boolean> {
+  if (TRANSICAO_AGENDAMENTO_ATIVA) return false;
   const { data, error } = await supabaseAdmin
     .from("clinica_feature_flags")
     .select("ativo")

@@ -130,12 +130,17 @@ it("limite de carga e JSON inválido são falhas técnicas, não foto borrada", 
   );
 });
 it("apresentação usa identidade publicada e mantém reconhecimento da segunda tentativa", () => {
-  const texto = apresentarRespostaDeFoto(PEDIR_NOVA_FOTO, true, {
-    assistente: "Ana",
-    estabelecimento: "Clínica Exemplo",
-  });
+  const texto = apresentarRespostaDeFoto(
+    PEDIR_NOVA_FOTO,
+    true,
+    {
+      assistente: "Ana",
+      estabelecimento: "Clínica Exemplo",
+    },
+    new Date(2026, 8, 5, 13, 33),
+  );
   expect(texto).toStartWith(
-    "Olá! Me chamo Ana e sou uma inteligência artificial da Clínica Exemplo.",
+    "Boa tarde! Me chamo Ana e eu sou inteligência artificial da Clínica Exemplo.",
   );
   expect(decidirFotos([foto("b", 20)], [{ ...pedido, body: texto }]).acao).toBe("encaminhar");
   expect(apresentarRespostaDeFoto(PEDIR_NOVA_FOTO, false, null)).toBe(PEDIR_NOVA_FOTO);

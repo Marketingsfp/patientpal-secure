@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone, telefoneParaFiltro } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
-import { agoraNaClinica } from "@/lib/nina-agora";
+import { agoraParaNina } from "@/lib/nina-agora";
 import {
   encaminhamentoSemRegistro,
   MOTIVO_SEM_REGISTRO,
@@ -1427,6 +1427,9 @@ async function gerarRespostaNinaInterno(
   // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
   const { ferramentasAgendaAtivas } = await import("@/lib/nina/agenda-flag.server");
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
+  const { temIntencaoDeAgendar } = await import("@/lib/nina/transicao-agendamento");
+  // `intencoesTurno` ja combina a leitura deterministica com a leitura segura do Jev.
+  const intencaoAgendamentoTransicao = !podeAgendar && temIntencaoDeAgendar(intencoesTurno);
 
   // Aprendizados APROVADOS pela equipe desta clínica, relevantes para a
   // mensagem atual. Nunca substituem dado vivo (preço/horário/agenda).
@@ -1640,6 +1643,17 @@ async function gerarRespostaNinaInterno(
   // pelo MESMO contrato, com origem, prioridade e motivo registrados.
   const instrucoesAdicionaisTurno: import("@/lib/nina/prompt/precedencia-turno").InstrucaoAdicionalTurno[] =
     [];
+  if (!podeAgendar) {
+    const { REGRA_TRANSICAO_AGENDAMENTO } = await import("@/lib/nina/transicao-agendamento");
+    instrucoesAdicionaisTurno.push({
+      codigo: "TRANSICAO_AGENDAMENTO_HUMANO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/transicao-agendamento.ts",
+      motivo:
+        "Medida temporaria: a Nina informa; ordem de chegada comparece; os demais agendamentos vao para a equipe.",
+      texto: REGRA_TRANSICAO_AGENDAMENTO,
+    });
+  }
   instrucoesAdicionaisTurno.push({
     codigo: "CANCELAMENTO_REMARCACAO_HUMANO",
     nivel: "inegociavel",
@@ -1893,7 +1907,7 @@ async function gerarRespostaNinaInterno(
     unidade: dadosPublicos,
     // FASE 2 — identidade de APRESENTAÇÃO da versão publicada do turno.
     identidade_atendimento: fatosIdentidade(identidadeEfetiva),
-    data_hora_atual: agoraNaClinica(),
+    data_hora_atual: agoraParaNina(),
     fluxo_fase1_ativo: fase1Ativa,
     intencoes: intencoesTurno,
     intencao_ambigua: intencaoAmbiguaTurno,
@@ -1964,9 +1978,11 @@ async function gerarRespostaNinaInterno(
       pode_agendar: podeAgendar,
     },
     consulta_agenda: {
-      ferramentas_de_consulta_disponiveis: true,
+      ferramentas_de_consulta_disponiveis: podeAgendar,
       interpretacao_intencao: "modelo_com_historico_da_sessao",
       permite_reservar: false,
+      modo_operacional: podeAgendar ? "agendamento_ativo" : "informar_e_encaminhar",
+      intencao_de_agendar_identificada: intencaoAgendamentoTransicao,
       referencia_anterior_profissional: contextoConsultaAgenda.medicoEscolhido?.nome ?? null,
       fonte_horarios_habituais: "catalogo_publicado",
       fonte_vagas: "agenda",
@@ -2894,6 +2910,24 @@ async function gerarRespostaNinaInterno(
       },
     });
   }
+  const { deveEncaminharAgendamentoAntesDoModelo } =
+    await import("@/lib/nina/transicao-agendamento");
+  if (
+    deveEncaminharAgendamentoAntesDoModelo({
+      ferramentasAgendaAtivas: podeAgendar,
+      intencoes: intencoesTurno,
+      modalidade: fluxoEstado.appointment.modalidade_atendimento,
+      atendimentoIdentificado: !nomeAtendimentoAusente,
+      jaPossuiEncaminhamento: Boolean(jevEncaminhamento),
+    })
+  ) {
+    jevEncaminhamento = {
+      motivo:
+        "AGENDAMENTO_TRANSICAO: paciente sinalizou que deseja agendar; a IA deve encaminhar antes de consultar vagas ou coletar dados para reserva.",
+      urgencia: "normal",
+    };
+  }
+
   async function executarDecisaoEncaminhamento(
     decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento,
   ) {
@@ -2910,13 +2944,19 @@ async function gerarRespostaNinaInterno(
     const semNome = decisao.motivo === MOTIVO_NOME_NAO_INFORMADO;
     const multiplos = !alteracaoSolicitada && multiplosAtendimentos;
     const listaExtensa = decisao.motivo.startsWith("LISTA_PROFISSIONAIS_EXTENSA");
+    const agendamentoTransicao = decisao.motivo.startsWith("AGENDAMENTO_TRANSICAO");
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
       motivo: decisao.motivo,
-      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : multiplos ? "Pedido com dois ou mais atendimentos" : listaExtensa ? "Lista com mais de 8 profissionais" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : agendamentoTransicao ? "Paciente deseja agendar durante a transição para atendimento humano" : multiplos ? "Pedido com dois ou mais atendimentos" : listaExtensa ? "Lista com mais de 8 profissionais" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
       urgencia: decisao.urgencia,
-      ...(alteracaoSolicitada ? { setor: "Agendamento" } : {}),
+      ...(alteracaoSolicitada || agendamentoTransicao ? { setor: "Agendamento" } : {}),
     };
+    if (agendamentoTransicao) {
+      const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
+      limparEscolhaAgendamento(fluxoEstado);
+      fluxoEstado.appointment.slot_options = null;
+    }
     const rh = await broker
       .executar("solicitar_atendente_humano", JSON.stringify(argumentos))
       .catch(
@@ -2941,13 +2981,15 @@ async function gerarRespostaNinaInterno(
       fonte: "atendimento",
       titulo: alteracaoSolicitada
         ? "Encaminhamento: cancelamento/remarcação solicitado"
-        : multiplos
-          ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
-          : listaExtensa
-            ? "Encaminhamento: lista com mais de 8 profissionais"
-            : semNome
-              ? "Encaminhamento: atendimento não informado após pergunta"
-              : "Encaminhamento pelo Jev (Fase 2)",
+        : agendamentoTransicao
+          ? "Encaminhamento: paciente deseja agendar"
+          : multiplos
+            ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
+            : listaExtensa
+              ? "Encaminhamento: lista com mais de 8 profissionais"
+              : semNome
+                ? "Encaminhamento: atendimento não informado após pergunta"
+                : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo,
         urgencia: argumentos.urgencia,
@@ -2962,13 +3004,15 @@ async function gerarRespostaNinaInterno(
       motivo: argumentos.motivo,
       origem: alteracaoSolicitada
         ? "regra_cancelamento_remarcacao"
-        : multiplos
-          ? "regra_multiplos_atendimentos"
-          : listaExtensa
-            ? "regra_lista_extensa"
-            : semNome
-              ? "regra_sem_indicacao"
-              : "jev",
+        : agendamentoTransicao
+          ? "regra_transicao_agendamento"
+          : multiplos
+            ? "regra_multiplos_atendimentos"
+            : listaExtensa
+              ? "regra_lista_extensa"
+              : semNome
+                ? "regra_sem_indicacao"
+                : "jev",
       urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes,
       handoff_confirmado: confirmado,

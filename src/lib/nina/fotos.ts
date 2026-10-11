@@ -1,5 +1,6 @@
 import { interpretarLeituraImagem, type LeituraImagem } from "./leitura-imagem";
 import { textoApresentacaoIA } from "./identidade-efetiva";
+import { saudacaoPorHorarioServidor } from "@/lib/nina-agora";
 
 export const PEDIR_NOVA_FOTO =
   "Não consegui ler a foto com segurança.\n\nPode enviar outra foto mais nítida, com boa iluminação e o documento inteiro, sem cortes?";
@@ -39,11 +40,12 @@ export function apresentarRespostaDeFoto(
   texto: string,
   obrigatoria: boolean,
   identidade: { assistente: string; estabelecimento: string } | null,
+  agoraServidor: Date = new Date(),
 ): string {
   if (!obrigatoria || !texto.trim()) return texto;
   const apresentacao = identidade
-    ? textoApresentacaoIA(identidade)
-    : "Olá! Sou uma inteligência artificial deste atendimento.";
+    ? textoApresentacaoIA(identidade, agoraServidor)
+    : `${saudacaoPorHorarioServidor(agoraServidor)}! Eu sou inteligência artificial deste atendimento.`;
   return `${apresentacao}\n\n${texto}`;
 }
 

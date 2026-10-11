@@ -45,11 +45,11 @@ export function modalidadeDoCatalogo(
 
 export function resolverModalidade(
   catalogo: ModalidadeResolvida | null,
-  ordemChegada?: boolean | null,
+  _ordemChegada?: boolean | null,
 ): ModalidadeResolvida {
-  // O catálogo publicado distingue as quatro regras. Um booleano de ordem de
-  // chegada, sozinho, não informa se há ou não pré-agendamento.
-  return catalogo ?? (ordemChegada === false ? "hora_marcada" : "nao_definida");
+  // O catálogo publicado é a única fonte da modalidade. O booleano legado da
+  // agenda não distingue todas as regras e nunca pode preencher "Não informado".
+  return catalogo ?? "nao_definida";
 }
 
 export function permiteReserva(

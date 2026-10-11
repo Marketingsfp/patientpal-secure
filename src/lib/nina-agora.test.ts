@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { agoraNaClinica } from "./nina-agora";
+import { agoraNaClinica, agoraParaNina, saudacaoPorHorarioServidor } from "./nina-agora";
 import { comporRequestNina, validarRuntimeContext } from "./nina/prompt-composer";
 
 describe("referência temporal da Nina", () => {
@@ -62,9 +62,17 @@ describe("referência temporal da Nina", () => {
     expect(depois.iso).toBe("2026-09-18");
   });
 
+  it("mantém as datas no fuso clínico e usa o relógio do servidor para a saudação", () => {
+    const agoraServidor = new Date(2026, 8, 17, 13, 33);
+    const contexto = agoraParaNina("Pacific/Honolulu", agoraServidor);
+    expect(contexto.saudacao_do_periodo).toBe("Boa tarde");
+    expect(contexto.saudacao_do_periodo).toBe(saudacaoPorHorarioServidor(agoraServidor));
+  });
+
   it("contexto contém fatos temporais, preservando o prompt publicado", () => {
+    const agoraServidor = new Date(2026, 8, 17, 13, 33);
     const runtimeContext = {
-      data_hora_atual: agoraNaClinica(undefined, new Date("2026-09-17T16:33:00Z")),
+      data_hora_atual: agoraParaNina(undefined, agoraServidor),
     };
     const publicado = "Siga as instruções publicadas desta clínica.";
     const request = comporRequestNina({ behaviorPrompt: publicado, runtimeContext });
