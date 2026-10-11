@@ -61,7 +61,10 @@ export type EntradaDashboard = {
   /** Eventos e respostas posteriores, só das conversas que entraram na fila ou foram assumidas. */
   seguintes: { eventos: EventoDashboard[]; mensagens: MensagemDashboard[] };
   avaliacoes: {
+    created_at?: string;
+    solicitada_em?: string | null;
     respondida_em: string | null;
+    status?: string;
     nota: number | null;
     atendente_user_id: string | null;
   }[];
@@ -109,6 +112,11 @@ export const CAMPOS_DIA = [
   "encaminhadas",
   "finalizadas",
   "transferencias",
+  "reabertas",
+  "pesquisasSolicitadas",
+  "avaliacoesRecebidas",
+  "notaSoma",
+  "notaQuantidade",
   "ninaExecucoes",
   "ninaFalhas",
   "ninaEncaminhamentos",
@@ -162,6 +170,12 @@ export const respostaNina = (m: MensagemDashboard) =>
   m.direction === "out" && CONFIRMADO.has(m.status ?? "") && m.enviada_por === "nina";
 const media = (v: number[], casas = 1) =>
   v.length ? Number((v.reduce((a, b) => a + b, 0) / v.length).toFixed(casas)) : null;
+const percentil = (valores: number[], proporcao: number, casas = 1) => {
+  if (!valores.length) return null;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const posicao = Math.max(0, Math.ceil(ordenados.length * proporcao) - 1);
+  return Number(ordenados[posicao].toFixed(casas));
+};
 const minutos = (de: string, ate: string) => (Date.parse(ate) - Date.parse(de)) / 60000;
 
 /** Monta todos os números do dashboard a partir de registros já filtrados por clínica e sem testes. */
@@ -263,14 +277,15 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   }
   for (const lista of porConversa.values())
     lista.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const respostasPorConversa = new Map<string, string[]>();
+  const respostasPorConversa = new Map<string, MensagemDashboard[]>();
   for (const m of [...e.mensagens, ...e.seguintes.mensagens])
     if (m.conversa_id && respostaTelefonia(m))
       respostasPorConversa.set(m.conversa_id, [
         ...(respostasPorConversa.get(m.conversa_id) ?? []),
-        m.created_at,
+        m,
       ]);
-  for (const l of respostasPorConversa.values()) l.sort();
+  for (const l of respostasPorConversa.values())
+    l.sort((a, b) => a.created_at.localeCompare(b.created_at));
   const proximo = (conversa: string, tipo: string, desde: string, porTelefonia = false) =>
     porConversa
       .get(conversa)
@@ -284,6 +299,13 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     primeiraRespostaMin: { atual: [] as number[], anterior: [] as number[] },
     tempoAteEncerrarMin: { atual: [] as number[], anterior: [] as number[] },
   };
+  const temposRespostaPorPessoa = new Map<string, number[]>();
+  const reabertas = { atual: 0, anterior: 0 };
+  const finalizadasSemReabrir = {
+    atual: { total: 0, semReabrir: 0 },
+    anterior: { total: 0, semReabrir: 0 },
+  };
+  const finalizadasSemReabrirPorPessoa = new Map<string, { total: number; semReabrir: number }>();
   const metricaEvento: Record<string, MetricaDashboard> = {
     HANDOFF_SOLICITADO: "encaminhadas",
     ASSUMIDA: "assumidas",
@@ -298,6 +320,10 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   for (const ev of e.eventos) {
     const j = janela(ev.created_at);
     if (!j || (PESSOAIS.has(ev.evento) && !daTelefonia(ev.user_id))) continue;
+    if (ev.evento === "REABERTA") {
+      reabertas[j]++;
+      somarDia(ev.created_at, "reabertas");
+    }
     if (metricaEvento[ev.evento]) contar(metricaEvento[ev.evento], ev.created_at);
     if (campoEvento[ev.evento]) somarDia(ev.created_at, campoEvento[ev.evento]);
     if (j === "atual" && ev.user_id) {
@@ -308,13 +334,39 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     if (ev.evento === "ENTROU_NA_FILA") {
       const assumida = proximo(ev.conversa_id, "ASSUMIDA", ev.created_at, true);
       if (assumida) tempos.esperaFilaMin[j].push(minutos(ev.created_at, assumida));
-      const resposta = respostasPorConversa.get(ev.conversa_id)?.find((t) => t >= ev.created_at);
-      if (resposta) tempos.primeiraRespostaMin[j].push(minutos(ev.created_at, resposta));
+      const resposta = respostasPorConversa
+        .get(ev.conversa_id)
+        ?.find((m) => m.created_at >= ev.created_at);
+      if (resposta) {
+        const tempo = minutos(ev.created_at, resposta.created_at);
+        tempos.primeiraRespostaMin[j].push(tempo);
+        if (j === "atual" && resposta.enviada_por_user_id) {
+          const lista = temposRespostaPorPessoa.get(resposta.enviada_por_user_id) ?? [];
+          lista.push(tempo);
+          temposRespostaPorPessoa.set(resposta.enviada_por_user_id, lista);
+        }
+      }
     }
     if (ev.evento === "ASSUMIDA") {
       const fimAtendimento = proximo(ev.conversa_id, "FINALIZADA", ev.created_at);
       if (fimAtendimento)
         tempos.tempoAteEncerrarMin[j].push(minutos(ev.created_at, fimAtendimento));
+    }
+    if (ev.evento === "FINALIZADA") {
+      const reabriu = porConversa
+        .get(ev.conversa_id)
+        ?.some((x) => x.evento === "REABERTA" && x.created_at > ev.created_at);
+      finalizadasSemReabrir[j].total++;
+      if (!reabriu) finalizadasSemReabrir[j].semReabrir++;
+      if (j === "atual" && ev.user_id) {
+        const pessoa = finalizadasSemReabrirPorPessoa.get(ev.user_id) ?? {
+          total: 0,
+          semReabrir: 0,
+        };
+        pessoa.total++;
+        if (!reabriu) pessoa.semReabrir++;
+        finalizadasSemReabrirPorPessoa.set(ev.user_id, pessoa);
+      }
     }
   }
   for (const [m, t] of Object.entries(tempos) as [MetricaDashboard, typeof tempos.esperaFilaMin][])
@@ -322,12 +374,26 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
 
   // Avaliações
   const notas = [0, 0, 0, 0, 0];
+  const pesquisas = {
+    atual: { solicitadas: 0, respondidas: 0 },
+    anterior: { solicitadas: 0, respondidas: 0 },
+  };
   const somaNotas = { atual: [] as number[], anterior: [] as number[] };
   const avaliacoesPorPessoa = new Map<string, number[]>();
   for (const a of e.avaliacoes) {
+    const solicitadaEm = a.solicitada_em ?? a.created_at ?? a.respondida_em;
+    const janelaSolicitacao = solicitadaEm ? janela(solicitadaEm) : null;
+    if (janelaSolicitacao && solicitadaEm) {
+      pesquisas[janelaSolicitacao].solicitadas++;
+      somarDia(solicitadaEm, "pesquisasSolicitadas");
+    }
     if (a.nota == null || !a.respondida_em) continue;
     const j = janela(a.respondida_em);
     if (!j) continue;
+    pesquisas[j].respondidas++;
+    somarDia(a.respondida_em, "avaliacoesRecebidas");
+    somarDia(a.respondida_em, "notaSoma", a.nota);
+    somarDia(a.respondida_em, "notaQuantidade");
     contar("avaliacoes", a.respondida_em);
     somaNotas[j].push(a.nota);
     if (j === "atual" && a.nota >= 1 && a.nota <= 5) notas[a.nota - 1]++;
@@ -348,6 +414,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     emAtendimento: grupoAgora(),
     aguardandoPaciente: grupoAgora(),
   };
+  let aguardandoPaciente24h = 0;
   const abertasPorPessoa = new Map<string, number>();
   const filaPorDep = new Map<string | null, number>();
   const atendPorDep = new Map<string | null, number>();
@@ -364,6 +431,8 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     g.conversas++;
     g.naoLidas += c.unread_count ?? 0;
     g.esperaMaxMin = Math.max(g.esperaMaxMin ?? 0, Math.round(minutos(desde, agoraIso)));
+    if (grupo === "aguardandoPaciente" && minutos(desde, agoraIso) >= 24 * 60)
+      aguardandoPaciente24h++;
     if (c.status === "waiting")
       filaPorDep.set(c.departamento_id, (filaPorDep.get(c.departamento_id) ?? 0) + 1);
     if (c.status === "active") {
@@ -426,6 +495,14 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
       abertasAgora: abertasPorPessoa.get(id) ?? 0,
       pausas: pausasPessoa.get(id)?.pausas ?? 0,
       minutosPausa: Math.round(pausasPessoa.get(id)?.minutos ?? 0),
+      respostaMediaMin: media(temposRespostaPorPessoa.get(id) ?? []),
+      respostaMedianaMin: percentil(temposRespostaPorPessoa.get(id) ?? [], 0.5),
+      respostaP90Min: percentil(temposRespostaPorPessoa.get(id) ?? [], 0.9),
+      respostasMedidas: temposRespostaPorPessoa.get(id)?.length ?? 0,
+      resolucaoSemReaberturaPct: (() => {
+        const v = finalizadasSemReabrirPorPessoa.get(id);
+        return v?.total ? v.semReabrir / v.total : null;
+      })(),
     }))
     .sort(
       (a, b) =>
@@ -553,6 +630,52 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
       .sort((a, b) => b.minutos - a.minutos),
     notas,
     sentimento,
+    qualidade: {
+      sla5MinPct: {
+        atual: tempos.primeiraRespostaMin.atual.length
+          ? tempos.primeiraRespostaMin.atual.filter((v) => v <= 5).length /
+            tempos.primeiraRespostaMin.atual.length
+          : null,
+        anterior: tempos.primeiraRespostaMin.anterior.length
+          ? tempos.primeiraRespostaMin.anterior.filter((v) => v <= 5).length /
+            tempos.primeiraRespostaMin.anterior.length
+          : null,
+      },
+      medianaPrimeiraRespostaMin: {
+        atual: percentil(tempos.primeiraRespostaMin.atual, 0.5),
+        anterior: percentil(tempos.primeiraRespostaMin.anterior, 0.5),
+      },
+      p90PrimeiraRespostaMin: {
+        atual: percentil(tempos.primeiraRespostaMin.atual, 0.9),
+        anterior: percentil(tempos.primeiraRespostaMin.anterior, 0.9),
+      },
+      respostasMedidas: {
+        atual: tempos.primeiraRespostaMin.atual.length,
+        anterior: tempos.primeiraRespostaMin.anterior.length,
+      },
+      reabertas,
+      resolucaoSemReaberturaPct: {
+        atual: finalizadasSemReabrir.atual.total
+          ? finalizadasSemReabrir.atual.semReabrir / finalizadasSemReabrir.atual.total
+          : null,
+        anterior: finalizadasSemReabrir.anterior.total
+          ? finalizadasSemReabrir.anterior.semReabrir / finalizadasSemReabrir.anterior.total
+          : null,
+      },
+      pesquisasSolicitadas: {
+        atual: pesquisas.atual.solicitadas,
+        anterior: pesquisas.anterior.solicitadas,
+      },
+      taxaRespostaPesquisa: {
+        atual: pesquisas.atual.solicitadas
+          ? pesquisas.atual.respondidas / pesquisas.atual.solicitadas
+          : null,
+        anterior: pesquisas.anterior.solicitadas
+          ? pesquisas.anterior.respondidas / pesquisas.anterior.solicitadas
+          : null,
+      },
+      aguardandoPaciente24h,
+    },
     nina,
     francisco,
     whatsapp: {

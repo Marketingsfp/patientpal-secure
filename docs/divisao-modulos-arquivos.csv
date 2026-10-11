@@ -1,0 +1,2210 @@
+arquivo;frente;linhas
+src/components/__tests__/chave-area-principal.test.ts;Nucleo compartilhado;28
+src/components/acessibilidade/AcessibilidadeProvider.tsx;Nucleo compartilhado;200
+src/components/acessibilidade/AtalhosAcessibilidade.tsx;Nucleo compartilhado;79
+src/components/acessibilidade/BotaoAcessibilidade.tsx;Nucleo compartilhado;401
+src/components/app-shell.tsx;Nucleo compartilhado;2265
+src/components/app-sidebar-layout.tsx;Nucleo compartilhado;109
+src/components/change-password-dialog.tsx;Nucleo compartilhado;97
+src/components/charts/MiniBarChart.tsx;Nucleo compartilhado;180
+src/components/charts/MiniLineChart.tsx;Nucleo compartilhado;127
+src/components/charts/MiniPieChart.tsx;Nucleo compartilhado;100
+src/components/date-range-filter.tsx;Nucleo compartilhado;193
+src/components/exige-unidade-escolhida.tsx;Nucleo compartilhado;60
+src/components/icons/tooth.tsx;Nucleo compartilhado;26
+src/components/idade-icon.tsx;Nucleo compartilhado;51
+src/components/keyboard-shortcuts.tsx;Nucleo compartilhado;305
+src/components/list-shell/command-palette.tsx;Nucleo compartilhado;215
+src/components/list-shell/index.ts;Nucleo compartilhado;10
+src/components/list-shell/list-shell.tsx;Nucleo compartilhado;154
+src/components/list-shell/quick-filters.tsx;Nucleo compartilhado;87
+src/components/list-shell/virtual-list.tsx;Nucleo compartilhado;86
+src/components/paciente-nome.tsx;Nucleo compartilhado;63
+src/components/page/page-header.tsx;Nucleo compartilhado;85
+src/components/patient-search-input.tsx;Nucleo compartilhado;471
+src/components/PendenciasAlert.tsx;Nucleo compartilhado;212
+src/components/portal-launcher.tsx;Nucleo compartilhado;167
+src/components/public-clinica-provider.tsx;Nucleo compartilhado;119
+src/components/responsive-cards.tsx;Nucleo compartilhado;138
+src/components/section-tabs.tsx;Nucleo compartilhado;120
+src/components/sem-permissao.tsx;Nucleo compartilhado;47
+src/components/sidebar-user-menu.tsx;Nucleo compartilhado;195
+src/components/simple-crud/SimpleCrud.tsx;Nucleo compartilhado;452
+src/components/supervisor-senha-dialog.tsx;Nucleo compartilhado;178
+src/components/theme/theme-switcher.tsx;Nucleo compartilhado;92
+src/components/tts/tts-button.tsx;Nucleo compartilhado;73
+src/components/tts/tts-toggle.tsx;Nucleo compartilhado;27
+src/components/ui/__tests__/caixa-alta.test.ts;Nucleo compartilhado;43
+src/components/ui/accordion.tsx;Nucleo compartilhado;52
+src/components/ui/alert-dialog.tsx;Nucleo compartilhado;116
+src/components/ui/alert.tsx;Nucleo compartilhado;50
+src/components/ui/aspect-ratio.tsx;Nucleo compartilhado;6
+src/components/ui/avatar.tsx;Nucleo compartilhado;48
+src/components/ui/badge.tsx;Nucleo compartilhado;33
+src/components/ui/breadcrumb.tsx;Nucleo compartilhado;102
+src/components/ui/button.tsx;Nucleo compartilhado;50
+src/components/ui/caixa-alta.tsx;Nucleo compartilhado;100
+src/components/ui/calendar.tsx;Nucleo compartilhado;180
+src/components/ui/card.tsx;Nucleo compartilhado;56
+src/components/ui/checkbox.tsx;Nucleo compartilhado;34
+src/components/ui/collapsible.tsx;Nucleo compartilhado;12
+src/components/ui/command.tsx;Nucleo compartilhado;177
+src/components/ui/context-menu.tsx;Nucleo compartilhado;188
+src/components/ui/currency-input.tsx;Nucleo compartilhado;40
+src/components/ui/date-input-br.tsx;Nucleo compartilhado;191
+src/components/ui/dialog.tsx;Nucleo compartilhado;108
+src/components/ui/dropdown-menu.tsx;Nucleo compartilhado;189
+src/components/ui/empty-state.tsx;Nucleo compartilhado;33
+src/components/ui/form.tsx;Nucleo compartilhado;172
+src/components/ui/hover-card.tsx;Nucleo compartilhado;28
+src/components/ui/input.tsx;Nucleo compartilhado;62
+src/components/ui/label.tsx;Nucleo compartilhado;22
+src/components/ui/list-skeleton.tsx;Nucleo compartilhado;32
+src/components/ui/masked-input.tsx;Nucleo compartilhado;82
+src/components/ui/menubar.tsx;Nucleo compartilhado;230
+src/components/ui/navigation-menu.tsx;Nucleo compartilhado;121
+src/components/ui/pagination.tsx;Nucleo compartilhado;99
+src/components/ui/popover.tsx;Nucleo compartilhado;32
+src/components/ui/progress.tsx;Nucleo compartilhado;26
+src/components/ui/radio-group.tsx;Nucleo compartilhado;37
+src/components/ui/scroll-area.tsx;Nucleo compartilhado;45
+src/components/ui/searchable-multi-select.tsx;Nucleo compartilhado;166
+src/components/ui/searchable-select.tsx;Nucleo compartilhado;128
+src/components/ui/select.tsx;Nucleo compartilhado;153
+src/components/ui/separator.tsx;Nucleo compartilhado;25
+src/components/ui/sheet.tsx;Nucleo compartilhado;130
+src/components/ui/sidebar.tsx;Nucleo compartilhado;745
+src/components/ui/skeleton.tsx;Nucleo compartilhado;22
+src/components/ui/slider.tsx;Nucleo compartilhado;24
+src/components/ui/sonner.tsx;Nucleo compartilhado;24
+src/components/ui/switch.tsx;Nucleo compartilhado;28
+src/components/ui/table-skeleton.tsx;Nucleo compartilhado;38
+src/components/ui/table.tsx;Nucleo compartilhado;124
+src/components/ui/tabs.tsx;Nucleo compartilhado;54
+src/components/ui/textarea.tsx;Nucleo compartilhado;25
+src/components/ui/toggle-group.tsx;Nucleo compartilhado;58
+src/components/ui/toggle.tsx;Nucleo compartilhado;43
+src/components/ui/tooltip.tsx;Nucleo compartilhado;33
+src/components/universal-search-bar.tsx;Nucleo compartilhado;71
+src/data/cid10.ts;Nucleo compartilhado;350
+src/data/lista-servico-nacional.ts;Nucleo compartilhado;943
+src/data/medicamentos.ts;Nucleo compartilhado;267
+src/design-system/hhp/chip.tsx;Nucleo compartilhado;80
+src/design-system/hhp/drawer.tsx;Nucleo compartilhado;63
+src/design-system/hhp/empty-state.tsx;Nucleo compartilhado;38
+src/design-system/hhp/header.tsx;Nucleo compartilhado;55
+src/design-system/hhp/index.ts;Nucleo compartilhado;23
+src/design-system/hhp/kpi-card.tsx;Nucleo compartilhado;144
+src/design-system/hhp/shortcuts-dialog.tsx;Nucleo compartilhado;64
+src/design-system/hhp/skeleton-card.tsx;Nucleo compartilhado;35
+src/design-system/hhp/tokens.ts;Nucleo compartilhado;76
+src/design-system/hhp/toolbar.tsx;Nucleo compartilhado;29
+src/design-system/hhp/wizard-shell.tsx;Nucleo compartilhado;81
+src/hooks/use-admin-plataforma.ts;Nucleo compartilhado;52
+src/hooks/use-alcadas.tsx;Nucleo compartilhado;68
+src/hooks/use-auth.tsx;Nucleo compartilhado;129
+src/hooks/use-clinic-feature-flag.ts;Nucleo compartilhado;138
+src/hooks/use-clinic-skin.ts;Nucleo compartilhado;82
+src/hooks/use-clinica.tsx;Nucleo compartilhado;256
+src/hooks/use-crud.tsx;Nucleo compartilhado;115
+src/hooks/use-debounced-value.ts;Nucleo compartilhado;58
+src/hooks/use-hover-tolerante.tsx;Nucleo compartilhado;112
+src/hooks/use-menu-favoritos.ts;Nucleo compartilhado;45
+src/hooks/use-menu-ordem.ts;Nucleo compartilhado;39
+src/hooks/use-mobile.tsx;Nucleo compartilhado;20
+src/hooks/use-permissoes.tsx;Nucleo compartilhado;240
+src/hooks/use-realtime-refresh.ts;Nucleo compartilhado;69
+src/hooks/use-theme.ts;Nucleo compartilhado;20
+src/hooks/use-tts.ts;Nucleo compartilhado;52
+src/hooks/use-turbo-disabled.ts;Nucleo compartilhado;17
+src/hooks/use-universal-search.ts;Nucleo compartilhado;169
+src/integrations/supabase/auth-attacher.ts;Nucleo compartilhado;16
+src/integrations/supabase/auth-middleware.ts;Nucleo compartilhado;65
+src/integrations/supabase/client.server.ts;Nucleo compartilhado;48
+src/integrations/supabase/client.ts;Nucleo compartilhado;34
+src/integrations/supabase/env.ts;Nucleo compartilhado;136
+src/integrations/supabase/fetch-com-prazo.test.ts;Nucleo compartilhado;57
+src/integrations/supabase/fetch-com-prazo.ts;Nucleo compartilhado;34
+src/integrations/supabase/previewAuthStorage.ts;Nucleo compartilhado;94
+src/integrations/supabase/types.ts;Nucleo compartilhado;19285
+src/lib/__tests__/nfse-falha-consulta.test.ts;Nucleo compartilhado;23
+src/lib/__tests__/nfse-retorno-sem-iss.test.ts;Nucleo compartilhado;44
+src/lib/__tests__/traduzir-http-cru.test.ts;Nucleo compartilhado;24
+src/lib/acessibilidade/__tests__/prefs.test.ts;Nucleo compartilhado;116
+src/lib/acessibilidade/prefs.ts;Nucleo compartilhado;177
+src/lib/auth-token-attacher.ts;Nucleo compartilhado;25
+src/lib/autorizacao-supervisor.functions.ts;Nucleo compartilhado;237
+src/lib/autorizacao-supervisor.test.ts;Nucleo compartilhado;142
+src/lib/autorizacao-supervisor.ts;Nucleo compartilhado;117
+src/lib/busca-texto.test.ts;Nucleo compartilhado;37
+src/lib/busca-texto.ts;Nucleo compartilhado;44
+src/lib/busca/relevancia.ts;Nucleo compartilhado;72
+src/lib/cache/clinic-flags-cache.ts;Nucleo compartilhado;53
+src/lib/cache/prefs-cache.ts;Nucleo compartilhado;65
+src/lib/cache/single-flight.ts;Nucleo compartilhado;53
+src/lib/charts/passo-rotulo.test.ts;Nucleo compartilhado;46
+src/lib/charts/passo-rotulo.ts;Nucleo compartilhado;37
+src/lib/clima.ts;Nucleo compartilhado;294
+src/lib/confirm.tsx;Nucleo compartilhado;118
+src/lib/contrast.ts;Nucleo compartilhado;45
+src/lib/cpf.ts;Nucleo compartilhado;35
+src/lib/date-utils.test.ts;Nucleo compartilhado;81
+src/lib/date-utils.ts;Nucleo compartilhado;195
+src/lib/docx-caixas-flutuantes.ts;Nucleo compartilhado;314
+src/lib/error-capture.ts;Nucleo compartilhado;28
+src/lib/error-page.ts;Nucleo compartilhado;31
+src/lib/export-csv.ts;Nucleo compartilhado;33
+src/lib/exportar-docx.test.ts;Nucleo compartilhado;83
+src/lib/exportar-docx.ts;Nucleo compartilhado;292
+src/lib/exportar-xlsx.test.ts;Nucleo compartilhado;113
+src/lib/exportar-xlsx.ts;Nucleo compartilhado;201
+src/lib/integracoes/agendamentos-v1.server.ts;Nucleo compartilhado;1095
+src/lib/integracoes/api.server.ts;Nucleo compartilhado;467
+src/lib/integracoes/cartao-v1.server.ts;Nucleo compartilhado;876
+src/lib/integracoes/cartao-v1.test.ts;Nucleo compartilhado;165
+src/lib/integracoes/intake.server.ts;Nucleo compartilhado;370
+src/lib/integracoes/pacientes-v1.server.ts;Nucleo compartilhado;213
+src/lib/integracoes/pacientes-v1.test.ts;Nucleo compartilhado;238
+src/lib/integracoes/verificacao-v1.server.ts;Nucleo compartilhado;504
+src/lib/limpar-html-colado.ts;Nucleo compartilhado;118
+src/lib/menu-hover.ts;Nucleo compartilhado;14
+src/lib/moeda-mascara.test.ts;Nucleo compartilhado;46
+src/lib/moeda-mascara.ts;Nucleo compartilhado;34
+src/lib/motivo.tsx;Nucleo compartilhado;191
+src/lib/nav-hash.test.ts;Nucleo compartilhado;102
+src/lib/nav-hash.ts;Nucleo compartilhado;32
+src/lib/nome-pessoa.ts;Nucleo compartilhado;53
+src/lib/notify.ts;Nucleo compartilhado;43
+src/lib/perf-cronometro.ts;Nucleo compartilhado;97
+src/lib/permissoes-pessoa.test.ts;Nucleo compartilhado;114
+src/lib/permissoes-pessoa.ts;Nucleo compartilhado;85
+src/lib/permissoes-presets.ts;Nucleo compartilhado;351
+src/lib/permissoes-rotas.test.ts;Nucleo compartilhado;215
+src/lib/permissoes-rotas.ts;Nucleo compartilhado;358
+src/lib/permissoes.server.ts;Nucleo compartilhado;98
+src/lib/print-doc-a4.ts;Nucleo compartilhado;155
+src/lib/print-html.ts;Nucleo compartilhado;99
+src/lib/print-relatorio-base.ts;Nucleo compartilhado;114
+src/lib/sanitize-search.ts;Nucleo compartilhado;11
+src/lib/schemas/paciente.ts;Nucleo compartilhado;113
+src/lib/seguranca/sanitizar.ts;Nucleo compartilhado;23
+src/lib/seguranca/schemas.ts;Nucleo compartilhado;82
+src/lib/seguranca/texto.ts;Nucleo compartilhado;66
+src/lib/sessao-cache.ts;Nucleo compartilhado;39
+src/lib/subsystem.ts;Nucleo compartilhado;63
+src/lib/tempo-limite.test.ts;Nucleo compartilhado;72
+src/lib/tempo-limite.ts;Nucleo compartilhado;52
+src/lib/texto-maiusculo.test.ts;Nucleo compartilhado;29
+src/lib/texto-maiusculo.ts;Nucleo compartilhado;45
+src/lib/traduzir-erro.ts;Nucleo compartilhado;288
+src/lib/transcribe.functions.ts;Nucleo compartilhado;53
+src/lib/tts-service.ts;Nucleo compartilhado;674
+src/lib/turbo-mode.ts;Nucleo compartilhado;43
+src/lib/utils.ts;Nucleo compartilhado;7
+src/lib/validators.ts;Nucleo compartilhado;219
+src/lib/zip-simples.ts;Nucleo compartilhado;121
+src/router.tsx;Nucleo compartilhado;52
+src/routes/__root.tsx;Nucleo compartilhado;205
+src/routes/_authenticated.tsx;Nucleo compartilhado;87
+src/routes/_authenticated/app.dev-hhp.tsx;Nucleo compartilhado;242
+src/routes/_authenticated/app.dev-list-shell.tsx;Nucleo compartilhado;264
+src/routes/_authenticated/app.index.tsx;Nucleo compartilhado;29
+src/routes/_authenticated/app.tsx;Nucleo compartilhado;11
+src/routes/[.]lovable.oauth.consent.tsx;Nucleo compartilhado;146
+src/routes/[.well-known]/oauth-protected-resource.ts;Nucleo compartilhado;19
+src/routes/api/integrations/v1/$.ts;Nucleo compartilhado;18
+src/routes/api/public/integrations/v1/$.ts;Nucleo compartilhado;18
+src/routes/api/public/tts-voices.ts;Nucleo compartilhado;94
+src/routes/api/public/tts.ts;Nucleo compartilhado;142
+src/routes/diagnostico.tsx;Nucleo compartilhado;190
+src/routes/index.tsx;Nucleo compartilhado;72
+src/routes/login.tsx;Nucleo compartilhado;276
+src/routes/privacy.tsx;Nucleo compartilhado;244
+src/routes/reset-password.tsx;Nucleo compartilhado;134
+src/routes/sitemap[.]xml.ts;Nucleo compartilhado;53
+src/routeTree.gen.ts;Nucleo compartilhado;4399
+src/server.ts;Nucleo compartilhado;81
+src/start.ts;Nucleo compartilhado;73
+src/styles.css;Nucleo compartilhado;1884
+src/testes/fase4/contratos.test.ts;Nucleo compartilhado;353
+src/testes/fase4/dados-sinteticos.ts;Nucleo compartilhado;99
+src/types/leaflet-heat.d.ts;Nucleo compartilhado;3
+src/types/qz-tray.d.ts;Nucleo compartilhado;34
+src/utils/printService.ts;Nucleo compartilhado;221
+src/components/agenda-v2/agenda-v2-shell.tsx;Frente 1 - Atendimento Clinico;1480
+src/components/agenda-v2/agenda-v2-sidebar.tsx;Frente 1 - Atendimento Clinico;225
+src/components/agenda-v2/ai-insights-strip.tsx;Frente 1 - Atendimento Clinico;180
+src/components/agenda-v2/kpi-bar.tsx;Frente 1 - Atendimento Clinico;72
+src/components/agenda-v2/novo-agendamento-wizard.tsx;Frente 1 - Atendimento Clinico;1155
+src/components/agenda-v2/patient-drawer.tsx;Frente 1 - Atendimento Clinico;713
+src/components/agenda-v2/reagendar-modal.tsx;Frente 1 - Atendimento Clinico;264
+src/components/agenda-v2/session-card.tsx;Frente 1 - Atendimento Clinico;521
+src/components/agenda/agenda-empty-state.tsx;Frente 1 - Atendimento Clinico;96
+src/components/agenda/agenda-por-medico-dia.tsx;Frente 1 - Atendimento Clinico;327
+src/components/agenda/bloqueio-agenda-dialog.tsx;Frente 1 - Atendimento Clinico;248
+src/components/agenda/datetime-field.tsx;Frente 1 - Atendimento Clinico;91
+src/components/agenda/detalhe-resumo-dialog.tsx;Frente 1 - Atendimento Clinico;497
+src/components/agenda/dividir-orcamento-dialog.tsx;Frente 1 - Atendimento Clinico;730
+src/components/agenda/ficha-em-uso-alert.tsx;Frente 1 - Atendimento Clinico;50
+src/components/agenda/paciente-quick-actions.tsx;Frente 1 - Atendimento Clinico;694
+src/components/agenda/paciente-resumo-bar.tsx;Frente 1 - Atendimento Clinico;199
+src/components/agenda/procedimento-cell.tsx;Frente 1 - Atendimento Clinico;217
+src/components/agenda/procedimento-picker.tsx;Frente 1 - Atendimento Clinico;303
+src/components/agenda/resumo-do-dia-bar.tsx;Frente 1 - Atendimento Clinico;266
+src/components/agenda/selecionar-itens-orcamento-dialog.tsx;Frente 1 - Atendimento Clinico;180
+src/components/agenda/tabela-checkup-rosa.tsx;Frente 1 - Atendimento Clinico;86
+src/components/agenda/turbo-mode-toggle.tsx;Frente 1 - Atendimento Clinico;31
+src/components/cid10-picker.tsx;Frente 1 - Atendimento Clinico;81
+src/components/face/FaceCaptureDialog.tsx;Frente 1 - Atendimento Clinico;282
+src/components/face/FaceIdentifyDialog.tsx;Frente 1 - Atendimento Clinico;158
+src/components/fisioterapia/avaliacao-fisio-tab.tsx;Frente 1 - Atendimento Clinico;266
+src/components/fisioterapia/fisio-subnav.tsx;Frente 1 - Atendimento Clinico;55
+src/components/fisioterapia/mapa-corporal.tsx;Frente 1 - Atendimento Clinico;134
+src/components/fisioterapia/marcacao-dialog.tsx;Frente 1 - Atendimento Clinico;219
+src/components/fisioterapia/novo-pacote-dialog.tsx;Frente 1 - Atendimento Clinico;308
+src/components/fisioterapia/pacotes-fisio-tab.tsx;Frente 1 - Atendimento Clinico;277
+src/components/fisioterapia/sessao-dialog.tsx;Frente 1 - Atendimento Clinico;291
+src/components/fluxo/paciente-detalhe-drawer.tsx;Frente 1 - Atendimento Clinico;238
+src/components/hiperdia/criterios-sbd-2025.tsx;Frente 1 - Atendimento Clinico;91
+src/components/hiperdia/hiperdia-panel.tsx;Frente 1 - Atendimento Clinico;629
+src/components/lumen-tv-config.tsx;Frente 1 - Atendimento Clinico;196
+src/components/medico/editor-prontuario.tsx;Frente 1 - Atendimento Clinico;231
+src/components/medico/opcoes-e-baixa.tsx;Frente 1 - Atendimento Clinico;408
+src/components/medico/paciente-dialogs.tsx;Frente 1 - Atendimento Clinico;1041
+src/components/odontograma.tsx;Frente 1 - Atendimento Clinico;96
+src/components/odontologia/add-to-orcamento-dialog.tsx;Frente 1 - Atendimento Clinico;513
+src/components/odontologia/anamnese-odonto-tab.tsx;Frente 1 - Atendimento Clinico;246
+src/components/odontologia/dente-picker.tsx;Frente 1 - Atendimento Clinico;122
+src/components/odontologia/evolucao-odonto-tab.tsx;Frente 1 - Atendimento Clinico;217
+src/components/odontologia/galeria-odonto-tab.tsx;Frente 1 - Atendimento Clinico;215
+src/components/odontologia/novo-orcamento-odonto-dialog.tsx;Frente 1 - Atendimento Clinico;896
+src/components/odontologia/odonto-subnav.tsx;Frente 1 - Atendimento Clinico;52
+src/components/odontologia/odontograma-arcada.tsx;Frente 1 - Atendimento Clinico;347
+src/components/odontologia/odontograma-clinico.tsx;Frente 1 - Atendimento Clinico;389
+src/components/odontologia/orcamento-tab.tsx;Frente 1 - Atendimento Clinico;586
+src/components/odontologia/tabela-precos-odonto-button.tsx;Frente 1 - Atendimento Clinico;202
+src/components/odontologia/upload-imagem-dialog.tsx;Frente 1 - Atendimento Clinico;237
+src/components/odontologia/visualizar-imagem-dialog.tsx;Frente 1 - Atendimento Clinico;231
+src/components/painel/aviso-sem-desfecho.tsx;Frente 1 - Atendimento Clinico;166
+src/components/painel/banner-boas-vindas.tsx;Frente 1 - Atendimento Clinico;93
+src/components/painel/detalhe-cartao-dia.tsx;Frente 1 - Atendimento Clinico;304
+src/components/painel/informacoes-rapidas.tsx;Frente 1 - Atendimento Clinico;525
+src/components/painel/medicos-do-dia-tv.tsx;Frente 1 - Atendimento Clinico;321
+src/components/painel/medicos-periodo.tsx;Frente 1 - Atendimento Clinico;129
+src/components/painel/painel-page.tsx;Frente 1 - Atendimento Clinico;922
+src/components/patient-quick-complete-sheet.tsx;Frente 1 - Atendimento Clinico;316
+src/components/prontuario/apoio-clinico.tsx;Frente 1 - Atendimento Clinico;288
+src/components/prontuario/cid10-autocomplete.tsx;Frente 1 - Atendimento Clinico;109
+src/components/prontuario/historico-prontuario-drawer.tsx;Frente 1 - Atendimento Clinico;248
+src/components/prontuario/linha-do-tempo-prontuario.tsx;Frente 1 - Atendimento Clinico;373
+src/components/prontuario/prescricao-builder.tsx;Frente 1 - Atendimento Clinico;225
+src/components/recepcao/solicitacoes-site.tsx;Frente 1 - Atendimento Clinico;188
+src/components/sessoes/contato-paciente-drawer.tsx;Frente 1 - Atendimento Clinico;311
+src/components/sessoes/registrar-contato-dialog.tsx;Frente 1 - Atendimento Clinico;163
+src/components/totem/teclado-numerico.tsx;Frente 1 - Atendimento Clinico;66
+src/components/voice-input.tsx;Frente 1 - Atendimento Clinico;136
+src/hooks/use-agenda-v2-flag.ts;Frente 1 - Atendimento Clinico;43
+src/hooks/use-atendimento-multiplo-disabled.ts;Frente 1 - Atendimento Clinico;13
+src/hooks/use-dashboard-blocos.ts;Frente 1 - Atendimento Clinico;286
+src/hooks/use-especialidade-odonto.ts;Frente 1 - Atendimento Clinico;26
+src/hooks/use-ficha-presence.ts;Frente 1 - Atendimento Clinico;97
+src/hooks/use-historico-anterior.ts;Frente 1 - Atendimento Clinico;132
+src/hooks/use-medico-context.tsx;Frente 1 - Atendimento Clinico;67
+src/hooks/use-medicos-permitidos.tsx;Frente 1 - Atendimento Clinico;72
+src/lib/agenda-v2/session-detect.ts;Frente 1 - Atendimento Clinico;175
+src/lib/agenda/__tests__/intervalos-grade.test.ts;Frente 1 - Atendimento Clinico;101
+src/lib/agenda/__tests__/mesmo-paciente-fichas-extras.test.ts;Frente 1 - Atendimento Clinico;144
+src/lib/agenda/__tests__/opcoes-profissional.test.ts;Frente 1 - Atendimento Clinico;62
+src/lib/agenda/ator.server.ts;Frente 1 - Atendimento Clinico;91
+src/lib/agenda/aviso-limite-pendentes.test.ts;Frente 1 - Atendimento Clinico;264
+src/lib/agenda/aviso-limite-pendentes.ts;Frente 1 - Atendimento Clinico;114
+src/lib/agenda/bloqueio.test.ts;Frente 1 - Atendimento Clinico;78
+src/lib/agenda/bloqueio.ts;Frente 1 - Atendimento Clinico;148
+src/lib/agenda/chat-agenda.functions.ts;Frente 1 - Atendimento Clinico;377
+src/lib/agenda/checkup-rosa.test.ts;Frente 1 - Atendimento Clinico;124
+src/lib/agenda/checkup-rosa.ts;Frente 1 - Atendimento Clinico;267
+src/lib/agenda/contagem.ts;Frente 1 - Atendimento Clinico;83
+src/lib/agenda/criar-agendamento.core.server.ts;Frente 1 - Atendimento Clinico;735
+src/lib/agenda/criar-agendamento.functions.ts;Frente 1 - Atendimento Clinico;35
+src/lib/agenda/criar-agendamento.types.ts;Frente 1 - Atendimento Clinico;109
+src/lib/agenda/detalhe-resumo.test.ts;Frente 1 - Atendimento Clinico;130
+src/lib/agenda/detalhe-resumo.ts;Frente 1 - Atendimento Clinico;174
+src/lib/agenda/encaixe-posicao.test.ts;Frente 1 - Atendimento Clinico;234
+src/lib/agenda/encaixe-posicao.ts;Frente 1 - Atendimento Clinico;186
+src/lib/agenda/expediente-encerrado.ts;Frente 1 - Atendimento Clinico;61
+src/lib/agenda/ficha-numero.test.ts;Frente 1 - Atendimento Clinico;77
+src/lib/agenda/ficha-numero.ts;Frente 1 - Atendimento Clinico;83
+src/lib/agenda/fichas-extras.test.ts;Frente 1 - Atendimento Clinico;169
+src/lib/agenda/fichas-extras.ts;Frente 1 - Atendimento Clinico;156
+src/lib/agenda/fila-ordem-chegada.test.ts;Frente 1 - Atendimento Clinico;176
+src/lib/agenda/fila-ordem-chegada.ts;Frente 1 - Atendimento Clinico;122
+src/lib/agenda/gr-atendente.functions.ts;Frente 1 - Atendimento Clinico;87
+src/lib/agenda/intervalos-grade.ts;Frente 1 - Atendimento Clinico;133
+src/lib/agenda/motivo-final.test.ts;Frente 1 - Atendimento Clinico;46
+src/lib/agenda/motivo-final.ts;Frente 1 - Atendimento Clinico;36
+src/lib/agenda/opcoes-profissional.ts;Frente 1 - Atendimento Clinico;157
+src/lib/agenda/reagendar-agendamento.core.server.ts;Frente 1 - Atendimento Clinico;228
+src/lib/agenda/reagendar-agendamento.functions.ts;Frente 1 - Atendimento Clinico;44
+src/lib/agenda/refs-cache.ts;Frente 1 - Atendimento Clinico;390
+src/lib/agenda/resumo-do-dia.test.ts;Frente 1 - Atendimento Clinico;166
+src/lib/agenda/resumo-do-dia.ts;Frente 1 - Atendimento Clinico;187
+src/lib/agenda/saldo-atendimento.test.ts;Frente 1 - Atendimento Clinico;91
+src/lib/agenda/saldo-atendimento.ts;Frente 1 - Atendimento Clinico;179
+src/lib/agenda/sem-faturamento-alcada.ts;Frente 1 - Atendimento Clinico;35
+src/lib/agenda/sem-faturamento.test.ts;Frente 1 - Atendimento Clinico;135
+src/lib/agenda/sem-faturamento.ts;Frente 1 - Atendimento Clinico;259
+src/lib/agenda/sinal-orcamento.ts;Frente 1 - Atendimento Clinico;218
+src/lib/agenda/status-agendamento.core.server.ts;Frente 1 - Atendimento Clinico;154
+src/lib/agenda/status-agendamento.functions.ts;Frente 1 - Atendimento Clinico;81
+src/lib/agenda/vaga-livre.ts;Frente 1 - Atendimento Clinico;36
+src/lib/atendimento-multiplo/criar.functions.ts;Frente 1 - Atendimento Clinico;201
+src/lib/biometria.ts;Frente 1 - Atendimento Clinico;46
+src/lib/consulta-ia.functions.ts;Frente 1 - Atendimento Clinico;167
+src/lib/exames-ia.functions.ts;Frente 1 - Atendimento Clinico;196
+src/lib/face-recognition.ts;Frente 1 - Atendimento Clinico;61
+src/lib/fisio-catalogo.ts;Frente 1 - Atendimento Clinico;152
+src/lib/fisio.ts;Frente 1 - Atendimento Clinico;466
+src/lib/fluxo/espera.ts;Frente 1 - Atendimento Clinico;52
+src/lib/hiperdia/afericao.test.ts;Frente 1 - Atendimento Clinico;160
+src/lib/hiperdia/afericao.ts;Frente 1 - Atendimento Clinico;231
+src/lib/lumen-tv.functions.ts;Frente 1 - Atendimento Clinico;161
+src/lib/medico-only.ts;Frente 1 - Atendimento Clinico;65
+src/lib/medico/finalizar-atendimento.ts;Frente 1 - Atendimento Clinico;144
+src/lib/odonto-imagens.ts;Frente 1 - Atendimento Clinico;183
+src/lib/odonto.ts;Frente 1 - Atendimento Clinico;87
+src/lib/painel/cards-do-dia.test.ts;Frente 1 - Atendimento Clinico;59
+src/lib/painel/cards-do-dia.ts;Frente 1 - Atendimento Clinico;64
+src/lib/painel/sem-desfecho.test.ts;Frente 1 - Atendimento Clinico;59
+src/lib/painel/sem-desfecho.ts;Frente 1 - Atendimento Clinico;59
+src/lib/print-a4-medico.ts;Frente 1 - Atendimento Clinico;192
+src/lib/print-comprovante-agendamento.ts;Frente 1 - Atendimento Clinico;384
+src/lib/print-senha.ts;Frente 1 - Atendimento Clinico;210
+src/lib/prontuario.test.ts;Frente 1 - Atendimento Clinico;173
+src/lib/prontuario.ts;Frente 1 - Atendimento Clinico;303
+src/lib/prontuario/html.test.ts;Frente 1 - Atendimento Clinico;22
+src/lib/prontuario/html.ts;Frente 1 - Atendimento Clinico;74
+src/lib/prontuario/macros.ts;Frente 1 - Atendimento Clinico;75
+src/lib/prontuario/prescricao.ts;Frente 1 - Atendimento Clinico;68
+src/lib/qz/sign.functions.ts;Frente 1 - Atendimento Clinico;70
+src/lib/sessoes/busca-ativa-contatos.test.ts;Frente 1 - Atendimento Clinico;156
+src/lib/sessoes/busca-ativa-contatos.ts;Frente 1 - Atendimento Clinico;196
+src/lib/sessoes/carregar-contatos.ts;Frente 1 - Atendimento Clinico;124
+src/lib/sessoes/carregar-sessoes.ts;Frente 1 - Atendimento Clinico;73
+src/lib/sessoes/relatorio-sessoes.test.ts;Frente 1 - Atendimento Clinico;519
+src/lib/sessoes/relatorio-sessoes.ts;Frente 1 - Atendimento Clinico;594
+src/lib/triagem/sinais-vitais.ts;Frente 1 - Atendimento Clinico;161
+src/routes/_authenticated/app.agenda-medicos.tsx;Frente 1 - Atendimento Clinico;440
+src/routes/_authenticated/app.agenda-v2.tsx;Frente 1 - Atendimento Clinico;190
+src/routes/_authenticated/app.agenda.tsx;Frente 1 - Atendimento Clinico;16086
+src/routes/_authenticated/app.alertas-enfermagem.tsx;Frente 1 - Atendimento Clinico;218
+src/routes/_authenticated/app.anamneses.tsx;Frente 1 - Atendimento Clinico;144
+src/routes/_authenticated/app.atendimento-ia.$agendamentoId.tsx;Frente 1 - Atendimento Clinico;1616
+src/routes/_authenticated/app.atendimento-ia.index.tsx;Frente 1 - Atendimento Clinico;1170
+src/routes/_authenticated/app.atendimento-ia.tsx;Frente 1 - Atendimento Clinico;6
+src/routes/_authenticated/app.atendimento-multiplo.tsx;Frente 1 - Atendimento Clinico;730
+src/routes/_authenticated/app.checkin.tsx;Frente 1 - Atendimento Clinico;1057
+src/routes/_authenticated/app.configuracoes.painel-totem.tsx;Frente 1 - Atendimento Clinico;275
+src/routes/_authenticated/app.configuracoes.prontuario.tsx;Frente 1 - Atendimento Clinico;239
+src/routes/_authenticated/app.configuracoes.voz.tsx;Frente 1 - Atendimento Clinico;674
+src/routes/_authenticated/app.consulta-ia.tsx;Frente 1 - Atendimento Clinico;299
+src/routes/_authenticated/app.consulta-rapida.tsx;Frente 1 - Atendimento Clinico;578
+src/routes/_authenticated/app.disponibilidades.tsx;Frente 1 - Atendimento Clinico;3322
+src/routes/_authenticated/app.documentos.tsx;Frente 1 - Atendimento Clinico;279
+src/routes/_authenticated/app.exames-resultados.tsx;Frente 1 - Atendimento Clinico;498
+src/routes/_authenticated/app.fisioterapia.index.tsx;Frente 1 - Atendimento Clinico;90
+src/routes/_authenticated/app.fisioterapia.pacotes.tsx;Frente 1 - Atendimento Clinico;126
+src/routes/_authenticated/app.fluxo.tsx;Frente 1 - Atendimento Clinico;1085
+src/routes/_authenticated/app.hiperdia.tsx;Frente 1 - Atendimento Clinico;76
+src/routes/_authenticated/app.imprimir.$agendamentoId.tsx;Frente 1 - Atendimento Clinico;116
+src/routes/_authenticated/app.medico.$medicoId.tsx;Frente 1 - Atendimento Clinico;492
+src/routes/_authenticated/app.odontologia.index.tsx;Frente 1 - Atendimento Clinico;790
+src/routes/_authenticated/app.painel.tsx;Frente 1 - Atendimento Clinico;939
+src/routes/_authenticated/app.prontuario-modelos.tsx;Frente 1 - Atendimento Clinico;173
+src/routes/_authenticated/app.prontuarios.tsx;Frente 1 - Atendimento Clinico;280
+src/routes/_authenticated/app.recepcao.tsx;Frente 1 - Atendimento Clinico;395
+src/routes/_authenticated/app.triagem-enfermagem.tsx;Frente 1 - Atendimento Clinico;977
+src/routes/api/public/hooks/confirmacao-consultas.ts;Frente 1 - Atendimento Clinico;94
+src/routes/api/public/intake-consulta-hoje.ts;Frente 1 - Atendimento Clinico;16
+src/routes/api/public/intake-sfp.ts;Frente 1 - Atendimento Clinico;16
+src/routes/api/public/intake.ts;Frente 1 - Atendimento Clinico;17
+src/routes/autoatendimento.tsx;Frente 1 - Atendimento Clinico;976
+src/routes/checkin.$token.tsx;Frente 1 - Atendimento Clinico;79
+src/routes/medico.tsx;Frente 1 - Atendimento Clinico;228
+src/routes/painel_.t.$token.tsx;Frente 1 - Atendimento Clinico;26
+src/routes/painel.$clinicaId.tsx;Frente 1 - Atendimento Clinico;24
+src/routes/painel.tsx;Frente 1 - Atendimento Clinico;23
+src/routes/totem_.$clinicaId.tsx;Frente 1 - Atendimento Clinico;28
+src/routes/totem_.t.$token.tsx;Frente 1 - Atendimento Clinico;29
+src/routes/totem.tsx;Frente 1 - Atendimento Clinico;931
+src/components/caixa-v2/alertas-fila.ts;Frente 2 - Financeiro;62
+src/components/caixa-v2/atalhos.ts;Frente 2 - Financeiro;49
+src/components/caixa-v2/caixa-shell.tsx;Frente 2 - Financeiro;1192
+src/components/caixa-v2/caixa-v2-mount.tsx;Frente 2 - Financeiro;40
+src/components/caixa-v2/fila-card.tsx;Frente 2 - Financeiro;141
+src/components/caixa-v2/kpi-bar.tsx;Frente 2 - Financeiro;50
+src/components/caixa-v2/mini-timeline.tsx;Frente 2 - Financeiro;70
+src/components/caixa-v2/painel-resumo.tsx;Frente 2 - Financeiro;91
+src/components/caixa/resumo-formas.tsx;Frente 2 - Financeiro;204
+src/components/caixa/timeline-gaveta.tsx;Frente 2 - Financeiro;148
+src/components/EstornosBell.tsx;Frente 2 - Financeiro;322
+src/components/financeiro/caixas-operadoras.tsx;Frente 2 - Financeiro;497
+src/components/financeiro/card-pendencias-repasse.tsx;Frente 2 - Financeiro;214
+src/components/financeiro/comprovantes-tab.tsx;Frente 2 - Financeiro;879
+src/components/financeiro/EditarEstornoDialog.tsx;Frente 2 - Financeiro;226
+src/components/financeiro/EstornoAtendimentosPanel.tsx;Frente 2 - Financeiro;289
+src/components/financeiro/historico-atendimento-dialog.tsx;Frente 2 - Financeiro;193
+src/components/financeiro/lancamento-dialog.tsx;Frente 2 - Financeiro;2863
+src/components/financeiro/movimento-resultado.tsx;Frente 2 - Financeiro;1443
+src/components/financeiro/pagina-detalhe.tsx;Frente 2 - Financeiro;98
+src/components/financeiro/painel-detalhamento.tsx;Frente 2 - Financeiro;541
+src/components/financeiro/pilulas.tsx;Frente 2 - Financeiro;47
+src/components/financeiro/pix-cobranca-dialog.tsx;Frente 2 - Financeiro;264
+src/components/financeiro/projecao-inteligencia.tsx;Frente 2 - Financeiro;811
+src/components/financeiro/projecao-melhorias-card.tsx;Frente 2 - Financeiro;561
+src/components/financeiro/projecao-pergunta.tsx;Frente 2 - Financeiro;192
+src/components/financeiro/SolicitarEstornoDialog.tsx;Frente 2 - Financeiro;321
+src/components/financeiro/visao-sobreposta.tsx;Frente 2 - Financeiro;295
+src/components/nfse/item-servico-picker.tsx;Frente 2 - Financeiro;99
+src/components/nfse/nfse-lote-dialog.tsx;Frente 2 - Financeiro;367
+src/components/nfse/use-pick-emitente.tsx;Frente 2 - Financeiro;133
+src/components/nfse/use-pick-tomador.tsx;Frente 2 - Financeiro;565
+src/components/nfse/use-prompt-descricao.tsx;Frente 2 - Financeiro;105
+src/components/orcamentos-v2/historico-orcamento-dialog.tsx;Frente 2 - Financeiro;144
+src/components/orcamentos-v2/kpi-bar.tsx;Frente 2 - Financeiro;35
+src/components/orcamentos-v2/orcamento-card.tsx;Frente 2 - Financeiro;258
+src/components/orcamentos-v2/orcamento-drawer.tsx;Frente 2 - Financeiro;239
+src/components/orcamentos-v2/orcamentos-shell.tsx;Frente 2 - Financeiro;400
+src/components/orcamentos-v2/orcamentos-v2-mount.tsx;Frente 2 - Financeiro;41
+src/components/orcamentos-v2/resumo-bar.tsx;Frente 2 - Financeiro;75
+src/components/orcamentos-v2/status-utils.ts;Frente 2 - Financeiro;82
+src/components/orcamentos/conversao-orcamento-dialog.tsx;Frente 2 - Financeiro;919
+src/components/painel-executivo/blocos.tsx;Frente 2 - Financeiro;618
+src/components/painel-executivo/card-indicador.tsx;Frente 2 - Financeiro;154
+src/components/painel-executivo/mapa-calor-origem.tsx;Frente 2 - Financeiro;418
+src/components/painel-executivo/origem-pacientes.tsx;Frente 2 - Financeiro;415
+src/components/relatorios/agendamentos-por-usuario.tsx;Frente 2 - Financeiro;492
+src/components/relatorios/CuboBI.tsx;Frente 2 - Financeiro;1593
+src/components/relatorios/marcacoes-por-atendente.tsx;Frente 2 - Financeiro;420
+src/components/tabela-valores/tabela-valores-dialog.tsx;Frente 2 - Financeiro;90
+src/components/tabela-valores/tabela-valores-painel.tsx;Frente 2 - Financeiro;401
+src/hooks/use-caixa-v2-flag.ts;Frente 2 - Financeiro;43
+src/hooks/use-orcamentos-v2-flag.ts;Frente 2 - Financeiro;43
+src/lib/boleto.functions.ts;Frente 2 - Financeiro;102
+src/lib/caixa/fechamento.test.ts;Frente 2 - Financeiro;249
+src/lib/caixa/fechamento.ts;Frente 2 - Financeiro;256
+src/lib/caixa/resumo-operadoras.test.ts;Frente 2 - Financeiro;188
+src/lib/caixa/resumo-operadoras.ts;Frente 2 - Financeiro;307
+src/lib/dashboard/evolucao-financeira.test.ts;Frente 2 - Financeiro;96
+src/lib/dashboard/evolucao-financeira.ts;Frente 2 - Financeiro;104
+src/lib/estornar-lancamento.ts;Frente 2 - Financeiro;117
+src/lib/financeiro/bi-serie.test.ts;Frente 2 - Financeiro;173
+src/lib/financeiro/bi-serie.ts;Frente 2 - Financeiro;263
+src/lib/financeiro/busca-movimento.test.ts;Frente 2 - Financeiro;107
+src/lib/financeiro/busca-movimento.ts;Frente 2 - Financeiro;94
+src/lib/financeiro/cache-periodo.test.ts;Frente 2 - Financeiro;92
+src/lib/financeiro/cache-periodo.ts;Frente 2 - Financeiro;112
+src/lib/financeiro/cartao-terapeutico.test.ts;Frente 2 - Financeiro;70
+src/lib/financeiro/cartao-terapeutico.ts;Frente 2 - Financeiro;51
+src/lib/financeiro/categorias-carregar.ts;Frente 2 - Financeiro;42
+src/lib/financeiro/composicao-receita.test.ts;Frente 2 - Financeiro;382
+src/lib/financeiro/composicao-receita.ts;Frente 2 - Financeiro;369
+src/lib/financeiro/contas.ts;Frente 2 - Financeiro;66
+src/lib/financeiro/detalhe-aba.test.ts;Frente 2 - Financeiro;74
+src/lib/financeiro/detalhe-aba.ts;Frente 2 - Financeiro;151
+src/lib/financeiro/detalhe-tabela.ts;Frente 2 - Financeiro;27
+src/lib/financeiro/estatisticas-analise.test.ts;Frente 2 - Financeiro;175
+src/lib/financeiro/estatisticas-analise.ts;Frente 2 - Financeiro;214
+src/lib/financeiro/extrato-caixa.test.ts;Frente 2 - Financeiro;594
+src/lib/financeiro/extrato-caixa.ts;Frente 2 - Financeiro;698
+src/lib/financeiro/extrato-carregar.ts;Frente 2 - Financeiro;426
+src/lib/financeiro/filtro-categoria.test.ts;Frente 2 - Financeiro;89
+src/lib/financeiro/filtro-categoria.ts;Frente 2 - Financeiro;114
+src/lib/financeiro/fora-do-caixa-carregar.ts;Frente 2 - Financeiro;134
+src/lib/financeiro/formas-pagamento.test.ts;Frente 2 - Financeiro;269
+src/lib/financeiro/formas-pagamento.ts;Frente 2 - Financeiro;475
+src/lib/financeiro/format.test.ts;Frente 2 - Financeiro;51
+src/lib/financeiro/format.ts;Frente 2 - Financeiro;54
+src/lib/financeiro/meio-pagamento.ts;Frente 2 - Financeiro;70
+src/lib/financeiro/movimento-resultado.test.ts;Frente 2 - Financeiro;430
+src/lib/financeiro/movimento-resultado.ts;Frente 2 - Financeiro;660
+src/lib/financeiro/paginacao.test.ts;Frente 2 - Financeiro;100
+src/lib/financeiro/paginacao.ts;Frente 2 - Financeiro;110
+src/lib/financeiro/painel-financeiro-carregar.ts;Frente 2 - Financeiro;206
+src/lib/financeiro/painel-financeiro.test.ts;Frente 2 - Financeiro;381
+src/lib/financeiro/painel-financeiro.ts;Frente 2 - Financeiro;444
+src/lib/financeiro/pendencias-repasse.test.ts;Frente 2 - Financeiro;97
+src/lib/financeiro/pendencias-repasse.ts;Frente 2 - Financeiro;126
+src/lib/financeiro/periodos.test.ts;Frente 2 - Financeiro;74
+src/lib/financeiro/periodos.ts;Frente 2 - Financeiro;86
+src/lib/financeiro/preset-periodo.test.ts;Frente 2 - Financeiro;145
+src/lib/financeiro/preset-periodo.ts;Frente 2 - Financeiro;228
+src/lib/financeiro/projecao-agenda.test.ts;Frente 2 - Financeiro;256
+src/lib/financeiro/projecao-agenda.ts;Frente 2 - Financeiro;651
+src/lib/financeiro/projecao-ia.functions.ts;Frente 2 - Financeiro;73
+src/lib/financeiro/projecao-melhorias.test.ts;Frente 2 - Financeiro;129
+src/lib/financeiro/projecao-melhorias.ts;Frente 2 - Financeiro;508
+src/lib/financeiro/projecao-meta-semana.test.ts;Frente 2 - Financeiro;167
+src/lib/financeiro/projecao-meta-semana.ts;Frente 2 - Financeiro;349
+src/lib/financeiro/projecao-pergunta.test.ts;Frente 2 - Financeiro;100
+src/lib/financeiro/projecao-pergunta.ts;Frente 2 - Financeiro;191
+src/lib/financeiro/projecao.test.ts;Frente 2 - Financeiro;290
+src/lib/financeiro/projecao.ts;Frente 2 - Financeiro;441
+src/lib/financeiro/rateio-colunas.test.ts;Frente 2 - Financeiro;246
+src/lib/financeiro/rateio-colunas.ts;Frente 2 - Financeiro;133
+src/lib/financeiro/rateio-receita.test.ts;Frente 2 - Financeiro;437
+src/lib/financeiro/rateio-receita.ts;Frente 2 - Financeiro;1545
+src/lib/financeiro/receita-por-forma.test.ts;Frente 2 - Financeiro;171
+src/lib/financeiro/receita-por-forma.ts;Frente 2 - Financeiro;117
+src/lib/financeiro/registro-no-caixa.test.ts;Frente 2 - Financeiro;106
+src/lib/financeiro/registro-no-caixa.ts;Frente 2 - Financeiro;88
+src/lib/financeiro/retroativos.test.ts;Frente 2 - Financeiro;297
+src/lib/financeiro/retroativos.ts;Frente 2 - Financeiro;345
+src/lib/financeiro/saldo-por-meio.test.ts;Frente 2 - Financeiro;47
+src/lib/nfse-aviso-cep.ts;Frente 2 - Financeiro;21
+src/lib/nfse-aviso-emitente.ts;Frente 2 - Financeiro;30
+src/lib/nfse-backfill.functions.ts;Frente 2 - Financeiro;40
+src/lib/nfse-backfill.server.ts;Frente 2 - Financeiro;141
+src/lib/nfse-backfill.test.ts;Frente 2 - Financeiro;42
+src/lib/nfse-backfill.ts;Frente 2 - Financeiro;99
+src/lib/nfse-classificacao-servico.test.ts;Frente 2 - Financeiro;55
+src/lib/nfse-classificacao-servico.ts;Frente 2 - Financeiro;91
+src/lib/nfse-descricao.server.ts;Frente 2 - Financeiro;42
+src/lib/nfse-descricao.test.ts;Frente 2 - Financeiro;51
+src/lib/nfse-descricao.ts;Frente 2 - Financeiro;104
+src/lib/nfse-endereco-tomador.test.ts;Frente 2 - Financeiro;103
+src/lib/nfse-endereco-tomador.ts;Frente 2 - Financeiro;95
+src/lib/nfse-numeracao.test.ts;Frente 2 - Financeiro;120
+src/lib/nfse-numeracao.ts;Frente 2 - Financeiro;86
+src/lib/nfse-retorno.server.ts;Frente 2 - Financeiro;60
+src/lib/nfse-retorno.test.ts;Frente 2 - Financeiro;33
+src/lib/nfse-retorno.ts;Frente 2 - Financeiro;128
+src/lib/nfse-roteamento-emitente.test.ts;Frente 2 - Financeiro;50
+src/lib/nfse-roteamento-emitente.ts;Frente 2 - Financeiro;85
+src/lib/nfse-tomador.test.ts;Frente 2 - Financeiro;39
+src/lib/nfse-tomador.ts;Frente 2 - Financeiro;45
+src/lib/nfse-tributos-aproximados.test.ts;Frente 2 - Financeiro;39
+src/lib/nfse-tributos-aproximados.ts;Frente 2 - Financeiro;48
+src/lib/nfse-tributos-federais.test.ts;Frente 2 - Financeiro;54
+src/lib/nfse-tributos-federais.ts;Frente 2 - Financeiro;64
+src/lib/nfse.functions.ts;Frente 2 - Financeiro;1619
+src/lib/orcamento-numero.ts;Frente 2 - Financeiro;47
+src/lib/orcamento-preparos.test.ts;Frente 2 - Financeiro;61
+src/lib/orcamento-preparos.ts;Frente 2 - Financeiro;90
+src/lib/orcamentos/correspondencia-servico.test.ts;Frente 2 - Financeiro;124
+src/lib/orcamentos/correspondencia-servico.ts;Frente 2 - Financeiro;183
+src/lib/orcamentos/leitura-pedido.test.ts;Frente 2 - Financeiro;59
+src/lib/orcamentos/leitura-pedido.ts;Frente 2 - Financeiro;88
+src/lib/orcamentos/ler-pedido-medico.functions.ts;Frente 2 - Financeiro;71
+src/lib/pagamento-status.ts;Frente 2 - Financeiro;93
+src/lib/pix/br-code.test.ts;Frente 2 - Financeiro;193
+src/lib/pix/br-code.ts;Frente 2 - Financeiro;169
+src/lib/pix/chave-clinica.ts;Frente 2 - Financeiro;87
+src/lib/print-caixa-comprovante.test.ts;Frente 2 - Financeiro;71
+src/lib/print-caixa-comprovante.ts;Frente 2 - Financeiro;803
+src/lib/print-gr.ts;Frente 2 - Financeiro;3349
+src/lib/print-orcamento.ts;Frente 2 - Financeiro;533
+src/lib/print-pedido-compra.ts;Frente 2 - Financeiro;113
+src/lib/print-recibo-lancamento.ts;Frente 2 - Financeiro;278
+src/lib/print-relatorio-financeiro.test.ts;Frente 2 - Financeiro;125
+src/lib/print-relatorio-financeiro.ts;Frente 2 - Financeiro;202
+src/lib/print-tabela-precos.ts;Frente 2 - Financeiro;83
+src/lib/relatorios/agendamentos-por-usuario.test.ts;Frente 2 - Financeiro;118
+src/lib/relatorios/agendamentos-por-usuario.ts;Frente 2 - Financeiro;211
+src/lib/relatorios/buscar-por-dia.ts;Frente 2 - Financeiro;61
+src/lib/relatorios/buscar-por-ids.ts;Frente 2 - Financeiro;59
+src/lib/relatorios/marcacoes-por-atendente.test.ts;Frente 2 - Financeiro;139
+src/lib/relatorios/marcacoes-por-atendente.ts;Frente 2 - Financeiro;136
+src/lib/relatorios/modalidade-atendimento.test.ts;Frente 2 - Financeiro;106
+src/lib/relatorios/modalidade-atendimento.ts;Frente 2 - Financeiro;117
+src/lib/repasse-calc.test.ts;Frente 2 - Financeiro;405
+src/lib/repasse-calc.ts;Frente 2 - Financeiro;366
+src/lib/repasse-por-servico.test.ts;Frente 2 - Financeiro;91
+src/lib/repasse-por-servico.ts;Frente 2 - Financeiro;153
+src/lib/tabela-valores/abrir.ts;Frente 2 - Financeiro;15
+src/lib/tabela-valores/calcular.test.ts;Frente 2 - Financeiro;254
+src/lib/tabela-valores/calcular.ts;Frente 2 - Financeiro;245
+src/lib/tabela-valores/tabela-precos-especialidade.test.ts;Frente 2 - Financeiro;129
+src/lib/tabela-valores/tabela-precos-especialidade.ts;Frente 2 - Financeiro;136
+src/routes/_authenticated/app.boletos.tsx;Frente 2 - Financeiro;608
+src/routes/_authenticated/app.caixa.tsx;Frente 2 - Financeiro;7239
+src/routes/_authenticated/app.configuracoes.nfse.tsx;Frente 2 - Financeiro;804
+src/routes/_authenticated/app.dev-caixa-shell.tsx;Frente 2 - Financeiro;74
+src/routes/_authenticated/app.dev-orcamentos-shell.tsx;Frente 2 - Financeiro;80
+src/routes/_authenticated/app.financeiro.alertas.tsx;Frente 2 - Financeiro;130
+src/routes/_authenticated/app.financeiro.analitico.tsx;Frente 2 - Financeiro;135
+src/routes/_authenticated/app.financeiro.atendimentos-externos.tsx;Frente 2 - Financeiro;199
+src/routes/_authenticated/app.financeiro.atendimentos.tsx;Frente 2 - Financeiro;5406
+src/routes/_authenticated/app.financeiro.bi.tsx;Frente 2 - Financeiro;534
+src/routes/_authenticated/app.financeiro.categorias.tsx;Frente 2 - Financeiro;237
+src/routes/_authenticated/app.financeiro.contas.tsx;Frente 2 - Financeiro;357
+src/routes/_authenticated/app.financeiro.detalhe.tsx;Frente 2 - Financeiro;21
+src/routes/_authenticated/app.financeiro.empresas.tsx;Frente 2 - Financeiro;266
+src/routes/_authenticated/app.financeiro.estatisticas.tsx;Frente 2 - Financeiro;765
+src/routes/_authenticated/app.financeiro.estorno.tsx;Frente 2 - Financeiro;687
+src/routes/_authenticated/app.financeiro.index.tsx;Frente 2 - Financeiro;1307
+src/routes/_authenticated/app.financeiro.lembretes.tsx;Frente 2 - Financeiro;288
+src/routes/_authenticated/app.financeiro.movimento-detalhe.tsx;Frente 2 - Financeiro;26
+src/routes/_authenticated/app.financeiro.movimento.tsx;Frente 2 - Financeiro;3749
+src/routes/_authenticated/app.financeiro.notas.tsx;Frente 2 - Financeiro;794
+src/routes/_authenticated/app.financeiro.pendencias.tsx;Frente 2 - Financeiro;286
+src/routes/_authenticated/app.financeiro.projecao.tsx;Frente 2 - Financeiro;682
+src/routes/_authenticated/app.financeiro.regras-ia.tsx;Frente 2 - Financeiro;292
+src/routes/_authenticated/app.financeiro.relatorios.tsx;Frente 2 - Financeiro;3455
+src/routes/_authenticated/app.financeiro.tsx;Frente 2 - Financeiro;262
+src/routes/_authenticated/app.nfse.index.tsx;Frente 2 - Financeiro;1503
+src/routes/_authenticated/app.nfse.testar.tsx;Frente 2 - Financeiro;432
+src/routes/_authenticated/app.odontologia.orcamentos.tsx;Frente 2 - Financeiro;131
+src/routes/_authenticated/app.orcamentos-agenda.tsx;Frente 2 - Financeiro;252
+src/routes/_authenticated/app.orcamentos.tsx;Frente 2 - Financeiro;2512
+src/routes/_authenticated/app.painel-executivo.tsx;Frente 2 - Financeiro;2379
+src/routes/_authenticated/app.relatorios.tsx;Frente 2 - Financeiro;2113
+src/routes/_authenticated/app.tabela-valores.tsx;Frente 2 - Financeiro;36
+src/routes/api/public/focusnfe.webhook.ts;Frente 2 - Financeiro;140
+src/routes/paciente.financeiro.tsx;Frente 2 - Financeiro;236
+src/components/cartao-beneficios/aviso-vinculo-duplicado.tsx;Frente 3 - Clientes, Cartao e Gestao;76
+src/components/cartao-beneficios/faturamento-rapido-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;679
+src/components/cartao-beneficios/image-crop-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;277
+src/components/cartao-beneficios/informativo-pdf-viewer.tsx;Frente 3 - Clientes, Cartao e Gestao;177
+src/components/cartao-beneficios/informativo-seed.ts;Frente 3 - Clientes, Cartao e Gestao;79
+src/components/cartao-beneficios/pagamento-avulso-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;735
+src/components/cartao-beneficios/regras-tab.tsx;Frente 3 - Clientes, Cartao e Gestao;1721
+src/components/cartao-beneficios/rich-editor.tsx;Frente 3 - Clientes, Cartao e Gestao;1589
+src/components/cartao-beneficios/table-cell-bg-menu.tsx;Frente 3 - Clientes, Cartao e Gestao;97
+src/components/cartao-beneficios/table-insert-menu.tsx;Frente 3 - Clientes, Cartao e Gestao;94
+src/components/cartao/conferencia-page.tsx;Frente 3 - Clientes, Cartao e Gestao;1006
+src/components/cartao/convenios-page.tsx;Frente 3 - Clientes, Cartao e Gestao;1127
+src/components/cartao/credito-clinica-painel.tsx;Frente 3 - Clientes, Cartao e Gestao;332
+src/components/cartao/dependentes-page.tsx;Frente 3 - Clientes, Cartao e Gestao;549
+src/components/cartao/importar-page.tsx;Frente 3 - Clientes, Cartao e Gestao;941
+src/components/cartao/layout.tsx;Frente 3 - Clientes, Cartao e Gestao;81
+src/components/cartao/relatorios-page.tsx;Frente 3 - Clientes, Cartao e Gestao;1249
+src/components/cartao/sem-convenio-page.tsx;Frente 3 - Clientes, Cartao e Gestao;490
+src/components/clientes-v2/cliente-card.tsx;Frente 3 - Clientes, Cartao e Gestao;157
+src/components/clientes-v2/cliente-drawer.tsx;Frente 3 - Clientes, Cartao e Gestao;120
+src/components/clientes-v2/clientes-shell.tsx;Frente 3 - Clientes, Cartao e Gestao;390
+src/components/clientes-v2/kpi-bar.tsx;Frente 3 - Clientes, Cartao e Gestao;36
+src/components/clientes-v2/resumo-bar.tsx;Frente 3 - Clientes, Cartao e Gestao;70
+src/components/clientes-v2/status-utils.ts;Frente 3 - Clientes, Cartao e Gestao;120
+src/components/clientes-v2/use-kpis.ts;Frente 3 - Clientes, Cartao e Gestao;83
+src/components/clientes-v2/use-total-pacientes.ts;Frente 3 - Clientes, Cartao e Gestao;28
+src/components/clientes/aviso-prontuario-fora-da-estante.tsx;Frente 3 - Clientes, Cartao e Gestao;151
+src/components/clientes/cliente-form.tsx;Frente 3 - Clientes, Cartao e Gestao;2562
+src/components/clientes/editar-cliente-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;117
+src/components/clientes/paciente-atendimentos-resumo.tsx;Frente 3 - Clientes, Cartao e Gestao;247
+src/components/clientes/paciente-cartoes-beneficios.tsx;Frente 3 - Clientes, Cartao e Gestao;507
+src/components/clientes/paciente-fisio-panel.tsx;Frente 3 - Clientes, Cartao e Gestao;69
+src/components/clientes/paciente-odonto-panel.tsx;Frente 3 - Clientes, Cartao e Gestao;241
+src/components/clientes/paciente-sessoes-panel.tsx;Frente 3 - Clientes, Cartao e Gestao;236
+src/components/coach/AtendenteGuard.tsx;Frente 3 - Clientes, Cartao e Gestao;79
+src/components/coach/BaseConhecimentoEditor.tsx;Frente 3 - Clientes, Cartao e Gestao;102
+src/components/coach/Certificado.tsx;Frente 3 - Clientes, Cartao e Gestao;137
+src/components/coach/EventosSeguranca.tsx;Frente 3 - Clientes, Cartao e Gestao;91
+src/components/coach/EvolucaoAtendente.tsx;Frente 3 - Clientes, Cartao e Gestao;283
+src/components/coach/GestaoDesempenho.tsx;Frente 3 - Clientes, Cartao e Gestao;632
+src/components/coach/HistoricoAtendente.tsx;Frente 3 - Clientes, Cartao e Gestao;379
+src/components/coach/HistoricoGestor.tsx;Frente 3 - Clientes, Cartao e Gestao;312
+src/components/coach/HistoricoSemUsuario.tsx;Frente 3 - Clientes, Cartao e Gestao;211
+src/components/coach/MarcaClinica.tsx;Frente 3 - Clientes, Cartao e Gestao;38
+src/components/coach/MinhaMeta.tsx;Frente 3 - Clientes, Cartao e Gestao;63
+src/components/coach/painel-views.tsx;Frente 3 - Clientes, Cartao e Gestao;2394
+src/components/coach/PainelAcoes.tsx;Frente 3 - Clientes, Cartao e Gestao;207
+src/components/coach/PainelGestora.tsx;Frente 3 - Clientes, Cartao e Gestao;442
+src/components/coach/ProtecaoTela.tsx;Frente 3 - Clientes, Cartao e Gestao;107
+src/components/coach/TelefoniaSufficit.tsx;Frente 3 - Clientes, Cartao e Gestao;327
+src/components/coach/TraineeHome.tsx;Frente 3 - Clientes, Cartao e Gestao;439
+src/components/coach/UsoIA.tsx;Frente 3 - Clientes, Cartao e Gestao;111
+src/components/coach/VozEditor.tsx;Frente 3 - Clientes, Cartao e Gestao;167
+src/components/contratos/contratos-cards.tsx;Frente 3 - Clientes, Cartao e Gestao;985
+src/components/contratos/editar-paciente-rapido-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;150
+src/components/contratos/historico-contrato-tab.tsx;Frente 3 - Clientes, Cartao e Gestao;490
+src/components/contratos/isencao-carencia-lote-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;331
+src/components/contratos/recalcular-vencimentos-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;333
+src/components/contratos/renovar-contrato-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;960
+src/components/funcionarios/ConvenioFuncionarioTab.tsx;Frente 3 - Clientes, Cartao e Gestao;320
+src/components/funcionarios/FuncionarioDadosDialog.tsx;Frente 3 - Clientes, Cartao e Gestao;372
+src/components/funcionarios/FuncionarioFormDialog.tsx;Frente 3 - Clientes, Cartao e Gestao;816
+src/components/medicos/ConvenioMedicoTab.tsx;Frente 3 - Clientes, Cartao e Gestao;329
+src/components/medicos/EncerrarExpedienteButton.tsx;Frente 3 - Clientes, Cartao e Gestao;300
+src/components/medicos/MedicoAgendasTab.tsx;Frente 3 - Clientes, Cartao e Gestao;346
+src/components/medicos/MedicoFormDialog.tsx;Frente 3 - Clientes, Cartao e Gestao;2925
+src/components/paciente/alerta-critico.tsx;Frente 3 - Clientes, Cartao e Gestao;202
+src/components/paciente/badge-paciente-distante.tsx;Frente 3 - Clientes, Cartao e Gestao;35
+src/components/pacientes/confirmar-prontuario-distante.tsx;Frente 3 - Clientes, Cartao e Gestao;66
+src/components/pacientes/quick-patient-dialog.tsx;Frente 3 - Clientes, Cartao e Gestao;292
+src/components/pages/contratos-page.tsx;Frente 3 - Clientes, Cartao e Gestao;7965
+src/components/pages/planos-page.tsx;Frente 3 - Clientes, Cartao e Gestao;331
+src/hooks/use-catalogo-atualizado.ts;Frente 3 - Clientes, Cartao e Gestao;79
+src/hooks/use-clientes-v2-flag.ts;Frente 3 - Clientes, Cartao e Gestao;43
+src/lib/backups.functions.ts;Frente 3 - Clientes, Cartao e Gestao;172
+src/lib/busca-servico.test.ts;Frente 3 - Clientes, Cartao e Gestao;36
+src/lib/busca-servico.ts;Frente 3 - Clientes, Cartao e Gestao;73
+src/lib/cartao/credito-clinica.ts;Frente 3 - Clientes, Cartao e Gestao;148
+src/lib/cartao/indicadores.test.ts;Frente 3 - Clientes, Cartao e Gestao;314
+src/lib/cartao/indicadores.ts;Frente 3 - Clientes, Cartao e Gestao;329
+src/lib/cartao/parcelas-que-faltam.test.ts;Frente 3 - Clientes, Cartao e Gestao;137
+src/lib/cartao/parcelas-que-faltam.ts;Frente 3 - Clientes, Cartao e Gestao;121
+src/lib/cartao/produto.ts;Frente 3 - Clientes, Cartao e Gestao;48
+src/lib/cartao/regerar-parcelas.test.ts;Frente 3 - Clientes, Cartao e Gestao;63
+src/lib/cartao/regerar-parcelas.ts;Frente 3 - Clientes, Cartao e Gestao;95
+src/lib/cb-regras.test.ts;Frente 3 - Clientes, Cartao e Gestao;116
+src/lib/cb-regras.ts;Frente 3 - Clientes, Cartao e Gestao;209
+src/lib/coach/__tests__/sessao-calculo.test.ts;Frente 3 - Clientes, Cartao e Gestao;110
+src/lib/coach/__tests__/treinamento-plano.test.ts;Frente 3 - Clientes, Cartao e Gestao;96
+src/lib/coach/analyze.functions.ts;Frente 3 - Clientes, Cartao e Gestao;456
+src/lib/coach/base-conhecimento.dados.ts;Frente 3 - Clientes, Cartao e Gestao;109
+src/lib/coach/base-conhecimento.ts;Frente 3 - Clientes, Cartao e Gestao;492
+src/lib/coach/base.functions.ts;Frente 3 - Clientes, Cartao e Gestao;59
+src/lib/coach/clinica-tema.ts;Frente 3 - Clientes, Cartao e Gestao;43
+src/lib/coach/config-clinica.ts;Frente 3 - Clientes, Cartao e Gestao;196
+src/lib/coach/config.server.ts;Frente 3 - Clientes, Cartao e Gestao;27
+src/lib/coach/contexto.ts;Frente 3 - Clientes, Cartao e Gestao;151
+src/lib/coach/data-atual.ts;Frente 3 - Clientes, Cartao e Gestao;65
+src/lib/coach/guard-prompt.test.ts;Frente 3 - Clientes, Cartao e Gestao;78
+src/lib/coach/guard.server.ts;Frente 3 - Clientes, Cartao e Gestao;190
+src/lib/coach/identidade.ts;Frente 3 - Clientes, Cartao e Gestao;40
+src/lib/coach/prova-persist.ts;Frente 3 - Clientes, Cartao e Gestao;55
+src/lib/coach/prova.functions.ts;Frente 3 - Clientes, Cartao e Gestao;167
+src/lib/coach/prova.server.ts;Frente 3 - Clientes, Cartao e Gestao;265
+src/lib/coach/roleplay-persist.ts;Frente 3 - Clientes, Cartao e Gestao;55
+src/lib/coach/roleplay-prompt.server.ts;Frente 3 - Clientes, Cartao e Gestao;341
+src/lib/coach/roleplay-tipos.ts;Frente 3 - Clientes, Cartao e Gestao;37
+src/lib/coach/roleplay.functions.ts;Frente 3 - Clientes, Cartao e Gestao;132
+src/lib/coach/salvar.functions.ts;Frente 3 - Clientes, Cartao e Gestao;148
+src/lib/coach/scripts.ts;Frente 3 - Clientes, Cartao e Gestao;14
+src/lib/coach/seguranca-tela.ts;Frente 3 - Clientes, Cartao e Gestao;60
+src/lib/coach/sessao-calculo.ts;Frente 3 - Clientes, Cartao e Gestao;89
+src/lib/coach/sessao.functions.ts;Frente 3 - Clientes, Cartao e Gestao;583
+src/lib/coach/sessao.server.ts;Frente 3 - Clientes, Cartao e Gestao;303
+src/lib/coach/study-time.ts;Frente 3 - Clientes, Cartao e Gestao;103
+src/lib/coach/telefonia-sufficit.server.ts;Frente 3 - Clientes, Cartao e Gestao;279
+src/lib/coach/telefonia.functions.ts;Frente 3 - Clientes, Cartao e Gestao;101
+src/lib/coach/treinamento-plano.ts;Frente 3 - Clientes, Cartao e Gestao;216
+src/lib/coach/variedade.ts;Frente 3 - Clientes, Cartao e Gestao;65
+src/lib/coach/voz-sistema.ts;Frente 3 - Clientes, Cartao e Gestao;172
+src/lib/contract-templates/menino-jesus-cartao-consulta-seguros.ts;Frente 3 - Clientes, Cartao e Gestao;1032
+src/lib/contract-templates/sao-francisco-cartao-consulta-seguros.ts;Frente 3 - Clientes, Cartao e Gestao;203
+src/lib/contract-templates/sao-francisco-cartao-desconto-seguros.ts;Frente 3 - Clientes, Cartao e Gestao;208
+src/lib/contrato-dependentes.test.ts;Frente 3 - Clientes, Cartao e Gestao;58
+src/lib/contrato-dependentes.ts;Frente 3 - Clientes, Cartao e Gestao;347
+src/lib/convenio/cartao-da-familia.test.ts;Frente 3 - Clientes, Cartao e Gestao;91
+src/lib/convenio/cartao-da-familia.ts;Frente 3 - Clientes, Cartao e Gestao;231
+src/lib/convenio/escolher-contrato-ativo.test.ts;Frente 3 - Clientes, Cartao e Gestao;135
+src/lib/convenio/escolher-contrato-ativo.ts;Frente 3 - Clientes, Cartao e Gestao;127
+src/lib/convenio/info-convenio-paciente.ts;Frente 3 - Clientes, Cartao e Gestao;1414
+src/lib/convenio/modalidade.ts;Frente 3 - Clientes, Cartao e Gestao;283
+src/lib/convenio/revisao-gratuita.test.ts;Frente 3 - Clientes, Cartao e Gestao;53
+src/lib/convenio/revisao-gratuita.ts;Frente 3 - Clientes, Cartao e Gestao;82
+src/lib/convenio/tipo-atendimento-padrao.ts;Frente 3 - Clientes, Cartao e Gestao;181
+src/lib/convenio/vidas-contrato.test.ts;Frente 3 - Clientes, Cartao e Gestao;149
+src/lib/convenio/vidas-contrato.ts;Frente 3 - Clientes, Cartao e Gestao;156
+src/lib/equipe.functions.ts;Frente 3 - Clientes, Cartao e Gestao;420
+src/lib/equipe/marcacao-gestao.test.ts;Frente 3 - Clientes, Cartao e Gestao;113
+src/lib/equipe/marcacao-gestao.ts;Frente 3 - Clientes, Cartao e Gestao;88
+src/lib/estoque/status.ts;Frente 3 - Clientes, Cartao e Gestao;129
+src/lib/importar-beneficiarios.test.ts;Frente 3 - Clientes, Cartao e Gestao;332
+src/lib/importar-beneficiarios.ts;Frente 3 - Clientes, Cartao e Gestao;552
+src/lib/importar-documento.ts;Frente 3 - Clientes, Cartao e Gestao;253
+src/lib/importar-medicos.test.ts;Frente 3 - Clientes, Cartao e Gestao;514
+src/lib/importar-medicos.ts;Frente 3 - Clientes, Cartao e Gestao;1182
+src/lib/importar-servicos.test.ts;Frente 3 - Clientes, Cartao e Gestao;281
+src/lib/importar-servicos.ts;Frente 3 - Clientes, Cartao e Gestao;616
+src/lib/lms-certificate.ts;Frente 3 - Clientes, Cartao e Gestao;59
+src/lib/nome-servico.test.ts;Frente 3 - Clientes, Cartao e Gestao;27
+src/lib/nome-servico.ts;Frente 3 - Clientes, Cartao e Gestao;27
+src/lib/paciente-distancia.ts;Frente 3 - Clientes, Cartao e Gestao;34
+src/lib/paciente/alerta-critico.test.ts;Frente 3 - Clientes, Cartao e Gestao;45
+src/lib/paciente/alerta-critico.ts;Frente 3 - Clientes, Cartao e Gestao;48
+src/lib/perguntar-vinculo-dependente.ts;Frente 3 - Clientes, Cartao e Gestao;27
+src/lib/print-carne.test.ts;Frente 3 - Clientes, Cartao e Gestao;74
+src/lib/print-carne.ts;Frente 3 - Clientes, Cartao e Gestao;741
+src/lib/print-cartao.ts;Frente 3 - Clientes, Cartao e Gestao;201
+src/lib/print-contrato.ts;Frente 3 - Clientes, Cartao e Gestao;815
+src/lib/procedimento/categoria.ts;Frente 3 - Clientes, Cartao e Gestao;111
+src/lib/procedimento/laboratorio-top60.ts;Frente 3 - Clientes, Cartao e Gestao;118
+src/routes/_authenticated/app.auditoria.tsx;Frente 3 - Clientes, Cartao e Gestao;762
+src/routes/_authenticated/app.backups.tsx;Frente 3 - Clientes, Cartao e Gestao;256
+src/routes/_authenticated/app.campanhas.tsx;Frente 3 - Clientes, Cartao e Gestao;179
+src/routes/_authenticated/app.cargos.tsx;Frente 3 - Clientes, Cartao e Gestao;285
+src/routes/_authenticated/app.cartao-beneficios.conferencia.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-beneficios.contratos.tsx;Frente 3 - Clientes, Cartao e Gestao;15
+src/routes/_authenticated/app.cartao-beneficios.convenios.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-beneficios.dependentes.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-beneficios.importar.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-beneficios.modelos.tsx;Frente 3 - Clientes, Cartao e Gestao;9
+src/routes/_authenticated/app.cartao-beneficios.relatorios.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-beneficios.sem-convenio.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-beneficios.tsx;Frente 3 - Clientes, Cartao e Gestao;24
+src/routes/_authenticated/app.cartao-terapeutico.conferencia.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-terapeutico.contratos.tsx;Frente 3 - Clientes, Cartao e Gestao;15
+src/routes/_authenticated/app.cartao-terapeutico.convenios.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-terapeutico.dependentes.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-terapeutico.importar.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-terapeutico.relatorios.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.cartao-terapeutico.tsx;Frente 3 - Clientes, Cartao e Gestao;24
+src/routes/_authenticated/app.chat.tsx;Frente 3 - Clientes, Cartao e Gestao;1254
+src/routes/_authenticated/app.clientes.$pacienteId.editar.tsx;Frente 3 - Clientes, Cartao e Gestao;113
+src/routes/_authenticated/app.clientes.$pacienteId.visualizar.tsx;Frente 3 - Clientes, Cartao e Gestao;221
+src/routes/_authenticated/app.clientes.duplicados.tsx;Frente 3 - Clientes, Cartao e Gestao;717
+src/routes/_authenticated/app.clientes.index.tsx;Frente 3 - Clientes, Cartao e Gestao;998
+src/routes/_authenticated/app.clientes.recentes.tsx;Frente 3 - Clientes, Cartao e Gestao;212
+src/routes/_authenticated/app.clinicas.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.coach.index.tsx;Frente 3 - Clientes, Cartao e Gestao;74
+src/routes/_authenticated/app.coach.prova.$nome.tsx;Frente 3 - Clientes, Cartao e Gestao;733
+src/routes/_authenticated/app.coach.roleplay.$nome.tsx;Frente 3 - Clientes, Cartao e Gestao;2102
+src/routes/_authenticated/app.contratos.tsx;Frente 3 - Clientes, Cartao e Gestao;8
+src/routes/_authenticated/app.crm.tsx;Frente 3 - Clientes, Cartao e Gestao;216
+src/routes/_authenticated/app.dev-clientes-shell.tsx;Frente 3 - Clientes, Cartao e Gestao;76
+src/routes/_authenticated/app.equipe-acessos.tsx;Frente 3 - Clientes, Cartao e Gestao;338
+src/routes/_authenticated/app.equipe.importar.tsx;Frente 3 - Clientes, Cartao e Gestao;1116
+src/routes/_authenticated/app.equipe.index.tsx;Frente 3 - Clientes, Cartao e Gestao;665
+src/routes/_authenticated/app.equipe.medico.$medicoId.editar.tsx;Frente 3 - Clientes, Cartao e Gestao;57
+src/routes/_authenticated/app.equipe.tsx;Frente 3 - Clientes, Cartao e Gestao;6
+src/routes/_authenticated/app.especialidades.tsx;Frente 3 - Clientes, Cartao e Gestao;524
+src/routes/_authenticated/app.estoque.tsx;Frente 3 - Clientes, Cartao e Gestao;1300
+src/routes/_authenticated/app.hr-contratos.$id.tsx;Frente 3 - Clientes, Cartao e Gestao;1087
+src/routes/_authenticated/app.hr-contratos.index.tsx;Frente 3 - Clientes, Cartao e Gestao;290
+src/routes/_authenticated/app.hr-ferias.tsx;Frente 3 - Clientes, Cartao e Gestao;359
+src/routes/_authenticated/app.hr-holerites.tsx;Frente 3 - Clientes, Cartao e Gestao;414
+src/routes/_authenticated/app.hr-ponto.tsx;Frente 3 - Clientes, Cartao e Gestao;273
+src/routes/_authenticated/app.integration-secrets.tsx;Frente 3 - Clientes, Cartao e Gestao;117
+src/routes/_authenticated/app.lgpd.tsx;Frente 3 - Clientes, Cartao e Gestao;353
+src/routes/_authenticated/app.lms-admin.tsx;Frente 3 - Clientes, Cartao e Gestao;442
+src/routes/_authenticated/app.medicos.tsx;Frente 3 - Clientes, Cartao e Gestao;25
+src/routes/_authenticated/app.mkt-envios.tsx;Frente 3 - Clientes, Cartao e Gestao;164
+src/routes/_authenticated/app.mkt-landing.tsx;Frente 3 - Clientes, Cartao e Gestao;213
+src/routes/_authenticated/app.mkt-leads.tsx;Frente 3 - Clientes, Cartao e Gestao;203
+src/routes/_authenticated/app.mkt-segmentos.tsx;Frente 3 - Clientes, Cartao e Gestao;113
+src/routes/_authenticated/app.modelos-documentos.tsx;Frente 3 - Clientes, Cartao e Gestao;139
+src/routes/_authenticated/app.perfis.tsx;Frente 3 - Clientes, Cartao e Gestao;1649
+src/routes/_authenticated/app.planos.tsx;Frente 3 - Clientes, Cartao e Gestao;10
+src/routes/_authenticated/app.procedimentos_.importar.tsx;Frente 3 - Clientes, Cartao e Gestao;1104
+src/routes/_authenticated/app.procedimentos.tsx;Frente 3 - Clientes, Cartao e Gestao;2142
+src/routes/_authenticated/app.revisao-convenio.tsx;Frente 3 - Clientes, Cartao e Gestao;578
+src/routes/_authenticated/app.setores.tsx;Frente 3 - Clientes, Cartao e Gestao;243
+src/routes/_authenticated/app.tipos-servico.tsx;Frente 3 - Clientes, Cartao e Gestao;336
+src/routes/_authenticated/app.treinamentos.tsx;Frente 3 - Clientes, Cartao e Gestao;287
+src/routes/_authenticated/app.unidades.tsx;Frente 3 - Clientes, Cartao e Gestao;503
+src/routes/api/public/hooks/backup-diario.ts;Frente 3 - Clientes, Cartao e Gestao;399
+src/routes/lp.$slug.tsx;Frente 3 - Clientes, Cartao e Gestao;194
+src/routes/p.$token.tsx;Frente 3 - Clientes, Cartao e Gestao;286
+src/routes/p.contrato.$token.tsx;Frente 3 - Clientes, Cartao e Gestao;188
+src/routes/paciente.cartoes.tsx;Frente 3 - Clientes, Cartao e Gestao;281
+src/routes/paciente.consultas.tsx;Frente 3 - Clientes, Cartao e Gestao;190
+src/routes/paciente.index.tsx;Frente 3 - Clientes, Cartao e Gestao;98
+src/routes/paciente.perfil.tsx;Frente 3 - Clientes, Cartao e Gestao;212
+src/routes/signup.tsx;Frente 3 - Clientes, Cartao e Gestao;206
+src/routes/verificar.$codigo.tsx;Frente 3 - Clientes, Cartao e Gestao;74
+src/components/acessibilidade/AjustesOsZap.tsx;OS ZAP (fora da divisao);353
+src/components/agenda/atendimento-externo-dialog.tsx;OS ZAP (fora da divisao);311
+src/components/atendimento/Departamentos.tsx;OS ZAP (fora da divisao);74
+src/components/atendimento/DepartamentosDemonstracao.tsx;OS ZAP (fora da divisao);58
+src/components/atendimento/DepartamentosView.tsx;OS ZAP (fora da divisao);275
+src/components/atendimento/PainelTvAtendimento.tsx;OS ZAP (fora da divisao);996
+src/components/francisco/FranciscoWorkspace.tsx;OS ZAP (fora da divisao);1311
+src/components/francisco/HomologacaoFrancisco.tsx;OS ZAP (fora da divisao);393
+src/components/nina/__tests__/catalogo-escopo-horarios.test.ts;OS ZAP (fora da divisao);37
+src/components/nina/__tests__/detalhes-mensagem-nina.test.ts;OS ZAP (fora da divisao);319
+src/components/nina/__tests__/evento-atribuicao-manual.test.ts;OS ZAP (fora da divisao);69
+src/components/nina/__tests__/eventos-internos-apresentacao.test.tsx;OS ZAP (fora da divisao);288
+src/components/nina/__tests__/fixtures/carga-teste-montagem.fixture.tsx;OS ZAP (fora da divisao);356
+src/components/nina/__tests__/fixtures/historico-scroll.fixture.tsx;OS ZAP (fora da divisao);162
+src/components/nina/__tests__/fixtures/inspecao-mensagem.fixture.tsx;OS ZAP (fora da divisao);534
+src/components/nina/__tests__/historico-scroll.test.ts;OS ZAP (fora da divisao);17
+src/components/nina/__tests__/inspecao-mensagem-montagem.test.ts;OS ZAP (fora da divisao);19
+src/components/nina/__tests__/registro-turno-resumo.test.ts;OS ZAP (fora da divisao);130
+src/components/nina/__tests__/visao-simples-nina.test.ts;OS ZAP (fora da divisao);34
+src/components/nina/AgendaConversaDrawer.tsx;OS ZAP (fora da divisao);737
+src/components/nina/AgendamentosContato.tsx;OS ZAP (fora da divisao);43
+src/components/nina/AnaliseErroIAResultado.tsx;OS ZAP (fora da divisao);225
+src/components/nina/AnalistaMetricasIA.tsx;OS ZAP (fora da divisao);561
+src/components/nina/ArquiteturaCanvas.tsx;OS ZAP (fora da divisao);778
+src/components/nina/AssistenteEscritaChat.tsx;OS ZAP (fora da divisao);251
+src/components/nina/AtendentesEmPausa.tsx;OS ZAP (fora da divisao);56
+src/components/nina/AtendimentoExtraTabs.tsx;OS ZAP (fora da divisao);4644
+src/components/nina/AudioMensagem.tsx;OS ZAP (fora da divisao);62
+src/components/nina/AvaliacaoSol.tsx;OS ZAP (fora da divisao);381
+src/components/nina/AvatarContato.tsx;OS ZAP (fora da divisao);28
+src/components/nina/BadgeConversaNova.tsx;OS ZAP (fora da divisao);17
+src/components/nina/BadgeEspera.tsx;OS ZAP (fora da divisao);71
+src/components/nina/BannerNaoAtribuidas.tsx;OS ZAP (fora da divisao);87
+src/components/nina/BaseConhecimento.tsx;OS ZAP (fora da divisao);86
+src/components/nina/CalibracaoConfianca.tsx;OS ZAP (fora da divisao);386
+src/components/nina/CaminhoProducaoCanvas.tsx;OS ZAP (fora da divisao);595
+src/components/nina/carga-bateria-campos.test.ts;OS ZAP (fora da divisao);14
+src/components/nina/carga-bateria-ui.test.ts;OS ZAP (fora da divisao);48
+src/components/nina/carga-teste-montagem.test.ts;OS ZAP (fora da divisao);22
+src/components/nina/carga-teste-ui.test.ts;OS ZAP (fora da divisao);412
+src/components/nina/carga-teste-ui.ts;OS ZAP (fora da divisao);265
+src/components/nina/CargaAgregada.tsx;OS ZAP (fora da divisao);154
+src/components/nina/CargaBateria.tsx;OS ZAP (fora da divisao);272
+src/components/nina/CargaBateriaResultado.tsx;OS ZAP (fora da divisao);180
+src/components/nina/CargaConfiguracao.tsx;OS ZAP (fora da divisao);127
+src/components/nina/CargaDiaReal.tsx;OS ZAP (fora da divisao);175
+src/components/nina/CargaDiaRealProgresso.tsx;OS ZAP (fora da divisao);52
+src/components/nina/CargaPlano.tsx;OS ZAP (fora da divisao);140
+src/components/nina/CargaTeste.tsx;OS ZAP (fora da divisao);955
+src/components/nina/catalogo/CatalogoNina.tsx;OS ZAP (fora da divisao);916
+src/components/nina/catalogo/DadosClinicaBase.tsx;OS ZAP (fora da divisao);55
+src/components/nina/catalogo/DicionarioCatalogoEditor.tsx;OS ZAP (fora da divisao);266
+src/components/nina/catalogo/EdicaoLoteIA.tsx;OS ZAP (fora da divisao);335
+src/components/nina/catalogo/EstruturaCatalogoEditor.tsx;OS ZAP (fora da divisao);357
+src/components/nina/catalogo/FonteConsultaMaria.tsx;OS ZAP (fora da divisao);173
+src/components/nina/catalogo/FormasPagamentoEditor.tsx;OS ZAP (fora da divisao);113
+src/components/nina/catalogo/FormProfissional.tsx;OS ZAP (fora da divisao);470
+src/components/nina/catalogo/FormServico.tsx;OS ZAP (fora da divisao);363
+src/components/nina/catalogo/HorarioFuncionamento.tsx;OS ZAP (fora da divisao);832
+src/components/nina/catalogo/ImportacaoCompleta.tsx;OS ZAP (fora da divisao);227
+src/components/nina/catalogo/MapaCamposCatalogo.tsx;OS ZAP (fora da divisao);59
+src/components/nina/catalogo/PedidoMedicoEditor.tsx;OS ZAP (fora da divisao);46
+src/components/nina/catalogo/SincronizacaoCatalogo.tsx;OS ZAP (fora da divisao);315
+src/components/nina/catalogo/TextoCatalogo.tsx;OS ZAP (fora da divisao);78
+src/components/nina/CenariosTeste.tsx;OS ZAP (fora da divisao);628
+src/components/nina/CentralAtencao.tsx;OS ZAP (fora da divisao);443
+src/components/nina/ConfiabilidadeDecisao.tsx;OS ZAP (fora da divisao);100
+src/components/nina/ConfiancaMensagem.tsx;OS ZAP (fora da divisao);589
+src/components/nina/ConfiancaRespostas.tsx;OS ZAP (fora da divisao);199
+src/components/nina/ConsultaBaseChat.tsx;OS ZAP (fora da divisao);243
+src/components/nina/ConversaAuditoriaDialog.tsx;OS ZAP (fora da divisao);264
+src/components/nina/ConversaSkeleton.tsx;OS ZAP (fora da divisao);44
+src/components/nina/ConversationEventGroup.tsx;OS ZAP (fora da divisao);224
+src/components/nina/ConversationSystemEvent.tsx;OS ZAP (fora da divisao);122
+src/components/nina/CorrecaoExecucaoPainel.tsx;OS ZAP (fora da divisao);147
+src/components/nina/CorrecaoRelatorioCard.tsx;OS ZAP (fora da divisao);224
+src/components/nina/CronometroPausa.tsx;OS ZAP (fora da divisao);41
+src/components/nina/DashboardHomologacao.tsx;OS ZAP (fora da divisao);350
+src/components/nina/DashboardOsZap.tsx;OS ZAP (fora da divisao);49
+src/components/nina/DashboardOsZapView.tsx;OS ZAP (fora da divisao);1218
+src/components/nina/DesempenhoPorPeriodo.tsx;OS ZAP (fora da divisao);357
+src/components/nina/DetalhesMensagemNina.tsx;OS ZAP (fora da divisao);451
+src/components/nina/distribuicao-fila-ui.test.ts;OS ZAP (fora da divisao);85
+src/components/nina/distribuicao-fila-ui.ts;OS ZAP (fora da divisao);84
+src/components/nina/EvidenciasExecucao.tsx;OS ZAP (fora da divisao);131
+src/components/nina/EvidenciasLimites.tsx;OS ZAP (fora da divisao);44
+src/components/nina/ExecucaoDiagnostico.tsx;OS ZAP (fora da divisao);201
+src/components/nina/FilaHumana.tsx;OS ZAP (fora da divisao);161
+src/components/nina/FiltrosAtendente.tsx;OS ZAP (fora da divisao);42
+src/components/nina/HomologacaoInbox.tsx;OS ZAP (fora da divisao);2184
+src/components/nina/IdentidadeAtendimentoCampos.tsx;OS ZAP (fora da divisao);131
+src/components/nina/ImagemMensagemAmpliada.tsx;OS ZAP (fora da divisao);180
+src/components/nina/InboxConversationCard.tsx;OS ZAP (fora da divisao);151
+src/components/nina/InformacoesClinica.tsx;OS ZAP (fora da divisao);20
+src/components/nina/InspecaoMensagemNina.tsx;OS ZAP (fora da divisao);171
+src/components/nina/InstrucoesNina.tsx;OS ZAP (fora da divisao);793
+src/components/nina/JevDecisaoContexto.tsx;OS ZAP (fora da divisao);40
+src/components/nina/JevObservacaoIntencao.tsx;OS ZAP (fora da divisao);69
+src/components/nina/LaboratorioNina.tsx;OS ZAP (fora da divisao);115
+src/components/nina/MensagensAnterioresResumo.tsx;OS ZAP (fora da divisao);40
+src/components/nina/MetricasConfiabilidade.tsx;OS ZAP (fora da divisao);483
+src/components/nina/MidiaMensagem.tsx;OS ZAP (fora da divisao);224
+src/components/nina/NinaMessage.tsx;OS ZAP (fora da divisao);62
+src/components/nina/NodeDetalhePainel.tsx;OS ZAP (fora da divisao);493
+src/components/nina/os-zap.css;OS ZAP (fora da divisao);402
+src/components/nina/PesquisaConversas.tsx;OS ZAP (fora da divisao);306
+src/components/nina/PipelineHomologacao.tsx;OS ZAP (fora da divisao);81
+src/components/nina/PromptsSalvosCarga.tsx;OS ZAP (fora da divisao);170
+src/components/nina/PromptSystemEditor.tsx;OS ZAP (fora da divisao);92
+src/components/nina/RastrearExecucao.tsx;OS ZAP (fora da divisao);240
+src/components/nina/RegistroTurnoResumo.tsx;OS ZAP (fora da divisao);294
+src/components/nina/RegrasPublicadasRevisao.tsx;OS ZAP (fora da divisao);95
+src/components/nina/RelatorioHomologacao.tsx;OS ZAP (fora da divisao);690
+src/components/nina/ReportarErroNinaDialog.tsx;OS ZAP (fora da divisao);94
+src/components/nina/RespostasRapidas.tsx;OS ZAP (fora da divisao);245
+src/components/nina/RespostasRapidasManager.tsx;OS ZAP (fora da divisao);429
+src/components/nina/ResumoHandoffCard.tsx;OS ZAP (fora da divisao);139
+src/components/nina/RevisarVinculoDialog.tsx;OS ZAP (fora da divisao);151
+src/components/nina/SaidaMensagem.tsx;OS ZAP (fora da divisao);100
+src/components/nina/SeletorStatusPresenca.tsx;OS ZAP (fora da divisao);133
+src/components/nina/SimulacaoAtendimento.tsx;OS ZAP (fora da divisao);359
+src/components/nina/TemperaturaNina.tsx;OS ZAP (fora da divisao);156
+src/components/nina/TranscricaoAudioMensagem.tsx;OS ZAP (fora da divisao);46
+src/components/nina/use-resumo-handoff.ts;OS ZAP (fora da divisao);191
+src/components/nina/use-resumos-conversa.ts;OS ZAP (fora da divisao);58
+src/components/nina/VerificacoesHomologacao.tsx;OS ZAP (fora da divisao);173
+src/components/nina/VisaoSimplesNina.tsx;OS ZAP (fora da divisao);142
+src/components/nina/VozNina.tsx;OS ZAP (fora da divisao);470
+src/hooks/use-chat-scroll.ts;OS ZAP (fora da divisao);145
+src/hooks/use-conversa-voz.ts;OS ZAP (fora da divisao);187
+src/hooks/use-mostrar-conversas-teste.ts;OS ZAP (fora da divisao);54
+src/hooks/use-nina-desativada.ts;OS ZAP (fora da divisao);15
+src/hooks/use-realtime-atendimento.ts;OS ZAP (fora da divisao);123
+src/hooks/use-relogio-pausa.ts;OS ZAP (fora da divisao);21
+src/hooks/use-webmcp-contexto.ts;OS ZAP (fora da divisao);180
+src/lib/__tests__/whatsapp-assinatura.test.ts;OS ZAP (fora da divisao);39
+src/lib/agenda/__tests__/nina-vaga-confirmada.test.ts;OS ZAP (fora da divisao);165
+src/lib/agenda/atendimento-externo-preco.ts;OS ZAP (fora da divisao);21
+src/lib/agenda/atendimento-externo-repasse.ts;OS ZAP (fora da divisao);121
+src/lib/agenda/atendimento-externo.functions.ts;OS ZAP (fora da divisao);148
+src/lib/agenda/atendimento-externo.server.ts;OS ZAP (fora da divisao);95
+src/lib/agenda/confirmacao-whatsapp.server.ts;OS ZAP (fora da divisao);949
+src/lib/agenda/confirmacao-whatsapp.test.ts;OS ZAP (fora da divisao);116
+src/lib/agenda/confirmacao-whatsapp.ts;OS ZAP (fora da divisao);256
+src/lib/atendimento-ai.functions.ts;OS ZAP (fora da divisao);177
+src/lib/atendimento-classify.test.ts;OS ZAP (fora da divisao);107
+src/lib/atendimento-classify.ts;OS ZAP (fora da divisao);90
+src/lib/atendimento.functions.ts;OS ZAP (fora da divisao);3692
+src/lib/atendimento/__tests__/abertura-rapida-qa.test.ts;OS ZAP (fora da divisao);148
+src/lib/atendimento/__tests__/abrir-conversa.test.ts;OS ZAP (fora da divisao);21
+src/lib/atendimento/__tests__/abrir-mensagem-alvo.test.ts;OS ZAP (fora da divisao);63
+src/lib/atendimento/__tests__/acesso-telas-oszap.test.ts;OS ZAP (fora da divisao);53
+src/lib/atendimento/__tests__/agendamentos-contato.test.ts;OS ZAP (fora da divisao);73
+src/lib/atendimento/__tests__/assinatura-otimista.test.ts;OS ZAP (fora da divisao);53
+src/lib/atendimento/__tests__/assistente-escrita.test.ts;OS ZAP (fora da divisao);196
+src/lib/atendimento/__tests__/avatar-contato.test.tsx;OS ZAP (fora da divisao);52
+src/lib/atendimento/__tests__/aviso-encaminhamento.test.ts;OS ZAP (fora da divisao);134
+src/lib/atendimento/__tests__/badge-nina.test.ts;OS ZAP (fora da divisao);90
+src/lib/atendimento/__tests__/cache-abertura-fase2.test.ts;OS ZAP (fora da divisao);80
+src/lib/atendimento/__tests__/cartao-encaminhamento-resumo.test.tsx;OS ZAP (fora da divisao);122
+src/lib/atendimento/__tests__/central-conversas.test.ts;OS ZAP (fora da divisao);158
+src/lib/atendimento/__tests__/claim-admin-migration.test.ts;OS ZAP (fora da divisao);106
+src/lib/atendimento/__tests__/consulta-base-chat.test.ts;OS ZAP (fora da divisao);172
+src/lib/atendimento/__tests__/continuidade-fila.test.ts;OS ZAP (fora da divisao);288
+src/lib/atendimento/__tests__/controle-presenca.test.ts;OS ZAP (fora da divisao);97
+src/lib/atendimento/__tests__/conversa-cache.test.ts;OS ZAP (fora da divisao);87
+src/lib/atendimento/__tests__/conversa-nova.server.test.ts;OS ZAP (fora da divisao);289
+src/lib/atendimento/__tests__/conversa-nova.test.ts;OS ZAP (fora da divisao);150
+src/lib/atendimento/__tests__/conversa-teste-unica.test.ts;OS ZAP (fora da divisao);206
+src/lib/atendimento/__tests__/conversas-teste-acesso.test.ts;OS ZAP (fora da divisao);40
+src/lib/atendimento/__tests__/conversas-teste.test.ts;OS ZAP (fora da divisao);116
+src/lib/atendimento/__tests__/cronometro-pausa.test.ts;OS ZAP (fora da divisao);348
+src/lib/atendimento/__tests__/dashboard-oszap.test.ts;OS ZAP (fora da divisao);439
+src/lib/atendimento/__tests__/data-hora.test.ts;OS ZAP (fora da divisao);38
+src/lib/atendimento/__tests__/deep-link.test.ts;OS ZAP (fora da divisao);80
+src/lib/atendimento/__tests__/departamentos-postgres.test.ts;OS ZAP (fora da divisao);361
+src/lib/atendimento/__tests__/distribuicao-server.test.ts;OS ZAP (fora da divisao);141
+src/lib/atendimento/__tests__/encerramento-supervisao.test.ts;OS ZAP (fora da divisao);43
+src/lib/atendimento/__tests__/envio-otimista.test.ts;OS ZAP (fora da divisao);87
+src/lib/atendimento/__tests__/escopo-inbox.test.ts;OS ZAP (fora da divisao);211
+src/lib/atendimento/__tests__/fase2-envio-instantaneo.test.ts;OS ZAP (fora da divisao);167
+src/lib/atendimento/__tests__/fase3-realtime-direto.test.ts;OS ZAP (fora da divisao);129
+src/lib/atendimento/__tests__/fase3-resumo-unico.test.ts;OS ZAP (fora da divisao);81
+src/lib/atendimento/__tests__/fase4-caminho-critico.test.ts;OS ZAP (fora da divisao);119
+src/lib/atendimento/__tests__/fase6-presenca-integrada.test.ts;OS ZAP (fora da divisao);481
+src/lib/atendimento/__tests__/fase7-benchmark.test.ts;OS ZAP (fora da divisao);331
+src/lib/atendimento/__tests__/filtro-atendente-realtime.test.ts;OS ZAP (fora da divisao);129
+src/lib/atendimento/__tests__/filtro-atendente.test.ts;OS ZAP (fora da divisao);146
+src/lib/atendimento/__tests__/filtros-atendente.test.ts;OS ZAP (fora da divisao);195
+src/lib/atendimento/__tests__/filtros-inbox.test.ts;OS ZAP (fora da divisao);191
+src/lib/atendimento/__tests__/fixtures/encerramento-auditoria.fixture.ts;OS ZAP (fora da divisao);57
+src/lib/atendimento/__tests__/fixtures/resumo-retencao-server.fixture.ts;OS ZAP (fora da divisao);211
+src/lib/atendimento/__tests__/historico-cache-qa.test.ts;OS ZAP (fora da divisao);172
+src/lib/atendimento/__tests__/historico-paginado.test.ts;OS ZAP (fora da divisao);308
+src/lib/atendimento/__tests__/identidade-contato-fase1.test.ts;OS ZAP (fora da divisao);103
+src/lib/atendimento/__tests__/identidade-divergencia-fase5.test.ts;OS ZAP (fora da divisao);44
+src/lib/atendimento/__tests__/inbox-cache.test.ts;OS ZAP (fora da divisao);120
+src/lib/atendimento/__tests__/inbox-merge.test.ts;OS ZAP (fora da divisao);76
+src/lib/atendimento/__tests__/inbox-rbac-e2e.test.ts;OS ZAP (fora da divisao);132
+src/lib/atendimento/__tests__/inbox-realtime.test.ts;OS ZAP (fora da divisao);74
+src/lib/atendimento/__tests__/latencia.test.ts;OS ZAP (fora da divisao);170
+src/lib/atendimento/__tests__/leitura-abertura.test.ts;OS ZAP (fora da divisao);52
+src/lib/atendimento/__tests__/leitura-fase4.test.ts;OS ZAP (fora da divisao);99
+src/lib/atendimento/__tests__/leitura-fase5.test.ts;OS ZAP (fora da divisao);148
+src/lib/atendimento/__tests__/leitura-inbox.test.ts;OS ZAP (fora da divisao);35
+src/lib/atendimento/__tests__/leitura-operacional.test.ts;OS ZAP (fora da divisao);70
+src/lib/atendimento/__tests__/links-entrada.test.ts;OS ZAP (fora da divisao);78
+src/lib/atendimento/__tests__/marcador-handoff.test.ts;OS ZAP (fora da divisao);52
+src/lib/atendimento/__tests__/mensagem-handoff.test.ts;OS ZAP (fora da divisao);81
+src/lib/atendimento/__tests__/mensagens-janela.test.ts;OS ZAP (fora da divisao);71
+src/lib/atendimento/__tests__/metadados-lista.test.ts;OS ZAP (fora da divisao);127
+src/lib/atendimento/__tests__/midia-whatsapp.test.tsx;OS ZAP (fora da divisao);512
+src/lib/atendimento/__tests__/motivos-transferencia.test.ts;OS ZAP (fora da divisao);149
+src/lib/atendimento/__tests__/numero-conversa.test.ts;OS ZAP (fora da divisao);72
+src/lib/atendimento/__tests__/ordem-estavel.test.ts;OS ZAP (fora da divisao);143
+src/lib/atendimento/__tests__/paginacao-inbox.test.ts;OS ZAP (fora da divisao);89
+src/lib/atendimento/__tests__/painel-tv-telefonia.test.ts;OS ZAP (fora da divisao);251
+src/lib/atendimento/__tests__/pausa-para-saida-migration.test.ts;OS ZAP (fora da divisao);299
+src/lib/atendimento/__tests__/perf-troca.test.ts;OS ZAP (fora da divisao);109
+src/lib/atendimento/__tests__/pesquisa-satisfacao.test.ts;OS ZAP (fora da divisao);48
+src/lib/atendimento/__tests__/pos-envio.test.ts;OS ZAP (fora da divisao);110
+src/lib/atendimento/__tests__/prefetch-cache.test.ts;OS ZAP (fora da divisao);77
+src/lib/atendimento/__tests__/prefetch-incremental-qa.test.ts;OS ZAP (fora da divisao);191
+src/lib/atendimento/__tests__/presenca-manual.test.ts;OS ZAP (fora da divisao);74
+src/lib/atendimento/__tests__/presenca-sync.test.ts;OS ZAP (fora da divisao);125
+src/lib/atendimento/__tests__/presenca-transferencia.test.ts;OS ZAP (fora da divisao);16
+src/lib/atendimento/__tests__/protocolo-handoff.test.ts;OS ZAP (fora da divisao);90
+src/lib/atendimento/__tests__/realtime-conexao.test.ts;OS ZAP (fora da divisao);66
+src/lib/atendimento/__tests__/realtime-filtros-fase4.test.ts;OS ZAP (fora da divisao);185
+src/lib/atendimento/__tests__/realtime-roteador.test.ts;OS ZAP (fora da divisao);188
+src/lib/atendimento/__tests__/reconciliacao-otimista.test.ts;OS ZAP (fora da divisao);93
+src/lib/atendimento/__tests__/relogio-pausa.test.ts;OS ZAP (fora da divisao);72
+src/lib/atendimento/__tests__/responsabilidade-espera-fase3.test.ts;OS ZAP (fora da divisao);59
+src/lib/atendimento/__tests__/resumo-atividades.test.tsx;OS ZAP (fora da divisao);188
+src/lib/atendimento/__tests__/resumo-desfecho.test.ts;OS ZAP (fora da divisao);57
+src/lib/atendimento/__tests__/resumo-retencao-server.test.ts;OS ZAP (fora da divisao);25
+src/lib/atendimento/__tests__/resumo-retencao.test.ts;OS ZAP (fora da divisao);113
+src/lib/atendimento/__tests__/retomada.test.ts;OS ZAP (fora da divisao);71
+src/lib/atendimento/__tests__/rotulo-conversa.test.ts;OS ZAP (fora da divisao);59
+src/lib/atendimento/__tests__/scroll-chat.test.ts;OS ZAP (fora da divisao);144
+src/lib/atendimento/__tests__/seletor-status-presenca.test.tsx;OS ZAP (fora da divisao);57
+src/lib/atendimento/__tests__/simulacao-atendimento.test.ts;OS ZAP (fora da divisao);101
+src/lib/atendimento/__tests__/supervisao-responde.test.ts;OS ZAP (fora da divisao);102
+src/lib/atendimento/__tests__/teclado-envio.test.ts;OS ZAP (fora da divisao);21
+src/lib/atendimento/__tests__/telefone-filtro.test.ts;OS ZAP (fora da divisao);37
+src/lib/atendimento/__tests__/timeline-encerramento.test.ts;OS ZAP (fora da divisao);112
+src/lib/atendimento/__tests__/timeline-handoff.test.ts;OS ZAP (fora da divisao);204
+src/lib/atendimento/__tests__/timeline-reabertura.test.ts;OS ZAP (fora da divisao);150
+src/lib/atendimento/__tests__/timeline-resumos.test.ts;OS ZAP (fora da divisao);114
+src/lib/atendimento/__tests__/transcricao-audio.test.tsx;OS ZAP (fora da divisao);48
+src/lib/atendimento/__tests__/troca-abas-carregamento.test.ts;OS ZAP (fora da divisao);135
+src/lib/atendimento/__tests__/troca-conversa-qa.test.ts;OS ZAP (fora da divisao);185
+src/lib/atendimento/__tests__/watchdog-realtime.test.ts;OS ZAP (fora da divisao);62
+src/lib/atendimento/abrir-conversa.ts;OS ZAP (fora da divisao);39
+src/lib/atendimento/acesso-conversa-erros.ts;OS ZAP (fora da divisao);18
+src/lib/atendimento/acesso-conversa.server.ts;OS ZAP (fora da divisao);120
+src/lib/atendimento/acesso-conversa.test.ts;OS ZAP (fora da divisao);69
+src/lib/atendimento/acesso-telas-oszap.ts;OS ZAP (fora da divisao);36
+src/lib/atendimento/agendamentos-contato.ts;OS ZAP (fora da divisao);22
+src/lib/atendimento/assistente-escrita.functions.ts;OS ZAP (fora da divisao);41
+src/lib/atendimento/assistente-escrita.server.ts;OS ZAP (fora da divisao);100
+src/lib/atendimento/assistente-escrita.ts;OS ZAP (fora da divisao);80
+src/lib/atendimento/atualizacao-incremental.ts;OS ZAP (fora da divisao);76
+src/lib/atendimento/aviso-encaminhamento.server.ts;OS ZAP (fora da divisao);267
+src/lib/atendimento/aviso-encaminhamento.ts;OS ZAP (fora da divisao);195
+src/lib/atendimento/badge-nina.ts;OS ZAP (fora da divisao);76
+src/lib/atendimento/benchmark-latencia.ts;OS ZAP (fora da divisao);284
+src/lib/atendimento/central-atencao.server.test.ts;OS ZAP (fora da divisao);350
+src/lib/atendimento/central-atencao.server.ts;OS ZAP (fora da divisao);176
+src/lib/atendimento/central-atencao.test.ts;OS ZAP (fora da divisao);261
+src/lib/atendimento/central-atencao.ts;OS ZAP (fora da divisao);225
+src/lib/atendimento/central-conversas.server.ts;OS ZAP (fora da divisao);35
+src/lib/atendimento/ciclo-e2e.test.ts;OS ZAP (fora da divisao);231
+src/lib/atendimento/ciclo-responsabilidade.test.ts;OS ZAP (fora da divisao);66
+src/lib/atendimento/ciclo-responsabilidade.ts;OS ZAP (fora da divisao);125
+src/lib/atendimento/consulta-base-chat.functions.ts;OS ZAP (fora da divisao);28
+src/lib/atendimento/consulta-base-chat.server.ts;OS ZAP (fora da divisao);43
+src/lib/atendimento/consulta-base-chat.ts;OS ZAP (fora da divisao);151
+src/lib/atendimento/contato-cache.ts;OS ZAP (fora da divisao);79
+src/lib/atendimento/contato-fase4.test.ts;OS ZAP (fora da divisao);124
+src/lib/atendimento/controle-presenca.ts;OS ZAP (fora da divisao);97
+src/lib/atendimento/conversa-cache.ts;OS ZAP (fora da divisao);133
+src/lib/atendimento/conversa-nova.server.ts;OS ZAP (fora da divisao);149
+src/lib/atendimento/conversa-nova.ts;OS ZAP (fora da divisao);83
+src/lib/atendimento/conversas-teste-acesso.server.ts;OS ZAP (fora da divisao);20
+src/lib/atendimento/conversas-teste.ts;OS ZAP (fora da divisao);58
+src/lib/atendimento/cronometro-pausa.server.ts;OS ZAP (fora da divisao);48
+src/lib/atendimento/cronometro-pausa.ts;OS ZAP (fora da divisao);57
+src/lib/atendimento/dashboard-oszap-periodos.ts;OS ZAP (fora da divisao);92
+src/lib/atendimento/dashboard-oszap.functions.ts;OS ZAP (fora da divisao);20
+src/lib/atendimento/dashboard-oszap.server.ts;OS ZAP (fora da divisao);321
+src/lib/atendimento/dashboard-oszap.ts;OS ZAP (fora da divisao);569
+src/lib/atendimento/data-hora.ts;OS ZAP (fora da divisao);23
+src/lib/atendimento/deep-link.ts;OS ZAP (fora da divisao);52
+src/lib/atendimento/departamentos-auditoria.server.ts;OS ZAP (fora da divisao);12
+src/lib/atendimento/departamentos-flag.ts;OS ZAP (fora da divisao);3
+src/lib/atendimento/departamentos.functions.ts;OS ZAP (fora da divisao);87
+src/lib/atendimento/departamentos.ts;OS ZAP (fora da divisao);24
+src/lib/atendimento/distribuicao-contrato.ts;OS ZAP (fora da divisao);43
+src/lib/atendimento/distribuicao.server.ts;OS ZAP (fora da divisao);66
+src/lib/atendimento/envio-otimista.ts;OS ZAP (fora da divisao);208
+src/lib/atendimento/escopo-inbox.ts;OS ZAP (fora da divisao);200
+src/lib/atendimento/espera.test.ts;OS ZAP (fora da divisao);73
+src/lib/atendimento/espera.ts;OS ZAP (fora da divisao);72
+src/lib/atendimento/fila-envio.ts;OS ZAP (fora da divisao);76
+src/lib/atendimento/filtros-atendente.ts;OS ZAP (fora da divisao);37
+src/lib/atendimento/filtros-inbox.ts;OS ZAP (fora da divisao);250
+src/lib/atendimento/filtros-persistencia.ts;OS ZAP (fora da divisao);110
+src/lib/atendimento/handoff-auditoria.server.ts;OS ZAP (fora da divisao);76
+src/lib/atendimento/handoff-auditoria.test.ts;OS ZAP (fora da divisao);213
+src/lib/atendimento/handoff-auditoria.ts;OS ZAP (fora da divisao);213
+src/lib/atendimento/handoff-resumo.functions.ts;OS ZAP (fora da divisao);51
+src/lib/atendimento/handoff-resumo.server.ts;OS ZAP (fora da divisao);529
+src/lib/atendimento/handoff-resumo.test.ts;OS ZAP (fora da divisao);56
+src/lib/atendimento/handoff-resumo.ts;OS ZAP (fora da divisao);266
+src/lib/atendimento/handoff.server.ts;OS ZAP (fora da divisao);795
+src/lib/atendimento/historico-paginado.functions.ts;OS ZAP (fora da divisao);26
+src/lib/atendimento/historico-paginado.server.ts;OS ZAP (fora da divisao);91
+src/lib/atendimento/historico-paginado.ts;OS ZAP (fora da divisao);79
+src/lib/atendimento/hover-tolerante.test.ts;OS ZAP (fora da divisao);30
+src/lib/atendimento/hover-tolerante.ts;OS ZAP (fora da divisao);47
+src/lib/atendimento/inbox-cache.ts;OS ZAP (fora da divisao);196
+src/lib/atendimento/inbox-merge.ts;OS ZAP (fora da divisao);89
+src/lib/atendimento/inbox-realtime.ts;OS ZAP (fora da divisao);53
+src/lib/atendimento/latencia-cliente.ts;OS ZAP (fora da divisao);140
+src/lib/atendimento/latencia.server.ts;OS ZAP (fora da divisao);69
+src/lib/atendimento/latencia.ts;OS ZAP (fora da divisao);361
+src/lib/atendimento/leitura-inbox.ts;OS ZAP (fora da divisao);147
+src/lib/atendimento/links-entrada.ts;OS ZAP (fora da divisao);68
+src/lib/atendimento/marcador-handoff.ts;OS ZAP (fora da divisao);70
+src/lib/atendimento/mensagem-handoff.server.ts;OS ZAP (fora da divisao);44
+src/lib/atendimento/mensagem-handoff.ts;OS ZAP (fora da divisao);247
+src/lib/atendimento/mensagem-realtime.ts;OS ZAP (fora da divisao);89
+src/lib/atendimento/mensagens-janela.ts;OS ZAP (fora da divisao);46
+src/lib/atendimento/metadados-lista.server.ts;OS ZAP (fora da divisao);35
+src/lib/atendimento/midia-mensagem.functions.ts;OS ZAP (fora da divisao);61
+src/lib/atendimento/motivo-sfp.ts;OS ZAP (fora da divisao);24
+src/lib/atendimento/numero-conversa.ts;OS ZAP (fora da divisao);62
+src/lib/atendimento/ordem-inbox.ts;OS ZAP (fora da divisao);51
+src/lib/atendimento/paginacao-inbox.ts;OS ZAP (fora da divisao);42
+src/lib/atendimento/painel-tv-demonstracao.ts;OS ZAP (fora da divisao);103
+src/lib/atendimento/painel-tv-presenca.ts;OS ZAP (fora da divisao);14
+src/lib/atendimento/painel-tv.server.ts;OS ZAP (fora da divisao);285
+src/lib/atendimento/patch-inbox.ts;OS ZAP (fora da divisao);230
+src/lib/atendimento/perf-conversa.ts;OS ZAP (fora da divisao);67
+src/lib/atendimento/perf-troca.ts;OS ZAP (fora da divisao);247
+src/lib/atendimento/perfil-atendimento.test.ts;OS ZAP (fora da divisao);31
+src/lib/atendimento/perfil-atendimento.ts;OS ZAP (fora da divisao);195
+src/lib/atendimento/periodo-central.ts;OS ZAP (fora da divisao);36
+src/lib/atendimento/pesquisa-satisfacao.server.ts;OS ZAP (fora da divisao);168
+src/lib/atendimento/pesquisa-satisfacao.ts;OS ZAP (fora da divisao);37
+src/lib/atendimento/pos-envio.ts;OS ZAP (fora da divisao);111
+src/lib/atendimento/prefetch-cache.ts;OS ZAP (fora da divisao);78
+src/lib/atendimento/presenca-manual.ts;OS ZAP (fora da divisao);89
+src/lib/atendimento/presenca-sync.ts;OS ZAP (fora da divisao);124
+src/lib/atendimento/protocolo-atendimento.server.ts;OS ZAP (fora da divisao);715
+src/lib/atendimento/protocolo-handoff.ts;OS ZAP (fora da divisao);51
+src/lib/atendimento/rascunhos-conversa.ts;OS ZAP (fora da divisao);54
+src/lib/atendimento/realtime-conexao.ts;OS ZAP (fora da divisao);64
+src/lib/atendimento/realtime-roteador.ts;OS ZAP (fora da divisao);170
+src/lib/atendimento/relogio-pausa.ts;OS ZAP (fora da divisao);31
+src/lib/atendimento/resolver-conversa.server.ts;OS ZAP (fora da divisao);122
+src/lib/atendimento/respostas-rapidas.functions.ts;OS ZAP (fora da divisao);273
+src/lib/atendimento/respostas-rapidas.test.ts;OS ZAP (fora da divisao);134
+src/lib/atendimento/respostas-rapidas.ts;OS ZAP (fora da divisao);256
+src/lib/atendimento/resumo-atividades.ts;OS ZAP (fora da divisao);114
+src/lib/atendimento/resumo-desfecho.ts;OS ZAP (fora da divisao);139
+src/lib/atendimento/resumo-retencao.ts;OS ZAP (fora da divisao);184
+src/lib/atendimento/retomada.ts;OS ZAP (fora da divisao);69
+src/lib/atendimento/rotulo-conversa.ts;OS ZAP (fora da divisao);178
+src/lib/atendimento/scroll-chat.ts;OS ZAP (fora da divisao);79
+src/lib/atendimento/selecao-conversa-fase4.test.ts;OS ZAP (fora da divisao);77
+src/lib/atendimento/simulacao-atendimento.ts;OS ZAP (fora da divisao);239
+src/lib/atendimento/teclado-envio.ts;OS ZAP (fora da divisao);23
+src/lib/atendimento/telefone.ts;OS ZAP (fora da divisao);33
+src/lib/atendimento/texto-interno-apresentacao.ts;OS ZAP (fora da divisao);212
+src/lib/atendimento/timeline-encerramento.ts;OS ZAP (fora da divisao);70
+src/lib/atendimento/timeline-grupos.test.ts;OS ZAP (fora da divisao);526
+src/lib/atendimento/timeline-grupos.ts;OS ZAP (fora da divisao);553
+src/lib/atendimento/timeline-handoff.ts;OS ZAP (fora da divisao);104
+src/lib/atendimento/timeline-reabertura.ts;OS ZAP (fora da divisao);95
+src/lib/atendimento/timeline-resumos.ts;OS ZAP (fora da divisao);80
+src/lib/atendimento/treinamento-flag.ts;OS ZAP (fora da divisao);3
+src/lib/atendimento/vinculo-contato.server.ts;OS ZAP (fora da divisao);166
+src/lib/atendimento/vinculo-contato.test.ts;OS ZAP (fora da divisao);134
+src/lib/atendimento/watchdog-realtime.ts;OS ZAP (fora da divisao);92
+src/lib/francisco/__tests__/config.test.ts;OS ZAP (fora da divisao);54
+src/lib/francisco/__tests__/homologacao.test.ts;OS ZAP (fora da divisao);280
+src/lib/francisco/__tests__/intencao.test.ts;OS ZAP (fora da divisao);112
+src/lib/francisco/__tests__/migration.test.ts;OS ZAP (fora da divisao);280
+src/lib/francisco/__tests__/permissoes.test.ts;OS ZAP (fora da divisao);214
+src/lib/francisco/__tests__/replies.test.ts;OS ZAP (fora da divisao);281
+src/lib/francisco/autoria.ts;OS ZAP (fora da divisao);5
+src/lib/francisco/config.ts;OS ZAP (fora da divisao);136
+src/lib/francisco/functions.ts;OS ZAP (fora da divisao);189
+src/lib/francisco/homologacao.functions.ts;OS ZAP (fora da divisao);83
+src/lib/francisco/homologacao.server.ts;OS ZAP (fora da divisao);193
+src/lib/francisco/homologacao.ts;OS ZAP (fora da divisao);127
+src/lib/francisco/intencao.server.ts;OS ZAP (fora da divisao);65
+src/lib/francisco/intencao.ts;OS ZAP (fora da divisao);41
+src/lib/francisco/permissoes.ts;OS ZAP (fora da divisao);40
+src/lib/francisco/replies.server.ts;OS ZAP (fora da divisao);173
+src/lib/francisco/runner.server.ts;OS ZAP (fora da divisao);174
+src/lib/francisco/service.server.ts;OS ZAP (fora da divisao);198
+src/lib/francisco/transport.server.ts;OS ZAP (fora da divisao);74
+src/lib/mcp/index.ts;OS ZAP (fora da divisao);23
+src/lib/mcp/supabase.ts;OS ZAP (fora da divisao);70
+src/lib/mcp/tools/buscar-pacientes.ts;OS ZAP (fora da divisao);47
+src/lib/mcp/tools/listar-agendamentos.ts;OS ZAP (fora da divisao);55
+src/lib/mcp/tools/listar-clinicas.ts;OS ZAP (fora da divisao);27
+src/lib/mcp/tools/listar-medicos.ts;OS ZAP (fora da divisao);35
+src/lib/nina-agora.test.ts;OS ZAP (fora da divisao);76
+src/lib/nina-agora.ts;OS ZAP (fora da divisao);125
+src/lib/nina-audio.server.ts;OS ZAP (fora da divisao);226
+src/lib/nina-contexto.server.ts;OS ZAP (fora da divisao);247
+src/lib/nina-desligada.server.ts;OS ZAP (fora da divisao);22
+src/lib/nina-especialidade.ts;OS ZAP (fora da divisao);59
+src/lib/nina-ferramentas.server.ts;OS ZAP (fora da divisao);559
+src/lib/nina-voz.ts;OS ZAP (fora da divisao);304
+src/lib/nina.functions.ts;OS ZAP (fora da divisao);264
+src/lib/nina/__tests__/adaptadores-paridade-entrada.test.ts;OS ZAP (fora da divisao);77
+src/lib/nina/__tests__/agenda-sem-vagas-fluxo.test.ts;OS ZAP (fora da divisao);174
+src/lib/nina/__tests__/agenda-sem-vagas.test.ts;OS ZAP (fora da divisao);91
+src/lib/nina/__tests__/agendamento-escolha.test.ts;OS ZAP (fora da divisao);265
+src/lib/nina/__tests__/agendamento-fixture.ts;OS ZAP (fora da divisao);37
+src/lib/nina/__tests__/agendamento-memoria-paridade.test.ts;OS ZAP (fora da divisao);309
+src/lib/nina/__tests__/agendamento-resumo-runtime.test.ts;OS ZAP (fora da divisao);86
+src/lib/nina/__tests__/agrupamento-persistido.test.ts;OS ZAP (fora da divisao);383
+src/lib/nina/__tests__/analise-erro.test.ts;OS ZAP (fora da divisao);138
+src/lib/nina/__tests__/analista-confiabilidade.test.ts;OS ZAP (fora da divisao);120
+src/lib/nina/__tests__/analista-metricas.test.ts;OS ZAP (fora da divisao);341
+src/lib/nina/__tests__/atendimento-consulta-fluxo.test.ts;OS ZAP (fora da divisao);33
+src/lib/nina/__tests__/atendimento-consulta.test.ts;OS ZAP (fora da divisao);281
+src/lib/nina/__tests__/atendimento-fase1.test.ts;OS ZAP (fora da divisao);88
+src/lib/nina/__tests__/atendimento-fase3.test.ts;OS ZAP (fora da divisao);118
+src/lib/nina/__tests__/atendimento-fase4.test.ts;OS ZAP (fora da divisao);97
+src/lib/nina/__tests__/atendimento-fase5.test.ts;OS ZAP (fora da divisao);79
+src/lib/nina/__tests__/atendimento-fase6.test.ts;OS ZAP (fora da divisao);159
+src/lib/nina/__tests__/atendimento-sem-indicacao.test.ts;OS ZAP (fora da divisao);147
+src/lib/nina/__tests__/audio-paridade.test.ts;OS ZAP (fora da divisao);69
+src/lib/nina/__tests__/audio-servico.test.ts;OS ZAP (fora da divisao);44
+src/lib/nina/__tests__/audio.test.tsx;OS ZAP (fora da divisao);93
+src/lib/nina/__tests__/auditoria-ia.test.ts;OS ZAP (fora da divisao);177
+src/lib/nina/__tests__/auditoria-jev-paridade.test.ts;OS ZAP (fora da divisao);45
+src/lib/nina/__tests__/base-editorial-isolada.test.ts;OS ZAP (fora da divisao);73
+src/lib/nina/__tests__/bateria-lead03-identificacao.test.ts;OS ZAP (fora da divisao);176
+src/lib/nina/__tests__/broker-revalidacao-leitura.test.ts;OS ZAP (fora da divisao);147
+src/lib/nina/__tests__/cadastro-dependente-sql.test.ts;OS ZAP (fora da divisao);211
+src/lib/nina/__tests__/cadastro-paciente-executor.test.ts;OS ZAP (fora da divisao);451
+src/lib/nina/__tests__/cadastro-paciente-gate.test.ts;OS ZAP (fora da divisao);873
+src/lib/nina/__tests__/cadastro-worker.test.ts;OS ZAP (fora da divisao);61
+src/lib/nina/__tests__/cancelamento-remarcacao.test.ts;OS ZAP (fora da divisao);145
+src/lib/nina/__tests__/carga-bateria-execucao.test.ts;OS ZAP (fora da divisao);382
+src/lib/nina/__tests__/carga-bateria.test.ts;OS ZAP (fora da divisao);347
+src/lib/nina/__tests__/carga-controle.test.ts;OS ZAP (fora da divisao);202
+src/lib/nina/__tests__/carga-dia-real.test.ts;OS ZAP (fora da divisao);218
+src/lib/nina/__tests__/carga-handlers.test.ts;OS ZAP (fora da divisao);14
+src/lib/nina/__tests__/carga-luna-paciente.test.ts;OS ZAP (fora da divisao);141
+src/lib/nina/__tests__/carga-paralela.test.ts;OS ZAP (fora da divisao);269
+src/lib/nina/__tests__/carga-por-item.test.ts;OS ZAP (fora da divisao);325
+src/lib/nina/__tests__/carga-servidor.test.ts;OS ZAP (fora da divisao);201
+src/lib/nina/__tests__/carga.test.ts;OS ZAP (fora da divisao);133
+src/lib/nina/__tests__/catalogo-busca.test.ts;OS ZAP (fora da divisao);147
+src/lib/nina/__tests__/catalogo-dicionario-autorizacao.test.ts;OS ZAP (fora da divisao);55
+src/lib/nina/__tests__/catalogo-dicionario.test.ts;OS ZAP (fora da divisao);289
+src/lib/nina/__tests__/catalogo-edicao-handlers.test.ts;OS ZAP (fora da divisao);13
+src/lib/nina/__tests__/catalogo-edicao-ia.test.ts;OS ZAP (fora da divisao);216
+src/lib/nina/__tests__/catalogo-esclarecimento-fluxo.test.ts;OS ZAP (fora da divisao);53
+src/lib/nina/__tests__/catalogo-esclarecimento.test.ts;OS ZAP (fora da divisao);156
+src/lib/nina/__tests__/catalogo-estrutura.test.ts;OS ZAP (fora da divisao);170
+src/lib/nina/__tests__/catalogo-ia.test.ts;OS ZAP (fora da divisao);89
+src/lib/nina/__tests__/catalogo-importacao-servicos.test.ts;OS ZAP (fora da divisao);81
+src/lib/nina/__tests__/catalogo-importacao.test.ts;OS ZAP (fora da divisao);402
+src/lib/nina/__tests__/catalogo-interpretacao-fluxo.test.ts;OS ZAP (fora da divisao);87
+src/lib/nina/__tests__/catalogo-interpretacao.test.ts;OS ZAP (fora da divisao);211
+src/lib/nina/__tests__/catalogo-lote-ia.test.ts;OS ZAP (fora da divisao);164
+src/lib/nina/__tests__/catalogo-mapa-campos.test.ts;OS ZAP (fora da divisao);137
+src/lib/nina/__tests__/catalogo-pesquisa.test.ts;OS ZAP (fora da divisao);103
+src/lib/nina/__tests__/catalogo-resposta.test.ts;OS ZAP (fora da divisao);83
+src/lib/nina/__tests__/catalogo-retrieval.test.ts;OS ZAP (fora da divisao);1782
+src/lib/nina/__tests__/catalogo-sem-registro-fluxo.test.ts;OS ZAP (fora da divisao);57
+src/lib/nina/__tests__/catalogo-sem-registro.test.ts;OS ZAP (fora da divisao);109
+src/lib/nina/__tests__/catalogo-sincronizacao.test.ts;OS ZAP (fora da divisao);283
+src/lib/nina/__tests__/catalogo.test.ts;OS ZAP (fora da divisao);89
+src/lib/nina/__tests__/cenario-desfecho.test.ts;OS ZAP (fora da divisao);106
+src/lib/nina/__tests__/cenarios.test.ts;OS ZAP (fora da divisao);82
+src/lib/nina/__tests__/ciclo-aprendizado.test.ts;OS ZAP (fora da divisao);68
+src/lib/nina/__tests__/ciclo-novo-apos-handoff.test.ts;OS ZAP (fora da divisao);79
+src/lib/nina/__tests__/ciclo-reset-memoria-fase5.test.ts;OS ZAP (fora da divisao);144
+src/lib/nina/__tests__/ciclo-teste.test.ts;OS ZAP (fora da divisao);72
+src/lib/nina/__tests__/classificador-periodo.test.ts;OS ZAP (fora da divisao);279
+src/lib/nina/__tests__/clinicas-grupo-executor.test.ts;OS ZAP (fora da divisao);19
+src/lib/nina/__tests__/clinicas-grupo.test.ts;OS ZAP (fora da divisao);105
+src/lib/nina/__tests__/clinico-geral-fluxo.test.ts;OS ZAP (fora da divisao);53
+src/lib/nina/__tests__/confianca-badge.test.ts;OS ZAP (fora da divisao);115
+src/lib/nina/__tests__/confianca-cache.test.ts;OS ZAP (fora da divisao);89
+src/lib/nina/__tests__/confianca-execucao.test.ts;OS ZAP (fora da divisao);73
+src/lib/nina/__tests__/confirmacao-agendamento.test.ts;OS ZAP (fora da divisao);126
+src/lib/nina/__tests__/confirmacao-identificacao-runtime.test.ts;OS ZAP (fora da divisao);50
+src/lib/nina/__tests__/confirmacao-identificacao.test.ts;OS ZAP (fora da divisao);171
+src/lib/nina/__tests__/confirmacao-medico-fluxo.test.ts;OS ZAP (fora da divisao);53
+src/lib/nina/__tests__/consolidacao-instrucoes.test.ts;OS ZAP (fora da divisao);89
+src/lib/nina/__tests__/consulta-agenda-contexto-fluxo.test.ts;OS ZAP (fora da divisao);59
+src/lib/nina/__tests__/consulta-agenda-continuidade.test.ts;OS ZAP (fora da divisao);281
+src/lib/nina/__tests__/consulta-agenda-executor.fixture.ts;OS ZAP (fora da divisao);4152
+src/lib/nina/__tests__/consulta-agenda-executor.test.ts;OS ZAP (fora da divisao);15
+src/lib/nina/__tests__/consulta-agenda-historico.test.ts;OS ZAP (fora da divisao);135
+src/lib/nina/__tests__/consulta-agenda.test.ts;OS ZAP (fora da divisao);353
+src/lib/nina/__tests__/consulta-base-somente-leitura.test.ts;OS ZAP (fora da divisao);159
+src/lib/nina/__tests__/conversa-auditoria.test.ts;OS ZAP (fora da divisao);141
+src/lib/nina/__tests__/correcao-executor.test.ts;OS ZAP (fora da divisao);117
+src/lib/nina/__tests__/correcao-falso-sucesso.test.ts;OS ZAP (fora da divisao);31
+src/lib/nina/__tests__/correcao-limites.test.ts;OS ZAP (fora da divisao);99
+src/lib/nina/__tests__/correcao-prontidao.test.ts;OS ZAP (fora da divisao);78
+src/lib/nina/__tests__/correcao-relatorio.test.ts;OS ZAP (fora da divisao);154
+src/lib/nina/__tests__/dashboard-homologacao.test.ts;OS ZAP (fora da divisao);145
+src/lib/nina/__tests__/data-nascimento.test.ts;OS ZAP (fora da divisao);56
+src/lib/nina/__tests__/decisoes.test.ts;OS ZAP (fora da divisao);103
+src/lib/nina/__tests__/desempenho-periodo.test.ts;OS ZAP (fora da divisao);133
+src/lib/nina/__tests__/detalhes-linha-do-tempo.test.ts;OS ZAP (fora da divisao);188
+src/lib/nina/__tests__/detalhes-mensagem.server.test.ts;OS ZAP (fora da divisao);310
+src/lib/nina/__tests__/detalhes-mensagem.test.ts;OS ZAP (fora da divisao);234
+src/lib/nina/__tests__/dicionario-leitura.test.ts;OS ZAP (fora da divisao);62
+src/lib/nina/__tests__/duas-falhas-entendimento-fluxo.test.ts;OS ZAP (fora da divisao);62
+src/lib/nina/__tests__/eco-transtoracico.test.ts;OS ZAP (fora da divisao);14
+src/lib/nina/__tests__/eficiencia-turno.test.ts;OS ZAP (fora da divisao);139
+src/lib/nina/__tests__/encerramento-automatico.test.ts;OS ZAP (fora da divisao);70
+src/lib/nina/__tests__/erro-rapido.test.ts;OS ZAP (fora da divisao);315
+src/lib/nina/__tests__/esclarecimento-apresentacao.test.ts;OS ZAP (fora da divisao);77
+src/lib/nina/__tests__/escolha-medico-fluxo.test.ts;OS ZAP (fora da divisao);44
+src/lib/nina/__tests__/escolha-profissional-nominal.test.ts;OS ZAP (fora da divisao);49
+src/lib/nina/__tests__/evidencias.test.ts;OS ZAP (fora da divisao);124
+src/lib/nina/__tests__/falha-agendamento.test.ts;OS ZAP (fora da divisao);96
+src/lib/nina/__tests__/falha-operacao-encaminha.test.ts;OS ZAP (fora da divisao);25
+src/lib/nina/__tests__/fase4-broker-contexto.test.ts;OS ZAP (fora da divisao);123
+src/lib/nina/__tests__/fase4-finalizacao-transporte.test.ts;OS ZAP (fora da divisao);132
+src/lib/nina/__tests__/fase5-aceite-identidade.test.ts;OS ZAP (fora da divisao);568
+src/lib/nina/__tests__/fase5-disponibilidade.test.ts;OS ZAP (fora da divisao);74
+src/lib/nina/__tests__/fase5-observabilidade.test.ts;OS ZAP (fora da divisao);179
+src/lib/nina/__tests__/fase6-fluxo-correcao.test.ts;OS ZAP (fora da divisao);590
+src/lib/nina/__tests__/fase6-validacao.test.ts;OS ZAP (fora da divisao);163
+src/lib/nina/__tests__/feedback-aplicacao.test.ts;OS ZAP (fora da divisao);55
+src/lib/nina/__tests__/feedback-diagnostico.test.ts;OS ZAP (fora da divisao);58
+src/lib/nina/__tests__/finalidade-vacina-fluxo.test.ts;OS ZAP (fora da divisao);37
+src/lib/nina/__tests__/finalidade-vacina.test.ts;OS ZAP (fora da divisao);111
+src/lib/nina/__tests__/fixtures/audio-servico.fixture.ts;OS ZAP (fora da divisao);104
+src/lib/nina/__tests__/fixtures/auditoria-jev.fixture.ts;OS ZAP (fora da divisao);67
+src/lib/nina/__tests__/fixtures/carga-banco-simulado.ts;OS ZAP (fora da divisao);260
+src/lib/nina/__tests__/fixtures/carga-handlers.fixture.ts;OS ZAP (fora da divisao);453
+src/lib/nina/__tests__/fixtures/catalogo-edicao-handlers.fixture.ts;OS ZAP (fora da divisao);295
+src/lib/nina/__tests__/fixtures/clinicas-grupo.fixture.ts;OS ZAP (fora da divisao);81
+src/lib/nina/__tests__/fixtures/consulta-contextual-cenarios.ts;OS ZAP (fora da divisao);52
+src/lib/nina/__tests__/fixtures/consultas-publicadas.fixture.ts;OS ZAP (fora da divisao);33
+src/lib/nina/__tests__/fixtures/detalhes-mj55.ts;OS ZAP (fora da divisao);257
+src/lib/nina/__tests__/fixtures/espera-job.fixture.ts;OS ZAP (fora da divisao);71
+src/lib/nina/__tests__/fixtures/espera-timeout.fixture.ts;OS ZAP (fora da divisao);705
+src/lib/nina/__tests__/fixtures/fonte-operacional-falsa.ts;OS ZAP (fora da divisao);42
+src/lib/nina/__tests__/fixtures/fotos-leitura.fixture.ts;OS ZAP (fora da divisao);33
+src/lib/nina/__tests__/fixtures/prazo-supabase.fixture.ts;OS ZAP (fora da divisao);26
+src/lib/nina/__tests__/fixtures/processo-encerrado-na-ferramenta.fixture.ts;OS ZAP (fora da divisao);45
+src/lib/nina/__tests__/fixtures/reset-envio-concorrente.fixture.ts;OS ZAP (fora da divisao);224
+src/lib/nina/__tests__/fixtures/resposta-direta.fixture.ts;OS ZAP (fora da divisao);2955
+src/lib/nina/__tests__/fixtures/sfp-protocolo.fixture.ts;OS ZAP (fora da divisao);89
+src/lib/nina/__tests__/fixtures/sincronizacao-especialidades.fixture.ts;OS ZAP (fora da divisao);177
+src/lib/nina/__tests__/fixtures/teste-console-mj53.fixture.ts;OS ZAP (fora da divisao);361
+src/lib/nina/__tests__/fixtures/validacao-reset-homologacao.fixture.ts;OS ZAP (fora da divisao);461
+src/lib/nina/__tests__/fixtures/voz-previa.fixture.ts;OS ZAP (fora da divisao);53
+src/lib/nina/__tests__/fixtures/watchdog-encaminha-desistencia.fixture.ts;OS ZAP (fora da divisao);148
+src/lib/nina/__tests__/fixtures/watchdog-falha.fixture.ts;OS ZAP (fora da divisao);366
+src/lib/nina/__tests__/fixtures/watchdog-gateway.fixture.ts;OS ZAP (fora da divisao);53
+src/lib/nina/__tests__/fixtures/watchdog-runtime.fixture.ts;OS ZAP (fora da divisao);289
+src/lib/nina/__tests__/fixtures/webhook-agrupamento.fixture.ts;OS ZAP (fora da divisao);471
+src/lib/nina/__tests__/fluxo-direto.test.ts;OS ZAP (fora da divisao);50
+src/lib/nina/__tests__/fonte-consulta-runtime.test.ts;OS ZAP (fora da divisao);59
+src/lib/nina/__tests__/fonte-consulta.fixture.ts;OS ZAP (fora da divisao);355
+src/lib/nina/__tests__/fonte-consulta.test.ts;OS ZAP (fora da divisao);15
+src/lib/nina/__tests__/fonte-operacional.test.ts;OS ZAP (fora da divisao);368
+src/lib/nina/__tests__/fonte-unica-catalogo.test.ts;OS ZAP (fora da divisao);59
+src/lib/nina/__tests__/formato-mobile.test.ts;OS ZAP (fora da divisao);114
+src/lib/nina/__tests__/fotos-paridade.test.ts;OS ZAP (fora da divisao);165
+src/lib/nina/__tests__/fotos.test.ts;OS ZAP (fora da divisao);177
+src/lib/nina/__tests__/handoff-assertions.test.ts;OS ZAP (fora da divisao);107
+src/lib/nina/__tests__/handoff-tool.test.ts;OS ZAP (fora da divisao);76
+src/lib/nina/__tests__/homologacao-exportacao.test.ts;OS ZAP (fora da divisao);153
+src/lib/nina/__tests__/homologacao-navegacao.test.ts;OS ZAP (fora da divisao);43
+src/lib/nina/__tests__/homologacao-realtime.test.ts;OS ZAP (fora da divisao);286
+src/lib/nina/__tests__/homologacao-retomada.test.ts;OS ZAP (fora da divisao);160
+src/lib/nina/__tests__/homologacao-ui-reset-manual.test.ts;OS ZAP (fora da divisao);54
+src/lib/nina/__tests__/horario-funcionamento.test.ts;OS ZAP (fora da divisao);241
+src/lib/nina/__tests__/horario-oficial.test.ts;OS ZAP (fora da divisao);181
+src/lib/nina/__tests__/horarios-habituais-ausentes.test.ts;OS ZAP (fora da divisao);195
+src/lib/nina/__tests__/horarios-habituais-primeiro.test.ts;OS ZAP (fora da divisao);77
+src/lib/nina/__tests__/horarios-periodo.test.ts;OS ZAP (fora da divisao);225
+src/lib/nina/__tests__/horarios-por-atendimento.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/__tests__/idade-nao-informada.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/__tests__/identidade-atendimento.test.ts;OS ZAP (fora da divisao);149
+src/lib/nina/__tests__/identidade-consumidores.test.ts;OS ZAP (fora da divisao);98
+src/lib/nina/__tests__/identidade-efetiva.test.ts;OS ZAP (fora da divisao);131
+src/lib/nina/__tests__/identificacao-catalogo.test.ts;OS ZAP (fora da divisao);156
+src/lib/nina/__tests__/identificacao-unificada-runtime.test.ts;OS ZAP (fora da divisao);58
+src/lib/nina/__tests__/inspecao-mensagem.test.ts;OS ZAP (fora da divisao);252
+src/lib/nina/__tests__/jev-auditoria.test.ts;OS ZAP (fora da divisao);135
+src/lib/nina/__tests__/jev-avaliacao.test.ts;OS ZAP (fora da divisao);42
+src/lib/nina/__tests__/jev-cadastro.test.ts;OS ZAP (fora da divisao);33
+src/lib/nina/__tests__/jev-conferencia.test.ts;OS ZAP (fora da divisao);111
+src/lib/nina/__tests__/jev-contexto.test.ts;OS ZAP (fora da divisao);266
+src/lib/nina/__tests__/jev-encaminhamento.test.ts;OS ZAP (fora da divisao);204
+src/lib/nina/__tests__/jev-esclarecimento-entregue.test.ts;OS ZAP (fora da divisao);154
+src/lib/nina/__tests__/jev-escolha.test.ts;OS ZAP (fora da divisao);81
+src/lib/nina/__tests__/jev-especialidade.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/__tests__/jev-intencao.test.ts;OS ZAP (fora da divisao);21
+src/lib/nina/__tests__/jev-limites.test.ts;OS ZAP (fora da divisao);46
+src/lib/nina/__tests__/jev-observacao-intencao.test.ts;OS ZAP (fora da divisao);274
+src/lib/nina/__tests__/jev-orientacao-intencao.test.ts;OS ZAP (fora da divisao);133
+src/lib/nina/__tests__/jev.test.ts;OS ZAP (fora da divisao);34
+src/lib/nina/__tests__/jornada-selecao-agenda-integracao.test.ts;OS ZAP (fora da divisao);382
+src/lib/nina/__tests__/knowledge-contract.test.ts;OS ZAP (fora da divisao);106
+src/lib/nina/__tests__/leads-resumo.test.ts;OS ZAP (fora da divisao);228
+src/lib/nina/__tests__/limite-esclarecimento-publicacao.test.ts;OS ZAP (fora da divisao);33
+src/lib/nina/__tests__/limite-leitura-saidas.test.ts;OS ZAP (fora da divisao);39
+src/lib/nina/__tests__/limites-papeis.test.ts;OS ZAP (fora da divisao);141
+src/lib/nina/__tests__/links-entrada-runtime.test.ts;OS ZAP (fora da divisao);29
+src/lib/nina/__tests__/lista-profissionais-extensa-runtime.test.ts;OS ZAP (fora da divisao);74
+src/lib/nina/__tests__/lista-profissionais-extensa.test.ts;OS ZAP (fora da divisao);106
+src/lib/nina/__tests__/memoria-processo.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/__tests__/mensagem-meta.test.ts;OS ZAP (fora da divisao);84
+src/lib/nina/__tests__/metricas-analise.test.ts;OS ZAP (fora da divisao);101
+src/lib/nina/__tests__/metricas-filtros.test.ts;OS ZAP (fora da divisao);76
+src/lib/nina/__tests__/mj52-validacao-integrada.test.ts;OS ZAP (fora da divisao);576
+src/lib/nina/__tests__/modalidade-atendimento.test.ts;OS ZAP (fora da divisao);135
+src/lib/nina/__tests__/modelo-flag.test.ts;OS ZAP (fora da divisao);25
+src/lib/nina/__tests__/multiplos-atendimentos.test.ts;OS ZAP (fora da divisao);74
+src/lib/nina/__tests__/nome-popular-especialidade.test.ts;OS ZAP (fora da divisao);54
+src/lib/nina/__tests__/oferta-completa.test.ts;OS ZAP (fora da divisao);151
+src/lib/nina/__tests__/pedido-medico-runtime.test.ts;OS ZAP (fora da divisao);65
+src/lib/nina/__tests__/pedido-medico.test.ts;OS ZAP (fora da divisao);217
+src/lib/nina/__tests__/pedidos-agendamento-independentes.test.ts;OS ZAP (fora da divisao);114
+src/lib/nina/__tests__/perguntas-independentes-fluxo.test.ts;OS ZAP (fora da divisao);79
+src/lib/nina/__tests__/perguntas-independentes.test.ts;OS ZAP (fora da divisao);512
+src/lib/nina/__tests__/pesquisa-atendimento-sessao.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/__tests__/pesquisa-medico-sessao.test.ts;OS ZAP (fora da divisao);209
+src/lib/nina/__tests__/prefetch-cadastro.test.ts;OS ZAP (fora da divisao);157
+src/lib/nina/__tests__/prevencao-erro-critico-01-proxima-vaga.test.ts;OS ZAP (fora da divisao);334
+src/lib/nina/__tests__/prevencao-erro-critico-01-watchdog.test.ts;OS ZAP (fora da divisao);244
+src/lib/nina/__tests__/prevencao-erro-critico-01.test.ts;OS ZAP (fora da divisao);227
+src/lib/nina/__tests__/procedimento-runtime.test.ts;OS ZAP (fora da divisao);40
+src/lib/nina/__tests__/procedimento-sessao.test.ts;OS ZAP (fora da divisao);128
+src/lib/nina/__tests__/protocolo-agendamento.test.ts;OS ZAP (fora da divisao);29
+src/lib/nina/__tests__/reabertura-entrada.test.ts;OS ZAP (fora da divisao);26
+src/lib/nina/__tests__/reabertura-sessao.test.ts;OS ZAP (fora da divisao);48
+src/lib/nina/__tests__/reasoning-router.test.ts;OS ZAP (fora da divisao);61
+src/lib/nina/__tests__/reformulacoes-catalogo-fluxo.test.ts;OS ZAP (fora da divisao);66
+src/lib/nina/__tests__/regras-catalogo-fluxo.test.ts;OS ZAP (fora da divisao);87
+src/lib/nina/__tests__/regras-catalogo.test.ts;OS ZAP (fora da divisao);75
+src/lib/nina/__tests__/regras-confirmadas-clinica.test.ts;OS ZAP (fora da divisao);99
+src/lib/nina/__tests__/remove-base-conhecimento-migration.test.ts;OS ZAP (fora da divisao);132
+src/lib/nina/__tests__/renovacao-reserva.test.ts;OS ZAP (fora da divisao);77
+src/lib/nina/__tests__/reserva-turno.test.ts;OS ZAP (fora da divisao);74
+src/lib/nina/__tests__/reset-devolve-vaga.test.ts;OS ZAP (fora da divisao);20
+src/lib/nina/__tests__/reset-envio-concorrente.test.ts;OS ZAP (fora da divisao);17
+src/lib/nina/__tests__/reset-somente-pelo-botao.test.ts;OS ZAP (fora da divisao);107
+src/lib/nina/__tests__/resposta-direta.test.ts;OS ZAP (fora da divisao);47
+src/lib/nina/__tests__/respostas-informais-brasil.test.ts;OS ZAP (fora da divisao);108
+src/lib/nina/__tests__/saudacao-paridade.test.ts;OS ZAP (fora da divisao);209
+src/lib/nina/__tests__/saudacao-sessao.test.ts;OS ZAP (fora da divisao);124
+src/lib/nina/__tests__/sem-emojis.test.ts;OS ZAP (fora da divisao);124
+src/lib/nina/__tests__/simulador-terra.test.ts;OS ZAP (fora da divisao);98
+src/lib/nina/__tests__/sincronizacao-especialidades.test.ts;OS ZAP (fora da divisao);87
+src/lib/nina/__tests__/somente-informa.test.ts;OS ZAP (fora da divisao);82
+src/lib/nina/__tests__/telefone-paciente.test.ts;OS ZAP (fora da divisao);51
+src/lib/nina/__tests__/temperatura-gateway.test.ts;OS ZAP (fora da divisao);107
+src/lib/nina/__tests__/temperatura.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/__tests__/termos-populares.test.ts;OS ZAP (fora da divisao);85
+src/lib/nina/__tests__/teste-console-mj53.test.ts;OS ZAP (fora da divisao);165
+src/lib/nina/__tests__/tipo-consulta-fluxo.test.ts;OS ZAP (fora da divisao);34
+src/lib/nina/__tests__/validacao-reset-homologacao.test.ts;OS ZAP (fora da divisao);18
+src/lib/nina/__tests__/voz-config.test.ts;OS ZAP (fora da divisao);180
+src/lib/nina/__tests__/voz-runtime.test.ts;OS ZAP (fora da divisao);82
+src/lib/nina/__tests__/watchdog-falha.test.ts;OS ZAP (fora da divisao);54
+src/lib/nina/__tests__/watchdog-postgres.test.ts;OS ZAP (fora da divisao);483
+src/lib/nina/__tests__/watchdog.test.ts;OS ZAP (fora da divisao);120
+src/lib/nina/__tests__/webhook-agrupamento.test.ts;OS ZAP (fora da divisao);161
+src/lib/nina/acoes/autorizacao.ts;OS ZAP (fora da divisao);213
+src/lib/nina/acoes/fase3-autorizacao.test.ts;OS ZAP (fora da divisao);234
+src/lib/nina/acoes/resultado.ts;OS ZAP (fora da divisao);132
+src/lib/nina/adapters/gemini-adapter.server.ts;OS ZAP (fora da divisao);226
+src/lib/nina/afirmacao-agendamento.test.ts;OS ZAP (fora da divisao);84
+src/lib/nina/afirmacao-agendamento.ts;OS ZAP (fora da divisao);69
+src/lib/nina/agenda-flag.server.ts;OS ZAP (fora da divisao);72
+src/lib/nina/agenda-sem-vagas.ts;OS ZAP (fora da divisao);74
+src/lib/nina/agendamento-escolha.ts;OS ZAP (fora da divisao);321
+src/lib/nina/agendamento-sessao.ts;OS ZAP (fora da divisao);58
+src/lib/nina/agrupamento-turno.ts;OS ZAP (fora da divisao);141
+src/lib/nina/ai-gateway.server.ts;OS ZAP (fora da divisao);304
+src/lib/nina/analise-erro.functions.ts;OS ZAP (fora da divisao);318
+src/lib/nina/analise-erro.ts;OS ZAP (fora da divisao);680
+src/lib/nina/analise-flag.server.ts;OS ZAP (fora da divisao);27
+src/lib/nina/analista-metricas.functions.ts;OS ZAP (fora da divisao);636
+src/lib/nina/analista-metricas.ts;OS ZAP (fora da divisao);520
+src/lib/nina/aprendizado.functions.ts;OS ZAP (fora da divisao);260
+src/lib/nina/aprendizado.server.ts;OS ZAP (fora da divisao);213
+src/lib/nina/arquitetura/__tests__/caminho-producao.test.ts;OS ZAP (fora da divisao);120
+src/lib/nina/arquitetura/__tests__/codigo.test.ts;OS ZAP (fora da divisao);93
+src/lib/nina/arquitetura/__tests__/conferencia.test.ts;OS ZAP (fora da divisao);135
+src/lib/nina/arquitetura/__tests__/detalhes-ia.test.ts;OS ZAP (fora da divisao);216
+src/lib/nina/arquitetura/__tests__/fontes-pacote.test.ts;OS ZAP (fora da divisao);18
+src/lib/nina/arquitetura/__tests__/grupos.test.ts;OS ZAP (fora da divisao);62
+src/lib/nina/arquitetura/__tests__/homologacao.test.ts;OS ZAP (fora da divisao);100
+src/lib/nina/arquitetura/__tests__/layout-incremental.test.ts;OS ZAP (fora da divisao);251
+src/lib/nina/arquitetura/__tests__/layout.test.ts;OS ZAP (fora da divisao);111
+src/lib/nina/arquitetura/__tests__/manifesto.test.ts;OS ZAP (fora da divisao);112
+src/lib/nina/arquitetura/__tests__/navegacao.test.ts;OS ZAP (fora da divisao);79
+src/lib/nina/arquitetura/__tests__/permissoes-instrucoes.test.ts;OS ZAP (fora da divisao);50
+src/lib/nina/arquitetura/__tests__/permissoes.test.ts;OS ZAP (fora da divisao);86
+src/lib/nina/arquitetura/__tests__/prompt-rastreabilidade.test.ts;OS ZAP (fora da divisao);101
+src/lib/nina/arquitetura/__tests__/rotas.test.ts;OS ZAP (fora da divisao);148
+src/lib/nina/arquitetura/__tests__/sync.test.ts;OS ZAP (fora da divisao);66
+src/lib/nina/arquitetura/__tests__/timeline.test.ts;OS ZAP (fora da divisao);174
+src/lib/nina/arquitetura/__tests__/tracing.test.ts;OS ZAP (fora da divisao);293
+src/lib/nina/arquitetura/__tests__/versoes.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/arquitetura/__tests__/visao-simples.test.ts;OS ZAP (fora da divisao);52
+src/lib/nina/arquitetura/caminho-producao-layout.ts;OS ZAP (fora da divisao);179
+src/lib/nina/arquitetura/caminho-producao.ts;OS ZAP (fora da divisao);663
+src/lib/nina/arquitetura/codigo.functions.ts;OS ZAP (fora da divisao);52
+src/lib/nina/arquitetura/codigo.server.ts;OS ZAP (fora da divisao);23
+src/lib/nina/arquitetura/codigo.ts;OS ZAP (fora da divisao);100
+src/lib/nina/arquitetura/conferencia.ts;OS ZAP (fora da divisao);131
+src/lib/nina/arquitetura/detalhes-ia.ts;OS ZAP (fora da divisao);314
+src/lib/nina/arquitetura/estado-evento.test.ts;OS ZAP (fora da divisao);69
+src/lib/nina/arquitetura/estado-evento.ts;OS ZAP (fora da divisao);73
+src/lib/nina/arquitetura/execucoes.functions.ts;OS ZAP (fora da divisao);163
+src/lib/nina/arquitetura/homologacao.ts;OS ZAP (fora da divisao);198
+src/lib/nina/arquitetura/layout-incremental.ts;OS ZAP (fora da divisao);361
+src/lib/nina/arquitetura/layout.ts;OS ZAP (fora da divisao);413
+src/lib/nina/arquitetura/manifesto.ts;OS ZAP (fora da divisao);1330
+src/lib/nina/arquitetura/navegacao.ts;OS ZAP (fora da divisao);89
+src/lib/nina/arquitetura/permissoes.functions.ts;OS ZAP (fora da divisao);35
+src/lib/nina/arquitetura/permissoes.ts;OS ZAP (fora da divisao);91
+src/lib/nina/arquitetura/rotas.ts;OS ZAP (fora da divisao);362
+src/lib/nina/arquitetura/snapshot-v5.ts;OS ZAP (fora da divisao);559
+src/lib/nina/arquitetura/snapshot-v6.ts;OS ZAP (fora da divisao);643
+src/lib/nina/arquitetura/sync.ts;OS ZAP (fora da divisao);473
+src/lib/nina/arquitetura/timeline.ts;OS ZAP (fora da divisao);339
+src/lib/nina/arquitetura/tracing.server.ts;OS ZAP (fora da divisao);99
+src/lib/nina/arquitetura/tracing.ts;OS ZAP (fora da divisao);341
+src/lib/nina/arquitetura/versoes.ts;OS ZAP (fora da divisao);362
+src/lib/nina/arquitetura/visao-simples.ts;OS ZAP (fora da divisao);223
+src/lib/nina/atendimento-consulta.ts;OS ZAP (fora da divisao);323
+src/lib/nina/atendimento-fase1.server.ts;OS ZAP (fora da divisao);23
+src/lib/nina/atendimento-fase1.ts;OS ZAP (fora da divisao);177
+src/lib/nina/atendimento-fase3.server.ts;OS ZAP (fora da divisao);23
+src/lib/nina/atendimento-fase3.ts;OS ZAP (fora da divisao);165
+src/lib/nina/atendimento-fase4.server.ts;OS ZAP (fora da divisao);22
+src/lib/nina/atendimento-fase4.ts;OS ZAP (fora da divisao);151
+src/lib/nina/atendimento-fase5.server.ts;OS ZAP (fora da divisao);22
+src/lib/nina/atendimento-fase5.ts;OS ZAP (fora da divisao);111
+src/lib/nina/atendimento-fase6.server.ts;OS ZAP (fora da divisao);22
+src/lib/nina/atendimento-fase6.ts;OS ZAP (fora da divisao);177
+src/lib/nina/atendimento-sem-indicacao.ts;OS ZAP (fora da divisao);100
+src/lib/nina/atribuicao-assertions.test.ts;OS ZAP (fora da divisao);107
+src/lib/nina/atribuicao-assertions.ts;OS ZAP (fora da divisao);169
+src/lib/nina/audio.ts;OS ZAP (fora da divisao);35
+src/lib/nina/auditoria-ia.server.ts;OS ZAP (fora da divisao);118
+src/lib/nina/auditoria-ia.ts;OS ZAP (fora da divisao);16
+src/lib/nina/avaliador-sol.functions.ts;OS ZAP (fora da divisao);550
+src/lib/nina/avaliador-sol.test.ts;OS ZAP (fora da divisao);241
+src/lib/nina/avaliador-sol.ts;OS ZAP (fora da divisao);707
+src/lib/nina/burst.server.ts;OS ZAP (fora da divisao);179
+src/lib/nina/burst.ts;OS ZAP (fora da divisao);58
+src/lib/nina/cadastro-paciente.server.ts;OS ZAP (fora da divisao);93
+src/lib/nina/cadastro-paciente.ts;OS ZAP (fora da divisao);56
+src/lib/nina/cancelamento-remarcacao.ts;OS ZAP (fora da divisao);82
+src/lib/nina/carga-bateria.server.ts;OS ZAP (fora da divisao);472
+src/lib/nina/carga-bateria.ts;OS ZAP (fora da divisao);603
+src/lib/nina/carga-controle.server.ts;OS ZAP (fora da divisao);323
+src/lib/nina/carga-controle.ts;OS ZAP (fora da divisao);207
+src/lib/nina/carga-dia-real.ts;OS ZAP (fora da divisao);373
+src/lib/nina/carga-execucao.server.ts;OS ZAP (fora da divisao);332
+src/lib/nina/carga-fase4-contexto-limpo.fixture.ts;OS ZAP (fora da divisao);368
+src/lib/nina/carga-fase4-contexto-limpo.test.ts;OS ZAP (fora da divisao);17
+src/lib/nina/carga-itens.server.ts;OS ZAP (fora da divisao);202
+src/lib/nina/carga-job.server.ts;OS ZAP (fora da divisao);55
+src/lib/nina/carga-paralela.server.ts;OS ZAP (fora da divisao);196
+src/lib/nina/carga-paralela.ts;OS ZAP (fora da divisao);85
+src/lib/nina/carga-planejamento.functions.ts;OS ZAP (fora da divisao);101
+src/lib/nina/carga-planejamento.test.ts;OS ZAP (fora da divisao);326
+src/lib/nina/carga-planejamento.ts;OS ZAP (fora da divisao);405
+src/lib/nina/carga-preflight.server.ts;OS ZAP (fora da divisao);103
+src/lib/nina/carga-preflight.test.ts;OS ZAP (fora da divisao);168
+src/lib/nina/carga-preflight.ts;OS ZAP (fora da divisao);186
+src/lib/nina/carga-preparacao.server.ts;OS ZAP (fora da divisao);139
+src/lib/nina/carga-prompts.functions.ts;OS ZAP (fora da divisao);35
+src/lib/nina/carga-prompts.server.ts;OS ZAP (fora da divisao);19
+src/lib/nina/carga-prompts.ts;OS ZAP (fora da divisao);19
+src/lib/nina/carga-redacao-luna.server.ts;OS ZAP (fora da divisao);522
+src/lib/nina/carga-redacao-luna.test.ts;OS ZAP (fora da divisao);301
+src/lib/nina/carga-servidor.server.ts;OS ZAP (fora da divisao);118
+src/lib/nina/carga-tempos.ts;OS ZAP (fora da divisao);57
+src/lib/nina/carga.functions.ts;OS ZAP (fora da divisao);843
+src/lib/nina/carga.ts;OS ZAP (fora da divisao);304
+src/lib/nina/catalogo-busca.ts;OS ZAP (fora da divisao);319
+src/lib/nina/catalogo-conhecimento.test.ts;OS ZAP (fora da divisao);195
+src/lib/nina/catalogo-conhecimento.ts;OS ZAP (fora da divisao);524
+src/lib/nina/catalogo-dicionario.server.ts;OS ZAP (fora da divisao);196
+src/lib/nina/catalogo-dicionario.ts;OS ZAP (fora da divisao);150
+src/lib/nina/catalogo-edicao-ia.ts;OS ZAP (fora da divisao);320
+src/lib/nina/catalogo-esclarecimento.ts;OS ZAP (fora da divisao);106
+src/lib/nina/catalogo-estrutura.ts;OS ZAP (fora da divisao);356
+src/lib/nina/catalogo-fonte.server.ts;OS ZAP (fora da divisao);28
+src/lib/nina/catalogo-ia.server.ts;OS ZAP (fora da divisao);167
+src/lib/nina/catalogo-ia.ts;OS ZAP (fora da divisao);316
+src/lib/nina/catalogo-importacao-servicos.ts;OS ZAP (fora da divisao);136
+src/lib/nina/catalogo-importacao.server.ts;OS ZAP (fora da divisao);253
+src/lib/nina/catalogo-importacao.ts;OS ZAP (fora da divisao);311
+src/lib/nina/catalogo-lote-ia.ts;OS ZAP (fora da divisao);120
+src/lib/nina/catalogo-mapa-campos.ts;OS ZAP (fora da divisao);244
+src/lib/nina/catalogo-pesquisa.ts;OS ZAP (fora da divisao);88
+src/lib/nina/catalogo-precos-texto.ts;OS ZAP (fora da divisao);106
+src/lib/nina/catalogo-prompt.server.ts;OS ZAP (fora da divisao);147
+src/lib/nina/catalogo-retrieval.server.ts;OS ZAP (fora da divisao);588
+src/lib/nina/catalogo-sem-registro.ts;OS ZAP (fora da divisao);173
+src/lib/nina/catalogo-sincronizacao.functions.ts;OS ZAP (fora da divisao);92
+src/lib/nina/catalogo-sincronizacao.server.ts;OS ZAP (fora da divisao);165
+src/lib/nina/catalogo-sincronizacao.ts;OS ZAP (fora da divisao);174
+src/lib/nina/catalogo-turno.server.ts;OS ZAP (fora da divisao);123
+src/lib/nina/catalogo.functions.ts;OS ZAP (fora da divisao);581
+src/lib/nina/catalogo.ts;OS ZAP (fora da divisao);274
+src/lib/nina/cenario-desfecho.ts;OS ZAP (fora da divisao);106
+src/lib/nina/cenarios.functions.ts;OS ZAP (fora da divisao);769
+src/lib/nina/cenarios.ts;OS ZAP (fora da divisao);265
+src/lib/nina/ciclo-aprendizado.ts;OS ZAP (fora da divisao);30
+src/lib/nina/ciclo-teste.ts;OS ZAP (fora da divisao);210
+src/lib/nina/classificador-periodo.functions.ts;OS ZAP (fora da divisao);185
+src/lib/nina/classificador-periodo.ts;OS ZAP (fora da divisao);287
+src/lib/nina/claude-messages.server.ts;OS ZAP (fora da divisao);341
+src/lib/nina/clinicas-grupo.ts;OS ZAP (fora da divisao);190
+src/lib/nina/confianca-badge.ts;OS ZAP (fora da divisao);111
+src/lib/nina/confianca-cache.ts;OS ZAP (fora da divisao);114
+src/lib/nina/confianca-execucao.ts;OS ZAP (fora da divisao);115
+src/lib/nina/confianca.functions.ts;OS ZAP (fora da divisao);1344
+src/lib/nina/confidence-engine.server.ts;OS ZAP (fora da divisao);266
+src/lib/nina/confidence-engine.test.ts;OS ZAP (fora da divisao);158
+src/lib/nina/confidence-engine.ts;OS ZAP (fora da divisao);236
+src/lib/nina/confidence/__tests__/classificacao-saida.test.ts;OS ZAP (fora da divisao);88
+src/lib/nina/confidence/afirmacao.ts;OS ZAP (fora da divisao);720
+src/lib/nina/confidence/alta-confianca-erro.test.ts;OS ZAP (fora da divisao);134
+src/lib/nina/confidence/answer-vs-action.test.ts;OS ZAP (fora da divisao);164
+src/lib/nina/confidence/auditoria.test.ts;OS ZAP (fora da divisao);145
+src/lib/nina/confidence/auditoria.ts;OS ZAP (fora da divisao);459
+src/lib/nina/confidence/avaliacao-regras.ts;OS ZAP (fora da divisao);741
+src/lib/nina/confidence/baixa-confiabilidade.test.ts;OS ZAP (fora da divisao);281
+src/lib/nina/confidence/baixa-confiabilidade.ts;OS ZAP (fora da divisao);402
+src/lib/nina/confidence/baseline-superconfianca.test.ts;OS ZAP (fora da divisao);416
+src/lib/nina/confidence/calibracao-nivel.test.ts;OS ZAP (fora da divisao);80
+src/lib/nina/confidence/calibracao.test.ts;OS ZAP (fora da divisao);147
+src/lib/nina/confidence/calibracao.ts;OS ZAP (fora da divisao);540
+src/lib/nina/confidence/claims.ts;OS ZAP (fora da divisao);1460
+src/lib/nina/confidence/classificacao-saida.ts;OS ZAP (fora da divisao);147
+src/lib/nina/confidence/cobertura-evidencias.test.ts;OS ZAP (fora da divisao);278
+src/lib/nina/confidence/configuracao-turno.server.ts;OS ZAP (fora da divisao);44
+src/lib/nina/confidence/configuracao.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/confidence/configuracao.ts;OS ZAP (fora da divisao);194
+src/lib/nina/confidence/conformidade-entrega.test.ts;OS ZAP (fora da divisao);168
+src/lib/nina/confidence/conformidade-entrega.ts;OS ZAP (fora da divisao);300
+src/lib/nina/confidence/conhecimento-sessao.test.ts;OS ZAP (fora da divisao);172
+src/lib/nina/confidence/conhecimento-sessao.ts;OS ZAP (fora da divisao);335
+src/lib/nina/confidence/contexto-avaliacao.ts;OS ZAP (fora da divisao);247
+src/lib/nina/confidence/contexto-canonico.ts;OS ZAP (fora da divisao);184
+src/lib/nina/confidence/contexto-turno.test.ts;OS ZAP (fora da divisao);142
+src/lib/nina/confidence/contexto-turno.ts;OS ZAP (fora da divisao);218
+src/lib/nina/confidence/contrato-flag.server.ts;OS ZAP (fora da divisao);40
+src/lib/nina/confidence/contrato-regras.ts;OS ZAP (fora da divisao);763
+src/lib/nina/confidence/contrato-turno.ts;OS ZAP (fora da divisao);63
+src/lib/nina/confidence/denominadores.ts;OS ZAP (fora da divisao);420
+src/lib/nina/confidence/desfecho.ts;OS ZAP (fora da divisao);108
+src/lib/nina/confidence/engine.test.ts;OS ZAP (fora da divisao);199
+src/lib/nina/confidence/engine.ts;OS ZAP (fora da divisao);554
+src/lib/nina/confidence/entrega.test.ts;OS ZAP (fora da divisao);142
+src/lib/nina/confidence/entrega.ts;OS ZAP (fora da divisao);198
+src/lib/nina/confidence/escala-fluxo-integrado.test.ts;OS ZAP (fora da divisao);268
+src/lib/nina/confidence/escala-publicada.test.ts;OS ZAP (fora da divisao);292
+src/lib/nina/confidence/escala-publicada.ts;OS ZAP (fora da divisao);229
+src/lib/nina/confidence/esclarecimento.ts;OS ZAP (fora da divisao);176
+src/lib/nina/confidence/escopo-enumeracao.test.ts;OS ZAP (fora da divisao);198
+src/lib/nina/confidence/escopo-enumeracao.ts;OS ZAP (fora da divisao);101
+src/lib/nina/confidence/escopo-metricas.ts;OS ZAP (fora da divisao);142
+src/lib/nina/confidence/especialidade-versus-endereco.test.ts;OS ZAP (fora da divisao);140
+src/lib/nina/confidence/etapas-flag.server.ts;OS ZAP (fora da divisao);40
+src/lib/nina/confidence/etapas.test.ts;OS ZAP (fora da divisao);110
+src/lib/nina/confidence/etapas.ts;OS ZAP (fora da divisao);116
+src/lib/nina/confidence/evidencia-extrator.ts;OS ZAP (fora da divisao);824
+src/lib/nina/confidence/evidencia.ts;OS ZAP (fora da divisao);321
+src/lib/nina/confidence/evidencias-turno.ts;OS ZAP (fora da divisao);61
+src/lib/nina/confidence/fase1-contexto-avaliacao.test.ts;OS ZAP (fora da divisao);312
+src/lib/nina/confidence/fase1-contrato-regras.test.ts;OS ZAP (fora da divisao);268
+src/lib/nina/confidence/fase1-preco-por-forma-pagamento.test.ts;OS ZAP (fora da divisao);117
+src/lib/nina/confidence/fase1-regressoes.test.ts;OS ZAP (fora da divisao);238
+src/lib/nina/confidence/fase2-avaliacao-regras.test.ts;OS ZAP (fora da divisao);489
+src/lib/nina/confidence/fase2-correspondencia.test.ts;OS ZAP (fora da divisao);245
+src/lib/nina/confidence/fase2-evidencia.test.ts;OS ZAP (fora da divisao);168
+src/lib/nina/confidence/fase2-nao-aplicavel.test.ts;OS ZAP (fora da divisao);140
+src/lib/nina/confidence/fase2-preco-condicoes.test.ts;OS ZAP (fora da divisao);163
+src/lib/nina/confidence/fase2-regras-em-blocos.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/confidence/fase3-answer-confidence.test.ts;OS ZAP (fora da divisao);126
+src/lib/nina/confidence/fase3-cadeia-real.test.ts;OS ZAP (fora da divisao);245
+src/lib/nina/confidence/fase3-cadeia-real.ts;OS ZAP (fora da divisao);284
+src/lib/nina/confidence/fase3-negacoes-cobertura.test.ts;OS ZAP (fora da divisao);184
+src/lib/nina/confidence/fase3-pontuacao-instrucoes.test.ts;OS ZAP (fora da divisao);342
+src/lib/nina/confidence/fase3-pontuacao.test.ts;OS ZAP (fora da divisao);283
+src/lib/nina/confidence/fase3-validacao-monetaria.test.ts;OS ZAP (fora da divisao);196
+src/lib/nina/confidence/fase4-estados-conversa.test.ts;OS ZAP (fora da divisao);235
+src/lib/nina/confidence/fase4-handoff-decision.test.ts;OS ZAP (fora da divisao);191
+src/lib/nina/confidence/fase4-integracao-bloqueio.test.ts;OS ZAP (fora da divisao);195
+src/lib/nina/confidence/fase4-obrigacoes.test.ts;OS ZAP (fora da divisao);180
+src/lib/nina/confidence/fase4-saida-final.test.ts;OS ZAP (fora da divisao);416
+src/lib/nina/confidence/fase4-verificacao-motor.test.ts;OS ZAP (fora da divisao);381
+src/lib/nina/confidence/fase5-aceite-preco-forma.test.ts;OS ZAP (fora da divisao);240
+src/lib/nina/confidence/fase5-eventos.ts;OS ZAP (fora da divisao);216
+src/lib/nina/confidence/fase5-explicacao.test.ts;OS ZAP (fora da divisao);674
+src/lib/nina/confidence/fase5-explicacao.ts;OS ZAP (fora da divisao);385
+src/lib/nina/confidence/fase5-homologacao.test.ts;OS ZAP (fora da divisao);301
+src/lib/nina/confidence/fase5-indicadores.ts;OS ZAP (fora da divisao);120
+src/lib/nina/confidence/fase5-propostas.ts;OS ZAP (fora da divisao);119
+src/lib/nina/confidence/fase5-revisao-amostra.ts;OS ZAP (fora da divisao);129
+src/lib/nina/confidence/fase5-revisao-final.test.ts;OS ZAP (fora da divisao);353
+src/lib/nina/confidence/fase6-ativacao.ts;OS ZAP (fora da divisao);213
+src/lib/nina/confidence/fase6-auditoria-vinculo.test.ts;OS ZAP (fora da divisao);143
+src/lib/nina/confidence/fase6-cadeia-integrada.ts;OS ZAP (fora da divisao);326
+src/lib/nina/confidence/fase6-identidade-saida.test.ts;OS ZAP (fora da divisao);290
+src/lib/nina/confidence/fase6-matriz-integrada.test.ts;OS ZAP (fora da divisao);747
+src/lib/nina/confidence/fase7-metricas-calibracao.test.ts;OS ZAP (fora da divisao);200
+src/lib/nina/confidence/fase7-metricas.test.ts;OS ZAP (fora da divisao);247
+src/lib/nina/confidence/fase8-aceite-runner.test.ts;OS ZAP (fora da divisao);582
+src/lib/nina/confidence/final-answer.test.ts;OS ZAP (fora da divisao);225
+src/lib/nina/confidence/final-answer.ts;OS ZAP (fora da divisao);99
+src/lib/nina/confidence/fixtures/clinica-ficticia.ts;OS ZAP (fora da divisao);123
+src/lib/nina/confidence/fixtures/prompt-23-regras.ts;OS ZAP (fora da divisao);164
+src/lib/nina/confidence/fixtures/prompt-publicado-v15.ts;OS ZAP (fora da divisao);234
+src/lib/nina/confidence/fixtures/prompt-publicado-v19.ts;OS ZAP (fora da divisao);239
+src/lib/nina/confidence/fontes-requeridas.test.ts;OS ZAP (fora da divisao);214
+src/lib/nina/confidence/fontes-requeridas.ts;OS ZAP (fora da divisao);161
+src/lib/nina/confidence/formas-pagamento-evidencia.test.ts;OS ZAP (fora da divisao);215
+src/lib/nina/confidence/formas-pagamento-resposta.test.ts;OS ZAP (fora da divisao);347
+src/lib/nina/confidence/gate-v2.test.ts;OS ZAP (fora da divisao);164
+src/lib/nina/confidence/gate-v2.ts;OS ZAP (fora da divisao);745
+src/lib/nina/confidence/handoff-decision.ts;OS ZAP (fora da divisao);264
+src/lib/nina/confidence/hash.ts;OS ZAP (fora da divisao);34
+src/lib/nina/confidence/identidade-publicada.ts;OS ZAP (fora da divisao);142
+src/lib/nina/confidence/identidade-saida.ts;OS ZAP (fora da divisao);275
+src/lib/nina/confidence/index.ts;OS ZAP (fora da divisao);102
+src/lib/nina/confidence/intencao-forma-pagamento.test.ts;OS ZAP (fora da divisao);25
+src/lib/nina/confidence/intent-stage-acao.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/confidence/jornada-fontes-sessao.test.ts;OS ZAP (fora da divisao);429
+src/lib/nina/confidence/metricas.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/confidence/metricas.ts;OS ZAP (fora da divisao);854
+src/lib/nina/confidence/modalidade-agendado-motor.test.ts;OS ZAP (fora da divisao);101
+src/lib/nina/confidence/modalidade.ts;OS ZAP (fora da divisao);129
+src/lib/nina/confidence/obrigacoes-abertura.test.ts;OS ZAP (fora da divisao);337
+src/lib/nina/confidence/obrigacoes-abertura.ts;OS ZAP (fora da divisao);229
+src/lib/nina/confidence/obrigacoes-agregacao-paridade.test.ts;OS ZAP (fora da divisao);219
+src/lib/nina/confidence/obrigacoes-continuidade.test.ts;OS ZAP (fora da divisao);458
+src/lib/nina/confidence/obrigacoes-continuidade.ts;OS ZAP (fora da divisao);404
+src/lib/nina/confidence/obrigacoes-operacionais.test.ts;OS ZAP (fora da divisao);252
+src/lib/nina/confidence/obrigacoes-operacionais.ts;OS ZAP (fora da divisao);124
+src/lib/nina/confidence/obrigacoes.ts;OS ZAP (fora da divisao);940
+src/lib/nina/confidence/oferta-cabecalho.test.ts;OS ZAP (fora da divisao);98
+src/lib/nina/confidence/oferta-particula-confirmacao.test.ts;OS ZAP (fora da divisao);118
+src/lib/nina/confidence/operacoes-ausentes-paridade.test.ts;OS ZAP (fora da divisao);144
+src/lib/nina/confidence/operadores-instrucoes.test.ts;OS ZAP (fora da divisao);146
+src/lib/nina/confidence/pagamento-declarado.ts;OS ZAP (fora da divisao);151
+src/lib/nina/confidence/plano-factual.test.ts;OS ZAP (fora da divisao);428
+src/lib/nina/confidence/plano-factual.ts;OS ZAP (fora da divisao);314
+src/lib/nina/confidence/policy.test.ts;OS ZAP (fora da divisao);195
+src/lib/nina/confidence/policy.ts;OS ZAP (fora da divisao);488
+src/lib/nina/confidence/politica-override.server.ts;OS ZAP (fora da divisao);92
+src/lib/nina/confidence/pontuacao-contrato.ts;OS ZAP (fora da divisao);434
+src/lib/nina/confidence/pontuacao-instrucoes.ts;OS ZAP (fora da divisao);357
+src/lib/nina/confidence/preco-modalidade-evidencia.test.ts;OS ZAP (fora da divisao);85
+src/lib/nina/confidence/precos-escopos-locais.test.ts;OS ZAP (fora da divisao);141
+src/lib/nina/confidence/profissionais-evidencia-individual.test.ts;OS ZAP (fora da divisao);151
+src/lib/nina/confidence/regras-publicadas.test.ts;OS ZAP (fora da divisao);203
+src/lib/nina/confidence/regras-publicadas.ts;OS ZAP (fora da divisao);1012
+src/lib/nina/confidence/regressao-saudacao-low.test.ts;OS ZAP (fora da divisao);116
+src/lib/nina/confidence/revisao-final.ts;OS ZAP (fora da divisao);495
+src/lib/nina/confidence/runtime.test.ts;OS ZAP (fora da divisao);183
+src/lib/nina/confidence/runtime.ts;OS ZAP (fora da divisao);360
+src/lib/nina/confidence/saida-final.ts;OS ZAP (fora da divisao);460
+src/lib/nina/confidence/saudacao-bloqueio-indevido.test.ts;OS ZAP (fora da divisao);159
+src/lib/nina/confidence/saudacao-bloqueio.test.ts;OS ZAP (fora da divisao);142
+src/lib/nina/confidence/saudacao-homologacao-verificacao.test.ts;OS ZAP (fora da divisao);157
+src/lib/nina/confidence/saudacao-nao-bloqueia.test.ts;OS ZAP (fora da divisao);86
+src/lib/nina/confidence/selecao-contextual.test.ts;OS ZAP (fora da divisao);301
+src/lib/nina/confidence/selecao-contextual.ts;OS ZAP (fora da divisao);460
+src/lib/nina/confidence/shadow-flag.server.ts;OS ZAP (fora da divisao);27
+src/lib/nina/confidence/shadow-matriz.ts;OS ZAP (fora da divisao);411
+src/lib/nina/confidence/shadow.test.ts;OS ZAP (fora da divisao);66
+src/lib/nina/confidence/shadow.ts;OS ZAP (fora da divisao);51
+src/lib/nina/confidence/turno-tipo.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/confidence/turno-tipo.ts;OS ZAP (fora da divisao);198
+src/lib/nina/confidence/types.ts;OS ZAP (fora da divisao);534
+src/lib/nina/confidence/validators.test.ts;OS ZAP (fora da divisao);320
+src/lib/nina/confidence/validators.ts;OS ZAP (fora da divisao);622
+src/lib/nina/confidence/valor-generico-publicado.test.ts;OS ZAP (fora da divisao);84
+src/lib/nina/confidence/workflow-consistency.test.ts;OS ZAP (fora da divisao);260
+src/lib/nina/confidence/workflow.ts;OS ZAP (fora da divisao);260
+src/lib/nina/confirmacao-agendamento.ts;OS ZAP (fora da divisao);112
+src/lib/nina/confirmacao-identificacao.ts;OS ZAP (fora da divisao);124
+src/lib/nina/consulta-agenda-historico.ts;OS ZAP (fora da divisao);68
+src/lib/nina/consulta-agenda.ts;OS ZAP (fora da divisao);583
+src/lib/nina/context-builder.ts;OS ZAP (fora da divisao);201
+src/lib/nina/conversa-auditoria.ts;OS ZAP (fora da divisao);120
+src/lib/nina/correcao-executor.functions.ts;OS ZAP (fora da divisao);844
+src/lib/nina/correcao-executor.ts;OS ZAP (fora da divisao);183
+src/lib/nina/correcao-falso-sucesso.ts;OS ZAP (fora da divisao);26
+src/lib/nina/correcao-ferramentas.server.ts;OS ZAP (fora da divisao);175
+src/lib/nina/correcao-limites.ts;OS ZAP (fora da divisao);106
+src/lib/nina/correcao-prontidao.ts;OS ZAP (fora da divisao);142
+src/lib/nina/correcao-relatorio.ts;OS ZAP (fora da divisao);293
+src/lib/nina/correcao-verificacao.server.ts;OS ZAP (fora da divisao);65
+src/lib/nina/dashboard-homologacao.functions.ts;OS ZAP (fora da divisao);215
+src/lib/nina/dashboard-homologacao.ts;OS ZAP (fora da divisao);306
+src/lib/nina/data-nascimento.ts;OS ZAP (fora da divisao);54
+src/lib/nina/decisao-schema.ts;OS ZAP (fora da divisao);101
+src/lib/nina/decisoes.functions.ts;OS ZAP (fora da divisao);198
+src/lib/nina/decisoes.ts;OS ZAP (fora da divisao);122
+src/lib/nina/desempenho-periodo.functions.ts;OS ZAP (fora da divisao);53
+src/lib/nina/desempenho-periodo.ts;OS ZAP (fora da divisao);116
+src/lib/nina/detalhes-auditoria-ia.ts;OS ZAP (fora da divisao);171
+src/lib/nina/detalhes-mensagem-contrato.ts;OS ZAP (fora da divisao);100
+src/lib/nina/detalhes-mensagem.server.ts;OS ZAP (fora da divisao);356
+src/lib/nina/detalhes-mensagem.ts;OS ZAP (fora da divisao);695
+src/lib/nina/dicionario-leitura.server.ts;OS ZAP (fora da divisao);53
+src/lib/nina/dicionario-leitura.ts;OS ZAP (fora da divisao);43
+src/lib/nina/eficiencia-turno.ts;OS ZAP (fora da divisao);129
+src/lib/nina/encerramento-automatico.server.ts;OS ZAP (fora da divisao);113
+src/lib/nina/encerramento-automatico.ts;OS ZAP (fora da divisao);129
+src/lib/nina/entrada-persistida.server.ts;OS ZAP (fora da divisao);88
+src/lib/nina/entrega-saida.server.ts;OS ZAP (fora da divisao);25
+src/lib/nina/erro-rapido-revisao.test.ts;OS ZAP (fora da divisao);30
+src/lib/nina/erro-rapido.ts;OS ZAP (fora da divisao);292
+src/lib/nina/erros.ts;OS ZAP (fora da divisao);127
+src/lib/nina/esclarecimento-apresentacao.ts;OS ZAP (fora da divisao);84
+src/lib/nina/espera-paciente.server.ts;OS ZAP (fora da divisao);290
+src/lib/nina/espera-paciente.test.ts;OS ZAP (fora da divisao);236
+src/lib/nina/espera-paciente.ts;OS ZAP (fora da divisao);155
+src/lib/nina/espera-timeout-motivo.ts;OS ZAP (fora da divisao);7
+src/lib/nina/espera-timeout.server.ts;OS ZAP (fora da divisao);236
+src/lib/nina/espera-timeout.test.ts;OS ZAP (fora da divisao);29
+src/lib/nina/evidencias-pacote.server.ts;OS ZAP (fora da divisao);447
+src/lib/nina/evidencias-pacote.ts;OS ZAP (fora da divisao);362
+src/lib/nina/evidencias-resumo.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/evidencias-resumo.ts;OS ZAP (fora da divisao);166
+src/lib/nina/evidencias.functions.ts;OS ZAP (fora da divisao);98
+src/lib/nina/evidencias.server.ts;OS ZAP (fora da divisao);199
+src/lib/nina/evidencias.ts;OS ZAP (fora da divisao);278
+src/lib/nina/executor-codigo.server.ts;OS ZAP (fora da divisao);134
+src/lib/nina/falha-agendamento.ts;OS ZAP (fora da divisao);43
+src/lib/nina/fase1-mensagens-fragmentadas.test.ts;OS ZAP (fora da divisao);159
+src/lib/nina/fase2-burst-aggregation.test.ts;OS ZAP (fora da divisao);160
+src/lib/nina/fase2-publicacao-versao.fixture.ts;OS ZAP (fora da divisao);276
+src/lib/nina/fase2-publicacao-versao.test.ts;OS ZAP (fora da divisao);15
+src/lib/nina/fase3-serializacao-conversa.test.ts;OS ZAP (fora da divisao);107
+src/lib/nina/fase4-stale-response.test.ts;OS ZAP (fora da divisao);128
+src/lib/nina/fase5-batch-turno-unico.test.ts;OS ZAP (fora da divisao);131
+src/lib/nina/fase6-homologacao.test.ts;OS ZAP (fora da divisao);244
+src/lib/nina/fase6-homologacao.ts;OS ZAP (fora da divisao);334
+src/lib/nina/feedback-aplicacao.functions.ts;OS ZAP (fora da divisao);329
+src/lib/nina/feedback-aplicacao.ts;OS ZAP (fora da divisao);171
+src/lib/nina/feedback-conversa.functions.ts;OS ZAP (fora da divisao);168
+src/lib/nina/feedback-diagnostico.functions.ts;OS ZAP (fora da divisao);214
+src/lib/nina/feedback-diagnostico.ts;OS ZAP (fora da divisao);149
+src/lib/nina/feedback-erros.functions.ts;OS ZAP (fora da divisao);282
+src/lib/nina/feedback-erros.ts;OS ZAP (fora da divisao);43
+src/lib/nina/feedback-metricas.functions.ts;OS ZAP (fora da divisao);364
+src/lib/nina/feedback-revisao.functions.ts;OS ZAP (fora da divisao);360
+src/lib/nina/feedback-versoes.functions.ts;OS ZAP (fora da divisao);276
+src/lib/nina/fila-individual.test.ts;OS ZAP (fora da divisao);148
+src/lib/nina/finalidade-vacina.ts;OS ZAP (fora da divisao);93
+src/lib/nina/fluxo-direto.ts;OS ZAP (fora da divisao);58
+src/lib/nina/fluxo-estado-normalizar.ts;OS ZAP (fora da divisao);201
+src/lib/nina/fluxo-estado-versao.ts;OS ZAP (fora da divisao);24
+src/lib/nina/fluxo-estado.server.ts;OS ZAP (fora da divisao);152
+src/lib/nina/fonte-consulta-admin.server.ts;OS ZAP (fora da divisao);107
+src/lib/nina/fonte-consulta-config.server.ts;OS ZAP (fora da divisao);15
+src/lib/nina/fonte-consulta-sessao.ts;OS ZAP (fora da divisao);30
+src/lib/nina/fonte-consulta.functions.ts;OS ZAP (fora da divisao);29
+src/lib/nina/fonte-consulta.ts;OS ZAP (fora da divisao);22
+src/lib/nina/fonte-editorial.server.ts;OS ZAP (fora da divisao);45
+src/lib/nina/fonte-operacional.server.ts;OS ZAP (fora da divisao);253
+src/lib/nina/fonte-operacional.ts;OS ZAP (fora da divisao);509
+src/lib/nina/fotos.server.ts;OS ZAP (fora da divisao);124
+src/lib/nina/fotos.ts;OS ZAP (fora da divisao);116
+src/lib/nina/handoff-assertions.ts;OS ZAP (fora da divisao);152
+src/lib/nina/handoff-silencioso.ts;OS ZAP (fora da divisao);26
+src/lib/nina/handoff-tool.server.ts;OS ZAP (fora da divisao);118
+src/lib/nina/homologacao-burst.test.ts;OS ZAP (fora da divisao);145
+src/lib/nina/homologacao-ciclo-concorrente.test.ts;OS ZAP (fora da divisao);144
+src/lib/nina/homologacao-exportacao.server.ts;OS ZAP (fora da divisao);61
+src/lib/nina/homologacao-exportacao.ts;OS ZAP (fora da divisao);57
+src/lib/nina/homologacao-navegacao.ts;OS ZAP (fora da divisao);18
+src/lib/nina/homologacao-realtime.ts;OS ZAP (fora da divisao);201
+src/lib/nina/homologacao-retomada.ts;OS ZAP (fora da divisao);65
+src/lib/nina/homologacao-stale.test.ts;OS ZAP (fora da divisao);155
+src/lib/nina/homologacao-validacao-final.test.ts;OS ZAP (fora da divisao);264
+src/lib/nina/homologacao/fase4-precedencia-verificacoes.test.ts;OS ZAP (fora da divisao);204
+src/lib/nina/homologacao/fase6-regressao-aceite.fixture.ts;OS ZAP (fora da divisao);608
+src/lib/nina/homologacao/fase6-regressao-aceite.test.ts;OS ZAP (fora da divisao);15
+src/lib/nina/homologacao/modo-tecnico.ts;OS ZAP (fora da divisao);76
+src/lib/nina/homologacao/verificacoes-diagnostico.test.ts;OS ZAP (fora da divisao);77
+src/lib/nina/homologacao/verificacoes.functions.ts;OS ZAP (fora da divisao);105
+src/lib/nina/homologacao/verificacoes.server.ts;OS ZAP (fora da divisao);309
+src/lib/nina/homologacao/verificacoes.ts;OS ZAP (fora da divisao);270
+src/lib/nina/horario-funcionamento.functions.ts;OS ZAP (fora da divisao);519
+src/lib/nina/horario-funcionamento.ts;OS ZAP (fora da divisao);232
+src/lib/nina/horario-oficial.ts;OS ZAP (fora da divisao);274
+src/lib/nina/horarios-habituais.ts;OS ZAP (fora da divisao);103
+src/lib/nina/horarios-periodo.ts;OS ZAP (fora da divisao);329
+src/lib/nina/horarios-por-atendimento.ts;OS ZAP (fora da divisao);67
+src/lib/nina/identidade-atendimento.ts;OS ZAP (fora da divisao);252
+src/lib/nina/identidade-efetiva.server.ts;OS ZAP (fora da divisao);64
+src/lib/nina/identidade-efetiva.ts;OS ZAP (fora da divisao);181
+src/lib/nina/identidade-paciente.test.ts;OS ZAP (fora da divisao);84
+src/lib/nina/identidade-paciente.ts;OS ZAP (fora da divisao);111
+src/lib/nina/identificacao-catalogo.ts;OS ZAP (fora da divisao);114
+src/lib/nina/identificacao-gate.server.ts;OS ZAP (fora da divisao);912
+src/lib/nina/inspecao-mensagem.ts;OS ZAP (fora da divisao);100
+src/lib/nina/instrucoes-diff.ts;OS ZAP (fora da divisao);80
+src/lib/nina/instrucoes-limites.ts;OS ZAP (fora da divisao);9
+src/lib/nina/instrucoes-runtime.server.ts;OS ZAP (fora da divisao);294
+src/lib/nina/instrucoes-template.ts;OS ZAP (fora da divisao);117
+src/lib/nina/instrucoes.functions.ts;OS ZAP (fora da divisao);329
+src/lib/nina/jev-auditoria.ts;OS ZAP (fora da divisao);84
+src/lib/nina/jev-avaliacao.ts;OS ZAP (fora da divisao);160
+src/lib/nina/jev-cadastro.ts;OS ZAP (fora da divisao);86
+src/lib/nina/jev-conferencia.ts;OS ZAP (fora da divisao);135
+src/lib/nina/jev-contexto.ts;OS ZAP (fora da divisao);226
+src/lib/nina/jev-encaminhamento.ts;OS ZAP (fora da divisao);208
+src/lib/nina/jev-esclarecimento-entregue.ts;OS ZAP (fora da divisao);109
+src/lib/nina/jev-escolha.ts;OS ZAP (fora da divisao);97
+src/lib/nina/jev-especialidade.ts;OS ZAP (fora da divisao);91
+src/lib/nina/jev-intencao.ts;OS ZAP (fora da divisao);66
+src/lib/nina/jev-limites.ts;OS ZAP (fora da divisao);89
+src/lib/nina/jev-motivo.test.ts;OS ZAP (fora da divisao);54
+src/lib/nina/jev-motivo.ts;OS ZAP (fora da divisao);105
+src/lib/nina/jev-observacao-intencao.ts;OS ZAP (fora da divisao);225
+src/lib/nina/jev-orientacao-intencao.ts;OS ZAP (fora da divisao);135
+src/lib/nina/jev.server.ts;OS ZAP (fora da divisao);435
+src/lib/nina/jev.ts;OS ZAP (fora da divisao);76
+src/lib/nina/knowledge-contract.ts;OS ZAP (fora da divisao);283
+src/lib/nina/knowledge.server.ts;OS ZAP (fora da divisao);61
+src/lib/nina/leads-resumo.ts;OS ZAP (fora da divisao);218
+src/lib/nina/leitura-imagem.ts;OS ZAP (fora da divisao);115
+src/lib/nina/limite-leitura-saidas.ts;OS ZAP (fora da divisao);41
+src/lib/nina/lista-profissionais-extensa.ts;OS ZAP (fora da divisao);51
+src/lib/nina/lock-conversa.server.ts;OS ZAP (fora da divisao);130
+src/lib/nina/memoria-processo.ts;OS ZAP (fora da divisao);45
+src/lib/nina/mensagem-meta.ts;OS ZAP (fora da divisao);112
+src/lib/nina/metricas-analise.functions.ts;OS ZAP (fora da divisao);266
+src/lib/nina/metricas-analise.ts;OS ZAP (fora da divisao);236
+src/lib/nina/metricas-filtros.ts;OS ZAP (fora da divisao);217
+src/lib/nina/modalidade-atendimento.server.ts;OS ZAP (fora da divisao);77
+src/lib/nina/modalidade-atendimento.ts;OS ZAP (fora da divisao);92
+src/lib/nina/modelo-flag.server.ts;OS ZAP (fora da divisao);31
+src/lib/nina/modelo-nina.ts;OS ZAP (fora da divisao);9
+src/lib/nina/multiplos-atendimentos.ts;OS ZAP (fora da divisao);57
+src/lib/nina/nome-popular-especialidade.ts;OS ZAP (fora da divisao);41
+src/lib/nina/oferta-completa.server.ts;OS ZAP (fora da divisao);23
+src/lib/nina/oferta-completa.ts;OS ZAP (fora da divisao);235
+src/lib/nina/paciente-tools.server.ts;OS ZAP (fora da divisao);3582
+src/lib/nina/pagamento-catalogo.test.ts;OS ZAP (fora da divisao);59
+src/lib/nina/papeis-modelos.ts;OS ZAP (fora da divisao);100
+src/lib/nina/pedido-medico-agenda.server.ts;OS ZAP (fora da divisao);60
+src/lib/nina/pedido-medico-flag.ts;OS ZAP (fora da divisao);8
+src/lib/nina/pedido-medico.ts;OS ZAP (fora da divisao);135
+src/lib/nina/perguntas-independentes.ts;OS ZAP (fora da divisao);493
+src/lib/nina/pesquisa-atendimento-sessao.ts;OS ZAP (fora da divisao);100
+src/lib/nina/pesquisa-medico-sessao.ts;OS ZAP (fora da divisao);88
+src/lib/nina/prefetch-cadastro.server.ts;OS ZAP (fora da divisao);81
+src/lib/nina/prefetch-cadastro.ts;OS ZAP (fora da divisao);265
+src/lib/nina/primeiro-disponivel-catalogo.server.ts;OS ZAP (fora da divisao);167
+src/lib/nina/procedimento-agenda.server.ts;OS ZAP (fora da divisao);82
+src/lib/nina/procedimento-sessao.ts;OS ZAP (fora da divisao);130
+src/lib/nina/prompt-composer.test.ts;OS ZAP (fora da divisao);140
+src/lib/nina/prompt-composer.ts;OS ZAP (fora da divisao);133
+src/lib/nina/prompt-preview.functions.ts;OS ZAP (fora da divisao);302
+src/lib/nina/prompt-snapshot.functions.ts;OS ZAP (fora da divisao);66
+src/lib/nina/prompt-snapshot.test.ts;OS ZAP (fora da divisao);83
+src/lib/nina/prompt/behavior-v4.ts;OS ZAP (fora da divisao);285
+src/lib/nina/prompt/consulta-agenda.ts;OS ZAP (fora da divisao);38
+src/lib/nina/prompt/fontes-cadastro.test.ts;OS ZAP (fora da divisao);13
+src/lib/nina/prompt/fontes-cadastro.ts;OS ZAP (fora da divisao);29
+src/lib/nina/prompt/formatacao-whatsapp.ts;OS ZAP (fora da divisao);18
+src/lib/nina/prompt/identidade-atendimento.ts;OS ZAP (fora da divisao);5
+src/lib/nina/prompt/limite-esclarecimento.ts;OS ZAP (fora da divisao);35
+src/lib/nina/prompt/pagamento.ts;OS ZAP (fora da divisao);34
+src/lib/nina/prompt/painel-interno.ts;OS ZAP (fora da divisao);37
+src/lib/nina/prompt/pedido-medico.ts;OS ZAP (fora da divisao);5
+src/lib/nina/prompt/precedencia-turno.test.ts;OS ZAP (fora da divisao);189
+src/lib/nina/prompt/precedencia-turno.ts;OS ZAP (fora da divisao);208
+src/lib/nina/prompt/precedencia.ts;OS ZAP (fora da divisao);216
+src/lib/nina/prompt/regras-catalogo.ts;OS ZAP (fora da divisao);16
+src/lib/nina/prompt/regras-temporais.ts;OS ZAP (fora da divisao);15
+src/lib/nina/prompt/respostas-contextuais.ts;OS ZAP (fora da divisao);14
+src/lib/nina/rastreio/__tests__/versoes-texto.test.ts;OS ZAP (fora da divisao);106
+src/lib/nina/rastreio/auditoria-instrucoes.test.ts;OS ZAP (fora da divisao);175
+src/lib/nina/rastreio/auditoria-instrucoes.ts;OS ZAP (fora da divisao);313
+src/lib/nina/rastreio/painel-detalhes-fase6.test.ts;OS ZAP (fora da divisao);292
+src/lib/nina/rastreio/rpcs-esperadas.test.ts;OS ZAP (fora da divisao);22
+src/lib/nina/rastreio/runtime-fingerprint.test.ts;OS ZAP (fora da divisao);55
+src/lib/nina/rastreio/runtime-version.test.ts;OS ZAP (fora da divisao);42
+src/lib/nina/rastreio/turno.server.ts;OS ZAP (fora da divisao);423
+src/lib/nina/rastreio/turno.test.ts;OS ZAP (fora da divisao);354
+src/lib/nina/rastreio/turno.ts;OS ZAP (fora da divisao);602
+src/lib/nina/rastreio/versoes-texto.ts;OS ZAP (fora da divisao);210
+src/lib/nina/reabertura-entrada.ts;OS ZAP (fora da divisao);15
+src/lib/nina/reasoning-router.ts;OS ZAP (fora da divisao);153
+src/lib/nina/redistribuicao-fila.test.ts;OS ZAP (fora da divisao);132
+src/lib/nina/regras-administrativas-confirmadas.ts;OS ZAP (fora da divisao);39
+src/lib/nina/regras-catalogo.server.ts;OS ZAP (fora da divisao);95
+src/lib/nina/regras-catalogo.ts;OS ZAP (fora da divisao);90
+src/lib/nina/relatorio-teste.functions.ts;OS ZAP (fora da divisao);539
+src/lib/nina/relatorio-teste.ts;OS ZAP (fora da divisao);220
+src/lib/nina/renovacao-reserva.ts;OS ZAP (fora da divisao);71
+src/lib/nina/reserva-turno.ts;OS ZAP (fora da divisao);33
+src/lib/nina/resposta-afirmativa.ts;OS ZAP (fora da divisao);50
+src/lib/nina/resposta/agendamento.ts;OS ZAP (fora da divisao);47
+src/lib/nina/resposta/contrato.ts;OS ZAP (fora da divisao);155
+src/lib/nina/resposta/efeitos-confirmados.ts;OS ZAP (fora da divisao);60
+src/lib/nina/resposta/finalizacao.server.ts;OS ZAP (fora da divisao);309
+src/lib/nina/resposta/formato-mobile.ts;OS ZAP (fora da divisao);70
+src/lib/nina/resposta/sem-emojis.ts;OS ZAP (fora da divisao);25
+src/lib/nina/resposta/templates.server.ts;OS ZAP (fora da divisao);112
+src/lib/nina/resposta/templates.ts;OS ZAP (fora da divisao);412
+src/lib/nina/revisao-conversa.server.ts;OS ZAP (fora da divisao);59
+src/lib/nina/revisao-teste.functions.ts;OS ZAP (fora da divisao);365
+src/lib/nina/revisao-teste.test.ts;OS ZAP (fora da divisao);119
+src/lib/nina/revisao-teste.ts;OS ZAP (fora da divisao);291
+src/lib/nina/revisao.ts;OS ZAP (fora da divisao);48
+src/lib/nina/runtime-version.ts;OS ZAP (fora da divisao);13
+src/lib/nina/saida-mensagem.functions.ts;OS ZAP (fora da divisao);108
+src/lib/nina/saida-mensagem.server.ts;OS ZAP (fora da divisao);147
+src/lib/nina/saudacao-sessao.ts;OS ZAP (fora da divisao);296
+src/lib/nina/sessao-teste-exclusiva.server.ts;OS ZAP (fora da divisao);31
+src/lib/nina/sessao.server.ts;OS ZAP (fora da divisao);42
+src/lib/nina/sessao.test.ts;OS ZAP (fora da divisao);105
+src/lib/nina/sessao.ts;OS ZAP (fora da divisao);300
+src/lib/nina/simulador-terra.functions.ts;OS ZAP (fora da divisao);457
+src/lib/nina/simulador-terra.ts;OS ZAP (fora da divisao);295
+src/lib/nina/telefone-paciente.ts;OS ZAP (fora da divisao);79
+src/lib/nina/telefonia-elegibilidade.test.ts;OS ZAP (fora da divisao);133
+src/lib/nina/telefonia-elegibilidade.ts;OS ZAP (fora da divisao);276
+src/lib/nina/telemetria.server.ts;OS ZAP (fora da divisao);62
+src/lib/nina/telemetria.ts;OS ZAP (fora da divisao);149
+src/lib/nina/temperatura.functions.ts;OS ZAP (fora da divisao);29
+src/lib/nina/temperatura.server.ts;OS ZAP (fora da divisao);126
+src/lib/nina/temperatura.ts;OS ZAP (fora da divisao);25
+src/lib/nina/teste-console.functions.ts;OS ZAP (fora da divisao);590
+src/lib/nina/teste-console.server.ts;OS ZAP (fora da divisao);1365
+src/lib/nina/timeout-resumo.ts;OS ZAP (fora da divisao);71
+src/lib/nina/tool-broker.server.ts;OS ZAP (fora da divisao);121
+src/lib/nina/tool-broker.ts;OS ZAP (fora da divisao);161
+src/lib/nina/vinculo-catalogo-agenda.server.ts;OS ZAP (fora da divisao);306
+src/lib/nina/voz-config.functions.ts;OS ZAP (fora da divisao);51
+src/lib/nina/voz-config.server.ts;OS ZAP (fora da divisao);176
+src/lib/nina/voz-config.ts;OS ZAP (fora da divisao);85
+src/lib/nina/watchdog-contexto.server.ts;OS ZAP (fora da divisao);6
+src/lib/nina/watchdog-falha.ts;OS ZAP (fora da divisao);39
+src/lib/nina/watchdog-metricas.server.ts;OS ZAP (fora da divisao);211
+src/lib/nina/watchdog.server.ts;OS ZAP (fora da divisao);555
+src/lib/nina/watchdog.ts;OS ZAP (fora da divisao);84
+src/lib/nina/whatsapp-processamento.server.ts;OS ZAP (fora da divisao);673
+src/lib/permissoes-oszap.server.ts;OS ZAP (fora da divisao);69
+src/lib/permissoes-oszap.test.ts;OS ZAP (fora da divisao);140
+src/lib/permissoes-oszap.ts;OS ZAP (fora da divisao);301
+src/lib/voz-correcoes.ts;OS ZAP (fora da divisao);179
+src/lib/webmcp/__tests__/contexto.test.ts;OS ZAP (fora da divisao);95
+src/lib/webmcp/__tests__/ferramentas.test.ts;OS ZAP (fora da divisao);214
+src/lib/webmcp/atualizacao.ts;OS ZAP (fora da divisao);30
+src/lib/webmcp/contexto.ts;OS ZAP (fora da divisao);109
+src/lib/webmcp/ferramentas.ts;OS ZAP (fora da divisao);476
+src/lib/webmcp/politica.ts;OS ZAP (fora da divisao);122
+src/lib/webmcp/selecao-conversa.ts;OS ZAP (fora da divisao);46
+src/lib/webmcp/selecao-teste.ts;OS ZAP (fora da divisao);19
+src/lib/whatsapp-assinatura.ts;OS ZAP (fora da divisao);29
+src/lib/whatsapp-midia-armazenamento.ts;OS ZAP (fora da divisao);165
+src/lib/whatsapp-midia.server.ts;OS ZAP (fora da divisao);561
+src/lib/whatsapp.functions.ts;OS ZAP (fora da divisao);431
+src/lib/whatsapp.server.ts;OS ZAP (fora da divisao);4541
+src/routes/_authenticated/app.configuracoes.respostas-rapidas.tsx;OS ZAP (fora da divisao);9
+src/routes/_authenticated/app.francisco.tsx;OS ZAP (fora da divisao);28
+src/routes/_authenticated/app.nina-aprendizado.tsx;OS ZAP (fora da divisao);2120
+src/routes/_authenticated/app.nina-arquitetura.tsx;OS ZAP (fora da divisao);431
+src/routes/_authenticated/app.nina-jev.tsx;OS ZAP (fora da divisao);455
+src/routes/_authenticated/app.nina-metricas.tsx;OS ZAP (fora da divisao);859
+src/routes/_authenticated/app.nina.$conversationId.tsx;OS ZAP (fora da divisao);18
+src/routes/_authenticated/app.nina.tsx;OS ZAP (fora da divisao);1557
+src/routes/_authenticated/app.painel-tv-atendimento.tsx;OS ZAP (fora da divisao);122
+src/routes/[.mcp]/invoke-tool/$tool.ts;OS ZAP (fora da divisao);20
+src/routes/[.mcp]/list-tools.ts;OS ZAP (fora da divisao);20
+src/routes/api/nina-fala.ts;OS ZAP (fora da divisao);235
+src/routes/api/nina-voz.ts;OS ZAP (fora da divisao);79
+src/routes/api/public/hooks/francisco.ts;OS ZAP (fora da divisao);36
+src/routes/api/public/nina-runtime.ts;OS ZAP (fora da divisao);16
+src/routes/api/public/nina.carga.ts;OS ZAP (fora da divisao);33
+src/routes/api/public/nina.espera-timeout.ts;OS ZAP (fora da divisao);40
+src/routes/api/public/nina.watchdog.ts;OS ZAP (fora da divisao);55
+src/routes/api/public/whatsapp.$clinicaId.ts;OS ZAP (fora da divisao);813
+src/routes/dev.dashboard-oszap.tsx;OS ZAP (fora da divisao);262
+src/routes/dev.departamentos.tsx;OS ZAP (fora da divisao);11
+src/routes/dev.francisco.tsx;OS ZAP (fora da divisao);16
+src/routes/dev.painel-tv.tsx;OS ZAP (fora da divisao);12
+src/routes/dev.simulacao-atendimento.tsx;OS ZAP (fora da divisao);37
+src/routes/mcp.ts;OS ZAP (fora da divisao);19
+src/types/nina-arquitetura-fontes.d.ts;OS ZAP (fora da divisao);5

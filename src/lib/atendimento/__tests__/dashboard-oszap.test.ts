@@ -212,8 +212,55 @@ describe("Números do dashboard", () => {
     expect(r.indicadores.esperaFilaMin.atual).toBe(10);
     expect(r.indicadores.primeiraRespostaMin.atual).toBe(20);
     expect(r.indicadores.tempoAteEncerrarMin.atual).toBe(25 * 60);
+    expect(r.qualidade.medianaPrimeiraRespostaMin.atual).toBe(20);
+    expect(r.qualidade.p90PrimeiraRespostaMin.atual).toBe(20);
+    expect(r.qualidade.sla5MinPct.atual).toBe(0);
+    expect(r.qualidade.respostasMedidas.atual).toBe(1);
+    expect(r.equipe.find((p) => p.id === "ana")).toMatchObject({
+      respostaMediaMin: 20,
+      respostaMedianaMin: 20,
+      respostaP90Min: 20,
+      respostasMedidas: 1,
+    });
     expect(r.indicadores.finalizadas.atual).toBe(0);
     expect(r.equipe.find((p) => p.id === "ana")).toMatchObject({ assumidas: 1, finalizadas: 0 });
+  });
+  it("mede reabertura, resolução sem reabrir e resposta da pesquisa", () => {
+    const r = montarDashboardOsZap(
+      base({
+        eventos: [
+          evento("fim-1", "FINALIZADA", "2024-10-01T12:00:00Z", { user_id: "ana" }),
+          evento("reabre", "REABERTA", "2024-10-01T13:00:00Z"),
+          evento("fim-2", "FINALIZADA", "2024-10-01T14:00:00Z", {
+            conversa_id: "outra",
+            user_id: "ana",
+          }),
+        ],
+        avaliacoes: [
+          {
+            created_at: "2024-10-01T15:00:00Z",
+            solicitada_em: "2024-10-01T15:00:00Z",
+            respondida_em: "2024-10-01T15:05:00Z",
+            status: "respondida",
+            nota: 5,
+            atendente_user_id: "ana",
+          },
+          {
+            created_at: "2024-10-01T16:00:00Z",
+            solicitada_em: "2024-10-01T16:00:00Z",
+            respondida_em: null,
+            status: "pendente",
+            nota: null,
+            atendente_user_id: "bia",
+          },
+        ],
+      }),
+    );
+    expect(r.qualidade.reabertas.atual).toBe(1);
+    expect(r.qualidade.resolucaoSemReaberturaPct.atual).toBe(0.5);
+    expect(r.qualidade.pesquisasSolicitadas.atual).toBe(2);
+    expect(r.qualidade.taxaRespostaPesquisa.atual).toBe(0.5);
+    expect(r.equipe.find((p) => p.id === "ana")?.resolucaoSemReaberturaPct).toBe(0.5);
   });
   it("atendentes são só o perfil telefonia: ações, presença e pausas de outros perfis ficam fora", () => {
     const r = montarDashboardOsZap(

@@ -9,6 +9,13 @@ export type DadosPainelTv = {
   conversasDoDia: number;
   tempoMedioRespostaSeg: number | null;
   respostasMedidas: number;
+  medianaRespostaSeg: number | null;
+  p90RespostaSeg: number | null;
+  slaAte5MinPct: number | null;
+  conversasUltimaHora: number;
+  resolvidasUltimaHora: number;
+  maisAntigaSemAtendente: string | null;
+  reabertasHoje: number;
   volumePorHora: number[];
   respostas: { equipe: number; nina: number };
   encaminhadasHoje: number;
@@ -75,6 +82,7 @@ export function criarDemonstracaoPainelTv(agora: number): DadosPainelTv {
       esperas,
       resolvidasHoje: 6 + ((indice * 3) % 19),
       tempoMedioRespostaSeg: indice % 9 === 0 ? null : 48 + ((indice * 37) % 260),
+      respostasMedidas: indice % 9 === 0 ? 0 : 2 + (indice % 11),
     };
   });
   const semAtendente = [16, 2].map(antes);
@@ -87,6 +95,13 @@ export function criarDemonstracaoPainelTv(agora: number): DadosPainelTv {
     conversasDoDia: 123,
     tempoMedioRespostaSeg: 146,
     respostasMedidas: 67,
+    medianaRespostaSeg: 118,
+    p90RespostaSeg: 424,
+    slaAte5MinPct: 0.84,
+    conversasUltimaHora: 18,
+    resolvidasUltimaHora: 15,
+    maisAntigaSemAtendente: semAtendente[0],
+    reabertasHoje: 7,
     volumePorHora: [
       0, 0, 0, 0, 0, 0, 0, 8, 26, 44, 57, 39, 24, 31, 48, 61, 46, 33, 19, 10, 4, 0, 0, 0,
     ],

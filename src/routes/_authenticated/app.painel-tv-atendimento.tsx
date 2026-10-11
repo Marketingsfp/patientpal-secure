@@ -13,11 +13,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { consultarPainelTv } from "@/lib/atendimento.functions";
+import { PainelTvAtendimentoVisual } from "@/components/atendimento/PainelTvAtendimento";
+import { PainelTvComIndicadores } from "@/components/atendimento/PainelTvIndicadores";
 import {
-  PainelTvAtendimentoVisual,
-  PainelTvDemonstracao,
-} from "@/components/atendimento/PainelTvAtendimento";
-import type { DadosPainelTv } from "@/lib/atendimento/painel-tv-demonstracao";
+  criarDemonstracaoPainelTv,
+  type DadosPainelTv,
+} from "@/lib/atendimento/painel-tv-demonstracao";
 
 export const Route = createFileRoute("/_authenticated/app/painel-tv-atendimento")({
   component: PainelTvAtendimento,
@@ -43,9 +44,24 @@ function PainelTvAtendimento() {
   const alternar = () =>
     void navigate({ search: { demonstracao: demonstracao ? undefined : true } });
   return demonstracao ? (
-    <PainelTvDemonstracao onAlternarDemonstracao={alternar} />
+    <PainelTvDemoCompleta onAlternarDemonstracao={alternar} />
   ) : (
     <PainelTvAoVivo onAlternarDemonstracao={alternar} />
+  );
+}
+
+function PainelTvDemoCompleta({ onAlternarDemonstracao }: { onAlternarDemonstracao: () => void }) {
+  const [dados] = useState(() => criarDemonstracaoPainelTv(Date.now()));
+  return (
+    <PainelTvComIndicadores dados={dados}>
+      <PainelTvAtendimentoVisual
+        dados={dados}
+        conectado={false}
+        clinicaNome="Clínica de demonstração"
+        demonstracao
+        onAlternarDemonstracao={onAlternarDemonstracao}
+      />
+    </PainelTvComIndicadores>
   );
 }
 
@@ -110,12 +126,14 @@ function PainelTvAoVivo({ onAlternarDemonstracao }: { onAlternarDemonstracao: ()
   }, [clinicaId, carregar]);
 
   return (
-    <PainelTvAtendimentoVisual
-      dados={dados}
-      erro={erro}
-      conectado={conectado}
-      clinicaNome={clinicaAtual?.clinica.nome ?? ""}
-      onAlternarDemonstracao={onAlternarDemonstracao}
-    />
+    <PainelTvComIndicadores dados={dados}>
+      <PainelTvAtendimentoVisual
+        dados={dados}
+        erro={erro}
+        conectado={conectado}
+        clinicaNome={clinicaAtual?.clinica.nome ?? ""}
+        onAlternarDemonstracao={onAlternarDemonstracao}
+      />
+    </PainelTvComIndicadores>
   );
 }

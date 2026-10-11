@@ -1,0 +1,285 @@
+<title>Divisão ClinicaOS em Frentes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: coluna de leitura única; visão geral em 3 colunas (uma por frente) que empilham no celular. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --ink: #18202b; --muted: #5a6575; --line: #dde2ea;
+  --f1: #1f6fb2; --f2: #a8660b; --f3: #7a3f8f; --core: #4b5563; --off: #9aa3af;
+  --f1-soft: #e6f0f9; --f2-soft: #fbf0df; --f3-soft: #f3e9f6; --core-soft: #eceff3;
+  --warn: #9a3412; --warn-soft: #fdeee6;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161d; --surface: #171e27; --ink: #e6ebf2; --muted: #9aa6b6; --line: #2a3441;
+  --f1: #6fb1ea; --f2: #e2a24a; --f3: #c58ad8; --core: #aab4c2; --off: #6b7685;
+  --f1-soft: #16283a; --f2-soft: #2e2314; --f3-soft: #2a1b31; --core-soft: #212a35;
+  --warn: #f19a6c; --warn-soft: #33201a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11161d; --surface: #171e27; --ink: #e6ebf2; --muted: #9aa6b6; --line: #2a3441;
+  --f1: #6fb1ea; --f2: #e2a24a; --f3: #c58ad8; --core: #aab4c2; --off: #6b7685;
+  --f1-soft: #16283a; --f2-soft: #2e2314; --f3-soft: #2a1b31; --core-soft: #212a35;
+  --warn: #f19a6c; --warn-soft: #33201a; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 1.0625rem/1.6 var(--body); margin: 0; }
+.wrap { max-width: 68rem; margin: 0 auto; padding-inline: 1.25rem; padding-block: 2.5rem 4rem; display: grid; gap: 2.75rem; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.5rem; font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code { font-family: var(--mono); font-size: 0.82em; background: var(--core-soft); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+.eyebrow { font: 600 0.78rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+section { display: grid; gap: 1rem; min-width: 0; }
+header { display: grid; gap: 0.9rem; }
+.meta { color: var(--muted); font-size: 0.95rem; }
+
+/* Visão geral */
+.fronts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.front { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 8px; padding: 1.1rem 1.2rem 1.25rem; display: grid; gap: 0.7rem; align-content: start; min-width: 0; }
+.front .tag { font: 600 0.75rem/1 var(--mono); color: var(--c); letter-spacing: 0.04em; }
+.front .flow { color: var(--muted); font-size: 0.95rem; }
+.size { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--c); }
+.owner { border-top: 1px dashed var(--line); padding-top: 0.6rem; font-size: 0.9rem; color: var(--muted); }
+.f1 { --c: var(--f1); --s: var(--f1-soft); } .f2 { --c: var(--f2); --s: var(--f2-soft); } .f3 { --c: var(--f3); --s: var(--f3-soft); } .core { --c: var(--core); --s: var(--core-soft); }
+
+.strip { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; font-size: 0.92rem; color: var(--muted); }
+.strip b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Detalhe por frente */
+.detail { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 8px; padding: 1.25rem 1.4rem; display: grid; gap: 1rem; min-width: 0; }
+.detail h2 { color: var(--c); }
+.kv { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 0.55rem 1.2rem; }
+.kv dt { font-weight: 700; font-size: 0.92rem; }
+.kv dd { margin: 0; min-width: 0; font-size: 0.97rem; }
+.note { background: var(--s, var(--core-soft)); border-radius: 6px; padding: 0.65rem 0.9rem; font-size: 0.95rem; }
+.excluded { background: var(--surface); border: 1px dashed var(--off); border-radius: 8px; padding: 1.25rem 1.4rem; display: grid; gap: 0.8rem; }
+.warn { background: var(--warn-soft); color: var(--ink); border-radius: 6px; padding: 0.7rem 0.95rem; font-size: 0.95rem; }
+.warn b { color: var(--warn); }
+
+/* Tabelas */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--core-soft); }
+tr:last-child td { border-bottom: 0; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; font: 600 0.75rem/1.5 var(--mono); padding: 0 0.45rem; border-radius: 4px; background: var(--s); color: var(--c); white-space: nowrap; }
+
+ol.rules, ul.list { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.55rem; max-width: 72ch; }
+ol.rules li::marker { font-weight: 700; color: var(--muted); }
+footer { color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+
+@media (max-width: 760px) {
+  .fronts { grid-template-columns: minmax(0, 1fr); }
+  .kv { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
+  .kv dd { margin-bottom: 0.6rem; }
+}
+@media print {
+  body { font-size: 10.5pt; }
+  .wrap { padding-block: 0; gap: 1.6rem; }
+  .detail, .front, .tbl, .excluded { break-inside: avoid; }
+  .fronts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
+  .kv { grid-template-columns: 8.5rem minmax(0, 1fr); gap: 0.4rem 1rem; }
+  .kv dd { margin-bottom: 0; }
+  h1 { font-size: 1.9rem; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">ClinicaOS · organização do time</span>
+    <h1>Divisão do sistema em 3 frentes de trabalho</h1>
+    <p>Proposta para três colaboradores trabalharem em paralelo sem mexer no código um do outro. Cada frente é um fluxo de negócio completo, da tela ao banco, para que uma pessoa entregue uma funcionalidade inteira sem abrir arquivo de outra frente. O OS ZAP fica fora da divisão.</p>
+    <p class="meta">Base: <code>main</code> no commit <code>ac6bc6cc</code> (10/10/2026). Levantamento feito no código: pastas, rotas, imports entre arquivos, 912 migrations e histórico git dos últimos 60 dias.</p>
+  </header>
+
+  <section aria-labelledby="visao">
+    <h2 id="visao">Visão geral</h2>
+    <div class="fronts">
+      <article class="front f1">
+        <span class="tag">FRENTE 1</span>
+        <h3>Atendimento Clínico</h3>
+        <p class="flow">Da marcação ao consultório: agenda, escala médica, check-in, recepção e filas, totem e painel de senhas, prontuário, odonto, fisio, hiperdia.</p>
+        <div class="size"><span>205 arquivos · ~72 mil linhas</span><div class="bar"><i style="width:82%"></i></div></div>
+        <p class="owner">Responsável: ____________</p>
+      </article>
+      <article class="front f2">
+        <span class="tag">FRENTE 2</span>
+        <h3>Financeiro</h3>
+        <p class="flow">Do caixa ao faturamento: caixa, financeiro, NFS-e, boletos, PIX, orçamentos, tabela de valores, repasses, relatórios, painel executivo.</p>
+        <div class="size"><span>225 arquivos · ~88 mil linhas</span><div class="bar"><i style="width:100%"></i></div></div>
+        <p class="owner">Responsável: ____________</p>
+      </article>
+      <article class="front f3">
+        <span class="tag">FRENTE 3</span>
+        <h3>Clientes, Cartão e Gestão</h3>
+        <p class="flow">Pacientes, cartão benefícios e terapêutico, contratos e convênios, cadastros da clínica, RH, treinamento, marketing e CRM, administração.</p>
+        <div class="size"><span>233 arquivos · ~85 mil linhas</span><div class="bar"><i style="width:96%"></i></div></div>
+        <p class="owner">Responsável: ____________</p>
+      </article>
+    </div>
+    <div class="strip">
+      <span>Núcleo compartilhado: <b>232</b> arquivos · <b>~56 mil</b> linhas</span>
+      <span>OS ZAP (fora): <b>1.314</b> arquivos · <b>~271 mil</b> linhas</span>
+      <span>Imports entre frentes: <b>~170</b> · das frentes para o núcleo: <b>~2.300</b></span>
+    </div>
+    <p>A Frente 1 tem menos linhas, mas concentra o arquivo mais complexo e mais alterado do sistema, <code>app.agenda.tsx</code>, com 183 commits em 60 dias. O esforço fica equilibrado. Os poucos imports entre frentes confirmam que as fronteiras estão em lugares naturais.</p>
+  </section>
+
+  <section aria-labelledby="oszap">
+    <div class="excluded">
+      <span class="eyebrow">Fora da divisão</span>
+      <h2 id="oszap">OS ZAP</h2>
+      <p>Nenhuma das três frentes altera estes itens.</p>
+      <dl class="kv">
+        <dt>Telas</dt><dd><code>/app/nina</code> (dashboard, conversas WhatsApp, mensagens prontas, central de conversas, departamentos, voz, laboratório, homologação, configurações e templates do WhatsApp), <code>/app/nina-*</code>, <code>/app/francisco</code>, <code>/app/painel-tv-atendimento</code>, <code>/app/configuracoes/respostas-rapidas</code> e as rotas <code>dev.*</code> do OS ZAP.</dd>
+        <dt>Código</dt><dd><code>components/nina</code>, <code>components/atendimento</code>, <code>components/francisco</code>, <code>lib/nina</code>, <code>lib/atendimento</code>, <code>lib/francisco</code>, <code>lib/webmcp</code>, <code>lib/mcp</code>, <code>permissoes-oszap*</code>, APIs da Nina, do WhatsApp e do Francisco.</dd>
+        <dt>Banco</dt><dd>91 tabelas <code>nina_*</code>, <code>atend_*</code>, <code>whatsapp_*</code>, <code>francisco_*</code>.</dd>
+      </dl>
+      <p class="warn"><b>Premissa a confirmar.</b> O Coach WhatsApp é um subsistema separado no menu e não importa código da Nina nem do Atendimento, por isso ficou na Frente 3. Se o time considerar o Coach parte do OS ZAP, ele sai da Frente 3 (cerca de 11 mil linhas).</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="f1">
+    <div class="detail f1">
+      <span class="eyebrow">Frente 1</span>
+      <h2 id="f1">Atendimento Clínico</h2>
+      <dl class="kv">
+        <dt>Telas do menu</dt><dd>Início, Agenda, Escala e Horários, Atendimento Múltiplo, Check-in, Fluxo do paciente, Recepção / Filas, Triagem, Documentos do paciente, Anamneses, Hiperdia, Apoio Clínico, Meus Pacientes, Prontuários, Enfermeira IA, Informações rápidas, Odontograma, Fisioterapia, Resultados de Exames, Horários médicos, Modelos de Prontuário, e as configurações de Numeração de Prontuário, Painel &amp; Totem e Voz &amp; Áudio.</dd>
+        <dt>Telas públicas</dt><dd>Totem, painel de senhas, autoatendimento, check-in por link, portal do médico, intake de consultas e o aviso de confirmação de consultas.</dd>
+        <dt>Pastas</dt><dd><code>components/</code> agenda, agenda-v2, recepcao, painel, totem, face, prontuario, odontologia, fisioterapia, hiperdia, medico, sessoes, fluxo · <code>lib/</code> agenda, agenda-v2, painel, prontuario, sessoes, triagem, hiperdia, medico, fluxo, qz, atendimento-multiplo, mais <code>prontuario.ts</code>, <code>fisio*</code>, <code>odonto*</code>, <code>biometria.ts</code>, <code>face-recognition.ts</code>, <code>consulta-ia</code>, <code>exames-ia</code>, <code>lumen-tv</code>, <code>print-senha</code> · hooks da agenda v2, ficha, médico e odonto.</dd>
+        <dt>Tabelas</dt><dd><code>agendamentos</code>, <code>agendamento_*</code>, <code>medico_agendas</code>, <code>medico_disponibilidades</code>, <code>medico_expediente_encerramento</code>, <code>medico_biometria</code>, <code>senhas</code>, <code>prontuarios</code>, <code>prontuario_*</code>, <code>anamnese_*</code>, <code>documentos_emitidos</code>, <code>exame_resultados</code>, <code>odonto_*</code>, <code>fisio_*</code>, <code>hiperdia_registros</code>, <code>triagens_enfermagem</code>, <code>enfermagem_recurso*</code>, <code>alertas_enfermagem</code>, <code>paciente_biometria</code>, <code>lumen_tv_*</code>, <code>busca_ativa_contatos</code>.</dd>
+      </dl>
+      <p class="note">A agenda clássica e a Agenda V2 coexistem por feature flag. A clássica só sai quando a V2 for promovida.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="f2">
+    <div class="detail f2">
+      <span class="eyebrow">Frente 2</span>
+      <h2 id="f2">Financeiro</h2>
+      <dl class="kv">
+        <dt>Telas do menu</dt><dd>Caixa, as 21 telas de Financeiro (movimento, atendimentos, contas, categorias, empresas, BI, analítico, projeção, pendências, estorno, lembretes, notas, regras IA, relatórios), NFS-e e sua configuração, Boletos, Orçamentos (inclusive os da agenda e de odonto), Tabela de valores, Relatórios, Painel Executivo.</dd>
+        <dt>Telas públicas</dt><dd>Financeiro do portal do paciente e retorno da Focus NFe.</dd>
+        <dt>Pastas</dt><dd><code>components/</code> caixa, caixa-v2, financeiro, nfse, orcamentos, orcamentos-v2, tabela-valores, relatorios, painel-executivo · <code>lib/</code> financeiro, caixa, orcamentos, pix, relatorios, tabela-valores, dashboard, mais <code>nfse*</code>, <code>boleto.functions</code>, <code>estornar-lancamento</code>, <code>repasse-*</code>, <code>orcamento-*</code>, <code>pagamento-status</code> e as impressões de caixa, recibo, GR, orçamento e relatório financeiro · hooks das flags de Caixa V2 e Orçamentos V2.</dd>
+        <dt>Tabelas</dt><dd><code>fin_*</code>, <code>caixa_sessoes</code>, <code>caixa_movimentos</code>, <code>nfse</code>, <code>nfse_agendamentos</code>, <code>nfse_emitentes</code>, <code>boletos</code>, <code>orcamentos</code>, <code>orcamento_itens</code>, <code>estorno_solicitacoes</code>, <code>regras_rateio</code>, <code>medico_repasse_laudo</code>, <code>gr_impressoes</code>, <code>pagamentos</code>, <code>pagamento_splits</code>, <code>prestadores</code>.</dd>
+      </dl>
+      <p class="note">Caixa V2 e Orçamentos V2 coexistem com os clássicos por feature flag.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="f3">
+    <div class="detail f3">
+      <span class="eyebrow">Frente 3</span>
+      <h2 id="f3">Clientes, Cartão e Gestão</h2>
+      <dl class="kv">
+        <dt>Telas do menu</dt><dd>Clientes (lista, ficha, recentes, duplicados e merge), Cartão Benefícios (9 telas), Cartão Terapêutico (7 telas), Contratos de assinatura, Planos, Revisão de convênio, Médicos e equipe, Equipe e acessos, Perfis, Serviços e especialidades, Procedimentos, Tipos de serviço, Unidades, Setores, Cargos, Estoque, Modelos de documentos, Recursos Humanos, Treinamentos e cursos, Coach WhatsApp, Marketing, CRM, LGPD, Segurança &amp; Compliance, Integrações, Clínicas, Backups, Chat interno.</dd>
+        <dt>Telas públicas</dt><dd>Portal do paciente (exceto financeiro), assinatura de contrato por link, landing pages, verificação de certificado, cadastro e o backup diário.</dd>
+        <dt>Pastas</dt><dd><code>components/</code> clientes, clientes-v2, pacientes, paciente, cartao, cartao-beneficios, contratos, pages (contratos e planos), medicos, funcionarios, coach · <code>lib/</code> cartao, convenio, contract-templates, coach, equipe, paciente, procedimento, estoque, mais <code>cb-regras</code>, <code>contrato-dependentes</code>, <code>importar-*</code>, <code>equipe.functions</code>, <code>backups.functions</code>, <code>lms-certificate</code> e as impressões de carnê, cartão e contrato.</dd>
+        <dt>Tabelas</dt><dd><code>pacientes</code>, <code>paciente_*</code> (exceto biometria), <code>cb_*</code>, <code>cartoes_convenio</code>, <code>credito_clinica_revisoes</code>, <code>contratos_assinatura</code>, <code>contrato_*</code>, <code>planos_assinatura</code>, <code>sistema_planos</code>, <code>medicos</code>, <code>medico_procedimentos</code>, <code>medico_especialidades</code>, <code>medico_convenios</code>, <code>especialidades</code>, <code>procedimentos</code>, <code>procedimento_*</code>, <code>tipos_servico</code>, <code>unidades</code>, <code>setores</code>, <code>cargos</code>, <code>estoque_*</code>, <code>modelos_documentos</code>, <code>hr_*</code>, <code>lms_*</code>, <code>coach_*</code>, <code>mkt_*</code>, <code>crm_*</code>, <code>lgpd_*</code>, <code>chat_*</code>, <code>backup_execucoes</code>.</dd>
+      </dl>
+      <p class="note">Clientes V2 coexiste com o clássico por feature flag.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="nucleo">
+    <div class="detail core">
+      <span class="eyebrow">Sem dono único</span>
+      <h2 id="nucleo">Núcleo compartilhado</h2>
+      <dl class="kv">
+        <dt>UI e visual</dt><dd><code>components/ui</code>, <code>design-system</code>, <code>styles.css</code>, list-shell, simple-crud, charts, theme, icons, acessibilidade.</dd>
+        <dt>Shell e menu</dt><dd><code>app-shell.tsx</code>, <code>app-sidebar-layout.tsx</code>, <code>portal-launcher.tsx</code>, busca universal, <code>subsystem.ts</code>, <code>menu-*</code>.</dd>
+        <dt>Acesso</dt><dd><code>use-auth</code>, <code>use-permissoes</code>, <code>use-clinica</code>, <code>use-alcadas</code>, <code>permissoes-rotas.ts</code>, <code>permissoes-presets.ts</code>, <code>permissoes.server.ts</code>, autorização de supervisor, <code>lib/seguranca</code>.</dd>
+        <dt>Infra</dt><dd><code>integrations/supabase</code> (inclui <code>types.ts</code>, gerado), <code>server.ts</code>, <code>start.ts</code>, <code>router.tsx</code>, <code>routeTree.gen.ts</code> (gerado), <code>__root.tsx</code>, <code>_authenticated.tsx</code>, login, API de integrações, TTS.</dd>
+        <dt>Utilitários</dt><dd><code>utils</code>, <code>traduzir-erro</code>, <code>date-utils</code>, <code>cpf</code>, <code>validators</code>, <code>confirm</code>, <code>notify</code>, exportações CSV/XLSX/DOCX, <code>patient-search-input</code>, <code>paciente-nome</code>.</dd>
+        <dt>Projeto</dt><dd><code>package.json</code>, lockfiles, <code>vite.config.ts</code>, <code>tsconfig.json</code>, <code>eslint.config.js</code>, <code>wrangler.jsonc</code>, CI.</dd>
+      </dl>
+      <ol class="rules">
+        <li>Pode usar à vontade. Para alterar, faça um PR pequeno só com essa mudança e avise os outros dois antes do merge.</li>
+        <li>Mudança de comportamento existente (assinatura de função, prop de componente, regra de permissão) precisa do OK de mais uma pessoa.</li>
+        <li>Sugestão: um guardião do núcleo por semana, em rodízio, revisa esses PRs.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section aria-labelledby="banco">
+    <h2 id="banco">Banco de dados</h2>
+    <ol class="rules">
+      <li>Cada frente só cria migrations para as suas tabelas.</li>
+      <li>Nunca editar migration existente. Correção é sempre uma migration nova.</li>
+      <li>Uma migration por PR, com nome descritivo e o prefixo da frente, por exemplo <code>..._f2_fin_alerta_vencimento.sql</code>.</li>
+      <li>Toda tabela nova segue o padrão multi-clínica: <code>clinica_id</code> e RLS com <code>is_member</code>, <code>has_role</code> ou <code>can_manage_clinica</code>.</li>
+      <li>Aplicar migration em produção continua exigindo autorização explícita.</li>
+    </ol>
+    <p>Tabelas compartilhadas exigem aviso aos outros dois antes de qualquer alteração de estrutura, policy, trigger ou função:</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Tabela</th><th>Dono</th><th style="text-align:right">Migrations que já a alteraram</th></tr></thead>
+        <tbody>
+          <tr><td><code>agendamentos</code></td><td><span class="chip f1">F1</span></td><td class="num">99</td></tr>
+          <tr><td><code>pacientes</code></td><td><span class="chip f3">F3</span></td><td class="num">84</td></tr>
+          <tr><td><code>fin_lancamentos</code></td><td><span class="chip f2">F2</span></td><td class="num">82</td></tr>
+          <tr><td><code>medicos</code></td><td><span class="chip f3">F3</span></td><td class="num">49</td></tr>
+          <tr><td><code>procedimentos</code></td><td><span class="chip f3">F3</span></td><td class="num">33</td></tr>
+          <tr><td><code>audit_log</code></td><td><span class="chip core">Núcleo</span></td><td class="num">31</td></tr>
+          <tr><td><code>clinica_feature_flags</code></td><td><span class="chip core">Núcleo</span></td><td class="num">20</td></tr>
+          <tr><td><code>clinicas</code>, <code>clinica_memberships</code>, <code>profiles</code></td><td><span class="chip core">Núcleo</span></td><td class="num">18+</td></tr>
+          <tr><td>Perfis e permissões: <code>perfis_acesso</code>, <code>perfil_permissoes</code>, <code>permissions</code>, <code>role_permissions</code>, <code>user_roles</code>, <code>usuario_permissoes</code>, <code>usuario_alcadas</code></td><td><span class="chip core">Núcleo</span></td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Tabelas de importação e legado (<code>_mj_*</code>, <code>_pasta_*</code>, <code>_stg_*</code>, <code>_tmp_*</code>, <code>*_backup_*</code>) não devem ser alteradas sem combinar.</p>
+  </section>
+
+  <section aria-labelledby="interfaces">
+    <h2 id="interfaces">Onde as frentes se encontram</h2>
+    <p>Quem usa o código de outra frente não edita o arquivo dela: pede a mudança ao dono. Quando uma tarefa exige mexer dos dois lados, cada dono faz a sua parte e os PRs entram juntos.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Interface</th><th>Dono</th><th>Usada por</th></tr></thead>
+        <tbody>
+          <tr><td>Busca e cadastro rápido de paciente, alerta crítico do paciente</td><td>Núcleo / <span class="chip f3">F3</span></td><td><span class="chip f1">F1</span> <span class="chip f2">F2</span></td></tr>
+          <tr><td>Regras de convênio do cartão (<code>lib/convenio</code>, <code>cb-regras.ts</code>)</td><td><span class="chip f3">F3</span></td><td><span class="chip f1">F1</span> agenda · <span class="chip f2">F2</span> caixa</td></tr>
+          <tr><td>Orçamento vinculado ao agendamento (<code>agendamento_orcamento_itens</code> e <code>orcamentos</code>)</td><td><span class="chip f1">F1</span> / <span class="chip f2">F2</span></td><td>as duas</td></tr>
+          <tr><td>Status de pagamento do agendamento</td><td><span class="chip f2">F2</span></td><td><span class="chip f1">F1</span></td></tr>
+          <tr><td>Prontuário (<code>lib/prontuario.ts</code>)</td><td><span class="chip f1">F1</span></td><td><span class="chip f3">F3</span> ficha do cliente</td></tr>
+          <tr><td>Formatação de moeda (<code>lib/financeiro/format.ts</code>)</td><td><span class="chip f2">F2</span></td><td><span class="chip f1">F1</span> <span class="chip f3">F3</span></td></tr>
+          <tr><td>Código do OS ZAP usado pelas frentes (16 imports, a maioria na Frente 1)</td><td>OS ZAP</td><td>só consumir, nunca alterar</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="regras">
+    <h2 id="regras">Regras de trabalho com Git e Lovable</h2>
+    <ol class="rules">
+      <li><strong>Nada direto na <code>main</code>.</strong> Cada tarefa vai em uma branch com o prefixo da frente: <code>f1/…</code>, <code>f2/…</code>, <code>f3/…</code> ou <code>nucleo/…</code>. Entra na <code>main</code> só por Pull Request.</li>
+      <li><strong>CI verde antes do merge.</strong> O PR roda Lint, Typecheck e Testes. Localmente: <code>npm run lint</code>, <code>npm run typecheck</code>, <code>npm run test</code>.</li>
+      <li><strong>PR pequeno e de uma frente só.</strong> Se tocar arquivo de outra frente ou do núcleo, marque o dono para revisar.</li>
+      <li><strong>Arquivos gerados não se resolvem à mão.</strong> Em conflito no <code>routeTree.gen.ts</code> ou no <code>supabase/types.ts</code>, aceite qualquer lado e gere de novo.</li>
+      <li><strong>Menu e permissões são os maiores pontos de conflito.</strong> Em 60 dias, <code>app-shell.tsx</code> mudou 120 vezes e as listas de permissões 46. Cada frente só edita o bloco do seu grupo de menu e das suas rotas, sem reordenar o resto.</li>
+      <li><strong>Feature flags por clínica continuam valendo.</strong> Melhorias entram atrás de flag, e o módulo clássico só sai quando a V2 for promovida.</li>
+      <li><strong>Avise antes</strong> de mexer em tabela compartilhada ou no núcleo, no canal do time. No fim do dia, cada um faz push da sua branch.</li>
+    </ol>
+    <p class="warn"><b>O Lovable é o maior risco de interferência.</b> Nos últimos 60 dias, 5.113 commits na <code>main</code> vieram do bot do Lovable, que grava direto na <code>main</code> e não conhece as fronteiras. Todo prompt deve dizer a frente e listar as pastas que não podem ser tocadas. Antes de usar o Lovable, faça <code>git pull</code>; depois, confira o diff. De preferência, só uma pessoa usa o Lovable por vez.</p>
+  </section>
+
+  <section aria-labelledby="passos">
+    <h2 id="passos">Próximos passos</h2>
+    <ol class="rules">
+      <li>Definir o responsável de cada frente.</li>
+      <li>Confirmar se o Coach WhatsApp fica na Frente 3 ou vai para o OS ZAP.</li>
+      <li>Proteger a <code>main</code> no GitHub, exigindo PR e CI verde, e criar um <code>CODEOWNERS</code> com os usuários de cada frente.</li>
+      <li>Opcional: separar o menu do <code>app-shell.tsx</code> e as listas de permissões em um arquivo por frente. É a maior fonte de conflito hoje. Por ser mudança no núcleo, precisa de plano e aprovação antes.</li>
+    </ol>
+  </section>
+
+  <footer>O dono de cada um dos 2.209 arquivos de <code>src/</code> está em <code>docs/divisao-modulos-arquivos.csv</code>. A versão em texto deste plano está em <code>docs/divisao-modulos-colaboradores.md</code>.</footer>
+</div>

@@ -29,6 +29,14 @@ export type AtendenteTv = {
   resolvidasHoje: number;
   /** Média de resposta humana desta pessoa nos intervalos medidos hoje. */
   tempoMedioRespostaSeg: number | null;
+  /** Quantidade de intervalos usados na média desta pessoa. */
+  respostasMedidas: number;
+};
+
+const percentilMs = (valores: number[], proporcao: number) => {
+  if (!valores.length) return null;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  return Math.round(ordenados[Math.max(0, Math.ceil(ordenados.length * proporcao) - 1)] / 1000);
 };
 
 /**
@@ -83,12 +91,13 @@ export async function carregarPainelTv(
     enviada_por: string | null;
     enviada_por_user_id: string | null;
     created_at: string;
+    status: string | null;
   }[] = [];
   let desde = 0;
   while (true) {
     const { data, error } = await supabase
       .from("whatsapp_mensagens")
-      .select("conversa_id, direction, enviada_por, enviada_por_user_id, created_at")
+      .select("conversa_id, direction, enviada_por, enviada_por_user_id, created_at, status")
       .eq("clinica_id", clinicaId)
       .eq("is_teste", false)
       .neq("status", "system")
@@ -118,16 +127,20 @@ export async function carregarPainelTv(
   // Respostas enviadas hoje: somente atendentes e Nina. Avisos automáticos,
   // lembretes e outras mensagens do sistema não entram no painel da TV.
   const respostas = { equipe: 0, nina: 0 };
+  const conversasUltimaHora = new Set<string>();
+  const limiteUltimaHora = Date.now() - 60 * 60 * 1000;
   for (const m of msgs) {
     const conv = m.conversa_id;
+    const confirmado = m.status === "sent" || m.status === "delivered" || m.status === "read";
     if (m.direction !== "in") {
-      if (m.enviada_por_user_id) respostas.equipe++;
-      else if (m.enviada_por === "nina") respostas.nina++;
+      if (confirmado && m.enviada_por_user_id) respostas.equipe++;
+      else if (confirmado && m.enviada_por === "nina") respostas.nina++;
     }
     if (m.direction === "in") {
       volumePorHora[Number(horaBR.format(new Date(m.created_at))) % 24]++;
+      if (conv && Date.parse(m.created_at) >= limiteUltimaHora) conversasUltimaHora.add(conv);
       if (conv && !inicioPendente.has(conv)) inicioPendente.set(conv, Date.parse(m.created_at));
-    } else if (conv) {
+    } else if (conv && confirmado) {
       if (m.enviada_por_user_id) {
         doDia.add(conv);
         const ini = inicioPendente.get(conv);
@@ -145,10 +158,15 @@ export async function carregarPainelTv(
   const tempoMedioRespostaSeg = tempos.length
     ? Math.round(tempos.reduce((s, v) => s + v, 0) / tempos.length / 1000)
     : null;
+  const medianaRespostaSeg = percentilMs(tempos, 0.5);
+  const p90RespostaSeg = percentilMs(tempos, 0.9);
+  const slaAte5MinPct = tempos.length
+    ? tempos.filter((tempo) => tempo <= 5 * 60 * 1000).length / tempos.length
+    : null;
 
   // Do dia: conversas que a Nina passou para a equipe e conversas resolvidas
   // (com quem resolveu). Só contagens; nada de paciente sai daqui.
-  const [encaminhadasHoje, resolvidasHoje] = await Promise.all([
+  const [encaminhadasHoje, resolvidasHoje, reabertasHoje] = await Promise.all([
     supabase
       .from("atend_conversas")
       .select("id", { count: "exact", head: true })
@@ -158,15 +176,23 @@ export async function carregarPainelTv(
       .lt("handoff_em", fimExclusivo),
     supabase
       .from("atend_conversas")
-      .select("resolved_by")
+      .select("resolved_by, resolved_at")
       .eq("clinica_id", clinicaId)
       .eq("is_teste", false)
       .gte("resolved_at", inicio)
       .lt("resolved_at", fimExclusivo)
       .limit(5000),
+    supabase
+      .from("atend_conversa_eventos")
+      .select("id", { count: "exact", head: true })
+      .eq("clinica_id", clinicaId)
+      .eq("evento", "REABERTA")
+      .gte("created_at", inicio)
+      .lt("created_at", fimExclusivo),
   ]);
   if (encaminhadasHoje.error) throw new Error(encaminhadasHoje.error.message);
   if (resolvidasHoje.error) throw new Error(resolvidasHoje.error.message);
+  if (reabertasHoje.error) throw new Error(reabertasHoje.error.message);
   const resolvidasPor = new Map<string, number>();
   for (const r of resolvidasHoje.data ?? []) {
     if (r.resolved_by)
@@ -194,6 +220,7 @@ export async function carregarPainelTv(
   const idsHumanas = new Set(humanas.map((c) => c.id));
   const donoDe = new Map(humanas.map((c) => [c.id, c.atribuida_user_id]));
   const espera: string[] = [];
+  const esperaSemAtendente: string[] = [];
   const esperasPorAtendente = new Map<string, string[]>();
   for (const t of esperas.data ?? []) {
     if (idsHumanas.has(t.conversa_id) && t.aguardando_desde) {
@@ -204,6 +231,7 @@ export async function carregarPainelTv(
           ...(esperasPorAtendente.get(dono) ?? []),
           t.aguardando_desde,
         ]);
+      else esperaSemAtendente.push(t.aguardando_desde);
     }
   }
 
@@ -260,6 +288,7 @@ export async function carregarPainelTv(
               )
             : null;
         })(),
+        respostasMedidas: temposPorAtendente.get(id)?.length ?? 0,
       };
     }),
   );
@@ -274,6 +303,17 @@ export async function carregarPainelTv(
     conversasDoDia: doDia.size,
     tempoMedioRespostaSeg,
     respostasMedidas: tempos.length,
+    medianaRespostaSeg,
+    p90RespostaSeg,
+    slaAte5MinPct,
+    conversasUltimaHora: conversasUltimaHora.size,
+    resolvidasUltimaHora: (resolvidasHoje.data ?? []).filter(
+      (r) => r.resolved_at && Date.parse(r.resolved_at) >= limiteUltimaHora,
+    ).length,
+    maisAntigaSemAtendente: esperaSemAtendente.length
+      ? esperaSemAtendente.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b))
+      : null,
+    reabertasHoje: reabertasHoje.count ?? 0,
     volumePorHora,
     respostas,
     encaminhadasHoje: encaminhadasHoje.count ?? 0,

@@ -52,7 +52,14 @@ const camposMensagem =
   "id, created_at, conversa_id, direction, enviada_por, enviada_por_user_id, status";
 // Somente o necessário: não lê conteúdo de mensagens, motivos, resumos clínicos nem telefones.
 const camposEvento = "id, created_at, conversa_id, evento, user_id";
-const EVENTOS = ["HANDOFF_SOLICITADO", "ENTROU_NA_FILA", "ASSUMIDA", "FINALIZADA", "TRANSFERIDA"];
+const EVENTOS = [
+  "HANDOFF_SOLICITADO",
+  "ENTROU_NA_FILA",
+  "ASSUMIDA",
+  "FINALIZADA",
+  "TRANSFERIDA",
+  "REABERTA",
+];
 
 /** Relatório de leitura para a gestão; não altera atendimento, fila nem presença. */
 export async function carregarResumoDashboardOsZap(
@@ -162,19 +169,22 @@ export async function carregarResumoDashboardOsZap(
     webhook,
   ] = await Promise.all([
     lerPaginasDashboard<{
+      created_at: string;
+      solicitada_em: string | null;
       respondida_em: string | null;
+      status: string;
       nota: number | null;
       atendente_user_id: string | null;
     }>((de, ate) =>
       db
         .from("atend_avaliacoes")
-        .select("respondida_em, nota, atendente_user_id, atend_conversas!inner(is_teste)")
+        .select(
+          "created_at, solicitada_em, respondida_em, status, nota, atendente_user_id, atend_conversas!inner(is_teste)",
+        )
         .eq("clinica_id", clinicaId)
-        .eq("status", "respondida")
-        .not("nota", "is", null)
         .eq("atend_conversas.is_teste", false)
-        .gte("respondida_em", inicioAnterior)
-        .lt("respondida_em", fim)
+        .gte("created_at", inicioAnterior)
+        .lt("created_at", fim)
         .order("id")
         .range(de, ate),
     ),
@@ -298,9 +308,7 @@ export async function carregarResumoDashboardOsZap(
       mensagens: msgs,
       eventos: evs,
       seguintes: { eventos: seguintesEventos, mensagens: seguintesMensagens },
-      avaliacoes: avaliacoes.flatMap((a) =>
-        a.nota == null ? [] : [{ created_at: a.created_at, nota: a.nota }],
-      ),
+      avaliacoes,
       transferencias,
       departamentos,
       presencas,

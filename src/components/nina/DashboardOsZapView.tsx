@@ -811,6 +811,75 @@ export function DashboardOsZapView({
                 </Grade>
               </Secao>
               <Secao
+                titulo="Qualidade e capacidade"
+                descricao="Mostra se a equipe está respondendo no tempo esperado e se os atendimentos permanecem resolvidos. Os tempos usam somente respostas com começo e fim registrados."
+              >
+                <Grade>
+                  <Indicador
+                    nome="Respondidas em até 5 min"
+                    valor={resumo.qualidade.sla5MinPct.atual}
+                    anterior={resumo.qualidade.sla5MinPct.anterior}
+                    formato={pct}
+                    ajuda="Percentual das primeiras respostas humanas medidas"
+                  />
+                  <Indicador
+                    nome="Resposta mediana"
+                    valor={resumo.qualidade.medianaPrimeiraRespostaMin.atual}
+                    anterior={resumo.qualidade.medianaPrimeiraRespostaMin.anterior}
+                    unidade="min"
+                    melhor="baixo"
+                    ajuda="Metade respondeu antes e metade depois"
+                  />
+                  <Indicador
+                    nome="90% responderam em até"
+                    valor={resumo.qualidade.p90PrimeiraRespostaMin.atual}
+                    anterior={resumo.qualidade.p90PrimeiraRespostaMin.anterior}
+                    unidade="min"
+                    melhor="baixo"
+                    ajuda="Mostra também os atendimentos mais demorados"
+                  />
+                  <Indicador
+                    nome="Respostas usadas no cálculo"
+                    valor={resumo.qualidade.respostasMedidas.atual}
+                    anterior={resumo.qualidade.respostasMedidas.anterior}
+                    melhor="neutro"
+                    ajuda="Amostra dos indicadores de tempo"
+                  />
+                  <Indicador
+                    nome="Resolvidas sem reabrir"
+                    valor={resumo.qualidade.resolucaoSemReaberturaPct.atual}
+                    anterior={resumo.qualidade.resolucaoSemReaberturaPct.anterior}
+                    formato={pct}
+                    ajuda="Finalizadas no período que não voltaram até esta consulta"
+                  />
+                  <Indicador
+                    nome="Conversas reabertas"
+                    valor={resumo.qualidade.reabertas.atual}
+                    anterior={resumo.qualidade.reabertas.anterior}
+                    melhor="baixo"
+                  />
+                  <Indicador
+                    nome="Pesquisas enviadas"
+                    valor={resumo.qualidade.pesquisasSolicitadas.atual}
+                    anterior={resumo.qualidade.pesquisasSolicitadas.anterior}
+                    melhor="neutro"
+                  />
+                  <Indicador
+                    nome="Pacientes que avaliaram"
+                    valor={resumo.qualidade.taxaRespostaPesquisa.atual}
+                    anterior={resumo.qualidade.taxaRespostaPesquisa.anterior}
+                    formato={pct}
+                    ajuda="Avaliações recebidas ÷ pesquisas enviadas no período"
+                  />
+                  <Indicador
+                    nome="Aguardando paciente há 24h+"
+                    valor={resumo.qualidade.aguardandoPaciente24h}
+                    melhor="baixo"
+                    ajuda="Situação atual; não significa abandono confirmado"
+                  />
+                </Grade>
+              </Secao>
+              <Secao
                 titulo="No período"
                 descricao="Verde é melhora e vermelho é piora em relação ao período anterior; tempos menores são melhores."
               >
@@ -895,6 +964,27 @@ export function DashboardOsZapView({
                     { campo: "abertasAgora", titulo: "Abertas agora" },
                     { campo: "pausas", titulo: "Pausas" },
                     { campo: "minutosPausa", titulo: "Min. em pausa" },
+                    {
+                      campo: "respostaMediaMin",
+                      titulo: "Resposta média",
+                      formato: (v) => (v == null ? "—" : `${numero(v as number)} min`),
+                    },
+                    {
+                      campo: "respostaMedianaMin",
+                      titulo: "Resposta mediana",
+                      formato: (v) => (v == null ? "—" : `${numero(v as number)} min`),
+                    },
+                    {
+                      campo: "respostaP90Min",
+                      titulo: "90% em até",
+                      formato: (v) => (v == null ? "—" : `${numero(v as number)} min`),
+                    },
+                    { campo: "respostasMedidas", titulo: "Amostra" },
+                    {
+                      campo: "resolucaoSemReaberturaPct",
+                      titulo: "Sem reabrir",
+                      formato: (v) => pct(v as number | null),
+                    },
                   ]}
                 />
               </Secao>
@@ -942,8 +1032,19 @@ export function DashboardOsZapView({
               <div className="grid gap-5 xl:grid-cols-2">
                 <Secao
                   titulo="Avaliações dos pacientes"
-                  descricao="Notas de 1 a 5 dadas no fim do atendimento."
+                  descricao="Notas de 1 a 5 dadas no fim do atendimento. A taxa mostra quantas pesquisas enviadas receberam uma nota."
                 >
+                  <div className="mb-4 grid grid-cols-2 gap-3">
+                    <Indicador
+                      nome="Pesquisas enviadas"
+                      valor={resumo.qualidade.pesquisasSolicitadas.atual}
+                    />
+                    <Indicador
+                      nome="Taxa de resposta"
+                      valor={resumo.qualidade.taxaRespostaPesquisa.atual}
+                      formato={pct}
+                    />
+                  </div>
                   <BarrasH
                     vazio="Nenhuma avaliação no período."
                     itens={resumo.notas
@@ -983,6 +1084,40 @@ export function DashboardOsZapView({
                   />
                 </Secao>
               </div>
+              <Secao
+                titulo="Evolução da satisfação"
+                descricao="Compara pesquisas enviadas, avaliações recebidas e nota média ao longo do período."
+              >
+                <Grafico
+                  rotulos={rotulos}
+                  series={[
+                    serie("Pesquisas enviadas", CORES[0], (g) => g.pesquisasSolicitadas),
+                    serie("Avaliações recebidas", CORES[1], (g) => g.avaliacoesRecebidas),
+                    serie("Nota média", CORES[2], (g) =>
+                      g.notaQuantidade ? Number((g.notaSoma / g.notaQuantidade).toFixed(2)) : null,
+                    ),
+                  ]}
+                />
+              </Secao>
+              <Secao
+                titulo="Indicadores que ainda precisam de dados"
+                descricao="Não mostramos estimativas para evitar decisões com números imprecisos."
+              >
+                <div className="grid gap-3 text-sm md:grid-cols-3">
+                  <p className="rounded-lg border border-atd-border p-3">
+                    <b>Produtividade por hora online:</b> falta registrar o histórico completo de
+                    entrada e saída de cada atendente.
+                  </p>
+                  <p className="rounded-lg border border-atd-border p-3">
+                    <b>Motivos de contato e transferência:</b> falta uma classificação padronizada,
+                    sem depender do texto da conversa.
+                  </p>
+                  <p className="rounded-lg border border-atd-border p-3">
+                    <b>Demanda versus escala:</b> falta o histórico da quantidade de atendentes
+                    disponíveis em cada hora.
+                  </p>
+                </div>
+              </Secao>
             </TabsContent>
 
             <TabsContent value="nina" className="space-y-5">
