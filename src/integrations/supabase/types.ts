@@ -16373,6 +16373,10 @@ export type Database = {
         }[]
       }
       atend_expurgar_resumos_vencidos: { Args: never; Returns: number }
+      atend_garantir_setores_fixos: {
+        Args: { _clinica_id: string }
+        Returns: undefined
+      }
       atend_gerar_protocolo: { Args: { _clinica_id: string }; Returns: string }
       atend_gerar_protocolo_atendimento: {
         Args: {
