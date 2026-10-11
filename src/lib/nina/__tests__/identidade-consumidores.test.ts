@@ -6,6 +6,7 @@ import { avaliarSaudacao, checarElementosSaudacao } from "../saudacao-sessao";
 import {
   nomeCompletoEstabelecimento,
   resolverIdentidadeEfetiva,
+  textoApresentacaoIA,
   valoresIdentidade,
 } from "../identidade-efetiva";
 import {
@@ -25,7 +26,7 @@ const BLOCO = [
 describe("saudação segue a identidade publicada, não a palavra Nina", () => {
   it("aceita apresentação com o novo nome publicado", () => {
     const texto =
-      "Bom dia! Sou a Sofia, assistente virtual da Clínica Santa Marta. Como posso te ajudar?";
+      "Bom dia! Sou a Sofia, uma inteligência artificial da Clínica Santa Marta. Como posso te ajudar?";
     const d = avaliarSaudacao(texto, { assistente: "Sofia", estabelecimento: "Santa Marta" });
     expect(d.completa).toBe(true);
     expect(d.saudacaoAusente).toBe(false);
@@ -33,13 +34,14 @@ describe("saudação segue a identidade publicada, não a palavra Nina", () => {
 
   it("não exige a palavra Nina quando a identidade publicada é outra", () => {
     const texto =
-      "Bom dia! Sou a Sofia, assistente virtual da Clínica Santa Marta. Como posso te ajudar?";
+      "Bom dia! Sou a Sofia, uma inteligência artificial da Clínica Santa Marta. Como posso te ajudar?";
     expect(checarElementosSaudacao(texto, { assistente: "Sofia" }).assistente).toBe(true);
     expect(/nina/i.test(texto)).toBe(false);
   });
 
   it("sem identidade publicada não reprova por nome", () => {
-    const texto = "Bom dia! Sou a assistente virtual do atendimento. Como posso te ajudar?";
+    const texto =
+      "Bom dia! Sou uma inteligência artificial deste atendimento. Como posso te ajudar?";
     const d = avaliarSaudacao(texto, { assistente: null, estabelecimento: null });
     expect(d.elementos.assistente).toBe(true);
     expect(d.completa).toBe(true);
@@ -47,6 +49,16 @@ describe("saudação segue a identidade publicada, não a palavra Nina", () => {
 });
 
 describe("composição do nome do estabelecimento", () => {
+  it("monta a apresentação como IA com os nomes publicados", () => {
+    expect(
+      textoApresentacaoIA({
+        assistente: "Sofia",
+        estabelecimento: "Menino Jesus",
+        tipoEstabelecimento: "Policlínica",
+      }),
+    ).toBe("Olá! Me chamo Sofia e sou uma inteligência artificial da Policlínica Menino Jesus.");
+  });
+
   it("não duplica o tipo já presente na grafia configurada", () => {
     expect(
       nomeCompletoEstabelecimento({

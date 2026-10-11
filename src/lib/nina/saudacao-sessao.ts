@@ -4,7 +4,7 @@
  * Regra estrutural (não é prompt): toda sessão operacional nova da Nina —
  * conversa nova, sessão expirada por TTL, ou conversa resolvida que voltou a
  * receber mensagem — precisa que a PRIMEIRA resposta contenha:
- *   saudação por horário + identidade publicada + identificação virtual
+ *   saudação por horário + identidade publicada + identificação como IA
  *   + abertura ("como posso te ajudar").
  *
  * O modelo continua escrevendo o texto. Este módulo garante o estado
@@ -70,7 +70,7 @@ function semAcento(t: string): string {
  * nunca contra a palavra "Nina" nem contra o nome administrativo da clínica.
  */
 export type IdentidadeApresentacao = {
-  /** Nome da atendente virtual publicado na Arquitetura. */
+  /** Nome da IA de atendimento publicado na Arquitetura. */
   assistente?: string | null;
   /** Nome do estabelecimento publicado na Arquitetura. */
   estabelecimento?: string | null;
@@ -100,6 +100,7 @@ export type ElementosSaudacao = {
   saudacao: boolean;
   /** O nome da assistente PUBLICADO aparece na resposta. */
   assistente: boolean;
+  /** A resposta deixa claro que o atendimento é feito por IA. */
   assistenteVirtual: boolean;
   unidade: boolean;
   abertura: boolean;
@@ -121,7 +122,8 @@ export function checarElementosSaudacao(
     saudacao: /\b(bom dia|boa tarde|boa noite|ola|oi)\b/.test(t),
     // Sem identidade publicada não há nome a exigir: o elemento não reprova.
     assistente: assistente.length > 0 ? t.includes(assistente) : true,
-    assistenteVirtual: /\b(?:assistente|atendente)\s+virtual\b/.test(t),
+    assistenteVirtual:
+      /\b(?:(?:assistente|atendente)\s+virtual|inteligencia\s+artificial|ia)\b/.test(t),
     unidade: unidade.length > 0 ? t.includes(unidade) : true,
     abertura: /(ajudar|ajudo|posso te ajudar|em que posso|como posso)/.test(t),
   };

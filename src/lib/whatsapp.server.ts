@@ -945,6 +945,7 @@ async function gerarRespostaNinaInterno(
     valoresIdentidade,
     fatosIdentidade,
     nomeCompletoEstabelecimento,
+    textoApresentacaoIA,
   } = await import("@/lib/nina/identidade-efetiva");
   // Prompt de reserva também consome a identidade efetiva: sem identidade
   // publicada ele fala de forma NEUTRA, sem fixar outra persona.
@@ -4016,7 +4017,7 @@ async function gerarRespostaNinaInterno(
     // Com resposta parcial, preserva o texto e acrescenta as pendências.
     const apresentacao =
       saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
-        ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
+        ? textoApresentacaoIA(identidadeEfetiva.apresentacao)
         : null;
     resposta = perguntaComplementar
       ? apresentarPerguntaEsclarecimento(ctxFerramentas.esclarecimentoCatalogo.pergunta, {
@@ -4045,7 +4046,7 @@ async function gerarRespostaNinaInterno(
     // Primeira resposta da conversa: a apresentação vem junto (07/10/2026).
     const apresentacao =
       !respostaParcialConfirmada && saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
-        ? `Olá! Me chamo ${identidadeEfetiva.apresentacao.assistente}, atendente virtual da ${nomeCompletoEstabelecimento(identidadeEfetiva.apresentacao)}.`
+        ? textoApresentacaoIA(identidadeEfetiva.apresentacao)
         : "";
     resposta = [
       apresentacao,

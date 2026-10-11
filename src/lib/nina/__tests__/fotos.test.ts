@@ -134,7 +134,9 @@ it("apresentação usa identidade publicada e mantém reconhecimento da segunda 
     assistente: "Ana",
     estabelecimento: "Clínica Exemplo",
   });
-  expect(texto).toStartWith("Olá! Me chamo Ana, atendente virtual da Clínica Exemplo.");
+  expect(texto).toStartWith(
+    "Olá! Me chamo Ana e sou uma inteligência artificial da Clínica Exemplo.",
+  );
   expect(decidirFotos([foto("b", 20)], [{ ...pedido, body: texto }]).acao).toBe("encaminhar");
   expect(apresentarRespostaDeFoto(PEDIR_NOVA_FOTO, false, null)).toBe(PEDIR_NOVA_FOTO);
   expect(apresentarRespostaDeFoto("", true, null)).toBe("");

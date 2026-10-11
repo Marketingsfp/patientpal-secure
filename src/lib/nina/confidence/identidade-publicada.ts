@@ -83,6 +83,9 @@ function atendenteDeclarada(resposta: string): string | null {
 function estabelecimentoDeclarado(resposta: string): string | null {
   const m =
     /\batendente\s+(?:virtual\s+)?d(?:a|o|as|os|e)\s+([^.,!?;\n]{2,60})/i.exec(resposta) ??
+    /\b(?:intelig[êe]ncia\s+artificial|ia)\s+d(?:a|o|as|os|e)\s+([^.,!?;\n]{2,60})/i.exec(
+      resposta,
+    ) ??
     /\b(?:da|do)\s+(?:cl[ií]nica|policl[ií]nica|hospital|laborat[óo]rio|centro)\s+([^.,!?;\n]{2,60})/i.exec(
       resposta,
     );

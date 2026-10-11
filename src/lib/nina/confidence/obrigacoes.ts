@@ -222,7 +222,8 @@ const SAUDACAO =
  * Repetição da APRESENTAÇÃO: a assistente dizendo de novo quem é. Só formas
  * de auto-identificação contam — "bom dia" sozinho NÃO é apresentação.
  */
-const APRESENTACAO_PESSOAL = /\b(sou a |sou o |meu nome (e|eh) |aqui (e|eh) a |assistente virtual)/;
+const APRESENTACAO_PESSOAL =
+  /\b(sou a |sou o |meu nome (e|eh) |aqui (e|eh) a |(?:assistente|atendente) virtual|inteligencia artificial|ia)\b/;
 
 const SAUDACAO_EM_QUALQUER_POSICAO =
   /(^|[\s.,;:!?"'()-])(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|seja bem[- ]vind[oa])\b/;

@@ -152,6 +152,21 @@ export function nomeCompletoEstabelecimento(apresentacao: {
   return `${tipo} ${nome}`;
 }
 
+/** Apresentação clara e única para todos os canais voltados ao paciente. */
+export function textoApresentacaoIA(apresentacao: {
+  assistente: string;
+  estabelecimento: string;
+  tipoEstabelecimento?: string;
+}): string {
+  const unidade = apresentacao.tipoEstabelecimento
+    ? nomeCompletoEstabelecimento({
+        estabelecimento: apresentacao.estabelecimento,
+        tipoEstabelecimento: apresentacao.tipoEstabelecimento,
+      })
+    : apresentacao.estabelecimento.trim();
+  return `Olá! Me chamo ${apresentacao.assistente.trim()} e sou uma inteligência artificial da ${unidade}.`;
+}
+
 export function valoresIdentidade(efetiva: IdentidadeEfetiva): Record<string, string> {
   const a = efetiva.apresentacao;
   const completo = efetiva.ok ? nomeCompletoEstabelecimento(a) : a.estabelecimento;
