@@ -35,3 +35,4 @@
 
 ## Latência da Nina
 - [x] Pré-busca do cadastro antes da 1ª chamada ao modelo (flag `nina_prefetch_cadastro`, padrão ligada) — não publicado
+- [x] Segurança: /api/nina-voz exige login (Bearer validado no servidor); frontend envia o token.
