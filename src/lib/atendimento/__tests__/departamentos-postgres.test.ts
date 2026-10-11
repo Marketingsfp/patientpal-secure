@@ -45,7 +45,7 @@ beforeAll(async () => {
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     CREATE TABLE auth.users(id uuid PRIMARY KEY,email text);
     CREATE TABLE clinicas(id uuid PRIMARY KEY);
-    CREATE TABLE profiles(id uuid PRIMARY KEY,nome text,email text);
+    CREATE TABLE profiles(id uuid PRIMARY KEY,nome text);
     CREATE TABLE clinica_memberships(clinica_id uuid,user_id uuid,role text,ativo boolean DEFAULT true);
     CREATE TABLE perfis_acesso(id uuid PRIMARY KEY,clinica_id uuid,chave text);
     CREATE TABLE perfil_permissoes(perfil_id uuid,modulo text,acesso text);
@@ -72,11 +72,7 @@ beforeAll(async () => {
     [carla, "telefonia", "Carla"],
   ]) {
     await db.query("INSERT INTO clinica_memberships VALUES($1,$2,$3,true)", [clinic, user, role]);
-    await db.query("INSERT INTO profiles VALUES($1,$2,$3)", [
-      user,
-      nome,
-      `${nome}@exemplo.invalid`,
-    ]);
+    await db.query("INSERT INTO profiles VALUES($1,$2)", [user, nome]);
     await db.query("INSERT INTO atend_agente_presenca VALUES($1,$2,'ONLINE','online')", [
       clinic,
       user,
@@ -101,6 +97,7 @@ beforeAll(async () => {
   await db.exec(legado.slice(inicio, legado.indexOf("$function$;", inicio) + "$function$;".length));
   await db.exec(await migration("20261009190000_oszap_departamentos.sql"));
   await db.exec(await migration("20261010210000_oszap_setores_fixos.sql"));
+  await db.exec(await migration("20261011120000_oszap_departamentos_profiles_sem_email.sql"));
   imagem = (
     await db.query<{ id: string }>(
       "SELECT id FROM atend_departamentos WHERE clinica_id=$1 AND nome='Tomografia e Ressonância'",
@@ -192,9 +189,7 @@ describe("Departamentos — regras executadas no PostgreSQL local", () => {
   });
   test("nova atendente de Telefonia entra automaticamente na Recepção", async () => {
     const nova = crypto.randomUUID();
-    await db.query("INSERT INTO profiles VALUES($1,'Nova Atendente','nova@exemplo.invalid')", [
-      nova,
-    ]);
+    await db.query("INSERT INTO profiles VALUES($1,'Nova Atendente')", [nova]);
     await db.query("INSERT INTO clinica_memberships VALUES($1,$2,'telefonia',true)", [
       clinic,
       nova,
