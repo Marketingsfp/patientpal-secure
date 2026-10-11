@@ -1,4 +1,15 @@
-export const DEPARTAMENTOS_INICIAIS = ["Recepção", "Laboratório", "Tomografia", "Ressonância"];
+export const DEPARTAMENTOS_INICIAIS = [
+  "Recepção",
+  "Laboratório",
+  "Tomografia e Ressonância",
+] as const;
+
+export function descricaoDepartamento(nome: string): string {
+  if (nome === "Recepção") return "Setor geral";
+  if (nome === "Laboratório") return "Identificado como LAB no painel da TV";
+  if (nome === "Tomografia e Ressonância") return "Identificado como TR no painel da TV";
+  return "Setor de atendimento";
+}
 
 export type DepartamentoZap = { id: string; nome: string; ativo: boolean };
 export type AtendenteDepartamento = {

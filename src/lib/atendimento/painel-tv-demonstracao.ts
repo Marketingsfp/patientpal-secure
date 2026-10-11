@@ -72,9 +72,10 @@ export function criarDemonstracaoPainelTv(agora: number): DadosPainelTv {
     const esperas = Array.from({ length: quantidadeEsperas }, (_, posicao) =>
       antes(1 + ((indice * 3 + posicao * 5) % 24)),
     );
+    const setor = [4, 9, 14].includes(indice) ? "LAB" : [19, 24, 28].includes(indice) ? "TR" : null;
     return {
       id: `demo-${String(indice + 1).padStart(2, "0")}`,
-      nome,
+      nome: setor ? `${nome} (${setor})` : nome,
       estado,
       inicioPausa:
         estado === "PAUSA" || estado === "PAUSA_SAIDA" ? antes(6 + (indice % 6) * 5) : null,

@@ -1,41 +1,29 @@
 import { useState } from "react";
-import { Building2, Pencil, Plus, Search, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Building2, Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
+  descricaoDepartamento,
   rotuloPresencaDepartamento,
   type DadosDepartamentos,
 } from "@/lib/atendimento/departamentos";
 
 type Props = {
   dados: DadosDepartamentos;
-  salvarDepartamento: (id: string | null, nome: string) => Promise<void>;
-  vincularAtendente: (userId: string, departamentoId: string | null) => Promise<void>;
+  vincularAtendente: (userId: string, departamentoId: string) => Promise<void>;
   demonstracao?: boolean;
   somenteLeitura?: boolean;
 };
 
 export function DepartamentosView({
   dados,
-  salvarDepartamento,
   vincularAtendente,
   demonstracao,
   somenteLeitura = false,
 }: Props) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("");
-  const [edicao, setEdicao] = useState<{ id: string | null; nome: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const bloqueado = salvando || somenteLeitura;
@@ -43,7 +31,7 @@ export function DepartamentosView({
   const atendentes = dados.atendentes.filter(
     (a) =>
       a.nome.toLocaleLowerCase("pt-BR").includes(busca.toLocaleLowerCase("pt-BR")) &&
-      (!filtro || (filtro === "sem" ? !a.departamentoId : a.departamentoId === filtro)),
+      (!filtro || a.departamentoId === filtro),
   );
   const executar = async (acao: () => Promise<void>) => {
     setSalvando(true);
@@ -58,7 +46,7 @@ export function DepartamentosView({
   };
   return (
     <div className="space-y-6" aria-busy={salvando}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
         <div>
           {demonstracao && (
             <Badge variant="secondary" className="mb-3">
@@ -67,18 +55,10 @@ export function DepartamentosView({
           )}
           <h1 className="text-2xl font-semibold tracking-tight">Departamentos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Organize a equipe de Telefonia e o destino das transferências.
+            Defina em qual setor cada atendente da Telefonia trabalha. A mudança também define quem
+            pode receber transferências daquele setor.
           </p>
         </div>
-        <Button
-          disabled={bloqueado}
-          onClick={() => {
-            setErro("");
-            setEdicao({ id: null, nome: "" });
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" /> Novo departamento
-        </Button>
       </div>
       {erro && (
         <p
@@ -99,18 +79,6 @@ export function DepartamentosView({
                   <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <h2 className="break-words">{d.nome}</h2>
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={bloqueado}
-                  aria-label={`Renomear ${d.nome}`}
-                  onClick={() => {
-                    setErro("");
-                    setEdicao({ id: d.id, nome: d.nome });
-                  }}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-semibold">
@@ -123,6 +91,9 @@ export function DepartamentosView({
                   className={`mt-2 text-sm ${online ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
                 >
                   {online} online
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {descricaoDepartamento(d.nome)}
                 </p>
               </CardContent>
             </Card>
@@ -155,7 +126,6 @@ export function DepartamentosView({
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="">Todos os departamentos</option>
-              <option value="sem">Sem departamento</option>
               {ativos.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.nome}
@@ -186,16 +156,15 @@ export function DepartamentosView({
                   value={a.departamentoId ?? ""}
                   disabled={bloqueado}
                   onChange={(e) => {
-                    const destino = e.target.value || null;
-                    void executar(() => vincularAtendente(a.userId, destino));
+                    if (!e.target.value) return;
+                    void executar(() => vincularAtendente(a.userId, e.target.value));
                   }}
                   className="h-10 rounded-md border border-input bg-background px-3 text-sm sm:w-64"
                 >
-                  <option value="">Sem departamento</option>
-                  {dados.departamentos.map((d) => (
-                    <option key={d.id} value={d.id} disabled={!d.ativo}>
+                  {!a.departamentoId && <option value="">Escolha um setor</option>}
+                  {ativos.map((d) => (
+                    <option key={d.id} value={d.id}>
                       {d.nome}
-                      {d.ativo ? "" : " (inativo)"}
                     </option>
                   ))}
                 </select>
@@ -210,65 +179,10 @@ export function DepartamentosView({
         </CardContent>
       </Card>
       <p className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-        A transferência por departamento sorteia uma atendente online vinculada a ele. Sem ninguém
-        online, a conversa continua com a atendente atual.
+        Ao transferir uma conversa para um setor, o sistema escolhe uma atendente online daquele
+        grupo. Se ninguém estiver online, a conversa continua com a atendente atual e nenhuma
+        mensagem é perdida.
       </p>
-      <Dialog
-        open={edicao !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto && !salvando) setEdicao(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{edicao?.id ? "Renomear departamento" : "Novo departamento"}</DialogTitle>
-            <DialogDescription>O nome identifica o destino no atendimento.</DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!edicao || !edicao.nome.trim() || salvando) return;
-              void executar(async () => {
-                await salvarDepartamento(edicao.id, edicao.nome.trim());
-                setEdicao(null);
-              });
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="nome-departamento">Nome do departamento</Label>
-              <Input
-                id="nome-departamento"
-                value={edicao?.nome ?? ""}
-                onChange={(e) =>
-                  setEdicao((anterior) => (anterior ? { ...anterior, nome: e.target.value } : null))
-                }
-                maxLength={120}
-                required
-                disabled={salvando}
-              />
-            </div>
-            {erro && (
-              <p role="alert" className="text-sm text-destructive">
-                {erro}
-              </p>
-            )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={salvando}
-                onClick={() => setEdicao(null)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={salvando || !edicao?.nome.trim()}>
-                {salvando ? "Salvando…" : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 // PostgreSQL embarcado em memória: não aceita URL e não acessa Supabase/WhatsApp.
 const db = new PGlite();
-let poolLegado: unknown[];
+let imagem: string;
 const clinic = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
 const admin = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -20,11 +20,6 @@ const migration = (file: string) =>
   readFile(new URL(`../../../../supabase/migrations/${file}`, import.meta.url), "utf8");
 async function login(user: string | null) {
   await db.query("select set_config('request.jwt.claim.sub', $1, false)", [user ?? ""]);
-}
-async function enabled(value: boolean) {
-  await db.exec(
-    `CREATE OR REPLACE FUNCTION public.atend_departamentos_habilitados() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT ${value} $$`,
-  );
 }
 async function transfer(department = lab, expected: string | null = ana) {
   return (
@@ -104,15 +99,21 @@ beforeAll(async () => {
   const legado = await migration("20260930130000_atend_pausa_para_saida.sql");
   const inicio = legado.indexOf("CREATE OR REPLACE FUNCTION public.atend_pool_canonico");
   await db.exec(legado.slice(inicio, legado.indexOf("$function$;", inicio) + "$function$;".length));
-  poolLegado = (await db.query("SELECT * FROM atend_pool_canonico($1,$2)", [clinic, tomo])).rows;
   await db.exec(await migration("20261009190000_oszap_departamentos.sql"));
+  await db.exec(await migration("20261010210000_oszap_setores_fixos.sql"));
+  imagem = (
+    await db.query<{ id: string }>(
+      "SELECT id FROM atend_departamentos WHERE clinica_id=$1 AND nome='Tomografia e Ressonância'",
+      [clinic],
+    )
+  ).rows[0].id;
 }, 30000);
 afterAll(async () => {
   await db.close();
 });
 
 describe("Departamentos — regras executadas no PostgreSQL local", () => {
-  test("controle desligado preserva pool legado e bloqueia novas escritas", async () => {
+  test("publica somente os três setores fixos e preserva os departamentos antigos inativos", async () => {
     await login(admin);
     expect(
       (
@@ -120,18 +121,25 @@ describe("Departamentos — regras executadas no PostgreSQL local", () => {
           "SELECT atend_departamentos_habilitados() AS habilitado",
         )
       ).rows[0].habilitado,
+    ).toBe(true);
+    expect((await db.query("SELECT * FROM atend_departamento_membros")).rows).toHaveLength(3);
+    const setores = await db.query<{ nome: string }>(
+      "SELECT nome FROM atend_departamentos WHERE clinica_id=$1 AND ativo ORDER BY nome",
+      [clinic],
+    );
+    expect(setores.rows.map((s) => s.nome).sort()).toEqual(
+      ["Recepção", "Laboratório", "Tomografia e Ressonância"].sort(),
+    );
+    expect(
+      (
+        await db.query<{ ativo: boolean }>("SELECT ativo FROM atend_departamentos WHERE id=$1", [
+          tomo,
+        ])
+      ).rows[0].ativo,
     ).toBe(false);
-    expect(
-      (await db.query("SELECT * FROM atend_pool_canonico($1,$2) WHERE elegivel", [clinic, tomo]))
-        .rows,
-    ).toHaveLength(3);
-    expect(
-      (await db.query("SELECT * FROM atend_pool_canonico($1,$2)", [clinic, tomo])).rows,
-    ).toEqual(poolLegado);
     await expect(
       db.query("SELECT atend_salvar_departamento($1,'Vacinas')", [clinic]),
-    ).rejects.toThrow("Somente");
-    await enabled(true);
+    ).rejects.toThrow("setores do OS ZAP são fixos");
   });
   test("somente admin/supervisor; telefonia, gestor, anônimo e outra clínica são bloqueados", async () => {
     for (const user of [ana, null]) {
@@ -182,27 +190,22 @@ describe("Departamentos — regras executadas no PostgreSQL local", () => {
     );
     await db.exec("DELETE FROM usuario_permissoes");
   });
-  test("criação/renomeação auditadas e nomes duplicados recusados", async () => {
-    await login(supervisor);
-    const { rows } = await db.query<{ id: string }>(
-      "SELECT atend_salvar_departamento($1,'Vacinas',NULL,'127.0.0.1') AS id",
-      [clinic],
+  test("nova atendente de Telefonia entra automaticamente na Recepção", async () => {
+    const nova = crypto.randomUUID();
+    await db.query("INSERT INTO profiles VALUES($1,'Nova Atendente','nova@exemplo.invalid')", [
+      nova,
+    ]);
+    await db.query("INSERT INTO clinica_memberships VALUES($1,$2,'telefonia',true)", [
+      clinic,
+      nova,
+    ]);
+    const vinculo = await db.query<{ nome: string }>(
+      `SELECT d.nome FROM atend_departamento_atendentes a
+       JOIN atend_departamentos d ON d.id=a.departamento_id
+       WHERE a.clinica_id=$1 AND a.user_id=$2`,
+      [clinic, nova],
     );
-    await db.query("SELECT atend_salvar_departamento($1,'Vacinação',$2)", [clinic, rows[0].id]);
-    await expect(
-      db.query("SELECT atend_salvar_departamento($1,'recepcao')", [clinic]),
-    ).rejects.toThrow("Já existe");
-    const events = await db.query<{ action: string; user_id: string }>(
-      "SELECT action,user_id FROM audit_log WHERE record_id=$1 ORDER BY created_at",
-      [rows[0].id],
-    );
-    expect(events.rows.map((e) => e.action)).toEqual(["INSERT", "UPDATE"]);
-    expect(events.rows.every((e) => e.user_id === supervisor)).toBe(true);
-    const origem = await db.query<{ ip: string }>(
-      "SELECT dados_depois->'_auditoria'->>'ip_origem' AS ip FROM audit_log WHERE record_id=$1 AND action='INSERT'",
-      [rows[0].id],
-    );
-    expect(origem.rows[0].ip).toBe("127.0.0.1");
+    expect(vinculo.rows[0].nome).toBe("Recepção");
   });
   test("vínculo único, troca auditada, sem alterar vínculo legado ou conversas", async () => {
     await login(admin);
@@ -228,7 +231,7 @@ describe("Departamentos — regras executadas no PostgreSQL local", () => {
     await expect(
       db.query(
         "INSERT INTO atend_departamento_atendentes(clinica_id,user_id,departamento_id) VALUES($1,$2,$3)",
-        [clinic, ana, tomo],
+        [clinic, ana, imagem],
       ),
     ).rejects.toThrow("duplicate");
     await db.query("SELECT atend_vincular_departamento($1,$2,$3)", [clinic, ana, reception]);
@@ -315,7 +318,7 @@ describe("Departamentos — regras executadas no PostgreSQL local", () => {
   test("departamento vazio/inativo ou de outra clínica bloqueia e falha no histórico desfaz toda a transferência", async () => {
     await resetConversation();
     await login(ana);
-    await expect(transfer(tomo)).rejects.toThrow("permanece");
+    await expect(transfer(imagem)).rejects.toThrow("permanece");
     await db.query("UPDATE atend_departamentos SET ativo=false WHERE id=$1", [lab]);
     await expect(transfer()).rejects.toThrow("inativo");
     await db.query("UPDATE atend_departamentos SET ativo=true WHERE id=$1", [lab]);

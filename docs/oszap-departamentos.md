@@ -7,8 +7,8 @@ Aplicação da migração em produção e ativação global ainda dependem de va
 
 - Aba exclusiva dos perfis `admin` e `supervisor`, sujeita à matriz de acesso.
 - Somente membros ativos com perfil `telefonia` são listados para vínculo. Administradores não recebem conversas.
-- Recepção, Laboratório, Tomografia e Ressonância são os departamentos iniciais. Permite criar e renomear.
-- Uma atendente possui, no máximo, um departamento em cada clínica. Pessoas ainda não configuradas aparecem como “Sem departamento”.
+- Os setores são fixos: Recepção, Laboratório e Tomografia e Ressonância. A tela não permite criar ou renomear setores.
+- Uma atendente possui exatamente um setor operacional por clínica. Novas pessoas de Telefonia entram na Recepção até que a gestão as mova.
 - Transferência por departamento sorteia entre atendentes vinculadas, elegíveis e com estado manual `ONLINE`.
 - Offline, Pausa e Pausa para saída não recebem transferência por departamento.
 - Sem destino disponível, a transferência é recusada e toda a conversa permanece intacta com a responsável atual.
@@ -32,10 +32,10 @@ Arquivo: `supabase/migrations/20261009190000_oszap_departamentos.sql`.
 | Referências | Clínica existente; departamento existente. Exclusão de departamento vinculado é recusada. |
 | RLS | Leitura dos vínculos restrita a Admin/Supervisor com acesso à opção; escrita direta recusada para `authenticated`. RPCs verificam clínica, perfil e matriz. |
 | Triggers | Validação de vínculo ativo/Telefonia/mesma clínica; auditoria de novos vínculos e mudanças de departamentos. |
-| `atend_departamentos` | Mantém o cadastro existente. Adiciona os quatro nomes iniciais que ainda não existirem, considerando acentos/capitalização; nomes e IDs antigos não são alterados. |
+| `atend_departamentos` | Mantém cadastros anteriores para histórico e publica os três setores fixos. Tomografia e Ressonância antigos ficam inativos após a união no setor `Tomografia e Ressonância`. |
 | `atend_departamento_membros` | Somente leitura para compatibilidade e bloqueio de fila. Vínculos de supervisão permanecem intactos. |
-| Importação de vínculos | Copia para a nova tabela apenas vínculos de Telefonia com um único departamento ativo inequívoco. Múltiplos setores ficam sem vínculo novo, exigindo seleção na aba. Não escolhe automaticamente um setor. |
-| `atend_conversas` | Nenhuma mudança estrutural ou atualização de conversas na migração. Nova RPC altera a responsável somente em uma transferência autorizada e concluída. |
+| Importação de vínculos | Copia vínculos inequívocos, une vínculos de Tomografia/Ressonância em `TR` e coloca Telefonia sem setor na Recepção. |
+| `atend_conversas` | Conversas ainda abertas dos setores antigos de Tomografia/Ressonância passam ao setor combinado. Conversas encerradas não são reescritas. |
 | Histórico | `atend_transferencias`, `atend_conversa_eventos` e `audit_log` recebem somente registros novos. Nenhuma auditoria histórica é reescrita. |
 | Pool | `atend_pool_canonico` conserva assinatura e comportamento legado quando o controle global está desligado. Quando ligado, consulta o vínculo novo e impede fallback fora do setor, inclusive em setor vazio/inativo. |
 
@@ -60,7 +60,7 @@ Auditoria registra autor autenticado, data/hora, registro, ação e valores ante
 
 Testes de SQL usam PostgreSQL embarcado (PGlite) inteiramente local, com migração real e registros sintéticos. Cobrem acesso, isolamento de clínica, matriz de leitura/edição, auditoria, nomes duplicados, exclusividade de vínculo, sorteio com cargas diferentes, offline/pausas, perda de perfil, setor vazio/inativo, seleção obsoleta e rollback de falha no histórico. Essa execução não comprova concorrência entre conexões de um PostgreSQL de produção.
 
-Playwright valida criação, renomeação, seleção única, busca/filtros, erro recuperável e apresentação em computador e celular, bloqueando acesso ao Supabase. Antes da promoção, validar também concorrência com conexões independentes em homologação e o fluxo autenticado com transporte real, sem envio a pacientes.
+A validação visual cobre seleção única, busca/filtros, erro recuperável e apresentação em computador e celular, bloqueando acesso ao Supabase. Antes da promoção, validar também concorrência com conexões independentes em homologação e o fluxo autenticado com transporte real, sem envio a pacientes.
 
 Resultado local: 89 testes passaram nas suítes de departamentos, acesso, matriz do OS ZAP, presença e preservação de leitura. Verificação de tipos, lint dos arquivos alterados e compilação de produção passaram. O lint mantém avisos de tipagem legados. Playwright passou em computador/celular e confirmou que a prévia anterior da TV continua funcionando. Nenhuma migração foi aplicada a um banco remoto.
 
@@ -68,15 +68,9 @@ Resultado local: 89 testes passaram nas suítes de departamentos, acesso, matriz
 
 1. Validar a prévia visual com o usuário.
 2. Conferir em leitura os vínculos legados múltiplos e o cadastro de pessoas com perfil Telefonia.
-3. Aplicar a migração em homologação; o controle do banco começa `false`. Habilitar os dois controles apenas nesse ambiente e configurar os vínculos pendentes conforme a escolha da supervisão.
+3. Aplicar as migrations em homologação. A migration de setores fixos publica o recurso e faz a atribuição padrão na Recepção.
 4. Fazer a validação autenticada e de concorrência em homologação.
-5. Mediante autorização de implantação, aplicar em produção e compilar o aplicativo com `VITE_OSZAP_DEPARTAMENTOS=true`. Esse controle habilita a aba e a nova transferência para todas as clínicas.
-6. Ativar o filtro global no banco, alterando exclusivamente a função de publicação abaixo. Configurar os vínculos pendentes segundo as escolhas já validadas; até a configuração, transferências para setores sem destino disponível são recusadas e preservam a responsável:
+5. Mediante autorização de implantação, aplicar em produção e publicar o aplicativo. O recurso fica ativo por padrão.
+6. Para reversão imediata, republicar com `VITE_OSZAP_DEPARTAMENTOS=false` e restaurar `atend_departamentos_habilitados()` para `SELECT false`.
 
-```sql
-CREATE OR REPLACE FUNCTION public.atend_departamentos_habilitados()
-RETURNS boolean LANGUAGE sql STABLE SET search_path = public, pg_temp
-AS $$ SELECT true $$;
-```
-
-Sem ativação no banco, novas RPCs recusam alterações. Para reversão, restaurar `SELECT false` e republicar o aplicativo com a variável desligada. O pool volta à origem legada. Não apagar tabelas, vínculos novos ou auditorias; transferências já concluídas continuam registradas e não são desfeitas automaticamente. Esse rollback altera apenas o comportamento futuro.
+O rollback desliga o comportamento futuro sem apagar tabelas, vínculos ou auditorias. Transferências já concluídas continuam registradas e não são desfeitas automaticamente.

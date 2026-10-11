@@ -9,60 +9,88 @@ type Props = { dados: DadosPainelTv | null; children: ReactNode };
 const explicacoes = [
   [
     "Esperando resposta da equipe",
-    "Quantidade de conversas em que a última mensagem foi do paciente e ainda falta uma resposta humana.",
+    "Número de pacientes que mandaram a última mensagem e ainda estão esperando uma resposta de uma pessoa da equipe.",
   ],
   [
     "Mais antiga sem resposta",
-    "Tempo da conversa que está esperando resposta há mais tempo. 'Desde' mostra quando essa espera começou.",
+    "Mostra há quanto tempo espera o paciente que está há mais tempo sem resposta. 'Desde' mostra o horário em que essa espera começou.",
   ],
   [
     "Normal, atenção e crítica",
     "Normal: menos de 5 minutos. Atenção: de 5 a 10 minutos. Crítica: mais de 10 minutos.",
   ],
-  ["Sem atendente", "Conversas esperando resposta que ainda não foram atribuídas a uma atendente."],
+  [
+    "Sem atendente",
+    "Pacientes esperando resposta cuja conversa ainda não foi entregue a nenhuma atendente.",
+  ],
   [
     "Online, pausa e offline",
     "Situação atual da atendente. Quem está offline só permanece na lista enquanto tiver conversa atribuída.",
   ],
   [
-    "Atrib.",
-    "Total de conversas abertas atribuídas à atendente, mesmo que estejam aguardando o paciente.",
+    "LAB e TR ao lado do nome",
+    "LAB identifica quem está vinculado ao departamento Laboratório. TR identifica quem está vinculado à Tomografia ou à Ressonância. Quem estiver em outro departamento aparece sem sigla.",
   ],
-  ["Pend.", "Conversas atribuídas em que o paciente falou por último e espera resposta."],
-  ["Crít.", "Quantidade acima de 10 minutos; abaixo dela aparece o tempo da crítica mais antiga."],
   [
-    "Média",
-    "Tempo médio de resposta da atendente hoje. O cálculo usa apenas respostas com começo e fim registrados.",
+    "Conversas com a atendente (Atrib.)",
+    "Todas as conversas abertas que estão sob responsabilidade da atendente, inclusive as que estão esperando o paciente responder.",
   ],
-  ["Resolv.", "Conversas finalizadas hoje por aquela atendente."],
+  [
+    "Pacientes esperando a atendente (Pend.)",
+    "Conversas daquela atendente em que o paciente falou por último e ainda aguarda uma resposta.",
+  ],
+  [
+    "Esperando há mais de 10 min (Crít.)",
+    "Número de pacientes daquela atendente esperando há mais de 10 minutos. O tempo mostrado abaixo é a maior espera entre eles.",
+  ],
+  [
+    "Tempo médio para responder (Média)",
+    "Tempo médio que a atendente levou para responder hoje. Só entram respostas em que o sistema registrou a mensagem do paciente e a resposta da atendente.",
+  ],
+  ["Encerrados hoje (Resolv.)", "Atendimentos finalizados hoje por aquela atendente."],
   [
     "Mensagens por hora",
-    "Quantidade de mensagens recebidas de pacientes em cada hora. A coluna clara é a hora atual.",
-  ],
-  ["Entradas · 60 min", "Conversas diferentes em que o paciente enviou mensagem na última hora."],
-  [
-    "Resolvidas · 60 min",
-    "Conversas encerradas pela equipe na última hora. Compare com as entradas para perceber se a fila tende a crescer.",
+    "Quantidade de mensagens recebidas de pacientes entre 01h e 22h. A coluna clara é a hora atual. O total de hoje continua considerando o dia inteiro, mesmo sem mostrar 00h e 23h no gráfico.",
   ],
   [
-    "No alvo de 5 min",
-    "Percentual das respostas humanas medidas hoje que aconteceram em até 5 minutos.",
-  ],
-  ["Em risco", "Conversas esperando entre 5 e 10 minutos, antes de entrarem na faixa crítica."],
-  ["Resposta média", "Soma de todos os tempos medidos dividida pela quantidade de respostas."],
-  ["Resposta mediana", "Tempo típico: metade das respostas aconteceu antes e metade depois."],
-  [
-    "90% em até",
-    "Tempo em que 90% das respostas aconteceram; ajuda a enxergar os casos mais demorados.",
+    "Pacientes que chamaram na última hora",
+    "Número de conversas diferentes que receberam uma nova mensagem do paciente nos últimos 60 minutos. Várias mensagens do mesmo paciente contam como uma conversa.",
   ],
   [
-    "Amostra",
-    "Quantidade de respostas usadas nos cálculos de tempo. Quanto maior, mais representativo é o resultado.",
+    "Atendimentos encerrados na última hora",
+    "Número de atendimentos que a equipe finalizou nos últimos 60 minutos. Se entram mais pacientes do que a equipe encerra, a fila pode aumentar.",
   ],
-  ["Reabertas hoje", "Conversas que já tinham sido finalizadas e voltaram ao atendimento hoje."],
   [
-    "Sem atendente mais antiga",
-    "Há quanto tempo espera a conversa mais antiga que ainda não foi atribuída a ninguém.",
+    "Respostas em até 5 minutos",
+    "De cada 100 primeiras respostas humanas analisadas hoje, mostra quantas aconteceram em até 5 minutos. Exemplo: 80% significa que 80 de cada 100 foram respondidas dentro desse tempo.",
+  ],
+  [
+    "Esperando de 5 a 10 minutos",
+    "Número de pacientes que estão esperando uma resposta da equipe há pelo menos 5 minutos, mas ainda não passaram de 10 minutos. Depois de 10 minutos, entram na faixa crítica.",
+  ],
+  [
+    "Tempo médio para responder",
+    "Soma do tempo de todas as primeiras respostas humanas analisadas hoje, dividida pelo número de respostas analisadas.",
+  ],
+  [
+    "Metade foi respondida em até",
+    "Tempo em que metade das primeiras respostas aconteceu. Exemplo: se mostra 2 min, metade dos pacientes recebeu a primeira resposta em até 2 minutos e a outra metade demorou mais.",
+  ],
+  [
+    "9 em cada 10 foram respondidas em até",
+    "Mostra até quanto tempo levou para responder 9 de cada 10 pacientes. Exemplo: se mostra 8 min, 9 de cada 10 receberam a primeira resposta em até 8 minutos; 1 de cada 10 pode ter esperado mais.",
+  ],
+  [
+    "Respostas analisadas",
+    "Quantidade de primeiras respostas humanas usadas para calcular os tempos deste painel. Só entram casos em que o sistema registrou quando o paciente chamou e quando a equipe respondeu.",
+  ],
+  [
+    "Atendimentos reabertos hoje",
+    "Atendimentos que já estavam encerrados, mas voltaram para a fila porque o paciente chamou novamente hoje.",
+  ],
+  [
+    "Maior espera sem atendente",
+    "Há quanto tempo está esperando o paciente mais antigo cuja conversa ainda não foi entregue a nenhuma atendente.",
   ],
   [
     "Dados atrasados",
@@ -77,6 +105,20 @@ export function PainelTvComIndicadores({ dados, children }: Props) {
     const id = window.setInterval(() => setAgora(Date.now()), 15_000);
     return () => window.clearInterval(id);
   }, []);
+  useEffect(() => {
+    const raiz = document.getElementById("painel-tv-com-indicadores");
+    if (!raiz) return;
+    for (const elemento of raiz.querySelectorAll<HTMLElement>("[data-setor-tv]")) {
+      elemento.removeAttribute("data-setor-tv");
+    }
+    for (const atendente of dados?.atendentes ?? []) {
+      const sigla = atendente.nome.match(/\((LAB|TR)\)$/)?.[1];
+      if (!sigla) continue;
+      for (const elemento of raiz.querySelectorAll<HTMLElement>("[title]")) {
+        if (elemento.title === atendente.nome) elemento.dataset.setorTv = sigla;
+      }
+    }
+  }, [dados]);
 
   const abrirAjudaCompleta = (evento: MouseEvent<HTMLDivElement>) => {
     const botao = (evento.target as HTMLElement).closest("button");
@@ -101,30 +143,58 @@ export function PainelTvComIndicadores({ dados, children }: Props) {
     valor == null ? "—" : `${Math.round(valor * 100)}%`;
 
   const metricas = [
-    [dados?.conversasUltimaHora ?? 0, "Entradas · 60 min"],
-    [dados?.resolvidasUltimaHora ?? 0, "Resolvidas · 60 min"],
-    [percentual(dados?.slaAte5MinPct), "No alvo de 5 min"],
-    [emRisco, "Em risco · 5–10 min", emRisco ? "text-atd-warn" : ""],
-    [duracao(dados?.medianaRespostaSeg), "Resposta mediana"],
-    [duracao(dados?.p90RespostaSeg), "90% em até"],
-    [dados?.respostasMedidas ?? 0, "Amostra"],
-    [dados?.reabertasHoje ?? 0, "Reabertas hoje"],
+    [dados?.conversasUltimaHora ?? 0, "Pacientes que chamaram na última hora"],
+    [dados?.resolvidasUltimaHora ?? 0, "Atendimentos encerrados na última hora"],
+    [percentual(dados?.slaAte5MinPct), "Respostas em até 5 minutos"],
+    [emRisco, "Esperando de 5 a 10 minutos", emRisco ? "text-atd-warn" : ""],
+    [duracao(dados?.medianaRespostaSeg), "Metade foi respondida em até"],
+    [duracao(dados?.p90RespostaSeg), "9 em cada 10 foram respondidas em até"],
+    [dados?.respostasMedidas ?? 0, "Respostas analisadas"],
+    [dados?.reabertasHoje ?? 0, "Atendimentos reabertos hoje"],
     [
       semAtendente == null ? "—" : formatarEspera(semAtendente),
-      "Sem atendente mais antiga",
+      "Maior espera sem atendente",
       semAtendente != null && semAtendente >= 10 ? "text-atd-danger" : "",
     ],
-    [dados?.resolvidasHoje ?? 0, "Resolvidas hoje"],
-    [duracao(dados?.tempoMedioRespostaSeg), "Resposta média"],
+    [dados?.resolvidasHoje ?? 0, "Atendimentos encerrados hoje"],
+    [duracao(dados?.tempoMedioRespostaSeg), "Tempo médio para responder"],
   ] as const;
 
   return (
-    <div onClickCapture={abrirAjudaCompleta}>
+    <div id="painel-tv-com-indicadores" onClickCapture={abrirAjudaCompleta}>
+      <style>{`
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type {
+          grid-template-columns: 60fr 40fr !important;
+          gap: 5vw !important;
+        }
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type
+          > div:first-child > div:nth-of-type(1),
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type
+          > div:first-child > div:nth-of-type(2) {
+          grid-template-columns: repeat(22, minmax(0, 1fr)) !important;
+        }
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type
+          > div:first-child > div:nth-of-type(1) > :first-child,
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type
+          > div:first-child > div:nth-of-type(1) > :last-child,
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type
+          > div:first-child > div:nth-of-type(2) > :first-child,
+        #painel-tv-com-indicadores > div:first-child > section:last-of-type
+          > div:first-child > div:nth-of-type(2) > :last-child {
+          display: none;
+        }
+        #painel-tv-com-indicadores [data-setor-tv]::after {
+          content: " (" attr(data-setor-tv) ")";
+          color: var(--atd-ai, currentColor);
+          font-size: 0.72em;
+          font-weight: 700;
+        }
+      `}</style>
       {children}
-      <section className="fixed bottom-[4.6vh] right-[3.6vw] z-[105] h-[25vh] w-[38vw] bg-atd-bg text-atd-ink">
+      <section className="fixed bottom-[4.6vh] right-[3.6vw] z-[105] h-[25vh] w-[36vw] border-l border-atd-border bg-atd-bg pl-[2vw] text-atd-ink">
         <div className="flex items-center justify-between">
           <p className="text-[1.35vh] uppercase tracking-[0.22em] text-atd-ink-soft">
-            Ritmo e qualidade
+            Movimento e tempo de resposta
           </p>
           {atrasado && (
             <b className="rounded-full bg-atd-warn px-[0.55vw] py-[0.2vh] text-[1vh] text-atd-bg">
@@ -132,15 +202,21 @@ export function PainelTvComIndicadores({ dados, children }: Props) {
             </b>
           )}
         </div>
-        <div className="mt-[1vh] grid h-[21vh] grid-cols-3 gap-x-[1vw] gap-y-[0.7vh] border-t border-atd-border pt-[1.1vh]">
+        <div className="mt-[0.7vh] grid h-[21.5vh] grid-cols-2 gap-x-[1.2vw] border-t border-atd-border pt-[0.7vh]">
           {metricas.map(([valor, rotulo, cor = ""]) => (
-            <div key={rotulo} className="min-w-0">
-              <b className={cn("block text-[2.35vh] font-semibold leading-none tabular-nums", cor)}>
+            <div
+              key={rotulo}
+              className="flex min-w-0 items-center justify-between gap-[0.7vw] border-b border-atd-border/60 py-[0.25vh]"
+            >
+              <span className="text-[0.95vh] leading-tight text-atd-ink-soft">{rotulo}</span>
+              <b
+                className={cn(
+                  "shrink-0 text-[1.75vh] font-semibold leading-none tabular-nums",
+                  cor,
+                )}
+              >
                 {valor}
               </b>
-              <span className="mt-[0.4vh] block truncate text-[0.88vh] uppercase tracking-[0.1em] text-atd-ink-soft">
-                {rotulo}
-              </span>
             </div>
           ))}
         </div>

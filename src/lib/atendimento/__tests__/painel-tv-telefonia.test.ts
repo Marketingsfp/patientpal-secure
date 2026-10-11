@@ -1,9 +1,24 @@
 import { describe, expect, it } from "bun:test";
 import { criarDemonstracaoPainelTv } from "../painel-tv-demonstracao";
 import { atendenteVisivelNaTv, colunasEquipeNaTv } from "../painel-tv-presenca";
-import { carregarPainelTv, idsTelefoniaTv } from "../painel-tv.server";
+import {
+  carregarPainelTv,
+  idsTelefoniaTv,
+  nomeAtendenteTv,
+  siglaDepartamentoTv,
+} from "../painel-tv.server";
 
 describe("Equipe do painel TV — somente telefonia", () => {
+  it("identifica Laboratório, Tomografia e Ressonância sem alterar os demais setores", () => {
+    expect(siglaDepartamentoTv("Laboratório")).toBe("LAB");
+    expect(siglaDepartamentoTv("laboratorio clínico")).toBe("LAB");
+    expect(siglaDepartamentoTv("Tomografia")).toBe("TR");
+    expect(siglaDepartamentoTv("Ressonância Magnética")).toBe("TR");
+    expect(siglaDepartamentoTv("Recepção")).toBeNull();
+    expect(nomeAtendenteTv("Jessica Alves", "LAB")).toBe("Jessica Alves (LAB)");
+    expect(nomeAtendenteTv("Jessica Alves", null)).toBe("Jessica Alves");
+  });
+
   it("distribui até 30 atendentes em no máximo dez linhas por coluna", () => {
     expect(colunasEquipeNaTv(0)).toBe(1);
     expect(colunasEquipeNaTv(10)).toBe(1);
@@ -24,6 +39,8 @@ describe("Equipe do painel TV — somente telefonia", () => {
     expect(painel.atendentes.some((a) => a.esperas.length > 0)).toBe(true);
     expect(painel.atendentes.some((a) => a.tempoMedioRespostaSeg != null)).toBe(true);
     expect(painel.atendentes.some((a) => a.tempoMedioRespostaSeg == null)).toBe(true);
+    expect(painel.atendentes.some((a) => a.nome.endsWith("(LAB)"))).toBe(true);
+    expect(painel.atendentes.some((a) => a.nome.endsWith("(TR)"))).toBe(true);
   });
 
   it("exclui administrador, supervisão e outros perfis", () => {
@@ -144,7 +161,10 @@ describe("Equipe do painel TV — somente telefonia", () => {
         enviada_por_user_id: null,
         created_at: new Date(inicioMensagens + 630_000).toISOString(),
       },
-    ];
+    ].map((mensagem) => ({
+      ...mensagem,
+      status: mensagem.direction === "out" ? "sent" : "received",
+    }));
     const consultas: { tabela: string; campos: string; filtros: [string, unknown][] }[] = [];
     const db = {
       async rpc(nome: string) {
@@ -210,7 +230,7 @@ describe("Equipe do painel TV — somente telefonia", () => {
             let data: unknown = [];
             if (tabela === "atend_conversas" && chamada.campos.includes("owner_type"))
               data = abertas;
-            if (tabela === "atend_conversas" && chamada.campos === "resolved_by")
+            if (tabela === "atend_conversas" && chamada.campos.includes("resolved_by"))
               data = [{ resolved_by: "tel-online" }, { resolved_by: "tel-offline" }];
             if (tabela === "whatsapp_mensagens") data = mensagens;
             if (tabela === "atend_agente_presenca") data = presencas;
@@ -220,6 +240,10 @@ describe("Equipe do painel TV — somente telefonia", () => {
               );
             if (tabela === "profiles")
               data = membros.map((m) => ({ id: m.user_id, nome: m.user_id }));
+            if (tabela === "atend_departamento_atendentes")
+              data = [{ user_id: "tel-online", departamento_id: "departamento-lab" }];
+            if (tabela === "atend_departamentos")
+              data = [{ id: "departamento-lab", nome: "Laboratório", ativo: true }];
             return Promise.resolve({ data: single ? null : data, error: null, count: 0 }).then(
               resolve,
             );
@@ -249,6 +273,7 @@ describe("Equipe do painel TV — somente telefonia", () => {
     expect(painel.respostas).toEqual({ equipe: 3, nina: 1 });
     expect(painel.tempoMedioRespostaSeg).toBe(180);
     expect(painel.atendentes.find((a) => a.id === "tel-online")?.tempoMedioRespostaSeg).toBe(120);
+    expect(painel.atendentes.find((a) => a.id === "tel-online")?.nome).toBe("tel-online (LAB)");
     expect(painel.atendentes.find((a) => a.id === "tel-offline")?.tempoMedioRespostaSeg).toBe(300);
     expect(painel.atendentes.find((a) => a.id === "tel-pausa")?.tempoMedioRespostaSeg).toBeNull();
     expect(painel.atendentes.find((a) => a.id === "tel-online")?.resolvidasHoje).toBe(1);

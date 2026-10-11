@@ -15,8 +15,8 @@ export function DepartamentosDemonstracao() {
       { userId: "bruna", nome: "Bruna Lima", departamentoId: "2", presenca: "ONLINE" },
       { userId: "carla", nome: "Carla Souza", departamentoId: "2", presenca: "ONLINE" },
       { userId: "diana", nome: "Diana Alves", departamentoId: "3", presenca: "PAUSA" },
-      { userId: "elisa", nome: "Elisa Santos", departamentoId: "4", presenca: "OFFLINE" },
-      { userId: "fernanda", nome: "Fernanda Costa", departamentoId: null, presenca: "ONLINE" },
+      { userId: "elisa", nome: "Elisa Santos", departamentoId: "3", presenca: "OFFLINE" },
+      { userId: "fernanda", nome: "Fernanda Costa", departamentoId: "1", presenca: "ONLINE" },
     ],
   }));
   return (
@@ -25,23 +25,6 @@ export function DepartamentosDemonstracao() {
         <DepartamentosView
           demonstracao
           dados={dados}
-          salvarDepartamento={async (id, nome) => {
-            if (
-              dados.departamentos.some(
-                (d) =>
-                  d.id !== id &&
-                  d.nome.trim().toLocaleLowerCase("pt-BR") ===
-                    nome.trim().toLocaleLowerCase("pt-BR"),
-              )
-            )
-              throw new Error("Já existe um departamento com esse nome.");
-            setDados((atual) => ({
-              ...atual,
-              departamentos: id
-                ? atual.departamentos.map((d) => (d.id === id ? { ...d, nome } : d))
-                : [...atual.departamentos, { id: crypto.randomUUID(), nome, ativo: true }],
-            }));
-          }}
           vincularAtendente={async (userId, departamentoId) => {
             setDados((atual) => ({
               ...atual,

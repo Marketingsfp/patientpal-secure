@@ -8,7 +8,6 @@ import { podeGerenciarDepartamentos } from "@/lib/atendimento/departamentos";
 import { DEPARTAMENTOS_HABILITADOS } from "@/lib/atendimento/departamentos-flag";
 import {
   consultarDepartamentosZap,
-  salvarDepartamentoZap,
   vincularDepartamentoZap,
 } from "@/lib/atendimento/departamentos.functions";
 
@@ -17,7 +16,6 @@ export function Departamentos() {
   const { user } = useAuth();
   const clinicaId = clinicaAtual?.clinica_id;
   const consultar = useServerFn(consultarDepartamentosZap);
-  const salvar = useServerFn(salvarDepartamentoZap);
   const vincular = useServerFn(vincularDepartamentoZap);
   const autorizado = DEPARTAMENTOS_HABILITADOS && podeGerenciarDepartamentos(clinicaAtual?.role);
   const query = useQuery({
@@ -60,10 +58,6 @@ export function Departamentos() {
     <DepartamentosView
       dados={query.data}
       somenteLeitura={!query.data.podeEditar}
-      salvarDepartamento={async (id, nome) => {
-        await salvar({ data: { clinicaId, id, nome } });
-        await atualizar();
-      }}
       vincularAtendente={async (userId, departamentoId) => {
         await vincular({ data: { clinicaId, userId, departamentoId } });
         await atualizar();

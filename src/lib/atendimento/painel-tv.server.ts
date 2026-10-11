@@ -15,6 +15,20 @@ export function idsTelefoniaTv(membros: readonly { user_id: string; role: string
   );
 }
 
+export function siglaDepartamentoTv(nome: string | null | undefined): "LAB" | "TR" | null {
+  const normalizado = (nome ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+  if (normalizado.includes("laboratorio")) return "LAB";
+  if (normalizado.includes("tomografia") || normalizado.includes("ressonancia")) return "TR";
+  return null;
+}
+
+export function nomeAtendenteTv(nome: string, sigla: "LAB" | "TR" | null): string {
+  return sigla ? `${nome} (${sigla})` : nome;
+}
+
 export type EstadoTv = "ONLINE" | "PAUSA" | "PAUSA_SAIDA" | "OFFLINE";
 
 export type AtendenteTv = {
@@ -32,6 +46,62 @@ export type AtendenteTv = {
   /** Quantidade de intervalos usados na média desta pessoa. */
   respostasMedidas: number;
 };
+
+type VinculoDepartamentoTv = { user_id: string; departamento_id: string };
+
+async function carregarSiglasDepartamentoTv(
+  supabase: SupabaseClient<Database>,
+  clinicaId: string,
+  userIds: string[],
+): Promise<Map<string, "LAB" | "TR">> {
+  if (!userIds.length) return new Map();
+  const cliente = supabase as unknown as {
+    from: (tabela: "atend_departamento_atendentes") => {
+      select: (campos: string) => {
+        eq: (
+          campo: string,
+          valor: string,
+        ) => {
+          in: (
+            campo: string,
+            valores: string[],
+          ) => Promise<{
+            data: VinculoDepartamentoTv[] | null;
+            error: { message: string } | null;
+          }>;
+        };
+      };
+    };
+  };
+  const vinculos = await cliente
+    .from("atend_departamento_atendentes")
+    .select("user_id, departamento_id")
+    .eq("clinica_id", clinicaId)
+    .in("user_id", userIds);
+  // O painel continua funcionando enquanto a publicação de Departamentos não estiver aplicada.
+  if (vinculos.error || !vinculos.data?.length) return new Map();
+
+  const departamentoIds = [...new Set(vinculos.data.map((v) => v.departamento_id))];
+  const departamentos = await supabase
+    .from("atend_departamentos")
+    .select("id, nome, ativo")
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .in("id", departamentoIds);
+  if (departamentos.error) return new Map();
+
+  const siglaPorDepartamento = new Map(
+    (departamentos.data ?? [])
+      .map((departamento) => [departamento.id, siglaDepartamentoTv(departamento.nome)] as const)
+      .filter((item): item is readonly [string, "LAB" | "TR"] => item[1] != null),
+  );
+  return new Map(
+    vinculos.data.flatMap((vinculo) => {
+      const sigla = siglaPorDepartamento.get(vinculo.departamento_id);
+      return sigla ? [[vinculo.user_id, sigla] as const] : [];
+    }),
+  );
+}
 
 const percentilMs = (valores: number[], proporcao: number) => {
   if (!valores.length) return null;
@@ -259,6 +329,7 @@ export async function carregarPainelTv(
     : { data: [], error: null };
   if (perfis.error) throw new Error(perfis.error.message);
   const nomes = new Map((perfis.data ?? []).map((p) => [p.id, p.nome]));
+  const siglasDepartamento = await carregarSiglasDepartamentoTv(supabase, clinicaId, ids);
 
   const atendentes: AtendenteTv[] = await Promise.all(
     ids.map(async (id) => {
@@ -266,7 +337,10 @@ export async function carregarPainelTv(
       const pausa = st.estado === "PAUSA" || st.estado === "PAUSA_SAIDA";
       return {
         id,
-        nome: nomes.get(id) || "Atendente sem nome",
+        nome: nomeAtendenteTv(
+          nomes.get(id) || "Atendente sem nome",
+          siglasDepartamento.get(id) ?? null,
+        ),
         estado: st.estado,
         // Mesma leitura do cronômetro da sidebar e da Central (após validar gestão).
         inicioPausa: pausa
