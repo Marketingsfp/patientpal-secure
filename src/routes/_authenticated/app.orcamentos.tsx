@@ -19,6 +19,7 @@ import {
   Workflow,
   Camera,
   Loader2,
+  Smartphone,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -62,6 +63,10 @@ import type { ReactNode } from "react";
 import { primeiroValorValido } from "@/lib/convenio/info-convenio-paciente";
 import { comprimirImagem } from "@/lib/odonto-imagens";
 import { lerPedidoMedicoParaOrcamento } from "@/lib/orcamentos/ler-pedido-medico.functions";
+import { linkFotoCelular, novoTokenFoto } from "@/lib/orcamentos/foto-celular";
+import type { LeituraPedidoBalcao } from "@/lib/orcamentos/leitura-pedido";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import QRCode from "qrcode";
 import { medicosComNomeLido } from "@/lib/orcamentos/leitura-pedido";
 import { escolhaSegura, ordenarServicosDoPedido } from "@/lib/orcamentos/correspondencia-servico";
 import { normalizarBusca } from "@/lib/busca/relevancia";
@@ -367,6 +372,10 @@ const MENSAGEM_LEITURA_FALHOU: Record<string, string> = {
   falha_tecnica:
     "A leitura automática não está disponível agora. Tente de novo em instantes ou preencha manualmente.",
 };
+
+// Tabela nova (migration 20261011120000), ainda fora dos tipos gerados.
+const sessoesFotoCelular = () =>
+  (supabase as unknown as SupabaseClient).from("orcamento_foto_sessoes");
 
 function blobParaDataUrl(blob: Blob, mime: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -1450,6 +1459,83 @@ function NovoOrcamentoDialog({
   const [lendoPedido, setLendoPedido] = useState(false);
   const [pedidoLido, setPedidoLido] = useState<PedidoLido | null>(null);
 
+  // Foto pelo celular: o QR abre a câmera no celular; o pedido lido volta para cá.
+  const [fotoCelular, setFotoCelular] = useState<{
+    id: string;
+    qr: string;
+    vence: number;
+  } | null>(null);
+  const [celularVenceu, setCelularVenceu] = useState(false);
+
+  const fecharFotoCelular = (id = fotoCelular?.id) => {
+    if (id) void sessoesFotoCelular().delete().eq("id", id);
+    setFotoCelular(null);
+  };
+
+  const abrirFotoCelular = async () => {
+    if (!categoria) return;
+    setCelularVenceu(false);
+    const token = novoTokenFoto();
+    const { data, error } = await sessoesFotoCelular()
+      .insert({ token, clinica_id: clinicaId })
+      .select("id, expira_em")
+      .single();
+    if (error || !data) return mostrarErro(error);
+    const qr = await QRCode.toDataURL(linkFotoCelular(window.location.origin, token), {
+      margin: 1,
+      width: 220,
+    });
+    setFotoCelular({ id: data.id, qr, vence: new Date(data.expira_em).getTime() });
+  };
+
+  // A foto pode chegar depois de a atendente mexer no formulário: usa sempre
+  // a versão atual (paciente, médico e itens de agora), não a da hora do QR.
+  const aplicarLeituraRef = useRef<(r: LeituraPedidoBalcao) => Promise<unknown>>(
+    async () => undefined,
+  );
+
+  // Confere a cada 2 s se o celular já mandou a foto lida.
+  useEffect(() => {
+    if (!fotoCelular) return;
+    let vivo = true;
+    const t = setInterval(async () => {
+      if (Date.now() > fotoCelular.vence) {
+        setCelularVenceu(true);
+        return fecharFotoCelular(fotoCelular.id);
+      }
+      const { data } = await sessoesFotoCelular()
+        .select("estado, resultado")
+        .eq("id", fotoCelular.id)
+        .maybeSingle();
+      if (!vivo || data?.estado !== "pronto" || !data.resultado) return;
+      fecharFotoCelular(fotoCelular.id);
+      setLendoPedido(true);
+      try {
+        await aplicarLeituraRef.current(data.resultado as LeituraPedidoBalcao);
+      } catch (e) {
+        mostrarErro(e);
+      } finally {
+        setLendoPedido(false);
+      }
+    }, 2000);
+    return () => {
+      vivo = false;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fotoCelular?.id]);
+
+  // Fechou o orçamento com o QR aberto: a sessão não fica esperando à toa.
+  const sessaoCelularRef = useRef<string | null>(null);
+  sessaoCelularRef.current = fotoCelular?.id ?? null;
+  useEffect(
+    () => () => {
+      if (sessaoCelularRef.current)
+        void sessoesFotoCelular().delete().eq("id", sessaoCelularRef.current);
+    },
+    [],
+  );
+
   const lerFotoDoPedido = async (arquivo: File) => {
     if (!categoria) return;
     setLendoPedido(true);
@@ -1461,105 +1547,112 @@ function NovoOrcamentoDialog({
       if (blob.size > 8_000_000) {
         return toast.error("Arquivo grande demais. Tire uma foto só do pedido.");
       }
-      const r = await lerPedido({ data: { arquivo: await blobParaDataUrl(blob, mime) } });
-      const { leitura } = r;
-      if (leitura.tipo !== "pedido_medico" && leitura.tipo !== "marcacao_incerta") {
-        return toast.error(MENSAGEM_LEITURA_FALHOU[leitura.tipo], { duration: 8000 });
-      }
-
-      // Paciente: nunca escolhido sozinho; a recepção confirma entre os parecidos.
-      let pacientes: PatientOption[] = [];
-      if (r.pacienteNome) {
-        if (!pacienteSelecionado && !pacienteNome.trim()) setPacienteNome(r.pacienteNome);
-        const { data } = await supabase.rpc("buscar_pacientes_global", {
-          _clinica_ids: clinicaIds.length > 0 ? clinicaIds : [clinicaId],
-          _termo: r.pacienteNome,
-          _limite: 5,
-        });
-        pacientes = (data ?? []) as PatientOption[];
-      }
-
-      // Médico: preenche só se o campo ainda está vazio.
-      let medicoSituacao: PedidoLido["medicoSituacao"] = "mantido";
-      let medicoOpcoes: MedicoOpt[] = [];
-      const medicoVazio = !medicoParticular && !medicoId && !(medicoExterno && medicoNome.trim());
-      if (!r.medicoNome) medicoSituacao = null;
-      else if (medicoVazio) {
-        medicoOpcoes = medicosComNomeLido(r.medicoNome, medicos);
-        if (medicoOpcoes.length === 1) {
-          alternarMedicoExterno(false);
-          selecionarMedico(medicoOpcoes[0].id);
-          medicoSituacao = "cadastrado";
-        } else if (medicoOpcoes.length > 1) {
-          alternarMedicoExterno(false);
-          medicoSituacao = "varios";
-        } else {
-          alternarMedicoExterno(true);
-          setMedicoNome(r.medicoNome);
-          medicoSituacao = "externo";
-        }
-      }
-
-      // Exames: compara com a tabela inteira da categoria e com o que a recepção
-      // já escolheu antes. Entra sozinho só o cadastro claramente à frente.
-      const lidos = leitura.tipo === "pedido_medico" ? leitura.itens : [];
-      const outra = categoria === "laboratorio" ? "demais" : "laboratorio";
-      const [catalogo, usos] = lidos.length
-        ? await Promise.all([carregarCatalogo(categoria), carregarUsos()])
-        : [[], new Map<string, number>()];
-      const usosDe = (p: Procedimento) =>
-        (usos.get(p.id) ?? 0) + (usos.get(normalizarBusca(p.nome)) ?? 0);
-      // A outra categoria só é carregada se algum exame não estiver nesta.
-      let catalogoOutra: Procedimento[] | null = null;
-      const resultado: ItemDoPedido[] = [];
-      for (const lido of lidos) {
-        const ordenados = ordenarServicosDoPedido(lido, catalogo, usosDe, valorDoProc);
-        const sugestoes = ordenados.slice(0, 4).map((o) => ({ servico: o.servico, usos: o.usos }));
-        if (sugestoes.length === 0) {
-          catalogoOutra ??= await carregarCatalogo(outra);
-          const naOutra = ordenarServicosDoPedido(lido, catalogoOutra, usosDe, valorDoProc)[0];
-          resultado.push(
-            naOutra
-              ? { lido, situacao: "outra_categoria", servico: naOutra.servico, sugestoes }
-              : { lido, situacao: "nao_encontrado", sugestoes },
-          );
-          continue;
-        }
-        const escolhido = escolhaSegura(ordenados, valorDoProc);
-        resultado.push(
-          escolhido
-            ? { lido, situacao: "adicionado", servico: escolhido, sugestoes }
-            : { lido, situacao: "escolher", sugestoes },
-        );
-      }
-      const noOrcamento = new Set(itens.map((it) => it.procedimento_id));
-      let adicionados = 0;
-      for (const it of resultado) {
-        if (it.situacao !== "adicionado" || !it.servico || noOrcamento.has(it.servico.id)) continue;
-        noOrcamento.add(it.servico.id);
-        adicionarProc(it.servico, { silencioso: true });
-        adicionados++;
-      }
-
-      setPedidoLido({
-        pacienteNome: r.pacienteNome,
-        pacientes,
-        medicoNome: r.medicoNome,
-        medicoSituacao,
-        medicoOpcoes,
-        marcacaoIncerta: leitura.tipo === "marcacao_incerta",
-        itens: resultado,
-      });
-      toast.success(
-        adicionados > 0
-          ? `${adicionados} exame(s) adicionado(s) pelo pedido. Confira antes de gerar.`
-          : "Pedido lido. Confira os dados antes de gerar.",
+      await aplicarLeituraDoPedido(
+        await lerPedido({ data: { arquivo: await blobParaDataUrl(blob, mime) } }),
       );
     } catch (e) {
       mostrarErro(e);
     } finally {
       setLendoPedido(false);
     }
+  };
+
+  // Preenche o orçamento com o pedido lido (foto do computador ou do celular).
+  const aplicarLeituraDoPedido = async (r: LeituraPedidoBalcao) => {
+    if (!categoria) return;
+    const { leitura } = r;
+    if (leitura.tipo !== "pedido_medico" && leitura.tipo !== "marcacao_incerta") {
+      return toast.error(MENSAGEM_LEITURA_FALHOU[leitura.tipo], { duration: 8000 });
+    }
+
+    // Paciente: nunca escolhido sozinho; a recepção confirma entre os parecidos.
+    let pacientes: PatientOption[] = [];
+    if (r.pacienteNome) {
+      if (!pacienteSelecionado && !pacienteNome.trim()) setPacienteNome(r.pacienteNome);
+      const { data } = await supabase.rpc("buscar_pacientes_global", {
+        _clinica_ids: clinicaIds.length > 0 ? clinicaIds : [clinicaId],
+        _termo: r.pacienteNome,
+        _limite: 5,
+      });
+      pacientes = (data ?? []) as PatientOption[];
+    }
+
+    // Médico: preenche só se o campo ainda está vazio.
+    let medicoSituacao: PedidoLido["medicoSituacao"] = "mantido";
+    let medicoOpcoes: MedicoOpt[] = [];
+    const medicoVazio = !medicoParticular && !medicoId && !(medicoExterno && medicoNome.trim());
+    if (!r.medicoNome) medicoSituacao = null;
+    else if (medicoVazio) {
+      medicoOpcoes = medicosComNomeLido(r.medicoNome, medicos);
+      if (medicoOpcoes.length === 1) {
+        alternarMedicoExterno(false);
+        selecionarMedico(medicoOpcoes[0].id);
+        medicoSituacao = "cadastrado";
+      } else if (medicoOpcoes.length > 1) {
+        alternarMedicoExterno(false);
+        medicoSituacao = "varios";
+      } else {
+        alternarMedicoExterno(true);
+        setMedicoNome(r.medicoNome);
+        medicoSituacao = "externo";
+      }
+    }
+
+    // Exames: compara com a tabela inteira da categoria e com o que a recepção
+    // já escolheu antes. Entra sozinho só o cadastro claramente à frente.
+    const lidos = leitura.tipo === "pedido_medico" ? leitura.itens : [];
+    const outra = categoria === "laboratorio" ? "demais" : "laboratorio";
+    const [catalogo, usos] = lidos.length
+      ? await Promise.all([carregarCatalogo(categoria), carregarUsos()])
+      : [[], new Map<string, number>()];
+    const usosDe = (p: Procedimento) =>
+      (usos.get(p.id) ?? 0) + (usos.get(normalizarBusca(p.nome)) ?? 0);
+    // A outra categoria só é carregada se algum exame não estiver nesta.
+    let catalogoOutra: Procedimento[] | null = null;
+    const resultado: ItemDoPedido[] = [];
+    for (const lido of lidos) {
+      const ordenados = ordenarServicosDoPedido(lido, catalogo, usosDe, valorDoProc);
+      const sugestoes = ordenados.slice(0, 4).map((o) => ({ servico: o.servico, usos: o.usos }));
+      if (sugestoes.length === 0) {
+        catalogoOutra ??= await carregarCatalogo(outra);
+        const naOutra = ordenarServicosDoPedido(lido, catalogoOutra, usosDe, valorDoProc)[0];
+        resultado.push(
+          naOutra
+            ? { lido, situacao: "outra_categoria", servico: naOutra.servico, sugestoes }
+            : { lido, situacao: "nao_encontrado", sugestoes },
+        );
+        continue;
+      }
+      const escolhido = escolhaSegura(ordenados, valorDoProc);
+      resultado.push(
+        escolhido
+          ? { lido, situacao: "adicionado", servico: escolhido, sugestoes }
+          : { lido, situacao: "escolher", sugestoes },
+      );
+    }
+    const noOrcamento = new Set(itens.map((it) => it.procedimento_id));
+    let adicionados = 0;
+    for (const it of resultado) {
+      if (it.situacao !== "adicionado" || !it.servico || noOrcamento.has(it.servico.id)) continue;
+      noOrcamento.add(it.servico.id);
+      adicionarProc(it.servico, { silencioso: true });
+      adicionados++;
+    }
+
+    setPedidoLido({
+      pacienteNome: r.pacienteNome,
+      pacientes,
+      medicoNome: r.medicoNome,
+      medicoSituacao,
+      medicoOpcoes,
+      marcacaoIncerta: leitura.tipo === "marcacao_incerta",
+      itens: resultado,
+    });
+    toast.success(
+      adicionados > 0
+        ? `${adicionados} exame(s) adicionado(s) pelo pedido. Confira antes de gerar.`
+        : "Pedido lido. Confira os dados antes de gerar.",
+    );
   };
 
   // Tabela inteira da categoria (o PostgREST entrega 1000 linhas por vez).
@@ -1595,6 +1688,8 @@ function NovoOrcamentoDialog({
     }
     return usos;
   };
+
+  aplicarLeituraRef.current = aplicarLeituraDoPedido;
 
   const escolherServicoDoPedido = (idx: number, p: Procedimento) => {
     const anterior = pedidoLido?.itens[idx]?.servico;
@@ -1817,10 +1912,54 @@ function NovoOrcamentoDialog({
                   )}
                   {lendoPedido ? "Lendo o pedido…" : "Ler pedido médico (foto)"}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  disabled={lendoPedido || !!fotoCelular}
+                  onClick={() => void abrirFotoCelular()}
+                >
+                  <Smartphone className="h-3.5 w-3.5" />
+                  Tirar com o celular
+                </Button>
                 <span className="text-xs text-muted-foreground">
                   Tire ou escolha a foto do pedido: paciente, médico e exames são preenchidos para
                   você conferir.
                 </span>
+                {fotoCelular && (
+                  <div className="basis-full flex flex-wrap items-center gap-4 rounded-md border bg-background p-3">
+                    <img
+                      src={fotoCelular.qr}
+                      alt="QR code para tirar a foto do pedido com o celular"
+                      className="h-40 w-40 rounded bg-white p-1"
+                    />
+                    <div className="flex-1 min-w-48 space-y-2 text-sm">
+                      <p className="font-medium">Aponte a câmera do celular para o código</p>
+                      <p className="text-xs text-muted-foreground">
+                        Abra o link, toque em "Tirar foto" e fotografe o pedido. Ele aparece aqui
+                        sozinho. O código vale 10 minutos e serve só para este orçamento.
+                      </p>
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Aguardando a foto…
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2"
+                        onClick={() => fecharFotoCelular()}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {celularVenceu && !fotoCelular && (
+                  <span className="basis-full text-xs text-amber-700 dark:text-amber-300">
+                    O código do celular venceu. Clique em "Tirar com o celular" para gerar outro.
+                  </span>
+                )}
                 <input
                   ref={fotoRef}
                   type="file"

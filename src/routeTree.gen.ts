@@ -127,6 +127,7 @@ import { Route as ApiPublicNinaRuntimeRouteImport } from './routes/api/public/ni
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts-voices'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as PPedidoTokenRouteImport } from './routes/p.pedido.$token'
 import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
@@ -850,6 +851,11 @@ const PContratoTokenRoute = PContratoTokenRouteImport.update({
   path: '/p/contrato/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PPedidoTokenRoute = PPedidoTokenRouteImport.update({
+  id: '/p/pedido/$token',
+  path: '/p/pedido/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PainelTTokenRoute = PainelTTokenRouteImport.update({
   id: '/painel_/t/$token',
   path: '/painel/t/$token',
@@ -1418,6 +1424,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
+  '/p/pedido/$token': typeof PPedidoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
@@ -1609,6 +1616,7 @@ export interface FileRoutesByTo {
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
+  '/p/pedido/$token': typeof PPedidoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
@@ -1806,6 +1814,7 @@ export interface FileRoutesById {
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
+  '/p/pedido/$token': typeof PPedidoTokenRoute
   '/painel_/t/$token': typeof PainelTTokenRoute
   '/totem_/t/$token': typeof TotemTTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
@@ -2003,6 +2012,7 @@ export interface FileRouteTypes {
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
+    | '/p/pedido/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
     | '/app/'
@@ -2194,6 +2204,7 @@ export interface FileRouteTypes {
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
+    | '/p/pedido/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
     | '/app'
@@ -2390,6 +2401,7 @@ export interface FileRouteTypes {
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
+    | '/p/pedido/$token'
     | '/painel_/t/$token'
     | '/totem_/t/$token'
     | '/_authenticated/app/'
@@ -2511,6 +2523,7 @@ export interface RootRouteChildren {
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
+  PPedidoTokenRoute: typeof PPedidoTokenRoute
   PainelTTokenRoute: typeof PainelTTokenRoute
   TotemTTokenRoute: typeof TotemTTokenRoute
   ApiIntegrationsV1SplatRoute: typeof ApiIntegrationsV1SplatRoute
@@ -3351,6 +3364,13 @@ declare module '@tanstack/react-router' {
       path: '/p/contrato/$token'
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p/pedido/$token': {
+      id: '/p/pedido/$token'
+      path: '/p/pedido/$token'
+      fullPath: '/p/pedido/$token'
+      preLoaderRoute: typeof PPedidoTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel_/t/$token': {
@@ -4369,6 +4389,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
   PContratoTokenRoute: PContratoTokenRoute,
+  PPedidoTokenRoute: PPedidoTokenRoute,
   PainelTTokenRoute: PainelTTokenRoute,
   TotemTTokenRoute: TotemTTokenRoute,
   ApiIntegrationsV1SplatRoute: ApiIntegrationsV1SplatRoute,
