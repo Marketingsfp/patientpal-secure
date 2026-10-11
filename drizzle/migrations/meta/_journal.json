@@ -57,6 +57,13 @@
       "when": 1791683837125,
       "tag": "0007_oszap_setores_fixos",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791735557610,
+      "tag": "0008_atend_listar_departamentos_profiles_nome",
+      "breakpoints": true
     }
   ]
 }
