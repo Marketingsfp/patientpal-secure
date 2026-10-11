@@ -1,4 +1,5 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { faixaEsperaDesde, formatarEspera, minutosDesde } from "@/lib/atendimento/espera";
 import type { DadosPainelTv } from "@/lib/atendimento/painel-tv-demonstracao";
@@ -17,7 +18,7 @@ const explicacoes = [
   ],
   [
     "Normal, atenção e crítica",
-    "Normal: menos de 5 minutos. Atenção: de 5 a 10 minutos. Crítica: mais de 10 minutos.",
+    "Normal: menos de 5 minutos. Atenção: de 5 a 10 minutos. Crítica: mais de 10 minutos. Cada quadrado é um paciente esperando; quando há muitos, os quadrados diminuem para todos caberem na régua.",
   ],
   [
     "Sem atendente",
@@ -101,6 +102,7 @@ const explicacoes = [
 export function PainelTvComIndicadores({ dados, children }: Props) {
   const [ajuda, setAjuda] = useState(false);
   const [agora, setAgora] = useState(Date.now());
+  const [alvosRegua, setAlvosRegua] = useState<HTMLElement[]>([]);
   useEffect(() => {
     const id = window.setInterval(() => setAgora(Date.now()), 15_000);
     return () => window.clearInterval(id);
@@ -119,6 +121,30 @@ export function PainelTvComIndicadores({ dados, children }: Props) {
       }
     }
   }, [dados]);
+  useEffect(() => {
+    const raiz = document.getElementById("painel-tv-com-indicadores");
+    if (!raiz) return;
+    const linhaTotais = Array.from(raiz.querySelectorAll<HTMLElement>("div.grid")).find((linha) => {
+      const textos = Array.from(linha.children, (filho) => filho.textContent?.trim() ?? "");
+      return (
+        textos.length === 3 &&
+        textos[0].includes("normal") &&
+        textos[1].includes("atenção") &&
+        textos[2].includes("crítica")
+      );
+    });
+    const linhaBlocos = linhaTotais?.previousElementSibling;
+    const novosAlvos = linhaBlocos
+      ? Array.from(linhaBlocos.children).filter(
+          (elemento): elemento is HTMLElement => elemento instanceof HTMLElement,
+        )
+      : [];
+    for (const alvo of novosAlvos) alvo.dataset.reguaBlocosAdaptativos = "true";
+    setAlvosRegua(novosAlvos.slice(0, 3));
+    return () => {
+      for (const alvo of novosAlvos) delete alvo.dataset.reguaBlocosAdaptativos;
+    };
+  }, [dados]);
 
   const abrirAjudaCompleta = (evento: MouseEvent<HTMLDivElement>) => {
     const botao = (evento.target as HTMLElement).closest("button");
@@ -131,6 +157,11 @@ export function PainelTvComIndicadores({ dados, children }: Props) {
   const emRisco = (dados?.espera ?? []).filter(
     (data) => faixaEsperaDesde(data, agora) === "atencao",
   ).length;
+  const blocosPorFaixa = (["normal", "atencao", "critico"] as const).map(
+    (faixa) =>
+      (dados?.espera ?? []).filter((data) => faixaEsperaDesde(data, agora) === faixa).length,
+  );
+  const coresBlocos = ["bg-atd-ok", "bg-atd-warn", "bg-atd-danger"] as const;
   const semAtendente = dados?.maisAntigaSemAtendente
     ? minutosDesde(dados.maisAntigaSemAtendente, agora)
     : null;
@@ -189,8 +220,52 @@ export function PainelTvComIndicadores({ dados, children }: Props) {
           font-size: 0.72em;
           font-weight: 700;
         }
+        #painel-tv-com-indicadores [data-regua-blocos-adaptativos="true"]
+          > :not([data-grade-espera-adaptativa]) {
+          display: none !important;
+        }
       `}</style>
       {children}
+      {alvosRegua.map((alvo, indice) => {
+        const quantidade = blocosPorFaixa[indice] ?? 0;
+        const espaco =
+          quantidade > 160
+            ? 0
+            : quantidade > 80
+              ? 0.02
+              : quantidade > 48
+                ? 0.05
+                : quantidade > 30
+                  ? 0.1
+                  : quantidade > 18
+                    ? 0.2
+                    : 0.4;
+        return createPortal(
+          <div
+            key={indice}
+            data-grade-espera-adaptativa
+            className="grid h-full w-full min-w-0 items-center justify-end overflow-hidden"
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(quantidade, 1)}, minmax(0, 2.2vh))`,
+              gap: `${espaco}vw`,
+            }}
+            title={`${quantidade} conversa${quantidade === 1 ? "" : "s"} nesta faixa`}
+          >
+            {Array.from({ length: quantidade }, (_, bloco) => (
+              <i
+                key={bloco}
+                aria-hidden="true"
+                className={cn(
+                  "block aspect-square w-full max-w-[2.2vh] justify-self-end rounded-[clamp(1px,0.4vh,4px)]",
+                  coresBlocos[indice],
+                )}
+              />
+            ))}
+          </div>,
+          alvo,
+          String(indice),
+        );
+      })}
       <section className="fixed bottom-[4.6vh] right-[3.6vw] z-[105] h-[25vh] w-[36vw] border-l border-atd-border bg-atd-bg pl-[2vw] text-atd-ink">
         <div className="flex items-center justify-between">
           <p className="text-[1.35vh] uppercase tracking-[0.22em] text-atd-ink-soft">
