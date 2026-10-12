@@ -15,12 +15,6 @@
  */
 import { describe, expect, it } from "bun:test";
 import { extrairRegrasPublicadas, aplicabilidadeDaRegra } from "./regras-publicadas";
-import { InstructionComplianceValidator } from "./obrigacoes";
-import {
-  excecaoSaudacaoAplicavel,
-  decidirBloqueioBaixaConfianca,
-  type EntradaSaudacao,
-} from "./baixa-confiabilidade";
 import type { ContextoConfianca } from "./types";
 
 const TEXTO_PUBLICADO = `ATENDIMENTO
@@ -72,87 +66,5 @@ describe("regra condicionada é lida por frase", () => {
 
   it("fica indeterminada quando a situação é desconhecida", () => {
     expect(aplicabilidadeDaRegra(proibicao!, {})).toBe("indeterminada");
-  });
-});
-
-describe("saudação correta não vira evidência desconhecida", () => {
-  it("não reprova nem marca UNKNOWN", () => {
-    const r = InstructionComplianceValidator(contexto({}));
-    expect(r.status).not.toBe("UNKNOWN");
-    expect(r.status).not.toBe("FAIL");
-    expect(r.score).toBe(100);
-  });
-
-  it("mantém a regra valendo quando a pessoa já pediu algo", () => {
-    const r = InstructionComplianceValidator(
-      contexto({
-        mensagemPaciente: "quanto custa a consulta de cardiologia?",
-        turnType: "INFORMACAO",
-        draftText: "Olá! Sou a Nina. A consulta de cardiologia custa R$ 200.",
-      }),
-    );
-    expect(r.status).toBe("FAIL");
-    expect(r.reasonCode).toBe("RESTRICAO_PUBLICADA_DESCUMPRIDA");
-  });
-});
-
-describe("exceção de saudação é estruturada", () => {
-  const base: EntradaSaudacao = { turnoSocial: true };
-
-  it("vale só quando nada de risco foi observado", () => {
-    expect(excecaoSaudacaoAplicavel(base).aplica).toBe(true);
-  });
-
-  it.each([
-    ["acaoOperacional", "ACAO_OPERACIONAL_NO_TURNO"],
-    ["afirmacaoSemFonte", "AFIRMACAO_SEM_FONTE"],
-    ["pedidoDeHumano", "PEDIDO_DE_ATENDIMENTO_HUMANO"],
-    ["conflitoDeIdentidade", "CONFLITO_DE_IDENTIDADE"],
-    ["conformidadeBloqueante", "CONFORMIDADE_BLOQUEANTE"],
-  ] as const)("cai com %s", (campo: string, impedimento: string) => {
-    const r = excecaoSaudacaoAplicavel({ ...base, [campo]: true });
-    expect(r.aplica).toBe(false);
-    expect(r.impedimento).toBe(impedimento);
-  });
-
-  it("não isenta turno que não é social", () => {
-    expect(excecaoSaudacaoAplicavel({ turnoSocial: false }).aplica).toBe(false);
-  });
-});
-
-describe("decisão de bloqueio com nota baixa", () => {
-  const comum = {
-    nivel: "LOW" as const,
-    score: 74,
-    decisaoMotor: "HANDOFF" as const,
-    etapa: "A" as const,
-    ambiente: "homologacao" as const,
-  };
-
-  it("saudação correta não encaminha", () => {
-    const d = decidirBloqueioBaixaConfianca({
-      ...comum,
-      saudacao: { turnoSocial: true },
-    });
-    expect(d.bloquear).toBe(false);
-    expect(d.encaminhar).toBe(false);
-  });
-
-  it("saudação com afirmação sem fonte volta ao critério normal", () => {
-    const d = decidirBloqueioBaixaConfianca({
-      ...comum,
-      saudacao: { turnoSocial: true, afirmacaoSemFonte: true },
-    });
-    expect(d.bloquear).toBe(true);
-    expect(d.impedimentoSaudacao).toBe("AFIRMACAO_SEM_FONTE");
-  });
-
-  it("homologação nunca transfere de verdade: a decisão só marca o desfecho", () => {
-    const d = decidirBloqueioBaixaConfianca({
-      ...comum,
-      saudacao: { turnoSocial: false },
-    });
-    expect(d.ambiente).toBe("homologacao");
-    expect(d.bloquear).toBe(true);
   });
 });

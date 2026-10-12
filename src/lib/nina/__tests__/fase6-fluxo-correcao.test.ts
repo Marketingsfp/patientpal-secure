@@ -16,12 +16,6 @@ import { montarPacoteInvestigacao } from "../evidencias-pacote.server";
 import { mesmoConjuntoDeEvidencias } from "../evidencias-pacote";
 import { integracaoCodigoDisponivel } from "../executor-codigo.server";
 import { extrairRegrasPublicadas } from "../confidence/regras-publicadas";
-import {
-  saidaControladaBaixaConfianca,
-  AVISO_ENCAMINHAMENTO_HUMANO,
-  AVISO_ENCAMINHAMENTO_SIMULADO,
-  AVISO_ENCAMINHAMENTO_FALHOU,
-} from "../confidence/baixa-confiabilidade";
 import { criarResultado } from "../resposta/contrato";
 import {
   finalizarResposta,
@@ -516,28 +510,6 @@ describe("FASE 6 — atendimento", () => {
     const incondicionais = regras.regras.filter((r) => r.condicao.tipo === "sempre");
     // Nenhuma proibição incondicional de "pergunta" recai sobre "ola bom dia".
     expect(incondicionais.some((r) => r.proibicoes.includes("pergunta"))).toBe(false);
-  });
-
-  it("12b. falha na tentativa de correção não anuncia transferência concluída", () => {
-    const s = saidaControladaBaixaConfianca({ tipo: "nao_executado", erro: "HTTP 400" });
-    expect(s.aviso).toBe(AVISO_ENCAMINHAMENTO_FALHOU);
-    expect(s.aviso).not.toBe(AVISO_ENCAMINHAMENTO_HUMANO);
-    expect(s.encaminhamentoConfirmado).toBe(false);
-    expect(s.exigeIntervencao).toBe(true);
-  });
-
-  it("13. pedido de humano: sucesso confirmado e falha são desfechos distintos", () => {
-    const real = saidaControladaBaixaConfianca({ tipo: "real", confirmado: true });
-    expect(real.aviso).toBe(AVISO_ENCAMINHAMENTO_HUMANO);
-    expect(real.encaminhamentoConfirmado).toBe(true);
-
-    const falhou = saidaControladaBaixaConfianca({ tipo: "real", confirmado: false, erro: "rpc" });
-    expect(falhou.encaminhamento).toBe("real_falhou");
-    expect(falhou.encaminhamentoConfirmado).toBe(false);
-
-    const simulado = saidaControladaBaixaConfianca({ tipo: "simulado" });
-    expect(simulado.aviso).toBe(AVISO_ENCAMINHAMENTO_SIMULADO);
-    expect(simulado.aviso).not.toBe(AVISO_ENCAMINHAMENTO_HUMANO);
   });
 
   it("14. marcador condicional só vale para a entrada prevista", () => {

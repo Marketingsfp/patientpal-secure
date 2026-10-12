@@ -16,13 +16,7 @@
  */
 import { describe, it, expect } from "bun:test";
 import { extrairRegrasPublicadas } from "./regras-publicadas";
-import { InstructionComplianceValidator } from "./obrigacoes";
 import { normalizarMensagensParaProvedor } from "../adapters/gemini-adapter.server";
-import {
-  saidaControladaBaixaConfianca,
-  AVISO_ENCAMINHAMENTO_HUMANO,
-  AVISO_ENCAMINHAMENTO_SIMULADO,
-} from "./baixa-confiabilidade";
 
 const TEXTO_APRESENTACAO = `APRESENTAÇÃO
 
@@ -59,36 +53,6 @@ describe("regras publicadas — proibição condicionada", () => {
     expect(alvo!.verificacao).not.toBe("proibicao_de_conteudo");
     expect(alvo!.proibicoes).toEqual([]);
   });
-
-  it("saudação com pergunta de acolhimento não é reprovada como regra descumprida", () => {
-    const { regras } = extrairRegrasPublicadas(TEXTO_APRESENTACAO, {
-      escopo: "whatsapp",
-      hash: "H",
-    });
-    const v = InstructionComplianceValidator({
-      mensagemPaciente: "ola bom dia",
-      draftText: RESPOSTA_APRESENTACAO,
-      instrucoes: { hash: "H", regras },
-      businessContext: { ambiente: "homologacao" },
-    } as never);
-    expect(v.status).not.toBe("FAIL");
-    expect(v.reasonCode).not.toBe("RESTRICAO_PUBLICADA_DESCUMPRIDA");
-  });
-
-  it("proibição sem condição (regra de teste v6) continua verificável e bloqueante", () => {
-    const { regras } = extrairRegrasPublicadas(TEXTO_V6, { escopo: "whatsapp", hash: "H6" });
-    const proibicao = regras.find((r) => r.verificacao === "proibicao_de_conteudo");
-    expect(proibicao).toBeDefined();
-    expect(proibicao!.proibicoes).toContain("saudacao");
-    const v = InstructionComplianceValidator({
-      mensagemPaciente: "TESTE-ARQUITETURA-9381",
-      draftText: "Olá! ARQUITETURA_CONFIRMADA_9381",
-      instrucoes: { hash: "H6", regras },
-      businessContext: { ambiente: "homologacao" },
-    } as never);
-    expect(v.status).toBe("FAIL");
-    expect(v.reasonCode).toBe("RESTRICAO_PUBLICADA_DESCUMPRIDA");
-  });
 });
 
 describe("composição do pedido ao provedor", () => {
@@ -122,20 +86,5 @@ describe("composição do pedido ao provedor", () => {
     const r = normalizarMensagensParaProvedor(msgs);
     expect(r.ajuste).toBe("nenhum");
     expect(r.mensagens).toBe(msgs);
-  });
-});
-
-describe("desfecho honesto", () => {
-  it("homologação não anuncia transferência concluída", () => {
-    const s = saidaControladaBaixaConfianca({ tipo: "simulado" });
-    expect(s.aviso).toBe(AVISO_ENCAMINHAMENTO_SIMULADO);
-    expect(s.aviso).not.toBe(AVISO_ENCAMINHAMENTO_HUMANO);
-    expect(s.encaminhamentoConfirmado).toBe(false);
-  });
-
-  it("transferência real confirmada mantém o aviso de conclusão", () => {
-    const s = saidaControladaBaixaConfianca({ tipo: "real", confirmado: true, comprovacao: "c" });
-    expect(s.aviso).toBe(AVISO_ENCAMINHAMENTO_HUMANO);
-    expect(s.encaminhamentoConfirmado).toBe(true);
   });
 });

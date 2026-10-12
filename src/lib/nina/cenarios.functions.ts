@@ -455,12 +455,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
 
     let respostasNina: string[] = [];
     let mensagens = 0;
-    // FASE 8 — a verificação parte das SAÍDAS reais, não dos snapshots.
-    let saidasEsperadas: Array<{
-      id: string;
-      execucao_id: string | null;
-      texto_hash: string | null;
-    }> = [];
     if (conversaId) {
       const { data: msgs } = await supabaseAdmin
         .from("whatsapp_mensagens")
@@ -472,12 +466,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       mensagens = lista.length;
       const saidas = lista.filter((m) => m.direction === "out");
       respostasNina = saidas.map((m) => String(m.body));
-      const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
-      saidasEsperadas = saidas.map((m) => ({
-        id: String(m.id),
-        execucao_id: m.execucao_id ?? null,
-        texto_hash: hashDoTexto(String(m.body)),
-      }));
     }
 
     let ferramentas: string[] = [];
@@ -596,39 +584,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       }
     }
 
-    // FASE 8 — confiança declarada pela Nina durante o cenário. Lemos os
-    // snapshots REAIS já persistidos pelo Confidence Decision Engine; nada é
-    // recalculado aqui. Os critérios rodam SEMPRE que houve saída da Nina:
-    // ausência de avaliação reprova o cenário em vez de pular a verificação.
-    const { resumirConfiancaExecucao } = await import("@/lib/nina/confianca-execucao");
-    let resumoConfianca = resumirConfiancaExecucao([]);
-    if (conversaId) {
-      const { data: snaps } = await supabaseAdmin
-        .from("nina_confianca_decisoes")
-        .select(
-          "score, nivel, trace_id, message_id, policy_version, evidence_coverage, bloqueadores, outgoing_message_id, clinica_id, conversation_id, execucao_id, avaliacao, texto_final_hash",
-        )
-        .eq("clinica_id", data.clinicaId)
-        .eq("conversation_id", conversaId)
-        .order("created_at", { ascending: true });
-      resumoConfianca = resumirConfiancaExecucao((snaps ?? []) as any[]);
-
-      if (saidasEsperadas.length > 0 || (snaps ?? []).length > 0) {
-        const { verificarConfiancaRunner, criteriosDeConfianca } =
-          await import("@/lib/nina/confidence/gate-v2");
-        const criteriosConfianca = criteriosDeConfianca(
-          verificarConfiancaRunner((snaps ?? []) as any[], saidasEsperadas, {
-            clinicaId: data.clinicaId,
-            conversaId,
-          }),
-        );
-        avaliados = [...avaliados, ...(criteriosConfianca as any[])];
-        if (resultado !== "inconclusivo") {
-          resultado = avaliados.every((a) => a.ok) ? "aprovado" : "reprovado";
-        }
-      }
-    }
-
     const agora = new Date().toISOString();
     await supabaseAdmin
       .from("nina_teste_execucao_itens")
@@ -649,13 +604,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
         transferida,
         conversa_id: conversaId,
         ciclo_id: cicloId,
-        confianca_amostras: resumoConfianca.amostras,
-        confianca_media: resumoConfianca.media,
-        confianca_min: resumoConfianca.min,
-        confianca_max: resumoConfianca.max,
-        confianca_niveis: resumoConfianca.niveis,
-        confianca_nivel_minimo: resumoConfianca.nivelMinimo,
-        confianca_trace_ids: resumoConfianca.traceIds,
         erro: data.erroCliente ?? null,
         finalizado_em: agora,
       } as never)

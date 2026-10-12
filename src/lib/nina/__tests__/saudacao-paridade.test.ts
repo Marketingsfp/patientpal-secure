@@ -1,17 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { derivarEtapa } from "../atendimento-fase6";
-import { estadoVazio, type EstadoFluxoNina } from "../fluxo-estado-normalizar";
+import { estadoVazio } from "../fluxo-estado-normalizar";
 import {
   avaliarSaudacao,
-  contemApresentacaoPublicada,
   garantirSessaoAtiva,
   marcarSaudacaoConcluida,
   recuperarSaudacaoEntregue,
   type MensagemSaudacaoEntregue,
 } from "../saudacao-sessao";
-import { sinaisDaConversa } from "../confidence/obrigacoes";
-import { montarContextoDoTurno } from "../confidence/runtime";
-import { aplicabilidadeDaRegra, extrairRegrasPublicadas } from "../confidence/regras-publicadas";
+import { extrairRegrasPublicadas } from "../confidence/regras-publicadas";
 import { PROMPT_PUBLICADO_V15 } from "../confidence/fixtures/prompt-publicado-v15";
 
 const IDENTIDADE = { assistente: "Nina", estabelecimento: "Policlínica Menino Jesus" };
@@ -52,91 +48,7 @@ function recuperar(
   });
 }
 
-function verificarSegundoTurno(estado: EstadoFluxoNina, ambiente: "producao" | "homologacao") {
-  const segunda = garantirSessaoAtiva(estado, { jaRespondeuNestaSessao: true, agoraISO: AGORA });
-  expect(segunda.saudacaoObrigatoria).toBe(false);
-  expect(segunda.novaSessao).toBe(false);
-  const contexto = montarContextoDoTurno({
-    mensagemPaciente: "voces tem cardiologista?",
-    apresentacaoJaFeita: !segunda.saudacaoObrigatoria,
-    ambiente,
-    ferramentas: [],
-    catalogoEncontrou: false,
-    agendamentoConfirmado: false,
-    pacienteIdentificado: false,
-    esclarecimentoUsado: false,
-    handoffSolicitado: false,
-  });
-  const sinais = sinaisDaConversa(contexto);
-  expect(sinais.primeiraMensagem).toBe(false);
-  expect(aplicabilidadeDaRegra(regra("CONV-02"), sinais)).toBe("nao_aplica");
-  expect(aplicabilidadeDaRegra(regra("CONV-03"), sinais)).toBe("aplica");
-  expect(
-    derivarEtapa({
-      estado: segunda.estado,
-      mensagem: contexto.mensagemPaciente!,
-      primeiraMensagem: sinais.primeiraMensagem!,
-      intencoes: [],
-    }),
-  ).toBe("INTENT_IDENTIFICATION");
-}
-
 describe("Apresentação e continuidade iguais nos dois ambientes", () => {
-  for (const ambiente of ["producao", "homologacao"] as const) {
-    for (const papel of ["atendente virtual", "assistente virtual"]) {
-      it(`${ambiente}: apresentação como ${papel} encerra a abertura antes do pedido concreto`, () => {
-        const inicial = sessao();
-        const diagnostico = avaliarSaudacao(
-          SAUDACAO.replace("atendente virtual", papel),
-          IDENTIDADE,
-          { obrigatoria: true },
-        );
-        expect(diagnostico.saudacaoAusente).toBe(false);
-        // Mesmo caminho do runtime: apenas apresentação reconhecida e entregue é marcada.
-        const persistido = contemApresentacaoPublicada(
-          SAUDACAO.replace("atendente virtual", papel),
-          IDENTIDADE,
-        )
-          ? marcarSaudacaoConcluida(inicial)
-          : inicial;
-        verificarSegundoTurno(persistido, ambiente);
-      });
-    }
-
-    it(`${ambiente}: recupera a apresentação entregue que a versão antiga não reconheceu`, () => {
-      const inicial = sessao();
-      const resultado = recuperar(
-        [entregue(ambiente === "homologacao")],
-        inicial,
-        ambiente === "homologacao",
-      );
-      expect(resultado.recuperada).toBe(true);
-      expect(resultado.mensagemId).toBe("saudacao-enviada");
-      expect(inicial.greeting_completed).toBe(false);
-      expect(resultado.estado.session_id).toBe(inicial.session_id);
-      verificarSegundoTurno(resultado.estado, ambiente);
-    });
-
-    it(`${ambiente}: apresentação que responde ao pedido concreto não exige pergunta genérica de ajuda`, () => {
-      const body =
-        "Olá! Sou a Nina, atendente virtual da Policlínica Menino Jesus. A consulta de Cardiologia custa R$ 180,00.";
-      expect(avaliarSaudacao(body, IDENTIDADE).completa).toBe(false);
-      expect(contemApresentacaoPublicada(body, IDENTIDADE)).toBe(true);
-      const inicial = sessao();
-      const persistido = contemApresentacaoPublicada(body, IDENTIDADE)
-        ? marcarSaudacaoConcluida(inicial)
-        : inicial;
-      verificarSegundoTurno(persistido, ambiente);
-      const recuperado = recuperar(
-        [{ ...entregue(ambiente === "homologacao"), body }],
-        inicial,
-        ambiente === "homologacao",
-      );
-      expect(recuperado.recuperada).toBe(true);
-      verificarSegundoTurno(recuperado.estado, ambiente);
-    });
-  }
-
   it("reconhece a identidade publicada sem fixar o nome Nina ou o estabelecimento", () => {
     const identidade = { assistente: "Lia", estabelecimento: "Clínica Aurora" };
     const body = "Boa tarde! Sou a Lia, atendente virtual da Clínica Aurora. Como posso ajudar?";

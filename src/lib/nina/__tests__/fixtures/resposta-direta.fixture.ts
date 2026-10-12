@@ -957,16 +957,6 @@ const proibido = () => {
   motorChamado++;
   throw new Error("Motor não pode ser executado");
 };
-mock.module("@/lib/nina/confidence/runtime", () => ({
-  decidirNoTurno: proibido,
-  garantirScoreDoTextoEnviado: proibido,
-  validarAgendamentoAntesDoCommit: proibido,
-  montarContextoDoTurno: proibido,
-}));
-mock.module("@/lib/nina/confidence/claims", () => ({ avaliarGrounding: proibido }));
-mock.module("@/lib/nina/confidence/configuracao-turno.server", () => ({
-  configuracaoDoTurno: proibido,
-}));
 globalThis.fetch = Object.assign(
   async () => {
     rede++;
@@ -979,8 +969,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from(tabela: string) {
       consultas.push(tabela);
-      if (tabela.startsWith("nina_confianca") && tabela !== "nina_confianca_vinculos")
-        return proibido();
+      // Motor de confiança removido: nenhuma tabela dele pode ser consultada.
+      if (tabela.startsWith("nina_confianca")) return proibido();
       let unica = false;
       const filtrosCatalogo: Array<(linha: any) => boolean> = [];
       let limiteCatalogo = Infinity;

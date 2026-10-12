@@ -24,12 +24,10 @@ describe("metadados internos", () => {
       isTeste: false,
       criadaEm: "2026-09-08T00:00:00.000Z",
       execucaoId: "e1",
-      confianca: { score: 94, nivel: "HIGH" },
     });
     expect(m.conversation_id).toBe("c1");
     expect(m.test_conversation_id).toBeNull();
     expect(m.environment).toBe("production");
-    expect(m.confidence_score).toBe(94);
     expect(m.audit_trace_id).toBe("e1");
   });
 
@@ -47,10 +45,8 @@ describe("metadados internos", () => {
     expect(m.nina_session_id).toBe("sess-1");
   });
 
-  it("não inventa confiança, reporte nem horários ausentes", () => {
+  it("não inventa reporte nem horários ausentes", () => {
     const m = montarMetadadosMensagemNina({ messageId: "m3", isTeste: true });
-    expect(m.confidence_score).toBeNull();
-    expect(m.confidence_level).toBeNull();
     expect(m.report_status).toBeNull();
     expect(m.created_at).toBeNull();
     expect(m.sent_at).toBeNull();

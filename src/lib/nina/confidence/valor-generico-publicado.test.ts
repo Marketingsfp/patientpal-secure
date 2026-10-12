@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { montarResultadoCatalogo, type ServicoPublicado } from "../catalogo-conhecimento";
 import { extrairEvidencia } from "./evidencia-extrator";
-import { avaliarGrounding } from "./claims";
 import type { ContextoConfianca } from "./types";
 
 const servico: ServicoPublicado = {
@@ -48,31 +47,6 @@ function contexto(formas_pagamento: unknown = null) {
 }
 
 describe("valor publicado sem forma de pagamento", () => {
-  it("preserva valor de referência no mapper e gera fato sem condição", () => {
-    const { retorno, evidencia, ctx } = contexto();
-    expect(retorno.records[0]?.preco_dinheiro).toBeNull();
-    expect(retorno.records[0]?.extras?.valor_referencia).toBe(75);
-    expect(retorno.records[0]?.extras?.formas_pagamento).toBeNull();
-    expect(evidencia.fatos.find((f) => f.campo === "preco")).toMatchObject({
-      valor: "75",
-      chave: { procedimento: "Eletrocardiograma", condicoes: null },
-    });
-    expect(
-      avaliarGrounding(ctx, "O eletrocardiograma custa R$ 75,00.").claims.find(
-        (c) => c.tipo === "valor",
-      )?.suportado,
-    ).toBe(true);
-  });
-
-  it.each(["dinheiro", "PIX", "cartão"])("valor genérico não comprova a forma %s", (forma) => {
-    const { ctx } = contexto();
-    expect(
-      avaliarGrounding(ctx, `O eletrocardiograma custa R$ 75,00 no ${forma}.`).claims.find(
-        (c) => c.tipo === "valor",
-      )?.suportado,
-    ).toBe(false);
-  });
-
   it("forma explicitamente publicada mantém seu preço e não cria um resumo sem condição", () => {
     const { retorno, evidencia } = contexto([{ forma: "PIX", valor: 75 }]);
     expect(retorno.records[0]?.extras?.valor_referencia).toBeNull();

@@ -30,10 +30,8 @@ export type EntradaMetadadosMensagem = {
   ninaSessionId?: string | null;
   criadaEm?: string | null;
   enviadaEm?: string | null;
-  /** Execução da Nina que gerou a mensagem — é o elo com trace e confiança. */
+  /** Execução da Nina que gerou a mensagem — é o elo com o trace. */
   execucaoId?: string | null;
-  /** Snapshot de confiança JÁ persistido. Nunca recalculado aqui. */
-  confianca?: { score: number; nivel: string } | null;
   reporte?: SituacaoReporteNina;
 };
 
@@ -47,8 +45,6 @@ export type MetadadosMensagemNina = {
   nina_session_id: string | null;
   created_at: string | null;
   sent_at: string | null;
-  confidence_score: number | null;
-  confidence_level: string | null;
   audit_trace_id: string | null;
   report_status: string | null;
   report: SituacaoReporteNina;
@@ -78,8 +74,6 @@ export function montarMetadadosMensagemNina(
     nina_session_id: entrada.ninaSessionId ?? null,
     created_at: entrada.criadaEm ?? null,
     sent_at: entrada.enviadaEm ?? null,
-    confidence_score: entrada.confianca ? entrada.confianca.score : null,
-    confidence_level: entrada.confianca ? entrada.confianca.nivel : null,
     audit_trace_id: entrada.execucaoId ?? null,
     report_status: entrada.reporte ? entrada.reporte.status : null,
     report: entrada.reporte ?? null,

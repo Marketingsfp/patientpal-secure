@@ -16,14 +16,6 @@ import {
   perguntaParaPaciente,
   reavaliarPendencia,
 } from "./esclarecimento";
-import {
-  TEXTO_HANDOFF_CONFIRMADO,
-  TEXTO_HANDOFF_FALHOU,
-  TEXTO_LIMITE_RODADAS,
-  desfechoDeHandoff,
-  desfechoLimiteRodadas,
-} from "./desfecho";
-import { decidirHandoff } from "./handoff-decision";
 import type { ResultadoConfianca } from "./types";
 
 const RASCUNHO_REPROVADO = "A consulta custa R$ 250 e o Dr. Silva atende amanhã às 9h.";
@@ -132,32 +124,6 @@ describe("a tentativa só é consumida quando o paciente responde", () => {
   it("resolvida a dúvida, a pendência é fechada", () => {
     expect(fecharPendencia().pendente).toBe(false);
   });
-
-  it("nenhuma transferência ocorre pela reavaliação da mesma mensagem", () => {
-    const r = reavaliarPendencia({
-      anterior: { ...pendente, tentativas: 1 },
-      intentAtual: "informacao",
-      messageIdAtual: "m1",
-    });
-    const plano = decidirHandoff({
-      avaliacaoAcao: resultado(),
-      decisaoEfetiva: "CLARIFY",
-      tipoTurno: "ESCLARECIMENTO",
-      tentativasEsclarecimento: r.tentativas,
-    });
-    expect(plano.decision).toBe("CLARIFY");
-  });
-
-  it("depois de duas respostas sem avanço, aí sim a política transfere", () => {
-    const plano = decidirHandoff({
-      avaliacaoAcao: resultado(),
-      decisaoEfetiva: "CLARIFY",
-      tipoTurno: "ESCLARECIMENTO",
-      tentativasEsclarecimento: 2,
-    });
-    expect(plano.decision).toBe("HANDOFF");
-    expect(plano.reason).toBe("REPEATED_CLARIFICATION_FAILURE");
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -179,56 +145,5 @@ describe("estado da conversa viaja no contrato de sistema", () => {
 
   it("sem pendência não há bloco algum", () => {
     expect(blocoContratoEsclarecimento(pendenciaVazia())).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 4 — handoff confirmado, handoff falho e limite de rodadas
-// ---------------------------------------------------------------------------
-describe("desfechos verdadeiros da transferência", () => {
-  it("transferência só é anunciada quando o serviço confirma", () => {
-    const d = desfechoDeHandoff({ confirmado: true, motivo: "HANDOFF/EXPLICIT_HUMAN_REQUEST" });
-    expect(d.estado).toBe("HANDOFF_CONFIRMADO");
-    expect(d.resposta).toBe(TEXTO_HANDOFF_CONFIRMADO);
-    expect(d.handoffConfirmado).toBe(true);
-  });
-
-  it("falha de transferência não anuncia atendente e não devolve o rascunho reprovado", () => {
-    const d = desfechoDeHandoff({
-      confirmado: false,
-      motivo: "HANDOFF/MISSING_REQUIRED_SOURCE",
-      erro: "conversa_nao_encontrada",
-    });
-    expect(d.estado).toBe("HANDOFF_FALHOU");
-    expect(d.resposta).toBe(TEXTO_HANDOFF_FALHOU);
-    expect(d.resposta).not.toContain(RASCUNHO_REPROVADO);
-    expect(d.resposta).not.toContain("vou chamar uma atendente");
-    expect(d.handoffConfirmado).toBe(false);
-    expect(d.requerRetomadaHumana).toBe(true);
-    expect(d.erro).toBe("conversa_nao_encontrada");
-  });
-
-  it("limite de rodadas tem desfecho próprio, sem reaproveitar rascunho", () => {
-    const d = desfechoLimiteRodadas({ handoffConfirmado: false, rodadas: 6 });
-    expect(d.estado).toBe("LIMITE_RODADAS");
-    expect(d.resposta).toBe(TEXTO_LIMITE_RODADAS);
-    expect(d.resposta).not.toContain(RASCUNHO_REPROVADO);
-    expect(d.explicacao).toContain("6 rodadas");
-  });
-
-  it("limite de rodadas com transferência confirmada anuncia a atendente", () => {
-    const d = desfechoLimiteRodadas({ handoffConfirmado: true, rodadas: 3 });
-    expect(d.estado).toBe("HANDOFF_CONFIRMADO");
-    expect(d.handoffConfirmado).toBe(true);
-  });
-
-  it("nenhum desfecho inventa gravação ou informação não confirmada", () => {
-    for (const d of [
-      desfechoDeHandoff({ confirmado: false, motivo: "x" }),
-      desfechoLimiteRodadas({ handoffConfirmado: false, rodadas: 3 }),
-    ]) {
-      expect(d.resposta).not.toMatch(/agendei|agendado|marcado|confirmad[oa] (sua|seu)/i);
-      expect(d.origem).toBe("codigo");
-    }
   });
 });
