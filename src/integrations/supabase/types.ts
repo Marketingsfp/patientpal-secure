@@ -13110,6 +13110,50 @@ export type Database = {
         }
         Relationships: []
       }
+      orcamento_foto_sessoes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          criado_por: string
+          estado: string
+          expira_em: string
+          id: string
+          resultado: Json | null
+          tentativas: number
+          token: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          criado_por?: string
+          estado?: string
+          expira_em?: string
+          id?: string
+          resultado?: Json | null
+          tentativas?: number
+          token: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string
+          estado?: string
+          expira_em?: string
+          id?: string
+          resultado?: Json | null
+          tentativas?: number
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_foto_sessoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orcamento_itens: {
         Row: {
           agendado_em: string | null
