@@ -3,7 +3,6 @@ import { estadoVazio } from "./fluxo-estado-normalizar";
 import {
   TTL_SESSAO_PADRAO_MINUTOS,
   aplicarTtlSessao,
-  blocoPromptSessao,
   encerrarEstadosTransacionais,
   etapaTransacional,
   sessaoExpirada,
@@ -82,23 +81,5 @@ describe("expiração e nova sessão", () => {
     expect(r.estado.appointment.intent_confirmed).toBe(false);
     expect(r.estado.patient.id).toBe("pac-1");
     expect(r.resumoAnterior).toContain("Cardiologia");
-  });
-
-  it("orienta saudação padrão após expirar e retomada natural dentro do TTL", () => {
-    const e = estadoEmAndamento();
-    e.updated_at = "2026-09-09T06:00:00Z";
-    const expirada = aplicarTtlSessao(e, new Date("2026-09-10T12:00:00Z"), 240);
-    expect(blocoPromptSessao(expirada)).toContain("nova sessão");
-
-    const e2 = estadoEmAndamento();
-    e2.updated_at = "2026-09-10T11:30:00Z";
-    const recente = aplicarTtlSessao(e2, new Date("2026-09-10T12:00:00Z"), 240);
-    expect(blocoPromptSessao(recente)).toContain("continuação recente");
-    expect(blocoPromptSessao(recente)).toContain("NÃO interprete");
-  });
-
-  it("sessão sem histórico não gera bloco de prompt", () => {
-    const r = aplicarTtlSessao(estadoVazio(), new Date(), 240);
-    expect(blocoPromptSessao(r)).toBe("");
   });
 });

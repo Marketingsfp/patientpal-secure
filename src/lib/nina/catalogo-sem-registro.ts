@@ -4,17 +4,6 @@ export const MOTIVO_SEM_REGISTRO =
   "CATALOGO_SEM_REGISTRO: atendimento solicitado não encontrado na base publicada";
 export const MOTIVO_MEDICO_SEM_REGISTRO =
   "CATALOGO_MEDICO_SEM_REGISTRO: médico informado não encontrado na base publicada";
-export const REGRA_SEM_REGISTRO_PROMPT = `INSTRUÇÃO FAT-04 — ATENDIMENTO NÃO ENCONTRADO NA BASE DE CONHECIMENTOS
-Tipo: ESSENCIAL.
-Aplica-se: consulta, especialidade, exame ou procedimento solicitado não encontrado após busca na base publicada.
-Conduta:
-- Consulte a base publicada para cada consulta, especialidade, exame ou procedimento solicitado, incluindo nomes escritos de outra forma e pedidos com mais de um item. Um resultado sobre outro atendimento não comprova o item pedido.
-- Se a busca não encontrar o atendimento solicitado, chame obrigatoriamente solicitar_atendente_humano e encaminhe a conversa. Esta regra substitui qualquer orientação anterior para afirmar que a clínica não atende a especialidade ou sugerir outro serviço nesse caso.
-- Ausência na base não comprova que a clínica não oferece o serviço. Não diga que não temos, não realizamos ou não oferecemos; não invente informações nem prossiga com agendamento automático. Avise de forma acolhedora que a equipe dará continuidade e só confirme a transferência após sucesso da ferramenta.
-- Pedido sem identificação do atendimento exige uma pergunta breve para identificá-lo; vários resultados possíveis exigem esclarecer qual é o solicitado. Falha na consulta não comprova ausência. Essas situações não devem ser confundidas com um item pesquisado e não encontrado.
-- Exceção explícita: limitacao_catalogo significa pedido compreendido, mas oferta específica não comprovada pelo cadastro. Siga a instrução desse retorno, sem pedir nova escrita nem acionar encaminhamento por falha de identificação.
-- A regra vale para atendimento real e homologação. No ambiente de teste, use o mecanismo de encaminhamento simulado disponibilizado pelo sistema e comunique a simulação conforme AMB-01, sem enviar mensagens ao WhatsApp nem atribuir a uma atendente real.
-Resultado esperado: continuidade humana obrigatória quando o item solicitado não for encontrado na base, sem negar a oferta do serviço nem substituir por outro atendimento.`;
 
 export function normalizarBuscaCatalogo(texto: string): string {
   return texto

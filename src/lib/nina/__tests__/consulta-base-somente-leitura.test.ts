@@ -23,7 +23,6 @@ mock.module("@/lib/nina/knowledge.server", () => ({
 }));
 const { executarFerramentaPaciente } = await import("@/lib/nina/paciente-tools.server");
 const { estadoVazio } = await import("@/lib/nina/fluxo-estado-normalizar");
-const { textoResumo } = await import("@/lib/nina/atendimento-fase4");
 const estado = estadoVazio();
 Object.assign(estado.appointment, entrada.appointment);
 const antes = structuredClone(estado);
@@ -32,8 +31,7 @@ const resultado = await executarFerramentaPaciente({
   pacienteNome: null, conversaId: "conversa-simulada",
   origem: "homologacao", teste: true, podeAgendar: false, estado
 }, "consultar_cadastro", entrada.args);
-console.log(JSON.stringify({ antes, depois: estado, resultado, chamadas, auditoria,
-  resumo: textoResumo(estado, "Unidade de teste") }));
+console.log(JSON.stringify({ antes, depois: estado, resultado, chamadas, auditoria }));
 `;
 
 type ResultadoLeitura = {
@@ -42,7 +40,6 @@ type ResultadoLeitura = {
   resultado: Record<string, unknown>;
   chamadas: unknown[];
   auditoria: Array<{ dados_depois: { entrada: { resposta: unknown }; ok: boolean } }>;
-  resumo: string;
 };
 
 async function consultar(entrada: {
@@ -104,7 +101,6 @@ describe("consulta da base da Nina preserva o atendimento selecionado", () => {
         tipo_atendimento: "nao_identificado",
       },
     });
-    expect(r.resumo).toContain("Valor: R$ 160,00");
     expect(r.auditoria).toHaveLength(1);
     expect(r.auditoria[0]?.dados_depois.entrada.resposta).toEqual(r.resultado);
   });
@@ -113,7 +109,6 @@ describe("consulta da base da Nina preserva o atendimento selecionado", () => {
     const r = await consultar({ args: { termo: "cardiologia" }, fonte: fonteGeral });
     expect(r.depois).toEqual(r.antes);
     expect(r.depois.appointment.price).toBeNull();
-    expect(r.resumo).not.toContain("Valor:");
     expect(r.resultado.price).toBe("R$ 120,00");
   });
 

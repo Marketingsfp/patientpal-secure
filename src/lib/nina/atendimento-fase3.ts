@@ -6,7 +6,7 @@
  * quer agendar. Interesse ("quanto custa?", "tem cardiologista?", "que dias
  * atende?") nunca dispara pedido de dado pessoal.
  *
- * Módulo PURO: detecta a confirmação e monta texto de prompt. Não grava
+ * Módulo PURO: detecta a confirmação e lista os dados faltantes. Não grava
  * nada, não cria paciente e não chama ferramenta.
  */
 import { detectarIntencoes, type IntencaoNina } from "./atendimento-fase1";
@@ -89,76 +89,4 @@ export function dadosFaltantes(estado: EstadoFluxoNina, telefone?: string | null
 
 export function rotulos(campos: CampoObrigatorio[]): string {
   return campos.map((c) => ROTULO[c]).join(", ");
-}
-
-/** Itens do agendamento já definidos — não perguntar de novo. */
-export function jaDefinido(estado: EstadoFluxoNina): string[] {
-  const a = estado.appointment;
-  const itens: string[] = [];
-  if (a.procedure) itens.push(`procedimento: ${a.procedure}`);
-  if (a.specialty) itens.push(`especialidade: ${a.specialty}`);
-  if (a.doctor_name) itens.push(`profissional: ${a.doctor_name}`);
-  if (a.date) itens.push(`data: ${a.date}`);
-  if (a.time) itens.push(`horário: ${a.time}`);
-  return itens;
-}
-
-export type EntradaFase3 = {
-  mensagem: string;
-  estado: EstadoFluxoNina;
-};
-
-export function blocoPromptFase3({ mensagem, estado }: EntradaFase3): string {
-  const { confirmado, interesse } = avaliarIntencaoAgendar(mensagem, estado);
-  const faltam = dadosFaltantes(estado);
-  const definidos = jaDefinido(estado);
-
-  const linhas: string[] = ["ENTRADA CONTROLADA NO AGENDAMENTO (FASE 3):"];
-
-  if (!confirmado) {
-    linhas.push(
-      "- O paciente AINDA NÃO confirmou que quer agendar. É PROIBIDO pedir nome, CPF, data de nascimento ou telefone agora.",
-      interesse
-        ? '- Ele demonstrou interesse: pergunte em uma frase — "Você gostaria que eu verificasse a disponibilidade para realizar o agendamento?" — e aguarde a resposta.'
-        : "- Responda apenas o que foi perguntado. No máximo ofereça, em uma frase curta, verificar a disponibilidade. Sem insistir.",
-    );
-  } else {
-    linhas.push("- INTENÇÃO DE AGENDAR CONFIRMADA (estado BOOKING_INTENT_CONFIRMED).");
-    if (!atendimentoDefinido(estado) || !estado.appointment.confirmation) {
-      linhas.push(
-        "- Defina primeiro procedimento, profissional e a escolha de uma vaga real. Ainda NÃO colete dados cadastrais. Depois da escolha, complete o cadastro antes de apresentar o resumo final para confirmação.",
-      );
-    } else if (estado.patient.identified && estado.patient.id) {
-      linhas.push(
-        `- O cadastro do paciente${estado.patient.first_name ? ` (${estado.patient.first_name})` : ""} JÁ existe e está vinculado a esta conversa. Consulte sua completude; NÃO peça dados preenchidos e NÃO crie cadastro novo.`,
-      );
-    } else if (faltam.length === CAMPOS_OBRIGATORIOS.length) {
-      linhas.push(
-        `- Peça os dados obrigatórios do paciente em UMA única mensagem, começando por algo como "Perfeito! 😊 Para prosseguirmos com o agendamento, preciso de alguns dados do paciente:" e liste: ${rotulos(faltam)}.`,
-        "- Só inicie a coleta depois de definir e confirmar procedimento, profissional e vaga. Aproveite o telefone do WhatsApp. CPF, endereço, e-mail e convênio são opcionais: não solicite.",
-      );
-    } else {
-      linhas.push(
-        `- O paciente JÁ informou: ${CAMPOS_OBRIGATORIOS.filter((c) => !faltam.includes(c))
-          .map((c) => ROTULO[c])
-          .join(
-            ", ",
-          )}. Peça SOMENTE o que falta: ${rotulos(faltam)} (ex.: "Obrigada! Agora só preciso da sua ${ROTULO[faltam[0]!]}.").`,
-        "- NÃO recomece a coleta e NÃO repita perguntas já respondidas.",
-      );
-    }
-    linhas.push(
-      "- CADASTRO ÚNICO: se já existir paciente correspondente, reutilize o cadastro encontrado. Nunca crie um segundo cadastro para a mesma pessoa.",
-    );
-  }
-
-  if (definidos.length > 0) {
-    linhas.push(`- Já definido nesta conversa, NÃO pergunte de novo: ${definidos.join(" | ")}.`);
-  } else {
-    linhas.push(
-      "- Se o paciente já disser procedimento, médico, unidade, data ou período na própria mensagem, aproveite essas informações; pergunte apenas o que ainda faltar.",
-    );
-  }
-
-  return linhas.join("\n");
 }

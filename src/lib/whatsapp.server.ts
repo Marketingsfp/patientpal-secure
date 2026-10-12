@@ -705,52 +705,45 @@ async function gerarRespostaNinaInterno(
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
 
-  const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const telefoneNorm = normalizarTelefoneRemetente(telefoneRemetente ?? null);
   // O telefone entra em um filtro de texto do banco: só o formato da Meta é aceito.
   const telefoneHistorico = telefoneParaFiltro(telefoneRemetente);
   if (telefoneRemetente && !telefoneHistorico)
     console.warn("[nina] telefone do remetente fora do formato esperado; histórico não consultado");
 
-  const [medR, dispR, procR, cliR, pacienteInfo, medEspR, espR, estadoId, histR] =
-    await Promise.all([
-      // FONTE ÚNICA (catálogo publicado): médicos, escalas e procedimentos da
-      // tabela operacional NÃO entram mais no prompt. O que não estiver
-      // publicado no catálogo é desconhecido e vira encaminhamento humano.
-      Promise.resolve({ data: [] as any[] }),
-      Promise.resolve({ data: [] as any[] }),
-      Promise.resolve({ data: [] as any[] }),
-      supabaseAdmin
-        .from("clinicas")
-        .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
-        .eq("id", clinicaId)
-        .maybeSingle(),
-      // Sem busca de paciente por telefone, CPF ou nome em nenhum ambiente
-      // (regra da clínica, 25/09/2026): a identidade vem só do cadastro já
-      // ligado à conversa (número do WhatsApp, nome completo e nascimento).
-      Promise.resolve(null as import("@/lib/nina/identidade-paciente").BuscaIdentidade | null),
-      Promise.resolve({ data: [] as any[] }),
-      Promise.resolve({ data: [] as any[] }),
-      carregarEstadoIdentidade(
-        clinicaId,
-        telefoneRemetente ? String(telefoneRemetente) : null,
-        opcoes?.conversaId,
-      ),
-      telefoneHistorico
-        ? supabaseAdmin
-            .from("whatsapp_mensagens")
-            .select(
-              "id, direction, body, created_at, conversa_id, status, is_teste, enviada_por, tipo, transcricao",
-            )
-            .eq("clinica_id", clinicaId)
-            // Marcadores de sistema (divisores de ciclo, avisos internos) são
-            // só para leitura humana: nunca entram no contexto do modelo.
-            .neq("status", "system")
-            .or(`from_number.eq.${telefoneHistorico},to_number.eq.${telefoneHistorico}`)
-            .order("created_at", { ascending: false })
-            .limit(10)
-        : Promise.resolve({ data: [] as any[] }),
-    ]);
+  // FONTE ÚNICA (catálogo publicado): médicos, escalas, especialidades e
+  // procedimentos da tabela operacional NÃO entram no prompt. A Nina consulta
+  // o catálogo por ferramenta; o que não estiver publicado vira encaminhamento.
+  const [cliR, pacienteInfo, estadoId, histR] = await Promise.all([
+    supabaseAdmin
+      .from("clinicas")
+      .select("nome, base_importada, endereco, cidade, estado, cep, telefone, email")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+    // Sem busca de paciente por telefone, CPF ou nome em nenhum ambiente
+    // (regra da clínica, 25/09/2026): a identidade vem só do cadastro já
+    // ligado à conversa (número do WhatsApp, nome completo e nascimento).
+    Promise.resolve(null as import("@/lib/nina/identidade-paciente").BuscaIdentidade | null),
+    carregarEstadoIdentidade(
+      clinicaId,
+      telefoneRemetente ? String(telefoneRemetente) : null,
+      opcoes?.conversaId,
+    ),
+    telefoneHistorico
+      ? supabaseAdmin
+          .from("whatsapp_mensagens")
+          .select(
+            "id, direction, body, created_at, conversa_id, status, is_teste, enviada_por, tipo, transcricao",
+          )
+          .eq("clinica_id", clinicaId)
+          // Marcadores de sistema (divisores de ciclo, avisos internos) são
+          // só para leitura humana: nunca entram no contexto do modelo.
+          .neq("status", "system")
+          .or(`from_number.eq.${telefoneHistorico},to_number.eq.${telefoneHistorico}`)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
 
   const baseImportada = (cliR.data as any)?.base_importada === true;
   const clinicaRow = (cliR.data ?? null) as {
@@ -771,117 +764,7 @@ async function gerarRespostaNinaInterno(
     .filter((p) => p && String(p).trim())
     .join(" - ");
 
-  const { data: agendasData } = await supabaseAdmin
-    .from("medico_agendas")
-    .select("id, medico_id, nome, ativo")
-    .eq("clinica_id", clinicaId);
-  const agendaNome = new Map<string, string>();
-  for (const a of (agendasData ?? []) as any[]) agendaNome.set(a.id, a.nome);
-  const agendasPorMedico = new Map<string, number>();
-  for (const a of (agendasData ?? []) as any[]) {
-    if (a.ativo === false) continue;
-    agendasPorMedico.set(a.medico_id, (agendasPorMedico.get(a.medico_id) ?? 0) + 1);
-  }
-
-  // Especialidades por médico
-  const espNomePorId = new Map<string, string>();
-  for (const e of (espR.data ?? []) as any[]) espNomePorId.set(e.id, e.nome);
-  const medEspNomes = new Map<string, string[]>();
-  for (const r of (medEspR.data ?? []) as any[]) {
-    const nome = espNomePorId.get(r.especialidade_id);
-    if (!nome) continue;
-    const arr = medEspNomes.get(r.medico_id) ?? [];
-    arr.push(nome);
-    medEspNomes.set(r.medico_id, arr);
-  }
-
-  const medicosLista = (medR.data ?? []).map((m: any) => {
-    const disps = (dispR.data ?? []).filter((d: any) => d.medico_id === m.id);
-    const temMultiplas = (agendasPorMedico.get(m.id) ?? 0) > 1;
-    const dias = new Set<number>(disps.map((d: any) => Number(d.dia_semana)));
-
-    // Agrupa por agenda → dia, mescla turnos sobrepostos/contíguos
-    const porAgenda = new Map<string, Map<number, Array<[string, string]>>>();
-    for (const d of disps) {
-      const ini = String(d.hora_inicio ?? "").slice(0, 5);
-      const fim = String(d.hora_fim ?? "").slice(0, 5);
-      if (!ini || !fim) continue;
-      const ag = d.agenda_id ?? "_";
-      if (!porAgenda.has(ag)) porAgenda.set(ag, new Map());
-      const porDia = porAgenda.get(ag)!;
-      const arr = porDia.get(d.dia_semana) ?? [];
-      arr.push([ini, fim]);
-      porDia.set(d.dia_semana, arr);
-    }
-
-    const formatPorDia = (porDia: Map<number, Array<[string, string]>>) => {
-      const partes: string[] = [];
-      for (const [dia, turnos] of [...porDia.entries()].sort((a, b) => a[0] - b[0])) {
-        turnos.sort((a, b) => a[0].localeCompare(b[0]));
-        const merged: Array<[string, string]> = [];
-        for (const [ini, fim] of turnos) {
-          const last = merged[merged.length - 1];
-          if (last && ini <= last[1]) {
-            if (fim > last[1]) last[1] = fim;
-          } else {
-            merged.push([ini, fim]);
-          }
-        }
-        partes.push(`${DIAS[dia] ?? "?"} ${merged.map(([a, b]) => `${a}-${b}`).join(" e ")}`);
-      }
-      return partes.join(", ");
-    };
-
-    const esps = medEspNomes.get(m.id) ?? [];
-    const sufixoEsp = esps.length ? ` (${esps.join(", ")})` : "";
-
-    if (!temMultiplas) {
-      // Junta tudo num único conjunto
-      const unico = new Map<number, Array<[string, string]>>();
-      for (const porDia of porAgenda.values()) {
-        for (const [dia, turnos] of porDia.entries()) {
-          const arr = unico.get(dia) ?? [];
-          arr.push(...turnos);
-          unico.set(dia, arr);
-        }
-      }
-      const horarios = formatPorDia(unico);
-      return {
-        id: m.id,
-        nome: m.nome,
-        esps,
-        dias,
-        texto: `- ${m.nome}${sufixoEsp}${horarios ? ` | ${horarios}` : ""}`,
-      };
-    }
-
-    // Mostra separado por agenda
-    const blocos: string[] = [];
-    for (const [ag, porDia] of porAgenda.entries()) {
-      const nome = agendaNome.get(ag) ?? "Agenda";
-      const horarios = formatPorDia(porDia);
-      if (horarios) blocos.push(`    • ${nome}: ${horarios}`);
-    }
-    return {
-      id: m.id,
-      nome: m.nome,
-      esps,
-      dias,
-      texto: `- ${m.nome}${sufixoEsp}${blocos.length ? `\n${blocos.join("\n")}` : ""}`,
-    };
-  });
-
-  // Nada de lista de médicos, especialidades ou tabela de preços no prompt: a
-  // única fonte factual é o catálogo publicado, consultado por ferramenta.
-  const SEM_FONTE_NO_PROMPT =
-    "(não disponível aqui — consulte SEMPRE a ferramenta consultar_cadastro. Sem registro PUBLICADO, não responda por conhecimento próprio: encaminhe para atendimento humano com solicitar_atendente_humano.)";
-  const medicos = SEM_FONTE_NO_PROMPT;
-  const procs = SEM_FONTE_NO_PROMPT;
-  const espsCadastradasTexto = SEM_FONTE_NO_PROMPT;
-  void medicosLista;
-
   const textoNorm = normalizar(mensagemPaciente);
-  const blocoFoco = "";
 
   /* ---------- Confirmação de identidade (uma vez por conversa) ---------- */
   // FASE 4 — o telefone só traz CANDIDATOS. A pessoa é reconhecida quando o
@@ -914,14 +797,6 @@ async function gerarRespostaNinaInterno(
   );
 
   const primeiroNome = primeiroNomeSeguro(identidadePaciente);
-  const blocoIdentidade =
-    identidadePaciente.status === "CONFIRMED"
-      ? `IDENTIDADE: já confirmada nesta conversa${primeiroNome ? ` (${primeiroNome})` : ""}. NUNCA volte a perguntar quem é a pessoa; trate-a pelo primeiro nome.`
-      : identidadePaciente.status === "AMBIGUOUS"
-        ? `IDENTIDADE: este número está ligado a MAIS DE UM cadastro. NÃO chame a pessoa por nenhum desses nomes, não use dados, convênio, contrato ou histórico de nenhum deles. Peça, em uma linha, o nome completo de quem está falando.`
-        : identidadePaciente.status === "UNIQUE_CANDIDATE"
-          ? `IDENTIDADE: existe um cadastro compatível com este número, mas NÃO está confirmado. Não trate a pessoa por esse nome nem use dados desse cadastro. Se for necessário para a ação pedida, peça a confirmação do nome em uma linha, no fim da resposta.`
-          : `IDENTIDADE: ainda não identificada. Você pode confirmar o nome UMA ÚNICA VEZ nesta conversa, e apenas se for necessário. Nunca abra a resposta com a confirmação: responda primeiro o que foi perguntado e, se ainda precisar, peça a confirmação no fim, em uma linha.`;
 
   // SESSÃO DA NINA (memória transitória com TTL deslizante, padrão 4h).
   // Encerrar a conversa NÃO apaga histórico, CRM, agendamentos nem Base: o que
