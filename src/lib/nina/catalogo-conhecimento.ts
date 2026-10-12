@@ -85,7 +85,10 @@ export function unidadeDoProfissional(p: ProfissionalPublicado): string | null {
 
 /** Estrutura publicada sem a cópia do formato antigo (dados substituídos não vão à Nina). */
 function estruturaParaNina(v: unknown) {
-  const { formato_antigo: _antigo, ...estrutura } = lerEstrutura(v);
+  // `atendimentos` crus repetiriam `atendimentos_publicados` (a mesma informação
+  // já traduzida) e multiplicariam o tamanho do retorno; regras de agendamento
+  // leem o cadastro do banco, não este registro.
+  const { formato_antigo: _antigo, atendimentos: _atendimentos, ...estrutura } = lerEstrutura(v);
   return estrutura;
 }
 

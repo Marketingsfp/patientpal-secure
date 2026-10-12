@@ -84,12 +84,19 @@ export function removerPerguntaDeAgendamento(texto: string): string {
   const blocos = texto.trimEnd().split(/\n{2,}/);
   const assunto =
     /(primeir[oa] (?:horario|vaga|disponivel)|escolher|qual (?:dos|das|desses|dessas) profissiona|profissional prefere|deseja (?:agendar|marcar)|quer (?:agendar|marcar)|gostaria de (?:agendar|marcar)|disponibilidade|encaminh|posso (?:agendar|marcar|verificar))/;
-  // Remove só perguntas finais sobre marcar; nunca esvazia a resposta.
-  // Corta só o trecho final da pergunta; quebras de linha do resto ficam intactas.
+  // Oferta de transferência escrita como afirmação ("posso transferir a
+  // conversa…."): seria uma segunda oferta ao lado da pergunta do sistema.
+  const ofertaAfirmada =
+    /\b(?:posso|vou|irei|podemos|vamos)\s+(?:te\s+|lhe\s+)?(?:transferir|encaminhar|passar|direcionar)\b|\b(?:nossa equipe|a equipe|um atendente|atendente)\b.*\b(?:verificar|confirmar|concluir|dar continuidade)\b/;
+  // Remove só perguntas ou ofertas finais sobre marcar; nunca esvazia a resposta.
+  // Corta só o trecho final; quebras de linha do resto ficam intactas.
   for (;;) {
     const ultimo = blocos[blocos.length - 1]!;
-    const final = /([^.!?\n]*\?)\s*$/.exec(ultimo);
-    if (!final || !assunto.test(normalizarRespostaInformal(final[1]!))) break;
+    const final = /([^.!?\n]*[.!?])\s*$/.exec(ultimo);
+    if (!final) break;
+    const frase = normalizarRespostaInformal(final[1]!);
+    const remover = final[1]!.endsWith("?") ? assunto.test(frase) : ofertaAfirmada.test(frase);
+    if (!remover) break;
     const resto = ultimo.slice(0, final.index).trimEnd();
     if (resto) {
       blocos[blocos.length - 1] = resto;
