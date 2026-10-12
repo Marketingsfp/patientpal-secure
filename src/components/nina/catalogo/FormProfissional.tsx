@@ -1,4 +1,13 @@
-import { EstruturaCatalogoEditor } from "./EstruturaCatalogoEditor";
+import {
+  CamposOrganizacao,
+  CampoEncaminhamentoHumano,
+  CampoNinaPodeAgendar,
+  CampoSituacaoConvenios,
+  ComplementosAtendimentos,
+  EstruturaCatalogoEditor,
+} from "./EstruturaCatalogoEditor";
+import { RotuloAjuda, SecaoCatalogo } from "./AjudaCatalogo";
+import { useCatalogoOrganizado } from "./catalogo-organizado";
 import { PedidoMedicoEditor } from "./PedidoMedicoEditor";
 import {
   estruturaVazia,
@@ -27,7 +36,7 @@ import {
 } from "@/components/ui/accordion";
 import { Plus, Trash2 } from "lucide-react";
 import { DIAS_SEMANA, RECORRENCIAS, profissionalSchema } from "@/lib/nina/catalogo";
-import { MODALIDADES_ATENDIMENTO } from "@/lib/nina/modalidade-atendimento";
+import { MODALIDADES_ATENDIMENTO, interpretarModalidade } from "@/lib/nina/modalidade-atendimento";
 import { FormasPagamentoEditor, type LinhaPagamento } from "./FormasPagamentoEditor";
 import type { OpcoesCatalogo } from "./FormServico";
 
@@ -147,6 +156,14 @@ export function profissionalParaEnvio(e: EstadoProfissional, opcoes: OpcoesCatal
   });
 }
 
+/** Como a Nina interpreta uma modalidade antiga, fora da lista confirmada. */
+function rotuloModalidadeLegada(valor: string): string {
+  const m = interpretarModalidade(valor);
+  return m && m !== "nao_definida"
+    ? `Cadastro atual: ${valor} — a Nina trata como “${MODALIDADES_ATENDIMENTO[m]}”`
+    : `Cadastro atual: ${valor} — a Nina trata como sem modalidade`;
+}
+
 export function FormProfissional({
   estado,
   onChange,
@@ -158,312 +175,415 @@ export function FormProfissional({
   opcoes: OpcoesCatalogo;
   somenteLeitura?: boolean;
 }) {
+  const organizado = useCatalogoOrganizado();
   const set = (patch: Partial<EstadoProfissional>) => onChange({ ...estado, ...patch });
   const setHorario = (i: number, patch: Partial<LinhaHorario>) =>
     set({ horarios: estado.horarios.map((h, idx) => (idx === i ? { ...h, ...patch } : h)) });
 
-  return (
-    <div className="space-y-4">
-      <EstruturaCatalogoEditor
-        valor={estado.estrutura}
-        onChange={(estrutura) => set({ estrutura })}
-        tipo="profissional"
-        atendimento={"Consulta"}
-        conteudo={estado.observacao_publica}
-        profissional={estado.nome}
-        somenteLeitura={somenteLeitura}
-        onOrganizar={(observacao_publica) => set({ observacao_publica })}
+  const estrutura = {
+    valor: estado.estrutura,
+    onChange: (e: EstruturaCatalogo) => set({ estrutura: e }),
+    somenteLeitura,
+  };
+  const atendimentos = {
+    ...estrutura,
+    conteudo: estado.observacao_publica,
+    profissional: estado.nome,
+    atendimento: "Consulta",
+    onOrganizar: (observacao_publica: string) => set({ observacao_publica }),
+  };
+
+  const pedidoMedico = (
+    <PedidoMedicoEditor
+      valor={estado.estrutura.pedido_medico}
+      somenteLeitura={somenteLeitura}
+      onChange={(pedido_medico) => set({ estrutura: { ...estado.estrutura, pedido_medico } })}
+    />
+  );
+  const nome = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="nome_profissional">Nome do profissional *</RotuloAjuda>
+      <CampoTextoCatalogo
+        value={estado.nome}
+        disabled={somenteLeitura}
+        onChange={(e) => set({ nome: e.target.value })}
       />
-      <PedidoMedicoEditor
-        valor={estado.estrutura.pedido_medico}
-        somenteLeitura={somenteLeitura}
-        onChange={(pedido_medico) => set({ estrutura: { ...estado.estrutura, pedido_medico } })}
+    </div>
+  );
+  const vinculo = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="vinculo_medico">Vincular ao cadastro do sistema</RotuloAjuda>
+      <SearchableSelect
+        options={opcoes.medicos.map((m) => ({ value: m.id, label: m.nome }))}
+        value={estado.medico_id ?? ""}
+        disabled={somenteLeitura}
+        placeholder="Opcional"
+        onChange={(v) => {
+          const m = opcoes.medicos.find((x) => x.id === v);
+          set({ medico_id: v || null, nome: estado.nome || (m?.nome ?? "") });
+        }}
       />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label>Nome do profissional *</Label>
-          <CampoTextoCatalogo
-            value={estado.nome}
-            disabled={somenteLeitura}
-            onChange={(e) => set({ nome: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label>Vincular ao cadastro do sistema</Label>
-          <SearchableSelect
-            options={opcoes.medicos.map((m) => ({ value: m.id, label: m.nome }))}
-            value={estado.medico_id ?? ""}
-            disabled={somenteLeitura}
-            placeholder="Opcional"
-            onChange={(v) => {
-              const m = opcoes.medicos.find((x) => x.id === v);
-              set({ medico_id: v || null, nome: estado.nome || (m?.nome ?? "") });
-            }}
-          />
-          <p className="text-xs text-muted-foreground">
-            Para copiar os dados da origem, use “Sincronizar com Clínica OS” na lista. O vínculo não
-            atualiza os campos sozinho.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label>Especialidades</Label>
-          <SearchableMultiSelect
-            options={opcoes.especialidades.map((e) => ({ value: e.id, label: e.nome }))}
-            value={estado.especialidades}
-            disabled={somenteLeitura}
-            placeholder="Selecione uma ou mais"
-            onChange={(v) => set({ especialidades: v })}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label>Unidade</Label>
-          <SearchableSelect
-            options={opcoes.unidades.map((u) => ({ value: u.id, label: u.nome }))}
-            value={estado.unidade_id ?? ""}
-            disabled={somenteLeitura}
-            placeholder="Opcional"
-            onChange={(v) => set({ unidade_id: v || null })}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label>Atende no consultório</Label>
-          <Select
-            value={estado.atende_consultorio || "nao_informado"}
-            disabled={somenteLeitura}
-            onValueChange={(v) =>
-              set({
-                atende_consultorio:
-                  v === "nao_informado" ? "" : (v as EstadoProfissional["atende_consultorio"]),
-              })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="nao_informado">Não informado</SelectItem>
-              <SelectItem value="sim">Sim</SelectItem>
-              <SelectItem value="nao">Não</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label>Modalidade de atendimento</Label>
-          <select
-            aria-label="Modalidade de atendimento"
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={estado.tipo_atendimento}
-            disabled={somenteLeitura}
-            onChange={(e) => set({ tipo_atendimento: e.target.value })}
-          >
-            <option value="">Não informado</option>
-            {!Object.values(MODALIDADES_ATENDIMENTO).includes(estado.tipo_atendimento as never) &&
-              estado.tipo_atendimento && (
-                <option value={estado.tipo_atendimento}>
-                  Ainda não confirmada — cadastro atual: {estado.tipo_atendimento}
-                </option>
-              )}
-            {Object.values(MODALIDADES_ATENDIMENTO).map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Registra a modalidade nesta base. Publicar não altera a orientação nem a confirmação de
-            atendimento da Maria.
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label>Convênios que atende</Label>
-        <SearchableMultiSelect
-          options={opcoes.convenios.map((c) => ({ value: c.id, label: c.nome }))}
-          value={estado.convenios}
-          disabled={somenteLeitura}
-          placeholder="Selecione os convênios"
-          onChange={(v) => set({ convenios: v })}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Horários por dia da semana</Label>
-        {estado.horarios.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            Nenhum horário informado. Dia sem cadastro não significa dia fechado.
-          </p>
-        )}
-        {estado.horarios.map((h, i) => (
-          <div key={i} className="rounded-lg border p-3 space-y-2">
-            <div className="grid gap-2 sm:grid-cols-4">
-              <Select
-                value={h.dia}
-                disabled={somenteLeitura}
-                onValueChange={(v) => setHorario(i, { dia: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Dia" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DIAS_SEMANA.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                aria-label="Início do atendimento"
-                type="time"
-                value={h.inicio}
-                disabled={somenteLeitura}
-                onChange={(e) => setHorario(i, { inicio: e.target.value })}
-              />
-              <Input
-                aria-label="Fim do atendimento (não é limite de chegada)"
-                type="time"
-                value={h.fim}
-                disabled={somenteLeitura}
-                onChange={(e) => setHorario(i, { fim: e.target.value })}
-              />
-              <Select
-                value={h.recorrencia}
-                disabled={somenteLeitura}
-                onValueChange={(v) => setHorario(i, { recorrencia: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Recorrência" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RECORRENCIAS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <CampoTextoCatalogo
-                value={h.observacao}
-                disabled={somenteLeitura}
-                placeholder="Observação do horário (opcional)"
-                onChange={(e) => setHorario(i, { observacao: e.target.value })}
-              />
-              {!somenteLeitura && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => set({ horarios: estado.horarios.filter((_, idx) => idx !== i) })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
+      <p className="text-xs text-muted-foreground">
+        Para copiar os dados da origem, use “Sincronizar com Clínica OS” na lista. O vínculo não
+        atualiza os campos sozinho.
+      </p>
+    </div>
+  );
+  const especialidades = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="especialidades">Especialidades</RotuloAjuda>
+      <SearchableMultiSelect
+        options={opcoes.especialidades.map((e) => ({ value: e.id, label: e.nome }))}
+        value={estado.especialidades}
+        disabled={somenteLeitura}
+        placeholder="Selecione uma ou mais"
+        onChange={(v) => set({ especialidades: v })}
+      />
+    </div>
+  );
+  const unidade = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="unidade">Unidade</RotuloAjuda>
+      <SearchableSelect
+        options={opcoes.unidades.map((u) => ({ value: u.id, label: u.nome }))}
+        value={estado.unidade_id ?? ""}
+        disabled={somenteLeitura}
+        placeholder="Opcional"
+        onChange={(v) => set({ unidade_id: v || null })}
+      />
+    </div>
+  );
+  const atendeConsultorio = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="atende_consultorio">Atende no consultório</RotuloAjuda>
+      <Select
+        value={estado.atende_consultorio || "nao_informado"}
+        disabled={somenteLeitura}
+        onValueChange={(v) =>
+          set({
+            atende_consultorio:
+              v === "nao_informado" ? "" : (v as EstadoProfissional["atende_consultorio"]),
+          })
+        }
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="nao_informado">Não informado</SelectItem>
+          <SelectItem value="sim">Sim</SelectItem>
+          <SelectItem value="nao">Não</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+  const modalidade = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="modalidade_profissional" htmlFor="modalidade-profissional">
+        Modalidade de atendimento
+      </RotuloAjuda>
+      <select
+        id="modalidade-profissional"
+        aria-label="Modalidade de atendimento"
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        value={estado.tipo_atendimento}
+        disabled={somenteLeitura}
+        onChange={(e) => set({ tipo_atendimento: e.target.value })}
+      >
+        <option value="">Não informado</option>
+        {!Object.values(MODALIDADES_ATENDIMENTO).includes(estado.tipo_atendimento as never) &&
+          estado.tipo_atendimento && (
+            <option value={estado.tipo_atendimento}>
+              {rotuloModalidadeLegada(estado.tipo_atendimento)}
+            </option>
+          )}
+        {Object.values(MODALIDADES_ATENDIMENTO).map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
         ))}
-        {!somenteLeitura && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              set({
-                horarios: [
-                  ...estado.horarios,
-                  {
-                    dia: DIAS_SEMANA[0],
-                    inicio: "",
-                    fim: "",
-                    recorrencia: "Toda semana",
-                    observacao: "",
-                  },
-                ],
-              })
-            }
-          >
-            <Plus className="mr-2 h-4 w-4" /> Adicionar horário
-          </Button>
-        )}
-      </div>
-
+      </select>
+      <p className="text-xs text-muted-foreground">
+        Define como a Nina conduz a consulta quando o atendimento não tem modalidade própria. Sem
+        modalidade, a Nina informa e encaminha à equipe.
+      </p>
+    </div>
+  );
+  const convenios = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="convenios">Convênios que atende</RotuloAjuda>
+      <SearchableMultiSelect
+        options={opcoes.convenios.map((c) => ({ value: c.id, label: c.nome }))}
+        value={estado.convenios}
+        disabled={somenteLeitura}
+        placeholder="Selecione os convênios"
+        onChange={(v) => set({ convenios: v })}
+      />
+    </div>
+  );
+  const horarios = (
+    <div className="space-y-2">
+      <RotuloAjuda chave="horarios_profissional">Horários por dia da semana</RotuloAjuda>
+      {estado.horarios.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Nenhum horário informado. Dia sem cadastro não significa dia fechado.
+        </p>
+      )}
+      {estado.horarios.map((h, i) => (
+        <div key={i} className="rounded-lg border p-3 space-y-2">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <Select
+              value={h.dia}
+              disabled={somenteLeitura}
+              onValueChange={(v) => setHorario(i, { dia: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Dia" />
+              </SelectTrigger>
+              <SelectContent>
+                {DIAS_SEMANA.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              aria-label="Início do atendimento"
+              type="time"
+              value={h.inicio}
+              disabled={somenteLeitura}
+              onChange={(e) => setHorario(i, { inicio: e.target.value })}
+            />
+            <Input
+              aria-label="Fim do atendimento (não é limite de chegada)"
+              type="time"
+              value={h.fim}
+              disabled={somenteLeitura}
+              onChange={(e) => setHorario(i, { fim: e.target.value })}
+            />
+            <Select
+              value={h.recorrencia}
+              disabled={somenteLeitura}
+              onValueChange={(v) => setHorario(i, { recorrencia: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Recorrência" />
+              </SelectTrigger>
+              <SelectContent>
+                {RECORRENCIAS.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <CampoTextoCatalogo
+              value={h.observacao}
+              disabled={somenteLeitura}
+              placeholder="Observação do horário (opcional)"
+              onChange={(e) => setHorario(i, { observacao: e.target.value })}
+            />
+            {!somenteLeitura && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => set({ horarios: estado.horarios.filter((_, idx) => idx !== i) })}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+      {!somenteLeitura && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            set({
+              horarios: [
+                ...estado.horarios,
+                {
+                  dia: DIAS_SEMANA[0],
+                  inicio: "",
+                  fim: "",
+                  recorrencia: "Toda semana",
+                  observacao: "",
+                },
+              ],
+            })
+          }
+        >
+          <Plus className="mr-2 h-4 w-4" /> Adicionar horário
+        </Button>
+      )}
+    </div>
+  );
+  const observacaoPublica = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="observacao_publica">Informações públicas dos atendimentos</RotuloAjuda>
+      <Textarea
+        rows={2}
+        value={estado.observacao_publica}
+        disabled={somenteLeitura}
+        onChange={(e) => set({ observacao_publica: e.target.value })}
+      />
+    </div>
+  );
+  const avisoSemDatas =
+    estado.aviso_dia.trim() !== "" && !estado.aviso_valido_de && !estado.aviso_valido_ate;
+  const aviso = (
+    <div className="rounded-lg border p-3 space-y-3">
       <div className="space-y-1">
-        <Label>Informações públicas dos atendimentos</Label>
+        <RotuloAjuda chave="aviso_dia">Aviso do dia</RotuloAjuda>
         <Textarea
           rows={2}
-          value={estado.observacao_publica}
+          value={estado.aviso_dia}
           disabled={somenteLeitura}
-          onChange={(e) => set({ observacao_publica: e.target.value })}
+          placeholder="Ex.: hoje o atendimento começa às 10:00"
+          onChange={(e) => set({ aviso_dia: e.target.value })}
         />
       </div>
-
-      <div className="rounded-lg border p-3 space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
-          <Label>Aviso do dia (temporário)</Label>
-          <Textarea
-            rows={2}
-            value={estado.aviso_dia}
+          <Label>Válido de</Label>
+          <DateInputBR
+            value={estado.aviso_valido_de}
             disabled={somenteLeitura}
-            placeholder="Ex.: hoje o atendimento começa às 10:00"
-            onChange={(e) => set({ aviso_dia: e.target.value })}
+            onChange={(e) => set({ aviso_valido_de: e.target.value })}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>Válido de</Label>
-            <DateInputBR
-              value={estado.aviso_valido_de}
-              disabled={somenteLeitura}
-              onChange={(e) => set({ aviso_valido_de: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Válido até</Label>
-            <DateInputBR
-              value={estado.aviso_valido_ate}
-              disabled={somenteLeitura}
-              onChange={(e) => set({ aviso_valido_ate: e.target.value })}
-            />
-          </div>
+        <div className="space-y-1">
+          <Label>Válido até</Label>
+          <DateInputBR
+            value={estado.aviso_valido_ate}
+            disabled={somenteLeitura}
+            onChange={(e) => set({ aviso_valido_ate: e.target.value })}
+          />
         </div>
-        <p className="text-xs text-muted-foreground">
-          Fora do período informado o aviso deixa de valer e não vira regra permanente.
-        </p>
       </div>
+      <p className="text-xs text-muted-foreground">
+        A Nina só informa o aviso dentro do período. Sem datas, ele vale até ser apagado.
+      </p>
+      {avisoSemDatas && (
+        <p className="text-xs text-amber-600">
+          Este aviso não tem datas: a Nina vai informá-lo até que ele seja apagado.
+        </p>
+      )}
+    </div>
+  );
+  const formasPagamento = (
+    <FormasPagamentoEditor
+      linhas={estado.formas_pagamento}
+      somenteLeitura={somenteLeitura}
+      onChange={(l) => set({ formas_pagamento: l })}
+    />
+  );
+  const notaInterna = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="nota_interna">Nota interna (somente equipe)</RotuloAjuda>
+      <Textarea
+        rows={6}
+        value={estado.nota_interna}
+        disabled={somenteLeitura}
+        onChange={(e) => set({ nota_interna: e.target.value })}
+      />
+      <p className="text-xs text-muted-foreground">
+        Visível apenas para a equipe. Não entra no conteúdo enviado à Nina.
+      </p>
+    </div>
+  );
+
+  if (organizado)
+    return (
+      <div className="space-y-4">
+        <SecaoCatalogo titulo="Identificação">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {nome}
+            {vinculo}
+            {especialidades}
+            {unidade}
+          </div>
+        </SecaoCatalogo>
+        <SecaoCatalogo
+          titulo="Regras da Nina"
+          descricao="Decidem se a Nina agenda, encaminha ou pede documentos para este profissional."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            {modalidade}
+            <CampoNinaPodeAgendar {...estrutura} />
+            <CampoEncaminhamentoHumano {...estrutura} />
+            {pedidoMedico}
+          </div>
+        </SecaoCatalogo>
+        <SecaoCatalogo titulo="Horários">
+          {horarios}
+          {aviso}
+        </SecaoCatalogo>
+        <SecaoCatalogo titulo="Convênios e consultório">
+          {convenios}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CampoSituacaoConvenios {...estrutura} />
+            {atendeConsultorio}
+          </div>
+        </SecaoCatalogo>
+        <SecaoCatalogo titulo="Valores">{formasPagamento}</SecaoCatalogo>
+        <SecaoCatalogo
+          titulo="Texto para o paciente e atendimentos"
+          descricao="A modalidade de cada atendimento fica aqui e tem prioridade sobre a do profissional."
+        >
+          {observacaoPublica}
+          <ComplementosAtendimentos {...atendimentos} />
+        </SecaoCatalogo>
+        <SecaoCatalogo titulo="Organização interna" descricao="Não muda o atendimento da Nina.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CamposOrganizacao {...estrutura} tipo="profissional" />
+          </div>
+        </SecaoCatalogo>
+        <SecaoCatalogo titulo="Nota interna">{notaInterna}</SecaoCatalogo>
+      </div>
+    );
+
+  return (
+    <div className="space-y-4">
+      <EstruturaCatalogoEditor {...atendimentos} tipo="profissional" />
+      {pedidoMedico}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {nome}
+        {vinculo}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {especialidades}
+        {unidade}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {atendeConsultorio}
+        {modalidade}
+      </div>
+
+      {convenios}
+
+      {horarios}
+
+      {observacaoPublica}
+
+      {aviso}
 
       <Accordion type="multiple" defaultValue={["pagamento"]}>
         <AccordionItem value="pagamento">
           <AccordionTrigger>Formas de pagamento da consulta</AccordionTrigger>
-          <AccordionContent>
-            <FormasPagamentoEditor
-              linhas={estado.formas_pagamento}
-              somenteLeitura={somenteLeitura}
-              onChange={(l) => set({ formas_pagamento: l })}
-            />
-          </AccordionContent>
+          <AccordionContent>{formasPagamento}</AccordionContent>
         </AccordionItem>
       </Accordion>
 
-      <div className="space-y-1">
-        <Label>Nota interna (somente equipe)</Label>
-        <Textarea
-          rows={6}
-          value={estado.nota_interna}
-          disabled={somenteLeitura}
-          onChange={(e) => set({ nota_interna: e.target.value })}
-        />
-        <p className="text-xs text-muted-foreground">
-          Visível apenas para a equipe. Não entra no conteúdo enviado à Nina.
-        </p>
-      </div>
+      {notaInterna}
     </div>
   );
 }

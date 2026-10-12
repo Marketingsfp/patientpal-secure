@@ -4,6 +4,7 @@ import { BookOpen, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TextoCatalogo as Textarea } from "./TextoCatalogo";
+import { ComoLer } from "./AjudaCatalogo";
 import { gerarVariacoesCatalogoIA } from "@/lib/nina/catalogo.functions";
 import {
   juntarVariacoes,
@@ -96,6 +97,7 @@ export function DicionarioCatalogoEditor({
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <BookOpen className="h-4 w-4" aria-hidden="true" />
           Dicionário de formas de falar
+          <ComoLer chave="aliases" />
         </h3>
         {!somenteLeitura && (
           <Button

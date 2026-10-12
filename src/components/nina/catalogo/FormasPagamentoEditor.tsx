@@ -3,6 +3,7 @@ import { TextoCatalogo as Textarea, CampoTextoCatalogo } from "./TextoCatalogo";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Plus, Trash2 } from "lucide-react";
+import { ComoLer } from "./AjudaCatalogo";
 
 export type LinhaPagamento = {
   forma: string;
@@ -36,6 +37,7 @@ export function FormasPagamentoEditor({
 
   return (
     <div className="space-y-3">
+      <ComoLer chave="formas_pagamento" />
       <p className="text-sm text-muted-foreground">
         Pix e cartão têm o mesmo valor. Cadastre como Pix/cartão; mantenha dinheiro separado.
         Parcelamento, quando informado, aplica-se somente ao cartão.

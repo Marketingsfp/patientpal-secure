@@ -16,6 +16,9 @@ import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
 import { DicionarioCatalogoEditor } from "./DicionarioCatalogoEditor";
 import { MapaCamposCatalogo } from "./MapaCamposCatalogo";
 import { SincronizacaoCatalogo } from "./SincronizacaoCatalogo";
+import { CatalogoOrganizado } from "./catalogo-organizado";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { FLAG_CATALOGO_ESTRUTURADO } from "@/lib/nina/catalogo-ajuda";
 import {
   Dialog,
   DialogContent,
@@ -138,6 +141,8 @@ export function CatalogoNina({
   }, [busca, itens, tipo]);
   const [opcoes, setOpcoes] = useState<OpcoesCatalogo>(OPCOES_VAZIAS);
   const [aberto, setAberto] = useState(false);
+  // Layout por seções e botões “Como ler” (liberação por clínica).
+  const { enabled: catalogoOrganizado } = useClinicFeatureFlag(FLAG_CATALOGO_ESTRUTURADO);
   const [servico, setServico] = useState<EstadoServico>(servicoVazio);
   const [profissional, setProfissional] = useState<EstadoProfissional>(profissionalVazio);
 
@@ -814,100 +819,105 @@ export function CatalogoNina({
 
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent data-os-zap="true" className="oszap-base-dialog">
-          <DialogHeader>
-            <DialogTitle>
-              {titulo}
-              {fila.length > 1 && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  Registro {posicao + 1} de {fila.length}
-                </span>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          {avisos.length > 0 && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-              <p className="font-medium">Confira antes de salvar</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-                {avisos.map((a, i) => (
-                  <li key={i}>{a}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <DicionarioCatalogoEditor
-            key={`${tipo}-${tipo === "servico" ? servico.id : profissional.id}-${posicao}`}
-            clinicaId={clinicaId}
-            somenteLeitura={!podeEditar || salvando}
-            contexto={
-              tipo === "servico"
-                ? {
-                    tipo,
-                    nome: servico.nome,
-                    descricao: servico.descricao_publica,
-                    especialidades: [],
-                    aliases: servico.estrutura.aliases,
-                    abrangencia: servico.estrutura.abrangencia,
-                  }
-                : {
-                    tipo,
-                    nome: profissional.nome,
-                    descricao: profissional.observacao_publica,
-                    especialidades: [
-                      ...opcoes.especialidades
-                        .filter((e) => profissional.especialidades.includes(e.id))
-                        .map((e) => e.nome),
-                      ...profissional.especialidadesLivres,
-                    ],
-                    aliases: profissional.estrutura.aliases,
-                    abrangencia: profissional.estrutura.abrangencia,
-                  }
-            }
-            onChange={(aliases) =>
-              tipo === "servico"
-                ? setServico((atual) => ({ ...atual, estrutura: { ...atual.estrutura, aliases } }))
-                : setProfissional((atual) => ({
-                    ...atual,
-                    estrutura: { ...atual.estrutura, aliases },
-                  }))
-            }
-          />
-          {tipo === "servico" ? (
-            <FormServico
-              estado={servico}
-              onChange={setServico}
-              opcoes={opcoes}
-              somenteLeitura={!podeEditar}
+          <CatalogoOrganizado.Provider value={catalogoOrganizado}>
+            <DialogHeader>
+              <DialogTitle>
+                {titulo}
+                {fila.length > 1 && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    Registro {posicao + 1} de {fila.length}
+                  </span>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+            {avisos.length > 0 && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p className="font-medium">Confira antes de salvar</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {avisos.map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <DicionarioCatalogoEditor
+              key={`${tipo}-${tipo === "servico" ? servico.id : profissional.id}-${posicao}`}
+              clinicaId={clinicaId}
+              somenteLeitura={!podeEditar || salvando}
+              contexto={
+                tipo === "servico"
+                  ? {
+                      tipo,
+                      nome: servico.nome,
+                      descricao: servico.descricao_publica,
+                      especialidades: [],
+                      aliases: servico.estrutura.aliases,
+                      abrangencia: servico.estrutura.abrangencia,
+                    }
+                  : {
+                      tipo,
+                      nome: profissional.nome,
+                      descricao: profissional.observacao_publica,
+                      especialidades: [
+                        ...opcoes.especialidades
+                          .filter((e) => profissional.especialidades.includes(e.id))
+                          .map((e) => e.nome),
+                        ...profissional.especialidadesLivres,
+                      ],
+                      aliases: profissional.estrutura.aliases,
+                      abrangencia: profissional.estrutura.abrangencia,
+                    }
+              }
+              onChange={(aliases) =>
+                tipo === "servico"
+                  ? setServico((atual) => ({
+                      ...atual,
+                      estrutura: { ...atual.estrutura, aliases },
+                    }))
+                  : setProfissional((atual) => ({
+                      ...atual,
+                      estrutura: { ...atual.estrutura, aliases },
+                    }))
+              }
             />
-          ) : (
-            <FormProfissional
-              estado={profissional}
-              onChange={setProfissional}
-              opcoes={opcoes}
-              somenteLeitura={!podeEditar}
-            />
-          )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setAberto(false)} disabled={salvando}>
-              Cancelar
-            </Button>
-            {posicao + 1 < fila.length && (
-              <Button variant="ghost" onClick={proximoDaFila} disabled={salvando}>
-                Pular para o próximo
+            {tipo === "servico" ? (
+              <FormServico
+                estado={servico}
+                onChange={setServico}
+                opcoes={opcoes}
+                somenteLeitura={!podeEditar}
+              />
+            ) : (
+              <FormProfissional
+                estado={profissional}
+                onChange={setProfissional}
+                opcoes={opcoes}
+                somenteLeitura={!podeEditar}
+              />
+            )}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setAberto(false)} disabled={salvando}>
+                Cancelar
               </Button>
-            )}
-            {podeEditar && (
-              <>
-                <Button variant="secondary" onClick={() => salvar(false)} disabled={salvando}>
-                  {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Salvar rascunho
+              {posicao + 1 < fila.length && (
+                <Button variant="ghost" onClick={proximoDaFila} disabled={salvando}>
+                  Pular para o próximo
                 </Button>
-                <Button onClick={() => salvar(true)} disabled={salvando}>
-                  {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Publicar
-                </Button>
-              </>
-            )}
-          </DialogFooter>
+              )}
+              {podeEditar && (
+                <>
+                  <Button variant="secondary" onClick={() => salvar(false)} disabled={salvando}>
+                    {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar rascunho
+                  </Button>
+                  <Button onClick={() => salvar(true)} disabled={salvando}>
+                    {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Publicar
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </CatalogoOrganizado.Provider>
         </DialogContent>
       </Dialog>
     </div>
