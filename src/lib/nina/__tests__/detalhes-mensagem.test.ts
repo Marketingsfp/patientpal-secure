@@ -187,14 +187,16 @@ describe("leitura depois da retirada do motor de confiança", () => {
     );
   });
 
-  it("depois de 7 dias explica que a retenção apagou os registros", () => {
+  it("depois de 6 meses explica que a retenção apagou os registros", () => {
     const p = { ...semAviso(), execucao: null };
     const criada = Date.parse(String(p.mensagem!.created_at));
-    const antiga = montarLeituraDetalhesMensagem({ ...p, agora: criada + 8 * 86_400_000 });
+    const antiga = montarLeituraDetalhesMensagem({ ...p, agora: criada + 185 * 86_400_000 });
     expect(antiga.mensagem?.origem).toBe("Resposta da Nina sem registro técnico disponível");
     expect(antiga.alertas.join(" ")).toContain("apagados pela limpeza automática");
+    expect(antiga.alertas.join(" ")).toContain("guardados por 6 meses");
     expect(antiga.alertas.join(" ")).not.toContain("não vinculada");
-    const recente = montarLeituraDetalhesMensagem({ ...p, agora: criada + 86_400_000 });
+    // Antes da regra de 11/10/2026 o prazo era de 7 dias: 8 dias ainda está dentro.
+    const recente = montarLeituraDetalhesMensagem({ ...p, agora: criada + 8 * 86_400_000 });
     expect(recente.alertas.join(" ")).toContain("não vinculada a esta mensagem");
   });
 
