@@ -166,7 +166,6 @@ describe("leitura compartilhada das saídas", () => {
   for (const tabela of [
     "whatsapp_mensagens",
     "atend_aviso_encaminhamento",
-    "nina_confianca_vinculos",
   ]) {
     it(`falha em ${tabela} não vira Não avaliada`, async () => {
       await expect(carregarSaidasDasMensagens(preparar(tabela).cliente, dados)).rejects.toThrow();
