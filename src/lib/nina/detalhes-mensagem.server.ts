@@ -61,18 +61,8 @@ export async function carregarDetalhesMensagem(
   const conversaId = s(mensagem?.conversa_id) ?? alvo.conversaId ?? null;
   const [vinculosBrutos, avisosBrutos, eventosDiretos] = mensagemId
     ? await Promise.all([
-        ler(
-          db
-            .from("nina_confianca_vinculos")
-            .select(
-              "id, clinica_id, conversation_id, outgoing_message_id, decisao_id, execucao_id, representacao, estado, texto_hash, transporte_id, detalhe, created_at",
-            )
-            .eq("clinica_id", alvo.clinicaId)
-            .eq("outgoing_message_id", mensagemId)
-            .order("created_at", { ascending: false })
-            .limit(100),
-          "os vínculos de entrega",
-        ),
+        // Vínculos do motor de confiança desativado não são mais lidos.
+        Promise.resolve([] as RegistroDetalhes[]),
         ler(
           db
             .from("atend_aviso_encaminhamento")

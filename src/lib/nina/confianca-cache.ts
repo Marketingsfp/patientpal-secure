@@ -8,7 +8,7 @@
  *  - não piscar: o que já está em cache continua na tela enquanto o restante
  *    é buscado em segundo plano.
  */
-import type { ConfiancaDaMensagem } from "@/lib/nina/confianca.functions";
+import type { ConfiancaDaMensagem } from "@/lib/nina/confianca-tipos";
 
 export type EntradaCache = {
   /** null = execução sem snapshot gravado ("Não avaliada"). */

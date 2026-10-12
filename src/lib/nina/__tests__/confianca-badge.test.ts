@@ -9,7 +9,7 @@ import {
   ehAltaConfiancaComErro,
   rotuloConfianca,
 } from "@/lib/nina/confianca-badge";
-import type { ConfiancaDaMensagem } from "@/lib/nina/confianca.functions";
+import type { ConfiancaDaMensagem } from "@/lib/nina/confianca-tipos";
 
 function snapshot(over: Partial<ConfiancaDaMensagem>): ConfiancaDaMensagem {
   return {

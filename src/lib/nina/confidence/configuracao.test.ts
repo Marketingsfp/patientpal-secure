@@ -18,7 +18,7 @@ import {
 } from "./configuracao";
 import { POLITICA_PADRAO, VERSAO_POLITICA } from "./policy";
 import { rotuloConfianca, ehAltaConfiancaComErro } from "@/lib/nina/confianca-badge";
-import type { ConfiancaDaMensagem } from "@/lib/nina/confianca.functions";
+import type { ConfiancaDaMensagem } from "@/lib/nina/confianca-tipos";
 
 const humano = "user-1";
 

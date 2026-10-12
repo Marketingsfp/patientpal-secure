@@ -42,17 +42,8 @@ export async function carregarSaidasDasMensagens(
 
   const ids = linhas.map((m) => String(m["id"]));
 
-  // Vínculos de entrega: estado, representação e detalhe (origem/motivo).
-  const { data: vincRows, error: erroVinculos } = await db
-    .from("nina_confianca_vinculos")
-    .select(
-      "clinica_id, conversation_id, outgoing_message_id, decisao_id, execucao_id, representacao, estado, texto_hash, transporte_id, detalhe, created_at",
-    )
-    .eq("clinica_id", data.clinicaId)
-    .in("outgoing_message_id", ids)
-    .order("created_at", { ascending: false });
-  if (erroVinculos) throw new Error("Não foi possível carregar os vínculos de entrega.");
-  const vinculos = (vincRows ?? []) as unknown as Array<Record<string, unknown>>;
+  // Vínculos do motor de confiança desativado não são mais lidos.
+  const vinculos: Array<Record<string, unknown>> = [];
 
   // Avisos de encaminhamento: vínculo real com a mensagem entregue.
   const { data: avisoRows, error: erroAvisos } = await db

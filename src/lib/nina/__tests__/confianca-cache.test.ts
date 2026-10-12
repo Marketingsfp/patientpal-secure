@@ -12,7 +12,7 @@ import {
   TTL_CONFIANCA_MS,
   type CacheConfianca,
 } from "@/lib/nina/confianca-cache";
-import type { ConfiancaDaMensagem } from "@/lib/nina/confianca.functions";
+import type { ConfiancaDaMensagem } from "@/lib/nina/confianca-tipos";
 
 const CLINICA = "c1";
 
