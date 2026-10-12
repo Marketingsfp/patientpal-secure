@@ -1,4 +1,4 @@
-import { hojeBR } from "@/lib/date-utils";
+import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { confirmDialog } from "@/lib/confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -70,6 +70,37 @@ import QRCode from "qrcode";
 import { medicosComNomeLido } from "@/lib/orcamentos/leitura-pedido";
 import { escolhaSegura, ordenarServicosDoPedido } from "@/lib/orcamentos/correspondencia-servico";
 import { normalizarBusca } from "@/lib/busca/relevancia";
+
+/** Teto de linhas que o banco devolve por consulta (max-rows do PostgREST). */
+const LIMITE_ORCAMENTOS = 1000;
+
+/** Soma `dias` a uma data pura YYYY-MM-DD, sem passar pelo fuso do runtime. */
+function somarDias(dataYYYYMMDD: string, dias: number): string {
+  const [y, m, d] = dataYYYYMMDD.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+/**
+ * Janela [inicio, fimExclusivo) do filtro de período, em dias civis da
+ * clínica. Mesmas faixas de antes: Dia = hoje, Semana = últimos 7 dias,
+ * Quinzena = 15, Mês = 30, Período = datas escolhidas. `null` = Todos.
+ */
+function janelaDoPeriodo(
+  periodo: "hoje" | "semana" | "quinzena" | "mes" | "personalizado" | "todos",
+  hoje: string,
+  dataIni: string,
+  dataFim: string,
+): { inicio: string; fimExclusivo: string } | null {
+  if (periodo === "todos") return null;
+  const voltar = { hoje: 0, semana: 6, quinzena: 14, mes: 29 } as const;
+  const ini = periodo === "personalizado" ? dataIni : somarDias(hoje, -voltar[periodo]);
+  const fim = periodo === "personalizado" ? dataFim : hoje;
+  if (!ini || !fim) return null;
+  return {
+    inicio: janelaDiaClinica(ini).inicio,
+    fimExclusivo: janelaDiaClinica(fim).fimExclusivo,
+  };
+}
 
 const ICON_BTN =
   "p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center";
@@ -555,29 +586,67 @@ function OrcamentosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded]);
 
+  // O filtro de período vai para a consulta ao banco: antes a tela carregava
+  // só os 200 orçamentos mais recentes e filtrava em memória, então Semana,
+  // Quinzena e Mês saíam cortados e os contadores nunca mudavam.
+  const janelaPeriodo = useMemo(
+    () => janelaDoPeriodo(periodo, hojeIso, dataIni, dataFim),
+    [periodo, hojeIso, dataIni, dataFim],
+  );
+  const janelaRef = useRef(janelaPeriodo);
+  janelaRef.current = janelaPeriodo;
+  const loadSeq = useRef(0);
+  const [truncado, setTruncado] = useState(false);
+
   const load = async () => {
     if (!clinicaAtual) return;
+    const seq = ++loadSeq.current;
+    const janela = janelaRef.current;
     setLoading(true);
-    const { data, error } = await supabase
+    let q = supabase
       .from("orcamentos")
       .select(
         "id, numero, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, status, created_at, categoria",
       )
-      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("clinica_id", clinicaAtual.clinica_id);
+    if (janela) q = q.gte("created_at", janela.inicio).lt("created_at", janela.fimExclusivo);
+    const { data, error } = await q
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(LIMITE_ORCAMENTOS);
+    if (seq !== loadSeq.current) return;
     if (error) mostrarErro(error);
     const orcs = (data ?? []) as Orc[];
     const ids = orcs.map((o) => o.id);
     if (ids.length > 0) {
-      const { data: ags } = await supabase
-        .from("agendamentos")
-        .select("orcamento_id, status")
-        .in("orcamento_id", ids)
-        .neq("status", "cancelado");
+      // Em lotes: centenas de ids num único `.in()` estouram o tamanho da URL.
+      const lotes: string[][] = [];
+      for (let i = 0; i < ids.length; i += 150) lotes.push(ids.slice(i, i + 150));
+      const porLote = await Promise.all(
+        lotes.map((lote) =>
+          Promise.all([
+            supabase
+              .from("agendamentos")
+              .select("orcamento_id, status")
+              .in("orcamento_id", lote)
+              .neq("status", "cancelado"),
+            supabase
+              .from("orcamento_itens")
+              .select("orcamento_id, quantidade")
+              .in("orcamento_id", lote),
+            supabase
+              .from("agendamento_orcamento_itens")
+              .select("orcamento_id, orcamento_item_id")
+              .in("orcamento_id", lote),
+          ]),
+        ),
+      );
+      if (seq !== loadSeq.current) return;
+      const ags = porLote.flatMap(([a]) => a.data ?? []);
+      const itens = porLote.flatMap(([, it]) => it.data ?? []);
+      const links = porLote.flatMap(([, , l]) => l.data ?? []);
       const tot = new Map<string, number>();
       const real = new Map<string, number>();
-      for (const a of (ags ?? []) as { orcamento_id: string; status: string }[]) {
+      for (const a of ags as { orcamento_id: string; status: string }[]) {
         tot.set(a.orcamento_id, (tot.get(a.orcamento_id) ?? 0) + 1);
         if (a.status === "realizado") real.set(a.orcamento_id, (real.get(a.orcamento_id) ?? 0) + 1);
       }
@@ -586,22 +655,15 @@ function OrcamentosPage() {
         o.agendamentos_realizados = real.get(o.id) ?? 0;
       }
       // Itens totais e consumidos (uso parcial vs total)
-      const [{ data: itens }, { data: links }] = await Promise.all([
-        supabase.from("orcamento_itens").select("orcamento_id, quantidade").in("orcamento_id", ids),
-        supabase
-          .from("agendamento_orcamento_itens")
-          .select("orcamento_id, orcamento_item_id")
-          .in("orcamento_id", ids),
-      ]);
       const totItens = new Map<string, number>();
-      for (const it of (itens ?? []) as { orcamento_id: string; quantidade: number }[]) {
+      for (const it of itens as { orcamento_id: string; quantidade: number }[]) {
         totItens.set(
           it.orcamento_id,
           (totItens.get(it.orcamento_id) ?? 0) + Number(it.quantidade || 1),
         );
       }
       const consumidos = new Map<string, Set<string>>();
-      for (const l of (links ?? []) as { orcamento_id: string; orcamento_item_id: string }[]) {
+      for (const l of links as { orcamento_id: string; orcamento_item_id: string }[]) {
         if (!consumidos.has(l.orcamento_id)) consumidos.set(l.orcamento_id, new Set());
         consumidos.get(l.orcamento_id)!.add(l.orcamento_item_id);
       }
@@ -611,62 +673,34 @@ function OrcamentosPage() {
       }
     }
     setList(orcs);
+    setTruncado(orcs.length >= LIMITE_ORCAMENTOS);
     setLoading(false);
   };
 
   useEffect(() => {
     load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id]);
+  }, [clinicaAtual?.clinica_id, janelaPeriodo?.inicio, janelaPeriodo?.fimExclusivo]);
+
+  // Período (já aplicado no banco) + busca. Os contadores de Realizados /
+  // Não realizados saem daqui, para acompanhar o que a tela mostra.
+  const doPeriodo = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (o) =>
+        o.paciente_nome.toLowerCase().includes(q) ||
+        String(o.numero).includes(q) ||
+        (o.medico_nome ?? "").toLowerCase().includes(q),
+    );
+  }, [list, query]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    // calcula intervalo do período
-    let ini: Date | null = null;
-    let fim: Date | null = null;
-    if (periodo !== "todos") {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      if (periodo === "hoje") {
-        ini = start;
-        fim = end;
-      } else if (periodo === "semana") {
-        ini = new Date(start);
-        ini.setDate(ini.getDate() - 6);
-        fim = end;
-      } else if (periodo === "quinzena") {
-        ini = new Date(start);
-        ini.setDate(ini.getDate() - 14);
-        fim = end;
-      } else if (periodo === "mes") {
-        ini = new Date(start);
-        ini.setDate(ini.getDate() - 29);
-        fim = end;
-      } else if (periodo === "personalizado") {
-        ini = new Date(`${dataIni}T00:00:00`);
-        fim = new Date(`${dataFim}T23:59:59.999`);
-      }
-    }
-    return list.filter((o) => {
-      if (
-        q &&
-        !(
-          o.paciente_nome.toLowerCase().includes(q) ||
-          String(o.numero).includes(q) ||
-          (o.medico_nome ?? "").toLowerCase().includes(q)
-        )
-      )
-        return false;
+    if (filtroRealizacao === "todos") return doPeriodo;
+    return doPeriodo.filter((o) => {
       const realizado = (o.agendamentos_total ?? 0) > 0;
-      if (filtroRealizacao === "realizados" && !realizado) return false;
-      if (filtroRealizacao === "nao_realizados" && realizado) return false;
-      if (ini && fim) {
-        const d = new Date(o.created_at);
-        if (d < ini || d > fim) return false;
-      }
-      return true;
+      return filtroRealizacao === "realizados" ? realizado : !realizado;
     });
-  }, [list, query, filtroRealizacao, periodo, dataIni, dataFim]);
+  }, [doPeriodo, filtroRealizacao]);
 
   const exportarCsv = () => {
     const header = [
@@ -850,9 +884,9 @@ function OrcamentosPage() {
             const active = filtroRealizacao === k;
             const count =
               k === "realizados"
-                ? list.filter((o) => (o.agendamentos_total ?? 0) > 0).length
+                ? doPeriodo.filter((o) => (o.agendamentos_total ?? 0) > 0).length
                 : k === "nao_realizados"
-                  ? list.filter((o) => (o.agendamentos_total ?? 0) === 0).length
+                  ? doPeriodo.filter((o) => (o.agendamentos_total ?? 0) === 0).length
                   : null;
             return (
               <button
@@ -878,6 +912,13 @@ function OrcamentosPage() {
           })}
         </div>
       </div>
+
+      {truncado && !loading && (
+        <p className={`text-xs text-muted-foreground${embedded ? " px-4 pt-2" : ""}`}>
+          Mostrando os {LIMITE_ORCAMENTOS} orçamentos mais recentes deste período. Para ver os
+          anteriores, escolha um período menor.
+        </p>
+      )}
 
       {embedCompact ? (
         <OrcamentosCompactList
