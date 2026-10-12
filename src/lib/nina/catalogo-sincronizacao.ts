@@ -1,5 +1,6 @@
 import { profissionalSchema, servicoSchema, valorResumo } from "./catalogo";
-import { estruturaCatalogoSchema } from "./catalogo-estrutura";
+import { atendimentosDaEstrutura, estruturaCatalogoSchema } from "./catalogo-estrutura";
+import { MENSAGEM_ITEM_ESTRUTURADO } from "./catalogo-atendimentos";
 import { compararDadosCatalogo } from "./catalogo-edicao-ia";
 import type { PerguntaJev, RespostaJev } from "./jev";
 
@@ -80,6 +81,8 @@ export function validarDestinoSincronizacao(registro: RegistroSincronizacao) {
     throw new Error(
       "Este registro representa um grupo. A sincronização manual exige um registro por médico ou procedimento; não vincule o grupo inteiro a um único exame.",
     );
+  // Item estruturado: a origem chega no formato antigo e apagaria os atendimentos.
+  if (atendimentosDaEstrutura(registro.estrutura)) throw new Error(MENSAGEM_ITEM_ESTRUTURADO);
 }
 
 /**

@@ -9,6 +9,8 @@ import {
 } from "./catalogo";
 import type { TipoCatalogo } from "./catalogo-ia";
 import { sincronizarPrecosPublicados } from "./catalogo-precos-texto";
+import { MENSAGEM_ITEM_ESTRUTURADO } from "./catalogo-atendimentos";
+import { atendimentosDaEstrutura } from "./catalogo-estrutura";
 
 export const CONFLITO_EDICAO_CATALOGO =
   "Este cadastro mudou depois da prévia. Gere uma nova prévia antes de publicar.";
@@ -228,6 +230,8 @@ export function aplicarEdicaoCatalogoIA(
   registro: Record<string, any>,
   bruto: unknown,
 ) {
+  // A edição com IA grava as colunas antigas; num item estruturado ela seria descartada.
+  if (atendimentosDaEstrutura(registro.estrutura)) throw new Error(MENSAGEM_ITEM_ESTRUTURADO);
   const proposta = saidaEdicaoSchema.parse(bruto);
   const duvidas = [...proposta.ambiguidades, ...proposta.pendencias];
   if (duvidas.length)

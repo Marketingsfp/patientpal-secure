@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { interpretarModalidade } from "./modalidade-atendimento";
+import { MODALIDADES_ATENDIMENTO, interpretarModalidade } from "./modalidade-atendimento";
+import { DIAS_SEMANA, RECORRENCIAS } from "./catalogo-constantes";
 import { REGRA_FOTO_PEDIDO_MEDICO } from "./prompt/pedido-medico";
 import {
   REGRA_ANESTESIA_ADICIONAL,
@@ -48,6 +49,75 @@ export const complementoAtendimentoSchema = z
       });
   });
 
+const textoCurto = z.string().trim().max(200).nullable().optional();
+
+/** Linha de escala habitual (não é vaga): dia, faixa, recorrência e observação. */
+export const horarioCatalogoSchema = z
+  .object({
+    dia: z.enum(DIAS_SEMANA),
+    inicio: hora,
+    fim: hora,
+    recorrencia: z.enum(RECORRENCIAS).default("Toda semana"),
+    referencia_recorrencia: z.string().date().nullable().optional(),
+    observacao: textoCurto,
+  })
+  .refine((h) => !h.inicio || !h.fim || h.fim > h.inicio, {
+    message: "O término precisa ser depois do início.",
+    path: ["fim"],
+  });
+
+/** Preço por forma de pagamento; `condicao` é a condição real (ex.: até 3x). */
+export const precoCatalogoSchema = z.object({
+  forma: z.string().trim().min(1, "Informe a forma de pagamento").max(80),
+  valor: z.number().min(0).nullable().optional(),
+  condicao: textoCurto,
+  observacao: texto,
+});
+
+/** Quem realiza um atendimento de exame/procedimento, com a própria escala. */
+export const executanteCatalogoSchema = z.object({
+  medico_id: z.string().uuid().nullable().optional(),
+  nome: z.string().trim().min(1, "Informe quem realiza").max(160),
+  horarios: z.array(horarioCatalogoSchema).max(60).default([]),
+});
+
+/**
+ * Atendimento estruturado: fonte única dos fatos do item (12/10/2026).
+ * Profissional usa `horarios`; exame/procedimento usa `executantes`.
+ */
+export const atendimentoCatalogoSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    nome: z.string().trim().min(1, "Informe o nome do atendimento").max(200),
+    especialidade: z.string().trim().max(200).nullable().optional(),
+    modalidade: modalidadesCatalogo.nullable().optional(),
+    horarios: z.array(horarioCatalogoSchema).max(60).default([]),
+    executantes: z.array(executanteCatalogoSchema).max(30).default([]),
+    chegada_ate: hora,
+    precos: z.array(precoCatalogoSchema).max(20).default([]),
+    situacao_preco: z
+      .enum(["definido", "sob_consulta", "incluido", "nao_informado"])
+      .nullable()
+      .optional(),
+    idade_minima: z.number().int().min(0).max(1500).nullable().optional(),
+    unidade_idade: z.enum(["anos", "meses"]).nullable().optional(),
+    criterio_adicional: texto,
+    inclui: texto,
+    acrescimos: texto,
+    observacao: texto,
+  })
+  .superRefine((v, ctx) => {
+    if ((v.idade_minima != null) !== (v.unidade_idade != null))
+      ctx.addIssue({
+        code: "custom",
+        message: "Informe a idade mínima e a unidade juntas.",
+        path: ["idade_minima"],
+      });
+  });
+export type AtendimentoCatalogo = z.infer<typeof atendimentoCatalogoSchema>;
+export type HorarioCatalogo = z.infer<typeof horarioCatalogoSchema>;
+export type PrecoCatalogo = z.infer<typeof precoCatalogoSchema>;
+
 export const estruturaCatalogoSchema = z
   .object({
     versao: z.literal(1).default(1),
@@ -76,6 +146,8 @@ export const estruturaCatalogoSchema = z
     pedido_medico: z.enum(["nao_informado", "obrigatorio", "dispensado"]).default("nao_informado"),
     convenios_status: z.enum(["nao_informado", "aceita", "nao_aceita"]).default("nao_informado"),
     complementos: z.array(complementoAtendimentoSchema).max(100).default([]),
+    /** Presente e não vazio = item estruturado: os fatos saem só daqui. */
+    atendimentos: z.array(atendimentoCatalogoSchema).max(60).optional(),
   })
   .superRefine((v, ctx) => {
     if (new Set(v.complementos.map((c) => c.chave)).size !== v.complementos.length)
@@ -83,6 +155,13 @@ export const estruturaCatalogoSchema = z
         code: "custom",
         message: "Há regras duplicadas para o mesmo atendimento.",
         path: ["complementos"],
+      });
+    const ids = (v.atendimentos ?? []).map((a) => a.id);
+    if (new Set(ids).size !== ids.length)
+      ctx.addIssue({
+        code: "custom",
+        message: "Há atendimentos com a mesma identificação.",
+        path: ["atendimentos"],
       });
   });
 export type EstruturaCatalogo = z.infer<typeof estruturaCatalogoSchema>;
@@ -189,12 +268,127 @@ export function separarAtendimentos(
   return itens;
 }
 
+/** Atendimentos estruturados do item, ou null quando o item ainda é do formato antigo. */
+export function atendimentosDaEstrutura(estrutura: unknown): AtendimentoCatalogo[] | null {
+  const lista = lerEstrutura(estrutura).atendimentos;
+  return lista && lista.length ? lista : null;
+}
+
+export function formatarPrecoCatalogo(valor: number | null | undefined): string | null {
+  if (valor == null) return null;
+  return `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function dataBR(iso: string): string {
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+
+/** Escala em texto, gerada a partir das linhas estruturadas (nunca digitada). */
+export function textoHorariosCatalogo(linhas: readonly HorarioCatalogo[]): string | null {
+  if (!linhas.length) return null;
+  return linhas
+    .map((h) => {
+      const faixa = h.inicio ? (h.fim ? ` ${h.inicio}–${h.fim}` : ` a partir de ${h.inicio}`) : "";
+      const ref = h.referencia_recorrencia
+        ? `; referência ${dataBR(h.referencia_recorrencia)}`
+        : "";
+      const rec =
+        h.recorrencia && h.recorrencia !== "Toda semana" ? ` (${h.recorrencia}${ref})` : "";
+      return `${h.dia}${faixa}${rec}${h.observacao ? `: ${h.observacao}` : ""}`;
+    })
+    .join(" · ");
+}
+
+type CampoPreco = "dinheiro" | "pix_cartao" | "cartao" | "pix";
+/** Forma de pagamento → campo de preço lido pelas regras existentes. */
+export function campoDaForma(forma: string): CampoPreco | null {
+  const f = normal(forma).replace(/\s*(\/|\be\b)\s*/g, "/");
+  if (/^(dinheiro|especie|em especie)$/.test(f)) return "dinheiro";
+  if (f === "pix/cartao" || f === "cartao/pix") return "pix_cartao";
+  if (/^cartao\b/.test(f)) return "cartao";
+  if (f === "pix") return "pix";
+  return null;
+}
+
+function rotuloIdade(n: number, unidade: "anos" | "meses"): string {
+  if (unidade === "anos") return `a partir de ${n} ${n === 1 ? "ano" : "anos"}`;
+  return `a partir de ${n} ${n === 1 ? "mês" : "meses"}`;
+}
+
+/** Atendimento estruturado no formato já consumido pela Nina e pelas regras. */
+export function publicadoDoAtendimento(
+  a: AtendimentoCatalogo,
+  profissional?: string,
+): AtendimentoPublicado {
+  const campos: Partial<Record<CampoPreco, string>> = {};
+  const outros: string[] = a.modalidade
+    ? [`Modalidade: ${MODALIDADES_ATENDIMENTO[a.modalidade]}`]
+    : ["Modalidade: não informada"];
+  for (const p of a.precos) {
+    const linha = `${formatarPrecoCatalogo(p.valor) ?? "valor não informado"}${p.condicao ? ` (${p.condicao})` : ""}`;
+    const campo = campoDaForma(p.forma);
+    if (campo && !campos[campo]) campos[campo] = linha;
+    else outros.push(`${p.forma}: ${linha}`);
+    if (p.observacao) outros.push(`${p.forma} — observação: ${p.observacao}`);
+  }
+  const idade =
+    a.idade_minima != null && a.unidade_idade ? rotuloIdade(a.idade_minima, a.unidade_idade) : null;
+  if (idade && a.criterio_adicional) outros.push(`Outros critérios: ${a.criterio_adicional}`);
+  if (a.situacao_preco === "sob_consulta") outros.push("Situação do preço: precisa de orçamento.");
+  if (a.situacao_preco === "incluido")
+    outros.push("Situação do preço: incluído em outro atendimento.");
+  if (a.inclui) outros.push(`Inclui: ${a.inclui}`);
+  if (a.acrescimos) outros.push(`Acréscimos: ${a.acrescimos}`);
+  const horarios = a.executantes.length
+    ? a.executantes
+        .map((e) => {
+          const t = textoHorariosCatalogo(e.horarios);
+          return t ? `${e.nome}: ${t}` : null;
+        })
+        .filter(Boolean)
+        .join(" | ") || null
+    : textoHorariosCatalogo(a.horarios);
+  const chave = `id:${a.id}`;
+  return {
+    chave,
+    atendimento: a.nome,
+    profissional: profissional || a.executantes.map((e) => e.nome).join(", ") || null,
+    especialidade: a.especialidade || null,
+    horarios_publicados: horarios,
+    chegada_publicada: a.chegada_ate ?? null,
+    criterio_publicado: idade ?? a.criterio_adicional ?? null,
+    idade_minima: a.idade_minima ?? null,
+    unidade_idade: a.unidade_idade ?? null,
+    modalidade: a.modalidade ?? null,
+    dinheiro: campos.dinheiro ?? null,
+    pix_cartao: campos.pix_cartao ?? null,
+    cartao: campos.cartao ?? null,
+    pix: campos.pix ?? null,
+    observacoes: a.observacao || null,
+    outros,
+    complemento: {
+      chave,
+      modalidade: a.modalidade ?? null,
+      idade_minima: a.idade_minima ?? null,
+      unidade_idade: a.unidade_idade ?? null,
+      criterio_adicional: a.criterio_adicional ?? null,
+      chegada_ate: a.chegada_ate ?? null,
+      situacao_preco: a.situacao_preco ?? null,
+      inclui: a.inclui ?? null,
+      acrescimos: a.acrescimos ?? null,
+    },
+  };
+}
+
 export function atendimentosEstruturados(
   conteudo: string | null | undefined,
   estrutura: unknown,
   profissional?: string,
   atendimentoPadrao?: string,
 ) {
+  const estruturados = atendimentosDaEstrutura(estrutura);
+  if (estruturados) return estruturados.map((a) => publicadoDoAtendimento(a, profissional));
   const e = lerEstrutura(estrutura);
   const publicados = separarAtendimentos(conteudo, profissional);
   const itens: AtendimentoPublicado[] =
@@ -304,6 +498,26 @@ export function pendenciasEstrutura(
   estrutura: unknown,
   profissional?: string,
 ): string[] {
+  const estruturados = atendimentosDaEstrutura(estrutura);
+  if (estruturados) {
+    const p: string[] = [];
+    for (const a of estruturados) {
+      if (!a.modalidade)
+        p.push(`${a.nome}: modalidade não informada — a Nina vai informar e encaminhar.`);
+      const linhas = [...a.horarios, ...a.executantes.flatMap((e) => e.horarios)];
+      if (linhas.some((h) => h.recorrencia === "Quinzenal" && !h.referencia_recorrencia))
+        p.push(`${a.nome}: horário quinzenal sem data de referência.`);
+      if (/anestesia/i.test(a.observacao ?? "") && !a.acrescimos)
+        p.push(`${a.nome}: confirmar o valor adicional da anestesia.`);
+      if (
+        !a.precos.length &&
+        a.situacao_preco !== "incluido" &&
+        a.situacao_preco !== "sob_consulta"
+      )
+        p.push(`${a.nome}: nenhum preço cadastrado.`);
+    }
+    return [...new Set(p)];
+  }
   const atendimentos = atendimentosEstruturados(conteudo, estrutura, profissional);
   const pendencias: string[] = [];
   for (const a of atendimentos) {

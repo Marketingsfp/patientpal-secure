@@ -206,9 +206,9 @@ export const AJUDA_CATALOGO = {
   },
   complemento_situacao_preco: {
     titulo: "Situação do preço",
-    efeito: "Registro para a equipe. Hoje não muda a resposta da Nina.",
+    efeito: "A Nina recebe esta situação como informação do atendimento.",
     atencao:
-      "“Precisa de orçamento” ou “Incluído” não impedem a Nina de informar o preço cadastrado.",
+      "Não existe trava automática: “Precisa de orçamento” ou “Incluído” não impedem a Nina de informar um preço que esteja cadastrado.",
   },
   complemento_idade: {
     titulo: "Idade mínima confirmada",
@@ -233,6 +233,64 @@ export const AJUDA_CATALOGO = {
   complemento_acrescimos: {
     titulo: "Acréscimos",
     efeito: "A Nina recebe os acréscimos e quando se aplicam. Não há cálculo automático.",
+  },
+
+  // Atendimentos estruturados (fonte única dos fatos do item)
+  atendimentos: {
+    titulo: "Atendimentos",
+    efeito:
+      "É a única fonte de horários, preços, modalidade, idade e regras deste item. A Nina recebe um resumo gerado daqui, e os campos antigos (formas de pagamento, horários, quem realiza) são calculados automaticamente ao salvar.",
+    atencao:
+      "Todos os atendimentos precisam ter a mesma modalidade para o item ser agendado; faltando em algum, a Nina informa e encaminha.",
+  },
+  atendimento_nome: {
+    titulo: "Nome do atendimento",
+    efeito:
+      "É como a Nina apresenta este atendimento e como ela distingue preços e horários quando o item tem mais de um.",
+  },
+  atendimento_especialidade: {
+    titulo: "Especialidade do atendimento",
+    efeito:
+      "A Nina usa para encontrar o atendimento quando o paciente pede a especialidade e para não misturar atendimentos diferentes do mesmo profissional.",
+  },
+  atendimento_horarios: {
+    titulo: "Horários deste atendimento",
+    efeito:
+      "É a escala habitual que a Nina informa para este atendimento. Nunca é vaga: a disponibilidade real vem da agenda.",
+    atencao:
+      "Profissional sem nenhum horário cadastrado faz a Nina encaminhar quando o paciente pede por ele. Em horário quinzenal, informe a data de referência.",
+  },
+  atendimento_executantes: {
+    titulo: "Quem realiza e horários",
+    efeito:
+      "Liga o atendimento ao médico da agenda e informa à Nina quem realiza e em que dias. Os horários são escala habitual, nunca vaga.",
+    atencao: "Linhas sem profissional escolhido impedem o salvamento.",
+  },
+  atendimento_precos: {
+    titulo: "Preços",
+    efeito:
+      "A Nina informa cada valor com a forma de pagamento e a condição (ex.: até 3x). Formas reconhecidas: Dinheiro, Pix/cartão, Cartão e Pix; outras são informadas como escritas.",
+    atencao: "Em branco significa valor não informado, nunca gratuito.",
+  },
+  atendimento_observacao: {
+    titulo: "Observação do atendimento",
+    efeito: "A Nina recebe junto do atendimento, como texto.",
+    atencao:
+      "Não escreva preço, horário, dia da semana, modalidade ou idade aqui: o salvamento é bloqueado para manter cada dado num lugar só.",
+  },
+  texto_livre: {
+    titulo: "Texto para o paciente",
+    efeito:
+      "Descrição livre que a Nina pode usar para explicar o item, junto do resumo gerado dos atendimentos.",
+    atencao:
+      "Sem fatos: preço, horário, dia da semana, modalidade, idade e rótulos como “Dinheiro:” bloqueiam o salvamento. Esses dados ficam só nos atendimentos.",
+  },
+  converter_estruturado: {
+    titulo: "Converter para atendimentos",
+    efeito:
+      "Lê o texto e os campos antigos e monta os atendimentos estruturados. Nada é salvo até você conferir e salvar; o que não puder ser lido com segurança aparece como pendência.",
+    atencao:
+      "Depois de salvo, sincronização com o Clínica OS, importação e edição com IA deixam de alterar este item.",
   },
 } satisfies Record<string, AjudaCatalogo>;
 

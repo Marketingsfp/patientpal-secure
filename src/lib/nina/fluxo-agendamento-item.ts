@@ -13,7 +13,7 @@
  *
  * Módulo puro: sem banco e sem rede.
  */
-import { lerEstrutura } from "./catalogo-estrutura";
+import { atendimentosDaEstrutura, lerEstrutura } from "./catalogo-estrutura";
 import { interpretarModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { normalizarRespostaInformal, ehRespostaAfirmativaCurta } from "./resposta-afirmativa";
 
@@ -33,6 +33,14 @@ export function modalidadeDoRegistro(registro: {
   estrutura?: unknown;
   tipo_atendimento?: string | null;
 }): ModalidadeResolvida {
+  // Item estruturado: a modalidade de cada atendimento é a única fonte. Todos
+  // precisam ter a mesma; faltando em algum, o item fica sem modalidade.
+  const estruturados = atendimentosDaEstrutura(registro.estrutura);
+  if (estruturados) {
+    const modos = new Set(estruturados.map((a) => a.modalidade ?? null));
+    const unica = modos.size === 1 ? [...modos][0] : null;
+    return unica ?? "nao_definida";
+  }
   const modos = lerEstrutura(registro.estrutura)
     .complementos.map((c) => c.modalidade)
     .filter((m): m is NonNullable<typeof m> => Boolean(m));

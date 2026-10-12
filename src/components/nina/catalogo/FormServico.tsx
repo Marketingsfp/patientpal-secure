@@ -7,7 +7,16 @@ import {
   EstruturaCatalogoEditor,
 } from "./EstruturaCatalogoEditor";
 import { ComoLer, RotuloAjuda, SecaoCatalogo } from "./AjudaCatalogo";
-import { useCatalogoOrganizado } from "./catalogo-organizado";
+import { ItemEstruturado, useCatalogoOrganizado } from "./catalogo-organizado";
+import {
+  AtendimentosEditor,
+  AvisoItemEstruturadoClassico,
+  AvisoTextoLivre,
+  ConversaoParaAtendimentos,
+  PendenciasAtendimentos,
+} from "./AtendimentosEditor";
+import { converterParaEstruturado } from "@/lib/nina/catalogo-atendimentos";
+import { pendenciasEstrutura, type AtendimentoCatalogo } from "@/lib/nina/catalogo-estrutura";
 import { PedidoMedicoEditor } from "./PedidoMedicoEditor";
 import {
   estruturaVazia,
@@ -146,7 +155,7 @@ export function FormServico({
   estado,
   onChange,
   opcoes,
-  somenteLeitura,
+  somenteLeitura: somenteLeituraProp,
 }: {
   estado: EstadoServico;
   onChange: (e: EstadoServico) => void;
@@ -155,7 +164,30 @@ export function FormServico({
 }) {
   const organizado = useCatalogoOrganizado();
   const [abertos, setAbertos] = useState<string[]>(["pagamento"]);
+  const [pendenciasConversao, setPendenciasConversao] = useState<string[]>([]);
   const set = (patch: Partial<EstadoServico>) => onChange({ ...estado, ...patch });
+  const listaAtendimentos = estado.estrutura.atendimentos ?? [];
+  const estruturado = listaAtendimentos.length > 0;
+  // Na tela clássica, os campos de um item estruturado são calculados: só leitura.
+  const somenteLeitura = somenteLeituraProp || (!organizado && estruturado);
+  const setAtendimentos = (atendimentos: AtendimentoCatalogo[]) =>
+    set({ estrutura: { ...estado.estrutura, atendimentos } });
+  const converter = () => {
+    const r = converterParaEstruturado("servico", {
+      nome: estado.nome,
+      estrutura: estado.estrutura,
+      descricao_publica: estado.descricao_publica,
+      valor: paraNumero(estado.valor),
+      valor_observacao: estado.valor_observacao,
+      executantes: estado.executantes,
+      formas_pagamento: estado.formas_pagamento,
+    });
+    setPendenciasConversao(r.pendencias);
+    set({
+      descricao_publica: r.descricao,
+      estrutura: { ...estado.estrutura, atendimentos: r.atendimentos },
+    });
+  };
 
   const formasComValor = estado.formas_pagamento.some((f) => paraNumero(f.valor) !== null);
   const resumo = valorResumo({
@@ -373,6 +405,74 @@ export function FormServico({
     />
   );
 
+  const textoLivre = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="texto_livre">Texto para o paciente</RotuloAjuda>
+      <Textarea
+        rows={3}
+        value={estado.descricao_publica}
+        disabled={somenteLeitura}
+        placeholder="Explicação do exame, sem preço, horário, modalidade ou idade"
+        onChange={(e) => set({ descricao_publica: e.target.value })}
+      />
+      <AvisoTextoLivre texto={estado.descricao_publica} />
+    </div>
+  );
+
+  if (organizado && estruturado)
+    return (
+      <ItemEstruturado.Provider value={true}>
+        <div className="space-y-4">
+          <SecaoCatalogo titulo="Identificação">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {nome}
+              {vinculo}
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo
+            titulo="Regras da Nina"
+            descricao="Decidem se a Nina agenda, encaminha ou pede documentos para este item."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CampoNinaPodeAgendar {...estrutura} />
+              <CampoEncaminhamentoHumano {...estrutura} />
+              {pedidoMedico}
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo titulo="Preparo e requisitos">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {preparo}
+              <CampoSituacaoPreparo {...estrutura} />
+            </div>
+            {restricoes}
+          </SecaoCatalogo>
+          <SecaoCatalogo
+            titulo="Atendimentos"
+            ajuda="atendimentos"
+            descricao="Única fonte de quem realiza, horários, preços, modalidade e regras deste item."
+          >
+            <PendenciasAtendimentos
+              itens={[...pendenciasConversao, ...pendenciasEstrutura("", estado.estrutura)]}
+            />
+            <AtendimentosEditor
+              tipo="servico"
+              atendimentos={listaAtendimentos}
+              onChange={setAtendimentos}
+              medicos={opcoes.medicos}
+              somenteLeitura={somenteLeitura}
+            />
+          </SecaoCatalogo>
+          <SecaoCatalogo titulo="Texto para o paciente">{textoLivre}</SecaoCatalogo>
+          <SecaoCatalogo titulo="Organização interna" descricao="Não muda o atendimento da Nina.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CamposOrganizacao {...estrutura} tipo="servico" />
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo titulo="Nota interna">{notaInterna}</SecaoCatalogo>
+        </div>
+      </ItemEstruturado.Provider>
+    );
+
   if (organizado)
     return (
       <div className="space-y-4">
@@ -411,6 +511,7 @@ export function FormServico({
           titulo="Texto para o paciente e atendimentos"
           descricao="A modalidade de cada atendimento fica aqui e decide como a Nina conduz o pedido."
         >
+          <ConversaoParaAtendimentos somenteLeitura={somenteLeitura} onConverter={converter} />
           {descricao}
           <ComplementosAtendimentos {...atendimentos} />
         </SecaoCatalogo>
@@ -425,6 +526,7 @@ export function FormServico({
 
   return (
     <div className="space-y-4">
+      {estruturado && <AvisoItemEstruturadoClassico />}
       <EstruturaCatalogoEditor {...atendimentos} tipo="servico" />
       <div className="grid gap-3 sm:grid-cols-2">
         {nome}

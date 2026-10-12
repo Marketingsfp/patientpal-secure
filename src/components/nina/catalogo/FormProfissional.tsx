@@ -7,7 +7,17 @@ import {
   EstruturaCatalogoEditor,
 } from "./EstruturaCatalogoEditor";
 import { RotuloAjuda, SecaoCatalogo } from "./AjudaCatalogo";
-import { useCatalogoOrganizado } from "./catalogo-organizado";
+import { ItemEstruturado, useCatalogoOrganizado } from "./catalogo-organizado";
+import { useState } from "react";
+import {
+  AtendimentosEditor,
+  AvisoItemEstruturadoClassico,
+  AvisoTextoLivre,
+  ConversaoParaAtendimentos,
+  PendenciasAtendimentos,
+} from "./AtendimentosEditor";
+import { converterParaEstruturado } from "@/lib/nina/catalogo-atendimentos";
+import { pendenciasEstrutura, type AtendimentoCatalogo } from "@/lib/nina/catalogo-estrutura";
 import { PedidoMedicoEditor } from "./PedidoMedicoEditor";
 import {
   estruturaVazia,
@@ -168,7 +178,7 @@ export function FormProfissional({
   estado,
   onChange,
   opcoes,
-  somenteLeitura,
+  somenteLeitura: somenteLeituraProp,
 }: {
   estado: EstadoProfissional;
   onChange: (e: EstadoProfissional) => void;
@@ -176,7 +186,34 @@ export function FormProfissional({
   somenteLeitura?: boolean;
 }) {
   const organizado = useCatalogoOrganizado();
+  const [pendenciasConversao, setPendenciasConversao] = useState<string[]>([]);
   const set = (patch: Partial<EstadoProfissional>) => onChange({ ...estado, ...patch });
+  const listaAtendimentos = estado.estrutura.atendimentos ?? [];
+  const estruturado = listaAtendimentos.length > 0;
+  // Na tela clássica, os campos de um item estruturado são calculados: só leitura.
+  const somenteLeitura = somenteLeituraProp || (!organizado && estruturado);
+  const nomesEspecialidades = [
+    ...opcoes.especialidades.filter((e) => estado.especialidades.includes(e.id)).map((e) => e.nome),
+    ...estado.especialidadesLivres,
+  ];
+  const setAtendimentos = (atendimentos: AtendimentoCatalogo[]) =>
+    set({ estrutura: { ...estado.estrutura, atendimentos } });
+  const converter = () => {
+    const r = converterParaEstruturado("profissional", {
+      nome: estado.nome,
+      estrutura: estado.estrutura,
+      observacao_publica: estado.observacao_publica,
+      horarios: estado.horarios,
+      formas_pagamento: estado.formas_pagamento,
+      tipo_atendimento: estado.tipo_atendimento,
+      especialidades: nomesEspecialidades.map((nome) => ({ nome })),
+    });
+    setPendenciasConversao(r.pendencias);
+    set({
+      observacao_publica: r.descricao,
+      estrutura: { ...estado.estrutura, atendimentos: r.atendimentos },
+    });
+  };
   const setHorario = (i: number, patch: Partial<LinhaHorario>) =>
     set({ horarios: estado.horarios.map((h, idx) => (idx === i ? { ...h, ...patch } : h)) });
 
@@ -499,6 +536,78 @@ export function FormProfissional({
     </div>
   );
 
+  const textoLivre = (
+    <div className="space-y-1">
+      <RotuloAjuda chave="texto_livre">Texto para o paciente</RotuloAjuda>
+      <Textarea
+        rows={3}
+        value={estado.observacao_publica}
+        disabled={somenteLeitura}
+        placeholder="Apresentação do profissional, sem preço, horário, modalidade ou idade"
+        onChange={(e) => set({ observacao_publica: e.target.value })}
+      />
+      <AvisoTextoLivre texto={estado.observacao_publica} />
+    </div>
+  );
+
+  if (organizado && estruturado)
+    return (
+      <ItemEstruturado.Provider value={true}>
+        <div className="space-y-4">
+          <SecaoCatalogo titulo="Identificação">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {nome}
+              {vinculo}
+              {especialidades}
+              {unidade}
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo
+            titulo="Regras da Nina"
+            descricao="Decidem se a Nina agenda, encaminha ou pede documentos para este profissional."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CampoNinaPodeAgendar {...estrutura} />
+              <CampoEncaminhamentoHumano {...estrutura} />
+              {pedidoMedico}
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo
+            titulo="Atendimentos"
+            ajuda="atendimentos"
+            descricao="Única fonte de horários, preços, modalidade e regras de cada consulta."
+          >
+            <PendenciasAtendimentos
+              itens={[...pendenciasConversao, ...pendenciasEstrutura("", estado.estrutura)]}
+            />
+            <AtendimentosEditor
+              tipo="profissional"
+              atendimentos={listaAtendimentos}
+              onChange={setAtendimentos}
+              medicos={opcoes.medicos}
+              especialidades={nomesEspecialidades}
+              somenteLeitura={somenteLeitura}
+            />
+          </SecaoCatalogo>
+          <SecaoCatalogo titulo="Aviso do dia">{aviso}</SecaoCatalogo>
+          <SecaoCatalogo titulo="Convênios e consultório">
+            {convenios}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CampoSituacaoConvenios {...estrutura} />
+              {atendeConsultorio}
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo titulo="Texto para o paciente">{textoLivre}</SecaoCatalogo>
+          <SecaoCatalogo titulo="Organização interna" descricao="Não muda o atendimento da Nina.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CamposOrganizacao {...estrutura} tipo="profissional" />
+            </div>
+          </SecaoCatalogo>
+          <SecaoCatalogo titulo="Nota interna">{notaInterna}</SecaoCatalogo>
+        </div>
+      </ItemEstruturado.Provider>
+    );
+
   if (organizado)
     return (
       <div className="space-y-4">
@@ -537,6 +646,7 @@ export function FormProfissional({
           titulo="Texto para o paciente e atendimentos"
           descricao="A modalidade de cada atendimento fica aqui e tem prioridade sobre a do profissional."
         >
+          <ConversaoParaAtendimentos somenteLeitura={somenteLeitura} onConverter={converter} />
           {observacaoPublica}
           <ComplementosAtendimentos {...atendimentos} />
         </SecaoCatalogo>
@@ -551,6 +661,7 @@ export function FormProfissional({
 
   return (
     <div className="space-y-4">
+      {estruturado && <AvisoItemEstruturadoClassico />}
       <EstruturaCatalogoEditor {...atendimentos} tipo="profissional" />
       {pedidoMedico}
       <div className="grid gap-3 sm:grid-cols-2">

@@ -13,6 +13,43 @@
  */
 import { z } from "zod";
 import { estruturaCatalogoSchema } from "./catalogo-estrutura";
+import { DIAS_SEMANA, RECORRENCIAS } from "./catalogo-constantes";
+import {
+  derivarProfissional,
+  derivarServico,
+  mensagemFatosNoTexto,
+  fatosNoTextoLivre,
+} from "./catalogo-atendimentos";
+
+/** Item estruturado: o texto livre e as observações dos atendimentos ficam sem fatos. */
+function validarTextosEstruturados(
+  estrutura:
+    | { atendimentos?: Array<{ nome: string; observacao?: string | null }> }
+    | null
+    | undefined,
+  textoLivre: string | null | undefined,
+  campoTexto: string,
+  ctx: z.RefinementCtx,
+) {
+  const atendimentos = estrutura?.atendimentos ?? [];
+  if (!atendimentos.length) return;
+  const fatos = fatosNoTextoLivre(textoLivre);
+  if (fatos.length)
+    ctx.addIssue({
+      code: "custom",
+      path: [campoTexto],
+      message: mensagemFatosNoTexto("Texto para o paciente", fatos),
+    });
+  atendimentos.forEach((a, i) => {
+    const f = fatosNoTextoLivre(a.observacao);
+    if (f.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["estrutura", "atendimentos", i, "observacao"],
+        message: mensagemFatosNoTexto(`Observação de “${a.nome}”`, f),
+      });
+  });
+}
 
 export const STATUS_CATALOGO = ["RASCUNHO", "PUBLICADO", "ARQUIVADO"] as const;
 export type StatusCatalogo = (typeof STATUS_CATALOGO)[number];
@@ -23,18 +60,7 @@ export const ROTULO_STATUS: Record<StatusCatalogo, string> = {
   ARQUIVADO: "Arquivado",
 };
 
-export const DIAS_SEMANA = [
-  "Segunda-feira",
-  "Terça-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sábado",
-  "Domingo",
-] as const;
-
-/** Recorrência: preserva exceções (quinzenal etc.) sem virar regra permanente. */
-export const RECORRENCIAS = ["Toda semana", "Quinzenal", "Mensal", "Data específica"] as const;
+export { DIAS_SEMANA, RECORRENCIAS } from "./catalogo-constantes";
 
 /* ------------------------------------------------------------------ */
 /* Utilitários de formato                                              */
@@ -173,10 +199,19 @@ export const servicoSchema = z
         message:
           "Há orientações de preparo cadastradas. Confira antes de marcar que não exige preparo.",
       });
+    validarTextosEstruturados(v.estrutura, v.descricao_publica, "descricao_publica", ctx);
   })
   .transform((v) => {
     if (v.estrutura && v.estrutura.preparo_status !== "sem_preparo")
       v.estrutura.preparo_status = v.preparo ? "informado" : "nao_informado";
+    // Item estruturado: as colunas antigas são calculadas dos atendimentos.
+    if (v.estrutura?.atendimentos?.length)
+      return {
+        ...v,
+        ...derivarServico(v.estrutura.atendimentos),
+        valor: null,
+        estrutura: { ...v.estrutura, complementos: [] },
+      };
     return v;
   });
 export type ServicoCatalogo = z.infer<typeof servicoSchema>;
@@ -242,6 +277,19 @@ export const profissionalSchema = z
   .refine(
     (p) => !p.aviso_valido_de || !p.aviso_valido_ate || p.aviso_valido_ate >= p.aviso_valido_de,
     "O fim da validade do aviso não pode ser antes do início",
+  )
+  .superRefine((p, ctx) =>
+    validarTextosEstruturados(p.estrutura, p.observacao_publica, "observacao_publica", ctx),
+  )
+  .transform((p) =>
+    // Item estruturado: horários, preços e modalidade são calculados dos atendimentos.
+    p.estrutura?.atendimentos?.length
+      ? {
+          ...p,
+          ...derivarProfissional(p.estrutura.atendimentos),
+          estrutura: { ...p.estrutura, complementos: [] },
+        }
+      : p,
   );
 export type ProfissionalCatalogo = z.infer<typeof profissionalSchema>;
 

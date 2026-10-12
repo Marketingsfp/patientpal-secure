@@ -6,3 +6,10 @@ export const CatalogoOrganizado = createContext(false);
 export function useCatalogoOrganizado() {
   return useContext(CatalogoOrganizado);
 }
+
+/** O item aberto usa atendimentos estruturados (muda a explicação da sincronização). */
+export const ItemEstruturado = createContext(false);
+
+export function useItemEstruturado() {
+  return useContext(ItemEstruturado);
+}
