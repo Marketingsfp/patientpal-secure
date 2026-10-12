@@ -43,7 +43,7 @@ import {
 import { agoraNaClinica, FUSO_PADRAO } from "@/lib/nina-agora";
 import { janelaDiaClinica } from "@/lib/date-utils";
 import { diaDaSemanaISO } from "./horario-oficial";
-import { atendimentoExigeHumano } from "./regras-catalogo.server";
+import { atendimentoExigeHumano, atendimentoPermiteAgendamento } from "./regras-catalogo.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizar, raizEspecialidade } from "@/lib/nina-especialidade";
 import { cadastroAutorizado, cadastroMinimoSchema } from "./cadastro-paciente";
@@ -116,6 +116,7 @@ import { verificarResultadoAgendamento, type RegistroAgendamento } from "./acoes
 /** Códigos de erro estáveis — a Nina usa para decidir como continuar a conversa. */
 export type CodigoErroNina =
   | "CATALOGO_ATENDIMENTO_HUMANO"
+  | "AGENDAMENTO_NAO_PERMITIDO"
   | "PATIENT_NOT_FOUND"
   | "PATIENT_NOT_VERIFIED"
   | "PATIENT_DATA_MISMATCH"
@@ -175,6 +176,11 @@ export type CtxNinaPaciente = {
   origem: "whatsapp" | "chat_interno" | "homologacao";
   /** Flag de agendamento da clínica. Sem ela, só ferramentas de consulta. */
   podeAgendar?: boolean;
+  /**
+   * Regra de 12/10/2026: além da clínica, cada item do catálogo precisa estar
+   * marcado com "Nina pode agendar". Ligado pelo atendimento da Nina.
+   */
+  agendamentoPorItem?: boolean;
   /**
    * Estado estruturado do fluxo, carregado da conversa antes da chamada do
    * modelo e regravado depois. É o que impede a Nina de "esquecer" o paciente
@@ -1606,7 +1612,7 @@ async function executarFerramentaInterna(
   if (FERRAMENTAS_DE_VAGAS.has(nome) && ctx.podeAgendar === false)
     return falha(
       "PERMISSION_DENIED",
-      "Nesta unidade a assistente não consulta vagas nem agenda. Informe os dias e horários habituais do catálogo e encaminhe o paciente à recepção com solicitar_atendente_humano (setor Recepção), sem prometer horário.",
+      "Nesta unidade a assistente não consulta vagas nem agenda. Responda às dúvidas com o cadastro (profissionais, dias e horários habituais, modalidade, funcionamento e valores), sem prometer horário. Não encaminhe por isso: o sistema pergunta ao paciente se pode encaminhar à equipe.",
     );
 
   if (
@@ -1643,6 +1649,9 @@ async function executarFerramentaInterna(
           selecao?.modalidade?.procedimento ??
           "",
       );
+      const referencias = pedido
+        ? [pedido.catalogo_id]
+        : selecao?.raizesFonte.map((r) => r.registro);
       let motivoTransferencia: string | undefined;
       if (
         (medico || procedimento) &&
@@ -1653,7 +1662,7 @@ async function executarFerramentaInterna(
           registrarMotivo: (motivo) => {
             motivoTransferencia = motivo;
           },
-          referencias: pedido ? [pedido.catalogo_id] : selecao?.raizesFonte.map((r) => r.registro),
+          referencias,
         }))
       ) {
         return falha(
@@ -1667,9 +1676,35 @@ async function executarFerramentaInterna(
           },
         );
       }
+      // Regra de 12/10/2026: a Nina só agenda itens marcados com "Nina pode agendar".
+      if (ctx.agendamentoPorItem) {
+        const permissao = await atendimentoPermiteAgendamento({
+          clinicaId: ctx.clinicaId,
+          medico,
+          procedimento,
+          referencias,
+        });
+        if (!permissao.permitido)
+          return falha(
+            "AGENDAMENTO_NAO_PERMITIDO",
+            "O cadastro deste atendimento não permite agendamento pela assistente.",
+            {
+              codigo: "AGENDAMENTO_NAO_PERMITIDO",
+              consulta_realizada: false,
+              nina_pode_agendar: false,
+              atendimentos: permissao.nomes,
+              instrucao:
+                "Não consulte vagas nem agende. Responda às dúvidas com o cadastro (profissionais, horários habituais, modalidade, funcionamento e valores). Não encaminhe por isso: o sistema pergunta ao paciente se pode encaminhar à equipe.",
+            },
+          );
+      }
       return null;
     }
     if (["consultar_cadastro_paciente", "identificar_paciente"].includes(nome)) {
+      const bloqueio = await conferirRegraCatalogo();
+      if (bloqueio) return bloqueio;
+    }
+    if (nome === "consultar_primeiro_disponivel") {
       const bloqueio = await conferirRegraCatalogo();
       if (bloqueio) return bloqueio;
     }

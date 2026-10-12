@@ -57,11 +57,11 @@ export function orientarIntencaoJev(
     );
   if (pedidos.includes("profissionais"))
     instrucoes.push(
-      'Se o paciente só pergunta se a clínica tem o atendimento ("vocês têm psicólogo?"), confirme que tem e, havendo dois ou mais médicos com nomes próprios, siga ESCOLHA_ANTES_DOS_DETALHES: pergunte se prefere o primeiro horário disponível ou escolher entre os profissionais, sem listar nomes, escalas nem preços. Apresente a lista somente quando ele pedir quais são, quem atende ou escolher ver os profissionais.',
+      'Se o paciente só pergunta se a clínica tem o atendimento ("vocês têm psicólogo?"), confirme que tem. Se o atendimento puder ser agendado pela assistente e houver dois ou mais médicos com nomes próprios, siga ESCOLHA_ANTES_DOS_DETALHES; caso contrário, apresente as informações publicadas do atendimento. Apresente a lista completa quando ele pedir quais são, quem atende ou escolher ver os profissionais.',
     );
   if (pedidos.includes("horario_habitual"))
     instrucoes.push(
-      "Informe dias e horários habituais somente conforme a base publicada. Escala habitual não comprova vaga. Quando o paciente pedir apenas informações gerais, responda com a base e ofereça verificar a disponibilidade do profissional escolhido; não consulte vagas só por mencionar a escala.",
+      "Informe dias e horários habituais somente conforme a base publicada. Escala habitual não comprova vaga. Quando o paciente pedir apenas informações gerais, responda com a base; ofereça verificar a disponibilidade somente se o atendimento puder ser agendado pela assistente. Não consulte vagas só por mencionar a escala.",
     );
   if (pedidos.includes("disponibilidade") || aceite === "consultar_agenda")
     instrucoes.push(

@@ -240,6 +240,8 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
       preparo_status: s.preparo ? "informado" : estrutura.preparo_status,
       pedido_medico: estrutura.pedido_medico,
       atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true,
+      // Só true libera o agendamento pela Nina; ausente = informar e encaminhar.
+      nina_pode_agendar: estrutura.nina_pode_agendar === true,
       // Valor publicado sem modalidade continua verificável como valor genérico.
       valor_referencia: !lista(s.formas_pagamento).length ? resumo : null,
       executantes: executantes.map((e) => ({
@@ -358,6 +360,8 @@ export function profissionalParaRegistro(
       convenios_status: convenios.length ? "aceita" : estrutura.convenios_status,
       pedido_medico: estrutura.pedido_medico,
       atendimento_humano_obrigatorio: estrutura.encaminhamento_humano === true,
+      // Só true libera o agendamento pela Nina; ausente = informar e encaminhar.
+      nina_pode_agendar: estrutura.nina_pode_agendar === true,
       modalidade_atendimento: modalidade,
       ...(selecionados.length
         ? { atendimentos_da_modalidade: selecionados.map(nomeCompletoConsulta) }

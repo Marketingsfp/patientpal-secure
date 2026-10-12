@@ -82,7 +82,10 @@ export function validarDestinoSincronizacao(registro: RegistroSincronizacao) {
     );
 }
 
-/** Os fatos vêm exclusivamente da origem; preserva somente aliases revisados e nota interna. */
+/**
+ * Os fatos vêm exclusivamente da origem; preserva somente decisões da equipe:
+ * aliases revisados, nota interna e se a Nina pode agendar o item.
+ */
 export function prepararSincronizacao(
   tipo: TipoSincronizacao,
   atual: RegistroSincronizacao,
@@ -93,6 +96,7 @@ export function prepararSincronizacao(
     ...fonte.estrutura,
     abrangencia: "item",
     aliases: atual.estrutura?.aliases ?? [],
+    nina_pode_agendar: atual.estrutura?.nina_pode_agendar ?? null,
   });
   const entrada = { ...fonte, estrutura, nota_interna: atual.nota_interna ?? null };
   const resultado =
@@ -139,6 +143,7 @@ const rotulosEstrutura: Record<string, string> = {
   abrangencia: "Abrangência",
   grupo: "Grupo",
   encaminhamento_humano: "Encaminhamento humano",
+  nina_pode_agendar: "Nina pode agendar",
   preparo_status: "Situação do preparo",
   pedido_medico: "Necessidade de pedido médico",
   convenios_status: "Situação dos convênios",

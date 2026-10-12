@@ -136,6 +136,17 @@ export function EstruturaCatalogoEditor({
             disabled={somenteLeitura}
             onChange={(v) => set({ encaminhamento_humano: v == null ? null : v === "true" })}
           />
+          <Escolha
+            label="Nina pode agendar"
+            // Sem marcação equivale a "Não": a Nina informa e encaminha à equipe.
+            value={valor.nina_pode_agendar === true ? "true" : "false"}
+            options={{
+              true: "Sim — a Nina agenda este item",
+              false: "Não — informa e encaminha à equipe",
+            }}
+            disabled={somenteLeitura}
+            onChange={(v) => set({ nina_pode_agendar: v === "true" })}
+          />
           {tipo === "servico" ? (
             <Escolha
               label="Situação do preparo"

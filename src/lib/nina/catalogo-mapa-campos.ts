@@ -70,6 +70,13 @@ const comuns: CampoCatalogo[] = [
     orientacao: "Aplicar ao atendimento solicitado, conforme as regras já existentes.",
   },
   {
+    campo: "nina_pode_agendar",
+    rotulo: "Nina pode agendar",
+    caminho: "extras.nina_pode_agendar",
+    orientacao:
+      "Só true permite à Nina agendar este atendimento; false ou ausente: informar e encaminhar à equipe.",
+  },
+  {
     campo: "observacoes_completas",
     rotulo: "Condições públicas em conjunto",
     caminho: "observacoes",

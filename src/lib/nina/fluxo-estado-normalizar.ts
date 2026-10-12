@@ -122,6 +122,11 @@ export type EstadoFluxoNina = {
   greeting_waived?: boolean;
   /** Código da regra publicada que dispensou a apresentação. */
   greeting_waived_by?: string | null;
+  /**
+   * A Nina já informou o atendimento e perguntou se pode encaminhar à equipe
+   * para confirmar o horário (fluxo "informar e encaminhar", 12/10/2026).
+   */
+  oferta_encaminhamento?: import("./fluxo-agendamento-item").OfertaEncaminhamento | null;
 };
 
 export function estadoVazio(): EstadoFluxoNina {
@@ -161,6 +166,7 @@ export function estadoVazio(): EstadoFluxoNina {
     greeting_completed: false,
     greeting_waived: false,
     greeting_waived_by: null,
+    oferta_encaminhamento: null,
   };
 }
 
@@ -196,5 +202,20 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     greeting_completed: o["greeting_completed"] === true,
     greeting_waived: o["greeting_waived"] === true,
     greeting_waived_by: o["greeting_waived_by"] ?? null,
+    oferta_encaminhamento: normalizarOferta(o["oferta_encaminhamento"]),
+  };
+}
+
+function normalizarOferta(
+  v: unknown,
+): import("./fluxo-agendamento-item").OfertaEncaminhamento | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.session_id !== "string" || typeof o.em !== "string" || !Array.isArray(o.referencias))
+    return null;
+  return {
+    session_id: o.session_id,
+    em: o.em,
+    referencias: o.referencias.filter((r): r is string => typeof r === "string").slice(0, 40),
   };
 }

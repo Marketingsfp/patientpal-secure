@@ -71,7 +71,8 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         const chamadas = r.requests[0].messages;
         expect(JSON.stringify(chamadas)).toContain("Perguntas independentes");
         expect(JSON.stringify(chamadas)).toContain("PEDIDOS PARALELOS");
-        expect(JSON.stringify(chamadas)).toContain(
+        // Sem item agendável, a regra de cadastro para reserva não vai ao contrato.
+        expect(JSON.stringify(chamadas)).not.toContain(
           "telefone de contato usa por padrão o número do remetente",
         );
       });
