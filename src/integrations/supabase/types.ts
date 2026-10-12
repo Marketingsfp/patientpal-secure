@@ -10137,6 +10137,283 @@ export type Database = {
           },
         ]
       }
+      nina_confianca_decisoes: {
+        Row: {
+          acao: string
+          acao_solicitada: string | null
+          ambiente: string
+          avaliacao: string
+          bloqueadores: string[]
+          bloqueio: string | null
+          categorias: Json
+          claims: Json | null
+          clinica_id: string
+          config_id: string | null
+          config_origem: string | null
+          conflitos: Json | null
+          conversation_id: string | null
+          created_at: string
+          decisao: string | null
+          engine_version: string | null
+          etapa_ativacao: string | null
+          evidence_coverage: number | null
+          evidencias_hash: string | null
+          execucao_id: string | null
+          ferramentas: Json
+          fontes: Json
+          handoff_decision: string | null
+          handoff_ocorreu: boolean | null
+          handoff_reason: string | null
+          id: string
+          intencao: string | null
+          message_id: string | null
+          modo: string
+          motivos: Json
+          nina_session_id: string | null
+          nivel: string | null
+          origem_resposta: string | null
+          outgoing_message_id: string | null
+          policy_version: string | null
+          reason_codes: string[]
+          representacao: string | null
+          resultado_final: string | null
+          revisao_conversa: number | null
+          rodadas: number | null
+          score: number
+          teria_permitido: boolean | null
+          texto_final_hash: string | null
+          trace_id: string | null
+          turn_type: string | null
+          updated_at: string
+          validadores: Json
+        }
+        Insert: {
+          acao: string
+          acao_solicitada?: string | null
+          ambiente?: string
+          avaliacao?: string
+          bloqueadores?: string[]
+          bloqueio?: string | null
+          categorias?: Json
+          claims?: Json | null
+          clinica_id: string
+          config_id?: string | null
+          config_origem?: string | null
+          conflitos?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          decisao?: string | null
+          engine_version?: string | null
+          etapa_ativacao?: string | null
+          evidence_coverage?: number | null
+          evidencias_hash?: string | null
+          execucao_id?: string | null
+          ferramentas?: Json
+          fontes?: Json
+          handoff_decision?: string | null
+          handoff_ocorreu?: boolean | null
+          handoff_reason?: string | null
+          id?: string
+          intencao?: string | null
+          message_id?: string | null
+          modo?: string
+          motivos?: Json
+          nina_session_id?: string | null
+          nivel?: string | null
+          origem_resposta?: string | null
+          outgoing_message_id?: string | null
+          policy_version?: string | null
+          reason_codes?: string[]
+          representacao?: string | null
+          resultado_final?: string | null
+          revisao_conversa?: number | null
+          rodadas?: number | null
+          score?: number
+          teria_permitido?: boolean | null
+          texto_final_hash?: string | null
+          trace_id?: string | null
+          turn_type?: string | null
+          updated_at?: string
+          validadores?: Json
+        }
+        Update: {
+          acao?: string
+          acao_solicitada?: string | null
+          ambiente?: string
+          avaliacao?: string
+          bloqueadores?: string[]
+          bloqueio?: string | null
+          categorias?: Json
+          claims?: Json | null
+          clinica_id?: string
+          config_id?: string | null
+          config_origem?: string | null
+          conflitos?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          decisao?: string | null
+          engine_version?: string | null
+          etapa_ativacao?: string | null
+          evidence_coverage?: number | null
+          evidencias_hash?: string | null
+          execucao_id?: string | null
+          ferramentas?: Json
+          fontes?: Json
+          handoff_decision?: string | null
+          handoff_ocorreu?: boolean | null
+          handoff_reason?: string | null
+          id?: string
+          intencao?: string | null
+          message_id?: string | null
+          modo?: string
+          motivos?: Json
+          nina_session_id?: string | null
+          nivel?: string | null
+          origem_resposta?: string | null
+          outgoing_message_id?: string | null
+          policy_version?: string | null
+          reason_codes?: string[]
+          representacao?: string | null
+          resultado_final?: string | null
+          revisao_conversa?: number | null
+          rodadas?: number | null
+          score?: number
+          teria_permitido?: boolean | null
+          texto_final_hash?: string | null
+          trace_id?: string | null
+          turn_type?: string | null
+          updated_at?: string
+          validadores?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_confianca_decisoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nina_confianca_propostas: {
+        Row: {
+          alvo: string
+          aplicado_em: string | null
+          aplicado_por: string | null
+          clinica_id: string
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          evidencia: Json
+          id: string
+          justificativa: string
+          motivo_decisao: string | null
+          origem: string
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          valor_atual: string | null
+          valor_sugerido: string | null
+        }
+        Insert: {
+          alvo: string
+          aplicado_em?: string | null
+          aplicado_por?: string | null
+          clinica_id: string
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          evidencia?: Json
+          id?: string
+          justificativa: string
+          motivo_decisao?: string | null
+          origem?: string
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+          valor_atual?: string | null
+          valor_sugerido?: string | null
+        }
+        Update: {
+          alvo?: string
+          aplicado_em?: string | null
+          aplicado_por?: string | null
+          clinica_id?: string
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          evidencia?: Json
+          id?: string
+          justificativa?: string
+          motivo_decisao?: string | null
+          origem?: string
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          valor_atual?: string | null
+          valor_sugerido?: string | null
+        }
+        Relationships: []
+      }
+      nina_confianca_vinculos: {
+        Row: {
+          clinica_id: string
+          conversation_id: string | null
+          created_at: string
+          decisao_id: string | null
+          detalhe: Json | null
+          estado: string
+          execucao_id: string | null
+          id: string
+          outgoing_message_id: string | null
+          representacao: string
+          texto_hash: string | null
+          transporte_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          conversation_id?: string | null
+          created_at?: string
+          decisao_id?: string | null
+          detalhe?: Json | null
+          estado?: string
+          execucao_id?: string | null
+          id?: string
+          outgoing_message_id?: string | null
+          representacao?: string
+          texto_hash?: string | null
+          transporte_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          decisao_id?: string | null
+          detalhe?: Json | null
+          estado?: string
+          execucao_id?: string | null
+          id?: string
+          outgoing_message_id?: string | null
+          representacao?: string
+          texto_hash?: string | null
+          transporte_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_confianca_vinculos_decisao_id_fkey"
+            columns: ["decisao_id"]
+            isOneToOne: false
+            referencedRelation: "nina_confianca_decisoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nina_conversa_locks: {
         Row: {
           adquirido_em: string
@@ -12258,6 +12535,13 @@ export type Database = {
           cenario_snapshot: Json
           ciclo_id: string | null
           clinica_id: string
+          confianca_amostras: number
+          confianca_max: number | null
+          confianca_media: number | null
+          confianca_min: number | null
+          confianca_niveis: Json
+          confianca_nivel_minimo: string | null
+          confianca_trace_ids: string[]
           conversa_id: string | null
           created_at: string
           criterios_resultado: Json
@@ -12292,6 +12576,13 @@ export type Database = {
           cenario_snapshot?: Json
           ciclo_id?: string | null
           clinica_id: string
+          confianca_amostras?: number
+          confianca_max?: number | null
+          confianca_media?: number | null
+          confianca_min?: number | null
+          confianca_niveis?: Json
+          confianca_nivel_minimo?: string | null
+          confianca_trace_ids?: string[]
           conversa_id?: string | null
           created_at?: string
           criterios_resultado?: Json
@@ -12326,6 +12617,13 @@ export type Database = {
           cenario_snapshot?: Json
           ciclo_id?: string | null
           clinica_id?: string
+          confianca_amostras?: number
+          confianca_max?: number | null
+          confianca_media?: number | null
+          confianca_min?: number | null
+          confianca_niveis?: Json
+          confianca_nivel_minimo?: string | null
+          confianca_trace_ids?: string[]
           conversa_id?: string | null
           created_at?: string
           criterios_resultado?: Json
