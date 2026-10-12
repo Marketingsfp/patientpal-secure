@@ -504,8 +504,10 @@ export function converterParaEstruturado(
     return {
       id: novoId(),
       nome: rotulo,
+      // A especialidade do bloco vem primeiro; sem bloco, exame usa "Especialidades cadastradas".
       especialidade:
-        tipo === "servico" ? (especialidadesCadastradas?.trim() ?? null) : null,
+        b.especialidade ??
+        (tipo === "servico" ? (especialidadesCadastradas?.trim() ?? null) : null),
       modalidade,
       horarios: comRef(horarios),
       executantes: executantes.map((e) => ({ ...e, horarios: comRef(e.horarios) })),
