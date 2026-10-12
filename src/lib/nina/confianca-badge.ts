@@ -6,7 +6,7 @@
  * que a resposta foi produzida. Sem snapshot, o rótulo é "Não avaliada" —
  * nunca um score artificial.
  */
-import type { ConfiancaDaMensagem } from "@/lib/nina/confianca.functions";
+import type { ConfiancaDaMensagem } from "@/lib/nina/confianca-tipos";
 
 export type RotuloConfianca = {
   /** Existe snapshot gravado para a mensagem. */
