@@ -503,6 +503,25 @@ describe("procedimentos do Lead 01 não viram consultas", () => {
       },
     ];
   }
+  for (const marcado of [false, true])
+    test(`agendamento por item: item ${marcado ? "marcado" : "sem marcação"} com "Nina pode agendar"`, async () => {
+      const { ctx, servico } = await iniciar();
+      fonteTeste = "base_conhecimento";
+      servico.estrutura = {
+        ...estruturaModalidadeServico(String(servico.nome), "hora_marcada"),
+        ...(marcado ? { nina_pode_agendar: true } : {}),
+      };
+      ctx.agendamentoPorItem = true;
+      const r = await executarFerramentaPaciente(ctx, "proxima_vaga", { medico_id: MEDICO });
+      if (marcado) {
+        expect(r.ok, JSON.stringify(r)).toBe(true);
+      } else {
+        expect(r.ok).toBe(false);
+        expect(r.erro).toBe("AGENDAMENTO_NAO_PERMITIDO");
+        expect(JSON.stringify(r)).not.toContain("motivo_transferencia");
+        expect(JSON.stringify(r)).toContain('"consulta_realizada":false');
+      }
+    });
   for (const modalidade of ["hora_marcada", "chegada_com_pre_agendamento"])
     for (const teste of [false, true])
       test(`${modalidade}/${teste ? "homologação" : "WhatsApp"}: nenhuma ferramenta lê vagas sem pedido e foto reconhecida libera`, async () => {

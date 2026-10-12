@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluxo de Atendimento da Nina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f5f7f6; --surface: #ffffff; --ink: #16211d; --muted: #586660; --line: #d9e1dd;
+  --nina: #0f6b57; --nina-soft: #e3f2ed; --pac: #3b4a8c; --pac-soft: #e8ebf7; --sys: #6b7280; --sys-soft: #eef0f2;
+  --alta: #a3261b; --alta-soft: #fbe9e7; --media: #9a6200; --media-soft: #fbf1dc; --baixa: #3f6212; --baixa-soft: #eef5e1;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1513; --surface: #161e1b; --ink: #e4ece8; --muted: #9aaba4; --line: #28332f;
+  --nina: #5fc4a8; --nina-soft: #11271f; --pac: #9aa8e6; --pac-soft: #1a2038; --sys: #a5adb8; --sys-soft: #20262b;
+  --alta: #f08a7e; --alta-soft: #321714; --media: #e8b45a; --media-soft: #2e2311; --baixa: #a6cf6c; --baixa-soft: #1c2711; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #161e1b; --ink: #e4ece8; --muted: #9aaba4; --line: #28332f;
+  --nina: #5fc4a8; --nina-soft: #11271f; --pac: #9aa8e6; --pac-soft: #1a2038; --sys: #a5adb8; --sys-soft: #20262b;
+  --alta: #f08a7e; --alta-soft: #321714; --media: #e8b45a; --media-soft: #2e2311; --baixa: #a6cf6c; --baixa-soft: #1c2711; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 1.0625rem/1.6 var(--body); margin: 0; }
+.wrap { max-width: 64rem; margin: 0 auto; padding-inline: 1.25rem; padding-block: 2.5rem 4rem; display: grid; gap: 2.5rem; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); font-weight: 700; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 700; }
+p { margin: 0; max-width: 72ch; }
+ul, ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.35rem; max-width: 76ch; }
+code { font-family: var(--mono); font-size: 0.82em; background: var(--sys-soft); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 1rem; }
+.sub { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.25rem; display: grid; gap: 0.7rem; }
+.tag { display: inline-block; font: 600 0.72rem/1 var(--body); letter-spacing: 0.04em; text-transform: uppercase; padding: 0.3em 0.55em; border-radius: 999px; }
+.t-prod { background: var(--nina-soft); color: var(--nina); }
+.t-branch { background: var(--media-soft); color: var(--media); }
+.t-alta { background: var(--alta-soft); color: var(--alta); }
+.t-media { background: var(--media-soft); color: var(--media); }
+.t-baixa { background: var(--baixa-soft); color: var(--baixa); }
+.resumo { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.resumo .card p { font-size: 0.98rem; }
+.num { font: 700 1.6rem/1 var(--display); color: var(--nina); }
+.fluxo { list-style: none; padding: 0; display: grid; gap: 0; counter-reset: etapa; }
+.fluxo li { counter-increment: etapa; position: relative; padding: 0 0 1.1rem 3rem; border-left: 2px solid var(--line); margin-left: 1rem; }
+.fluxo li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.fluxo li::before { content: counter(etapa); position: absolute; left: -1rem; top: -0.1rem; width: 2rem; height: 2rem; border-radius: 50%; background: var(--nina); color: var(--surface); font: 700 0.95rem/2rem var(--display); text-align: center; }
+.fluxo strong { display: block; font-family: var(--display); font-size: 1.02rem; }
+.fluxo span { color: var(--muted); font-size: 0.97rem; display: block; max-width: 70ch; }
+.tabela { width: 100%; border-collapse: collapse; font-size: 0.94rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.tabela th, .tabela td { text-align: left; vertical-align: top; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
+.tabela th { font: 600 0.78rem/1.3 var(--body); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: var(--sys-soft); }
+.tabela tr:last-child td { border-bottom: 0; }
+.rolagem { overflow-x: auto; }
+.nota { border-left: 4px solid var(--nina); background: var(--nina-soft); padding: 0.8rem 1rem; border-radius: 0 10px 10px 0; }
+.alerta { border-left: 4px solid var(--alta); background: var(--alta-soft); padding: 0.8rem 1rem; border-radius: 0 10px 10px 0; }
+nav ol { columns: 2; column-gap: 2rem; display: block; }
+nav li { margin-bottom: 0.25rem; }
+a { color: var(--nina); }
+@media (max-width: 40rem) { nav ol { columns: 1; } .fluxo li { padding-left: 2.4rem; } }
+@media print { body { background: #fff; } .wrap { padding-block: 0; gap: 1.6rem; } .card, .tabela { break-inside: avoid; } h2 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<header style="display:grid;gap:.6rem">
+  <h1>Fluxo de atendimento da Nina</h1>
+  <p class="sub">Análise do código e da configuração em produção em 12/10/2026, depois dos PRs #23, #24 e #25. Mostra o caminho completo de uma mensagem do paciente, todas as regras aplicadas e quem decide cada uma. Dados conferidos no banco somente por leitura.</p>
+  <p><span class="tag t-prod">Produção</span> já está valendo &nbsp; <span class="tag t-branch">Branch</span> implementado na branch <code>nina/agendamento-por-item</code>, ainda não publicado</p>
+</header>
+
+<nav class="card" aria-label="Sumário">
+  <h3>Sumário</h3>
+  <ol>
+    <li><a href="#resumo">Resumo</a></li>
+    <li><a href="#mapa">O caminho de uma mensagem</a></li>
+    <li><a href="#entrada">Entrada e quem pode responder</a></li>
+    <li><a href="#turno">Agrupamento, trava e watchdog</a></li>
+    <li><a href="#contexto">O que a Nina sabe em cada turno</a></li>
+    <li><a href="#jev">Jev: a leitura antes da IA</a></li>
+    <li><a href="#portoes">Decisões tomadas pelo código antes da IA</a></li>
+    <li><a href="#regras">Regras que a IA recebe</a></li>
+    <li><a href="#ia">A IA e as ferramentas</a></li>
+    <li><a href="#saida">Correções e envio</a></li>
+    <li><a href="#humano">Transferência para a equipe</a></li>
+    <li><a href="#agenda">Agendamento</a></li>
+    <li><a href="#prazos">Prazos, retenção e limites</a></li>
+    <li><a href="#atencao">Pontos de atenção</a></li>
+  </ol>
+</nav>
+
+<section id="resumo">
+  <h2>Resumo</h2>
+  <div class="resumo">
+    <div class="card"><span class="num">24h</span><p>A Nina responde a qualquer hora. Fora do funcionamento, toda transferência informa quando a clínica abre e que a equipe atende nesse horário.</p></div>
+    <div class="card"><span class="num">Não agenda</span><p>Hoje ela informa e encaminha toda intenção de agendar para a equipe. O agendamento por item ("Nina pode agendar") está pronto na branch.</p></div>
+    <div class="card"><span class="num">3 camadas</span><p>Cada resposta passa por: decisões fixas do código, leitura do Jev e a IA com regras publicadas + regras inegociáveis do código.</p></div>
+    <div class="card"><span class="num">30 min</span><p>Paciente que não responde à Nina por 30 minutos vai para o atendimento humano.</p></div>
+    <div class="card"><span class="num">6 meses</span><p>Tudo que guarda mensagens é apagado após 6 meses (ativo desde 12/10). Resumos de transferência: 7 dias.</p></div>
+    <div class="card"><span class="num">0</span><p>Itens do catálogo da Menino Jesus com modalidade preenchida. Sem modalidade, até ordem de chegada vai para a equipe.</p></div>
+  </div>
+</section>
+
+<section id="mapa">
+  <h2>O caminho de uma mensagem</h2>
+  <p>Do WhatsApp até a resposta, nesta ordem. Cada etapa pode encerrar o turno: responder sem IA, transferir ou descartar.</p>
+  <ol class="fluxo">
+    <li><strong>Webhook recebe e confere</strong><span>Assinatura da Meta, tipo de mensagem (texto, áudio transcrito, foto lida, documento só guardado), mensagem repetida descartada.</span></li>
+    <li><strong>Atalhos antes da Nina</strong><span>Resposta ao Francisco, confirmação de consulta (1/2), código do site e nota da pesquisa de satisfação são tratados sem a Nina.</span></li>
+    <li><strong>Reabre conversa encerrada e zera a espera</strong><span>Conversa resolvida volta para a Nina com sessão nova; o relógio dos 30 minutos é apagado.</span></li>
+    <li><strong>A Nina pode responder?</strong><span>Só se a conversa é da Nina (ou nova/resolvida) e a Nina não está desligada na clínica. Com atendente ou na fila humana, ela fica calada.</span></li>
+    <li><strong>Agrupa mensagens e trava a conversa</strong><span>Espera 1 s de silêncio (até 2,5 s) para juntar mensagens seguidas num turno só; uma trava impede duas respostas ao mesmo tempo.</span></li>
+    <li><strong>Carrega o contexto</strong><span>Sessão (4 h), identidade publicada, prompt publicado, catálogo da clínica, paciente confirmado, chave de agenda.</span></li>
+    <li><strong>Fotos</strong><span>Pedido médico lido pela IA de imagem; foto ilegível pede nova foto; falhas repetidas vão para a equipe.</span></li>
+    <li><strong>Jev lê a mensagem</strong><span>Intenção, nome do atendimento, cancelamento/remarcação, vários atendimentos, cartão consulta, urgência, pedido de atendente, irritação.</span></li>
+    <li><strong>Decisões fixas do código</strong><span>Cancelamento, cartão consulta, vários atendimentos, atendimento sem nome, agendamento: encaminham antes da IA.</span></li>
+    <li><strong>IA com ferramentas</strong><span>Gemini 3.8 Flash consulta o catálogo, responde e pode pedir transferência; o executor confere cada ferramenta.</span></li>
+    <li><strong>Correções e mensagem final</strong><span>Aviso de transferência único, saudação do período, apresentação sem repetir "eu sou", formato para celular.</span></li>
+    <li><strong>Envio e espera</strong><span>Texto (ou áudio) enviado; começa o prazo de 30 minutos para o paciente responder.</span></li>
+  </ol>
+</section>
+
+<section id="entrada">
+  <h2>Entrada e quem pode responder <span class="tag t-prod">Produção</span></h2>
+  <div class="card">
+    <ul>
+      <li><strong>Segurança:</strong> toda chamada da Meta tem assinatura conferida; sem a chave do app ou com assinatura errada, a mensagem é recusada.</li>
+      <li><strong>Áudio:</strong> é transcrito; se a transcrição falhar, a Nina responde que não conseguiu ouvir.</li>
+      <li><strong>Foto:</strong> só é lida pela IA quando a Nina pode responder; a leitura vira o texto do paciente.</li>
+      <li><strong>Documento e vídeo:</strong> só ficam guardados (5 anos); a Nina não lê.</li>
+      <li><strong>Responsável pela conversa</strong> (regra única): Resolvida → Humano (atendente atribuído) → Fila humana → Nina. A Nina só fala quando é dela, resolvida ou nova.</li>
+      <li><strong>Exceção:</strong> se a própria Nina transferiu neste turno e o aviso do protocolo falhou, o texto de transferência dela ainda é entregue.</li>
+      <li><strong>Janela de 24 h do WhatsApp:</strong> a Nina sempre responde a uma mensagem recebida, então está sempre dentro da janela.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="turno">
+  <h2>Agrupamento, trava e watchdog <span class="tag t-prod">Produção</span></h2>
+  <div class="card">
+    <ul>
+      <li><strong>Mensagens em sequência</strong> viram um turno só ("Mensagens recentes do paciente neste turno: 1… 2…").</li>
+      <li><strong>Mensagem nova durante a resposta:</strong> a resposta antiga é descartada e o próximo turno responde tudo junto.</li>
+      <li><strong>Trava por conversa</strong> de 90 s, renovada a cada 20 s.</li>
+      <li><strong>Watchdog</strong> (a cada minuto): retoma turnos travados; até 3 tentativas. Se não der para concluir com segurança, transfere para a equipe (<code>NINA_PROCESSING_FAILED</code>).</li>
+      <li><strong>Entrega incerta</strong> (rede caiu no envio) nunca é reenviada às cegas: é conferida antes.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="contexto">
+  <h2>O que a Nina sabe em cada turno <span class="tag t-prod">Produção</span></h2>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Informação</th><th>De onde vem</th><th>Regra</th></tr></thead>
+    <tbody>
+      <tr><td>Sessão</td><td>Estado da conversa</td><td>Dura 4 h desde a última mensagem. Sessão nova exige apresentação de novo e começa sem a memória anterior (só um resumo curto).</td></tr>
+      <tr><td>Nome da assistente e da clínica</td><td>Bloco [IDENTIDADE DO ATENDIMENTO] do prompt publicado</td><td>Hoje: Maria, Policlínica Menino Jesus. Sem bloco válido, fala de forma neutra.</td></tr>
+      <tr><td>Instruções</td><td>Prompt publicado (v65, 05/10/2026)</td><td>Uma única versão por turno; se o banco falhar, usa a última válida.</td></tr>
+      <tr><td>Catálogo</td><td>Base de conhecimento (Menino Jesus) ou cadastro do Clínica OS (SFP, Consulta Hoje)</td><td>Uma leitura por resposta; as fontes nunca se misturam.</td></tr>
+      <tr><td>Paciente</td><td>Identidade confirmada na conversa</td><td>Nome e convênio só entram com identidade confirmada; não há busca por telefone/CPF.</td></tr>
+      <tr><td>Data e hora</td><td>Relógio do servidor em Brasília</td><td>Define "hoje/amanhã" e a saudação (bom dia 05h–11h59, boa tarde 12h–17h59, boa noite 18h–04h59).</td></tr>
+      <tr><td>Agenda</td><td>Flag da clínica + transição</td><td>Hoje desligada em todas. <span class="tag t-branch">Branch</span> liga só se houver item com "Nina pode agendar".</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="jev">
+  <h2>Jev: a leitura antes da IA <span class="tag t-prod">Produção</span></h2>
+  <p>Um modelo rápido lê a mensagem com o histórico recente antes da IA principal. Ligado na Menino Jesus (fases 1 e 2). Se o Jev falhar, o turno segue normalmente.</p>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Pergunta</th><th>Quando vale</th><th>Efeito</th></tr></thead>
+    <tbody>
+      <tr><td>Intenção</td><td>Confiança ≥ 0,8</td><td>Substitui a leitura por palavras-chave e orienta a IA.</td></tr>
+      <tr><td>Disse qual atendimento?</td><td>"Sem nome" ≥ 0,8</td><td>Pergunta o nome uma vez; na segunda vez, transfere.</td></tr>
+      <tr><td>Cancelar/remarcar</td><td>≥ 0,8</td><td>Transfere (setor Agendamento).</td></tr>
+      <tr><td>Dois ou mais atendimentos</td><td>≥ 0,8</td><td>Transfere.</td></tr>
+      <tr><td>Cartão consulta</td><td>≥ 0,8</td><td>Transfere.</td></tr>
+      <tr><td>Urgência</td><td>≥ 0,5</td><td>Transfere com urgência alta (tem prioridade sobre tudo).</td></tr>
+      <tr><td>Pediu atendente</td><td>≥ 0,7</td><td>Transfere (não conta quando o paciente só cita um médico).</td></tr>
+      <tr><td>Irritação</td><td>≥ 0,8</td><td>Transfere.</td></tr>
+      <tr><td>Não entendeu duas vezes</td><td>&lt; 0,5 duas vezes, com esclarecimento entregue no meio</td><td>Transfere.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="portoes">
+  <h2>Decisões tomadas pelo código antes da IA <span class="tag t-prod">Produção</span></h2>
+  <p>Não dependem da IA obedecer. Nesta ordem de prioridade:</p>
+  <ol>
+    <li><strong>Fotos:</strong> falha técnica, pedido de nova foto ou transferência.</li>
+    <li><strong>Urgência</strong> (Jev) sempre mantém prioridade alta.</li>
+    <li><strong>Cancelamento ou remarcação</strong> (palavras ou Jev) → equipe, setor Agendamento.</li>
+    <li><strong>Cartão consulta</strong> (palavras como "cartão consulta", "cartão de benefícios", "sou associado", ou Jev) → equipe.</li>
+    <li><strong>Dois ou mais atendimentos</strong> na mesma mensagem (ou pedido médico com 2+ itens) → equipe.</li>
+    <li><strong>Atendimento sem nome:</strong> pergunta uma vez; sem resposta clara, equipe.</li>
+    <li><strong>Intenção de agendar</strong> com o atendimento identificado → equipe (setor Agendamento), exceto ordem de chegada sem pré-agendamento, que recebe a orientação de comparecer.</li>
+  </ol>
+  <p class="nota">Como nenhum item da Menino Jesus tem modalidade preenchida, a exceção de "ordem de chegada" nunca é aplicada hoje: toda intenção de agendar vai para a equipe.</p>
+</section>
+
+<section id="regras">
+  <h2>Regras que a IA recebe</h2>
+  <p>A IA recebe, nesta ordem: o envelope técnico, o <strong>prompt publicado</strong> (aba Arquitetura), um <strong>contrato de precedência</strong> com as regras inegociáveis do código e o contexto do turno em JSON. A regra de LGPD é sempre a primeira exceção.</p>
+
+  <h3>Prompt publicado (v65, 05/10/2026) <span class="tag t-prod">Produção</span></h3>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Regra</th><th>O que manda</th></tr></thead>
+    <tbody>
+      <tr><td>ID-01 Identidade</td><td>Maria, atendente virtual da Policlínica Menino Jesus; cordial, simples; nunca se apresenta como médica nem faz diagnóstico.</td></tr>
+      <tr><td>FONTE-01 Informações confirmadas</td><td>Consultar as ferramentas antes de informar; não inventar; "não encontrado" é diferente de "não oferecido".</td></tr>
+      <tr><td>PAG-01 Valores</td><td>Uma linha por modalidade: "Dinheiro: R$" e "Pix/cartão: R$".</td></tr>
+      <tr><td>PAG-02 Pix antecipado</td><td>Informar "Pix somente antecipado", sem inventar prazo ou chave.</td></tr>
+      <tr><td>ATEND-01 Escolha do atendimento</td><td>Responder primeiro a dúvida; identificar atendimento e modalidade; não tratar setor (Laboratório, Raio-X) como médico; perguntar "primeiro horário ou escolher profissional".</td></tr>
+      <tr><td>AGENDA-01 Horários</td><td>Horário habitual não é vaga; consultar vagas só com interesse em agendar; só dizer "agendado" com confirmação da ferramenta.</td></tr>
+      <tr><td>CONV-01 Várias perguntas</td><td>Responder cada pergunta separadamente; dúvida nova não cancela o agendamento em andamento.</td></tr>
+      <tr><td>CONV-02 Nomes duvidosos</td><td>Sugerir o nome entendido e pedir confirmação; após uma tentativa sem sucesso, equipe.</td></tr>
+      <tr><td>TRANSF-01 Encaminhamento</td><td>Registrar motivo específico; só dizer que transferiu após confirmação; o sistema cuida do aviso e do protocolo.</td></tr>
+      <tr><td>UNID-01 a 04 Unidades</td><td>Endereço, CEP e funcionamento habitual das 3 clínicas (fonte de verdade dos horários); informar só a unidade perguntada.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Regras inegociáveis do código, em todo turno <span class="tag t-prod">Produção</span></h3>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Código</th><th>O que manda</th></tr></thead>
+    <tbody>
+      <tr><td><code>PRIVACIDADE_PACIENTE</code></td><td>LGPD: apresentar-se como inteligência artificial ("Me chamo … e eu sou inteligência artificial da …"), pedir só dados necessários, não revelar dados sem validação, não interpretar exames, encaminhar pedidos de direitos e incidentes.</td></tr>
+      <tr><td><code>TRANSICAO_AGENDAMENTO_HUMANO</code></td><td>A Nina informa horários habituais e valores; não consulta vagas nem agenda; ordem de chegada → comparecer; demais → equipe (setor Agendamento). <span class="tag t-branch">Branch</span> vira <code>AGENDAMENTO_POR_ITEM</code> quando houver item liberado.</td></tr>
+      <tr><td><code>SAUDACAO_PELO_HORARIO</code></td><td>Cumprimento pelo horário de Brasília, mesmo que o paciente diga outro.</td></tr>
+      <tr><td><code>CARTAO_CONSULTA_HUMANO</code></td><td>Nada sobre cartão consulta; encaminhar.</td></tr>
+      <tr><td><code>CANCELAMENTO_REMARCACAO_HUMANO</code></td><td>Cancelar/remarcar é só da equipe.</td></tr>
+      <tr><td><code>SEM_INDICACAO_CLINICA</code></td><td>Não sugerir atendimento a partir de sintomas.</td></tr>
+      <tr><td><code>ENTENDIMENTO_DUAS_FALHAS</code></td><td>Duas mensagens sem entendimento → equipe.</td></tr>
+      <tr><td><code>PAGAMENTO_COMPROVADO</code></td><td>Pix e cartão têm o mesmo valor; usar só valores confirmados.</td></tr>
+      <tr><td><code>SOMENTE_PRIMEIRO_HORARIO</code></td><td>"Primeiro horário" = uma opção, não uma lista.</td></tr>
+      <tr><td><code>TIPO_CONSULTA_ANTES_AGENDA</code></td><td>Definir consulta, revisão ou noturna antes das vagas.</td></tr>
+      <tr><td><code>IDADE_NAO_INFORMADA_SEM_RESTRICAO</code></td><td>Sem idade cadastrada não há restrição de idade.</td></tr>
+      <tr><td><code>PEDIDOS_PARALELOS_PRESERVAM_RESERVA</code></td><td>Outras perguntas não desfazem o horário escolhido.</td></tr>
+      <tr><td><code>ESCOLHA_PROFISSIONAL_NOMINAL</code></td><td>Setores não são opções de médico.</td></tr>
+      <tr><td><code>ESCOLHA_ANTES_DOS_DETALHES</code></td><td>Horários habituais e escolha primeiro, detalhes depois.</td></tr>
+      <tr><td><code>CADASTRO_PESSOA_ATENDIDA</code></td><td>Cadastrar quem será atendido (inclusive dependente).</td></tr>
+      <tr><td><code>FINALIDADE_VACINA</code></td><td>Preservar a intenção de vacina.</td></tr>
+      <tr><td><code>IDENTIFICACAO_UNIFICADA</code></td><td>Confirmar candidatos; uma releitura antes de encaminhar.</td></tr>
+      <tr><td><code>SOLICITAR_FOTO_PEDIDO_MEDICO</code></td><td>Pedir foto do pedido quando o cadastro exigir (base de conhecimento).</td></tr>
+    </tbody>
+  </table></div>
+  <p class="sub">Também entram regras gerais (sem nível inegociável): formato para celular, formato de áudio, não repetir consultas, uma leitura do catálogo por resposta, preservar "Clínico Geral", consultar o dicionário publicado e a orientação de intenção do Jev.</p>
+</section>
+
+<section id="ia">
+  <h2>A IA e as ferramentas <span class="tag t-prod">Produção</span></h2>
+  <div class="card">
+    <ul>
+      <li><strong>Modelo:</strong> Google Gemini 3.8 Flash, até 6 rodadas de ferramentas (10 para listas) e no máximo 15 chamadas por turno.</li>
+      <li><strong>Ferramentas hoje:</strong> consulta ao catálogo, médicos, procedimentos, especialidades, dados e horário da clínica, pedir o nome do atendimento e solicitar atendente. Sem consulta de vagas nem agendamento.</li>
+      <li><strong>O executor confere cada ferramenta:</strong> sem agenda, vagas e reserva são recusadas; item com "encaminhamento humano obrigatório" (35 itens na Menino Jesus) → equipe; <span class="tag t-branch">Branch</span> item sem "Nina pode agendar" → recusa e equipe.</li>
+      <li><strong>Catálogo sem resultado:</strong> uma pergunta de esclarecimento; sem sucesso, equipe. Lista com mais de 8 médicos → equipe.</li>
+      <li><strong>Proteções:</strong> não dizer "agendado" sem confirmação do banco; não anunciar transferência que não aconteceu; resposta vazia vira uma mensagem de contingência.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="saida">
+  <h2>Correções e envio <span class="tag t-prod">Produção</span></h2>
+  <ol>
+    <li><strong>Aviso único:</strong> se o aviso do protocolo já saiu, a Nina não manda outro.</li>
+    <li><strong>Transferência:</strong> texto fixo com o nome publicado ("Você não está mais falando com Maria, a inteligência artificial do atendimento…") e, fora do horário, a próxima abertura.</li>
+    <li><strong>Mensagem final:</strong> modelos publicados, despedida e encerramento automático (ligado na Menino Jesus: "não, só isso, obrigado" encerra a conversa).</li>
+    <li><strong>Formato para celular</strong> e sem emojis.</li>
+    <li><strong>Saudação do período</strong> corrigida pelo relógio do servidor.</li>
+    <li><strong>Apresentação:</strong> "Eu sou a Maria, eu sou inteligência artificial" vira "Me chamo Maria e eu sou inteligência artificial".</li>
+    <li><strong>Resposta obsoleta</strong> (chegou mensagem nova) é descartada.</li>
+    <li><strong>Envio:</strong> em áudio quando o paciente mandou áudio (resposta longa: resumo falado + texto); se falhar, texto.</li>
+  </ol>
+</section>
+
+<section id="humano">
+  <h2>Transferência para a equipe <span class="tag t-prod">Produção</span></h2>
+  <div class="card">
+    <ul>
+      <li><strong>Como transfere:</strong> a conversa vai para a fila humana; o setor é escolhido pelo nome entre os departamentos ativos; em produção a conversa é distribuída para um atendente online com menor carga.</li>
+      <li><strong>Protocolo e aviso:</strong> gerados nas clínicas com protocolo configurado (Menino Jesus). Uma IA redige o aviso, validado (protocolo, equipe, "por aqui", sem termos técnicos); fora do horário o código acrescenta a abertura. Se falhar, vale o texto de reserva.</li>
+      <li><strong>Encaminhamento silencioso:</strong> possível quando o pedido marca para não avisar o paciente.</li>
+      <li><strong>Resumo interno</strong> para a equipe, guardado por 7 dias.</li>
+    </ul>
+  </div>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Motivo</th><th>Quando</th><th>Setor</th></tr></thead>
+    <tbody>
+      <tr><td>Urgência clínica</td><td>Jev ≥ 0,5</td><td>Padrão (prioridade alta)</td></tr>
+      <tr><td>Pedido de atendente / irritação / dúvida repetida</td><td>Jev</td><td>Padrão</td></tr>
+      <tr><td>Cancelamento / remarcação</td><td>Palavras, Jev ou a IA</td><td>Agendamento</td></tr>
+      <tr><td>Cartão consulta</td><td>Palavras ou Jev</td><td>Padrão</td></tr>
+      <tr><td>Vários atendimentos</td><td>Jev ou foto com 2+ itens</td><td>Padrão</td></tr>
+      <tr><td>Atendimento não informado</td><td>Nome pedido uma vez sem resposta</td><td>Padrão</td></tr>
+      <tr><td>Agendamento (<code>AGENDAMENTO_TRANSICAO</code>)</td><td>Intenção de agendar</td><td>Agendamento</td></tr>
+      <tr><td>Encaminhamento obrigatório do catálogo</td><td>Item marcado no cadastro</td><td>Padrão</td></tr>
+      <tr><td>Sem registro / não identificado</td><td>Catálogo sem resultado após esclarecimento</td><td>Padrão</td></tr>
+      <tr><td>Lista extensa</td><td>Mais de 8 profissionais</td><td>Padrão</td></tr>
+      <tr><td>Horário habitual não publicado</td><td>Médico sem horário no cadastro</td><td>Padrão</td></tr>
+      <tr><td>Foto ilegível ou falha técnica repetida</td><td>Leitura da imagem</td><td>Padrão</td></tr>
+      <tr><td>Sem resposta do paciente</td><td>30 minutos após a última mensagem da Nina</td><td>Padrão</td></tr>
+      <tr><td>Falha de processamento</td><td>Watchdog esgotou as tentativas</td><td>Padrão</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="agenda">
+  <h2>Agendamento</h2>
+  <div class="card">
+    <h3>Hoje <span class="tag t-prod">Produção</span></h3>
+    <p>A Nina informa horários habituais, valores, preparo e dúvidas. Quando o paciente quer marcar: ordem de chegada sem pré-agendamento recebe "basta comparecer"; qualquer outro caso vai para a equipe, setor Agendamento. Como as modalidades estão todas em branco, na prática tudo vai para a equipe.</p>
+  </div>
+  <div class="card">
+    <h3>Com "Nina pode agendar" <span class="tag t-branch">Branch</span></h3>
+    <ul>
+      <li>Opção por item na base de conhecimento; todos começam em "Não".</li>
+      <li>A clínica só liga as ferramentas de agenda se a flag estiver ligada e houver ao menos um item marcado. Sem nenhum item, nada muda.</li>
+      <li>Antes de consultar vagas, escolher horário, identificar ou reservar, o executor confere o item; desmarcado → equipe com o aviso de sempre.</li>
+      <li>Para agendar, o item precisa estar marcado, ter modalidade preenchida e vínculo com médico e agenda.</li>
+      <li>Vale só para quem usa a base de conhecimento (hoje, Menino Jesus); SFP e Consulta Hoje continuam encaminhando.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="prazos">
+  <h2>Prazos, retenção e limites <span class="tag t-prod">Produção</span></h2>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>O quê</th><th>Prazo</th></tr></thead>
+    <tbody>
+      <tr><td>Juntar mensagens seguidas</td><td>1 s de silêncio, até 2,5 s</td></tr>
+      <tr><td>Memória da sessão</td><td>4 h desde a última mensagem</td></tr>
+      <tr><td>Paciente sem responder</td><td>30 min → equipe</td></tr>
+      <tr><td>Watchdog</td><td>A cada minuto; 3 tentativas; turno até 5 min</td></tr>
+      <tr><td>Mensagens, conversas sem mensagens, execuções, rastros, lotes, homologação, reportes</td><td>6 meses, depois apagados (ativo desde 12/10/2026)</td></tr>
+      <tr><td>Contadores e travas por telefone</td><td>7 dias</td></tr>
+      <tr><td>Resumos internos de transferência</td><td>7 dias</td></tr>
+      <tr><td>Documentos e mídias recebidos</td><td>5 anos</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="atencao">
+  <h2>Pontos de atenção</h2>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Nível</th><th>Ponto</th><th>Sugestão</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag t-alta">Alta</span></td><td>Nenhum item do catálogo da Menino Jesus tem modalidade preenchida (migration de 11/10 limpou todas). A orientação "basta comparecer" nunca é usada e, quando o agendamento por item for publicado, nenhum item poderá ser agendado.</td><td>Preencher a modalidade dos itens mais procurados na base de conhecimento.</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td>O prompt publicado (ATEND-01 e AGENDA-01, de 05/10) ainda orienta a consultar vagas e agendar. A regra inegociável do código prevalece, mas as instruções se contradizem.</td><td>Atualizar o prompt na Arquitetura para "informar e encaminhar", ou para o agendamento por item.</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td>Com a agenda desligada, a recusa da ferramenta orienta a IA a encaminhar para o setor "Recepção", enquanto as demais regras usam "Agendamento".</td><td>Padronizar o setor de agendamento.</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td>As tabelas do motor de confiança continuam em produção; a migration de remoção ainda não foi aplicada.</td><td>Aplicar <code>20261011190000_remover_motor_confianca.sql</code> pelo Lovable.</td></tr>
+      <tr><td><span class="tag t-baixa">Baixa</span></td><td>Falha operacional de agendamento vinda de uma ferramenta transfere sem setor definido.</td><td>Enviar ao setor Agendamento, como no restante do fluxo.</td></tr>
+      <tr><td><span class="tag t-baixa">Baixa</span></td><td>Protocolo e aviso redigido só existem nas clínicas com protocolo configurado (Menino Jesus); nas outras vale o texto da própria Nina.</td><td>Confirmar se SFP e Consulta Hoje devem ter protocolo.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer class="sub" style="font-size:.9rem">Fonte: código da main em 12/10/2026 (commit 2e178ea99), branch <code>nina/agendamento-por-item</code> e consultas somente leitura ao banco de produção. Nenhum dado de paciente foi lido.</footer>
+</main>
+</body>
+</html>

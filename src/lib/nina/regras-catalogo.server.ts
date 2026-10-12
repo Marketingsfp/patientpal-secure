@@ -1,5 +1,5 @@
 import { catalogoDoTurno } from "./catalogo-turno.server";
-import { motivoRegraHumano } from "./regras-catalogo";
+import { motivoRegraHumano, permissaoAgendamentoNoCatalogo } from "./regras-catalogo";
 import { lerEstrutura } from "./catalogo-estrutura";
 
 /** Valida ações pelo cadastro lido neste turno, inclusive em sessões antigas. */
@@ -91,4 +91,40 @@ export async function atendimentoExigeHumano(entrada: {
     }
   }
   return false;
+}
+
+/**
+ * A Nina pode agendar o atendimento resolvido neste turno? Só quando o cadastro
+ * publicado do item está marcado com "Nina pode agendar" (regra de 12/10/2026).
+ * Ordem: itens já identificados na conversa, exame/procedimento pelo nome exato e
+ * consulta pelo profissional. Nada identificado = não.
+ */
+export async function atendimentoPermiteAgendamento(entrada: {
+  clinicaId: string;
+  medico?: string | null;
+  procedimento?: string | null;
+  referencias?: readonly string[];
+}): Promise<{ permitido: boolean; nomes: string[] }> {
+  const catalogo = await catalogoDoTurno(entrada.clinicaId);
+  const decisao = permissaoAgendamentoNoCatalogo(catalogo, entrada);
+  if (decisao) return decisao;
+  // Nome do médico que não bate com o cadastro: resolve pelo vínculo com a agenda.
+  if (entrada.medico?.trim() && catalogo.profissionais.some((p) => p.medico_id)) {
+    const { resolverMedicoAgenda } = await import("./vinculo-catalogo-agenda.server");
+    const resolvido = await resolverMedicoAgenda(entrada.clinicaId, entrada.medico);
+    if (resolvido.ok) {
+      const porVinculo = permissaoAgendamentoNoCatalogo(catalogo, { medico: resolvido.id });
+      if (porVinculo) return porVinculo;
+    }
+  }
+  return { permitido: false, nomes: [] };
+}
+
+/** A clínica tem ao menos um item publicado que a Nina pode agendar (marcado e com modalidade agendável)? */
+export async function algumItemPodeAgendar(clinicaId: string): Promise<boolean> {
+  const catalogo = await catalogoDoTurno(clinicaId);
+  const { fluxoDoRegistro } = await import("./fluxo-agendamento-item");
+  return [...catalogo.servicos, ...catalogo.profissionais].some(
+    (r) => fluxoDoRegistro(r) === "agendar",
+  );
 }

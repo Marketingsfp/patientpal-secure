@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auditoria das Regras da Nina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f5f7f6; --surface: #ffffff; --ink: #16211d; --muted: #586660; --line: #d9e1dd;
+  --nina: #0f6b57; --nina-soft: #e3f2ed; --sys-soft: #eef0f2;
+  --alta: #a3261b; --alta-soft: #fbe9e7; --media: #9a6200; --media-soft: #fbf1dc; --baixa: #3f6212; --baixa-soft: #eef5e1;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1513; --surface: #161e1b; --ink: #e4ece8; --muted: #9aaba4; --line: #28332f;
+  --nina: #5fc4a8; --nina-soft: #11271f; --sys-soft: #20262b;
+  --alta: #f08a7e; --alta-soft: #321714; --media: #e8b45a; --media-soft: #2e2311; --baixa: #a6cf6c; --baixa-soft: #1c2711; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #161e1b; --ink: #e4ece8; --muted: #9aaba4; --line: #28332f;
+  --nina: #5fc4a8; --nina-soft: #11271f; --sys-soft: #20262b;
+  --alta: #f08a7e; --alta-soft: #321714; --media: #e8b45a; --media-soft: #2e2311; --baixa: #a6cf6c; --baixa-soft: #1c2711; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 1.0625rem/1.6 var(--body); margin: 0; }
+.wrap { max-width: 66rem; margin: 0 auto; padding-inline: 1.25rem; padding-block: 2.5rem 4rem; display: grid; gap: 2.4rem; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); font-weight: 700; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 700; }
+p { margin: 0; max-width: 74ch; }
+ul, ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.35rem; max-width: 78ch; }
+code { font-family: var(--mono); font-size: 0.8em; background: var(--sys-soft); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 1rem; }
+.sub { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.25rem; display: grid; gap: 0.6rem; }
+.tag { display: inline-block; font: 600 0.72rem/1 var(--body); letter-spacing: 0.04em; text-transform: uppercase; padding: 0.3em 0.55em; border-radius: 999px; white-space: nowrap; }
+.t-alta { background: var(--alta-soft); color: var(--alta); }
+.t-media { background: var(--media-soft); color: var(--media); }
+.t-baixa { background: var(--baixa-soft); color: var(--baixa); }
+.t-branch { background: var(--media-soft); color: var(--media); }
+.resumo { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.num { font: 700 1.8rem/1 var(--display); color: var(--nina); }
+.tabela { width: 100%; border-collapse: collapse; font-size: 0.93rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.tabela th, .tabela td { text-align: left; vertical-align: top; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
+.tabela th { font: 600 0.78rem/1.3 var(--body); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: var(--sys-soft); }
+.tabela tr:last-child td { border-bottom: 0; }
+.rolagem { overflow-x: auto; }
+.nota { border-left: 4px solid var(--nina); background: var(--nina-soft); padding: 0.8rem 1rem; border-radius: 0 10px 10px 0; }
+nav ol { columns: 2; column-gap: 2rem; display: block; }
+nav li { margin-bottom: 0.25rem; }
+a { color: var(--nina); }
+@media (max-width: 40rem) { nav ol { columns: 1; } }
+@media print { body { background: #fff; } .wrap { padding-block: 0; gap: 1.5rem; } .card { break-inside: avoid; } tr { break-inside: avoid; } h2 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<header style="display:grid;gap:.6rem">
+  <h1>Auditoria das regras da Nina</h1>
+  <p class="sub">Regras do prompt publicado (v65, 05/10/2026) e de todo o código que instrui a IA, analisadas em 12/10/2026 na branch <code>nina/agendamento-por-item</code> (main + mudanças ainda não publicadas). Busca: regras não usadas, conflitantes, duplicadas e ambíguas.</p>
+  <p><span class="tag t-alta">Alta</span> muda o comportamento ou trava o atendimento &nbsp; <span class="tag t-media">Média</span> confunde a IA ou a equipe &nbsp; <span class="tag t-baixa">Baixa</span> limpeza &nbsp; <span class="tag t-branch">Branch</span> está no código novo, ainda não publicado</p>
+</header>
+
+<nav class="card" aria-label="Sumário">
+  <h3>Sumário</h3>
+  <ol>
+    <li><a href="#resumo">Resumo</a></li>
+    <li><a href="#camadas">De onde vêm as regras</a></li>
+    <li><a href="#conflitos">Conflitos</a></li>
+    <li><a href="#mortas">Regras não usadas</a></li>
+    <li><a href="#condicoes">Regras enviadas fora de hora</a></li>
+    <li><a href="#duplicadas">Duplicadas</a></li>
+    <li><a href="#ambiguas">Ambíguas</a></li>
+    <li><a href="#lacunas">Prompt e código fora de sincronia</a></li>
+    <li><a href="#previa">Prévia e prompt de reserva</a></li>
+    <li><a href="#plano">Plano de correção</a></li>
+  </ol>
+</nav>
+
+<section id="resumo">
+  <h2>Resumo</h2>
+  <div class="resumo">
+    <div class="card"><span class="num">12</span><p>regras no prompt publicado (aba Arquitetura).</p></div>
+    <div class="card"><span class="num">~26</span><p>regras do código enviadas em todo turno, quase todas "inegociáveis", mais instruções em ferramentas e retornos.</p></div>
+    <div class="card"><span class="num">16</span><p>conflitos; 6 de nível alto, 4 deles no fluxo de agendamento.</p></div>
+    <div class="card"><span class="num">~20</span><p>regras ou blocos de instrução que nunca chegam à IA (código morto).</p></div>
+    <div class="card"><span class="num">14</span><p>instruções repetidas em 2 a 6 lugares.</p></div>
+    <div class="card"><span class="num">3 de 24</span><p>regras do turno aparecem na prévia do prompt; a prévia não mostra o que a IA recebe.</p></div>
+  </div>
+  <p class="nota">O problema principal: o prompt publicado foi escrito para uma Nina que agenda tudo, o código foi mudando para "informar e encaminhar" e agora para "agendar por item". As duas camadas mandam coisas diferentes no mesmo turno, e regras de agenda continuam sendo enviadas mesmo quando a Nina não pode agendar.</p>
+</section>
+
+<section id="camadas">
+  <h2>De onde vêm as regras</h2>
+  <div class="card">
+    <p>Em cada turno a IA recebe, nesta ordem:</p>
+    <ol>
+      <li><strong>Envelope técnico</strong> (fixo no código).</li>
+      <li><strong>Prompt publicado</strong> da Arquitetura (v65). Se não houver versão válida, entra o <strong>prompt de reserva V4</strong>, que está no código.</li>
+      <li><strong>Contrato de precedência:</strong> LGPD (sempre primeira), apresentação e as ~24 regras do turno montadas no código.</li>
+      <li><strong>Contexto do turno em JSON</strong> (data, sessão, paciente, catálogo, ferramentas).</li>
+    </ol>
+    <p>Além disso, há instruções dentro das <strong>descrições das ferramentas</strong>, nos <strong>retornos das ferramentas</strong> (ex.: <code>INSTRUCAO_FOUND</code> do catálogo) e mensagens de sistema durante o laço (limite de rodadas, correção de falso sucesso). Depois da resposta, o código ainda <strong>reescreve o texto</strong> (saudação, apresentação, formato, aviso de transferência, pergunta de encaminhamento).</p>
+  </div>
+</section>
+
+<section id="conflitos">
+  <h2>Conflitos</h2>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Nível</th><th>Conflito</th><th>Efeito no atendimento</th><th>Sugestão</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag t-alta">Alta</span></td><td><strong>Prompt ATEND-01/AGENDA-01 × agendamento por item.</strong> O prompt manda apresentar profissionais, perguntar "primeiro horário ou escolher profissional" e consultar vagas quando há interesse, sem distinguir item agendável. O código proíbe vagas para itens não marcados.</td><td>A IA gasta rodadas em ferramentas recusadas e faz perguntas de agendamento sobre itens que só a equipe marca.</td><td>Reescrever ATEND-01/AGENDA-01 e criar no prompt uma regra com os três fluxos por item.</td></tr>
+      <tr><td><span class="tag t-alta">Alta</span> <span class="tag t-branch">Branch</span></td><td><strong>Pergunta dupla no fim da mensagem.</strong> Em item "informar e encaminhar" com 2+ médicos, o prompt faz a IA perguntar "primeiro horário ou profissional?" e o sistema acrescenta "Posso encaminhar…?". A orientação do Jev ainda manda "ofereça verificar a disponibilidade".</td><td>Paciente recebe duas perguntas diferentes de uma vez.</td><td>Proibir pergunta final de agendamento nesse fluxo e só acrescentar a do sistema se a IA não tiver feito pergunta parecida.</td></tr>
+      <tr><td><span class="tag t-alta">Alta</span></td><td><strong>Duas regras inegociáveis opostas.</strong> <code>ESCOLHA_ANTES_DOS_DETALHES</code>: "não antecipe a lista de médicos, escalas, preços". A regra de agendamento (e AGENDA-01, e as descrições de <code>consultar_disponibilidade</code>): "primeiro passe profissionais, horários habituais e valores".</td><td>A IA ora lista tudo, ora segura as informações.</td><td>Uma única regra de "primeira resposta ao pedido de marcar", com um ramo por fluxo.</td></tr>
+      <tr><td><span class="tag t-alta">Alta</span></td><td><strong>Regras de agenda ativas sem agenda.</strong> <code>SOMENTE_PRIMEIRO_HORARIO</code> (cita <code>proxima_vaga</code>), <code>ESCOLHA_ANTES</code>, <code>TIPO_CONSULTA_ANTES_AGENDA</code>, <code>CADASTRO_PESSOA_ATENDIDA</code>, <code>PEDIDOS_PARALELOS_PRESERVAM_RESERVA</code> e a eficiência de "vagas" vão sempre, junto com "não consulte vagas".</td><td>Instruções contraditórias no mesmo contrato, todas com o mesmo nível.</td><td>Enviar essas regras só quando a Nina pode agendar no turno.</td></tr>
+      <tr><td><span class="tag t-alta">Alta</span> <span class="tag t-branch">Branch</span></td><td><strong>Trava de transferência ampla demais.</strong> A trava nova bloqueia qualquer pedido de transferência da IA com "quer/deseja agendar|marcar" no motivo (só cancelamento/remarcação escapam).</td><td>Pode bloquear transferências legítimas, como vaga indisponível ou item que exige atendimento humano.</td><td>Travar só motivos <code>AGENDAMENTO_TRANSICAO</code> de itens "informar e encaminhar".</td></tr>
+      <tr><td><span class="tag t-alta">Alta</span></td><td><strong>Prompt CONV-01 × encaminhamento por vários atendimentos.</strong> O prompt manda responder cada pergunta separadamente; o código transfere antes da IA quando há 2+ atendimentos na mesma mensagem (regra de 06/10).</td><td>"Quanto custa hemograma e TSH?" vai para a equipe sem resposta. A regra de 06/10 não foi revista junto com as de 11–12/10.</td><td>Decidir com a clínica qual vale; se o encaminhamento continuar, limitar CONV-01 a perguntas do mesmo atendimento.</td></tr>
+      <tr><td><span class="tag t-media">Média</span> <span class="tag t-branch">Branch</span></td><td><strong>Clínica com agenda desligada e item marcado.</strong> Se a flag de agenda da clínica estiver desligada e um item estiver marcado, o item cai no fluxo "agendar": o sistema não pergunta nem encaminha, e a ferramenta recusa.</td><td>Paciente fica sem saída até os 30 minutos.</td><td>Considerar a flag da clínica no fluxo do item (sem agenda → informar e encaminhar).</td></tr>
+      <tr><td><span class="tag t-media">Média</span> <span class="tag t-branch">Branch</span></td><td><strong>Recusa com instrução contraditória.</strong> A recusa <code>AGENDAMENTO_NAO_PERMITIDO</code> traz "motivo de transferência" e, junto, "não encaminhe".</td><td>Sinal ambíguo para a IA.</td><td>Tirar o motivo de transferência dessa recusa.</td></tr>
+      <tr><td><span class="tag t-media">Média</span> <span class="tag t-branch">Branch</span></td><td><strong>"Informações entregues" é presumido.</strong> Se o item já apareceu numa consulta anterior da sessão, a intenção de marcar encaminha direto, sem a pergunta, mesmo que a Nina não tenha passado tudo (valores, modalidade…).</td><td>Pode encaminhar sem o paciente ter recebido todas as informações.</td><td>Confirmar a regra com a clínica; se necessário, marcar "informado" só quando a resposta com as informações foi entregue.</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td><strong>Contexto do turno desatualizado.</strong> <code>permite_reservar</code> vai sempre "false", mesmo quando a regra manda agendar; <code>ferramentas_de_consulta_disponiveis</code> recebe o valor da agenda, embora o catálogo esteja sempre disponível.</td><td>A IA recebe fatos que contradizem a regra.</td><td>Refletir o modo real de agendamento do turno.</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td><strong>Identidade.</strong> ID-01: "Maria, a atendente virtual". LGPD: proíbe "apenas atendente virtual" e exige "Me chamo… e eu sou inteligência artificial". As regras do código chamam a persona de "Nina".</td><td>Risco de apresentação errada e de o nome "Nina" vazar ao paciente.</td><td>ID-01: "Você é Maria, inteligência artificial da…"; no código, "a assistente".</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td><strong>Transferência anunciada duas vezes.</strong> TRANSF-01: "não acrescente segunda mensagem de transferência". O código acrescenta o aviso fixo a qualquer texto da IA (que muitas vezes já diz "vou encaminhar"); o texto padrão "Já chamei uma atendente…" vem seguido do aviso.</td><td>Mensagem repetitiva para o paciente.</td><td>No prompt: "em transferências, não anuncie"; no código, um único aviso.</td></tr>
+      <tr><td><span class="tag t-media">Média</span></td><td><strong>São Francisco de Paula.</strong> UNID-02/04 mandam informar dados da SFP; a regra do código encaminha atendimentos da SFP em silêncio.</td><td>Fronteira pouco clara entre informar a unidade e atender pela unidade.</td><td>Deixar explícito: endereço e funcionamento da SFP podem ser informados; atendimento pela SFP vai para a equipe.</td></tr>
+      <tr><td><span class="tag t-baixa">Baixa</span></td><td><strong>Esclarecimento: uma ou duas tentativas.</strong> O código efetivo encaminha após um esclarecimento (como CONV-02), mas há restos de "até duas vezes" (limite = 2 e um texto morto), e o próprio CONV-02 fala em "primeira tentativa" e "terceira".</td><td>Confusão ao ajustar o fluxo.</td><td>Apagar o texto morto, alinhar o limite e reescrever CONV-02.</td></tr>
+      <tr><td><span class="tag t-baixa">Baixa</span></td><td><strong>Homologação.</strong> Regras dizem "na homologação use o simulado", mas a IA sempre recebe <code>ambiente: "producao"</code>.</td><td>Trecho que a IA não consegue cumprir.</td><td>Remover esses trechos.</td></tr>
+      <tr><td><span class="tag t-baixa">Baixa</span></td><td><strong>Pix.</strong> PAG-02: "Pix somente antecipado; não repetir". O prompt de reserva: "informe uma vez por mensagem… pelo WhatsApp". <code>PAGAMENTO_COMPROVADO</code>: "pode ser informado como Pix/cartão" (permissivo, o prompt é obrigatório).</td><td>Pequenas diferenças de formato.</td><td>Alinhar com PAG-01/PAG-02.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="mortas">
+  <h2>Regras não usadas (nunca chegam à IA)</h2>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Regra / bloco</th><th>Arquivo</th><th>Situação</th></tr></thead>
+    <tbody>
+      <tr><td><code>REGRA_SEM_REGISTRO_PROMPT</code></td><td><code>catalogo-sem-registro.ts</code></td><td>Sem nenhum uso; quase idêntica a um trecho do prompt de reserva.</td></tr>
+      <tr><td><code>blocoPromptAgenda</code>, <code>blocoPromptDisponibilidade</code></td><td><code>agenda-flag.server.ts</code></td><td>Sem uso; ainda citam "somente leitura" e "no máximo 3 opções".</td></tr>
+      <tr><td><code>blocoPromptFase3/4/5/6</code></td><td><code>atendimento-fase3..6.ts</code></td><td>Só testes.</td></tr>
+      <tr><td><code>blocoPromptEstado</code>, <code>blocoPromptSessao</code>, <code>blocoPromptOfertaCompleta</code>, <code>blocoContratoEsclarecimento</code></td><td>vários</td><td>Só testes.</td></tr>
+      <tr><td><code>blocoPromptEncerramento</code>, <code>blocoDataHoraAgora</code></td><td><code>encerramento-automatico.ts</code>, <code>nina-agora.ts</code></td><td>Sem uso.</td></tr>
+      <tr><td><code>REGRA_ESCOLHA_MEDICO</code>, <code>REGRA_ESCLARECIMENTO_GERAL</code>, <code>REGRA_ESCLARECIMENTO_DUAS</code></td><td><code>prompt/limite-esclarecimento.ts</code></td><td>Só testes; "até duas vezes" contradiz a regra efetiva.</td></tr>
+      <tr><td><code>CONTINUIDADE_RESPOSTAS_ANTERIOR</code>, <code>CONTINUIDADE_RESPOSTAS_CONTEXTUAIS</code></td><td><code>prompt/respostas-contextuais.ts</code></td><td>Sem uso.</td></tr>
+      <tr><td><code>revisarFontesPromptMaster</code></td><td><code>prompt/fontes-cadastro.ts</code></td><td>Só testes.</td></tr>
+      <tr><td><code>blocoIdentidade</code>, <code>blocoFoco</code>, <code>SEM_FONTE_NO_PROMPT</code> e variáveis afins</td><td><code>whatsapp.server.ts</code></td><td>Calculadas em todo turno e nunca usadas.</td></tr>
+      <tr><td>Regras do catálogo via <code>blocoPromptCatalogo</code> (grupo, horários publicados, anestesia)</td><td><code>catalogo-prompt.server.ts</code></td><td>Só no chat do painel interno; não chegam ao WhatsApp por esse caminho.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="sub">Conferido: cada uma aparece apenas no próprio arquivo de definição (e em testes).</p>
+</section>
+
+<section id="condicoes">
+  <h2>Regras enviadas fora de hora ou com condição que não muda</h2>
+  <ul>
+    <li><strong>Regras de agenda sem agenda</strong> (ver conflito acima): vão em todo turno.</li>
+    <li><code>TRANSICAO_AGENDAMENTO_ATIVA</code> está fixa em <code>true</code>: os desvios "se a transição estiver desligada" nunca rodam.</li>
+    <li><strong>Agendamento por item, foto do pedido médico e dicionário publicado</strong> só funcionam para clínicas na base de conhecimento; SFP e Consulta Hoje (Clínica OS) nunca recebem essas regras.</li>
+    <li><strong>Regras dentro do retorno do catálogo</strong> (<code>INSTRUCAO_FOUND</code>) falam em "reservar" e "coleta de dados" mesmo sem agenda.</li>
+  </ul>
+</section>
+
+<section id="duplicadas">
+  <h2>Duplicadas</h2>
+  <div class="rolagem"><table class="tabela">
+    <thead><tr><th>Instrução</th><th>Onde aparece</th><th>Fonte única sugerida</th></tr></thead>
+    <tbody>
+      <tr><td>"Horário habitual não é vaga"</td><td>AGENDA-01, catálogo, transição, por item, 2 descrições de ferramentas, Jev (6+)</td><td>AGENDA-01 (prompt)</td></tr>
+      <tr><td>Pix = cartão</td><td>PAG-01, <code>PAGAMENTO_COMPROVADO</code>, prompt de reserva (3×)</td><td>PAG-01</td></tr>
+      <tr><td>Setores não são médicos</td><td>ATEND-01, <code>ESCOLHA_PROFISSIONAL_NOMINAL</code>, regras do catálogo</td><td>Código (lista completa)</td></tr>
+      <tr><td>Ordem de chegada sem pré-agendamento</td><td>ATEND-01, por item, transição, escolha profissional</td><td>Regra por item (código)</td></tr>
+      <tr><td>"Primeiro horário" = uma opção</td><td>AGENDA-01, <code>SOMENTE_PRIMEIRO_HORARIO</code>, descrição de <code>proxima_vaga</code></td><td>Código</td></tr>
+      <tr><td>Só afirmar sucesso com retorno da ferramenta</td><td>AGENDA-01, TRANSF-01, LGPD, cadastro, pedidos paralelos, identificação</td><td>AGENDA-01 e TRANSF-01</td></tr>
+      <tr><td>Pedidos independentes</td><td>CONV-01, pedidos paralelos, identificação unificada</td><td>CONV-01</td></tr>
+      <tr><td>Fonte/histórico não confirma informação</td><td>FONTE-01, regra do catálogo, descrição de <code>consultar_cadastro</code></td><td>FONTE-01</td></tr>
+      <tr><td>Identificação unificada</td><td>Contrato, leitura ampliada do Jev, interpretação do catálogo (2× por turno com Jev)</td><td>Contrato</td></tr>
+      <tr><td>Idade não informada / foto do pedido</td><td>Contrato, retorno do catálogo, mapa de campos</td><td>Retorno do catálogo</td></tr>
+      <tr><td>Sem diagnóstico</td><td>ID-01, LGPD, sem indicação clínica</td><td>LGPD</td></tr>
+      <tr><td>Apresentação</td><td>LGPD, regra geral de apresentação, escolha antes dos detalhes, texto do código</td><td>Identidade publicada + texto do código</td></tr>
+      <tr><td>Duas falhas de entendimento</td><td>Regra do turno, descrição da ferramenta de transferência</td><td>Regra do turno</td></tr>
+      <tr><td>Transição × por item</td><td>Três tópicos idênticos nas duas regras</td><td>Um bloco comum</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="ambiguas">
+  <h2>Ambíguas</h2>
+  <ul>
+    <li><strong>"Interesse em agendar":</strong> o código conta "disponibilidade" como intenção. "Tem vaga amanhã?" dispara a oferta ou o encaminhamento, enquanto o prompt só exclui preço, preparo e funcionamento.</li>
+    <li><strong>"Equipe/departamento que permite agendamento"</strong> (ATEND-01): não diz se depende da modalidade, de "Nina pode agendar" ou da flag da clínica.</li>
+    <li><strong>"Encaminhamentos obrigatórios"</strong> (TRANSF-01): a lista só existe no código (cartão consulta, cancelamento, privacidade, SFP, +8 profissionais, vários atendimentos, sem registro).</li>
+    <li><strong>"Tentativa" de esclarecimento</strong> (CONV-02): não diz se conta por mensagem do paciente ou por pergunta da Nina.</li>
+    <li><strong>"Primeiro contato" × "primeira resposta da sessão" × "saudação obrigatória":</strong> três critérios para a mesma coisa.</li>
+    <li><strong>"Pix somente antecipado":</strong> não diz antecipado a quê.</li>
+    <li><span class="tag t-branch">Branch</span> <strong>Oferta "Posso encaminhar?" pendente:</strong> só é limpa com recusa ou encaminhamento; um "sim" dado mais tarde a outra pergunta pode ser lido como aceite.</li>
+    <li><span class="tag t-branch">Branch</span> <strong>Itens com fluxos diferentes</strong> na mesma conversa: a decisão fica indefinida e segue sem regra própria.</li>
+  </ul>
+</section>
+
+<section id="lacunas">
+  <h2>Prompt e código fora de sincronia</h2>
+  <div class="card">
+    <h3>Regras do prompt que o código anula</h3>
+    <ul>
+      <li>CONV-01, quando há vários atendimentos (transferência antes da IA).</li>
+      <li>A pergunta de escolha do ATEND-01 e a consulta de vagas do AGENDA-01, nos itens não agendáveis.</li>
+      <li>"Não repita o aviso de transferência" (TRANSF-01): o aviso é sempre acrescentado.</li>
+      <li>"Atendente virtual" (ID-01): a LGPD sobrepõe sem corrigir o texto.</li>
+      <li>A saudação escrita pela IA é reescrita pelo relógio do servidor; o formato é reorganizado e os emojis removidos.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Regras que só existem no código (o prompt v65 não menciona)</h3>
+    <ul>
+      <li>Os três fluxos por item e a pergunta de encaminhamento do sistema.</li>
+      <li>Cartão consulta e cancelamento/remarcação vão para a equipe.</li>
+      <li>Saudação pelo horário de Brasília e apresentação "Me chamo… eu sou inteligência artificial".</li>
+      <li>Limite de 8 profissionais, SFP silencioso, idade não informada, foto do pedido médico, duas falhas de entendimento.</li>
+      <li>30 minutos sem resposta → equipe; Nina 24 h com horário de abertura no aviso.</li>
+      <li>A regra geral de apresentação manda seguir "o comportamento publicado", mas o v65 não define formato de apresentação: referência circular.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="previa">
+  <h2>Prévia do prompt e prompt de reserva</h2>
+  <ul>
+    <li><strong>Prévia incompleta:</strong> a tela de prévia monta só 3 das 24 regras do turno (transição/por item, cartão consulta e LGPD/apresentação). O comentário no código diz "nada é omitido", o que não é verdade. Também falta a ferramenta <code>solicitar_nome_atendimento</code>.</li>
+    <li><strong>Prompt de reserva V4 desatualizado:</strong> entra quando não há versão publicada válida (ou falha de leitura sem cache recente). Ele manda "encaminhe com PACIENTE_QUER_MARCAR, setor Recepção", contradiz as regras de 11–12/10 e ainda se contradiz em partes que mandam consultar vagas e agendar. Em modo de reserva, várias regras vão duas vezes (reserva + contrato).</li>
+  </ul>
+</section>
+
+<section id="plano">
+  <h2>Plano de correção</h2>
+  <ol>
+    <li><strong>Código da branch, antes do commit</strong> (baixo risco): restringir a trava de transferência; considerar a flag da clínica no fluxo do item; tirar o motivo da recusa <code>AGENDAMENTO_NAO_PERMITIDO</code>; evitar pergunta dupla; enviar as regras de agenda só quando a Nina pode agendar no turno; corrigir <code>permite_reservar</code> no contexto.</li>
+    <li><strong>Prompt publicado</strong> (Arquitetura): reescrever ID-01, ATEND-01, AGENDA-01, CONV-02 e TRANSF-01; criar uma regra com os três fluxos por item; listar os encaminhamentos obrigatórios.</li>
+    <li><strong>Decisões da clínica:</strong> vários atendimentos na mesma mensagem (encaminhar ou responder cada um); encaminhar direto quando as informações já foram passadas ou sempre perguntar.</li>
+    <li><strong>Limpeza:</strong> apagar as regras mortas; remover duplicações injetadas (Pix, pedidos paralelos); unificar a regra de "primeira resposta ao pedido de marcar"; atualizar o prompt de reserva V4 e a prévia.</li>
+  </ol>
+</section>
+
+<footer class="sub" style="font-size:.9rem">Fonte: prompt publicado v65 (leitura somente leitura do banco) e código da branch <code>nina/agendamento-por-item</code> em 12/10/2026. Nenhum dado de paciente foi lido.</footer>
+</main>
+</body>
+</html>

@@ -72,10 +72,11 @@ describe("defesa na execução com a flag desligada", () => {
     },
   );
 
-  test("a mensagem das ferramentas de vaga manda encaminhar à recepção", async () => {
+  test("a mensagem das ferramentas de vaga manda informar antes de qualquer encaminhamento", async () => {
     const r = await executar("proxima_vaga");
-    expect(String(r["mensagem"] ?? r["message"] ?? JSON.stringify(r))).toContain(
-      "solicitar_atendente_humano",
-    );
+    const mensagem = String(r["mensagem"] ?? r["message"] ?? JSON.stringify(r));
+    expect(mensagem).toContain("horários habituais");
+    expect(mensagem).toContain("o sistema pergunta ao paciente se pode encaminhar");
+    expect(mensagem).not.toContain("Recepção");
   });
 });

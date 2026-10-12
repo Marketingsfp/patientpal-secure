@@ -203,7 +203,7 @@ export const previewRequestNina = createServerFn({ method: "POST" })
       consulta_agenda: {
         ferramentas_de_consulta_disponiveis: podeAgendar,
         permite_reservar: false,
-        modo_operacional: podeAgendar ? "agendamento_ativo" : "informar_e_encaminhar",
+        modo_operacional: podeAgendar ? "agendamento_por_item" : "informar_e_encaminhar",
         intencao_de_agendar_identificada: false,
       },
       aprendizados: [],
@@ -221,6 +221,17 @@ export const previewRequestNina = createServerFn({ method: "POST" })
         motivo: "Exibir na previa a mesma transicao aplicada no atendimento.",
         texto: REGRA_TRANSICAO_AGENDAMENTO,
       });
+    } else {
+      const { TRANSICAO_AGENDAMENTO_ATIVA, REGRA_AGENDAMENTO_POR_ITEM } =
+        await import("./transicao-agendamento");
+      if (TRANSICAO_AGENDAMENTO_ATIVA)
+        instrucoesAdicionais.push({
+          codigo: "AGENDAMENTO_POR_ITEM",
+          nivel: "inegociavel",
+          origem: "src/lib/nina/transicao-agendamento.ts",
+          motivo: "Exibir na prévia a mesma regra de agendamento por item aplicada no atendimento.",
+          texto: REGRA_AGENDAMENTO_POR_ITEM,
+        });
     }
     const { REGRA_CARTAO_CONSULTA } = await import("./cartao-consulta");
     instrucoesAdicionais.push({

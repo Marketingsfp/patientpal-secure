@@ -1,4 +1,71 @@
 import { CAUSA_SFP_OUTRA_UNIDADE } from "@/lib/atendimento/motivo-sfp";
+import { lerEstrutura } from "./catalogo-estrutura";
+import { fluxoDoRegistro } from "./fluxo-agendamento-item";
+
+/**
+ * Regra de 12/10/2026: a Nina só agenda itens do catálogo marcados com
+ * "Nina pode agendar". Sem registro identificado, ou com qualquer registro
+ * não marcado, a resposta é não: informar e encaminhar à equipe.
+ */
+export function registrosPermitemAgendar(registros: readonly { estrutura?: unknown }[]): boolean {
+  return (
+    registros.length > 0 &&
+    registros.every((r) => lerEstrutura(r.estrutura).nina_pode_agendar === true)
+  );
+}
+
+type RegistroAgendavel = {
+  id: string;
+  nome: string;
+  estrutura?: unknown;
+  medico_id?: string | null;
+  tipo_atendimento?: string | null;
+};
+
+/**
+ * Decide pelo catálogo já lido. Ordem: itens identificados na conversa,
+ * exame/procedimento pelo nome exato e consulta pelo profissional.
+ * `null` = nenhum item encontrado (o servidor ainda pode resolver o médico).
+ */
+export function permissaoAgendamentoNoCatalogo(
+  catalogo: { servicos: readonly RegistroAgendavel[]; profissionais: readonly RegistroAgendavel[] },
+  entrada: {
+    medico?: string | null;
+    procedimento?: string | null;
+    referencias?: readonly string[];
+  },
+): { permitido: boolean; nomes: string[] } | null {
+  // Agendar exige "Nina pode agendar" E modalidade agendável (hora marcada,
+  // ordem de chegada com pré-agendamento ou ficha).
+  const decidir = (registros: readonly RegistroAgendavel[]) => ({
+    permitido: registros.length > 0 && registros.every((r) => fluxoDoRegistro(r) === "agendar"),
+    nomes: registros.map((r) => r.nome),
+  });
+  const referencias = (entrada.referencias ?? []).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  const porReferencia = [...catalogo.servicos, ...catalogo.profissionais].filter((r) =>
+    referencias.includes(r.id),
+  );
+  if (porReferencia.length) return decidir(porReferencia);
+  const procedimento = entrada.procedimento?.trim().toLocaleLowerCase("pt-BR");
+  if (procedimento) {
+    const servicos = catalogo.servicos.filter(
+      (s) => s.nome.toLocaleLowerCase("pt-BR") === procedimento,
+    );
+    if (servicos.length) return decidir(servicos);
+  }
+  const medico = entrada.medico?.trim();
+  if (medico) {
+    const alvo = medico.toLocaleLowerCase("pt-BR");
+    const profissionais = catalogo.profissionais.filter(
+      (p) =>
+        p.id === medico ||
+        p.medico_id === medico ||
+        p.nome.trim().toLocaleLowerCase("pt-BR") === alvo,
+    );
+    if (profissionais.length) return decidir(profissionais);
+  }
+  return null;
+}
 
 /** Só normaliza critérios de idade explícitos, não datas, preços ou periodicidade. */
 export function apresentarIdadeMinima(texto: string | null): string | null {

@@ -67,6 +67,11 @@ export const estruturaCatalogoSchema = z
     abrangencia: z.enum(["item", "grupo"]).nullable().optional(),
     grupo: z.string().trim().max(200).nullable().optional(),
     encaminhamento_humano: z.boolean().nullable().optional(),
+    /**
+     * A Nina pode agendar este item (regra de 12/10/2026). Só `true` libera;
+     * ausente, nulo ou `false` = informar e encaminhar à equipe.
+     */
+    nina_pode_agendar: z.boolean().nullable().optional(),
     preparo_status: z.enum(["nao_informado", "informado", "sem_preparo"]).default("nao_informado"),
     pedido_medico: z.enum(["nao_informado", "obrigatorio", "dispensado"]).default("nao_informado"),
     convenios_status: z.enum(["nao_informado", "aceita", "nao_aceita"]).default("nao_informado"),

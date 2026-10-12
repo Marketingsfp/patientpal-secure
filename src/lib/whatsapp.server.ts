@@ -1474,6 +1474,16 @@ async function gerarRespostaNinaInterno(
       codigo: { arquivo: "src/lib/nina/multiplos-atendimentos.ts", funcao: "multiplosPeloJev" },
     });
   }
+  // Resposta à pergunta "Posso encaminhar…?" (fluxo informar e encaminhar):
+  // o atendimento já é conhecido pela oferta, então não se pergunta o nome de novo.
+  const { respostaAOferta } = await import("@/lib/nina/fluxo-agendamento-item");
+  const ofertaEncaminhamento =
+    sessaoNina.estado?.oferta_encaminhamento &&
+    sessaoNina.estado.oferta_encaminhamento.session_id === sessaoNina.estado.session_id
+      ? sessaoNina.estado.oferta_encaminhamento
+      : null;
+  const respostaOfertaTurno = ofertaEncaminhamento ? respostaAOferta(mensagemPaciente) : null;
+  if (respostaOfertaTurno === "aceite") nomeAtendimentoAusente = false;
   if (nomeAtendimentoAusente && !jevEncaminhamento) {
     if (perguntaNomeAnterior)
       jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
@@ -1490,7 +1500,8 @@ async function gerarRespostaNinaInterno(
   // regras da recepção. Fora disso, nada muda (comportamento antigo intacto).
   const { ferramentasAgendaAtivas } = await import("@/lib/nina/agenda-flag.server");
   const podeAgendar = await ferramentasAgendaAtivas(clinicaId);
-  const { temIntencaoDeAgendar } = await import("@/lib/nina/transicao-agendamento");
+  const { temIntencaoDeAgendar, TRANSICAO_AGENDAMENTO_ATIVA: agendamentoPorItem } =
+    await import("@/lib/nina/transicao-agendamento");
   // `intencoesTurno` ja combina a leitura deterministica com a leitura segura do Jev.
   const intencaoAgendamentoTransicao = !podeAgendar && temIntencaoDeAgendar(intencoesTurno);
 
@@ -1716,6 +1727,17 @@ async function gerarRespostaNinaInterno(
         "Medida temporaria: a Nina informa; ordem de chegada comparece; os demais agendamentos vao para a equipe.",
       texto: REGRA_TRANSICAO_AGENDAMENTO,
     });
+  } else {
+    const { REGRA_AGENDAMENTO_POR_ITEM } = await import("@/lib/nina/transicao-agendamento");
+    if (agendamentoPorItem)
+      instrucoesAdicionaisTurno.push({
+        codigo: "AGENDAMENTO_POR_ITEM",
+        nivel: "inegociavel",
+        origem: "src/lib/nina/transicao-agendamento.ts",
+        motivo:
+          "A Nina agenda somente os itens do catálogo marcados com 'Nina pode agendar' (regra de 12/10/2026).",
+        texto: REGRA_AGENDAMENTO_POR_ITEM,
+      });
   }
   const { regraSaudacaoPeriodo } = await import("@/lib/nina/resposta/saudacao-periodo");
   instrucoesAdicionaisTurno.push({
@@ -1914,6 +1936,19 @@ async function gerarRespostaNinaInterno(
     });
   // O motor antigo não impõe pendências aos novos turnos.
   fluxoEstado.clarification = undefined;
+  // Regras que só tratam de vagas, reserva e cadastro para reserva não vão quando
+  // a Nina não pode agendar neste turno (evita instruções opostas no contrato).
+  if (!podeAgendar) {
+    const SO_COM_AGENDA = new Set([
+      "SOMENTE_PRIMEIRO_HORARIO",
+      "TIPO_CONSULTA_ANTES_AGENDA",
+      "ESCOLHA_ANTES_DOS_DETALHES",
+      "CADASTRO_PESSOA_ATENDIDA",
+    ]);
+    for (let i = instrucoesAdicionaisTurno.length - 1; i >= 0; i--)
+      if (SO_COM_AGENDA.has(instrucoesAdicionaisTurno[i]!.codigo))
+        instrucoesAdicionaisTurno.splice(i, 1);
+  }
   const precedenciaTurno = resolverPrecedenciaDoTurno({
     instrucoesAdicionais: instrucoesAdicionaisTurno,
     textoPublicado: behaviorPrompt,
@@ -2061,7 +2096,11 @@ async function gerarRespostaNinaInterno(
       ferramentas_de_consulta_disponiveis: podeAgendar,
       interpretacao_intencao: "modelo_com_historico_da_sessao",
       permite_reservar: false,
-      modo_operacional: podeAgendar ? "agendamento_ativo" : "informar_e_encaminhar",
+      modo_operacional: !podeAgendar
+        ? "informar_e_encaminhar"
+        : agendamentoPorItem
+          ? "agendamento_por_item"
+          : "agendamento_ativo",
       intencao_de_agendar_identificada: intencaoAgendamentoTransicao,
       referencia_anterior_profissional: contextoConsultaAgenda.medicoEscolhido?.nome ?? null,
       fonte_horarios_habituais: "catalogo_publicado",
@@ -2166,6 +2205,7 @@ async function gerarRespostaNinaInterno(
       conversaId: estadoId.conversaId,
       origem: opcoes?.teste ? "homologacao" : "whatsapp",
       podeAgendar,
+      agendamentoPorItem,
       estado: fluxoEstado,
       teste: opcoes?.teste === true,
       consultaAgenda: contextoConsultaAgenda,
@@ -2749,6 +2789,8 @@ async function gerarRespostaNinaInterno(
           undefined,
           (r.dados as { motivo_transferencia?: unknown } | null)?.motivo_transferencia,
         );
+      // Item sem "Nina pode agendar" (AGENDAMENTO_NAO_PERMITIDO): não encaminha aqui.
+      // A IA informa e o sistema pergunta se pode encaminhar (fluxo por item).
       return limitarRetornoParaModelo(payload);
     }
     const esclarecimentoAtual = (
@@ -2990,28 +3032,47 @@ async function gerarRespostaNinaInterno(
       },
     });
   }
-  const { deveEncaminharAgendamentoAntesDoModelo } =
-    await import("@/lib/nina/transicao-agendamento");
-  if (
-    deveEncaminharAgendamentoAntesDoModelo({
-      ferramentasAgendaAtivas: podeAgendar,
-      intencoes: intencoesTurno,
-      modalidade: fluxoEstado.appointment.modalidade_atendimento,
-      atendimentoIdentificado: !nomeAtendimentoAusente,
-      jaPossuiEncaminhamento: Boolean(jevEncaminhamento),
-    })
-  ) {
+  // Fluxo por item (regra de 12/10/2026): o item decide entre agendar, informar e
+  // encaminhar, ou só informar (ordem de chegada). Nunca encaminha antes de informar:
+  // com a intenção chegando antes das informações, a Nina informa e o sistema pergunta.
+  const fluxoAgendamento = await import("@/lib/nina/fluxo-agendamento-item");
+  const { catalogoDoTurno: catalogoDoFluxo } = await import("@/lib/nina/catalogo-turno.server");
+  const catalogoFluxo = await catalogoDoFluxo(clinicaId);
+  const fluxoDasReferencias = (referencias: readonly string[]) =>
+    fluxoAgendamento.fluxoDosItens(
+      [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
+        .filter((r) => referencias.includes(r.id))
+        .map((r) => fluxoAgendamento.fluxoDoRegistro(r, podeAgendar)),
+    );
+  // Itens apresentados em turnos anteriores desta sessão (sem esclarecimento pendente).
+  const referenciasInformadas = conhecimentoAnterior?.esclarecimento
+    ? []
+    : (conhecimentoAnterior?.referencias ?? []).map((r) => r.registro);
+  const referenciasDaDecisao = ofertaEncaminhamento?.referencias.length
+    ? ofertaEncaminhamento.referencias
+    : referenciasInformadas;
+  const decisaoAgendamento = fluxoAgendamento.decidirAgendamentoNoTurno({
+    intencaoAgendar: temIntencaoDeAgendar(intencoesTurno),
+    fluxo: fluxoDasReferencias(referenciasDaDecisao),
+    informacoesEntregues: referenciasDaDecisao.length > 0,
+    ofertaPendente: Boolean(ofertaEncaminhamento),
+    respostaOferta: respostaOfertaTurno,
+  });
+  if (respostaOfertaTurno === "recusa") fluxoEstado.oferta_encaminhamento = null;
+  if (decisaoAgendamento === "encaminhar" && !jevEncaminhamento) {
     jevEncaminhamento = {
       motivo:
-        "AGENDAMENTO_TRANSICAO: paciente sinalizou que deseja agendar; a IA deve encaminhar antes de consultar vagas ou coletar dados para reserva.",
+        "AGENDAMENTO_TRANSICAO: o paciente já recebeu as informações do atendimento e deseja marcar; a equipe confirma o horário.",
       urgencia: "normal",
     };
+    nomeAtendimentoAusente = false;
   }
 
   async function executarDecisaoEncaminhamento(
     decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento,
   ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
+    fluxoEstado.oferta_encaminhamento = null;
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
       turnoObsoleto = await respostaObsoleta({
@@ -3606,6 +3667,44 @@ async function gerarRespostaNinaInterno(
           },
         });
         continue;
+      }
+      if (
+        nome === "solicitar_atendente_humano" &&
+        decisaoAgendamento !== "encaminhar" &&
+        fluxoDasReferencias(
+          (fluxoEstado.knowledge_context?.referencias ?? []).map((r) => r.registro),
+        ) !== "agendar"
+      ) {
+        let motivoModelo = "";
+        try {
+          motivoModelo = String(JSON.parse(c.function?.arguments ?? "{}")?.motivo ?? "");
+        } catch {
+          /* Argumentos inválidos seguem a validação normal do broker. */
+        }
+        if (fluxoAgendamento.motivoEhEncaminhamentoDeAgendamento(motivoModelo)) {
+          mensagens.push({
+            role: "tool",
+            tool_call_id: c.id,
+            content: JSON.stringify({
+              ok: false,
+              executada: false,
+              erro: "INFORMAR_ANTES_DE_ENCAMINHAR",
+              mensagem:
+                "Não encaminhe ainda. Responda primeiro às dúvidas com as informações do cadastro (profissionais, horários habituais, modalidade, funcionamento da clínica e valores). O sistema pergunta ao paciente se pode encaminhar e faz o encaminhamento quando ele confirmar.",
+            }),
+          });
+          registrarEtapa({
+            tipo: "consulta",
+            fonte: "sistema",
+            titulo: "Encaminhamento de agendamento adiado até informar o paciente",
+            dados: { motivo: motivoModelo.slice(0, 300) },
+            codigo: {
+              arquivo: "src/lib/nina/fluxo-agendamento-item.ts",
+              funcao: "motivoEhEncaminhamentoDeAgendamento",
+            },
+          });
+          continue;
+        }
       }
       if (reservaComPerguntas && !PESQUISAS_INDEPENDENTES.has(nome)) {
         mensagens.push({
@@ -4334,6 +4433,51 @@ async function gerarRespostaNinaInterno(
         comPedido,
       );
     resposta = comPedido;
+  }
+
+  // Fluxo informar e encaminhar: a intenção de marcar chegou antes das informações.
+  // A Nina informou neste turno; o sistema pergunta se pode encaminhar à equipe.
+  if (
+    !semNovaMensagem &&
+    !turnoObsoleto &&
+    !houveHandoff &&
+    !finalizacaoHandoff &&
+    !ctxFerramentas?.esclarecimentoCatalogo &&
+    !fluxoEstado.knowledge_context?.esclarecimento &&
+    resposta.trim() &&
+    temIntencaoDeAgendar(intencoesTurno)
+  ) {
+    const referenciasDoTurno = (fluxoEstado.knowledge_context?.referencias ?? []).map(
+      (r) => r.registro,
+    );
+    if (
+      referenciasDoTurno.length &&
+      fluxoDasReferencias(referenciasDoTurno) === "informar_e_encaminhar" &&
+      !resposta.includes(fluxoAgendamento.PERGUNTA_ENCAMINHAMENTO)
+    ) {
+      const antes = resposta;
+      // Uma pergunta só: a da IA sobre horário/profissional sai e entra a do sistema.
+      resposta = `${fluxoAgendamento.removerPerguntaDeAgendamento(resposta).trim()}\n\n${fluxoAgendamento.PERGUNTA_ENCAMINHAMENTO}`;
+      transformar(
+        "agendamento.oferta_encaminhamento",
+        "Informações entregues; pergunta se pode encaminhar à equipe para confirmar o horário",
+        antes,
+        resposta,
+      );
+      if (fluxoEstado.session_id) {
+        fluxoEstado.oferta_encaminhamento = {
+          session_id: fluxoEstado.session_id,
+          referencias: referenciasDoTurno.slice(0, 40),
+          em: new Date().toISOString(),
+        };
+        await salvarFluxoEstado(
+          supabaseAdmin as never,
+          clinicaId,
+          estadoId.conversaId,
+          fluxoEstado,
+        );
+      }
+    }
   }
 
   // Sem aviso do protocolo: a própria Nina avisa. Na homologação o aviso é de

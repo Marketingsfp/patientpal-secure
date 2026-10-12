@@ -36,13 +36,17 @@ describe("Jev: orientação ativa da resposta", () => {
     const o = orientar({ obs_pedido_profissionais: { noul: 0.95 } })!;
     const texto = o.instrucoes.join("\n");
     expect(texto).toContain("ESCOLHA_ANTES_DOS_DETALHES");
-    expect(texto).toContain("sem listar nomes, escalas nem preços");
+    expect(texto).toContain("Se o atendimento puder ser agendado pela assistente");
+    expect(texto).toContain("apresente as informações publicadas do atendimento");
   });
   test("dias habituais orientam a base e oferta de consulta, sem virar disponibilidade", () => {
     const o = orientar({ obs_pedido_horario_habitual: { noul: 0.98 } })!;
     expect(o.intencoes).not.toContain("disponibilidade");
     expect(o.instrucoes.join("\n")).toContain("Escala habitual não comprova vaga");
-    expect(o.instrucoes.join("\n")).toContain("não consulte vagas só por mencionar a escala");
+    expect(o.instrucoes.join("\n")).toContain("Não consulte vagas só por mencionar a escala");
+    expect(o.instrucoes.join("\n")).toContain(
+      "somente se o atendimento puder ser agendado pela assistente",
+    );
   });
   test("escala e pedido explícito de vaga coexistem", () => {
     const o = orientar({
