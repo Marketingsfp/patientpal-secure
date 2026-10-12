@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Label } from "@/components/ui/label";
+import { RotuloAjuda } from "./AjudaCatalogo";
 import type { EstruturaCatalogo } from "@/lib/nina/catalogo-estrutura";
 
 type PedidoMedico = EstruturaCatalogo["pedido_medico"];
@@ -23,7 +23,9 @@ export function PedidoMedicoEditor({
   const id = useId();
   return (
     <div className="space-y-1">
-      <Label htmlFor={id}>Precisa de pedido médico?</Label>
+      <RotuloAjuda chave="pedido_medico" htmlFor={id}>
+        Precisa de pedido médico?
+      </RotuloAjuda>
       <select
         id={id}
         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
