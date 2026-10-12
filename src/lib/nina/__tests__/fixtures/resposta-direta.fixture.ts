@@ -964,9 +964,6 @@ mock.module("@/lib/nina/confidence/runtime", () => ({
   montarContextoDoTurno: proibido,
 }));
 mock.module("@/lib/nina/confidence/claims", () => ({ avaliarGrounding: proibido }));
-mock.module("@/lib/nina/confidence/configuracao-turno.server", () => ({
-  configuracaoDoTurno: proibido,
-}));
 globalThis.fetch = Object.assign(
   async () => {
     rede++;
@@ -979,7 +976,7 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from(tabela: string) {
       consultas.push(tabela);
-      if (tabela.startsWith("nina_confianca") && tabela !== "nina_confianca_vinculos")
+      if (tabela.startsWith("nina_confianca"))
         return proibido();
       let unica = false;
       const filtrosCatalogo: Array<(linha: any) => boolean> = [];
