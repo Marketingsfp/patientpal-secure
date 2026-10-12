@@ -64,6 +64,13 @@
       "when": 1791735557610,
       "tag": "0008_atend_listar_departamentos_profiles_nome",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791775925989,
+      "tag": "0009_retencao_mensagens_6_meses",
+      "breakpoints": true
     }
   ]
 }
