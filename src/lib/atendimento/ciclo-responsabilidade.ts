@@ -64,6 +64,18 @@ export function ninaResponde(conv: ConversaCiclo | null | undefined): boolean {
   return r === "NINA" || r === "RESOLVIDA";
 }
 
+/**
+ * A Nina pode entregar o aviso do encaminhamento que ela mesma fez neste turno?
+ * Só enquanto a conversa aguarda na fila humana: o encaminhamento é o motivo de
+ * ela não responder mais. Com atendente já atribuído, o humano conduz.
+ */
+export function ninaAvisaProprioHandoff(
+  conv: ConversaCiclo | null | undefined,
+  handoffNoTurno: boolean,
+): boolean {
+  return handoffNoTurno && derivarResponsavel(conv) === "FILA_HUMANA";
+}
+
 /** Rótulo interno para a equipe (não vai para o paciente). */
 export function rotuloResponsavel(r: Responsavel): string {
   switch (r) {

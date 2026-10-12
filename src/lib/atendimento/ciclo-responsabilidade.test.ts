@@ -3,6 +3,7 @@ import {
   CICLO_PATCH,
   derivarResponsavel,
   inconsistenciasCiclo,
+  ninaAvisaProprioHandoff,
   ninaResponde,
 } from "./ciclo-responsabilidade";
 
@@ -61,5 +62,33 @@ describe("ciclo de responsabilidade da conversa", () => {
     expect(inconsistenciasCiclo({ ...CICLO_PATCH.filaHumana(), status: "waiting" })).toEqual([]);
     expect(inconsistenciasCiclo({ ...CICLO_PATCH.humano("u1"), status: "active" })).toEqual([]);
     expect(inconsistenciasCiclo({ ...CICLO_PATCH.resolvida(), status: "closed" })).toEqual([]);
+  });
+});
+
+describe("aviso do encaminhamento feito no próprio turno", () => {
+  const fila = {
+    owner_type: "NONE",
+    ai_enabled: false,
+    status: "waiting",
+    atribuida_user_id: null,
+  };
+  const humano = {
+    owner_type: "HUMAN",
+    ai_enabled: false,
+    status: "active",
+    atribuida_user_id: "u1",
+  };
+
+  it("fila humana criada por este turno: o texto de transferência ainda é entregue", () => {
+    expect(ninaResponde(fila)).toBe(false);
+    expect(ninaAvisaProprioHandoff(fila, true)).toBe(true);
+  });
+
+  it("sem encaminhamento neste turno a fila humana continua calando a Nina", () => {
+    expect(ninaAvisaProprioHandoff(fila, false)).toBe(false);
+  });
+
+  it("atendente já atribuído conduz a conversa: a Nina não fala", () => {
+    expect(ninaAvisaProprioHandoff(humano, true)).toBe(false);
   });
 });

@@ -383,12 +383,17 @@ export async function prepararAvisoHandoff(args: {
   const { identidadeEfetivaAtual, identidadeParaMensagens } =
     await import("@/lib/nina/identidade-efetiva.server");
   const identidade = identidadeParaMensagens(await identidadeEfetivaAtual("whatsapp"));
+  // Nina atende 24h: fora do funcionamento, o aviso informa a abertura e que a
+  // equipe atende nesse horário; a transferência acontece mesmo assim.
+  const { aberturaPrevistaParaAviso } = await import("@/lib/nina/proxima-abertura.server");
+  const aberturaPrevista = await aberturaPrevistaParaAviso(args.clinicaId);
   const { texto: textoAviso, origem } = await gerarMensagemHandoff({
     protocolo: args.protocolo,
     nome: nomeContato(conv),
     setor,
     motivo: await motivoDoHandoff(args.clinicaId, args.conversaId),
     identidade,
+    aberturaPrevista,
   });
   // Homologação: é a mesma mensagem da produção, com o aviso de simulação no
   // fim (nenhuma atendente real é acionada). Continua sendo a única mensagem.

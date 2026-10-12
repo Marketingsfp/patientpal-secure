@@ -33,15 +33,33 @@ export interface AgoraClinica {
 
 export type SaudacaoPeriodo = "Bom dia" | "Boa tarde" | "Boa noite";
 
-/** Saudação pelo relógio local do processo servidor, sem converter para o fuso da clínica. */
+/** Hora (0-23) do instante informado no horário de Brasília. */
+export function horaEmBrasilia(now: Date = new Date()): number {
+  const hora = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: TZ_CLINICA,
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).format(now);
+  return Number(hora.replace(/\D/g, "")) % 24;
+}
+
+/**
+ * Saudação pelo horário real do servidor, lido no horário de Brasília:
+ * "Bom dia" das 05:00 às 11:59, "Boa tarde" das 12:00 às 17:59 e
+ * "Boa noite" das 18:00 às 04:59.
+ *
+ * O instante vem do relógio do servidor, mas a hora é sempre lida em
+ * Brasília. O processo de produção (Cloudflare Workers) roda em UTC; ler
+ * `getHours()` direto daria "Boa tarde" às 09:00 e "Boa noite" às 15:00.
+ */
 export function saudacaoPorHorarioServidor(now: Date = new Date()): SaudacaoPeriodo {
-  const hora = now.getHours();
+  const hora = horaEmBrasilia(now);
   return hora >= 5 && hora < 12 ? "Bom dia" : hora >= 12 && hora < 18 ? "Boa tarde" : "Boa noite";
 }
 
 /**
- * Datas da agenda permanecem no fuso clínico; somente a saudação acompanha o
- * relógio local do servidor, conforme a regra operacional do atendimento.
+ * Datas da agenda permanecem no fuso clínico; a saudação acompanha o horário
+ * real do servidor lido em Brasília, conforme a regra operacional do atendimento.
  */
 export function agoraParaNina(fuso: string = FUSO_PADRAO, now: Date = new Date()): AgoraClinica {
   return {

@@ -137,7 +137,8 @@ it("apresentação usa identidade publicada e mantém reconhecimento da segunda 
       assistente: "Ana",
       estabelecimento: "Clínica Exemplo",
     },
-    new Date(2026, 8, 5, 13, 33),
+    // 13:33 em Brasília.
+    new Date("2026-09-05T16:33:00Z"),
   );
   expect(texto).toStartWith(
     "Boa tarde! Me chamo Ana e eu sou inteligência artificial da Clínica Exemplo.",
