@@ -171,6 +171,20 @@ export function textoApresentacaoIA(
   return `${saudacaoPorHorarioServidor(agoraServidor)}! Me chamo ${apresentacao.assistente.trim()} e eu sou inteligência artificial da ${unidade}.`;
 }
 
+/**
+ * Aviso fixo de transferência para o humano. Cita o nome PUBLICADO da
+ * assistente; sem identidade válida, fala de forma neutra — nunca um nome fixo.
+ */
+export function avisoTransferenciaHumano(
+  efetiva: Pick<IdentidadeEfetiva, "ok" | "apresentacao">,
+): string {
+  const nome = efetiva.ok ? efetiva.apresentacao.assistente.trim() : "";
+  const ia = nome
+    ? `${nome}, a inteligência artificial do atendimento`
+    : "a inteligência artificial do atendimento";
+  return `*Transferido para atendimento humano.* Você não está mais falando com ${ia} — uma atendente da equipe assume esta conversa e responde por aqui mesmo.`;
+}
+
 export function valoresIdentidade(efetiva: IdentidadeEfetiva): Record<string, string> {
   const a = efetiva.apresentacao;
   const completo = efetiva.ok ? nomeCompletoEstabelecimento(a) : a.estabelecimento;

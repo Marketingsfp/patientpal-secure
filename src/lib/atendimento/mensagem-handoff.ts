@@ -59,6 +59,26 @@ export interface ContextoMensagemHandoff {
    * "Nina"/nome administrativo da clínica.
    */
   identidade?: IdentidadeHandoff | null;
+  /**
+   * Fora do horário de funcionamento: frase com a próxima abertura e o
+   * atendimento nesse horário (proxima-abertura.ts). Ausente = dentro do
+   * horário ou horário não confiável; o aviso não cita horário.
+   */
+  aberturaPrevista?: string | null;
+}
+
+/** Promessas de atendimento imediato, falsas fora do horário de funcionamento. */
+const PROMESSA_IMEDIATA =
+  /(?<!\p{L})(?:agora mesmo|neste momento|em instantes|em breve|imediatamente|j[aá] j[aá]|logo mais|em (?:poucos|alguns) minutos)(?!\p{L})/iu;
+
+/** Insere a frase de abertura antes da linha do protocolo. */
+export function incluirAberturaPrevista(texto: string, abertura?: string | null): string {
+  const frase = (abertura ?? "").trim();
+  if (!frase || texto.includes(frase)) return texto;
+  const i = texto.lastIndexOf("Protocolo do atendimento:");
+  return i < 0
+    ? `${texto.trimEnd()}\n\n${frase}`
+    : `${texto.slice(0, i).trimEnd()}\n\n${frase}\n\n${texto.slice(i)}`;
 }
 
 const TERMOS_TECNICOS = [
@@ -136,7 +156,7 @@ export interface ResultadoValidacao {
  */
 export function validarMensagemHandoff(
   texto: string,
-  ctx: { protocolo: string; setor?: string | null },
+  ctx: { protocolo: string; setor?: string | null; foraDoHorario?: boolean },
 ): ResultadoValidacao {
   const problemas: string[] = [];
   const t = (texto ?? "").trim();
@@ -158,6 +178,8 @@ export function validarMensagemHandoff(
       problemas.push("menciona setor não estruturado");
   }
   if (t.length > 400) problemas.push("mensagem longa demais");
+  if (ctx.foraDoHorario && PROMESSA_IMEDIATA.test(t))
+    problemas.push("promete atendimento imediato fora do horário");
 
   return { ok: problemas.length === 0, problemas };
 }
@@ -192,7 +214,12 @@ export function montarMensagemHandoffFallback(ctx: ContextoMensagemHandoff): str
       corpo = `${saudacao ? saudacao.charAt(0).toUpperCase() + saudacao.slice(1) : ""}vou encaminhar seu atendimento${sobre} para ${destino} continuar com você por aqui.`;
   }
   corpo = corpo.charAt(0).toUpperCase() + corpo.slice(1);
-  return formatarMensagemNina(`${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`);
+  return formatarMensagemNina(
+    incluirAberturaPrevista(
+      `${corpo}\n\nProtocolo do atendimento: ${ctx.protocolo}`,
+      ctx.aberturaPrevista,
+    ),
+  );
 }
 
 /** Instrução do modelo para redigir a mensagem contextual. */
@@ -219,6 +246,11 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
     "- tom acolhedor e natural, sem repetir frases prontas;",
     "- a conversa já está em andamento: não cumprimente (sem Olá, Oi, Bom dia, Boa tarde ou Boa noite) e não se apresente de novo;",
     "- use o nome no máximo uma vez e só se for um nome de pessoa; nunca use nomes como Lead, Teste, Paciente ou números.",
+    ...(ctx.aberturaPrevista
+      ? [
+          "- a clínica está fora do horário de funcionamento: não prometa atendimento agora, em instantes ou em breve e não cite horários; o sistema acrescenta o horário de abertura.",
+        ]
+      : []),
     ctx.nome ? `Nome do paciente: ${ctx.nome}` : "Nome do paciente: desconhecido",
     ctx.assunto ? `Assunto da conversa: ${ctx.assunto}` : "Assunto da conversa: não informado",
     `Motivo do encaminhamento (uso interno): ${ctx.motivo ?? "indefinido"}`,

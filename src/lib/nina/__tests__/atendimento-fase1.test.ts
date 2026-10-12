@@ -7,9 +7,18 @@ import {
   saudacaoPorHorario,
 } from "../atendimento-fase1";
 
-const noServidor = (hora: number, minuto = 0) => new Date(2026, 8, 5, hora, minuto);
+// Instante real do servidor para uma hora de Brasília (UTC-3, sem horário de verão).
+const noServidor = (hora: number, minuto = 0) => new Date(Date.UTC(2026, 8, 5, hora + 3, minuto));
 
-describe("saudação pelo relógio atual do servidor", () => {
+describe("saudação pelo horário real do servidor, lido em Brasília", () => {
+  it("não depende do fuso do processo (produção roda em UTC)", () => {
+    // 12:00 UTC = 09:00 em Brasília: ainda é manhã.
+    expect(saudacaoPorHorario(new Date("2026-09-05T12:00:00Z"))).toBe("Bom dia");
+    // 18:00 UTC = 15:00 em Brasília: ainda é tarde.
+    expect(saudacaoPorHorario(new Date("2026-09-05T18:00:00Z"))).toBe("Boa tarde");
+    // 22:08 UTC = 19:08 em Brasília.
+    expect(saudacaoPorHorario(new Date("2026-10-11T22:08:00Z"))).toBe("Boa noite");
+  });
   it("usa noite até 04:59", () => expect(saudacaoPorHorario(noServidor(4, 59))).toBe("Boa noite"));
   it("usa manhã das 05:00 às 11:59", () => {
     expect(saudacaoPorHorario(noServidor(5))).toBe("Bom dia");

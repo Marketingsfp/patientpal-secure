@@ -1,5 +1,7 @@
 import { POLITICA_WATCHDOG } from "./watchdog";
 import { formatarMensagemNina } from "./resposta/formato-mobile";
+import { corrigirSaudacaoDoPeriodo } from "./resposta/saudacao-periodo";
+import { corrigirApresentacaoRepetida } from "./resposta/apresentacao-ia";
 /** Transporte canônico da Nina, reutilizado pelo webhook e pela retomada de lotes. */
 import {
   carregarControleWatchdog,
@@ -15,6 +17,7 @@ import { criarGuardiaoReservaTurno } from "./reserva-turno";
 import { gerarRespostaNina, metaSendText, type WhatsAppConfigRow } from "../whatsapp.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { estadoConversaPorTelefone, ninaPodeResponder } from "../atendimento/handoff.server";
+import { ninaAvisaProprioHandoff } from "../atendimento/ciclo-responsabilidade";
 
 export type EntradaRespostaWhatsappNina = {
   clinicaId: string;
@@ -105,6 +108,8 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
         texto: string,
         representacao: "audio_integral" | "audio_resumo",
       ) => Promise<{ decisaoId: string | null; textoHash: string | null } | null>;
+      // Encaminhamento confirmado neste turno (preenchido pelo núcleo da Nina).
+      handoffNoTurno?: boolean;
     } = {};
 
     // Mensagens de entrada reais desta resposta. O paciente pode
@@ -209,9 +214,15 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
     // Revalida o dono ANTES de enviar: um atendente pode ter
     // assumido enquanto o modelo pensava. Nesse caso, a resposta
     // é descartada para o paciente não receber IA e humano juntos.
+    // Exceção: o encaminhamento feito NESTE turno colocou a conversa na
+    // fila humana; se o aviso do protocolo não saiu, o texto de
+    // transferência da Nina é o único aviso e precisa ser entregue.
     if (reply && from) {
       const agora = await estadoConversaPorTelefone(params.clinicaId, from);
-      if (!ninaPodeResponder(agora)) {
+      if (
+        !ninaPodeResponder(agora) &&
+        !ninaAvisaProprioHandoff(agora, auditoriaNina.handoffNoTurno === true)
+      ) {
         reply = "";
         // FASE 1 — atendente assumiu durante a geração.
         const { registrarTurnoSemModelo } = await import("@/lib/nina/rastreio/turno.server");
@@ -270,6 +281,10 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
     }
     // Também protege checkpoints de versões antigas e falha da finalização.
     reply = formatarMensagemNina(reply);
+    // Cumprimento de abertura pelo horário real do servidor no momento do envio.
+    reply = corrigirSaudacaoDoPeriodo(reply);
+    // Apresentação como IA sem repetir "eu sou".
+    reply = corrigirApresentacaoRepetida(reply);
     // FASE 4 — antes de QUALQUER envio: a resposta ainda vale?
     if (reply && revisaoTurno) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");

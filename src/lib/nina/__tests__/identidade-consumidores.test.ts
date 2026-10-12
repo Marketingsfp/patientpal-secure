@@ -4,6 +4,7 @@
 import { describe, expect, it } from "bun:test";
 import { avaliarSaudacao, checarElementosSaudacao } from "../saudacao-sessao";
 import {
+  avisoTransferenciaHumano,
   nomeCompletoEstabelecimento,
   resolverIdentidadeEfetiva,
   textoApresentacaoIA,
@@ -57,7 +58,8 @@ describe("composição do nome do estabelecimento", () => {
           estabelecimento: "Menino Jesus",
           tipoEstabelecimento: "Policlínica",
         },
-        new Date(2026, 8, 5, 13, 33),
+        // 13:33 em Brasília.
+        new Date("2026-09-05T16:33:00Z"),
       ),
     ).toBe(
       "Boa tarde! Me chamo Sofia e eu sou inteligência artificial da Policlínica Menino Jesus.",
@@ -110,5 +112,34 @@ describe("mensagem de transferência recebe a identidade efetiva", () => {
   it("contingência continua com protocolo, equipe e mesmo canal", () => {
     const texto = montarMensagemHandoffFallback({ protocolo: "MJ-77", motivo: "agendamento" });
     expect(validarMensagemHandoff(texto, { protocolo: "MJ-77" }).ok).toBe(true);
+  });
+});
+
+describe("aviso fixo de transferência usa a identidade publicada", () => {
+  const publicada = {
+    ok: true,
+    apresentacao: {
+      assistente: "Sofia",
+      estabelecimento: "Santa Marta",
+      tipoEstabelecimento: "Clínica",
+    },
+  };
+
+  it("cita o nome publicado da assistente, nunca Nina", () => {
+    const aviso = avisoTransferenciaHumano(publicada);
+    expect(aviso).toContain(
+      "Você não está mais falando com Sofia, a inteligência artificial do atendimento",
+    );
+    expect(aviso).toStartWith("*Transferido para atendimento humano.*");
+    expect(aviso).not.toContain("Nina");
+  });
+
+  it("sem identidade válida o aviso é neutro", () => {
+    const aviso = avisoTransferenciaHumano({ ...publicada, ok: false });
+    expect(aviso).toContain(
+      "Você não está mais falando com a inteligência artificial do atendimento",
+    );
+    expect(aviso).not.toContain("Sofia");
+    expect(aviso).not.toContain("Nina");
   });
 });

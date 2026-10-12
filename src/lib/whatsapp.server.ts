@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizarTelefone, telefoneParaFiltro } from "@/lib/atendimento/telefone";
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
-import { agoraParaNina } from "@/lib/nina-agora";
+import { agoraParaNina, saudacaoPorHorarioServidor } from "@/lib/nina-agora";
 import {
   encaminhamentoSemRegistro,
   MOTIVO_SEM_REGISTRO,
@@ -599,7 +599,34 @@ export async function gerarRespostaNina(
               depoisHash: hashDoTexto(formatado),
             });
           }
-          return formatado;
+          // Cumprimento de abertura sempre pelo horário real do servidor (Brasília).
+          const { corrigirSaudacaoDoPeriodo } =
+            await import("@/lib/nina/resposta/saudacao-periodo");
+          const comSaudacao = corrigirSaudacaoDoPeriodo(formatado);
+          // Apresentação como IA sem repetir "eu sou".
+          const { corrigirApresentacaoRepetida } =
+            await import("@/lib/nina/resposta/apresentacao-ia");
+          const comApresentacao = corrigirApresentacaoRepetida(comSaudacao);
+          if (comSaudacao !== formatado || comApresentacao !== comSaudacao) {
+            const { registrarTransformacaoResposta } =
+              await import("@/lib/nina/rastreio/turno.server");
+            const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
+            if (comSaudacao !== formatado)
+              registrarTransformacaoResposta({
+                etapa: "saudacao.periodo",
+                motivo: "Cumprimento ajustado ao horário real do servidor (Brasília)",
+                antesHash: hashDoTexto(formatado),
+                depoisHash: hashDoTexto(comSaudacao),
+              });
+            if (comApresentacao !== comSaudacao)
+              registrarTransformacaoResposta({
+                etapa: "apresentacao.ia",
+                motivo: "Apresentação como IA sem repetir 'eu sou'",
+                antesHash: hashDoTexto(comSaudacao),
+                depoisHash: hashDoTexto(comApresentacao),
+              });
+          }
+          return comApresentacao;
         });
         await conferirReserva();
         rastro.concluir("message.inbound", { resposta_tamanho: resultado.length });
@@ -946,6 +973,7 @@ async function gerarRespostaNinaInterno(
     fatosIdentidade,
     nomeCompletoEstabelecimento,
     textoApresentacaoIA,
+    avisoTransferenciaHumano,
   } = await import("@/lib/nina/identidade-efetiva");
   // Prompt de reserva também consome a identidade efetiva: sem identidade
   // publicada ele fala de forma NEUTRA, sem fixar outra persona.
@@ -1177,6 +1205,17 @@ async function gerarRespostaNinaInterno(
     await import("@/lib/nina/agendamento-sessao")
   ).reservaDaSessaoAtual(sessaoNina.estado);
   let alteracaoSolicitada = alteracaoExplicita(mensagemPaciente, reservaAtualParaAlteracao);
+  // Cartão consulta é exclusivo da equipe humana (regra de negócio de 11/10/2026).
+  // Expressões fixas valem mesmo com o Jev desligado; o Jev cobre menções indiretas.
+  const {
+    mencionaCartaoConsulta,
+    perguntaCartaoConsulta,
+    cartaoConsultaPeloJev,
+    MOTIVO_CARTAO_CONSULTA,
+  } = await import("@/lib/nina/cartao-consulta");
+  let cartaoConsulta: "expressao" | "jev" | null = mencionaCartaoConsulta(mensagemPaciente)
+    ? "expressao"
+    : null;
   // Dois ou mais atendimentos na mesma mensagem vão para a equipe (regra de 06/10/2026).
   // A foto do pedido médico já chega como lista lida pelo sistema; texto livre é lido pelo Jev.
   const { perguntaMultiplosAtendimentos, multiplosPeloJev, itensDoPedidoLido, motivoMultiplos } =
@@ -1213,6 +1252,7 @@ async function gerarRespostaNinaInterno(
         ...perguntaNomeAtendimento(),
         ...perguntaAlteracaoAgendamento(),
         ...perguntaMultiplosAtendimentos(),
+        ...perguntaCartaoConsulta(),
         ...(f2 ? enc.perguntasEncaminhamento() : {}),
       };
       const inicioCiclo = sessaoNina.estado.session_started_at ?? null;
@@ -1239,6 +1279,8 @@ async function gerarRespostaNinaInterno(
       alteracaoSolicitada =
         alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
+      if (!cartaoConsulta && cartaoConsultaPeloJev(respostas?.cartao_consulta))
+        cartaoConsulta = "jev";
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
       // Pré-busca: aceita também o pedido dividido entre intenções compatíveis.
       if (f1 && respostas) {
@@ -1388,6 +1430,27 @@ async function gerarRespostaNinaInterno(
         pedido: alteracaoSolicitada,
         motivo,
         mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+      },
+    });
+  } else if (cartaoConsulta) {
+    // Mesma precedência administrativa: antes de catálogo, agenda e cadastro.
+    jevEncaminhamento =
+      jevEncaminhamento?.urgencia === "alta"
+        ? { ...jevEncaminhamento, motivo: `${jevEncaminhamento.motivo} ${MOTIVO_CARTAO_CONSULTA}` }
+        : { motivo: MOTIVO_CARTAO_CONSULTA, urgencia: "normal" };
+    nomeAtendimentoAusente = false;
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Cartão consulta exclusivo da equipe",
+      dados: {
+        origem: cartaoConsulta,
+        motivo: MOTIVO_CARTAO_CONSULTA,
+        mensagens_entrada: opcoes?.mensagensEntrada ?? [],
+      },
+      codigo: {
+        arquivo: "src/lib/nina/cartao-consulta.ts",
+        funcao: cartaoConsulta === "jev" ? "cartaoConsultaPeloJev" : "mencionaCartaoConsulta",
       },
     });
   } else if (multiplosAtendimentos) {
@@ -1654,6 +1717,23 @@ async function gerarRespostaNinaInterno(
       texto: REGRA_TRANSICAO_AGENDAMENTO,
     });
   }
+  const { regraSaudacaoPeriodo } = await import("@/lib/nina/resposta/saudacao-periodo");
+  instrucoesAdicionaisTurno.push({
+    codigo: "SAUDACAO_PELO_HORARIO",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/resposta/saudacao-periodo.ts",
+    motivo:
+      "A saudação segue o horário real do servidor (Brasília), não o cumprimento do paciente.",
+    texto: regraSaudacaoPeriodo(saudacaoPorHorarioServidor()),
+  });
+  const { REGRA_CARTAO_CONSULTA } = await import("@/lib/nina/cartao-consulta");
+  instrucoesAdicionaisTurno.push({
+    codigo: "CARTAO_CONSULTA_HUMANO",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/cartao-consulta.ts",
+    motivo: "Assuntos do cartão consulta são exclusivos da equipe humana.",
+    texto: REGRA_CARTAO_CONSULTA,
+  });
   instrucoesAdicionaisTurno.push({
     codigo: "CANCELAMENTO_REMARCACAO_HUMANO",
     nivel: "inegociavel",
@@ -2945,10 +3025,11 @@ async function gerarRespostaNinaInterno(
     const multiplos = !alteracaoSolicitada && multiplosAtendimentos;
     const listaExtensa = decisao.motivo.startsWith("LISTA_PROFISSIONAIS_EXTENSA");
     const agendamentoTransicao = decisao.motivo.startsWith("AGENDAMENTO_TRANSICAO");
+    const cartaoConsultaEquipe = decisao.motivo.includes("CARTAO_CONSULTA");
     const { motivoLegivel } = await import("@/lib/nina/jev-encaminhamento");
     const argumentos = {
       motivo: decisao.motivo,
-      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : agendamentoTransicao ? "Paciente deseja agendar durante a transição para atendimento humano" : multiplos ? "Pedido com dois ou mais atendimentos" : listaExtensa ? "Lista com mais de 8 profissionais" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
+      resumo: `${alteracaoSolicitada ? "Pedido de cancelamento/remarcação para a equipe" : agendamentoTransicao ? "Paciente deseja agendar durante a transição para atendimento humano" : cartaoConsultaEquipe ? "Assunto do cartão consulta para a equipe" : multiplos ? "Pedido com dois ou mais atendimentos" : listaExtensa ? "Lista com mais de 8 profissionais" : semNome ? "Atendimento não informado após pergunta" : "Encaminhado pelo filtro de decisão (Jev)"}: ${motivoLegivel(decisao.motivo)}. Última mensagem: ${mensagemPaciente.slice(0, 500)}`,
       urgencia: decisao.urgencia,
       ...(alteracaoSolicitada || agendamentoTransicao ? { setor: "Agendamento" } : {}),
     };
@@ -2983,13 +3064,15 @@ async function gerarRespostaNinaInterno(
         ? "Encaminhamento: cancelamento/remarcação solicitado"
         : agendamentoTransicao
           ? "Encaminhamento: paciente deseja agendar"
-          : multiplos
-            ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
-            : listaExtensa
-              ? "Encaminhamento: lista com mais de 8 profissionais"
-              : semNome
-                ? "Encaminhamento: atendimento não informado após pergunta"
-                : "Encaminhamento pelo Jev (Fase 2)",
+          : cartaoConsultaEquipe
+            ? "Encaminhamento: cartão consulta"
+            : multiplos
+              ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
+              : listaExtensa
+                ? "Encaminhamento: lista com mais de 8 profissionais"
+                : semNome
+                  ? "Encaminhamento: atendimento não informado após pergunta"
+                  : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo,
         urgencia: argumentos.urgencia,
@@ -3006,13 +3089,15 @@ async function gerarRespostaNinaInterno(
         ? "regra_cancelamento_remarcacao"
         : agendamentoTransicao
           ? "regra_transicao_agendamento"
-          : multiplos
-            ? "regra_multiplos_atendimentos"
-            : listaExtensa
-              ? "regra_lista_extensa"
-              : semNome
-                ? "regra_sem_indicacao"
-                : "jev",
+          : cartaoConsultaEquipe
+            ? "regra_cartao_consulta"
+            : multiplos
+              ? "regra_multiplos_atendimentos"
+              : listaExtensa
+                ? "regra_lista_extensa"
+                : semNome
+                  ? "regra_sem_indicacao"
+                  : "jev",
       urgencia: argumentos.urgencia,
       pontuacoes: jevPontuacoes,
       handoff_confirmado: confirmado,
@@ -4126,9 +4211,11 @@ async function gerarRespostaNinaInterno(
                 ? "atendimento.nome_nao_informado"
                 : alteracaoSolicitada
                   ? "agenda.cancelamento_remarcacao"
-                  : finalizacaoHandoff.motivo.startsWith("JEV_")
-                    ? "jev.encaminhamento"
-                    : "agenda.sem_vagas",
+                  : finalizacaoHandoff.motivo.includes("CARTAO_CONSULTA")
+                    ? "cartao_consulta.equipe"
+                    : finalizacaoHandoff.motivo.startsWith("JEV_")
+                      ? "jev.encaminhamento"
+                      : "agenda.sem_vagas",
       finalizacaoHandoff.motivo,
       antes,
       resposta,
@@ -4201,6 +4288,10 @@ async function gerarRespostaNinaInterno(
     avisoDoTurno.atual = avisoGate.atual;
     houveHandoff = true;
   }
+  // A conversa já está na fila humana; quem envia precisa saber que o texto
+  // de transferência deste turno é o aviso do próprio encaminhamento.
+  if (houveHandoff && opcoes?.auditoria)
+    (opcoes.auditoria as { handoffNoTurno?: boolean }).handoffNoTurno = true;
   if (houveHandoff && avisoDoTurno.atual) {
     const { precisaAvisoDoChamador } = await import("@/lib/atendimento/aviso-encaminhamento");
     if (!precisaAvisoDoChamador(avisoDoTurno.atual)) {
@@ -4267,14 +4358,30 @@ async function gerarRespostaNinaInterno(
       marcarOrigem("codigo", "texto fixo de transferência (sem texto do modelo)");
     }
     // Aviso explícito ao paciente: ele precisa saber que saiu da IA e foi para
-    // uma pessoa. A frase é fixa para nunca depender do humor do modelo.
-    const AVISO_TRANSFERENCIA =
-      "*Transferido para atendimento humano.* Você não está mais falando com a Nina — uma atendente da equipe assume esta conversa e responde por aqui mesmo.";
+    // uma pessoa. A frase é fixa para nunca depender do humor do modelo e cita
+    // o nome da identidade publicada do turno, nunca um nome fixo.
+    const AVISO_TRANSFERENCIA = avisoTransferenciaHumano(identidadeEfetiva);
     if (!resposta.includes("Transferido para atendimento humano")) {
       const antes = resposta;
       resposta = `${resposta.trim()}\n\n${AVISO_TRANSFERENCIA}`.trim();
       transformar("handoff.aviso", "aviso obrigatório de transferência", antes, resposta);
     }
+  }
+  // Nina atende 24h: fora do funcionamento, o aviso da própria Nina (sem aviso
+  // do protocolo) também informa a abertura e que a equipe atende nesse horário.
+  if (!semNovaMensagem && houveHandoff && resposta.trim()) {
+    const [{ aberturaPrevistaParaAviso }, { incluirAberturaPrevista }] = await Promise.all([
+      import("@/lib/nina/proxima-abertura.server"),
+      import("@/lib/atendimento/mensagem-handoff"),
+    ]);
+    const antes = resposta;
+    resposta = incluirAberturaPrevista(resposta, await aberturaPrevistaParaAviso(clinicaId));
+    transformar(
+      "handoff.horario_abertura",
+      "Fora do horário: abertura da clínica e atendimento nesse horário",
+      antes,
+      resposta,
+    );
   }
 
   if (!resposta && !semNovaMensagem) {

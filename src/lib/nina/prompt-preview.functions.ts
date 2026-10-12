@@ -222,6 +222,14 @@ export const previewRequestNina = createServerFn({ method: "POST" })
         texto: REGRA_TRANSICAO_AGENDAMENTO,
       });
     }
+    const { REGRA_CARTAO_CONSULTA } = await import("./cartao-consulta");
+    instrucoesAdicionais.push({
+      codigo: "CARTAO_CONSULTA_HUMANO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/cartao-consulta.ts",
+      motivo: "Exibir na prévia a mesma regra do cartão consulta aplicada no atendimento.",
+      texto: REGRA_CARTAO_CONSULTA,
+    });
     const precedencia = resolverPrecedenciaDoTurno({
       instrucoesAdicionais,
       textoPublicado: template,

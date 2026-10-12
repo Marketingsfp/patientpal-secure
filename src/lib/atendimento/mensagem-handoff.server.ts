@@ -7,6 +7,7 @@
  * contingência — nunca fica sem mensagem e nunca vaza erro técnico.
  */
 import {
+  incluirAberturaPrevista,
   montarMensagemHandoffFallback,
   promptMensagemHandoff,
   validarMensagemHandoff,
@@ -32,8 +33,14 @@ export async function gerarMensagemHandoff(
     });
     const texto = formatarMensagemNina(r.conteudo ?? "");
     if (r.ok && texto) {
-      const v = validarMensagemHandoff(texto, { protocolo: ctx.protocolo, setor: ctx.setor });
-      if (v.ok) return { texto, origem: "modelo" };
+      const v = validarMensagemHandoff(texto, {
+        protocolo: ctx.protocolo,
+        setor: ctx.setor,
+        foraDoHorario: Boolean(ctx.aberturaPrevista),
+      });
+      // Fora do horário, a abertura entra pelo código: o modelo não cita horários.
+      if (v.ok)
+        return { texto: incluirAberturaPrevista(texto, ctx.aberturaPrevista), origem: "modelo" };
       console.warn("[handoff-msg] texto do modelo rejeitado:", v.problemas.join("; "));
     }
   } catch (e) {
