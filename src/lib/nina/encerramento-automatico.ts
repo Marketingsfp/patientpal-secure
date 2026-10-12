@@ -115,14 +115,3 @@ export function garantirMensagemFinal(
   const padrao = padraoOuPublicada || mensagemFinalPadrao(nomeUnidade);
   return texto ? `${texto}\n\n${padrao}` : padrao;
 }
-
-/** Bloco de prompt para o modelo já escrever a despedida no formato correto. */
-export function blocoPromptEncerramento(nomeUnidade: string): string {
-  return [
-    "ENCERRAMENTO DO ATENDIMENTO:",
-    "- O paciente indicou que NÃO precisa de mais nada. Este turno é a despedida: não faça novas perguntas.",
-    `- A mensagem final precisa conter: agradecimento, o nome ${nomeUnidade}, a informação de que o atendimento foi encerrado e o convite para enviar uma nova mensagem se precisar.`,
-    `- Sugestão: "${mensagemFinalPadrao(nomeUnidade)}"`,
-    "- Se ainda houver qualquer solicitação pendente do paciente, NÃO se despeça: continue o atendimento.",
-  ].join("\n");
-}

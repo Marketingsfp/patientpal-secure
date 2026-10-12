@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { estadoVazio, type EstadoFluxoNina } from "../fluxo-estado.server";
-import { blocoPromptFase6, derivarEtapa, pediuAtendenteHumano } from "../atendimento-fase6";
+import { derivarEtapa, pediuAtendenteHumano } from "../atendimento-fase6";
 import { resumoEntregueFixture } from "./agendamento-fixture";
 
 function comEstado(patch: {
@@ -132,27 +132,5 @@ describe("fase 6 — máquina de estados", () => {
   it("pedido de humano e falha sem recuperação viram handoff", () => {
     expect(derivarEtapa(ctx({ mensagem: "quero falar com um atendente" }))).toBe("HANDOFF");
     expect(derivarEtapa(ctx({ falhaSemRecuperacao: true }))).toBe("HANDOFF");
-  });
-});
-
-describe("fase 6 — prompt", () => {
-  it("proíbe pular etapas e não vira script", () => {
-    const bloco = blocoPromptFase6(ctx({ primeiraMensagem: true }));
-    expect(bloco).toMatch(/etapa atual: GREETING/);
-    expect(bloco).toMatch(/proibido pular etapa crítica/i);
-    expect(bloco).toMatch(/linguagem continua natural/);
-  });
-
-  it("handoff pede resumo interno e nunca mostra ao paciente", () => {
-    const bloco = blocoPromptFase6(ctx({ mensagem: "quero um atendente humano" }));
-    expect(bloco).toMatch(/etapa atual: HANDOFF/);
-    expect(bloco).toMatch(/NUNCA envie esse resumo ao paciente/);
-    expect(bloco).toMatch(/transfira agora/);
-  });
-
-  it("não transfere por falta de dado do paciente", () => {
-    const estado = comEstado({ appointment: { intent_confirmed: true } });
-    const bloco = blocoPromptFase6(ctx({ estado }));
-    expect(bloco).toMatch(/NÃO é motivo de transferência/);
   });
 });

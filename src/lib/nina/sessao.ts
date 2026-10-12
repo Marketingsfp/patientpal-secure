@@ -276,24 +276,3 @@ export function resolverEstadoDaSessao(
     saneouEncerramento: saneado !== estado,
   };
 }
-
-/** Bloco de prompt para a retomada (Parte 4 — saudação natural). */
-export function blocoPromptSessao(r: ResultadoSessao): string {
-  if (r.expirou) {
-    return [
-      "SESSÃO DA NINA: nova sessão (o atendimento anterior expirou por inatividade).",
-      "- Pode usar a saudação/apresentação padrão normalmente.",
-      "- NÃO retome etapas, vagas, confirmações ou intenções da sessão anterior.",
-      r.resumoAnterior ? `- ${r.resumoAnterior}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
-  if (!r.continuacao) return "";
-  return [
-    "SESSÃO DA NINA: continuação recente do mesmo atendimento.",
-    '- Não repita a apresentação completa. Cumprimente de forma natural (ex.: "Oi novamente! 😊 Como posso te ajudar?").',
-    "- O contexto recente vale, mas qualquer operação pendente anterior (escolha de vaga, confirmação, criação de agendamento) já foi encerrada.",
-    "- NÃO interprete um novo 'oi', 'sim' ou 'ok' como confirmação de agendamento antigo. Confirme tudo de novo antes de agir.",
-  ].join("\n");
-}

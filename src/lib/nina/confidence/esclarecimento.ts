@@ -159,17 +159,3 @@ export function abrirPendencia(entrada: {
 export function fecharPendencia(): PendenciaEsclarecimento {
   return pendenciaVazia();
 }
-
-/**
- * Estado e restrições do turno expressos no CONTRATO correto (mensagem de
- * sistema), nunca como uma falsa mensagem do paciente.
- */
-export function blocoContratoEsclarecimento(p: PendenciaEsclarecimento): string | null {
-  if (!p.pendente) return null;
-  return [
-    "ESCLARECIMENTO PENDENTE NESTE ATENDIMENTO:",
-    `- Falta esclarecer: ${p.alvo ?? "não registrado"}.`,
-    `- Perguntas já respondidas sem resolver: ${p.tentativas}.`,
-    "- Não repita afirmação não confirmada. Se o paciente já respondeu, use a resposta dele e consulte a fonte oficial antes de afirmar qualquer coisa.",
-  ].join("\n");
-}

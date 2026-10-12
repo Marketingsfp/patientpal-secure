@@ -9,7 +9,6 @@
 import { describe, expect, it } from "bun:test";
 import {
   abrirPendencia,
-  blocoContratoEsclarecimento,
   fecharPendencia,
   normalizarPendencia,
   pendenciaVazia,
@@ -123,27 +122,5 @@ describe("a tentativa só é consumida quando o paciente responde", () => {
 
   it("resolvida a dúvida, a pendência é fechada", () => {
     expect(fecharPendencia().pendente).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3 — estado e restrições no contrato correto (nunca falso role:user)
-// ---------------------------------------------------------------------------
-describe("estado da conversa viaja no contrato de sistema", () => {
-  it("o bloco descreve a pendência sem se passar por mensagem do paciente", () => {
-    const bloco = blocoContratoEsclarecimento(
-      abrirPendencia({
-        resultado: resultado(),
-        intent: "informacao",
-        messageId: "m1",
-        tentativasConsumidas: 1,
-      }),
-    );
-    expect(bloco).toContain("ESCLARECIMENTO PENDENTE");
-    expect(bloco).toContain("Perguntas já respondidas sem resolver: 1");
-  });
-
-  it("sem pendência não há bloco algum", () => {
-    expect(blocoContratoEsclarecimento(pendenciaVazia())).toBeNull();
   });
 });

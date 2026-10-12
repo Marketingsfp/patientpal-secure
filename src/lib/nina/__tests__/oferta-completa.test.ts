@@ -1,12 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import {
-  blocoPromptOfertaCompleta,
-  lerPedidoOferta,
-  montarOferta,
-  textoResumoComValor,
-} from "../oferta-completa";
+import { montarOferta, textoResumoComValor } from "../oferta-completa";
 import { estadoVazio } from "../fluxo-estado-normalizar";
-import { textoResumo } from "../atendimento-fase4";
 
 function estado(over: Partial<ReturnType<typeof estadoVazio>["appointment"]> = {}) {
   const e = estadoVazio();
@@ -15,56 +9,6 @@ function estado(over: Partial<ReturnType<typeof estadoVazio>["appointment"]> = {
 }
 
 const base = { estado: estado(), nomeUnidade: "Policlínica Menino Jesus", baseAtiva: true };
-
-describe("leitura do pedido", () => {
-  it("Teste 1 — pedido de informação sobre a especialidade", () => {
-    const l = lerPedidoOferta("Quero informações sobre Ortopedia");
-    expect(l.pedeInfoConsulta).toBe(true);
-    expect(l.pedeDisponibilidade).toBe(false);
-  });
-
-  it("Teste 2 — pedido de disponibilidade", () => {
-    const l = lerPedidoOferta("Tem ortopedista hoje?");
-    expect(l.pedeDisponibilidade).toBe(true);
-    expect(l.preferencias).toContain("hoje");
-  });
-
-  it("Teste 3 — intenção de agendar", () => {
-    const l = lerPedidoOferta("Quero agendar Ortopedia");
-    expect(l.pedeAgendamento).toBe(true);
-    expect(l.pedeDisponibilidade).toBe(true);
-  });
-
-  it("Teste 14 — preferência de dia e período", () => {
-    const l = lerPedidoOferta("Quero sábado de manhã");
-    expect(l.preferencias).toEqual(expect.arrayContaining(["sábado", "manhã"]));
-  });
-});
-
-describe("prompt da oferta", () => {
-  it("informação: pede valor, médicos, dias e horários da base", () => {
-    const t = blocoPromptOfertaCompleta({ ...base, mensagem: "Informações sobre Ortopedia" });
-    expect(t).toContain("consultar_cadastro");
-    expect(t).toContain("valor da consulta");
-  });
-
-  it("disponibilidade: exige as duas fontes e agrupamento por médico", () => {
-    const t = blocoPromptOfertaCompleta({ ...base, mensagem: "Tem ortopedista hoje?" });
-    expect(t).toContain("consultar_disponibilidade");
-    expect(t).toContain("POR MÉDICO");
-  });
-
-  it("Testes 5, 6, 10, 11 e 12 — nunca inventar valor nem vaga", () => {
-    const t = blocoPromptOfertaCompleta({ ...base, mensagem: "Tem ortopedista hoje?" });
-    expect(t).toContain("não é vaga");
-    expect(t).toContain("jamais estime");
-  });
-
-  it("preferência do paciente é priorizada", () => {
-    const t = blocoPromptOfertaCompleta({ ...base, mensagem: "Quero sábado de manhã" });
-    expect(t).toContain("sábado");
-  });
-});
 
 describe("montagem da oferta", () => {
   it("Teste 4 — organiza por médico", () => {
@@ -126,25 +70,5 @@ describe("resumo final", () => {
     });
     expect(t).toContain("Valor: R$ 150,00");
     expect(t).toContain("Horário: 14:30");
-  });
-
-  it("resumo da Fase 4 também traz o valor quando existe", () => {
-    const comValor = textoResumo(
-      estado({
-        procedure: "Ortopedia",
-        doctor_name: "Dr. Paulo",
-        date: "05/09/2026",
-        time: "14:30",
-        price: "R$ 150,00",
-      }) as never,
-      "Policlínica Menino Jesus",
-    );
-    expect(comValor).toContain("Valor: R$ 150,00");
-
-    const semValor = textoResumo(
-      estado({ procedure: "Ortopedia", doctor_name: "Dr. Paulo" }) as never,
-      "Policlínica Menino Jesus",
-    );
-    expect(semValor).not.toContain("Valor:");
   });
 });

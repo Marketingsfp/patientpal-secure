@@ -146,16 +146,3 @@ export function somarDiasIso(iso: string, dias: number): string {
   dt.setUTCDate(dt.getUTCDate() + dias);
   return dt.toISOString().slice(0, 10);
 }
-
-/** Bloco de texto injetado no system prompt com data/hora e regras temporais. */
-export function blocoDataHoraAgora(fuso: string = FUSO_PADRAO, now: Date = new Date()): string {
-  const a = agoraNaClinica(fuso, now);
-  return `DATA E HORA ATUAIS (calculadas pelo sistema — são a verdade):
-Agora é ${a.extenso}, ${a.hora} (${a.fuso}). Data de hoje em ISO: ${a.iso}.
-
-REGRAS DE TEMPO:
-- NUNCA pergunte ao paciente que dia é hoje, que horas são ou que dia da semana é. Você já sabe.
-- Resolva sozinha "hoje", "amanhã", "depois de amanhã", "essa semana", "semana que vem", "segunda que vem", "daqui a X dias" a partir da data acima.
-- Ao confirmar data, diga a absoluta junto da relativa: "amanhã, sexta-feira, 28/08".
-- Se o horário pedido para hoje já passou, avise que já passou e ofereça os próximos disponíveis.`;
-}
