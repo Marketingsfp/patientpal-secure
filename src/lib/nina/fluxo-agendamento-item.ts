@@ -124,6 +124,20 @@ export function respostaAOferta(texto: string): "aceite" | "recusa" | null {
     )
   )
     return "aceite";
+  // Resposta longa (ex.: dados do paciente junto do "pode encaminhar sim").
+  // Recusa explícita do encaminhamento prevalece sobre qualquer "sim".
+  if (
+    /\bnao\s+(?:precisa|quero|pode|precisa(?:r)? de)\s+(?:me\s+)?(?:encaminhar|transferir|passar|marcar|agendar)\b|\bnao\s+(?:me\s+)?(?:encaminh|transfir|transfer)/.test(
+      t,
+    )
+  )
+    return "recusa";
+  if (
+    /\b(?:pode|podem|sim|pode sim|sim pode)\s+(?:me\s+)?(?:encaminhar|transferir|passar|mandar|encaminha|encaminhe|transfere|transfira)\b|\b(?:encaminh(?:a|e|ar)|transfer(?:e|ir)|transfira)\s+sim\b|\b(?:pode sim|sim pode|pode sim por favor)\b|\bquero (?:sim|marcar|agendar)\b|\bpode (?:marcar|agendar)\b/.test(
+      t,
+    )
+  )
+    return "aceite";
   return null;
 }
 

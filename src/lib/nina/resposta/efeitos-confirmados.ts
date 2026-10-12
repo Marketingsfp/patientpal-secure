@@ -29,6 +29,11 @@ export function protegerEfeitosDaResposta(
           const promessa =
             /\b(?:vou|vamos|irei|iremos|estou|estamos)\s+(?:agora\s+)?(?:te\s+|lhe\s+)?(?:encaminhar|transferir|direcionar|encaminhando|transferindo|direcionando)\b|\b(?:encaminhei|transferi|direcionei|encaminhamos|transferimos)\b|\b(?:voce|seu atendimento|sua conversa|sua solicitacao)\s+(?:ja\s+)?(?:foi|esta|sera)\s+(?:encaminhad[oa]|transferid[oa])\b/.test(
               t,
+            ) ||
+            // "a equipe/um atendente já vai responder/dar continuidade" também
+            // anuncia uma transferência que precisa ter acontecido.
+            /\b(?:equipe|setor|atendente|atendentes|recepcao)\b[^.!?]{0,80}?\b(?:ja|logo)\s+(?:vai|vao|ira|irao)\s+(?:te\s+|lhe\s+)?(?:responder|atender|dar continuidade|continuar|assumir|entrar em contato|falar)\b/.test(
+              t,
             );
           if (!fatos.handoffConfirmado && !negativa && !t.includes("?") && promessa) {
             transferencia = true;
