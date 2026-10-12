@@ -505,9 +505,7 @@ export function converterParaEstruturado(
       id: novoId(),
       nome: rotulo,
       especialidade:
-        b.especialidade ??
-        (tipo === "servico" ? (especialidadesCadastradas?.trim() ?? null) : null) ??
-        null,
+        tipo === "servico" ? (especialidadesCadastradas?.trim() ?? null) : null,
       modalidade,
       horarios: comRef(horarios),
       executantes: executantes.map((e) => ({ ...e, horarios: comRef(e.horarios) })),
