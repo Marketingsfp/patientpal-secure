@@ -18183,6 +18183,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      nina_zap_retencao_executar: { Args: never; Returns: Json }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {
