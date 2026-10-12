@@ -3,8 +3,11 @@ import {
   converterParaEstruturado,
   fatosNoTextoLivre,
   lerHorariosTexto,
-  MENSAGEM_ITEM_ESTRUTURADO,
+  copiaFormatoAntigo,
+  restaurarFormatoAntigo,
+  mesclarComOrigem,
 } from "../catalogo-atendimentos";
+import { planejarConversao } from "../catalogo-conversao";
 import { profissionalSchema, servicoSchema } from "../catalogo";
 import { servicoParaRegistro, profissionalParaRegistro } from "../catalogo-conhecimento";
 import {
@@ -282,20 +285,208 @@ describe("regra única de modalidade", () => {
   });
 });
 
-describe("ferramentas que ainda gravam o formato antigo recusam item estruturado", () => {
-  test("sincronização e importação", () => {
+describe("sincronização de item estruturado: origem atualiza fatos, equipe mantém regras", () => {
+  const ID = "22222222-2222-4222-8222-222222222222";
+  const FONTE = "33333333-3333-4333-8333-333333333333";
+  test("preços e horários da origem; modalidade, idade e encaminhamento da equipe", () => {
     const salvo = exameEstruturado();
-    expect(() =>
-      prepararSincronizacao(
-        "servico",
-        { id: "22222222-2222-4222-8222-222222222222", ...salvo, status: "PUBLICADO" } as never,
-        { id: "33333333-3333-4333-8333-333333333333", nome: "Exame Teste" } as never,
-      ),
-    ).toThrow(MENSAGEM_ITEM_ESTRUTURADO);
+    const [a] = salvo.estrutura!.atendimentos!;
+    const atual = {
+      id: ID,
+      ...salvo,
+      status: "PUBLICADO",
+      descricao_publica: "Texto da equipe",
+      estrutura: {
+        ...salvo.estrutura,
+        encaminhamento_humano: true,
+        pedido_medico: "obrigatorio",
+        atendimentos: [{ ...a!, idade_minima: 12, unidade_idade: "anos", inclui: "Laudo" }],
+      },
+    };
+    const origem = {
+      ...exameAntigo(),
+      id: FONTE,
+      procedimento_id: FONTE,
+      descricao_publica: "Descrição da origem",
+      formas_pagamento: [{ forma: "Dinheiro", valor: 180, condicao: null, observacao: null }],
+      estrutura: { versao: 1, complementos: [] },
+    };
+    const { dados, mudancas } = prepararSincronizacao("servico", atual as never, origem as never);
+    const [depois] = dados.estrutura!.atendimentos!;
+    expect(depois).toMatchObject({
+      id: a!.id,
+      modalidade: "hora_marcada",
+      idade_minima: 12,
+      inclui: "Laudo",
+    });
+    expect(depois!.precos.map((p) => p.valor)).toEqual([180]);
+    expect(dados.estrutura).toMatchObject({
+      encaminhamento_humano: true,
+      pedido_medico: "obrigatorio",
+      nina_pode_agendar: true,
+    });
+    expect((dados as { descricao_publica?: string | null }).descricao_publica).toBe(
+      "Texto da equipe",
+    );
+    expect(mudancas.some((m) => m.campo === "“Exame Teste” — Preços")).toBe(true);
   });
 
-  test("edição com IA", () => {
+  test("mesclagem casa pelo nome, preserva referência quinzenal e aponta removidos", () => {
+    const atual: AtendimentoCatalogo[] = [
+      {
+        id: "x1",
+        nome: "Consulta Pediatria",
+        modalidade: "ficha",
+        horarios: [
+          {
+            dia: "Sexta-feira",
+            inicio: "08:00",
+            fim: "12:00",
+            recorrencia: "Quinzenal",
+            referencia_recorrencia: "2026-10-09",
+          },
+        ],
+        executantes: [],
+        precos: [],
+      },
+      { id: "x2", nome: "Retorno", horarios: [], executantes: [], precos: [] },
+    ];
+    const origem: AtendimentoCatalogo[] = [
+      {
+        id: "o1",
+        nome: "CONSULTA PEDIATRIA",
+        modalidade: null,
+        horarios: [{ dia: "Sexta-feira", inicio: "08:00", fim: "12:00", recorrencia: "Quinzenal" }],
+        executantes: [],
+        precos: [{ forma: "Dinheiro", valor: 200 }],
+      },
+    ];
+    const r = mesclarComOrigem(atual, origem);
+    expect(r.removidos).toEqual(["Retorno"]);
+    expect(r.atendimentos[0]).toMatchObject({ id: "x1", modalidade: "ficha" });
+    expect(r.atendimentos[0]!.horarios[0]!.referencia_recorrencia).toBe("2026-10-09");
+    expect(r.atendimentos[0]!.precos[0]!.valor).toBe(200);
+  });
+});
+
+describe("edição com IA de item estruturado", () => {
+  const op = (operacao: string, caminho: string, valor?: unknown) => ({
+    operacao,
+    caminho,
+    valor_json: valor === undefined ? null : JSON.stringify(valor),
+  });
+  const proposta = (...alteracoes: unknown[]) => ({ alteracoes, pendencias: [], ambiguidades: [] });
+
+  test("altera preço e modalidade do atendimento e mostra a diferença", () => {
     const salvo = exameEstruturado();
-    expect(() => aplicarEdicaoCatalogoIA("servico", salvo, {})).toThrow(MENSAGEM_ITEM_ESTRUTURADO);
+    const r = aplicarEdicaoCatalogoIA(
+      "servico",
+      salvo,
+      proposta(
+        op("definir", "/atendimentos/0/precos/0/valor", 170),
+        op("definir", "/atendimentos/0/modalidade", "ficha"),
+        op("adicionar", "/atendimentos/0/executantes/0/horarios", {
+          dia: "Sexta-feira",
+          inicio: "08:00",
+          fim: "10:00",
+        }),
+      ),
+    );
+    const [a] = r.dados.estrutura!.atendimentos!;
+    expect(a!.precos[0]!.valor).toBe(170);
+    expect(a!.modalidade).toBe("ficha");
+    expect(a!.executantes[0]!.horarios).toHaveLength(3);
+    expect(r.dados.formas_pagamento[0]!.valor).toBe(170);
+    expect(r.mudancas.map((m) => m.campo)).toEqual([
+      "“Exame Teste” — Modalidade",
+      "“Exame Teste” — Quem realiza",
+      "“Exame Teste” — Preços",
+    ]);
+  });
+
+  test("recusa caminho fora da lista, troca de quem realiza e fato no texto livre", () => {
+    const salvo = exameEstruturado();
+    expect(() =>
+      aplicarEdicaoCatalogoIA(
+        "servico",
+        salvo,
+        proposta(op("definir", "/formas_pagamento/0/valor", 1)),
+      ),
+    ).toThrow("fora dos campos permitidos");
+    expect(() =>
+      aplicarEdicaoCatalogoIA(
+        "servico",
+        salvo,
+        proposta(op("adicionar", "/atendimentos/0/executantes", { nome: "Outro" })),
+      ),
+    ).toThrow("fora dos campos permitidos");
+    expect(() =>
+      aplicarEdicaoCatalogoIA(
+        "servico",
+        salvo,
+        proposta(op("definir", "/descricao_publica", "Valor R$ 99,00")),
+      ),
+    ).toThrow("não pôde ser aplicada");
+  });
+});
+
+describe("conversão em lote", () => {
+  const registro = (extra: Record<string, unknown> = {}) => ({
+    id: "11111111-1111-4111-8111-111111111111",
+    status: "PUBLICADO",
+    updated_at: "2026-10-12T10:00:00.000000+00:00",
+    rascunho: null,
+    ...exameAntigo(),
+    ...extra,
+  });
+
+  test("item pronto: atendimentos, cópia do formato antigo e colunas calculadas", () => {
+    const { item, dados } = planejarConversao("servico", registro(), "2026-10-12T10:00:00.000Z");
+    expect(item.acao).toBe("converter");
+    expect(item.avisos).toEqual([]);
+    expect(item.atendimentos[0]!.linhas).toContain("Modalidade: Hora marcada");
+    expect(dados!.estrutura!.atendimentos).toHaveLength(1);
+    const copia = restaurarFormatoAntigo("servico", dados!.estrutura!.formato_antigo!);
+    expect(copia.campos.descricao_publica).toBe(exameAntigo().descricao_publica);
+    expect(copia.complementos).toEqual(exameAntigo().estrutura.complementos);
+  });
+
+  test("modalidade ausente é aviso; horário ilegível, rascunho e já convertido não convertem", () => {
+    const semModalidade = registro({ estrutura: { versao: 1, complementos: [] } });
+    const r1 = planejarConversao("servico", semModalidade);
+    expect(r1.item.acao).toBe("converter");
+    expect(r1.item.avisos.some((a) => a.includes("modalidade não informada"))).toBe(true);
+
+    const ilegivel = registro({
+      executantes: [{ medico_id: null, nome: "Profissional Teste", horarios: "Seg de manhã" }],
+    });
+    expect(planejarConversao("servico", ilegivel).item.acao).toBe("revisar");
+    expect(planejarConversao("servico", registro({ rascunho: { nome: "x" } })).item.acao).toBe(
+      "revisar",
+    );
+    const convertido = registro({ estrutura: exameEstruturado().estrutura });
+    expect(planejarConversao("servico", convertido).item.acao).toBe("convertido");
+  });
+
+  test("a cópia do formato antigo nunca chega à Nina", () => {
+    const { dados } = planejarConversao("servico", registro());
+    const r = servicoParaRegistro({ id: "x", ...dados } as never);
+    expect((r.extras as { estrutura: Record<string, unknown> }).estrutura).not.toHaveProperty(
+      "formato_antigo",
+    );
+    expect(JSON.stringify(r)).not.toContain("convertido_em");
+  });
+
+  test("cópia e restauração preservam os campos substituídos", () => {
+    const antigo = exameAntigo();
+    const copia = copiaFormatoAntigo("servico", antigo, "2026-10-12T10:00:00.000Z");
+    const { campos } = restaurarFormatoAntigo("servico", copia);
+    expect(campos).toEqual({
+      descricao_publica: antigo.descricao_publica,
+      valor: antigo.valor,
+      valor_observacao: null,
+      executantes: antigo.executantes,
+      formas_pagamento: antigo.formas_pagamento,
+    });
   });
 });

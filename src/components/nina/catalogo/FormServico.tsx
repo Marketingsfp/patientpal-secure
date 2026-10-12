@@ -13,9 +13,14 @@ import {
   AvisoItemEstruturadoClassico,
   AvisoTextoLivre,
   ConversaoParaAtendimentos,
+  DesfazerConversao,
   PendenciasAtendimentos,
 } from "./AtendimentosEditor";
-import { converterParaEstruturado } from "@/lib/nina/catalogo-atendimentos";
+import {
+  converterParaEstruturado,
+  copiaFormatoAntigo,
+  restaurarFormatoAntigo,
+} from "@/lib/nina/catalogo-atendimentos";
 import { pendenciasEstrutura, type AtendimentoCatalogo } from "@/lib/nina/catalogo-estrutura";
 import { PedidoMedicoEditor } from "./PedidoMedicoEditor";
 import {
@@ -173,19 +178,47 @@ export function FormServico({
   const setAtendimentos = (atendimentos: AtendimentoCatalogo[]) =>
     set({ estrutura: { ...estado.estrutura, atendimentos } });
   const converter = () => {
-    const r = converterParaEstruturado("servico", {
+    const antigo = {
       nome: estado.nome,
       estrutura: estado.estrutura,
       descricao_publica: estado.descricao_publica,
       valor: paraNumero(estado.valor),
       valor_observacao: estado.valor_observacao,
       executantes: estado.executantes,
-      formas_pagamento: estado.formas_pagamento,
-    });
+      formas_pagamento: estado.formas_pagamento.map((f) => ({
+        ...f,
+        valor: paraNumero(f.valor),
+      })),
+    };
+    const r = converterParaEstruturado("servico", antigo);
     setPendenciasConversao(r.pendencias);
     set({
       descricao_publica: r.descricao,
-      estrutura: { ...estado.estrutura, atendimentos: r.atendimentos },
+      estrutura: {
+        ...estado.estrutura,
+        atendimentos: r.atendimentos,
+        formato_antigo: copiaFormatoAntigo("servico", antigo),
+      },
+    });
+  };
+  const desfazer = () => {
+    const copia = estado.estrutura.formato_antigo;
+    if (!copia) return;
+    const { campos, complementos } = restaurarFormatoAntigo("servico", copia);
+    const { atendimentos: _a, formato_antigo: _f, ...resto } = estado.estrutura;
+    const r = servicoDoRegistro({
+      ...estado,
+      ...campos,
+      estrutura: { ...resto, complementos },
+    });
+    setPendenciasConversao([]);
+    set({
+      descricao_publica: r.descricao_publica,
+      valor: r.valor,
+      valor_observacao: r.valor_observacao,
+      executantes: r.executantes,
+      formas_pagamento: r.formas_pagamento,
+      estrutura: r.estrutura,
     });
   };
 
@@ -460,6 +493,11 @@ export function FormServico({
               onChange={setAtendimentos}
               medicos={opcoes.medicos}
               somenteLeitura={somenteLeitura}
+            />
+            <DesfazerConversao
+              copia={estado.estrutura.formato_antigo}
+              somenteLeitura={somenteLeitura}
+              onDesfazer={desfazer}
             />
           </SecaoCatalogo>
           <SecaoCatalogo titulo="Texto para o paciente">{textoLivre}</SecaoCatalogo>

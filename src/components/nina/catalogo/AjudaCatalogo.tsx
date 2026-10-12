@@ -45,7 +45,7 @@ export function ComoLer({ chave }: { chave: ChaveAjudaCatalogo }) {
         )}
         <p className="border-t pt-2 text-xs text-muted-foreground">
           {estruturado
-            ? "“Sincronizar com Clínica OS” não altera itens com atendimentos estruturados."
+            ? "Neste item estruturado, “Sincronizar com Clínica OS” atualiza só nome, quem realiza, horários e preços; as regras da equipe ficam."
             : preservadoNaSincronizacao(chave)
               ? "“Sincronizar com Clínica OS” preserva esta opção."
               : "“Sincronizar com Clínica OS” substitui esta opção pelo dado da origem (ou a deixa em branco)."}

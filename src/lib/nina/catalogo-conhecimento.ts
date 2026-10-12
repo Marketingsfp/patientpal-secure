@@ -83,6 +83,12 @@ export function unidadeDoProfissional(p: ProfissionalPublicado): string | null {
   return nome ? nome : null;
 }
 
+/** Estrutura publicada sem a cópia do formato antigo (dados substituídos não vão à Nina). */
+function estruturaParaNina(v: unknown) {
+  const { formato_antigo: _antigo, ...estrutura } = lerEstrutura(v);
+  return estrutura;
+}
+
 function lista(v: unknown): Array<Record<string, unknown>> {
   return Array.isArray(v)
     ? (v.filter((i) => i && typeof i === "object") as Array<Record<string, unknown>>)
@@ -171,7 +177,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
       .join("\n\n");
   }
   s = { ...s, executantes, descricao_publica: descricao };
-  const estrutura = lerEstrutura(s.estrutura);
+  const estrutura = estruturaParaNina(s.estrutura);
   const atendimentos = atendimentosEstruturados(
     s.descricao_publica,
     s.estrutura,
@@ -279,7 +285,7 @@ export function profissionalParaRegistro(
       ),
     };
   const especialidades = nomesVinculos(p.especialidades);
-  const estrutura = lerEstrutura(p.estrutura);
+  const estrutura = estruturaParaNina(p.estrutura);
   const atendimentos = atendimentosEstruturados(
     p.observacao_publica,
     p.estrutura,

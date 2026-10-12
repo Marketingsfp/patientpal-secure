@@ -12,6 +12,7 @@
 import { DIAS_SEMANA, type DiaSemana } from "./catalogo-constantes";
 import {
   atendimentosEstruturados,
+  formatarPrecoCatalogo,
   textoHorariosCatalogo,
   type AtendimentoCatalogo,
   type AtendimentoPublicado,
@@ -30,10 +31,6 @@ const normal = (v: unknown) =>
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
-
-/** Recusa de ferramentas que ainda gravam no formato antigo (sincronização, IA, importação). */
-export const MENSAGEM_ITEM_ESTRUTURADO =
-  "Este item usa atendimentos estruturados. A sincronização, a importação e a edição com IA ainda não atualizam esse formato: edite os atendimentos pela tela do catálogo.";
 
 /* ------------------------------------------------------------------ */
 /* Texto livre sem fatos                                               */
@@ -297,8 +294,10 @@ export type ResultadoConversao = {
   atendimentos: AtendimentoCatalogo[];
   /** Texto livre que sobra, já sem os blocos convertidos. */
   descricao: string;
-  /** O que a equipe precisa conferir antes de publicar. */
+  /** Tudo o que a equipe precisa conferir (inclui os bloqueios). */
   pendencias: string[];
+  /** Problemas que perderiam dado: o item não pode ser convertido em lote. */
+  bloqueios: string[];
 };
 
 function numero(v: unknown): number | null {
@@ -350,6 +349,11 @@ export function converterParaEstruturado(
   novoId: () => string = () => crypto.randomUUID(),
 ): ResultadoConversao {
   const pendencias: string[] = [];
+  const bloqueios: string[] = [];
+  const bloquear = (m: string) => {
+    bloqueios.push(m);
+    pendencias.push(m);
+  };
   const profissional = tipo === "profissional" ? r.nome : undefined;
   const texto = (tipo === "servico" ? r.descricao_publica : r.observacao_publica) ?? "";
   // Leitura antiga, com os complementos já associados a cada bloco.
@@ -404,11 +408,11 @@ export function converterParaEstruturado(
       if (doBloco?.linhas.length) {
         horarios = doBloco.linhas;
         if (!doBloco.completo)
-          pendencias.push(`${rotulo}: confira os horários — parte do texto não foi lida.`);
+          bloquear(`${rotulo}: confira os horários — parte do texto não foi lida.`);
       } else {
         horarios = linhasProfissional;
         if (temBlocos && b.horarios_publicados)
-          pendencias.push(
+          bloquear(
             `${rotulo}: horários do texto (“${b.horarios_publicados}”) não puderam ser lidos; usados os horários do profissional.`,
           );
       }
@@ -421,9 +425,7 @@ export function converterParaEstruturado(
         .map((e) => {
           const lido = lerHorariosTexto(e.horarios);
           if (e.horarios && !lido.completo)
-            pendencias.push(
-              `${rotulo}: confira os horários de ${e.nome} — parte do texto não foi lida.`,
-            );
+            bloquear(`${rotulo}: confira os horários de ${e.nome} — parte do texto não foi lida.`);
           return {
             medico_id: e.medico_id ?? null,
             nome: e.nome!.trim(),
@@ -462,9 +464,7 @@ export function converterParaEstruturado(
           observacao: [precos[0].observacao, r.valor_observacao].filter(Boolean).join(" · "),
         };
       else
-        pendencias.push(
-          `${rotulo}: observação do valor (“${r.valor_observacao}”) sem preço cadastrado.`,
-        );
+        bloquear(`${rotulo}: observação do valor (“${r.valor_observacao}”) sem preço cadastrado.`);
     }
 
     // Idade e critérios.
@@ -483,9 +483,7 @@ export function converterParaEstruturado(
     if (!chegada_ate && b.chegada_publicada) {
       chegada_ate = lerHora(b.chegada_publicada);
       if (!chegada_ate || !/^\s*(?:at[eé]\s*(?:as|às)?\s*)?\d/i.test(b.chegada_publicada))
-        pendencias.push(
-          `${rotulo}: limite de chegada “${b.chegada_publicada}” precisa ser conferido.`,
-        );
+        bloquear(`${rotulo}: limite de chegada “${b.chegada_publicada}” precisa ser conferido.`);
     }
 
     // Referência da recorrência vale para as linhas quinzenais.
@@ -536,6 +534,220 @@ export function converterParaEstruturado(
         .filter((l) => !/^\s*Especialidades cadastradas\s*:/i.test(l))
         .join("\n")
         .trim();
-  pendencias.push(...textosLivresComFatos(descricao, atendimentos));
-  return { atendimentos, descricao, pendencias: [...new Set(pendencias)] };
+  for (const m of textosLivresComFatos(descricao, atendimentos)) bloquear(m);
+  return {
+    atendimentos,
+    descricao,
+    pendencias: [...new Set(pendencias)],
+    bloqueios: [...new Set(bloqueios)],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Cópia do formato antigo (desfazer a conversão)                      */
+/* ------------------------------------------------------------------ */
+
+const CAMPOS_ANTIGOS = {
+  servico: ["descricao_publica", "valor", "valor_observacao", "executantes", "formas_pagamento"],
+  profissional: ["observacao_publica", "horarios", "formas_pagamento", "tipo_atendimento"],
+} as const;
+
+/** Cópia (JSON) do que a conversão substitui, guardada na própria estrutura do item. */
+export function copiaFormatoAntigo(
+  tipo: "servico" | "profissional",
+  r: Record<string, unknown> & { estrutura?: unknown },
+  agoraISO = new Date().toISOString(),
+): string {
+  const estrutura = (r.estrutura ?? {}) as { complementos?: unknown };
+  return JSON.stringify({
+    convertido_em: agoraISO,
+    ...Object.fromEntries(CAMPOS_ANTIGOS[tipo].map((c) => [c, r[c] ?? null])),
+    complementos: estrutura.complementos ?? [],
+  });
+}
+
+/** Data da conversão registrada na cópia, ou null se a cópia não puder ser lida. */
+export function dataDaConversao(copia: string | null | undefined): string | null {
+  try {
+    const v = JSON.parse(copia ?? "") as { convertido_em?: unknown };
+    return typeof v.convertido_em === "string" ? v.convertido_em : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Campos para voltar ao formato antigo a partir da cópia guardada. */
+export function restaurarFormatoAntigo(
+  tipo: "servico" | "profissional",
+  copia: string,
+): { campos: Record<string, unknown>; complementos: unknown[] } {
+  const v = JSON.parse(copia) as Record<string, unknown>;
+  return {
+    campos: Object.fromEntries(CAMPOS_ANTIGOS[tipo].map((c) => [c, v[c] ?? null])),
+    complementos: Array.isArray(v.complementos) ? v.complementos : [],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Sincronização: origem atualiza fatos, equipe mantém regras          */
+/* ------------------------------------------------------------------ */
+
+/** Regras da equipe por atendimento, que a origem não conhece. */
+const REGRAS_DA_EQUIPE = [
+  "idade_minima",
+  "unidade_idade",
+  "chegada_ate",
+  "criterio_adicional",
+  "inclui",
+  "acrescimos",
+  "situacao_preco",
+  "observacao",
+] as const;
+
+/**
+ * Junta os atendimentos convertidos da origem com os atuais. Casamento pelo
+ * nome do atendimento (ou pela especialidade, quando única). A origem traz
+ * nome, especialidade, quem realiza, horários e preços; a equipe mantém
+ * modalidade (quando confirmada), idade, chegada, critérios, inclui,
+ * acréscimos, situação do preço, observação e a referência das quinzenas.
+ */
+export function mesclarComOrigem(
+  atuais: readonly AtendimentoCatalogo[],
+  daOrigem: readonly AtendimentoCatalogo[],
+): { atendimentos: AtendimentoCatalogo[]; removidos: string[] } {
+  const usados = new Set<string>();
+  const achar = (o: AtendimentoCatalogo) => {
+    const livres = atuais.filter((a) => !usados.has(a.id));
+    const porNome = livres.find((a) => normal(a.nome) === normal(o.nome));
+    if (porNome) return porNome;
+    const porEsp = o.especialidade
+      ? livres.filter((a) => a.especialidade && normal(a.especialidade) === normal(o.especialidade))
+      : [];
+    return porEsp.length === 1 ? porEsp[0] : undefined;
+  };
+  const comReferencia = (novas: HorarioCatalogo[], antigas: HorarioCatalogo[]) =>
+    novas.map((h) => {
+      const igual = antigas.find(
+        (a) =>
+          a.dia === h.dia &&
+          a.inicio === h.inicio &&
+          a.fim === h.fim &&
+          a.recorrencia === h.recorrencia &&
+          a.referencia_recorrencia,
+      );
+      return igual ? { ...h, referencia_recorrencia: igual.referencia_recorrencia } : h;
+    });
+  const atendimentos = daOrigem.map((o) => {
+    const atual = achar(o);
+    if (!atual) return o;
+    usados.add(atual.id);
+    const regras = Object.fromEntries(REGRAS_DA_EQUIPE.map((k) => [k, atual[k] ?? null]));
+    return {
+      ...o,
+      ...regras,
+      id: atual.id,
+      modalidade: atual.modalidade ?? o.modalidade ?? null,
+      horarios: comReferencia(o.horarios, atual.horarios),
+      executantes: o.executantes.map((e) => {
+        const antes = atual.executantes.find(
+          (x) => (e.medico_id && x.medico_id === e.medico_id) || normal(x.nome) === normal(e.nome),
+        );
+        return antes ? { ...e, horarios: comReferencia(e.horarios, antes.horarios) } : e;
+      }),
+    };
+  });
+  return {
+    atendimentos,
+    removidos: atuais.filter((a) => !usados.has(a.id)).map((a) => a.nome),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Comparação antes/depois por atendimento (prévias)                   */
+/* ------------------------------------------------------------------ */
+
+const ROTULOS_ATENDIMENTO: Record<string, string> = {
+  nome: "Nome",
+  especialidade: "Especialidade",
+  modalidade: "Modalidade",
+  horarios: "Horários",
+  executantes: "Quem realiza",
+  chegada_ate: "Limite de chegada",
+  precos: "Preços",
+  situacao_preco: "Situação do preço",
+  idade_minima: "Idade mínima",
+  unidade_idade: "Unidade da idade",
+  criterio_adicional: "Outros critérios",
+  inclui: "O que está incluído",
+  acrescimos: "Acréscimos",
+  observacao: "Observação",
+};
+const SITUACAO_PRECO: Record<string, string> = {
+  definido: "Valor definido no cadastro",
+  sob_consulta: "Precisa de orçamento",
+  incluido: "Incluído em outro atendimento",
+  nao_informado: "Ainda não informado",
+};
+
+function apresentarCampoAtendimento(campo: string, v: unknown): string {
+  if (v == null || v === "" || (Array.isArray(v) && !v.length)) return "Não informado";
+  if (campo === "modalidade")
+    return MODALIDADES_ATENDIMENTO[v as keyof typeof MODALIDADES_ATENDIMENTO] ?? String(v);
+  if (campo === "situacao_preco") return SITUACAO_PRECO[String(v)] ?? String(v);
+  if (campo === "horarios") return textoHorariosCatalogo(v as HorarioCatalogo[]) ?? "Não informado";
+  if (campo === "executantes")
+    return (v as AtendimentoCatalogo["executantes"])
+      .map((e) => `${e.nome}: ${textoHorariosCatalogo(e.horarios) ?? "sem horários"}`)
+      .join("\n");
+  if (campo === "precos")
+    return (v as PrecoCatalogo[])
+      .map(
+        (p) =>
+          `${p.forma}: ${formatarPrecoCatalogo(p.valor) ?? "valor não informado"}${p.condicao ? ` (${p.condicao})` : ""}${p.observacao ? ` — ${p.observacao}` : ""}`,
+      )
+      .join("\n");
+  return String(v);
+}
+
+function resumoAtendimento(a: AtendimentoCatalogo): string {
+  return ["modalidade", "precos", a.executantes.length ? "executantes" : "horarios"]
+    .map(
+      (k) =>
+        `${ROTULOS_ATENDIMENTO[k]}: ${apresentarCampoAtendimento(k, a[k as keyof AtendimentoCatalogo])}`,
+    )
+    .join("\n");
+}
+
+/** Diferenças por atendimento, casando pelo identificador. */
+export function compararAtendimentos(
+  antes: readonly AtendimentoCatalogo[],
+  depois: readonly AtendimentoCatalogo[],
+): Array<{ campo: string; antes: string; depois: string }> {
+  const mudancas: Array<{ campo: string; antes: string; depois: string }> = [];
+  for (const d of depois) {
+    const a = antes.find((x) => x.id === d.id);
+    if (!a) {
+      mudancas.push({
+        campo: `Atendimento “${d.nome}”`,
+        antes: "Não existia",
+        depois: resumoAtendimento(d),
+      });
+      continue;
+    }
+    for (const k of Object.keys(ROTULOS_ATENDIMENTO) as Array<keyof AtendimentoCatalogo>)
+      if (JSON.stringify(a[k] ?? null) !== JSON.stringify(d[k] ?? null))
+        mudancas.push({
+          campo: `“${d.nome}” — ${ROTULOS_ATENDIMENTO[k]}`,
+          antes: apresentarCampoAtendimento(k, a[k]),
+          depois: apresentarCampoAtendimento(k, d[k]),
+        });
+  }
+  for (const a of antes)
+    if (!depois.some((d) => d.id === a.id))
+      mudancas.push({
+        campo: `Atendimento “${a.nome}”`,
+        antes: resumoAtendimento(a),
+        depois: "Removido",
+      });
+  return mudancas;
 }
