@@ -966,7 +966,7 @@ export const NODES_ARQUITETURA: NodeArquitetura[] = [
     nome: "Limpeza automática de registros",
     categoria: "OBSERVABILIDADE",
     descricao:
-      "Função do banco nina_zap_retencao_executar, agendada de hora em hora pelo agendador do banco quando a migration de retenção está aplicada. Apaga execuções, evidências, rastros, lotes, travas e dados de teste com mais de 7 dias, e conversas, mensagens e confirmações com mais de 3 meses.",
+      "Função do banco nina_zap_retencao_executar, agendada de hora em hora pelo agendador do banco quando a migration de retenção está aplicada. Apaga tudo que guarda conteúdo de mensagens com mais de 6 meses: conversas, mensagens, confirmações, execuções, evidências, rastros, lotes, reportes de erro e dados de teste. Contadores e travas por telefone saem com 7 dias.",
     servico: "Agendador do banco (pg_cron)",
     entrada: "Registros gravados pelo atendimento e horário agendado",
     saida: "Registros antigos apagados e resumo da limpeza",

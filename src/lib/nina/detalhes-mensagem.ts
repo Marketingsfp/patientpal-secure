@@ -23,8 +23,16 @@ export type PacoteDetalhesMensagem = {
   agora?: number;
 };
 
-/** Registros técnicos da Nina são apagados após 7 dias (migration 20260924230000_nina_zap_retencao_dados). */
-export const DIAS_RETENCAO_REGISTROS = 7;
+/** Registros técnicos da Nina são apagados após 6 meses (migration 20261012100000_retencao_mensagens_6_meses). */
+export const MESES_RETENCAO_REGISTROS = 6;
+
+/** O instante já passou do prazo de retenção (meses de calendário)? */
+export function alemDaRetencaoRegistros(registradaEm: number, agora: number): boolean {
+  if (!(registradaEm > 0)) return false;
+  const limite = new Date(registradaEm);
+  limite.setUTCMonth(limite.getUTCMonth() + MESES_RETENCAO_REGISTROS);
+  return agora > limite.getTime();
+}
 
 export function objetoDetalhes(v: unknown): RegistroDetalhes {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as RegistroDetalhes) : {};
@@ -573,13 +581,11 @@ export function montarLeituraDetalhesMensagem(p: PacoteDetalhesMensagem): Leitur
       "Mensagem não selecionada ou não localizada; nenhum texto interno foi apresentado como mensagem entregue.",
     );
   const registradaEm = instante(mensagem?.created_at);
-  const alemDaRetencao =
-    registradaEm > 0 &&
-    (p.agora ?? Date.now()) - registradaEm > DIAS_RETENCAO_REGISTROS * 86_400_000;
+  const alemDaRetencao = alemDaRetencaoRegistros(registradaEm, p.agora ?? Date.now());
   if (!p.execucao)
     alertas.push(
       alemDaRetencao
-        ? `Os registros técnicos desta mensagem foram apagados pela limpeza automática (são guardados por ${DIAS_RETENCAO_REGISTROS} dias). O texto da conversa continua preservado.`
+        ? `Os registros técnicos desta mensagem foram apagados pela limpeza automática (são guardados por ${MESES_RETENCAO_REGISTROS} meses). O texto da conversa continua preservado.`
         : "Execução da Nina não vinculada a esta mensagem.",
     );
   if (
