@@ -111,3 +111,19 @@ test("preserva transferência confirmada, pergunta e negativa verdadeira", () =>
       .texto,
   ).toBe(texto);
 });
+test("retira 'a equipe/atendente já vai responder' quando não houve transferência", () => {
+  const r = protegerEfeitosDaResposta(
+    "Com certeza! O agendamento será feito no nome do paciente.\n\nNossa equipe do setor de Agendamento já vai dar continuidade para verificar as vagas de sábado.\n\nPor favor, aguarde só um momento que um atendente humano já vai te responder por aqui!",
+    { handoffConfirmado: false, bloqueioIdentificacao: false },
+  );
+  expect(r.alterado).toBe(true);
+  expect(r.texto).toContain("O agendamento será feito no nome do paciente.");
+  expect(r.texto).not.toContain("já vai dar continuidade");
+  expect(r.texto).not.toContain("já vai te responder");
+  expect(r.texto).toContain("ainda não foi realizado");
+  const confirmado = protegerEfeitosDaResposta("Nossa equipe já vai te responder por aqui.", {
+    handoffConfirmado: true,
+    bloqueioIdentificacao: false,
+  });
+  expect(confirmado.alterado).toBe(false);
+});

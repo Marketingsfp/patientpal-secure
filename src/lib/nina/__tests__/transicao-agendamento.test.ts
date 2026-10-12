@@ -146,6 +146,24 @@ describe("informar antes de encaminhar", () => {
     expect(respostaAOferta("Quanto custa o exame?")).toBeNull();
   });
 
+  test("aceite ou recusa dentro de uma mensagem com outros dados", () => {
+    for (const sim of [
+      "o paciente é meu filho Paciente Teste, nasceu em 5 de junho de 2022. eu sou a mãe. pode encaminhar sim, mas fica no nome dele, tá?",
+      "Meu nome é Paciente Teste, pode sim",
+      "sim, pode transferir. É para sábado de manhã",
+      "encaminha sim, obrigada",
+      "quero marcar sim, é para mim mesmo",
+    ])
+      expect(respostaAOferta(sim)).toBe("aceite");
+    for (const nao of [
+      "obrigada pelas informações, não precisa encaminhar",
+      "por enquanto não quero marcar, só queria o valor",
+      "pode deixar, não me transfere agora",
+    ])
+      expect(respostaAOferta(nao)).toBe("recusa");
+    expect(respostaAOferta("Tem atendimento no sábado de manhã?")).toBeNull();
+  });
+
   test("trava só a transferência de agendamento pedida pela IA", () => {
     expect(motivoEhEncaminhamentoDeAgendamento("AGENDAMENTO_TRANSICAO: deseja marcar")).toBe(true);
     expect(motivoEhEncaminhamentoDeAgendamento("Paciente deseja agendar cardiologia")).toBe(true);
