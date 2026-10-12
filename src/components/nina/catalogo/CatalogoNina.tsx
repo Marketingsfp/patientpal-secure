@@ -882,6 +882,7 @@ export function CatalogoNina({
             />
             {tipo === "servico" ? (
               <FormServico
+                key={`servico-${servico.id ?? "novo"}-${posicao}`}
                 estado={servico}
                 onChange={setServico}
                 opcoes={opcoes}
@@ -889,6 +890,7 @@ export function CatalogoNina({
               />
             ) : (
               <FormProfissional
+                key={`profissional-${profissional.id ?? "novo"}-${posicao}`}
                 estado={profissional}
                 onChange={setProfissional}
                 opcoes={opcoes}

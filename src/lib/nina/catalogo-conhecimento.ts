@@ -1,4 +1,5 @@
 import {
+  atendimentosDaEstrutura,
   atendimentosEstruturados,
   textoAtendimentos,
   pagamentosJaDescritos,
@@ -179,6 +180,8 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
   );
   const dinheiro = precoPorForma(s.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(s.formas_pagamento, /cart/i);
+  // Item estruturado: texto livre + resumo gerado dos atendimentos (fonte única).
+  const estruturado = Boolean(atendimentosDaEstrutura(s.estrutura));
   const resumo = valorResumo({
     valor: paraNumero(s.valor),
     formas_pagamento: lista(s.formas_pagamento).map((f) => ({ valor: paraNumero(f["valor"]) })),
@@ -205,7 +208,9 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
     preco_cartao: cartao,
     observacoes:
       [
-        texto(atendimentos.length ? textoAtendimentos(atendimentos) : s.descricao_publica),
+        ...(estruturado
+          ? [texto(s.descricao_publica), texto(textoAtendimentos(atendimentos))]
+          : [texto(atendimentos.length ? textoAtendimentos(atendimentos) : s.descricao_publica)]),
         texto(s.valor_observacao),
         !lista(s.formas_pagamento).length && resumo !== null
           ? `Valor de referência: R$ ${resumo.toFixed(2).replace(".", ",")} (forma de pagamento não informada)`
@@ -216,7 +221,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
           : estrutura.pedido_medico === "dispensado"
             ? "Pedido médico: dispensado para este exame/procedimento."
             : null,
-        pagamentosJaDescritos(s.formas_pagamento, atendimentos)
+        estruturado || pagamentosJaDescritos(s.formas_pagamento, atendimentos)
           ? null
           : descricaoPagamentos(s.formas_pagamento),
       ]
@@ -281,6 +286,7 @@ export function profissionalParaRegistro(
     p.nome,
     "Consulta",
   );
+  const estruturado = Boolean(atendimentosDaEstrutura(p.estrutura));
   const convenios = nomesVinculos(p.convenios);
   const horarios = lista(p.horarios) as Array<Record<string, unknown>>;
   const dinheiro = precoPorForma(p.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
@@ -315,7 +321,7 @@ export function profissionalParaRegistro(
     preco_cartao: cartao,
     observacoes:
       [
-        texto(p.tipo_atendimento)
+        !estruturado && texto(p.tipo_atendimento)
           ? `${interpretarModalidade(p.tipo_atendimento) ? "Modalidade" : "Classificação do cadastro (não define modalidade)"}: ${texto(p.tipo_atendimento)}`
           : null,
         p.atende_consultorio === null
@@ -329,14 +335,16 @@ export function profissionalParaRegistro(
             ? "A clínica confirmou que não aceita convênios neste atendimento."
             : null,
         unidadeDoProfissional(p) ? `Unidade: ${unidadeDoProfissional(p)}` : null,
-        texto(atendimentos.length ? textoAtendimentos(atendimentos) : p.observacao_publica),
+        ...(estruturado
+          ? [texto(p.observacao_publica), texto(textoAtendimentos(atendimentos))]
+          : [texto(atendimentos.length ? textoAtendimentos(atendimentos) : p.observacao_publica)]),
         estrutura.pedido_medico === "obrigatorio"
           ? "Pedido médico: obrigatório para este atendimento."
           : estrutura.pedido_medico === "dispensado"
             ? "Pedido médico: dispensado para este atendimento."
             : null,
         aviso ? `Aviso vigente: ${aviso}` : null,
-        pagamentosJaDescritos(p.formas_pagamento, atendimentos)
+        estruturado || pagamentosJaDescritos(p.formas_pagamento, atendimentos)
           ? null
           : descricaoPagamentos(p.formas_pagamento),
       ]

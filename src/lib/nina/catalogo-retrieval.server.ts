@@ -32,7 +32,7 @@ import {
 } from "./catalogo-conhecimento";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
-import { separarAtendimentos } from "./catalogo-estrutura";
+import { atendimentosDaEstrutura, atendimentosEstruturados } from "./catalogo-estrutura";
 import { horariosPorTipo } from "./horarios-por-atendimento";
 import { pedidoPreventivo } from "./atendimento-consulta";
 import { publicacaoDoMedicoAgenda } from "./vinculo-catalogo-agenda.server";
@@ -47,16 +47,26 @@ import {
 /** Projeções para pesquisar e selecionar; no turno, vêm da leitura compartilhada.
  * O modelo continua recebendo somente os detalhes dos registros relevantes. */
 const INDICE_SERVICO =
-  "id, nome, descricao_publica, aliases:estrutura->aliases, status, updated_at";
+  "id, nome, descricao_publica, aliases:estrutura->aliases, atendimentos:estrutura->atendimentos, status, updated_at";
 const INDICE_PROFISSIONAL =
-  "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, status, updated_at";
+  "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, atendimentos:estrutura->atendimentos, status, updated_at";
 type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & {
   aliases?: unknown;
+  atendimentos?: unknown;
 };
+
+/** Texto pesquisável do exame: descrição livre + nome e especialidade de cada atendimento. */
+function textoIndiceServico(s: IndiceServico): string {
+  const atendimentos = atendimentosDaEstrutura({ atendimentos: s.atendimentos }) ?? [];
+  return [
+    String(s.descricao_publica ?? ""),
+    ...atendimentos.map((a) => [a.nome, a.especialidade].filter(Boolean).join(" ")),
+  ].join(" · ");
+}
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
   "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios" | "observacao_publica"
-> & { aliases?: unknown; medico_id?: string | null };
+> & { aliases?: unknown; medico_id?: string | null; atendimentos?: unknown };
 
 function aliasesDoIndice(i: { aliases?: unknown }): string[] {
   return Array.isArray(i.aliases)
@@ -83,7 +93,11 @@ function atendimentosTexto(p: IndiceProfissional, preventivo: "com" | "sem" | nu
   const legado = [especialidades, semAcento(p.tipo_atendimento)].filter(Boolean).join(" ");
   // Indexa apenas título e especialidade de cada bloco público. Não combina
   // palavras de consultas diferentes nem pesquisa preços, notas ou instruções.
-  const itens = separarAtendimentos(p.observacao_publica ?? "", p.nome);
+  const itens = atendimentosEstruturados(
+    p.observacao_publica ?? "",
+    p.atendimentos ? { atendimentos: p.atendimentos } : undefined,
+    p.nome,
+  );
   const titulos = itens
     .filter((i) => {
       if (!preventivo) return true;
@@ -159,11 +173,7 @@ async function buscarNaFonteDoTurno(
   const busca = prepararBuscaCatalogo(
     escrita(pedido.query),
     [
-      ...brutosServicos.flatMap((s) => [
-        s.nome,
-        ...aliasesDoIndice(s),
-        String(s.descricao_publica ?? ""),
-      ]),
+      ...brutosServicos.flatMap((s) => [s.nome, ...aliasesDoIndice(s), textoIndiceServico(s)]),
       ...brutosProfissionais.flatMap((p) => [
         p.nome,
         ...aliasesDoIndice(p),
@@ -220,7 +230,7 @@ async function buscarNaFonteDoTurno(
       s,
       score: Math.max(
         ...[s.nome, ...aliasesDoIndice(s)].map((n) =>
-          busca.pontuar(escrita(n), escrita(String(s.descricao_publica ?? ""))),
+          busca.pontuar(escrita(n), escrita(textoIndiceServico(s))),
         ),
       ),
     }))

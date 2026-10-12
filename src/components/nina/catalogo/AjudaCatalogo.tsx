@@ -7,11 +7,12 @@ import {
   preservadoNaSincronizacao,
   type ChaveAjudaCatalogo,
 } from "@/lib/nina/catalogo-ajuda";
-import { useCatalogoOrganizado } from "./catalogo-organizado";
+import { useCatalogoOrganizado, useItemEstruturado } from "./catalogo-organizado";
 
 /** Botão “Como ler”: explica o que a opção muda no atendimento da Nina. */
 export function ComoLer({ chave }: { chave: ChaveAjudaCatalogo }) {
   const ativo = useCatalogoOrganizado();
+  const estruturado = useItemEstruturado();
   if (!ativo) return null;
   const ajuda = AJUDA_CATALOGO[chave];
   return (
@@ -43,9 +44,11 @@ export function ComoLer({ chave }: { chave: ChaveAjudaCatalogo }) {
           </div>
         )}
         <p className="border-t pt-2 text-xs text-muted-foreground">
-          {preservadoNaSincronizacao(chave)
-            ? "“Sincronizar com Clínica OS” preserva esta opção."
-            : "“Sincronizar com Clínica OS” substitui esta opção pelo dado da origem (ou a deixa em branco)."}
+          {estruturado
+            ? "“Sincronizar com Clínica OS” não altera itens com atendimentos estruturados."
+            : preservadoNaSincronizacao(chave)
+              ? "“Sincronizar com Clínica OS” preserva esta opção."
+              : "“Sincronizar com Clínica OS” substitui esta opção pelo dado da origem (ou a deixa em branco)."}
         </p>
       </PopoverContent>
     </Popover>
@@ -74,16 +77,21 @@ export function RotuloAjuda({
 export function SecaoCatalogo({
   titulo,
   descricao,
+  ajuda,
   children,
 }: {
   titulo: string;
   descricao?: string;
+  ajuda?: ChaveAjudaCatalogo;
   children: ReactNode;
 }) {
   return (
     <section className="space-y-3 rounded-lg border p-4">
       <div>
-        <h3 className="font-medium">{titulo}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-medium">{titulo}</h3>
+          {ajuda && <ComoLer chave={ajuda} />}
+        </div>
         {descricao && <p className="text-xs text-muted-foreground">{descricao}</p>}
       </div>
       {children}
