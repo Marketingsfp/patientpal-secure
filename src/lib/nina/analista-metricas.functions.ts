@@ -196,19 +196,6 @@ async function ferramentaConsultarMetricas(
   } as any);
 }
 
-/**
- * Ferramenta: confiabilidade das respostas (FASE 6/7).
- *
- * Leitura agregada dos snapshots de confiança já gravados, cruzada com os erros
- * reportados. Não recalcula confiança e não expõe texto de paciente.
- */
-async function ferramentaConfiabilidade(_context: Contexto, _clinicaId: string, _args: any) {
-  // Motor de confiança desativado em 16/09/2026; os registros dele saem do banco.
-  return {
-    aviso: "O motor de confiança foi desativado em 16/09/2026. Não há notas de confiabilidade para consultar. Não estime valores.",
-  };
-}
-
 /** Ferramenta 2: calendário e faixas configuradas (sem dados de paciente). */
 async function ferramentaConfiguracao(context: Contexto, clinicaId: string) {
   const [cal, faixas] = await Promise.all([
@@ -392,18 +379,6 @@ export const perguntarAnalistaMetricas = createServerFn({ method: "POST" })
                 // Permissões revalidadas a cada consulta, inclusive em perguntas seguintes.
                 await exigirPermissao(ctx, data.clinicaId);
                 const dados = await ferramentaConsultarMetricas(ctx, data.clinicaId, fuso, args);
-                const id = `consulta_${consultas.length + 1}`;
-                consultas.push({ id, dados });
-                resultado = { consulta_id: id, ...dados };
-              }
-            } else if (chamada.name === "consultar_confiabilidade") {
-              if (consultas.length >= limites.max_consultas_por_pergunta) {
-                resultado = {
-                  erro: `Limite de ${limites.max_consultas_por_pergunta} consultas por pergunta atingido.`,
-                };
-              } else {
-                await exigirPermissao(ctx, data.clinicaId);
-                const dados = await ferramentaConfiabilidade(ctx, data.clinicaId, args);
                 const id = `consulta_${consultas.length + 1}`;
                 consultas.push({ id, dados });
                 resultado = { consulta_id: id, ...dados };

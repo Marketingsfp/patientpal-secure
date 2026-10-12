@@ -61,7 +61,7 @@ export async function carregarDetalhesMensagem(
   const conversaId = s(mensagem?.conversa_id) ?? alvo.conversaId ?? null;
   const [vinculosBrutos, avisosBrutos, eventosDiretos] = mensagemId
     ? await Promise.all([
-        // Vínculos do motor de confiança desativado não são mais lidos.
+        // Vínculos do motor de confiança (removido): não há mais registro a ler.
         Promise.resolve([] as RegistroDetalhes[]),
         ler(
           db

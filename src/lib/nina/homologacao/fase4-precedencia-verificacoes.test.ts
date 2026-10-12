@@ -23,7 +23,6 @@ import {
   avaliarAderenciaFonte,
   resumirAtendimentoCompleto,
 } from "@/lib/nina/homologacao/verificacoes";
-import { decidirHandoff } from "@/lib/nina/confidence/handoff-decision";
 import { validarTemplateInstrucoes } from "@/lib/nina/instrucoes-template";
 
 const saudacao: RestricaoEstruturada = {
@@ -179,25 +178,5 @@ describe("atendimento completo", () => {
       entrega: { mensagemId: "m2" },
     });
     expect(r.resultado).toBe("REPROVADO");
-  });
-});
-
-describe("handoff com exceção publicada", () => {
-  const base = {
-    avaliacaoAcao: { decision: "CLARIFY", hardBlockers: [] } as never,
-    decisaoEfetiva: "CLARIFY" as const,
-    tipoTurno: "PERGUNTA_FACTUAL" as const,
-    tentativasEsclarecimento: 0,
-  };
-
-  it("exceção publicada evita CLARIFY desnecessário", () => {
-    const d = decidirHandoff({ ...base, excecaoPublicadaAplicavel: true } as never);
-    expect(d.decision).toBe("CONTINUE");
-    expect(d.reason).toBe("PUBLISHED_EXCEPTION");
-  });
-
-  it("sem exceção, o comportamento anterior continua", () => {
-    const d = decidirHandoff({ ...base } as never);
-    expect(d.decision).toBe("CLARIFY");
   });
 });

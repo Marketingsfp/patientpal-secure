@@ -455,12 +455,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
 
     let respostasNina: string[] = [];
     let mensagens = 0;
-    // FASE 8 — a verificação parte das SAÍDAS reais, não dos snapshots.
-    let saidasEsperadas: Array<{
-      id: string;
-      execucao_id: string | null;
-      texto_hash: string | null;
-    }> = [];
     if (conversaId) {
       const { data: msgs } = await supabaseAdmin
         .from("whatsapp_mensagens")
@@ -472,12 +466,6 @@ export const finalizarItemExecucao = createServerFn({ method: "POST" })
       mensagens = lista.length;
       const saidas = lista.filter((m) => m.direction === "out");
       respostasNina = saidas.map((m) => String(m.body));
-      const { hashDoTexto } = await import("@/lib/nina/confidence/hash");
-      saidasEsperadas = saidas.map((m) => ({
-        id: String(m.id),
-        execucao_id: m.execucao_id ?? null,
-        texto_hash: hashDoTexto(String(m.body)),
-      }));
     }
 
     let ferramentas: string[] = [];

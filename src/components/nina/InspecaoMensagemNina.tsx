@@ -56,7 +56,6 @@ export function InspecaoMensagemNina({ clinicaId, conversaId, mensagem, saida, p
         clinicaId={clinicaId}
         conversaId={conversaId}
         mensagemId={mensagemId}
-        execucaoId={noEscopo?.execucaoId ?? null}
       />
     ) : null;
   return (

@@ -14,7 +14,6 @@
 import { describe, expect, it } from "bun:test";
 import { montarResultadoConhecimento } from "../knowledge-contract";
 import { extrairEvidencia, type RetornoFerramenta } from "./evidencia-extrator";
-import { avaliarGrounding } from "./claims";
 import type { FatoRecuperado } from "./evidencia";
 import type { ContextoConfianca } from "./types";
 
@@ -88,29 +87,5 @@ describe("FASE 1 — caminho dos dados do preço", () => {
       ["dinheiro", "51"],
       ["cartao", "60"],
     ]);
-  });
-});
-
-describe("FASE 1 — controle A/B da validação monetária", () => {
-  it("B) pergunta só sobre dinheiro: a afirmação de R$ 51,00 é confirmada", () => {
-    const { fatos } = extrairEvidencia(retornoDaFerramenta());
-    const r = avaliarGrounding(contexto(fatos), "O eletrocardiograma custa R$ 51,00 no dinheiro.");
-    const valores = r.claims.filter((c) => c.tipo === "valor");
-    expect(valores.length).toBeGreaterThan(0);
-    expect(valores.every((c) => c.suportado)).toBe(true);
-  });
-
-  it("A) CORRIGIDO NA FASE 3: cada valor é conferido com a sua forma de pagamento", () => {
-    const { fatos } = extrairEvidencia(retornoDaFerramenta());
-    const r = avaliarGrounding(
-      contexto(fatos),
-      "O eletrocardiograma custa R$ 51,00 no dinheiro e R$ 60,00 no cartão.",
-    );
-    const valores = r.claims.filter((c) => c.tipo === "valor");
-    const cartao = valores.find((c) => /60/.test(c.trecho));
-    expect(cartao).toBeDefined();
-    expect(fatos.some((f) => f.chave?.condicoes === "cartao" && f.valor === "60")).toBe(true);
-    expect(cartao!.situacao).toBe("confirmado");
-    expect(valores.every((c) => c.suportado)).toBe(true);
   });
 });

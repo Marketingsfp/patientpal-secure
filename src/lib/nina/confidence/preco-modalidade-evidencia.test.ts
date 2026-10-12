@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { extrairEvidencia } from "./evidencia-extrator";
-import { avaliarGrounding } from "./claims";
 import type { ContextoConfianca } from "./types";
 
 const evidencia = extrairEvidencia({
@@ -54,31 +53,5 @@ describe("preço pertence à modalidade declarada no próprio registro", () => {
       ["Consulta Cardiologia Infantil", "160"],
       ["Consulta Cardiologia Infantil", "190"],
     ]);
-  });
-
-  it.each([
-    ["Cardiologia Infantil", 120, "dinheiro"],
-    ["Cardiologia Infantil", 145, "cartão"],
-    ["Cardiologia", 160, "dinheiro"],
-    ["Cardiologia", 190, "cartão"],
-  ])("reprova o preço de outra modalidade: %s %s %s", (modalidade, preco, forma) => {
-    const r = avaliarGrounding(
-      ctx,
-      `A consulta de ${modalidade} com Dr. Carlos Silva custa R$ ${preco},00 no ${forma}.`,
-    );
-    expect(r.claims.find((c) => c.tipo === "valor")?.suportado).toBe(false);
-  });
-
-  it.each([
-    ["Cardiologia Infantil", 160, "dinheiro"],
-    ["Cardiologia Infantil", 190, "cartão"],
-    ["Cardiologia", 120, "dinheiro"],
-    ["Cardiologia", 145, "cartão"],
-  ])("aceita o preço da modalidade e forma corretas: %s %s %s", (modalidade, preco, forma) => {
-    const r = avaliarGrounding(
-      ctx,
-      `A consulta de ${modalidade} com Dr. Carlos Silva custa R$ ${preco},00 no ${forma}.`,
-    );
-    expect(r.claims.find((c) => c.tipo === "valor")?.suportado).toBe(true);
   });
 });

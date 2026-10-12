@@ -6,7 +6,6 @@
  * como alta confiança sem prova do processo.
  */
 import { describe, expect, it } from "bun:test";
-import { decidirConfianca } from "./engine";
 import { classificarAfirmacaoOperacional, WorkflowConsistencyValidator } from "./workflow";
 import type { ContextoConfianca, EstadoOperacionalTurno } from "./types";
 
@@ -213,47 +212,5 @@ describe("FASE 4 — oito cenários de workflow", () => {
       ctxBase({ draftText: "Agendei sua consulta para sexta." }),
     );
     expect(r.status).toBe("UNKNOWN");
-  });
-});
-
-describe("FASE 4 — caso originador no motor inteiro", () => {
-  const ctxOriginador = ctxBase({
-    intent: "valor",
-    requestedAction: "informar_valor",
-    draftText: "Não consegui concluir seu agendamento neste momento. Vou verificar novamente.",
-    toolResults: [
-      {
-        nome: "buscar_catalogo",
-        capacidade: "searchKnowledgeBase",
-        fonte: "catalogo",
-        success: true,
-        temConteudo: true,
-      },
-    ],
-    retrievedSources: [{ tipo: "catalogo_publicado", temConteudo: true, publicado: true }],
-    operationalState: estado({
-      bookingIntentConfirmed: false,
-      appointmentFlowActive: false,
-      appointmentAttempted: false,
-      appointmentToolCalled: false,
-      appointmentCreated: false,
-      workflowState: "INFORMATION_RESPONSE",
-    }),
-  });
-
-  it("nunca sai como alta confiança", () => {
-    const r = decidirConfianca(ctxOriginador);
-    expect(r.level).not.toBe("HIGH");
-    expect(r.decision).not.toBe("ALLOW");
-    expect(r.hardBlockers).toContain("WORKFLOW_STATE_MISMATCH");
-  });
-
-  it("handoff pedido pelo runtime não apaga o bloqueio de processo", () => {
-    const r = decidirConfianca({
-      ...ctxOriginador,
-      businessContext: { ...ctxOriginador.businessContext, handoffSolicitado: true },
-    });
-    expect(r.score).toBeLessThan(90);
-    expect(r.hardBlockers).toContain("WORKFLOW_STATE_MISMATCH");
   });
 });

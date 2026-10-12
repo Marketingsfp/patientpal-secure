@@ -9,8 +9,6 @@
 import { describe, expect, it } from "bun:test";
 import { autorizarAcao, vagaCorresponde, type EntradaAutorizacao } from "./autorizacao";
 import { verificarResultadoAgendamento } from "./resultado";
-import { decidirConfianca } from "@/lib/nina/confidence/engine";
-import { montarContextoDoTurno } from "@/lib/nina/confidence/runtime";
 
 const INICIO = "2026-09-15T13:00:00.000Z";
 const FIM = "2026-09-15T13:30:00.000Z";
@@ -210,24 +208,5 @@ describe("FASE 3 — prova do resultado", () => {
     const r = verificarResultadoAgendamento(esperado, null, { erro: "SLOT_UNAVAILABLE" });
     expect(r.estado).toBe("FAILED");
     expect(r.erro).toBe("SLOT_UNAVAILABLE");
-  });
-});
-
-describe("FASE 3 — actionSafety não confunde 'sem bloqueio' com autorizado", () => {
-  it("decisão que ainda pede esclarecimento não sai como ALLOWED", () => {
-    const ctx = montarContextoDoTurno({
-      ferramentas: [],
-      catalogoEncontrou: false,
-      agendamentoConfirmado: false,
-      pacienteIdentificado: false,
-      esclarecimentoUsado: false,
-      handoffSolicitado: false,
-      ambiente: "homologacao",
-      acao: "criar_agendamento",
-      intent: "agendamento",
-      texto: "Posso confirmar?",
-    });
-    const r = decidirConfianca({ ...ctx, tipoAvaliacao: "action_safety" });
-    if (r.decision !== "ALLOW") expect(r.actionSafety?.status).not.toBe("ALLOWED");
   });
 });

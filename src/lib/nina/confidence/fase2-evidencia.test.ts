@@ -8,8 +8,6 @@
 import { describe, expect, it } from "bun:test";
 import { extrairEvidencia, identidadeConsulta } from "./evidencia-extrator";
 import { consolidarTentativas, corresponder, houveTruncamento } from "./evidencia";
-import { verificarRespostaFinalDoTurno } from "./runtime";
-import { turnoBase, FERRAMENTA_CATALOGO_OK } from "./fixtures/clinica-ficticia";
 import type { FatoRecuperado } from "./evidencia";
 
 const catalogoUltrassom = {
@@ -36,48 +34,6 @@ describe("FASE 2 — fatos vêm do retorno real da ferramenta", () => {
     expect(preco?.valor).toBe("R$ 150,00");
     expect(preco?.fonte).toBe("catalogo_publicado");
     expect(preco?.chave?.procedimento).toBe("Ultrassonografia abdominal");
-  });
-
-  it("valor diferente do fato (R$ 999 contra R$ 150) não passa", () => {
-    const r = verificarRespostaFinalDoTurno(
-      turnoBase({
-        acao: "informar_valor",
-        tipoTurno: "INFORMACAO",
-        catalogoEncontrou: true,
-        ferramentas: [FERRAMENTA_CATALOGO_OK],
-        fatos: fatosDoCatalogo(),
-      }),
-      "A ultrassonografia abdominal custa R$ 999,00.",
-    );
-    expect(r.decision).not.toBe("ALLOW");
-  });
-
-  it("mesmo valor do fato (R$ 150) é liberado", () => {
-    const r = verificarRespostaFinalDoTurno(
-      turnoBase({
-        acao: "informar_valor",
-        tipoTurno: "INFORMACAO",
-        catalogoEncontrou: true,
-        ferramentas: [FERRAMENTA_CATALOGO_OK],
-        fatos: fatosDoCatalogo(),
-      }),
-      "A ultrassonografia abdominal custa R$ 150,00.",
-    );
-    expect(r.decision).toBe("ALLOW");
-  });
-
-  it("endereço nunca consultado não pode ser afirmado", () => {
-    const r = verificarRespostaFinalDoTurno(
-      turnoBase({
-        acao: "responder_informacao",
-        tipoTurno: "INFORMACAO",
-        catalogoEncontrou: true,
-        ferramentas: [FERRAMENTA_CATALOGO_OK],
-        fatos: fatosDoCatalogo(),
-      }),
-      "Estamos na Rua das Palmeiras, 120, centro.",
-    );
-    expect(r.decision).not.toBe("ALLOW");
   });
 });
 

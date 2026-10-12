@@ -49,9 +49,6 @@ import {
   resumirAtendimentoCompleto,
   type ParMarcador,
 } from "@/lib/nina/homologacao/verificacoes";
-import { decidirHandoff } from "@/lib/nina/confidence/handoff-decision";
-import { nivelDaPontuacao } from "@/lib/nina/confidence/policy";
-import type { ResultadoConfianca } from "@/lib/nina/confidence/types";
 
 const CLINICA_A = "11111111-1111-4111-8111-111111111111";
 const CLINICA_B = "22222222-2222-4222-8222-222222222222";
@@ -340,80 +337,8 @@ describe("4. saudação, exceção, sessão e mensagens agrupadas", () => {
   });
 });
 
-// ============================================================== 5. confiança
-function avaliacao(p: Partial<ResultadoConfianca> = {}): ResultadoConfianca {
-  return {
-    score: 90,
-    decision: "ALLOW",
-    hardBlockers: [],
-    validators: [],
-    ...(p as any),
-  } as ResultadoConfianca;
-}
-
-describe("5. faixas de confiança e garantias por tipo de turno", () => {
-  it("faixas A/B/C/D continuam classificando pela pontuação", () => {
-    expect(nivelDaPontuacao(95)).toBe("HIGH");
-    expect(nivelDaPontuacao(75)).toBe("MEDIUM");
-    expect(nivelDaPontuacao(20)).toBe("LOW");
-  });
-
-  it("pedido de humano transfere sem depender de confiança", () => {
-    const p = decidirHandoff({
-      avaliacaoAcao: avaliacao(),
-      decisaoEfetiva: "ALLOW",
-      tipoTurno: "HANDOFF",
-      pedidoHumanoExplicito: true,
-    });
-    expect(p.decision).toBe("HANDOFF");
-    expect(p.reason).toBe("EXPLICIT_HUMAN_REQUEST");
-  });
-
-  it("falha de ferramenta em ação crítica nunca executa a ação", () => {
-    const p = decidirHandoff({
-      avaliacaoAcao: avaliacao({
-        score: 30,
-        decision: "BLOCK_ACTION",
-        hardBlockers: ["TOOL_FAILURE_ON_CRITICAL_ACTION"] as any,
-        actionSafety: { status: "BLOCKED" } as any,
-      }),
-      decisaoEfetiva: "BLOCK_ACTION",
-      tipoTurno: "OPERACAO",
-    });
-    expect(["HANDOFF", "BLOCK_ACTION"]).toContain(p.decision);
-  });
-
-  it("coleta de dados se resolve perguntando, sem transferir de imediato", () => {
-    const p = decidirHandoff({
-      avaliacaoAcao: avaliacao({
-        score: 60,
-        decision: "CLARIFY",
-        hardBlockers: ["AMBIGUOUS_CRITICAL_ENTITY"] as any,
-        actionSafety: { status: "BLOCKED" } as any,
-      }),
-      decisaoEfetiva: "CLARIFY",
-      tipoTurno: "ESCLARECIMENTO",
-      tentativasEsclarecimento: 0,
-    });
-    expect(p.recuperavel).toBe(true);
-    expect(p.decision).not.toBe("HANDOFF");
-  });
-
-  it("tentativas esgotadas passam para atendente humano", () => {
-    const p = decidirHandoff({
-      avaliacaoAcao: avaliacao({
-        score: 40,
-        decision: "BLOCK_ACTION",
-        hardBlockers: ["AMBIGUOUS_CRITICAL_ENTITY"] as any,
-        actionSafety: { status: "BLOCKED" } as any,
-      }),
-      decisaoEfetiva: "BLOCK_ACTION",
-      tipoTurno: "ESCLARECIMENTO",
-      tentativasEsclarecimento: 2,
-    });
-    expect(p.decision).toBe("HANDOFF");
-  });
-
+// ============================================================== 5. encerramento
+describe("5. encerramento por tipo de turno", () => {
   it("encerramento continua com texto próprio e origem própria", async () => {
     const r = await finalizarTemplate({
       clinicaId: CLINICA_A,

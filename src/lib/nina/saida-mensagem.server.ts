@@ -1,6 +1,6 @@
 import { hashDoTexto } from "./confidence/hash";
 import { representacaoDaMensagem } from "./confidence/identidade-saida";
-import { ROTULO_ESTADO_AVISO, ROTULO_ESTADO_ENTREGA } from "./confidence/classificacao-saida";
+import { ROTULO_ESTADO_AVISO } from "./confidence/classificacao-saida";
 
 import type { SaidaMensagemView } from "./saida-mensagem.functions";
 import {
@@ -42,9 +42,6 @@ export async function carregarSaidasDasMensagens(
 
   const ids = linhas.map((m) => String(m["id"]));
 
-  // Vínculos do motor de confiança desativado não são mais lidos.
-  const vinculos: Array<Record<string, unknown>> = [];
-
   // Avisos de encaminhamento: vínculo real com a mensagem entregue.
   const { data: avisoRows, error: erroAvisos } = await db
     .from("atend_aviso_encaminhamento")
@@ -67,14 +64,6 @@ export async function carregarSaidasDasMensagens(
     const textoEntregue = identidade.conteudo;
     const hashEntregue = textoEntregue == null ? null : hashDoTexto(textoEntregue);
 
-    const vinculo =
-      vinculos.find(
-        (v) =>
-          v.clinica_id === data.clinicaId &&
-          v.conversation_id === m.conversa_id &&
-          String(v["outgoing_message_id"]) === mensagemId,
-      ) ?? null;
-    const detalhe = (vinculo?.["detalhe"] ?? null) as Record<string, unknown> | null;
     const avisosValidos = avisosOficiaisDaMensagem(m, avisos, data.clinicaId);
     const aviso = avisosValidos.length === 1 ? (avisosValidos[0] as Record<string, unknown>) : null;
     const execucaoConflitante =
@@ -84,11 +73,7 @@ export async function carregarSaidasDasMensagens(
         ),
       ).size > 1;
 
-    const origemBruta = txt(detalhe?.["origem"]);
-    const avisoOperacional =
-      avisosValidos.length > 0 ||
-      origemBruta === "aviso_encaminhamento" ||
-      detalhe?.["avaliada"] === false;
+    const avisoOperacional = avisosValidos.length > 0;
 
     const estadoAviso = txt(aviso?.["estado"]);
 
@@ -104,22 +89,12 @@ export async function carregarSaidasDasMensagens(
         ? "Aviso operacional registrado."
         : "Resposta da Nina registrada.",
       limitacao: execucaoConflitante ? "Vínculos de execução divergentes." : null,
-      origem:
-        (origemBruta ? (ORIGEM_ROTULO[origemBruta] ?? origemBruta) : null) ??
-        (aviso ? ORIGEM_ROTULO["aviso_encaminhamento"]! : null),
+      origem: aviso ? ORIGEM_ROTULO["aviso_encaminhamento"]! : null,
       textoEntregue,
       textoEntregueHash: hashEntregue,
-      motivoSubstituicao: txt(detalhe?.["motivo"]),
-      entrega: vinculo
-        ? {
-            estado: (() => {
-              const e = txt(vinculo["estado"]);
-              return e ? (ROTULO_ESTADO_ENTREGA[e] ?? e) : null;
-            })(),
-            representacao: txt(vinculo["representacao"]),
-            transporteId: txt(vinculo["transporte_id"]),
-          }
-        : null,
+      // O registro de entrega do motor de confiança foi desativado: sem vínculo.
+      motivoSubstituicao: null,
+      entrega: null,
       encaminhamento: aviso
         ? {
             protocolo: txt(aviso["protocolo"]),

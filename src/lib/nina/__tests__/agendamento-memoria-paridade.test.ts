@@ -2,15 +2,9 @@
 import { describe, expect, it } from "bun:test";
 import { normalizarEstado, type EstadoFluxoNina } from "../fluxo-estado-normalizar";
 import { encerrarEstadosTransacionais, reabrirSessao, resolverEstadoDaSessao } from "../sessao";
-import {
-  estadoOperacionalDaSessao,
-  reservaDaSessaoAtual,
-  resultadoComprovaCriacaoNoTurno,
-} from "../agendamento-sessao";
+import { reservaDaSessaoAtual, resultadoComprovaCriacaoNoTurno } from "../agendamento-sessao";
 import { validarResultado } from "../tool-broker";
 import { derivarEtapa } from "../atendimento-fase6";
-import { decidirConfianca } from "../confidence/engine";
-import { WorkflowConsistencyValidator } from "../confidence/workflow";
 import type { ContextoConfianca, EstadoOperacionalTurno } from "../confidence/types";
 
 const AGORA = new Date("2026-09-14T01:04:00Z");
@@ -63,11 +57,6 @@ function contexto(
       handoffSolicitado: false,
     },
   };
-}
-function executarDuasAvaliacoes(ctx: ContextoConfianca) {
-  return (["action_safety", "answer_confidence"] as const).map((tipoAvaliacao) =>
-    decidirConfianca({ ...ctx, tipoAvaliacao }, { agora: AGORA }),
-  );
 }
 
 describe("memória de agendamento respeita o encerramento do atendimento", () => {
@@ -190,119 +179,3 @@ describe("memória de agendamento respeita o encerramento do atendimento", () =>
       ).toBe(false);
   });
 });
-
-for (const ambiente of ["producao", "homologacao"] as const) {
-  describe(`paridade do núcleo em ${ambiente}`, () => {
-    it.each(["nova", "reaberta", "legada", "confirmada"])(
-      "saudação correta passa nos dois motores: %s",
-      (caso) => {
-        const original = reserva();
-        let estado: EstadoFluxoNina;
-        if (caso === "nova") estado = normalizarEstado(null);
-        else if (caso === "reaberta") estado = reabrirSessao(original, AGORA.toISOString());
-        else if (caso === "legada") {
-          delete original.appointment.confirmed_in_session;
-          estado = resolverEstadoDaSessao(original, AGORA, 240, FIM).estado;
-        } else estado = original;
-        const st = estadoOperacionalDaSessao(estado, {
-          ferramentaChamada: false,
-          reservaCriada: false,
-        });
-        expect(st.appointmentFlowActive).toBe(false);
-        const ctx = contexto(ambiente, st);
-        expect(WorkflowConsistencyValidator(ctx).status).toBe("NOT_APPLICABLE");
-        for (const r of executarDuasAvaliacoes(ctx)) {
-          expect(r.score).toBe(100);
-          expect(r.decision).toBe("ALLOW");
-          expect(r.hardBlockers).toEqual([]);
-        }
-      },
-    );
-
-    it("não confunde o estado bruto do incidente com tentativa de agendar na saudação", () => {
-      const ctx = contexto(ambiente, {
-        appointmentFlowActive: true,
-        workflowState: "APPOINTMENT_CONFIRMED",
-        appointmentCreated: true,
-        appointmentId: "reserva-anterior",
-        appointmentToolCalled: false,
-        appointmentAttempted: false,
-      });
-      for (const r of executarDuasAvaliacoes(ctx)) expect(r.decision).toBe("ALLOW");
-    });
-
-    it("referência à reserva comprovada na mesma sessão não exige gravá-la novamente", () => {
-      const st = estadoOperacionalDaSessao(reserva(), {
-        ferramentaChamada: false,
-        reservaCriada: false,
-      });
-      const ctx = contexto(ambiente, st, "Sua consulta está agendada.");
-      expect(WorkflowConsistencyValidator(ctx).status).toBe("PASS");
-      for (const r of executarDuasAvaliacoes(ctx)) expect(r.decision).toBe("ALLOW");
-    });
-
-    it.each([
-      "Agendei sua consulta agora.",
-      "Sua nova consulta está agendada.",
-      "Confirmei sua consulta.",
-    ])("reserva antiga não comprova nova criação: %s", (texto) => {
-      const st = estadoOperacionalDaSessao(reserva(), {
-        ferramentaChamada: false,
-        reservaCriada: false,
-      });
-      const ctx = contexto(ambiente, st, texto);
-      expect(WorkflowConsistencyValidator(ctx).reasonCode).toBe("NOVA_OPERACAO_SEM_PROVA_DO_TURNO");
-      for (const r of executarDuasAvaliacoes(ctx)) {
-        expect(r.decision).not.toBe("ALLOW");
-        expect(r.hardBlockers).toContain("UNSUPPORTED_OPERATIONAL_CLAIM");
-      }
-    });
-
-    it("nova reserva exige ferramenta e ID no atendimento correto", () => {
-      const st = estadoOperacionalDaSessao(reserva(), {
-        ferramentaChamada: true,
-        reservaCriada: true,
-      });
-      const ctx = contexto(ambiente, st, "Agendei sua consulta.");
-      expect(WorkflowConsistencyValidator(ctx).status).toBe("PASS");
-      for (const r of executarDuasAvaliacoes(ctx)) expect(r.decision).toBe("ALLOW");
-      const semId = { ...st, appointmentId: null };
-      expect(WorkflowConsistencyValidator(contexto(ambiente, semId, ctx.draftText!)).status).toBe(
-        "BLOCK",
-      );
-    });
-
-    it("retorno idempotente EXISTING comprova existência, mas não nova gravação", () => {
-      const st = estadoOperacionalDaSessao(reserva(), {
-        ferramentaChamada: true,
-        reservaCriada: false,
-      });
-      expect(
-        WorkflowConsistencyValidator(contexto(ambiente, st, "Sua consulta está agendada.")).status,
-      ).toBe("PASS");
-      expect(
-        WorkflowConsistencyValidator(contexto(ambiente, st, "Agendei sua consulta.")).reasonCode,
-      ).toBe("NOVA_OPERACAO_SEM_PROVA_DO_TURNO");
-    });
-
-    it("confirmação sem prova em sessão reaberta continua bloqueada", () => {
-      const st = estadoOperacionalDaSessao(reabrirSessao(reserva()), {
-        ferramentaChamada: false,
-        reservaCriada: false,
-      });
-      for (const r of executarDuasAvaliacoes(contexto(ambiente, st, "Sua consulta está agendada.")))
-        expect(r.decision).not.toBe("ALLOW");
-    });
-
-    it("contrato legado sem prova de criação neste turno não aprova nova operação", () => {
-      const st = estadoOperacionalDaSessao(reserva(), {
-        ferramentaChamada: true,
-        reservaCriada: true,
-      });
-      delete st.appointmentCreatedThisTurn;
-      const ctx = contexto(ambiente, st, "Agendei sua consulta agora.");
-      expect(WorkflowConsistencyValidator(ctx).reasonCode).toBe("NOVA_OPERACAO_SEM_PROVA_DO_TURNO");
-      for (const r of executarDuasAvaliacoes(ctx)) expect(r.decision).not.toBe("ALLOW");
-    });
-  });
-}

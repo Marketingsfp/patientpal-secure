@@ -163,21 +163,20 @@ describe("leitura compartilhada das saídas", () => {
       expect(saida!.avaliacoes).toEqual([]);
     });
   }
-  for (const tabela of [
-    "whatsapp_mensagens",
-    "atend_aviso_encaminhamento",
-  ]) {
+  for (const tabela of ["whatsapp_mensagens", "atend_aviso_encaminhamento"]) {
     it(`falha em ${tabela} não vira Não avaliada`, async () => {
       await expect(carregarSaidasDasMensagens(preparar(tabela).cliente, dados)).rejects.toThrow();
     });
   }
-  it("indisponibilidade do motor não interfere na leitura de saídas", async () => {
-    const { cliente, consultas } = preparar("nina_confianca_decisoes");
-    const [saida] = await carregarSaidasDasMensagens(cliente, dados);
-    expect(saida?.inspecionavel).toBe(true);
-    expect(saida?.avaliacoes).toEqual([]);
-    expect(consultas.some((c) => c.tabela === "nina_confianca_decisoes")).toBe(false);
-  });
+  for (const tabela of ["nina_confianca_decisoes", "nina_confianca_vinculos"]) {
+    it(`motor de confiança removido: ${tabela} não é consultada`, async () => {
+      const { cliente, consultas } = preparar(tabela);
+      const [saida] = await carregarSaidasDasMensagens(cliente, dados);
+      expect(saida?.inspecionavel).toBe(true);
+      expect(saida?.avaliacoes).toEqual([]);
+      expect(consultas.some((c) => c.tabela.startsWith("nina_confianca"))).toBe(false);
+    });
+  }
   it("não devolve mensagem de outra conversa/clínica solicitada pelo cliente", async () => {
     const { cliente } = preparar();
     expect(await carregarSaidasDasMensagens(cliente, { ...dados, conversaId: "v2" })).toEqual([]);

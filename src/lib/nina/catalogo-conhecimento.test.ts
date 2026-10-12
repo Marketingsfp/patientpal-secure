@@ -1,6 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { extrairEvidencia } from "./confidence/evidencia-extrator";
-import { verificarFormaPagamento } from "./confidence/pagamento-declarado";
 import {
   avisoVigente,
   montarResultadoCatalogo,
@@ -41,39 +39,6 @@ const profissional: ProfissionalPublicado = {
 };
 
 describe("catálogo como fonte de conhecimento da Nina", () => {
-  it.each([null, undefined, "inválido", [null], []].map((formas) => ({ formas })))(
-    "preserva lista de pagamento sem confundir ausência e lista vazia: %j",
-    ({ formas }) => {
-      for (const tipo of ["servico", "profissional"]) {
-        const dados = montarResultadoCatalogo({
-          servicos:
-            tipo === "servico"
-              ? [{ ...servico, nome: "Consulta Cardiologia", formas_pagamento: formas }]
-              : [],
-          profissionais:
-            tipo === "profissional" ? [{ ...profissional, formas_pagamento: formas }] : [],
-          hojeISO: "2026-09-13",
-        });
-        const evidencia = extrairEvidencia({
-          ferramenta: "consultar_cadastro",
-          capacidade: "searchKnowledgeBase",
-          fonte: "base_conhecimento",
-          success: true,
-          args: { termo: "cardiologia" },
-          dados,
-        });
-        const resultado = verificarFormaPagamento({
-          forma: "pix",
-          negacao: true,
-          chave: { procedimento: "Cardiologia" },
-          fatos: evidencia.fatos,
-          consultas: [evidencia.consulta],
-        });
-        expect(resultado.situacao).not.toBe("confirmado");
-      }
-    },
-  );
-
   it("não converte um preço cadastrado só em PIX para dinheiro", () => {
     const formas = [{ forma: "PIX", valor: 100, condicao: "Consulta Cardiologia" }];
     const s = servicoParaRegistro({ ...servico, valor: 100, formas_pagamento: formas });

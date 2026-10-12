@@ -340,8 +340,8 @@ export function HomologacaoInbox({
     }));
   }, [msgs, eventosConversa]);
 
-  // Mesma leitura de confiança da Inbox real: lotes pela conversa de cada
-  // mensagem, com concorrência limitada e sem recalcular avaliações na tela.
+  // Mesma leitura de saídas da Inbox real: lotes pela conversa de cada
+  // mensagem, com concorrência limitada.
   const idsDasMensagens = useMemo(() => idsParaInspecaoNina(msgs), [msgs]);
   const saidasPorMensagem = useSaidasDasMensagens(
     clinicaId,
@@ -355,7 +355,6 @@ export function HomologacaoInbox({
   const metadadosDaMensagem = useCallback(
     (m: Msg) => {
       const saida = saidasPorMensagem[m.id];
-      const c = saida && saida !== "falha" && saida.classe === "resposta_avaliada" ? saida : null;
       const conversaMensagem =
         m.conversa_id ??
         (saida && saida !== "falha" && saida.mensagemId === m.id && saida.clinicaId === clinicaId
@@ -377,7 +376,6 @@ export function HomologacaoInbox({
         ninaSessionId: cicloVinculado?.nina_session_id ?? null,
         criadaEm: m.created_at,
         execucaoId: m.execucao_id ?? null,
-        confianca: c?.score != null && c.nivel ? { score: c.score, nivel: c.nivel } : null,
       });
     },
     [clinicaId, conversaId, saidasPorMensagem, ciclos, leads, leadId],

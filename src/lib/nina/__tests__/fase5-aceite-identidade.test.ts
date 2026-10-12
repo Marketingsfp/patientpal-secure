@@ -24,9 +24,6 @@ import {
 } from "../identidade-efetiva";
 import { avaliarSaudacao } from "../saudacao-sessao";
 import { garantirSessaoAtiva } from "../saudacao-sessao";
-import { montarInstrucoesDoTurno } from "../confidence/contexto-avaliacao";
-import { avaliarObrigacoes, InstructionComplianceValidator } from "../confidence/obrigacoes";
-import type { ContextoConfianca } from "../confidence/types";
 import {
   promptMensagemHandoff,
   montarMensagemHandoffFallback,
@@ -414,70 +411,6 @@ describe("G — sem identidade válida a resposta é neutra", () => {
     const efetiva = await identidadeEfetivaAtual("whatsapp", "G-2");
     expect(efetiva.ok).toBe(false);
     expect(efetiva.apresentacao.assistente).toBe(IDENTIDADE_NEUTRA.assistente);
-  });
-});
-
-// ------------------------------------------------------------------------- H
-describe("H — regra de resposta exata da homologação continua valendo", () => {
-  const ctx = (texto: string, draft: string): ContextoConfianca => ({
-    requestedAction: null,
-    retrievedSources: [],
-    toolResults: [],
-    mensagemPaciente: "TESTE-ARQUITETURA-9381",
-    instrucoes: montarInstrucoesDoTurno({
-      escopo: "whatsapp",
-      versao: "9",
-      versaoId: "v-9",
-      publicadoEm: "2026-09-11T10:00:00.000Z",
-      origem: "publicada",
-      texto,
-    }),
-    draftText: draft,
-    businessContext: {
-      ambiente: "homologacao",
-      pacienteIdentificado: false,
-      agendamentoConfirmado: false,
-      esclarecimentoUsado: false,
-      handoffSolicitado: false,
-    },
-  });
-
-  const textoComIdentidade = aplicarIdentidadeNoTexto(
-    `${REGRAS_BASE.replace("${nomeUnidade}", "a unidade")}\n\n${REGRA_HOMOLOGACAO}`,
-    IDENT_B,
-  );
-
-  it("marcador exato é cumprido sem ocultar outras regras não verificadas", () => {
-    const c = ctx(textoComIdentidade, "ARQUITETURA_CONFIRMADA_9381");
-    const r = avaliarObrigacoes(c, c.draftText!);
-    const literal = r.avaliacoes.find((a) => a.obrigacao.tipo === "restricao_literal");
-    expect(literal?.status).toBe("cumprida");
-    expect(literal?.obrigacao.literal).toBe("ARQUITETURA_CONFIRMADA_9381");
-    // A proibição aberta legada continua sem verificador: cumprir o literal
-    // não pode fabricar cumprimento dessa outra exigência.
-    expect(r.avaliacoes.some((a) => a.status === "indeterminada")).toBe(true);
-    expect(r.estadoRestricoes).toBe("indeterminadas");
-    expect(InstructionComplianceValidator(c).status).toBe("PASS");
-  });
-
-  it("apresentação não é forçada no turno de teste", () => {
-    const c = ctx(textoComIdentidade, "ARQUITETURA_CONFIRMADA_9381");
-    const d = avaliarSaudacao(
-      c.draftText!,
-      { assistente: "Lia", estabelecimento: "Horizonte" },
-      {
-        obrigatoria: false,
-      },
-    );
-    expect(d.saudacaoAusente).toBe(false);
-    // A telemetria observa, nunca reescreve o texto entregue.
-    expect(c.draftText).toBe("ARQUITETURA_CONFIRMADA_9381");
-  });
-
-  it("saudação com o novo nome antes do marcador é descumprimento (sem exceção fixa)", () => {
-    const c = ctx(textoComIdentidade, "Bom dia! Sou a Lia. ARQUITETURA_CONFIRMADA_9381");
-    expect(avaliarObrigacoes(c, c.draftText!).restricoesCumpridas).toBe(false);
-    expect(InstructionComplianceValidator(c).status).toBe("FAIL");
   });
 });
 

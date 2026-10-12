@@ -1,7 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import type { FatoRecuperado } from "./evidencia";
-import { montarContextoCanonicoTurno } from "./contexto-turno";
-import { detectarIntencoes, intencaoAmbigua } from "../atendimento-fase1";
 import {
   candidatosDaSelecaoContextual,
   normalizarSelecaoContextual,
@@ -266,35 +264,5 @@ describe("seleção contextual com fatos oficiais reconsultados", () => {
     expect(r).toEqual(alex());
     expect(r).not.toHaveProperty("bookingIntentConfirmed");
     expect(normalizarSelecaoContextual({ medicoNome: "Alex Silva" })).toBeNull();
-  });
-});
-
-describe("preferência contextual no contexto canônico", () => {
-  const deps = { detectarIntencoes, intencaoAmbigua };
-  it.each(["vou fazer com o dr alex", "Alex", "o dr Alex", "infantil"])(
-    "escolha legível é esclarecimento sem ação executável: %s",
-    (mensagem) => {
-      const c = montarContextoCanonicoTurno(
-        {
-          mensagemPaciente: mensagem,
-          podeAgendar: true,
-          selecaoContextual: resolver(mensagem, mensagem === "infantil" ? alex() : null),
-        },
-        deps,
-      );
-      expect(c.turnType).toBe("ESCLARECIMENTO");
-      expect(c.intentAmbiguo).toBe(false);
-      expect(c.intent).not.toBeNull();
-      expect(c.requestedAction).toBeNull();
-    },
-  );
-  it("informação sobre profissional conserva classificação informativa", () => {
-    const mensagem = "qual o horário do dr Alex?";
-    const c = montarContextoCanonicoTurno(
-      { mensagemPaciente: mensagem, podeAgendar: true, selecaoContextual: resolver(mensagem) },
-      deps,
-    );
-    expect(c.turnType).toBe("INFORMACAO");
-    expect(c.requestedAction).not.toBe("criar_agendamento");
   });
 });
