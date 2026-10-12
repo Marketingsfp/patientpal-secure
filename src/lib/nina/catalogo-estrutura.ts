@@ -148,6 +148,8 @@ export const estruturaCatalogoSchema = z
     complementos: z.array(complementoAtendimentoSchema).max(100).default([]),
     /** Presente e não vazio = item estruturado: os fatos saem só daqui. */
     atendimentos: z.array(atendimentoCatalogoSchema).max(60).optional(),
+    /** Cópia do formato antigo, para desfazer a conversão. Nunca vai para a Nina. */
+    formato_antigo: z.string().max(500000).optional(),
   })
   .superRefine((v, ctx) => {
     if (new Set(v.complementos.map((c) => c.chave)).size !== v.complementos.length)

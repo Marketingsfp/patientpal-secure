@@ -15,12 +15,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { profissionalSchema, servicoSchema, valorResumo, STATUS_CATALOGO } from "./catalogo";
-import { separarAtendimentos } from "./catalogo-estrutura";
+import { atendimentosEstruturados } from "./catalogo-estrutura";
+import {
+  LIMITE_LOTE_CONVERSAO,
+  LIMITE_PAGINA_CONVERSAO,
+  planejarConversao,
+} from "./catalogo-conversao";
+import { FLAG_CATALOGO_ESTRUTURADO } from "./catalogo-ajuda";
 import { contextoDicionarioSchema } from "./catalogo-dicionario";
 import { validarSelecaoLote, publicarLoteValidado, LIMITE_EDICAO_LOTE } from "./catalogo-lote-ia";
 import {
   aplicarEdicaoCatalogoIA,
   dadosEditaveisCatalogo,
+  dadosParaEdicaoIA,
   CONFLITO_EDICAO_CATALOGO,
   type PreviaEdicaoCatalogo,
 } from "./catalogo-edicao-ia";
@@ -453,7 +460,7 @@ export const preverEdicaoCatalogoIA = createServerFn({ method: "POST" })
     const proposta = await editarTextoComIA(
       data.tipo,
       data.texto,
-      dadosEditaveisCatalogo(data.tipo, registro),
+      dadosParaEdicaoIA(data.tipo, registro),
     );
     const previa = aplicarEdicaoCatalogoIA(data.tipo, registro, proposta);
     return {
@@ -499,8 +506,9 @@ export const selecionarEdicoesCatalogoIA = createServerFn({ method: "POST" })
             nome: d.nome,
             especialidades: d.especialidades?.map((e: any) => e.nome),
             aliases: d.estrutura?.aliases,
-            atendimentos: separarAtendimentos(
+            atendimentos: atendimentosEstruturados(
               tipo === "servico" ? d.descricao_publica : d.observacao_publica,
+              d.estrutura,
               tipo === "profissional" ? d.nome : undefined,
             ).map((a) => ({
               atendimento: a.atendimento,
@@ -577,4 +585,151 @@ export const publicarEdicoesCatalogoIA = createServerFn({ method: "POST" })
         );
       },
     );
+  });
+
+/* ------------------------------------------------------------------ */
+/* Conversão em lote para atendimentos estruturados                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cliente do Supabase para tabela escolhida em tempo de execução (serviço ou
+ * profissional): a tipagem gerada não resolve o nome dinâmico da tabela.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- ver comentário acima
+type ClienteCatalogo = any;
+
+/** A conversão só existe nas clínicas com a flag do catálogo estruturado. */
+async function exigirConversaoLiberada(supabase: ClienteCatalogo, clinicaId: string) {
+  const { data, error } = await supabase
+    .from("clinica_feature_flags")
+    .select("ativo")
+    .eq("clinica_id", clinicaId)
+    .eq("flag_key", FLAG_CATALOGO_ESTRUTURADO)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.ativo)
+    throw new Error(
+      "A conversão para atendimentos estruturados não está liberada para esta clínica.",
+    );
+}
+
+/** Prévia paginada: lê e converte em memória. Não grava nada. */
+export const preverConversaoCatalogo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        tipo: z.enum(["servico", "profissional"]),
+        inicio: z.number().int().min(0).default(0),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    await exigirConversaoLiberada(context.supabase, data.clinicaId);
+    const sb: ClienteCatalogo = context.supabase;
+    const { data: linhas, error } = await sb
+      .from(TABELA[data.tipo])
+      .select(data.tipo === "servico" ? COLUNAS_SERVICO : COLUNAS_PROFISSIONAL)
+      .eq("clinica_id", data.clinicaId)
+      .neq("status", "ARQUIVADO")
+      .order("id")
+      .range(data.inicio, data.inicio + LIMITE_PAGINA_CONVERSAO - 1);
+    if (error) throw erroLeituraCatalogo(error);
+    const registros = (linhas ?? []) as Parameters<typeof planejarConversao>[1][];
+    return {
+      itens: registros.map((r) => planejarConversao(data.tipo, r).item),
+      proximo:
+        registros.length === LIMITE_PAGINA_CONVERSAO ? data.inicio + LIMITE_PAGINA_CONVERSAO : null,
+    };
+  });
+
+/** Converte os itens confirmados na prévia, um a um, só se não mudaram desde ela. */
+export const aplicarConversaoCatalogo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        itens: z
+          .array(
+            z.object({
+              tipo: z.enum(["servico", "profissional"]),
+              id: z.string().uuid(),
+              versao: z.string().min(1),
+            }),
+          )
+          .min(1)
+          .max(LIMITE_LOTE_CONVERSAO),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.supabase, context.userId, data.clinicaId);
+    await exigirConversaoLiberada(context.supabase, data.clinicaId);
+    const sb: ClienteCatalogo = context.supabase;
+    const resultados: Array<{
+      tipo: "servico" | "profissional";
+      id: string;
+      nome: string;
+      ok: boolean;
+      motivo: string | null;
+    }> = [];
+    for (const alvo of data.itens) {
+      const { data: registro, error } = await sb
+        .from(TABELA[alvo.tipo])
+        .select(alvo.tipo === "servico" ? COLUNAS_SERVICO : COLUNAS_PROFISSIONAL)
+        .eq("clinica_id", data.clinicaId)
+        .eq("id", alvo.id)
+        .maybeSingle();
+      const nome = String(registro?.nome ?? alvo.id);
+      if (error || !registro) {
+        resultados.push({
+          ...alvo,
+          nome,
+          ok: false,
+          motivo: "Registro não encontrado nesta clínica.",
+        });
+        continue;
+      }
+      if (registro.updated_at !== alvo.versao) {
+        resultados.push({
+          ...alvo,
+          nome,
+          ok: false,
+          motivo: "O cadastro mudou depois da prévia. Gere uma nova prévia.",
+        });
+        continue;
+      }
+      const plano = planejarConversao(alvo.tipo, registro);
+      if (plano.item.acao !== "converter" || !plano.dados) {
+        resultados.push({
+          ...alvo,
+          nome,
+          ok: false,
+          motivo: plano.item.motivo ?? "Item já convertido.",
+        });
+        continue;
+      }
+      const { data: gravado, error: erroGravar } = await sb
+        .from(TABELA[alvo.tipo])
+        .update(plano.dados)
+        .eq("clinica_id", data.clinicaId)
+        .eq("id", alvo.id)
+        .eq("updated_at", alvo.versao)
+        .select("id")
+        .maybeSingle();
+      resultados.push(
+        erroGravar || !gravado
+          ? {
+              ...alvo,
+              nome,
+              ok: false,
+              motivo: erroGravar?.message ?? "O cadastro mudou durante a conversão.",
+            }
+          : { ...alvo, nome, ok: true, motivo: null },
+      );
+    }
+    return { resultados };
   });

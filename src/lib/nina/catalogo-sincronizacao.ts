@@ -1,7 +1,11 @@
 import { profissionalSchema, servicoSchema, valorResumo } from "./catalogo";
-import { atendimentosDaEstrutura, estruturaCatalogoSchema } from "./catalogo-estrutura";
-import { MENSAGEM_ITEM_ESTRUTURADO } from "./catalogo-atendimentos";
-import { compararDadosCatalogo } from "./catalogo-edicao-ia";
+import {
+  atendimentosDaEstrutura,
+  estruturaCatalogoSchema,
+  type AtendimentoCatalogo,
+} from "./catalogo-estrutura";
+import { converterParaEstruturado, mesclarComOrigem } from "./catalogo-atendimentos";
+import { compararDadosCatalogo, compararDadosEstruturados } from "./catalogo-edicao-ia";
 import type { PerguntaJev, RespostaJev } from "./jev";
 
 export type TipoSincronizacao = "servico" | "profissional";
@@ -81,8 +85,6 @@ export function validarDestinoSincronizacao(registro: RegistroSincronizacao) {
     throw new Error(
       "Este registro representa um grupo. A sincronização manual exige um registro por médico ou procedimento; não vincule o grupo inteiro a um único exame.",
     );
-  // Item estruturado: a origem chega no formato antigo e apagaria os atendimentos.
-  if (atendimentosDaEstrutura(registro.estrutura)) throw new Error(MENSAGEM_ITEM_ESTRUTURADO);
 }
 
 /**
@@ -95,6 +97,8 @@ export function prepararSincronizacao(
   fonte: RegistroSincronizacao,
 ) {
   validarDestinoSincronizacao(atual);
+  const atuais = atendimentosDaEstrutura(atual.estrutura);
+  if (atuais) return prepararSincronizacaoEstruturada(tipo, atual, fonte, atuais);
   const estrutura = estruturaCatalogoSchema.parse({
     ...fonte.estrutura,
     abrangencia: "item",
@@ -139,6 +143,80 @@ export function prepararSincronizacao(
   return { dados, mudancas };
 }
 
+/**
+ * Item estruturado (regra de 12/10/2026): a origem atualiza os fatos — nome,
+ * quem realiza, horários e preços de cada atendimento. A equipe mantém as
+ * regras por atendimento (modalidade confirmada, idade, chegada, critérios,
+ * inclui, acréscimos, situação do preço, observação) e do item (encaminhamento
+ * obrigatório, pedido médico, aviso, Nina pode agendar, sinônimos, nota e texto
+ * livre). O que a origem não informa (convênios, unidade, consultório) fica.
+ */
+function prepararSincronizacaoEstruturada(
+  tipo: TipoSincronizacao,
+  atual: RegistroSincronizacao,
+  fonte: RegistroSincronizacao,
+  atuais: AtendimentoCatalogo[],
+) {
+  const origem = converterParaEstruturado(tipo, fonte);
+  if (origem.bloqueios.length)
+    throw new Error(
+      `A origem não pôde ser lida com segurança: ${origem.bloqueios.join(" ")} Confira o cadastro no Clínica OS.`,
+    );
+  if (!origem.atendimentos.length)
+    throw new Error("A origem não trouxe nenhum atendimento. Confira o cadastro no Clínica OS.");
+  const { atendimentos } = mesclarComOrigem(atuais, origem.atendimentos);
+  const e = atual.estrutura ?? {};
+  const semPreparoDaEquipe = e.preparo_status === "sem_preparo" && !fonte.preparo;
+  const estrutura = estruturaCatalogoSchema.parse({
+    ...fonte.estrutura,
+    abrangencia: "item",
+    aliases: e.aliases ?? [],
+    nina_pode_agendar: e.nina_pode_agendar ?? null,
+    encaminhamento_humano: e.encaminhamento_humano ?? null,
+    pedido_medico: e.pedido_medico ?? "nao_informado",
+    convenios_status: e.convenios_status ?? "nao_informado",
+    ...(semPreparoDaEquipe ? { preparo_status: "sem_preparo" } : {}),
+    complementos: [],
+    atendimentos,
+    formato_antigo: e.formato_antigo,
+  });
+  const textoLivre = tipo === "servico" ? "descricao_publica" : "observacao_publica";
+  const preenchido = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v != null && v !== "");
+  const entrada: Record<string, unknown> = {
+    ...fonte,
+    [textoLivre]: atual[textoLivre] ?? null,
+    estrutura,
+    nota_interna: atual.nota_interna ?? null,
+  };
+  if (tipo === "profissional")
+    Object.assign(entrada, {
+      aviso_dia: atual.aviso_dia ?? null,
+      aviso_valido_de: atual.aviso_valido_de ?? null,
+      aviso_valido_ate: atual.aviso_valido_ate ?? null,
+      convenios: preenchido(fonte.convenios) ? fonte.convenios : (atual.convenios ?? []),
+      atende_consultorio: fonte.atende_consultorio ?? atual.atende_consultorio ?? null,
+      unidade_id: fonte.unidade_id ?? atual.unidade_id ?? null,
+    });
+  const resultado =
+    tipo === "servico" ? servicoSchema.safeParse(entrada) : profissionalSchema.safeParse(entrada);
+  if (!resultado.success)
+    throw new Error(
+      `O cadastro de origem não cabe no formato da base. ${resultado.error.issues.map((i) => i.message).join("; ")}`,
+    );
+  const dados = resultado.data;
+  if ("valor" in dados) dados.valor = valorResumo(dados);
+  const mudancas = compararDadosEstruturados(tipo, atual, dados);
+  const vinculo = tipo === "servico" ? "procedimento_id" : "medico_id";
+  const depois = (dados as Record<string, unknown>)[vinculo];
+  if (JSON.stringify(atual[vinculo] ?? null) !== JSON.stringify(depois ?? null))
+    mudancas.push({
+      campo: "Vínculo com Clínica OS",
+      antes: apresentarEstrutura(atual[vinculo]),
+      depois: apresentarEstrutura(depois),
+    });
+  return { dados, mudancas };
+}
+
 const rotulosEstrutura: Record<string, string> = {
   origem_clinica_os: "Origem no Clínica OS",
   aliases: "Variações de escrita",
@@ -151,6 +229,8 @@ const rotulosEstrutura: Record<string, string> = {
   pedido_medico: "Necessidade de pedido médico",
   convenios_status: "Situação dos convênios",
   complementos: "Regras por atendimento",
+  atendimentos: "Atendimentos",
+  formato_antigo: "Cópia do formato antigo",
   chave: "Atendimento",
   modalidade: "Modalidade",
   idade_minima: "Idade mínima",

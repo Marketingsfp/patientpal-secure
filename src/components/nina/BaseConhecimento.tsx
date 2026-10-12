@@ -3,6 +3,9 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { BookOpen, Building2, FlaskConical, Stethoscope } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CatalogoNina } from "@/components/nina/catalogo/CatalogoNina";
+import { ConversaoEmLote } from "@/components/nina/catalogo/ConversaoEmLote";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { FLAG_CATALOGO_ESTRUTURADO } from "@/lib/nina/catalogo-ajuda";
 import { HorarioFuncionamento } from "@/components/nina/catalogo/HorarioFuncionamento";
 import { FonteConsultaMaria } from "@/components/nina/catalogo/FonteConsultaMaria";
 import { ImportacaoCompleta } from "@/components/nina/catalogo/ImportacaoCompleta";
@@ -20,6 +23,7 @@ export function BaseConhecimento() {
   const podeEscrever = usePodeEscrever("nina-base-conhecimento");
   const podeEditar = podeEscrever && ["admin", "gestor"].includes(String(clinicaAtual?.role ?? ""));
   const [revisao, setRevisao] = useState(0);
+  const { enabled: catalogoEstruturado } = useClinicFeatureFlag(FLAG_CATALOGO_ESTRUTURADO);
 
   return (
     <section className="oszap-base" data-os-zap="true" aria-label="Base de conhecimento">
@@ -36,6 +40,13 @@ export function BaseConhecimento() {
       {podeEditar && clinicaId && (
         <ImportacaoCompleta
           key={clinicaId}
+          clinicaId={clinicaId}
+          onConcluido={() => setRevisao((v) => v + 1)}
+        />
+      )}
+      {podeEditar && clinicaId && catalogoEstruturado && (
+        <ConversaoEmLote
+          key={`conversao-${clinicaId}`}
           clinicaId={clinicaId}
           onConcluido={() => setRevisao((v) => v + 1)}
         />

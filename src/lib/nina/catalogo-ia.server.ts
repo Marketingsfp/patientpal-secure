@@ -16,7 +16,11 @@ import {
   schemaSaida,
   type TipoCatalogo,
 } from "./catalogo-ia";
-import { instrucoesEdicaoCatalogoIA, schemaSaidaEdicao } from "./catalogo-edicao-ia";
+import {
+  instrucoesEdicaoCatalogoIA,
+  instrucoesEdicaoEstruturadaIA,
+  schemaSaidaEdicao,
+} from "./catalogo-edicao-ia";
 import { instrucoesSelecaoLote, schemaSelecaoLote } from "./catalogo-lote-ia";
 
 export type ResultadoIA = {
@@ -151,7 +155,10 @@ export async function editarTextoComIA(
   cadastro: Record<string, unknown>,
 ): Promise<unknown> {
   return gerarJsonCatalogo(
-    instrucoesEdicaoCatalogoIA(tipo),
+    // Item estruturado chega como { ...campos simples, atendimentos }.
+    Array.isArray(cadastro.atendimentos)
+      ? instrucoesEdicaoEstruturadaIA(tipo)
+      : instrucoesEdicaoCatalogoIA(tipo),
     JSON.stringify({ cadastro_atual: cadastro, pedido_do_operador: texto }),
     schemaSaidaEdicao(),
   );

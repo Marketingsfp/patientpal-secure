@@ -290,7 +290,7 @@ export const AJUDA_CATALOGO = {
     efeito:
       "Lê o texto e os campos antigos e monta os atendimentos estruturados. Nada é salvo até você conferir e salvar; o que não puder ser lido com segurança aparece como pendência.",
     atencao:
-      "Depois de salvo, sincronização com o Clínica OS, importação e edição com IA deixam de alterar este item.",
+      "Depois de convertido, “Sincronizar com Clínica OS” e a importação atualizam só nome, quem realiza, horários e preços; as regras da equipe ficam. Uma cópia do formato antigo é guardada para desfazer a conversão.",
   },
 } satisfies Record<string, AjudaCatalogo>;
 

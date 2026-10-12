@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,11 @@ import { TextoCatalogo as Textarea, CampoTextoCatalogo } from "./TextoCatalogo";
 import { ComoLer } from "./AjudaCatalogo";
 import { DIAS_SEMANA, RECORRENCIAS } from "@/lib/nina/catalogo-constantes";
 import { paraNumero } from "@/lib/nina/catalogo";
-import { fatosNoTextoLivre, mensagemFatosNoTexto } from "@/lib/nina/catalogo-atendimentos";
+import {
+  dataDaConversao,
+  fatosNoTextoLivre,
+  mensagemFatosNoTexto,
+} from "@/lib/nina/catalogo-atendimentos";
 import { MODALIDADES_ATENDIMENTO } from "@/lib/nina/modalidade-atendimento";
 import type {
   AtendimentoCatalogo,
@@ -644,6 +648,54 @@ export function AvisoItemEstruturadoClassico() {
       Este item usa atendimentos estruturados. Os horários, preços e modalidade abaixo são
       calculados a partir deles e ficam só para leitura nesta tela; a edição é feita na tela
       organizada do catálogo.
+    </div>
+  );
+}
+
+/** Volta o item ao formato antigo a partir da cópia guardada na conversão. */
+export function DesfazerConversao({
+  copia,
+  somenteLeitura,
+  onDesfazer,
+}: {
+  copia: string | null | undefined;
+  somenteLeitura?: boolean;
+  onDesfazer: () => void;
+}) {
+  const [confirmar, setConfirmar] = useState(false);
+  if (!copia || somenteLeitura) return null;
+  const quando = dataDaConversao(copia);
+  const data = quando ? new Date(quando).toLocaleDateString("pt-BR") : null;
+  return (
+    <div className="space-y-2 rounded-md border border-dashed p-3 text-sm">
+      {!confirmar ? (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmar(true)}>
+          Desfazer conversão
+        </Button>
+      ) : (
+        <>
+          <p>
+            Volta ao conteúdo de antes da conversão{data ? ` (${data})` : ""}. Mudanças feitas nos
+            atendimentos depois disso serão perdidas. Nada é gravado até você salvar.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setConfirmar(false);
+                onDesfazer();
+              }}
+            >
+              Confirmar e voltar ao formato antigo
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setConfirmar(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

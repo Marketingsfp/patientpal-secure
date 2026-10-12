@@ -14,9 +14,15 @@ import {
   AvisoItemEstruturadoClassico,
   AvisoTextoLivre,
   ConversaoParaAtendimentos,
+  DesfazerConversao,
   PendenciasAtendimentos,
 } from "./AtendimentosEditor";
-import { converterParaEstruturado } from "@/lib/nina/catalogo-atendimentos";
+import {
+  converterParaEstruturado,
+  copiaFormatoAntigo,
+  restaurarFormatoAntigo,
+} from "@/lib/nina/catalogo-atendimentos";
+import { paraNumero } from "@/lib/nina/catalogo";
 import { pendenciasEstrutura, type AtendimentoCatalogo } from "@/lib/nina/catalogo-estrutura";
 import { PedidoMedicoEditor } from "./PedidoMedicoEditor";
 import {
@@ -199,19 +205,47 @@ export function FormProfissional({
   const setAtendimentos = (atendimentos: AtendimentoCatalogo[]) =>
     set({ estrutura: { ...estado.estrutura, atendimentos } });
   const converter = () => {
-    const r = converterParaEstruturado("profissional", {
+    const antigo = {
       nome: estado.nome,
       estrutura: estado.estrutura,
       observacao_publica: estado.observacao_publica,
       horarios: estado.horarios,
-      formas_pagamento: estado.formas_pagamento,
+      formas_pagamento: estado.formas_pagamento.map((f) => ({
+        ...f,
+        valor: paraNumero(f.valor),
+      })),
       tipo_atendimento: estado.tipo_atendimento,
       especialidades: nomesEspecialidades.map((nome) => ({ nome })),
-    });
+    };
+    const r = converterParaEstruturado("profissional", antigo);
     setPendenciasConversao(r.pendencias);
     set({
       observacao_publica: r.descricao,
-      estrutura: { ...estado.estrutura, atendimentos: r.atendimentos },
+      estrutura: {
+        ...estado.estrutura,
+        atendimentos: r.atendimentos,
+        formato_antigo: copiaFormatoAntigo("profissional", antigo),
+      },
+    });
+  };
+  const desfazer = () => {
+    const copia = estado.estrutura.formato_antigo;
+    if (!copia) return;
+    const { campos, complementos } = restaurarFormatoAntigo("profissional", copia);
+    const { atendimentos: _a, formato_antigo: _f, ...resto } = estado.estrutura;
+    const r = profissionalDoRegistro({
+      id: estado.id,
+      nome: estado.nome,
+      ...campos,
+      estrutura: { ...resto, complementos },
+    });
+    setPendenciasConversao([]);
+    set({
+      observacao_publica: r.observacao_publica,
+      horarios: r.horarios,
+      formas_pagamento: r.formas_pagamento,
+      tipo_atendimento: r.tipo_atendimento,
+      estrutura: r.estrutura,
     });
   };
   const setHorario = (i: number, patch: Partial<LinhaHorario>) =>
@@ -587,6 +621,11 @@ export function FormProfissional({
               medicos={opcoes.medicos}
               especialidades={nomesEspecialidades}
               somenteLeitura={somenteLeitura}
+            />
+            <DesfazerConversao
+              copia={estado.estrutura.formato_antigo}
+              somenteLeitura={somenteLeitura}
+              onDesfazer={desfazer}
             />
           </SecaoCatalogo>
           <SecaoCatalogo titulo="Aviso do dia">{aviso}</SecaoCatalogo>
