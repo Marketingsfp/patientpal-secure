@@ -20,6 +20,8 @@ import {
   removerTokenTelefonia,
   salvarTokenTelefonia,
   testarConexaoTelefonia,
+  importarChamadasTelefonia,
+  listarChamadasTelefonia,
 } from "@/lib/coach/telefonia.functions";
 
 type Teste = Awaited<ReturnType<typeof testarConexaoTelefonia>>;
@@ -396,6 +398,8 @@ export function TelefoniaSufficit({
           )}
         </div>
       )}
+
+      <ImportacaoChamadas clinicaId={clinicaId} de={de} ate={ate} />
     </div>
   );
 }
@@ -407,4 +411,145 @@ function diaLocal(deslocamento: number): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dia = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${dia}`;
+}
+
+type Importacao = Awaited<ReturnType<typeof importarChamadasTelefonia>>;
+type Lista = Awaited<ReturnType<typeof listarChamadasTelefonia>>;
+
+const FUSO_CLINICA = "America/Sao_Paulo";
+const fmtDataHora = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: FUSO_CLINICA,
+  dateStyle: "short",
+  timeStyle: "medium",
+});
+
+function minSeg(s: number | null): string {
+  if (s == null) return "—";
+  return `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, "0")}s`;
+}
+
+/** Período De/Até (dias locais) em ISO UTC. Ambos obrigatórios na importação. */
+function periodoIso(de: string, ate: string): { start: string; end: string } | null {
+  if (!de || !ate) return null;
+  return {
+    start: new Date(`${de}T00:00:00`).toISOString(),
+    end: new Date(`${ate}T23:59:59.999`).toISOString(),
+  };
+}
+
+function ImportacaoChamadas({
+  clinicaId,
+  de,
+  ate,
+}: {
+  clinicaId: string | null;
+  de: string;
+  ate: string;
+}) {
+  const importar = useServerFn(importarChamadasTelefonia);
+  const listar = useServerFn(listarChamadasTelefonia);
+  const [ultima, setUltima] = useState<Importacao | null>(null);
+  const [lista, setLista] = useState<Lista | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const periodo = periodoIso(de, ate);
+
+  async function recarregar() {
+    if (!clinicaId || !periodo) return;
+    setLista(await listar({ data: { clinicaId, ...periodo } }));
+  }
+
+  useEffect(() => {
+    setLista(null);
+    setUltima(null);
+    void recarregar().catch((e) => setErro((e as Error)?.message || "Falha ao ler."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicaId, de, ate]);
+
+  async function rodar() {
+    if (!clinicaId || !periodo) return;
+    setErro(null);
+    setOcupado(true);
+    try {
+      setUltima(await importar({ data: { clinicaId, ...periodo } }));
+      await recarregar();
+    } catch (e) {
+      setErro((e as Error)?.message || "Falha inesperada.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3 border-t pt-4 text-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="font-medium">Ligações importadas</div>
+        <Button onClick={() => void rodar()} disabled={!clinicaId || !periodo || ocupado}>
+          {ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Importar período
+        </Button>
+        {!periodo && (
+          <span className="text-muted-foreground">Preencha De e Até para importar.</span>
+        )}
+      </div>
+      {erro && <p className="text-destructive">{erro}</p>}
+      {ultima &&
+        (ultima.ok ? (
+          <p>
+            Última importação: {ultima.lidas} lidas · {ultima.inseridas} inseridas ·{" "}
+            {ultima.repetidas} repetidas · {ultima.erros} com erro
+            {ultima.avisos.length ? ` · ${ultima.avisos.join(" ")}` : ""}
+          </p>
+        ) : (
+          <p className="text-destructive">{ultima.erro}</p>
+        ))}
+      {lista && (
+        <>
+          <p>
+            Total no período: {lista.total}
+            {lista.total > lista.linhas.length ? ` (mostrando as ${lista.linhas.length} mais recentes)` : ""}
+          </p>
+          <div className="max-h-[480px] overflow-auto rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-left">
+                <tr>
+                  <th className="p-2">Data/hora (Brasília)</th>
+                  <th className="p-2">Duração</th>
+                  <th className="p-2">Tarifado</th>
+                  <th className="p-2">Direção</th>
+                  <th className="p-2">Situação</th>
+                  <th className="p-2">Origem</th>
+                  <th className="p-2">Destino</th>
+                  <th className="p-2">Discado</th>
+                  <th className="p-2">DID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lista.linhas.map((l) => (
+                  <tr key={l.id} className="border-t">
+                    <td className="p-2 whitespace-nowrap">{fmtDataHora.format(new Date(l.inicio))}</td>
+                    <td className="p-2">{minSeg(l.duracao_seg)}</td>
+                    <td className="p-2">{minSeg(l.tarifado_seg)}</td>
+                    <td className="p-2">{l.direcao ?? "—"}</td>
+                    <td className="p-2">{l.situacao ?? "—"}</td>
+                    <td className="p-2">{l.origem_numero ?? "—"}</td>
+                    <td className="p-2">{l.destino_numero ?? "—"}</td>
+                    <td className="p-2">{l.discado ?? "—"}</td>
+                    <td className="p-2">{l.did ?? "—"}</td>
+                  </tr>
+                ))}
+                {!lista.linhas.length && (
+                  <tr>
+                    <td className="p-2 text-muted-foreground" colSpan={9}>
+                      Nenhuma ligação importada neste período.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
