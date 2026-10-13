@@ -54,6 +54,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
       "O paciente solicitou remarcação. A Nina encaminhou para a equipe humana realizar a alteração; não remarcou nem cancelou a reserva anterior.",
     ],
     [
+      /\bINFORMACAO_COM_RECEPCAO\b/i,
+      "O paciente pediu uma informação que não está no cadastro da Nina. A recepção responde.",
+    ],
+    [
       /\bESPECIALIDADE_NAO_OFERECIDA\b/i,
       "O paciente procura uma especialidade que a clínica não oferece. A recepção orienta o paciente.",
     ],

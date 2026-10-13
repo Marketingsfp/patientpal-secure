@@ -32,18 +32,25 @@ import { PERGUNTA_PREFERENCIA_PROFISSIONAL } from "./prompt/consulta-agenda";
  * Pergunta de preferência no modelo de 13/10/2026: a última pergunta da IA
  * sobre preferência de profissional, médico ou primeiro disponível vira
  * "Você tem preferência por algum profissional ou gostaria de marcar com o
- * primeiro disponível?" (sem emoji). Outras perguntas ficam como estão.
+ * primeiro disponível?" (sem emoji). Com dois ou mais profissionais
+ * apresentados (`variosProfissionais`), o convite final para marcar ("Você
+ * gostaria de marcar uma consulta ou ficou com alguma dúvida?") também vira a
+ * pergunta padrão. Outras perguntas ficam como estão.
  */
-export function padronizarPerguntaPreferencia(texto: string): string {
+export function padronizarPerguntaPreferencia(texto: string, variosProfissionais = false): string {
   const protegido = protegerAbreviacoes(texto.trimEnd());
   const final = /([^.!?\n]*\?)[^\p{L}\p{N}\n]*$/u.exec(protegido);
   if (!final) return texto;
   const frase = normalizarRespostaInformal(restaurarAbreviacoes(final[1]!));
-  if (
-    !/\bprefer/.test(frase) ||
-    !/(?:profissiona|medic|doutor|primeiro (?:horario )?disponivel|primeira vaga)/.test(frase)
-  )
-    return texto;
+  const preferencia =
+    /\bprefer/.test(frase) &&
+    /(?:profissiona|medic|doutor|primeiro (?:horario )?disponivel|primeira vaga)/.test(frase);
+  const conviteParaMarcar =
+    variosProfissionais &&
+    /\b(?:gostaria|deseja|quer|queria|tem interesse|posso)\b[^?]*\b(?:marcar|agendar|agendamento)\b/.test(
+      frase,
+    );
+  if (!preferencia && !conviteParaMarcar) return texto;
   const antes = protegido.slice(0, final.index);
   const separador = antes && !/\s$/.test(antes) ? " " : "";
   return restaurarAbreviacoes(`${antes}${separador}${PERGUNTA_PREFERENCIA_PROFISSIONAL}`);
