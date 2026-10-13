@@ -297,7 +297,7 @@ export async function garantirResumoHandoff(args: {
   const { data: convData } = await supabaseAdmin
     .from("atend_conversas")
     .select(
-      "handoff_em, handoff_motivo, contato_paciente_id, contato_nome, protocolo_atendimento, nina_fluxo_estado",
+      "handoff_em, handoff_motivo, handoff_resumo, contato_paciente_id, contato_nome, protocolo_atendimento, nina_fluxo_estado",
     )
     .eq("id", conversaId)
     .eq("clinica_id", clinicaId)
@@ -305,6 +305,7 @@ export async function garantirResumoHandoff(args: {
   const conv = convData as {
     handoff_em?: string | null;
     handoff_motivo?: string | null;
+    handoff_resumo?: { dados?: { dados_paciente?: unknown } | null } | null;
     contato_paciente_id?: string | null;
     contato_nome?: string | null;
     protocolo_atendimento?: string | null;
@@ -377,6 +378,8 @@ export async function garantirResumoHandoff(args: {
         // do handoff; nunca é recalculado nem inventado pelo modelo.
         protocolo: conv.protocolo_atendimento ?? null,
         agendamentoReal: agendado,
+        // Nome e data de nascimento vêm do registro da transferência, não da IA.
+        dadosPaciente: conv.handoff_resumo?.dados?.dados_paciente ?? null,
         ...(args.extras ?? {}),
       }),
       desfecho,

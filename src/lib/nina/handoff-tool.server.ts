@@ -7,6 +7,7 @@
  */
 import { encaminharParaHumano } from "@/lib/atendimento/handoff.server";
 import { explicitarMotivoSfp } from "@/lib/atendimento/motivo-sfp";
+import { normalizarDadosPaciente } from "./dados-transferencia";
 
 export const NOME_FERRAMENTA_HANDOFF = "solicitar_atendente_humano";
 
@@ -88,6 +89,8 @@ export async function executarHandoffTool(
     ? (String(args.urgencia) as "baixa" | "normal" | "alta")
     : "normal";
   const setor = args.setor ? String(args.setor).slice(0, 120) : null;
+  // Nome completo e data de nascimento pedidos pelo sistema antes da transferência.
+  const dadosPaciente = normalizarDadosPaciente(args.dados_paciente);
 
   const r = await encaminharParaHumano({
     clinicaId: ctx.clinicaId,
@@ -98,6 +101,7 @@ export async function executarHandoffTool(
     departamentoNome: setor,
     solicitadoPor: "IA",
     avisarPaciente: args.avisar_paciente !== false,
+    ...(dadosPaciente ? { dadosColetados: { dados_paciente: dadosPaciente } } : {}),
   });
   const silencioso = r.ok && args.avisar_paciente === false;
 

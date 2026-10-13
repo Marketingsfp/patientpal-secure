@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 import { REGRA_DUAS_FALHAS_ENTENDIMENTO } from "../jev-encaminhamento";
+import { PERGUNTA_DADOS_TRANSFERENCIA } from "../dados-transferencia";
 
 const fixture = fileURLToPath(new URL("./fixtures/resposta-direta.fixture.ts", import.meta.url));
-function simular(ambiente: string, caso: string) {
+function simular(ambiente: string, caso: string, dadosTransferencia = false) {
   const p = Bun.spawnSync([process.execPath, fixture, ambiente, `catalogo_duvida_${caso}`], {
     cwd: fileURLToPath(new URL("../../../../../", import.meta.url)),
+    env: {
+      ...process.env,
+      NINA_FIXTURE_DADOS_TRANSFERENCIA: dadosTransferencia ? "1" : "0",
+    },
     stdout: "pipe",
     stderr: "pipe",
     timeout: 15_000,
@@ -39,6 +44,20 @@ describe("núcleo compartilhado — encaminhar na segunda falha de entendimento"
         expect(r.rede).toBe(0);
       });
     }
+    test(`${ambiente}: com a flag de dados, pede nome e nascimento antes de transferir`, () => {
+      const r = simular(ambiente, "segunda", true);
+      expect(r.encaminhamentos).toHaveLength(0);
+      expect(r.requests).toHaveLength(0);
+      expect(r.resposta).toContain(PERGUNTA_DADOS_TRANSFERENCIA);
+      const estado = r.gravacoes
+        .filter(
+          (g: { tabela: string; valor?: { nina_fluxo_estado?: unknown } }) =>
+            g.tabela === "atend_conversas" && g.valor?.nina_fluxo_estado,
+        )
+        .at(-1)?.valor.nina_fluxo_estado;
+      expect(estado?.transferencia_pendente?.argumentos.motivo).toBeTruthy();
+      expect(r.rede).toBe(0);
+    });
     test(`${ambiente}: segunda mensagem sem entendimento encaminha uma vez, antes de outra geração`, () => {
       const r = simular(ambiente, "segunda");
       expect(r.encaminhamentos).toHaveLength(1);

@@ -1359,6 +1359,20 @@ async function gerarRespostaNinaInterno(
       : null;
   const respostaOfertaTurno = ofertaEncaminhamento ? respostaAOferta(mensagemPaciente) : null;
   if (respostaOfertaTurno === "aceite") nomeAtendimentoAusente = false;
+  // Transferência aguardando nome completo e data de nascimento (regra de 12/10/2026):
+  // a resposta do paciente, qualquer que seja, conclui a transferência pedida.
+  const dadosTransferencia = await import("@/lib/nina/dados-transferencia");
+  const transferenciaPendente =
+    sessaoNina.estado?.transferencia_pendente &&
+    sessaoNina.estado.transferencia_pendente.session_id === sessaoNina.estado.session_id
+      ? sessaoNina.estado.transferencia_pendente
+      : null;
+  if (transferenciaPendente) nomeAtendimentoAusente = false;
+  let perguntaDadosTransferencia: string | null = null;
+  // Flag por clínica `nina_dados_transferencia`; desligada, transfere na hora como antes.
+  const pedirDadosAntesDaTransferencia = await import("@/lib/nina/dados-transferencia-flag.server")
+    .then((m) => m.flagDadosTransferenciaAtiva(clinicaId))
+    .catch(() => false);
   if (nomeAtendimentoAusente && !jevEncaminhamento) {
     if (perguntaNomeAnterior)
       jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
@@ -2461,6 +2475,66 @@ async function gerarRespostaNinaInterno(
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
     | null = null;
+  // Regra de 12/10/2026: antes de transferir, a Nina pede uma vez nome completo e
+  // data de nascimento; a transferência acontece na próxima mensagem do paciente.
+  // Urgência, reclamação, pedido explícito por uma pessoa e aviso silencioso
+  // transferem na hora.
+  async function reterTransferenciaParaDados(
+    argumentos: {
+      motivo: string;
+      resumo?: string | null;
+      urgencia?: string | null;
+      setor?: string | null;
+      avisar_paciente?: boolean;
+    },
+    contexto = "",
+  ): Promise<boolean> {
+    if (perguntaDadosTransferencia) return true;
+    if (
+      !pedirDadosAntesDaTransferencia ||
+      transferenciaPendente ||
+      !fluxoEstado.session_id ||
+      !estadoId.conversaId
+    )
+      return false;
+    if (
+      dadosTransferencia.transferenciaDispensaDados({
+        urgencia: argumentos.urgencia,
+        motivo: argumentos.motivo,
+        avisarPaciente: argumentos.avisar_paciente,
+        pedidoExplicitoAtendente: [...intencoesDetectadasTurno, ...intencoesTurno].includes(
+          "falar_humano",
+        ),
+      })
+    )
+      return false;
+    fluxoEstado.oferta_encaminhamento = null;
+    fluxoEstado.transferencia_pendente = {
+      session_id: fluxoEstado.session_id,
+      em: new Date().toISOString(),
+      argumentos: {
+        motivo: argumentos.motivo.slice(0, 500),
+        resumo: argumentos.resumo?.slice(0, 2000) ?? null,
+        urgencia: argumentos.urgencia ?? null,
+        setor: argumentos.setor ?? null,
+      },
+    };
+    perguntaDadosTransferencia = [contexto.trim(), dadosTransferencia.PERGUNTA_DADOS_TRANSFERENCIA]
+      .filter(Boolean)
+      .join("\n\n");
+    await salvarFluxoEstado(supabaseAdmin as never, clinicaId, estadoId.conversaId, fluxoEstado);
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Transferência aguardando nome completo e data de nascimento",
+      dados: { motivo: argumentos.motivo.slice(0, 300) },
+      codigo: {
+        arquivo: "src/lib/nina/dados-transferencia.ts",
+        funcao: "transferenciaDispensaDados",
+      },
+    });
+    return true;
+  }
   async function encaminharRegraCatalogo(
     ferramentaOrigem: string,
     ausencia?: NonNullable<ReturnType<typeof encaminhamentoSemRegistro>>,
@@ -2499,6 +2573,7 @@ async function gerarRespostaNinaInterno(
         ? { resumo: `${CAUSA_SFP_OUTRA_UNIDADE} A equipe deve continuar o atendimento.` }
         : {}),
     };
+    if (await reterTransferenciaParaDados(argumentos)) return;
     const origem =
       ausencia &&
       [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(ausencia.motivo)
@@ -2933,8 +3008,20 @@ async function gerarRespostaNinaInterno(
   const referenciasDaDecisao = ofertaEncaminhamento?.referencias.length
     ? ofertaEncaminhamento.referencias
     : referenciasInformadas;
+  // A intenção de marcar vale para a sessão: escolher o profissional ou o
+  // horário ("pode ser a Valeria", "seria 9h") continua o mesmo pedido.
+  const intencaoAgendarTurno = fluxoAgendamento.intencaoDeAgendarNaSessao({
+    intencaoNoTurno: temIntencaoDeAgendar(intencoesTurno),
+    sessaoComIntencao:
+      Boolean(fluxoEstado.session_id) &&
+      fluxoEstado.intencao_agendar_sessao === fluxoEstado.session_id,
+    intencoesTurno,
+    mensagem: mensagemPaciente,
+  });
+  if (temIntencaoDeAgendar(intencoesTurno) && fluxoEstado.session_id)
+    fluxoEstado.intencao_agendar_sessao = fluxoEstado.session_id;
   const decisaoAgendamento = fluxoAgendamento.decidirAgendamentoNoTurno({
-    intencaoAgendar: temIntencaoDeAgendar(intencoesTurno),
+    intencaoAgendar: intencaoAgendarTurno,
     fluxo: fluxoDasReferencias(referenciasDaDecisao),
     informacoesEntregues: referenciasDaDecisao.length > 0,
     ofertaPendente: Boolean(ofertaEncaminhamento),
@@ -2958,9 +3045,11 @@ async function gerarRespostaNinaInterno(
 
   async function executarDecisaoEncaminhamento(
     decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento,
+    pendente?: import("@/lib/nina/dados-transferencia").TransferenciaPendente,
   ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     fluxoEstado.oferta_encaminhamento = null;
+    fluxoEstado.transferencia_pendente = null;
     if (opcoes?.revisao?.valor) {
       const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
       turnoObsoleto = await respostaObsoleta({
@@ -2982,13 +3071,22 @@ async function gerarRespostaNinaInterno(
       urgencia: decisao.urgencia,
       ...(alteracaoSolicitada || agendamentoTransicao ? { setor: "Agendamento" } : {}),
     };
+    if (!pendente && (await reterTransferenciaParaDados(argumentos))) return;
+    // Transferência retomada: os argumentos guardados e os dados que o paciente enviou.
+    const dadosPaciente = pendente
+      ? dadosTransferencia.extrairDadosTransferencia(mensagemPaciente)
+      : null;
+    const transferencia =
+      pendente && dadosPaciente
+        ? dadosTransferencia.argumentosComDados(pendente.argumentos, dadosPaciente)
+        : argumentos;
     if (agendamentoTransicao) {
       const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
       limparEscolhaAgendamento(fluxoEstado);
       fluxoEstado.appointment.slot_options = null;
     }
     const rh = await broker
-      .executar("solicitar_atendente_humano", JSON.stringify(argumentos))
+      .executar("solicitar_atendente_humano", JSON.stringify(transferencia))
       .catch(
         () =>
           ({ success: false, erro: "handoff_indisponivel" }) as {
@@ -3009,24 +3107,33 @@ async function gerarRespostaNinaInterno(
     registrarEtapa({
       tipo: "ferramenta",
       fonte: "atendimento",
-      titulo: alteracaoSolicitada
-        ? "Encaminhamento: cancelamento/remarcação solicitado"
-        : agendamentoTransicao
-          ? "Encaminhamento: paciente deseja agendar"
-          : cartaoConsultaEquipe
-            ? "Encaminhamento: cartão consulta"
-            : multiplos
-              ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
-              : listaExtensa
-                ? "Encaminhamento: lista com mais de 8 profissionais"
-                : semNome
-                  ? "Encaminhamento: atendimento não informado após pergunta"
-                  : "Encaminhamento pelo Jev (Fase 2)",
+      titulo: pendente
+        ? "Encaminhamento após pedir nome completo e data de nascimento"
+        : alteracaoSolicitada
+          ? "Encaminhamento: cancelamento/remarcação solicitado"
+          : agendamentoTransicao
+            ? "Encaminhamento: paciente deseja agendar"
+            : cartaoConsultaEquipe
+              ? "Encaminhamento: cartão consulta"
+              : multiplos
+                ? "Encaminhamento: dois ou mais atendimentos na mesma mensagem"
+                : listaExtensa
+                  ? "Encaminhamento: lista com mais de 8 profissionais"
+                  : semNome
+                    ? "Encaminhamento: atendimento não informado após pergunta"
+                    : "Encaminhamento pelo Jev (Fase 2)",
       dados: {
         motivo: argumentos.motivo,
         urgencia: argumentos.urgencia,
         pontuacoes: jevPontuacoes,
         pergunta_nome_entregue: semNome ? perguntaNomeAnterior : null,
+        // Só indica se os dados vieram; nome e data ficam fora do rastro.
+        ...(dadosPaciente
+          ? {
+              nome_completo_informado: Boolean(dadosPaciente.nome_completo),
+              data_nascimento_informada: Boolean(dadosPaciente.data_nascimento),
+            }
+          : {}),
         handoff_confirmado: confirmado,
         erro: rh.erro ?? null,
       },
@@ -3052,7 +3159,15 @@ async function gerarRespostaNinaInterno(
       handoff_confirmado: confirmado,
     });
   }
-  if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);
+  if (transferenciaPendente)
+    await executarDecisaoEncaminhamento(
+      {
+        motivo: transferenciaPendente.argumentos.motivo,
+        urgencia: transferenciaPendente.argumentos.urgencia === "alta" ? "alta" : "normal",
+      },
+      transferenciaPendente,
+    );
+  else if (jevEncaminhamento) await executarDecisaoEncaminhamento(jevEncaminhamento);
   async function solicitarNomeAtendimento() {
     if (perguntaNomeAnterior)
       await executarDecisaoEncaminhamento({
@@ -3100,7 +3215,8 @@ async function gerarRespostaNinaInterno(
       houveHandoff ||
       turnoObsoleto ||
       perguntaComplementar ||
-      respostaNomeAtendimento
+      respostaNomeAtendimento ||
+      perguntaDadosTransferencia
     )
       break;
     await conferirReserva();
@@ -3149,6 +3265,7 @@ async function gerarRespostaNinaInterno(
       !turnoObsoleto &&
       !perguntaComplementar &&
       !respostaNomeAtendimento &&
+      !perguntaDadosTransferencia &&
       reconsultasIdentificacao.length === 0;
     if (r && "plano" in r) {
       if (aproveitar) {
@@ -3192,7 +3309,13 @@ async function gerarRespostaNinaInterno(
     .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
     .catch(() => false);
   for (let rodada = 0; ; rodada++) {
-    if (finalizacaoHandoff || turnoObsoleto || respostaNomeAtendimento) break;
+    if (
+      finalizacaoHandoff ||
+      turnoObsoleto ||
+      respostaNomeAtendimento ||
+      perguntaDadosTransferencia
+    )
+      break;
     // Trava final: nenhum caminho do laço passa deste número de chamadas ao modelo.
     if (rodada >= LIMITE_CHAMADAS_MODELO) {
       semRespostaAposSintese = true;
@@ -3559,6 +3682,8 @@ async function gerarRespostaNinaInterno(
       if (
         nome === "solicitar_atendente_humano" &&
         decisaoAgendamento !== "encaminhar" &&
+        // Informações já entregues em mensagens anteriores: a transferência segue.
+        referenciasInformadas.length === 0 &&
         fluxoDasReferencias(
           (fluxoEstado.knowledge_context?.referencias ?? []).map((r) => r.registro),
         ) !== "agendar"
@@ -3590,6 +3715,37 @@ async function gerarRespostaNinaInterno(
               arquivo: "src/lib/nina/fluxo-agendamento-item.ts",
               funcao: "motivoEhEncaminhamentoDeAgendamento",
             },
+          });
+          continue;
+        }
+      }
+      if (nome === "solicitar_atendente_humano") {
+        let pedido: Record<string, unknown> = {};
+        try {
+          const lido: unknown = JSON.parse(c.function?.arguments ?? "{}");
+          if (lido && typeof lido === "object") pedido = lido as Record<string, unknown>;
+        } catch {
+          /* Argumentos inválidos seguem a validação normal do broker. */
+        }
+        if (
+          await reterTransferenciaParaDados({
+            motivo: String(pedido.motivo ?? "").trim() || "Transferência solicitada pela Nina",
+            resumo: typeof pedido.resumo === "string" ? pedido.resumo : null,
+            urgencia: typeof pedido.urgencia === "string" ? pedido.urgencia : null,
+            setor: typeof pedido.setor === "string" ? pedido.setor : null,
+            avisar_paciente: pedido.avisar_paciente !== false,
+          })
+        ) {
+          mensagens.push({
+            role: "tool",
+            tool_call_id: c.id,
+            content: JSON.stringify({
+              ok: false,
+              executada: false,
+              erro: "DADOS_ANTES_DA_TRANSFERENCIA",
+              mensagem:
+                "O sistema pediu ao paciente nome completo e data de nascimento. A transferência acontece na próxima mensagem dele; não escreva outra resposta.",
+            }),
           });
           continue;
         }
@@ -3908,6 +4064,17 @@ async function gerarRespostaNinaInterno(
             break;
           }
         }
+        // A primeira frase do aviso explica o motivo; o pedido dos dados vem em seguida.
+        const motivoParaPaciente = (
+          falhaAgendamento
+            ? respostaFalhaAgendamento(true)
+            : respostaSemVagas(
+                true,
+                encaminhamento.motivo.startsWith("VAGA_ESCOLHIDA_INDISPONIVEL"),
+                encaminhamento.motivo.startsWith("MODALIDADE_"),
+              )
+        ).split(/(?<=\.)\s/)[0];
+        if (await reterTransferenciaParaDados(encaminhamento, motivoParaPaciente)) break;
         rastro?.iniciar("tool.execute", {
           ferramenta: "solicitar_atendente_humano",
           origem_solicitacao: origemEncaminhamento,
@@ -4015,7 +4182,9 @@ async function gerarRespostaNinaInterno(
   // Uma pergunta determinística também precisa pertencer à revisão atual.
   if (
     !turnoObsoleto &&
-    (ctxFerramentas?.esclarecimentoCatalogo || respostaNomeAtendimento) &&
+    (ctxFerramentas?.esclarecimentoCatalogo ||
+      respostaNomeAtendimento ||
+      perguntaDadosTransferencia) &&
     opcoes?.revisao?.valor
   ) {
     const { respostaObsoleta } = await import("@/lib/nina/revisao-conversa.server");
@@ -4209,6 +4378,22 @@ async function gerarRespostaNinaInterno(
     );
     marcarOrigem("codigo", "atendimento não informado; pergunta antes do encaminhamento");
   }
+  if (perguntaDadosTransferencia && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto) {
+    const antes = resposta;
+    const apresentacao =
+      saudacaoObrigatoriaEfetivaTurno && identidadeEfetiva.ok
+        ? textoApresentacaoIA(identidadeEfetiva.apresentacao)
+        : "";
+    resposta = [apresentacao, perguntaDadosTransferencia].filter(Boolean).join("\n\n");
+    transformar(
+      "transferencia.dados_paciente",
+      "Pedir nome completo e data de nascimento antes de transferir",
+      antes,
+      resposta,
+      "aviso_operacional",
+    );
+    marcarOrigem("codigo", "transferência aguardando nome completo e data de nascimento");
+  }
   if (finalizacaoHandoff) {
     const antes = respostaDoModelo;
     resposta = finalizacaoHandoff.texto;
@@ -4361,8 +4546,9 @@ async function gerarRespostaNinaInterno(
     !finalizacaoHandoff &&
     !ctxFerramentas?.esclarecimentoCatalogo &&
     !fluxoEstado.knowledge_context?.esclarecimento &&
+    !perguntaDadosTransferencia &&
     resposta.trim() &&
-    temIntencaoDeAgendar(intencoesTurno)
+    (intencaoAgendarTurno || fluxoAgendamento.terminaComOfertaDeAgendamento(resposta))
   ) {
     const referenciasDoTurno = (fluxoEstado.knowledge_context?.referencias ?? []).map(
       (r) => r.registro,
@@ -4545,7 +4731,7 @@ async function gerarRespostaNinaInterno(
             ? finalizacaoHandoff.handoffConfirmado
               ? "handoff"
               : "erro"
-            : respostaNomeAtendimento
+            : respostaNomeAtendimento || perguntaDadosTransferencia
               ? "gate"
               : "modelo",
           texto: resposta,

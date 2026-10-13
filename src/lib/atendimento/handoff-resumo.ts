@@ -12,6 +12,11 @@
 
 import { textoOperacional } from "./texto-interno-apresentacao";
 import { normalizarAtividades, type AtividadePaciente } from "./resumo-atividades";
+import {
+  linhasDadosPaciente,
+  normalizarDadosPaciente,
+  type DadosPacienteTransferencia,
+} from "@/lib/nina/dados-transferencia";
 
 export type IntencaoHandoff =
   | "agendamento"
@@ -83,6 +88,11 @@ export interface ResumoHandoff {
   etapa_interrompida?: string | null;
   /** Resumo completo e elaborado, em parágrafos (é o que aparece dentro do chat). */
   texto_resumo?: string | null;
+  /**
+   * Nome completo e data de nascimento enviados pelo paciente antes da
+   * transferência (regra de 12/10/2026). Vem do registro do handoff, nunca da IA.
+   */
+  dados_paciente?: DadosPacienteTransferencia | null;
 }
 
 function listaBruta(v: unknown): unknown[] {
@@ -159,6 +169,7 @@ export function normalizarResumo(
     protocolo?: string | null;
     pendenciasExtras?: string[];
     informacoesExtras?: string[];
+    dadosPaciente?: unknown;
   },
 ): ResumoHandoff {
   const o = (bruto ?? {}) as Record<string, unknown>;
@@ -187,13 +198,27 @@ export function normalizarResumo(
     motivo_handoff: texto(extras?.motivoHandoff ?? o.motivo_handoff, 240),
     agendamento_confirmado: real && (real.medico || real.servico || real.data) ? real : null,
     texto_resumo: textoCorrido(o.texto_resumo),
+    dados_paciente: normalizarDadosPaciente(extras?.dadosPaciente),
   };
+}
+
+/** Linhas "Nome completo: …" e "Data de nascimento: …" do resumo, quando pedidas. */
+export function dadosDoPacienteNoResumo(
+  r: ResumoHandoff,
+): Array<{ rotulo: string; valor: string }> {
+  const dados = normalizarDadosPaciente(r.dados_paciente);
+  if (!dados) return [];
+  return linhasDadosPaciente(dados).map((linha) => {
+    const [rotulo, ...resto] = linha.split(": ");
+    return { rotulo: rotulo!, valor: resto.join(": ") };
+  });
 }
 
 /** Blocos que realmente têm conteúdo — campo vazio não vai para a tela. */
 export function blocosVisiveis(r: ResumoHandoff): Array<{ titulo: string; itens: string[] }> {
   const b: Array<{ titulo: string; itens: string[] }> = [];
   if (r.protocolo) b.push({ titulo: "Protocolo", itens: [r.protocolo] });
+  for (const d of dadosDoPacienteNoResumo(r)) b.push({ titulo: d.rotulo, itens: [d.valor] });
   if (r.motivo_contato) b.push({ titulo: "Motivo do contato", itens: [r.motivo_contato] });
   if (r.situacao) b.push({ titulo: "Situação", itens: [r.situacao] });
   if (r.informacoes.length) b.push({ titulo: "Informações coletadas", itens: r.informacoes });
@@ -235,7 +260,7 @@ Regras obrigatórias:
 - Português do Brasil. Os campos em lista são telegráficos; só "texto_resumo" é escrito em frases completas. Este texto NUNCA será enviado ao paciente.`;
 
 export type ConteudoDoResumo =
-  | { tipo: "texto"; paragrafos: string[] }
+  | { tipo: "texto"; paragrafos: string[]; dados: Array<{ rotulo: string; valor: string }> }
   | { tipo: "campos"; campos: Array<{ rotulo: string; valor: string }> };
 
 /**
@@ -250,6 +275,7 @@ export function conteudoDoResumo(
   if (corrido) {
     return {
       tipo: "texto",
+      dados: dadosDoPacienteNoResumo(r),
       paragrafos: corrido
         .split(/\n\s*\n/)
         .map((p) => p.trim())

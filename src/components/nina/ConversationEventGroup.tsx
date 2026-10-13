@@ -95,6 +95,14 @@ function ResumoDaNina({
       </div>
       <div className="mt-1 space-y-0.5">
         {conteudo.tipo === "texto"
+          ? conteudo.dados.map((c) => (
+              <div key={c.rotulo}>
+                <span className="opacity-70">{c.rotulo}: </span>
+                <span className="font-medium text-foreground/90">{c.valor}</span>
+              </div>
+            ))
+          : null}
+        {conteudo.tipo === "texto"
           ? conteudo.paragrafos.map((p, i) => (
               <p key={i} className="whitespace-pre-wrap font-medium text-foreground/90">
                 {p}
