@@ -124,6 +124,20 @@ describe("dados do paciente antes da transferência", () => {
     );
   });
 
+  test("frase de confirmação antes do nome não vira nome", () => {
+    expect(
+      extrairDadosTransferencia(
+        "Tá bom. Meu nome é Paciente Teste Homologação e nasci em 22 de fevereiro de 1991.",
+        HOJE,
+      ),
+    ).toEqual({ nome_completo: "Paciente Teste Homologação", data_nascimento: "22/02/1991" });
+    expect(
+      extrairDadosTransferencia("Entendi. Paciente Teste da Silva, 01/02/1990", HOJE).nome_completo,
+    ).toBe("Paciente Teste da Silva");
+    // Só a confirmação: nenhum nome.
+    expect(extrairDadosTransferencia("Tá bom, pode seguir.", HOJE).nome_completo).toBeNull();
+  });
+
   test("o que não é nome ou data válida fica null", () => {
     expect(extrairDadosTransferencia("pode sim por favor", HOJE)).toEqual({
       nome_completo: null,

@@ -2508,6 +2508,24 @@ async function gerarRespostaNinaInterno(
       })
     )
       return false;
+    // A própria mensagem já traz nome completo e data de nascimento (ex.: "meu
+    // nome é … e nasci em …"): transfere com eles, sem pedir de novo.
+    const dadosNaMensagem = dadosTransferencia.extrairDadosTransferencia(mensagemPaciente);
+    if (dadosNaMensagem.nome_completo && dadosNaMensagem.data_nascimento) {
+      Object.assign(argumentos, dadosTransferencia.argumentosComDados(argumentos, dadosNaMensagem));
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo:
+          "Nome e data de nascimento já informados na mensagem: transferência sem nova pergunta",
+        dados: { motivo: argumentos.motivo.slice(0, 300) },
+        codigo: {
+          arquivo: "src/lib/nina/dados-transferencia.ts",
+          funcao: "extrairDadosTransferencia",
+        },
+      });
+      return false;
+    }
     fluxoEstado.oferta_encaminhamento = null;
     fluxoEstado.transferencia_pendente = {
       session_id: fluxoEstado.session_id,
@@ -3745,15 +3763,18 @@ async function gerarRespostaNinaInterno(
         } catch {
           /* Argumentos inválidos seguem a validação normal do broker. */
         }
-        if (
-          await reterTransferenciaParaDados({
-            motivo: String(pedido.motivo ?? "").trim() || "Transferência solicitada pela Nina",
-            resumo: typeof pedido.resumo === "string" ? pedido.resumo : null,
-            urgencia: typeof pedido.urgencia === "string" ? pedido.urgencia : null,
-            setor: typeof pedido.setor === "string" ? pedido.setor : null,
-            avisar_paciente: pedido.avisar_paciente !== false,
-          })
-        ) {
+        const pedidoTransferencia: Parameters<typeof reterTransferenciaParaDados>[0] = {
+          motivo: String(pedido.motivo ?? "").trim() || "Transferência solicitada pela Nina",
+          resumo: typeof pedido.resumo === "string" ? pedido.resumo : null,
+          urgencia: typeof pedido.urgencia === "string" ? pedido.urgencia : null,
+          setor: typeof pedido.setor === "string" ? pedido.setor : null,
+          avisar_paciente: pedido.avisar_paciente !== false,
+        };
+        const retida = await reterTransferenciaParaDados(pedidoTransferencia);
+        // Nome e data de nascimento já vieram na mensagem: seguem na transferência.
+        if (!retida && "dados_paciente" in pedidoTransferencia && c.function)
+          c.function.arguments = JSON.stringify({ ...pedido, ...pedidoTransferencia });
+        if (retida) {
           mensagens.push({
             role: "tool",
             tool_call_id: c.id,
