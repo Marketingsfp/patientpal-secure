@@ -78,6 +78,13 @@
       "when": 1791902258442,
       "tag": "0010_tel_chamadas",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791907680947,
+      "tag": "0011_tel_transcricoes_e_analises",
+      "breakpoints": true
     }
   ]
 }
