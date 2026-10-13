@@ -17026,6 +17026,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      coach_resumo_ligacoes: {
+        Args: {
+          p_clinica: string
+          p_fim: string
+          p_hora_abre?: number
+          p_hora_fecha?: number
+          p_inicio: string
+        }
+        Returns: Json
+      }
       coach_vincular_atendente: {
         Args: { _clinica_id: string; _nome_antigo: string; _user_id: string }
         Returns: Json

@@ -168,15 +168,17 @@ export const ligacoesParaAnalise = createServerFn({ method: "POST" })
     const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
     await guard.garantirAcessoCoach(db, data.clinicaId, "read");
     const sb = context.supabase;
-    const { data: linhas, error } = await sb
+    // O servidor corta em 1.000 linhas; o total vem junto para a tela avisar o recorte.
+    const { data: linhas, error, count } = await sb
       .from("tel_chamadas")
-      .select("externo_id, inicio, direcao, situacao, origem_numero, duracao_seg")
+      .select("externo_id, inicio, direcao, situacao, origem_numero, duracao_seg", { count: "exact" })
       .eq("clinica_id", data.clinicaId)
       .gte("inicio", data.start)
       .lte("inicio", data.end)
       .order("inicio", { ascending: false })
       .limit(5000);
     if (error) throw new Error("Não foi possível ler as ligações.");
+    const totalNoPeriodo = count ?? (linhas ?? []).length;
     const ids = (linhas ?? [])
       .filter((l) => (l.situacao ?? "").toUpperCase() === "ANSWERED")
       .map((l) => l.externo_id);
@@ -208,12 +210,47 @@ export const ligacoesParaAnalise = createServerFn({ method: "POST" })
     }
     return {
       linhas: linhas ?? [],
+      totalNoPeriodo,
       transcritas: Object.fromEntries(transcritas),
       analises: Object.fromEntries(analises) as Record<
         string,
         { pontuacao: number | null; criado_em: string; resultado: AnalysisResult }
       >,
     };
+  });
+
+export type ResumoContagem = { recebidas: number; atendidas: number; naoAtendidas: number; pctPerdido: number };
+export type ResumoLigacoes = {
+  totais: ResumoContagem;
+  dentroHorario: ResumoContagem;
+  foraHorario: ResumoContagem;
+  porHora: (ResumoContagem & { hora: number })[];
+  linhaLivre: { perdidas: number; comLinhaOcupada: number; pctOcupada: number };
+  tempoTocando: { faixa: string; n: number }[];
+  pessoas: { distintas: number; nuncaFalaram: number; pctNunca: number };
+  retorno: { numero: string; tentativas: number; primeira: string; ultima: string }[];
+  retornoTotal: number;
+};
+
+/** Contas do período feitas no banco (sem depender de quantas linhas viriam). */
+export const resumoLigacoesTelefonia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(periodoObrigatorio)
+  .handler(async ({ data, context }) => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "read");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: r, error } = await supabaseAdmin.rpc("coach_resumo_ligacoes", {
+      p_clinica: data.clinicaId,
+      p_inicio: data.start,
+      p_fim: data.end,
+    });
+    if (error) {
+      console.error("[coach] resumo ligacoes falhou", error.code);
+      throw new Error("Não foi possível calcular o resumo das ligações.");
+    }
+    return r as unknown as ResumoLigacoes;
   });
 
 const porLigacao = (data: unknown) =>

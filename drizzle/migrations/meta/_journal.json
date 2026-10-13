@@ -92,6 +92,13 @@
       "when": 1791915609335,
       "tag": "0012_tel_fila_analise",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791931387132,
+      "tag": "0013_coach_resumo_ligacoes",
+      "breakpoints": true
     }
   ]
 }

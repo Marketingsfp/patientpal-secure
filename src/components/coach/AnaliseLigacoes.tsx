@@ -20,13 +20,19 @@ import {
   cotaIACoach,
   lerTranscricaoLigacao,
   ligacoesParaAnalise,
+  resumoLigacoesTelefonia,
+  type ResumoLigacoes,
 } from "@/lib/coach/telefonia.functions";
-import { foiAtendida, ehRecebida, linkWhatsApp, resumirSemResposta } from "@/lib/telefonia/sem-resposta";
+import { foiAtendida, ehRecebida, linkWhatsApp } from "@/lib/telefonia/sem-resposta";
 
 type Dados = Awaited<ReturnType<typeof ligacoesParaAnalise>>;
 type Cota = Awaited<ReturnType<typeof cotaIACoach>>;
 
 const TZ = "America/Sao_Paulo";
+const HORA_ABRE = 8;
+const HORA_FECHA = 17;
+const fmtN = (n: number) => n.toLocaleString("pt-BR");
+const pct = (n: number) => `${n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const diaSP = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: TZ });
 const fmtDataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", {
@@ -55,11 +61,13 @@ export function AnaliseLigacoes({
   const fnLer = useServerFn(lerTranscricaoLigacao);
   const fnAnalisar = useServerFn(analisarLigacao);
   const fnCota = useServerFn(cotaIACoach);
+  const fnResumo = useServerFn(resumoLigacoesTelefonia);
 
   const hoje = new Date();
   const [de, setDe] = useState(diaSP(new Date(hoje.getTime() - 6 * 86_400_000)));
   const [ate, setAte] = useState(diaSP(hoje));
   const [dados, setDados] = useState<Dados | null>(null);
+  const [resumo, setResumo] = useState<ResumoLigacoes | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [cota, setCota] = useState<Cota | null>(null);
@@ -74,14 +82,16 @@ export function AnaliseLigacoes({
     setCarregando(true);
     setErro(null);
     try {
-      const r = await carregar({ data: { clinicaId, start: inicioDiaSP(de), end: fimDiaSP(ate) } });
+      const periodo = { clinicaId, start: inicioDiaSP(de), end: fimDiaSP(ate) };
+      const [r, res] = await Promise.all([carregar({ data: periodo }), fnResumo({ data: periodo })]);
       setDados(r);
+      setResumo(res);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar.");
     } finally {
       setCarregando(false);
     }
-  }, [clinicaId, de, ate, carregar]);
+  }, [clinicaId, de, ate, carregar, fnResumo]);
 
   const atualizarCota = useCallback(async () => {
     if (!clinicaId) return;
@@ -99,12 +109,16 @@ export function AnaliseLigacoes({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaId]);
 
-  const resumo = useMemo(() => resumirSemResposta(dados?.linhas ?? []), [dados]);
+  const porHora = resumo?.porHora ?? [];
+  const maxHora = Math.max(1, ...porHora.map((h) => h.recebidas));
+  const maxFaixa = Math.max(1, ...(resumo?.tempoTocando ?? []).map((f) => f.n));
+  const tocou30 = (resumo?.tempoTocando ?? [])
+    .filter((f) => f.faixa === "30-59s" || f.faixa === ">=60s")
+    .reduce((t, f) => t + f.n, 0);
   const atendidas = useMemo(
     () => (dados?.linhas ?? []).filter((l) => foiAtendida(l)),
     [dados],
   );
-  const maxHora = Math.max(1, ...resumo.porHora.map((h) => h.atendidas + h.naoAtendidas));
 
   async function transcrever(id: string) {
     if (!clinicaId) return;
@@ -179,82 +193,136 @@ export function AnaliseLigacoes({
       <section className="space-y-4">
         <h2 className="text-xl font-semibold tracking-tight">Quem ficou sem resposta</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Cartao titulo="Ligações recebidas" valor={resumo.recebidas} />
-          <Cartao titulo="Atendidas" valor={resumo.atendidas} />
-          <Cartao titulo="Não atendidas" valor={resumo.naoAtendidas} destaque />
-          <Cartao titulo="Pessoas que nunca conseguiram falar" valor={resumo.nuncaFalaram} destaque />
+          <Cartao titulo="Ligações recebidas" valor={resumo?.totais.recebidas ?? 0} />
+          <Cartao
+            titulo="Não atendidas"
+            valor={resumo?.totais.naoAtendidas ?? 0}
+            sub={resumo ? `${pct(resumo.totais.pctPerdido)} do total` : undefined}
+            destaque
+          />
+          <Cartao
+            titulo="Perdidas em horário comercial"
+            valor={resumo?.dentroHorario.naoAtendidas ?? 0}
+            sub={resumo ? `e ${fmtN(resumo.foraHorario.naoAtendidas)} fora do horário` : undefined}
+            destaque
+          />
+          <Cartao
+            titulo="Pessoas que nunca conseguiram falar"
+            valor={resumo?.pessoas.nuncaFalaram ?? 0}
+            sub={resumo ? `${pct(resumo.pessoas.pctNunca)} das ${fmtN(resumo.pessoas.distintas)} pessoas` : undefined}
+            destaque
+          />
         </div>
 
         <div className="rounded-xl border bg-card p-5 shadow-sm">
           <h3 className="mb-3 font-medium">Ligações recebidas por hora do dia</h3>
-          <div className="flex h-40 items-end gap-1">
-            {resumo.porHora.map((h) => {
-              const total = h.atendidas + h.naoAtendidas;
+          <div className="flex h-48 items-end gap-1">
+            {porHora.map((h) => {
+              const fora = h.hora < HORA_ABRE || h.hora >= HORA_FECHA;
               return (
-                <div key={h.hora} className="flex flex-1 flex-col items-center gap-1" title={`${h.hora}h: ${h.atendidas} atendidas, ${h.naoAtendidas} não atendidas`}>
+                <div
+                  key={h.hora}
+                  className={`flex flex-1 flex-col items-center gap-1 rounded-sm ${fora ? "bg-muted/60" : ""}`}
+                  title={`${h.hora}h: ${h.atendidas} atendidas, ${h.naoAtendidas} não atendidas`}
+                >
+                  <span className="h-4 text-[10px] font-medium text-destructive">
+                    {h.recebidas ? `${Math.round(h.pctPerdido)}%` : ""}
+                  </span>
                   <div className="flex w-full flex-col justify-end" style={{ height: "8rem" }}>
                     <div className="w-full rounded-t bg-destructive/70" style={{ height: `${(h.naoAtendidas / maxHora) * 100}%` }} />
                     <div className="w-full bg-primary/70" style={{ height: `${(h.atendidas / maxHora) * 100}%` }} />
                   </div>
-                  <span className="text-[10px] text-muted-foreground">{total ? h.hora : ""}</span>
+                  <span className="text-[10px] text-muted-foreground">{h.hora}</span>
                 </div>
               );
             })}
           </div>
-          <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-primary/70" />Atendidas</span>
             <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-destructive/70" />Não atendidas</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-muted" />Fora do horário</span>
+            <span>Número acima da barra: % perdido naquela hora.</span>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Considerando {HORA_ABRE}h às {HORA_FECHA}h como horário de funcionamento.
+          </p>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="p-3">Número</th>
-                <th className="p-3">Tentativas</th>
-                <th className="p-3">Primeira</th>
-                <th className="p-3">Última</th>
-                <th className="p-3">Foi atendido?</th>
-                <th className="p-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {resumo.grupos.map((g) => {
-                const wa = linkWhatsApp(g);
-                return (
-                  <tr key={g.rotulo + g.primeira} className="border-b last:border-0">
-                    <td className="p-3 font-mono text-xs">
-                      {g.rotulo}
-                      {g.interno ? <span className="ml-2 rounded bg-muted px-1.5 py-0.5 font-sans text-[11px] text-muted-foreground">ramal/interno</span> : null}
-                    </td>
-                    <td className="p-3">{g.tentativas}</td>
-                    <td className="p-3">{fmtDataHora(g.primeira)}</td>
-                    <td className="p-3">{fmtDataHora(g.ultima)}</td>
-                    <td className="p-3">
-                      {g.algumaAtendida ? (
-                        <span>Sim ({g.atendidas})</span>
-                      ) : (
-                        <span className="font-medium text-destructive">Nunca</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right">
-                      {wa ? (
-                        <Button asChild size="sm" variant="outline">
-                          <a href={wa} target="_blank" rel="noopener noreferrer">
-                            <MessageCircle className="mr-1 h-4 w-4" /> WhatsApp
-                          </a>
-                        </Button>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-              {!resumo.grupos.length ? (
-                <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Nenhuma ligação recebida no período.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+        {resumo ? (
+          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-5">
+            <h3 className="font-medium">Por que se perdeu</h3>
+            <div>
+              <p className="text-sm">
+                De {fmtN(resumo.linhaLivre.perdidas)} ligações perdidas, apenas{" "}
+                {fmtN(resumo.linhaLivre.comLinhaOcupada)} aconteceram enquanto alguém falava em outra ligação (
+                {pct(resumo.linhaLivre.pctOcupada)}).
+              </p>
+              <p className="text-xs text-muted-foreground">Nas outras, o telefone tocou com a linha livre.</p>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-sm">Quanto tempo tocou antes de desistirem</div>
+              {resumo.tempoTocando.map((f) => (
+                <div key={f.faixa} className="flex items-center gap-2 text-xs">
+                  <span className="w-14 text-muted-foreground">{f.faixa}</span>
+                  <div className="h-3 flex-1 rounded bg-muted">
+                    <div className="h-3 rounded bg-destructive/70" style={{ width: `${(f.n / maxFaixa) * 100}%` }} />
+                  </div>
+                  <span className="w-10 text-right">{fmtN(f.n)}</span>
+                </div>
+              ))}
+              <p className="pt-1 text-sm font-medium">
+                {fmtN(tocou30)} tocaram 30 segundos ou mais
+                {resumo.linhaLivre.perdidas ? ` (${pct((100 * tocou30) / resumo.linhaLivre.perdidas)})` : ""}.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <h3 className="font-medium">Para retornar</h3>
+          {resumo && resumo.retornoTotal > resumo.retorno.length ? (
+            <p className="text-xs text-muted-foreground">
+              Mostrando os {resumo.retorno.length} mais insistentes de {fmtN(resumo.retornoTotal)}.
+            </p>
+          ) : null}
+          <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+            <table className="w-full text-sm">
+              <thead className="border-b text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="p-3">Número</th>
+                  <th className="p-3">Tentativas</th>
+                  <th className="p-3">Primeira</th>
+                  <th className="p-3">Última</th>
+                  <th className="p-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {(resumo?.retorno ?? []).map((g) => {
+                  const wa = linkWhatsApp({ e164: g.numero, interno: false });
+                  return (
+                    <tr key={g.numero} className="border-b last:border-0">
+                      <td className="p-3 font-mono text-xs">{g.numero}</td>
+                      <td className="p-3">{g.tentativas}</td>
+                      <td className="p-3">{fmtDataHora(g.primeira)}</td>
+                      <td className="p-3">{fmtDataHora(g.ultima)}</td>
+                      <td className="p-3 text-right">
+                        {wa ? (
+                          <Button asChild size="sm" variant="outline">
+                            <a href={wa} target="_blank" rel="noopener noreferrer">
+                              <MessageCircle className="mr-1 h-4 w-4" /> WhatsApp
+                            </a>
+                          </Button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!resumo?.retorno.length ? (
+                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Ninguém ficou sem resposta neste período.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -273,6 +341,11 @@ export function AnaliseLigacoes({
               : "Cota de IA indisponível"}
           </div>
         </div>
+        {dados && dados.totalNoPeriodo > dados.linhas.length ? (
+          <p className="text-xs text-muted-foreground">
+            Mostrando as {fmtN(dados.linhas.length)} ligações mais recentes de {fmtN(dados.totalNoPeriodo)} no período.
+          </p>
+        ) : null}
         <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="border-b text-left text-xs text-muted-foreground">
@@ -357,11 +430,22 @@ export function AnaliseLigacoes({
   );
 }
 
-function Cartao({ titulo, valor, destaque }: { titulo: string; valor: number; destaque?: boolean }) {
+function Cartao({
+  titulo,
+  valor,
+  sub,
+  destaque,
+}: {
+  titulo: string;
+  valor: number;
+  sub?: string;
+  destaque?: boolean;
+}) {
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="text-xs text-muted-foreground">{titulo}</div>
-      <div className={`mt-1 text-3xl font-semibold ${destaque ? "text-destructive" : ""}`}>{valor}</div>
+      <div className={`mt-1 text-3xl font-semibold ${destaque ? "text-destructive" : ""}`}>{fmtN(valor)}</div>
+      {sub ? <div className="mt-1 text-xs text-muted-foreground">{sub}</div> : null}
     </div>
   );
 }
