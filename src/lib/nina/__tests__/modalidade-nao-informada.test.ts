@@ -49,10 +49,10 @@ describe("modalidade não informada: quem informa é a equipe", () => {
   test("a IA recebe 'informada pela equipe' em vez de 'não informada'", () => {
     const sem = publicadoDoAtendimento(atendimento(null) as never);
     const com = publicadoDoAtendimento(atendimento("hora_marcada") as never);
-    expect(JSON.stringify(sem)).toContain("informada pela equipe de atendimento");
+    expect(JSON.stringify(sem)).toContain("informada pela nossa recepção");
     expect(JSON.stringify(sem)).not.toContain("Modalidade: não informada");
     expect(JSON.stringify(com)).toContain("Modalidade: Hora marcada");
-    expect(orientacaoModalidade("nao_definida")).toContain("nossa equipe de atendimento");
+    expect(orientacaoModalidade("nao_definida")).toContain("nossa recepção");
   });
 
   test("a regra entra nas instruções de agendamento", () => {
