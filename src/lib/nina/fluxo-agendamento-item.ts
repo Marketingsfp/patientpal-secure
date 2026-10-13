@@ -6,8 +6,9 @@
  *    disponibilidade → dados → agendamento.
  *  - informar_e_encaminhar: "Nina não pode agendar" ou modalidade não informada →
  *    saudação → informações → encaminha à equipe só quando o paciente quer
- *    marcar, nunca antes de informar. Se a intenção chega antes das
- *    informações, a Nina informa e pergunta se pode encaminhar.
+ *    marcar, nunca antes de informar. A mensagem de informações não pergunta
+ *    se pode encaminhar (13/10/2026): a Nina espera a resposta, e a escolha de
+ *    dia, horário ou profissional encaminha.
  *  - somente_informar: ordem de chegada SEM pré-agendamento → tira dúvidas e
  *    orienta a comparecer, sem encaminhar (vale só a regra dos 30 minutos).
  *
@@ -137,6 +138,74 @@ export function removerPerguntaDeAgendamento(texto: string): string {
   return blocos.join("\n\n");
 }
 
+/**
+ * Mensagem de informações não oferece transferência (regra de 13/10/2026): tira
+ * do fim do texto só a pergunta ou oferta de encaminhar/transferir à equipe. As
+ * demais perguntas (ex.: preferência de profissional ou dia) continuam.
+ */
+export function removerOfertaDeEncaminhamento(texto: string): string {
+  const blocos = texto.trimEnd().split(/\n{2,}/);
+  const oferta =
+    /\b(?:encaminh|transfer|direcion)\w*|\b(?:nossa equipe|a equipe|um atendente|atendente|setor)\b.*\b(?:verificar|confirmar|concluir|dar continuidade|agendar|marcar)\b/;
+  for (;;) {
+    const ultimo = blocos[blocos.length - 1]!;
+    const final = /([^.!?\n]*[.!?])\s*$/.exec(ultimo);
+    if (!final) break;
+    const frase = normalizarRespostaInformal(final[1]!);
+    if (
+      !oferta.test(frase) ||
+      !/\b(?:posso|podemos|deseja|quer|gostaria|vou|vamos|irei|devo)\b/.test(frase)
+    )
+      break;
+    const resto = ultimo.slice(0, final.index).trimEnd();
+    if (resto) {
+      blocos[blocos.length - 1] = resto;
+      continue;
+    }
+    if (blocos.length === 1) break;
+    blocos.pop();
+  }
+  return blocos.join("\n\n");
+}
+
+/**
+ * A IA afirma que a conversa vai para a equipe ("nossa equipe vai dar
+ * continuidade", "aguarde que logo você será atendido"). Sem transferência
+ * real, isso é uma promessa falsa.
+ */
+export function afirmaEncaminhamento(texto: string): boolean {
+  const t = normalizarRespostaInformal(texto ?? "");
+  return /\b(?:vou|irei|vamos)\s+(?:te\s+|lhe\s+)?(?:encaminhar|transferir|passar|direcionar)\b(?![^.!?\n]*\?)|\b(?:encaminhei|transferi|direcionei)\b|\b(?:nossa equipe|a equipe|um atendente|uma atendente|atendente)\b[^.!?\n]*\b(?:vai|ira|vao|irao)\s+(?:dar continuidade|continuar|verificar|confirmar|entrar em contato|te atender|atender)|\baguarde\b[^.!?\n]*\b(?:atendid|atendente|equipe)/.test(
+    t,
+  );
+}
+
+const DIAS_DA_SEMANA =
+  /\b(?:segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:[- ]feira)?s?\b|\bamanha\b|\bhoje\b/;
+const ESCOLHA =
+  /\b(?:pode deixar|pode ser|fica bom|fica boa|ficaria bom|ficaria boa|serve|da pra mim|pra mim (?:da|serve|fica)|quero (?:marcar|agendar|com|esse|essa|na|no|sim)|vou querer|prefiro|pode marcar|pode agendar|pode confirmar|combinado|fechado|melhor pra mim)\b/;
+
+/**
+ * Depois das informações, o paciente escolhe dia, horário ou profissional
+ * ("quinta com a Dra. X fica boa pra mim", "pode deixar pra quinta"): é o
+ * pedido de marcar. `nomes` são os profissionais/itens informados na conversa.
+ */
+export function escolhaParaAgendar(mensagem: string, nomes: readonly string[] = []): boolean {
+  const t = normalizarRespostaInformal(mensagem ?? "");
+  if (!t) return false;
+  const citaProfissional = nomes.some((nome) =>
+    normalizarRespostaInformal(nome)
+      .split(/\s+/)
+      .filter((p) => p.length >= 4 && !/^(?:consulta|exame|doutor|doutora)$/.test(p))
+      .some((p) => new RegExp(`\\b${p}\\b`).test(t)),
+  );
+  const citaQuando = DIAS_DA_SEMANA.test(t) || /\b\d{1,2}\s*(?:h|horas?|:\d{2})\b/.test(t);
+  if (ESCOLHA.test(t) && (citaQuando || citaProfissional || /\b(?:marcar|agendar)\b/.test(t)))
+    return true;
+  // Resposta curta só com o dia, o horário ou o nome ("quinta às 10h", "com a Valeria").
+  return (citaQuando || citaProfissional) && !mensagem.includes("?") && t.split(/\s+/).length <= 6;
+}
+
 /** A resposta da IA termina com uma pergunta ou oferta própria sobre marcar ou encaminhar? */
 export function terminaComOfertaDeAgendamento(texto: string): boolean {
   const original = texto.trimEnd();
@@ -163,7 +232,11 @@ export function intencaoDeAgendarNaSessao(p: {
   if (
     !t ||
     /\?/.test(p.mensagem) ||
-    /^(?:qual|quais|quanto|quantos|que horas|onde|como|quando|tem|voces tem|existe)\b/.test(t)
+    /^(?:qual|quais|quanto|quantos|que horas|onde|como|quando|tem|voces tem|existe)\b/.test(t) ||
+    // Despedida ou adiamento não é pedido de marcar.
+    /\b(?:obrigad[oa]|valeu|so isso|era so|vou pensar|vou ver|depois eu|mais tarde|nao precisa|deixa pra la)\b/.test(
+      t,
+    )
   )
     return false;
   return true;

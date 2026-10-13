@@ -1612,7 +1612,7 @@ async function executarFerramentaInterna(
   if (FERRAMENTAS_DE_VAGAS.has(nome) && ctx.podeAgendar === false)
     return falha(
       "PERMISSION_DENIED",
-      "Nesta unidade a assistente não consulta vagas nem agenda. Responda às dúvidas com o cadastro (profissionais, dias e horários habituais, modalidade, funcionamento e valores), sem prometer horário. Não encaminhe por isso: o sistema pergunta ao paciente se pode encaminhar à equipe.",
+      "Nesta unidade a assistente não consulta vagas nem agenda. Responda às dúvidas com o cadastro (profissionais, dias e horários habituais, modalidade, funcionamento e valores), sem prometer horário. Não pergunte se pode encaminhar nem diga que vai encaminhar ou que a equipe vai dar continuidade: passe as informações e aguarde a resposta do paciente; quando ele escolher dia, horário ou profissional, ou disser que quer marcar, o sistema faz o encaminhamento.",
     );
 
   if (
@@ -1695,7 +1695,7 @@ async function executarFerramentaInterna(
               nina_pode_agendar: false,
               atendimentos: permissao.nomes,
               instrucao:
-                "Não consulte vagas nem agende. Responda às dúvidas com o cadastro (profissionais, horários habituais, modalidade, funcionamento e valores). Não encaminhe por isso: o sistema pergunta ao paciente se pode encaminhar à equipe.",
+                "Não consulte vagas nem agende. Responda às dúvidas com o cadastro (profissionais, horários habituais, modalidade, funcionamento e valores). Não pergunte se pode encaminhar nem diga que vai encaminhar ou que a equipe vai dar continuidade: passe as informações e aguarde a resposta do paciente; quando ele escolher dia, horário ou profissional, ou disser que quer marcar, o sistema faz o encaminhamento.",
             },
           );
       }

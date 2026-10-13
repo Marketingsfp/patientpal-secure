@@ -3008,10 +3008,37 @@ async function gerarRespostaNinaInterno(
   const referenciasDaDecisao = ofertaEncaminhamento?.referencias.length
     ? ofertaEncaminhamento.referencias
     : referenciasInformadas;
+  // Motivo da transferência de agendamento: leva o atendimento informado.
+  const motivoAgendamento = (referencias: readonly string[]) => {
+    const itens = [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
+      .filter((r) => referencias.includes(r.id))
+      .map((r) => String(r.nome ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 5)
+      .join("; ");
+    return `AGENDAMENTO_TRANSICAO: ${itens || "atendimento informado na conversa"}.`;
+  };
+  // Depois das informações, escolher dia, horário ou profissional ("quinta com
+  // a Dra. X fica boa pra mim") é o pedido de marcar (regra de 13/10/2026). Com
+  // pergunta na mesma mensagem, a Nina responde primeiro e a confirmação
+  // seguinte encaminha (a escolha fica guardada na sessão).
+  const escolhaDoPaciente =
+    referenciasDaDecisao.length > 0 &&
+    fluxoAgendamento.escolhaParaAgendar(
+      mensagemPaciente,
+      [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
+        .filter((r) => referenciasDaDecisao.includes(r.id))
+        .map((r) => String(r.nome ?? "")),
+    );
+  if (escolhaDoPaciente && fluxoEstado.session_id)
+    fluxoEstado.intencao_agendar_sessao = fluxoEstado.session_id;
   // A intenção de marcar vale para a sessão: escolher o profissional ou o
   // horário ("pode ser a Valeria", "seria 9h") continua o mesmo pedido.
   const intencaoAgendarTurno = fluxoAgendamento.intencaoDeAgendarNaSessao({
-    intencaoNoTurno: temIntencaoDeAgendar(intencoesTurno),
+    // Escolha sem pergunta na mesma mensagem vale como pedido de marcar.
+    intencaoNoTurno:
+      temIntencaoDeAgendar(intencoesTurno) ||
+      (escolhaDoPaciente && !mensagemPaciente.includes("?")),
     sessaoComIntencao:
       Boolean(fluxoEstado.session_id) &&
       fluxoEstado.intencao_agendar_sessao === fluxoEstado.session_id,
@@ -3030,16 +3057,7 @@ async function gerarRespostaNinaInterno(
   if (respostaOfertaTurno === "recusa") fluxoEstado.oferta_encaminhamento = null;
   if (decisaoAgendamento === "encaminhar" && !jevEncaminhamento) {
     // O motivo leva o atendimento informado, para a equipe saber o que confirmar.
-    const itensAgendamento = [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
-      .filter((r) => referenciasDaDecisao.includes(r.id))
-      .map((r) => String(r.nome ?? "").trim())
-      .filter(Boolean)
-      .slice(0, 5)
-      .join("; ");
-    jevEncaminhamento = {
-      motivo: `AGENDAMENTO_TRANSICAO: ${itensAgendamento || "atendimento informado na conversa"}.`,
-      urgencia: "normal",
-    };
+    jevEncaminhamento = { motivo: motivoAgendamento(referenciasDaDecisao), urgencia: "normal" };
     nomeAtendimentoAusente = false;
   }
 
@@ -3703,7 +3721,7 @@ async function gerarRespostaNinaInterno(
               executada: false,
               erro: "INFORMAR_ANTES_DE_ENCAMINHAR",
               mensagem:
-                "Não encaminhe ainda. Responda primeiro às dúvidas com as informações do cadastro (profissionais, horários habituais, modalidade, funcionamento da clínica e valores). O sistema pergunta ao paciente se pode encaminhar e faz o encaminhamento quando ele confirmar.",
+                "Não encaminhe ainda. Responda primeiro às dúvidas com as informações do cadastro (profissionais, horários habituais, modalidade, funcionamento da clínica e valores). Não pergunte se pode encaminhar nem diga que vai encaminhar: aguarde a resposta do paciente; quando ele escolher dia, horário ou profissional, o sistema encaminha.",
             }),
           });
           registrarEtapa({
@@ -4220,6 +4238,47 @@ async function gerarRespostaNinaInterno(
     finalizacaoHandoff?.textoModelo ??
     (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
 
+  // A IA escreveu que a equipe vai dar continuidade ou que vai encaminhar, mas
+  // nenhuma transferência aconteceu (homologação 13/10/2026). Com o atendimento
+  // já informado e sem agendamento pela Nina, o encaminhamento é feito de fato
+  // (com a flag de dados, a Nina pede nome e data de nascimento antes).
+  if (
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !perguntaDadosTransferencia &&
+    !respostaNomeAtendimento &&
+    !ctxFerramentas?.esclarecimentoCatalogo &&
+    !agendamentoConfirmado &&
+    fluxoAgendamento.afirmaEncaminhamento(resposta)
+  ) {
+    const referenciasPrometidas = [
+      ...new Set([
+        ...referenciasDaDecisao,
+        ...(fluxoEstado.knowledge_context?.referencias ?? []).map((r) => r.registro),
+      ]),
+    ];
+    if (
+      referenciasPrometidas.length &&
+      fluxoDasReferencias(referenciasPrometidas) === "informar_e_encaminhar"
+    ) {
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Promessa de encaminhamento da IA cumprida pelo sistema",
+        dados: { motivo: "texto afirmava encaminhamento sem transferência" },
+        codigo: {
+          arquivo: "src/lib/nina/fluxo-agendamento-item.ts",
+          funcao: "afirmaEncaminhamento",
+        },
+      });
+      await executarDecisaoEncaminhamento({
+        motivo: motivoAgendamento(referenciasPrometidas),
+        urgencia: "normal",
+      });
+    }
+  }
+
   if (
     !finalizacaoHandoff &&
     !houveHandoff &&
@@ -4553,8 +4612,9 @@ async function gerarRespostaNinaInterno(
       );
     }
   }
-  // Fluxo informar e encaminhar: a intenção de marcar chegou antes das informações.
-  // A Nina informou neste turno; o sistema pergunta se pode encaminhar à equipe.
+  // Fluxo informar e encaminhar (regra de 13/10/2026): a mensagem de
+  // informações não pergunta se pode encaminhar. A Nina espera a resposta; a
+  // escolha de dia, horário ou profissional encaminha no turno seguinte.
   if (
     !semNovaMensagem &&
     !turnoObsoleto &&
@@ -4563,37 +4623,26 @@ async function gerarRespostaNinaInterno(
     !ctxFerramentas?.esclarecimentoCatalogo &&
     !fluxoEstado.knowledge_context?.esclarecimento &&
     !perguntaDadosTransferencia &&
-    resposta.trim() &&
-    (intencaoAgendarTurno || fluxoAgendamento.terminaComOfertaDeAgendamento(resposta))
+    resposta.trim()
   ) {
     const referenciasDoTurno = (fluxoEstado.knowledge_context?.referencias ?? []).map(
       (r) => r.registro,
     );
     if (
       referenciasDoTurno.length &&
-      fluxoDasReferencias(referenciasDoTurno) === "informar_e_encaminhar" &&
-      !resposta.includes(fluxoAgendamento.PERGUNTA_ENCAMINHAMENTO)
+      fluxoDasReferencias(referenciasDoTurno) === "informar_e_encaminhar"
     ) {
-      const antes = resposta;
-      // Uma pergunta só: a da IA sobre horário/profissional sai e entra a do sistema.
-      resposta = `${fluxoAgendamento.removerPerguntaDeAgendamento(resposta).trim()}\n\n${fluxoAgendamento.PERGUNTA_ENCAMINHAMENTO}`;
-      transformar(
-        "agendamento.oferta_encaminhamento",
-        "Informações entregues; pergunta se pode encaminhar à equipe para confirmar o horário",
-        antes,
-        resposta,
+      const semOferta = fluxoAgendamento.removerOfertaDeEncaminhamento(
+        resposta.split(fluxoAgendamento.PERGUNTA_ENCAMINHAMENTO).join("").trim(),
       );
-      if (fluxoEstado.session_id) {
-        fluxoEstado.oferta_encaminhamento = {
-          session_id: fluxoEstado.session_id,
-          referencias: referenciasDoTurno.slice(0, 40),
-          em: new Date().toISOString(),
-        };
-        await salvarFluxoEstado(
-          supabaseAdmin as never,
-          clinicaId,
-          estadoId.conversaId,
-          fluxoEstado,
+      if (semOferta.trim() && semOferta !== resposta.trimEnd()) {
+        const antes = resposta;
+        resposta = semOferta;
+        transformar(
+          "agendamento.sem_oferta_encaminhamento",
+          "Informações entregues sem perguntar se pode encaminhar; a Nina espera a resposta do paciente",
+          antes,
+          resposta,
         );
       }
     }

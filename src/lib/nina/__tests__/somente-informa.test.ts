@@ -76,7 +76,9 @@ describe("defesa na execução com a flag desligada", () => {
     const r = await executar("proxima_vaga");
     const mensagem = String(r["mensagem"] ?? r["message"] ?? JSON.stringify(r));
     expect(mensagem).toContain("horários habituais");
-    expect(mensagem).toContain("o sistema pergunta ao paciente se pode encaminhar");
+    // Regra de 13/10/2026: informa, espera a resposta e não oferece encaminhamento.
+    expect(mensagem).toContain("Não pergunte se pode encaminhar");
+    expect(mensagem).toContain("o sistema faz o encaminhamento");
     expect(mensagem).not.toContain("Recepção");
   });
 });
