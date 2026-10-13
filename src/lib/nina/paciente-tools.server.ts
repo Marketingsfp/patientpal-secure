@@ -1683,6 +1683,7 @@ async function executarFerramentaInterna(
           medico,
           procedimento,
           referencias,
+          escopo: escopoModalidade(ctx, procedimento || null),
         });
         if (!permissao.permitido)
           return falha(

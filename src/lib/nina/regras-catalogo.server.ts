@@ -1,6 +1,7 @@
 import { catalogoDoTurno } from "./catalogo-turno.server";
 import { motivoRegraHumano, permissaoAgendamentoNoCatalogo } from "./regras-catalogo";
 import { lerEstrutura } from "./catalogo-estrutura";
+import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 
 /** Valida ações pelo cadastro lido neste turno, inclusive em sessões antigas. */
 export async function atendimentoExigeHumano(entrada: {
@@ -104,6 +105,7 @@ export async function atendimentoPermiteAgendamento(entrada: {
   medico?: string | null;
   procedimento?: string | null;
   referencias?: readonly string[];
+  escopo?: EscopoAtendimentoConsulta | null;
 }): Promise<{ permitido: boolean; nomes: string[] }> {
   const catalogo = await catalogoDoTurno(entrada.clinicaId);
   const decisao = permissaoAgendamentoNoCatalogo(catalogo, entrada);
@@ -113,7 +115,10 @@ export async function atendimentoPermiteAgendamento(entrada: {
     const { resolverMedicoAgenda } = await import("./vinculo-catalogo-agenda.server");
     const resolvido = await resolverMedicoAgenda(entrada.clinicaId, entrada.medico);
     if (resolvido.ok) {
-      const porVinculo = permissaoAgendamentoNoCatalogo(catalogo, { medico: resolvido.id });
+      const porVinculo = permissaoAgendamentoNoCatalogo(catalogo, {
+        medico: resolvido.id,
+        escopo: entrada.escopo,
+      });
       if (porVinculo) return porVinculo;
     }
   }

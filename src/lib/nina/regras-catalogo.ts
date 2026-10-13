@@ -1,6 +1,7 @@
 import { CAUSA_SFP_OUTRA_UNIDADE } from "@/lib/atendimento/motivo-sfp";
 import { lerEstrutura } from "./catalogo-estrutura";
 import { fluxoDoRegistro } from "./fluxo-agendamento-item";
+import type { EscopoAtendimentoConsulta } from "./atendimento-consulta";
 
 /**
  * Regra de 12/10/2026: a Nina só agenda itens do catálogo marcados com
@@ -33,12 +34,16 @@ export function permissaoAgendamentoNoCatalogo(
     medico?: string | null;
     procedimento?: string | null;
     referencias?: readonly string[];
+    /** Atendimento pedido na conversa: a modalidade dele decide, isoladamente. */
+    escopo?: EscopoAtendimentoConsulta | null;
   },
 ): { permitido: boolean; nomes: string[] } | null {
   // Agendar exige "Nina pode agendar" E modalidade agendável (hora marcada,
   // ordem de chegada com pré-agendamento ou ficha).
   const decidir = (registros: readonly RegistroAgendavel[]) => ({
-    permitido: registros.length > 0 && registros.every((r) => fluxoDoRegistro(r) === "agendar"),
+    permitido:
+      registros.length > 0 &&
+      registros.every((r) => fluxoDoRegistro(r, true, entrada.escopo) === "agendar"),
     nomes: registros.map((r) => r.nome),
   });
   const referencias = (entrada.referencias ?? []).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
