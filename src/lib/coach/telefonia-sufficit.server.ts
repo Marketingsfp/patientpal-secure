@@ -36,8 +36,10 @@ export type ResultadoAmostra =
       camposPrimeiroRegistro: string[] | null;
       /** Só quando a resposta não é 2xx: cabeçalhos úteis para entender a recusa. */
       cabecalhos: Record<string, string> | null;
+      /** URL chamada (sem token), para conferir grafia de caminho e parâmetros. */
+      url: string;
     }
-  | { ok: false; erro: string; status?: number; tempoMs?: number };
+  | { ok: false; erro: string; status?: number; tempoMs?: number; url?: string };
 
 async function lerChaves(clinicaId: string): Promise<Map<string, string>> {
   const { data, error } = await supabaseAdmin
@@ -173,6 +175,7 @@ function camposDoPrimeiro(json: unknown): string[] | null {
 export async function amostraChamadasSufficit(
   clinicaId: string,
   limite = 5,
+  periodo: { start?: string; end?: string } = {},
 ): Promise<ResultadoAmostra> {
   let cred: CredenciaisSufficit;
   try {
@@ -181,12 +184,16 @@ export async function amostraChamadasSufficit(
     return { ok: false, erro: (e as Error).message };
   }
   const n = Math.min(Math.max(Math.trunc(limite) || 5, 1), 50);
-  const url = `${cred.base}/telephony/calls?contextid=${encodeURIComponent(cred.objectId)}&limit=${n}`;
+  // Grafia exata do contrato (swagger v2): /Telephony/Calls, ContextId, Limit, Start, End.
+  const qs = new URLSearchParams({ ContextId: cred.objectId, Limit: String(n) });
+  if (periodo.start) qs.set("Start", periodo.start);
+  if (periodo.end) qs.set("End", periodo.end);
+  const url = `${cred.base}/Telephony/Calls?${qs.toString()}`;
   const r = await buscar(url, {
     Authorization: `Bearer ${cred.token}`,
     Accept: "application/json",
   });
-  if ("erro" in r) return { ok: false, erro: r.erro, tempoMs: r.tempoMs };
+  if ("erro" in r) return { ok: false, erro: r.erro, tempoMs: r.tempoMs, url };
 
   let texto: string;
   try {
@@ -197,6 +204,7 @@ export async function amostraChamadasSufficit(
       erro: "A resposta da Sufficit não pôde ser lida.",
       status: r.res.status,
       tempoMs: r.tempoMs,
+      url,
     };
   }
   const contentType = r.res.headers.get("content-type");
@@ -215,6 +223,7 @@ export async function amostraChamadasSufficit(
     truncado: texto.length > LIMITE_CORPO,
     camposPrimeiroRegistro: campos,
     cabecalhos: r.res.ok ? null : cabecalhosDiagnostico(r.res),
+    url,
   };
 }
 

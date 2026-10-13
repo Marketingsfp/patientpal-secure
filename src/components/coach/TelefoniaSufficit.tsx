@@ -95,6 +95,8 @@ export function TelefoniaSufficit({
   const [amostra, setAmostra] = useState<Amostra | null>(null);
   const [carregando, setCarregando] = useState<"teste" | "amostra" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [de, setDe] = useState(() => diaLocal(-7));
+  const [ate, setAte] = useState(() => diaLocal(0));
   // Token: o valor só existe no campo até salvar; o servidor nunca o devolve.
   const lerEstado = useServerFn(estadoSegredoTelefonia);
   const salvarToken = useServerFn(salvarTokenTelefonia);
@@ -179,7 +181,16 @@ export function TelefoniaSufficit({
     setCarregando(tipo);
     try {
       if (tipo === "teste") setTeste(await testar({ data: { clinicaId } }));
-      else setAmostra(await amostrar({ data: { clinicaId } }));
+      else
+        setAmostra(
+          await amostrar({
+            data: {
+              clinicaId,
+              ...(de ? { start: new Date(`${de}T00:00:00`).toISOString() } : {}),
+              ...(ate ? { end: new Date(`${ate}T23:59:59.999`).toISOString() } : {}),
+            },
+          }),
+        );
     } catch (e) {
       setErro((e as Error)?.message || "Falha inesperada.");
     } finally {
@@ -311,6 +322,24 @@ export function TelefoniaSufficit({
           )}
           Ver amostra (5 chamadas)
         </Button>
+        <div className="flex items-center gap-2 text-sm">
+          <Label htmlFor="sufficit-de">De</Label>
+          <Input
+            id="sufficit-de"
+            type="date"
+            className="w-40"
+            value={de}
+            onChange={(e) => setDe(e.target.value)}
+          />
+          <Label htmlFor="sufficit-ate">Até</Label>
+          <Input
+            id="sufficit-ate"
+            type="date"
+            className="w-40"
+            value={ate}
+            onChange={(e) => setAte(e.target.value)}
+          />
+        </div>
       </div>
 
       {erro && <p className="text-sm text-destructive">{erro}</p>}
@@ -337,6 +366,11 @@ export function TelefoniaSufficit({
       {amostra && (
         <div className="space-y-2 text-sm">
           <div className="font-medium">Amostra de chamadas</div>
+          {amostra.url && (
+            <p className="break-all text-xs">
+              URL chamada: <code>GET {amostra.url}</code>
+            </p>
+          )}
           {amostra.ok ? (
             <>
               <p>
@@ -364,4 +398,13 @@ export function TelefoniaSufficit({
       )}
     </div>
   );
+}
+
+/** Data local AAAA-MM-DD deslocada em dias a partir de hoje. */
+function diaLocal(deslocamento: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + deslocamento);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${dia}`;
 }
