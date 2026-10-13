@@ -168,7 +168,28 @@ export function textoApresentacaoIA(
         tipoEstabelecimento: apresentacao.tipoEstabelecimento,
       })
     : apresentacao.estabelecimento.trim();
-  return `${saudacaoPorHorarioServidor(agoraServidor)}! Me chamo ${apresentacao.assistente.trim()} e eu sou inteligência artificial da ${unidade}.`;
+  return `${saudacaoPorHorarioServidor(agoraServidor)}! Me chamo ${apresentacao.assistente.trim()}, sou a inteligência artificial da ${unidade}.`;
+}
+
+/** Pergunta de abertura quando o paciente só cumprimenta (modelo de 13/10/2026). */
+export const PERGUNTA_ABERTURA_SAUDACAO =
+  "Como posso ajudar? Informações sobre consultas, especialidades, exames ou algum outro assunto?";
+
+/**
+ * Resposta a uma mensagem que é só um cumprimento: saudação pelo horário,
+ * apresentação (na primeira resposta da sessão) e a pergunta de abertura.
+ * Ex.: "Bom dia! Me chamo Maria, sou a inteligência artificial da Policlínica
+ * Menino Jesus." e, na linha seguinte, a pergunta de abertura (sem emoji).
+ */
+export function respostaSoSaudacao(
+  apresentacao: Parameters<typeof textoApresentacaoIA>[0],
+  comApresentacao: boolean,
+  agoraServidor: Date = new Date(),
+): string {
+  const abertura = comApresentacao
+    ? textoApresentacaoIA(apresentacao, agoraServidor)
+    : `${saudacaoPorHorarioServidor(agoraServidor)}!`;
+  return `${abertura}\n${PERGUNTA_ABERTURA_SAUDACAO}`;
 }
 
 /**

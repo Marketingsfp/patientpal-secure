@@ -49,7 +49,7 @@ for (const ambiente of ["producao", "homologacao"])
           expect(r.requests).toHaveLength(2);
           expect(r.resposta).toContain("Temos atendimento em Cardiologia");
           expect(r.resposta).toContain(
-            "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?",
+            "Você tem preferência por algum profissional ou gostaria de marcar com o primeiro disponível?",
           );
           expect(r.resposta).not.toContain("Amanda Souza");
           expect(r.ferramentas).not.toContain("consultar_primeiro_disponivel");

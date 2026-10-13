@@ -18,7 +18,7 @@ test("prompt de referência pergunta a preferência antes de listar informaçõe
   expect(PROMPT_NINA_WHATSAPP_V4).toContain("sem pré-agendamento");
   expect(PROMPT_NINA_WHATSAPP_V4).toContain("SFP tem prioridade");
   expect(PROMPT_NINA_WHATSAPP_V4).toContain(
-    "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?",
+    "Você tem preferência por algum profissional ou gostaria de marcar com o primeiro disponível?",
   );
   expect(PROMPT_NINA_WHATSAPP_V4).toContain(
     "pedido misto de preço e agendamento responde ao preço pedido",

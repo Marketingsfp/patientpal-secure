@@ -27,7 +27,7 @@ const ofertaGeral =
 
 describe("escolha entre médico e primeiro disponível", () => {
   const ofertaCurta =
-    "Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?";
+    "Você tem preferência por algum profissional ou gostaria de marcar com o primeiro disponível?";
   it.each([
     "o primeiro horário",
     "o primeiro horário disponível",

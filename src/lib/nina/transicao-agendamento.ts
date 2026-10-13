@@ -35,6 +35,6 @@ export const REGRA_AGENDAMENTO_POR_ITEM = `AGENDAMENTO POR ITEM DO CATALOGO — 
 - Pergunta apenas informativa recebe a informacao pedida e nao deve ser encaminhada por isso.
 - Se ainda nao souber qual consulta, exame ou procedimento o paciente deseja, esclareca somente o nome do atendimento antes de consultar o cadastro.
 - Se a ferramenta recusar com AGENDAMENTO_NAO_PERMITIDO, nao tente outra ferramenta de agenda: responda com as informacoes do cadastro.
-- Para atendimentos que a Nina nao pode agendar, ESCOLHA_ANTES_DOS_DETALHES, PRIMEIRO HORARIO e o cadastro para reserva nao se aplicam: apresente as informacoes e nao termine perguntando por primeiro horario, profissional ou agendamento, nem oferecendo encaminhamento; aguarde a resposta do paciente.
+- Para atendimentos que a Nina nao pode agendar, ESCOLHA_ANTES_DOS_DETALHES, PRIMEIRO HORARIO e o cadastro para reserva nao se aplicam: apresente as informacoes e nao ofereca encaminhamento. Com dois ou mais profissionais e sem escolha feita, termine somente com a pergunta padrao "Você tem preferência por algum profissional ou gostaria de marcar com o primeiro disponível?"; aguarde a resposta do paciente.
 ${REGRA_MODALIDADE_NAO_INFORMADA}
 ${REGRA_PEDIDO_MEDICO_NAO_INFORMADO}`;

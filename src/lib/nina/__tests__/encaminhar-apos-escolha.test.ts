@@ -3,6 +3,7 @@ import {
   afirmaEncaminhamento,
   escolhaParaAgendar,
   intencaoDeAgendarNaSessao,
+  padronizarPerguntaPreferencia,
   removerOfertaDeEncaminhamento,
 } from "../fluxo-agendamento-item";
 
@@ -75,5 +76,36 @@ describe("informar, esperar e encaminhar na escolha do paciente", () => {
         "As condições de parcelamento são confirmadas diretamente com a nossa equipe de atendimento.",
       ),
     ).toBe(false);
+  });
+});
+
+describe("pergunta de preferência no modelo", () => {
+  const PADRAO =
+    "Você tem preferência por algum profissional ou gostaria de marcar com o primeiro disponível?";
+  test("variações da IA viram a pergunta padrão", () => {
+    expect(
+      padronizarPerguntaPreferencia(
+        "Valores: R$ 120,00.\n\nVocê tem preferência por alguma das profissionais, ou por algum dia da semana específico para a sua consulta?",
+      ),
+    ).toBe(`Valores: R$ 120,00.\n\n${PADRAO}`);
+    expect(
+      padronizarPerguntaPreferencia(
+        "Temos Cardiologia. Você prefere o primeiro horário disponível ou deseja escolher entre os profissionais?",
+      ),
+    ).toBe(`Temos Cardiologia. ${PADRAO}`);
+    expect(padronizarPerguntaPreferencia(PADRAO)).toBe(PADRAO);
+  });
+  test("outras perguntas ficam como estão", () => {
+    for (const t of [
+      "Atende às quintas. Você gostaria de agendar uma consulta?",
+      "Qual o seu nome completo?",
+      "Atende às quintas.",
+    ])
+      expect(padronizarPerguntaPreferencia(t)).toBe(t);
+  });
+  test("'o primeiro disponível' e 'qualquer um' são escolha para marcar", () => {
+    expect(escolhaParaAgendar("Pode ser o primeiro disponível", [])).toBe(true);
+    expect(escolhaParaAgendar("qualquer um", [])).toBe(true);
+    expect(escolhaParaAgendar("tem o primeiro disponível no sábado?", [])).toBe(false);
   });
 });

@@ -19,8 +19,8 @@ describe("LGPD da Nina", () => {
     );
     expect(resultado.contrato).toContain("PRIVACIDADE_DIREITOS");
     expect(resultado.contrato).toContain("PRIVACIDADE_INCIDENTE");
-    expect(resultado.contrato).toContain("eu sou inteligência artificial");
-    expect(resultado.contrato).toContain("Não diga “eu sou uma inteligência artificial”");
+    expect(resultado.contrato).toContain("sou a inteligência artificial");
+    expect(resultado.contrato).toContain("nem “eu sou uma inteligência artificial”");
     expect(resultado.contrato).toContain("nome da clínica definidos na identidade publicada");
   });
 

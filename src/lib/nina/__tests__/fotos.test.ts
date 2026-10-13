@@ -141,7 +141,7 @@ it("apresentação usa identidade publicada e mantém reconhecimento da segunda 
     new Date("2026-09-05T16:33:00Z"),
   );
   expect(texto).toStartWith(
-    "Boa tarde! Me chamo Ana e eu sou inteligência artificial da Clínica Exemplo.",
+    "Boa tarde! Me chamo Ana, sou a inteligência artificial da Clínica Exemplo.",
   );
   expect(decidirFotos([foto("b", 20)], [{ ...pedido, body: texto }]).acao).toBe("encaminhar");
   expect(apresentarRespostaDeFoto(PEDIR_NOVA_FOTO, false, null)).toBe(PEDIR_NOVA_FOTO);
