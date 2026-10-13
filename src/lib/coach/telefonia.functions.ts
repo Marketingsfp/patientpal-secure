@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { analisarTextoNoServidor, type AnalysisResult } from "./analyze.functions";
+import type { AnalysisResult } from "./analyze.functions";
 
 const entrada = (data: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(data);
 
@@ -255,69 +255,76 @@ export const cotaIACoach = createServerFn({ method: "POST" })
     const guard = await import("./guard.server");
     const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
     const userId = await guard.garantirAcessoCoach(db, data.clinicaId, "read");
-    // Igual a coach_registrar_uso_ia: data de São Paulo à meia-noite UTC.
-    const dia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-    const desde = `${dia}T00:00:00Z`;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [cfg, eu, clinica] = await Promise.all([
-      supabaseAdmin
-        .from("coach_config_clinica")
-        .select("limite_ia_usuario, limite_ia_clinica")
-        .eq("clinica_id", data.clinicaId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("coach_uso_ia")
-        .select("id", { count: "exact", head: true })
-        .eq("clinica_id", data.clinicaId)
-        .eq("user_id", userId)
-        .gte("created_at", desde),
-      supabaseAdmin
-        .from("coach_uso_ia")
-        .select("id", { count: "exact", head: true })
-        .eq("clinica_id", data.clinicaId)
-        .gte("created_at", desde),
-    ]);
-    const limUser = Number(cfg.data?.limite_ia_usuario ?? 60) || 60;
-    const limClin = Number(cfg.data?.limite_ia_clinica ?? 600) || 600;
-    return {
-      restaUsuario: Math.max(0, limUser - (eu.count ?? 0)),
-      limiteUsuario: limUser,
-      restaClinica: Math.max(0, limClin - (clinica.count ?? 0)),
-      limiteClinica: limClin,
-    };
+    const f = await import("./fila-analise.server");
+    return f.calcularCotaIA(data.clinicaId, userId);
   });
 
 export const analisarLigacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(porLigacao)
+  .handler(async ({ data, context }): Promise<AnalysisResult> => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    const userId = await guard.garantirAcessoCoach(db, data.clinicaId, "write");
+    const f = await import("./fila-analise.server");
+    const r = await f.analisarTranscricaoGuardada(db, data.clinicaId, data.externoId, userId);
+    return r.resultado;
+  });
+
+/* ------------------------------------------------------------------ */
+/* Processar em lote (fila persistida em tel_fila_analise).            */
+/* ------------------------------------------------------------------ */
+
+export const enfileirarAnalises = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        start: z.string().datetime(),
+        end: z.string().datetime(),
+        incluirFeitas: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "write");
+    const f = await import("./fila-analise.server");
+    return f.enfileirar(data.clinicaId, {
+      start: data.start,
+      end: data.end,
+      incluirFeitas: !!data.incluirFeitas,
+    });
+  });
+
+export const estadoFilaAnalise = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(entrada)
   .handler(async ({ data, context }) => {
     const guard = await import("./guard.server");
     const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
     const userId = await guard.garantirAcessoCoach(db, data.clinicaId, "write");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: t } = await supabaseAdmin
-      .from("tel_transcricoes")
-      .select("texto")
-      .eq("clinica_id", data.clinicaId)
-      .eq("origem", "sufficit")
-      .eq("externo_id", data.externoId)
-      .maybeSingle();
-    if (!t?.texto || t.texto.trim().length < 20) {
-      throw new Error("Busque a transcrição desta ligação antes de analisar.");
-    }
-    const resultado = await analisarTextoNoServidor(db, {
-      clinicaId: data.clinicaId,
-      text: t.texto.slice(0, 30_000),
-      semFalantes: true,
-    });
-    const { error } = await supabaseAdmin.from("tel_analises").insert({
-      clinica_id: data.clinicaId,
-      origem: "sufficit",
-      externo_id: data.externoId,
-      resultado: resultado as never,
-      pontuacao: Number(resultado.pontuacao) || null,
-      criado_por: userId,
-    });
-    if (error) console.error("[coach] gravar análise da ligação:", error.code ?? "erro");
-    return resultado;
+    const f = await import("./fila-analise.server");
+    const [contagem, cota] = await Promise.all([
+      f.contagemPorEstado(data.clinicaId),
+      f.calcularCotaIA(data.clinicaId, userId),
+    ]);
+    return { contagem, cota };
+  });
+
+export const processarLoteAnalise = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({ clinicaId: z.string().uuid(), maximo: z.number().int().min(1).max(5).optional() })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    const userId = await guard.garantirAcessoCoach(db, data.clinicaId, "write");
+    const f = await import("./fila-analise.server");
+    return f.processarLote(db, data.clinicaId, userId, data.maximo ?? 3);
   });
