@@ -15,10 +15,17 @@
  *    (`atend_gerar_protocolo_atendimento`, com lock por clínica). O frontend e
  *    a IA nunca calculam o número.
  *  - Só existe protocolo onde há configuração ativa. Hoje: Menino Jesus.
+ *  - Homologação (`is_teste`) recebe número SIMULADO (ex.: MJ-TESTE-482913) e
+ *    nunca consome a sequência real (regra de 13/10/2026).
  */
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ambienteDoHandoff, vinculoProtocolo } from "./protocolo-handoff";
+import {
+  ambienteDoHandoff,
+  protocoloSimulado,
+  reaproveitaProtocolo,
+  vinculoProtocolo,
+} from "./protocolo-handoff";
 import { classificarMotivoHandoff, type MotivoHandoff } from "./mensagem-handoff";
 import { nomeContato } from "./rotulo-conversa";
 import { handoffSemAviso } from "@/lib/nina/handoff-silencioso";
@@ -63,6 +70,58 @@ async function lerConversa(clinicaId: string, conversaId: string) {
 }
 
 /**
+ * Protocolo da homologação: mesma decisão e mesmo reaproveitamento por ciclo,
+ * mas com número simulado e sem tocar a sequência real da clínica.
+ */
+async function protocoloDeHomologacao(
+  clinicaId: string,
+  conversaId: string,
+  conv: LinhaConversa,
+): Promise<{ protocolo: string; novo: boolean } | null> {
+  const sessao = sessionIdDoEstado(conv.nina_fluxo_estado);
+  if (
+    reaproveitaProtocolo({
+      atual: conv.protocolo_atendimento,
+      sessaoAtual: conv.protocolo_sessao_id,
+      sessao,
+    })
+  )
+    return { protocolo: conv.protocolo_atendimento!, novo: false };
+  // Sem configuração ativa a clínica não usa protocolo, como no banco.
+  const { data: cfg } = await supabaseAdmin
+    .from("atend_protocolo_atendimento_config")
+    .select("prefixo, ativo")
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (!cfg?.ativo) return null;
+  const protocolo = protocoloSimulado(cfg.prefixo);
+  // Troca condicionada ao valor lido: duas chamadas juntas não geram dois números.
+  let atualizacao = supabaseAdmin
+    .from("atend_conversas")
+    .update({
+      protocolo_atendimento: protocolo,
+      protocolo_sessao_id: sessao,
+      protocolo_em: new Date().toISOString(),
+    })
+    .eq("id", conversaId)
+    .eq("clinica_id", clinicaId)
+    .eq("is_teste", true);
+  atualizacao = conv.protocolo_atendimento
+    ? atualizacao.eq("protocolo_atendimento", conv.protocolo_atendimento)
+    : atualizacao.is("protocolo_atendimento", null);
+  const { data, error } = await atualizacao.select("protocolo_atendimento").maybeSingle();
+  if (error) {
+    console.error("[protocolo] falha ao gerar protocolo de homologação", error.message);
+    return null;
+  }
+  if (data) return { protocolo, novo: true };
+  const atual = await lerConversa(clinicaId, conversaId);
+  return atual?.protocolo_atendimento
+    ? { protocolo: atual.protocolo_atendimento, novo: false }
+    : null;
+}
+
+/**
  * Gera (ou reaproveita) o protocolo do atendimento atual.
  * Devolve `null` quando a clínica não usa protocolo — nenhum efeito colateral.
  */
@@ -77,16 +136,21 @@ export async function garantirProtocoloAtendimento(args: {
   const conv = await lerConversa(args.clinicaId, args.conversaId);
   if (!conv) return null;
 
-  const { data, error } = await supabaseAdmin.rpc("atend_gerar_protocolo_atendimento", {
-    _clinica_id: args.clinicaId,
-    _conversa_id: args.conversaId,
-    _session_id: sessionIdDoEstado(conv.nina_fluxo_estado) ?? undefined,
-  });
-  if (error) {
-    console.error("[protocolo] falha ao gerar", error.message);
-    return null;
+  let linha: { protocolo: string; novo: boolean } | null | undefined;
+  if (conv.is_teste) {
+    linha = await protocoloDeHomologacao(args.clinicaId, args.conversaId, conv);
+  } else {
+    const { data, error } = await supabaseAdmin.rpc("atend_gerar_protocolo_atendimento", {
+      _clinica_id: args.clinicaId,
+      _conversa_id: args.conversaId,
+      _session_id: sessionIdDoEstado(conv.nina_fluxo_estado) ?? undefined,
+    });
+    if (error) {
+      console.error("[protocolo] falha ao gerar", error.message);
+      return null;
+    }
+    linha = (data as Array<{ protocolo: string; novo: boolean }> | null)?.[0];
   }
-  const linha = (data as Array<{ protocolo: string; novo: boolean }> | null)?.[0];
   if (!linha?.protocolo) return null;
 
   if (linha.novo) {

@@ -33,6 +33,9 @@ mock.module("@/integrations/supabase/client.server", () => ({
               handoff_motivo: motivo,
               handoff_resumo: { avisar_paciente: false },
               nina_fluxo_estado: { session_id: "sessao" },
+              // Homologação reaproveita o número simulado do mesmo ciclo.
+              protocolo_atendimento: teste ? "TESTE-1" : null,
+              protocolo_sessao_id: teste ? "sessao" : null,
               is_teste: teste,
               departamento_id: null,
               contato_nome: "Paciente fictício",
@@ -44,6 +47,8 @@ mock.module("@/integrations/supabase/client.server", () => ({
     },
     rpc: async (nome: string, args: Record<string, unknown>) => {
       assert.equal(nome, "atend_gerar_protocolo_atendimento");
+      // A sequência real nunca é usada pela homologação.
+      assert.equal(teste, false);
       assert.equal(args._clinica_id, "clinica");
       assert.equal(args._conversa_id, "conversa");
       return { error: null, data: [{ protocolo: "TESTE-1", novo: false }] };

@@ -2,8 +2,34 @@ import { describe, expect, it } from "bun:test";
 import {
   ambienteDoHandoff,
   deveInformarProtocolo,
+  ehProtocoloSimulado,
+  protocoloSimulado,
+  reaproveitaProtocolo,
   vinculoProtocolo,
 } from "@/lib/atendimento/protocolo-handoff";
+
+describe("protocolo da homologação", () => {
+  it("é simulado, com o prefixo da clínica, e nunca parece um número real", () => {
+    const p = protocoloSimulado("MJ", new Date(1_791_891_234_567));
+    expect(p).toBe("MJ-TESTE-234567");
+    expect(ehProtocoloSimulado(p)).toBe(true);
+    expect(ehProtocoloSimulado("MJ-908")).toBe(false);
+    expect(protocoloSimulado("MJ", new Date(1_000_000_000_042))).toBe("MJ-TESTE-000042");
+  });
+
+  it("reaproveita o número no mesmo ciclo e gera outro em sessão nova", () => {
+    expect(reaproveitaProtocolo({ atual: "MJ-TESTE-1", sessaoAtual: "s1", sessao: "s1" })).toBe(
+      true,
+    );
+    expect(reaproveitaProtocolo({ atual: "MJ-TESTE-1", sessaoAtual: null, sessao: "s2" })).toBe(
+      true,
+    );
+    expect(reaproveitaProtocolo({ atual: "MJ-TESTE-1", sessaoAtual: "s1", sessao: "s2" })).toBe(
+      false,
+    );
+    expect(reaproveitaProtocolo({ atual: null, sessaoAtual: null, sessao: "s1" })).toBe(false);
+  });
+});
 
 describe("ambiente do handoff", () => {
   it("separa homologação de produção sem mudar a regra", () => {
