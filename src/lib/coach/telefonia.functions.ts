@@ -26,13 +26,21 @@ export const testarConexaoTelefonia = createServerFn({ method: "POST" })
 
 export const amostrarChamadasTelefonia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(entrada)
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        start: z.string().datetime().optional(),
+        end: z.string().datetime().optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data, context }) => {
     const guard = await import("./guard.server");
     const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
     await guard.garantirAcessoCoach(db, data.clinicaId, "write");
     const s = await import("./telefonia-sufficit.server");
-    return s.amostraChamadasSufficit(data.clinicaId, 5);
+    return s.amostraChamadasSufficit(data.clinicaId, 5, { start: data.start, end: data.end });
   });
 
 // Nome da chave é parâmetro, mas restrito à lista fechada do servidor.
