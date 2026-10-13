@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ResultView } from "@/components/coach/painel-views";
+import { ProcessarLoteLigacoes } from "@/components/coach/ProcessarLoteLigacoes";
 import type { AnalysisResult } from "@/lib/coach/analyze.functions";
 import {
   analisarLigacao,
@@ -345,6 +346,13 @@ export function AnaliseLigacoes({
           </div>
         ) : null}
       </section>
+
+      <ProcessarLoteLigacoes
+        clinicaId={clinicaId}
+        start={inicioDiaSP(de)}
+        end={fimDiaSP(ate)}
+        aoAvancar={() => void atualizarCota()}
+      />
     </div>
   );
 }
