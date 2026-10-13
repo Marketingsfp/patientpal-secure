@@ -45,7 +45,7 @@ export function apresentarRespostaDeFoto(
   if (!obrigatoria || !texto.trim()) return texto;
   const apresentacao = identidade
     ? textoApresentacaoIA(identidade, agoraServidor)
-    : `${saudacaoPorHorarioServidor(agoraServidor)}! Eu sou inteligência artificial deste atendimento.`;
+    : `${saudacaoPorHorarioServidor(agoraServidor)}! Eu sou a inteligência artificial deste atendimento.`;
   return `${apresentacao}\n\n${texto}`;
 }
 

@@ -4457,6 +4457,30 @@ async function gerarRespostaNinaInterno(
       "identificação pendente por pergunta; respostas confirmadas preservadas",
     );
   }
+  // Mensagem que é só um cumprimento ("oi", "bom dia"): resposta no modelo de
+  // 13/10/2026 — saudação, apresentação (primeira da sessão) e pergunta de abertura.
+  if (
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !respostaNomeAtendimento &&
+    !perguntaDadosTransferencia &&
+    !ctxFerramentas?.esclarecimentoCatalogo &&
+    identidadeEfetiva.ok &&
+    (await import("@/lib/nina/confidence/turno-tipo")).ehSaudacaoPura(mensagemPaciente)
+  ) {
+    const { respostaSoSaudacao } = await import("@/lib/nina/identidade-efetiva");
+    const antes = resposta;
+    resposta = respostaSoSaudacao(identidadeEfetiva.apresentacao, saudacaoObrigatoriaEfetivaTurno);
+    transformar(
+      "saudacao.so_cumprimento",
+      "Paciente só cumprimentou: saudação, apresentação e pergunta de abertura padrão",
+      antes,
+      resposta,
+      "aviso_operacional",
+    );
+    marcarOrigem("codigo", "resposta padrão a mensagem que é só um cumprimento");
+  }
   if (respostaNomeAtendimento && !finalizacaoHandoff && !houveHandoff && !turnoObsoleto) {
     const antes = resposta;
     // Primeira resposta da conversa: a apresentação vem junto (07/10/2026).
@@ -4773,6 +4797,29 @@ async function gerarRespostaNinaInterno(
     }
   }
 
+  // Pergunta de preferência no modelo de 13/10/2026: "Você tem preferência por
+  // algum profissional ou gostaria de marcar com o primeiro disponível? 😊".
+  if (
+    !semNovaMensagem &&
+    !turnoObsoleto &&
+    !houveHandoff &&
+    !finalizacaoHandoff &&
+    !perguntaDadosTransferencia &&
+    !resumoEscolha &&
+    resposta.trim()
+  ) {
+    const padronizada = fluxoAgendamento.padronizarPerguntaPreferencia(resposta);
+    if (padronizada !== resposta) {
+      const antes = resposta;
+      resposta = padronizada;
+      transformar(
+        "agendamento.pergunta_preferencia",
+        "Pergunta de preferência de profissional no modelo padrão",
+        antes,
+        resposta,
+      );
+    }
+  }
   // Sem aviso do protocolo: a própria Nina avisa. Na homologação o aviso é de
   // simulação — nenhuma atendente real é acionada, então a frase de que uma
   // atendente assume nunca é acrescentada.

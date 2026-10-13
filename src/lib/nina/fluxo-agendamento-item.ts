@@ -26,6 +26,28 @@ import {
 } from "./atendimento-consulta";
 import { interpretarModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { normalizarRespostaInformal, ehRespostaAfirmativaCurta } from "./resposta-afirmativa";
+import { PERGUNTA_PREFERENCIA_PROFISSIONAL } from "./prompt/consulta-agenda";
+
+/**
+ * Pergunta de preferência no modelo de 13/10/2026: a última pergunta da IA
+ * sobre preferência de profissional, médico ou primeiro disponível vira
+ * "Você tem preferência por algum profissional ou gostaria de marcar com o
+ * primeiro disponível?" (sem emoji). Outras perguntas ficam como estão.
+ */
+export function padronizarPerguntaPreferencia(texto: string): string {
+  const protegido = protegerAbreviacoes(texto.trimEnd());
+  const final = /([^.!?\n]*\?)[^\p{L}\p{N}\n]*$/u.exec(protegido);
+  if (!final) return texto;
+  const frase = normalizarRespostaInformal(restaurarAbreviacoes(final[1]!));
+  if (
+    !/\bprefer/.test(frase) ||
+    !/(?:profissiona|medic|doutor|primeiro (?:horario )?disponivel|primeira vaga)/.test(frase)
+  )
+    return texto;
+  const antes = protegido.slice(0, final.index);
+  const separador = antes && !/\s$/.test(antes) ? " " : "";
+  return restaurarAbreviacoes(`${antes}${separador}${PERGUNTA_PREFERENCIA_PROFISSIONAL}`);
+}
 
 export type FluxoItem = "agendar" | "informar_e_encaminhar" | "somente_informar";
 
@@ -193,6 +215,9 @@ const DIAS_DA_SEMANA =
   /\b(?:segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:[- ]feira)?s?\b|\bamanha\b|\bhoje\b/;
 const ESCOLHA =
   /\b(?:pode deixar|pode ser|fica bom|fica boa|ficaria bom|ficaria boa|serve|da pra mim|pra mim (?:da|serve|fica)|quero (?:marcar|agendar|com|esse|essa|na|no|sim)|vou querer|prefiro|pode marcar|pode agendar|pode confirmar|combinado|fechado|melhor pra mim)\b/;
+/** "O primeiro disponível", "qualquer um": escolha sem dia nem profissional. */
+const SEM_PREFERENCIA =
+  /\b(?:primeiro (?:horario |)disponivel|primeiro horario|primeira vaga|qualquer um|qualquer uma|qualquer profissional|tanto faz|quem tiver primeiro|o que tiver primeiro)\b/;
 
 /**
  * Depois das informações, o paciente escolhe dia, horário ou profissional
@@ -208,6 +233,7 @@ export function escolhaParaAgendar(mensagem: string, nomes: readonly string[] = 
       .filter((p) => p.length >= 4 && !/^(?:consulta|exame|doutor|doutora)$/.test(p))
       .some((p) => new RegExp(`\\b${p}\\b`).test(t)),
   );
+  if (SEM_PREFERENCIA.test(t) && !mensagem.includes("?")) return true;
   const citaQuando = DIAS_DA_SEMANA.test(t) || /\b\d{1,2}\s*(?:h|horas?|:\d{2})\b/.test(t);
   if (ESCOLHA.test(t) && (citaQuando || citaProfissional || /\b(?:marcar|agendar)\b/.test(t)))
     return true;

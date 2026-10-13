@@ -61,9 +61,7 @@ describe("composição do nome do estabelecimento", () => {
         // 13:33 em Brasília.
         new Date("2026-09-05T16:33:00Z"),
       ),
-    ).toBe(
-      "Boa tarde! Me chamo Sofia e eu sou inteligência artificial da Policlínica Menino Jesus.",
-    );
+    ).toBe("Boa tarde! Me chamo Sofia, sou a inteligência artificial da Policlínica Menino Jesus.");
   });
 
   it("não duplica o tipo já presente na grafia configurada", () => {
