@@ -14,6 +14,7 @@ import { normalizarNomeBusca } from "@/lib/busca-texto";
 import { EdicaoLoteIA } from "./EdicaoLoteIA";
 import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
 import { DicionarioCatalogoEditor } from "./DicionarioCatalogoEditor";
+import { ResumoDecisaoNina } from "./ResumoDecisaoNina";
 import { MapaCamposCatalogo } from "./MapaCamposCatalogo";
 import { SincronizacaoCatalogo } from "./SincronizacaoCatalogo";
 import { CatalogoOrganizado } from "./catalogo-organizado";
@@ -736,7 +737,10 @@ export function CatalogoNina({
               </CardHeader>
               <CardContent className="oszap-base-record-content text-sm text-muted-foreground">
                 <div className="min-w-0 space-y-1">
-                  {tipo === "servico" ? (
+                  {/* Catálogo estruturado: resumo do que decide a conduta da Nina. */}
+                  {catalogoOrganizado ? (
+                    <ResumoDecisaoNina item={item} tipo={tipo} />
+                  ) : tipo === "servico" ? (
                     item.formas_pagamento?.length ? (
                       <dl className="oszap-base-payments">
                         {item.formas_pagamento.map(
@@ -768,12 +772,14 @@ export function CatalogoNina({
                   ) : (
                     <p>{resumoHorarios(item.horarios ?? [])}</p>
                   )}
-                  <p>
-                    Pedido médico:{" "}
-                    <span className="font-medium text-foreground">
-                      {rotuloPedidoMedico(item.estrutura?.pedido_medico)}
-                    </span>
-                  </p>
+                  {!catalogoOrganizado && (
+                    <p>
+                      Pedido médico:{" "}
+                      <span className="font-medium text-foreground">
+                        {rotuloPedidoMedico(item.estrutura?.pedido_medico)}
+                      </span>
+                    </p>
+                  )}
                   {!!item.estrutura?.aliases?.length && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-primary">
