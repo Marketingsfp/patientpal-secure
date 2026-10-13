@@ -286,7 +286,7 @@ export function PainelGestora({ ctx }: { ctx: CoachContexto }) {
 
             <TabsContent value="ligacoes" className="mt-5">
               {aba === "ligacoes" ? (
-                <AnaliseLigacoes clinicaId={clinicaId} clinicaNome={clinicaNome} />
+                <AnaliseLigacoes clinicaId={clinicaId} clinicaNome={clinicaNome ?? ""} />
               ) : null}
             </TabsContent>
 
