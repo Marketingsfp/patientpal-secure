@@ -4596,10 +4596,45 @@ async function gerarRespostaNinaInterno(
     resposta = comPedido;
   }
 
-  // Modalidade não informada (regra de 13/10/2026): quem informa é a equipe de
-  // atendimento; a resposta nunca diz que a forma de atendimento "não consta no sistema".
+  // Modalidade (regras de 13/10/2026): a Nina só fala da forma de atendimento
+  // quando o paciente pergunta. Exceções: ordem de chegada sem pré-agendamento
+  // com o paciente querendo marcar ("basta comparecer") e o agendamento feito
+  // pela própria Nina. Quando fala, nunca diz que a modalidade "não consta".
   if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && resposta.trim()) {
-    const { corrigirModalidadeNaoConsta } = await import("@/lib/nina/modalidade-nao-informada");
+    const {
+      corrigirModalidadeNaoConsta,
+      pacientePerguntouModalidade,
+      removerModalidadeNaoPerguntada,
+    } = await import("@/lib/nina/modalidade-nao-informada");
+    const referenciasDaResposta = (fluxoEstado.knowledge_context?.referencias ?? []).map(
+      (r) => r.registro,
+    );
+    const orientaComparecimento =
+      intencaoAgendarTurno &&
+      [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
+        .filter((r) => referenciasDaResposta.includes(r.id))
+        .some(
+          (r) =>
+            fluxoAgendamento.fluxoDoRegistro(r, podeAgendar, escopoDoAtendimento()) ===
+            "somente_informar",
+        );
+    const semModalidade =
+      !pacientePerguntouModalidade(mensagemPaciente) &&
+      !orientaComparecimento &&
+      !resumoEscolha &&
+      !agendamentoConfirmado
+        ? removerModalidadeNaoPerguntada(resposta)
+        : resposta;
+    if (semModalidade !== resposta) {
+      const antes = resposta;
+      resposta = semModalidade;
+      transformar(
+        "modalidade.so_se_perguntar",
+        "Forma de atendimento só é informada quando o paciente pergunta",
+        antes,
+        resposta,
+      );
+    }
     const corrigida = corrigirModalidadeNaoConsta(resposta);
     if (corrigida !== resposta) {
       const antes = resposta;
