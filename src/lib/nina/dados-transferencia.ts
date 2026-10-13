@@ -132,7 +132,7 @@ function lerData(texto: string, hoje: Date): { data: string; trecho: string } | 
 const ROTULOS =
   /\b(?:meu nome completo e|meu nome e|nome completo|nome|me chamo|eu me chamo|eu sou|sou|data de nascimento|data nascimento|nascimento|nascida em|nascido em|nasci em|nasci no dia|nasci dia|nasci|nasc|dn)\b\s*[:=-]?/g;
 const NAO_NOME =
-  /\b(?:sim|nao|pode|podem|por favor|favor|obrigad[oa]|quero|queria|gostaria|consulta|exame|agendar|marcar|transfer\w*|encaminh\w*|ok|oi|ola|bom dia|boa tarde|boa noite|tudo bem|valeu|beleza|certo|claro|doutor\w*|dra?|medic\w*|horario|sabado|domingo|amanha|hoje)\b/;
+  /\b(?:sim|nao|pode|podem|por favor|favor|obrigad[oa]|quero|queria|gostaria|consulta|exame|agendar|marcar|transfer\w*|encaminh\w*|ok|oi|ola|bom dia|boa tarde|boa noite|tudo bem|valeu|beleza|certo|claro|doutor\w*|dra?|medic\w*|horario|sabado|domingo|amanha|hoje|ta bom|esta bom|ta certo|tudo certo|entendi|perfeito|combinado|pronto|segue|seguem|meus dados|dados)\b/;
 const CONECTORES = new Set(["de", "da", "do", "das", "dos", "e", "d'"]);
 
 function tituloDoNome(nome: string): string {
@@ -174,7 +174,8 @@ export function extrairDadosTransferencia(
     return saida + base.slice(ultimo);
   })();
   let nome: string | null = null;
-  for (const trecho of semRotulos.split(/[\n,;:|()]+|\s+-\s+|\s+e\s+(?=\d)/)) {
+  // Frases separadas ("Tá bom. Meu nome é …") não se misturam no nome.
+  for (const trecho of semRotulos.split(/[\n,;:|()]+|[.!?]\s+|\s+-\s+|\s+e\s+(?=\d)/)) {
     const candidato = trecho
       .replace(/[.!?"]+/g, " ")
       .replace(/\s+/g, " ")

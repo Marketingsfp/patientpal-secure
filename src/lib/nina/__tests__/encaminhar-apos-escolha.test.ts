@@ -20,6 +20,12 @@ describe("informar, esperar e encaminhar na escolha do paciente", () => {
         "A Dra. Paciente Teste atende às quintas-feiras.\n\nPosso encaminhar a sua conversa para a nossa equipe verificar o agendamento para quinta?",
       ),
     ).toBe("A Dra. Paciente Teste atende às quintas-feiras.");
+    // "Dra." não termina a frase: a oferta sai inteira, sem deixar "com a Dra." solto.
+    expect(
+      removerOfertaDeEncaminhamento(
+        "Sim, o pagamento por Pix precisa ser realizado antecipadamente.\n\nComo você tem preferência pelo atendimento com a Dra. Paciente Teste no sábado, posso encaminhar a sua solicitação para a nossa equipe agendar para você?",
+      ),
+    ).toBe("Sim, o pagamento por Pix precisa ser realizado antecipadamente.");
     // Sem oferta, nada muda; nunca esvazia a resposta.
     expect(removerOfertaDeEncaminhamento("Atendemos às quintas.")).toBe("Atendemos às quintas.");
     expect(removerOfertaDeEncaminhamento("Posso encaminhar para a equipe?")).toBe(

@@ -106,12 +106,21 @@ export function fluxoDoRegistro(
   });
 }
 
+/** Marca temporária do ponto de "Dra." e afins, que não termina a frase. */
+const PONTO_ABREVIACAO = String.fromCharCode(30);
+function protegerAbreviacoes(texto: string): string {
+  return texto.replace(/\b(?:dra?|sra?|profa?)\./gi, (m) => m.slice(0, -1) + PONTO_ABREVIACAO);
+}
+function restaurarAbreviacoes(texto: string): string {
+  return texto.split(PONTO_ABREVIACAO).join(".");
+}
+
 /**
  * Tira do fim do texto da IA a pergunta sobre marcar, primeiro horário ou
  * escolha de profissional, para a pergunta de encaminhamento ser a única.
  */
 export function removerPerguntaDeAgendamento(texto: string): string {
-  const blocos = texto.trimEnd().split(/\n{2,}/);
+  const blocos = protegerAbreviacoes(texto.trimEnd()).split(/\n{2,}/);
   const assunto =
     /(primeir[oa] (?:horario|vaga|disponivel)|escolher|qual (?:dos|das|desses|dessas) profissiona|profissional prefere|deseja (?:agendar|marcar)|quer (?:agendar|marcar)|gostaria de (?:agendar|marcar)|disponibilidade|encaminh|transfer|posso (?:agendar|marcar|verificar))/;
   // Oferta de transferência escrita como afirmação ("posso transferir a
@@ -135,7 +144,7 @@ export function removerPerguntaDeAgendamento(texto: string): string {
     if (blocos.length === 1) break;
     blocos.pop();
   }
-  return blocos.join("\n\n");
+  return restaurarAbreviacoes(blocos.join("\n\n"));
 }
 
 /**
@@ -144,7 +153,7 @@ export function removerPerguntaDeAgendamento(texto: string): string {
  * demais perguntas (ex.: preferência de profissional ou dia) continuam.
  */
 export function removerOfertaDeEncaminhamento(texto: string): string {
-  const blocos = texto.trimEnd().split(/\n{2,}/);
+  const blocos = protegerAbreviacoes(texto.trimEnd()).split(/\n{2,}/);
   const oferta =
     /\b(?:encaminh|transfer|direcion)\w*|\b(?:nossa equipe|a equipe|um atendente|atendente|setor)\b.*\b(?:verificar|confirmar|concluir|dar continuidade|agendar|marcar)\b/;
   for (;;) {
@@ -165,7 +174,7 @@ export function removerOfertaDeEncaminhamento(texto: string): string {
     if (blocos.length === 1) break;
     blocos.pop();
   }
-  return blocos.join("\n\n");
+  return restaurarAbreviacoes(blocos.join("\n\n"));
 }
 
 /**
