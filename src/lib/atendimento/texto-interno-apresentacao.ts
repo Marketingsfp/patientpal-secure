@@ -54,6 +54,18 @@ export function motivoParaAtendimento(valor: unknown): string | null {
       "O paciente solicitou remarcação. A Nina encaminhou para a equipe humana realizar a alteração; não remarcou nem cancelou a reserva anterior.",
     ],
     [
+      /\bAGENDAMENTO_TRANSICAO\b/i,
+      "O paciente recebeu as informações do atendimento e deseja agendar. Pela regra da clínica, a equipe confirma o horário com ele.",
+    ],
+    [
+      /\bCARTAO_CONSULTA\b/i,
+      "O paciente mencionou o cartão consulta. Assuntos do cartão consulta (adesão, mensalidade, benefícios, dependentes) são tratados pela equipe.",
+    ],
+    [
+      /\bTELEFONE_NAO_ATUALIZADO\b/i,
+      "O paciente pediu para corrigir o telefone e a alteração não foi gravada. A equipe deve atualizar o contato.",
+    ],
+    [
       /\bLISTA_PROFISSIONAIS_EXTENSA\b/i,
       "A especialidade pedida tem mais de 8 profissionais para apresentar. Pela regra da clínica, a equipe apresenta as opções ao paciente.",
     ],

@@ -320,11 +320,20 @@ async function buscarNaFonteDoTurno(
       ));
   // Reapresenta os nomes da consulta, sem transformar nenhum deles em seleção.
   // O dia não filtra a correção do nome: escala não comprova identidade.
+  // Médico pedido pelo nome que não atende no dia perguntado continua no
+  // resultado: os dias em que ele atende são a resposta ("a Bárbara atende
+  // sábado?" → "não; atende às sextas"). Sem nome, o dia filtra a lista.
+  const porNomeNoDia = profissionaisPorNome.filter((p) => atendeNoDia(p, pedido.dia ?? null));
+  const foraDoDiaPedido = Boolean(
+    medico && pedido.dia && profissionaisPorNome.length && !porNomeNoDia.length,
+  );
   const profissionaisRelevantes = escolhaMedicoPendente
     ? profissionaisPorNome.length
       ? profissionaisPorNome
       : profissionaisDaConsulta
-    : profissionaisPorNome.filter((p) => atendeNoDia(p, pedido.dia ?? null));
+    : foraDoDiaPedido
+      ? profissionaisPorNome
+      : porNomeNoDia;
   // Lista da especialidade (sem nome de médico): todos os profissionais com
   // horário publicado, sem o corte de 6; quem não tem horário fica fora da
   // lista (decisão do usuário em 08/10/2026). Pedido pelo nome segue igual.
@@ -382,6 +391,13 @@ async function buscarNaFonteDoTurno(
     atendimentoConsultado: { atendimento: pedido.query },
   });
   resultado.tipo_atendimento = tipoAtendimento;
+  if (foraDoDiaPedido && resultado.knowledge_status !== "not_found")
+    resultado.instrucao = [
+      resultado.instrucao,
+      `O profissional pedido não atende em ${pedido.dia}. Informe os dias e horários habituais em que ele atende (campo dia); não diga que ele não foi encontrado.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
   if (vacinaGripe && resultado.knowledge_status === "not_found") {
     resultado.limitacao_catalogo = {
       codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA",
