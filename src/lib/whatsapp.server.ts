@@ -4537,6 +4537,22 @@ async function gerarRespostaNinaInterno(
     resposta = comPedido;
   }
 
+  // Modalidade não informada (regra de 13/10/2026): quem informa é a equipe de
+  // atendimento; a resposta nunca diz que a forma de atendimento "não consta no sistema".
+  if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && resposta.trim()) {
+    const { corrigirModalidadeNaoConsta } = await import("@/lib/nina/modalidade-nao-informada");
+    const corrigida = corrigirModalidadeNaoConsta(resposta);
+    if (corrigida !== resposta) {
+      const antes = resposta;
+      resposta = corrigida;
+      transformar(
+        "modalidade.informada_pela_equipe",
+        "Modalidade não informada: quem informa é a equipe de atendimento",
+        antes,
+        resposta,
+      );
+    }
+  }
   // Fluxo informar e encaminhar: a intenção de marcar chegou antes das informações.
   // A Nina informou neste turno; o sistema pergunta se pode encaminhar à equipe.
   if (

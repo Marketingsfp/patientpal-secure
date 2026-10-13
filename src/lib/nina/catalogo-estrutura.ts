@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MODALIDADES_ATENDIMENTO, interpretarModalidade } from "./modalidade-atendimento";
 import { DIAS_SEMANA, RECORRENCIAS } from "./catalogo-constantes";
+import { MODALIDADE_INFORMADA_PELA_EQUIPE } from "./modalidade-nao-informada";
 import { REGRA_FOTO_PEDIDO_MEDICO } from "./prompt/pedido-medico";
 import {
   REGRA_ANESTESIA_ADICIONAL,
@@ -326,7 +327,8 @@ export function publicadoDoAtendimento(
   const campos: Partial<Record<CampoPreco, string>> = {};
   const outros: string[] = a.modalidade
     ? [`Modalidade: ${MODALIDADES_ATENDIMENTO[a.modalidade]}`]
-    : ["Modalidade: não informada"];
+    : // Sem modalidade: quem informa é a equipe (nunca "não consta no sistema").
+      [`Modalidade: ${MODALIDADE_INFORMADA_PELA_EQUIPE}`];
   for (const p of a.precos) {
     const linha = `${formatarPrecoCatalogo(p.valor) ?? "valor não informado"}${p.condicao ? ` (${p.condicao})` : ""}`;
     const campo = campoDaForma(p.forma);
