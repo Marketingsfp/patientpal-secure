@@ -15502,6 +15502,50 @@ export type Database = {
           },
         ]
       }
+      tel_fila_analise: {
+        Row: {
+          atualizado_em: string
+          clinica_id: string
+          criado_em: string
+          estado: string
+          externo_id: string
+          id: string
+          origem: string
+          tentativas: number
+          ultimo_erro: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          clinica_id: string
+          criado_em?: string
+          estado?: string
+          externo_id: string
+          id?: string
+          origem?: string
+          tentativas?: number
+          ultimo_erro?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          clinica_id?: string
+          criado_em?: string
+          estado?: string
+          externo_id?: string
+          id?: string
+          origem?: string
+          tentativas?: number
+          ultimo_erro?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tel_fila_analise_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tel_transcricoes: {
         Row: {
           caracteres: number
