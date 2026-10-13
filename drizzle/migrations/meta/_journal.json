@@ -99,6 +99,13 @@
       "when": 1791931387132,
       "tag": "0013_coach_resumo_ligacoes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791933007532,
+      "tag": "0014_coach_resumo_ligacoes_horario_por_dia",
+      "breakpoints": true
     }
   ]
 }
