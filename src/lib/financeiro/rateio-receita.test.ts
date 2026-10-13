@@ -3,6 +3,7 @@ import {
   agruparRateio,
   chaveGrupo,
   compararRateio,
+  especialidadeDoAtendimento,
   filtrarRateio,
   liberacaoDaLinha,
   margemClinica,
@@ -432,5 +433,39 @@ describe("liberacaoDaLinha", () => {
         valorPago: 17,
       }),
     ).toBeNull();
+  });
+});
+
+describe("especialidadeDoAtendimento", () => {
+  const ctx = {
+    especialidades: [
+      { id: "geri", nome: "GERIATRIA" },
+      { id: "card", nome: "CARDIOLOGIA" },
+      { id: "clin", nome: "CLÍNICO GERAL" },
+    ],
+  };
+  // Médico fictício com várias especialidades; a principal do cadastro é Geriatria.
+  const medico = { id: "m1", nome: "MEDICO TESTE", especialidade_id: "geri" };
+
+  it("usa a especialidade escrita no serviço, não a principal do médico", () => {
+    expect(especialidadeDoAtendimento(ctx, "ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)", medico)).toBe(
+      "card",
+    );
+    expect(especialidadeDoAtendimento(ctx, "RISCO CIRURGICO (CARDIOLOGIA)", medico)).toBe("card");
+  });
+
+  it("casa sem acento e com o serviço gravado só com a especialidade", () => {
+    expect(especialidadeDoAtendimento(ctx, "CONSULTA (CLINICO GERAL)", medico)).toBe("clin");
+    expect(especialidadeDoAtendimento(ctx, "Cardiologia", medico)).toBe("card");
+  });
+
+  it("parêntese que não é especialidade cai no cadastro do médico", () => {
+    expect(especialidadeDoAtendimento(ctx, "ELETROCARDIOGRAMA (ECG)", medico)).toBe("geri");
+    expect(especialidadeDoAtendimento(ctx, null, medico)).toBe("geri");
+    expect(especialidadeDoAtendimento(ctx, null, null)).toBeNull();
+  });
+
+  it("a especialidade gravada no agendamento vence o texto", () => {
+    expect(especialidadeDoAtendimento(ctx, "CONSULTA (GERIATRIA)", medico, "card")).toBe("card");
   });
 });

@@ -25,9 +25,9 @@
  * `@/lib/repasse-calc`. Quando o lançamento da agenda tem repasse editado à
  * mão (`valor_medico_override`), o valor digitado vence o cálculo.
  *
- * Especialidade: vem do CADASTRO DO MÉDICO. O agendamento também tem um campo
- * de especialidade, mas ele está vazio em toda a base de produção, e usá-lo
- * jogaria o relatório inteiro para "Sem especialidade".
+ * Especialidade: a do SERVIÇO PRESTADO, não a principal do médico (ver
+ * `especialidadeDoAtendimento`). Médico com várias especialidades — geriatra
+ * que também faz ecocardiograma — caía inteiro na principal do cadastro.
  */
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -679,6 +679,46 @@ function chaveDoServico(
   return temLab ? CHAVE_EXAMES_LAB : null;
 }
 
+/** nome normalizado da especialidade -> id, um por lista de especialidades. */
+const especialidadePorNomeCache = new WeakMap<
+  RateioContexto["especialidades"],
+  Map<string, string>
+>();
+
+/**
+ * Especialidade do atendimento, na ordem de confiança:
+ *
+ *  1. a gravada no próprio agendamento (só os mais recentes têm);
+ *  2. a que está escrita no serviço: a agenda grava "ECOCARDIOGRAMA (ADULTO)
+ *     (CARDIOLOGIA)" — vale o último parêntese — e o histórico importado grava
+ *     só "GERIATRIA". Parêntese que não é especialidade ("ELETROCARDIOGRAMA
+ *     (ECG)", "USG JOELHO (CADA)") é parte do nome do serviço e é ignorado;
+ *  3. a principal do cadastro do médico, quando o serviço não diz nada.
+ *
+ * Em setembro/2026, na Menino Jesus, o agendamento tinha especialidade em
+ * quase nenhuma linha; o texto do serviço resolvia ~72% delas.
+ */
+export function especialidadeDoAtendimento(
+  ctx: Pick<RateioContexto, "especialidades">,
+  procedimento: string | null,
+  medico: MedicoOpcao | null,
+  especialidadeAgendamento?: string | null,
+): string | null {
+  if (especialidadeAgendamento) return especialidadeAgendamento;
+  let porNome = especialidadePorNomeCache.get(ctx.especialidades);
+  if (!porNome) {
+    porNome = new Map(ctx.especialidades.map((e) => [normRepasse(e.nome ?? ""), e.id]));
+    especialidadePorNomeCache.set(ctx.especialidades, porNome);
+  }
+  if (procedimento) {
+    const sufixo = procedimento.match(/\(([^()]*)\)\s*$/);
+    const candidato = normRepasse(sufixo ? sufixo[1] : procedimento);
+    const id = porNome.get(candidato);
+    if (id) return id;
+  }
+  return medico?.especialidade_id ?? null;
+}
+
 const CHAVE_EXAMES_LAB = normRepasse("EXAMES LABORATORIAIS");
 /** Prefixo que o orçamento grava: "LABORATÓRIO (2 EXAMES): ..." (já normalizado). */
 const ORCAMENTO_LAB = /^laboratorio\s*\(\s*(\d+)\s*exames?\s*\)\s*:\s*/;
@@ -795,6 +835,8 @@ function reparte(
 
     pacienteId: string | null;
     procedimento: string | null;
+    /** `agendamentos.especialidade_id`, quando a linha veio da agenda. */
+    especialidadeId?: string | null;
     valorPago: number;
     descricao?: string | null;
     modalidadeLancamento?: string | null;
@@ -908,7 +950,12 @@ function reparte(
 
     medico_id: params.medicoId,
     medico_nome: medico?.nome ?? "Sem profissional",
-    especialidade_id: medico?.especialidade_id ?? null,
+    especialidade_id: especialidadeDoAtendimento(
+      ctx,
+      params.procedimento,
+      medico,
+      params.especialidadeId,
+    ),
     especialidade_nome: "",
     procedimento: params.procedimento,
     servico_nome: params.laudo
@@ -1119,7 +1166,7 @@ async function lerRateioDoBanco(
       supabase
         .from("fin_lancamentos")
         .select(
-          `${COLUNAS_LANC}, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio, agenda_id)`,
+          `${COLUNAS_LANC}, agendamento:agendamentos!inner(procedimento, medico_id, paciente_id, inicio, agenda_id, especialidade_id)`,
         )
         .eq("clinica_id", clinicaId)
         .eq("tipo", "receita")
@@ -1215,6 +1262,7 @@ async function lerRateioDoBanco(
       paciente_id?: string | null;
       inicio?: string | null;
       agenda_id?: string | null;
+      especialidade_id?: string | null;
     } | null;
     if (ag?.agenda_id) agendaIdPorLinha.set(r.id as string, ag.agenda_id);
     const overrideRaw = r.valor_medico_override;
@@ -1231,6 +1279,7 @@ async function lerRateioDoBanco(
         medicoId: (r.medico_id as string) ?? ag?.medico_id ?? null,
         pacienteId: (r.paciente_id as string) ?? ag?.paciente_id ?? null,
         procedimento: ag?.procedimento ?? null,
+        especialidadeId: ag?.especialidade_id ?? null,
         valorPago: num(r.valor),
         descricao: (r.descricao as string) ?? null,
         modalidadeLancamento: (r.convenio_modalidade as string) ?? null,
