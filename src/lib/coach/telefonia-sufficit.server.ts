@@ -464,3 +464,103 @@ export async function importarChamadasSufficit(
       : avisos,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Transcrição da ligação (Sufficit faz; nós guardamos).               */
+/* ------------------------------------------------------------------ */
+
+export type ResultadoTranscricao =
+  | { ok: true; situacao: "gravada" | "ja_existia"; caracteres: number; segmentos: number }
+  | { ok: true; situacao: "em_processamento" }
+  | { ok: false; erro: string };
+
+const TEMPO_TRANSCRICAO_MS = 170_000;
+
+/**
+ * Pede a transcrição (`await=true`) e grava em tel_transcricoes sem
+ * sobrescrever. Nunca registra texto, telefone nem token em log.
+ */
+export async function buscarTranscricaoSufficit(
+  clinicaId: string,
+  externoId: string,
+): Promise<ResultadoTranscricao> {
+  const { textoDosSegmentos } = await import("@/lib/telefonia/sem-resposta");
+  const { data: existente } = await supabaseAdmin
+    .from("tel_transcricoes")
+    .select("caracteres, segmentos")
+    .eq("clinica_id", clinicaId)
+    .eq("origem", "sufficit")
+    .eq("externo_id", externoId)
+    .maybeSingle();
+  if (existente) {
+    const segs = Array.isArray(existente.segmentos) ? existente.segmentos.length : 0;
+    return { ok: true, situacao: "ja_existia", caracteres: existente.caracteres, segmentos: segs };
+  }
+  const { data: chamada } = await supabaseAdmin
+    .from("tel_chamadas")
+    .select("situacao")
+    .eq("clinica_id", clinicaId)
+    .eq("origem", "sufficit")
+    .eq("externo_id", externoId)
+    .maybeSingle();
+  if (!chamada) return { ok: false, erro: "Ligação não encontrada nesta clínica." };
+  if ((chamada.situacao ?? "").toUpperCase() !== "ANSWERED") {
+    return { ok: false, erro: "Só ligações atendidas têm gravação para transcrever." };
+  }
+
+  let cred: CredenciaisSufficit;
+  try {
+    cred = await lerCredenciaisSufficit(clinicaId);
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message };
+  }
+  const token = cred.token.trim().replace(/^bearer\s+/i, "");
+  const qs = new URLSearchParams({ ContextId: cred.objectId, linkedId: externoId, await: "true" });
+  const controle = new AbortController();
+  const timer = setTimeout(() => controle.abort(), TEMPO_TRANSCRICAO_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${cred.base}/Telephony/Calls/Transcript?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: controle.signal,
+    });
+  } catch {
+    if (controle.signal.aborted) return { ok: true, situacao: "em_processamento" };
+    console.error("[coach/sufficit] transcrição: falha de rede");
+    return { ok: false, erro: "Não foi possível conectar à Sufficit (falha de rede)." };
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status === 202) return { ok: true, situacao: "em_processamento" };
+  if (!res.ok) {
+    return { ok: false, erro: `A Sufficit não entregou a transcrição (HTTP ${res.status}).` };
+  }
+  let corpo: { model?: unknown; segments?: unknown };
+  try {
+    corpo = (await res.json()) as typeof corpo;
+  } catch {
+    return { ok: false, erro: "A resposta da Sufficit não é JSON." };
+  }
+  const segmentos = Array.isArray(corpo.segments)
+    ? (corpo.segments as { start?: unknown; end?: unknown; text?: unknown }[])
+    : [];
+  if (segmentos.length === 0) return { ok: true, situacao: "em_processamento" };
+  const texto = textoDosSegmentos(segmentos);
+  const { error } = await supabaseAdmin.from("tel_transcricoes").upsert(
+    {
+      clinica_id: clinicaId,
+      origem: "sufficit",
+      externo_id: externoId,
+      modelo: typeof corpo.model === "string" ? corpo.model : null,
+      segmentos: segmentos as never,
+      texto,
+      caracteres: texto.length,
+    },
+    { onConflict: "clinica_id,origem,externo_id", ignoreDuplicates: true },
+  );
+  if (error) {
+    console.error("[coach/sufficit] gravar transcrição:", error.code ?? "erro");
+    return { ok: false, erro: "Não foi possível guardar a transcrição." };
+  }
+  return { ok: true, situacao: "gravada", caracteres: texto.length, segmentos: segmentos.length };
+}
