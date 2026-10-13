@@ -432,10 +432,14 @@ export function modalidadeEstruturada(
     selecionados ?? atendimentosEstruturados(conteudo, estrutura, profissional, "Consulta");
   if (!itens.length) return "nao_definida" as const;
   const base = interpretarModalidade(modalidadeLegada);
-  const modos = itens.map((a) => {
+  let modos = itens.map((a) => {
     const fontes = [a.complemento?.modalidade, a.modalidade, base].filter(Boolean);
     return new Set(fontes).size > 1 ? "nao_definida" : (fontes[0] ?? null);
   });
+  // Itens estruturados: atendimento sem modalidade não bloqueia os demais
+  // selecionados (ex.: consulta noturna em branco ao lado da consulta).
+  if (itens.every((a) => a.chave?.startsWith("id:")) && modos.some(Boolean))
+    modos = modos.filter(Boolean);
   if (modos.every((m) => !m)) return null;
   if (modos.some((m) => !m || m === "nao_definida") || new Set(modos).size !== 1)
     return "nao_definida" as const;

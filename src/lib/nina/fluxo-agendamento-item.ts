@@ -13,7 +13,16 @@
  *
  * Módulo puro: sem banco e sem rede.
  */
-import { atendimentosDaEstrutura, lerEstrutura } from "./catalogo-estrutura";
+import {
+  atendimentosDaEstrutura,
+  atendimentosEstruturados,
+  lerEstrutura,
+  modalidadeEstruturada,
+} from "./catalogo-estrutura";
+import {
+  selecionarAtendimentosConsulta,
+  type EscopoAtendimentoConsulta,
+} from "./atendimento-consulta";
 import { interpretarModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { normalizarRespostaInformal, ehRespostaAfirmativaCurta } from "./resposta-afirmativa";
 
@@ -28,18 +37,37 @@ const MODALIDADES_AGENDAVEIS = new Set<ModalidadeResolvida>([
   "ficha",
 ]);
 
-/** Modalidade do item pelos blocos de atendimento; a classificação antiga só completa. */
-export function modalidadeDoRegistro(registro: {
-  estrutura?: unknown;
-  tipo_atendimento?: string | null;
-}): ModalidadeResolvida {
-  // Item estruturado: a modalidade de cada atendimento é a única fonte. Todos
-  // precisam ter a mesma; faltando em algum, o item fica sem modalidade.
+/**
+ * Modalidade do item pelos blocos de atendimento; a classificação antiga só completa.
+ * Item estruturado (regra de 12/10/2026): cada atendimento vale por si.
+ *  - Com o atendimento pedido identificado (`escopo`), vale a modalidade dele,
+ *    isoladamente (consulta, revisão, noturna, atestado, laudos…).
+ *  - Sem identificação, vale a modalidade comum aos atendimentos que a têm;
+ *    atendimento sem modalidade não bloqueia os demais.
+ */
+export function modalidadeDoRegistro(
+  registro: {
+    estrutura?: unknown;
+    tipo_atendimento?: string | null;
+    nome?: string | null;
+  },
+  escopo?: EscopoAtendimentoConsulta | null,
+): ModalidadeResolvida {
   const estruturados = atendimentosDaEstrutura(registro.estrutura);
   if (estruturados) {
-    const modos = new Set(estruturados.map((a) => a.modalidade ?? null));
-    const unica = modos.size === 1 ? [...modos][0] : null;
-    return unica ?? "nao_definida";
+    if (escopo?.atendimento?.trim()) {
+      const itens = atendimentosEstruturados("", registro.estrutura, registro.nome ?? undefined);
+      const selecionados = selecionarAtendimentosConsulta(itens, escopo);
+      if (selecionados.length)
+        return (
+          modalidadeEstruturada("", registro.estrutura, registro.nome ?? "", null, selecionados) ??
+          "nao_definida"
+        );
+    }
+    const modos = new Set(
+      estruturados.map((a) => a.modalidade).filter((m): m is NonNullable<typeof m> => Boolean(m)),
+    );
+    return modos.size === 1 ? [...modos][0]! : "nao_definida";
   }
   const modos = lerEstrutura(registro.estrutura)
     .complementos.map((c) => c.modalidade)
@@ -66,11 +94,12 @@ export function fluxoDoItem(item: {
 }
 
 export function fluxoDoRegistro(
-  registro: { estrutura?: unknown; tipo_atendimento?: string | null },
+  registro: { estrutura?: unknown; tipo_atendimento?: string | null; nome?: string | null },
   clinicaPodeAgendar = true,
+  escopo?: EscopoAtendimentoConsulta | null,
 ): FluxoItem {
   return fluxoDoItem({
-    modalidade: modalidadeDoRegistro(registro),
+    modalidade: modalidadeDoRegistro(registro, escopo),
     ninaPodeAgendar: lerEstrutura(registro.estrutura).nina_pode_agendar === true,
     clinicaPodeAgendar,
   });

@@ -12,10 +12,12 @@ import { profissionalSchema, servicoSchema } from "../catalogo";
 import { servicoParaRegistro, profissionalParaRegistro } from "../catalogo-conhecimento";
 import {
   atendimentosEstruturados,
+  modalidadeEstruturada,
   pendenciasEstrutura,
   type AtendimentoCatalogo,
 } from "../catalogo-estrutura";
 import { fluxoDoRegistro, modalidadeDoRegistro } from "../fluxo-agendamento-item";
+import { permissaoAgendamentoNoCatalogo } from "../regras-catalogo";
 import { prepararSincronizacao } from "../catalogo-sincronizacao";
 import { aplicarEdicaoCatalogoIA } from "../catalogo-edicao-ia";
 
@@ -258,10 +260,89 @@ describe("regra única de modalidade", () => {
     tipo_atendimento: "Hora marcada",
   });
 
-  test("todos iguais → essa modalidade; diferentes ou faltando → não definida", () => {
+  test("modalidade comum aos atendimentos preenchidos; em branco não bloqueia; diferentes → não definida", () => {
     expect(modalidadeDoRegistro(com(["ficha", "ficha"]))).toBe("ficha");
     expect(modalidadeDoRegistro(com(["ficha", "hora_marcada"]))).toBe("nao_definida");
-    expect(modalidadeDoRegistro(com(["hora_marcada", null]))).toBe("nao_definida");
+    // Caso real (12/10): consulta com hora marcada e atestado/noturna/laudos/revisão em branco.
+    expect(modalidadeDoRegistro(com(["hora_marcada", null, null, null, null]))).toBe(
+      "hora_marcada",
+    );
+    expect(fluxoDoRegistro(com(["hora_marcada", null, null, null, null]))).toBe("agendar");
+    expect(modalidadeDoRegistro(com([null, null]))).toBe("nao_definida");
+  });
+
+  test("trava da agenda: atendimento pedido sem modalidade continua sem modalidade", () => {
+    const estrutura = com(["hora_marcada", null]).estrutura;
+    const [consulta, noturna] = atendimentosEstruturados("", estrutura, "Profissional Teste");
+    // Consulta e noturna selecionadas juntas: a noturna em branco não bloqueia.
+    expect(
+      modalidadeEstruturada("", estrutura, "Profissional Teste", null, [consulta!, noturna!]),
+    ).toBe("hora_marcada");
+    // Pedido específico pela noturna (sem modalidade): segue sem modalidade.
+    expect(modalidadeEstruturada("", estrutura, "Profissional Teste", null, [noturna!])).toBeNull();
+  });
+
+  test("cada atendimento vale isoladamente quando o pedido é identificado", () => {
+    const registro = {
+      nome: "Profissional Teste",
+      estrutura: {
+        nina_pode_agendar: true,
+        atendimentos: [
+          {
+            id: "c",
+            nome: "CONSULTA",
+            especialidade: "ORTOPEDIA",
+            modalidade: "hora_marcada",
+            horarios: [],
+            executantes: [],
+            precos: [],
+          },
+          {
+            id: "r",
+            nome: "REVISAO",
+            especialidade: "ORTOPEDIA",
+            modalidade: "ficha",
+            horarios: [],
+            executantes: [],
+            precos: [],
+          },
+          {
+            id: "n",
+            nome: "CONSULTA NOTURNA",
+            especialidade: "ORTOPEDIA",
+            horarios: [],
+            executantes: [],
+            precos: [],
+          },
+        ],
+      },
+    };
+    // Pedido de consulta de ortopedia: revisão (serviço próprio) e noturna em branco não interferem.
+    expect(modalidadeDoRegistro(registro, { atendimento: "ortopedia" })).toBe("hora_marcada");
+    expect(fluxoDoRegistro(registro, true, { atendimento: "ortopedia" })).toBe("agendar");
+    // Revisão pedida pelo nome: a modalidade dela.
+    expect(modalidadeDoRegistro(registro, { atendimento: "revisao" })).toBe("ficha");
+    // Noturna pedida pelo nome, sem modalidade: informa e encaminha.
+    expect(fluxoDoRegistro(registro, true, { atendimento: "consulta noturna" })).toBe(
+      "informar_e_encaminhar",
+    );
+    // Sem atendimento identificado e modalidades diferentes: não definida.
+    expect(modalidadeDoRegistro(registro)).toBe("nao_definida");
+    // A trava da ferramenta de agendamento decide pelo mesmo atendimento.
+    const catalogo = { servicos: [], profissionais: [{ id: "p1", ...registro }] };
+    expect(
+      permissaoAgendamentoNoCatalogo(catalogo, {
+        medico: "p1",
+        escopo: { atendimento: "ortopedia" },
+      })?.permitido,
+    ).toBe(true);
+    expect(
+      permissaoAgendamentoNoCatalogo(catalogo, {
+        medico: "p1",
+        escopo: { atendimento: "consulta noturna" },
+      })?.permitido,
+    ).toBe(false);
+    expect(permissaoAgendamentoNoCatalogo(catalogo, { medico: "p1" })?.permitido).toBe(false);
   });
 
   test("fluxo do item segue a modalidade estruturada", () => {

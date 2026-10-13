@@ -2913,11 +2913,18 @@ async function gerarRespostaNinaInterno(
   const fluxoAgendamento = await import("@/lib/nina/fluxo-agendamento-item");
   const { catalogoDoTurno: catalogoDoFluxo } = await import("@/lib/nina/catalogo-turno.server");
   const catalogoFluxo = await catalogoDoFluxo(clinicaId);
+  // Atendimento identificado na conversa (ex.: "consulta" de ortopedia):
+  // a modalidade dele decide, isoladamente dos demais atendimentos do item.
+  const escopoDoAtendimento = () => {
+    const c = fluxoEstado.knowledge_context ?? conhecimentoAnterior;
+    const atendimento = c?.consulta?.termo?.trim();
+    return atendimento ? { atendimento, preferencia: c?.atendimentoConsulta ?? null } : null;
+  };
   const fluxoDasReferencias = (referencias: readonly string[]) =>
     fluxoAgendamento.fluxoDosItens(
       [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
         .filter((r) => referencias.includes(r.id))
-        .map((r) => fluxoAgendamento.fluxoDoRegistro(r, podeAgendar)),
+        .map((r) => fluxoAgendamento.fluxoDoRegistro(r, podeAgendar, escopoDoAtendimento())),
     );
   // Itens apresentados em turnos anteriores desta sessão (sem esclarecimento pendente).
   const referenciasInformadas = conhecimentoAnterior?.esclarecimento
