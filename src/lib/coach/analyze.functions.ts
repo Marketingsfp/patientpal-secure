@@ -383,6 +383,58 @@ export const analyzeConversation = createServerFn({ method: "POST" })
     const parsed = JSON.parse(toolCall.function.arguments) as AnalysisResult;
     return parsed;
   });
+
+/** Aviso que entra no prompt quando o texto é transcrição da telefonia. */
+export const AVISO_SEM_FALANTES = `ATENÇÃO — ESTA ENTRADA É A TRANSCRIÇÃO AUTOMÁTICA DE UMA LIGAÇÃO TELEFÔNICA e NÃO separa quem está falando. Cada linha traz o tempo [mm:ss] e o trecho dito, sem dizer se foi a atendente ou o paciente. Deduza o falante pelo conteúdo (quem oferece horário/valor tende a ser a atendente; quem pergunta preço ou relata sintoma tende a ser o paciente). Quando não der para ter certeza de quem falou, diga isso explicitamente ("provavelmente a atendente", "não dá para saber quem disse") em vez de afirmar. Nunca escreva "a atendente disse" sobre um trecho cujo falante é incerto. A transcrição pode ter erros de reconhecimento de voz: não trate palavra estranha como erro da atendente.`;
+
+/**
+ * Análise de texto já lido no servidor (ex.: transcrição de ligação). Mesmo
+ * prompt, mesma cota e mesmo registro de uso do `analyzeConversation`.
+ * Quem chama já conferiu `garantirAcessoCoach(..., "write")`.
+ */
+export async function analisarTextoNoServidor(
+  db: import("./guard.server").ClienteCoach,
+  entrada: { clinicaId: string; text: string; semFalantes: boolean },
+): Promise<AnalysisResult> {
+  const guard = await import("./guard.server");
+  const usoId = await guard.registrarUsoIA(db, {
+    clinicaId: entrada.clinicaId,
+    funcao: "analise_ligacao",
+    atendente: null,
+  });
+  const config = await guard.configDaClinica(db, entrada.clinicaId);
+  const msg: AnalysisInput = {
+    text: entrada.text,
+    checklist: config.checklist,
+    scripts: config.scripts,
+    tabela: guard.baseParaPrompt(config, entrada.text, 40_000),
+  };
+  const apiKey = process.env["LOVABLE_API_KEY"];
+  if (!apiKey) {
+    throw new Error("O recurso de IA está indisponível no momento. Avise a gestão da clínica.");
+  }
+  const sistema = `${contextoDataAtual()}\n\n${SYSTEM_PROMPT}${entrada.semFalantes ? `\n\n${AVISO_SEM_FALANTES}` : ""}`;
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-3.8-flash",
+      messages: [{ role: "system", content: sistema }, buildUserMessage(msg)],
+      tools: [TOOL],
+      tool_choice: { type: "function", function: { name: "registrar_analise" } },
+    }),
+  });
+  if (!res.ok) await guard.erroGenericoIA(res, "analise_ligacao");
+  const json = await res.json();
+  await guard.fecharUsoIA(db, usoId, json);
+  const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
+  if (!toolCall?.function?.arguments) {
+    // Sem o corpo: a resposta pode repetir trechos da conversa.
+    console.error("[coach] analise_ligacao: resposta sem ferramenta");
+    throw new Error("A IA não retornou uma análise estruturada. Tente novamente.");
+  }
+  return JSON.parse(toolCall.function.arguments) as AnalysisResult;
+}
 /** Formato do áudio para a IA, a partir do tipo do arquivo enviado. */
 function formatoAudio(mime: string): string {
   const m = (mime || "").toLowerCase();

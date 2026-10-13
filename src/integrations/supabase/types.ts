@@ -15396,6 +15396,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tel_analises: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          criado_por: string
+          externo_id: string
+          id: string
+          origem: string
+          pontuacao: number | null
+          resultado: Json
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          criado_por: string
+          externo_id: string
+          id?: string
+          origem?: string
+          pontuacao?: number | null
+          resultado: Json
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          criado_por?: string
+          externo_id?: string
+          id?: string
+          origem?: string
+          pontuacao?: number | null
+          resultado?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tel_analises_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tel_chamadas: {
         Row: {
           clinica_id: string
@@ -15454,6 +15495,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tel_chamadas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tel_transcricoes: {
+        Row: {
+          caracteres: number
+          clinica_id: string
+          criado_em: string
+          externo_id: string
+          id: string
+          modelo: string | null
+          origem: string
+          segmentos: Json
+          texto: string
+        }
+        Insert: {
+          caracteres: number
+          clinica_id: string
+          criado_em?: string
+          externo_id: string
+          id?: string
+          modelo?: string | null
+          origem?: string
+          segmentos: Json
+          texto: string
+        }
+        Update: {
+          caracteres?: number
+          clinica_id?: string
+          criado_em?: string
+          externo_id?: string
+          id?: string
+          modelo?: string | null
+          origem?: string
+          segmentos?: Json
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tel_transcricoes_clinica_id_fkey"
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
