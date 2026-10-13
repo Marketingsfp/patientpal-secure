@@ -302,7 +302,12 @@ export async function conferirRespostaJev(ctx: {
   texto: string;
   fatos: import("./jev-conferencia").FatosTurno;
   jaCorrigida: boolean;
-}): Promise<{ acao: "enviar" } | { acao: "refazer"; instrucao: string } | { acao: "bloquear" }> {
+}): Promise<
+  | { acao: "enviar" }
+  | { acao: "refazer"; instrucao: string }
+  | { acao: "bloquear" }
+  | { acao: "encaminhar" }
+> {
   try {
     const c = await import("./jev-conferencia");
     const perguntas = c.perguntasConferencia(ctx.fatos);
@@ -338,6 +343,9 @@ export async function conferirRespostaJev(ctx: {
       mensagem: { origem: "resposta_nina", texto: ctx.texto },
     });
     if (problemas.length === 0) return { acao: "enviar" };
+    // Sem a informação para responder (regra de 13/10/2026): encaminha ao
+    // atendimento humano em vez de reescrever a resposta.
+    if (problemas.includes("pergunta_sem_resposta")) return { acao: "encaminhar" };
     if (ctx.jaCorrigida) return { acao: "bloquear" };
     return { acao: "refazer", instrucao: c.instrucaoCorrecao(problemas) };
   } catch (e) {

@@ -3104,6 +3104,8 @@ async function gerarRespostaNinaInterno(
   async function executarDecisaoEncaminhamento(
     decisao: import("@/lib/nina/jev-encaminhamento").Encaminhamento,
     pendente?: import("@/lib/nina/dados-transferencia").TransferenciaPendente,
+    /** Respostas que a Nina já tem, enviadas antes do pedido de dados/aviso. */
+    contexto = "",
   ) {
     if (finalizacaoHandoff || turnoObsoleto) return;
     fluxoEstado.oferta_encaminhamento = null;
@@ -3129,7 +3131,7 @@ async function gerarRespostaNinaInterno(
       urgencia: decisao.urgencia,
       ...(alteracaoSolicitada || agendamentoTransicao ? { setor: "Agendamento" } : {}),
     };
-    if (!pendente && (await reterTransferenciaParaDados(argumentos))) return;
+    if (!pendente && (await reterTransferenciaParaDados(argumentos, contexto))) return;
     // Transferência retomada: os argumentos guardados e os dados que o paciente enviou.
     const dadosPaciente = pendente
       ? dadosTransferencia.extrairDadosTransferencia(mensagemPaciente)
@@ -3157,7 +3159,9 @@ async function gerarRespostaNinaInterno(
     houveHandoff ||= confirmado;
     fluxoEstado.flow.stage = "HANDOFF";
     finalizacaoHandoff = {
-      texto: respostaSemRegistro(confirmado, opcoes?.teste === true),
+      texto: [contexto.trim(), respostaSemRegistro(confirmado, opcoes?.teste === true)]
+        .filter(Boolean)
+        .join("\n\n"),
       textoModelo: "",
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
@@ -3363,6 +3367,7 @@ async function gerarRespostaNinaInterno(
   // JEV — Fase 6 (flag `nina_jev_fase6`): confere a resposta antes do envio.
   const inicioMensagensTurno = mensagens.length;
   let conferenciaJevUsada = false;
+  let perguntaSemRespostaJev = false;
   const conferenciaJevAtiva = await import("@/lib/nina/jev.server")
     .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
     .catch(() => false);
@@ -3624,9 +3629,17 @@ async function gerarRespostaNinaInterno(
               .slice(inicioMensagensTurno)
               .filter((m) => m.role === "tool" && typeof m.content === "string")
               .map((m) => String(m.content)),
+            mensagemPaciente,
           },
           jaCorrigida: conferenciaJevUsada,
         });
+        // O Jev viu pergunta do paciente sem resposta concreta: encaminha
+        // depois do laço, com as respostas que a Nina tem (regra de 13/10/2026).
+        if (decisao.acao === "encaminhar") {
+          perguntaSemRespostaJev = true;
+          resposta = texto;
+          break;
+        }
         if (decisao.acao === "refazer" && !conferenciaJevUsada) {
           conferenciaJevUsada = true;
           modoSintese = "correcao";
@@ -4322,6 +4335,69 @@ async function gerarRespostaNinaInterno(
     }
   }
 
+  // Regra de 13/10/2026 (segunda revisão): sem a informação, a Nina não diz
+  // "quem passa é a recepção" — encaminha logo. As respostas que ela já tem
+  // seguem junto, antes do pedido de nome e data de nascimento (ou do aviso).
+  if (
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !perguntaDadosTransferencia &&
+    !respostaNomeAtendimento &&
+    !ctxFerramentas?.esclarecimentoCatalogo &&
+    !agendamentoConfirmado &&
+    !resumoEscolha &&
+    resposta.trim()
+  ) {
+    const { corrigirInformacaoNaoCadastrada, separarOrientacaoRecepcao } =
+      await import("@/lib/nina/informacao-nao-cadastrada");
+    const { pacientePerguntouModalidade } = await import("@/lib/nina/modalidade-nao-informada");
+    // Suposição sobre pedido médico sem cadastro também vira "recepção".
+    const referenciasRecepcao = (fluxoEstado.knowledge_context?.referencias ?? []).map(
+      (r) => r.registro,
+    );
+    const registrosRecepcao = [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais].filter(
+      (r) => referenciasRecepcao.includes(r.id),
+    );
+    const { lerEstrutura: lerEstruturaRecepcao } = await import("@/lib/nina/catalogo-estrutura");
+    const { corrigirSuposicaoPedidoMedico } = await import("@/lib/nina/pedido-medico-recepcao");
+    const semPedidoNoCadastro =
+      registrosRecepcao.length > 0 &&
+      registrosRecepcao.every(
+        (r) => lerEstruturaRecepcao(r.estrutura).pedido_medico === "nao_informado",
+      );
+    const candidata = corrigirInformacaoNaoCadastrada(
+      semPedidoNoCadastro ? corrigirSuposicaoPedidoMedico(resposta) : resposta,
+    );
+    const { orientaRecepcao, restante } = separarOrientacaoRecepcao(
+      candidata,
+      pacientePerguntouModalidade(mensagemPaciente),
+    );
+    if (orientaRecepcao || perguntaSemRespostaJev) {
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Informação com a recepção: encaminhamento direto",
+        dados: {
+          respostas_mantidas: Boolean(restante),
+          origem: perguntaSemRespostaJev ? "jev_pergunta_sem_resposta" : "orientacao_recepcao",
+        },
+        codigo: {
+          arquivo: "src/lib/nina/informacao-nao-cadastrada.ts",
+          funcao: "separarOrientacaoRecepcao",
+        },
+      });
+      await executarDecisaoEncaminhamento(
+        {
+          motivo: `INFORMACAO_COM_RECEPCAO: ${mensagemPaciente.slice(0, 200)}`,
+          urgencia: "normal",
+        },
+        undefined,
+        restante,
+      );
+    }
+  }
+
   if (
     !finalizacaoHandoff &&
     !houveHandoff &&
@@ -4808,7 +4884,16 @@ async function gerarRespostaNinaInterno(
     !resumoEscolha &&
     resposta.trim()
   ) {
-    const padronizada = fluxoAgendamento.padronizarPerguntaPreferencia(resposta);
+    // Dois ou mais profissionais apresentados nesta conversa.
+    const referenciasPreferencia = (fluxoEstado.knowledge_context?.referencias ?? []).map(
+      (r) => r.registro,
+    );
+    const variosProfissionais =
+      catalogoFluxo.profissionais.filter((r) => referenciasPreferencia.includes(r.id)).length >= 2;
+    const padronizada = fluxoAgendamento.padronizarPerguntaPreferencia(
+      resposta,
+      variosProfissionais,
+    );
     if (padronizada !== resposta) {
       const antes = resposta;
       resposta = padronizada;

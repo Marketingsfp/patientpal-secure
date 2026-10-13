@@ -57,3 +57,79 @@ export function corrigirInformacaoNaoCadastrada(texto: string): string {
     .trim();
   return resultado || texto;
 }
+
+/** Frase que manda o paciente à recepção/equipe para obter uma informação. */
+const ORIENTA_RECEPCAO =
+  /\b(?:recepcao|nossa equipe|equipe de atendimento|atendentes?)\b[^.!?\n]*\b(?:passa|passam|informa|informam|tira|tiram|confirma|confirmam|confirmad[ao]s?|verifica|verificar|orienta|orientam|esclarece|esclarecem|responde|respondem)\b|\b(?:quem|so a|somente a|apenas a)\b[^.!?\n]*\b(?:passa|informa|tira|confirma|orienta|esclarece|responde)\b[^.!?\n]*\b(?:recepcao|equipe)\b/;
+const ASSUNTO_MODALIDADE =
+  /\b(?:modalidade|forma de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|pre-?agendamento)\b/;
+
+/**
+ * Regra de 13/10/2026 (segunda revisão): quando a resposta seria "quem passa
+ * essa informação é a recepção", a Nina não diz isso — encaminha. Devolve se
+ * há essa orientação e o que sobra para enviar junto do encaminhamento: as
+ * respostas que a Nina tem, sem a orientação, sem a apresentação e sem as
+ * perguntas finais ("Deseja agendar…?").
+ * `modalidadePerguntada` = o paciente perguntou como funciona o atendimento;
+ * sem pergunta, frase de modalidade não dispara encaminhamento.
+ */
+export function separarOrientacaoRecepcao(
+  texto: string,
+  modalidadePerguntada: boolean,
+): { orientaRecepcao: boolean; restante: string } {
+  const protegido = (texto ?? "").replace(
+    /\b(?:dra?|sra?|profa?)\./gi,
+    (m) => m.slice(0, -1) + PONTO,
+  );
+  let orientaRecepcao = false;
+  const linhas = protegido.split("\n").map((linha) => {
+    if (/intelig[eê]ncia artificial/i.test(linha)) return "";
+    const frases = linha.match(/[^.!?\n]+[.!?]*/g) ?? [];
+    return frases
+      .filter((frase) => {
+        const t = normalizarRespostaInformal(frase.split(PONTO).join("."));
+        // Pergunta, oferta ou promessa ("posso encaminhar…?", "vou encaminhar")
+        // têm tratamento próprio; não são a orientação de procurar a recepção.
+        if (frase.includes("?") || /\b(?:posso|podemos|vou|vamos|irei)\b/.test(t)) return true;
+        if (!ORIENTA_RECEPCAO.test(t)) return true;
+        if (ASSUNTO_MODALIDADE.test(t) && !modalidadePerguntada) return false;
+        orientaRecepcao = true;
+        return false;
+      })
+      .join("")
+      .trim();
+  });
+  // Convites para marcar escritos como afirmação ("Caso tenha preferência, me
+  // informe se deseja o primeiro horário…") também saem.
+  const CONVITE =
+    /\b(?:deseja|gostaria|quer|me informe|caso (?:tenha|queira|deseje)|se (?:quiser|desejar))\b[^.!?\n]*\b(?:agendar|marcar|prefer\w*|primeiro (?:horario|disponivel)|profissional)\b/;
+  for (let i = 0; i < linhas.length; i++) {
+    const frases = linhas[i]!.match(/[^.!?\n]+[.!?]*/g) ?? [];
+    linhas[i] = frases
+      .filter((f) => !CONVITE.test(normalizarRespostaInformal(f.split(PONTO).join("."))))
+      .join("")
+      .trim();
+  }
+  // Perguntas finais (oferta de agendar, "mais alguma dúvida?") saem.
+  while (linhas.length) {
+    const ultima = linhas[linhas.length - 1]!.trim();
+    if (!ultima) {
+      linhas.pop();
+      continue;
+    }
+    if (!/\?\s*$/.test(ultima)) break;
+    const semPergunta = ultima.replace(/[^.!?\n]*\?\s*$/, "").trim();
+    if (semPergunta) {
+      linhas[linhas.length - 1] = semPergunta;
+      continue;
+    }
+    linhas.pop();
+  }
+  const restante = linhas
+    .join("\n")
+    .split(PONTO)
+    .join(".")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { orientaRecepcao, restante };
+}

@@ -16,17 +16,29 @@ export type FatosTurno = {
   agendamentoConfirmado: boolean;
   /** Resultados das ferramentas deste turno (texto). Vazio = não confere dados. */
   dadosConsultados: string[];
+  /** Mensagem do paciente neste turno: permite conferir pergunta sem resposta. */
+  mensagemPaciente?: string;
 };
+
+/** Confiança mínima para encaminhar por pergunta sem resposta (regra de 13/10/2026). */
+export const LIMITE_PERGUNTA_SEM_RESPOSTA = 0.8;
 
 export type ProblemaConferencia =
   | "vaga_sem_agenda"
   | "agendado_sem_confirmacao"
   | "cancelamento"
-  | "dado_sem_fonte";
+  | "dado_sem_fonte"
+  | "pergunta_sem_resposta";
 
 export function estadoConferencia(resposta: string, fatos: FatosTurno) {
   const dados = [...new Set(fatos.dadosConsultados.map(dadosParaConferencia))].join("\n");
-  return { resposta, dados_consultados: dados || null };
+  return {
+    resposta,
+    dados_consultados: dados || null,
+    ...(fatos.mensagemPaciente?.trim()
+      ? { mensagem_paciente: fatos.mensagemPaciente.trim().slice(0, 1500) }
+      : {}),
+  };
 }
 
 /** Mantém preços e condições junto do atendimento, inclusive no fim do retorno.
@@ -94,6 +106,12 @@ export function perguntasConferencia(fatos: FatosTurno): Record<string, Pergunta
         "`resposta` cita algum valor em dinheiro, endereço ou telefone que NÃO aparece em `dados_consultados`? Responda sim apenas se houver valor, endereço ou telefone na resposta ausente dos dados. Compare valores numéricos equivalentes (120, 120.00 e R$ 120,00), preservando atendimento, profissional, forma de pagamento e condições; o preço de outro atendimento não comprova este. " +
         REGRA_MODALIDADES_PAGAMENTO,
     };
+  if (fatos.mensagemPaciente?.trim())
+    p.pergunta_sem_resposta = {
+      type: "noul",
+      instructions:
+        "O paciente fez em `mensagem_paciente` alguma pergunta que `resposta` NÃO respondeu com uma informação concreta? Conta como sem resposta: ignorar a pergunta, mudar de assunto, responder só com outra pergunta, dizer que não tem a informação ou que a recepção/equipe passa essa informação. Não conta: cumprimento respondido; pedido para marcar respondido com a pergunta de preferência de profissional; pergunta respondida com o dado do cadastro.",
+    };
   return p;
 }
 
@@ -111,6 +129,13 @@ export function problemasConferencia(
   if (sim(respostas["cancelamento"])) out.push("cancelamento");
   if (fatos.dadosConsultados.length > 0 && sim(respostas["dado_sem_fonte"]))
     out.push("dado_sem_fonte");
+  const semResposta = respostas["pergunta_sem_resposta"];
+  if (
+    fatos.mensagemPaciente?.trim() &&
+    typeof semResposta?.noul === "number" &&
+    semResposta.noul >= Math.max(limite, LIMITE_PERGUNTA_SEM_RESPOSTA)
+  )
+    out.push("pergunta_sem_resposta");
   return out;
 }
 
@@ -123,6 +148,8 @@ const CORRECOES: Record<ProblemaConferencia, string> = {
     "A Maria nunca cancela consultas. Pedidos de cancelamento são sempre encaminhados para a recepção.",
   dado_sem_fonte:
     "A resposta cita valor, endereço ou telefone que não aparece nos dados consultados. Use só dados consultados; se não houver, não informe.",
+  pergunta_sem_resposta:
+    "Uma pergunta do paciente ficou sem resposta concreta: o sistema encaminha ao atendimento humano.",
 };
 
 /** Instrução interna (papel de sistema) para a Maria refazer a resposta uma vez. */
