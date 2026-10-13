@@ -22,7 +22,7 @@ export type CredenciaisSufficit = { base: string; token: string; objectId: strin
 export type EstadoConfigSufficit = Record<ChaveSufficit, boolean>;
 
 export type ResultadoPing =
-  | { ok: true; status: number; tempoMs: number }
+  | { ok: true; status: number; tempoMs: number; cabecalhos: Record<string, string> | null }
   | { ok: false; erro: string; status?: number; tempoMs?: number };
 
 export type ResultadoAmostra =
@@ -34,6 +34,8 @@ export type ResultadoAmostra =
       corpoCru: string;
       truncado: boolean;
       camposPrimeiroRegistro: string[] | null;
+      /** Só quando a resposta não é 2xx: cabeçalhos úteis para entender a recusa. */
+      cabecalhos: Record<string, string> | null;
     }
   | { ok: false; erro: string; status?: number; tempoMs?: number };
 
@@ -53,6 +55,29 @@ async function lerChaves(clinicaId: string): Promise<Map<string, string>> {
     if (v) mapa.set(r.chave, v);
   }
   return mapa;
+}
+
+/** Quantidade de caracteres do token gravado (após remover espaços das pontas). Nunca o valor. */
+export async function tamanhoTokenSufficit(clinicaId: string): Promise<number | null> {
+  const mapa = await lerChaves(clinicaId);
+  return mapa.get("sufficit_api_token")?.length ?? null;
+}
+
+const CABECALHOS_DIAGNOSTICO = [
+  "www-authenticate",
+  "x-request-id",
+  "x-correlation-id",
+  "date",
+  "server",
+] as const;
+
+function cabecalhosDiagnostico(res: Response): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const h of CABECALHOS_DIAGNOSTICO) {
+    const v = res.headers.get(h);
+    if (v) out[h] = v.slice(0, 500);
+  }
+  return out;
 }
 
 /** Só presente/ausente de cada chave — nunca o valor. */
@@ -103,18 +128,32 @@ async function buscar(
   }
 }
 
-export async function pingSufficit(clinicaId: string): Promise<ResultadoPing> {
+async function pingUm(url: string, headers: Record<string, string>): Promise<ResultadoPing> {
+  const r = await buscar(url, headers);
+  if ("erro" in r) return { ok: false, erro: r.erro, tempoMs: r.tempoMs };
+  // Corpo descartado: o diagnóstico é status + tempo (+ cabeçalhos se recusado).
+  await r.res.body?.cancel().catch(() => {});
+  const cabecalhos = r.res.ok ? null : cabecalhosDiagnostico(r.res);
+  return { ok: true, status: r.res.status, tempoMs: r.tempoMs, cabecalhos };
+}
+
+/** /health chamado duas vezes: sem e com o Bearer, para isolar problema de credencial. */
+export async function pingSufficit(
+  clinicaId: string,
+): Promise<{ semAuth: ResultadoPing; comAuth: ResultadoPing }> {
   let cred: CredenciaisSufficit;
   try {
     cred = await lerCredenciaisSufficit(clinicaId);
   } catch (e) {
-    return { ok: false, erro: (e as Error).message };
+    const falha: ResultadoPing = { ok: false, erro: (e as Error).message };
+    return { semAuth: falha, comAuth: falha };
   }
-  const r = await buscar(`${cred.base}/health`, { Accept: "*/*" });
-  if ("erro" in r) return { ok: false, erro: r.erro, tempoMs: r.tempoMs };
-  // Corpo descartado: o diagnóstico é status + tempo.
-  await r.res.body?.cancel().catch(() => {});
-  return { ok: true, status: r.res.status, tempoMs: r.tempoMs };
+  const url = `${cred.base}/health`;
+  const [semAuth, comAuth] = await Promise.all([
+    pingUm(url, { Accept: "*/*" }),
+    pingUm(url, { Accept: "*/*", Authorization: `Bearer ${cred.token}` }),
+  ]);
+  return { semAuth, comAuth };
 }
 
 function camposDoPrimeiro(json: unknown): string[] | null {
@@ -175,6 +214,7 @@ export async function amostraChamadasSufficit(
     corpoCru: texto.slice(0, LIMITE_CORPO),
     truncado: texto.length > LIMITE_CORPO,
     camposPrimeiroRegistro: campos,
+    cabecalhos: r.res.ok ? null : cabecalhosDiagnostico(r.res),
   };
 }
 

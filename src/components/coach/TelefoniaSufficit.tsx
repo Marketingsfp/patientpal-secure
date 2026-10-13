@@ -25,6 +25,51 @@ import {
 type Teste = Awaited<ReturnType<typeof testarConexaoTelefonia>>;
 type Amostra = Awaited<ReturnType<typeof amostrarChamadasTelefonia>>;
 
+function Cabecalhos({ itens }: { itens: Record<string, string> | null | undefined }) {
+  if (!itens) return null;
+  const e = Object.entries(itens);
+  return (
+    <div className="text-xs">
+      <div className="text-muted-foreground">Cabeçalhos da resposta:</div>
+      {e.length ? (
+        <ul className="ml-3 list-disc">
+          {e.map(([k, v]) => (
+            <li key={k} className="break-all">
+              <code>{k}</code>: {v}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground">nenhum dos cabeçalhos de diagnóstico veio na resposta</p>
+      )}
+    </div>
+  );
+}
+
+function rotuloChave(k: string, presente: boolean, tamanho: number | null) {
+  if (!presente) return "ausente";
+  if (k === "sufficit_api_token" && tamanho != null) return `presente (${tamanho} caracteres)`;
+  return "presente";
+}
+
+function LinhaPing({ titulo, p }: { titulo: string; p: Teste["ping"]["semAuth"] }) {
+  return (
+    <div>
+      <div>{titulo}:</div>
+      {p.ok ? (
+        <>
+          <p>
+            HTTP {p.status} em {p.tempoMs} ms
+          </p>
+          <Cabecalhos itens={p.cabecalhos} />
+        </>
+      ) : (
+        <p className="text-destructive">{p.erro}</p>
+      )}
+    </div>
+  );
+}
+
 const ROTULOS: Record<string, string> = {
   sufficit_api_base: "Endereço da API",
   sufficit_api_token: "Token de acesso",
@@ -166,7 +211,7 @@ export function TelefoniaSufficit({
               <li key={k}>
                 {ROTULOS[k] ?? k}:{" "}
                 <span className={presente ? "text-primary" : "text-destructive"}>
-                  {presente ? "presente" : "ausente"}
+                  {rotuloChave(k, presente, cfg.tamanhoToken)}
                 </span>
               </li>
             ))}
@@ -278,19 +323,14 @@ export function TelefoniaSufficit({
               <li key={k}>
                 {ROTULOS[k] ?? k} (<code className="text-xs">{k}</code>):{" "}
                 <span className={presente ? "text-primary" : "text-destructive"}>
-                  {presente ? "presente" : "ausente"}
+                  {rotuloChave(k, presente, teste.tamanhoToken)}
                 </span>
               </li>
             ))}
           </ul>
           <div className="font-medium">Teste de vida (/health)</div>
-          {teste.ping.ok ? (
-            <p>
-              HTTP {teste.ping.status} em {teste.ping.tempoMs} ms
-            </p>
-          ) : (
-            <p className="text-destructive">{teste.ping.erro}</p>
-          )}
+          <LinhaPing titulo="Sem autenticação" p={teste.ping.semAuth} />
+          <LinhaPing titulo="Com autenticação (Bearer)" p={teste.ping.comAuth} />
         </div>
       )}
 
@@ -303,6 +343,7 @@ export function TelefoniaSufficit({
                 HTTP {amostra.status} · {amostra.contentType ?? "sem content-type"} ·{" "}
                 {amostra.tempoMs} ms{amostra.truncado ? " · corpo truncado em 4000 caracteres" : ""}
               </p>
+              <Cabecalhos itens={amostra.cabecalhos} />
               <p>
                 Campos do primeiro registro:{" "}
                 {amostra.camposPrimeiroRegistro?.length
