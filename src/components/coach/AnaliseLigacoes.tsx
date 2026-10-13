@@ -100,7 +100,7 @@ export function AnaliseLigacoes({
 
   const resumo = useMemo(() => resumirSemResposta(dados?.linhas ?? []), [dados]);
   const atendidas = useMemo(
-    () => (dados?.linhas ?? []).filter((l) => foiAtendida(l) && ehRecebida(l) || foiAtendida(l)),
+    () => (dados?.linhas ?? []).filter((l) => foiAtendida(l)),
     [dados],
   );
   const maxHora = Math.max(1, ...resumo.porHora.map((h) => h.atendidas + h.naoAtendidas));
