@@ -44,7 +44,14 @@ export function corrigirInformacaoNaoCadastrada(texto: string): string {
       /^\s*(?:[•*_-]*\s*[*_]{0,2}[\p{L} /]{2,40}?[*_]{0,2}\s*:\s*[*_]{0,2}\s*)?/u.exec(
         frase,
       )?.[0] ?? "";
-    if (IDADE.test(t)) return "";
+    // IDADE-01: a resposta continua ("não há restrição de idade, portanto…");
+    // sai só a menção ao cadastro. Apagar a frase inteira sumia com a resposta
+    // (homologação 13/10/2026, 19:45).
+    if (IDADE.test(t))
+      return frase
+        .replace(/\s+(?:cadastrad[ao]s?|registrad[ao]s?|informad[ao]s?)\b/gi, "")
+        .replace(/\s+(?:n[oa]|em)\s+(?:nosso\s+)?(?:sistema|cadastro|base)\b/gi, "")
+        .replace(/\s{2,}/g, " ");
     if (trocou) return "";
     trocou = true;
     return `${inicio}${TEXTO_INFORMACAO_PELA_RECEPCAO}`;

@@ -28,12 +28,29 @@ describe("informação que o cadastro não traz: quem passa é a recepção", ()
     );
   });
 
-  test("idade sem restrição (IDADE-01): a frase sai, sem trocar pela recepção", () => {
+  test("idade sem restrição (IDADE-01): a resposta fica, só a menção ao cadastro sai", () => {
     expect(
       corrigirInformacaoNaoCadastrada(
         "Sim, atendemos crianças! A consulta de Ortopedia não possui restrição de idade cadastrada.\n\nValores: R$ 120,00.",
       ),
-    ).toBe("Sim, atendemos crianças!\n\nValores: R$ 120,00.");
+    ).toBe(
+      "Sim, atendemos crianças! A consulta de Ortopedia não possui restrição de idade.\n\nValores: R$ 120,00.",
+    );
+    // Caso real de 13/10 19:45: a resposta não pode sumir.
+    expect(
+      corrigirInformacaoNaoCadastrada(
+        "Esse atendimento não possui restrição de idade cadastrada, portanto qualquer um dos nossos ortopedistas pode atendê-lo.",
+      ),
+    ).toBe(
+      "Esse atendimento não possui restrição de idade, portanto qualquer um dos nossos ortopedistas pode atendê-lo.",
+    );
+    expect(
+      corrigirInformacaoNaoCadastrada(
+        "O Dr. Paciente Teste não possui restrição de idade cadastrada para a consulta, portanto pode atender seu filho de oito anos.",
+      ),
+    ).toBe(
+      "O Dr. Paciente Teste não possui restrição de idade para a consulta, portanto pode atender seu filho de oito anos.",
+    );
   });
 
   test("uma troca só por resposta; texto com informação do cadastro fica igual", () => {

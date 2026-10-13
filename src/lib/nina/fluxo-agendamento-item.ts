@@ -51,7 +51,17 @@ export function padronizarPerguntaPreferencia(texto: string, variosProfissionais
       frase,
     );
   if (!preferencia && !conviteParaMarcar) return texto;
-  const antes = protegido.slice(0, final.index);
+  let antes = protegido.slice(0, final.index);
+  // Convite para marcar logo antes ("Você gostaria de agendar uma consulta?")
+  // sai: a pergunta padrão já é o convite (homologação 13/10/2026, 19:44).
+  const anterior = /([^.!?\n]*\?)[^\p{L}\p{N}\n]*$/u.exec(antes.trimEnd());
+  if (
+    anterior &&
+    /\b(?:gostaria|deseja|quer|queria|tem interesse)\b[^?]*\b(?:marcar|agendar|agendamento)\b/.test(
+      normalizarRespostaInformal(restaurarAbreviacoes(anterior[1]!)),
+    )
+  )
+    antes = antes.trimEnd().slice(0, anterior.index).trimEnd() + "\n";
   const separador = antes && !/\s$/.test(antes) ? " " : "";
   return restaurarAbreviacoes(`${antes}${separador}${PERGUNTA_PREFERENCIA_PROFISSIONAL}`);
 }

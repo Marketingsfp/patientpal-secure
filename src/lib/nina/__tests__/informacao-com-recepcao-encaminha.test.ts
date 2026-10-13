@@ -66,6 +66,13 @@ describe("pergunta de preferência também no convite final para marcar", () => 
         true,
       ),
     ).toBe(`Valores: R$ 120,00.\n${PADRAO}`);
+    // Caso real de 13/10 19:44: o convite anterior sai, para não saírem duas perguntas.
+    expect(
+      padronizarPerguntaPreferencia(
+        "Lista de profissionais.\n\nVocê gostaria de agendar uma consulta?\n\nVocê prefere o primeiro horário disponível ou deseja escolher?",
+        true,
+      ),
+    ).toBe(`Lista de profissionais.\n${PADRAO}`);
   });
   test("com um profissional só, o convite fica como está", () => {
     const t =
