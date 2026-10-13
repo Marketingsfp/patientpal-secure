@@ -1,9 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Receipt,
   ExternalLink,
-  FilePlus2,
   RefreshCw,
   Send,
   ScanLine,
@@ -660,7 +659,7 @@ function NfsePage() {
           </p>
         </div>
         {/* Os botões quebram linha quando não cabem: com o perfil admin são
-            sete, e numa linha só o "Emitir NFS-e" saía cortado da tela. */}
+            seis, e numa linha só o último saía cortado da tela. */}
         <div className="flex flex-wrap justify-end gap-2">
           {/* Exportar não depende de permissão de escrita nem da clínica: é
               leitura do que já está na tela, e a São Francisco também precisa
@@ -717,25 +716,16 @@ function NfsePage() {
             </>
           )}
           {!ehSaoFrancisco && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setConferirOpen(true);
-                  setConferirExtraido(null);
-                  setConferirPreview(null);
-                }}
-              >
-                <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
-              </Button>
-              {podeEscrever && (
-                <Button asChild>
-                  <Link to="/app/nfse/testar">
-                    <FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e
-                  </Link>
-                </Button>
-              )}
-            </>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConferirOpen(true);
+                setConferirExtraido(null);
+                setConferirPreview(null);
+              }}
+            >
+              <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
+            </Button>
           )}
         </div>
       </div>
