@@ -16,9 +16,12 @@ export const testarConexaoTelefonia = createServerFn({ method: "POST" })
     const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
     await guard.garantirAcessoCoach(db, data.clinicaId, "write");
     const s = await import("./telefonia-sufficit.server");
-    const config = await s.estadoConfigSufficit(data.clinicaId);
-    const ping = await s.pingSufficit(data.clinicaId);
-    return { config, ping };
+    const [config, tamanhoToken, ping] = await Promise.all([
+      s.estadoConfigSufficit(data.clinicaId),
+      s.tamanhoTokenSufficit(data.clinicaId),
+      s.pingSufficit(data.clinicaId),
+    ]);
+    return { config, tamanhoToken, ping };
   });
 
 export const amostrarChamadasTelefonia = createServerFn({ method: "POST" })
@@ -92,9 +95,10 @@ export const estadoConfigTelefonia = createServerFn({ method: "POST" })
     const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
     const userId = await guard.garantirAcessoCoach(db, data.clinicaId, "write");
     const s = await import("./telefonia-sufficit.server");
-    const [config, outras] = await Promise.all([
+    const [config, tamanhoToken, outras] = await Promise.all([
       s.estadoConfigSufficit(data.clinicaId),
+      s.tamanhoTokenSufficit(data.clinicaId),
       s.outrasClinicasComSufficit(db, userId, data.clinicaId),
     ]);
-    return { config, outras };
+    return { config, tamanhoToken, outras };
   });
