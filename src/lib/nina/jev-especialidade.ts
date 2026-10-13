@@ -79,6 +79,23 @@ export function perguntaEspecialidade(opcoes: string[]): Record<string, Pergunta
 }
 
 /** Nome escolhido, ou null (nenhuma, confiança baixa, fora da lista). */
+/** Confiança mínima para concluir que a clínica não oferece o que o paciente procura. */
+export const CONFIANCA_ESPECIALIDADE_NAO_OFERECIDA = 0.9;
+
+/**
+ * O Jev respondeu "nenhuma" com confiança alta, tendo visto a lista completa
+ * do catálogo: a clínica não oferece o atendimento procurado (13/10/2026).
+ */
+export function especialidadeNaoOferecida(r: RespostaJev | undefined, opcoes: string[]): boolean {
+  return (
+    r?.choice === NENHUMA &&
+    typeof r.confidence === "number" &&
+    r.confidence >= CONFIANCA_ESPECIALIDADE_NAO_OFERECIDA &&
+    opcoes.length > 0 &&
+    opcoes.length <= LIMITE_OPCOES
+  );
+}
+
 export function especialidadeAplicavel(
   r: RespostaJev | undefined,
   opcoes: string[],

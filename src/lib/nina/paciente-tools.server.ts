@@ -2190,6 +2190,26 @@ async function executarFerramentaInterna(
                   ? esp.especialidadeAplicavel(r.respostas["especialidade"], opcoes)
                   : null;
                 let aplicada = false;
+                // "Nenhuma" com confiança alta: a clínica não oferece o atendimento.
+                // Pedido entendido: sem pedir outra escrita; o sistema encaminha
+                // à recepção para orientar (regra de 13/10/2026).
+                const naoOferecida =
+                  !escolhida &&
+                  r.ok &&
+                  esp.especialidadeNaoOferecida(r.respostas["especialidade"], opcoes);
+                if (naoOferecida) {
+                  resultado = {
+                    ...resultado,
+                    esclarecimento: undefined,
+                    limitacao_catalogo: {
+                      codigo: "ESPECIALIDADE_NAO_OFERECIDA",
+                      pedido: p.termo,
+                      mensagem: `A clínica não oferece ${p.termo}.`,
+                    },
+                    instrucao: `A clínica não oferece ${p.termo}. Diga isso ao paciente; não peça outra escrita nem diga que não encontrou no cadastro. O sistema encaminha à recepção para orientar.`,
+                  };
+                  aplicada = true;
+                }
                 if (escolhida) {
                   const novo = await searchKnowledgeBase({
                     clinicaId: ctx.clinicaId,
@@ -2218,7 +2238,8 @@ async function executarFerramentaInterna(
                     tipo_atendimento: tipo,
                     opcoes: opcoes.length,
                     escolhida,
-                    refez_busca: aplicada,
+                    nao_oferecida: naoOferecida,
+                    refez_busca: aplicada && !naoOferecida,
                   },
                   mensagem: ctx.consultaAgenda?.mensagemAtual?.trim()
                     ? { origem: "paciente", texto: ctx.consultaAgenda.mensagemAtual.trim() }
