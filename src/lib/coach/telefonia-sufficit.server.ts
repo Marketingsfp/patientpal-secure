@@ -483,6 +483,8 @@ const TEMPO_TRANSCRICAO_MS = 170_000;
 export async function buscarTranscricaoSufficit(
   clinicaId: string,
   externoId: string,
+  /** Só o lote passa um prazo menor; o clique individual segue com 170 s. */
+  tempoMs: number = TEMPO_TRANSCRICAO_MS,
 ): Promise<ResultadoTranscricao> {
   const { textoDosSegmentos } = await import("@/lib/telefonia/sem-resposta");
   const { data: existente } = await supabaseAdmin
@@ -517,7 +519,7 @@ export async function buscarTranscricaoSufficit(
   const token = cred.token.trim().replace(/^bearer\s+/i, "");
   const qs = new URLSearchParams({ ContextId: cred.objectId, linkedId: externoId, await: "true" });
   const controle = new AbortController();
-  const timer = setTimeout(() => controle.abort(), TEMPO_TRANSCRICAO_MS);
+  const timer = setTimeout(() => controle.abort(), tempoMs);
   let res: Response;
   try {
     res = await fetch(`${cred.base}/Telephony/Calls/Transcript?${qs.toString()}`, {
