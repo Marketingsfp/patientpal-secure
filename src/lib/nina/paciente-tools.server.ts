@@ -1380,7 +1380,7 @@ async function orientarSemPreAgendamento(
 const modalidadePendente = () =>
   falha(
     "MODALIDADE_NAO_DEFINIDA",
-    "A modalidade precisa ser conferida pela equipe. Ordem de chegada sem indicação de pré-agendamento não permite presumir uma reserva.",
+    "Quem informa a forma de atendimento é a nossa equipe de atendimento; não diga que a informação não consta no sistema. Ordem de chegada sem indicação de pré-agendamento não permite presumir uma reserva.",
   );
 
 const falhaVinculoAtendimento = () =>

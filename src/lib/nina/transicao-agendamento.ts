@@ -1,4 +1,5 @@
 import type { IntencaoNina } from "./atendimento-fase1";
+import { REGRA_MODALIDADE_NAO_INFORMADA } from "./modalidade-nao-informada";
 
 /**
  * Agendamento pela Nina controlado por item do catalogo (regras de 11 e 12/10/2026).
@@ -16,7 +17,8 @@ export const REGRA_TRANSICAO_AGENDAMENTO = `INFORMAR ANTES DE ENCAMINHAR — REG
 - Nao chame solicitar_atendente_humano por motivo de agendamento e nao diga que ja encaminhou: o sistema pergunta ao paciente se pode encaminhar e faz o encaminhamento, setor Agendamento, motivo AGENDAMENTO_TRANSICAO, quando ele confirmar.
 - Se a modalidade salva for chegada_sem_pre_agendamento, nao encaminhe: diga que nao precisa agendar, basta comparecer a clinica nos horarios informados, e que o atendimento segue a ordem de chegada.
 - Pergunta apenas informativa recebe a informacao pedida.
-- Se ainda nao souber qual consulta, exame ou procedimento o paciente deseja, esclareca somente o nome do atendimento antes de consultar o cadastro.`;
+- Se ainda nao souber qual consulta, exame ou procedimento o paciente deseja, esclareca somente o nome do atendimento antes de consultar o cadastro.
+${REGRA_MODALIDADE_NAO_INFORMADA}`;
 
 /**
  * Regra de 12/10/2026: com algum item marcado com "Nina pode agendar", a Nina
@@ -31,4 +33,5 @@ export const REGRA_AGENDAMENTO_POR_ITEM = `AGENDAMENTO POR ITEM DO CATALOGO — 
 - Pergunta apenas informativa recebe a informacao pedida e nao deve ser encaminhada por isso.
 - Se ainda nao souber qual consulta, exame ou procedimento o paciente deseja, esclareca somente o nome do atendimento antes de consultar o cadastro.
 - Se a ferramenta recusar com AGENDAMENTO_NAO_PERMITIDO, nao tente outra ferramenta de agenda: responda com as informacoes do cadastro.
-- Para atendimentos que a Nina nao pode agendar, ESCOLHA_ANTES_DOS_DETALHES, PRIMEIRO HORARIO e o cadastro para reserva nao se aplicam: apresente as informacoes e nao termine perguntando por primeiro horario, profissional ou agendamento; o sistema faz a pergunta de encaminhamento.`;
+- Para atendimentos que a Nina nao pode agendar, ESCOLHA_ANTES_DOS_DETALHES, PRIMEIRO HORARIO e o cadastro para reserva nao se aplicam: apresente as informacoes e nao termine perguntando por primeiro horario, profissional ou agendamento; o sistema faz a pergunta de encaminhamento.
+${REGRA_MODALIDADE_NAO_INFORMADA}`;
