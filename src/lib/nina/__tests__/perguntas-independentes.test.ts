@@ -552,3 +552,68 @@ it("profissional não identificado numa busca e encontrado em outra do mesmo tur
   );
   expect(turno.pendentes).toHaveLength(0);
 });
+it("especialidade sem resultado numa busca (dia filtrado) e encontrada em outra do mesmo turno: sem pendência", () => {
+  const turno = criarPerguntasDoTurno(null);
+  const naoAchou: ConhecimentoSessao = {
+    versao: 1,
+    clinicaId: "c",
+    sessionId: "s",
+    consulta: { termo: "neurologia", medico: "", tipo_atendimento: "consulta" },
+    referencias: [],
+    esclarecimento: {
+      tipo: "procedimento",
+      opcoes: [],
+      pergunta: 'Não encontrei "neurologia" no nosso cadastro.',
+    },
+    esclarecimentoTentativas: 1,
+  };
+  turno.registrar(
+    { termo: "neurologia", dia: "sábado", tipo_atendimento: "consulta" },
+    naoAchou,
+    null,
+    false,
+  );
+  expect(turno.pendentes).toHaveLength(1);
+  const achou: ConhecimentoSessao = {
+    versao: 1,
+    clinicaId: "c",
+    sessionId: "s",
+    consulta: { termo: "NEUROLOGIA", medico: "", tipo_atendimento: "consulta" },
+    referencias: [
+      {
+        registro: "p1",
+        procedimento: "Consulta — NEUROLOGIA",
+        medicoNome: "PROFISSIONAL TESTE",
+        versao: null,
+      },
+    ],
+  };
+  turno.registrar({ especialidade: "NEUROLOGIA" }, achou, null, true);
+  expect(turno.pendentes).toHaveLength(0);
+});
+it("pendência de outra especialidade continua quando só uma é encontrada", () => {
+  const turno = criarPerguntasDoTurno(null);
+  const naoAchou: ConhecimentoSessao = {
+    versao: 1,
+    clinicaId: "c",
+    sessionId: "s",
+    consulta: { termo: "angiologia", medico: "", tipo_atendimento: "consulta" },
+    referencias: [],
+    esclarecimento: { tipo: "procedimento", opcoes: [], pergunta: "Não encontrei." },
+    esclarecimentoTentativas: 1,
+  };
+  turno.registrar({ termo: "angiologia", tipo_atendimento: "consulta" }, naoAchou, null, false);
+  turno.registrar(
+    { especialidade: "NEUROLOGIA" },
+    {
+      versao: 1,
+      clinicaId: "c",
+      sessionId: "s",
+      consulta: { termo: "NEUROLOGIA", medico: "", tipo_atendimento: "consulta" },
+      referencias: [{ registro: "p1", procedimento: "Consulta", medicoNome: null, versao: null }],
+    },
+    null,
+    true,
+  );
+  expect(turno.pendentes).toHaveLength(1);
+});

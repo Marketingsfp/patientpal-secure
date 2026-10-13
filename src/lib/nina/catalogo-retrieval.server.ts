@@ -327,6 +327,12 @@ async function buscarNaFonteDoTurno(
   const foraDoDiaPedido = Boolean(
     medico && pedido.dia && profissionaisPorNome.length && !porNomeNoDia.length,
   );
+  // Ninguém da especialidade atende no dia pedido ("tem neuro no sábado?"): o
+  // pedido foi entendido e a resposta é só que não há atendimento nesse dia,
+  // sem listar outros dias nem pedir outra escrita (regra de 13/10/2026).
+  const especialidadeForaDoDia = Boolean(
+    !medico && pedido.dia && profissionaisPorNome.length && !porNomeNoDia.length,
+  );
   const profissionaisRelevantes = escolhaMedicoPendente
     ? profissionaisPorNome.length
       ? profissionaisPorNome
@@ -398,6 +404,14 @@ async function buscarNaFonteDoTurno(
     ]
       .filter(Boolean)
       .join(" ");
+  if (especialidadeForaDoDia && !listaProfissionais.length) {
+    resultado.limitacao_catalogo = {
+      codigo: "SEM_ATENDIMENTO_NO_DIA",
+      pedido: pedido.query,
+      mensagem: `Não há atendimento de ${pedido.query} em ${pedido.dia}.`,
+    };
+    resultado.instrucao = `Pedido compreendido: a clínica tem ${pedido.query}, mas nenhum profissional atende em ${pedido.dia}. Responda apenas que não há atendimento de ${pedido.query} em ${pedido.dia}. Não informe outros dias, profissionais, horários ou valores, não diga que o atendimento não foi encontrado e não peça para escrever de outro jeito.`;
+  }
   if (vacinaGripe && resultado.knowledge_status === "not_found") {
     resultado.limitacao_catalogo = {
       codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA",

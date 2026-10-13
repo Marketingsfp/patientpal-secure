@@ -997,6 +997,39 @@ describe("busca completa com e sem acentos", () => {
     expect(lista.doctors).toEqual(["OUTRA PROFISSIONAL"]);
   });
 
+  it("especialidade sem ninguém no dia pedido: só diz que não há atendimento nesse dia", async () => {
+    banco.profissionais = [
+      profissional({
+        id: idSequencial(1),
+        nome: "PROFISSIONAL TESTE MONTEIRO",
+        especialidades: [{ nome: "NEUROLOGIA" }],
+        horarios: [{ dia: "Quarta-feira", inicio: "07:00" }],
+      }),
+    ];
+    const r = await buscarNoCatalogo({ clinicaId: CLINICA, query: "neurologia", dia: "sabado" });
+    // Sem outros dias nem profissionais: o pedido foi entendido, não é "não encontrado".
+    expect(r.doctors).toEqual([]);
+    expect(r.limitacao_catalogo?.codigo).toBe("SEM_ATENDIMENTO_NO_DIA");
+    expect(r.esclarecimento ?? null).toBeNull();
+    expect(r.instrucao).toContain("Não informe outros dias");
+    // Com alguém no dia, a lista é só de quem atende nesse dia.
+    banco.profissionais.push(
+      profissional({
+        id: idSequencial(2),
+        nome: "OUTRO PROFISSIONAL TESTE",
+        especialidades: [{ nome: "NEUROLOGIA" }],
+        horarios: [{ dia: "Sábado", inicio: "08:00" }],
+      }),
+    );
+    const sabado = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "neurologia",
+      dia: "sabado",
+    });
+    expect(sabado.doctors).toEqual(["OUTRO PROFISSIONAL TESTE"]);
+    expect(sabado.limitacao_catalogo ?? null).toBeNull();
+  });
+
   it("exclui registros privados, arquivados e de outra clínica em todas as páginas", async () => {
     tetoServidor = 1;
     banco.servicos = [

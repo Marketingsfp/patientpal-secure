@@ -53,7 +53,8 @@ export type ResultadoConhecimento = {
   knowledge_status: KnowledgeStatus;
   /** Pedido compreendido, mas a fonte não confirma a oferta específica. Não é dúvida de escrita. */
   limitacao_catalogo?: {
-    codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA";
+    /** SEM_ATENDIMENTO_NO_DIA: o atendimento existe, mas ninguém atende no dia pedido. */
+    codigo: "VACINA_ESPECIFICA_NAO_CONFIRMADA" | "SEM_ATENDIMENTO_NO_DIA";
     pedido: string;
     mensagem: string;
   };
