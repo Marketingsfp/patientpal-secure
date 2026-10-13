@@ -32,6 +32,7 @@ import { exportToExcel } from "@/lib/export-csv";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { prontuarioExibicao } from "@/lib/prontuario";
+import { brl, fmtDate } from "@/lib/financeiro/format";
 export const Route = createFileRoute("/_authenticated/app/auditoria")({
   component: PageWithTabs,
   head: () => ({ meta: [{ title: "Auditoria — ClinicaOS" }] }),
@@ -43,7 +44,7 @@ interface AuditRow {
   user_id: string | null;
   table_name: string;
   record_id: string | null;
-  action: "INSERT" | "UPDATE" | "DELETE";
+  action: string;
   dados_antes: Record<string, unknown> | null;
   dados_depois: Record<string, unknown> | null;
   created_at: string;
@@ -53,12 +54,39 @@ const ACTION_LABEL: Record<string, string> = {
   INSERT: "Criou",
   UPDATE: "Alterou",
   DELETE: "Excluiu",
+  DESFAZER_BAIXA: "Desfez baixa",
+  ESTORNO_REPASSE: "Estornou repasse",
+  NINA_AGENDAR: "Nina agendou",
+  NINA_CADASTRO_RESOLVIDO: "Nina vinculou cadastro",
+  NINA_TOOL: "Nina consultou",
+  NINA_CONSULTAR_DISPONIBILIDADE: "Nina consultou",
+  NINA_CONSULTAR_PRIMEIRO_DISPONIVEL: "Nina consultou",
+  NINA_IDENTIFICAR_PACIENTE: "Nina identificou",
+  NINA_PROXIMA_VAGA: "Nina consultou",
+  NINA_VERIFICAR_HORARIO: "Nina consultou",
+  NINA_INSTRUCOES_PUBLICACAO: "Publicou instruções",
+  NINA_INSTRUCOES_RASCUNHO: "Salvou rascunho",
+  NINA_INSTRUCOES_RESTAURACAO: "Restaurou instruções",
+  NINA_FONTE_CONSULTA_ALTERADA: "Alterou fonte",
+  NINA_VOZ_ALTERADA: "Alterou voz",
+  NINA_VOZ_PREVIA: "Ouviu prévia",
 };
 const ACTION_COLOR: Record<string, string> = {
   INSERT: "bg-emerald-100 text-emerald-700",
   UPDATE: "bg-amber-100 text-amber-700",
   DELETE: "bg-rose-100 text-rose-700",
+  DESFAZER_BAIXA: "bg-rose-100 text-rose-700",
+  ESTORNO_REPASSE: "bg-rose-100 text-rose-700",
 };
+const ACTION_COLOR_PADRAO = "bg-slate-100 text-slate-700";
+// Ações oferecidas no filtro (as NINA_* agrupadas não entram — são consultas da IA)
+const ACOES_FILTRO = ["INSERT", "UPDATE", "DELETE", "DESFAZER_BAIXA", "ESTORNO_REPASSE"];
+function labelAcao(a: string): string {
+  return ACTION_LABEL[a] ?? a.replace(/_/g, " ").toLowerCase();
+}
+function corAcao(a: string): string {
+  return ACTION_COLOR[a] ?? ACTION_COLOR_PADRAO;
+}
 
 // Rótulos amigáveis para nomes técnicos de tabelas e colunas
 const TABLE_LABEL: Record<string, string> = {
@@ -78,6 +106,37 @@ const TABLE_LABEL: Record<string, string> = {
   triagens_enfermagem: "Triagem de enfermagem",
   prontuarios: "Prontuário",
   senhas: "Senha",
+  nfse: "Nota fiscal (NFS-e)",
+  estorno_solicitacoes: "Pedido de estorno",
+  gr_impressoes: "Impressão de GR",
+  medico_disponibilidades: "Grade do médico",
+  perfil_permissoes: "Permissão de perfil",
+  perfis_acesso: "Perfil de acesso",
+  usuario_permissoes: "Permissão de usuário",
+  usuario_alcadas: "Alçada de usuário",
+  user_roles: "Papel de usuário",
+  clinica_memberships: "Acesso à unidade",
+  cb_convenios: "Convênio do cartão",
+  cb_convenio_regras: "Regra do cartão",
+  cb_convenio_faixas: "Faixa do cartão",
+  procedimento_cb_convenio_valores: "Valor de serviço no cartão",
+  prontuario_sequencia: "Numeração de prontuário",
+  especialidades: "Especialidade",
+  especialidade_unidade: "Especialidade na unidade",
+  fin_categorias: "Categoria financeira",
+  fin_contas: "Conta financeira",
+  medico_repasse_laudo: "Repasse de laudo",
+  planos_assinatura: "Plano do cartão",
+  clinicas: "Unidade",
+  nina_cat_servicos: "Nina — serviço",
+  nina_cat_profissionais: "Nina — profissional",
+  nina_ferramenta: "Nina — consulta",
+  nina_instrucoes_versoes: "Nina — instruções",
+  clinica_feature_flags: "Configuração da unidade",
+  atend_departamentos: "Departamento de atendimento",
+  atend_departamento_atendentes: "Atendente de departamento",
+  fisio_sessoes: "Sessão de fisioterapia",
+  prontuario_modelos: "Modelo de prontuário",
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -292,13 +351,12 @@ async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, stri
   const contratos = new Set<string>();
   const orcamentos = new Set<string>();
   for (const r of rows) {
-    const merged = { ...(r.dados_antes ?? {}), ...(r.dados_depois ?? {}) } as Record<
-      string,
-      unknown
-    >;
+    // Lê antes e depois: numa troca de médico/paciente os dois lados entram no resumo
     const pick = (k: string, set: Set<string>) => {
-      const v = merged[k];
-      if (typeof v === "string" && /^[0-9a-f]{8}-/.test(v)) set.add(v);
+      for (const obj of [r.dados_antes, r.dados_depois]) {
+        const v = obj?.[k];
+        if (typeof v === "string" && /^[0-9a-f]{8}-/.test(v)) set.add(v);
+      }
     };
     pick("medico_id", medicos);
     pick("paciente_id", pacientes);
@@ -392,8 +450,247 @@ async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, stri
   return nomes;
 }
 
+// ---------------------------------------------------------------------------
+// Identificação amigável do registro e resumo da alteração, montados a partir
+// da "foto" gravada na própria linha de auditoria (funciona também para
+// registros que já foram excluídos).
+// ---------------------------------------------------------------------------
+
+type Snap = Record<string, unknown>;
+
+function snapDe(row: AuditRow): Snap {
+  return { ...(row.dados_antes ?? {}), ...(row.dados_depois ?? {}) };
+}
+function txt(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
+function dinheiro(v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? brl(n) : null;
+}
+function dataCurta(v: unknown): string | null {
+  const s = txt(v);
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return fmtDate(s);
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+function juntar(...partes: Array<string | null | undefined | false>): string {
+  return partes.filter(Boolean).join(" — ");
+}
+function legivel(v: unknown): string | null {
+  const s = txt(v);
+  return s ? s.replace(/_/g, " ").toLowerCase() : null;
+}
+
+const DIA_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+const TIPO_MOV_CAIXA: Record<string, string> = {
+  abertura: "Abertura",
+  recebimento: "Recebimento",
+  estorno: "Estorno",
+  sangria: "Sangria",
+  registro: "Registro",
+  fechamento: "Fechamento",
+  suprimento: "Suprimento",
+  transferencia: "Transferência",
+};
+
+/** Texto principal da coluna Registro: o que é este registro, em linguagem de balcão. */
+function descreverRegistro(row: AuditRow, nomes: Record<string, string>): string | null {
+  const s = snapDe(row);
+  const id = row.record_id;
+  const nomeDe = (k: string) => {
+    const v = s[k];
+    return typeof v === "string" ? (nomes[v] ?? null) : null;
+  };
+  switch (row.table_name) {
+    case "agendamentos":
+      return (
+        (id ? nomes[id] : null) ??
+        juntar(txt(s.paciente_nome) ?? "Agendamento", dataCurta(s.inicio))
+      );
+    case "pacientes":
+      return (id ? nomes[id] : null) ?? txt(s.nome);
+    case "medicos":
+      return (id ? nomes[id] : null) ?? (txt(s.nome) ? `Dr(a). ${txt(s.nome)}` : null);
+    case "fin_lancamentos":
+      return juntar(
+        s.tipo === "despesa" ? "Despesa" : s.tipo === "receita" ? "Receita" : "Lançamento",
+        dinheiro(s.valor),
+        legivel(s.forma_pagamento),
+        txt(s.descricao),
+      );
+    case "fin_atendimentos":
+      return juntar(
+        txt(s.procedimento) ?? "Atendimento",
+        dinheiro(s.valor_total),
+        fmtDate(txt(s.data)),
+      );
+    case "caixa_movimentos":
+      return juntar(
+        TIPO_MOV_CAIXA[String(s.tipo)] ?? legivel(s.tipo) ?? "Movimento",
+        dinheiro(s.valor),
+        legivel(s.forma_pagamento),
+        txt(s.descricao),
+      );
+    case "caixa_sessoes":
+      return juntar(
+        `Caixa de ${txt(s.user_nome) ?? "operador"}`,
+        dataCurta(s.aberto_em) && `aberto em ${dataCurta(s.aberto_em)}`,
+      );
+    case "contrato_mensalidades":
+      return juntar(
+        s.taxa_adesao === true ? "Taxa de adesão" : `Parcela ${txt(s.numero_parcela) ?? "?"}`,
+        dinheiro(s.valor),
+        txt(s.vencimento) && `venc. ${fmtDate(txt(s.vencimento))}`,
+      );
+    case "contratos_assinatura":
+      return juntar(`Contrato ${txt(s.numero) ?? ""}`.trim(), txt(s.paciente_nome));
+    case "contrato_dependentes":
+      return juntar(`Dependente ${txt(s.paciente_nome) ?? ""}`.trim(), legivel(s.parentesco));
+    case "orcamentos":
+      return juntar(
+        (id ? nomes[id] : null) ?? (txt(s.numero) ? `Orçamento #${txt(s.numero)}` : "Orçamento"),
+        txt(s.paciente_nome),
+        dinheiro(s.valor_total),
+      );
+    case "orcamento_itens":
+      return juntar(txt(s.descricao) ?? "Item", dinheiro(s.valor_total), nomeDe("orcamento_id"));
+    case "nfse":
+      return juntar(
+        txt(s.numero) ? `NFS-e nº ${txt(s.numero)}` : "NFS-e (sem número)",
+        dinheiro(s.valor_servicos),
+        txt(s.tomador_nome),
+      );
+    case "estorno_solicitacoes":
+      return juntar("Estorno", dinheiro(s.valor), txt(s.paciente_nome), txt(s.descricao));
+    case "gr_impressoes":
+      return juntar(
+        `GR ficha ${txt(s.ficha_numero) ?? "?"}`,
+        txt(s.via_numero) && `${txt(s.via_numero)}ª via`,
+        nomeDe("agendamento_id"),
+      );
+    case "medico_disponibilidades":
+      return juntar(
+        "Grade",
+        typeof s.dia_semana === "number" ? DIA_SEMANA[s.dia_semana] : null,
+        txt(s.hora_inicio) &&
+          `${String(s.hora_inicio).slice(0, 5)}–${String(s.hora_fim ?? "").slice(0, 5)}`,
+      );
+    case "prontuarios":
+      return juntar("Prontuário", fmtDate(txt(s.data)));
+    case "perfil_permissoes":
+      return juntar(`Módulo ${txt(s.modulo) ?? "?"}`, legivel(s.acesso));
+    case "prontuario_sequencia":
+      return txt(s.proximo) ? `Próximo nº ${txt(s.proximo)}` : null;
+    case "cb_convenio_regras":
+      return juntar(txt(s.nome_padrao) ?? legivel(s.tipo) ?? "Regra", dinheiro(s.valor));
+    case "procedimento_cb_convenio_valores":
+      return juntar("Valor no cartão", dinheiro(s.valor_dinheiro));
+    case "nina_ferramenta":
+      return legivel(s.ferramenta);
+    default:
+      return txt(s.nome) ?? txt(s.descricao) ?? txt(s.paciente_nome) ?? null;
+  }
+}
+
+// Campos que mudam sozinhos (trava de edição, carimbos) e não dizem nada ao operador
+const CAMPOS_RUIDO = new Set([
+  ...CAMPOS_OCULTOS,
+  "edit_lock_at",
+  "edit_lock_by",
+  "edit_lock_by_nome",
+  "fluxo_atualizado_em",
+  "atualizado_em",
+  "status_alterado_em",
+  "status_alterado_por",
+  "status_fin_em",
+  "status_op_em",
+  "telefone_norm",
+  "telefone2_norm",
+  "cpf_digits",
+  "credito_revisado_em",
+  "consultado_em",
+]);
+
+// No resumo da lista, estes campos aparecem só como "alterado", sem o conteúdo
+// (dado clínico, documento pessoal, biometria, dados bancários, blocos técnicos).
+// O conteúdo continua no "Ver", para quem tem acesso à auditoria.
+const CAMPOS_SEM_VALOR_NO_RESUMO = new Set([
+  "queixa_principal",
+  "historia_doenca",
+  "exame_fisico",
+  "hipotese_diagnostica",
+  "conduta",
+  "prescricao",
+  "cpf",
+  "rg",
+  "data_nascimento",
+  "face_descriptor",
+  "assinatura_svg",
+  "agencia",
+  "conta",
+  "pix_chave",
+  "payload_envio",
+  "payload_resposta",
+  "token_publico",
+  "composicao_pagamento",
+  "valores_formas",
+  "valores_pagamento",
+]);
+
+function ehCampoDinheiro(c: string): boolean {
+  return (
+    c === "valor" ||
+    c.startsWith("valor_") ||
+    ["desconto", "juros", "multa", "credito_limite", "sinal_valor", "diferenca"].includes(c)
+  );
+}
+
+function valorResumo(campo: string, v: unknown, nomes: Record<string, string>): string {
+  if (v === null || v === undefined || v === "") return "vazio";
+  const emReais = ehCampoDinheiro(campo) ? dinheiro(v) : null;
+  if (emReais) return emReais;
+  if (typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(v)) return nomes[v] ?? "outro";
+  if (typeof v === "string" && /^[a-z0-9_]+$/.test(v) && v.includes("_"))
+    return v.replace(/_/g, " ");
+  const f = formatValor(v);
+  return f.length > 40 ? f.slice(0, 40) + "…" : f;
+}
+
+/** Frase curta da coluna Resumo — o que mudou, sem precisar abrir o "Ver". */
+function resumirAlteracao(row: AuditRow, nomes: Record<string, string>): string {
+  if (row.action === "INSERT") return "Registro criado";
+  if (row.action === "DELETE") return "Registro excluído";
+  if (row.action !== "UPDATE") return labelAcao(row.action);
+
+  const diff = computarDiff(row.dados_antes, row.dados_depois);
+  const uteis = diff.filter((d) => !CAMPOS_RUIDO.has(d.campo));
+  if (uteis.length === 0) {
+    return diff.some((d) => d.campo.startsWith("edit_lock"))
+      ? "Abriu/fechou a ficha para edição (nada mudou)"
+      : "Nenhum campo visível mudou";
+  }
+  // Status e valores primeiro: é o que a gestão costuma procurar
+  const prioridade = (c: string) => (c === "status" ? 0 : ehCampoDinheiro(c) ? 1 : 2);
+  const ordenados = [...uteis].sort((a, b) => prioridade(a.campo) - prioridade(b.campo));
+  const MAX = 3;
+  const frases = ordenados.slice(0, MAX).map((d) => {
+    const rotulo = labelCampo(d.campo);
+    if (CAMPOS_SEM_VALOR_NO_RESUMO.has(d.campo)) return `${rotulo} alterado`;
+    return `${rotulo}: ${valorResumo(d.campo, d.antes, nomes)} → ${valorResumo(d.campo, d.depois, nomes)}`;
+  });
+  const resto = ordenados.length - MAX;
+  return frases.join(" · ") + (resto > 0 ? ` · +${resto} ${resto === 1 ? "campo" : "campos"}` : "");
+}
+
 function RegistroCell({ row, nomes }: { row: AuditRow; nomes: Record<string, string> }) {
-  const principal = row.record_id ? nomes[row.record_id] : null;
+  const principal = descreverRegistro(row, nomes);
   const merged = { ...(row.dados_antes ?? {}), ...(row.dados_depois ?? {}) } as Record<
     string,
     unknown
@@ -404,12 +701,25 @@ function RegistroCell({ row, nomes }: { row: AuditRow; nomes: Record<string, str
   const paciente = pacienteId ? nomes[pacienteId] : null;
   const extras: string[] = [];
   if (medico && !principal?.includes("Dr")) extras.push(medico);
-  if (paciente && paciente !== principal) extras.push(paciente);
+  // Evita repetir o paciente quando o texto principal já traz o nome dele
+  if (paciente && !principal?.includes(paciente.split(" (#")[0])) extras.push(paciente);
+  const idCurto = row.record_id ? row.record_id.slice(0, 8) : null;
+  const titulo = [principal, ...extras].filter(Boolean).join("\n");
   return (
-    <div className="flex flex-col">
-      <span className="truncate">{principal ?? row.record_id ?? "—"}</span>
+    <div className="flex flex-col min-w-0" title={titulo || undefined}>
+      <span className="truncate">
+        {principal ?? `${labelTabela(row.table_name)} sem descrição`}
+      </span>
       {extras.length > 0 && (
         <span className="text-xs text-muted-foreground truncate">{extras.join(" · ")}</span>
+      )}
+      {idCurto && (
+        <span
+          className="text-[10px] text-muted-foreground/70 font-mono"
+          title={row.record_id ?? ""}
+        >
+          ID {idCurto}
+        </span>
       )}
     </div>
   );
@@ -456,8 +766,13 @@ function Page() {
     void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
+  // Lista fixa de tipos conhecidos + os que vierem na consulta: assim o filtro
+  // não "encolhe" para um item só depois que você filtra por um tipo.
   const tabelasUnicas = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.table_name))).sort(),
+    () =>
+      Array.from(new Set([...Object.keys(TABLE_LABEL), ...rows.map((r) => r.table_name)])).sort(
+        (a, b) => labelTabela(a).localeCompare(labelTabela(b)),
+      ),
     [rows],
   );
 
@@ -470,8 +785,10 @@ function Page() {
       rows.map((r) => ({
         data: new Date(r.created_at).toLocaleString("pt-BR"),
         usuario: r.user_email ?? "—",
-        acao: ACTION_LABEL[r.action] ?? r.action,
-        tabela: r.table_name,
+        acao: labelAcao(r.action),
+        tabela: labelTabela(r.table_name),
+        registro: descreverRegistro(r, nomesLista) ?? "",
+        resumo: resumirAlteracao(r, nomesLista),
         registro_id: r.record_id ?? "",
         dados_antes: r.dados_antes ? JSON.stringify(r.dados_antes) : "",
         dados_depois: r.dados_depois ? JSON.stringify(r.dados_depois) : "",
@@ -481,7 +798,9 @@ function Page() {
         { key: "data", label: "Data/Hora" },
         { key: "usuario", label: "Usuário" },
         { key: "acao", label: "Ação" },
-        { key: "tabela", label: "Tabela" },
+        { key: "tabela", label: "Tipo de registro" },
+        { key: "registro", label: "Registro" },
+        { key: "resumo", label: "Resumo" },
         { key: "registro_id", label: "ID do registro" },
         { key: "dados_antes", label: "Dados antes" },
         { key: "dados_depois", label: "Dados depois" },
@@ -515,79 +834,94 @@ function Page() {
       <Card>
         <CardContent className="py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
-            <Label className="text-xs">Tabela</Label>
+            <Label htmlFor="aud-filtro-tipo" className="text-xs">
+              Tipo de registro
+            </Label>
             <Select value={tabela} onValueChange={setTabela}>
-              <SelectTrigger>
+              <SelectTrigger id="aud-filtro-tipo">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">Todos os tipos</SelectItem>
                 {tabelasUnicas.map((t) => (
                   <SelectItem key={t} value={t}>
-                    {t}
+                    {labelTabela(t)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Ação</Label>
+            <Label htmlFor="aud-filtro-acao" className="text-xs">
+              O que foi feito
+            </Label>
             <Select value={acao} onValueChange={setAcao}>
-              <SelectTrigger>
+              <SelectTrigger id="aud-filtro-acao">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="INSERT">Criou</SelectItem>
-                <SelectItem value="UPDATE">Alterou</SelectItem>
-                <SelectItem value="DELETE">Excluiu</SelectItem>
+                <SelectItem value="all">Todas as ações</SelectItem>
+                {ACOES_FILTRO.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {labelAcao(a)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Usuário (e-mail)</Label>
+            <Label htmlFor="aud-filtro-usuario" className="text-xs">
+              Quem fez (e-mail do usuário)
+            </Label>
             <Input
+              id="aud-filtro-usuario"
               value={usuario}
               onChange={(e) => setUsuario(e.target.value)}
-              placeholder="Buscar e-mail..."
+              onKeyDown={(e) => e.key === "Enter" && void load()}
+              placeholder="Digite parte do e-mail"
             />
           </div>
           <div>
-            <Label className="text-xs">De</Label>
+            <Label className="text-xs">Data inicial</Label>
             <DateInputBR value={dataIni} onChange={(e) => setDataIni(e.target.value)} />
           </div>
           <div>
-            <Label className="text-xs">Até</Label>
+            <Label className="text-xs">Data final</Label>
             <DateInputBR value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
           </div>
-          <div className="sm:col-span-2 lg:col-span-5 flex justify-end">
-            <Button onClick={() => void load()}>Filtrar</Button>
+          <div className="sm:col-span-2 lg:col-span-5 flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              Mostra até 1.000 registros, do mais recente para o mais antigo. Escolha os filtros e
+              clique em Aplicar filtros.
+            </p>
+            <Button onClick={() => void load()}>Aplicar filtros</Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-40">Data/Hora</TableHead>
               <TableHead>Usuário</TableHead>
               <TableHead className="w-24">Ação</TableHead>
-              <TableHead>Tabela</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Registro</TableHead>
+              <TableHead>Resumo</TableHead>
               <TableHead className="text-right">Detalhes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   Nenhum registro de auditoria encontrado.
                 </TableCell>
               </TableRow>
@@ -599,13 +933,14 @@ function Page() {
                   </TableCell>
                   <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge className={ACTION_COLOR[r.action]}>
-                      {ACTION_LABEL[r.action] ?? r.action}
-                    </Badge>
+                    <Badge className={corAcao(r.action)}>{labelAcao(r.action)}</Badge>
                   </TableCell>
                   <TableCell className="text-sm">{labelTabela(r.table_name)}</TableCell>
-                  <TableCell className="text-sm max-w-[320px]">
+                  <TableCell className="text-sm max-w-[300px]">
                     <RegistroCell row={r} nomes={nomesLista} />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground min-w-[220px] max-w-[380px]">
+                    <span className="line-clamp-2">{resumirAlteracao(r, nomesLista)}</span>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>
@@ -665,9 +1000,7 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
     <div className="space-y-4 text-sm">
       <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={ACTION_COLOR[row.action]}>
-            {ACTION_LABEL[row.action] ?? row.action}
-          </Badge>
+          <Badge className={corAcao(row.action)}>{labelAcao(row.action)}</Badge>
           <span className="font-medium">{labelTabela(row.table_name)}</span>
           {contexto && <span className="text-muted-foreground">— {contexto}</span>}
         </div>
