@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { analisarTextoNoServidor, type AnalysisResult } from "./analyze.functions";
 
 const entrada = (data: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(data);
 
@@ -210,7 +211,7 @@ export const ligacoesParaAnalise = createServerFn({ method: "POST" })
       transcritas: Object.fromEntries(transcritas),
       analises: Object.fromEntries(analises) as Record<
         string,
-        { pontuacao: number | null; criado_em: string; resultado: import("./analyze.functions").AnalysisResult }
+        { pontuacao: number | null; criado_em: string; resultado: AnalysisResult }
       >,
     };
   });
@@ -304,7 +305,6 @@ export const analisarLigacao = createServerFn({ method: "POST" })
     if (!t?.texto || t.texto.trim().length < 20) {
       throw new Error("Busque a transcrição desta ligação antes de analisar.");
     }
-    const { analisarTextoNoServidor } = await import("./analyze.functions");
     const resultado = await analisarTextoNoServidor(db, {
       clinicaId: data.clinicaId,
       text: t.texto.slice(0, 30_000),
