@@ -17030,8 +17030,7 @@ export type Database = {
         Args: {
           p_clinica: string
           p_fim: string
-          p_hora_abre?: number
-          p_hora_fecha?: number
+          p_horarios?: Json
           p_inicio: string
         }
         Returns: Json
