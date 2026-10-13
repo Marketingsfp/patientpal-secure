@@ -840,8 +840,9 @@ export function CatalogoNina({
                 </ul>
               </div>
             )}
+            {/* Chave própria: igual à do formulário ao lado, o React duplicava o dicionário. */}
             <DicionarioCatalogoEditor
-              key={`${tipo}-${tipo === "servico" ? servico.id : profissional.id}-${posicao}`}
+              key={`dicionario-${tipo}-${tipo === "servico" ? servico.id : profissional.id}-${posicao}`}
               clinicaId={clinicaId}
               somenteLeitura={!podeEditar || salvando}
               contexto={

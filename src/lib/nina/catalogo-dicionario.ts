@@ -20,14 +20,14 @@ const saidaSchema = z
           .object({
             termo: z.string().trim().min(2).max(160),
             categoria: z.enum(categorias),
-            explicacao: z.string().trim().min(1).max(350),
+            explicacao: z.string().trim().min(1),
             origem: z.enum(["web", "linguistica"]),
             fontes: z.array(z.string().url().max(2000)).max(5),
           })
           .strict(),
       )
       .max(LIMITE_VARIACOES),
-    duvidas: z.array(z.string().trim().min(1).max(350)).max(20),
+    duvidas: z.array(z.string().trim().min(1)).max(20),
   })
   .strict();
 export type SugestoesDicionario = z.infer<typeof saidaSchema>;
