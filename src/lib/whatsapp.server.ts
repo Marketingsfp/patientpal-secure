@@ -2935,9 +2935,15 @@ async function gerarRespostaNinaInterno(
   });
   if (respostaOfertaTurno === "recusa") fluxoEstado.oferta_encaminhamento = null;
   if (decisaoAgendamento === "encaminhar" && !jevEncaminhamento) {
+    // O motivo leva o atendimento informado, para a equipe saber o que confirmar.
+    const itensAgendamento = [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
+      .filter((r) => referenciasDaDecisao.includes(r.id))
+      .map((r) => String(r.nome ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 5)
+      .join("; ");
     jevEncaminhamento = {
-      motivo:
-        "AGENDAMENTO_TRANSICAO: o paciente já recebeu as informações do atendimento e deseja marcar; a equipe confirma o horário.",
+      motivo: `AGENDAMENTO_TRANSICAO: ${itensAgendamento || "atendimento informado na conversa"}.`,
       urgencia: "normal",
     };
     nomeAtendimentoAusente = false;
@@ -3708,6 +3714,35 @@ async function gerarRespostaNinaInterno(
           error_code: r.erro ?? null,
           reused: r.reused,
         });
+      }
+      // Restrição de horário do paciente ("depois das 17h"): a lista e a regra
+      // dos 8 consideram só quem atende nessa janela (regra de 12/10/2026).
+      if (r.success) {
+        const { filtrarListaPorHorario } = await import("@/lib/nina/lista-profissionais-extensa");
+        const filtrado = filtrarListaPorHorario(
+          nome,
+          c.function?.arguments ?? null,
+          r.dados as never,
+          mensagemPaciente,
+        );
+        if (filtrado) {
+          registrarEtapa({
+            tipo: "consulta",
+            fonte: "sistema",
+            titulo: "Lista filtrada pelo horário pedido pelo paciente",
+            dados: {
+              antes: Array.isArray((r.dados as { doctors?: unknown[] } | null)?.doctors)
+                ? (r.dados as { doctors: unknown[] }).doctors.length
+                : null,
+              depois: (filtrado as { doctors: unknown[] }).doctors.length,
+            },
+            codigo: {
+              arquivo: "src/lib/nina/lista-profissionais-extensa.ts",
+              funcao: "filtrarListaPorHorario",
+            },
+          });
+          r.dados = filtrado;
+        }
       }
       const listaExtensa = r.success
         ? (await import("@/lib/nina/lista-profissionais-extensa")).listaProfissionaisExtensa(

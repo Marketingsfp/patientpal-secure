@@ -7,6 +7,7 @@ import { confirmacaoDaEscolha } from "./agendamento-escolha";
 import type { EstadoFluxoNina } from "./fluxo-estado-normalizar";
 import type { ConfirmacaoIdentificacao } from "./confirmacao-identificacao";
 import { preservarFinalidadeVacina, pendenciaAntigaDaVacina } from "./finalidade-vacina";
+import { compararNomeProfissional } from "./catalogo-busca";
 
 const normal = (v: unknown) =>
   typeof v === "string"
@@ -403,6 +404,20 @@ export function criarPerguntasDoTurno(
         if (confirmado && atual?.consulta.tipo_atendimento === "consulta") {
           const assuntoConfirmado = assunto(q.termo);
           consultasConfirmadas.add(assuntoConfirmado);
+          // "Bárbara" não encontrada numa busca e "Barbara de Oliveira Soriano"
+          // encontrada em outra, no mesmo turno e na mesma especialidade: a
+          // dúvida sobre o nome já está respondida.
+          if (q.medico.trim())
+            for (const [chavePendente, pendencia] of pendentes) {
+              const medicoPendente = pendencia.consulta.medico ?? "";
+              if (
+                pendentesDoTurno.has(chavePendente) &&
+                medicoPendente.trim() &&
+                assunto(pendencia.consulta.termo) === assuntoConfirmado &&
+                compararNomeProfissional(medicoPendente, q.medico) === "exato"
+              )
+                pendentes.delete(chavePendente);
+            }
           // Dúvida de procedimento deste turno com o mesmo assunto fica respondida pela consulta.
           for (const [chavePendente, pendencia] of pendentes) {
             if (

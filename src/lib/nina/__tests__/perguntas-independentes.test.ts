@@ -509,3 +509,46 @@ it("procedimento 'CONSULTA X' ambíguo não vira pergunta quando a consulta de X
   ambiguo(antes, "audiometria", ["AUDIOMETRIA TONAL", "AUDIOMETRIA VOCAL"]);
   expect(antes.pendentes).toHaveLength(1);
 });
+it("profissional não identificado numa busca e encontrado em outra do mesmo turno: sem pendência", () => {
+  const turno = criarPerguntasDoTurno(null);
+  const naoAchou: ConhecimentoSessao = {
+    versao: 1,
+    clinicaId: "c",
+    sessionId: "s",
+    consulta: { termo: "psicologia", medico: "Bárbara", tipo_atendimento: "consulta" },
+    referencias: [],
+    esclarecimento: {
+      tipo: "profissional",
+      opcoes: [],
+      pergunta: 'Não consegui identificar o profissional "Bárbara".',
+    },
+    esclarecimentoTentativas: 1,
+  };
+  turno.registrar({ termo: "psicologia", medico: "Bárbara" }, naoAchou, null, false);
+  expect(turno.pendentes).toHaveLength(1);
+  const achou: ConhecimentoSessao = {
+    versao: 1,
+    clinicaId: "c",
+    sessionId: "s",
+    consulta: {
+      termo: "psicologia",
+      medico: "Barbara de Oliveira Soriano",
+      tipo_atendimento: "consulta",
+    },
+    referencias: [
+      {
+        registro: "p1",
+        procedimento: "Consulta — PSICOLOGIA",
+        medicoNome: "BARBARA DE OLIVEIRA SORIANO",
+        versao: null,
+      },
+    ],
+  };
+  turno.registrar(
+    { termo: "psicologia", medico: "Barbara de Oliveira Soriano" },
+    achou,
+    null,
+    true,
+  );
+  expect(turno.pendentes).toHaveLength(0);
+});

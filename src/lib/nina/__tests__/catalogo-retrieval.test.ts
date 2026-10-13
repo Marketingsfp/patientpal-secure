@@ -963,6 +963,40 @@ describe("busca completa com e sem acentos", () => {
     expect(porNome.doctors).toEqual(["Dr. João Hélio"]);
   });
 
+  it("médico pedido pelo nome num dia em que não atende continua no resultado com os dias reais", async () => {
+    banco.profissionais = [
+      profissional({
+        id: idSequencial(1),
+        nome: "PROFISSIONAL TESTE DE OLIVEIRA",
+        especialidades: [{ nome: "PSICOLOGIA" }],
+        horarios: [{ dia: "Sexta-feira", inicio: "09:00", fim: "13:30" }],
+      }),
+      profissional({
+        id: idSequencial(2),
+        nome: "OUTRA PROFISSIONAL",
+        especialidades: [{ nome: "PSICOLOGIA" }],
+        horarios: [{ dia: "Sábado", inicio: "08:00", fim: "12:00" }],
+      }),
+    ];
+    const r = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "psicologia",
+      medico: "Oliveira",
+      dia: "sabado",
+    });
+    expect(r.knowledge_status).not.toBe("not_found");
+    expect(r.doctors).toEqual(["PROFISSIONAL TESTE DE OLIVEIRA"]);
+    expect(r.days.join(" ")).toContain("Sexta-feira");
+    expect(r.instrucao).toContain("não atende em sabado");
+    // Sem nome, o dia continua filtrando a lista da especialidade.
+    const lista = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "psicologia",
+      dia: "sabado",
+    });
+    expect(lista.doctors).toEqual(["OUTRA PROFISSIONAL"]);
+  });
+
   it("exclui registros privados, arquivados e de outra clínica em todas as páginas", async () => {
     tetoServidor = 1;
     banco.servicos = [

@@ -2,8 +2,8 @@
 export const REGRA_IDADE_NAO_INFORMADA =
   "IDADE-01 — Para consulta, exame ou procedimento encontrado na fonte oficial, campo de idade vazio, nulo, com traço ou 'Não informado' significa idade não informada e nenhuma restrição etária cadastrada a aplicar. " +
   "Prossiga normalmente, inclusive para crianças e idosos: não invente idade mínima/máxima, não peça conferência nem ofereça encaminhamento apenas por essa ausência. " +
-  "Se o paciente perguntar sobre a idade, informe objetivamente que esse atendimento não possui restrição de idade cadastrada, sem acrescentar ressalva de confirmação técnica por idade. " +
-  "Não anuncie a ausência do campo quando não for perguntado. Preserve limites de idade explicitamente publicados para o mesmo atendimento e profissional, inclusive em observações ou complementos; zero é idade preenchida, não campo vazio. " +
+  "Só fale de idade quando houver limite publicado para o atendimento. Sem limite publicado, não mencione idade nem ausência de restrição, inclusive quando o paciente apenas informar a idade (ex.: 'ela tem 15 anos'). " +
+  "Somente se o paciente perguntar diretamente se existe restrição ou idade mínima, responda objetivamente que esse atendimento não possui restrição de idade cadastrada, sem ressalva de confirmação técnica por idade. Preserve limites de idade explicitamente publicados para o mesmo atendimento e profissional, inclusive em observações ou complementos; zero é idade preenchida, não campo vazio. " +
   "Não copie restrições de outro exame, consulta ou profissional. Esta exceção à regra de dados ausentes vale somente para idade: não dispensa preparo, pedido médico ou outros requisitos e não constitui avaliação de segurança clínica individual. Falha de leitura, item não encontrado ou conflito de dados não são campo vazio.";
 
 /** Reconhece somente marcadores de ausência; não apaga critérios clínicos ou numéricos. */
