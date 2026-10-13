@@ -90,6 +90,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
   /** Combinações "especialidadeId|tipo" existentes em serviços ativos. */
   const [paresEspTipo, setParesEspTipo] = useState<Set<string>>(new Set());
+  /** Serviços ativos vinculados a cada especialidade (especialidadeId → ids). */
+  const [procsPorEsp, setProcsPorEsp] = useState<Map<string, Set<string>>>(new Map());
   const [loading, setLoading] = useState(false);
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
@@ -166,6 +168,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     try {
       const tipoDe = new Map(allProcs.map((p) => [p.id, (p.tipo ?? "").toLowerCase()]));
       const pares = new Set<string>();
+      const porEsp = new Map<string, Set<string>>();
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
           .from("procedimento_especialidades")
@@ -178,10 +181,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           if (t === undefined) continue; // serviço inativo/de outra clínica
           pares.add(`${row.especialidade_id}|${t}`);
           pares.add(`${row.especialidade_id}|`);
+          const ids = porEsp.get(row.especialidade_id) ?? new Set<string>();
+          ids.add(row.procedimento_id);
+          porEsp.set(row.especialidade_id, ids);
         }
         if (page.length < PAGE) break;
       }
       setParesEspTipo(pares);
+      setProcsPorEsp(porEsp);
     } catch {
       /* aviso é opcional */
     }
@@ -951,6 +958,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         clinicaId={clinicaId}
         espOpts={espOpts}
         procOpts={procOpts}
+        procsPorEsp={procsPorEsp}
         onSaved={async () => {
           setNovoOpen(false);
           await load();
@@ -963,6 +971,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         clinicaId={clinicaId}
         espOpts={espOpts}
         procOpts={procOpts}
+        procsPorEsp={procsPorEsp}
         regra={editRegra}
         onSaved={async () => {
           setEditRegra(null);
@@ -1159,6 +1168,7 @@ function NovaRegraDialog({
   clinicaId,
   espOpts,
   procOpts,
+  procsPorEsp,
   onSaved,
   regra,
 }: {
@@ -1168,6 +1178,7 @@ function NovaRegraDialog({
   clinicaId: string;
   espOpts: Array<{ value: string; label: string }>;
   procOpts: Array<{ value: string; label: string; tipo: string | null }>;
+  procsPorEsp: Map<string, Set<string>>;
   onSaved: () => void | Promise<void>;
   regra?: CbRegra | null;
 }) {
@@ -1276,11 +1287,23 @@ function NovaRegraDialog({
     /* eslint-disable-next-line */
   }, [open, r.procedimento_id, convenioId]);
 
+  // Serviço específico depende da Especialidade e da Categoria escolhidas.
+  // Sem especialidade (ou se o vínculo não pôde ser carregado), lista todos.
+  const filtraPorEsp = !!r.especialidade_id && procsPorEsp.size > 0;
   const procOptsFiltrados = useMemo(() => {
-    if (!r.tipo) return procOpts;
-    const t = r.tipo.toLowerCase();
-    return procOpts.filter((o) => o.value === "__any__" || (o.tipo ?? "").toLowerCase() === t);
-  }, [procOpts, r.tipo]);
+    const t = r.tipo?.toLowerCase() ?? null;
+    const daEsp = filtraPorEsp
+      ? (procsPorEsp.get(r.especialidade_id as string) ?? new Set<string>())
+      : null;
+    return procOpts.filter(
+      (o) =>
+        o.value === "__any__" ||
+        ((!t || (o.tipo ?? "").toLowerCase() === t) && (!daEsp || daEsp.has(o.value))),
+    );
+  }, [procOpts, procsPorEsp, filtraPorEsp, r.especialidade_id, r.tipo]);
+  const espNome = r.especialidade_id
+    ? espOpts.find((o) => o.value === r.especialidade_id)?.label
+    : undefined;
   const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
   const excModo = r.excedente_modo ?? "percentual_particular";
 
@@ -1447,7 +1470,16 @@ function NovaRegraDialog({
             />
             <p className="text-[12px] text-muted-foreground">
               Quando escolhido, esta regra vale apenas para este serviço.
-              {r.tipo ? ` Mostrando apenas serviços da categoria "${r.tipo}".` : ""}
+              {filtraPorEsp && espNome && r.tipo
+                ? ` Mostrando apenas serviços de ${espNome} na categoria "${r.tipo}".`
+                : filtraPorEsp && espNome
+                  ? ` Mostrando apenas serviços de ${espNome}.`
+                  : r.tipo
+                    ? ` Mostrando apenas serviços da categoria "${r.tipo}".`
+                    : ""}
+              {filtraPorEsp && procOptsFiltrados.length <= 1
+                ? " Nenhum serviço ativo vinculado a esta combinação."
+                : ""}
             </p>
           </div>
 
