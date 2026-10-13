@@ -15,14 +15,13 @@
 import { normalizarRespostaInformal } from "./resposta-afirmativa";
 
 export const TEXTO_MODALIDADE_PELA_EQUIPE =
-  "Quem informa a forma de atendimento (horário marcado, ordem de chegada ou ficha) é a nossa equipe de atendimento.";
+  "Quem informa a forma de atendimento (horário marcado, ordem de chegada ou ficha) é a nossa recepção.";
 
 /** Valor do campo de modalidade entregue à IA quando o catálogo não a traz. */
-export const MODALIDADE_INFORMADA_PELA_EQUIPE =
-  "informada pela equipe de atendimento (não cadastrada para a Nina)";
+export const MODALIDADE_INFORMADA_PELA_EQUIPE = "informada pela nossa recepção";
 
 export const REGRA_MODALIDADE_NAO_INFORMADA =
-  "- Modalidade (horario marcado, ordem de chegada ou ficha): so fale dela quando o paciente perguntar como funciona o atendimento; no fluxo normal nao mencione. Excecao: ordem de chegada sem pre-agendamento quando o paciente quer marcar (diga que nao precisa agendar, basta comparecer). Quando perguntarem: com modalidade no cadastro, informe exatamente a cadastrada; sem modalidade, diga que quem informa a forma de atendimento e a nossa equipe de atendimento, nunca que a informacao nao consta no sistema, no cadastro ou na base.";
+  "- Modalidade (horario marcado, ordem de chegada ou ficha): so fale dela quando o paciente perguntar como funciona o atendimento; no fluxo normal nao mencione. Excecao: ordem de chegada sem pre-agendamento quando o paciente quer marcar (diga que nao precisa agendar, basta comparecer). Quando perguntarem: com modalidade no cadastro, informe exatamente a cadastrada; sem modalidade, diga que quem informa a forma de atendimento e a nossa recepcao, nunca que a informacao nao consta no sistema, no cadastro ou na base.";
 
 const ASSUNTO =
   /\b(?:modalidade|forma de atendimento|ordem de chegada|hora marcada|horario marcado|horario certinho|por ficha|pre-?agendamento)\b/;

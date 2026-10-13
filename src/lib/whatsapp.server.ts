@@ -1630,6 +1630,17 @@ async function gerarRespostaNinaInterno(
         texto: REGRA_AGENDAMENTO_POR_ITEM,
       });
   }
+  // Regra de 13/10/2026, todos os casos: o que o cadastro não traz quem passa é
+  // a recepção; a Nina não supõe nem diz que a informação "não está cadastrada".
+  const { REGRA_INFORMACAO_NAO_CADASTRADA } = await import("@/lib/nina/informacao-nao-cadastrada");
+  instrucoesAdicionaisTurno.push({
+    codigo: "INFORMACAO_NAO_CADASTRADA",
+    nivel: "inegociavel",
+    origem: "src/lib/nina/informacao-nao-cadastrada.ts",
+    motivo:
+      "Informação que o cadastro não traz é passada pela recepção, sem suposição nem menção a cadastro.",
+    texto: REGRA_INFORMACAO_NAO_CADASTRADA,
+  });
   const { regraSaudacaoPeriodo } = await import("@/lib/nina/resposta/saudacao-periodo");
   instrucoesAdicionaisTurno.push({
     codigo: "SAUDACAO_PELO_HORARIO",
@@ -4674,6 +4685,23 @@ async function gerarRespostaNinaInterno(
       transformar(
         "modalidade.informada_pela_equipe",
         "Modalidade não informada: quem informa é a equipe de atendimento",
+        antes,
+        resposta,
+      );
+    }
+  }
+  // Informação que o cadastro não traz (regra de 13/10/2026, todos os casos):
+  // frase que expõe a falta de cadastro vira a orientação da recepção.
+  if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && resposta.trim()) {
+    const { corrigirInformacaoNaoCadastrada } =
+      await import("@/lib/nina/informacao-nao-cadastrada");
+    const corrigida = corrigirInformacaoNaoCadastrada(resposta);
+    if (corrigida !== resposta) {
+      const antes = resposta;
+      resposta = corrigida;
+      transformar(
+        "informacao.nao_cadastrada_recepcao",
+        "Informação que o cadastro não traz: quem passa é a recepção",
         antes,
         resposta,
       );

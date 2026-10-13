@@ -69,7 +69,7 @@ export function orientacaoModalidade(m: ModalidadeResolvida): string {
     case "ficha":
       return "O atendimento é por ficha, seguindo a numeração. Esse horário não é garantia da hora da consulta.";
     default:
-      return "Quem informa a forma de atendimento (horário marcado, ordem de chegada ou ficha) é a nossa equipe de atendimento. Não diga que a informação não consta no sistema e não prometa horário, ficha ou pré-agendamento.";
+      return "Quem informa a forma de atendimento (horário marcado, ordem de chegada ou ficha) é a nossa recepção. Não diga que a informação não consta no sistema e não prometa horário, ficha ou pré-agendamento.";
   }
 }
 
