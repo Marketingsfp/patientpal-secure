@@ -230,6 +230,9 @@ export type ResumoLigacoes = {
   pessoas: { distintas: number; nuncaFalaram: number; pctNunca: number };
   retorno: { numero: string; tentativas: number; primeira: string; ultima: string }[];
   retornoTotal: number;
+  porDiaSemana: (ResumoContagem & { dow: number; diasNoPeriodo: number; mediaPorDia: number })[];
+  /** Chave = dia ISO (1 seg … 7 dom); [abre, fecha) ou null = fechado. */
+  horarios: Record<string, [number, number] | null>;
 };
 
 /** Contas do período feitas no banco (sem depender de quantas linhas viriam). */

@@ -29,8 +29,25 @@ type Dados = Awaited<ReturnType<typeof ligacoesParaAnalise>>;
 type Cota = Awaited<ReturnType<typeof cotaIACoach>>;
 
 const TZ = "America/Sao_Paulo";
-const HORA_ABRE = 8;
-const HORA_FECHA = 17;
+const DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const NOMES_DIA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
+/** Ex.: "Horário considerado: segunda a sexta 8h–17h, sábado 8h–13h, domingo fechado." */
+function descreverHorarios(h: Record<string, [number, number] | null>): string {
+  const txt = (d: number) => {
+    const j = h[String(d)];
+    return Array.isArray(j) ? `${j[0]}h–${j[1]}h` : "fechado";
+  };
+  const partes: string[] = [];
+  let i = 1;
+  while (i <= 7) {
+    let f = i;
+    while (f < 7 && txt(f + 1) === txt(i)) f++;
+    const nome = f > i ? `${NOMES_DIA[i - 1]} a ${NOMES_DIA[f - 1]}` : NOMES_DIA[i - 1];
+    partes.push(`${nome} ${txt(i)}`);
+    i = f + 1;
+  }
+  return `Horário considerado: ${partes.join(", ")}.`;
+}
 const fmtN = (n: number) => n.toLocaleString("pt-BR");
 const pct = (n: number) => `${n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const diaSP = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: TZ });
@@ -111,6 +128,10 @@ export function AnaliseLigacoes({
 
   const porHora = resumo?.porHora ?? [];
   const maxHora = Math.max(1, ...porHora.map((h) => h.recebidas));
+  const porDia = resumo?.porDiaSemana ?? [];
+  const maxDia = Math.max(1, ...porDia.map((d) => d.recebidas));
+  const horarios = resumo?.horarios ?? {};
+  const janelaUtil = horarios["1"] ?? [8, 17];
   const maxFaixa = Math.max(1, ...(resumo?.tempoTocando ?? []).map((f) => f.n));
   const tocou30 = (resumo?.tempoTocando ?? [])
     .filter((f) => f.faixa === "30-59s" || f.faixa === ">=60s")
@@ -218,7 +239,7 @@ export function AnaliseLigacoes({
           <h3 className="mb-3 font-medium">Ligações recebidas por hora do dia</h3>
           <div className="flex h-48 items-end gap-1">
             {porHora.map((h) => {
-              const fora = h.hora < HORA_ABRE || h.hora >= HORA_FECHA;
+              const fora = h.hora < janelaUtil[0] || h.hora >= janelaUtil[1];
               return (
                 <div
                   key={h.hora}
@@ -240,12 +261,45 @@ export function AnaliseLigacoes({
           <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-primary/70" />Atendidas</span>
             <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-destructive/70" />Não atendidas</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-muted" />Fora do horário</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-muted" />Fora do horário (dias úteis)</span>
             <span>Número acima da barra: % perdido naquela hora.</span>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Considerando {HORA_ABRE}h às {HORA_FECHA}h como horário de funcionamento.
+          <p className="mt-2 text-xs text-muted-foreground">{descreverHorarios(horarios)}</p>
+          <p className="mt-1 rounded bg-accent/40 px-2 py-1 text-[11px] text-accent-foreground">
+            O horário de sábado foi inferido das ligações atendidas, não confirmado com a clínica — avise se estiver errado.
           </p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <h3 className="mb-3 font-medium">Por dia da semana</h3>
+          <div className="flex h-52 items-end gap-2">
+            {porDia.map((d) => {
+              const fechado = !Array.isArray(horarios[String(d.dow)]);
+              return (
+                <div
+                  key={d.dow}
+                  className={`flex flex-1 flex-col items-center gap-1 rounded-sm ${fechado ? "bg-muted/60" : ""}`}
+                  title={`${DIAS[d.dow - 1]}: ${d.atendidas} atendidas, ${d.naoAtendidas} não atendidas, ${d.diasNoPeriodo} dia(s) com ligação`}
+                >
+                  <span className="h-4 text-[10px] font-medium text-destructive">
+                    {d.recebidas ? `${Math.round(d.pctPerdido)}%` : ""}
+                  </span>
+                  <div className="flex w-full flex-col justify-end" style={{ height: "8rem" }}>
+                    <div className="w-full rounded-t bg-destructive/70" style={{ height: `${(d.naoAtendidas / maxDia) * 100}%` }} />
+                    <div className="w-full bg-primary/70" style={{ height: `${(d.atendidas / maxDia) * 100}%` }} />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{DIAS[d.dow - 1]}{fechado ? " (fechado)" : ""}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {d.mediaPorDia.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}/dia
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="inline-block h-2 w-3 bg-muted" />Fechado</span>
+            <span>Número acima: % perdido. Embaixo: média de ligações por dia que teve ligação.</span>
+          </div>
         </div>
 
         {resumo ? (
