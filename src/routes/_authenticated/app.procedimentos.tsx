@@ -656,13 +656,30 @@ function ProcedimentosPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [open, form.valor_dinheiro, form.valor_pix_cartao, regras, convenios]);
 
-  const grupos = useMemo(() => {
-    const s = new Set<string>();
+  // Opções do filtro de Especialidade: só as que algum serviço da unidade usa
+  // (no campo Especialidade ou nas marcadas em "Especialidades em que este
+  // serviço aparece"). Grafia do serviço que não existe no catálogo entra
+  // como opção própria — assim nenhuma opção do filtro devolve lista vazia.
+  const opcoesFiltroEspecialidade = useMemo(() => {
+    const usadas = new Map<string, string>();
+    const idsVinculados = new Set<string>();
+    vincEspMap.forEach((ids) => ids.forEach((id) => idsVinculados.add(id)));
     items.forEach((p) => {
-      if (p.grupo) s.add(p.grupo);
+      const k = especialidadeKey(p.grupo);
+      if (k && !usadas.has(k)) usadas.set(k, p.grupo!.trim());
     });
-    return Array.from(s).sort();
-  }, [items]);
+    const opcoes = new Map<string, string>();
+    especialidades.forEach((e) => {
+      const k = especialidadeKey(e.nome);
+      if (usadas.has(k) || idsVinculados.has(e.id)) opcoes.set(k, e.nome);
+    });
+    usadas.forEach((nome, k) => {
+      if (!opcoes.has(k)) opcoes.set(k, nome);
+    });
+    return Array.from(opcoes.values()).sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [items, especialidades, vincEspMap]);
 
   const filtrados = useMemo(() => {
     const norm = (s: string) =>
@@ -1285,9 +1302,9 @@ function ProcedimentosPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Especialidades</SelectItem>
-              {especialidades.map((e) => (
-                <SelectItem key={e.id} value={e.nome}>
-                  {e.nome}
+              {opcoesFiltroEspecialidade.map((nome) => (
+                <SelectItem key={nome} value={nome}>
+                  {nome}
                 </SelectItem>
               ))}
             </SelectContent>
