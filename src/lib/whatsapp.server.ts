@@ -3,6 +3,8 @@ import { normalizarTelefone, telefoneParaFiltro } from "@/lib/atendimento/telefo
 import { dadosPublicosClinicaGrupo } from "@/lib/nina/clinicas-grupo";
 import { agoraParaNina, saudacaoPorHorarioServidor } from "@/lib/nina-agora";
 import {
+  avisoEspecialidadeNaoOferecida,
+  encaminhamentoEspecialidadeNaoOferecida,
   encaminhamentoSemRegistro,
   MOTIVO_SEM_REGISTRO,
   MOTIVO_MEDICO_SEM_REGISTRO,
@@ -2591,7 +2593,10 @@ async function gerarRespostaNinaInterno(
         ? { resumo: `${CAUSA_SFP_OUTRA_UNIDADE} A equipe deve continuar o atendimento.` }
         : {}),
     };
-    if (await reterTransferenciaParaDados(argumentos)) return;
+    // Especialidade que a clínica não oferece: o paciente sabe disso antes de
+    // pedir os dados ou de ser transferido.
+    const avisoNaoOferecida = avisoEspecialidadeNaoOferecida(argumentos.motivo);
+    if (await reterTransferenciaParaDados(argumentos, avisoNaoOferecida ?? "")) return;
     const origem =
       ausencia &&
       [MOTIVO_IDENTIFICACAO_PENDENTE, MOTIVO_MEDICO_NAO_IDENTIFICADO].includes(ausencia.motivo)
@@ -2612,7 +2617,12 @@ async function gerarRespostaNinaInterno(
     fluxoEstado.appointment.slot_options = null;
     fluxoEstado.flow.stage = "HANDOFF";
     finalizacaoHandoff = {
-      texto: respostaSemRegistro(confirmado, opcoes?.teste === true),
+      texto: [
+        confirmado ? avisoNaoOferecida : null,
+        respostaSemRegistro(confirmado, opcoes?.teste === true),
+      ]
+        .filter(Boolean)
+        .join(" "),
       textoModelo: textoModeloAtual,
       handoffConfirmado: confirmado,
       motivo: argumentos.motivo,
@@ -2908,7 +2918,8 @@ async function gerarRespostaNinaInterno(
       ctxFerramentas.esclarecimentoCatalogo = perguntasDoTurno.pendentes[0]?.esclarecimento;
     const ausencia =
       encaminharAposEsclarecimento(referenciaAnterior, r, mensagemPaciente) ??
-      encaminhamentoSemRegistro(r, args);
+      encaminhamentoSemRegistro(r, args) ??
+      encaminhamentoEspecialidadeNaoOferecida(r);
     if (ausencia) await encaminharRegraCatalogo(nome, ausencia);
     else if (
       r.success &&

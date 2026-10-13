@@ -2,6 +2,37 @@ import type { ResultadoBroker } from "./tool-broker";
 
 export const MOTIVO_SEM_REGISTRO =
   "CATALOGO_SEM_REGISTRO: atendimento solicitado não encontrado na base publicada";
+export const PREFIXO_ESPECIALIDADE_NAO_OFERECIDA = "ESPECIALIDADE_NAO_OFERECIDA";
+
+/**
+ * A clínica não oferece o atendimento procurado (Jev, fase 3): encaminha à
+ * recepção para orientar (opção escolhida em 13/10/2026).
+ */
+export function encaminhamentoEspecialidadeNaoOferecida(r: ResultadoBroker) {
+  const d = r.dados as {
+    limitacao_catalogo?: { codigo?: string; pedido?: string } | null;
+  } | null;
+  const limitacao = d?.limitacao_catalogo;
+  if (limitacao?.codigo !== PREFIXO_ESPECIALIDADE_NAO_OFERECIDA) return null;
+  const pedido =
+    String(limitacao.pedido ?? "")
+      .trim()
+      .slice(0, 120) || "o atendimento procurado";
+  return {
+    motivo: `${PREFIXO_ESPECIALIDADE_NAO_OFERECIDA}: ${pedido}`,
+    resumo: `O paciente procura ${pedido}, que a clínica não oferece (nenhum atendimento publicado corresponde). A recepção deve orientar o paciente.`,
+    urgencia: "normal" as const,
+  };
+}
+
+/** Frase ao paciente quando a clínica não oferece o atendimento procurado. */
+export function avisoEspecialidadeNaoOferecida(motivo: string): string | null {
+  const m = new RegExp(`^${PREFIXO_ESPECIALIDADE_NAO_OFERECIDA}:\\s*(.+)$`).exec(motivo.trim());
+  if (!m) return null;
+  const pedido = m[1]!.trim();
+  return `Não temos atendimento de ${pedido.charAt(0).toLocaleUpperCase("pt-BR")}${pedido.slice(1)} aqui na clínica.`;
+}
+
 export const MOTIVO_MEDICO_SEM_REGISTRO =
   "CATALOGO_MEDICO_SEM_REGISTRO: médico informado não encontrado na base publicada";
 

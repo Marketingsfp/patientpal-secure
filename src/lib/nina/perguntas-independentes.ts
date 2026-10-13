@@ -444,7 +444,11 @@ export function criarPerguntasDoTurno(
       return {
         ...lista[0]!,
         pendenciasIdentificacao: lista.map((p) => ({ ...p, pendenciasIdentificacao: undefined })),
-        esclarecimento: { tipo: "procedimento", opcoes: [], pergunta: perguntas(lista) },
+        esclarecimento: {
+          tipo: "procedimento",
+          opcoes: [],
+          pergunta: perguntas(pendenciasAPerguntar("", lista)),
+        },
       };
     },
   };
@@ -480,7 +484,7 @@ export function pendenciasAPerguntar(
     return !(opcoes.length && opcoes.every((o) => texto.includes(o)));
   });
   // Opções contidas nas de outra pendência mantida já são perguntadas por ela.
-  return restantes.filter((p, i) => {
+  const semContidas = restantes.filter((p, i) => {
     const opcoes = opcoesDe(p);
     if (!opcoes.length) return true;
     return !restantes.some((q, j) => {
@@ -490,6 +494,19 @@ export function pendenciasAPerguntar(
       return contidas && (outras.size > opcoes.length || j < i);
     });
   });
+  // O mesmo pedido pesquisado de jeitos diferentes ("pneumologia" e "pneumo"),
+  // sem opções a escolher, vira uma pergunta só (homologação 13/10/2026).
+  const mesmoPedido = (a: string, b: string) =>
+    a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a));
+  const mantidas: ConhecimentoSessao[] = [];
+  for (const p of semContidas) {
+    const termo = compacto(p.consulta.termo);
+    const repetida =
+      !opcoesDe(p).length &&
+      mantidas.some((q) => !opcoesDe(q).length && mesmoPedido(compacto(q.consulta.termo), termo));
+    if (!repetida) mantidas.push(p);
+  }
+  return mantidas;
 }
 
 export function comporRespostaParcial(
