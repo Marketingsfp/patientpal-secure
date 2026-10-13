@@ -1,49 +1,55 @@
-# Revisão de segurança completa — 12/10/2026 04:10 UTC (somente leitura)
+# Revisão de segurança completa — 13/10/2026 04:07 UTC (somente leitura)
 
-Nada foi alterado. Cada correção abaixo depende de aprovação, uma por vez.
+Nada foi alterado. Cada correção depende de aprovação, uma por vez.
 
-## Foco das últimas 24h
+## Foco: código novo desde 12/10/2026 04:00 UTC (PRs #26 a #35)
 
-### 1. Foto do pedido pelo celular (`/p/pedido/<código>`, `orcamento_foto_sessoes`)
-Conferido: RLS ligada; visitante sem acesso (REVOKE ALL de anon); funcionário só vê, cria e apaga a própria sessão da própria clínica; sem UPDATE pelo navegador; código de 48 caracteres aleatórios (não dá para adivinhar); validade de 10 min; até 5 fotos por sessão; reserva atômica evita leitura dupla; a foto não é guardada.
+### 1. Atendimentos estruturados: conversão em lote, sincronização e edição com IA (`src/lib/nina/catalogo.functions.ts`)
+Conferido: todas as funções exigem login no servidor (`requireSupabaseAuth`); as que gravam ou chamam IA conferem admin/gestor no servidor (`exigirAdmin`); conversão confere a flag `catalogo_estruturado` no servidor; toda leitura e gravação filtra pela clínica do pedido e roda como o próprio usuário (sem chave de serviço), e as regras do banco de `nina_cat_servicos`/`nina_cat_profissionais` também exigem admin/gestor para gravar; conferência de versão (`updated_at`) evita sobrescrever edição de outra pessoa; prévia não grava.
 
-- **Média — sessão com dados do paciente pode ficar até ~1h10 no banco.** `resultado` guarda nome do paciente, médico e exames. Se o computador não buscar o resultado, a linha só é apagada quando alguém envia outra foto e já passou 1h do vencimento. Sem envio novo, fica indefinidamente.
-  Correção: incluir a limpeza das sessões vencidas no agendamento de retenção (ou um agendamento próprio a cada 10 min) e reduzir a margem de 1h.
-- **Baixa — rota pública sem limite por IP.** Cada sessão válida permite 5 leituras de IA. Só funciona com um código válido gerado por um funcionário logado, então o risco é baixo. Correção: limite por IP/minuto, como já existe no totem.
-- **Baixa — tamanho de envio de até 12 MB.** O celular já comprime para 8 MB, mas o servidor aceita até 12 MB. Correção: baixar o limite do servidor para cerca de 9 MB.
+- **Média — duas fontes de papel diferentes.** O catálogo lê o papel em `clinica_memberships.role`; as regras das flags (`clinica_feature_flags`) leem em `user_roles` (`has_role`). Uma pessoa pode ser gestora numa fonte e não na outra. Correção: unificar a fonte (mesmo achado antigo de `is_financeiro_clinica`).
+- **Baixa — a flag não é barreira contra gestor.** Qualquer admin/gestor da clínica pode ligar `catalogo_estruturado` sozinho pelas regras do banco. Serve como liberação gradual, não como proteção. Correção (se a flag precisar ser barreira): gravar flags só pelo administrador da plataforma. Possível regra de negócio — validar com a equipe da clínica.
+- **Baixa — publicação com IA aceita os dados vindos do navegador.** `publicarEdicoesCatalogoIA` grava o `dados` enviado pela tela, não a proposta gerada no servidor. Só admin/gestor chega aqui e ele já pode editar à mão, então não amplia acesso. Correção: guardar a proposta no servidor e publicar por referência.
+- **Baixa — texto da clínica vai para a IA.** O texto colado é delimitado por marcas e o pedido fica como mensagem de usuário. Risco só de resultado estranho na prévia, que precisa de confirmação humana. Sem ação.
 
-### 2. Retirada do motor de confiança
-Conferido: o código não usa mais as tabelas (passo anterior). No banco, as 3 tabelas continuam com RLS e só membros da clínica leem.
-- **Baixa — permissões antigas sobrando.** `nina_confianca_propostas` ainda aceita INSERT/UPDATE de membros, e `nina_confianca_propostas_guard` pode ser chamada por visitantes (função comum, sem efeito sozinha). Ninguém usa isso. Correção: já está coberta pelo SQL de exclusão pendente; até lá, sem ação.
+### 2. Agendamento por item do catálogo (`src/lib/nina/fluxo-agendamento-item.ts`)
+Conferido: o módulo é puro (sem banco, sem rede); só decide o próximo passo. A reserva continua no executor já existente do WhatsApp.
+- **Não verificado:** o executor de vagas/reserva em `src/lib/whatsapp.server.ts` não foi relido linha a linha nesta rodada (amarração da clínica e do paciente à conversa).
 
-### 3. Retenção de 6 meses (`nina_zap_retencao_executar`)
-Conferido: SECURITY DEFINER com `search_path` fixo; executar só pelo sistema (revogado de PUBLIC, anon e authenticated); agendamento `nina-zap-retencao-dados` ativo no minuto 23; lotes limitados por execução; `nina-resumos-retencao-7-dias` intacto.
-- **Informativo:** a exclusão é permanente e inclui conversas, mensagens do WhatsApp e confirmações de consulta com mais de 6 meses. Possível regra de negócio — validar com a equipe da clínica se 6 meses atende à guarda exigida para comunicação com o paciente.
+### 3. Orçamentos com filtro de período (`src/routes/_authenticated/app.orcamentos.tsx`)
+Conferido: lotes de 150 ids por consulta, pelo navegador com as regras do banco; a busca por nome passa por `sanitizePostgrestSearch` antes do `.or()`. Sem achado.
 
-## Achados gerais (varredura de 09/10 e consultas de hoje)
+### 4. Retorno compacto do catálogo e remoção de blocos de prompt
+Conferido por nomes de arquivo: mudanças só em texto/regras da Nina, sem nova rota, tabela ou permissão. Sem achado de segurança; risco é de comportamento, não de acesso.
+
+## Achados gerais (banco consultado agora)
 
 | Severidade | Achado | Local | Correção sugerida |
 |---|---|---|---|
-| Alta (já corrigida, falta publicar) | Voz da Nina sem login | `src/routes/api/nina-voz.ts` | Publicar a correção já feita; depois marcar como resolvido |
-| Média | Funcionário pode mandar falas "da assistente" para o modelo | `src/routes/api/nina-fala.ts` | Aceitar só o papel `user`/`assistant` validado e montar o histórico no servidor |
-| Média | Texto livre do médico entra como instrução de sistema | `src/lib/consulta-ia.functions.ts` | Enviar `contexto` como mensagem de usuário, não de sistema; validar papéis |
-| Média | Homologação do Francisco aceita instrução do navegador | `src/lib/francisco/functions.ts` | Ler a instrução salva no banco, não a do pedido |
-| Média | Código pode rodar na impressão da composição corporal | `src/components/medico/paciente-dialogs.tsx` | Escapar os textos antes de montar a página de impressão |
-| Média | Mensagens de qualquer site chegam na agenda do orçamento | `src/routes/_authenticated/app.orcamentos-agenda.tsx` | Conferir a origem da mensagem e não usar `"*"` como destino |
-| Baixa | Busca de aprendizados aceita sintaxe de filtro | `src/lib/nina/aprendizado.functions.ts` (linha 55) | Usar `sanitizePostgrestSearch` antes do `.or()` |
-| Baixa | Exportação CSV da agenda pode virar fórmula no Excel | `src/lib/export-csv.ts` | Prefixar com `'` células que começam com `= + - @` |
-| Baixa | Tabelas de cópia com permissão de leitura para visitante, mas sem regra | `backup_nina_cat_servicos_20261010_pedido`, `integracao_idempotencia`, `nina_remarcacoes_pendentes` | Hoje fechadas pela RLS; revogar a permissão de anon para não depender só disso |
-| Pendente (já conhecido) | Permissão por módulo aplicada na tela, não em todo o banco | várias tabelas antigas | Seguir a migração gradual para `assertAcessoModulo`/`has_module_access` |
+| Alta (corrigida, falta publicar) | Voz da Nina sem login | `src/routes/api/nina-voz.ts` | Publicar a correção já feita |
+| Média | Sessão da foto do pedido pode ficar no banco com nome do paciente | `orcamento_foto_sessoes` | Limpeza agendada das vencidas |
+| Média | Falas "da assistente" vindas do navegador | `src/routes/api/nina-fala.ts` | Montar histórico no servidor |
+| Média | Texto do médico como instrução de sistema | `src/lib/consulta-ia.functions.ts` | Enviar como mensagem de usuário |
+| Média | Homologação do Francisco aceita instrução do navegador | `src/lib/francisco/functions.ts` | Ler instrução salva no banco |
+| Média | Impressão da composição corporal sem escapar texto | `src/components/medico/paciente-dialogs.tsx` | Escapar antes de montar a página |
+| Média | Mensagens entre janelas aceitam qualquer origem | `app.orcamentos-agenda.tsx` | Conferir origem; não usar `"*"` |
+| Média | 71 funções privilegiadas chamáveis por visitante (igual a 10/10) | banco | Revogar acesso de visitante em lotes |
+| Baixa | 1 função sem `search_path` fixo; 6 extensões no esquema público | banco | Fixar `search_path`; mover extensões |
+| Baixa | 19 tabelas com proteção ligada e sem regra (fechadas) | banco | Revogar permissão de visitante |
+| Baixa | Busca de aprendizados sem saneamento | `src/lib/nina/aprendizado.functions.ts` | `sanitizePostgrestSearch` |
+| Baixa | CSV da agenda pode virar fórmula | `src/lib/export-csv.ts` | Prefixar `'` em `= + - @` |
+| Pendente | Permissão por módulo só na tela em tabelas antigas | várias | Migração gradual |
 
-Sem achado novo de segredo exposto: o token da Sufficit e as chaves de integração seguem só no servidor.
+Nenhum segredo exposto novo; tabelas sem proteção: 0.
 
-## Não verificado nesta rodada
-- Dependências: a varredura de pacotes não foi rodada agora.
-- Teste com usuário logado de verdade na rota da voz e na foto pelo celular.
+## Não verificado
+- Executor de reserva da Nina linha a linha.
+- Varredura de dependências.
+- Teste com usuário logado (gestor e recepção) nas telas novas do catálogo.
 
 ## Ordem sugerida
 1. Publicar a correção da voz (com autorização).
-2. Limpeza automática das sessões de foto vencidas.
-3. Instruções de IA vindas do navegador (`nina-fala`, `consulta-ia`, Francisco).
-4. Impressão e mensagens entre janelas.
+2. Unificar a fonte do papel (catálogo x flags x financeiro).
+3. Limpeza das sessões de foto vencidas.
+4. Instruções de IA vindas do navegador.
 5. Itens baixos.
