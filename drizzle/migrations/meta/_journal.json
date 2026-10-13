@@ -71,6 +71,13 @@
       "when": 1791775925989,
       "tag": "0009_retencao_mensagens_6_meses",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791902258442,
+      "tag": "0010_tel_chamadas",
+      "breakpoints": true
     }
   ]
 }

@@ -110,3 +110,46 @@ export const estadoConfigTelefonia = createServerFn({ method: "POST" })
     ]);
     return { config, tamanhoToken, outras };
   });
+
+const periodoObrigatorio = (data: unknown) =>
+  z
+    .object({
+      clinicaId: z.string().uuid(),
+      start: z.string().datetime(),
+      end: z.string().datetime(),
+    })
+    .parse(data);
+
+export const importarChamadasTelefonia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(periodoObrigatorio)
+  .handler(async ({ data, context }) => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "write");
+    const s = await import("./telefonia-sufficit.server");
+    return s.importarChamadasSufficit(data.clinicaId, { start: data.start, end: data.end });
+  });
+
+/** Ligações já importadas no período, lidas com a RLS de quem pediu. */
+export const listarChamadasTelefonia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(periodoObrigatorio)
+  .handler(async ({ data, context }) => {
+    const guard = await import("./guard.server");
+    const db = context.supabase as unknown as import("./guard.server").ClienteCoach;
+    await guard.garantirAcessoCoach(db, data.clinicaId, "write");
+    const { data: linhas, count, error } = await context.supabase
+      .from("tel_chamadas")
+      .select(
+        "id, inicio, duracao_seg, tarifado_seg, direcao, situacao, modelo, origem_numero, destino_numero, discado, did",
+        { count: "exact" },
+      )
+      .eq("clinica_id", data.clinicaId)
+      .gte("inicio", data.start)
+      .lte("inicio", data.end)
+      .order("inicio", { ascending: false })
+      .limit(500);
+    if (error) throw new Error("Não foi possível ler as ligações importadas.");
+    return { total: count ?? 0, linhas: linhas ?? [] };
+  });

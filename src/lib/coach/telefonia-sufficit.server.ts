@@ -325,3 +325,142 @@ export async function outrasClinicasComSufficit(
     chaves: linhas.filter((l) => l.clinica_id === id).map((l) => l.chave as ChaveSufficit),
   }));
 }
+
+/* ------------------------------------------------------------------ */
+/* Importação das ligações para tel_chamadas (aditiva, idempotente).   */
+/* ------------------------------------------------------------------ */
+
+export type ResultadoImportacao =
+  | { ok: true; lidas: number; inseridas: number; repetidas: number; erros: number; avisos: string[] }
+  | { ok: false; erro: string };
+
+const DIA_MS = 86_400_000;
+const MAX_DIAS_IMPORTACAO = 62;
+// Swagger v2 não declara teto para Limit/MaxRecords; testado com 20000 sem diferença.
+const LIMITE_POR_JANELA = "20000";
+
+function inteiroOuNulo(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : null;
+}
+
+/**
+ * Busca janela a janela (1 dia por chamada, para não depender de teto
+ * não documentado) e grava com upsert ignorando duplicatas. Nunca apaga,
+ * nunca sobrescreve uma linha já importada. Não registra números em log.
+ */
+export async function importarChamadasSufficit(
+  clinicaId: string,
+  periodo: { start: string; end: string },
+): Promise<ResultadoImportacao> {
+  const { normalizarTelefone } = await import("@/lib/telefonia/numero");
+  const ini = Date.parse(periodo.start);
+  const fim = Date.parse(periodo.end);
+  if (!Number.isFinite(ini) || !Number.isFinite(fim) || fim <= ini) {
+    return { ok: false, erro: "Período inválido." };
+  }
+  if (fim - ini > MAX_DIAS_IMPORTACAO * DIA_MS) {
+    return { ok: false, erro: `Período máximo de ${MAX_DIAS_IMPORTACAO} dias por importação.` };
+  }
+  let cred: CredenciaisSufficit;
+  try {
+    cred = await lerCredenciaisSufficit(clinicaId);
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message };
+  }
+  const token = cred.token.trim().replace(/^bearer\s+/i, "");
+
+  const registros: Record<string, unknown>[] = [];
+  for (let t = ini; t < fim; t += DIA_MS) {
+    const qs = new URLSearchParams({
+      ContextId: cred.objectId,
+      Start: new Date(t).toISOString(),
+      End: new Date(Math.min(t + DIA_MS, fim)).toISOString(),
+      Limit: LIMITE_POR_JANELA,
+      MaxRecords: LIMITE_POR_JANELA,
+    });
+    const r = await buscar(`${cred.base}/Telephony/Calls?${qs.toString()}`, {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    });
+    if ("erro" in r) return { ok: false, erro: r.erro };
+    if (!r.res.ok) {
+      return { ok: false, erro: `A Sufficit recusou a consulta (HTTP ${r.res.status}).` };
+    }
+    let corpo: unknown;
+    try {
+      corpo = await r.res.json();
+    } catch {
+      return { ok: false, erro: "A resposta da Sufficit não é JSON." };
+    }
+    if (!Array.isArray(corpo)) return { ok: false, erro: "A resposta da Sufficit não é uma lista." };
+    for (const x of corpo) if (x && typeof x === "object") registros.push(x as Record<string, unknown>);
+  }
+
+  const avisos: string[] = [];
+  let erros = 0;
+  const vistos = new Set<string>();
+  const linhas: Record<string, unknown>[] = [];
+  let duplicadosNaOrigem = 0;
+  for (const x of registros) {
+    const protocolo = typeof x.protocol === "string" ? x.protocol.trim() : "";
+    const inicio = typeof x.start === "string" ? Date.parse(x.start) : NaN;
+    if (!protocolo || !Number.isFinite(inicio)) {
+      erros++;
+      continue;
+    }
+    // A mesma chamada pode vir em duas janelas vizinhas (borda): conta como repetida.
+    if (vistos.has(protocolo)) {
+      duplicadosNaOrigem++;
+      continue;
+    }
+    vistos.add(protocolo);
+    linhas.push({
+      clinica_id: clinicaId,
+      origem: "sufficit",
+      externo_id: protocolo,
+      inicio: new Date(inicio).toISOString(),
+      duracao_seg: inteiroOuNulo(x.duration),
+      tarifado_seg: inteiroOuNulo(x.billing),
+      direcao: typeof x.direction === "string" ? x.direction : null,
+      situacao: typeof x.disposition === "string" ? x.disposition : null,
+      modelo: typeof x.model === "string" ? x.model : null,
+      origem_numero: normalizarTelefone(x.origin).e164 ?? (x.origin as string | null) ?? null,
+      destino_numero:
+        normalizarTelefone(x.destination).e164 ?? (x.destination as string | null) ?? null,
+      discado: normalizarTelefone(x.dialed).e164 ?? (x.dialed as string | null) ?? null,
+      did: normalizarTelefone(x.did).e164 ?? (x.did as string | null) ?? null,
+      payload: x,
+    });
+  }
+  if (erros) avisos.push(`${erros} registro(s) sem protocolo ou sem data foram ignorados.`);
+
+  let inseridas = 0;
+  for (let i = 0; i < linhas.length; i += 500) {
+    const lote = linhas.slice(i, i + 500);
+    const { data, error } = await supabaseAdmin
+      .from("tel_chamadas")
+      .upsert(lote as never, {
+        onConflict: "clinica_id,origem,externo_id",
+        ignoreDuplicates: true,
+      })
+      .select("id");
+    if (error) {
+      // Só o código: a mensagem do banco pode citar valores da linha.
+      console.error("[coach/sufficit] gravação falhou:", error.code ?? "erro");
+      erros += lote.length;
+      continue;
+    }
+    inseridas += data?.length ?? 0;
+  }
+  const lidas = registros.length;
+  return {
+    ok: true,
+    lidas,
+    inseridas,
+    repetidas: lidas - inseridas - erros,
+    erros,
+    avisos: duplicadosNaOrigem
+      ? [...avisos, `${duplicadosNaOrigem} registro(s) vieram repetidos da Sufficit no mesmo período.`]
+      : avisos,
+  };
+}

@@ -15396,6 +15396,71 @@ export type Database = {
         }
         Relationships: []
       }
+      tel_chamadas: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          destino_numero: string | null
+          did: string | null
+          direcao: string | null
+          discado: string | null
+          duracao_seg: number | null
+          externo_id: string
+          id: string
+          inicio: string
+          modelo: string | null
+          origem: string
+          origem_numero: string | null
+          payload: Json
+          situacao: string | null
+          tarifado_seg: number | null
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          destino_numero?: string | null
+          did?: string | null
+          direcao?: string | null
+          discado?: string | null
+          duracao_seg?: number | null
+          externo_id: string
+          id?: string
+          inicio: string
+          modelo?: string | null
+          origem?: string
+          origem_numero?: string | null
+          payload: Json
+          situacao?: string | null
+          tarifado_seg?: number | null
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          destino_numero?: string | null
+          did?: string | null
+          direcao?: string | null
+          discado?: string | null
+          duracao_seg?: number | null
+          externo_id?: string
+          id?: string
+          inicio?: string
+          modelo?: string | null
+          origem?: string
+          origem_numero?: string | null
+          payload?: Json
+          situacao?: string | null
+          tarifado_seg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tel_chamadas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tipo_servico_unidade: {
         Row: {
           ativo: boolean
