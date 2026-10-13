@@ -7,6 +7,7 @@ import {
   modalidadeEstruturada,
   INSTRUCAO_ESTRUTURA_CATALOGO,
 } from "./catalogo-estrutura";
+import { PEDIDO_MEDICO_NAO_INFORMADO } from "./pedido-medico-recepcao";
 import { mapaCamposResultado } from "./catalogo-mapa-campos";
 import {
   horariosPorTipo,
@@ -229,7 +230,7 @@ export function servicoParaRegistro(s: ServicoPublicado): RegistroConhecimento {
           ? "Pedido médico: obrigatório para realizar este exame/procedimento."
           : estrutura.pedido_medico === "dispensado"
             ? "Pedido médico: dispensado para este exame/procedimento."
-            : null,
+            : PEDIDO_MEDICO_NAO_INFORMADO,
         estruturado || pagamentosJaDescritos(s.formas_pagamento, atendimentos)
           ? null
           : descricaoPagamentos(s.formas_pagamento),
@@ -351,7 +352,7 @@ export function profissionalParaRegistro(
           ? "Pedido médico: obrigatório para este atendimento."
           : estrutura.pedido_medico === "dispensado"
             ? "Pedido médico: dispensado para este atendimento."
-            : null,
+            : PEDIDO_MEDICO_NAO_INFORMADO,
         aviso ? `Aviso vigente: ${aviso}` : null,
         estruturado || pagamentosJaDescritos(p.formas_pagamento, atendimentos)
           ? null

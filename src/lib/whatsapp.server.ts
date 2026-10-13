@@ -4668,6 +4668,36 @@ async function gerarRespostaNinaInterno(
       );
     }
   }
+  // Pedido médico (regra de 13/10/2026): sem a informação no cadastro dos
+  // itens da conversa, a Nina não supõe; quem tira a dúvida é a recepção.
+  if (!finalizacaoHandoff && !houveHandoff && !turnoObsoleto && resposta.trim()) {
+    const referenciasPedido = (fluxoEstado.knowledge_context?.referencias ?? []).map(
+      (r) => r.registro,
+    );
+    const { lerEstrutura: lerEstruturaCatalogo } = await import("@/lib/nina/catalogo-estrutura");
+    const registrosPedido = [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais].filter(
+      (r) => referenciasPedido.includes(r.id),
+    );
+    if (
+      registrosPedido.length &&
+      registrosPedido.every(
+        (r) => lerEstruturaCatalogo(r.estrutura).pedido_medico === "nao_informado",
+      )
+    ) {
+      const { corrigirSuposicaoPedidoMedico } = await import("@/lib/nina/pedido-medico-recepcao");
+      const corrigida = corrigirSuposicaoPedidoMedico(resposta);
+      if (corrigida !== resposta) {
+        const antes = resposta;
+        resposta = corrigida;
+        transformar(
+          "pedido_medico.recepcao",
+          "Pedido médico não informado no cadastro: quem tira a dúvida é a recepção",
+          antes,
+          resposta,
+        );
+      }
+    }
+  }
   // Fluxo informar e encaminhar (regra de 13/10/2026): a mensagem de
   // informações não pergunta se pode encaminhar. A Nina espera a resposta; a
   // escolha de dia, horário ou profissional encaminha no turno seguinte.
