@@ -62,6 +62,19 @@ describe("dicionário por cadastro", () => {
       juntarVariacoes(["USG transvaginal"], ["usg TRANSVAGINAL", "USG transvaginal com Doppler"]),
     ).toEqual(["USG transvaginal", "USG transvaginal com Doppler"]);
   });
+  test("dúvidas e explicações longas do Astra não são recusadas", () => {
+    const longo = "Expressão ambígua que precisa de esclarecimento com a equipe. ".repeat(10);
+    expect(longo.length).toBeGreaterThan(350);
+    const r = validarSugestoesDicionario(
+      {
+        variacoes: [{ ...sugestao("mamografia das duas mamas"), explicacao: longo }],
+        duvidas: [longo],
+      },
+      contexto,
+    );
+    expect(r.duvidas).toEqual([longo.trim()]);
+    expect(r.variacoes[0]!.explicacao).toBe(longo.trim());
+  });
   test("não trunca silenciosamente excesso de variações ou texto inválido", () => {
     expect(() =>
       juntarVariacoes(
