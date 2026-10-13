@@ -112,7 +112,7 @@ export function fluxoDoRegistro(
 export function removerPerguntaDeAgendamento(texto: string): string {
   const blocos = texto.trimEnd().split(/\n{2,}/);
   const assunto =
-    /(primeir[oa] (?:horario|vaga|disponivel)|escolher|qual (?:dos|das|desses|dessas) profissiona|profissional prefere|deseja (?:agendar|marcar)|quer (?:agendar|marcar)|gostaria de (?:agendar|marcar)|disponibilidade|encaminh|posso (?:agendar|marcar|verificar))/;
+    /(primeir[oa] (?:horario|vaga|disponivel)|escolher|qual (?:dos|das|desses|dessas) profissiona|profissional prefere|deseja (?:agendar|marcar)|quer (?:agendar|marcar)|gostaria de (?:agendar|marcar)|disponibilidade|encaminh|transfer|posso (?:agendar|marcar|verificar))/;
   // Oferta de transferência escrita como afirmação ("posso transferir a
   // conversa…."): seria uma segunda oferta ao lado da pergunta do sistema.
   const ofertaAfirmada =
@@ -135,6 +135,38 @@ export function removerPerguntaDeAgendamento(texto: string): string {
     blocos.pop();
   }
   return blocos.join("\n\n");
+}
+
+/** A resposta da IA termina com uma pergunta ou oferta própria sobre marcar ou encaminhar? */
+export function terminaComOfertaDeAgendamento(texto: string): boolean {
+  const original = texto.trimEnd();
+  return Boolean(original) && removerPerguntaDeAgendamento(original) !== original;
+}
+
+const INTENCOES_DE_SEGUIMENTO = new Set(["agendamento", "disponibilidade", "medico", "horario"]);
+
+/**
+ * Intenção de agendar que vale para a sessão: depois que o paciente disse que
+ * quer marcar, escolher o profissional ou o horário ("pode ser a Valeria",
+ * "seria 9h") continua o agendamento. Pergunta nova não continua.
+ */
+export function intencaoDeAgendarNaSessao(p: {
+  intencaoNoTurno: boolean;
+  sessaoComIntencao: boolean;
+  intencoesTurno: readonly string[];
+  mensagem: string;
+}): boolean {
+  if (p.intencaoNoTurno) return true;
+  if (!p.sessaoComIntencao) return false;
+  if (!p.intencoesTurno.every((i) => INTENCOES_DE_SEGUIMENTO.has(i))) return false;
+  const t = normalizarRespostaInformal(p.mensagem ?? "");
+  if (
+    !t ||
+    /\?/.test(p.mensagem) ||
+    /^(?:qual|quais|quanto|quantos|que horas|onde|como|quando|tem|voces tem|existe)\b/.test(t)
+  )
+    return false;
+  return true;
 }
 
 /** Fluxo comum aos itens em discussão; itens com fluxos diferentes = indefinido. */

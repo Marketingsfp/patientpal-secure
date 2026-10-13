@@ -14,6 +14,7 @@ import {
 } from "./confidence/conhecimento-sessao";
 import type { OpcoesAgendamento, ConfirmacaoAgendamento } from "./agendamento-escolha";
 import type { ModalidadeAtendimento } from "./modalidade-atendimento";
+import { normalizarTransferenciaPendente } from "./dados-transferencia";
 
 export type { PendenciaEsclarecimento };
 
@@ -127,6 +128,10 @@ export type EstadoFluxoNina = {
    * para confirmar o horário (fluxo "informar e encaminhar", 12/10/2026).
    */
   oferta_encaminhamento?: import("./fluxo-agendamento-item").OfertaEncaminhamento | null;
+  /** Sessão em que o paciente disse que quer marcar (vale para as mensagens seguintes). */
+  intencao_agendar_sessao?: string | null;
+  /** Transferência aguardando nome completo e data de nascimento (pedidos uma vez). */
+  transferencia_pendente?: import("./dados-transferencia").TransferenciaPendente | null;
 };
 
 export function estadoVazio(): EstadoFluxoNina {
@@ -167,6 +172,8 @@ export function estadoVazio(): EstadoFluxoNina {
     greeting_waived: false,
     greeting_waived_by: null,
     oferta_encaminhamento: null,
+    intencao_agendar_sessao: null,
+    transferencia_pendente: null,
   };
 }
 
@@ -203,6 +210,9 @@ export function normalizarEstado(bruto: unknown): EstadoFluxoNina {
     greeting_waived: o["greeting_waived"] === true,
     greeting_waived_by: o["greeting_waived_by"] ?? null,
     oferta_encaminhamento: normalizarOferta(o["oferta_encaminhamento"]),
+    intencao_agendar_sessao:
+      typeof o["intencao_agendar_sessao"] === "string" ? o["intencao_agendar_sessao"] : null,
+    transferencia_pendente: normalizarTransferenciaPendente(o["transferencia_pendente"]),
   };
 }
 

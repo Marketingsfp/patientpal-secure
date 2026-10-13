@@ -1153,6 +1153,11 @@ mock.module("@/lib/nina/atendimento-fase3.server", () => ({
 mock.module("@/lib/nina/atendimento-fase6.server", () => ({
   flagFluxoFase6Ativa: async () => false,
 }));
+// Regra dos dados antes da transferência: ligada só quando o teste pede.
+mock.module("@/lib/nina/dados-transferencia-flag.server", () => ({
+  FLAG_NINA_DADOS_TRANSFERENCIA: "nina_dados_transferencia",
+  flagDadosTransferenciaAtiva: async () => process.env.NINA_FIXTURE_DADOS_TRANSFERENCIA === "1",
+}));
 mock.module("@/lib/nina/aprendizado.server", () => ({ recuperarAprendizados: async () => [] }));
 mock.module("@/lib/nina/instrucoes-runtime.server", () => ({
   promptInstrucoes: async () => ({
