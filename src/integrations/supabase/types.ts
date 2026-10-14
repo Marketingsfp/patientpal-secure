@@ -4988,6 +4988,7 @@ export type Database = {
           clinica_id: string
           created_at: string
           especialidade_id: string
+          removida: boolean
           updated_at: string
         }
         Insert: {
@@ -4995,6 +4996,7 @@ export type Database = {
           clinica_id: string
           created_at?: string
           especialidade_id: string
+          removida?: boolean
           updated_at?: string
         }
         Update: {
@@ -5002,6 +5004,7 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           especialidade_id?: string
+          removida?: boolean
           updated_at?: string
         }
         Relationships: [

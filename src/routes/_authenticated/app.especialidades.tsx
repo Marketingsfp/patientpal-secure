@@ -61,6 +61,8 @@ interface Esp {
   ativoGlobal: boolean;
   /** Ligada nesta unidade (sem linha = não aparece aqui). */
   ativoUnidade: boolean;
+  /** "Excluída" desta unidade: some da lista daqui; as outras unidades não mudam. */
+  removidaUnidade: boolean;
 }
 
 /** Aparece nas listas de escolha desta unidade? */
@@ -79,7 +81,9 @@ function EspecialidadesPage() {
 
   const [q, setQ] = useState("");
   const [qInput, setQInput] = useState("");
-  const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo">("todos");
+  const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo" | "removida">(
+    "todos",
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Esp | null>(null);
   const [form, setForm] = useState({ nome: "", descricao: "" });
@@ -87,6 +91,7 @@ function EspecialidadesPage() {
   const [alternando, setAlternando] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Esp | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [toRemove, setToRemove] = useState<Esp | null>(null);
 
   const {
     data: rows = [],
@@ -99,13 +104,16 @@ function EspecialidadesPage() {
         supabase.from("especialidades").select("id,nome,descricao,ativo").order("nome"),
         supabase
           .from("especialidade_unidade")
-          .select("especialidade_id,ativo")
+          .select("especialidade_id,ativo,removida")
           .eq("clinica_id", clinicaId),
       ]);
       if (esps.error) throw esps.error;
       if (daUnidade.error) throw daUnidade.error;
       const ligada = new Map(
         (daUnidade.data ?? []).map((r) => [r.especialidade_id, r.ativo] as const),
+      );
+      const removida = new Set(
+        (daUnidade.data ?? []).filter((r) => r.removida).map((r) => r.especialidade_id),
       );
       return (esps.data ?? []).map(
         (e): Esp => ({
@@ -114,6 +122,7 @@ function EspecialidadesPage() {
           descricao: e.descricao,
           ativoGlobal: e.ativo,
           ativoUnidade: ligada.get(e.id) ?? false,
+          removidaUnidade: removida.has(e.id),
         }),
       );
     },
@@ -153,6 +162,36 @@ function EspecialidadesPage() {
         ? `${e.nome} desativada em ${clinicaAtual!.clinica.nome}`
         : `${e.nome} ativada em ${clinicaAtual!.clinica.nome}`,
     );
+    load();
+  }
+
+  // "Excluir" vale só para esta unidade (14/10/2026): a lista de nomes é
+  // compartilhada e apagar a especialidade de verdade tiraria ela das outras
+  // unidades e desligaria médicos, serviços e regras do cartão. Aqui ela só
+  // some da lista desta unidade (e fica inativa); "Restaurar" traz de volta.
+  async function marcarRemovida(e: Esp, removida: boolean) {
+    if (!podeEscreverModulo) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    setAlternando(e.id);
+    const { error } = await supabase
+      .from("especialidade_unidade")
+      .upsert(
+        { clinica_id: clinicaId, especialidade_id: e.id, ativo: false, removida },
+        { onConflict: "clinica_id,especialidade_id" },
+      );
+    setAlternando(null);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success(
+      removida
+        ? `${e.nome} excluída de ${clinicaAtual!.clinica.nome}`
+        : `${e.nome} restaurada em ${clinicaAtual!.clinica.nome} (inativa — ative se for usar)`,
+    );
+    setToRemove(null);
     load();
   }
 
@@ -223,10 +262,14 @@ function EspecialidadesPage() {
 
   const filtered = rows.filter((r) => {
     const matchNome = r.nome.toLowerCase().includes(q.toLowerCase());
+    // Excluída desta unidade só aparece no filtro próprio, para poder restaurar.
     const matchStatus =
-      statusFiltro === "todos" ||
-      (statusFiltro === "ativo" && ativaAqui(r)) ||
-      (statusFiltro === "inativo" && !ativaAqui(r));
+      statusFiltro === "removida"
+        ? r.removidaUnidade
+        : !r.removidaUnidade &&
+          (statusFiltro === "todos" ||
+            (statusFiltro === "ativo" && ativaAqui(r)) ||
+            (statusFiltro === "inativo" && !ativaAqui(r)));
     return matchNome && matchStatus;
   });
 
@@ -353,7 +396,7 @@ function EspecialidadesPage() {
           </Button>
           <Select
             value={statusFiltro}
-            onValueChange={(v) => setStatusFiltro(v as "todos" | "ativo" | "inativo")}
+            onValueChange={(v) => setStatusFiltro(v as "todos" | "ativo" | "inativo" | "removida")}
           >
             <SelectTrigger className="w-44">
               <SelectValue placeholder="Situação" />
@@ -362,6 +405,7 @@ function EspecialidadesPage() {
               <SelectItem value="todos">Todas as situações</SelectItem>
               <SelectItem value="ativo">Ativas nesta unidade</SelectItem>
               <SelectItem value="inativo">Inativas nesta unidade</SelectItem>
+              <SelectItem value="removida">Excluídas desta unidade</SelectItem>
             </SelectContent>
           </Select>
         </form>
@@ -397,16 +441,28 @@ function EspecialidadesPage() {
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full ${ativaAqui(r) ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
                     >
-                      {!r.ativoGlobal
-                        ? "Desativada pela plataforma"
-                        : r.ativoUnidade
-                          ? "Ativa"
-                          : "Inativa"}
+                      {r.removidaUnidade
+                        ? "Excluída desta unidade"
+                        : !r.ativoGlobal
+                          ? "Desativada pela plataforma"
+                          : r.ativoUnidade
+                            ? "Ativa"
+                            : "Inativa"}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {podeEscreverModulo && r.ativoGlobal && (
+                      {podeEscreverModulo && r.removidaUnidade && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={alternando === r.id}
+                          onClick={() => void marcarRemovida(r, false)}
+                        >
+                          Restaurar nesta unidade
+                        </Button>
+                      )}
+                      {podeEscreverModulo && r.ativoGlobal && !r.removidaUnidade && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -426,12 +482,25 @@ function EspecialidadesPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
+                      {podeEscreverModulo && !r.removidaUnidade && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={alternando === r.id}
+                          onClick={() => setToRemove(r)}
+                          aria-label="Excluir desta unidade"
+                          title="Excluir desta unidade"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                       {podeEditarNome && adminPlataforma && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setToDelete(r)}
-                          aria-label="Excluir"
+                          aria-label="Excluir de todas as unidades"
+                          title="Excluir de todas as unidades (plataforma)"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -484,6 +553,32 @@ function EspecialidadesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!toRemove} onOpenChange={(o) => !o && setToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir desta unidade</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{toRemove?.nome}</strong> vai sumir da lista de {clinicaAtual!.clinica.nome} e
+              deixar de aparecer para escolha aqui. As outras unidades não mudam e nenhum
+              atendimento ou cadastro é apagado. Dá para restaurar pelo filtro “Excluídas desta
+              unidade”.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={alternando === toRemove?.id}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (toRemove) void marcarRemovida(toRemove, true);
+              }}
+              disabled={alternando === toRemove?.id}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <AlertDialogContent>
