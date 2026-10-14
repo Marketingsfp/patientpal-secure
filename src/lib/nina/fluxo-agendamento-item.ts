@@ -347,6 +347,20 @@ export function intencaoDeAgendarNaSessao(p: {
 }
 
 /** Fluxo comum aos itens em discussão; itens com fluxos diferentes = indefinido. */
+/**
+ * Profissional agendado pela equipe (EQUIPE-01, 14/10/2026) aparece na lista,
+ * mas não decide o fluxo dos demais: escolhê-lo encaminha pela regra de
+ * atendimento humano. Só ele na lista continua decidindo.
+ */
+export function registrosQueDecidemFluxo<T extends { estrutura?: unknown }>(
+  registros: readonly T[],
+): T[] {
+  const semEquipe = registros.filter(
+    (r) => lerEstrutura(r.estrutura).encaminhamento_humano !== true,
+  );
+  return semEquipe.length ? semEquipe : [...registros];
+}
+
 export function fluxoDosItens(fluxos: readonly FluxoItem[]): FluxoItem | null {
   if (!fluxos.length) return null;
   return new Set(fluxos).size === 1 ? fluxos[0]! : null;

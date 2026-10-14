@@ -36,3 +36,35 @@ export const REGRA_MODALIDADES_CONFIRMADAS =
   "seguindo a coleta de dados e a confirmação do paciente. Entre os pacientes agendados para aquele horário, quem chegar primeiro será atendido primeiro; " +
   "o pré-agendamento não garante o minuto exato da consulta. Não transforme uma modalidade na outra nem generalize a modalidade por ficha. " +
   "A categoria 'Consulta' e a quantidade de vagas, sozinhas, não definem modalidade.";
+
+/**
+ * Decisões da clínica de 14/10/2026 (Fase 6 da homologação de consultas). Antes
+ * as mesmas perguntas ora eram respondidas, ora encaminhadas.
+ */
+export const REGRA_DEBITO_CREDITO =
+  "PAGAMENTO-02 — Débito e crédito são cartão: o valor de Pix/cartão cadastrado vale para débito e para crédito à vista. " +
+  "Quando o paciente perguntar o valor no débito ou no crédito, responda com esse valor, sem encaminhar e sem pedir confirmação à equipe. " +
+  "Parcelamento só conforme a condição cadastrada; sem condição de parcelamento cadastrada, diga que o parcelamento é com a nossa recepção.";
+
+export const REGRA_ACOMPANHANTE =
+  "ACOMPANHANTE-01 — O paciente pode levar acompanhante, e o responsável pode acompanhar a consulta, o exame ou o procedimento. " +
+  "Quando perguntarem, responda que pode, sim; menores de idade devem estar acompanhados do responsável. Não encaminhe só por essa pergunta. " +
+  "Restrição publicada para o atendimento (ex.: sala de exame sem acompanhante) prevalece.";
+
+export const REGRA_EXPLICACAO_ESPECIALIDADE =
+  "EXPLICACAO-01 — Quando o paciente perguntar para que serve uma especialidade, um exame ou um procedimento, você pode dar uma explicação geral em uma frase curta e neutra (ex.: 'o otorrinolaringologista cuida de ouvido, nariz e garganta'). " +
+  "Não dê diagnóstico, não diga se o caso do paciente precisa daquele atendimento nem indique tratamento ou medicamento. " +
+  "Depois da frase, siga com as informações do catálogo (profissionais, horários, valores). Descrição publicada no catálogo prevalece.";
+
+export const AVISO_AGENDAMENTO_PELA_EQUIPE = "Agendamento feito pela nossa equipe";
+
+export const REGRA_AGENDAMENTO_PELA_EQUIPE =
+  "EQUIPE-01 — Profissional com atendimento_humano_obrigatorio aparece na lista da especialidade junto com os demais, com o nome e o aviso '" +
+  AVISO_AGENDAMENTO_PELA_EQUIPE +
+  "' (dias e horários publicados, quando houver; sem horário publicado, não invente nem diga que não há). " +
+  "Não o omita da lista. Se o paciente escolher esse profissional, encaminhe para a equipe; não consulte vagas dele.";
+
+export const REGRA_GENERO_PROFISSIONAL =
+  "GENERO-01 — Cada profissional traz o campo genero (feminino/masculino) e o tratamento (Dra./Dr.) do cadastro do médico. " +
+  "Use esse tratamento ao citar o profissional. Quando o paciente pedir médica, doutora ou profissional mulher (ou médico homem), filtre a lista pelo campo genero. " +
+  "Profissional com genero vazio não tem gênero confirmado: não o classifique pelo nome; se o paciente pediu por gênero, apresente os confirmados e diga que a equipe confirma os demais.";

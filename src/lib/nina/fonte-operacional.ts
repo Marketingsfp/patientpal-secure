@@ -30,6 +30,8 @@ export type MedicoOp = {
   nome: string;
   especialidade_id: string | null;
   visivel_agendamento_online?: boolean | null;
+  /** Sexo do cadastro do médico: decide pedidos de médica/médico (14/10/2026). */
+  sexo?: string | null;
   /** Lista oficial usada na adaptação editorial completa, inclusive lista vazia. */
   especialidades_cadastro?: EspecialidadeOp[];
 };
@@ -404,6 +406,7 @@ export function mapearProfissionais(
       id: m.id,
       medico_id: m.id,
       nome: m.nome,
+      medicos: { sexo: m.sexo ?? null },
       especialidades,
       atende_consultorio: null,
       convenios: [],

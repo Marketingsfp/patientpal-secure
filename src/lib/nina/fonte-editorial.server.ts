@@ -5,7 +5,7 @@ import type { ProfissionalPublicado, ServicoPublicado } from "./catalogo-conheci
 export const COLUNAS_BASE_SERVICO =
   "id, procedimento_id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura, status, updated_at";
 export const COLUNAS_BASE_PROFISSIONAL =
-  "id, medico_id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura, status, updated_at";
+  "id, medico_id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), medicos(sexo), estrutura, status, updated_at";
 
 export async function lerFonteEditorial(clinicaId: string, db: any = supabaseAdmin) {
   async function paginas<T>(tabela: string, colunas: string): Promise<T[]> {
