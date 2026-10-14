@@ -5630,14 +5630,23 @@ function AgendaPage() {
     return { inicio: apertado };
   };
 
-  // "+ Ficha extra": cria UMA vaga livre no fim da fila do dia, sem abrir o
-  // formulário. A ficha é posicional, então a linha nova nasce depois do maior
-  // `inicio` do dia (inclusive canceladas) e nenhuma ficha já impressa muda.
+  // "+ Ficha extra": cria N vagas livres (padrão 1) no fim da fila do dia, sem
+  // abrir o formulário. A ficha é posicional, então as linhas novas nascem
+  // depois do maior `inicio` do dia (inclusive canceladas) e nenhuma ficha já
+  // impressa muda. A quantidade foi pedida pela recepção em 14/10/2026: abrir
+  // um dia inteiro clicando uma ficha por vez era inviável.
   const [criandoFichaExtra, setCriandoFichaExtra] = useState(false);
+  const [fichaExtraAberto, setFichaExtraAberto] = useState(false);
+  const [fichaExtraQtd, setFichaExtraQtd] = useState("1");
   const criarFichaExtra = async () => {
     const medicoId = filtroMedico !== "todos" ? filtroMedico : "";
     const fila = agendaDeFila(medicoId);
     if (!clinicaAtual || !medicoId || !fila) return;
+    const qtd = parseInt(fichaExtraQtd || "0", 10);
+    if (!qtd || qtd < 1 || qtd > 500) {
+      toast.error("Informe de 1 a 500 fichas.");
+      return;
+    }
     setCriandoFichaExtra(true);
     try {
       const iniDia = new Date(`${dataRef}T00:00:00`);
@@ -5663,31 +5672,35 @@ function AgendaPage() {
         ultimoInicio: ultimo ? new Date(ultimo) : null,
         inicioGrade: "08:00",
         fimTurno: `${String(fimTurno.getHours()).padStart(2, "0")}:${String(fimTurno.getMinutes()).padStart(2, "0")}`,
-        quantidade: 1,
+        quantidade: qtd,
         intervaloMin: 5,
       });
       if (!r.ok) {
         toast.error(r.erro, { duration: 8000 });
         return;
       }
-      const ficha = r.fichas[0];
       const procedimento = procedimentoPadraoDoMedico(medicoId);
-      const { error: erroIns } = await supabase.from("agendamentos").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        medico_id: medicoId,
-        agenda_id: fila.id,
-        paciente_nome: "DISPONÍVEL",
-        inicio: ficha.inicio.toISOString(),
-        fim: ficha.fim.toISOString(),
-        status: "agendado" as const,
-        observacoes: "Ficha extra gerada na Agenda",
-        ...(procedimento ? { procedimento } : {}),
-      });
+      const { error: erroIns } = await supabase.from("agendamentos").insert(
+        r.fichas.map((ficha) => ({
+          clinica_id: clinicaAtual.clinica_id,
+          medico_id: medicoId,
+          agenda_id: fila.id,
+          paciente_nome: "DISPONÍVEL",
+          inicio: ficha.inicio.toISOString(),
+          fim: ficha.fim.toISOString(),
+          status: "agendado" as const,
+          observacoes: "Ficha extra gerada na Agenda",
+          ...(procedimento ? { procedimento } : {}),
+        })),
+      );
       if (erroIns) {
         mostrarErro(erroIns);
         return;
       }
+      setFichaExtraAberto(false);
+      setFichaExtraQtd("1");
       await load();
+      const ultimaNova = r.fichas[r.fichas.length - 1];
       const { count } = await supabase
         .from("agendamentos")
         .select("id", { count: "exact", head: true })
@@ -5695,8 +5708,14 @@ function AgendaPage() {
         .eq("medico_id", medicoId)
         .eq("agenda_id", fila.id)
         .gte("inicio", iniDia.toISOString())
-        .lte("inicio", ficha.inicio.toISOString());
-      toast.success(`Ficha #${String(count ?? 0).padStart(3, "0")} criada no fim da fila.`);
+        .lte("inicio", ultimaNova.inicio.toISOString());
+      const num = (n: number) => `#${String(n).padStart(3, "0")}`;
+      const ate = count ?? 0;
+      toast.success(
+        r.fichas.length === 1
+          ? `Ficha ${num(ate)} criada no fim da fila.`
+          : `${r.fichas.length} fichas criadas no fim da fila (${num(ate - r.fichas.length + 1)} a ${num(ate)}).`,
+      );
     } finally {
       setCriandoFichaExtra(false);
     }
@@ -10041,15 +10060,49 @@ function AgendaPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => void criarFichaExtra()}
+                onClick={() => setFichaExtraAberto(true)}
                 disabled={criandoFichaExtra || !clinicaAtual}
-                title="Cria uma ficha livre no fim da fila deste médico"
+                title="Cria fichas livres no fim da fila deste médico"
                 className="h-9 lg:h-7 rounded-xl lg:rounded-md text-xs lg:text-[12px] px-3 lg:px-2 font-semibold"
               >
                 <Plus className="h-4 w-4 lg:h-3 lg:w-3 mr-1.5" />
                 {criandoFichaExtra ? "Criando..." : "Ficha extra"}
               </Button>
             )}
+          <Dialog open={fichaExtraAberto} onOpenChange={setFichaExtraAberto}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Ficha extra</DialogTitle>
+                <DialogDescription>
+                  Quantas fichas criar neste dia? Elas entram no fim da fila, depois das que já
+                  existem — o número das fichas atuais não muda.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1">
+                <Label htmlFor="agenda-ficha-extra-qtd">Quantidade de fichas</Label>
+                <Input
+                  id="agenda-ficha-extra-qtd"
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={fichaExtraQtd}
+                  onChange={(e) => setFichaExtraQtd(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void criarFichaExtra();
+                  }}
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setFichaExtraAberto(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => void criarFichaExtra()} disabled={criandoFichaExtra}>
+                  {criandoFichaExtra ? "Criando..." : "Criar fichas"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {podeEscrever && !isMedicoOnly && (
             <Button
               size="sm"
