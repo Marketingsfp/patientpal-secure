@@ -70,6 +70,9 @@ const carenciaLabel = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
   return CARENCIA_GROUPS.find((g) => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
 };
+const REGRA_NAO_GRAVADA =
+  "A regra não foi salva: seu usuário não tem permissão para alterar regras desta unidade. Peça a um gestor da unidade.";
+
 // Legenda do campo Período — descreve a contagem feita em
 // src/lib/convenio/info-convenio-paciente.ts (passo 5, limite de uso).
 const PERIODO_LEGENDA: Record<string, string> = {
@@ -475,13 +478,19 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           return;
         }
       } else {
-        const { error } = await (supabase as any)
+        const { data: gravadas, error } = await (supabase as any)
           .from("cb_convenio_regras")
           .update(payload)
-          .eq("id", r.id);
+          .eq("id", r.id)
+          .select("id");
         if (error) {
           setLoading(false);
           mostrarErro(error);
+          return;
+        }
+        if (!gravadas?.length) {
+          setLoading(false);
+          toast.error(REGRA_NAO_GRAVADA);
           return;
         }
       }
@@ -1398,12 +1407,22 @@ function NovaRegraDialog({
       gratuito: !!r.gratuito,
       grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
     };
-    const { error } = isEdit
-      ? await (supabase as any).from("cb_convenio_regras").update(payload).eq("id", r.id)
-      : await (supabase as any).from("cb_convenio_regras").insert(payload);
+    // .select() devolve as linhas gravadas: o RLS barra o update sem erro (0 linhas),
+    // e sem essa conferência a tela dizia "Regra atualizada" sem ter salvo nada.
+    const { data: gravadas, error } = isEdit
+      ? await (supabase as any)
+          .from("cb_convenio_regras")
+          .update(payload)
+          .eq("id", r.id)
+          .select("id")
+      : await (supabase as any).from("cb_convenio_regras").insert(payload).select("id");
     setSaving(false);
     if (error) {
       mostrarErro(error);
+      return;
+    }
+    if (!gravadas?.length) {
+      toast.error(REGRA_NAO_GRAVADA);
       return;
     }
     toast.success(isEdit ? "Regra atualizada." : "Regra adicionada.");
