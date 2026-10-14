@@ -70,6 +70,15 @@ const carenciaLabel = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
   return CARENCIA_GROUPS.find((g) => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
 };
+// Legenda do campo Período — descreve a contagem feita em
+// src/lib/convenio/info-convenio-paciente.ts (passo 5, limite de uso).
+const PERIODO_LEGENDA: Record<string, string> = {
+  ano: "Conta em ciclos de 12 meses a partir da adesão ou da última renovação do contrato. Ao começar um novo ciclo, a contagem zera.",
+  "12m_uso":
+    "O paciente só pode usar de novo após 12 meses completos desde o último uso. Renovar o contrato não zera a contagem.",
+  contrato:
+    "Limite único enquanto durar o contrato, sem renovação periódica. Renovar o contrato não zera a contagem.",
+};
 const carenciaShort = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
   return v === 0 ? "Imediato" : `Após ${v}ª`;
@@ -1063,6 +1072,11 @@ function LimiteDialog({
                   <SelectItem value="contrato">Por contrato</SelectItem>
                 </SelectContent>
               </Select>
+              {hasLimit && PERIODO_LEGENDA[r.limite_periodo ?? "dia"] && (
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  {PERIODO_LEGENDA[r.limite_periodo ?? "dia"]}
+                </p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Escopo</Label>
@@ -1660,6 +1674,11 @@ function NovaRegraDialog({
                     <SelectItem value="contrato">Por contrato</SelectItem>
                   </SelectContent>
                 </Select>
+                {hasLimit && PERIODO_LEGENDA[r.limite_periodo ?? "dia"] && (
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    {PERIODO_LEGENDA[r.limite_periodo ?? "dia"]}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Escopo</Label>
