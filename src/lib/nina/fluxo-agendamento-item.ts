@@ -39,13 +39,30 @@ import { PERGUNTA_PREFERENCIA_PROFISSIONAL } from "./prompt/consulta-agenda";
  */
 export function padronizarPerguntaPreferencia(texto: string, variosProfissionais = false): string {
   const protegido = protegerAbreviacoes(texto.trimEnd());
-  const final = /([^.!?\n]*\?)[^\p{L}\p{N}\n]*$/u.exec(protegido);
+  // Pedido no lugar da pergunta ("me informe o dia ou período de sua
+  // preferência (ou se prefere escolher um médico específico).") também conta
+  // com dois ou mais profissionais (homologação 13/10/2026, 22:05).
+  const pergunta = /([^.!?\n]*\?)[^\p{L}\p{N}\n]*$/u.exec(protegido);
+  const pedido = pergunta
+    ? null
+    : variosProfissionais
+      ? /([^.!?\n]*\.)[^\p{L}\p{N}\n]*$/u.exec(protegido)
+      : null;
+  const final =
+    pergunta ??
+    (pedido &&
+    /\b(?:me|nos) (?:informe|diga|fale|conte)\b/.test(
+      normalizarRespostaInformal(restaurarAbreviacoes(pedido[1]!)),
+    )
+      ? pedido
+      : null);
   if (!final) return texto;
   const frase = normalizarRespostaInformal(restaurarAbreviacoes(final[1]!));
   const preferencia =
     /\bprefer/.test(frase) &&
     /(?:profissiona|medic|doutor|primeiro (?:horario )?disponivel|primeira vaga)/.test(frase);
   const conviteParaMarcar =
+    Boolean(pergunta) &&
     variosProfissionais &&
     /\b(?:gostaria|deseja|quer|queria|tem interesse|posso)\b[^?]*\b(?:marcar|agendar|agendamento)\b/.test(
       frase,
@@ -235,6 +252,27 @@ const ESCOLHA =
 /** "O primeiro disponível", "qualquer um": escolha sem dia nem profissional. */
 const SEM_PREFERENCIA =
   /\b(?:primeiro (?:horario |)disponivel|primeiro horario|primeira vaga|qualquer um|qualquer uma|qualquer profissional|tanto faz|quem tiver primeiro|o que tiver primeiro)\b/;
+/**
+ * "Não tenho preferência", "não tenho um médico específico", "quem conseguir
+ * me atender antes": sem preferência de profissional vale como primeiro
+ * disponível (decisão de 13/10/2026).
+ */
+const SEM_PREFERENCIA_DECLARADA =
+  /\b(?:(?:nao tenho|sem) (?:nenhuma |qualquer )?preferencia(?! (?:pela|pelo|pelas|pelos)\b)|nao tenho (?:um |uma |nenhum |nenhuma )?(?:medico|medica|profissional|doutor|doutora)s? (?:especific|em mente|preferid|de preferencia)|nao conheco (?:ninguem|nenhum (?:medico|profissional)|os (?:medicos|profissionais))|quem (?:conseguir|puder|tiver|estiver|der) (?:me )?(?:atender )?(?:antes|primeiro|mais cedo|mais rapido|disponivel)|(?:marcar|agendar|atendid[ao]|consulta|horario)\b.*\bmais (?:cedo|rapido) possivel|qualquer (?:medico|medica|doutor|doutora|um deles|uma delas)|nao faco questao (?:de|do|da) (?:medico|medica|profissional|doutor|doutora))/;
+
+/**
+ * O paciente diz que não tem preferência de profissional numa frase que não é
+ * pergunta ("Não tenho médico específico. O cartão é antes?" vale; "tem o
+ * primeiro disponível no sábado?" não).
+ */
+export function semPreferenciaDeProfissional(mensagem: string): boolean {
+  const frases = (mensagem ?? "").match(/[^.!?\n]+[.!?]*/g) ?? [];
+  return frases.some((frase) => {
+    if (frase.includes("?")) return false;
+    const t = normalizarRespostaInformal(frase);
+    return SEM_PREFERENCIA.test(t) || SEM_PREFERENCIA_DECLARADA.test(t);
+  });
+}
 
 /**
  * Depois das informações, o paciente escolhe dia, horário ou profissional
@@ -250,7 +288,7 @@ export function escolhaParaAgendar(mensagem: string, nomes: readonly string[] = 
       .filter((p) => p.length >= 4 && !/^(?:consulta|exame|doutor|doutora)$/.test(p))
       .some((p) => new RegExp(`\\b${p}\\b`).test(t)),
   );
-  if (SEM_PREFERENCIA.test(t) && !mensagem.includes("?")) return true;
+  if (semPreferenciaDeProfissional(mensagem)) return true;
   const citaQuando = DIAS_DA_SEMANA.test(t) || /\b\d{1,2}\s*(?:h|horas?|:\d{2})\b/.test(t);
   if (ESCOLHA.test(t) && (citaQuando || citaProfissional || /\b(?:marcar|agendar)\b/.test(t)))
     return true;

@@ -1370,6 +1370,9 @@ async function gerarRespostaNinaInterno(
       ? sessaoNina.estado.transferencia_pendente
       : null;
   if (transferenciaPendente) nomeAtendimentoAusente = false;
+  // Pergunta em vez dos dados: a Nina responde e transfere na mesma mensagem.
+  const responderAntesDaTransferencia =
+    Boolean(transferenciaPendente) && dadosTransferencia.perguntaEmVezDosDados(mensagemPaciente);
   let perguntaDadosTransferencia: string | null = null;
   // Flag por clínica `nina_dados_transferencia`; desligada, transfere na hora como antes.
   const pedirDadosAntesDaTransferencia = await import("@/lib/nina/dados-transferencia-flag.server")
@@ -1641,6 +1644,15 @@ async function gerarRespostaNinaInterno(
       "Informação que o cadastro não traz é passada pela recepção, sem suposição nem menção a cadastro.",
     texto: REGRA_INFORMACAO_NAO_CADASTRADA,
   });
+  if (responderAntesDaTransferencia)
+    instrucoesAdicionaisTurno.push({
+      codigo: "RESPONDER_ANTES_DA_TRANSFERENCIA",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/dados-transferencia.ts",
+      motivo:
+        "Transferência aguardando dados: a pergunta do paciente é respondida e a transferência segue na mesma mensagem.",
+      texto: dadosTransferencia.REGRA_RESPONDER_ANTES_DA_TRANSFERENCIA,
+    });
   const { regraSaudacaoPeriodo } = await import("@/lib/nina/resposta/saudacao-periodo");
   instrucoesAdicionaisTurno.push({
     codigo: "SAUDACAO_PELO_HORARIO",
@@ -3072,6 +3084,20 @@ async function gerarRespostaNinaInterno(
     );
   if (escolhaDoPaciente && fluxoEstado.session_id)
     fluxoEstado.intencao_agendar_sessao = fluxoEstado.session_id;
+  // "Não tenho preferência" com uma dúvida junto: a Nina responde a dúvida e
+  // encaminha no mesmo turno, depois da resposta do modelo.
+  const semPreferenciaPaciente = fluxoAgendamento.semPreferenciaDeProfissional(mensagemPaciente);
+  const semPreferenciaComPergunta =
+    escolhaDoPaciente &&
+    semPreferenciaPaciente &&
+    mensagemPaciente.includes("?") &&
+    fluxoAgendamento.decidirAgendamentoNoTurno({
+      intencaoAgendar: true,
+      fluxo: fluxoDasReferencias(referenciasDaDecisao),
+      informacoesEntregues: true,
+      ofertaPendente: false,
+      respostaOferta: null,
+    }) === "encaminhar";
   // A intenção de marcar vale para a sessão: escolher o profissional ou o
   // horário ("pode ser a Valeria", "seria 9h") continua o mesmo pedido.
   const intencaoAgendarTurno = fluxoAgendamento.intencaoDeAgendarNaSessao({
@@ -3221,7 +3247,7 @@ async function gerarRespostaNinaInterno(
       handoff_confirmado: confirmado,
     });
   }
-  if (transferenciaPendente)
+  if (transferenciaPendente && !responderAntesDaTransferencia)
     await executarDecisaoEncaminhamento(
       {
         motivo: transferenciaPendente.argumentos.motivo,
@@ -4294,6 +4320,37 @@ async function gerarRespostaNinaInterno(
     finalizacaoHandoff?.textoModelo ??
     (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
 
+  // Transferência aguardando dados e o paciente perguntou algo: a resposta
+  // segue junto da transferência pedida antes (regra de 13/10/2026).
+  // Se outra regra já transferiu neste turno, só a pendência é encerrada.
+  if (
+    transferenciaPendente &&
+    responderAntesDaTransferencia &&
+    (finalizacaoHandoff || houveHandoff)
+  )
+    fluxoEstado.transferencia_pendente = null;
+  else if (transferenciaPendente && responderAntesDaTransferencia && !turnoObsoleto) {
+    const respostaMantida = dadosTransferencia.respostaAntesDaTransferencia(resposta);
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Pergunta em vez dos dados: resposta e transferência na mesma mensagem",
+      dados: { respostas_mantidas: Boolean(respostaMantida) },
+      codigo: {
+        arquivo: "src/lib/nina/dados-transferencia.ts",
+        funcao: "perguntaEmVezDosDados",
+      },
+    });
+    await executarDecisaoEncaminhamento(
+      {
+        motivo: transferenciaPendente.argumentos.motivo,
+        urgencia: transferenciaPendente.argumentos.urgencia === "alta" ? "alta" : "normal",
+      },
+      transferenciaPendente,
+      respostaMantida,
+    );
+  }
+
   // A IA escreveu que a equipe vai dar continuidade ou que vai encaminhar, mas
   // nenhuma transferência aconteceu (homologação 13/10/2026). Com o atendimento
   // já informado e sem agendamento pela Nina, o encaminhamento é feito de fato
@@ -4396,6 +4453,38 @@ async function gerarRespostaNinaInterno(
         restante,
       );
     }
+  }
+
+  // Sem preferência de profissional vale como primeiro disponível (decisão de
+  // 13/10/2026): com uma dúvida na mesma mensagem ("Não tenho médico
+  // específico. O cartão é antes?"), a resposta segue junto do encaminhamento,
+  // sem perguntar de novo a preferência.
+  if (
+    semPreferenciaComPergunta &&
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !perguntaDadosTransferencia &&
+    !agendamentoConfirmado &&
+    !resumoEscolha
+  ) {
+    const { separarOrientacaoRecepcao } = await import("@/lib/nina/informacao-nao-cadastrada");
+    const { restante } = separarOrientacaoRecepcao(resposta, false);
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Sem preferência de profissional: encaminhamento como primeiro disponível",
+      dados: { respostas_mantidas: Boolean(restante) },
+      codigo: {
+        arquivo: "src/lib/nina/fluxo-agendamento-item.ts",
+        funcao: "semPreferenciaDeProfissional",
+      },
+    });
+    await executarDecisaoEncaminhamento(
+      { motivo: motivoAgendamento(referenciasDaDecisao), urgencia: "normal" },
+      undefined,
+      restante,
+    );
   }
 
   if (
@@ -4875,6 +4964,7 @@ async function gerarRespostaNinaInterno(
 
   // Pergunta de preferência no modelo de 13/10/2026: "Você tem preferência por
   // algum profissional ou gostaria de marcar com o primeiro disponível? 😊".
+  // Quem acabou de dizer que não tem preferência não ouve a pergunta de novo.
   if (
     !semNovaMensagem &&
     !turnoObsoleto &&
@@ -4882,6 +4972,7 @@ async function gerarRespostaNinaInterno(
     !finalizacaoHandoff &&
     !perguntaDadosTransferencia &&
     !resumoEscolha &&
+    !semPreferenciaPaciente &&
     resposta.trim()
   ) {
     // Dois ou mais profissionais apresentados nesta conversa.

@@ -11,9 +11,62 @@
  * Módulo puro: sem banco e sem rede.
  */
 import { normalizarRespostaInformal } from "./resposta-afirmativa";
+import { separarOrientacaoRecepcao } from "./informacao-nao-cadastrada";
+import { afirmaEncaminhamento } from "./fluxo-agendamento-item";
 
 export const PERGUNTA_DADOS_TRANSFERENCIA =
   "Vou encaminhar você para a nossa equipe. Para agilizar o seu atendimento, me envie, por favor, o seu nome completo e a sua data de nascimento.";
+
+/**
+ * Regra de 13/10/2026: com a transferência aguardando os dados, o paciente
+ * pergunta algo em vez de mandá-los ("Antes de passar meus dados, preciso
+ * saber quanto custa"). A Nina responde com o cadastro e transfere na mesma
+ * mensagem, sem pedir os dados de novo.
+ */
+export function perguntaEmVezDosDados(mensagem: string): boolean {
+  const dados = extrairDadosTransferencia(mensagem);
+  if (dados.nome_completo || dados.data_nascimento) return false;
+  if ((mensagem ?? "").includes("?")) return true;
+  return /\b(?:preciso saber|queria saber|quero saber|gostaria de saber|me (?:diga|fala|informe)|quanto (?:custa|e|fica)|qual (?:o|a) (?:valor|preco)|voces (?:fazem|atendem|tem))\b/.test(
+    normalizarRespostaInformal(mensagem ?? ""),
+  );
+}
+
+export const REGRA_RESPONDER_ANTES_DA_TRANSFERENCIA = `TRANSFERENCIA AGUARDANDO DADOS — REGRA INEGOCIAVEL:
+- A transferencia para a equipe ja foi pedida. O paciente fez uma pergunta em vez de enviar nome e data de nascimento.
+- Responda somente a pergunta, com o que o cadastro traz. Nao peca nome nem data de nascimento de novo, nao pergunte nada no final e nao diga que vai encaminhar: o sistema transfere logo depois da sua resposta.`;
+
+/**
+ * O que segue junto da transferência: a resposta da IA sem perguntas finais,
+ * convites, orientação de procurar a recepção, promessa de encaminhar ou novo
+ * pedido de dados.
+ */
+export function respostaAntesDaTransferencia(texto: string): string {
+  const { restante } = separarOrientacaoRecepcao(texto ?? "", false);
+  const PONTO = String.fromCharCode(30);
+  const protegido = restante.replace(/\b(?:dra?|sra?|profa?)\./gi, (m) => m.slice(0, -1) + PONTO);
+  return protegido
+    .split("\n")
+    .map((linha) =>
+      (linha.match(/[^.!?\n]+[.!?]*/g) ?? [])
+        .filter((frase) => {
+          const f = frase.split(PONTO).join(".");
+          return (
+            !afirmaEncaminhamento(f) &&
+            !/\b(?:nome completo|data de nascimento|encaminh\w*|transfer\w*)\b/.test(
+              normalizarRespostaInformal(f),
+            )
+          );
+        })
+        .join("")
+        .trim(),
+    )
+    .join("\n")
+    .split(PONTO)
+    .join(".")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 /** Argumentos da ferramenta de transferência guardados até o paciente responder. */
 export type ArgumentosTransferencia = {
