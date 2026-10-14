@@ -25,45 +25,49 @@ async function clinicasAdmin(db: Db, userId: string) {
   return (data ?? []).map((m) => m.clinica_id as string);
 }
 
+/**
+ * Devolve só a clínica pedida (a selecionada no topo). Quem não é admin dela
+ * recebe `{ admin: false }` — nunca a lista das outras clínicas.
+ */
 export const listarSiteAgendamento = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
     const db = context.supabase as Db;
     const ids = await clinicasAdmin(db, context.userId);
-    if (!ids.length) return [];
+    if (!ids.includes(data.clinicaId)) return { admin: false as const, linha: null };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [{ data: clinicas }, { data: cfgs }] = await Promise.all([
-      supabaseAdmin.from("clinicas").select("id, nome").in("id", ids),
+    const [{ data: clinica }, { data: cfg }] = await Promise.all([
+      supabaseAdmin.from("clinicas").select("id, nome").eq("id", data.clinicaId).maybeSingle(),
       supabaseAdmin
         .from("site_agendamento_config")
         .select("clinica_id, ativo, motivo, dias_antecedencia, horas_minimas, atualizado_em, atualizado_por")
-        .in("clinica_id", ids),
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle(),
     ]);
-    const autores = [...new Set((cfgs ?? []).map((c) => c.atualizado_por).filter(Boolean))] as string[];
-    const nomes = new Map<string, string>();
-    if (autores.length) {
-      const { data: perfis } = await supabaseAdmin
+    if (!clinica) return { admin: false as const, linha: null };
+    let autor: string | null = null;
+    if (cfg?.atualizado_por) {
+      const { data: perfil } = await supabaseAdmin
         .from("profiles")
         .select("id, nome")
-        .in("id", autores);
-      for (const p of (perfis ?? []) as { id: string; nome: string | null }[])
-        nomes.set(p.id, p.nome ?? "");
+        .eq("id", cfg.atualizado_por)
+        .maybeSingle();
+      autor = (perfil as { nome: string | null } | null)?.nome || "Usuário";
     }
-    return (clinicas ?? [])
-      .map((c) => {
-        const cfg = (cfgs ?? []).find((x) => x.clinica_id === c.id);
-        return {
-          clinicaId: c.id as string,
-          nome: c.nome as string,
-          ativo: cfg ? cfg.ativo : true,
-          motivo: cfg?.motivo ?? "",
-          diasAntecedencia: cfg?.dias_antecedencia ?? 7,
-          horasMinimas: cfg?.horas_minimas ?? 0,
-          atualizadoEm: cfg?.atualizado_em ?? null,
-          atualizadoPor: cfg?.atualizado_por ? nomes.get(cfg.atualizado_por) || "Usuário" : null,
-        };
-      })
-      .sort((a, b) => a.nome.localeCompare(b.nome));
+    return {
+      admin: true as const,
+      linha: {
+        clinicaId: clinica.id as string,
+        nome: clinica.nome as string,
+        ativo: cfg ? cfg.ativo : true,
+        motivo: cfg?.motivo ?? "",
+        diasAntecedencia: cfg?.dias_antecedencia ?? 7,
+        horasMinimas: cfg?.horas_minimas ?? 0,
+        atualizadoEm: cfg?.atualizado_em ?? null,
+        atualizadoPor: autor,
+      },
+    };
   });
 
 export const salvarSiteAgendamento = createServerFn({ method: "POST" })
