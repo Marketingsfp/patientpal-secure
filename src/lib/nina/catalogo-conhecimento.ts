@@ -78,7 +78,20 @@ export type ProfissionalPublicado = {
   aviso_valido_ate: string | null;
   /** Unidade vinculada (nome público), quando cadastrada. */
   unidades?: { nome?: string | null } | null;
+  /** Sexo do cadastro do médico vinculado (`medicos.sexo`). */
+  medicos?: { sexo?: string | null } | null;
 };
+
+/**
+ * Gênero do profissional para pedidos de médica/médico (decisão de 14/10/2026):
+ * vem do cadastro do médico. "Não informado" fica null; a Nina não presume.
+ */
+export function generoDoProfissional(p: ProfissionalPublicado): "feminino" | "masculino" | null {
+  const sexo = String(p.medicos?.sexo ?? "")
+    .trim()
+    .toLowerCase();
+  return sexo === "feminino" || sexo === "masculino" ? sexo : null;
+}
 
 /** Nome da unidade do profissional, quando houver. */
 export function unidadeDoProfissional(p: ProfissionalPublicado): string | null {
@@ -307,6 +320,7 @@ export function profissionalParaRegistro(
   const dinheiro = precoPorForma(p.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(p.formas_pagamento, /cart/i);
   const aviso = avisoVigente(p, hojeISO);
+  const genero = generoDoProfissional(p);
   const selecionados = escopo ? selecionarAtendimentosConsulta(atendimentos, escopo) : [];
   const modalidade = modalidadeEstruturada(
     p.observacao_publica,
@@ -394,6 +408,9 @@ export function profissionalParaRegistro(
       orientacao_atendimento: modalidade ? orientacaoModalidade(modalidade) : null,
       especialidades,
       unidade: unidadeDoProfissional(p),
+      // Pedido de médica/médico e tratamento Dr./Dra. (GENERO-01, 14/10/2026).
+      genero,
+      tratamento: genero === "feminino" ? "Dra." : genero === "masculino" ? "Dr." : null,
       convenios,
       horarios,
       atende_consultorio: p.atende_consultorio,

@@ -551,7 +551,9 @@ async function buscarNaFonteDoTurno(
         camposEncontrados: campos.filter((c) => r[c] !== null && r[c] !== undefined && r[c] !== ""),
       }));
     const camposServico = COLUNAS_SERVICO.split(", ");
-    const camposProf = COLUNAS_PROFISSIONAL.replace("unidades(nome)", "unidades").split(", ");
+    const camposProf = COLUNAS_PROFISSIONAL.replace("unidades(nome)", "unidades")
+      .replace("medicos(sexo)", "medicos")
+      .split(", ");
     const codigo = {
       arquivo: "src/lib/nina/catalogo-retrieval.server.ts",
       funcao: "buscarNoCatalogo",

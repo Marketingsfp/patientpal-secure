@@ -1782,6 +1782,7 @@ async function gerarRespostaNinaInterno(
     REGRA_ACOMPANHANTE,
     REGRA_EXPLICACAO_ESPECIALIDADE,
     REGRA_AGENDAMENTO_PELA_EQUIPE,
+    REGRA_GENERO_PROFISSIONAL,
   } = await import("@/lib/nina/regras-administrativas-confirmadas");
   instrucoesAdicionaisTurno.push(
     {
@@ -1819,6 +1820,13 @@ async function gerarRespostaNinaInterno(
       motivo:
         "Regra confirmada em 14/10/2026: profissional de atendimento humano obrigatório aparece com aviso.",
       texto: REGRA_AGENDAMENTO_PELA_EQUIPE,
+    },
+    {
+      codigo: "GENERO_DO_CADASTRO_DO_MEDICO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+      motivo: "Regra confirmada em 14/10/2026: médica/médico e Dr./Dra. pelo cadastro do médico.",
+      texto: REGRA_GENERO_PROFISSIONAL,
     },
   );
   const { REGRA_PRESERVAR_RESERVA } = await import("@/lib/nina/procedimento-sessao");

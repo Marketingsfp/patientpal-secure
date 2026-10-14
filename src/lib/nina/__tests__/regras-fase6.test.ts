@@ -5,13 +5,18 @@ import {
   REGRA_AGENDAMENTO_PELA_EQUIPE,
   REGRA_DEBITO_CREDITO,
   REGRA_EXPLICACAO_ESPECIALIDADE,
+  REGRA_GENERO_PROFISSIONAL,
 } from "../regras-administrativas-confirmadas";
 import { REGRA_INFORMACAO_NAO_CADASTRADA } from "../informacao-nao-cadastrada";
 import { REGRA_MODALIDADES_PAGAMENTO } from "../eficiencia-turno";
 import { perguntasConferencia } from "../jev-conferencia";
 import { motivoSemHorariosHabituais, orientacaoHorariosHabituais } from "../horarios-habituais";
 import { registrosQueDecidemFluxo } from "../fluxo-agendamento-item";
-import { profissionalParaRegistro, type ProfissionalPublicado } from "../catalogo-conhecimento";
+import {
+  generoDoProfissional,
+  profissionalParaRegistro,
+  type ProfissionalPublicado,
+} from "../catalogo-conhecimento";
 import type { ResultadoBroker } from "../tool-broker";
 
 // Decisões da clínica de 14/10/2026 (Fase 6 da homologação de consultas). Dados fictícios.
@@ -98,5 +103,46 @@ describe("profissional agendado pela equipe (EQUIPE-01)", () => {
     const equipe = { id: "b", estrutura: { encaminhamento_humano: true } };
     expect(registrosQueDecidemFluxo([agenda, equipe])).toEqual([agenda]);
     expect(registrosQueDecidemFluxo([equipe])).toEqual([equipe]);
+  });
+});
+
+describe("gênero do profissional pelo cadastro do médico (GENERO-01)", () => {
+  const base = {
+    id: "p-genero",
+    nome: "PROFISSIONAL TESTE",
+    especialidades: [{ id: null, nome: "Clínica Geral" }],
+    atende_consultorio: null,
+    formas_pagamento: [],
+    convenios: [],
+    horarios: [],
+    tipo_atendimento: "Consulta",
+    observacao_publica: null,
+    aviso_dia: null,
+    aviso_valido_de: null,
+    aviso_valido_ate: null,
+  } as ProfissionalPublicado;
+  const extras = (p: ProfissionalPublicado) =>
+    profissionalParaRegistro(p, "2026-10-14").extras as Record<string, unknown>;
+
+  test("feminino e masculino viram Dra./Dr.; não informado fica vazio", () => {
+    expect(generoDoProfissional({ ...base, medicos: { sexo: "feminino" } })).toBe("feminino");
+    expect(extras({ ...base, medicos: { sexo: "feminino" } })).toMatchObject({
+      genero: "feminino",
+      tratamento: "Dra.",
+    });
+    expect(extras({ ...base, medicos: { sexo: "masculino" } })).toMatchObject({
+      genero: "masculino",
+      tratamento: "Dr.",
+    });
+    expect(extras({ ...base, medicos: { sexo: "nao_informar" } })).toMatchObject({
+      genero: null,
+      tratamento: null,
+    });
+    expect(extras(base)).toMatchObject({ genero: null, tratamento: null });
+  });
+
+  test("regra no turno e exceção na informação não cadastrada", () => {
+    expect(REGRA_GENERO_PROFISSIONAL).toMatch(/não o classifique pelo nome/);
+    expect(REGRA_INFORMACAO_NAO_CADASTRADA).toContain("GENERO-01");
   });
 });

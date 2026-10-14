@@ -14,7 +14,7 @@ import { ROTULOS_FONTE, type SelecaoFonte } from "./fonte-consulta";
 export const COLUNAS_SERVICO =
   "id, procedimento_id, nome, valor, valor_observacao, descricao_publica, preparo, restricoes, executantes, formas_pagamento, estrutura, status, updated_at";
 export const COLUNAS_PROFISSIONAL =
-  "id, medico_id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), estrutura, status, updated_at";
+  "id, medico_id, nome, especialidades, atende_consultorio, formas_pagamento, convenios, horarios, tipo_atendimento, observacao_publica, aviso_dia, aviso_valido_de, aviso_valido_ate, unidades(nome), medicos(sexo), estrutura, status, updated_at";
 export const TAMANHO_PAGINA = 250;
 type Tabela = "servicos" | "profissionais";
 type Catalogo = {
@@ -113,7 +113,8 @@ export async function lerPublicados<T extends { id: string }>(
             .map((c) => {
               if (c === "aliases:estrutura->aliases")
                 return ["aliases", (fonte.estrutura as { aliases?: unknown } | null)?.aliases];
-              const campo = c === "unidades(nome)" ? "unidades" : c;
+              const campo =
+                c === "unidades(nome)" ? "unidades" : c === "medicos(sexo)" ? "medicos" : c;
               return [campo, fonte[campo]];
             }),
         ) as T;

@@ -63,3 +63,8 @@ export const REGRA_AGENDAMENTO_PELA_EQUIPE =
   AVISO_AGENDAMENTO_PELA_EQUIPE +
   "' (dias e horários publicados, quando houver; sem horário publicado, não invente nem diga que não há). " +
   "Não o omita da lista. Se o paciente escolher esse profissional, encaminhe para a equipe; não consulte vagas dele.";
+
+export const REGRA_GENERO_PROFISSIONAL =
+  "GENERO-01 — Cada profissional traz o campo genero (feminino/masculino) e o tratamento (Dra./Dr.) do cadastro do médico. " +
+  "Use esse tratamento ao citar o profissional. Quando o paciente pedir médica, doutora ou profissional mulher (ou médico homem), filtre a lista pelo campo genero. " +
+  "Profissional com genero vazio não tem gênero confirmado: não o classifique pelo nome; se o paciente pediu por gênero, apresente os confirmados e diga que a equipe confirma os demais.";
