@@ -118,7 +118,45 @@ export function acrescentarSolicitacaoPedido(
   const perguntas = [
     ...new Set(solicitacoes.filter((s) => s.acao === "solicitar_foto").map((s) => s.pergunta)),
   ].filter((p) => !espacos(texto).includes(espacos(p)));
-  return perguntas.length ? [texto.trim(), ...perguntas].filter(Boolean).join("\n\n") : texto;
+  if (!perguntas.length) return texto;
+  // A frase do sistema já diz que o pedido é necessário e pede a foto: o pedido
+  // escrito pela IA com outras palavras sai, para não cobrar duas vezes
+  // (homologação 14/10/2026, ciclos 1174–1199).
+  const semPedidoDaIa = removerPedidoDeFoto(texto);
+  return [semPedidoDaIa.trim() || texto.trim(), ...perguntas].filter(Boolean).join("\n\n");
+}
+
+/** Marca temporária do ponto de "Dra." e afins, que não termina a frase. */
+const PONTO_ABREVIACAO = String.fromCharCode(30);
+
+/**
+ * Tira as frases que pedem a foto do pedido médico ou só repetem que ele é
+ * obrigatório/necessário. Frases com outra informação (valores, horários,
+ * profissionais) ficam.
+ */
+export function removerPedidoDeFoto(texto: string): string {
+  const pedeFoto = /\b(?:foto|imagem)\b.*\bpedido\b|\bpedido\b.*\b(?:foto|imagem)\b/;
+  const soExigencia =
+    /^(?:para (?:realizar|a realizacao|fazer)?\s*(?:d[eao]s?\s+)?[a-z0-9 /()-]{0,60},?\s*)?(?:e |o |a )?(?:apresentacao (?:do|de) )?pedido medico (?:e |sera )?(?:obrigatori[oa]|necessari[oa])(?: para [a-z0-9 /()-]{0,60})?$|^(?:para [a-z0-9 /()-]{0,60},?\s*)?e (?:obrigatori[oa]|necessari[oa]) (?:apresentar )?(?:o )?pedido medico(?: para [a-z0-9 /()-]{0,60})?$|^requisito:?$/;
+  const linhas = texto
+    .replace(/\b(?:dra?|sra?|profa?)\./gi, (m) => m.slice(0, -1) + PONTO_ABREVIACAO)
+    .split("\n")
+    .map((linha) => {
+      const frases = linha.match(/[^.!?]+[.!?]*/g) ?? [];
+      const restantes = frases.filter((f) => {
+        const t = normal(f.split(PONTO_ABREVIACAO).join("."));
+        return t && !pedeFoto.test(t) && !soExigencia.test(t);
+      });
+      if (!restantes.length && linha.trim()) return null;
+      return restantes.join("").trim();
+    })
+    .filter((l): l is string => l !== null);
+  return linhas
+    .join("\n")
+    .split(PONTO_ABREVIACAO)
+    .join(".")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /** Reavalia o mesmo item e descarta a seleção anterior quando a pesquisa muda de solicitação. */
