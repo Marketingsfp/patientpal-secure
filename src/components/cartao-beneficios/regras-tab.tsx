@@ -1054,8 +1054,10 @@ function LimiteDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dia">Por dia</SelectItem>
-                  <SelectItem value="semana">Por semana</SelectItem>
-                  <SelectItem value="mes">Por mês</SelectItem>
+                  {r.limite_periodo === "semana" && (
+                    <SelectItem value="semana">Por semana</SelectItem>
+                  )}
+                  {r.limite_periodo === "mes" && <SelectItem value="mes">Por mês</SelectItem>}
                   <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
                   <SelectItem value="12m_uso">12 meses entre usos</SelectItem>
                   <SelectItem value="contrato">Por contrato</SelectItem>
@@ -1073,7 +1075,7 @@ function LimiteDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
+                  <SelectItem value="contrato">Titular + Dependente</SelectItem>
                   <SelectItem value="paciente">Por paciente</SelectItem>
                   <SelectItem value="titular_ou_dependente">
                     Titular ou dependente (exclusivo)
@@ -1201,7 +1203,7 @@ function NovaRegraDialog({
     excedente_modo: null,
     excedente_percentual: null,
     excedente_valor: null,
-    carencia_mensalidades: 0,
+    carencia_mensalidades: 1,
     gratuito: false,
     grupo_gratuidade: null,
   });
@@ -1582,7 +1584,10 @@ function NovaRegraDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CARENCIA_GROUPS.map((g) => (
+                  {/* "Imediato" saiu da escolha; só aparece para não esconder o valor de regra antiga. */}
+                  {CARENCIA_GROUPS.filter(
+                    (g) => g.value !== 0 || Number(r.carencia_mensalidades ?? 0) === 0,
+                  ).map((g) => (
                     <SelectItem key={g.value} value={String(g.value)}>
                       {g.label}
                     </SelectItem>
@@ -1645,8 +1650,11 @@ function NovaRegraDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dia">Por dia</SelectItem>
-                    <SelectItem value="semana">Por semana</SelectItem>
-                    <SelectItem value="mes">Por mês</SelectItem>
+                    {/* Semana/mês saíram da escolha; só aparecem para não esconder o valor de regra antiga. */}
+                    {r.limite_periodo === "semana" && (
+                      <SelectItem value="semana">Por semana</SelectItem>
+                    )}
+                    {r.limite_periodo === "mes" && <SelectItem value="mes">Por mês</SelectItem>}
                     <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
                     <SelectItem value="12m_uso">12 meses entre usos</SelectItem>
                     <SelectItem value="contrato">Por contrato</SelectItem>
@@ -1664,7 +1672,7 @@ function NovaRegraDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
+                    <SelectItem value="contrato">Titular + Dependente</SelectItem>
                     <SelectItem value="paciente">Por paciente</SelectItem>
                     <SelectItem value="titular_ou_dependente">Titular ou dependente</SelectItem>
                   </SelectContent>
