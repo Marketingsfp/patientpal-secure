@@ -11,6 +11,12 @@ import {
   definirSenhaFuncionario,
 } from "@/lib/equipe.functions";
 import { useClinica } from "@/hooks/use-clinica";
+import {
+  carregarPerfisCustomizados,
+  perfilParaGravar,
+  type PerfilCustomizado,
+} from "@/lib/perfis-customizados";
+import { PerfilSelectItems } from "@/components/perfis/PerfilSelectItems";
 import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -164,6 +170,16 @@ const fetchProcedimentosAtivos = async (clinicaId: string) => {
   return all;
 };
 
+/** Perfis de sistema oferecidos ao criar o login do médico (os de sempre). */
+const PERFIS_LOGIN_MEDICO = [
+  { value: "medico", label: "Médico" },
+  { value: "enfermeiro", label: "Enfermeiro" },
+  { value: "recepcao", label: "Recepção" },
+  { value: "financeiro", label: "Financeiro" },
+  { value: "gestor", label: "Gestor" },
+  { value: "admin", label: "Admin" },
+];
+
 const emptyForm = () => ({
   nome: "",
   crm: "",
@@ -203,7 +219,8 @@ const emptyForm = () => ({
   pix_chave: "",
   criarUsuario: false,
   senhaUsuario: "",
-  roleUsuario: "medico" as "admin" | "gestor" | "medico" | "enfermeiro" | "recepcao" | "financeiro",
+  // Perfil de sistema ("medico", "admin"…) ou customizado ("custom:<id>").
+  roleUsuario: "medico" as string,
   ativo: true,
   visivel_agendamento_online: true,
 });
@@ -276,6 +293,17 @@ export function MedicoFormDialog({
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkQuery, setBulkQuery] = useState("");
   const activeClinicaId = formClinicaId || clinicaId;
+  // Perfis criados pela clínica em Perfis de Acesso, para o login novo.
+  const [perfisCustom, setPerfisCustom] = useState<PerfilCustomizado[]>([]);
+  useEffect(() => {
+    if (!open || !activeClinicaId) return;
+    carregarPerfisCustomizados(activeClinicaId)
+      .then(setPerfisCustom)
+      .catch((e) => {
+        console.error("[medico] perfis customizados indisponíveis", e);
+        setPerfisCustom([]);
+      });
+  }, [open, activeClinicaId]);
 
   const normalizarNome = (s: string) =>
     s
@@ -1154,13 +1182,15 @@ export function MedicoFormDialog({
     // Optionally create system user / add to clinic team
     if (form.criarUsuario && form.email && form.senhaUsuario.length >= 6) {
       try {
+        const perfil = perfilParaGravar(form.roleUsuario, perfisCustom);
         const res = await cadastrarUsuarioFn({
           data: {
             clinicaId: activeClinicaId,
             email: form.email,
             password: form.senhaUsuario,
             nome: nomeLimpo,
-            role: form.roleUsuario,
+            role: perfil.role,
+            ...(perfil.perfilAcessoId ? { perfilAcessoId: perfil.perfilAcessoId } : {}),
           },
         });
         // O login sozinho não basta: sem gravar o `user_id` no cadastro do
@@ -2749,20 +2779,16 @@ export function MedicoFormDialog({
                       <Label>Perfil de acesso</Label>
                       <Select
                         value={form.roleUsuario}
-                        onValueChange={(v) =>
-                          setForm({ ...form, roleUsuario: v as typeof form.roleUsuario })
-                        }
+                        onValueChange={(v) => setForm({ ...form, roleUsuario: v })}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="medico">Médico</SelectItem>
-                          <SelectItem value="enfermeiro">Enfermeiro</SelectItem>
-                          <SelectItem value="recepcao">Recepção</SelectItem>
-                          <SelectItem value="financeiro">Financeiro</SelectItem>
-                          <SelectItem value="gestor">Gestor</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
+                          <PerfilSelectItems
+                            sistema={PERFIS_LOGIN_MEDICO}
+                            customizados={perfisCustom}
+                          />
                         </SelectContent>
                       </Select>
                     </div>

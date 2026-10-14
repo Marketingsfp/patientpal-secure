@@ -24,6 +24,25 @@ async function assertManager(userId: string, clinicaId: string) {
   if (!data) throw new Error("Sem permissão para gerenciar a equipe desta clínica");
 }
 
+/**
+ * Perfil customizado escolhido na tela (ex.: CARTÃO BENEFÍCIOS): confere que
+ * é desta clínica e devolve o perfil base, que é o que vai em `role`. O
+ * trigger do banco refaz a mesma conferência; esta aqui existe para devolver
+ * uma mensagem clara em vez de um erro de banco.
+ */
+async function perfilBaseDoCustomizado(clinicaId: string, perfilAcessoId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("perfis_acesso")
+    .select("*")
+    .eq("id", perfilAcessoId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data || data.clinica_id !== clinicaId || data.sistema || !data.perfil_base) {
+    throw new Error("Perfil de acesso inválido para esta unidade");
+  }
+  return data.perfil_base as (typeof ROLES)[number];
+}
+
 async function assertUserBelongsToClinica(userId: string, clinicaId: string) {
   const { data, error } = await supabaseAdmin
     .from("clinica_memberships")
@@ -193,11 +212,19 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
         password: z.string().min(6).max(100),
         nome: z.string().min(2).max(120),
         role: z.enum(ROLES),
+        /** Perfil customizado; quando vem, `role` passa a ser o perfil base dele. */
+        perfilAcessoId: z.string().uuid().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
+    if (data.perfilAcessoId) {
+      data.role = await perfilBaseDoCustomizado(data.clinicaId, data.perfilAcessoId);
+    }
+    // Só manda a coluna quando há perfil customizado: antes da migration ela
+    // não existe, e o cadastro comum não pode depender dela.
+    const perfilCustom = data.perfilAcessoId ? { perfil_acesso_id: data.perfilAcessoId } : {};
 
     // Check if user already exists by email
     let userId: string | null = null;
@@ -233,13 +260,17 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
     if (existingMem) {
       const { error } = await supabaseAdmin
         .from("clinica_memberships")
-        .update({ role: data.role, ativo: true })
+        .update({ role: data.role, ativo: true, ...perfilCustom })
         .eq("id", existingMem.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabaseAdmin
-        .from("clinica_memberships")
-        .insert({ user_id: userId!, clinica_id: data.clinicaId, role: data.role, ativo: true });
+      const { error } = await supabaseAdmin.from("clinica_memberships").insert({
+        user_id: userId!,
+        clinica_id: data.clinicaId,
+        role: data.role,
+        ativo: true,
+        ...perfilCustom,
+      });
       if (error) throw new Error(error.message);
     }
 
@@ -257,6 +288,12 @@ export const editarMembro = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         membershipId: z.string().uuid(),
         role: z.enum(ROLES),
+        /**
+         * Perfil customizado. `undefined` não mexe (telas que não conhecem
+         * perfil customizado); `null` tira a pessoa do customizado; um id
+         * coloca nele e `role` passa a ser o perfil base.
+         */
+        perfilAcessoId: z.string().uuid().nullable().optional(),
         ativo: z.boolean(),
         /**
          * Autoriza isenções e descontos com a própria senha. Só é gravado
@@ -288,11 +325,16 @@ export const editarMembro = createServerFn({ method: "POST" })
       await assertPodeAlterarConta(context.userId, mem.user_id);
     }
 
+    if (data.perfilAcessoId) {
+      data.role = await perfilBaseDoCustomizado(data.clinicaId, data.perfilAcessoId);
+    }
+
     const { error: upErr } = await supabaseAdmin
       .from("clinica_memberships")
       .update({
         role: data.role,
         ativo: data.ativo,
+        ...(data.perfilAcessoId === undefined ? {} : { perfil_acesso_id: data.perfilAcessoId }),
         ...(data.podeAutorizar === undefined ? {} : { pode_autorizar: data.podeAutorizar }),
         ...(data.podeGerirHorarios === undefined
           ? {}

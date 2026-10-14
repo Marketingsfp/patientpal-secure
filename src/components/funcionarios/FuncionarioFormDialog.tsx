@@ -29,6 +29,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { PERFIS_SISTEMA, perfilCanonico } from "@/lib/permissoes-presets";
+import {
+  carregarPerfisCustomizados,
+  idDoCustomizado,
+  perfilParaGravar,
+  valorDoCustomizado,
+  type PerfilCustomizado,
+} from "@/lib/perfis-customizados";
+import { PerfilSelectItems } from "@/components/perfis/PerfilSelectItems";
 
 // "Supervisor" voltou em 08/10/2026 como perfil configurável (preset próprio
 // em permissoes-presets.ts): gestão operacional sem acesso a dinheiro. Poder
@@ -95,6 +103,8 @@ export function FuncionarioFormDialog({
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [perfilOriginal, setPerfilOriginal] = useState<string | null>(null);
+  // Perfis criados pela clínica em Perfis de Acesso (ex.: CARTÃO BENEFÍCIOS).
+  const [perfisCustom, setPerfisCustom] = useState<PerfilCustomizado[]>([]);
   const [autorizaOriginal, setAutorizaOriginal] = useState(false);
   // Escopo por profissional (ver o bloco "Agendas que esta pessoa pode ver").
   const [medicosDaClinica, setMedicosDaClinica] = useState<Ref[]>([]);
@@ -107,6 +117,17 @@ export function FuncionarioFormDialog({
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+
+  useEffect(() => {
+    if (!open || !clinicaId) return;
+    carregarPerfisCustomizados(clinicaId)
+      .then(setPerfisCustom)
+      .catch((e) => {
+        // Sem a lista, a tela continua com os perfis de sistema.
+        console.error("[funcionario] perfis customizados indisponíveis", e);
+        setPerfisCustom([]);
+      });
+  }, [open, clinicaId]);
 
   // Load setores + funcionários disponíveis (sem login) when dialog opens
   useEffect(() => {
@@ -178,7 +199,8 @@ export function FuncionarioFormDialog({
             .maybeSingle(),
           supabase
             .from("clinica_memberships")
-            .select("id, role, ativo, pode_autorizar")
+            // "*": a coluna perfil_acesso_id só existe depois da migration.
+            .select("*")
             .eq("clinica_id", clinicaId)
             .eq("user_id", editingUserId)
             .maybeSingle(),
@@ -208,7 +230,10 @@ export function FuncionarioFormDialog({
         ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
       // Normaliza variações de capitalização para a chave canônica, senão o
       // Select abre vazio e um "TELEFONIA" viraria "recepcao" ao salvar.
-      const currentRole = perfilCanonico(mem?.role as string | undefined) ?? "recepcao";
+      // Quem está num perfil customizado aparece com ele, não com o perfil base.
+      const currentRole = mem?.perfil_acesso_id
+        ? valorDoCustomizado(mem.perfil_acesso_id)
+        : (perfilCanonico(mem?.role as string | undefined) ?? "recepcao");
       const autorizaAtual =
         (mem as { pode_autorizar?: boolean | null } | null)?.pode_autorizar === true;
       setMembershipId((mem?.id as string | undefined) ?? null);
@@ -313,13 +338,15 @@ export function FuncionarioFormDialog({
     const nomeParaLogin = (escolhido?.nome ?? form.funcionario_nome).trim();
     if (form.criar_login && isNew) {
       try {
+        const perfil = perfilParaGravar(form.perfil, perfisCustom);
         const res = await cadastrarUsuarioFn({
           data: {
             clinicaId: form.clinica_id,
             email: form.email.trim(),
             password: form.senha,
             nome: nomeParaLogin,
-            role: form.perfil as "recepcao",
+            role: perfil.role,
+            ...(perfil.perfilAcessoId ? { perfilAcessoId: perfil.perfilAcessoId } : {}),
           },
         });
         userId = (res as { userId?: string })?.userId ?? null;
@@ -375,11 +402,17 @@ export function FuncionarioFormDialog({
       (form.perfil !== perfilOriginal || form.pode_autorizar !== autorizaOriginal)
     ) {
       try {
+        const perfil = perfilParaGravar(form.perfil, perfisCustom);
+        // Só manda o perfil customizado quando ele está envolvido (entrando
+        // ou saindo dele); troca entre perfis de sistema segue como antes.
+        const envolveCustom =
+          perfil.perfilAcessoId !== null || idDoCustomizado(perfilOriginal ?? "") !== null;
         await editarMembroFn({
           data: {
             clinicaId: form.clinica_id,
             membershipId,
-            role: form.perfil as "recepcao",
+            role: perfil.role,
+            ...(envolveCustom ? { perfilAcessoId: perfil.perfilAcessoId } : {}),
             ativo: ativoOriginal,
             podeAutorizar: form.pode_autorizar,
           },
@@ -566,11 +599,7 @@ export function FuncionarioFormDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PERFIS.map((p) => (
-                          <SelectItem key={p.value} value={p.value}>
-                            {p.label}
-                          </SelectItem>
-                        ))}
+                        <PerfilSelectItems sistema={PERFIS} customizados={perfisCustom} />
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -743,11 +772,7 @@ export function FuncionarioFormDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PERFIS.map((p) => (
-                          <SelectItem key={p.value} value={p.value}>
-                            {p.label}
-                          </SelectItem>
-                        ))}
+                        <PerfilSelectItems sistema={PERFIS} customizados={perfisCustom} />
                       </SelectContent>
                     </Select>
                   </div>

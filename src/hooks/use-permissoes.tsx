@@ -130,6 +130,50 @@ export function usePermissoes(): {
       };
 
       try {
+        // Perfil customizado (ex.: CARTÃO BENEFÍCIOS): `role` é o perfil base
+        // dele, mas as telas seguem a matriz do customizado. `select("*")`
+        // porque antes da migration a coluna não existe — aí ninguém tem
+        // customizado e vale o perfil pela chave, como sempre foi.
+        let perfilCustomId: string | null = null;
+        if (userId) {
+          const { data: mem, error: memErr } = await supabase
+            .from("clinica_memberships")
+            .select("*")
+            .eq("clinica_id", clinicaId)
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (memErr) throw memErr;
+          perfilCustomId = mem?.perfil_acesso_id ?? null;
+        }
+
+        if (perfilCustomId) {
+          // Customizado começa fechado: só abre o que a matriz dele liberou,
+          // sem herdar o padrão de fábrica do perfil base. Mesma regra do
+          // has_module_access no banco (módulo sem linha = sem acesso).
+          const { data: perms, error: permErr } = await supabase
+            .from("perfil_permissoes")
+            .select("modulo, acesso")
+            .eq("perfil_id", perfilCustomId);
+          if (permErr) throw permErr;
+          if (cancelled) return;
+          const set = new Set<string>();
+          const nvl = new Map<string, "read" | "write">();
+          const cfg = new Set<string>();
+          for (const p of perms ?? []) {
+            cfg.add(p.modulo);
+            if (p.acesso === "read" || p.acesso === "write") {
+              set.add(p.modulo);
+              nvl.set(p.modulo, p.acesso);
+            }
+          }
+          await aplicarExcecoesDaPessoa(set, nvl, cfg);
+          if (cancelled) return;
+          setAllowed(set);
+          setNivel(nvl);
+          setConfigured(cfg);
+          return;
+        }
+
         const { data: perfil } = await supabase
           .from("perfis_acesso")
           .select("id")

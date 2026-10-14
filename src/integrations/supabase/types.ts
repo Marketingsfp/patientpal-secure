@@ -3474,6 +3474,7 @@ export type Database = {
           clinica_id: string
           created_at: string
           id: string
+          perfil_acesso_id: string | null
           pode_autorizar: boolean
           pode_gerir_horarios: boolean
           role: Database["public"]["Enums"]["app_role"]
@@ -3484,6 +3485,7 @@ export type Database = {
           clinica_id: string
           created_at?: string
           id?: string
+          perfil_acesso_id?: string | null
           pode_autorizar?: boolean
           pode_gerir_horarios?: boolean
           role: Database["public"]["Enums"]["app_role"]
@@ -3494,6 +3496,7 @@ export type Database = {
           clinica_id?: string
           created_at?: string
           id?: string
+          perfil_acesso_id?: string | null
           pode_autorizar?: boolean
           pode_gerir_horarios?: boolean
           role?: Database["public"]["Enums"]["app_role"]
@@ -14258,6 +14261,7 @@ export type Database = {
           descricao: string | null
           id: string
           nome: string
+          perfil_base: Database["public"]["Enums"]["app_role"] | null
           sistema: boolean
           updated_at: string
         }
@@ -14269,6 +14273,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome: string
+          perfil_base?: Database["public"]["Enums"]["app_role"] | null
           sistema?: boolean
           updated_at?: string
         }
@@ -14280,6 +14285,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome?: string
+          perfil_base?: Database["public"]["Enums"]["app_role"] | null
           sistema?: boolean
           updated_at?: string
         }

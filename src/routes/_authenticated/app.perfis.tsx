@@ -42,8 +42,28 @@ import {
   Users,
   Save,
   Loader2,
+  Plus,
+  Tag,
+  Trash2,
 } from "lucide-react";
 import { perfilCanonico, PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import {
+  BASES_PERMITIDAS,
+  chaveDoNome,
+  erroDaChave,
+  type PerfilCustomizado,
+} from "@/lib/perfis-customizados";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { confirmDialog } from "@/lib/confirm";
 import { diffDaPessoa } from "@/lib/permissoes-pessoa";
 import { ESCOPOS_AUTORIZACAO, type EscopoAutorizacao } from "@/lib/autorizacao-supervisor";
 import { Switch } from "@/components/ui/switch";
@@ -691,8 +711,26 @@ function aplicaGranularidade(grupos: Grupo[], granular: boolean): Grupo[] {
   });
 }
 
-function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<string, Acesso>> {
-  const out = {} as Record<PerfilKey, Record<string, Acesso>>;
+/**
+ * Padrão de fábrica de um perfil. Perfil customizado não tem preset: começa
+ * todo fechado, e só abre o que o admin marcar (mesma regra do usePermissoes
+ * e do has_module_access no banco).
+ */
+function presetDe(chave: string): Partial<Record<string, Acesso>> {
+  return (PRESETS as Record<string, Partial<Record<string, Acesso>>>)[chave] ?? {};
+}
+
+/** Linha da lista de perfis: os de sistema e os criados pela clínica. */
+type PerfilLinha = {
+  key: string;
+  nome: string;
+  icon: typeof ShieldCheck;
+  descricao: string;
+  custom?: PerfilCustomizado;
+};
+
+function buildInitialState(todosModulos: string[]): Record<string, Record<string, Acesso>> {
+  const out = {} as Record<string, Record<string, Acesso>>;
   for (const p of PERFIS) {
     const preset = PRESETS[p.key];
     out[p.key] = Object.fromEntries(todosModulos.map((k) => [k, acessoPadrao(preset, k)]));
@@ -745,8 +783,18 @@ const ROTULO_ACESSO: Record<Acesso, string> = {
   write: "Edição",
 };
 
-/** Uma pessoa com vínculo na clínica, para a aba "Por pessoa". */
-type Pessoa = { userId: string; nome: string; role: PerfilKey | null; roleBruto: string };
+/**
+ * Uma pessoa com vínculo na clínica, para a aba "Por pessoa". `role` é o
+ * perfil de sistema (o BASE, quando ela está num perfil customizado);
+ * `perfilAcessoId` é o customizado, se houver.
+ */
+type Pessoa = {
+  userId: string;
+  nome: string;
+  role: PerfilKey | null;
+  roleBruto: string;
+  perfilAcessoId: string | null;
+};
 
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
@@ -765,24 +813,39 @@ function PerfisPage() {
   // acesso no sistema.
   const podeAdministrar = clinicaAtual?.role === "admin";
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
-  const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
-  const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(() =>
+  // Chave do perfil escolhido: de sistema ("recepcao") ou customizado.
+  const [perfilSel, setPerfilSel] = useState<string>("admin");
+  const [matriz, setMatriz] = useState<Record<string, Record<string, Acesso>>>(() =>
     buildInitialState(GRUPOS_BASE.flatMap((g) => g.modulos.map((m) => m.key))),
+  );
+  // Perfis criados pela clínica (ex.: CARTÃO BENEFÍCIOS).
+  const [perfisCustom, setPerfisCustom] = useState<PerfilCustomizado[]>([]);
+  const todosPerfis = useMemo<PerfilLinha[]>(
+    () => [
+      ...PERFIS,
+      ...perfisCustom.map((c) => ({
+        key: c.chave,
+        nome: c.nome,
+        icon: Tag,
+        descricao: c.descricao ?? "",
+        custom: c,
+      })),
+    ],
+    [perfisCustom],
   );
 
   // Quando a granularidade muda (flag carrega), garante que as novas chaves
   // apareçam na matriz com o valor padrão herdado do pai.
   useEffect(() => {
     setMatriz((prev) => {
-      const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
-      for (const p of PERFIS) {
-        const preset = PRESETS[p.key];
-        const atual = next[p.key] ?? {};
-        const novo: Record<string, Acesso> = { ...atual };
+      const next = { ...prev };
+      for (const chave of Object.keys(next)) {
+        const preset = presetDe(chave);
+        const novo: Record<string, Acesso> = { ...next[chave] };
         for (const k of TODOS_MODULOS) {
           if (!(k in novo)) novo[k] = acessoPadrao(preset, k);
         }
-        next[p.key] = novo;
+        next[chave] = novo;
       }
       return next;
     });
@@ -790,11 +853,9 @@ function PerfisPage() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
   );
-  const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>(
-    {} as Record<PerfilKey, string>,
-  );
+  const [perfilIds, setPerfilIds] = useState<Record<string, string>>({});
   const [configuradosPorPerfil, setConfiguradosPorPerfil] = useState(
-    new Map<PerfilKey, Set<string>>(),
+    new Map<string, Set<string>>(),
   );
   // --- Aba "Por pessoa" -------------------------------------------------
   // `modo` escolhe o que a grade está editando: a regra do cargo (que vale
@@ -836,15 +897,37 @@ function PerfisPage() {
           .upsert(upsertRows, { onConflict: "clinica_id,chave", ignoreDuplicates: true });
         if (upErr) throw upErr;
 
+        // "*": a coluna perfil_base só existe depois da migration de perfis
+        // customizados; pedida pelo nome, derrubaria a tela antes dela.
         const { data: perfis, error: pErr } = await supabase
           .from("perfis_acesso")
-          .select("id, chave")
+          .select("*")
           .eq("clinica_id", clinicaId);
         if (pErr) throw pErr;
 
         const ids: Record<string, string> = {};
         for (const p of perfis ?? []) ids[p.chave] = p.id;
-        setPerfilIds(ids as Record<PerfilKey, string>);
+        setPerfilIds(ids);
+
+        const customs: PerfilCustomizado[] = (perfis ?? [])
+          .filter((p) => !p.sistema && p.perfil_base)
+          .map((p) => ({
+            id: p.id,
+            chave: p.chave,
+            nome: p.nome,
+            descricao: p.descricao,
+            perfilBase: p.perfil_base as PerfilKey,
+          }))
+          .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+        setPerfisCustom(customs);
+        // Customizado começa todo "Sem"; as linhas salvas entram logo abaixo.
+        setMatriz((prev) => {
+          const next = { ...prev };
+          for (const c of customs) {
+            next[c.chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+          }
+          return next;
+        });
 
         const perfilIdList = (perfis ?? []).map((p) => p.id);
         if (perfilIdList.length > 0) {
@@ -854,9 +937,9 @@ function PerfisPage() {
             .in("perfil_id", perfilIdList);
           if (permErr) throw permErr;
 
-          const idToChave: Record<string, PerfilKey> = {};
-          for (const p of perfis ?? []) idToChave[p.id] = p.chave as PerfilKey;
-          const configurados = new Map<PerfilKey, Set<string>>();
+          const idToChave: Record<string, string> = {};
+          for (const p of perfis ?? []) idToChave[p.id] = p.chave;
+          const configurados = new Map<string, Set<string>>();
           for (const row of perms ?? []) {
             const chave = idToChave[row.perfil_id];
             if (!chave) continue;
@@ -867,7 +950,7 @@ function PerfisPage() {
           setConfiguradosPorPerfil(configurados);
 
           setMatriz((prev) => {
-            const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
+            const next = { ...prev };
             const seen: Record<string, boolean> = {};
             for (const row of perms ?? []) {
               const chave = idToChave[row.perfil_id];
@@ -880,7 +963,7 @@ function PerfisPage() {
                 // base era "none", então um módulo novo (ex.: Hiperdia)
                 // aparecia como "Sem" aqui mesmo estando liberado no padrão.
                 // Submódulo sem valor próprio herda o pai, pela mesma razão.
-                const preset = PRESETS[chave];
+                const preset = presetDe(chave);
                 next[chave] = Object.fromEntries(
                   TODOS_MODULOS.map((k) => [k, acessoPadrao(preset, k)]),
                 );
@@ -888,8 +971,12 @@ function PerfisPage() {
               }
               next[chave][row.modulo] = row.acesso as Acesso;
             }
-            for (const p of PERFIS) {
-              herdarAcessosOsZap(next[p.key], configurados.get(p.key) ?? new Set(), PRESETS[p.key]);
+            for (const chave of Object.keys(next)) {
+              herdarAcessosOsZap(
+                next[chave],
+                configurados.get(chave) ?? new Set(),
+                presetDe(chave),
+              );
             }
             return next;
           });
@@ -912,13 +999,18 @@ function PerfisPage() {
     let cancelado = false;
     void (async () => {
       try {
+        // "*": perfil_acesso_id só existe depois da migration.
         const { data: mems, error } = await supabase
           .from("clinica_memberships")
-          .select("user_id, role, ativo")
+          .select("*")
           .eq("clinica_id", clinicaId)
           .eq("ativo", true);
         if (error) throw error;
-        const linhas = (mems ?? []) as Array<{ user_id: string; role: string }>;
+        const linhas = (mems ?? []) as Array<{
+          user_id: string;
+          role: string;
+          perfil_acesso_id?: string | null;
+        }>;
         const ids = [...new Set(linhas.map((l) => l.user_id))];
         const nomes = new Map<string, string>();
         if (ids.length > 0) {
@@ -937,6 +1029,7 @@ function PerfisPage() {
               nome: nomes.get(l.user_id) ?? "(sem nome cadastrado)",
               role: perfilCanonico(l.role),
               roleBruto: l.role,
+              perfilAcessoId: l.perfil_acesso_id ?? null,
             }))
             .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
         );
@@ -1012,7 +1105,7 @@ function PerfisPage() {
       const rows = TODOS_MODULOS.map((modulo) => ({
         perfil_id: perfilId,
         modulo,
-        acesso: matriz[perfilSel][modulo],
+        acesso: matriz[perfilSel]?.[modulo] ?? "none",
       }));
       const { error } = await supabase
         .from("perfil_permissoes")
@@ -1050,12 +1143,12 @@ function PerfisPage() {
   };
 
   const contagens = useMemo(() => {
-    const out = {} as Record<PerfilKey, number>;
-    for (const p of PERFIS) {
-      out[p.key] = Object.values(matriz[p.key]).filter((v) => v !== "none").length;
+    const out: Record<string, number> = {};
+    for (const p of todosPerfis) {
+      out[p.key] = Object.values(matriz[p.key] ?? {}).filter((v) => v !== "none").length;
     }
     return out;
-  }, [matriz]);
+  }, [matriz, todosPerfis]);
 
   const totalModulos = TODOS_MODULOS.length;
 
@@ -1064,29 +1157,41 @@ function PerfisPage() {
     [pessoas, pessoaSel],
   );
 
+  // Perfil cuja matriz vale para a pessoa: o customizado dela, se tiver, ou
+  // o perfil de sistema.
+  const perfilDaPessoa = useMemo<string | null>(() => {
+    if (!pessoa) return null;
+    const custom = perfisCustom.find((c) => c.id === pessoa.perfilAcessoId);
+    return custom?.chave ?? pessoa.role;
+  }, [pessoa, perfisCustom]);
+  const nomeDoPerfilDaPessoa = (p: Pessoa) =>
+    perfisCustom.find((c) => c.id === p.perfilAcessoId)?.nome ??
+    PERFIS.find((x) => x.key === p.role)?.nome ??
+    p.roleBruto;
+
   // O que a pessoa herda do cargo dela — exatamente a mesma grade que a aba
   // "Por cargo" mostra para aquele perfil.
   const basePessoa = useMemo<Record<string, Acesso>>(() => {
-    if (!pessoa?.role) return Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
-    return matriz[pessoa.role] ?? {};
-  }, [pessoa, matriz, TODOS_MODULOS]);
+    if (!perfilDaPessoa) return Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+    return matriz[perfilDaPessoa] ?? {};
+  }, [perfilDaPessoa, matriz, TODOS_MODULOS]);
 
   // O que a pessoa realmente enxerga: o cargo, com as exceções por cima.
   const padraoPessoa = useMemo<Record<string, Acesso>>(() => {
-    if (!pessoa?.role) return basePessoa;
+    if (!perfilDaPessoa) return basePessoa;
     return padraoOsZapDaPessoa(
       basePessoa,
-      configuradosPorPerfil.get(pessoa.role) ?? new Set(),
-      PRESETS[pessoa.role],
+      configuradosPorPerfil.get(perfilDaPessoa) ?? new Set(),
+      presetDe(perfilDaPessoa),
       overridesPessoa,
     );
-  }, [basePessoa, overridesPessoa, pessoa, configuradosPorPerfil]);
+  }, [basePessoa, overridesPessoa, perfilDaPessoa, configuradosPorPerfil]);
   const efetivoPessoa = { ...padraoPessoa, ...overridesPessoa };
 
   const editandoPessoa = modo === "pessoa";
   const bloqueado =
     !podeAdministrar || loading || saving || carregandoPessoa || (modo === "pessoa" && !pessoaSel);
-  const valores = editandoPessoa ? efetivoPessoa : matriz[perfilSel];
+  const valores = editandoPessoa ? efetivoPessoa : (matriz[perfilSel] ?? {});
   const acessosMostrados = TODOS_MODULOS.filter((k) => valores[k] && valores[k] !== "none").length;
   const totalPersonalizado = Object.keys(overridesPessoa).length;
   // Admin não passa pela matriz em lugar nenhum do sistema (o app libera tudo
@@ -1110,7 +1215,7 @@ function PerfisPage() {
     setConfiguradosPorPerfil((prev) => new Map(prev).set(perfilSel, configurados));
     setMatriz((prev) => {
       const valores = { ...prev[perfilSel], [modulo]: valor };
-      herdarAcessosOsZap(valores, configurados, PRESETS[perfilSel]);
+      herdarAcessosOsZap(valores, configurados, presetDe(perfilSel));
       return { ...prev, [perfilSel]: valores };
     });
   };
@@ -1189,6 +1294,143 @@ function PerfisPage() {
     }
   };
 
+  // --- Novo perfil customizado -----------------------------------------
+  const [novoAberto, setNovoAberto] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novaChave, setNovaChave] = useState("");
+  // Enquanto ninguém mexer na chave, ela acompanha o nome.
+  const [chaveEditada, setChaveEditada] = useState(false);
+  const [novaDescricao, setNovaDescricao] = useState("");
+  const [novaBase, setNovaBase] = useState<PerfilKey>("recepcao");
+  const [criando, setCriando] = useState(false);
+
+  const abrirNovoPerfil = () => {
+    setNovoNome("");
+    setNovaChave("");
+    setChaveEditada(false);
+    setNovaDescricao("");
+    setNovaBase("recepcao");
+    setNovoAberto(true);
+  };
+
+  const erroNovaChave = novaChave
+    ? (erroDaChave(novaChave) ??
+      (todosPerfis.some((p) => p.key === novaChave) ? "Já existe um perfil com essa chave." : null))
+    : null;
+
+  const criarPerfil = async () => {
+    if (!podeAdministrar || !clinicaId) return;
+    const nome = novoNome.trim();
+    if (nome.length < 2) {
+      toast.error("Informe o nome do perfil.");
+      return;
+    }
+    if (!novaChave || erroNovaChave) {
+      toast.error(erroNovaChave ?? "Informe a chave do perfil.");
+      return;
+    }
+    setCriando(true);
+    try {
+      const { data: criado, error } = await supabase
+        .from("perfis_acesso")
+        .insert({
+          clinica_id: clinicaId,
+          chave: novaChave,
+          nome,
+          descricao: novaDescricao.trim() || null,
+          sistema: false,
+          ativo: true,
+          perfil_base: novaBase,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+
+      // Grava a matriz inteira como "Sem": o perfil nasce sem acesso a nada,
+      // e o banco passa a ter a mesma resposta que a tela mostra.
+      const { error: permErr } = await supabase.from("perfil_permissoes").insert(
+        TODOS_MODULOS.map((modulo) => ({
+          perfil_id: criado.id,
+          modulo,
+          acesso: "none" as Acesso,
+        })),
+      );
+      if (permErr) throw permErr;
+
+      const novo: PerfilCustomizado = {
+        id: criado.id,
+        chave: novaChave,
+        nome,
+        descricao: novaDescricao.trim() || null,
+        perfilBase: novaBase,
+      };
+      setPerfisCustom((prev) =>
+        [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      );
+      setPerfilIds((prev) => ({ ...prev, [novaChave]: criado.id }));
+      setMatriz((prev) => ({
+        ...prev,
+        [novaChave]: Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso])),
+      }));
+      setConfiguradosPorPerfil((prev) => new Map(prev).set(novaChave, new Set(TODOS_MODULOS)));
+      setNovoAberto(false);
+      setModo("perfil");
+      setPerfilSel(novaChave);
+      setTab("permissoes");
+      toast.success("Perfil criado sem nenhum acesso.", {
+        description: "Marque abaixo as telas que ele pode abrir e clique em Salvar.",
+      });
+    } catch (e) {
+      console.error("[perfis] erro criando perfil", e);
+      toast.error("Falha ao criar o perfil", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setCriando(false);
+    }
+  };
+
+  /** Exclui um perfil customizado que ninguém usa. */
+  const excluirPerfil = async (perfil: PerfilCustomizado) => {
+    if (!podeAdministrar || !clinicaId) return;
+    try {
+      const { count, error: cErr } = await supabase
+        .from("clinica_memberships")
+        .select("id", { count: "exact", head: true })
+        .eq("clinica_id", clinicaId)
+        .eq("perfil_acesso_id", perfil.id);
+      if (cErr) throw cErr;
+      if ((count ?? 0) > 0) {
+        toast.error(`${count} pessoa(s) usam o perfil ${perfil.nome}.`, {
+          description: "Troque o perfil delas no cadastro antes de excluir.",
+        });
+        return;
+      }
+      const ok = await confirmDialog({
+        title: `Excluir o perfil ${perfil.nome}?`,
+        description: "O perfil e a matriz de permissões dele saem do sistema.",
+        confirmText: "Excluir",
+        tone: "danger",
+      });
+      if (!ok) return;
+      const { error } = await supabase.from("perfis_acesso").delete().eq("id", perfil.id);
+      if (error) throw error;
+      setPerfisCustom((prev) => prev.filter((c) => c.id !== perfil.id));
+      setPerfilIds((prev) => {
+        const next = { ...prev };
+        delete next[perfil.chave];
+        return next;
+      });
+      if (perfilSel === perfil.chave) setPerfilSel("admin");
+      toast.success(`Perfil ${perfil.nome} excluído.`);
+    } catch (e) {
+      console.error("[perfis] erro excluindo perfil", e);
+      toast.error("Falha ao excluir o perfil", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
+
   /** Apaga todas as exceções: a pessoa volta a ser igual ao cargo dela. */
   const limparPersonalizacao = () => setOverridesPessoa({});
 
@@ -1248,12 +1490,113 @@ function PerfisPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Perfis de Acesso</h1>
-        <p className="text-sm text-muted-foreground">
-          Gerencie os perfis e suas permissões por módulo do sistema.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Perfis de Acesso</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie os perfis e suas permissões por módulo do sistema.
+          </p>
+        </div>
+        {podeAdministrar && (
+          <Button onClick={abrirNovoPerfil} disabled={loading}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Perfil
+          </Button>
+        )}
       </div>
+
+      <Dialog open={novoAberto} onOpenChange={(o) => !criando && setNovoAberto(o)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Novo perfil de acesso</DialogTitle>
+            <DialogDescription>
+              O perfil nasce sem acesso a nenhuma tela. Depois de criar, você marca na aba
+              Permissões o que ele pode abrir.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="novo-perfil-nome">Nome do perfil *</Label>
+              <Input
+                id="novo-perfil-nome"
+                placeholder="Ex.: CARTÃO BENEFÍCIOS"
+                value={novoNome}
+                maxLength={60}
+                onChange={(e) => {
+                  setNovoNome(e.target.value);
+                  if (!chaveEditada) setNovaChave(chaveDoNome(e.target.value));
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="novo-perfil-chave">Chave *</Label>
+              <Input
+                id="novo-perfil-chave"
+                // A chave é técnica e minúscula (ex.: cartao_beneficios).
+                uppercase={false}
+                className="font-mono"
+                placeholder="cartao_beneficios"
+                value={novaChave}
+                maxLength={40}
+                onChange={(e) => {
+                  setChaveEditada(true);
+                  setNovaChave(e.target.value.toLowerCase());
+                }}
+              />
+              {erroNovaChave ? (
+                <p className="text-xs text-destructive">{erroNovaChave}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Gerada a partir do nome. Não pode ser mudada depois.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="novo-perfil-descricao">Descrição</Label>
+              <Textarea
+                id="novo-perfil-descricao"
+                placeholder="O que quem tem este perfil faz no dia a dia"
+                rows={2}
+                value={novaDescricao}
+                maxLength={300}
+                onChange={(e) => setNovaDescricao(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="novo-perfil-base">Perfil base *</Label>
+              <Select value={novaBase} onValueChange={(v) => setNovaBase(v as PerfilKey)}>
+                <SelectTrigger id="novo-perfil-base">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BASES_PERMITIDAS.map((b) => (
+                    <SelectItem key={b.value} value={b.value}>
+                      {b.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                As telas seguem só a matriz deste perfil novo. Nas partes do sistema que perguntam
+                pelo nome do perfil, a pessoa conta como o perfil base. Escolha o mais restrito que
+                sirva para a função. Não pode ser mudado depois.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNovoAberto(false)} disabled={criando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void criarPerfil()}
+              disabled={criando || novoNome.trim().length < 2 || !novaChave || !!erroNovaChave}
+            >
+              {criando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Criar perfil
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "perfis" | "permissoes")}>
         <TabsList>
@@ -1272,11 +1615,15 @@ function PerfisPage() {
                     <TableHead className="w-28">Chave</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="w-32 text-right">Acessos</TableHead>
+                    {podeAdministrar && perfisCustom.length > 0 && (
+                      <TableHead className="w-12"></TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {PERFIS.map((p) => {
+                  {todosPerfis.map((p) => {
                     const Icon = p.icon;
+                    const custom = p.custom;
                     return (
                       <TableRow
                         key={p.key}
@@ -1297,11 +1644,36 @@ function PerfisPage() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {p.descricao}
+                          {custom && (
+                            <span className="mt-0.5 block text-xs">
+                              Perfil da clínica · base:{" "}
+                              {PERFIS.find((x) => x.key === custom.perfilBase)?.nome ??
+                                custom.perfilBase}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right text-sm">
-                          <span className="font-medium">{contagens[p.key]}</span>
+                          <span className="font-medium">{contagens[p.key] ?? 0}</span>
                           <span className="text-muted-foreground"> / {totalModulos}</span>
                         </TableCell>
+                        {podeAdministrar && perfisCustom.length > 0 && (
+                          <TableCell className="text-right">
+                            {custom && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Excluir o perfil ${custom.nome}`}
+                                title="Excluir perfil"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void excluirPerfil(custom);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -1361,18 +1733,18 @@ function PerfisPage() {
                       <SelectContent>
                         {pessoas.map((p) => (
                           <SelectItem key={p.userId} value={p.userId}>
-                            {p.nome} — {PERFIS.find((x) => x.key === p.role)?.nome ?? p.roleBruto}
+                            {p.nome} — {nomeDoPerfilDaPessoa(p)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Select value={perfilSel} onValueChange={(v) => setPerfilSel(v as PerfilKey)}>
+                    <Select value={perfilSel} onValueChange={setPerfilSel}>
                       <SelectTrigger className="w-64">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PERFIS.map((p) => (
+                        {todosPerfis.map((p) => (
                           <SelectItem key={p.key} value={p.key}>
                             {p.nome}
                           </SelectItem>
