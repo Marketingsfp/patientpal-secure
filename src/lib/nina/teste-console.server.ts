@@ -152,7 +152,12 @@ async function garantirCiclo(
   return { conversaId: conversaId as string, cicloId };
 }
 
-/** Teto de mensagens guardadas por lead de teste (todas as sessões somadas). */
+/**
+ * Quantas mensagens recentes o console mostra por lead (só exibição). Nada é
+ * apagado: a homologação guarda todo o histórico e a exportação pagina tudo.
+ * Antes, um teto de 400 apagava as respostas antigas da Nina e do sistema,
+ * deixando perguntas do paciente "sem resposta" (homologação 14/10/2026).
+ */
 const LIMITE_MENSAGENS_LEAD = 400;
 
 /** IDs de todas as conversas de teste do lead (sessões atuais e anteriores). */
@@ -166,37 +171,6 @@ async function conversasDoLead(admin: any, clinicaId: string, lead: LeadRow): Pr
   const ids = ((convs ?? []) as any[]).map((c) => c.id as string);
   if (lead.conversa_id && !ids.includes(lead.conversa_id)) ids.push(lead.conversa_id);
   return ids;
-}
-
-/**
- * Mantém no máximo LIMITE_MENSAGENS_LEAD mensagens por lead de teste: ao bater
- * o teto, as mais antigas são apagadas para dar lugar às novas.
- */
-async function podarMensagensLead(admin: any, clinicaId: string, lead: LeadRow) {
-  try {
-    const ids = await conversasDoLead(admin, clinicaId, lead);
-    if (ids.length === 0) return;
-    const { count } = await admin
-      .from("whatsapp_mensagens")
-      .select("id", { count: "exact", head: true })
-      .eq("clinica_id", clinicaId)
-      .in("conversa_id", ids)
-      .is("nina_status", null);
-    const excedente = (count ?? 0) - LIMITE_MENSAGENS_LEAD;
-    if (excedente <= 0) return;
-    const { data: antigas } = await admin
-      .from("whatsapp_mensagens")
-      .select("id")
-      .eq("clinica_id", clinicaId)
-      .in("conversa_id", ids)
-      .is("nina_status", null)
-      .order("created_at", { ascending: true })
-      .limit(excedente);
-    const alvo = ((antigas ?? []) as any[]).map((m) => m.id as string);
-    if (alvo.length) await admin.from("whatsapp_mensagens").delete().in("id", alvo);
-  } catch (e) {
-    console.error("[NINA_TESTE] falha ao podar mensagens antigas", e);
-  }
 }
 
 export type EntradaMensagemTeste = {
@@ -400,8 +374,6 @@ export async function processarMensagemTeste(
         patient_response_deadline: null,
       })
       .eq("id", conversaId);
-    // Teto atingido → apaga as mensagens mais antigas do lead para caber as novas.
-    await podarMensagensLead(supabaseAdmin, data.clinicaId, { ...lead, conversa_id: conversaId });
   }
 
   const mensagemId = (msgEntrada as { id?: string } | null)?.id ?? null;
@@ -1359,6 +1331,5 @@ export {
   carregarLead,
   garantirCiclo,
   conversasDoLead,
-  podarMensagensLead,
 };
 export type { LeadRow };
