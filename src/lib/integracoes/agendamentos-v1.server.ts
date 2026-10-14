@@ -38,6 +38,7 @@ import {
   pacienteSchema,
   resolverPaciente,
 } from "./pacientes-v1.server";
+import { idsDesligados, medicoLiberado } from "./site-especialidades";
 
 const CAMPOS_AGENDAMENTO =
   "id,clinica_id,paciente_id,paciente_nome,medico_id,especialidade_id,inicio,fim,procedimento,status,observacoes,tipo_atendimento,data_pagamento,origem_integracao,id_externo,created_at,updated_at";
@@ -82,6 +83,30 @@ function ok<T>(status: number, data: T) {
   return { status, body: { data } };
 }
 
+/** Especialidades desligadas para o site na clínica (teto da unidade + interruptor do site). */
+async function especialidadesDesligadasSite(
+  db: SupabaseClient<Database>,
+  clinicaId: string,
+): Promise<Set<string>> {
+  const [u, s] = await Promise.all([
+    db
+      .from("especialidade_unidade")
+      .select("especialidade_id, ativo")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", false),
+    db
+      .from("site_agendamento_especialidade")
+      .select("especialidade_id, ativo")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", false),
+  ]);
+  if (u.error || s.error) {
+    console.error("[api-v1] esp desligadas:", u.error?.code ?? s.error?.code ?? "erro");
+    throw new ApiError({ status: 500, code: "read_failed", message: "Falha ao ler especialidades." });
+  }
+  return idsDesligados(u.data, s.data);
+}
+
 // ------------------------------------------------------------------ handlers
 
 async function handleAvailability(
@@ -95,7 +120,7 @@ async function handleAvailability(
     .object({
       medico_id: uuid.optional(),
       especialidade_id: uuid.optional(),
-      dias: z.coerce.number().int().min(1).max(30).default(7),
+      dias: z.coerce.number().int().min(1).max(30).optional(),
       limite: z.coerce.number().int().min(1).max(200).default(60),
     })
     .safeParse(Object.fromEntries(url.searchParams));
@@ -108,12 +133,23 @@ async function handleAvailability(
     });
   }
 
+  // Janela da clínica (site_agendamento_config.dias_antecedencia, padrão 7)
+  // é o padrão e o teto. Pedido acima do teto usa o teto, sem recusar.
+  const { data: cfgJanela, error: errJanela } = await db
+    .from("site_agendamento_config")
+    .select("dias_antecedencia")
+    .eq("clinica_id", ctx.clinica_id)
+    .maybeSingle();
+  if (errJanela) console.error("[api-v1] janela:", errJanela.code ?? "erro");
+  const teto = Number(cfgJanela?.dias_antecedencia ?? 7) || 7;
+  const dias = Math.min(q.data.dias ?? teto, teto);
+
   const { data, error } = await db.rpc("horarios_disponiveis_publico", {
     _clinica_id: ctx.clinica_id,
     _especialidade_id: q.data.especialidade_id ?? null,
     _medico_id: q.data.medico_id ?? null,
     _de: null,
-    _dias: q.data.dias,
+    _dias: dias,
     _limite: q.data.limite,
   } as never);
   if (error) {
@@ -679,12 +715,15 @@ async function handleEspecialidades(
       ].filter(Boolean),
     ),
   ];
-  if (espIds.length === 0) return { status: 200, body: { data: [] } };
+  const desligadas = await especialidadesDesligadasSite(db, ctx.clinica_id);
+  const espLiberadas = (espIds as string[]).filter((id) => !desligadas.has(id));
+  if (espLiberadas.length === 0) return { status: 200, body: { data: [] } };
 
   const { data, error } = await db
     .from("especialidades")
     .select("id,nome")
-    .in("id", espIds as string[])
+    .in("id", espLiberadas)
+    .neq("ativo", false)
     .order("nome");
   if (error) {
     throw new ApiError({
@@ -713,7 +752,7 @@ async function handleMedicos(
 
   const { data: medicos, error } = await db
     .from("medicos")
-    .select("id,nome")
+    .select("id,nome,especialidade_id")
     .eq("clinica_id", ctx.clinica_id)
     .eq("ativo", true)
     .eq("visivel_agendamento_online", true)
@@ -735,6 +774,21 @@ async function handleMedicos(
       "medico_id",
       lista.map((m) => m.id),
     );
+
+  // Médico com TODAS as especialidades (principal + N:N) desligadas no
+  // catálogo da unidade ou no site sai da vitrine. Sem especialidade: fica.
+  const desligadas = await especialidadesDesligadasSite(db, ctx.clinica_id);
+  if (desligadas.size > 0) {
+    lista = lista.filter((m) =>
+      medicoLiberado(
+        [
+          m.especialidade_id,
+          ...(rel ?? []).filter((r) => r.medico_id === m.id).map((r) => r.especialidade_id),
+        ],
+        desligadas,
+      ),
+    );
+  }
 
   const saida: Array<{ id: string; nome: string; especialidade_id: string | null }> = [];
   for (const m of lista) {
