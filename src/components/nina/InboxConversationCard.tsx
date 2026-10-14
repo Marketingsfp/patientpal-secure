@@ -3,6 +3,8 @@ import { ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BadgeConversaNova } from "./BadgeConversaNova";
 import { BadgeEspera } from "./BadgeEspera";
+import { TextoFluido } from "./TextoFluido";
+import { useTrechoFluido } from "@/hooks/use-lista-fluida";
 import { tituloConversa, type ConversaComNome } from "@/lib/atendimento/rotulo-conversa";
 import { tiposDeBadgeDoCard } from "@/lib/atendimento/badge-nina";
 import type { ConversaNova } from "@/lib/atendimento/conversa-nova";
@@ -47,6 +49,7 @@ export function InboxConversationCard({
   previa,
   autorPrevia,
   simulada = false,
+  fluido = false,
   ...eventos
 }: {
   conversa: ConversaCardData;
@@ -57,6 +60,8 @@ export function InboxConversationCard({
   previa?: string;
   autorPrevia?: AutorPreviaConversa;
   simulada?: boolean;
+  /** Badges, contador, prévia e espera mudam com transição (flag ux_melhorias). */
+  fluido?: boolean;
 } & Pick<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "onClick" | "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
@@ -64,6 +69,8 @@ export function InboxConversationCard({
   const fmtData = (s?: string | null) => (s ? new Date(s).toLocaleString("pt-BR") : "—");
   const indicadorPrevia = autorPrevia ? INDICADOR_PREVIA[autorPrevia] : null;
   const IconePrevia = indicadorPrevia?.Icone;
+  const linhaTitulo = useTrechoFluido<HTMLDivElement>(fluido);
+  const linhaBadges = useTrechoFluido<HTMLDivElement>(fluido);
   return (
     <button
       type="button"
@@ -77,18 +84,21 @@ export function InboxConversationCard({
           : "bg-atd-surface"
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div ref={linhaTitulo} className="flex items-center gap-2">
         <span className="font-semibold text-sm truncate flex-1" title={tituloConversa(c)}>
           {tituloConversa(c)}
         </span>
         <BadgeConversaNova conversa={simulada ? { ...c, is_teste: false } : c} />
         {Number(c.nao_lidas ?? 0) > 0 && (
-          <Badge className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0">
-            {Number(c.nao_lidas ?? 0)}
+          <Badge
+            key="nao-lidas"
+            className="bg-atd-blue text-atd-on-strong text-xs px-1.5 py-0 overflow-hidden"
+          >
+            <TextoFluido valor={Number(c.nao_lidas ?? 0)} ativo={fluido} />
           </Badge>
         )}
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
+      <div ref={linhaBadges} className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
         {/* Lista canônica e já deduplicada por chave semântica. */}
         {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
           // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).
@@ -125,7 +135,7 @@ export function InboxConversationCard({
             {simulada ? "SIMULAÇÃO" : "TESTE"}
           </Badge>
         )}
-        <BadgeEspera desde={esperaDesde} />
+        <BadgeEspera key="espera" desde={esperaDesde} fluido={fluido} />
       </div>
       {previa && (
         <div
@@ -141,7 +151,9 @@ export function InboxConversationCard({
               <span className="sr-only">{indicadorPrevia.descricao}: </span>
             </>
           )}
-          <span className="truncate">{previa}</span>
+          <span className="truncate">
+            <TextoFluido valor={previa} ativo={fluido} />
+          </span>
         </div>
       )}
       <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtData(c.ultima_msg_em)}</div>

@@ -8,6 +8,7 @@ import {
   rotuloEspera,
 } from "@/lib/atendimento/espera";
 import { cn } from "@/lib/utils";
+import { TextoFluido } from "./TextoFluido";
 
 /**
  * Relógio único da tela: um só intervalo (30s) alimenta TODOS os indicadores
@@ -39,10 +40,13 @@ export function BadgeEspera({
   desde,
   className,
   prefixo,
+  fluido = false,
 }: {
   desde?: string | null;
   className?: string;
   prefixo?: string;
+  /** O tempo muda com transição e a cor da faixa troca suavemente (flag ux_melhorias). */
+  fluido?: boolean;
 }) {
   const agora = useAgora();
   if (!desde) return null;
@@ -56,6 +60,7 @@ export function BadgeEspera({
       aria-label={rotuloEspera(min)}
       className={cn(
         "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums",
+        fluido && "overflow-hidden transition-colors duration-300",
         CLASSE_ESPERA_ATD[faixa],
         className,
       )}
@@ -63,7 +68,7 @@ export function BadgeEspera({
       <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
       <span>
         {prefixo ? `${prefixo} ` : faixa === "critico" ? "Espera crítica · " : "Espera · "}
-        {formatarEspera(min)}
+        <TextoFluido valor={formatarEspera(min)} ativo={fluido} />
       </span>
     </span>
   );

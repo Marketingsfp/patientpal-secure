@@ -19,7 +19,8 @@ function PreviaSimulacao() {
     <SemCaixaAlta>
       <main data-os-zap="true" className="h-dvh bg-background text-foreground">
         {ativa ? (
-          <SimulacaoAtendimento onEncerrar={() => setAtiva(false)} />
+          // Prévia local, sem clínica: a fluidez dos cards fica ligada para conferência.
+          <SimulacaoAtendimento fluido onEncerrar={() => setAtiva(false)} />
         ) : (
           <div className="mx-auto flex h-full max-w-lg flex-col items-center justify-center gap-4 p-6 text-center">
             <h1 className="text-xl font-semibold">Simulação do atendimento OS ZAP</h1>
