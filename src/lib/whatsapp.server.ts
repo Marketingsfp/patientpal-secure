@@ -1371,11 +1371,39 @@ async function gerarRespostaNinaInterno(
   // Transferência aguardando nome completo e data de nascimento (regra de 12/10/2026):
   // a resposta do paciente, qualquer que seja, conclui a transferência pedida.
   const dadosTransferencia = await import("@/lib/nina/dados-transferencia");
-  const transferenciaPendente =
+  const pendenteGuardada =
     sessaoNina.estado?.transferencia_pendente &&
     sessaoNina.estado.transferencia_pendente.session_id === sessaoNina.estado.session_id
       ? sessaoNina.estado.transferencia_pendente
       : null;
+  // O paciente desistiu do pedido e pediu outra coisa ("vou deixar a
+  // dermatologia para depois, quero nutricionista"), sem mandar os dados: a
+  // transferência do pedido antigo deixa de valer e o novo pedido é atendido
+  // (homologação 14/10/2026, ciclos 1062 e 1148).
+  const { trocaDeAssunto } = await import("@/lib/nina/escolha-paciente");
+  const assuntoTrocado = trocaDeAssunto(mensagemPaciente);
+  if (assuntoTrocado && sessaoNina.estado) {
+    // O pedido antigo não é mais o que o paciente quer marcar.
+    sessaoNina.estado.intencao_agendar_sessao = null;
+    sessaoNina.estado.oferta_encaminhamento = null;
+  }
+  const dadosNaTroca = dadosTransferencia.extrairDadosTransferencia(mensagemPaciente);
+  const pendenteDescartada =
+    Boolean(pendenteGuardada) &&
+    assuntoTrocado &&
+    !dadosNaTroca.nome_completo &&
+    !dadosNaTroca.data_nascimento;
+  if (pendenteDescartada && sessaoNina.estado) {
+    sessaoNina.estado.transferencia_pendente = null;
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Paciente trocou de pedido: transferência pendente do pedido antigo descartada",
+      dados: { motivo_antigo: pendenteGuardada!.argumentos.motivo.slice(0, 300) },
+      codigo: { arquivo: "src/lib/nina/escolha-paciente.ts", funcao: "trocaDeAssunto" },
+    });
+  }
+  const transferenciaPendente = pendenteDescartada ? null : pendenteGuardada;
   if (transferenciaPendente) nomeAtendimentoAusente = false;
   // Pergunta em vez dos dados: a Nina responde e transfere na mesma mensagem.
   const responderAntesDaTransferencia =
@@ -3072,22 +3100,56 @@ async function gerarRespostaNinaInterno(
         .filter((r) => referencias.includes(r.id))
         .map((r) => fluxoAgendamento.fluxoDoRegistro(r, podeAgendar, escopoDoAtendimento())),
     );
-  // Itens apresentados em turnos anteriores desta sessão (sem esclarecimento pendente).
-  const referenciasInformadas = conhecimentoAnterior?.esclarecimento
-    ? []
-    : (conhecimentoAnterior?.referencias ?? []).map((r) => r.registro);
-  const referenciasDaDecisao = ofertaEncaminhamento?.referencias.length
-    ? ofertaEncaminhamento.referencias
-    : referenciasInformadas;
-  // Motivo da transferência de agendamento: leva o atendimento informado.
+  // Itens apresentados em turnos anteriores desta sessão (sem esclarecimento
+  // pendente). Na troca de assunto, os itens antigos não decidem nada.
+  const referenciasInformadas =
+    conhecimentoAnterior?.esclarecimento || assuntoTrocado
+      ? []
+      : (conhecimentoAnterior?.referencias ?? []).map((r) => r.registro);
+  const referenciasDaDecisao =
+    !assuntoTrocado && ofertaEncaminhamento?.referencias.length
+      ? ofertaEncaminhamento.referencias
+      : referenciasInformadas;
+  const escolhaPaciente = await import("@/lib/nina/escolha-paciente");
+  // Profissional escolhido pelo paciente entre os da conversa (ou, sem nenhum
+  // deles citado, o único do catálogo com aquele nome); null quando não há escolha.
+  const profissionalEscolhido = (referencias: readonly string[]) => {
+    const daConversa = catalogoFluxo.profissionais.filter((r) => referencias.includes(r.id));
+    const textos = textosDoPacienteNaConversa();
+    const nomeEscolhido = (lista: typeof daConversa) =>
+      escolhaPaciente.escolhaNaConversa(
+        textos,
+        lista.map((r) => String(r.nome ?? "")),
+      ).profissional;
+    const nome = nomeEscolhido(daConversa) ?? nomeEscolhido(catalogoFluxo.profissionais);
+    return nome ? (catalogoFluxo.profissionais.find((r) => r.nome === nome) ?? null) : null;
+  };
+  // Motivo da transferência de agendamento: leva o atendimento informado e, com
+  // escolha feita, só o profissional escolhido (homologação 14/10/2026: o
+  // motivo trazia o último consultado ou todos da especialidade).
   const motivoAgendamento = (referencias: readonly string[]) => {
+    const escolhido = profissionalEscolhido(referencias);
+    const idsProfissionais = new Set(catalogoFluxo.profissionais.map((r) => r.id));
     const itens = [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
-      .filter((r) => referencias.includes(r.id))
+      .filter((r) =>
+        escolhido && idsProfissionais.has(r.id)
+          ? r.id === escolhido.id
+          : referencias.includes(r.id),
+      )
       .map((r) => String(r.nome ?? "").trim())
       .filter(Boolean)
       .slice(0, 5)
       .join("; ");
-    return `AGENDAMENTO_TRANSICAO: ${itens || "atendimento informado na conversa"}.`;
+    return `AGENDAMENTO_TRANSICAO: ${itens || String(escolhido?.nome ?? "") || "atendimento informado na conversa"}.`;
+  };
+  // Linha "Escolha do paciente: …" com profissional, dia/período e pagamento.
+  const linhaEscolhaDoPaciente = (referencias: readonly string[]) => {
+    const escolhido = profissionalEscolhido(referencias);
+    const e = escolhaPaciente.escolhaNaConversa(textosDoPacienteNaConversa(), []);
+    return escolhaPaciente.linhaEscolha({
+      ...e,
+      profissional: escolhido ? String(escolhido.nome ?? "") : null,
+    });
   };
   // Depois das informações, escolher dia, horário ou profissional ("quinta com
   // a Dra. X fica boa pra mim") é o pedido de marcar (regra de 13/10/2026). Com
@@ -3176,6 +3238,20 @@ async function gerarRespostaNinaInterno(
       urgencia: decisao.urgencia,
       ...(alteracaoSolicitada || agendamentoTransicao ? { setor: "Agendamento" } : {}),
     };
+    // Profissional, dia/período e pagamento escolhidos entram no resumo, também
+    // quando o encaminhamento vem por uma pergunta (homologação 14/10/2026).
+    const referenciasEscolha = [
+      ...new Set([
+        ...referenciasDaDecisao,
+        ...(fluxoEstado.knowledge_context?.referencias ?? []).map((r) => r.registro),
+      ]),
+    ];
+    const comEscolha = !alteracaoSolicitada && !cartaoConsultaEquipe;
+    if (comEscolha)
+      argumentos.resumo = escolhaPaciente.resumoComEscolha(
+        argumentos.resumo,
+        linhaEscolhaDoPaciente(referenciasEscolha),
+      );
     if (!pendente && (await reterTransferenciaParaDados(argumentos, contexto))) return;
     // Transferência retomada: os argumentos guardados e os dados que o paciente enviou.
     const dadosPaciente = pendente
@@ -3185,6 +3261,19 @@ async function gerarRespostaNinaInterno(
       pendente && dadosPaciente
         ? dadosTransferencia.argumentosComDados(pendente.argumentos, dadosPaciente)
         : argumentos;
+    // A troca feita junto com os dados ("na verdade, quinta com o Milton")
+    // atualiza a escolha e o profissional do motivo.
+    if (pendente && comEscolha) {
+      transferencia.resumo = escolhaPaciente.resumoComEscolha(
+        transferencia.resumo,
+        linhaEscolhaDoPaciente(referenciasEscolha),
+      );
+      if (
+        transferencia.motivo.startsWith("AGENDAMENTO_TRANSICAO") &&
+        profissionalEscolhido(referenciasEscolha)
+      )
+        transferencia.motivo = motivoAgendamento(referenciasEscolha);
+    }
     if (agendamentoTransicao) {
       const { limparEscolhaAgendamento } = await import("@/lib/nina/agendamento-escolha");
       limparEscolhaAgendamento(fluxoEstado);
