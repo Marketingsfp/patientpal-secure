@@ -4956,6 +4956,7 @@ async function gerarRespostaNinaInterno(
           respostaParcialConfirmada ? resposta : "",
           perguntasDoTurno.pendentesAtuais,
           apresentacao,
+          mensagemPaciente,
         );
     transformar(
       "catalogo.esclarecimento",

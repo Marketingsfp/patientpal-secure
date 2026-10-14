@@ -168,12 +168,22 @@ export function resumoComEscolha(resumo: string | null | undefined, linha: strin
 
 /**
  * O paciente desiste do pedido em andamento e pede outra coisa ("vou deixar a
- * dermatologia para depois, quero nutricionista"): a transferência pendente do
+ * dermatologia para depois, quero nutricionista"), ou corrige o exame do pedido
+ * ("confundi os pedidos, o meu é Doppler venoso"): a transferência pendente do
  * pedido antigo não vale mais.
+ *
+ * Trocar só o profissional ou o dia ("pode seguir com o Milton em vez da
+ * Raisa", "me confundi nos nomes") continua o mesmo pedido.
  */
 export function trocaDeAssunto(mensagem: string): boolean {
   const t = chave(mensagem);
-  return /\b(?:deixar|deixa|vou deixar|deixo)\b[^.!?\n]{0,40}\b(?:para|pra) depois\b|\bmudei de ideia\b|\bdesisti\b|\bnao quero mais\b|\b(?:em vez|ao inves) d[eoa]\b|\bpensando melhor\b[^.!?\n]{0,40}\b(?:quero|prefiro|vou) (?:ver|consultar|marcar|comecar|agendar)\b/.test(
-    t,
+  return (
+    /\b(?:deixar|deixa|vou deixar|deixo)\b[^.!?\n]{0,40}\b(?:para|pra) depois\b|\bmudei de ideia\b|\bdesisti\b|\bnao quero mais\b|\b(?:em vez|ao inves) d[eoa]s? (?:consulta|exame|procedimento|especialidade)\b|\bpensando melhor\b[^.!?\n]{0,40}\b(?:quero|prefiro|vou) (?:ver|consultar|marcar|comecar|agendar)\b/.test(
+      t,
+    ) ||
+    // Correção do exame/pedido (homologação 14/10/2026, ciclo 1201).
+    /\b(?:me )?(?:confundi|enganei|errei|troquei)\b[^.!?\n]{0,30}\b(?:pedidos?|exames?|papel|papeis|guias?)\b|\b(?:pedidos?|exames?|papel|papeis|guias?)\b[^.!?\n]{0,20}\b(?:confundi|errad[oa]s?|trocad[oa]s?)\b|\bnao e (?:ess[ea]|est[ea]) (?:exame|pedido|procedimento)\b/.test(
+      t,
+    )
   );
 }

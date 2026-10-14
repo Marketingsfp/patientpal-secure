@@ -1846,3 +1846,38 @@ describe("escolha completa do exame após esclarecer ultrassonografia", () => {
     expect(r.records).toHaveLength(0);
   });
 });
+
+describe("Fase 8 (exames, homologação 14/10/2026)", () => {
+  it("registro equivalente sem preço não aparece ao lado do que tem preço (E4)", async () => {
+    banco.servicos = [
+      servico({ id: idSequencial(21), nome: "ULTRASSONOGRAFIA ABDOMINAL TOTAL", valor: null }),
+      servico({ id: idSequencial(22), nome: "USG ABDOMINAL TOTAL", valor: 110 }),
+    ];
+    const r = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "usg abdome total",
+      tipo_atendimento: "exame_procedimento",
+    });
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.records.map((i) => i.procedimento)).toEqual(["USG ABDOMINAL TOTAL"]);
+  });
+
+  it("o nome exato não esconde as variantes entre parênteses (E7)", async () => {
+    banco.servicos = [
+      servico({ id: idSequencial(31), nome: "CURATIVO", valor: 70 }),
+      servico({ id: idSequencial(32), nome: "CURATIVO (P)", valor: 35 }),
+      servico({ id: idSequencial(33), nome: "CURATIVO (G)", valor: 83 }),
+      servico({ id: idSequencial(34), nome: "RETIRADA DE PONTOS (P)", valor: 28 }),
+    ];
+    const r = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "curativo",
+      tipo_atendimento: "exame_procedimento",
+    });
+    expect(r.esclarecimento?.opcoes.map((o) => o.nome).sort()).toEqual([
+      "CURATIVO",
+      "CURATIVO (G)",
+      "CURATIVO (P)",
+    ]);
+  });
+});

@@ -494,17 +494,34 @@ const opcoesDe = (p: ConhecimentoSessao) => [
 export function pendenciasAPerguntar(
   textoConfirmado: string,
   lista: readonly ConhecimentoSessao[],
+  mensagemPaciente?: string,
 ): ConhecimentoSessao[] {
   const texto = compacto(textoConfirmado);
   const restantes = lista.filter((p) => {
     const opcoes = opcoesDe(p);
-    return !(opcoes.length && opcoes.every((o) => texto.includes(o)));
+    if (!opcoes.length) return true;
+    // A resposta já trouxe a lista (todas as opções, ou quase todas com pelo
+    // menos duas): anexar de novo repetia a lista (homologação 14/10/2026,
+    // ciclo 1198).
+    const citadas = opcoes.filter((o) => texto.includes(o)).length;
+    return !(citadas === opcoes.length || (citadas >= 2 && citadas >= opcoes.length * 0.6));
   });
+  // Termos que a IA criou ao reformular ("enfermagem", "ferida") e que o
+  // paciente não escreveu não viram "Não encontrei…" para ele, desde que reste
+  // outra pergunta (homologação 14/10/2026, ciclo 1199).
+  const palavrasPaciente = new Set(normal(mensagemPaciente ?? "").split(/[^a-z0-9]+/));
+  const doPaciente = (p: ConhecimentoSessao) =>
+    normal(p.consulta.termo)
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 4)
+      .every((w) => palavrasPaciente.has(w));
+  const filtradas =
+    mensagemPaciente && restantes.some(doPaciente) ? restantes.filter(doPaciente) : restantes;
   // Opções contidas nas de outra pendência mantida já são perguntadas por ela.
-  const semContidas = restantes.filter((p, i) => {
+  const semContidas = filtradas.filter((p, i) => {
     const opcoes = opcoesDe(p);
     if (!opcoes.length) return true;
-    return !restantes.some((q, j) => {
+    return !filtradas.some((q, j) => {
       if (j === i) return false;
       const outras = new Set(opcoesDe(q));
       const contidas = opcoes.every((o) => outras.has(o));
@@ -530,10 +547,11 @@ export function comporRespostaParcial(
   textoConfirmado: string,
   lista: readonly ConhecimentoSessao[],
   apresentacao?: string | null,
+  mensagemPaciente?: string,
 ): string {
   const texto = textoConfirmado.trim();
   const faltantes = [
-    ...new Set(pendenciasAPerguntar(texto, lista).map((p) => perguntas([p]))),
+    ...new Set(pendenciasAPerguntar(texto, lista, mensagemPaciente).map((p) => perguntas([p]))),
   ].filter((p) => !normal(texto).includes(normal(p)));
   return [!texto && apresentacao ? apresentacao : "", texto, ...faltantes]
     .filter(Boolean)
