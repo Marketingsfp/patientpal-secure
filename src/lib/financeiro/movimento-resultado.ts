@@ -103,8 +103,11 @@ export interface LinhaMovimento {
   medico_nome?: string | null;
   /** Cadastro do profissional do lançamento (direto ou pelo agendamento). */
   medico_id?: string | null;
-  /** Especialidades do cadastro do profissional — só para a busca do quadro. */
-  especialidades?: string[];
+  /**
+   * Especialidade do ATENDIMENTO (a do serviço prestado, mesma regra do Rateio
+   * da Receita), não as do cadastro do profissional.
+   */
+  especialidade?: string | null;
   /** Nome da agenda do agendamento (`medico_agendas.nome`), só detalhamento. */
   agenda_nome?: string | null;
   ficha_numero?: number | null;
@@ -615,7 +618,7 @@ export interface LinhaAgendaProf {
 
 export interface LinhaProfissional extends LinhaAgendaProf {
   profissional: string;
-  /** Especialidades do cadastro, em ordem alfabética — só para a busca. */
+  /** Especialidades dos atendimentos do período, em ordem alfabética. */
   especialidades: string[];
   agendas: LinhaAgendaProf[];
 }
@@ -653,9 +656,9 @@ export function resumoPorProfissional(linhas: LinhaClassificada[]): LinhaProfiss
     const agendas = Array.from(porAgenda, ([a, ls]) => soma(ls, a)).sort(
       (x, y) => y.total.total - x.total.total,
     );
-    const especialidades = Array.from(new Set(doProf.flatMap((l) => l.especialidades ?? []))).sort(
-      (x, y) => x.localeCompare(y, "pt-BR"),
-    );
+    const especialidades = Array.from(
+      new Set(doProf.map((l) => l.especialidade).filter((e): e is string => !!e)),
+    ).sort((x, y) => x.localeCompare(y, "pt-BR"));
     out.push({ profissional, ...soma(doProf, profissional), especialidades, agendas });
   }
   return out.sort((a, b) => {

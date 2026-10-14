@@ -183,27 +183,29 @@ function QuadroProfissionais({
   const [busca, setBusca] = useState("");
   /**
    * O que a busca procura: o nome do profissional ou a especialidade do
-   * cadastro dele. Por especialidade, cada profissional aparece com o total
-   * INTEIRO do período — quem tem duas especialidades aparece nas duas buscas
-   * com o mesmo número, porque o lançamento não diz por qual delas atendeu.
+   * ATENDIMENTO. Por especialidade, a tabela é refeita só com os atendimentos
+   * daquela especialidade (pedido de 14/10/2026): antes cada médico entrava
+   * com o total inteiro do período, e a busca por CARDIOLOGIA trazia os
+   * ultrassons de quem só tinha Cardiologia marcada no cadastro.
    */
   const [buscarPor, setBuscarPor] = useState<"profissional" | "especialidade">("profissional");
   /** Lista inteira aberta pelo botão "Ver todos" — por padrão só os primeiros. */
   const [verTodos, setVerTodos] = useState(false);
-  const dados = resumoPorProfissional(linhas);
+  const todos = resumoPorProfissional(linhas);
   // O hook acima fica ANTES desta saída: hook depois de `return` quebra a
   // regra do React e derruba a tela quando o período não tem atendimento.
-  if (dados.length === 0) return null;
+  if (todos.length === 0) return null;
   const chave = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   const termo = chave(busca.trim());
   const porEspecialidade = buscarPor === "especialidade";
-  const casa = (d: LinhaProfissional) =>
-    porEspecialidade
-      ? d.especialidades.some((e) => chave(e).includes(termo))
-      : chave(d.profissional).includes(termo);
-  const visiveis = termo ? dados.filter(casa) : dados;
+  const dados =
+    porEspecialidade && termo
+      ? resumoPorProfissional(linhas.filter((l) => chave(l.especialidade ?? "").includes(termo)))
+      : todos;
+  const visiveis =
+    termo && !porEspecialidade ? dados.filter((d) => chave(d.profissional).includes(termo)) : dados;
   /** Sugestões do campo: só as especialidades que têm movimento no período. */
-  const especialidadesDoPeriodo = Array.from(new Set(dados.flatMap((d) => d.especialidades))).sort(
+  const especialidadesDoPeriodo = Array.from(new Set(todos.flatMap((d) => d.especialidades))).sort(
     (a, b) => a.localeCompare(b, "pt-BR"),
   );
   // A tabela abre só com os de maior faturamento (a lista já vem nessa ordem)
@@ -230,11 +232,14 @@ function QuadroProfissionais({
   // Linha clicada na tabela. A busca é feita em `dados`, a lista inteira, e
   // não em `visiveis`: o filtro pode ter sido ligado antes de a pessoa digitar
   // um nome na busca, e nesse caso o selecionado sai da lista visível sem
-  // deixar de estar filtrando a tela. E o filtro também pode vir dos cards de
-  // condição lá de cima, que não trazem profissional nenhum — aí `selecionado`
-  // fica nulo e os cards continuam consolidados, como antes.
+  // deixar de estar filtrando a tela. Com busca por especialidade, vale o
+  // número só daquela especialidade; se ele não atendeu nela, o do período.
+  // E o filtro também pode vir dos cards de condição lá de cima, que não
+  // trazem profissional nenhum — aí `selecionado` fica nulo e os cards
+  // continuam consolidados, como antes.
+  const doProfissional = (d: LinhaProfissional) => d.profissional === filtro?.profissional;
   const selecionado = filtro?.profissional
-    ? (dados.find((d) => d.profissional === filtro.profissional) ?? null)
+    ? (dados.find(doProfissional) ?? todos.find(doProfissional) ?? null)
     : null;
   // Cards da direita: mostram o profissional selecionado; sem seleção, somam o
   // que a busca deixou na tela; sem busca nenhuma, o período inteiro.
@@ -253,14 +258,13 @@ function QuadroProfissionais({
   const tituloCard = (curto: string, consolidado: string) =>
     deQuem ? `${curto} — ${deQuem}` : consolidado;
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
-  // Duas linhas por célula (valor em cima, quantidade embaixo). A altura da
-  // linha vem daqui, não do padding: por isso as duas usam entrelinha curta.
-  const celula = (valor: TotalQtd) => (
+  // Valor e quantidade em colunas próprias (pedido de 14/10/2026): a
+  // quantidade era um número miúdo embaixo do valor e passava despercebida, e
+  // é por ela que a equipe confere o repasse feito fora do sistema.
+  const celula = (valor: TotalQtd, destaque = "") => (
     <>
-      <span className="block leading-tight tabular-nums">{brl(valor.total)}</span>
-      <span className="block text-[10px] leading-none text-muted-foreground tabular-nums">
-        {int(valor.qtd)}
-      </span>
+      <td className={`py-1 px-2 text-right tabular-nums ${destaque}`}>{brl(valor.total)}</td>
+      <td className={`py-1 px-2 text-right tabular-nums ${destaque}`}>{int(valor.qtd)}</td>
     </>
   );
   return (
@@ -379,9 +383,12 @@ function QuadroProfissionais({
                 <thead className="sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--border)]">
                   <tr className="text-[11px] uppercase tracking-wide text-foreground">
                     <th className="py-1.5 pr-4 text-left font-bold">Profissional</th>
-                    <th className="w-32 py-1.5 px-2 text-right font-bold">Consultas</th>
-                    <th className="w-32 py-1.5 px-2 text-right font-bold">Exames</th>
-                    <th className="w-32 py-1.5 px-2 text-right font-bold">Total</th>
+                    <th className="w-28 py-1.5 px-2 text-right font-bold">Consultas</th>
+                    <th className="w-14 py-1.5 px-2 text-right font-bold">Qtd.</th>
+                    <th className="w-28 py-1.5 px-2 text-right font-bold">Exames</th>
+                    <th className="w-14 py-1.5 px-2 text-right font-bold">Qtd.</th>
+                    <th className="w-28 py-1.5 px-2 text-right font-bold">Total</th>
+                    <th className="w-14 py-1.5 px-2 text-right font-bold">Qtd.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -405,15 +412,15 @@ function QuadroProfissionais({
                             </span>
                           )}
                         </td>
-                        <td className="py-1 px-2 text-right">{celula(d.consulta)}</td>
-                        <td className="py-1 px-2 text-right">{celula(d.exame)}</td>
-                        <td className="py-1 px-2 text-right font-medium">{celula(d.total)}</td>
+                        {celula(d.consulta)}
+                        {celula(d.exame)}
+                        {celula(d.total, "font-medium")}
                       </tr>
                     );
                   })}
                   {visiveis.length === 0 && (
                     <tr className="border-t border-border/60">
-                      <td colSpan={4} className="py-3 text-center text-muted-foreground">
+                      <td colSpan={7} className="py-3 text-center text-muted-foreground">
                         {porEspecialidade
                           ? "Nenhum profissional dessa especialidade no período."
                           : "Nenhum profissional com esse nome no período."}
@@ -426,15 +433,9 @@ function QuadroProfissionais({
                     <td className="py-1 pr-4 whitespace-nowrap">
                       {termo ? "Total filtrado" : "Total geral"}
                     </td>
-                    <td className="py-1 px-2 text-right">
-                      {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
-                    </td>
-                    <td className="py-1 px-2 text-right">
-                      {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
-                    </td>
-                    <td className="py-1 px-2 text-right">
-                      {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
-                    </td>
+                    {celula({ total: totalGeral.consulta, qtd: totalGeral.consultaQtd })}
+                    {celula({ total: totalGeral.exame, qtd: totalGeral.exameQtd })}
+                    {celula({ total: totalGeral.total, qtd: totalGeral.totalQtd })}
                   </tr>
                 </tfoot>
               </table>

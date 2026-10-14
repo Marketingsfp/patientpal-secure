@@ -83,6 +83,8 @@ import { CaixasOperadoras } from "@/components/financeiro/caixas-operadoras";
 import {
   carregarContextoRateio,
   carregarRateio,
+  especialidadeDoAtendimento,
+  type MedicoOpcao,
   type RateioContexto,
 } from "@/lib/financeiro/rateio-receita";
 import { carregarForaDoCaixa } from "@/lib/financeiro/fora-do-caixa-carregar";
@@ -181,8 +183,8 @@ interface Lanc {
   medico_nome?: string | null;
   /** Cadastro do profissional: do próprio lançamento ou do agendamento. */
   medico_id?: string | null;
-  /** Especialidades do cadastro do profissional — só para a busca do quadro. */
-  especialidades?: string[];
+  /** Especialidade do atendimento (ver `especialidadeDoAtendimento`). */
+  especialidade?: string | null;
   /** Nome da agenda do agendamento (`medico_agendas.nome`), só detalhamento. */
   agenda_nome?: string | null;
   /** Nº da ficha do agendamento vinculado. */
@@ -746,11 +748,12 @@ function Page() {
         agenda_id: string | null;
         inicio: string | null;
         reagendamento_em: string | null;
+        especialidade_id: string | null;
       }>(agIds, (lote) =>
         supabase
           .from("agendamentos")
           .select(
-            "id, ficha_numero, procedimento, medico_id, paciente_id, agenda_id, inicio, reagendamento_em",
+            "id, ficha_numero, procedimento, medico_id, paciente_id, agenda_id, inicio, reagendamento_em, especialidade_id",
           )
           .in("id", lote),
       );
@@ -770,45 +773,32 @@ function Page() {
         ),
       );
       // Nomes de agenda e de profissional são buscas independentes: vão juntas.
-      // As especialidades do cadastro do profissional (a principal e as de
-      // `medico_especialidades`) servem só para a busca por especialidade do
-      // quadro "Por profissional" — não entram em conta nenhuma.
-      type EspJoin = { nome: string | null } | null;
-      const [agendasNomes, medicosNomes, medicosEsps] = await Promise.all([
+      // A especialidade de cada linha é a do ATENDIMENTO, pela mesma regra do
+      // Rateio da Receita (`especialidadeDoAtendimento`), e não a lista do
+      // cadastro do médico: a Dra. Isis, só de Ultrassonografia, aparecia como
+      // "CARDIOLOGIA · ULTRASSONOGRAFIA", e a busca por CARDIOLOGIA trazia
+      // todos os ultrassons dela (pedido de 14/10/2026).
+      const [agendasNomes, medicosNomes, especialidadesAtivas] = await Promise.all([
         emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
           supabase.from("medico_agendas").select("id, nome").in("id", lote),
         ),
-        emLotes<{ id: string; nome: string | null; especialidade: EspJoin }>(medIds, (lote) =>
-          supabase
-            .from("medicos")
-            .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
-            .in("id", lote),
+        emLotes<{ id: string; nome: string | null; especialidade_id: string | null }>(
+          medIds,
+          (lote) => supabase.from("medicos").select("id, nome, especialidade_id").in("id", lote),
         ),
-        emLotes<{ medico_id: string; especialidade: EspJoin }>(medIds, (lote) =>
-          supabase
-            .from("medico_especialidades")
-            .select(
-              "medico_id, especialidade:especialidades!medico_especialidades_especialidade_id_fkey(nome)",
-            )
-            .in("medico_id", lote),
-        ),
+        supabase
+          .from("especialidades")
+          .select("id, nome")
+          .eq("ativo", true)
+          .then((r) => (r.data ?? []) as Array<{ id: string; nome: string }>),
       ]);
       const agendaMap = new Map<string, string>();
       for (const a of agendasNomes) agendaMap.set(a.id, a.nome ?? "");
-      const medMap = new Map<string, string>();
-      const espMap = new Map<string, Set<string>>();
-      const addEsp = (medicoId: string, esp: EspJoin) => {
-        const nome = esp?.nome?.trim();
-        if (!nome) return;
-        const s = espMap.get(medicoId) ?? new Set<string>();
-        s.add(nome);
-        espMap.set(medicoId, s);
-      };
-      for (const m of medicosNomes) {
-        medMap.set(m.id, m.nome ?? "");
-        addEsp(m.id, m.especialidade);
-      }
-      for (const e of medicosEsps) addEsp(e.medico_id, e.especialidade);
+      const medMap = new Map<string, MedicoOpcao>();
+      for (const m of medicosNomes)
+        medMap.set(m.id, { id: m.id, nome: m.nome ?? "", especialidade_id: m.especialidade_id });
+      const ctxEspecialidades = { especialidades: especialidadesAtivas };
+      const nomeEspecialidade = new Map(especialidadesAtivas.map((e) => [e.id, e.nome]));
       finList = finList.map((l) => {
         const raw = l as unknown as {
           medico_id?: string | null;
@@ -822,11 +812,18 @@ function Page() {
         // avisa para onde a consulta foi. Ex.: pago em 16/09, consulta em 23/09.
         const diaConsulta = ag?.reagendamento_em ? dataClinicaDe(ag.inicio) : null;
         const reagendadoPara = diaConsulta && diaConsulta !== l.data ? diaConsulta : null;
+        const medico = medicoId ? (medMap.get(medicoId) ?? null) : null;
+        const especialidadeId = especialidadeDoAtendimento(
+          ctxEspecialidades,
+          ag?.procedimento ?? null,
+          medico,
+          ag?.especialidade_id ?? null,
+        );
         return {
           ...l,
-          medico_nome: medicoId ? (medMap.get(medicoId) ?? null) : null,
+          medico_nome: medico?.nome ?? null,
           medico_id: medicoId,
-          especialidades: medicoId ? Array.from(espMap.get(medicoId) ?? []).sort() : [],
+          especialidade: especialidadeId ? (nomeEspecialidade.get(especialidadeId) ?? null) : null,
           agenda_nome: ag?.agenda_id ? (agendaMap.get(ag.agenda_id) ?? null) : null,
           ficha_numero: ag?.ficha_numero ?? null,
           procedimento: ag?.procedimento ?? null,

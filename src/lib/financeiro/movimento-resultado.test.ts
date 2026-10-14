@@ -426,4 +426,33 @@ describe("resumoPorProfissional", () => {
     ]);
     expect(rotuloFiltro(f)).toBe("DR JOAO · EXAMES");
   });
+
+  it("especialidades do quadro são as dos atendimentos, não as do cadastro", () => {
+    // Médica de ultrassom com Cardiologia marcada no cadastro: só aparece com
+    // a especialidade do que atendeu no período.
+    const linhas = classificarMovimento(
+      [
+        l({
+          descricao: "PACIENTE TESTE — USG",
+          procedimento: "ULTRASSONOGRAFIA",
+          valor: 200,
+          agendamento_id: "b1",
+          medico_nome: "DRA TESTE",
+          especialidade: "ULTRASSONOGRAFIA",
+        }),
+        l({
+          descricao: "PACIENTE TESTE — USG",
+          procedimento: "ULTRASSONOGRAFIA",
+          valor: 200,
+          agendamento_id: "b2",
+          medico_nome: "DRA TESTE",
+          especialidade: "ULTRASSONOGRAFIA",
+        }),
+      ],
+      ctx,
+    );
+    const [dra] = resumoPorProfissional(linhas);
+    expect(dra.especialidades).toEqual(["ULTRASSONOGRAFIA"]);
+    expect(dra.total).toEqual({ total: 400, qtd: 2 });
+  });
 });
