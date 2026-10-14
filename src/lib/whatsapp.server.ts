@@ -2488,6 +2488,17 @@ async function gerarRespostaNinaInterno(
   let selecaoDoTurno:
     | import("@/lib/nina/confidence/selecao-contextual").ResultadoSelecaoContextual
     | null = null;
+  // Mensagens do paciente nesta conversa, da mais recente para a mais antiga:
+  // nome e data enviados antes valem para a transferência (homologação 14/10/2026).
+  function textosDoPacienteNaConversa(): string[] {
+    const anteriores = (msgsMemoria as any[])
+      .filter(
+        (m) =>
+          m?.direction === "in" && (!estadoId.conversaId || m.conversa_id === estadoId.conversaId),
+      )
+      .map((m) => String(m.transcricao ?? m.body ?? ""));
+    return [mensagemPaciente, ...anteriores.filter((t) => t && t !== mensagemPaciente)];
+  }
   // Regra de 12/10/2026: antes de transferir, a Nina pede uma vez nome completo e
   // data de nascimento; a transferência acontece na próxima mensagem do paciente.
   // Urgência, reclamação, pedido explícito por uma pessoa e aviso silencioso
@@ -2521,16 +2532,17 @@ async function gerarRespostaNinaInterno(
       })
     )
       return false;
-    // A própria mensagem já traz nome completo e data de nascimento (ex.: "meu
-    // nome é … e nasci em …"): transfere com eles, sem pedir de novo.
-    const dadosNaMensagem = dadosTransferencia.extrairDadosTransferencia(mensagemPaciente);
+    // A mensagem ou a conversa já trazem nome completo e data de nascimento
+    // ("meu nome é … e nasci em …", inclusive enviados antes): transfere com
+    // eles, sem pedir de novo.
+    const dadosNaMensagem = dadosTransferencia.dadosDaConversa(textosDoPacienteNaConversa());
     if (dadosNaMensagem.nome_completo && dadosNaMensagem.data_nascimento) {
       Object.assign(argumentos, dadosTransferencia.argumentosComDados(argumentos, dadosNaMensagem));
       registrarEtapa({
         tipo: "consulta",
         fonte: "sistema",
         titulo:
-          "Nome e data de nascimento já informados na mensagem: transferência sem nova pergunta",
+          "Nome e data de nascimento já informados na conversa: transferência sem nova pergunta",
         dados: { motivo: argumentos.motivo.slice(0, 300) },
         codigo: {
           arquivo: "src/lib/nina/dados-transferencia.ts",
@@ -3134,7 +3146,7 @@ async function gerarRespostaNinaInterno(
     if (!pendente && (await reterTransferenciaParaDados(argumentos, contexto))) return;
     // Transferência retomada: os argumentos guardados e os dados que o paciente enviou.
     const dadosPaciente = pendente
-      ? dadosTransferencia.extrairDadosTransferencia(mensagemPaciente)
+      ? dadosTransferencia.dadosDaConversa(textosDoPacienteNaConversa())
       : null;
     const transferencia =
       pendente && dadosPaciente
