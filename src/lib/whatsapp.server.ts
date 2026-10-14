@@ -5258,6 +5258,17 @@ async function gerarRespostaNinaInterno(
           resposta,
         );
       }
+      const neutra = fluxoAgendamento.ofertaNeutraDeAgendamento(resposta);
+      if (neutra !== resposta) {
+        const antes = resposta;
+        resposta = neutra;
+        transformar(
+          "agendamento.sem_oferta_de_agendar",
+          "Atendimento que a Nina não agenda: pergunta se o paciente quer agendar, sem se oferecer para agendar",
+          antes,
+          resposta,
+        );
+      }
     }
   }
 

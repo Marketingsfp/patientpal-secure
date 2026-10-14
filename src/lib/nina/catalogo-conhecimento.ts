@@ -44,6 +44,7 @@ import {
 
 import { paraNumero, resumoHorarios, valorResumo } from "./catalogo";
 import { apresentarIdadeMinima } from "./regras-catalogo";
+import { fimDoHorario, semFimDoDia } from "./catalogo-constantes";
 /** Serviço publicado, já sem colunas internas. */
 export type ServicoPublicado = {
   procedimento_id?: string | null;
@@ -100,7 +101,7 @@ function lista(v: unknown): Array<Record<string, unknown>> {
 }
 
 function texto(v: unknown): string | null {
-  const t = String(v ?? "").trim();
+  const t = semFimDoDia(String(v ?? "").trim());
   return apresentarIdadeMinima(t || null);
 }
 
@@ -298,7 +299,10 @@ export function profissionalParaRegistro(
   );
   const estruturado = Boolean(atendimentosDaEstrutura(p.estrutura));
   const convenios = nomesVinculos(p.convenios);
-  const horarios = lista(p.horarios) as Array<Record<string, unknown>>;
+  // "23:59" no fim = sem hora para terminar: a IA não recebe o 23:59.
+  const horarios = lista(p.horarios).map((h) =>
+    h["fim"] != null && !fimDoHorario(h["fim"]) ? { ...h, fim: null } : h,
+  ) as Array<Record<string, unknown>>;
   const dinheiro = precoPorForma(p.formas_pagamento, /\b(?:dinheiro|esp[eé]cie)\b/i);
   const cartao = precoPorForma(p.formas_pagamento, /cart/i);
   const aviso = avisoVigente(p, hojeISO);

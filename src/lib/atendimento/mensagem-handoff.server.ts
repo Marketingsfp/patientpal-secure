@@ -37,6 +37,7 @@ export async function gerarMensagemHandoff(
         protocolo: ctx.protocolo,
         setor: ctx.setor,
         foraDoHorario: Boolean(ctx.aberturaPrevista),
+        assistente: ctx.identidade?.assistente ?? null,
       });
       // Fora do horário, a abertura entra pelo código: o modelo não cita horários.
       if (v.ok)

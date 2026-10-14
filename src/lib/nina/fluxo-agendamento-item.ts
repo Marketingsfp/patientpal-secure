@@ -204,6 +204,20 @@ export function removerPerguntaDeAgendamento(texto: string): string {
 }
 
 /**
+ * Atendimento que a Nina não agenda: ela não se oferece para agendar ("Posso te
+ * ajudar a agendar?", "Quer que eu agende para você?") — homologação 14/10/2026,
+ * ciclo 1055. A pergunta vira "Você gostaria de agendar?"; o "sim" segue para a
+ * equipe pelo fluxo de transferência.
+ */
+export function ofertaNeutraDeAgendamento(texto: string): string {
+  return texto.replace(
+    /(^|[.!?]\s+|\n\s*)(?:(?:posso|podemos)\s+(?:te\s+|lhe\s+)?(?:ajudar\s+(?:a\s+|com\s+o\s+|no\s+)?)?|(?:quer|deseja|gostaria)\s+que\s+(?:eu|a gente)\s+)(agend\w*|marc\w*|verific\w*\s+(?:a\s+agenda|as\s+vagas|vagas|a\s+disponibilidade))(?:\s+(?:para|pra)\s+(?:você|voce|vc|o senhor|a senhora))?(?=[\s?,])/gi,
+    (_m, inicio: string, verbo: string) =>
+      `${inicio}Você gostaria de ${/^marc/i.test(verbo) ? "marcar" : "agendar"}`,
+  );
+}
+
+/**
  * Mensagem de informações não oferece transferência (regra de 13/10/2026): tira
  * do fim do texto só a pergunta ou oferta de encaminhar/transferir à equipe. As
  * demais perguntas (ex.: preferência de profissional ou dia) continuam.
