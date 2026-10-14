@@ -135,7 +135,7 @@ export function InboxConversationCard({
           {IconePrevia && indicadorPrevia && (
             <>
               <IconePrevia
-                className={`h-3.5 w-3.5 shrink-0 ${indicadorPrevia.classe}`}
+                className={`h-[18px] w-[18px] shrink-0 ${indicadorPrevia.classe}`}
                 aria-hidden="true"
               />
               <span className="sr-only">{indicadorPrevia.descricao}: </span>
