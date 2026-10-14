@@ -181,6 +181,13 @@ function QuadroProfissionais({
 }) {
   /** Busca por nome, só deste quadro — não mexe na lista de lançamentos. */
   const [busca, setBusca] = useState("");
+  /**
+   * O que a busca procura: o nome do profissional ou a especialidade do
+   * cadastro dele. Por especialidade, cada profissional aparece com o total
+   * INTEIRO do período — quem tem duas especialidades aparece nas duas buscas
+   * com o mesmo número, porque o lançamento não diz por qual delas atendeu.
+   */
+  const [buscarPor, setBuscarPor] = useState<"profissional" | "especialidade">("profissional");
   /** Lista inteira aberta pelo botão "Ver todos" — por padrão só os primeiros. */
   const [verTodos, setVerTodos] = useState(false);
   const dados = resumoPorProfissional(linhas);
@@ -189,7 +196,16 @@ function QuadroProfissionais({
   if (dados.length === 0) return null;
   const chave = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   const termo = chave(busca.trim());
-  const visiveis = termo ? dados.filter((d) => chave(d.profissional).includes(termo)) : dados;
+  const porEspecialidade = buscarPor === "especialidade";
+  const casa = (d: LinhaProfissional) =>
+    porEspecialidade
+      ? d.especialidades.some((e) => chave(e).includes(termo))
+      : chave(d.profissional).includes(termo);
+  const visiveis = termo ? dados.filter(casa) : dados;
+  /** Sugestões do campo: só as especialidades que têm movimento no período. */
+  const especialidadesDoPeriodo = Array.from(new Set(dados.flatMap((d) => d.especialidades))).sort(
+    (a, b) => a.localeCompare(b, "pt-BR"),
+  );
   // A tabela abre só com os de maior faturamento (a lista já vem nessa ordem)
   // e o resto fica a um clique (pedido de 29/09/2026). Com a busca preenchida
   // mostra tudo o que casou: quem digitou um nome quer ver todos os resultados.
@@ -230,7 +246,9 @@ function QuadroProfissionais({
   const deQuem = selecionado
     ? selecionado.profissional
     : termo
-      ? plural(visiveis.length, "profissional da busca", "profissionais da busca")
+      ? porEspecialidade
+        ? `${busca.trim().toUpperCase()} (${plural(visiveis.length, "profissional", "profissionais")})`
+        : plural(visiveis.length, "profissional da busca", "profissionais da busca")
       : null;
   const tituloCard = (curto: string, consolidado: string) =>
     deQuem ? `${curto} — ${deQuem}` : consolidado;
@@ -265,24 +283,77 @@ function QuadroProfissionais({
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,2.75fr)_minmax(0,1.25fr)]">
           <aside className="space-y-3">
             <div className="space-y-1">
+              <p
+                id="buscar-por-rotulo"
+                className="text-xs font-semibold uppercase tracking-wide text-foreground/80"
+              >
+                Buscar por
+              </p>
+              <div
+                role="group"
+                aria-labelledby="buscar-por-rotulo"
+                className="grid grid-cols-2 gap-1 rounded-md border border-foreground/30 p-0.5"
+              >
+                {(
+                  [
+                    ["profissional", "Profissional"],
+                    ["especialidade", "Especialidade"],
+                  ] as const
+                ).map(([valor, rotulo]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    aria-pressed={buscarPor === valor}
+                    onClick={() => {
+                      // O texto digitado não serve para o outro campo: um nome
+                      // de médico buscado como especialidade esvaziaria a lista.
+                      if (buscarPor !== valor) setBusca("");
+                      setBuscarPor(valor);
+                    }}
+                    className={`rounded px-2 py-1.5 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      buscarPor === valor
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground/80 hover:bg-muted"
+                    }`}
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
               <label
                 htmlFor="busca-profissional"
                 className="text-xs font-semibold uppercase tracking-wide text-foreground/80"
               >
-                Buscar profissional
+                {porEspecialidade ? "Buscar especialidade" : "Buscar profissional"}
               </label>
               <Input
                 id="busca-profissional"
                 type="search"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Nome do profissional..."
+                placeholder={porEspecialidade ? "Ex.: CARDIOLOGIA..." : "Nome do profissional..."}
+                list={porEspecialidade ? "especialidades-do-periodo" : undefined}
                 className="h-10 px-3 py-2 text-sm text-foreground placeholder:text-foreground/60 border-foreground/30 hover:border-foreground/50 focus-visible:border-primary"
               />
+              {porEspecialidade && (
+                <datalist id="especialidades-do-periodo">
+                  {especialidadesDoPeriodo.map((e) => (
+                    <option key={e} value={e} />
+                  ))}
+                </datalist>
+              )}
             </div>
             {termo && (
               <p className="text-xs text-foreground/80">
                 {visiveis.length} de {dados.length} profissionais
+              </p>
+            )}
+            {porEspecialidade && (
+              <p className="text-xs leading-snug text-foreground/80">
+                Especialidade do cadastro do profissional. Quem tem mais de uma aparece em cada uma
+                delas com o total inteiro do período.
               </p>
             )}
             {filtro?.profissional && (
@@ -326,7 +397,14 @@ function QuadroProfissionais({
                         aria-selected={ativo}
                         onClick={() => alternar(f)}
                       >
-                        <td className="py-1 pr-4 leading-tight">{d.profissional}</td>
+                        <td className="py-1 pr-4 leading-tight">
+                          {d.profissional}
+                          {d.especialidades.length > 0 && (
+                            <span className="block text-[10px] leading-none text-muted-foreground">
+                              {d.especialidades.join(" · ")}
+                            </span>
+                          )}
+                        </td>
                         <td className="py-1 px-2 text-right">{celula(d.consulta)}</td>
                         <td className="py-1 px-2 text-right">{celula(d.exame)}</td>
                         <td className="py-1 px-2 text-right font-medium">{celula(d.total)}</td>
@@ -336,7 +414,9 @@ function QuadroProfissionais({
                   {visiveis.length === 0 && (
                     <tr className="border-t border-border/60">
                       <td colSpan={4} className="py-3 text-center text-muted-foreground">
-                        Nenhum profissional com esse nome no período.
+                        {porEspecialidade
+                          ? "Nenhum profissional dessa especialidade no período."
+                          : "Nenhum profissional com esse nome no período."}
                       </td>
                     </tr>
                   )}

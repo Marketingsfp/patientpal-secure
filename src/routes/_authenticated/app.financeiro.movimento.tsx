@@ -181,6 +181,8 @@ interface Lanc {
   medico_nome?: string | null;
   /** Cadastro do profissional: do próprio lançamento ou do agendamento. */
   medico_id?: string | null;
+  /** Especialidades do cadastro do profissional — só para a busca do quadro. */
+  especialidades?: string[];
   /** Nome da agenda do agendamento (`medico_agendas.nome`), só detalhamento. */
   agenda_nome?: string | null;
   /** Nº da ficha do agendamento vinculado. */
@@ -768,18 +770,45 @@ function Page() {
         ),
       );
       // Nomes de agenda e de profissional são buscas independentes: vão juntas.
-      const [agendasNomes, medicosNomes] = await Promise.all([
+      // As especialidades do cadastro do profissional (a principal e as de
+      // `medico_especialidades`) servem só para a busca por especialidade do
+      // quadro "Por profissional" — não entram em conta nenhuma.
+      type EspJoin = { nome: string | null } | null;
+      const [agendasNomes, medicosNomes, medicosEsps] = await Promise.all([
         emLotes<{ id: string; nome: string | null }>(agendaIds, (lote) =>
           supabase.from("medico_agendas").select("id, nome").in("id", lote),
         ),
-        emLotes<{ id: string; nome: string | null }>(medIds, (lote) =>
-          supabase.from("medicos").select("id, nome").in("id", lote),
+        emLotes<{ id: string; nome: string | null; especialidade: EspJoin }>(medIds, (lote) =>
+          supabase
+            .from("medicos")
+            .select("id, nome, especialidade:especialidades!medicos_especialidade_id_fkey(nome)")
+            .in("id", lote),
+        ),
+        emLotes<{ medico_id: string; especialidade: EspJoin }>(medIds, (lote) =>
+          supabase
+            .from("medico_especialidades")
+            .select(
+              "medico_id, especialidade:especialidades!medico_especialidades_especialidade_id_fkey(nome)",
+            )
+            .in("medico_id", lote),
         ),
       ]);
       const agendaMap = new Map<string, string>();
       for (const a of agendasNomes) agendaMap.set(a.id, a.nome ?? "");
       const medMap = new Map<string, string>();
-      for (const m of medicosNomes) medMap.set(m.id, m.nome ?? "");
+      const espMap = new Map<string, Set<string>>();
+      const addEsp = (medicoId: string, esp: EspJoin) => {
+        const nome = esp?.nome?.trim();
+        if (!nome) return;
+        const s = espMap.get(medicoId) ?? new Set<string>();
+        s.add(nome);
+        espMap.set(medicoId, s);
+      };
+      for (const m of medicosNomes) {
+        medMap.set(m.id, m.nome ?? "");
+        addEsp(m.id, m.especialidade);
+      }
+      for (const e of medicosEsps) addEsp(e.medico_id, e.especialidade);
       finList = finList.map((l) => {
         const raw = l as unknown as {
           medico_id?: string | null;
@@ -797,6 +826,7 @@ function Page() {
           ...l,
           medico_nome: medicoId ? (medMap.get(medicoId) ?? null) : null,
           medico_id: medicoId,
+          especialidades: medicoId ? Array.from(espMap.get(medicoId) ?? []).sort() : [],
           agenda_nome: ag?.agenda_id ? (agendaMap.get(ag.agenda_id) ?? null) : null,
           ficha_numero: ag?.ficha_numero ?? null,
           procedimento: ag?.procedimento ?? null,
