@@ -54,6 +54,9 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "recepcao",
   "triagem-enfermagem",
   "cartao-beneficios",
+  // Permissão de edição, não tela: gravar regras de preço do convênio. Não é
+  // submódulo de propósito — herdar "cartao-beneficios" daria preço ao caixa.
+  "cartao-beneficios-precos",
   "cartao-terapeutico",
   "painel",
   "documentos",
@@ -185,6 +188,8 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "consulta-rapida": "read",
     "alertas-enfermagem": "read",
     "cartao-beneficios": "read",
+    // Gestor já grava regras de preço pelo banco (can_manage_clinica).
+    "cartao-beneficios-precos": "write",
     "cartao-terapeutico": "read",
     "painel-executivo": "write",
     "atendimento-multiplo": "read",

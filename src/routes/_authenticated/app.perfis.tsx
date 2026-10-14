@@ -295,6 +295,14 @@ const GRUPOS_BASE: Grupo[] = [
         menu: "Operação › Cartão Benefícios",
       },
       {
+        // Sem `menu` e sem `sub`: não é tela, é o poder de alterar preço. Não
+        // herda "Cartão Benefícios" (lá o caixa tem Edição).
+        key: "cartao-beneficios-precos",
+        nome: "Cartão Benefícios › Regras de preço",
+        descricao:
+          "Edição = criar, alterar e excluir regras de preço e exceções dos convênios. Admin e gestor sempre podem.",
+      },
+      {
         key: "cartao-terapeutico",
         nome: "Cartão Terapêutico",
         descricao: "Planos, contratos, dependentes e conferência",

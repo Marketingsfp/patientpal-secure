@@ -4,6 +4,7 @@ import { Plus, Trash2, Timer, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -71,7 +72,7 @@ const carenciaLabel = (n: number | null | undefined) => {
   return CARENCIA_GROUPS.find((g) => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
 };
 const REGRA_NAO_GRAVADA =
-  "A regra não foi salva: seu usuário não tem permissão para alterar regras desta unidade. Peça a um gestor da unidade.";
+  "A regra não foi salva: seu usuário não tem a permissão “Cartão Benefícios › Regras de preço” nesta unidade. Peça a um gestor.";
 
 // Legenda do campo Período — descreve a contagem feita em
 // src/lib/convenio/info-convenio-paciente.ts (passo 5, limite de uso).
@@ -97,6 +98,8 @@ const isConvenioFuncionario = (nome: string) =>
     .includes("FUNCIONARIO");
 
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
+  // Mesma permissão que o RLS de cb_convenio_regras confere (além de admin/gestor).
+  const podeEditar = usePodeEscrever("cartao-beneficios-precos");
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
@@ -311,9 +314,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     await load();
   };
   const removeExcecao = async (id: string) => {
-    const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", id);
+    const { data: apagadas, error } = await (supabase as any)
+      .from("cb_convenio_regras")
+      .delete()
+      .eq("id", id)
+      .select("id");
     if (error) {
       mostrarErro(error);
+      return;
+    }
+    if (!apagadas?.length) {
+      toast.error(REGRA_NAO_GRAVADA);
       return;
     }
     toast.success("Exceção removida.");
@@ -415,9 +426,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const r = regras[idx];
     if (!(await confirmDialog("Excluir esta regra?"))) return;
     if (!r.id.startsWith("new-")) {
-      const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", r.id);
+      const { data: apagadas, error } = await (supabase as any)
+        .from("cb_convenio_regras")
+        .delete()
+        .eq("id", r.id)
+        .select("id");
       if (error) {
         mostrarErro(error);
+        return;
+      }
+      if (!apagadas?.length) {
+        toast.error(REGRA_NAO_GRAVADA);
         return;
       }
     }
@@ -532,7 +551,11 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
             placeholder="Selecione um ou mais serviços"
           />
         </div>
-        <Button size="sm" onClick={addExcecao} disabled={excSel.length === 0 || excSaving}>
+        <Button
+          size="sm"
+          onClick={addExcecao}
+          disabled={!podeEditar || excSel.length === 0 || excSaving}
+        >
           <Plus className="h-4 w-4 mr-1" />
           {excSel.length > 1 ? `Adicionar exceções (${excSel.length})` : "Adicionar exceção"}
         </Button>
@@ -551,6 +574,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 size="sm"
                 className="text-destructive hover:text-destructive"
                 onClick={() => removeExcecao(e.id)}
+                disabled={!podeEditar}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -573,11 +597,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <Button variant="ghost" size="sm" onClick={addRegra}>
+          <Button variant="ghost" size="sm" onClick={addRegra} disabled={!podeEditar}>
             <Plus className="h-4 w-4 mr-1" /> Adicionar regra
           </Button>
         </div>
       </div>
+      {!podeEditar && (
+        <p className="text-xs text-muted-foreground border rounded-md px-3 py-2 bg-muted/40">
+          Somente consulta: alterar regras de preço exige a permissão “Cartão Benefícios › Regras de
+          preço”, liberada pelo gestor em Perfis de Acesso.
+        </p>
+      )}
 
       <div className="flex items-center justify-end">
         <div className="text-xs text-muted-foreground">
@@ -922,6 +952,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                         variant="ghost"
                         className="h-7 w-7"
                         onClick={() => setEditRegra(r)}
+                        disabled={!podeEditar}
                         title="Editar regra"
                       >
                         <Pencil className="h-4 w-4 text-muted-foreground" />
@@ -931,6 +962,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                         variant="ghost"
                         className="h-7 w-7"
                         onClick={() => remove(idx)}
+                        disabled={!podeEditar}
                         title="Excluir regra"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -949,7 +981,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           Dica: prioridade maior vence em caso de empate. Regras por serviço específico sempre
           vencem regras por especialidade/categoria.
         </p>
-        <Button size="sm" onClick={salvar} disabled={loading}>
+        <Button size="sm" onClick={salvar} disabled={!podeEditar || loading}>
           {loading ? "Salvando…" : "Salvar regras"}
         </Button>
       </div>
