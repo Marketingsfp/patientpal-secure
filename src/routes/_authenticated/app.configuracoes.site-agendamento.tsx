@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useClinica } from "@/hooks/use-clinica";
 import {
   listarAgendasMedicoSite,
   salvarAgendaSite,
@@ -27,32 +28,46 @@ export const Route = createFileRoute("/_authenticated/app/configuracoes/site-age
   head: () => ({ meta: [{ title: "Agendamento pelo site — ClinicaOS" }] }),
 });
 
-type Linha = Awaited<ReturnType<typeof listarSiteAgendamento>>[number];
+type Linha = NonNullable<Awaited<ReturnType<typeof listarSiteAgendamento>>["linha"]>;
 
 function Pagina() {
   const listar = useServerFn(listarSiteAgendamento);
+  // Mesmo mecanismo das demais telas: a clínica escolhida no seletor do topo.
+  const { clinicaAtual, modoTodas, loading: carregandoClinica } = useClinica();
+  const clinicaId = modoTodas ? null : (clinicaAtual?.clinica_id ?? null);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["site-agendamento"],
-    queryFn: () => listar(),
+    queryKey: ["site-agendamento", clinicaId],
+    queryFn: () => listar({ data: { clinicaId: clinicaId as string } }),
+    enabled: !!clinicaId,
   });
   return (
     <div className="space-y-4 p-6">
       <div>
         <h1 className="text-2xl font-semibold">Agendamento pelo site</h1>
+        {clinicaAtual && !modoTodas && (
+          <p className="text-base font-medium">Clínica: {clinicaAtual.clinica.nome}</p>
+        )}
         <p className="text-sm text-muted-foreground">
           Controla o formulário de agendamento do site institucional. Desligado, o site passa a
           mostrar que o agendamento está indisponível. Não afeta agendamentos já existentes nem a
           agenda da recepção.
         </p>
       </div>
-      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {error && <p className="text-sm text-destructive">Não foi possível carregar.</p>}
-      {data && data.length === 0 && (
+      {!carregandoClinica && !clinicaId && (
         <p className="text-sm text-muted-foreground">
-          Somente administradores da clínica podem alterar esta configuração.
+          Selecione uma clínica no seletor acima para ver esta configuração.
         </p>
       )}
-      {data?.map((l) => <CartaoClinica key={l.clinicaId} linha={l} />)}
+      {clinicaId && isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {error && <p className="text-sm text-destructive">Não foi possível carregar.</p>}
+      {data && !data.admin && (
+        <p className="text-sm text-muted-foreground">
+          Você não é administrador desta clínica. Troque a clínica no seletor acima ou peça acesso.
+        </p>
+      )}
+      {data?.admin && data.linha && (
+        <CartaoClinica key={data.linha.clinicaId} linha={data.linha} />
+      )}
     </div>
   );
 }
