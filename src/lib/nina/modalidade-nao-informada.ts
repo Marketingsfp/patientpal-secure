@@ -63,8 +63,16 @@ export function pacientePerguntouModalidade(mensagem: string): boolean {
 
 const ROTULO_MODALIDADE =
   /[*_]{0,2}(?:modalidade|forma de atendimento)(?: e agendamento)?(?:\s*:\s*[*_]{0,2}|[*_]{1,2}\s*:)/i;
+// "modalidade débito/crédito/de pagamento" é forma de pagamento, não de atendimento.
 const ASSUNTO_MODALIDADE =
-  /\b(?:modalidade|forma (?:exata )?de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|numeracao \(ficha\)|pre-?agendamento|agendamento previo|como funciona a chamada|funcionamento do atendimento)\b/;
+  /\b(?:modalidade(?! (?:de )?(?:pagamento|debito|credito|pix|cartao|dinheiro|parcel))|forma (?:exata )?de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|numeracao \(ficha\)|pre-?agendamento|agendamento previo|como funciona a chamada|funcionamento do atendimento)\b/;
+/**
+ * Orientação obrigatória do atendimento sem agendamento ("não é necessário
+ * agendar: o atendimento segue por ordem de chegada, basta comparecer") fica
+ * inteira (homologação 14/10/2026, ciclo 1186).
+ */
+const ORIENTACAO_SEM_AGENDAMENTO =
+  /\b(?:nao (?:e necessario|precisa|ha necessidade de) (?:agendar|marcar)|basta comparecer|e so comparecer)\b/;
 
 /**
  * Tira da resposta o que fala da forma de atendimento, quando o paciente não
@@ -74,6 +82,7 @@ const ASSUNTO_MODALIDADE =
  */
 export function removerModalidadeNaoPerguntada(texto: string): string {
   const linhas = texto.split("\n").flatMap((linha) => {
+    if (ORIENTACAO_SEM_AGENDAMENTO.test(normalizarRespostaInformal(linha))) return [linha];
     // "*Modalidade:* Hora marcada" sozinha na linha, ou como cabeçalho.
     const inicio = linha.search(ROTULO_MODALIDADE);
     if (inicio >= 0 && /^[\s*_•-]*$/.test(linha.slice(0, inicio))) return [];
@@ -84,9 +93,15 @@ export function removerModalidadeNaoPerguntada(texto: string): string {
         /\s*\((?:[^()]*\b(?:ordem de chegada|hora marcada|horário marcado|horario marcado|ficha)\b[^()]*)\)/gi,
         "",
       )
-      .replace(/,?\s*(?:na|em|pela|por)\s+modalidade(?:\s+de)?\s+[^.,;\n]*/gi, "")
+      // "tanto na modalidade débito quanto crédito" é pagamento: fica.
       .replace(
-        /,?\s*(?:com|por|na|em)\s+(?:hora marcada|horário marcado|horario marcado|ordem de chegada)(?:\s*\([^)]*\))?(?=[.,;\n]|$)/gi,
+        /,?\s*(?:na|em|pela|por)\s+modalidade(?!\s+(?:de\s+)?(?:pagamento|d[ée]bito|cr[ée]dito|pix|cart[aã]o|dinheiro|parcel))(?:\s+de)?\s+[^.,;\n]*/gi,
+        "",
+      )
+      // Depois de verbo ("segue por ordem de chegada"), cortar deixaria a frase
+      // pela metade: a frase inteira é tratada abaixo.
+      .replace(
+        /(?<!\b(?:segue|seguem|funciona|funcionam|feito|feita|atende|atendem|realizado|realizada)\s{0,3})\s*,?\s*(?:com|por|na|em)\s+(?:hora marcada|horário marcado|horario marcado|ordem de chegada)(?:\s*\([^)]*\))?(?=[.,;\n]|$)/gi,
         "",
       );
     // Frases que ainda falam do assunto saem inteiras.

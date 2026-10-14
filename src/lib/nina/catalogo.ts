@@ -13,7 +13,7 @@
  */
 import { z } from "zod";
 import { estruturaCatalogoSchema } from "./catalogo-estrutura";
-import { DIAS_SEMANA, RECORRENCIAS } from "./catalogo-constantes";
+import { DIAS_SEMANA, RECORRENCIAS, fimDoHorario } from "./catalogo-constantes";
 import {
   derivarProfissional,
   derivarServico,
@@ -313,7 +313,8 @@ export function resumoHorarios(horarios: Array<Partial<HorarioAtendimento>>): st
   if (!horarios?.length) return "Horários não informados";
   return horarios
     .map((h) => {
-      const faixa = h.inicio ? (h.fim ? `${h.inicio}–${h.fim}` : `a partir de ${h.inicio}`) : "";
+      const fim = fimDoHorario(h.fim);
+      const faixa = h.inicio ? (fim ? `${h.inicio}–${fim}` : `a partir de ${h.inicio}`) : "";
       const rec = h.recorrencia && h.recorrencia !== "Toda semana" ? ` (${h.recorrencia})` : "";
       return `${h.dia}${faixa ? ` ${faixa}` : ""}${rec}`;
     })

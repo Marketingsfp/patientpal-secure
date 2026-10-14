@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MODALIDADES_ATENDIMENTO, interpretarModalidade } from "./modalidade-atendimento";
-import { DIAS_SEMANA, RECORRENCIAS } from "./catalogo-constantes";
+import { DIAS_SEMANA, RECORRENCIAS, fimDoHorario } from "./catalogo-constantes";
 import { MODALIDADE_INFORMADA_PELA_EQUIPE } from "./modalidade-nao-informada";
 import { REGRA_FOTO_PEDIDO_MEDICO } from "./prompt/pedido-medico";
 import {
@@ -292,7 +292,8 @@ export function textoHorariosCatalogo(linhas: readonly HorarioCatalogo[]): strin
   if (!linhas.length) return null;
   return linhas
     .map((h) => {
-      const faixa = h.inicio ? (h.fim ? ` ${h.inicio}–${h.fim}` : ` a partir de ${h.inicio}`) : "";
+      const fim = fimDoHorario(h.fim);
+      const faixa = h.inicio ? (fim ? ` ${h.inicio}–${fim}` : ` a partir de ${h.inicio}`) : "";
       const ref = h.referencia_recorrencia
         ? `; referência ${dataBR(h.referencia_recorrencia)}`
         : "";

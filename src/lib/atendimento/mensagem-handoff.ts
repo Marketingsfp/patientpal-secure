@@ -139,9 +139,21 @@ export function destinoTexto(setor?: string | null): string {
   return s ? `nossa equipe de ${s}` : "nossa equipe";
 }
 
+/**
+ * Nome de contato que não é nome de pessoa: contatos de teste ("Lead Teste 01")
+ * e rótulos genéricos nunca vão para a mensagem (homologação 14/10/2026).
+ */
+export function nomeDePessoa(nome?: string | null): string | null {
+  const n = (nome ?? "").trim();
+  if (!n || /\d/.test(n)) return null;
+  if (/\b(?:lead|teste|test|paciente|cliente|contato|usuario|usuário|whatsapp)\b/i.test(n))
+    return null;
+  return n;
+}
+
 function primeiroNome(nome?: string | null): string | null {
-  const n = (nome ?? "").trim().split(/\s+/)[0];
-  if (!n || n.length < 2 || /\d/.test(n)) return null;
+  const n = (nomeDePessoa(nome) ?? "").split(/\s+/)[0];
+  if (!n || n.length < 2) return null;
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
@@ -156,13 +168,31 @@ export interface ResultadoValidacao {
  */
 export function validarMensagemHandoff(
   texto: string,
-  ctx: { protocolo: string; setor?: string | null; foraDoHorario?: boolean },
+  ctx: {
+    protocolo: string;
+    setor?: string | null;
+    foraDoHorario?: boolean;
+    /** Nome da assistente: ela não fala de si em terceira pessoa. */
+    assistente?: string | null;
+  },
 ): ResultadoValidacao {
   const problemas: string[] = [];
   const t = (texto ?? "").trim();
   const baixo = t.toLowerCase();
 
   if (!t) problemas.push("mensagem vazia");
+  // "Certo, Lead Teste 01, vou encaminhar…" (homologação 14/10/2026).
+  if (/\blead\b|\bteste\s*\d/i.test(t)) problemas.push("usa nome de contato de teste");
+  // "Maria vai encaminhar…", "Maria aqui!" (homologação 14/10/2026).
+  const assistente = (ctx.assistente ?? "").trim();
+  if (
+    assistente &&
+    new RegExp(
+      `\\b${assistente.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b\\s*(?:aqui\\b|vai\\b|ir[aá]\\b|encaminh|est[aá]\\b|transfer|direcion)`,
+      "i",
+    ).test(t)
+  )
+    problemas.push("fala de si em terceira pessoa");
   if (!t.includes(ctx.protocolo)) problemas.push("protocolo ausente");
   if (!/(encaminh|transferi|passar|continuar com nossa|nossa equipe|equipe)/i.test(t))
     problemas.push("não informa o encaminhamento para a equipe");
@@ -244,6 +274,7 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
     "- nunca cite outro setor além do informado acima;",
     "- nunca cite erro técnico, ferramenta, sistema, base de dados ou modelo;",
     "- tom acolhedor e natural, sem repetir frases prontas;",
+    '- fale sempre em primeira pessoa ("vou encaminhar"); nunca escreva o seu próprio nome nem fale de si em terceira pessoa;',
     "- a conversa já está em andamento: não cumprimente (sem Olá, Oi, Bom dia, Boa tarde ou Boa noite) e não se apresente de novo;",
     "- use o nome no máximo uma vez e só se for um nome de pessoa; nunca use nomes como Lead, Teste, Paciente ou números.",
     ...(ctx.aberturaPrevista
@@ -251,7 +282,9 @@ export function promptMensagemHandoff(ctx: ContextoMensagemHandoff): string {
           "- a clínica está fora do horário de funcionamento: não prometa atendimento agora, em instantes ou em breve e não cite horários; o sistema acrescenta o horário de abertura.",
         ]
       : []),
-    ctx.nome ? `Nome do paciente: ${ctx.nome}` : "Nome do paciente: desconhecido",
+    nomeDePessoa(ctx.nome)
+      ? `Nome do paciente: ${nomeDePessoa(ctx.nome)}`
+      : "Nome do paciente: desconhecido",
     ctx.assunto ? `Assunto da conversa: ${ctx.assunto}` : "Assunto da conversa: não informado",
     `Motivo do encaminhamento (uso interno): ${ctx.motivo ?? "indefinido"}`,
   ].join("\n");

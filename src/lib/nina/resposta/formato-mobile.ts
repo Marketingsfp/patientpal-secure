@@ -1,6 +1,6 @@
 import { removerEmojisNina } from "./sem-emojis";
 
-export const REGRA_FORMATO_MOBILE = `FORMATO MOBILE OBRIGATÓRIO: todas as mensagens ao paciente devem ser legíveis no WhatsApp de um celular. Use frases diretas, parágrafos curtos com uma linha em branco entre assuntos e quebras de linha reais. Para negrito, use somente um asterisco de cada lado: *texto*. Nunca use dois asteriscos de cada lado. Separe saudação, informações e pergunta final quando existirem. Liste cada opção em uma linha e cada profissional/atendimento em seu próprio bloco, mantendo valores, horários e condições junto da opção correspondente. Coloque formas de pagamento e dias com horários diferentes em linhas separadas. Preserve todas as condições relevantes, sem resumir ou omitir fatos para caber. Não use tabelas, colunas alinhadas, HTML ou blocos de código. Não quebre palavras, links, telefones, valores, datas ou horários nem tente fixar uma largura por quantidade de caracteres: o celular ajusta a largura. Esta regra organiza a apresentação e não altera regras de pagamento, nomes, fatos ou decisões.`;
+export const REGRA_FORMATO_MOBILE = `FORMATO MOBILE OBRIGATÓRIO: todas as mensagens ao paciente devem ser legíveis no WhatsApp de um celular. Use frases diretas, parágrafos curtos com uma linha em branco entre assuntos e quebras de linha reais. Para negrito, use somente um asterisco de cada lado: *texto*. Nunca use dois asteriscos de cada lado. Separe saudação, informações e pergunta final quando existirem. Liste cada opção em uma linha e cada profissional/atendimento em seu próprio bloco, mantendo valores, horários e condições junto da opção correspondente. Coloque formas de pagamento e dias com horários diferentes em linhas separadas. Preserve todas as condições relevantes, sem resumir ou omitir fatos para caber. Não repita o bloco de valores (dinheiro, Pix/cartão) que você já enviou nesta conversa para o mesmo atendimento e profissional: responda só o valor perguntado; o bloco completo volta apenas quando o atendimento ou o profissional mudar. Não use tabelas, colunas alinhadas, HTML ou blocos de código. Não quebre palavras, links, telefones, valores, datas ou horários nem tente fixar uma largura por quantidade de caracteres: o celular ajusta a largura. Esta regra organiza a apresentação e não altera regras de pagamento, nomes, fatos ou decisões.`;
 
 /** Altera espaços/quebras e converte negrito Markdown ao formato do WhatsApp.
  * A largura de cada linha fica a cargo do WhatsApp.
@@ -20,7 +20,21 @@ export function formatarTextoMobile(texto: string): string {
     .replace(/(?<!\*)\*\*(?=\S)([^*\n]*?[^*\s])\*\*(?!\*)/g, "*$1*")
     .replace(
       /[\t ]+(?=\*{0,2}(?:Dinheiro|Pix\/cartão|Pix|Cartão|Profissional|Dias e horários(?: habituais)?|Horários(?: disponíveis| habituais)?|Preparo|Unidade|Protocolo(?: d[eo] atendimento)?):)/gi,
-      "\n",
+      (espaco: string, indice: number, todo: string) => {
+        const antes = todo.slice(todo.lastIndexOf("\n", indice - 1) + 1, indice).replace(/\*/g, "");
+        // Homologação 14/10/2026: "Profissionais e horários habituais:" virava
+        // "Profissionais e⏎horários" e "* Dinheiro:" deixava o marcador sozinho.
+        // Rótulo no meio da frase (depois de "e", "os", "seus"…) ou logo depois
+        // do marcador de lista fica na mesma linha.
+        if (!antes.trim() || /^\s*(?:[-•]|\d+[.)])?\s*$/.test(antes)) return espaco;
+        if (
+          /\b(?:e|ou|de|da|do|das|dos|com|os|as|o|a|seus|suas|nossos|nossas|demais)\s*$/i.test(
+            antes,
+          )
+        )
+          return espaco;
+        return "\n";
+      },
     );
 
   const organizado = normal
