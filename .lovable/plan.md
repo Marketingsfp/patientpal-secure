@@ -1,55 +1,38 @@
-# Revisão de segurança completa — 13/10/2026 04:07 UTC (somente leitura)
+# Revisão de segurança — 14/10/2026 04:07 UTC (somente leitura, nada foi alterado)
 
-Nada foi alterado. Cada correção depende de aprovação, uma por vez.
+Este documento é o relatório. Aprovar NÃO aplica nenhuma correção; cada item só será corrigido com pedido explícito.
 
-## Foco: código novo desde 12/10/2026 04:00 UTC (PRs #26 a #35)
+## 1. O que mudou nas últimas 24h
 
-### 1. Atendimentos estruturados: conversão em lote, sincronização e edição com IA (`src/lib/nina/catalogo.functions.ts`)
-Conferido: todas as funções exigem login no servidor (`requireSupabaseAuth`); as que gravam ou chamam IA conferem admin/gestor no servidor (`exigirAdmin`); conversão confere a flag `catalogo_estruturado` no servidor; toda leitura e gravação filtra pela clínica do pedido e roda como o próprio usuário (sem chave de serviço), e as regras do banco de `nina_cat_servicos`/`nina_cat_profissionais` também exigem admin/gestor para gravar; conferência de versão (`updated_at`) evita sobrescrever edição de outra pessoa; prévia não grava.
+| # | Sev. | Onde | Achado | Correção sugerida |
+|---|---|---|---|---|
+| 1 | Média | `tel_chamadas`, `tel_transcricoes`, `tel_analises`, `tel_fila_analise` | RLS correta (só leitura, `clinicas_do_usuario()` + `coach_pode_gerir`, escrita só servidor). Porém transcrições guardam fala integral de pacientes (dado de saúde) sem prazo de retenção definido. | Definir retenção (ex.: igual à de 6 meses das mensagens) — regra a validar com a clínica. |
+| 2 | Média | `src/lib/coach/telefonia.functions.ts` (`ligacoesParaAnalise`, `resumoLigacoesTelefonia`, `lerTranscricaoLigacao`) | Exigem só nível `read` do Coach, mas usam caminho de servidor que ignora a RLS (que exige `coach_pode_gerir`). Quem tem só leitura do Coach pode ver telefones, transcrições e lista de retorno que a RLS bloquearia. | Alinhar: exigir o mesmo critério da RLS ou consultar com o cliente do usuário. Validar com a equipe quem deve ver. |
+| 3 | Baixa | `coach_resumo_ligacoes` (migrations 0013/0014) | SECURITY DEFINER sem checagem interna de clínica; mitigado porque o EXECUTE é só `service_role`. Risco só se alguém regravar o GRANT. | Manter grant; opcionalmente adicionar checagem interna. |
+| 4 | Baixa | `src/lib/coach/telefonia-sufficit.server.ts:51` | Log usa `error.message` do banco (demais logs só usam código). Não vaza token, mas foge do padrão. | Logar só `error.code`. |
+| 5 | Baixa | Lote de análise (`fila-analise.server.ts`) | Sem limite por usuário além da cota diária; cota calculada em dia UTC enquanto a tela fala em horário de São Paulo. | Unificar fuso da cota. |
+| 6 | Baixa | `src/lib/nina/dados-transferencia.ts` | Nome completo e data de nascimento vão em texto para a recepção na transferência. Acesso segue a RLS das conversas; conferir que o texto não entra em logs nem no resumo exportado. | Confirmar com a equipe; nenhum log encontrado no arquivo. |
+| 7 | Info | Auditoria legível / protocolo simulado de homologação | Não encontrei esses commits nas últimas ~30h do histórico. `audit_log` segue restrita a gestores e financeiro (tabelas financeiras). | Indicar o commit/PR para revisar. |
 
-- **Média — duas fontes de papel diferentes.** O catálogo lê o papel em `clinica_memberships.role`; as regras das flags (`clinica_feature_flags`) leem em `user_roles` (`has_role`). Uma pessoa pode ser gestora numa fonte e não na outra. Correção: unificar a fonte (mesmo achado antigo de `is_financeiro_clinica`).
-- **Baixa — a flag não é barreira contra gestor.** Qualquer admin/gestor da clínica pode ligar `catalogo_estruturado` sozinho pelas regras do banco. Serve como liberação gradual, não como proteção. Correção (se a flag precisar ser barreira): gravar flags só pelo administrador da plataforma. Possível regra de negócio — validar com a equipe da clínica.
-- **Baixa — publicação com IA aceita os dados vindos do navegador.** `publicarEdicoesCatalogoIA` grava o `dados` enviado pela tela, não a proposta gerada no servidor. Só admin/gestor chega aqui e ele já pode editar à mão, então não amplia acesso. Correção: guardar a proposta no servidor e publicar por referência.
-- **Baixa — texto da clínica vai para a IA.** O texto colado é delimitado por marcas e o pedido fica como mensagem de usuário. Risco só de resultado estranho na prévia, que precisa de confirmação humana. Sem ação.
+## 2. Achados gerais (já conhecidos, continuam abertos)
 
-### 2. Agendamento por item do catálogo (`src/lib/nina/fluxo-agendamento-item.ts`)
-Conferido: o módulo é puro (sem banco, sem rede); só decide o próximo passo. A reserva continua no executor já existente do WhatsApp.
-- **Não verificado:** o executor de vagas/reserva em `src/lib/whatsapp.server.ts` não foi relido linha a linha nesta rodada (amarração da clínica e do paciente à conversa).
-
-### 3. Orçamentos com filtro de período (`src/routes/_authenticated/app.orcamentos.tsx`)
-Conferido: lotes de 150 ids por consulta, pelo navegador com as regras do banco; a busca por nome passa por `sanitizePostgrestSearch` antes do `.or()`. Sem achado.
-
-### 4. Retorno compacto do catálogo e remoção de blocos de prompt
-Conferido por nomes de arquivo: mudanças só em texto/regras da Nina, sem nova rota, tabela ou permissão. Sem achado de segurança; risco é de comportamento, não de acesso.
-
-## Achados gerais (banco consultado agora)
-
-| Severidade | Achado | Local | Correção sugerida |
+| Sev. | Onde | Achado | Correção |
 |---|---|---|---|
-| Alta (corrigida, falta publicar) | Voz da Nina sem login | `src/routes/api/nina-voz.ts` | Publicar a correção já feita |
-| Média | Sessão da foto do pedido pode ficar no banco com nome do paciente | `orcamento_foto_sessoes` | Limpeza agendada das vencidas |
-| Média | Falas "da assistente" vindas do navegador | `src/routes/api/nina-fala.ts` | Montar histórico no servidor |
-| Média | Texto do médico como instrução de sistema | `src/lib/consulta-ia.functions.ts` | Enviar como mensagem de usuário |
-| Média | Homologação do Francisco aceita instrução do navegador | `src/lib/francisco/functions.ts` | Ler instrução salva no banco |
-| Média | Impressão da composição corporal sem escapar texto | `src/components/medico/paciente-dialogs.tsx` | Escapar antes de montar a página |
-| Média | Mensagens entre janelas aceitam qualquer origem | `app.orcamentos-agenda.tsx` | Conferir origem; não usar `"*"` |
-| Média | 71 funções privilegiadas chamáveis por visitante (igual a 10/10) | banco | Revogar acesso de visitante em lotes |
-| Baixa | 1 função sem `search_path` fixo; 6 extensões no esquema público | banco | Fixar `search_path`; mover extensões |
-| Baixa | 19 tabelas com proteção ligada e sem regra (fechadas) | banco | Revogar permissão de visitante |
-| Baixa | Busca de aprendizados sem saneamento | `src/lib/nina/aprendizado.functions.ts` | `sanitizePostgrestSearch` |
-| Baixa | CSV da agenda pode virar fórmula | `src/lib/export-csv.ts` | Prefixar `'` em `= + - @` |
-| Pendente | Permissão por módulo só na tela em tabelas antigas | várias | Migração gradual |
+| Alta | `src/routes/api/nina-voz.ts` | Correção de login feita, mas ainda não publicada — produção continua aberta. | Publicar com autorização. |
+| Média | Banco | 71 funções SECURITY DEFINER executáveis por visitante sem login; 219 por qualquer usuário logado. | Revisar e revogar EXECUTE das que não são públicas. |
+| Média | Papéis | Duas fontes de papel (`clinica_memberships.role` vs `user_roles`). | Unificar fonte. |
+| Média | Fotos de orçamento | Retenção indefinida se não buscadas. | Expirar automaticamente. |
+| Baixa | Banco | 19 tabelas com RLS sem policy (bloqueadas — sem vazamento); 1 função sem `search_path`; 6 extensões no schema público. | Fixar `search_path`; mover extensões. |
+| Baixa | Diversos | Impressão sem escape de HTML, mensagens entre janelas sem checar origem, CSV sujeito a fórmula, busca sem saneamento. | Escapar/sanitizar. |
 
-Nenhum segredo exposto novo; tabelas sem proteção: 0.
+## 3. Dependências (81 pacotes)
 
-## Não verificado
-- Executor de reserva da Nina linha a linha.
-- Varredura de dependências.
-- Teste com usuário logado (gestor e recepção) nas telas novas do catálogo.
+- Crítica: `proxy-addr` via `@lovable.dev/mcp-js` (falsificação de IP) — só ferramenta de desenvolvimento, impacto baixo em produção.
+- Altas: `undici`, `ws`, `sharp` (via plugin Cloudflare de build), `seroval` (via TanStack Router/Start — afeta o app rodando: estouro de memória), `fast-uri`, `js-yaml`, `browserslist`.
+- Sugestão: atualizar TanStack Router/Start primeiro (único com impacto direto em produção).
 
-## Ordem sugerida
-1. Publicar a correção da voz (com autorização).
-2. Unificar a fonte do papel (catálogo x flags x financeiro).
-3. Limpeza das sessões de foto vencidas.
-4. Instruções de IA vindas do navegador.
-5. Itens baixos.
+## 4. Não verificado
+
+- Teste com usuário real logado em cada papel.
+- Conteúdo real dos logs de produção.
+- Segredos: nenhum valor encontrado em código; `.env` versionado contém só chaves públicas.
