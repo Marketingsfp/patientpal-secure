@@ -15405,6 +15405,7 @@ export type Database = {
           atualizado_em: string
           atualizado_por: string | null
           clinica_id: string
+          dias_antecedencia: number
           motivo: string | null
         }
         Insert: {
@@ -15412,6 +15413,7 @@ export type Database = {
           atualizado_em?: string
           atualizado_por?: string | null
           clinica_id: string
+          dias_antecedencia?: number
           motivo?: string | null
         }
         Update: {
@@ -15419,6 +15421,7 @@ export type Database = {
           atualizado_em?: string
           atualizado_por?: string | null
           clinica_id?: string
+          dias_antecedencia?: number
           motivo?: string | null
         }
         Relationships: [
@@ -15427,6 +15430,52 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: true
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_agendamento_especialidade: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          clinica_id: string
+          especialidade_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id: string
+          especialidade_id: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id?: string
+          especialidade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_agendamento_especialidade_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_agendamento_especialidade_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_agendamento_especialidade_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades_da_unidade"
             referencedColumns: ["id"]
           },
         ]
