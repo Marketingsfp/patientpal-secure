@@ -397,6 +397,118 @@ async function handleLookupPaciente(
   return ok(200, await consultarPaciente(db, ctx, parsed.data));
 }
 
+function travaErro(code: string, message: string): never {
+  throw new ApiError({ status: 422, code, message });
+}
+
+async function checarTravasAgendaSite(
+  db: SupabaseClient<Database>,
+  clinicaId: string,
+  medicoId: string | null,
+  inicio: string,
+): Promise<void> {
+  const { antesDoPiso, casarFaixa, eDoSite, limitesDiaSP } = await import("./site-travas");
+  const { data: cfg, error: eCfg } = await db
+    .from("site_agendamento_config")
+    .select("horas_minimas")
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (eCfg) console.error("[api v1] travas config:", eCfg.code ?? "erro");
+  const horas = cfg?.horas_minimas ?? 0;
+  if (antesDoPiso(inicio, horas)) {
+    travaErro(
+      "too_soon_to_book",
+      `O agendamento online exige pelo menos ${horas} horas de antecedência.`,
+    );
+  }
+  if (!medicoId) return;
+
+  // A agenda vem da ficha livre do médico nesse horário.
+  const inicioIso = new Date(inicio).toISOString();
+  const { data: fichas, error: eFicha } = await db
+    .from("agendamentos")
+    .select("agenda_id, paciente_nome")
+    .eq("clinica_id", clinicaId)
+    .eq("medico_id", medicoId)
+    .eq("inicio", inicioIso)
+    .neq("status", "cancelado")
+    .not("agenda_id", "is", null)
+    .limit(20);
+  if (eFicha) console.error("[api v1] travas ficha:", eFicha.code ?? "erro");
+  const livre = (fichas ?? []).find((f) =>
+    ["disponivel", "disponível"].includes((f.paciente_nome ?? "").trim().toLowerCase()),
+  );
+  const agendaId = livre?.agenda_id ?? null;
+  if (!agendaId) return;
+
+  const { data: ag, error: eAg } = await db
+    .from("site_agendamento_agenda")
+    .select("ativo")
+    .eq("clinica_id", clinicaId)
+    .eq("agenda_id", agendaId)
+    .maybeSingle();
+  if (eAg) console.error("[api v1] travas agenda:", eAg.code ?? "erro");
+  if (ag && ag.ativo === false) {
+    travaErro("agenda_not_bookable_online", "Esta agenda não está disponível para agendamento online.");
+  }
+
+  const { data: disps, error: eDisp } = await db
+    .from("medico_disponibilidades")
+    .select("id, dia_semana, hora_inicio, hora_fim, vigencia_inicio, vigencia_fim")
+    .eq("clinica_id", clinicaId)
+    .eq("medico_id", medicoId)
+    .eq("agenda_id", agendaId)
+    .eq("ativo", true);
+  if (eDisp) console.error("[api v1] travas faixas:", eDisp.code ?? "erro");
+  const faixa = casarFaixa(
+    (disps ?? []).map((d) => ({
+      id: d.id as string,
+      dia_semana: d.dia_semana as number,
+      hora_inicio: String(d.hora_inicio),
+      hora_fim: String(d.hora_fim),
+      vigencia_inicio: (d.vigencia_inicio as string | null) ?? null,
+      vigencia_fim: (d.vigencia_fim as string | null) ?? null,
+    })),
+    inicioIso,
+  );
+  if (!faixa) return;
+
+  const { data: sf, error: eSf } = await db
+    .from("site_agendamento_faixa")
+    .select("ativo, limite_site")
+    .eq("clinica_id", clinicaId)
+    .eq("disponibilidade_id", faixa.id)
+    .maybeSingle();
+  if (eSf) console.error("[api v1] travas faixa:", eSf.code ?? "erro");
+  if (!sf) return;
+  if (sf.ativo === false) {
+    travaErro("timeslot_not_bookable_online", "Este horário não está disponível para agendamento online.");
+  }
+  if (sf.limite_site == null) return;
+
+  const dia = limitesDiaSP(inicioIso);
+  const { data: doSite, error: eQ } = await db
+    .from("agendamentos")
+    .select("paciente_nome, origem_integracao")
+    .eq("clinica_id", clinicaId)
+    .eq("medico_id", medicoId)
+    .eq("agenda_id", agendaId)
+    .neq("status", "cancelado")
+    .gte("inicio", dia.de)
+    .lt("inicio", dia.ate)
+    .or("origem_integracao.eq.site_publico,origem_integracao.like.site-%")
+    .limit(1000);
+  if (eQ) console.error("[api v1] travas cota:", eQ.code ?? "erro");
+  const ocupados = (doSite ?? []).filter(
+    (r) =>
+      eDoSite(r.origem_integracao) &&
+      !["disponivel", "disponível", "bloqueio"].includes((r.paciente_nome ?? "").trim().toLowerCase()),
+  ).length;
+  if (ocupados >= sf.limite_site) {
+    travaErro("online_quota_reached", "As vagas online deste horário já foram preenchidas.");
+  }
+}
+
 async function handleCriar(
   db: SupabaseClient<Database>,
   ctx: ApiKeyContexto,
@@ -500,6 +612,12 @@ async function handleCriar(
       });
     }
   }
+
+  // Travas de agenda do site (mesmos critérios de horarios_disponiveis_publico).
+  // Antes do paciente para não cadastrar ninguém à toa.
+  await checarTravasAgendaSite(db, ctx.clinica_id, body.medico_id ?? null, body.inicio);
+
+
 
   // Resolução do paciente.
   //  • v1 (`paciente_id`): precisa existir; comportamento inalterado.

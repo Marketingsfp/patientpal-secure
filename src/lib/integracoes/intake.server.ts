@@ -128,14 +128,16 @@ export async function handleIntake(
 
   // Interruptor por clínica (site_agendamento_config). Vem antes de ler o
   // corpo, do rate limit e de qualquer escrita. Sem linha = ligado.
+  let horasMinimas = 0;
   {
     const { supabaseAdmin: dbCfg } = await import("@/integrations/supabase/client.server");
     const { data: cfg, error: erroCfg } = await dbCfg
       .from("site_agendamento_config")
-      .select("ativo")
+      .select("ativo, horas_minimas")
       .eq("clinica_id", clinicaId)
       .maybeSingle();
     if (erroCfg) console.error("[intake] leitura do interruptor:", erroCfg.code ?? "erro");
+    horasMinimas = cfg?.horas_minimas ?? 0;
     if (cfg && cfg.ativo === false) {
       return json(503, {
         error: {
@@ -283,6 +285,16 @@ export async function handleIntake(
   const janela = janelaPreferida(body.data_preferida, body.hora_preferida, body.periodo_preferido);
   if (!janela) {
     return json(422, { error: { code: "invalid_datetime", message: "Data/hora inválida." } });
+  }
+  // Antecedência mínima do site: preferência antes do piso é empurrada para o
+  // próximo horário válido (não recusa).
+  if (horasMinimas > 0) {
+    const { empurrarParaPiso } = await import("./site-travas");
+    const novoInicio = empurrarParaPiso(janela.inicio, horasMinimas);
+    if (novoInicio !== janela.inicio) {
+      janela.inicio = novoInicio;
+      janela.fim = new Date(new Date(novoInicio).getTime() + 30 * 60000).toISOString();
+    }
   }
 
   // Especialidade escolhida no site → id do catálogo (sem diferenciar

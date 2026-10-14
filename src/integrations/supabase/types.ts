@@ -15399,6 +15399,45 @@ export type Database = {
         }
         Relationships: []
       }
+      site_agendamento_agenda: {
+        Row: {
+          agenda_id: string
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          clinica_id: string
+        }
+        Insert: {
+          agenda_id: string
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id: string
+        }
+        Update: {
+          agenda_id?: string
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_agendamento_agenda_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "medico_agendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_agendamento_agenda_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_agendamento_config: {
         Row: {
           ativo: boolean
@@ -15406,6 +15445,7 @@ export type Database = {
           atualizado_por: string | null
           clinica_id: string
           dias_antecedencia: number
+          horas_minimas: number
           motivo: string | null
         }
         Insert: {
@@ -15414,6 +15454,7 @@ export type Database = {
           atualizado_por?: string | null
           clinica_id: string
           dias_antecedencia?: number
+          horas_minimas?: number
           motivo?: string | null
         }
         Update: {
@@ -15422,6 +15463,7 @@ export type Database = {
           atualizado_por?: string | null
           clinica_id?: string
           dias_antecedencia?: number
+          horas_minimas?: number
           motivo?: string | null
         }
         Relationships: [
@@ -15476,6 +15518,48 @@ export type Database = {
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades_da_unidade"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_agendamento_faixa: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          clinica_id: string
+          disponibilidade_id: string
+          limite_site: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id: string
+          disponibilidade_id: string
+          limite_site?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          clinica_id?: string
+          disponibilidade_id?: string
+          limite_site?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_agendamento_faixa_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_agendamento_faixa_disponibilidade_id_fkey"
+            columns: ["disponibilidade_id"]
+            isOneToOne: false
+            referencedRelation: "medico_disponibilidades"
             referencedColumns: ["id"]
           },
         ]
@@ -19213,6 +19297,7 @@ export type Database = {
       servico_nome_chave: { Args: { nome: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      site_agendamento_e_do_site: { Args: { origem: string }; Returns: boolean }
       strip_accents: { Args: { _text: string }; Returns: string }
       tem_alcada_nominal: {
         Args: { _clinica_id: string; _escopo: string; _user_id: string }
