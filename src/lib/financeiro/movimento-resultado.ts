@@ -621,7 +621,24 @@ export interface LinhaProfissional extends LinhaAgendaProf {
   /** Especialidades dos atendimentos do período, em ordem alfabética. */
   especialidades: string[];
   agendas: LinhaAgendaProf[];
+  /**
+   * Os mesmos números abertos por especialidade do ATENDIMENTO, maior total
+   * primeiro (pedido de 14/10/2026): a unidade SAO FRANCISCO DE PAULA soma
+   * Obstetrícia, Podologia etc. numa linha só e não dava para ver quanto cada
+   * uma fez. A soma das linhas fecha com o total do profissional.
+   */
+  porEspecialidade: LinhaEspecialidadeProf[];
 }
+
+export interface LinhaEspecialidadeProf {
+  especialidade: string;
+  consulta: TotalQtd;
+  exame: TotalQtd;
+  total: TotalQtd;
+}
+
+/** Atendimento cujo serviço não tem especialidade no cadastro. */
+export const SEM_ESPECIALIDADE = "(sem especialidade)";
 
 const soma = (linhas: LinhaClassificada[], agenda: string): LinhaAgendaProf => ({
   agenda,
@@ -659,7 +676,28 @@ export function resumoPorProfissional(linhas: LinhaClassificada[]): LinhaProfiss
     const especialidades = Array.from(
       new Set(doProf.map((l) => l.especialidade).filter((e): e is string => !!e)),
     ).sort((x, y) => x.localeCompare(y, "pt-BR"));
-    out.push({ profissional, ...soma(doProf, profissional), especialidades, agendas });
+    const porEsp = new Map<string, LinhaClassificada[]>();
+    for (const l of doProf) {
+      const e = l.especialidade?.trim() || SEM_ESPECIALIDADE;
+      const lista = porEsp.get(e);
+      if (lista) lista.push(l);
+      else porEsp.set(e, [l]);
+    }
+    const porEspecialidade = Array.from(porEsp, ([e, ls]) => {
+      const { consulta, exame, total } = soma(ls, e);
+      return { especialidade: e, consulta, exame, total };
+    }).sort((x, y) => {
+      if (x.especialidade === SEM_ESPECIALIDADE) return 1;
+      if (y.especialidade === SEM_ESPECIALIDADE) return -1;
+      return y.total.total - x.total.total;
+    });
+    out.push({
+      profissional,
+      ...soma(doProf, profissional),
+      especialidades,
+      agendas,
+      porEspecialidade,
+    });
   }
   return out.sort((a, b) => {
     if (a.profissional === SEM_PROFISSIONAL) return 1;

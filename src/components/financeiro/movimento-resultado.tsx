@@ -17,6 +17,8 @@
 import {
   Activity,
   Calendar,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   Coins,
   CreditCard,
@@ -32,7 +34,7 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,6 +193,19 @@ function QuadroProfissionais({
   const [buscarPor, setBuscarPor] = useState<"profissional" | "especialidade">("profissional");
   /** Lista inteira aberta pelo botão "Ver todos" — por padrão só os primeiros. */
   const [verTodos, setVerTodos] = useState(false);
+  /**
+   * Linhas abertas por especialidade (pedido de 14/10/2026): quem atende em
+   * várias especialidades — caso da unidade SAO FRANCISCO DE PAULA — tinha só
+   * os nomes emendados num texto miúdo, sem quantidade nem valor de cada uma.
+   */
+  const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
+  const alternarAberto = (p: string) =>
+    setAbertos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(p)) novo.delete(p);
+      else novo.add(p);
+      return novo;
+    });
   const todos = resumoPorProfissional(linhas);
   // O hook acima fica ANTES desta saída: hook depois de `return` quebra a
   // regra do React e derruba a tela quando o período não tem atendimento.
@@ -356,8 +371,8 @@ function QuadroProfissionais({
             )}
             {porEspecialidade && (
               <p className="text-xs leading-snug text-foreground/80">
-                Especialidade do cadastro do profissional. Quem tem mais de uma aparece em cada uma
-                delas com o total inteiro do período.
+                Especialidade do serviço atendido. Os números de cada profissional contam só os
+                atendimentos dessa especialidade.
               </p>
             )}
             {filtro?.profissional && (
@@ -395,27 +410,66 @@ function QuadroProfissionais({
                   {exibidos.map((d) => {
                     const f: FiltroCard = { profissional: d.profissional };
                     const ativo = mesmoFiltro(filtro, f);
+                    // Só abre quem tem mais de uma especialidade: com uma só,
+                    // a sublinha repetiria os números da própria linha.
+                    const abrivel = d.porEspecialidade.length > 1;
+                    const aberto = abrivel && abertos.has(d.profissional);
                     return (
-                      <tr
-                        key={d.profissional}
-                        className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
-                          ativo ? "bg-primary/5" : ""
-                        }`}
-                        aria-selected={ativo}
-                        onClick={() => alternar(f)}
-                      >
-                        <td className="py-1 pr-4 leading-tight">
-                          {d.profissional}
-                          {d.especialidades.length > 0 && (
-                            <span className="block text-[10px] leading-none text-muted-foreground">
-                              {d.especialidades.join(" · ")}
-                            </span>
-                          )}
-                        </td>
-                        {celula(d.consulta)}
-                        {celula(d.exame)}
-                        {celula(d.total, "font-medium")}
-                      </tr>
+                      <Fragment key={d.profissional}>
+                        <tr
+                          className={`border-t border-border/60 cursor-pointer hover:bg-muted/40 ${
+                            ativo ? "bg-primary/5" : ""
+                          }`}
+                          aria-selected={ativo}
+                          onClick={() => alternar(f)}
+                        >
+                          <td className="py-1 pr-4 leading-tight">
+                            {d.profissional}
+                            {abrivel ? (
+                              <button
+                                type="button"
+                                aria-expanded={aberto}
+                                onClick={(e) => {
+                                  // Abrir o detalhe não liga o filtro da linha.
+                                  e.stopPropagation();
+                                  alternarAberto(d.profissional);
+                                }}
+                                className="mt-0.5 flex items-center gap-0.5 rounded text-[11px] font-medium text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                {aberto ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3" />
+                                )}
+                                {aberto
+                                  ? "Ocultar especialidades"
+                                  : `Ver ${d.porEspecialidade.length} especialidades`}
+                              </button>
+                            ) : (
+                              d.especialidades.length > 0 && (
+                                <span className="block text-[10px] leading-none text-muted-foreground">
+                                  {d.especialidades.join(" · ")}
+                                </span>
+                              )
+                            )}
+                          </td>
+                          {celula(d.consulta)}
+                          {celula(d.exame)}
+                          {celula(d.total, "font-medium")}
+                        </tr>
+                        {aberto &&
+                          d.porEspecialidade.map((e) => (
+                            <tr
+                              key={`${d.profissional}|${e.especialidade}`}
+                              className="bg-muted/30 text-foreground/85"
+                            >
+                              <td className="py-0.5 pl-4 pr-4 leading-tight">{e.especialidade}</td>
+                              {celula(e.consulta)}
+                              {celula(e.exame)}
+                              {celula(e.total, "font-medium")}
+                            </tr>
+                          ))}
+                      </Fragment>
                     );
                   })}
                   {visiveis.length === 0 && (

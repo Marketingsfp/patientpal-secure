@@ -9,6 +9,7 @@ import {
   resumoPorProfissional,
   rotuloFiltro,
   SEM_AGENDA,
+  SEM_ESPECIALIDADE,
   SEM_PROFISSIONAL,
   servicoDaDescricao,
   type ContextoClassificacao,
@@ -454,5 +455,54 @@ describe("resumoPorProfissional", () => {
     const [dra] = resumoPorProfissional(linhas);
     expect(dra.especialidades).toEqual(["ULTRASSONOGRAFIA"]);
     expect(dra.total).toEqual({ total: 400, qtd: 2 });
+  });
+
+  it("abre a linha por especialidade e a soma fecha com o profissional", () => {
+    const linhas = classificarMovimento(
+      [
+        l({
+          descricao: "PACIENTE TESTE — CONSULTA",
+          procedimento: "CONSULTA",
+          valor: 100,
+          agendamento_id: "c1",
+          medico_nome: "UNIDADE TESTE",
+          especialidade: "PODOLOGIA",
+        }),
+        l({
+          descricao: "PACIENTE TESTE — CONSULTA",
+          procedimento: "CONSULTA",
+          valor: 100,
+          agendamento_id: "c2",
+          medico_nome: "UNIDADE TESTE",
+          especialidade: "PODOLOGIA",
+        }),
+        l({
+          descricao: "PACIENTE TESTE — ULTRASSONOGRAFIA",
+          procedimento: "ULTRASSONOGRAFIA",
+          valor: 300,
+          agendamento_id: "c3",
+          medico_nome: "UNIDADE TESTE",
+          especialidade: "OBSTETRICIA",
+        }),
+        l({
+          descricao: "PACIENTE TESTE — CONSULTA",
+          procedimento: "CONSULTA",
+          valor: 50,
+          agendamento_id: "c4",
+          medico_nome: "UNIDADE TESTE",
+        }),
+      ],
+      ctx,
+    );
+    const [un] = resumoPorProfissional(linhas);
+    expect(un.porEspecialidade.map((e) => e.especialidade)).toEqual([
+      "OBSTETRICIA",
+      "PODOLOGIA",
+      SEM_ESPECIALIDADE,
+    ]);
+    expect(un.porEspecialidade[1].consulta).toEqual({ total: 200, qtd: 2 });
+    expect(un.porEspecialidade[0].exame).toEqual({ total: 300, qtd: 1 });
+    expect(un.porEspecialidade.reduce((s, e) => s + e.total.total, 0)).toBe(un.total.total);
+    expect(un.porEspecialidade.reduce((s, e) => s + e.total.qtd, 0)).toBe(un.total.qtd);
   });
 });
