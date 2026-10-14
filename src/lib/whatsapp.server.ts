@@ -3072,6 +3072,20 @@ async function gerarRespostaNinaInterno(
     );
   if (escolhaDoPaciente && fluxoEstado.session_id)
     fluxoEstado.intencao_agendar_sessao = fluxoEstado.session_id;
+  // "Não tenho preferência" com uma dúvida junto: a Nina responde a dúvida e
+  // encaminha no mesmo turno, depois da resposta do modelo.
+  const semPreferenciaPaciente = fluxoAgendamento.semPreferenciaDeProfissional(mensagemPaciente);
+  const semPreferenciaComPergunta =
+    escolhaDoPaciente &&
+    semPreferenciaPaciente &&
+    mensagemPaciente.includes("?") &&
+    fluxoAgendamento.decidirAgendamentoNoTurno({
+      intencaoAgendar: true,
+      fluxo: fluxoDasReferencias(referenciasDaDecisao),
+      informacoesEntregues: true,
+      ofertaPendente: false,
+      respostaOferta: null,
+    }) === "encaminhar";
   // A intenção de marcar vale para a sessão: escolher o profissional ou o
   // horário ("pode ser a Valeria", "seria 9h") continua o mesmo pedido.
   const intencaoAgendarTurno = fluxoAgendamento.intencaoDeAgendarNaSessao({
@@ -4398,6 +4412,38 @@ async function gerarRespostaNinaInterno(
     }
   }
 
+  // Sem preferência de profissional vale como primeiro disponível (decisão de
+  // 13/10/2026): com uma dúvida na mesma mensagem ("Não tenho médico
+  // específico. O cartão é antes?"), a resposta segue junto do encaminhamento,
+  // sem perguntar de novo a preferência.
+  if (
+    semPreferenciaComPergunta &&
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !perguntaDadosTransferencia &&
+    !agendamentoConfirmado &&
+    !resumoEscolha
+  ) {
+    const { separarOrientacaoRecepcao } = await import("@/lib/nina/informacao-nao-cadastrada");
+    const { restante } = separarOrientacaoRecepcao(resposta, false);
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Sem preferência de profissional: encaminhamento como primeiro disponível",
+      dados: { respostas_mantidas: Boolean(restante) },
+      codigo: {
+        arquivo: "src/lib/nina/fluxo-agendamento-item.ts",
+        funcao: "semPreferenciaDeProfissional",
+      },
+    });
+    await executarDecisaoEncaminhamento(
+      { motivo: motivoAgendamento(referenciasDaDecisao), urgencia: "normal" },
+      undefined,
+      restante,
+    );
+  }
+
   if (
     !finalizacaoHandoff &&
     !houveHandoff &&
@@ -4875,6 +4921,7 @@ async function gerarRespostaNinaInterno(
 
   // Pergunta de preferência no modelo de 13/10/2026: "Você tem preferência por
   // algum profissional ou gostaria de marcar com o primeiro disponível? 😊".
+  // Quem acabou de dizer que não tem preferência não ouve a pergunta de novo.
   if (
     !semNovaMensagem &&
     !turnoObsoleto &&
@@ -4882,6 +4929,7 @@ async function gerarRespostaNinaInterno(
     !finalizacaoHandoff &&
     !perguntaDadosTransferencia &&
     !resumoEscolha &&
+    !semPreferenciaPaciente &&
     resposta.trim()
   ) {
     // Dois ou mais profissionais apresentados nesta conversa.
