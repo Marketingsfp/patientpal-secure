@@ -1370,6 +1370,9 @@ async function gerarRespostaNinaInterno(
       ? sessaoNina.estado.transferencia_pendente
       : null;
   if (transferenciaPendente) nomeAtendimentoAusente = false;
+  // Pergunta em vez dos dados: a Nina responde e transfere na mesma mensagem.
+  const responderAntesDaTransferencia =
+    Boolean(transferenciaPendente) && dadosTransferencia.perguntaEmVezDosDados(mensagemPaciente);
   let perguntaDadosTransferencia: string | null = null;
   // Flag por clínica `nina_dados_transferencia`; desligada, transfere na hora como antes.
   const pedirDadosAntesDaTransferencia = await import("@/lib/nina/dados-transferencia-flag.server")
@@ -1641,6 +1644,15 @@ async function gerarRespostaNinaInterno(
       "Informação que o cadastro não traz é passada pela recepção, sem suposição nem menção a cadastro.",
     texto: REGRA_INFORMACAO_NAO_CADASTRADA,
   });
+  if (responderAntesDaTransferencia)
+    instrucoesAdicionaisTurno.push({
+      codigo: "RESPONDER_ANTES_DA_TRANSFERENCIA",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/dados-transferencia.ts",
+      motivo:
+        "Transferência aguardando dados: a pergunta do paciente é respondida e a transferência segue na mesma mensagem.",
+      texto: dadosTransferencia.REGRA_RESPONDER_ANTES_DA_TRANSFERENCIA,
+    });
   const { regraSaudacaoPeriodo } = await import("@/lib/nina/resposta/saudacao-periodo");
   instrucoesAdicionaisTurno.push({
     codigo: "SAUDACAO_PELO_HORARIO",
@@ -3235,7 +3247,7 @@ async function gerarRespostaNinaInterno(
       handoff_confirmado: confirmado,
     });
   }
-  if (transferenciaPendente)
+  if (transferenciaPendente && !responderAntesDaTransferencia)
     await executarDecisaoEncaminhamento(
       {
         motivo: transferenciaPendente.argumentos.motivo,
@@ -4307,6 +4319,37 @@ async function gerarRespostaNinaInterno(
   const respostaDoModelo =
     finalizacaoHandoff?.textoModelo ??
     (ctxFerramentas?.esclarecimentoCatalogo ? textoModeloAtual : resposta);
+
+  // Transferência aguardando dados e o paciente perguntou algo: a resposta
+  // segue junto da transferência pedida antes (regra de 13/10/2026).
+  // Se outra regra já transferiu neste turno, só a pendência é encerrada.
+  if (
+    transferenciaPendente &&
+    responderAntesDaTransferencia &&
+    (finalizacaoHandoff || houveHandoff)
+  )
+    fluxoEstado.transferencia_pendente = null;
+  else if (transferenciaPendente && responderAntesDaTransferencia && !turnoObsoleto) {
+    const respostaMantida = dadosTransferencia.respostaAntesDaTransferencia(resposta);
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Pergunta em vez dos dados: resposta e transferência na mesma mensagem",
+      dados: { respostas_mantidas: Boolean(respostaMantida) },
+      codigo: {
+        arquivo: "src/lib/nina/dados-transferencia.ts",
+        funcao: "perguntaEmVezDosDados",
+      },
+    });
+    await executarDecisaoEncaminhamento(
+      {
+        motivo: transferenciaPendente.argumentos.motivo,
+        urgencia: transferenciaPendente.argumentos.urgencia === "alta" ? "alta" : "normal",
+      },
+      transferenciaPendente,
+      respostaMantida,
+    );
+  }
 
   // A IA escreveu que a equipe vai dar continuidade ou que vai encaminhar, mas
   // nenhuma transferência aconteceu (homologação 13/10/2026). Com o atendimento
