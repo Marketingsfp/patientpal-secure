@@ -29,6 +29,11 @@ function temEscala(registro: Record<string, unknown>): boolean {
   return dia.test(legado) && hora.test(legado);
 }
 
+/** Profissional de atendimento humano obrigatório sem escala: agendado pela equipe (EQUIPE-01). */
+function pelaEquipe(registro: Record<string, unknown>): boolean {
+  return objeto(registro.extras).atendimento_humano_obrigatorio === true;
+}
+
 function profissionaisDoRetorno(resultado: ResultadoBroker): Record<string, unknown>[] {
   if (
     !resultado.success ||
@@ -58,9 +63,11 @@ export function orientacaoHorariosHabituais(resultado: ResultadoBroker) {
   const classificar = (r: Record<string, unknown>) =>
     temEscala(r)
       ? "com_horarios"
-      : Array.isArray(objeto(r.extras).horarios)
-        ? "sem_horarios"
-        : "nao_verificados";
+      : pelaEquipe(r)
+        ? "agendamento_pela_equipe"
+        : Array.isArray(objeto(r.extras).horarios)
+          ? "sem_horarios"
+          : "nao_verificados";
   const grupo = (status: string) =>
     profissionais
       .filter((r) => classificar(r) === status)
@@ -69,8 +76,9 @@ export function orientacaoHorariosHabituais(resultado: ResultadoBroker) {
     com_horarios: grupo("com_horarios"),
     sem_horarios: grupo("sem_horarios"),
     nao_verificados: grupo("nao_verificados"),
+    agendamento_pela_equipe: grupo("agendamento_pela_equipe"),
     instrucao:
-      "Pedido genérico: apresente somente profissionais de com_horarios, com seus horários habituais publicados. Não encaminhe pela falta de horários dos demais. Médico solicitado especificamente prevalece: se estiver sem_horarios, encaminhe para a equipe; não o substitua. nao_verificados exige completar a leitura, não comprova ausência. Esta classificação cobre apenas este retorno e não confirma vagas na agenda.",
+      'Pedido genérico: apresente os profissionais de com_horarios, com seus horários habituais publicados, e também os de agendamento_pela_equipe, com o nome e o aviso "Agendamento feito pela nossa equipe" (EQUIPE-01); se o paciente escolher um destes, encaminhe para a equipe. Não encaminhe pela falta de horários dos demais. Médico solicitado especificamente prevalece: se estiver sem_horarios, encaminhe para a equipe; não o substitua. nao_verificados exige completar a leitura, não comprova ausência. Esta classificação cobre apenas este retorno e não confirma vagas na agenda.',
   };
 }
 
@@ -88,6 +96,8 @@ export function motivoSemHorariosHabituais(
       ? profissionaisRetornados
       : [];
   const semEscala = profissionais.filter((r) => {
+    // Agendamento pela equipe (EQUIPE-01) já encaminha pela regra de atendimento humano.
+    if (pelaEquipe(r)) return false;
     // Retorno parcial, sem o campo, não comprova ausência no cadastro.
     if (!Array.isArray(objeto(r.extras).horarios)) return false;
     return !temEscala(r);

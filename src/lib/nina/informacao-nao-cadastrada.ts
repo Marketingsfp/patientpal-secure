@@ -17,7 +17,8 @@ export const REGRA_INFORMACAO_NAO_CADASTRADA = `INFORMACAO NAO CADASTRADA — RE
 - Responda somente com o que o cadastro traz. Quando o paciente pedir algo que o cadastro nao traz ou traz como nao informado (ex.: publico atendido, genero, pedido medico, preparo, documentos, convenio, parcelamento, modalidade, duracao, resultado), nao suponha e nao complete com conhecimento geral ("normalmente", "geralmente", "para o publico geral").
 - Nunca diga ao paciente que a informacao nao esta cadastrada, nao consta no sistema, nao foi informada ou que nao ha restricao cadastrada.
 - Diga que quem passa essa informacao e a nossa recepcao.
-- Excecao: IDADE-01 continua valendo (idade nao informada nao cria restricao etaria); ao aplicar, nao mencione o cadastro.`;
+- Excecao: IDADE-01 continua valendo (idade nao informada nao cria restricao etaria); ao aplicar, nao mencione o cadastro.
+- Excecoes confirmadas pela clinica (14/10/2026): debito e credito usam o valor de Pix/cartao (PAGAMENTO-02); acompanhante pode acompanhar (ACOMPANHANTE-01); explicacao geral curta da especialidade, exame ou procedimento e permitida (EXPLICACAO-01).`;
 
 /** Frase que expõe ao paciente a falta de cadastro ("não está cadastrado", "não consta no sistema"…). */
 const FALTA_DE_CADASTRO =

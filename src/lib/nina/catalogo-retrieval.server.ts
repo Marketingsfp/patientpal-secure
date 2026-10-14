@@ -32,7 +32,11 @@ import {
 } from "./catalogo-conhecimento";
 import type { ResultadoConhecimento } from "./knowledge-contract";
 import type { TipoAtendimentoCatalogo } from "./catalogo-pesquisa";
-import { atendimentosDaEstrutura, atendimentosEstruturados } from "./catalogo-estrutura";
+import {
+  atendimentosDaEstrutura,
+  atendimentosEstruturados,
+  lerEstrutura,
+} from "./catalogo-estrutura";
 import { horariosPorTipo } from "./horarios-por-atendimento";
 import { pedidoPreventivo } from "./atendimento-consulta";
 import { publicacaoDoMedicoAgenda } from "./vinculo-catalogo-agenda.server";
@@ -49,7 +53,7 @@ import {
 const INDICE_SERVICO =
   "id, nome, descricao_publica, aliases:estrutura->aliases, atendimentos:estrutura->atendimentos, status, updated_at";
 const INDICE_PROFISSIONAL =
-  "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, aliases:estrutura->aliases, atendimentos:estrutura->atendimentos, status, updated_at";
+  "id, nome, medico_id, especialidades, tipo_atendimento, horarios, observacao_publica, estrutura, aliases:estrutura->aliases, atendimentos:estrutura->atendimentos, status, updated_at";
 type IndiceServico = Pick<ServicoPublicado, "id" | "nome" | "descricao_publica"> & {
   aliases?: unknown;
   atendimentos?: unknown;
@@ -66,7 +70,12 @@ function textoIndiceServico(s: IndiceServico): string {
 type IndiceProfissional = Pick<
   ProfissionalPublicado,
   "id" | "nome" | "especialidades" | "tipo_atendimento" | "horarios" | "observacao_publica"
-> & { aliases?: unknown; medico_id?: string | null; atendimentos?: unknown };
+> & {
+  aliases?: unknown;
+  medico_id?: string | null;
+  atendimentos?: unknown;
+  estrutura?: unknown;
+};
 
 function aliasesDoIndice(i: { aliases?: unknown }): string[] {
   return Array.isArray(i.aliases)
@@ -349,6 +358,8 @@ async function buscarNaFonteDoTurno(
     !medico &&
     !escolhaMedicoPendente &&
     !profissionaisRelevantes.some((p) => busca.pontuar(p.nome, "") > 0);
+  // EQUIPE-01 (decisão de 14/10/2026): quem tem atendimento humano obrigatório
+  // aparece na lista mesmo sem horário, com o aviso de agendamento pela equipe.
   const comHorario = profissionaisRelevantes.filter(
     (p) =>
       horariosPorTipo(
@@ -356,8 +367,13 @@ async function buscarNaFonteDoTurno(
         "consulta",
       ).length > 0,
   );
+  const listaComEquipe = comHorario.length
+    ? profissionaisRelevantes.filter(
+        (p) => comHorario.includes(p) || lerEstrutura(p.estrutura).encaminhamento_humano === true,
+      )
+    : comHorario;
   const profissionaisListados =
-    listaDaEspecialidade && comHorario.length ? comHorario : profissionaisRelevantes;
+    listaDaEspecialidade && comHorario.length ? listaComEquipe : profissionaisRelevantes;
   const idsProfissionais = profissionaisListados
     .slice(
       0,

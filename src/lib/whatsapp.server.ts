@@ -1776,15 +1776,51 @@ async function gerarRespostaNinaInterno(
     texto: REGRA_SELECAO_ATENDIMENTO_CONSULTA,
   });
   const { REGRA_ESCOLHA_PROFISSIONAL_NOMINAL } = await import("@/lib/nina/prompt/regras-catalogo");
-  const { REGRA_IDADE_NAO_INFORMADA } =
-    await import("@/lib/nina/regras-administrativas-confirmadas");
-  instrucoesAdicionaisTurno.push({
-    codigo: "IDADE_NAO_INFORMADA_SEM_RESTRICAO",
-    nivel: "inegociavel",
-    origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
-    motivo: "Regra confirmada: campo de idade não informado não cria restrição etária.",
-    texto: REGRA_IDADE_NAO_INFORMADA,
-  });
+  const {
+    REGRA_IDADE_NAO_INFORMADA,
+    REGRA_DEBITO_CREDITO,
+    REGRA_ACOMPANHANTE,
+    REGRA_EXPLICACAO_ESPECIALIDADE,
+    REGRA_AGENDAMENTO_PELA_EQUIPE,
+  } = await import("@/lib/nina/regras-administrativas-confirmadas");
+  instrucoesAdicionaisTurno.push(
+    {
+      codigo: "IDADE_NAO_INFORMADA_SEM_RESTRICAO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+      motivo: "Regra confirmada: campo de idade não informado não cria restrição etária.",
+      texto: REGRA_IDADE_NAO_INFORMADA,
+    },
+    {
+      codigo: "DEBITO_CREDITO_VALOR_CARTAO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+      motivo: "Regra confirmada em 14/10/2026: débito e crédito usam o valor de Pix/cartão.",
+      texto: REGRA_DEBITO_CREDITO,
+    },
+    {
+      codigo: "ACOMPANHANTE_PERMITIDO",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+      motivo: "Regra confirmada em 14/10/2026: acompanhante e responsável podem acompanhar.",
+      texto: REGRA_ACOMPANHANTE,
+    },
+    {
+      codigo: "EXPLICACAO_GERAL_CURTA",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+      motivo: "Regra confirmada em 14/10/2026: explicação geral curta, sem orientação clínica.",
+      texto: REGRA_EXPLICACAO_ESPECIALIDADE,
+    },
+    {
+      codigo: "AGENDAMENTO_PELA_EQUIPE_NA_LISTA",
+      nivel: "inegociavel",
+      origem: "src/lib/nina/regras-administrativas-confirmadas.ts",
+      motivo:
+        "Regra confirmada em 14/10/2026: profissional de atendimento humano obrigatório aparece com aviso.",
+      texto: REGRA_AGENDAMENTO_PELA_EQUIPE,
+    },
+  );
   const { REGRA_PRESERVAR_RESERVA } = await import("@/lib/nina/procedimento-sessao");
   instrucoesAdicionaisTurno.push({
     codigo: "PEDIDOS_PARALELOS_PRESERVAM_RESERVA",
@@ -3096,8 +3132,12 @@ async function gerarRespostaNinaInterno(
   };
   const fluxoDasReferencias = (referencias: readonly string[]) =>
     fluxoAgendamento.fluxoDosItens(
-      [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais]
-        .filter((r) => referencias.includes(r.id))
+      fluxoAgendamento
+        .registrosQueDecidemFluxo(
+          [...catalogoFluxo.servicos, ...catalogoFluxo.profissionais].filter((r) =>
+            referencias.includes(r.id),
+          ),
+        )
         .map((r) => fluxoAgendamento.fluxoDoRegistro(r, podeAgendar, escopoDoAtendimento())),
     );
   // Itens apresentados em turnos anteriores desta sessão (sem esclarecimento

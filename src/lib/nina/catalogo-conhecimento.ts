@@ -44,6 +44,7 @@ import {
 
 import { paraNumero, resumoHorarios, valorResumo } from "./catalogo";
 import { apresentarIdadeMinima } from "./regras-catalogo";
+import { AVISO_AGENDAMENTO_PELA_EQUIPE } from "./regras-administrativas-confirmadas";
 import { fimDoHorario, semFimDoDia } from "./catalogo-constantes";
 /** Serviço publicado, já sem colunas internas. */
 export type ServicoPublicado = {
@@ -328,7 +329,9 @@ export function profissionalParaRegistro(
           // muda a leitura do dia: precisa chegar junto, não só no resumo.
           ...horarios.map((h) => texto(h["observacao"])).filter(Boolean),
         ].join(" · ")
-      : texto(p.observacao_publica),
+      : // EQUIPE-01 (14/10/2026): sem escala publicada, o aviso entra na lista.
+        (texto(p.observacao_publica) ??
+        (estrutura.encaminhamento_humano === true ? AVISO_AGENDAMENTO_PELA_EQUIPE : null)),
 
     horario: null,
     preco_dinheiro: dinheiro,
