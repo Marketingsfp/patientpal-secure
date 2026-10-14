@@ -383,7 +383,14 @@ function aparaConectores(palavras: string[]): string[] {
 
 /** Lê o nome que começa em `inicio`, até pontuação, número ou palavra de parada. */
 function nomeAPartirDe(texto: string, inicio: number, exigirMaiuscula = false): string | null {
-  const resto = texto.slice(inicio, inicio + 160);
+  // "o paciente é meu pai: nome joão…" — o rótulo "nome" não é parte do nome
+  // (homologação 14/10/2026, ciclo 1204).
+  const resto = texto
+    .slice(inicio, inicio + 160)
+    .replace(
+      /^[\s:–-]*(?:(?:o|seu|meu|sua|minha)\s+)?nome(?:\s+completo)?(?:\s+(?:dele|dela))?\s*(?:[:–-]|\b(?:é|e)\b)?\s*/iu,
+      "",
+    );
   const achados = [...resto.matchAll(/[\p{L}'´`-]+|\d+|[^\s\p{L}\d'´`-]/gu)];
   const tokens = achados.map((m) => m[0]);
   const palavras: string[] = [];

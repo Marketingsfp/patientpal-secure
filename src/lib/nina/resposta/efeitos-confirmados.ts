@@ -6,13 +6,28 @@ const normalizar = (s: string) =>
 
 /** Não executa uma operação para cumprir uma promessa do modelo. Remove a
  * afirmação sem prova, preserva informações independentes e registra a correção. */
+/**
+ * "Registrei / deixei anotada a sua preferência": a Nina não registra
+ * preferência em lugar nenhum (homologação 14/10/2026, ciclos 1197 e 1202).
+ * A frase passa a dizer só que ela entendeu.
+ */
+export function semRegistroInventado(texto: string): string {
+  return texto.replace(
+    /\b(?:j[aá]\s+)?(?:registrei|anotei|deixei\s+(?:anotad[ao]|registrad[ao]))(?=\s+(?:a\s+)?(?:sua|tua)\s+prefer[eê]ncia)/gi,
+    (_m, posicao: number) =>
+      /(?:^|[.!?]\s+|\n\s*)$/.test(texto.slice(0, posicao)) ? "Entendi" : "entendi",
+  );
+}
+
 export function protegerEfeitosDaResposta(
-  texto: string,
+  textoOriginal: string,
   fatos: {
     handoffConfirmado: boolean;
     bloqueioIdentificacao: boolean;
   },
 ) {
+  const texto = semRegistroInventado(textoOriginal);
+  const registroInventado = texto !== textoOriginal;
   let transferencia = false,
     bloqueio = false;
   const preservadas = texto
@@ -51,7 +66,8 @@ export function protegerEfeitosDaResposta(
         .join(" "),
     )
     .filter(Boolean);
-  if (!transferencia && !bloqueio) return { texto, alterado: false, transferenciaPrometida: false };
+  if (!transferencia && !bloqueio)
+    return { texto, alterado: registroInventado, transferenciaPrometida: false };
   const corpo = preservadas.filter(
     (p) =>
       !/^(?:(?:so|só) )?(?:um (?:momento|instante),? (?:por favor|so|só)?|aguarde(?: (?:so|só) )?(?: um (?:momento|instante))?)[.!\s]*(?:por favor[.!\s]*)?$/i.test(
