@@ -42,6 +42,14 @@ import { PatientSearchInput, type PatientOption } from "@/components/patient-sea
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { UserPlus } from "lucide-react";
 import { PERFIS_SISTEMA, perfilCanonico } from "@/lib/permissoes-presets";
+import { PerfilSelectItems } from "@/components/perfis/PerfilSelectItems";
+import {
+  carregarPerfisCustomizados,
+  idDoCustomizado,
+  perfilParaGravar,
+  valorDoCustomizado,
+  type PerfilCustomizado,
+} from "@/lib/perfis-customizados";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
   component: EditarFuncionarioPage,
@@ -69,6 +77,12 @@ interface DuplicadoInfo {
 
 // Fonte única de perfis (inclui Telefonia); nunca duplicar a lista aqui.
 const PERFIS = PERFIS_SISTEMA;
+
+/** Valor da lista "Perfil de acesso": o customizado aparece no lugar do perfil base. */
+function perfilDoVinculo(mem: { role?: unknown; perfil_acesso_id?: unknown } | null): string {
+  if (typeof mem?.perfil_acesso_id === "string") return valorDoCustomizado(mem.perfil_acesso_id);
+  return perfilCanonico(mem?.role as string | undefined) ?? "recepcao";
+}
 
 function EditarFuncionarioPage() {
   const { id } = Route.useParams();
@@ -128,12 +142,25 @@ function EditarFuncionarioPage() {
     senha: "",
     perfil: "recepcao",
   });
+  const [perfisCustom, setPerfisCustom] = useState<PerfilCustomizado[]>([]);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   // Cadastro repetido encontrado antes de gravar (trava do clique duplo).
   const [duplicado, setDuplicado] = useState<{ tipo: "cpf" | "nome"; reg: DuplicadoInfo } | null>(
     null,
   );
+
+  const clinicaIdAtual = clinicaAtual?.clinica_id;
+  useEffect(() => {
+    if (!clinicaIdAtual) return;
+    carregarPerfisCustomizados(clinicaIdAtual)
+      .then(setPerfisCustom)
+      .catch((e) => {
+        // Sem a lista, a tela continua com os perfis de sistema.
+        console.error("[hr-contratos] perfis customizados indisponíveis", e);
+        setPerfisCustom([]);
+      });
+  }, [clinicaIdAtual]);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -215,9 +242,11 @@ function EditarFuncionarioPage() {
           if (uid) {
             // Carrega membership + email do login vinculado.
             const [mem, emailRes] = await Promise.all([
+              // "*": a coluna perfil_acesso_id só existe depois da migration
+              // de perfis customizados (ver carregarPerfisCustomizados).
               supabase
                 .from("clinica_memberships")
-                .select("id, role, ativo")
+                .select("*")
                 .eq("clinica_id", clinicaAtual.clinica_id)
                 .eq("user_id", uid)
                 .maybeSingle(),
@@ -225,7 +254,7 @@ function EditarFuncionarioPage() {
                 () => ({ email: null as string | null }),
               ),
             ]);
-            const roleAtual = perfilCanonico(mem.data?.role as string | undefined) ?? "recepcao";
+            const roleAtual = perfilDoVinculo(mem.data);
             const ativoAtual = (mem.data?.ativo as boolean | undefined) ?? true;
             setMembershipId((mem.data?.id as string | undefined) ?? null);
             setMembershipRole(roleAtual);
@@ -368,14 +397,15 @@ function EditarFuncionarioPage() {
     let userId: string | null = null;
     if (criandoLogin) {
       try {
+        const perfil = perfilParaGravar(form.perfil, perfisCustom);
         const res = await cadastrarUsuarioFn({
           data: {
             clinicaId: form.clinica_id,
             email: form.email.trim(),
             password: form.senha,
             nome: form.funcionario_nome.trim(),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            role: form.perfil as any,
+            role: perfil.role,
+            ...(perfil.perfilAcessoId ? { perfilAcessoId: perfil.perfilAcessoId } : {}),
           },
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -422,14 +452,7 @@ function EditarFuncionarioPage() {
       (membershipRole !== membershipSalvo.role || membershipAtivo !== membershipSalvo.ativo);
     if (acessoMudou) {
       try {
-        await editarMembroFn({
-          data: {
-            clinicaId: form.clinica_id,
-            membershipId: membershipId!,
-            role: membershipRole as "recepcao",
-            ativo: membershipAtivo,
-          },
-        });
+        await editarMembroFn({ data: dadosDoAcesso(membershipId!) });
         setMembershipSalvo({ role: membershipRole, ativo: membershipAtivo });
       } catch (e) {
         setSaving(false);
@@ -442,6 +465,23 @@ function EditarFuncionarioPage() {
     setSaving(false);
     toast.success(isNovo ? "Funcionário cadastrado" : "Funcionário atualizado");
     void navigate({ to: "/app/hr-contratos" });
+  }
+
+  /**
+   * O que vai para `editarMembro`. Perfil customizado só é mandado quando está
+   * envolvido (entrando ou saindo dele) — mesma regra do FuncionarioFormDialog.
+   */
+  function dadosDoAcesso(memId: string) {
+    const perfil = perfilParaGravar(membershipRole, perfisCustom);
+    const envolveCustom =
+      perfil.perfilAcessoId !== null || idDoCustomizado(membershipSalvo.role) !== null;
+    return {
+      clinicaId: form.clinica_id,
+      membershipId: memId,
+      role: perfil.role,
+      ...(envolveCustom ? { perfilAcessoId: perfil.perfilAcessoId } : {}),
+      ativo: membershipAtivo,
+    };
   }
 
   async function salvarAcesso() {
@@ -457,14 +497,7 @@ function EditarFuncionarioPage() {
     }
     setSavingAcesso(true);
     try {
-      await editarMembroFn({
-        data: {
-          clinicaId: form.clinica_id,
-          membershipId,
-          role: membershipRole as "recepcao",
-          ativo: membershipAtivo,
-        },
-      });
+      await editarMembroFn({ data: dadosDoAcesso(membershipId) });
       setMembershipSalvo({ role: membershipRole, ativo: membershipAtivo });
       toast.success("Acesso atualizado");
     } catch (e) {
@@ -518,7 +551,7 @@ function EditarFuncionarioPage() {
     const [mem, emailRes] = await Promise.all([
       supabase
         .from("clinica_memberships")
-        .select("id, role, ativo")
+        .select("*")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("user_id", vincularUserId)
         .maybeSingle(),
@@ -527,8 +560,12 @@ function EditarFuncionarioPage() {
       ),
     ]);
     setMembershipId((mem.data?.id as string | undefined) ?? null);
-    setMembershipRole(perfilCanonico(mem.data?.role as string | undefined) ?? "recepcao");
+    setMembershipRole(perfilDoVinculo(mem.data));
     setMembershipAtivo((mem.data?.ativo as boolean | undefined) ?? true);
+    setMembershipSalvo({
+      role: perfilDoVinculo(mem.data),
+      ativo: (mem.data?.ativo as boolean | undefined) ?? true,
+    });
     setLoginEmail((emailRes as { email?: string | null })?.email ?? null);
   }
 
@@ -753,11 +790,7 @@ function EditarFuncionarioPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {PERFIS.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>
-                                {p.label}
-                              </SelectItem>
-                            ))}
+                            <PerfilSelectItems sistema={PERFIS} customizados={perfisCustom} />
                           </SelectContent>
                         </Select>
                       </div>
@@ -881,11 +914,7 @@ function EditarFuncionarioPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {PERFIS.map((p) => (
-                                <SelectItem key={p.value} value={p.value}>
-                                  {p.label}
-                                </SelectItem>
-                              ))}
+                              <PerfilSelectItems sistema={PERFIS} customizados={perfisCustom} />
                             </SelectContent>
                           </Select>
                         </div>
@@ -944,11 +973,7 @@ function EditarFuncionarioPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {PERFIS.map((p) => (
-                            <SelectItem key={p.value} value={p.value}>
-                              {p.label}
-                            </SelectItem>
-                          ))}
+                          <PerfilSelectItems sistema={PERFIS} customizados={perfisCustom} />
                         </SelectContent>
                       </Select>
                     </div>
