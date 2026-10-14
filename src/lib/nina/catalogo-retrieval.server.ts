@@ -265,12 +265,29 @@ async function buscarNaFonteDoTurno(
   const completasInterpretadas = nomesCompletos.length ? nomesCompletos : aliasesCompletos;
   // O nome copiado exatamente como publicado seleciona aquele registro.
   const literais = completasInterpretadas.filter(({ s }) => busca.correspondeNomeLiteral(s.nome));
-  const correspondenciasCompletas = literais.length === 1 ? literais : completasInterpretadas;
+  // "CURATIVO" (odontologia) e "CURATIVO (P)/(M)/(G)" (enfermagem): o nome
+  // exato não esconde as variantes que só acrescentam um qualificador entre
+  // parênteses; o paciente escolhe (homologação 14/10/2026, ciclo 1199).
+  const semParenteses = (nome: string) => semAcento(nome.replace(/\([^)]*\)/g, " ")).trim();
+  const variantesDoLiteral =
+    literais.length === 1
+      ? pontuados.filter(
+          ({ s }) =>
+            s !== literais[0]!.s &&
+            /\(/.test(s.nome) &&
+            semParenteses(s.nome) === semParenteses(literais[0]!.s.nome),
+        )
+      : [];
+  const correspondenciasCompletas =
+    literais.length === 1
+      ? [literais[0]!, ...variantesDoLiteral.map((v) => ({ ...v, score: literais[0]!.score }))]
+      : completasInterpretadas;
   // Nomes publicados diferentes que coincidem por inteiro com o pedido depois da
   // interpretação ("USG" = "ULTRASSONOGRAFIA") são registros equivalentes do
   // cadastro, não exames diferentes: informa todos, sem escolher nem perguntar.
   // Aliases compartilhados continuam ambíguos: só o nome publicado comprova.
-  const registrosEquivalentes = nomesCompletos.length > 0 && correspondenciasCompletas.length > 1;
+  const registrosEquivalentes =
+    !variantesDoLiteral.length && nomesCompletos.length > 0 && correspondenciasCompletas.length > 1;
   const servicosRelevantes = correspondenciasCompletas.length
     ? correspondenciasCompletas
     : pontuados;
@@ -390,7 +407,15 @@ async function buscarNaFonteDoTurno(
     ),
   ]);
   // O banco ordena por ID para paginar; a resposta mantém a relevância da busca.
-  const listaServicos = idsServicos.flatMap((id) => detalhesServicos.filter((s) => s.id === id));
+  const servicosLidos = idsServicos.flatMap((id) => detalhesServicos.filter((s) => s.id === id));
+  // Registros equivalentes ("USG ABDOMINAL TOTAL" e "ULTRASSONOGRAFIA ABDOMINAL
+  // TOTAL"): o que está sem preço não aparece ao lado do que tem (homologação
+  // 14/10/2026, ciclos 1189 e 1197). Sem nenhum com preço, ficam todos.
+  const temPreco = (s: ServicoPublicado) =>
+    s.valor != null || (Array.isArray(s.formas_pagamento) && s.formas_pagamento.length > 0);
+  const comPreco = registrosEquivalentes ? servicosLidos.filter(temPreco) : [];
+  const listaServicos =
+    comPreco.length && comPreco.length < servicosLidos.length ? comPreco : servicosLidos;
   const listaProfissionais = idsProfissionais.flatMap((id) =>
     detalhesProfissionais.filter((p) => p.id === id),
   );
