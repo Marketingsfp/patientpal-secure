@@ -68,8 +68,56 @@ export function corrigirInformacaoNaoCadastrada(texto: string): string {
 /** Frase que manda o paciente à recepção/equipe para obter uma informação. */
 const ORIENTA_RECEPCAO =
   /\b(?:recepcao|nossa equipe|equipe de atendimento|atendentes?)\b[^.!?\n]*\b(?:passa|passam|informa|informam|tira|tiram|confirma|confirmam|confirmad[ao]s?|verifica|verificar|orienta|orientam|esclarece|esclarecem|responde|respondem)\b|\b(?:quem|so a|somente a|apenas a)\b[^.!?\n]*\b(?:passa|informa|tira|confirma|orienta|esclarece|responde)\b[^.!?\n]*\b(?:recepcao|equipe)\b/;
+// "forma exata de atendimento" e "como funciona a chamada" também são o assunto
+// da modalidade (homologação 14/10/2026, ciclo 1167).
 const ASSUNTO_MODALIDADE =
-  /\b(?:modalidade|forma de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|pre-?agendamento)\b/;
+  /\b(?:modalidade|forma (?:exata )?de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|pre-?agendamento|como funciona a chamada|funcionamento do atendimento)\b/;
+
+/**
+ * Mensagem só com pergunta genérica ("vocês têm otorrino? como funciona aí?",
+ * "como vocês atendem?"): a Nina informa e espera; não é pergunta sem resposta
+ * que justifique encaminhar (homologação 14/10/2026, ciclos 1060 e 1180).
+ */
+const PERGUNTA_GENERICA =
+  /^(?:e |mas |entao )?(?:como funciona(?: ai| aqui| na clinica| com voces| ai na clinica)?|como (?:voces|vcs) (?:atendem|trabalham|fazem)|como sao (?:os |as )?(?:atendimentos|consultas|opcoes)(?: de voces| ai)?|quais (?:sao )?(?:as )?opcoes(?: de voces| de atendimento| ai)?|(?:voces|vcs) (?:tem|fazem|atendem|realizam)\b.{0,80}|tem (?:esse |essa )?(?:atendimento|consulta|exame)\b.{0,60}|como (?:eu )?faco)$/;
+
+export function perguntaGenerica(mensagem: string): boolean {
+  const perguntas = (mensagem ?? "").match(/[^.!?\n]+\?/g) ?? [];
+  if (!perguntas.length) return false;
+  return perguntas.every((f) =>
+    PERGUNTA_GENERICA.test(normalizarRespostaInformal(f).replace(/\?/g, "").trim()),
+  );
+}
+
+/**
+ * Tira as frases "quem passa essa informação é a recepção" da resposta, sem
+ * mexer no resto — para quando o paciente não perguntou aquilo.
+ */
+export function removerOrientacaoRecepcao(texto: string): string {
+  const protegido = (texto ?? "").replace(
+    /\b(?:dra?|sra?|profa?)\./gi,
+    (m) => m.slice(0, -1) + PONTO,
+  );
+  const linhas = protegido.split("\n").flatMap((linha) => {
+    const nova = (linha.match(/[^.!?\n]+[.!?]*/g) ?? [linha])
+      .filter((frase) => {
+        const t = normalizarRespostaInformal(frase.split(PONTO).join("."));
+        if (frase.includes("?") || /\b(?:posso|podemos|vou|vamos|irei)\b/.test(t)) return true;
+        return !ORIENTA_RECEPCAO.test(t);
+      })
+      .join("")
+      .trim();
+    // Linha que só tinha a orientação some; linhas em branco do texto ficam.
+    return linha.trim() && !nova ? [] : [nova];
+  });
+  const resultado = linhas
+    .join("\n")
+    .split(PONTO)
+    .join(".")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return resultado || texto;
+}
 
 /**
  * Regra de 13/10/2026 (segunda revisão): quando a resposta seria "quem passa

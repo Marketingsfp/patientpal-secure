@@ -20,12 +20,40 @@ type Dados =
   | null
   | undefined;
 
+/**
+ * O paciente pediu para ver os profissionais ("quais são os médicos?", "pode me
+ * mostrar os nomes e os dias?", "quem atende?"). Pergunta de valor, de
+ * presencial ou só a especialidade não é pedido de lista (homologação 14/10/2026).
+ */
+export function pedeListaDeProfissionais(mensagem: string): boolean {
+  const t = normalizarBuscaCatalogo(mensagem ?? "");
+  return /\b(?:quais (?:sao )?(?:os |as )?(?:medicos|medicas|profissionais|doutores|doutoras|nomes|opcoes de (?:medicos|profissionais))|quem (?:sao|atende|atendem|faz|fazem)|nomes? (?:e|dos|das) (?:os |as )?(?:dias|horarios|medicos|profissionais)|(?:mostra|mostrar|passa|passar|manda|mandar|envia|enviar|apresenta|apresentar|lista|listar|ver|conhecer|escolher)\b.{0,30}\b(?:lista|nomes|medicos|medicas|profissionais|opcoes)|(?:quero|prefiro|vou|gostaria de) escolher|pode me mostrar|tem mais de um|quantos (?:medicos|profissionais))\b/.test(
+    t,
+  );
+}
+
+/** Pedido de médica ou médico ("prefiro uma médica", "quais são médicas?"): é filtro, não lista. */
+export function pedeFiltroPorGenero(mensagem: string): boolean {
+  const t = normalizarBuscaCatalogo(mensagem ?? "");
+  // "consulta médica"/"clínica médica" são adjetivo, não pedido de médica.
+  return /(?<!(?:consulta|clinica|avaliacao|pericia|equipe|area) )\b(?:medicas?|doutoras?|mulher|mulheres|feminin[ao]|medicos? homens?|homem|masculin[ao])\b/.test(
+    t,
+  );
+}
+
 export function listaProfissionaisExtensa(
   ferramenta: string,
   argumentos: string | null | undefined,
   dados: Dados,
+  /** Mensagem do paciente: sem pedido de lista (ou com filtro por gênero), a regra não vale. */
+  mensagem?: string,
 ): { total: number; especialidade: string } | null {
   if (ferramenta !== "consultar_cadastro" || !dados || dados.esclarecimento) return null;
+  if (
+    mensagem !== undefined &&
+    (!pedeListaDeProfissionais(mensagem) || pedeFiltroPorGenero(mensagem))
+  )
+    return null;
   if (dados.tipo_atendimento === "exame_procedimento") return null;
   let args: { medico?: unknown; termo?: unknown; objetivos?: unknown } = {};
   try {
