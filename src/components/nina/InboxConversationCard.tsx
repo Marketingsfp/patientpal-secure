@@ -19,7 +19,7 @@ export type AutorPreviaConversa = "paciente" | "equipe" | "nina";
 const INDICADOR_PREVIA = {
   paciente: {
     Icone: ArrowDownLeft,
-    classe: "text-amber-400",
+    classe: "text-amber-400 oszap-seta-paciente",
     descricao: "Mensagem recebida do paciente",
   },
   equipe: {

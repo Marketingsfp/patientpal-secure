@@ -399,3 +399,22 @@ html.a11y-alto-contraste [data-os-zap="true"] .text-muted-foreground { color: va
   .oszap-central-body[data-selected="false"] .oszap-central-chat { display: none; }
   .oszap-central-back { display: flex; }
 }
+
+/* Seta ↙ do card: brilho suave enquanto a última mensagem é do paciente. */
+@keyframes oszap-seta-brilho {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 1px currentColor);
+  }
+}
+.oszap-seta-paciente {
+  animation: oszap-seta-brilho 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oszap-seta-paciente {
+    animation: none;
+  }
+}
