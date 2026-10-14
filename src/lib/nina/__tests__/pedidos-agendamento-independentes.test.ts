@@ -93,7 +93,8 @@ test("sessão 670: não anuncia transferência fictícia nem chama bloqueio de i
   expect(r.texto).toContain("A Dra. Isis é para o ultrassom.");
   expect(r.texto).not.toContain("instabilidade");
   expect(r.texto).not.toContain("Vou encaminhar");
-  expect(r.texto).toContain("ainda não foi realizado");
+  expect(r.texto).not.toContain("ainda não foi realizado");
+  expect(r.transferenciaPrometida).toBe(true);
 });
 test("preserva transferência confirmada, pergunta e negativa verdadeira", () => {
   for (const texto of [
@@ -120,7 +121,8 @@ test("retira 'a equipe/atendente já vai responder' quando não houve transferê
   expect(r.texto).toContain("O agendamento será feito no nome do paciente.");
   expect(r.texto).not.toContain("já vai dar continuidade");
   expect(r.texto).not.toContain("já vai te responder");
-  expect(r.texto).toContain("ainda não foi realizado");
+  expect(r.texto).not.toContain("ainda não foi realizado");
+  expect(r.transferenciaPrometida).toBe(true);
   const confirmado = protegerEfeitosDaResposta("Nossa equipe já vai te responder por aqui.", {
     handoffConfirmado: true,
     bloqueioIdentificacao: false,

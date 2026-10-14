@@ -37,7 +37,7 @@ describe("perguntas independentes no núcleo compartilhado (serviços simulados)
         if (caso === "transferencia_ficticia") {
           expect(r.resposta).not.toContain("Vou encaminhar");
           expect(r.resposta).not.toContain("instabilidade técnica");
-          expect(r.resposta).toContain("ainda não foi realizado");
+          expect(r.resposta).not.toContain("ainda não foi realizado");
           const alteracao = r.etapas.find((e: any) => e.tipo === "alteracao_posterior");
           expect(alteracao.dados.antes).toContain("Vou encaminhar");
           expect(alteracao.dados.depois).not.toContain("Vou encaminhar");

@@ -2950,7 +2950,7 @@ async function gerarRespostaNinaInterno(
       !esclarecimentoAtual && ex.consulta.status === "com_itens",
     );
     if (ctxFerramentas)
-      ctxFerramentas.esclarecimentoCatalogo = perguntasDoTurno.pendentes[0]?.esclarecimento;
+      ctxFerramentas.esclarecimentoCatalogo = perguntasDoTurno.pendentesAtuais[0]?.esclarecimento;
     const ausencia =
       encaminharAposEsclarecimento(referenciaAnterior, r, mensagemPaciente) ??
       encaminhamentoSemRegistro(r, args) ??
@@ -3406,6 +3406,7 @@ async function gerarRespostaNinaInterno(
   const inicioMensagensTurno = mensagens.length;
   let conferenciaJevUsada = false;
   let perguntaSemRespostaJev = false;
+  let conferenciaReprovada = false;
   const conferenciaJevAtiva = await import("@/lib/nina/jev.server")
     .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
     .catch(() => false);
@@ -3688,6 +3689,7 @@ async function gerarRespostaNinaInterno(
         if (decisao.acao === "refazer" || decisao.acao === "bloquear") {
           const { RESPOSTA_SEGURA_CONFERENCIA } = await import("@/lib/nina/jev-conferencia");
           resposta = RESPOSTA_SEGURA_CONFERENCIA;
+          conferenciaReprovada = true;
           const { registrarOrigemResposta } = await import("@/lib/nina/rastreio/turno.server");
           registrarOrigemResposta(
             "codigo",
@@ -3791,6 +3793,10 @@ async function gerarRespostaNinaInterno(
       if (
         nome === "solicitar_atendente_humano" &&
         decisaoAgendamento !== "encaminhar" &&
+        // O paciente quer marcar (escolheu dia/profissional ou confirmou): a
+        // transferência não é adiada. Adiar de novo deixava a conversa sem saída
+        // (homologação 14/10/2026, ciclo 1066).
+        !intencaoAgendarTurno &&
         // Informações já entregues em mensagens anteriores: a transferência segue.
         referenciasInformadas.length === 0 &&
         fluxoDasReferencias(
@@ -4467,6 +4473,33 @@ async function gerarRespostaNinaInterno(
     }
   }
 
+  // A conferência do Jev reprovou a resposta mesmo depois da correção: em vez
+  // de "Desculpe, preciso conferir… Pode me dizer novamente como posso ajudar?",
+  // que deixava a conversa sem saída, a equipe assume (homologação 14/10/2026).
+  if (
+    conferenciaReprovada &&
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !perguntaDadosTransferencia
+  ) {
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Conferência do Jev reprovou a resposta: encaminhamento à equipe",
+      dados: { mensagem: mensagemPaciente.slice(0, 200) },
+      codigo: { arquivo: "src/lib/nina/jev-conferencia.ts", funcao: "RESPOSTA_SEGURA_CONFERENCIA" },
+    });
+    await executarDecisaoEncaminhamento(
+      {
+        motivo: `INFORMACAO_COM_RECEPCAO: ${mensagemPaciente.slice(0, 200)}`,
+        urgencia: "normal",
+      },
+      undefined,
+      "",
+    );
+  }
+
   // Sem preferência de profissional vale como primeiro disponível (decisão de
   // 13/10/2026): com uma dúvida na mesma mensagem ("Não tenho médico
   // específico. O cartão é antes?"), a resposta segue junto do encaminhamento,
@@ -4511,7 +4544,7 @@ async function gerarRespostaNinaInterno(
   else if (
     ctxFerramentas &&
     !perguntaComplementar &&
-    !perguntasDoTurno.pendentes.length &&
+    !perguntasDoTurno.pendentesAtuais.length &&
     fluxoEstado.knowledge_context?.esclarecimento
   )
     fluxoEstado.knowledge_context = {
@@ -4582,6 +4615,45 @@ async function gerarRespostaNinaInterno(
     });
   };
 
+  // Atendimentos já informados nesta conversa (para o motivo da transferência).
+  const referenciasDaConversa = [
+    ...new Set([
+      ...referenciasDaDecisao,
+      ...(fluxoEstado.knowledge_context?.referencias ?? []).map((r) => r.registro),
+    ]),
+  ];
+  // A IA pediu nome completo e data de nascimento por conta própria para um
+  // atendimento que a Nina não agenda: o sistema assume o pedido (pendência de
+  // dados), em vez de pedir de novo na resposta seguinte (homologação 14/10/2026,
+  // ciclo 1152).
+  if (
+    !finalizacaoHandoff &&
+    !houveHandoff &&
+    !turnoObsoleto &&
+    !perguntaDadosTransferencia &&
+    !transferenciaPendente &&
+    !agendamentoConfirmado &&
+    referenciasDaConversa.length > 0 &&
+    fluxoDasReferencias(referenciasDaConversa) === "informar_e_encaminhar" &&
+    dadosTransferencia.pedeDadosDoPaciente(resposta)
+  ) {
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo: "Pedido de nome e data feito pela IA: o sistema assume a transferência",
+      dados: { motivo: motivoAgendamento(referenciasDaConversa).slice(0, 300) },
+      codigo: {
+        arquivo: "src/lib/nina/dados-transferencia.ts",
+        funcao: "pedeDadosDoPaciente",
+      },
+    });
+    await executarDecisaoEncaminhamento(
+      { motivo: motivoAgendamento(referenciasDaConversa), urgencia: "normal" },
+      undefined,
+      dadosTransferencia.respostaAntesDaTransferencia(resposta),
+    );
+  }
+
   if (!finalizacaoHandoff && !houveHandoff) {
     const { protegerEfeitosDaResposta } = await import("@/lib/nina/resposta/efeitos-confirmados");
     const protegida = protegerEfeitosDaResposta(resposta, {
@@ -4596,6 +4668,39 @@ async function gerarRespostaNinaInterno(
         protegida.texto,
       );
       resposta = protegida.texto;
+    }
+    // A IA anunciou a transferência e nada a impede (sem identificação pendente):
+    // a transferência acontece de fato, com as respostas que ela já tinha.
+    if (
+      protegida.transferenciaPrometida &&
+      !bloqueioIdentificacaoNoTurno &&
+      // Atendimento que a Nina agenda segue o fluxo de agenda, nunca a promessa.
+      (referenciasDaConversa.length === 0 ||
+        fluxoDasReferencias(referenciasDaConversa) === "informar_e_encaminhar") &&
+      !turnoObsoleto &&
+      !perguntaDadosTransferencia &&
+      !agendamentoConfirmado
+    ) {
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Transferência anunciada pela IA cumprida pelo sistema",
+        dados: { referencias: referenciasDaConversa.length },
+        codigo: {
+          arquivo: "src/lib/nina/resposta/efeitos-confirmados.ts",
+          funcao: "protegerEfeitosDaResposta",
+        },
+      });
+      await executarDecisaoEncaminhamento(
+        {
+          motivo: referenciasDaConversa.length
+            ? motivoAgendamento(referenciasDaConversa)
+            : `INFORMACAO_COM_RECEPCAO: ${mensagemPaciente.slice(0, 200)}`,
+          urgencia: "normal",
+        },
+        undefined,
+        dadosTransferencia.respostaAntesDaTransferencia(resposta),
+      );
     }
   }
   if (
@@ -4619,7 +4724,7 @@ async function gerarRespostaNinaInterno(
         })
       : comporRespostaParcial(
           respostaParcialConfirmada ? resposta : "",
-          perguntasDoTurno.pendentes,
+          perguntasDoTurno.pendentesAtuais,
           apresentacao,
         );
     transformar(

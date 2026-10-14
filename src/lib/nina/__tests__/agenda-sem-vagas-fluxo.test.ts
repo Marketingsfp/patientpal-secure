@@ -49,11 +49,18 @@ describe("geração real interrompe o turno após agenda sem vagas (serviços ex
         expect(r.requests.at(-1).tools).toBeUndefined();
         expect(r.conferencias).toHaveLength(2);
         expect(r.conferencias.map((c: any) => c.jaCorrigida)).toEqual([false, true]);
-        expect(r.ferramentas).toHaveLength(6);
-        expect(r.encaminhamentos).toHaveLength(0);
-        expect(r.resposta).toContain(
-          desfecho === "aprovada" ? "Qual data você prefere?" : "preciso conferir essa informação",
-        );
+        if (desfecho === "aprovada") {
+          expect(r.ferramentas).toHaveLength(6);
+          expect(r.encaminhamentos).toHaveLength(0);
+          expect(r.resposta).toContain("Qual data você prefere?");
+        } else {
+          // Reprovada depois da correção: a equipe assume, sem a resposta sem saída
+          // "preciso conferir… pode me dizer novamente?" (homologação 14/10/2026).
+          expect(r.ferramentas).toHaveLength(7);
+          expect(r.ferramentas.at(-1)).toBe("solicitar_atendente_humano");
+          expect(r.encaminhamentos).toHaveLength(1);
+          expect(r.resposta).not.toContain("preciso conferir essa informação");
+        }
       });
     }
     for (const cenario of ["resposta_vazia_recuperada", "resposta_vazia_persistente"]) {

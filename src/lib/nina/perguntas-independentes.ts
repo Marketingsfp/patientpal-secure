@@ -106,6 +106,12 @@ export function criarPerguntasDoTurno(
   const pendentes = new Map(
     anteriores.filter((p) => p.esclarecimento).map((p) => [chave(p.consulta), p]),
   );
+  // Dúvidas herdadas do turno anterior: servem para reconhecer a resposta do
+  // paciente e são retomadas UMA vez quando ele fala de outra coisa; depois só
+  // voltam se uma busca deste turno as recriar. Antes, uma dúvida não
+  // respondida era anexada a todas as respostas seguintes e travava a
+  // transferência (homologação 14/10/2026, ciclo 1066).
+  const herdadas = new Set(pendentes.keys());
   const pesquisas = new Set<string>();
   const confirmadas = new Set<string>();
   const tiposConfirmados = new Map<string, string>();
@@ -128,6 +134,13 @@ export function criarPerguntasDoTurno(
   }
   // Pendências de exame/procedimento abertas NESTE turno (não respostas do paciente).
   const pendentesDoTurno = new Set<string>();
+  const retomada = (k: string) => herdadas.has(k) && !pendentesDoTurno.has(k);
+  const pendentesAtuais = () =>
+    [...pendentes.entries()]
+      .filter(([k, p]) => !retomada(k) || (p.esclarecimentoRetomadas ?? 0) < 1)
+      .map(([k, p]) =>
+        retomada(k) ? { ...p, esclarecimentoRetomadas: (p.esclarecimentoRetomadas ?? 0) + 1 } : p,
+      );
   // Assuntos confirmados como consulta neste turno ("odontologia", "fonoaudiologia").
   const consultasConfirmadas = new Set<string>();
   /**
@@ -433,11 +446,15 @@ export function criarPerguntasDoTurno(
     get pendentes() {
       return [...pendentes.values()];
     },
+    /** Dúvidas a perguntar ao paciente: as abertas neste turno (as herdadas só se recriadas). */
+    get pendentesAtuais() {
+      return pendentesAtuais();
+    },
     get temConfirmadas() {
       return confirmadas.size > 0;
     },
     estado(atual: ConhecimentoSessao | null): ConhecimentoSessao | null {
-      const lista = [...pendentes.values()];
+      const lista = pendentesAtuais();
       if (!lista.length) return atual;
       if (lista.length === 1) return { ...lista[0]!, pendenciasIdentificacao: undefined };
       // Um "sim" sem identificar a pergunta não confirma múltiplos candidatos.

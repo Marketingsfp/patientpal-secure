@@ -51,14 +51,19 @@ export function protegerEfeitosDaResposta(
         .join(" "),
     )
     .filter(Boolean);
-  if (!transferencia && !bloqueio) return { texto, alterado: false };
+  if (!transferencia && !bloqueio) return { texto, alterado: false, transferenciaPrometida: false };
   const corpo = preservadas.filter(
-    (p) => !/^(?:um momento,? por favor|aguarde(?: um momento)?)[.!\s]*$/i.test(p.trim()),
+    (p) =>
+      !/^(?:(?:so|só) )?(?:um (?:momento|instante),? (?:por favor|so|só)?|aguarde(?: (?:so|só) )?(?: um (?:momento|instante))?)[.!\s]*(?:por favor[.!\s]*)?$/i.test(
+        p.trim(),
+      ),
   );
   if (bloqueio)
     corpo.push(
       "Ainda há uma identificação pendente em um dos pedidos; essa etapa precisa ser esclarecida para continuar.",
     );
-  if (transferencia) corpo.push("O encaminhamento para a equipe ainda não foi realizado.");
-  return { texto: corpo.join("\n\n"), alterado: true };
+  // A promessa sai sem aviso interno ao paciente ("o encaminhamento ainda não
+  // foi realizado" vazou na homologação de 14/10/2026); quem chama decide se a
+  // transferência prometida deve acontecer de fato.
+  return { texto: corpo.join("\n\n"), alterado: true, transferenciaPrometida: transferencia };
 }
