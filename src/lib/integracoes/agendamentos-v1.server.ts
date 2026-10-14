@@ -723,7 +723,7 @@ async function handleEspecialidades(
     .from("especialidades")
     .select("id,nome")
     .in("id", espLiberadas)
-    .neq("ativo", false)
+    .or("ativo.is.null,ativo.eq.true")
     .order("nome");
   if (error) {
     throw new ApiError({

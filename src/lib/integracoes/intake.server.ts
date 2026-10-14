@@ -17,6 +17,7 @@
 // `criar_solicitacao_site`, que só cria a linha pendente. A confirmação (que
 // vira agendamento de verdade) continua sendo feita pela Agenda, no núcleo.
 
+import { idsDesligados } from "./site-especialidades";
 import { z } from "zod";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
 
@@ -306,7 +307,17 @@ export async function handleIntake(
       angiologista: "angiologia",
       pneumologista: "pneumologia",
     };
-    const catalogo = (esps ?? []) as Array<{ id: string; nome: string; ativo: boolean | null }>;
+    // Só especialidades oferecidas online por ESTA clínica: fora as desligadas
+    // no catálogo da unidade ou no interruptor do site. Não achou → fallback.
+    const [eu, se] = await Promise.all([
+      db.from("especialidade_unidade").select("especialidade_id, ativo").eq("clinica_id", clinicaId).eq("ativo", false),
+      db.from("site_agendamento_especialidade").select("especialidade_id, ativo").eq("clinica_id", clinicaId).eq("ativo", false),
+    ]);
+    if (eu.error || se.error) console.error("[intake] esp desligadas:", eu.error?.code ?? se.error?.code ?? "erro");
+    const desligadas = idsDesligados(eu.data, se.data);
+    const catalogo = ((esps ?? []) as Array<{ id: string; nome: string; ativo: boolean | null }>).filter(
+      (e) => !desligadas.has(e.id),
+    );
     const buscar = (nome: string) =>
       catalogo
         .filter((e) => normalizar(e.nome ?? "") === nome)
