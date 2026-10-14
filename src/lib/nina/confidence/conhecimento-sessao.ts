@@ -40,6 +40,8 @@ export type ConhecimentoSessao = {
   /** Somente opções de identificação, sem preço ou vaga; reconsultadas após a resposta. */
   esclarecimento?: ResultadoConhecimento["esclarecimento"];
   esclarecimentoTentativas?: number;
+  /** Vezes que a dúvida foi retomada sem nova busca (no máximo uma; 14/10/2026). */
+  esclarecimentoRetomadas?: number;
   esclarecimentoPerguntas?: string[];
   /** Perguntas independentes pendentes; apenas referências, nunca fatos antigos. */
   pendenciasIdentificacao?: ConhecimentoSessao[];
@@ -145,6 +147,9 @@ export function normalizarConhecimentoSessao(
                 ? o.esclarecimentoTentativas
                 : undefined,
           }),
+          ...(typeof o.esclarecimentoRetomadas === "number" && o.esclarecimentoRetomadas > 0
+            ? { esclarecimentoRetomadas: Math.min(Math.floor(o.esclarecimentoRetomadas), 5) }
+            : {}),
           esclarecimentoPerguntas: Array.isArray(o.esclarecimentoPerguntas)
             ? o.esclarecimentoPerguntas
                 .map((p) => texto(p, 1600))

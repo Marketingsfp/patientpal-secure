@@ -37,6 +37,21 @@ export const REGRA_RESPONDER_ANTES_DA_TRANSFERENCIA = `TRANSFERENCIA AGUARDANDO 
 - Responda somente a pergunta, com o que o cadastro traz. Nao peca nome nem data de nascimento de novo, nao pergunte nada no final e nao diga que vai encaminhar: o sistema transfere logo depois da sua resposta.`;
 
 /**
+ * A resposta da IA pede nome completo e data de nascimento do paciente
+ * ("vou solicitar que informe seu nome completo e sua data de nascimento").
+ */
+export function pedeDadosDoPaciente(texto: string): boolean {
+  const t = normalizarRespostaInformal(texto ?? "");
+  return (
+    /\bnome completo\b/.test(t) &&
+    /\b(?:data de nascimento|nascimento|data de nasc)\b/.test(t) &&
+    /\b(?:envie|enviar|informe|informar|informa|passe|passar|mande|mandar|preciso|precisamos|solicitar|solicito|poderia|pode me|me diga|por gentileza|por favor)\b/.test(
+      t,
+    )
+  );
+}
+
+/**
  * O que segue junto da transferência: a resposta da IA sem perguntas finais,
  * convites, orientação de procurar a recepção, promessa de encaminhar ou novo
  * pedido de dados.
