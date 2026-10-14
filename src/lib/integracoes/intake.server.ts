@@ -125,6 +125,28 @@ export async function handleIntake(
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (request.method !== "POST") return json(405, { error: { code: "method_not_allowed" } });
 
+  // Interruptor por clínica (site_agendamento_config). Vem antes de ler o
+  // corpo, do rate limit e de qualquer escrita. Sem linha = ligado.
+  {
+    const { supabaseAdmin: dbCfg } = await import("@/integrations/supabase/client.server");
+    const { data: cfg, error: erroCfg } = await dbCfg
+      .from("site_agendamento_config")
+      .select("ativo")
+      .eq("clinica_id", clinicaId)
+      .maybeSingle();
+    if (erroCfg) console.error("[intake] leitura do interruptor:", erroCfg.code ?? "erro");
+    if (cfg && cfg.ativo === false) {
+      return json(503, {
+        error: {
+          code: "site_agendamento_desativado",
+          message:
+            "O agendamento pelo site está temporariamente indisponível. Entre em contato com a clínica por telefone.",
+        },
+      });
+    }
+  }
+
+
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) {
     return json(413, { error: { code: "payload_too_large", message: "Envio muito grande." } });
