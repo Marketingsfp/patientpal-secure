@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   MessageSquare,
@@ -20,6 +20,7 @@ import { SeletorStatusPresenca } from "./SeletorStatusPresenca";
 import type { FiltroAtendente } from "@/lib/atendimento/filtros-atendente";
 import { tituloConversa } from "@/lib/atendimento/rotulo-conversa";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
+import { useListaFluida } from "@/hooks/use-lista-fluida";
 import {
   abrirConversaSimulada,
   avancarSimulacao,
@@ -34,9 +35,12 @@ import {
 export function SimulacaoAtendimento({
   onEncerrar,
   iniciarAutomaticamente = true,
+  fluido = false,
 }: {
   onEncerrar: () => void;
   iniciarAutomaticamente?: boolean;
+  /** Cards com entrada, saída e reordenação suaves (flag ux_melhorias na Inbox). */
+  fluido?: boolean;
 }) {
   const [estado, setEstado] = useState(() => ({
     ...criarSimulacao(),
@@ -53,6 +57,10 @@ export function SimulacaoAtendimento({
   const fimChat = useRef<HTMLDivElement>(null);
   const sel = estado.conversas.find((c) => c.id === selecionada);
   const linhas = conversasDaSimulacao(estado, filtro);
+  const listaFluidaAtiva = fluido;
+  const chaveIds = linhas.map((c) => c.id).join("|");
+  const ids = useMemo(() => (chaveIds ? chaveIds.split("|") : []), [chaveIds]);
+  const listaFluidaRef = useListaFluida<HTMLDivElement>(listaFluidaAtiva, ids);
   const aberto = fixado || hover;
   const totalCards = estado.conversas.length + estado.chegadas.filter((c) => c.nova).length;
 
@@ -224,24 +232,27 @@ export function SimulacaoAtendimento({
                         : "Aguardando cards fictícios…"}
                     </p>
                   )}
-                  {linhas.map((c) => (
-                    <InboxConversationCard
-                      key={c.id}
-                      conversa={c}
-                      selecionada={sel?.id === c.id}
-                      meuId={USUARIO_SIMULADO}
-                      simulada
-                      nomeUsuario={() => "Você"}
-                      esperaDesde={c.esperaDesde}
-                      previa={c.mensagens.at(-1)?.body}
-                      autorPrevia={c.mensagens.at(-1)?.direction === "in" ? "paciente" : "equipe"}
-                      onClick={() => {
-                        setSelecionada(c.id);
-                        setListaMobile(false);
-                        setEstado((e) => abrirConversaSimulada(e, c.id));
-                      }}
-                    />
-                  ))}
+                  <div ref={listaFluidaRef}>
+                    {linhas.map((c) => (
+                      <InboxConversationCard
+                        key={c.id}
+                        conversa={c}
+                        selecionada={sel?.id === c.id}
+                        meuId={USUARIO_SIMULADO}
+                        simulada
+                        fluido={listaFluidaAtiva}
+                        nomeUsuario={() => "Você"}
+                        esperaDesde={c.esperaDesde}
+                        previa={c.mensagens.at(-1)?.body}
+                        autorPrevia={c.mensagens.at(-1)?.direction === "in" ? "paciente" : "equipe"}
+                        onClick={() => {
+                          setSelecionada(c.id);
+                          setListaMobile(false);
+                          setEstado((e) => abrirConversaSimulada(e, c.id));
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </Card>

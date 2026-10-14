@@ -881,6 +881,20 @@ html.theme-emerald {
   .kpi-stagger > * { animation: none; }
 }
 
+/* Valor que muda nos cards da Inbox (não lidas, tempo de espera): o novo
+ * texto sobe e aparece — flag ux_melhorias (TextoFluido). */
+@keyframes ux-texto-novo {
+  from { opacity: 0; transform: translateY(45%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ux-texto-novo {
+  display: inline-block;
+  animation: ux-texto-novo 240ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ux-texto-novo { animation: none; }
+}
+
 /* =====================================================================
  * Totem — modo Alto Contraste (acessibilidade)
  *

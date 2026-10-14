@@ -112,6 +112,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { useListaFluida } from "@/hooks/use-lista-fluida";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
@@ -372,7 +374,9 @@ type AtendInboxProps = {
 
 export function AtendInbox(props: AtendInboxProps = {}) {
   const [simulando, setSimulando] = useState(false);
-  if (simulando) return <SimulacaoAtendimento onEncerrar={() => setSimulando(false)} />;
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  if (simulando)
+    return <SimulacaoAtendimento fluido={uxMelhorias} onEncerrar={() => setSimulando(false)} />;
   return <AtendInboxOperacional {...props} onSimular={() => setSimulando(true)} />;
 }
 
@@ -740,6 +744,14 @@ function AtendInboxOperacional({
       return ta - tb;
     });
   })();
+  // Cards que chegam, saem e reordenam com transição (flag ux_melhorias).
+  const { enabled: listaFluidaAtiva } = useClinicFeatureFlag("ux_melhorias");
+  const chaveIdsVisiveis = convsVisiveis.map((c: any) => String(c.id)).join("|");
+  const idsVisiveis = useMemo(
+    () => (chaveIdsVisiveis ? chaveIdsVisiveis.split("|") : []),
+    [chaveIdsVisiveis],
+  );
+  const listaFluidaRef = useListaFluida<HTMLDivElement>(listaFluidaAtiva, idsVisiveis);
 
   // Prévia do card: última mensagem trocada com o paciente (recebida ou
   // enviada). Avisos internos do sistema (status "system") ficam de fora.
@@ -3698,34 +3710,37 @@ function AtendInboxOperacional({
                     ) : (
                       <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa.</p>
                     ))}
-                  {convsVisiveis.map((c) => (
-                    <InboxConversationCard
-                      key={c.id}
-                      conversa={c}
-                      selecionada={sel?.id === c.id}
-                      meuId={meuId}
-                      nomeUsuario={nomeUsuario}
-                      esperaDesde={espera[c.id]}
-                      previa={previas[c.id]?.texto}
-                      autorPrevia={previas[c.id]?.autor}
-                      onClick={() => {
-                        setListaMobile(false);
-                        iniciarTroca(c.id, "clique");
-                        // Abertura normal pela Inbox: volta a valer a leitura
-                        // automática, mesmo que antes tenha vindo de um erro.
-                        aberturaPorAlvoRef.current.delete(c.id);
+                  <div ref={listaFluidaRef}>
+                    {convsVisiveis.map((c) => (
+                      <InboxConversationCard
+                        key={c.id}
+                        conversa={c}
+                        selecionada={sel?.id === c.id}
+                        meuId={meuId}
+                        nomeUsuario={nomeUsuario}
+                        fluido={listaFluidaAtiva}
+                        esperaDesde={espera[c.id]}
+                        previa={previas[c.id]?.texto}
+                        autorPrevia={previas[c.id]?.autor}
+                        onClick={() => {
+                          setListaMobile(false);
+                          iniciarTroca(c.id, "clique");
+                          // Abertura normal pela Inbox: volta a valer a leitura
+                          // automática, mesmo que antes tenha vindo de um erro.
+                          aberturaPorAlvoRef.current.delete(c.id);
 
-                        medidor.current = criarMedidorConversa(`conversa ${c.id}`);
-                        medidor.current.marcar("click");
-                        // Seleção interna: a conversa aberta é escolhida aqui mesmo.
-                        abrirConversa(c.id);
-                      }}
-                      onMouseEnter={() => agendarPrefetch(c.id)}
-                      onMouseLeave={() => cancelarPrefetch(c.id)}
-                      onFocus={() => agendarPrefetch(c.id)}
-                      onBlur={() => cancelarPrefetch(c.id)}
-                    />
-                  ))}
+                          medidor.current = criarMedidorConversa(`conversa ${c.id}`);
+                          medidor.current.marcar("click");
+                          // Seleção interna: a conversa aberta é escolhida aqui mesmo.
+                          abrirConversa(c.id);
+                        }}
+                        onMouseEnter={() => agendarPrefetch(c.id)}
+                        onMouseLeave={() => cancelarPrefetch(c.id)}
+                        onFocus={() => agendarPrefetch(c.id)}
+                        onBlur={() => cancelarPrefetch(c.id)}
+                      />
+                    ))}
+                  </div>
                   {visualizacao === "recentes" && (temMaisConvs || erroPaginaConvs) && (
                     <div className="p-3 text-center text-xs text-muted-foreground">
                       {carregandoLista ? (
