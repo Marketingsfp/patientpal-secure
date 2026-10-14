@@ -418,3 +418,40 @@ html.a11y-alto-contraste [data-os-zap="true"] .text-muted-foreground { color: va
     animation: none;
   }
 }
+
+/* Espera crítica (mais de 10 min) no card: brilho que atravessa a barra da esquerda para a direita. */
+@keyframes oszap-espera-varredura {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+.oszap-conversation [data-wait-level="critico"] {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.oszap-conversation [data-wait-level="critico"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in oklab, currentColor 35%, transparent) 50%,
+    transparent 80%
+  );
+  transform: translateX(-100%);
+  animation: oszap-espera-varredura 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oszap-conversation [data-wait-level="critico"]::after {
+    animation: none;
+    display: none;
+  }
+}
