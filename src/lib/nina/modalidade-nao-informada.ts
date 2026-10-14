@@ -54,7 +54,9 @@ export function corrigirModalidadeNaoConsta(texto: string): string {
 /** O paciente perguntou como funciona o atendimento (horário marcado, ordem de chegada, ficha…)? */
 export function pacientePerguntouModalidade(mensagem: string): boolean {
   const t = normalizarRespostaInformal(mensagem ?? "");
-  return /\b(?:modalidade|forma de atendimento|ordem de chegada|por ordem|hora marcada|horario marcado|horario certinho|horario certo|ficha|pre-?agendamento|encaixe|como funciona|precisa (?:marcar|agendar)|tem que (?:marcar|agendar)|chegar cedo|que horas (?:devo|tenho que|preciso|eu) chegar|so chegar|e so ir|chego e)\b/.test(
+  // "Como funciona aí?" sozinho é genérico (14/10/2026): só conta "como funciona
+  // o atendimento/a marcação/a chamada…".
+  return /\b(?:modalidade|forma de atendimento|ordem de chegada|por ordem|hora marcada|horario marcado|horario certinho|horario certo|ficha|pre-?agendamento|encaixe|como funciona (?:o atendimento|o agendamento|a marcacao|a chamada|a fila|a ordem|pra marcar|para marcar|pra agendar|para agendar)|reservar (?:um )?horario|precisa (?:marcar|agendar|reservar)|tem que (?:marcar|agendar)|chegar cedo|que horas (?:devo|tenho que|preciso|eu) chegar|so chegar|e so ir|chego e)\b/.test(
     t,
   );
 }
@@ -62,7 +64,7 @@ export function pacientePerguntouModalidade(mensagem: string): boolean {
 const ROTULO_MODALIDADE =
   /[*_]{0,2}(?:modalidade|forma de atendimento)(?: e agendamento)?(?:\s*:\s*[*_]{0,2}|[*_]{1,2}\s*:)/i;
 const ASSUNTO_MODALIDADE =
-  /\b(?:modalidade|forma de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|numeracao \(ficha\)|pre-?agendamento|agendamento previo)\b/;
+  /\b(?:modalidade|forma (?:exata )?de atendimento|ordem de chegada|hora marcada|horario marcado|por ficha|numeracao \(ficha\)|pre-?agendamento|agendamento previo|como funciona a chamada|funcionamento do atendimento)\b/;
 
 /**
  * Tira da resposta o que fala da forma de atendimento, quando o paciente não

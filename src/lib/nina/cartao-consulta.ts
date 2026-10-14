@@ -33,6 +33,25 @@ export function mencionaCartaoConsulta(mensagem: string): boolean {
   return CARTAO_CONSULTA.test(texto) || ASSOCIADO.test(texto);
 }
 
+/**
+ * "Cartão" usado como forma de pagamento ("o preço no cartão é o mesmo?",
+ * "posso pagar no cartão de crédito?"), sem nada que lembre o cartão consulta.
+ * Nesse caso a leitura do Jev não manda para a equipe (homologação 14/10/2026).
+ */
+export function cartaoDePagamento(mensagem: string): boolean {
+  const t = semAcento(mensagem ?? "");
+  if (!/\bcart(?:ao|oes)\b/.test(t) || mencionaCartaoConsulta(mensagem)) return false;
+  if (
+    /\b(?:carteirinha|associad[oa]s?|beneficios?|descontos?|plano de voces|plano da clinica|mensalidade|dependentes?|renova\w*|segunda via|adesao|aderir|vencimento|venceu)\b/.test(
+      t,
+    )
+  )
+    return false;
+  return /\b(?:preco|valor|valores|pagar|pago|pagamento|credito|debito|parcel\w*|no cartao|com cartao|fica|custa|aceita|maquininha)\b/.test(
+    t,
+  );
+}
+
 /** Leitura do Jev para menções indiretas que as expressões fixas não alcançam. */
 export function perguntaCartaoConsulta(): Record<string, PerguntaJev> {
   return {

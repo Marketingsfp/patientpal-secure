@@ -1088,6 +1088,7 @@ async function gerarRespostaNinaInterno(
     mencionaCartaoConsulta,
     perguntaCartaoConsulta,
     cartaoConsultaPeloJev,
+    cartaoDePagamento,
     MOTIVO_CARTAO_CONSULTA,
   } = await import("@/lib/nina/cartao-consulta");
   let cartaoConsulta: "expressao" | "jev" | null = mencionaCartaoConsulta(mensagemPaciente)
@@ -1156,7 +1157,13 @@ async function gerarRespostaNinaInterno(
       alteracaoSolicitada =
         alteracaoPeloJev(respostas?.alteracao_agendamento) ?? alteracaoSolicitada;
       multiplosAtendimentos ||= multiplosPeloJev(respostas?.multiplos_atendimentos);
-      if (!cartaoConsulta && cartaoConsultaPeloJev(respostas?.cartao_consulta))
+      if (
+        !cartaoConsulta &&
+        cartaoConsultaPeloJev(respostas?.cartao_consulta) &&
+        // "O preço no cartão é o mesmo?" é pagamento, não cartão consulta
+        // (homologação 14/10/2026, ciclo 1156).
+        !cartaoDePagamento(mensagemPaciente)
+      )
         cartaoConsulta = "jev";
       const escolhida = f1 && respostas ? intencaoAplicavel(respostas["intencao"]) : null;
       // Pré-busca: aceita também o pedido dividido entre intenções compatíveis.
@@ -3407,6 +3414,9 @@ async function gerarRespostaNinaInterno(
   let conferenciaJevUsada = false;
   let perguntaSemRespostaJev = false;
   let conferenciaReprovada = false;
+  const perguntaGenericaPaciente = await import("@/lib/nina/informacao-nao-cadastrada").then((m) =>
+    m.perguntaGenerica(mensagemPaciente),
+  );
   const conferenciaJevAtiva = await import("@/lib/nina/jev.server")
     .then((j) => j.jevAtivo(clinicaId, "fase6_conferencia", opcoes?.teste === true))
     .catch(() => false);
@@ -3664,17 +3674,38 @@ async function gerarRespostaNinaInterno(
               (await import("@/lib/nina/jev-contexto")).opcoesOferecidasJev(sessaoNina.estado)
                 .length > 0,
             agendamentoConfirmado: Boolean(agendamentoConfirmado),
-            dadosConsultados: mensagens
-              .slice(inicioMensagensTurno)
-              .filter((m) => m.role === "tool" && typeof m.content === "string")
-              .map((m) => String(m.content)),
+            dadosConsultados: [
+              ...mensagens
+                .slice(inicioMensagensTurno)
+                .filter((m) => m.role === "tool" && typeof m.content === "string")
+                .map((m) => String(m.content)),
+              // O que a Nina já informou nesta conversa também é fonte (os valores
+              // de todas as médicas, dados no 1º turno): a conferência não barra a
+              // mesma informação repetida (homologação 14/10/2026, ciclo 1057).
+              ...(msgsMemoria as any[])
+                .filter(
+                  (m) =>
+                    m?.direction === "out" &&
+                    m?.enviada_por === "nina" &&
+                    (!estadoId.conversaId || m.conversa_id === estadoId.conversaId),
+                )
+                .slice(0, 3)
+                .map((m) =>
+                  JSON.stringify({
+                    fonte: "mensagem_ja_enviada_pela_nina_nesta_conversa",
+                    texto: String(m.body ?? "").slice(0, 2500),
+                  }),
+                ),
+            ],
             mensagemPaciente,
           },
           jaCorrigida: conferenciaJevUsada,
         });
         // O Jev viu pergunta do paciente sem resposta concreta: encaminha
         // depois do laço, com as respostas que a Nina tem (regra de 13/10/2026).
-        if (decisao.acao === "encaminhar") {
+        // Pergunta genérica ("vocês têm? como funciona aí?") não conta: a Nina
+        // informa e espera (homologação 14/10/2026, ciclo 1060).
+        if (decisao.acao === "encaminhar" && !perguntaGenericaPaciente) {
           perguntaSemRespostaJev = true;
           resposta = texto;
           break;
@@ -3789,6 +3820,47 @@ async function gerarRespostaNinaInterno(
           },
         });
         continue;
+      }
+      // A IA quis transferir por causa da quantidade de profissionais ("mais de
+      // oito cardiologistas"), mas o paciente não pediu a lista: ela informa
+      // primeiro (homologação 14/10/2026, ciclos 1064 e 1102).
+      if (nome === "solicitar_atendente_humano") {
+        let motivoModelo = "";
+        try {
+          motivoModelo = String(JSON.parse(c.function?.arguments ?? "{}")?.motivo ?? "");
+        } catch {
+          /* Argumentos inválidos seguem a validação normal do broker. */
+        }
+        const { pedeListaDeProfissionais } = await import("@/lib/nina/lista-profissionais-extensa");
+        if (
+          /lista_profissionais|lista extensa|mais de (?:8|oito)|muitos profissionais|diversos profissionais/i.test(
+            motivoModelo,
+          ) &&
+          !pedeListaDeProfissionais(mensagemPaciente)
+        ) {
+          mensagens.push({
+            role: "tool",
+            tool_call_id: c.id,
+            content: JSON.stringify({
+              ok: false,
+              executada: false,
+              erro: "LISTA_NAO_PEDIDA",
+              mensagem:
+                "Não encaminhe pela quantidade de profissionais: o paciente não pediu a lista. Responda o que ele perguntou com o cadastro (a especialidade, os valores e, se ele pediu médica ou médico, só os profissionais desse perfil, com dias e horários). Termine com a pergunta padrão de preferência.",
+            }),
+          });
+          registrarEtapa({
+            tipo: "consulta",
+            fonte: "sistema",
+            titulo: "Encaminhamento pela quantidade de profissionais sem pedido de lista: informar",
+            dados: { motivo: motivoModelo.slice(0, 300) },
+            codigo: {
+              arquivo: "src/lib/nina/lista-profissionais-extensa.ts",
+              funcao: "pedeListaDeProfissionais",
+            },
+          });
+          continue;
+        }
       }
       if (
         nome === "solicitar_atendente_humano" &&
@@ -4030,6 +4102,8 @@ async function gerarRespostaNinaInterno(
             nome,
             c.function?.arguments ?? null,
             r.dados as never,
+            // Só quando o paciente pediu a lista (e não um filtro por médica/médico).
+            mensagemPaciente,
           )
         : null;
       if (listaExtensa) {
@@ -4448,7 +4522,26 @@ async function gerarRespostaNinaInterno(
       candidata,
       pacientePerguntouModalidade(mensagemPaciente),
     );
-    if (orientaRecepcao || perguntaSemRespostaJev) {
+    if (orientaRecepcao && perguntaGenericaPaciente && !perguntaSemRespostaJev) {
+      // O paciente só perguntou se tem o atendimento ou "como funciona aí": a
+      // orientação sobre o que ele não perguntou sai, e a Nina informa e espera
+      // (homologação 14/10/2026, ciclos 1180 e 1185).
+      const { removerOrientacaoRecepcao } = await import("@/lib/nina/informacao-nao-cadastrada");
+      const semOrientacao = removerOrientacaoRecepcao(resposta);
+      if (semOrientacao !== resposta) {
+        registrarEtapa({
+          tipo: "consulta",
+          fonte: "sistema",
+          titulo: "Orientação sobre o que o paciente não perguntou removida (pergunta genérica)",
+          dados: { antes: resposta.slice(0, 800), depois: semOrientacao.slice(0, 800) },
+          codigo: {
+            arquivo: "src/lib/nina/informacao-nao-cadastrada.ts",
+            funcao: "removerOrientacaoRecepcao",
+          },
+        });
+        resposta = semOrientacao;
+      }
+    } else if (orientaRecepcao || perguntaSemRespostaJev) {
       registrarEtapa({
         tipo: "consulta",
         fonte: "sistema",
