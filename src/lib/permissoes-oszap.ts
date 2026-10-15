@@ -168,6 +168,15 @@ export const TELAS_OSZAP: TelaOsZap[] = [
     pai: "nina",
   },
   {
+    key: "nina-ligacao",
+    nome: "Ligação",
+    descricao: "Demonstração da Nina por voz, com agendamento e encaminhamento simulados",
+    grupo: "Configurações do WhatsApp",
+    to: "/app/nina",
+    hash: "ligacao",
+    pai: "nina",
+  },
+  {
     key: "francisco-visao-geral",
     nome: "Visão geral",
     descricao: "Visão geral do acompanhamento de orçamentos",

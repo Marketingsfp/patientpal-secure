@@ -99,6 +99,7 @@ import {
 import { SemPermissao } from "@/components/sem-permissao";
 import { podeAbrirTelaOsZap } from "@/lib/atendimento/acesso-telas-oszap";
 import { moduloTelaOsZap, TELAS_OSZAP } from "@/lib/permissoes-oszap";
+import { FLAG_NINA_LIGACAO } from "@/lib/nina/ligacao/config";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getSubsystem,
@@ -705,6 +706,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
       { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
       { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
+      { to: "/app/nina", hash: "ligacao", label: "Ligação", icon: PhoneCall },
     ],
   },
   // ---------------------------------------------------------------------
@@ -834,6 +836,7 @@ function AppShellInner() {
   // Pacote de melhorias de UX (navegação SPA, transição de rota, dark mode) —
   // flag `ux_melhorias`, ligada só para a São Francisco de Paula.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const { enabled: ligacaoDemo } = useClinicFeatureFlag(FLAG_NINA_LIGACAO);
   // Ordem personalizada dos itens do menu (arrastar e soltar) — por usuário.
   const { ordem: menuOrdem, salvar: salvarMenuOrdem } = useMenuOrdem(uxMelhorias);
   // Telas fixadas pelo usuário em "Meus Favoritos" (estrela ao lado do item).
@@ -1246,14 +1249,20 @@ function AppShellInner() {
         .filter((row) => row.items.length > 0)
     : permissionFilteredRows;
   // Ambiente de testes da Nina (10 leads simultâneos): só com a flag ux_melhorias.
-  const flagFilteredRows = uxMelhorias
-    ? semAtendimentoMultiplo
-    : semAtendimentoMultiplo
-        .map((row) => ({
-          ...row,
-          items: row.items.filter((it) => isParent(it) || it.hash !== "ambiente-testes"),
-        }))
-        .filter((row) => row.items.length > 0);
+  // Ligação de demonstração por voz: só com a flag nina_ligacao_demo.
+  const abasOcultas = new Set([
+    ...(uxMelhorias ? [] : ["ambiente-testes"]),
+    ...(ligacaoDemo ? [] : ["ligacao"]),
+  ]);
+  const flagFilteredRows =
+    abasOcultas.size === 0
+      ? semAtendimentoMultiplo
+      : semAtendimentoMultiplo
+          .map((row) => ({
+            ...row,
+            items: row.items.filter((it) => isParent(it) || !abasOcultas.has(it.hash ?? "")),
+          }))
+          .filter((row) => row.items.length > 0);
 
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
