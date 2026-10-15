@@ -15,7 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { interpretarLinha, lerLinhas, loteCheio, type LinhaLida } from "@/lib/importacao-legado/leitor-jsonl";
+import {
+  interpretarLinha,
+  lerLinhas,
+  loteCheio,
+  type LinhaLida,
+} from "@/lib/importacao-legado/leitor-jsonl";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/importar-clinica-total")({
   component: Pagina,
@@ -64,7 +69,9 @@ function Pagina() {
     queryKey: ["imp-legado-resumo", clinicaId],
     enabled: !!clinicaId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("importacao_legado_resumo", { _clinica: clinicaId! });
+      const { data, error } = await supabase.rpc("importacao_legado_resumo", {
+        _clinica: clinicaId!,
+      });
       if (error) throw new Error(error.message);
       return data as Record<string, number>;
     },
@@ -129,7 +136,8 @@ function Pagina() {
           {ETAPAS.map((etapa, i) => {
             const lista = execucoes.data ?? [];
             const anteriorOk =
-              i === 0 || lista.some((e) => e.tipo === ETAPAS[i - 1].tipo && e.status === "concluido");
+              i === 0 ||
+              lista.some((e) => e.tipo === ETAPAS[i - 1].tipo && e.status === "concluido");
             return (
               <EtapaCard
                 key={`${clinicaId}-${etapa.tipo}`}
@@ -258,7 +266,9 @@ function EtapaCard(props: {
       setTerminouLeitura(true);
       setMensagem("Arquivo lido até o fim. Confira os números e clique em Concluir etapa.");
     } catch (e) {
-      setMensagem(`Parou por erro: ${(e as Error).message}. Clique em "Iniciar / continuar" para tentar de novo.`);
+      setMensagem(
+        `Parou por erro: ${(e as Error).message}. Clique em "Iniciar / continuar" para tentar de novo.`,
+      );
     } finally {
       setRodando(false);
       atualizar();
@@ -312,9 +322,14 @@ function EtapaCard(props: {
     <Card className={props.liberada ? "" : "opacity-60"}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">
-          {props.rotulo} <span className="text-sm font-normal text-muted-foreground">({props.arquivo})</span>
+          {props.rotulo}{" "}
+          <span className="text-sm font-normal text-muted-foreground">({props.arquivo})</span>
         </CardTitle>
-        {concluida ? <Badge>Concluída</Badge> : ultima ? <Badge variant="secondary">Em andamento</Badge> : null}
+        {concluida ? (
+          <Badge>Concluída</Badge>
+        ) : ultima ? (
+          <Badge variant="secondary">Em andamento</Badge>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
         {!props.liberada ? (
@@ -334,10 +349,19 @@ function EtapaCard(props: {
                 }}
                 className="text-sm"
               />
-              <Button size="sm" disabled={!arquivo || rodando || concluida} onClick={() => void executar()}>
+              <Button
+                size="sm"
+                disabled={!arquivo || rodando || concluida}
+                onClick={() => void executar()}
+              >
                 Iniciar / continuar
               </Button>
-              <Button size="sm" variant="outline" disabled={!rodando} onClick={() => (pausar.current = true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!rodando}
+                onClick={() => (pausar.current = true)}
+              >
                 Pausar
               </Button>
               <Button
@@ -348,7 +372,12 @@ function EtapaCard(props: {
               >
                 Concluir etapa
               </Button>
-              <Button size="sm" variant="ghost" disabled={!ultima} onClick={() => void baixarErros()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!ultima}
+                onClick={() => void baixarErros()}
+              >
                 Baixar log de erros
               </Button>
             </div>
@@ -364,8 +393,8 @@ function EtapaCard(props: {
             </div>
             {ultima && !exec && !concluida && (
               <p className="text-xs text-muted-foreground">
-                Última execução: {ultima.arquivo_nome}. Escolha o mesmo arquivo para continuar da linha{" "}
-                {ultima.ultima_linha + 1}.
+                Última execução: {ultima.arquivo_nome}. Escolha o mesmo arquivo para continuar da
+                linha {ultima.ultima_linha + 1}.
               </p>
             )}
             {mensagem && <p className="text-sm">{mensagem}</p>}
@@ -412,7 +441,8 @@ function ProfissionaisNaoCasados({ clinicaId }: { clinicaId: string }) {
     },
   });
   const pendentes = useMemo(
-    () => (profs.data ?? []).filter((p) => !p.medico_id || p.casado_por === "manual" || p.sem_medico),
+    () =>
+      (profs.data ?? []).filter((p) => !p.medico_id || p.casado_por === "manual" || p.sem_medico),
     [profs.data],
   );
   if (!profs.data || profs.data.length === 0) return null;
@@ -433,7 +463,8 @@ function ProfissionaisNaoCasados({ clinicaId }: { clinicaId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">
-          Profissionais não encontrados automaticamente ({pendentes.filter((p) => !p.medico_id && !p.sem_medico).length})
+          Profissionais não encontrados automaticamente (
+          {pendentes.filter((p) => !p.medico_id && !p.sem_medico).length})
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -444,7 +475,8 @@ function ProfissionaisNaoCasados({ clinicaId }: { clinicaId: string }) {
         {pendentes.map((p) => (
           <div key={p.codigo_pessoa} className="flex flex-wrap items-center gap-2 text-sm">
             <span className="w-72 truncate">
-              {p.nome ?? "(sem nome)"} <span className="text-muted-foreground">#{p.codigo_pessoa}</span>
+              {p.nome ?? "(sem nome)"}{" "}
+              <span className="text-muted-foreground">#{p.codigo_pessoa}</span>
             </span>
             <Select
               value={p.sem_medico ? "__sem" : (p.medico_id ?? undefined)}
@@ -494,7 +526,9 @@ function Resumo({ dados }: { dados?: Record<string, number> }) {
         {Object.entries(ROTULOS_RESUMO).map(([k, r]) => (
           <div key={k} className="flex justify-between border-b py-1">
             <span>{r}</span>
-            <span className="font-semibold tabular-nums">{(dados[k] ?? 0).toLocaleString("pt-BR")}</span>
+            <span className="font-semibold tabular-nums">
+              {(dados[k] ?? 0).toLocaleString("pt-BR")}
+            </span>
           </div>
         ))}
       </CardContent>

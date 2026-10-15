@@ -23,7 +23,9 @@ describe("lerLinhas", () => {
     const bytes = enc.encode('{"nome":"José"}\r\n{"nome":"Ção"}');
     // corta no meio do "é" (2 bytes) e no meio da segunda linha
     const corte = bytes.indexOf(0xc3) + 1;
-    const linhas = await todas(fluxoDe([bytes.slice(0, corte), bytes.slice(corte, 20), bytes.slice(20)]));
+    const linhas = await todas(
+      fluxoDe([bytes.slice(0, corte), bytes.slice(corte, 20), bytes.slice(20)]),
+    );
     expect(linhas).toEqual(['{"nome":"José"}', '{"nome":"Ção"}']);
   });
 
