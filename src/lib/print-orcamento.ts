@@ -327,24 +327,31 @@ export async function printOrcamento(
   @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
+  /* Courier New em peso normal sai fraco/apagado na cabeça térmica:
+     o cupom inteiro imprime em negrito e preto puro. */
+  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25;
+         font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ticket, .ticket * { color: #000; }
   .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
   .center { text-align: center; }
   .right { text-align: right; }
   .bold { font-weight: 700; }
-  .sm { font-size: 9pt; }
+  .sm { font-size: 9.5pt; }
+  .obs { font-size: 10.5pt; white-space: pre-wrap; }
   .lg { font-size: 13pt; font-weight: 700; }
   .sep { border-top: 1px dashed #000; margin: 6px 0; }
   .row { display: flex; justify-content: space-between; gap: 6px; }
   table { width: 100%; border-collapse: collapse; }
   td { padding: 1px 0; vertical-align: top; }
   .item-nome { font-weight: 700; }
-  .item-linha { padding: 3px 0; border-bottom: 1px dotted #999; }
+  .item-linha { padding: 3px 0; border-bottom: 1px dotted #000; }
   @media print { .noprint { display: none; } }
   .noprint { position: fixed; top: 8px; right: 8px; }
   .noprint button { padding: 6px 12px; font-size: 12px; cursor: pointer; }
   ${labCss}
   .lab, .lab-prep { font-size: 9.5pt; }
+  /* Faixa preta do laboratório: o texto continua branco. */
+  .ticket .lab-chegada { color: #fff; }
 </style></head>
 <body>
   <div class="ticket">
@@ -479,7 +486,7 @@ export async function printOrcamento(
           })()
         : ""
     }
-    ${obsImpressa ? `<div class="sep"></div><div class="sm" style="white-space:pre-wrap"><div class="bold">OBSERVAÇÕES</div>${esc(obsImpressa)}</div>` : ""}
+    ${obsImpressa ? `<div class="sep"></div><div class="obs"><div class="bold">OBSERVAÇÕES</div>${esc(obsImpressa)}</div>` : ""}
 
     ${
       preparos.length > 0
