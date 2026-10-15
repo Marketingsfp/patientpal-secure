@@ -87,6 +87,21 @@ function semAcento(v: unknown): string {
   return normalizarBuscaCatalogo(String(v ?? ""));
 }
 
+/**
+ * Qualificadores entre parênteses ("CURATIVO (P)" → ["p"]). No pedido do
+ * paciente também vale P/M/G solto no fim ("curativo p", "pontos g").
+ */
+function qualificadores(texto: string, pedido: boolean): string[] {
+  const t = String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  const entre = [...t.matchAll(/\(\s*([a-z0-9][a-z0-9 /-]{0,14}?)\s*\)/g)].map((m) => m[1]!.trim());
+  if (!pedido || entre.length) return entre;
+  const solto = /\s([pmg])\s*$/.exec(t.trim());
+  return solto ? [solto[1]!] : [];
+}
+
 const PALAVRAS_CONSULTA = /\b(?:consultas?|especialistas?|doutor|doutora|dra?)\b/i;
 const PALAVRAS_PROCEDIMENTO = /\b(?:exames?|procedimentos?)\b/i;
 
@@ -288,9 +303,21 @@ async function buscarNaFonteDoTurno(
   // Aliases compartilhados continuam ambíguos: só o nome publicado comprova.
   const registrosEquivalentes =
     !variantesDoLiteral.length && nomesCompletos.length > 0 && correspondenciasCompletas.length > 1;
-  const servicosRelevantes = correspondenciasCompletas.length
-    ? correspondenciasCompletas
-    : pontuados;
+  const relevantesBase = correspondenciasCompletas.length ? correspondenciasCompletas : pontuados;
+  // "RETIRADA DE PONTOS (P)" escolhida da lista: a busca descartava o "(P)" e
+  // voltava empatada com o (G), encaminhando como "não esclarecido"
+  // (homologação 15/10/2026, ~22 ciclos). O qualificador do pedido entre
+  // parênteses (ou P/M/G solto no fim) escolhe o único registro que o tem.
+  const qualificadoresDoPedido = qualificadores(pedido.query, true);
+  const comQualificador = qualificadoresDoPedido.length
+    ? relevantesBase.filter(({ s }) =>
+        qualificadores(s.nome, false).some((q) => qualificadoresDoPedido.includes(q)),
+      )
+    : [];
+  const servicosRelevantes =
+    comQualificador.length === 1
+      ? [{ ...comQualificador[0]!, score: Math.max(...relevantesBase.map((x) => x.score)) }]
+      : relevantesBase;
   const idsServicos = servicosRelevantes.slice(0, limite).map((x) => x.s.id);
   let medico = semAcento(pedido.medico || nomeProfissionalNaPergunta(pedido.query)).trim();
   const profissionaisDaConsulta = brutosProfissionais.filter((p) => pontuarProfissional(p) > 0);
