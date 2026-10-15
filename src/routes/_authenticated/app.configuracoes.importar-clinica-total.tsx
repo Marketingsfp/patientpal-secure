@@ -32,7 +32,7 @@ const CLINICA_SFP = "1d3c4f34-2a0f-40fa-b39a-3609677a11a5";
 
 const ETAPAS = [
   { tipo: "profissionais", rotulo: "1. Profissionais", arquivo: "profissionais.jsonl" },
-  { tipo: "pessoas", rotulo: "2. Pessoas (clientes)", arquivo: "pessoas.jsonl" },
+  { tipo: "pessoas", rotulo: "2. Pessoas (clientes)", arquivo: "pessoas_v2.jsonl" },
   { tipo: "prontuarios", rotulo: "3. Prontuários", arquivo: "prontuarios.jsonl" },
   { tipo: "observacoes", rotulo: "4. Observações", arquivo: "observacoes.jsonl" },
 ] as const;
@@ -158,6 +158,23 @@ function Pagina() {
   );
 }
 
+/** Arquivo de pessoas precisa trazer o campo "chave" (número da pasta). Devolve o motivo ou null. */
+async function conferirCampoChave(arquivo: File): Promise<string | null> {
+  let n = 0;
+  for await (const texto of lerLinhas(arquivo.stream())) {
+    n += 1;
+    const linha = interpretarLinha(texto, n);
+    if (!linha) continue;
+    if ("d" in linha) {
+      return "chave" in linha.d
+        ? null
+        : 'Este arquivo não tem o campo "chave" (número da pasta). Use o arquivo pessoas_v2.jsonl.';
+    }
+    if (n > 20) break;
+  }
+  return 'Não foi possível conferir o campo "chave" no início do arquivo.';
+}
+
 const vazio = { lidas: 0, inseridas: 0, atualizadas: 0, ignoradas: 0, orfaos: 0, erros: 0 };
 
 function EtapaCard(props: {
@@ -215,6 +232,13 @@ function EtapaCard(props: {
     pausar.current = false;
     setLidoBytes(0);
     try {
+      if (props.tipo === "pessoas") {
+        const motivo = await conferirCampoChave(arquivo);
+        if (motivo) {
+          setMensagem(motivo);
+          return;
+        }
+      }
       const { data, error } = await supabase.rpc("importacao_legado_iniciar", {
         _clinica: props.clinicaId,
         _tipo: props.tipo,
@@ -256,6 +280,15 @@ function EtapaCard(props: {
         setMensagem("Preenchendo responsáveis…");
         for (;;) {
           const r = await supabase.rpc("importacao_legado_aplicar_responsaveis", {
+            _clinica: props.clinicaId,
+            _limite: 2000,
+          });
+          if (r.error) throw new Error(r.error.message);
+          if (((r.data as { restantes?: number })?.restantes ?? 0) === 0) break;
+        }
+        setMensagem("Dando número novo a quem ficou sem pasta válida…");
+        for (;;) {
+          const r = await supabase.rpc("importacao_legado_numerar_pendentes", {
             _clinica: props.clinicaId,
             _limite: 2000,
           });
@@ -509,6 +542,8 @@ const ROTULOS_RESUMO: Record<string, string> = {
   responsaveis_aplicados: "Responsáveis preenchidos",
   responsaveis_nao_encontrados: "Responsáveis não encontrados",
   responsaveis_pendentes: "Responsáveis pendentes",
+  numeros_novos_gerados: "Números de prontuário novos (pasta vazia/repetida)",
+  numeros_pendentes: "…aguardando número",
   campos_extras_guardados: "Campos extras guardados (mãe, pai, obs.)",
   prontuarios_importados: "Prontuários importados",
   prontuarios_sem_medico: "…sem médico",
