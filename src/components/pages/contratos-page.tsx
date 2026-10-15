@@ -2137,7 +2137,10 @@ function NovoContratoForm({
     setDepOpen(false);
   };
 
-  const salvar = async () => {
+  // `imprimir = false` vem do botão "Salvar sem imprimir": grava o contrato
+  // igual, só não abre o carnê — o balcão sem impressora ligada não fica
+  // preso esperando a impressão. O carnê sai depois pelo "Gerar carnê".
+  const salvar = async (imprimir = true) => {
     if (!podeEscrever) return toast.error("Você não tem permissão de edição neste módulo.");
     if (!titular || !convenio) return toast.error("Selecione paciente e convênio");
     if (titularContratoAtivo !== null) {
@@ -2270,7 +2273,9 @@ function NovoContratoForm({
     // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
     const withTimeout = <T,>(p: Promise<T>, ms: number) =>
       Promise.race<T>([p, new Promise<T>((_, r) => setTimeout(() => r(new Error("TIMEOUT")), ms))]);
-    if (tipoCobranca === "carne") {
+    if (tipoCobranca === "carne" && !imprimir) {
+      toast.info('Carnê não impresso — use "Gerar carnê" no contrato quando quiser imprimir.');
+    } else if (tipoCobranca === "carne") {
       try {
         await withTimeout(gerarCarnePDF(contrato.id), 15000);
       } catch (e) {
@@ -2835,7 +2840,15 @@ function NovoContratoForm({
             <Button variant="ghost" onClick={onBack}>
               Cancelar
             </Button>
-            <Button onClick={salvar} disabled={!podeSalvar || !podeEscrever}>
+            <Button
+              variant="outline"
+              onClick={() => void salvar(false)}
+              disabled={!podeSalvar || !podeEscrever}
+              className="border-slate-300 text-slate-700 hover:bg-slate-50"
+            >
+              {saving ? "Salvando…" : "Salvar sem imprimir"}
+            </Button>
+            <Button onClick={() => void salvar(true)} disabled={!podeSalvar || !podeEscrever}>
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -4033,6 +4046,8 @@ function DetalheContrato({
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
   /** Cobrança da taxa de 2ª via: recebe no caixa e, em seguida, reimprime o carnê. */
   const [segundaViaOpen, setSegundaViaOpen] = useState(false);
+  /** Cobrança da 2ª via da carteirinha: recebe no caixa e reimprime o cartão. */
+  const [segundaViaCartaoOpen, setSegundaViaCartaoOpen] = useState(false);
   // Isenção de juros + multa para a mensalidade atualmente em pagamento.
   // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
   const [isencaoEncargos, setIsencaoEncargos] = useState<{
@@ -5820,6 +5835,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <CreditCard className="h-4 w-4 mr-1" />
                   Imprimir cartão{deps.length > 0 ? `(${deps.length + 1})` : ""}
                 </Button>
+                {podeEscrever && !cancelado ? (
+                  <Button size="sm" variant="outline" onClick={() => setSegundaViaCartaoOpen(true)}>
+                    <CreditCard className="h-4 w-4 mr-1" />
+                    2ª via da carteirinha ({BRL(VALOR_TAXA_SEGUNDA_VIA)})
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="outline"
@@ -5850,7 +5871,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     }}
                   >
                     <Printer className="h-4 w-4 mr-1" />
-                    Emitir 2ª Via ({BRL(VALOR_TAXA_SEGUNDA_VIA)})
+                    2ª via do carnê ({BRL(VALOR_TAXA_SEGUNDA_VIA)})
                   </Button>
                 ) : null}
                 <Button
@@ -7250,6 +7271,47 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   label: "Imprimir carnê",
                   onClick: () => {
                     gerarCarnePDF(contrato.id).catch(mostrarErro);
+                  },
+                },
+              },
+            );
+          }
+        }}
+      />
+
+      {/* 2ª via da carteirinha: mesma taxa e mesmo diálogo de recebimento da
+          2ª via do carnê, mas reimprime o cartão — vale também para contrato
+          sem parcela em aberto, que é o caso comum de quem perdeu o cartão. */}
+      <LancamentoDialog
+        open={segundaViaCartaoOpen}
+        onOpenChange={setSegundaViaCartaoOpen}
+        tipo="receita"
+        pacienteIdFixo={(contrato as { paciente_id?: string | null }).paciente_id ?? null}
+        initialDescricao={`Taxa de 2ª via de carteirinha — Contrato #${contrato.numero} — ${contrato.paciente_nome}`}
+        initialValor={VALOR_TAXA_SEGUNDA_VIA.toFixed(2)}
+        categoriaFixaNome="TAXA 2A VIA CARNE/CARTAO"
+        onSavedWithData={async (dados) => {
+          setSegundaViaCartaoOpen(false);
+          if (dados.imprimir === false) {
+            toast.success(
+              'Taxa de 2ª via registrada. A carteirinha não foi impressa — use "Imprimir cartão" quando quiser.',
+            );
+            return;
+          }
+          try {
+            await printCartoes(contrato.id);
+            toast.success("Taxa de 2ª via registrada e carteirinha aberta para impressão.");
+          } catch (e) {
+            // Mesmo caso do carnê: o pagamento já está gravado, então oferece
+            // um clique novo em vez de pedir para cobrar de novo.
+            toast.error(
+              `Taxa de 2ª via registrada, mas a carteirinha não abriu (${e instanceof Error ? e.message : String(e)}).`,
+              {
+                duration: 20000,
+                action: {
+                  label: "Imprimir cartão",
+                  onClick: () => {
+                    printCartoes(contrato.id).catch(mostrarErro);
                   },
                 },
               },
