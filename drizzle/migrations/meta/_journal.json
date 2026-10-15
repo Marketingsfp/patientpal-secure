@@ -148,6 +148,13 @@
       "when": 1792067198529,
       "tag": "0020_funcionario_membro_cria_paciente",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792067310133,
+      "tag": "0021_funcionario_paciente_cpf_digitos",
+      "breakpoints": true
     }
   ]
 }
