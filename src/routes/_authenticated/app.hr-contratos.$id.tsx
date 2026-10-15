@@ -367,10 +367,6 @@ function EditarFuncionarioPage() {
       toast.error("Informe o nome");
       return;
     }
-    if (isNovo && !form.paciente_id) {
-      toast.error("Selecione o cliente vinculado ao funcionário");
-      return;
-    }
     // "Criar login" pode ser marcado tanto no cadastro novo quanto ao editar
     // um contrato existente que ainda não tem login vinculado.
     const criandoLogin = form.criar_login && (isNovo || !linkedUserId);
@@ -648,13 +644,26 @@ function EditarFuncionarioPage() {
                       <UserPlus className="h-4 w-4 mr-1" /> Cadastrar
                     </Button>
                   </div>
+                  <Input
+                    className="mt-2"
+                    value={form.funcionario_nome}
+                    readOnly={!!form.paciente_id}
+                    onChange={(e) => setForm((f) => ({ ...f, funcionario_nome: e.target.value }))}
+                    placeholder="Nome completo do funcionário"
+                  />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Escolha o cliente correspondente. Nome e CPF vêm do cadastro do paciente.
+                    Se a pessoa já tem cadastro de cliente, busque acima. Se ainda não tiver, basta
+                    preencher nome e CPF: o cadastro de cliente será criado automaticamente ao salvar.
                   </p>
                 </div>
                 <div>
                   <Label>CPF</Label>
-                  <Input value={form.cpf} readOnly placeholder="—" />
+                  <Input
+                    value={form.cpf ?? ""}
+                    readOnly={!!form.paciente_id}
+                    onChange={(e) => setForm((f) => ({ ...f, cpf: e.target.value }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <Label>Regime</Label>

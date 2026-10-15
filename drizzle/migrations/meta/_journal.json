@@ -141,6 +141,13 @@
       "when": 1792062338954,
       "tag": "0019_orcamento_foto_diagnosticos",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792067198529,
+      "tag": "0020_funcionario_membro_cria_paciente",
+      "breakpoints": true
     }
   ]
 }
