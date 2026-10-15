@@ -263,7 +263,12 @@ function EtapaCard(props: {
       let n = 0;
       let lote: LinhaLida[] = [];
       let bytesLote = 0;
-      for await (const texto of lerLinhas(arquivo.stream(), (b) => setLidoBytes((x) => x + b))) {
+      for await (const texto of lerLinhas(
+        jaConfirmada === Infinity
+          ? new ReadableStream<Uint8Array>({ start: (c) => c.close() })
+          : arquivo.stream(),
+        (b) => setLidoBytes((x) => x + b),
+      )) {
         n += 1;
         if (n <= jaConfirmada) continue;
         const linha = interpretarLinha(texto, n);
@@ -308,7 +313,6 @@ function EtapaCard(props: {
               ? `Fase 1 de 2: liberando os números antigos (${feitos.toLocaleString("pt-BR")} clientes)…`
               : `Fase 2 de 2: gravando o número da pasta (faltam ${(d.restantes ?? 0).toLocaleString("pt-BR")})…`,
           );
-          if (d.fase === "aplicando" && d.feitos === 0 && feitos > 0) feitos = 0;
           if (pausar.current) {
             setMensagem('Pausado. Clique em "Iniciar / continuar" para seguir de onde parou.');
             return;
