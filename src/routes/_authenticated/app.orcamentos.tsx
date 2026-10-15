@@ -1957,7 +1957,7 @@ function NovoOrcamentoDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1"
+                  className="hidden gap-1 md:inline-flex"
                   disabled={lendoPedido || !!fotoCelular}
                   onClick={() => void abrirFotoCelular()}
                 >
