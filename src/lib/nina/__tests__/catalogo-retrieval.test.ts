@@ -1881,3 +1881,42 @@ describe("Fase 8 (exames, homologação 14/10/2026)", () => {
     ]);
   });
 });
+
+describe("Fase 9: opção escolhida da lista com qualificador", () => {
+  beforeEach(() => {
+    banco.servicos = [
+      servico({ id: idSequencial(41), nome: "CURATIVO", valor: 70 }),
+      servico({ id: idSequencial(42), nome: "CURATIVO (P)", valor: 35 }),
+      servico({ id: idSequencial(43), nome: "CURATIVO (G)", valor: 83 }),
+      servico({ id: idSequencial(44), nome: "RETIRADA DE PONTOS (P)", valor: 28 }),
+      servico({ id: idSequencial(45), nome: "RETIRADA DE PONTOS (G)", valor: 55 }),
+    ];
+  });
+
+  it.each([
+    ["CURATIVO (P)", "CURATIVO (P)"],
+    ["curativo g", "CURATIVO (G)"],
+    ["RETIRADA DE PONTOS (P)", "RETIRADA DE PONTOS (P)"],
+    ["retirada de pontos g", "RETIRADA DE PONTOS (G)"],
+  ])("%s seleciona só aquele registro", async (query, esperado) => {
+    const r = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query,
+      tipo_atendimento: "exame_procedimento",
+    });
+    expect(r.esclarecimento).toBeUndefined();
+    expect(r.records.map((i) => i.procedimento)).toEqual([esperado]);
+  });
+
+  it("sem qualificador continua perguntando", async () => {
+    const r = await buscarNoCatalogo({
+      clinicaId: CLINICA,
+      query: "retirada de pontos",
+      tipo_atendimento: "exame_procedimento",
+    });
+    expect(r.esclarecimento?.opcoes.map((o) => o.nome).sort()).toEqual([
+      "RETIRADA DE PONTOS (G)",
+      "RETIRADA DE PONTOS (P)",
+    ]);
+  });
+});
