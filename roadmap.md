@@ -45,7 +45,7 @@
 - [x] Restaurar plano da importação
 - [x] Banco + funções + tela /app/configuracoes/importar-clinica-total + testes (sem importação real, sem publicar)
 - [ ] Importação real da SFP (aguarda o dono rodar com os arquivos)
-- [ ] Etapa 5 "Corrigir número da pasta" + painel de problemas + religar médico nos prontuários (em andamento)
+- [x] Etapa 5 "Corrigir número da pasta" + painel de problemas + religar médico nos prontuários (testado em clínica fictícia; aguarda publicar e o dono rodar)
 
 ## Ligação da Nina (GPT-Live 1)
 - [ ] Conectar GPT-Live 1 à aba "Ligação" do OS ZAP (pedido do Jean, arquivo enviado) — depois da etapa 5
