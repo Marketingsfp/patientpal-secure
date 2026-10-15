@@ -1413,6 +1413,38 @@ async function gerarRespostaNinaInterno(
   const pedirDadosAntesDaTransferencia = await import("@/lib/nina/dados-transferencia-flag.server")
     .then((m) => m.flagDadosTransferenciaAtiva(clinicaId))
     .catch(() => false);
+  // Regra da clínica (15/10/2026): a foto do pedido médico é pedida duas vezes;
+  // sem a foto depois do segundo pedido, a equipe assume direto (sem pedir
+  // nome e data). Depois do primeiro, a Nina responde e o pedido é repetido.
+  const { pedidoMedicoPendente, removerPedidoDeFoto, MOTIVO_PEDIDO_NAO_ENVIADO } =
+    await import("@/lib/nina/pedido-medico");
+  const pedidoNaoEnviado = transferenciaPendente
+    ? null
+    : pedidoMedicoPendente(msgsMemoria, {
+        conversaId: estadoId.conversaId ?? null,
+        inicioSessao: sessaoNina.estado.session_started_at ?? null,
+        teste: opcoes?.teste === true,
+      });
+  let repetirPedidoMedico: string | null = null;
+  if (pedidoNaoEnviado && !jevEncaminhamento) {
+    if (pedidoNaoEnviado.vezes >= 2) {
+      jevEncaminhamento = {
+        motivo: `${MOTIVO_PEDIDO_NAO_ENVIADO}: ${pedidoNaoEnviado.nome}`,
+        urgencia: "normal",
+      };
+      nomeAtendimentoAusente = false;
+    } else repetirPedidoMedico = pedidoNaoEnviado.pergunta;
+    registrarEtapa({
+      tipo: "consulta",
+      fonte: "sistema",
+      titulo:
+        pedidoNaoEnviado.vezes >= 2
+          ? "Pedido médico pedido duas vezes e não enviado: encaminhamento direto à equipe"
+          : "Pedido médico ainda não enviado: a Nina responde e pede a foto de novo",
+      dados: { item: pedidoNaoEnviado.nome, pedidos: pedidoNaoEnviado.vezes },
+      codigo: { arquivo: "src/lib/nina/pedido-medico.ts", funcao: "pedidoMedicoPendente" },
+    });
+  }
   if (nomeAtendimentoAusente && !jevEncaminhamento) {
     if (perguntaNomeAnterior)
       jevEncaminhamento = { motivo: MOTIVO_NOME_NAO_INFORMADO, urgencia: "normal" };
@@ -5209,6 +5241,18 @@ async function gerarRespostaNinaInterno(
         comPedido,
       );
     resposta = comPedido;
+    if (repetirPedidoMedico && !resposta.includes(repetirPedidoMedico)) {
+      const comSegundoPedido = [removerPedidoDeFoto(resposta).trim(), repetirPedidoMedico]
+        .filter(Boolean)
+        .join("\n\n");
+      transformar(
+        "pedido_medico.segundo_pedido",
+        "Foto do pedido médico ainda não enviada: segundo pedido",
+        resposta,
+        comSegundoPedido,
+      );
+      resposta = comSegundoPedido;
+    }
   }
 
   // Modalidade (regras de 13/10/2026): a Nina só fala da forma de atendimento
