@@ -154,6 +154,9 @@ const MESES = [
 
 const DATA_NUMERICA = /\b(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{4}|\d{2})\b/;
 const DATA_COMPACTA = /(?<!\d)(\d{2})(\d{2})(\d{4})(?!\d)/;
+/** "dia 5 mes 6 ano 1987", "dia7 do6 de1988", "7 do 8 de 1984" (homologação 15/10/2026). */
+const DATA_PARTES =
+  /(?:\bdia\s*)?(?<!\d)(\d{1,2})\s*,?\s*(?:do\s+mes|mes|do|de)\s*(\d{1,2})\s*,?\s*(?:do\s+ano|ano|de|do)\s*(\d{4})(?!\d)/;
 const DATA_EXTENSO = new RegExp(
   `\\b(\\d{1,2})\\s*(?:de\\s+)?(${MESES.join("|")})\\s*(?:de\\s+)?(\\d{4})\\b`,
 );
@@ -204,6 +207,11 @@ function lerData(texto: string, hoje: Date): { data: string; trecho: string } | 
     const data = dataValida(Number(compacta[1]), Number(compacta[2]), Number(compacta[3]), hoje);
     if (data) return { data, trecho: compacta[0] };
   }
+  const partes = DATA_PARTES.exec(t);
+  if (partes) {
+    const data = dataValida(Number(partes[1]), Number(partes[2]), Number(partes[3]), hoje);
+    if (data) return { data, trecho: partes[0] };
+  }
   return null;
 }
 
@@ -234,6 +242,17 @@ function chaveMesmoTamanho(t: string): string {
 const PARENTES =
   "filho|filha|pai|mae|avo|avoa|tia|tio|irma|irmao|marido|esposa|esposo|sobrinho|sobrinha|neto|neta|bebe|enteado|enteada|sogro|sogra|primo|prima|companheiro|companheira";
 
+/**
+ * "paciente Fulano" sem o parentesco: só no meio da frase e escrito em
+ * minúscula ("mas paciente…", "sou filho Caio. paciente…"). "Paciente" com
+ * maiúscula é nome (os nomes fictícios "Paciente Teste…"), e nunca depois de
+ * "meu nome é" nem no início do texto.
+ */
+const ROTULO_PACIENTE_SOLTO = new RegExp(
+  String.raw`(?<!\b(?:nome(?: completo)?(?: e)?|chamo|sou(?: o| a)?)\s)(?<=[a-z,.]\s)\bpaciente\s+(?:e\s+)?[,:-]?\s*`,
+  "g",
+);
+
 /** Rótulos que apresentam o PACIENTE quando quem escreve é outra pessoa. */
 const ROTULOS_PACIENTE: RegExp[] = [
   /\bnome (?:completo )?d[oa] (?:paciente|bebe|crianca)\s*(?:e\b|:|-)?\s*/g,
@@ -248,10 +267,31 @@ const ROTULOS_PACIENTE: RegExp[] = [
     String.raw`\b(?:meu|minha)\s+(?:${PARENTES})\s*(?:se chama\b|chama\b|e\b|[,:-])\s*`,
     "g",
   ),
+  // Homologação 15/10/2026 (ciclos 1248–1424): "é pro meu pai Fulano",
+  // "paciente minha irmã Fulana", "paciente é meu filho Fulano", "minha mãe
+  // paciente Fulana", "é o meu marido Fulano", "o dele Fulano".
+  new RegExp(
+    String.raw`\b(?:pro|pra|para o|para a|p/)\s+(?:o\s+|a\s+)?(?:meu|minha)\s+(?:${PARENTES})\b\s*[,:-]?\s*`,
+    "g",
+  ),
+  // "paciente minha irmã Fulana", "paciente é meu filho Fulano", "paciente esposa Fulana".
+  new RegExp(
+    String.raw`(?<!\b(?:nome(?: completo)?(?: e)?|chamo)\s)\bpaciente\s+(?:e\s+)?(?:(?:o|a)\s+)?(?:(?:meu|minha)\s+)?(?:${PARENTES})\b\s*[,:-]?\s*`,
+    "g",
+  ),
+  ROTULO_PACIENTE_SOLTO,
+  new RegExp(String.raw`\b(?:meu|minha)\s+(?:${PARENTES})\s+paciente\s*[,:-]?\s*`, "g"),
+  new RegExp(String.raw`\b(?:e\s+)?(?:o|a)\s+(?:meu|minha)\s+(?:${PARENTES})\b\s*[,:-]?\s*`, "g"),
+  /\b(?:o|a)\s+(?:dele|dela)\s*(?:e\b|:)?\s*/g,
+];
+/** "ela Fulana Cardoso, nascimento: …": só com o nome começando em maiúscula. */
+const ROTULOS_PACIENTE_MAIUSCULA: RegExp[] = [
+  /\b(?:ele|ela|o menino|a menina|o bebe|a bebe|a crianca)\s+/g,
 ];
 /** Rótulos de quem escreve falando de si. */
 const ROTULOS_PROPRIO: RegExp[] = [
-  /\bmeu nome (?:completo )?(?:e\b|:)\s*:?\s*/g,
+  // "meu nome Fulano, nasci…" também vale, sem o "é" (ciclos 1235–1261).
+  /\bmeu nome (?:completo )?(?:e\b|:)?\s*:?\s*/g,
   /\b(?:eu )?me chamo\s+/g,
   /\bnome(?: completo)?\s*:\s*/g,
 ];
@@ -260,6 +300,8 @@ const ROTULO_SOU = /\bsou\s+(?:(?:o|a)\s+)?/g;
 
 /** Palavras que encerram o nome quando aparecem depois dele. */
 const PARADAS = new Set([
+  "nasc",
+  "dn",
   "nasci",
   "nasceu",
   "nascida",
@@ -361,6 +403,58 @@ const NUNCA_NOME = new Set([
   "nasceu",
   "nascida",
   "nascido",
+  "nasc",
+  // Frases e termos que viravam nome no resumo (homologação 15/10/2026:
+  // "Eu Q To Falando", "Qnt Custa", "Levo Pedido", "Rm de Joelho"…).
+  "eu",
+  "q",
+  "to",
+  "ta",
+  "tava",
+  "esta",
+  "estou",
+  "so",
+  "mesmo",
+  "msm",
+  "vendo",
+  "falando",
+  "qnt",
+  "qto",
+  "quanto",
+  "custa",
+  "valor",
+  "levo",
+  "levar",
+  "pedido",
+  "receita",
+  "original",
+  "papel",
+  "precisa",
+  "preciso",
+  "quer",
+  "queria",
+  "faz",
+  "fazer",
+  "tem",
+  "rm",
+  "rx",
+  "tc",
+  "usg",
+  "tsh",
+  "ecg",
+  "eeg",
+  "exames",
+  "ultrassonografia",
+  "ultrassom",
+  "joelho",
+  "debito",
+  "credito",
+  "dinheiro",
+  "pix",
+  "cartao",
+  "menino",
+  "menina",
+  "crianca",
 ]);
 
 function palavrasValidas(palavras: string[], permitirPaciente = false): boolean {
@@ -429,6 +523,7 @@ function nomeRotulado(
 ): string | null {
   for (const rotulo of rotulos) {
     for (const m of chave.matchAll(rotulo)) {
+      if (rotulo === ROTULO_PACIENTE_SOLTO && original[m.index!] !== "p") continue;
       const nome = nomeAPartirDe(original, m.index! + m[0].length, exigirMaiuscula);
       if (nome) return nome;
     }
@@ -465,7 +560,9 @@ export function extrairDadosTransferencia(
       base = `${base.slice(0, inicio)}${"\n".padEnd(lida.trecho.length, " ")}${base.slice(inicio + lida.trecho.length)}`;
   }
   const chave = chaveMesmoTamanho(base);
-  const doPaciente = nomeRotulado(base, chave, ROTULOS_PACIENTE);
+  const doPaciente =
+    nomeRotulado(base, chave, ROTULOS_PACIENTE) ??
+    nomeRotulado(base, chave, ROTULOS_PACIENTE_MAIUSCULA, true);
   const proprio =
     nomeRotulado(base, chave, ROTULOS_PROPRIO) ?? nomeRotulado(base, chave, [ROTULO_SOU], true);
   let nome = doPaciente ?? proprio;
@@ -476,7 +573,12 @@ export function extrairDadosTransferencia(
     // "Dr. Fulano" fica junto da palavra "Dr" e é recusado.
     const semAbrev = base.replace(/\b(dra?|sra?|profa?)\./gi, "$1 ");
     for (const trecho of semAbrev.split(/[\n,;:|()]+|[.!?](?:\s+|$)|\s+-\s+/)) {
-      const palavras = aparaConectores(trecho.replace(/["“”]/g, " ").trim().split(/\s+/));
+      // "Fulana de Tal nasc …": o rótulo da data no fim não faz parte do nome.
+      const semRotuloData = trecho
+        .replace(/["“”]/g, " ")
+        .replace(/\s+(?:nasc(?:eu|ida|ido)?|dn)\s*[:,-]?\s*$/i, "")
+        .trim();
+      const palavras = aparaConectores(semRotuloData.split(/\s+/));
       if (!palavrasValidas(palavras, true)) continue;
       const significativas = palavras.filter((p) => !CONECTORES.has(semAcento(p.toLowerCase())));
       const maiusculas =
@@ -493,7 +595,7 @@ export function extrairDadosTransferencia(
     const linha = bruto.slice(0, Math.max(inicio, 0)).split("\n").at(-1) ?? "";
     const antes = linha
       .replace(
-        /(?:,|-|\s)*(?:nasci(?:do|da)?(?: em)?|data de nascimento|nascimento|dn)?\s*[:,-]?\s*$/i,
+        /(?:,|-|\s)*(?:nasci(?:do|da)?(?: em)?|nasc(?:eu)?(?: em)?|data de nascimento|nascimento|dn)?\s*[:,-]?\s*$/i,
         "",
       )
       .trim();
@@ -518,6 +620,17 @@ export function dadosDaConversa(
   let nome: string | null = null;
   let data: string | null = null;
   let responsavel: string | null = null;
+  // A mensagem que traz nome E data juntos é a dos dados: vale antes de um
+  // "nome" lido de outra mensagem da conversa (homologação 15/10/2026).
+  for (const m of mensagens) {
+    const d = extrairDadosTransferencia(m, hoje);
+    if (d.nome_completo && d.data_nascimento)
+      return {
+        nome_completo: d.nome_completo,
+        data_nascimento: d.data_nascimento,
+        ...(d.responsavel ? { responsavel: d.responsavel } : {}),
+      };
+  }
   for (const m of mensagens) {
     const d = extrairDadosTransferencia(m, hoje);
     if (!nome && d.nome_completo) {
