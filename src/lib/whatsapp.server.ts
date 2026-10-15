@@ -1426,7 +1426,7 @@ async function gerarRespostaNinaInterno(
         teste: opcoes?.teste === true,
       });
   let repetirPedidoMedico: string | null = null;
-  if (pedidoNaoEnviado && !jevEncaminhamento) {
+  if (pedidoNaoEnviado && (pedidoNaoEnviado.vezes < 2 || !jevEncaminhamento)) {
     if (pedidoNaoEnviado.vezes >= 2) {
       jevEncaminhamento = {
         motivo: `${MOTIVO_PEDIDO_NAO_ENVIADO}: ${pedidoNaoEnviado.nome}`,
@@ -2622,6 +2622,11 @@ async function gerarRespostaNinaInterno(
       .map((m) => String(m.transcricao ?? m.body ?? ""));
     return [mensagemPaciente, ...anteriores.filter((t) => t && t !== mensagemPaciente)];
   }
+  const { fotoPendenteNoTurno, INSTRUCAO_FOTO_ANTES_DOS_DADOS } =
+    await import("@/lib/nina/pedido-medico");
+  const fotoPedidoAntesDosDados = () =>
+    fotoPendenteNoTurno(pedidoNaoEnviado, runtimeContext.pedido_medico_do_turno);
+  let transferenciaAguardandoFoto: string | null = null;
   // Regra de 12/10/2026: antes de transferir, a Nina pede uma vez nome completo e
   // data de nascimento; a transferência acontece na próxima mensagem do paciente.
   // Urgência, reclamação, pedido explícito por uma pessoa e aviso silencioso
@@ -2636,7 +2641,7 @@ async function gerarRespostaNinaInterno(
     },
     contexto = "",
   ): Promise<boolean> {
-    if (perguntaDadosTransferencia) return true;
+    if (perguntaDadosTransferencia || transferenciaAguardandoFoto) return true;
     if (
       !pedirDadosAntesDaTransferencia ||
       transferenciaPendente ||
@@ -2655,6 +2660,23 @@ async function gerarRespostaNinaInterno(
       })
     )
       return false;
+    // Decisão da clínica (15/10/2026, "foto primeiro"): com a foto do pedido
+    // médico pendente, a Nina responde e pede a foto, sem pedir nome e data nem
+    // transferir. Com a foto, o fluxo segue; sem ela depois do segundo pedido,
+    // PEDIDO_MEDICO_NAO_ENVIADO transfere direto.
+    if (fotoPedidoAntesDosDados()) {
+      transferenciaAguardandoFoto = argumentos.motivo.slice(0, 300);
+      (runtimeContext as Record<string, unknown>).transferencia_apos_resposta =
+        INSTRUCAO_FOTO_ANTES_DOS_DADOS;
+      registrarEtapa({
+        tipo: "consulta",
+        fonte: "sistema",
+        titulo: "Foto do pedido médico pendente: a Nina pede a foto antes de nome e data",
+        dados: { motivo: transferenciaAguardandoFoto },
+        codigo: { arquivo: "src/lib/nina/pedido-medico.ts", funcao: "fotoPendenteNoTurno" },
+      });
+      return true;
+    }
     // A mensagem ou a conversa já trazem nome completo e data de nascimento
     // ("meu nome é … e nasci em …", inclusive enviados antes): transfere com
     // eles, sem pedir de novo.
@@ -3293,7 +3315,9 @@ async function gerarRespostaNinaInterno(
     ) {
       encaminharAposResposta = true;
       (runtimeContext as Record<string, unknown>).transferencia_apos_resposta =
-        dadosTransferencia.INSTRUCAO_RESPONDER_E_ENCAMINHAR;
+        fotoPedidoAntesDosDados()
+          ? INSTRUCAO_FOTO_ANTES_DOS_DADOS
+          : dadosTransferencia.INSTRUCAO_RESPONDER_E_ENCAMINHAR;
     } else {
       // O motivo leva o atendimento informado, para a equipe saber o que confirmar.
       jevEncaminhamento = { motivo: motivoAgendamento(referenciasDaDecisao), urgencia: "normal" };
@@ -4127,13 +4151,22 @@ async function gerarRespostaNinaInterno(
           mensagens.push({
             role: "tool",
             tool_call_id: c.id,
-            content: JSON.stringify({
-              ok: false,
-              executada: false,
-              erro: "DADOS_ANTES_DA_TRANSFERENCIA",
-              mensagem:
-                "O sistema pediu ao paciente nome completo e data de nascimento. A transferência acontece na próxima mensagem dele; não escreva outra resposta.",
-            }),
+            content: JSON.stringify(
+              transferenciaAguardandoFoto && !perguntaDadosTransferencia
+                ? {
+                    ok: false,
+                    executada: false,
+                    erro: "FOTO_PEDIDO_ANTES_DA_TRANSFERENCIA",
+                    mensagem: INSTRUCAO_FOTO_ANTES_DOS_DADOS,
+                  }
+                : {
+                    ok: false,
+                    executada: false,
+                    erro: "DADOS_ANTES_DA_TRANSFERENCIA",
+                    mensagem:
+                      "O sistema pediu ao paciente nome completo e data de nascimento. A transferência acontece na próxima mensagem dele; não escreva outra resposta.",
+                  },
+            ),
           });
           continue;
         }
@@ -5224,13 +5257,33 @@ async function gerarRespostaNinaInterno(
     }
   }
 
+  // Foto primeiro (15/10/2026): a transferência esperou a foto; a resposta não
+  // promete encaminhamento nem pede nome e data, só responde e pede a foto.
+  const aguardandoFoto =
+    Boolean(transferenciaAguardandoFoto) &&
+    !perguntaDadosTransferencia &&
+    !semNovaMensagem &&
+    !turnoObsoleto &&
+    !houveHandoff &&
+    !finalizacaoHandoff;
+  if (aguardandoFoto) {
+    const semEncaminhamento = dadosTransferencia.respostaAntesDaTransferencia(resposta).trim();
+    if (semEncaminhamento !== resposta.trim())
+      transformar(
+        "pedido_medico.foto_antes_dos_dados",
+        "Foto do pedido médico antes de nome, data e encaminhamento",
+        resposta,
+        semEncaminhamento,
+      );
+    resposta = semEncaminhamento;
+  }
   if (
     !semNovaMensagem &&
     !turnoObsoleto &&
     !houveHandoff &&
     !finalizacaoHandoff &&
     !ctxFerramentas?.esclarecimentoCatalogo &&
-    resposta.trim()
+    (resposta.trim() || aguardandoFoto)
   ) {
     const comPedido = acrescentarSolicitacaoPedido(resposta, runtimeContext.pedido_medico_do_turno);
     if (comPedido !== resposta)
@@ -5253,6 +5306,10 @@ async function gerarRespostaNinaInterno(
       );
       resposta = comSegundoPedido;
     }
+    if (aguardandoFoto && !resposta.trim())
+      resposta =
+        runtimeContext.pedido_medico_do_turno.find((s) => s.acao !== "foto_recebida")?.pergunta ??
+        "";
   }
 
   // Modalidade (regras de 13/10/2026): a Nina só fala da forma de atendimento

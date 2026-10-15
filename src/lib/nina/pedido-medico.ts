@@ -181,6 +181,26 @@ export const MOTIVO_PEDIDO_NAO_ENVIADO = "PEDIDO_MEDICO_NAO_ENVIADO";
 
 export type PedidoMedicoPendente = { nome: string; vezes: number; pergunta: string };
 
+/**
+ * Decisão da clínica (15/10/2026, "foto primeiro"): enquanto a foto do pedido
+ * estiver pendente (pedida neste turno, já pedida uma vez ou exigida pelo item
+ * consultado), a transferência espera e nome e data não são pedidos. Depois do
+ * segundo pedido sem foto, quem decide é PEDIDO_MEDICO_NAO_ENVIADO.
+ */
+export function fotoPendenteNoTurno(
+  pendente: PedidoMedicoPendente | null,
+  solicitacoes: readonly SolicitacaoPedidoMedico[],
+): boolean {
+  if (pendente && pendente.vezes >= 2) return false;
+  return (
+    Boolean(pendente) ||
+    solicitacoes.some((s) => s.acao === "solicitar_foto" || s.acao === "ja_solicitado")
+  );
+}
+
+export const INSTRUCAO_FOTO_ANTES_DOS_DADOS =
+  "A foto do pedido médico ainda não chegou e vem antes de qualquer encaminhamento. Responda somente as dúvidas do paciente com o que o cadastro traz (débito e crédito à vista têm o valor de Pix/cartão). Não peça nome nem data de nascimento, não diga que vai encaminhar ou transferir e não peça a foto: o sistema pede a foto do pedido médico logo depois da sua resposta.";
+
 const SOLICITACAO_DO_SISTEMA =
   /Para (.+?), é necessário pedido médico\.\s+Pode enviar uma foto legível do pedido médico por aqui\?/;
 
