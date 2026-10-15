@@ -1,6 +1,7 @@
 /** Preferências conversacionais revalidadas no catálogo; nunca autorizam agendamento. */
 import { normalizarTexto, type FatoRecuperado } from "./evidencia";
 import { perguntaIdentificacaoProfissional } from "../catalogo-busca";
+import { literalRegex } from "../regex-literal";
 
 export type RaizSelecaoContextual = {
   fonte: "catalogo_publicado";
@@ -223,7 +224,7 @@ function citacoesMedicos(m: string, candidatos: CandidatoSelecaoContextual[]): C
   }
   // Nome sem título só é candidato; o chamador ainda exige uma escolha explícita.
   for (const primeiro of primeiras) {
-    for (const match of m.matchAll(new RegExp(`\\b${primeiro}\\b`, "g"))) {
+    for (const match of m.matchAll(new RegExp(`\\b${literalRegex(primeiro)}\\b`, "g"))) {
       if (citacoes.some((c) => match.index! >= c.inicio && match.index! < c.fim)) continue;
       const inicio = match.index!,
         cauda = m.slice(inicio).split(/[,.!?;\n]/)[0]!;

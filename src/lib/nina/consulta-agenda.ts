@@ -6,6 +6,7 @@
  */
 import type { SelecaoContextual } from "./confidence/selecao-contextual";
 import { lerEscolhaHorario } from "./agendamento-escolha";
+import { literalRegex } from "./regex-literal";
 
 /** Referência ao pedido/aceite do paciente; não representa vaga nem reserva. */
 export type InteresseConsultaAgenda = {
@@ -341,7 +342,7 @@ function complementoDaConsulta(ctx: ContextoConsultaAgenda): boolean {
   for (const termo of [...nome.split(/\s+/), ...modalidade.split(/\s+/)].filter(
     (t) => t.length > 2,
   ))
-    resto = resto.replace(new RegExp(`\\b${termo}\\b`, "g"), " ");
+    resto = resto.replace(new RegExp(`\\b${literalRegex(termo)}\\b`, "g"), " ");
   resto = resto.replace(
     /\b(?:nao|nem|sim|s|isso|ok|pode|ser|quero|prefiro|vou|fazer|por|favor|a|o|as|os|de|da|do|das|dos|no|na|nas|nos|para|pra|em|com|e|mas|eh|sera|seria|dr|dra|doutor|doutora|geral|infantil|adulto|adulta|segunda|terca|quarta|quinta|sexta|sabado|domingo|manha|tarde|noite|amanha|hoje|proxima|proximo|semana|dia|feira|hora|horas|h|hs|às|se|tiver|houver|algum|alguma|horario|horarios|livre|livres|disponivel|disponiveis|parte|periodo|preferencia|preferencialmente|possivel|mais|cedo|tarde)\b/g,
     " ",
@@ -448,7 +449,7 @@ function mencionaMedico(nome: string, texto: string): boolean {
     .filter((t) => t.length > 2 && !["dos", "das"].includes(t));
   if (!termos.length) return false;
   const t = normalizar(texto);
-  const citacao = t.match(new RegExp(`\\b${termos[0]}\\b([^.!?\\n]*)`));
+  const citacao = t.match(new RegExp(`\\b${literalRegex(termos[0]!)}\\b([^.!?\\n]*)`));
   if (!citacao) return false;
   const sobrenomes = (citacao[1] ?? "")
     .split(

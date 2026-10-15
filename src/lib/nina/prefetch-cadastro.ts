@@ -13,6 +13,7 @@ import { normalizar, raizEspecialidade } from "../nina-especialidade";
 import type { IntencaoNina } from "./atendimento-fase1";
 import type { OBJETIVOS_PESQUISA_CATALOGO } from "./catalogo-pesquisa";
 import { itensDoPedidoLido } from "./multiplos-atendimentos";
+import { literalRegex } from "./regex-literal";
 
 export const FLAG_PREFETCH_CADASTRO = "nina_prefetch_cadastro";
 export const PRAZO_PREFETCH_MS = 2000;
@@ -162,7 +163,7 @@ function citaEspecialidade(texto: string, nome: string): boolean {
   const primeira = n.split(" ")[0] ?? "";
   if (n.includes(" ") && primeira.length >= 6) {
     const r = primeira.slice(0, primeira.length - 1); // clinica -> clinic
-    return new RegExp(`\\b${r}[a-z]?\\b`).test(texto);
+    return new RegExp(`\\b${literalRegex(r)}[a-z]?\\b`).test(texto);
   }
   return false;
 }
