@@ -1,0 +1,650 @@
+/**
+ * Ambiente de testes da Nina: 10 conversas simultâneas, cada lead com um modo
+ * de paciente difícil (Claude Opus 5.5) e um juiz que lista as falhas da Nina
+ * ao fim de cada conversa. Esta tela conduz as conversas: mantê-la aberta.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { FlaskConical, Loader2, Play, Square, History, MessageSquareText } from "lucide-react";
+import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { enviarMensagemTeste } from "@/lib/nina/teste-console.functions";
+import {
+  avaliarConversaAmbiente,
+  conversaAmbiente,
+  encerrarConversaAmbiente,
+  iniciarRodadaAmbiente,
+  listarRodadasAmbiente,
+  prepararAmbienteTestes,
+  turnoPacienteAmbiente,
+} from "@/lib/nina/ambiente-testes.functions";
+
+type Modo = { id: string; nome: string; resumo: string };
+type Falha = {
+  categoria: string;
+  gravidade: "alta" | "media" | "baixa";
+  trecho: string;
+  explicacao: string;
+};
+type Avaliacao = {
+  resultado: string;
+  nota: number;
+  resumo: string;
+  falhas: Falha[];
+  acertos: string[];
+};
+type Estado = "aguardando" | "paciente" | "nina" | "avaliando" | "concluida" | "parada" | "erro";
+type Linha = { autor: "paciente" | "nina" | "sistema"; texto: string };
+
+type Conversa = {
+  posicao: number;
+  modo: string;
+  assunto: string;
+  simulacaoId: string | null;
+  leadId: string | null;
+  conversaId: string | null;
+  estado: Estado;
+  turnos: number;
+  linhas: Linha[];
+  avaliacao: Avaliacao | null;
+  erro: string | null;
+  motivoFim: string | null;
+};
+
+type Rodada = {
+  rodada: string;
+  criadaEm: string;
+  conversas: number;
+  avaliadas: number;
+  notaMedia: number | null;
+  falhas: number;
+  tokens: number;
+};
+
+const ROTULO_ESTADO: Record<Estado, string> = {
+  aguardando: "Aguardando",
+  paciente: "Paciente escrevendo…",
+  nina: "Nina respondendo…",
+  avaliando: "Juiz avaliando…",
+  concluida: "Concluída",
+  parada: "Parada",
+  erro: "Erro",
+};
+
+const ROTULO_RESULTADO: Record<string, string> = {
+  aprovado: "Aprovada",
+  aprovado_observacao: "Aprovada com observação",
+  reprovado: "Reprovada",
+  erro_critico: "Erro crítico",
+};
+
+const COR_RESULTADO: Record<string, string> = {
+  aprovado: "bg-emerald-600 text-white",
+  aprovado_observacao:
+    "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100",
+  reprovado: "bg-amber-500 text-white",
+  erro_critico: "bg-red-600 text-white",
+};
+
+const COR_GRAVIDADE: Record<Falha["gravidade"], string> = {
+  alta: "text-red-600 dark:text-red-400",
+  media: "text-amber-600 dark:text-amber-400",
+  baixa: "text-muted-foreground",
+};
+
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function AmbienteTestes() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id;
+  const preparar = useServerFn(prepararAmbienteTestes);
+  const iniciar = useServerFn(iniciarRodadaAmbiente);
+  const turno = useServerFn(turnoPacienteAmbiente);
+  const enviar = useServerFn(enviarMensagemTeste);
+  const encerrar = useServerFn(encerrarConversaAmbiente);
+  const avaliar = useServerFn(avaliarConversaAmbiente);
+  const listar = useServerFn(listarRodadasAmbiente);
+  const carregarConversa = useServerFn(conversaAmbiente);
+
+  const [modos, setModos] = useState<Modo[]>([]);
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [turnosMax, setTurnosMax] = useState("10");
+  const [rodando, setRodando] = useState(false);
+  const [iniciando, setIniciando] = useState(false);
+  const [rodadas, setRodadas] = useState<Rodada[]>([]);
+  const [rodadaAberta, setRodadaAberta] = useState<string | null>(null);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
+  const [detalhe, setDetalhe] = useState<Conversa | null>(null);
+  const [detalheLinhas, setDetalheLinhas] = useState<Linha[] | null>(null);
+  const pararRef = useRef(false);
+  const podeEscrever = usePodeEscrever("nina-ambiente-testes");
+
+  const modoPorId = (id: string) => modos.find((m) => m.id === id);
+
+  const atualizar = useCallback((posicao: number, mudanca: Partial<Conversa>) => {
+    setConversas((lista) => lista.map((c) => (c.posicao === posicao ? { ...c, ...mudanca } : c)));
+  }, []);
+  const acrescentar = useCallback((posicao: number, linha: Linha) => {
+    setConversas((lista) =>
+      lista.map((c) => (c.posicao === posicao ? { ...c, linhas: [...c.linhas, linha] } : c)),
+    );
+  }, []);
+
+  const carregarRodadas = useCallback(async () => {
+    if (!clinicaId) return;
+    try {
+      const r: any = await listar({ data: { clinicaId } });
+      setRodadas(r.rodadas as Rodada[]);
+    } catch (e) {
+      mostrarErro(e as never, "carregar rodadas do ambiente de testes");
+    }
+  }, [clinicaId, listar]);
+
+  useEffect(() => {
+    if (!clinicaId) return;
+    let vivo = true;
+    setErroCarga(null);
+    preparar({ data: { clinicaId } })
+      .then((r: any) => {
+        if (!vivo) return;
+        setModos(r.modos as Modo[]);
+        setConversas(
+          (r.leads as { modo: string }[]).map((l, i) => ({
+            posicao: i + 1,
+            modo: l.modo,
+            assunto: "—",
+            simulacaoId: null,
+            leadId: null,
+            conversaId: null,
+            estado: "aguardando",
+            turnos: 0,
+            linhas: [],
+            avaliacao: null,
+            erro: null,
+            motivoFim: null,
+          })),
+        );
+      })
+      .catch((e: unknown) => vivo && setErroCarga(String((e as Error)?.message ?? e)));
+    void carregarRodadas();
+    return () => {
+      vivo = false;
+    };
+  }, [clinicaId, preparar, carregarRodadas]);
+
+  // Sair da tela com a rodada rodando interrompe as conversas: avisa antes.
+  useEffect(() => {
+    if (!rodando) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [rodando]);
+
+  async function conduzir(c: Conversa) {
+    const { simulacaoId, leadId, posicao } = c;
+    if (!clinicaId || !simulacaoId || !leadId) return;
+    let turnos = 0;
+    try {
+      for (;;) {
+        if (pararRef.current) break;
+        atualizar(posicao, { estado: "paciente" });
+        const passo: any = await turno({ data: { clinicaId, simulacaoId } });
+        if (passo.acao === "encerrar" || !passo.mensagem) {
+          atualizar(posicao, { motivoFim: passo.motivo ?? null });
+          break;
+        }
+        if (pararRef.current) break;
+        acrescentar(posicao, { autor: "paciente", texto: passo.mensagem });
+        turnos += 1;
+        atualizar(posicao, { estado: "nina", turnos });
+        const envio: any = await enviar({
+          data: {
+            clinicaId,
+            leadId,
+            tipo: "text",
+            texto: passo.mensagem,
+            chave: `ambiente-${simulacaoId}-${turnos}`,
+          },
+        });
+        if (envio?.processamento === "ERRO" && envio?.erro) throw new Error(envio.erro);
+        if (envio?.reply) acrescentar(posicao, { autor: "nina", texto: String(envio.reply) });
+        if (envio?.transferida) {
+          await encerrar({
+            data: {
+              clinicaId,
+              simulacaoIds: [simulacaoId],
+              status: "concluida",
+              motivo: "transferida para atendente",
+            },
+          });
+          atualizar(posicao, { motivoFim: "transferida para atendente" });
+          break;
+        }
+      }
+      if (pararRef.current) {
+        await encerrar({
+          data: {
+            clinicaId,
+            simulacaoIds: [simulacaoId],
+            status: "parada",
+            motivo: "parada pelo operador",
+          },
+        }).catch(() => {});
+        atualizar(posicao, { estado: "parada" });
+        return;
+      }
+      if (!turnos) {
+        atualizar(posicao, { estado: "concluida" });
+        return;
+      }
+      atualizar(posicao, { estado: "avaliando" });
+      const j: any = await avaliar({ data: { clinicaId, simulacaoId } });
+      atualizar(posicao, { estado: "concluida", avaliacao: j as Avaliacao });
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e).slice(0, 300);
+      await encerrar({
+        data: { clinicaId, simulacaoIds: [simulacaoId], status: "erro", motivo: msg },
+      }).catch(() => {});
+      atualizar(posicao, { estado: "erro", erro: msg });
+    }
+  }
+
+  async function iniciarRodada() {
+    if (!clinicaId || rodando) return;
+    setIniciando(true);
+    pararRef.current = false;
+    setRodadaAberta(null);
+    try {
+      const r: any = await iniciar({ data: { clinicaId, turnos: Number(turnosMax) } });
+      const novas: Conversa[] = (r.itens as any[]).map((it) => ({
+        posicao: it.posicao,
+        modo: it.modo,
+        assunto: it.assunto,
+        simulacaoId: it.simulacaoId,
+        leadId: it.leadId,
+        conversaId: null,
+        estado: "aguardando",
+        turnos: 0,
+        linhas: [],
+        avaliacao: null,
+        erro: null,
+        motivoFim: null,
+      }));
+      setConversas(novas);
+      setRodando(true);
+      setIniciando(false);
+      // Início escalonado: as 10 conversas não chegam no mesmo segundo.
+      await Promise.all(novas.map((c, i) => espera(i * 1500).then(() => conduzir(c))));
+      toast.success("Rodada concluída. As avaliações estão nos cards.");
+    } catch (e) {
+      mostrarErro(e as never, "iniciar a rodada do ambiente de testes");
+    } finally {
+      setIniciando(false);
+      setRodando(false);
+      void carregarRodadas();
+    }
+  }
+
+  function pararRodada() {
+    pararRef.current = true;
+    toast.info("Parando: cada conversa termina a mensagem em andamento.");
+  }
+
+  async function abrirRodada(rodada: string) {
+    if (!clinicaId || rodando) return;
+    try {
+      const r: any = await listar({ data: { clinicaId, rodada } });
+      setRodadaAberta(rodada);
+      setConversas(
+        (r.conversas as any[]).map((c) => ({
+          posicao: c.posicao,
+          modo: c.modo,
+          assunto: c.assunto,
+          simulacaoId: c.simulacaoId,
+          leadId: null,
+          conversaId: c.conversaId,
+          estado:
+            c.status === "executando"
+              ? "parada"
+              : c.status === "erro"
+                ? "erro"
+                : c.status === "parada"
+                  ? "parada"
+                  : "concluida",
+          turnos: c.turnos,
+          linhas: [],
+          avaliacao: c.avaliacao as Avaliacao | null,
+          erro: null,
+          motivoFim: c.motivoFim,
+        })),
+      );
+    } catch (e) {
+      mostrarErro(e as never, "abrir a rodada");
+    }
+  }
+
+  async function verDetalhe(c: Conversa) {
+    setDetalhe(c);
+    setDetalheLinhas(c.linhas.length && !c.conversaId ? c.linhas : null);
+    if (!clinicaId || !c.conversaId) return;
+    try {
+      const r: any = await carregarConversa({ data: { clinicaId, conversaId: c.conversaId } });
+      setDetalheLinhas(r.linhas as Linha[]);
+    } catch (e) {
+      mostrarErro(e as never, "carregar a conversa");
+      setDetalheLinhas(c.linhas);
+    }
+  }
+
+  if (!clinicaId) return null;
+  if (erroCarga)
+    return (
+      <p role="alert" className="p-6 text-sm text-destructive">
+        Não foi possível abrir o ambiente de testes: {erroCarga}
+      </p>
+    );
+  if (!modos.length)
+    return (
+      <p role="status" className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Preparando o ambiente de
+        testes…
+      </p>
+    );
+
+  const concluidas = conversas.filter((c) => c.avaliacao);
+  const media = concluidas.length
+    ? Math.round(concluidas.reduce((t, c) => t + (c.avaliacao?.nota ?? 0), 0) / concluidas.length)
+    : null;
+
+  return (
+    <div className="space-y-4 p-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FlaskConical className="h-5 w-5" aria-hidden="true" /> Ambiente de testes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            10 conversas ao mesmo tempo. Em cada uma, um paciente simulado (Claude Opus 5.5) tenta
+            dificultar a Nina de um jeito diferente, sem ver nada do prompt, das ferramentas ou do
+            catálogo dela. No fim, um juiz lista as falhas de cada conversa. Os leads são próprios
+            deste ambiente (não mexem nos 10 leads da Homologação).
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="ambiente-turnos" className="text-sm">
+              Mensagens do paciente por conversa
+            </label>
+            <Select value={turnosMax} onValueChange={setTurnosMax} disabled={rodando || iniciando}>
+              <SelectTrigger id="ambiente-turnos" className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {["6", "10", "14"].map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {rodando ? (
+              <Button variant="destructive" onClick={pararRodada}>
+                <Square className="mr-1 h-4 w-4" aria-hidden="true" /> Parar
+              </Button>
+            ) : (
+              <Button
+                onClick={() => void iniciarRodada()}
+                disabled={iniciando || !podeEscrever}
+                title={podeEscrever ? undefined : "Seu perfil só pode consultar esta tela."}
+              >
+                {iniciando ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Play className="mr-1 h-4 w-4" aria-hidden="true" />
+                )}
+                Iniciar 10 conversas
+              </Button>
+            )}
+            {media !== null && (
+              <Badge variant="outline" className="ml-auto text-sm">
+                Nota média: {media} · {concluidas.length}/{conversas.length} avaliadas
+              </Badge>
+            )}
+          </div>
+          {rodando && (
+            <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
+              Mantenha esta aba aberta enquanto a rodada roda: é ela que conduz as conversas.
+            </p>
+          )}
+          {rodadaAberta && !rodando && (
+            <p className="text-xs text-muted-foreground">Mostrando uma rodada anterior.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {conversas.map((c) => {
+          const modo = modoPorId(c.modo);
+          const ativo = c.estado === "paciente" || c.estado === "nina" || c.estado === "avaliando";
+          return (
+            <Card key={c.posicao} className="flex min-w-0 flex-col">
+              <CardHeader className="space-y-1 p-3 pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground">#{c.posicao}</span>
+                  <Badge
+                    variant={c.estado === "erro" ? "destructive" : "secondary"}
+                    className="text-[11px]"
+                  >
+                    {ativo && <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" />}
+                    {ROTULO_ESTADO[c.estado]}
+                  </Badge>
+                </div>
+                <p className="text-sm font-semibold">{modo?.nome ?? c.modo}</p>
+                <p className="text-xs text-muted-foreground" title={modo?.resumo}>
+                  {modo?.resumo}
+                </p>
+                <p className="truncate text-xs" title={c.assunto}>
+                  <span className="text-muted-foreground">Assunto: </span>
+                  {c.assunto}
+                </p>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-2 p-3 pt-0">
+                {c.linhas.length > 0 && (
+                  <div
+                    className="max-h-56 space-y-1.5 overflow-auto rounded-md border bg-muted/30 p-2 text-xs"
+                    aria-label={`Conversa ${c.posicao}`}
+                  >
+                    {c.linhas.slice(-8).map((l, i) => (
+                      <p key={i} className="whitespace-pre-wrap break-words">
+                        <span
+                          className={
+                            l.autor === "paciente"
+                              ? "font-semibold text-sky-700 dark:text-sky-300"
+                              : "font-semibold text-violet-700 dark:text-violet-300"
+                          }
+                        >
+                          {l.autor === "paciente" ? "Paciente: " : "Nina: "}
+                        </span>
+                        {l.texto.length > 400 ? `${l.texto.slice(0, 400)}…` : l.texto}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground">
+                  {c.turnos} mensagem(ns) do paciente
+                  {c.motivoFim ? ` · ${c.motivoFim}` : ""}
+                </p>
+                {c.erro && (
+                  <p role="alert" className="text-xs text-destructive">
+                    {c.erro}
+                  </p>
+                )}
+                {c.avaliacao && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${COR_RESULTADO[c.avaliacao.resultado] ?? ""}`}
+                      >
+                        {ROTULO_RESULTADO[c.avaliacao.resultado] ?? c.avaliacao.resultado}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums">{c.avaliacao.nota}</span>
+                    </div>
+                    <ul className="space-y-0.5 text-xs">
+                      {c.avaliacao.falhas.slice(0, 3).map((f, i) => (
+                        <li key={i} className={COR_GRAVIDADE[f.gravidade]}>
+                          • {f.explicacao}
+                        </li>
+                      ))}
+                      {c.avaliacao.falhas.length > 3 && (
+                        <li className="text-muted-foreground">
+                          + {c.avaliacao.falhas.length - 3} falha(s)
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                {(c.linhas.length > 0 || c.conversaId) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-auto"
+                    onClick={() => void verDetalhe(c)}
+                  >
+                    <MessageSquareText className="mr-1 h-4 w-4" aria-hidden="true" /> Ver conversa
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="h-4 w-4" aria-hidden="true" /> Rodadas anteriores
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {rodadas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma rodada ainda.</p>
+          ) : (
+            <ul className="divide-y text-sm">
+              {rodadas.map((r) => (
+                <li key={r.rodada} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+                  <span className="tabular-nums">
+                    {new Date(r.criadaEm).toLocaleString("pt-BR")}
+                  </span>
+                  <span>
+                    Nota média: <b>{r.notaMedia ?? "—"}</b>
+                  </span>
+                  <span>
+                    {r.avaliadas}/{r.conversas} avaliadas · {r.falhas} falha(s)
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {Math.round(r.tokens / 1000)} mil tokens do paciente
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto"
+                    disabled={rodando}
+                    onClick={() => void abrirRodada(r.rodada)}
+                  >
+                    Abrir
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!detalhe} onOpenChange={(aberto) => !aberto && setDetalhe(null)}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-auto">
+          {detalhe && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  #{detalhe.posicao} · {modoPorId(detalhe.modo)?.nome ?? detalhe.modo}
+                </DialogTitle>
+                <DialogDescription>Assunto: {detalhe.assunto}</DialogDescription>
+              </DialogHeader>
+              {detalhe.avaliacao && (
+                <section className="space-y-2 text-sm">
+                  <p>
+                    <b>
+                      {ROTULO_RESULTADO[detalhe.avaliacao.resultado] ?? detalhe.avaliacao.resultado}
+                    </b>{" "}
+                    · nota {detalhe.avaliacao.nota}
+                  </p>
+                  <p>{detalhe.avaliacao.resumo}</p>
+                  {detalhe.avaliacao.falhas.length > 0 && (
+                    <ul className="space-y-2">
+                      {detalhe.avaliacao.falhas.map((f, i) => (
+                        <li key={i} className="rounded border p-2">
+                          <p className={`text-xs font-semibold ${COR_GRAVIDADE[f.gravidade]}`}>
+                            {f.gravidade.toUpperCase()} · {f.categoria.replace(/_/g, " ")}
+                          </p>
+                          {f.trecho && <p className="text-xs italic">“{f.trecho}”</p>}
+                          <p className="text-xs">{f.explicacao}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {detalhe.avaliacao.acertos.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Acertos: {detalhe.avaliacao.acertos.join(" · ")}
+                    </p>
+                  )}
+                </section>
+              )}
+              <section className="space-y-1.5 rounded-md border bg-muted/30 p-3 text-sm">
+                {!detalheLinhas ? (
+                  <p role="status" className="text-muted-foreground">
+                    Carregando a conversa…
+                  </p>
+                ) : (
+                  detalheLinhas.map((l, i) => (
+                    <p key={i} className="whitespace-pre-wrap break-words">
+                      <span className="font-semibold">
+                        {l.autor === "paciente"
+                          ? "Paciente"
+                          : l.autor === "nina"
+                            ? "Nina"
+                            : "Sistema"}
+                        :{" "}
+                      </span>
+                      {l.texto}
+                    </p>
+                  ))
+                )}
+              </section>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

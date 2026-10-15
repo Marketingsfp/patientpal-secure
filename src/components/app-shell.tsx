@@ -692,6 +692,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         icon: MessageCircle,
       },
       { to: "/app/nina", hash: "laboratorio-nina", label: "Laboratório Nina", icon: FlaskConical },
+      { to: "/app/nina", hash: "ambiente-testes", label: "Ambiente de testes", icon: FlaskConical },
       { to: "/app/nina-aprendizado", label: "Revisão de Aprendizados", icon: ShieldCheck },
       { to: "/app/nina-metricas", label: "Métricas de Aprendizado", icon: BarChart3 },
       { to: "/app/nina-jev", label: "Decisões do Jev", icon: BarChart3 },
@@ -1235,7 +1236,7 @@ function AppShellInner() {
   // Obs.: a flag `nina_desativada` desliga apenas a ASSISTENTE de IA (chat e
   // respostas automáticas). A ferramenta de atendimento do WhatsApp continua
   // no menu, pois é usada pela equipe manualmente.
-  const flagFilteredRows = atendimentoMultiploDisabled
+  const semAtendimentoMultiplo = atendimentoMultiploDisabled
     ? permissionFilteredRows
         .map((row) => ({
           ...row,
@@ -1243,6 +1244,15 @@ function AppShellInner() {
         }))
         .filter((row) => row.items.length > 0)
     : permissionFilteredRows;
+  // Ambiente de testes da Nina (10 leads simultâneos): só com a flag ux_melhorias.
+  const flagFilteredRows = uxMelhorias
+    ? semAtendimentoMultiplo
+    : semAtendimentoMultiplo
+        .map((row) => ({
+          ...row,
+          items: row.items.filter((it) => isParent(it) || it.hash !== "ambiente-testes"),
+        }))
+        .filter((row) => row.items.length > 0);
 
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e

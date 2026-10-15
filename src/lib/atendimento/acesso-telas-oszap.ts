@@ -8,6 +8,7 @@ const ABAS_RESTRITAS = new Set([
   "base-conhecimento", // Catálogo editorial independente do atendimento.
   "homologacao",
   "laboratorio-nina",
+  "ambiente-testes",
   "config",
   "templates",
 ]);

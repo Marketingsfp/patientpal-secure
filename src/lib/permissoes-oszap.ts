@@ -109,6 +109,15 @@ export const TELAS_OSZAP: TelaOsZap[] = [
     pai: "nina",
   },
   {
+    key: "nina-ambiente-testes",
+    nome: "Ambiente de testes",
+    descricao: "10 conversas simultâneas com paciente simulado e juiz automático",
+    grupo: "Nina",
+    to: "/app/nina",
+    hash: "ambiente-testes",
+    pai: "nina",
+  },
+  {
     key: "nina-aprendizado",
     nome: "Revisão de Aprendizados",
     descricao: "Revisão dos aprendizados reportados",

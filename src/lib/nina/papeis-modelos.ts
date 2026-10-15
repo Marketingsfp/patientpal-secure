@@ -9,6 +9,8 @@
  * - carga     (GPT Luna)  → gera variações de texto para volume e, na bateria
  *                           por profissional, escreve o paciente dos testes de carga;
  * - avaliador (Claude Opus 5.5)   → avalia execuções já concluídas;
+ * - paciente_dificil (Claude Opus 5.5) → paciente do Ambiente de testes (10 leads);
+ * - juiz_testes      (Claude Opus 5.5) → avalia cada conversa do Ambiente de testes;
  * - nina                  → o sistema sob teste; o modelo vem da configuração
  *                           real da clínica e é registrado por execução.
  */
@@ -16,7 +18,14 @@ import { MODELO_TERRA } from "@/lib/nina/simulador-terra";
 import { MODELO_LUNA } from "@/lib/nina/carga";
 import { MODELO_SOL } from "@/lib/nina/avaliador-sol";
 
-export type PapelModelo = "paciente" | "carga" | "avaliador" | "nina" | "planejador_carga";
+export type PapelModelo =
+  | "paciente"
+  | "carga"
+  | "avaliador"
+  | "nina"
+  | "planejador_carga"
+  | "paciente_dificil"
+  | "juiz_testes";
 
 export const PROVEDOR_IA = "lovable-ai-gateway";
 
@@ -57,6 +66,21 @@ export const PAPEIS_MODELOS: Record<PapelModelo, DefinicaoPapel> = {
     modelo: null,
     provedor: PROVEDOR_IA,
     descricao: "Modelo real da clínica; registrado em cada execução.",
+  },
+  paciente_dificil: {
+    papel: "paciente_dificil",
+    rotulo: "Claude Opus 5.5 — paciente difícil",
+    modelo: MODELO_SOL,
+    provedor: PROVEDOR_IA,
+    descricao:
+      "Ambiente de testes: escreve como paciente em um modo que dificulta a Nina. Só vê a conversa; nunca o prompt, as ferramentas ou o catálogo da Nina.",
+  },
+  juiz_testes: {
+    papel: "juiz_testes",
+    rotulo: "Claude Opus 5.5 — juiz do ambiente de testes",
+    modelo: MODELO_SOL,
+    provedor: PROVEDOR_IA,
+    descricao: "Lê a conversa concluída e lista as falhas da Nina. Nunca participa da conversa.",
   },
   planejador_carga: {
     papel: "planejador_carga",
