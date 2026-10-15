@@ -3250,10 +3250,23 @@ async function gerarRespostaNinaInterno(
     respostaOferta: respostaOfertaTurno,
   });
   if (respostaOfertaTurno === "recusa") fluxoEstado.oferta_encaminhamento = null;
+  // Escolha com pergunta na mesma mensagem: a Nina responde e o encaminhamento
+  // (com o pedido de dados) vem depois da resposta, no mesmo turno.
+  let encaminharAposResposta = false;
   if (decisaoAgendamento === "encaminhar" && !jevEncaminhamento) {
-    // O motivo leva o atendimento informado, para a equipe saber o que confirmar.
-    jevEncaminhamento = { motivo: motivoAgendamento(referenciasDaDecisao), urgencia: "normal" };
-    nomeAtendimentoAusente = false;
+    if (
+      !transferenciaPendente &&
+      !semPreferenciaComPergunta &&
+      dadosTransferencia.perguntaJuntoDaEscolha(mensagemPaciente)
+    ) {
+      encaminharAposResposta = true;
+      (runtimeContext as Record<string, unknown>).transferencia_apos_resposta =
+        dadosTransferencia.INSTRUCAO_RESPONDER_E_ENCAMINHAR;
+    } else {
+      // O motivo leva o atendimento informado, para a equipe saber o que confirmar.
+      jevEncaminhamento = { motivo: motivoAgendamento(referenciasDaDecisao), urgencia: "normal" };
+      nomeAtendimentoAusente = false;
+    }
   }
 
   async function executarDecisaoEncaminhamento(
@@ -3295,6 +3308,22 @@ async function gerarRespostaNinaInterno(
       ]),
     ];
     const comEscolha = !alteracaoSolicitada && !cartaoConsultaEquipe;
+    // "INFORMACAO_COM_RECEPCAO: <frase do paciente>" não dizia à equipe qual
+    // atendimento estava em conversa (homologação 15/10/2026, ~55 ciclos).
+    if (
+      comEscolha &&
+      decisao.motivo.startsWith("INFORMACAO_COM_RECEPCAO") &&
+      referenciasEscolha.length
+    ) {
+      const itens = motivoAgendamento(referenciasEscolha)
+        .replace(/^AGENDAMENTO_TRANSICAO:\s*/, "")
+        .replace(/\.$/, "");
+      argumentos.motivo =
+        `INFORMACAO_COM_RECEPCAO (${itens}): ${decisao.motivo.replace(/^INFORMACAO_COM_RECEPCAO:\s*/, "")}`.slice(
+          0,
+          500,
+        );
+    }
     if (comEscolha)
       argumentos.resumo = escolhaPaciente.resumoComEscolha(
         argumentos.resumo,
@@ -4734,8 +4763,9 @@ async function gerarRespostaNinaInterno(
   // 13/10/2026): com uma dúvida na mesma mensagem ("Não tenho médico
   // específico. O cartão é antes?"), a resposta segue junto do encaminhamento,
   // sem perguntar de novo a preferência.
+  // O mesmo vale para qualquer escolha com pergunta junto (homologação 15/10/2026).
   if (
-    semPreferenciaComPergunta &&
+    (semPreferenciaComPergunta || encaminharAposResposta) &&
     !finalizacaoHandoff &&
     !houveHandoff &&
     !turnoObsoleto &&
@@ -4744,11 +4774,16 @@ async function gerarRespostaNinaInterno(
     !resumoEscolha
   ) {
     const { separarOrientacaoRecepcao } = await import("@/lib/nina/informacao-nao-cadastrada");
-    const { restante } = separarOrientacaoRecepcao(resposta, false);
+    const { restante } = separarOrientacaoRecepcao(
+      dadosTransferencia.respostaAntesDaTransferencia(resposta),
+      false,
+    );
     registrarEtapa({
       tipo: "consulta",
       fonte: "sistema",
-      titulo: "Sem preferência de profissional: encaminhamento como primeiro disponível",
+      titulo: semPreferenciaComPergunta
+        ? "Sem preferência de profissional: encaminhamento como primeiro disponível"
+        : "Escolha com pergunta: a Nina responde e pede os dados na mesma mensagem",
       dados: { respostas_mantidas: Boolean(restante) },
       codigo: {
         arquivo: "src/lib/nina/fluxo-agendamento-item.ts",
