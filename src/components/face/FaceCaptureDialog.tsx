@@ -242,10 +242,13 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
         }
       }}
     >
-      <DialogContent className="max-w-md">
+      {/* coluna da grade travada na largura do modal: sem isso o vídeo da
+          webcam (640–1280px) alargava a grade e empurrava título e botões
+          para fora */}
+      <DialogContent className="max-w-lg grid-cols-[minmax(0,1fr)]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" /> {titulo}
+          <DialogTitle className="flex items-center gap-2 break-words">
+            <Camera className="h-5 w-5 shrink-0" /> <span className="min-w-0">{titulo}</span>
           </DialogTitle>
           <DialogDescription>{camErro ?? msg}</DialogDescription>
         </DialogHeader>
@@ -266,7 +269,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover"
             />
             <div className="absolute inset-x-16 inset-y-6 border-4 border-white/60 rounded-[50%] pointer-events-none" />
             <span className="absolute bottom-2 inset-x-0 text-center text-[12px] text-white/85 pointer-events-none">
@@ -316,7 +319,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
             </Select>
           </div>
         )}
-        <DialogFooter>
+        <DialogFooter className="flex-wrap gap-2 sm:space-x-0">
           <input
             ref={fileRef}
             type="file"
