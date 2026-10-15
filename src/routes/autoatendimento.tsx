@@ -16,7 +16,18 @@ import {
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react";
-import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
+import {
+  detectDescriptor,
+  ensureFaceModels,
+  ensureFaceModelsComLimite,
+  FACE_MATCH_THRESHOLD,
+} from "@/lib/face-recognition";
+import {
+  CameraCanceladaError,
+  ligarCameraComImagem,
+  mensagemErroCamera,
+  pararStream,
+} from "@/lib/camera";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 import { detectarTipoAtendimentoPadrao } from "@/lib/convenio/tipo-atendimento-padrao";
 
@@ -97,6 +108,9 @@ function AutoatendimentoPage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Muda a cada parada da câmera: a abertura em andamento percebe que o
+  // paciente cancelou mesmo antes de existir stream.
+  const camSessaoRef = useRef(0);
 
   useEffect(() => {
     void ensureFaceModels().catch(() => {});
@@ -110,7 +124,9 @@ function AutoatendimentoPage() {
   }, [step]);
 
   function stopCamera() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    camSessaoRef.current++;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    pararStream(streamRef.current);
     streamRef.current = null;
   }
 
@@ -160,19 +176,35 @@ function AutoatendimentoPage() {
   async function iniciarFacial(onMatch: (p: { id: string; nome: string }) => void) {
     if (!clinicaAtual) return;
     setScanMsg("Carregando câmera…");
+    stopCamera();
+    const sessao = camSessaoRef.current;
+    const cancelado = () => camSessaoRef.current !== sessao;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480 },
-        audio: false,
+      await ligarCameraComImagem({
+        obterVideo: () => videoRef.current,
+        cancelado,
+        onStream: (s) => {
+          streamRef.current = s;
+        },
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setScanMsg("Posicione seu rosto e fique parado…");
-      await ensureFaceModels();
-
+    } catch (e) {
+      if (e instanceof CameraCanceladaError || cancelado()) return;
+      console.error("Camera Error:", (e as { name?: string } | null)?.name ?? e);
+      stopCamera();
+      setScanMsg(`${mensagemErroCamera(e)}. Use o CPF.`);
+      return;
+    }
+    setScanMsg("Posicione seu rosto e fique parado…");
+    try {
+      await ensureFaceModelsComLimite();
+    } catch (e) {
+      console.error("Face models error:", e);
+      if (cancelado()) return;
+      stopCamera();
+      setScanMsg("Reconhecimento facial indisponível agora (sem internet?). Use o CPF.");
+      return;
+    }
+    try {
       let descritor: Float32Array | null = null;
       for (let i = 0; i < 12; i++) {
         if (!videoRef.current || !streamRef.current) return;
@@ -211,9 +243,11 @@ function AutoatendimentoPage() {
       } else {
         setScanMsg("Não reconhecemos seu rosto. Use o CPF.");
       }
-    } catch {
-      toast.error("Não foi possível acessar a câmera");
+    } catch (e) {
+      console.error("Face match error:", e);
+      if (cancelado()) return;
       stopCamera();
+      setScanMsg("Não foi possível concluir o reconhecimento. Use o CPF.");
     }
   }
 
@@ -640,6 +674,7 @@ function AutoatendimentoPage() {
                   <video
                     ref={videoRef}
                     className="w-full h-full object-cover scale-x-[-1]"
+                    autoPlay
                     playsInline
                     muted
                   />

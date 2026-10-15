@@ -27,7 +27,18 @@ import {
   obterTokenTotem,
 } from "@/utils/printService";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
-import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
+import {
+  detectDescriptor,
+  ensureFaceModels,
+  ensureFaceModelsComLimite,
+  FACE_MATCH_THRESHOLD,
+} from "@/lib/face-recognition";
+import {
+  CameraCanceladaError,
+  ligarCameraComImagem,
+  mensagemErroCamera,
+  pararStream,
+} from "@/lib/camera";
 
 export const Route = createFileRoute("/totem")({
   component: TotemRoute,
@@ -109,6 +120,9 @@ export function TotemPage() {
   const [scanMsg, setScanMsg] = useState("Posicione seu rosto na câmera");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Muda a cada parada da câmera: a abertura em andamento percebe que o
+  // paciente cancelou mesmo antes de existir stream.
+  const camSessaoRef = useRef(0);
   // Status da impressão da senha — ver item 10 (feedback de impressão).
   const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "incerto" | "falha" | null>(
     null,
@@ -285,7 +299,9 @@ export function TotemPage() {
   }, [step]);
 
   function stopCamera() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    camSessaoRef.current++;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    pararStream(streamRef.current);
     streamRef.current = null;
   }
 
@@ -454,19 +470,37 @@ export function TotemPage() {
     if (!clinicaAtual) return;
     setStep("checkin-facial");
     setScanMsg("Carregando câmera…");
+    stopCamera();
+    const sessao = camSessaoRef.current;
+    const cancelado = () => camSessaoRef.current !== sessao;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480 },
-        audio: false,
+      await ligarCameraComImagem({
+        obterVideo: () => videoRef.current,
+        cancelado,
+        onStream: (s) => {
+          streamRef.current = s;
+        },
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setScanMsg("Posicione seu rosto e fique parado…");
-      await ensureFaceModels();
-
+    } catch (e) {
+      if (e instanceof CameraCanceladaError || cancelado()) return;
+      console.error("Camera Error:", (e as { name?: string } | null)?.name ?? e);
+      stopCamera();
+      toast.error(`${mensagemErroCamera(e)}. Digite o CPF.`);
+      setStep("checkin");
+      return;
+    }
+    setScanMsg("Posicione seu rosto e fique parado…");
+    try {
+      await ensureFaceModelsComLimite();
+    } catch (e) {
+      console.error("Face models error:", e);
+      if (cancelado()) return;
+      stopCamera();
+      toast.error("Reconhecimento facial indisponível agora (sem internet?). Digite o CPF.");
+      setStep("checkin");
+      return;
+    }
+    try {
       let descritor: Float32Array | null = null;
       for (let i = 0; i < 12; i++) {
         if (!streamRef.current || !videoRef.current) return; // cancelado pelo paciente
@@ -515,9 +549,11 @@ export function TotemPage() {
         procedimento: r.procedimento ?? null,
       });
       setStep("checkin-ok");
-    } catch {
+    } catch (e) {
+      console.error("Face checkin error:", e);
+      if (cancelado()) return;
       stopCamera();
-      toast.error("Não foi possível acessar a câmera. Digite o CPF.");
+      toast.error("Não foi possível concluir o reconhecimento. Digite o CPF.");
       setStep("checkin");
     }
   }
@@ -792,6 +828,7 @@ export function TotemPage() {
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover scale-x-[-1]"
+                autoPlay
                 playsInline
                 muted
               />

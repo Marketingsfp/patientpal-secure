@@ -10,7 +10,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Camera, Loader2, CheckCircle2, AlertTriangle, RefreshCw, Upload } from "lucide-react";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { detectDescriptor, ensureFaceModels } from "@/lib/face-recognition";
+import { detectDescriptor, ensureFaceModelsComLimite } from "@/lib/face-recognition";
+import {
+  abrirStream,
+  cameraDisponivel,
+  ligarStreamNoVideo,
+  mensagemErroCamera,
+  MSG_CAMERA_INDISPONIVEL,
+  pararStream,
+} from "@/lib/camera";
 import {
   Select,
   SelectContent,
@@ -26,81 +34,120 @@ interface Props {
   titulo?: string;
 }
 
+// Sem imagem depois desse tempo = câmera aberta mas preta (ex.: câmera virtual
+// do OBS/Teams escolhida como padrão, tampa da webcam, driver travado).
+const ESPERA_IMAGEM_MS = 6000;
+
 export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Capturar rosto" }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [busy, setBusy] = useState(false);
   const [camErro, setCamErro] = useState<string | null>(null);
+  const [modelos, setModelos] = useState<"carregando" | "ok" | "erro">("carregando");
   const [tentativa, setTentativa] = useState(0);
   const [msg, setMsg] = useState("Posicione o rosto na câmera");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  // deviceId = câmera mostrada no seletor; camPedida = câmera escolhida pela
+  // pessoa (só ela reinicia a câmera — antes, gravar a câmera atual no seletor
+  // derrubava e reabria o vídeo logo após abrir).
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
+  const [camPedida, setCamPedida] = useState<string | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Liga o vídeo assim que o elemento aparece na tela (o modal monta o
+  // conteúdo depois que o efeito já começou a abrir a câmera).
+  const ligarVideo = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    const stream = streamRef.current;
+    if (el && stream) ligarStreamNoVideo(el, stream);
+  }, []);
+
+  // Modelos do reconhecimento facial: baixam em paralelo com a câmera e só
+  // travam o botão de capturar, nunca a imagem.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setModelos("carregando");
+    ensureFaceModelsComLimite()
+      .then(() => !cancelled && setModelos("ok"))
+      .catch((e) => {
+        console.error("Face models error:", e);
+        if (!cancelled) setModelos("erro");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tentativa]);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let vigia: ReturnType<typeof setTimeout> | undefined;
     setCamErro(null);
-    setMsg("Posicione o rosto na câmera");
-    (async () => {
+    setMsg("Abrindo câmera…");
+
+    async function listarCameras() {
       try {
-        await ensureFaceModels();
-        stop();
-        const stream = await navigator.mediaDevices.getUserMedia(
-          deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: true },
-        );
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        try {
-          const list = await navigator.mediaDevices.enumerateDevices();
-          if (!cancelled) {
-            const cams = list.filter((d) => d.kind === "videoinput");
-            setDevices(cams);
-            if (!deviceId) {
-              const atual = stream.getVideoTracks()[0]?.getSettings().deviceId;
-              if (atual) setDeviceId(atual);
-            }
-          }
-        } catch {
-          /* enumeração indisponível */
-        }
-      } catch (e: any) {
-        if (cancelled) return;
-        console.error("Camera Error:", e);
-        const nome = e?.name as string | undefined;
-        if (nome === "NotReadableError" || nome === "TrackStartError") {
-          setCamErro("Câmera em uso por outro app (Zoom/Discord/OBS)");
-        } else if (nome === "NotAllowedError" || nome === "SecurityError") {
-          setCamErro("Permissão bloqueada no navegador");
-        } else if (
-          nome === "NotFoundError" ||
-          nome === "DevicesNotFoundError" ||
-          nome === "OverconstrainedError"
-        ) {
-          setCamErro("Nenhuma webcam física encontrada");
-        } else {
-          setCamErro("Não foi possível iniciar a câmera");
-        }
-        try {
-          const list = await navigator.mediaDevices.enumerateDevices();
-          if (!cancelled) setDevices(list.filter((d) => d.kind === "videoinput"));
-        } catch {
-          /* ignore */
-        }
+        const list = await navigator.mediaDevices.enumerateDevices();
+        if (!cancelled) setDevices(list.filter((d) => d.kind === "videoinput"));
+      } catch {
+        /* enumeração indisponível */
       }
+    }
+
+    (async () => {
+      if (!cameraDisponivel()) {
+        setCamErro(MSG_CAMERA_INDISPONIVEL);
+        return;
+      }
+      stop();
+      let stream: MediaStream;
+      try {
+        stream = await abrirStream(camPedida);
+      } catch (e) {
+        if (cancelled) return;
+        console.error("Camera Error:", (e as { name?: string } | null)?.name ?? e);
+        setCamErro(mensagemErroCamera(e));
+        await listarCameras();
+        return;
+      }
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      streamRef.current = stream;
+      if (videoRef.current) ligarVideo(videoRef.current);
+      setMsg("Posicione o rosto na câmera");
+
+      const track = stream.getVideoTracks()[0];
+      const atual = track?.getSettings().deviceId;
+      if (atual) setDeviceId(atual);
+      if (track) {
+        track.onended = () => {
+          if (!cancelled && streamRef.current === stream) {
+            setCamErro("A câmera foi desconectada");
+          }
+        };
+      }
+      // Rótulos das câmeras só vêm depois da permissão concedida.
+      await listarCameras();
+
+      vigia = setTimeout(() => {
+        if (cancelled || streamRef.current !== stream) return;
+        if ((videoRef.current?.videoWidth ?? 0) === 0) {
+          stop();
+          setCamErro(
+            "A câmera abriu, mas não está enviando imagem. Se houver mais de uma câmera, escolha outra abaixo; senão, confira a tampa da webcam ou reconecte o cabo",
+          );
+        }
+      }, ESPERA_IMAGEM_MS);
     })();
     return () => {
       cancelled = true;
+      clearTimeout(vigia);
       stop();
     };
-  }, [open, tentativa, deviceId]);
+  }, [open, tentativa, camPedida, ligarVideo]);
 
   function resetarCamera() {
     stop();
@@ -111,7 +158,9 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
   }
 
   function stop() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    const v = videoRef.current;
+    if (v) v.srcObject = null;
+    pararStream(streamRef.current);
     streamRef.current = null;
   }
 
@@ -133,7 +182,10 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
     if (!videoRef.current) return;
     setBusy(true);
     setMsg("Analisando…");
-    const desc = await detectDescriptor(videoRef.current);
+    const desc = await detectDescriptor(videoRef.current).catch((e) => {
+      console.error("Face detect error:", e);
+      return null;
+    });
     if (!desc) {
       setMsg("Rosto não detectado. Aproxime e tente novamente.");
       setBusy(false);
@@ -201,10 +253,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm space-y-3">
             <p className="flex items-start gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>
-                {camErro}. Verifique se há uma webcam conectada e libere o acesso à câmera nas
-                permissões do navegador.
-              </span>
+              <span>{camErro}.</span>
             </p>
             <Button type="button" variant="outline" size="sm" onClick={resetarCamera}>
               <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
@@ -212,11 +261,36 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
           </div>
         ) : (
           <div className="relative rounded-lg overflow-hidden bg-black aspect-[4/3]">
-            <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
+            <video
+              ref={ligarVideo}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
             <div className="absolute inset-x-16 inset-y-6 border-4 border-white/60 rounded-[50%] pointer-events-none" />
             <span className="absolute bottom-2 inset-x-0 text-center text-[12px] text-white/85 pointer-events-none">
               Enquadre o rosto do paciente aqui
             </span>
+          </div>
+        )}
+        {!camErro && modelos === "carregando" && (
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparando o reconhecimento facial…
+          </p>
+        )}
+        {modelos === "erro" && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm space-y-2">
+            <p className="flex items-start gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Não foi possível carregar o reconhecimento facial. Confira a internet e tente
+                novamente.
+              </span>
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={resetarCamera}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
+            </Button>
           </div>
         )}
         {devices.length > 1 && (
@@ -225,8 +299,8 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
             <Select
               value={deviceId}
               onValueChange={(v) => {
-                stop();
                 setDeviceId(v);
+                setCamPedida(v);
               }}
             >
               <SelectTrigger>
@@ -266,7 +340,7 @@ export function FaceCaptureDialog({ open, onClose, onCaptured, titulo = "Captura
           >
             Cancelar
           </Button>
-          <Button onClick={capturar} disabled={busy || !!camErro}>
+          <Button onClick={capturar} disabled={busy || !!camErro || modelos !== "ok"}>
             {busy ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (

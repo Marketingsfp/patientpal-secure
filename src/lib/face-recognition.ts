@@ -29,7 +29,26 @@ export async function ensureFaceModels(): Promise<void> {
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
     ]);
   })();
+  // Falha no download não pode ficar em cache: sem isso, uma queda de rede
+  // deixava a biometria quebrada até recarregar a página.
+  loadingPromise.catch(() => {
+    loadingPromise = null;
+  });
   return loadingPromise;
+}
+
+// Mesmo download, com prazo: rede da clínica lenta ou bloqueando a CDN não
+// pode deixar a tela esperando para sempre.
+export async function ensureFaceModelsComLimite(ms = 45000): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limite = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error("timeout ao carregar modelos faciais")), ms);
+  });
+  try {
+    await Promise.race([ensureFaceModels(), limite]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function detectDescriptor(
