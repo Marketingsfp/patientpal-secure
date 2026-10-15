@@ -38,6 +38,7 @@ import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { abrirDetalheEmNovaAba } from "@/lib/financeiro/detalhe-aba";
 import { Card, CardContent } from "@/components/ui/card";
 import { brl } from "@/lib/financeiro/format";
@@ -567,6 +568,7 @@ export function MovimentoResultado({
   ate,
   clinicaNome,
   conferencia,
+  ajustes,
 }: {
   /** Linhas visíveis do período (sem os retroativos escondidos), já classificadas. */
   linhas: LinhaClassificada[];
@@ -593,6 +595,17 @@ export function MovimentoResultado({
     foraDoCaixa: { cortesias: number; pagos: number };
   } | null;
   /**
+   * O que entra nos cards sem estar no cupom impresso do dia — ids das linhas
+   * retroativas e das do sistema antigo — e a chave "Incluir lançamentos
+   * retroativos" da tela. Nulo na busca em todas as datas, onde a chave não vale.
+   */
+  ajustes?: {
+    retroativos: Set<string>;
+    sistemaAntigo: Set<string>;
+    incluidos: boolean;
+    onIncluir: (incluir: boolean) => void;
+  } | null;
+  /**
    * Nomes dos profissionais com mais de uma agenda ativa em `medico_agendas`.
    * Só para eles o quadro abre a quebra por agenda — para os demais a agenda
    * única não acrescenta informação nenhuma.
@@ -601,6 +614,19 @@ export function MovimentoResultado({
   const [drill, setDrill] = useState<Drill | null>(null);
   const r = resumoMovimento(linhas);
   const v = (n: number) => (pronto ? brl(n) : "…");
+  // Quanto de cada forma do card de Receita bruta não está no cupom impresso
+  // do dia, pela mesma quebra do card — senão os rótulos não casariam.
+  const porFormaDe = (ids: Set<string> | undefined) =>
+    new Map(
+      ids && ids.size > 0
+        ? resumoMovimento(linhas.filter((l) => ids.has(l.id))).receitaBruta.formas.map(
+            (f) => [f.rotulo, f.valor] as const,
+          )
+        : [],
+    );
+  const retroPorForma = porFormaDe(ajustes?.retroativos);
+  const antigoPorForma = porFormaDe(ajustes?.sistemaAntigo);
+  const temAjusteNoCard = retroPorForma.size + antigoPorForma.size > 0;
   const alternar = (f: FiltroCard) => onFiltro(mesmoFiltro(filtro, f) ? null : f);
 
   /**
@@ -689,12 +715,32 @@ export function MovimentoResultado({
         >
           {pronto && (
             <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
-              {r.receitaBruta.formas.map((f) => (
-                <li key={f.rotulo} className="flex items-center justify-between gap-2 text-[13px]">
-                  <span className="text-foreground/75">{f.rotulo}</span>
-                  <span className="tabular-nums">{brl(f.valor)}</span>
-                </li>
-              ))}
+              {r.receitaBruta.formas.map((f) => {
+                const retro = retroPorForma.get(f.rotulo) ?? 0;
+                const antigo = antigoPorForma.get(f.rotulo) ?? 0;
+                const doDia = Number((f.valor - retro - antigo).toFixed(2));
+                return (
+                  <li key={f.rotulo} className="text-[13px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-foreground/75">{f.rotulo}</span>
+                      <span className="tabular-nums">{brl(f.valor)}</span>
+                    </div>
+                    {/* A tabela das operadoras e o cupom impresso só têm o
+                        caixa do dia; o resto vem de guia digitada depois ou
+                        do sistema antigo. Separado aqui, a conta fecha à vista. */}
+                    {(retro !== 0 || antigo !== 0) && (
+                      <p
+                        className="text-right text-[11px] leading-snug text-muted-foreground tabular-nums"
+                        title="Caixas do dia: o que passou pelas gavetas da recepção na data e está no cupom impresso. Retroativos: lançamentos com data deste período digitados depois. Sistema antigo: parcelas e pagamentos trazidos da Clínica Total. Desligue “Incluir retroativos” para ver só os caixas do dia."
+                      >
+                        {brl(doDia)} caixas do dia
+                        {retro !== 0 && ` + ${brl(retro)} retroativos`}
+                        {antigo !== 0 && ` + ${brl(antigo)} sistema antigo`}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
               {/* Cortesia e gratuidade: o atendimento aconteceu e conta na
                   produção, mas não entrou dinheiro — por isso R$ 0,00. */}
               {cortesiasTotais > 0 && (
@@ -714,6 +760,30 @@ export function MovimentoResultado({
                 Dinheiro: soma de todos os caixas da clínica. Sangria não entra: é a mesma nota indo
                 para a tesouraria.
               </li>
+              {/* A mesma chave "Incluir lançamentos retroativos" da barra de
+                  filtros, à mão no card que se compara com o cupom. O clique
+                  não pode vazar para o card, que abre o detalhamento. */}
+              {ajustes && (ajustes.incluidos ? temAjusteNoCard : true) && (
+                <li
+                  className="flex items-center gap-2 pt-1"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <Switch
+                    id="receita-incluir-retroativos"
+                    checked={ajustes.incluidos}
+                    onCheckedChange={ajustes.onIncluir}
+                  />
+                  <label
+                    htmlFor="receita-incluir-retroativos"
+                    className="cursor-pointer text-[11px] leading-snug text-muted-foreground"
+                  >
+                    {ajustes.incluidos
+                      ? "Incluir retroativos — desligue para comparar com o cupom impresso"
+                      : "Só os caixas do dia, igual ao cupom impresso — ligue para incluir retroativos"}
+                  </label>
+                </li>
+              )}
             </ul>
           )}
         </KpiCard>

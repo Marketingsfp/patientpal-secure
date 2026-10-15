@@ -1976,6 +1976,16 @@ function Page() {
   const displayItems = filtroGrupo
     ? itensVisiveis.filter((_, i) => linhaCasaComFiltro(classificadas[i], filtroGrupo))
     : itensVisiveis;
+  // Linhas que estão nos cards mas não no cupom impresso do dia: o card de
+  // Receita bruta separa, forma a forma, o que é caixa do dia e o que é ajuste.
+  // Em 03/09/2026 o Dinheiro do card dava R$ 750,00 a mais que a tabela das
+  // operadoras — eram três guias em dinheiro digitadas depois (15/10/2026).
+  const ajustesNoCard = {
+    retroativos: new Set(itensVisiveis.filter((l) => l._retroativo).map((l) => l.id)),
+    sistemaAntigo: new Set(
+      itensVisiveis.filter((l) => l._parcelaImportada && !l._retroativo).map((l) => l.id),
+    ),
+  };
 
   // Cards de Receita/Despesa/Saldo.
   //
@@ -2617,6 +2627,15 @@ function Page() {
         ate={toDate}
         clinicaNome={clinicaAtual?.clinica.nome ?? "Clínica"}
         conferencia={conferencia}
+        ajustes={
+          buscaGlobal
+            ? null
+            : {
+                ...ajustesNoCard,
+                incluidos: !ocultarRetroativos,
+                onIncluir: (v) => setOcultarRetroativos(!v),
+              }
+        }
       />
 
       {/* Fechamento das gavetas da recepção, somado por operadora: o que o
