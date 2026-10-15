@@ -27,6 +27,7 @@ import {
 import { interpretarModalidade, type ModalidadeResolvida } from "./modalidade-atendimento";
 import { normalizarRespostaInformal, ehRespostaAfirmativaCurta } from "./resposta-afirmativa";
 import { PERGUNTA_PREFERENCIA_PROFISSIONAL } from "./prompt/consulta-agenda";
+import { literalRegex } from "./regex-literal";
 
 /**
  * Pergunta de preferência no modelo de 13/10/2026: a última pergunta da IA
@@ -300,7 +301,7 @@ export function escolhaParaAgendar(mensagem: string, nomes: readonly string[] = 
     normalizarRespostaInformal(nome)
       .split(/\s+/)
       .filter((p) => p.length >= 4 && !/^(?:consulta|exame|doutor|doutora)$/.test(p))
-      .some((p) => new RegExp(`\\b${p}\\b`).test(t)),
+      .some((p) => new RegExp(`\\b${literalRegex(p)}\\b`).test(t)),
   );
   if (semPreferenciaDeProfissional(mensagem)) return true;
   const citaQuando = DIAS_DA_SEMANA.test(t) || /\b\d{1,2}\s*(?:h|horas?|:\d{2})\b/.test(t);
