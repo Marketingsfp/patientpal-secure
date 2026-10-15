@@ -43,4 +43,5 @@
 
 ## Importar Clínica Total (SFP)
 - [x] Restaurar plano da importação
-- [ ] Banco + funções + tela /app/configuracoes/importar-clinica-total + testes (sem importação real, sem publicar)
+- [x] Banco + funções + tela /app/configuracoes/importar-clinica-total + testes (sem importação real, sem publicar)
+- [ ] Importação real da SFP (aguarda o dono rodar com os arquivos)
