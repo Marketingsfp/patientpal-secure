@@ -2075,8 +2075,6 @@ function NovoOrcamentoDialog({
                     {pedidoLido.pacienteNome ?? (
                       <span className="text-muted-foreground">não lido — preencha abaixo</span>
                     )}
-                      </div>
-                    )}
                   </div>
 
                   <div>
