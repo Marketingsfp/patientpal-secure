@@ -39,4 +39,4 @@
 
 ## Site institucional
 - [x] Interruptor por clínica do agendamento pelo site (Menino Jesus desligada) — não publicado
-- [ ] Segurança: só admin concede/altera perfil admin em equipe.functions.ts (cadastrarUsuario/editarMembro)
+- [x] Segurança: só admin concede/altera perfil admin em equipe.functions.ts (cadastrarUsuario/editarMembro)
