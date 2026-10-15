@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -90,6 +91,14 @@ const carenciaShort = (n: number | null | undefined) => {
 
 // Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
 // "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+/** Grupo de cota compartilhada (grupo_gratuidade) com os itens que o compõem. */
+type GrupoOu = { id: string; label: string };
+
+/** Seletor "E / OU" no lugar do nome de grupo digitado — por enquanto só na
+ *  POLICLINICA SAO FRANCISCO DE PAULA (mesmo critério por nome do app-shell). */
+const ehSaoFrancisco = (nome: string | null | undefined) =>
+  (nome ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().includes("sao francisco");
+
 const isConvenioFuncionario = (nome: string) =>
   (nome || "")
     .normalize("NFD")
@@ -100,6 +109,9 @@ const isConvenioFuncionario = (nome: string) =>
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   // Mesma permissão que o RLS de cb_convenio_regras confere (além de admin/gestor).
   const podeEditar = usePodeEscrever("cartao-beneficios-precos");
+  const { clinicaAtual } = useClinica();
+  const condicaoEOu =
+    clinicaAtual?.clinica_id === clinicaId && ehSaoFrancisco(clinicaAtual?.clinica.nome);
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
@@ -220,6 +232,29 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     ],
     [especialidades],
   );
+
+  // Grupos OU já existentes neste convênio, nomeados pelos itens que dividem a
+  // cota (ex.: "MAMOGRAFIA OU USG MAMA") — o operador escolhe, não digita.
+  const gruposOu = useMemo<GrupoOu[]>(() => {
+    const espNome = new Map(especialidades.map((e) => [e.id, e.nome]));
+    const procNome = new Map(procedimentos.map((p) => [p.id, p.nome]));
+    const itens = new Map<string, string[]>();
+    for (const r of regras) {
+      const g = r.grupo_gratuidade?.trim();
+      if (!g) continue;
+      const nome =
+        (r.procedimento_id && procNome.get(r.procedimento_id)) ||
+        (r.especialidade_id && espNome.get(r.especialidade_id)) ||
+        r.tipo ||
+        "Qualquer serviço";
+      const lista = itens.get(g) ?? [];
+      if (!lista.includes(nome)) lista.push(nome);
+      itens.set(g, lista);
+    }
+    return [...itens.entries()]
+      .map(([id, nomes]) => ({ id, label: nomes.join(" OU ") }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [regras, especialidades, procedimentos]);
 
   const procOpts = useMemo(
     () => [
@@ -920,10 +955,16 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     {r.grupo_gratuidade && r.limite_qtd ? (
                       <div
                         className="flex items-center gap-1 pl-2 text-[11px] text-muted-foreground"
-                        title={`Cota compartilhada com as outras regras do grupo "${r.grupo_gratuidade}"`}
+                        title={
+                          condicaoEOu
+                            ? `Cota compartilhada (OU): ${gruposOu.find((g) => g.id === r.grupo_gratuidade)?.label ?? r.grupo_gratuidade}`
+                            : `Cota compartilhada com as outras regras do grupo "${r.grupo_gratuidade}"`
+                        }
                       >
                         <Link2 className="h-3 w-3" />
-                        <span className="max-w-[90px] truncate">{r.grupo_gratuidade}</span>
+                        <span className="max-w-[90px] truncate">
+                          {condicaoEOu ? "Cota OU" : r.grupo_gratuidade}
+                        </span>
                       </div>
                     ) : null}
                   </TableCell>
@@ -1018,6 +1059,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         espOpts={espOpts}
         procOpts={procOpts}
         procsPorEsp={procsPorEsp}
+        condicaoEOu={condicaoEOu}
+        gruposOu={gruposOu}
         onSaved={async () => {
           setNovoOpen(false);
           await load();
@@ -1031,6 +1074,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         espOpts={espOpts}
         procOpts={procOpts}
         procsPorEsp={procsPorEsp}
+        condicaoEOu={condicaoEOu}
+        gruposOu={gruposOu}
         regra={editRegra}
         onSaved={async () => {
           setEditRegra(null);
@@ -1227,6 +1272,9 @@ function LimiteDialog({
   );
 }
 
+/** Valor do seletor "Divide a cota com" que não aponta para grupo existente. */
+const GRUPO_OU_NOVO = "__novo__";
+
 function NovaRegraDialog({
   open,
   onClose,
@@ -1235,6 +1283,8 @@ function NovaRegraDialog({
   espOpts,
   procOpts,
   procsPorEsp,
+  condicaoEOu,
+  gruposOu,
   onSaved,
   regra,
 }: {
@@ -1245,6 +1295,9 @@ function NovaRegraDialog({
   espOpts: Array<{ value: string; label: string }>;
   procOpts: Array<{ value: string; label: string; tipo: string | null }>;
   procsPorEsp: Map<string, Set<string>>;
+  /** Seletor "E / OU" no lugar do campo de grupo digitado (hoje só SFP). */
+  condicaoEOu: boolean;
+  gruposOu: GrupoOu[];
   onSaved: () => void | Promise<void>;
   regra?: CbRegra | null;
 }) {
@@ -1281,13 +1334,17 @@ function NovaRegraDialog({
   // Cota compartilhada = mesmo grupo_gratuidade em todas as linhas; o motor
   // (info-convenio-paciente.ts) já soma o uso do grupo inteiro.
   const [usoCompartilhado, setUsoCompartilhado] = useState(false);
+  // Seletor E/OU (condicaoEOu): no OU, a regra entra num grupo já existente
+  // ou — com vários itens — num grupo novo de id gerado. Ninguém digita nome.
+  const [grupoOuId, setGrupoOuId] = useState<string>(GRUPO_OU_NOVO);
 
   useEffect(() => {
     if (open) {
       setR(regra ? { ...regra } : emptyRegra());
       setEspIds([]);
       setProcIds([]);
-      setUsoCompartilhado(false);
+      setUsoCompartilhado(!!regra?.grupo_gratuidade?.trim());
+      setGrupoOuId(regra?.grupo_gratuidade?.trim() || GRUPO_OU_NOVO);
     }
     /* eslint-disable-next-line */
   }, [open, convenioId, regra]);
@@ -1427,10 +1484,26 @@ function NovaRegraDialog({
     return `de R$100 → R$ ${v.dinheiro.toFixed(2)} (${r.percentual}% off)`;
   })();
 
+  // Grupo que a condição E/OU grava: E = sem grupo; OU = grupo escolhido ou,
+  // com vários itens, um id novo. undefined = condição não se aplica (fora da SFP).
+  const grupoDaCondicao = (): string | null | undefined => {
+    if (!condicaoEOu) return undefined;
+    if (!usoCompartilhado) return null;
+    if (grupoOuId !== GRUPO_OU_NOVO) return grupoOuId;
+    return `ou-${crypto.randomUUID().slice(0, 8)}`;
+  };
+
   const salvarNovo = async () => {
     // Cota compartilhada sem quantidade não divide nada — o grupo só pesa no limite.
-    if (variosAlvos && usoCompartilhado && !hasLimit) {
+    if ((variosAlvos || condicaoEOu) && usoCompartilhado && !hasLimit) {
       toast.error("Para os itens dividirem a mesma cota, informe a Quantidade em Limite de uso.");
+      return;
+    }
+    // OU com um item só precisa de outro item para dividir a cota.
+    if (condicaoEOu && usoCompartilhado && !variosAlvos && grupoOuId === GRUPO_OU_NOVO) {
+      toast.error(
+        "Na condição OU, escolha com quais itens esta regra divide a cota — ou selecione mais de um serviço/especialidade.",
+      );
       return;
     }
     // Guarda: se o operador está criando/editando uma regra por procedimento e
@@ -1496,6 +1569,8 @@ function NovaRegraDialog({
       gratuito: !!r.gratuito,
       grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
     };
+    const grupoCondicao = grupoDaCondicao();
+    if (grupoCondicao !== undefined) payload.grupo_gratuidade = grupoCondicao;
     // Vários itens: uma linha por serviço (ou por especialidade). Uso independente
     // = sem grupo (cada linha conta a própria cota); compartilhado = mesmo grupo.
     let linhas = [payload];
@@ -1911,7 +1986,61 @@ function NovaRegraDialog({
                 )}
               </div>
             )}
-            {variosAlvos && (
+            {condicaoEOu && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="condicao-e-ou" className="text-xs">
+                    Tipo de condição (regra de uso)
+                  </Label>
+                  <Select
+                    value={usoCompartilhado ? "ou" : "e"}
+                    onValueChange={(v) => setUsoCompartilhado(v === "ou")}
+                  >
+                    <SelectTrigger id="condicao-e-ou">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="e">E — cada item com a própria cota</SelectItem>
+                      <SelectItem value="ou">OU — os itens dividem a mesma cota</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[12px] text-muted-foreground">
+                    {usoCompartilhado
+                      ? "Usar um item consome o benefício e bloqueia os outros no período (ex.: Mamografia OU USG Mama)."
+                      : "Todos podem ser usados: cada item conta o próprio limite (ex.: 1 consulta E 1 exame)."}
+                  </p>
+                </div>
+                {usoCompartilhado && (variosAlvos ? gruposOu.length > 0 : true) && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="grupo-ou" className="text-xs">
+                      {variosAlvos ? "Somar a uma condição OU já existente?" : "Divide a cota com"}
+                    </Label>
+                    <Select value={grupoOuId} onValueChange={setGrupoOuId}>
+                      <SelectTrigger id="grupo-ou">
+                        <SelectValue placeholder="Escolha os itens" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={GRUPO_OU_NOVO}>
+                          {variosAlvos ? `Não — só estes ${qtdAlvos} itens` : "Escolha os itens…"}
+                        </SelectItem>
+                        {gruposOu.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!variosAlvos && gruposOu.length === 0 && (
+                      <p className="text-[12px] text-muted-foreground">
+                        Ainda não há condição OU neste cartão. Para criar uma, selecione os
+                        serviços/especialidades juntos em uma regra nova.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {!condicaoEOu && variosAlvos && (
               <div className="space-y-1.5">
                 <Label htmlFor="uso-limite-itens" className="text-xs">
                   Uso do limite entre os {qtdAlvos} itens
@@ -1935,7 +2064,7 @@ function NovaRegraDialog({
                 </p>
               </div>
             )}
-            {(!variosAlvos || usoCompartilhado) && (
+            {!condicaoEOu && (!variosAlvos || usoCompartilhado) && (
               <div className="space-y-1.5">
                 <Label htmlFor="grupo-gratuidade" className="text-xs">
                   {variosAlvos ? "Nome do grupo (opcional)" : "Grupo de gratuidade (opcional)"}
