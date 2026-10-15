@@ -10,6 +10,8 @@ BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', adm::text, true);
   INSERT INTO public.clinicas (nome) VALUES ('CLINICA TESTE CHAVE') RETURNING id INTO c;
+  ex := (public.importacao_legado_iniciar(c, 'profissionais', 'prof.jsonl', 1)).id;
+  PERFORM public.importacao_legado_concluir(ex);
   ex := (public.importacao_legado_iniciar(c, 'pessoas', 'teste.jsonl', 1)).id;
 
   -- Pessoa 30 chega antes da 10 com a mesma pasta: a 10 (menor código) fica com o número.
@@ -56,8 +58,7 @@ BEGIN
     RAISE EXCEPTION 'FALHOU aviso de repetida';
   END IF;
   -- Reenviar o mesmo arquivo não duplica nem renumera.
-  ex := (public.importacao_legado_iniciar(c, 'pessoas', 'teste2.jsonl', 2)).id;
-  PERFORM public.importacao_legado_lote(ex, 1, '[{"n":1,"d":{"codigo_pessoa":"30","nome":"EVA TESTE","chave":"777"}}]'::jsonb);
+  PERFORM public.importacao_legado_lote(ex, 9, '[{"n":9,"d":{"codigo_pessoa":"30","nome":"EVA TESTE","chave":"777"}}]'::jsonb);
   IF (SELECT count(*) FROM public.pacientes WHERE clinica_id = c) <> 7
      OR (SELECT codigo_prontuario FROM public.pacientes WHERE clinica_id = c AND codigo_prontuario_anterior = '30') <> '490024' THEN
     RAISE EXCEPTION 'FALHOU reimportação';
