@@ -7272,6 +7272,7 @@ export type Database = {
           concluido_em: string | null
           created_at: string
           erros: number
+          fase: string | null
           id: string
           ignoradas: number
           iniciado_por: string | null
@@ -7291,6 +7292,7 @@ export type Database = {
           concluido_em?: string | null
           created_at?: string
           erros?: number
+          fase?: string | null
           id?: string
           ignoradas?: number
           iniciado_por?: string | null
@@ -7310,6 +7312,7 @@ export type Database = {
           concluido_em?: string | null
           created_at?: string
           erros?: number
+          fase?: string | null
           id?: string
           ignoradas?: number
           iniciado_por?: string | null
@@ -7365,6 +7368,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "importacao_legado_numeracao_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importacao_legado_pasta: {
+        Row: {
+          aplicado: boolean
+          chave_original: string | null
+          clinica_id: string
+          codigo_pessoa: string
+          created_at: string
+          motivo: string | null
+          novo: boolean
+          numero_chave: number | null
+          numero_final: number | null
+          paciente_id: string | null
+        }
+        Insert: {
+          aplicado?: boolean
+          chave_original?: string | null
+          clinica_id: string
+          codigo_pessoa: string
+          created_at?: string
+          motivo?: string | null
+          novo?: boolean
+          numero_chave?: number | null
+          numero_final?: number | null
+          paciente_id?: string | null
+        }
+        Update: {
+          aplicado?: boolean
+          chave_original?: string | null
+          clinica_id?: string
+          codigo_pessoa?: string
+          created_at?: string
+          motivo?: string | null
+          novo?: boolean
+          numero_chave?: number | null
+          numero_final?: number | null
+          paciente_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_legado_pasta_clinica_id_fkey"
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
@@ -16968,6 +17018,7 @@ export type Database = {
           mesclados: number
         }[]
       }
+      _imp_chave_num: { Args: { _t: string }; Returns: number }
       _imp_date: { Args: { _t: string }; Returns: string }
       _imp_legado_eh_admin: { Args: { _clinica: string }; Returns: boolean }
       _imp_norm_nome: { Args: { _t: string }; Returns: string }
@@ -18227,6 +18278,7 @@ export type Database = {
           concluido_em: string | null
           created_at: string
           erros: number
+          fase: string | null
           id: string
           ignoradas: number
           iniciado_por: string | null
@@ -18260,6 +18312,7 @@ export type Database = {
           concluido_em: string | null
           created_at: string
           erros: number
+          fase: string | null
           id: string
           ignoradas: number
           iniciado_por: string | null
@@ -18284,6 +18337,19 @@ export type Database = {
       }
       importacao_legado_numerar_pendentes: {
         Args: { _clinica: string; _limite?: number }
+        Returns: Json
+      }
+      importacao_legado_pasta_aplicar: {
+        Args: { _execucao: string; _limite?: number }
+        Returns: Json
+      }
+      importacao_legado_pasta_lote: {
+        Args: { _execucao: string; _linha_final: number; _linhas: Json }
+        Returns: Json
+      }
+      importacao_legado_problemas: { Args: { _clinica: string }; Returns: Json }
+      importacao_legado_reaplicar_profissional: {
+        Args: { _clinica: string; _codigo_pessoa: string }
         Returns: Json
       }
       importacao_legado_resumo: { Args: { _clinica: string }; Returns: Json }
