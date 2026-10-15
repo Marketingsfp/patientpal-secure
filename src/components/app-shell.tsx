@@ -649,6 +649,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
       { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
       { to: "/app/configuracoes/site-agendamento", label: "Agendamento pelo site", icon: KeyRound },
+      { to: "/app/configuracoes/importar-clinica-total", label: "Importar Clínica Total", icon: FolderOpen },
       { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
       { to: "/app/backups", label: "Backups", icon: ShieldCheck },
     ],
