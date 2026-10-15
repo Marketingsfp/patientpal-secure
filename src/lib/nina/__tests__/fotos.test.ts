@@ -74,10 +74,22 @@ it("resultado ou receita de remédio vai à equipe; texto nunca é contado como 
   expect(decidirFotos([{ ...foto("b", 20), tipo: "text" }], [pedido]).acao).toBe("continuar");
 });
 it("leitura parcial ou inválida não libera nomes presumidos", () => {
-  for (const itens of [[], ["ECG", null], ["x".repeat(81)]])
+  for (const itens of [[], ["ECG", null]])
     expect(interpretarLeituraImagem(JSON.stringify({ tipo: "pedido_medico", itens })).tipo).toBe(
       "ilegivel",
     );
+  expect(interpretarLeituraImagem(JSON.stringify({ tipo: "pedido_medico", itens: [1] })).tipo).toBe(
+    "ilegivel",
+  );
+});
+it("item com mais de 80 caracteres é cortado em vez de derrubar a leitura", () => {
+  const r = interpretarLeituraImagem(
+    JSON.stringify({ tipo: "pedido_medico", itens: ["x".repeat(81), "ECG"] }),
+  );
+  expect(r).toEqual({ tipo: "pedido_medico", itens: ["x".repeat(80), "ECG"] });
+});
+it("JSON que não é objeto continua ilegível", () => {
+  expect(interpretarLeituraImagem("{}").tipo).toBe("falha_tecnica");
   expect(interpretarLeituraImagem('{"tipo":"ilegivel","itens":["talvez ECG"]}').tipo).toBe(
     "ilegivel",
   );
