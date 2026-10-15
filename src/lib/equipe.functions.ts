@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
+import { MSG_SO_ADMIN, exigeAdministrador } from "@/lib/equipe/conceder-admin";
 
 const ROLES = [
   "admin",
@@ -240,6 +241,10 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
     if (data.perfilAcessoId) {
       data.role = await perfilBaseDoCustomizado(data.clinicaId, data.perfilAcessoId);
     }
+    // Antes de criar conta: conceder admin exige administrador.
+    if (exigeAdministrador({ papelFinal: data.role })) {
+      await assertAdminDaClinicaOuPlataforma(context.userId, data.clinicaId);
+    }
     // Só manda a coluna quando há perfil customizado: antes da migration ela
     // não existe, e o cadastro comum não pode depender dela.
     const perfilCustom = data.perfilAcessoId ? { perfil_acesso_id: data.perfilAcessoId } : {};
@@ -270,10 +275,22 @@ export const cadastrarUsuario = createServerFn({ method: "POST" })
     // Insert membership (or reactivate)
     const { data: existingMem } = await supabaseAdmin
       .from("clinica_memberships")
-      .select("id")
+      .select("id, role, ativo")
       .eq("user_id", userId!)
       .eq("clinica_id", data.clinicaId)
       .maybeSingle();
+
+    if (
+      existingMem &&
+      exigeAdministrador({
+        papelFinal: data.role,
+        papelAtual: existingMem.role,
+        alvoEhOProprio:
+          userId === context.userId && (data.role !== existingMem.role || !existingMem.ativo),
+      })
+    ) {
+      await assertAdminDaClinicaOuPlataforma(context.userId, data.clinicaId);
+    }
 
     if (existingMem) {
       const { error } = await supabaseAdmin
@@ -332,7 +349,7 @@ export const editarMembro = createServerFn({ method: "POST" })
 
     const { data: mem, error: mErr } = await supabaseAdmin
       .from("clinica_memberships")
-      .select("id, user_id, clinica_id")
+      .select("id, user_id, clinica_id, role, ativo")
       .eq("id", data.membershipId)
       .single();
     if (mErr || !mem) throw new Error("Membro não encontrado");
@@ -345,6 +362,18 @@ export const editarMembro = createServerFn({ method: "POST" })
 
     if (data.perfilAcessoId) {
       data.role = await perfilBaseDoCustomizado(data.clinicaId, data.perfilAcessoId);
+    }
+
+    const proprioMudando =
+      mem.user_id === context.userId && (data.role !== mem.role || data.ativo !== mem.ativo);
+    if (
+      exigeAdministrador({
+        papelFinal: data.role,
+        papelAtual: mem.role,
+        alvoEhOProprio: proprioMudando,
+      })
+    ) {
+      await assertAdminDaClinicaOuPlataforma(context.userId, data.clinicaId);
     }
 
     const { error: upErr } = await supabaseAdmin
