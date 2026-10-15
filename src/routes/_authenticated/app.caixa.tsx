@@ -3213,10 +3213,11 @@ function Page() {
     [todosMovs],
   );
 
-  /** Mesma conta para o caixa de outra pessoa, fechado pelo gestor. */
-  const composicaoGavetaSessao = useCallback(
-    (sid: string, valorAbertura: number) => {
-      const movs = todosMovs.filter((m) => m.sessao_id === sid && !m.id.startsWith("fin:"));
+  /** Conta da gaveta de UMA sessão, a partir dos movimentos dela — a mesma do
+   *  fechamento pelo gestor e da 2ª via do fechamento (detalhe do caixa). */
+  const composicaoGavetaDosMovs = useCallback(
+    (movsSessao: Mov[], valorAbertura: number) => {
+      const movs = movsSessao.filter((m) => !m.id.startsWith("fin:"));
       const dinheiro = detalhePorFormaDosMovs(
         movs.filter((m) => m.tipo === "recebimento" || m.tipo === "estorno"),
       ).dinheiro ?? { entradas: 0, saidas: 0 };
@@ -3237,7 +3238,16 @@ function Page() {
         despesas,
       };
     },
-    [todosMovs, detalhePorFormaDosMovs],
+    [detalhePorFormaDosMovs],
+  );
+  /** Mesma conta para o caixa de outra pessoa, fechado pelo gestor. */
+  const composicaoGavetaSessao = useCallback(
+    (sid: string, valorAbertura: number) =>
+      composicaoGavetaDosMovs(
+        todosMovs.filter((m) => m.sessao_id === sid),
+        valorAbertura,
+      ),
+    [todosMovs, composicaoGavetaDosMovs],
   );
 
   /**
@@ -4152,6 +4162,51 @@ function Page() {
     }));
     const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
     exportToExcel(rows, `sessao_caixa_${op}_${openDetalhe.id.slice(0, 8)}`);
+  };
+
+  /**
+   * 2ª via do comprovante de fechamento de um caixa já fechado. O cupom só saía
+   * na hora de encerrar: se a impressão era cancelada ou o papel se perdia, não
+   * havia como tirar outro. Usa os valores gravados no fechamento (calculado,
+   * informado, diferença) e os movimentos da sessão — nada é recalculado nem
+   * regravado, o caixa fechado continua intocado.
+   */
+  const reimprimirFechamento = () => {
+    const s = openDetalhe;
+    if (!s || s.status !== "fechado") return;
+    const movs = detalheMovs.filter((m) => !m.id.startsWith("fin:"));
+    const fech = [...movs].reverse().find((m) => m.tipo === "fechamento");
+    const informado = Number(s.valor_fechamento_informado ?? 0);
+    const composicao = composicaoGavetaDosMovs(movs, Number(s.valor_abertura || 0));
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual?.clinica?.nome ?? "Clínica",
+      operadorNome: s.user_nome || "Atendente",
+      valor: informado,
+      saldoCalculado: Number(s.valor_fechamento_calculado ?? 0),
+      valorInformado: informado,
+      diferenca: Number(s.diferenca ?? 0),
+      descricao: `2ª VIA — ${fech?.descricao ?? "Fechamento"}`,
+      porForma: porFormaDosMovs(movs),
+      porFormaDetalhe: detalhePorFormaDosMovs(movs),
+      formato: formatoFechamento,
+      aberturaEm: s.aberto_em,
+      fechamentoEm: s.fechado_em,
+      saldoInicial: composicao.saldoInicial,
+      esperadoGaveta: saldoEsperadoGaveta(composicao),
+      composicaoGaveta: composicao,
+      retroativos: resumoRetroativos(movs),
+      registros: resumoRegistros(movs),
+      movimentos: movs
+        .filter((m) => m.tipo === "sangria" || m.tipo === "suprimento")
+        .map((m) => ({
+          tipo: m.tipo as "sangria" | "suprimento",
+          valor: Number(m.valor || 0),
+          descricao: m.descricao ?? null,
+          created_at: m.created_at,
+        }))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    });
   };
 
   const imprimirDetalhe = () => {
@@ -6776,6 +6831,16 @@ function Page() {
                   <Button size="sm" variant="outline" onClick={imprimirDetalhe}>
                     <Printer className="h-4 w-4 mr-1" /> Imprimir
                   </Button>
+                  {openDetalhe.status === "fechado" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={reimprimirFechamento}
+                      disabled={detalheMovs.length === 0}
+                    >
+                      <Printer className="h-4 w-4 mr-1" /> Reimprimir fechamento
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
