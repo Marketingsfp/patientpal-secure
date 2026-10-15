@@ -3510,6 +3510,13 @@ export type Database = {
             referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clinica_memberships_perfil_acesso_id_fkey"
+            columns: ["perfil_acesso_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_acesso"
+            referencedColumns: ["id"]
+          },
         ]
       }
       clinica_tts_config: {
