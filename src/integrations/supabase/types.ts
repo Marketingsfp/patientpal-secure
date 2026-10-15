@@ -7331,6 +7331,47 @@ export type Database = {
           },
         ]
       }
+      importacao_legado_numeracao: {
+        Row: {
+          chave_original: string | null
+          clinica_id: string
+          codigo_pessoa: string
+          created_at: string
+          motivo: string
+          numerado_em: string | null
+          numero_novo: number | null
+          paciente_id: string
+        }
+        Insert: {
+          chave_original?: string | null
+          clinica_id: string
+          codigo_pessoa: string
+          created_at?: string
+          motivo: string
+          numerado_em?: string | null
+          numero_novo?: number | null
+          paciente_id: string
+        }
+        Update: {
+          chave_original?: string | null
+          clinica_id?: string
+          codigo_pessoa?: string
+          created_at?: string
+          motivo?: string
+          numerado_em?: string | null
+          numero_novo?: number | null
+          paciente_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_legado_numeracao_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       importacao_legado_profissionais: {
         Row: {
           casado_por: string | null
@@ -18239,6 +18280,10 @@ export type Database = {
       }
       importacao_legado_lote: {
         Args: { _execucao: string; _linha_final: number; _linhas: Json }
+        Returns: Json
+      }
+      importacao_legado_numerar_pendentes: {
+        Args: { _clinica: string; _limite?: number }
         Returns: Json
       }
       importacao_legado_resumo: { Args: { _clinica: string }; Returns: Json }
