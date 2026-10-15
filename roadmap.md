@@ -40,3 +40,7 @@
 ## Site institucional
 - [x] Interruptor por clínica do agendamento pelo site (Menino Jesus desligada) — não publicado
 - [x] Segurança: só admin concede/altera perfil admin em equipe.functions.ts (cadastrarUsuario/editarMembro)
+
+## Importar Clínica Total (SFP)
+- [x] Restaurar plano da importação
+- [ ] Banco + funções + tela /app/configuracoes/importar-clinica-total + testes (sem importação real, sem publicar)
