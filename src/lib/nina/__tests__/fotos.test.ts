@@ -88,7 +88,7 @@ it("item com mais de 80 caracteres é cortado em vez de derrubar a leitura", () 
   );
   expect(r).toEqual({ tipo: "pedido_medico", itens: ["x".repeat(80), "ECG"] });
 });
-it("JSON que não é objeto continua ilegível", () => {
+it("JSON sem tipo continua sem comprovar leitura", () => {
   expect(interpretarLeituraImagem("{}").tipo).toBe("falha_tecnica");
   expect(interpretarLeituraImagem('{"tipo":"ilegivel","itens":["talvez ECG"]}').tipo).toBe(
     "ilegivel",

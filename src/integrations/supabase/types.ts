@@ -13421,6 +13421,59 @@ export type Database = {
         }
         Relationships: []
       }
+      orcamento_foto_diagnosticos: {
+        Row: {
+          altura_enviada: number | null
+          altura_original: number | null
+          bytes_enviados: number | null
+          clinica_id: string
+          created_at: string
+          id: string
+          largura_enviada: number | null
+          largura_original: number | null
+          mime_recebido: string | null
+          sessao_id: string | null
+          user_agent: string | null
+          veredito_ia: string | null
+        }
+        Insert: {
+          altura_enviada?: number | null
+          altura_original?: number | null
+          bytes_enviados?: number | null
+          clinica_id: string
+          created_at?: string
+          id?: string
+          largura_enviada?: number | null
+          largura_original?: number | null
+          mime_recebido?: string | null
+          sessao_id?: string | null
+          user_agent?: string | null
+          veredito_ia?: string | null
+        }
+        Update: {
+          altura_enviada?: number | null
+          altura_original?: number | null
+          bytes_enviados?: number | null
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          largura_enviada?: number | null
+          largura_original?: number | null
+          mime_recebido?: string | null
+          sessao_id?: string | null
+          user_agent?: string | null
+          veredito_ia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_foto_diagnosticos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orcamento_foto_sessoes: {
         Row: {
           clinica_id: string
