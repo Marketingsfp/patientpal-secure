@@ -150,6 +150,7 @@ import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
 import { Route as AuthenticatedAppClientesRecentesRouteImport } from './routes/_authenticated/app.clientes.recentes'
 import { Route as AuthenticatedAppCoachIndexRouteImport } from './routes/_authenticated/app.coach.index'
+import { Route as AuthenticatedAppConfiguracoesImportarClinicaTotalRouteImport } from './routes/_authenticated/app.configuracoes.importar-clinica-total'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
 import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
 import { Route as AuthenticatedAppConfiguracoesProntuarioRouteImport } from './routes/_authenticated/app.configuracoes.prontuario'
@@ -987,6 +988,12 @@ const AuthenticatedAppCoachIndexRoute =
     path: '/coach/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppConfiguracoesImportarClinicaTotalRoute =
+  AuthenticatedAppConfiguracoesImportarClinicaTotalRouteImport.update({
+    id: '/configuracoes/importar-clinica-total',
+    path: '/configuracoes/importar-clinica-total',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppConfiguracoesNfseRoute =
   AuthenticatedAppConfiguracoesNfseRouteImport.update({
     id: '/configuracoes/nfse',
@@ -1452,6 +1459,7 @@ export interface FileRoutesByFullPath {
   '/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
+  '/app/configuracoes/importar-clinica-total': typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -1645,6 +1653,7 @@ export interface FileRoutesByTo {
   '/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
+  '/app/configuracoes/importar-clinica-total': typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -1844,6 +1853,7 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
+  '/_authenticated/app/configuracoes/importar-clinica-total': typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
   '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/_authenticated/app/configuracoes/prontuario': typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -2043,6 +2053,7 @@ export interface FileRouteTypes {
     | '/app/cartao-terapeutico/relatorios'
     | '/app/clientes/duplicados'
     | '/app/clientes/recentes'
+    | '/app/configuracoes/importar-clinica-total'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
     | '/app/configuracoes/prontuario'
@@ -2236,6 +2247,7 @@ export interface FileRouteTypes {
     | '/app/cartao-terapeutico/relatorios'
     | '/app/clientes/duplicados'
     | '/app/clientes/recentes'
+    | '/app/configuracoes/importar-clinica-total'
     | '/app/configuracoes/nfse'
     | '/app/configuracoes/painel-totem'
     | '/app/configuracoes/prontuario'
@@ -2434,6 +2446,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-terapeutico/relatorios'
     | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/clientes/recentes'
+    | '/_authenticated/app/configuracoes/importar-clinica-total'
     | '/_authenticated/app/configuracoes/nfse'
     | '/_authenticated/app/configuracoes/painel-totem'
     | '/_authenticated/app/configuracoes/prontuario'
@@ -3540,6 +3553,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppCoachIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/configuracoes/importar-clinica-total': {
+      id: '/_authenticated/app/configuracoes/importar-clinica-total'
+      path: '/configuracoes/importar-clinica-total'
+      fullPath: '/app/configuracoes/importar-clinica-total'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/configuracoes/nfse': {
       id: '/_authenticated/app/configuracoes/nfse'
       path: '/configuracoes/nfse'
@@ -4190,6 +4210,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppClientesDuplicadosRoute: typeof AuthenticatedAppClientesDuplicadosRoute
   AuthenticatedAppClientesRecentesRoute: typeof AuthenticatedAppClientesRecentesRoute
+  AuthenticatedAppConfiguracoesImportarClinicaTotalRoute: typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
   AuthenticatedAppConfiguracoesPainelTotemRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   AuthenticatedAppConfiguracoesProntuarioRoute: typeof AuthenticatedAppConfiguracoesProntuarioRoute
@@ -4305,6 +4326,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppClientesDuplicadosRoute:
     AuthenticatedAppClientesDuplicadosRoute,
   AuthenticatedAppClientesRecentesRoute: AuthenticatedAppClientesRecentesRoute,
+  AuthenticatedAppConfiguracoesImportarClinicaTotalRoute:
+    AuthenticatedAppConfiguracoesImportarClinicaTotalRoute,
   AuthenticatedAppConfiguracoesNfseRoute:
     AuthenticatedAppConfiguracoesNfseRoute,
   AuthenticatedAppConfiguracoesPainelTotemRoute:

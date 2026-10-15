@@ -343,7 +343,7 @@ function EtapaCard(props: {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={rodando || !ultima || concluida || (!terminouLeitura && !ultima)}
+                disabled={rodando || !ultima || concluida}
                 onClick={() => void concluir()}
               >
                 Concluir etapa
