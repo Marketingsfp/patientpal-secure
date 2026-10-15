@@ -35,6 +35,7 @@ const ETAPAS = [
   { tipo: "pessoas", rotulo: "2. Pessoas (clientes)", arquivo: "pessoas_v2.jsonl" },
   { tipo: "prontuarios", rotulo: "3. Prontuários", arquivo: "prontuarios.jsonl" },
   { tipo: "observacoes", rotulo: "4. Observações", arquivo: "observacoes.jsonl" },
+  { tipo: "corrigir_pasta", rotulo: "5. Corrigir número da pasta", arquivo: "pessoas_v2.jsonl" },
 ] as const;
 type Tipo = (typeof ETAPAS)[number]["tipo"];
 
@@ -151,6 +152,7 @@ function Pagina() {
             );
           })}
           <ProfissionaisNaoCasados clinicaId={clinicaId} />
+          <Problemas clinicaId={clinicaId} />
           <Resumo dados={resumo.data} />
         </>
       )}
@@ -208,11 +210,14 @@ function EtapaCard(props: {
   async function enviar(execId: string, linhas: LinhaLida[], linhaFinal: number) {
     let tentativa = 0;
     for (;;) {
-      const { data, error } = await supabase.rpc("importacao_legado_lote", {
-        _execucao: execId,
-        _linha_final: linhaFinal,
-        _linhas: linhas as never,
-      });
+      const { data, error } = await supabase.rpc(
+        props.tipo === "corrigir_pasta" ? "importacao_legado_pasta_lote" : "importacao_legado_lote",
+        {
+          _execucao: execId,
+          _linha_final: linhaFinal,
+          _linhas: linhas as never,
+        },
+      );
       if (!error) {
         const total = (data as { total?: Execucao }).total;
         if (total) setExec(total);
@@ -232,7 +237,7 @@ function EtapaCard(props: {
     pausar.current = false;
     setLidoBytes(0);
     try {
-      if (props.tipo === "pessoas") {
+      if (props.tipo === "pessoas" || props.tipo === "corrigir_pasta") {
         const motivo = await conferirCampoChave(arquivo);
         if (motivo) {
           setMensagem(motivo);
@@ -252,7 +257,9 @@ function EtapaCard(props: {
         setMensagem("Este arquivo já foi importado e a etapa está concluída.");
         return;
       }
-      const jaConfirmada = ex.ultima_linha;
+      const jaConfirmada = (ex as Execucao & { fase?: string | null }).fase
+        ? Infinity
+        : ex.ultima_linha;
       let n = 0;
       let lote: LinhaLida[] = [];
       let bytesLote = 0;
@@ -276,6 +283,38 @@ function EtapaCard(props: {
         }
       }
       if (n > jaConfirmada) await enviar(ex.id, lote, n);
+      if (props.tipo === "corrigir_pasta") {
+        setMensagem("Preenchendo responsáveis dos clientes novos…");
+        for (;;) {
+          const r = await supabase.rpc("importacao_legado_aplicar_responsaveis", {
+            _clinica: props.clinicaId,
+            _limite: 2000,
+          });
+          if (r.error) throw new Error(r.error.message);
+          if (((r.data as { restantes?: number })?.restantes ?? 0) === 0) break;
+        }
+        let feitos = 0;
+        for (;;) {
+          const r = await supabase.rpc("importacao_legado_pasta_aplicar", {
+            _execucao: ex.id,
+            _limite: 5000,
+          });
+          if (r.error) throw new Error(r.error.message);
+          const d = r.data as { fase: string; feitos: number; restantes: number | null };
+          feitos += d.feitos ?? 0;
+          if (d.fase === "aplicado") break;
+          setMensagem(
+            d.fase === "provisorio"
+              ? `Fase 1 de 2: liberando os números antigos (${feitos.toLocaleString("pt-BR")} clientes)…`
+              : `Fase 2 de 2: gravando o número da pasta (faltam ${(d.restantes ?? 0).toLocaleString("pt-BR")})…`,
+          );
+          if (d.fase === "aplicando" && d.feitos === 0 && feitos > 0) feitos = 0;
+          if (pausar.current) {
+            setMensagem('Pausado. Clique em "Iniciar / continuar" para seguir de onde parou.');
+            return;
+          }
+        }
+      }
       if (props.tipo === "pessoas") {
         setMensagem("Preenchendo responsáveis…");
         for (;;) {
@@ -489,7 +528,22 @@ function ProfissionaisNaoCasados({ clinicaId }: { clinicaId: string }) {
       _sem_medico: sem,
     });
     if (error) toast.error(error.message);
+    else if (!sem) {
+      const r = await supabase.rpc("importacao_legado_reaplicar_profissional", {
+        _clinica: clinicaId,
+        _codigo_pessoa: codigo,
+      });
+      if (r.error) toast.error(r.error.message);
+      else {
+        const d = r.data as { atualizados: number; nome_repetido: boolean };
+        toast.success(
+          `${d.atualizados.toLocaleString("pt-BR")} prontuário(s) já importado(s) ligado(s) a este médico` +
+            (d.nome_repetido ? " (nome repetido entre profissionais: só pelo código antigo)" : ""),
+        );
+      }
+    }
     void qc.invalidateQueries({ queryKey: ["imp-legado-prof", clinicaId] });
+    void qc.invalidateQueries({ queryKey: ["imp-legado-problemas", clinicaId] });
   }
 
   return (
@@ -503,7 +557,8 @@ function ProfissionaisNaoCasados({ clinicaId }: { clinicaId: string }) {
       <CardContent className="space-y-2">
         <p className="text-sm text-muted-foreground">
           Associe ao médico certo ou deixe "Sem médico" (o nome do profissional fica escrito no
-          prontuário). Faça isso antes da etapa de prontuários.
+          prontuário). Ao associar, os prontuários já importados desse profissional que estão sem
+          médico passam a ficar com o médico escolhido.
         </p>
         {pendentes.map((p) => (
           <div key={p.codigo_pessoa} className="flex flex-wrap items-center gap-2 text-sm">
@@ -548,7 +603,92 @@ const ROTULOS_RESUMO: Record<string, string> = {
   prontuarios_importados: "Prontuários importados",
   prontuarios_sem_medico: "…sem médico",
   observacoes_importadas: "Observações importadas",
+  pasta_atualizados: "Etapa 5: clientes com número da pasta corrigido",
+  pasta_novos: "Etapa 5: clientes novos criados",
+  pasta_numeros_gerados: "Etapa 5: números novos gerados (pasta vazia/repetida/inválida)",
+  pasta_avisos: "Etapa 5: avisos no log",
+  pasta_pendentes: "Etapa 5: aguardando troca",
 };
+
+type ProblemasDados = {
+  sem_cadastro: { codigo_pessoa: string; motivo: string; nome: string | null }[];
+  cpf_repetidos: number;
+  prontuarios_orfaos: number;
+  observacoes_orfas: number;
+  profissionais: number;
+  profissionais_casados: number;
+  prontuarios_sem_medico: number;
+  prontuarios_sem_medico_com_profissional: number;
+};
+
+/** Problemas já gravados, só para conferir e decidir depois (nada é corrigido aqui). */
+function Problemas({ clinicaId }: { clinicaId: string }) {
+  const q = useQuery({
+    queryKey: ["imp-legado-problemas", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("importacao_legado_problemas", {
+        _clinica: clinicaId,
+      });
+      if (error) throw new Error(error.message);
+      return data as unknown as ProblemasDados;
+    },
+  });
+  const d = q.data;
+  if (!d) return null;
+  const n = (v: number) => v.toLocaleString("pt-BR");
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Problemas para decidir depois</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
+          <Linha r="Pessoas não importadas (nome inválido ou vazio)" v={n(d.sem_cadastro.length)} />
+          <Linha r="CPFs repetidos guardados nas observações antigas" v={n(d.cpf_repetidos)} />
+          <Linha r="Prontuários sem paciente (não importados)" v={n(d.prontuarios_orfaos)} />
+          <Linha r="Observações sem paciente (não importadas)" v={n(d.observacoes_orfas)} />
+          <Linha
+            r="Profissionais ligados a médico"
+            v={`${n(d.profissionais_casados)} de ${n(d.profissionais)}`}
+          />
+          <Linha r="Prontuários sem médico" v={n(d.prontuarios_sem_medico)} />
+          <Linha
+            r="…dos quais com profissional anotado no texto"
+            v={n(d.prontuarios_sem_medico_com_profissional)}
+          />
+        </div>
+        {d.sem_cadastro.length > 0 && (
+          <div>
+            <p className="mb-1 font-medium">Pessoas não importadas</p>
+            <p className="mb-1 text-xs text-muted-foreground">
+              O nome aparece depois que a etapa 5 lê o pessoas_v2.jsonl.
+            </p>
+            <div className="max-h-64 overflow-auto rounded-md border">
+              {d.sem_cadastro.map((p) => (
+                <div key={p.codigo_pessoa} className="flex gap-3 border-b px-2 py-1">
+                  <span className="w-24 tabular-nums text-muted-foreground">
+                    #{p.codigo_pessoa}
+                  </span>
+                  <span className="flex-1 truncate">{p.nome ?? "—"}</span>
+                  <span className="text-muted-foreground">{p.motivo}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Linha({ r, v }: { r: string; v: string }) {
+  return (
+    <div className="flex justify-between border-b py-1">
+      <span>{r}</span>
+      <span className="font-semibold tabular-nums">{v}</span>
+    </div>
+  );
+}
 
 function Resumo({ dados }: { dados?: Record<string, number> }) {
   if (!dados) return null;
