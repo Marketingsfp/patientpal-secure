@@ -11,17 +11,24 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { DATA_URL_PEDIDO, lerPedidoMedicoNaIA } from "./ler-pedido-medico.server";
-import { MAX_TENTATIVAS_FOTO, TOKEN_FOTO } from "./foto-celular";
+import { DATA_URL_PEDIDO, lerPedidoMedicoComVeredito } from "./ler-pedido-medico.server";
+import { MAX_DATA_URL_FOTO, MAX_TENTATIVAS_FOTO, TOKEN_FOTO } from "./foto-celular";
+import { getRequest } from "@tanstack/react-start/server";
 
 // A tabela é nova e ainda não está nos tipos gerados.
 const sessoes = () => (supabaseAdmin as unknown as SupabaseClient).from("orcamento_foto_sessoes");
 
-type Sessao = { id: string; estado: string; tentativas: number; expira_em: string };
+type Sessao = {
+  id: string;
+  clinica_id: string;
+  estado: string;
+  tentativas: number;
+  expira_em: string;
+};
 
 async function sessaoValida(token: string): Promise<Sessao | null> {
   const { data } = await sessoes()
-    .select("id, estado, tentativas, expira_em")
+    .select("id, clinica_id, estado, tentativas, expira_em")
     .eq("token", token)
     .maybeSingle();
   const s = data as Sessao | null;
@@ -59,7 +66,17 @@ export const enviarFotoCelular = createServerFn({ method: "POST" })
     z
       .object({
         token: z.string().regex(TOKEN_FOTO),
-        arquivo: z.string().min(50).max(12_000_000).regex(DATA_URL_PEDIDO),
+        arquivo: z.string().min(50).max(MAX_DATA_URL_FOTO).regex(DATA_URL_PEDIDO),
+        // Só metadados técnicos, para o diagnóstico de leituras ilegíveis.
+        meta: z
+          .object({
+            mime: z.string().max(100),
+            larguraOriginal: z.number().int().min(0).max(100_000),
+            alturaOriginal: z.number().int().min(0).max(100_000),
+            larguraEnviada: z.number().int().min(0).max(100_000),
+            alturaEnviada: z.number().int().min(0).max(100_000),
+          })
+          .optional(),
       })
       .parse(i),
   )
@@ -82,10 +99,35 @@ export const enviarFotoCelular = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!reservada) return { ok: false, motivo: "ocupado" };
 
-    const r = await lerPedidoMedicoNaIA(data.arquivo);
+    const { resultado: r, veredito } = await lerPedidoMedicoComVeredito(data.arquivo);
     const lido = r.leitura.tipo === "pedido_medico" || r.leitura.tipo === "marcacao_incerta";
+    const ilegivel = r.leitura.tipo === "ilegivel";
+    // Leitura ilegível devolve a tentativa: foto ruim não deve vencer o QR code.
     await sessoes()
-      .update(lido ? { estado: "pronto", resultado: r } : { estado: "aguardando" })
+      .update(
+        lido
+          ? { estado: "pronto", resultado: r }
+          : ilegivel
+            ? { estado: "aguardando", tentativas: s.tentativas }
+            : { estado: "aguardando" },
+      )
       .eq("id", s.id);
+    if (ilegivel) {
+      const { error } = await (supabaseAdmin as unknown as SupabaseClient)
+        .from("orcamento_foto_diagnosticos")
+        .insert({
+          clinica_id: s.clinica_id,
+          sessao_id: s.id,
+          mime_recebido: /^data:([^;]{1,100});/.exec(data.arquivo)?.[1] ?? null,
+          bytes_enviados: Math.floor(((data.arquivo.length - data.arquivo.indexOf(",") - 1) * 3) / 4),
+          largura_original: data.meta?.larguraOriginal ?? null,
+          altura_original: data.meta?.alturaOriginal ?? null,
+          largura_enviada: data.meta?.larguraEnviada ?? null,
+          altura_enviada: data.meta?.alturaEnviada ?? null,
+          user_agent: (getRequest()?.headers.get("user-agent") ?? "").slice(0, 300) || null,
+          veredito_ia: veredito,
+        });
+      if (error) console.error("[orcamento-foto] diagnostico falhou", error.code);
+    }
     return lido ? { ok: true } : { ok: false, motivo: r.leitura.tipo as "ilegivel" };
   });
