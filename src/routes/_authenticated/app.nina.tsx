@@ -63,6 +63,9 @@ import type { ConversaTesteAlvo } from "@/lib/nina/homologacao-navegacao";
 const LaboratorioNina = lazy(() =>
   import("@/components/nina/LaboratorioNina").then((m) => ({ default: m.LaboratorioNina })),
 );
+const AmbienteTestes = lazy(() =>
+  import("@/components/nina/AmbienteTestes").then((m) => ({ default: m.AmbienteTestes })),
+);
 const BaseConhecimento = lazy(() =>
   import("@/components/nina/BaseConhecimento").then((m) => ({ default: m.BaseConhecimento })),
 );
@@ -113,6 +116,7 @@ function NinaPage() {
     "templates",
     "homologacao",
     "laboratorio-nina",
+    "ambiente-testes",
     "atend-macros",
     "atend-inbox",
     "atend-departamentos",
@@ -197,6 +201,18 @@ function NinaPage() {
                 setAbaAtiva("homologacao");
               }}
             />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="ambiente-testes">
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm text-muted-foreground">
+                Carregando ambiente de testes…
+              </p>
+            }
+          >
+            <AmbienteTestes key={clinicaId} />
           </Suspense>
         </TabsContent>
 

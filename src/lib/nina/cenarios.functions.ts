@@ -230,6 +230,8 @@ export const criarExecucaoCenarios = createServerFn({ method: "POST" })
       .from("nina_teste_leads")
       .select("id, indice, nome")
       .eq("clinica_id", data.clinicaId)
+      // Só os 10 leads do console (11 a 20 são do Ambiente de testes).
+      .lte("indice", 10)
       .order("indice", { ascending: true });
     if (eLead) throw new Error(eLead.message);
     if (!leads?.length) throw new Error("Leads de teste ainda não foram criados nesta clínica");

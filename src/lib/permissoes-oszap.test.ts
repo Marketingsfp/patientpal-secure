@@ -26,8 +26,8 @@ describe("cada opção do OS ZAP tem seu próprio controle", () => {
           m.to.startsWith("/app/francisco") ||
           m.to === "/app/painel-tv-atendimento",
       );
-    expect(opcoes).toHaveLength(24);
-    expect(new Set(opcoes.map((t) => moduloTelaOsZap(t.to, t.hash))).size).toBe(24);
+    expect(opcoes).toHaveLength(25);
+    expect(new Set(opcoes.map((t) => moduloTelaOsZap(t.to, t.hash))).size).toBe(25);
     expect(opcoes.map((t) => moduloTelaOsZap(t.to, t.hash)).sort()).toEqual(
       TELAS_OSZAP.map((t) => t.key).sort(),
     );

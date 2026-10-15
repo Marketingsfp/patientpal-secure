@@ -67,6 +67,8 @@ async function garantirLeads(admin: any, clinicaId: string): Promise<LeadRow[]> 
       "id, indice, nome, telefone_base, telefone_sessao, sessao_seq, conversa_id, ciclo_id, ciclo_iniciado_em, resolvido_em, status",
     )
     .eq("clinica_id", clinicaId)
+    // Leads 11 a 20 são do Ambiente de testes: o console só mostra os seus 10.
+    .lte("indice", TOTAL_LEADS)
     .order("indice");
   if (e2) throw new Error(e2.message);
   return (data ?? []) as LeadRow[];
