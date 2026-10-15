@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "@/lib/confirm";
-import { Plus, Trash2, Timer, Pencil } from "lucide-react";
+import { Plus, Trash2, Timer, Pencil, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -917,6 +917,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                         ? `${r.limite_qtd}/${r.limite_periodo ?? "dia"} ${r.limite_escopo === "paciente" ? "paciente" : r.limite_escopo === "titular_ou_dependente" ? "titular-ou-dep" : "contrato"}`
                         : "Sem limite"}
                     </Button>
+                    {r.grupo_gratuidade && r.limite_qtd ? (
+                      <div
+                        className="flex items-center gap-1 pl-2 text-[11px] text-muted-foreground"
+                        title={`Cota compartilhada com as outras regras do grupo "${r.grupo_gratuidade}"`}
+                      >
+                        <Link2 className="h-3 w-3" />
+                        <span className="max-w-[90px] truncate">{r.grupo_gratuidade}</span>
+                      </div>
+                    ) : null}
                   </TableCell>
                   <TableCell className="w-[92px]">
                     <Select
@@ -1265,13 +1274,33 @@ function NovaRegraDialog({
   const [r, setR] = useState<CbRegra>(emptyRegra());
   const [saving, setSaving] = useState(false);
   const isEdit = !!regra && !regra.id.startsWith("new-");
+  // Regra nova aceita vários itens: grava uma linha por serviço (ou, sem
+  // serviço, uma por especialidade). Edição continua mexendo numa linha só.
+  const [espIds, setEspIds] = useState<string[]>([]);
+  const [procIds, setProcIds] = useState<string[]>([]);
+  // Cota compartilhada = mesmo grupo_gratuidade em todas as linhas; o motor
+  // (info-convenio-paciente.ts) já soma o uso do grupo inteiro.
+  const [usoCompartilhado, setUsoCompartilhado] = useState(false);
 
   useEffect(() => {
-    if (open) setR(regra ? { ...regra } : emptyRegra());
+    if (open) {
+      setR(regra ? { ...regra } : emptyRegra());
+      setEspIds([]);
+      setProcIds([]);
+      setUsoCompartilhado(false);
+    }
     /* eslint-disable-next-line */
   }, [open, convenioId, regra]);
 
   const upd = (patch: Partial<CbRegra>) => setR((prev) => ({ ...prev, ...patch }));
+
+  // Com um único serviço escolhido, r.procedimento_id alimenta o aviso de
+  // valor cartão/PIX da regra por especialidade (regraBase, logo abaixo).
+  useEffect(() => {
+    if (isEdit) return;
+    const unico = procIds.length === 1 ? procIds[0] : null;
+    setR((prev) => (prev.procedimento_id === unico ? prev : { ...prev, procedimento_id: unico }));
+  }, [procIds, isEdit]);
 
   // Regra "base" por especialidade deste convênio para o procedimento selecionado.
   // Serve para avisar o operador (e pré-preencher) que ao salvar uma regra por
@@ -1346,21 +1375,44 @@ function NovaRegraDialog({
 
   // Serviço específico depende da Especialidade e da Categoria escolhidas.
   // Sem especialidade (ou se o vínculo não pôde ser carregado), lista todos.
-  const filtraPorEsp = !!r.especialidade_id && procsPorEsp.size > 0;
+  const espFiltro = useMemo(
+    () => (isEdit ? (r.especialidade_id ? [r.especialidade_id] : []) : espIds),
+    [isEdit, r.especialidade_id, espIds],
+  );
+  const filtraPorEsp = espFiltro.length > 0 && procsPorEsp.size > 0;
   const procOptsFiltrados = useMemo(() => {
     const t = r.tipo?.toLowerCase() ?? null;
-    const daEsp = filtraPorEsp
-      ? (procsPorEsp.get(r.especialidade_id as string) ?? new Set<string>())
-      : null;
+    let daEsp: Set<string> | null = null;
+    if (filtraPorEsp) {
+      daEsp = new Set<string>();
+      for (const id of espFiltro) procsPorEsp.get(id)?.forEach((p) => daEsp!.add(p));
+    }
     return procOpts.filter(
       (o) =>
         o.value === "__any__" ||
         ((!t || (o.tipo ?? "").toLowerCase() === t) && (!daEsp || daEsp.has(o.value))),
     );
-  }, [procOpts, procsPorEsp, filtraPorEsp, r.especialidade_id, r.tipo]);
-  const espNome = r.especialidade_id
-    ? espOpts.find((o) => o.value === r.especialidade_id)?.label
-    : undefined;
+  }, [procOpts, procsPorEsp, filtraPorEsp, espFiltro, r.tipo]);
+  // Serviço marcado que saiu do filtro (trocou especialidade/categoria) é
+  // desmarcado — senão seria gravado sem aparecer na lista.
+  useEffect(() => {
+    if (isEdit) return;
+    const visiveis = new Set(procOptsFiltrados.map((o) => o.value));
+    setProcIds((prev) => {
+      const next = prev.filter((id) => visiveis.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [procOptsFiltrados, isEdit]);
+  const espNome =
+    espFiltro.length === 1
+      ? espOpts.find((o) => o.value === espFiltro[0])?.label
+      : espFiltro.length > 1
+        ? `${espFiltro.length} especialidades`
+        : undefined;
+  // Quantas regras serão gravadas: uma por serviço; sem serviço, uma por
+  // especialidade; sem nenhum dos dois, a regra genérica de sempre.
+  const qtdAlvos = isEdit ? 1 : procIds.length > 0 ? procIds.length : Math.max(espIds.length, 1);
+  const variosAlvos = qtdAlvos > 1;
   const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
   const excModo = r.excedente_modo ?? "percentual_particular";
 
@@ -1376,6 +1428,11 @@ function NovaRegraDialog({
   })();
 
   const salvarNovo = async () => {
+    // Cota compartilhada sem quantidade não divide nada — o grupo só pesa no limite.
+    if (variosAlvos && usoCompartilhado && !hasLimit) {
+      toast.error("Para os itens dividirem a mesma cota, informe a Quantidade em Limite de uso.");
+      return;
+    }
     // Guarda: se o operador está criando/editando uma regra por procedimento e
     // deixou o valor cartão/PIX igual ao dinheiro (ou zero) enquanto existe uma
     // regra por especialidade do convênio com valor cartão diferente, confirma
@@ -1439,15 +1496,42 @@ function NovaRegraDialog({
       gratuito: !!r.gratuito,
       grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
     };
+    // Vários itens: uma linha por serviço (ou por especialidade). Uso independente
+    // = sem grupo (cada linha conta a própria cota); compartilhado = mesmo grupo.
+    let linhas = [payload];
+    if (!isEdit && variosAlvos) {
+      const grupo = usoCompartilhado
+        ? (payload.grupo_gratuidade ?? `compartilhado-${crypto.randomUUID().slice(0, 8)}`)
+        : null;
+      linhas =
+        procIds.length > 0
+          ? procIds.map((id) => ({
+              ...payload,
+              procedimento_id: id,
+              especialidade_id: null,
+              tipo: null,
+              grupo_gratuidade: grupo,
+            }))
+          : espIds.map((id) => ({
+              ...payload,
+              procedimento_id: null,
+              especialidade_id: id,
+              tipo: r.tipo,
+              grupo_gratuidade: grupo,
+            }));
+    } else if (!isEdit && espIds.length === 1 && procIds.length === 0) {
+      linhas = [{ ...payload, especialidade_id: espIds[0] }];
+    }
     // .select() devolve as linhas gravadas: o RLS barra o update sem erro (0 linhas),
     // e sem essa conferência a tela dizia "Regra atualizada" sem ter salvo nada.
+    // O insert em lote é um único comando: grava todas as linhas ou nenhuma.
     const { data: gravadas, error } = isEdit
       ? await (supabase as any)
           .from("cb_convenio_regras")
           .update(payload)
           .eq("id", r.id)
           .select("id")
-      : await (supabase as any).from("cb_convenio_regras").insert(payload).select("id");
+      : await (supabase as any).from("cb_convenio_regras").insert(linhas).select("id");
     setSaving(false);
     if (error) {
       mostrarErro(error);
@@ -1457,7 +1541,13 @@ function NovaRegraDialog({
       toast.error(REGRA_NAO_GRAVADA);
       return;
     }
-    toast.success(isEdit ? "Regra atualizada." : "Regra adicionada.");
+    toast.success(
+      isEdit
+        ? "Regra atualizada."
+        : linhas.length > 1
+          ? `${linhas.length} regras adicionadas${usoCompartilhado ? " dividindo a mesma cota" : ", cada uma com a própria cota"}.`
+          : "Regra adicionada.",
+    );
     await onSaved();
   };
 
@@ -1481,13 +1571,22 @@ function NovaRegraDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Especialidade</Label>
-              <SearchableSelect
-                options={espOpts}
-                value={r.especialidade_id ?? "__any__"}
-                onChange={(v) => upd({ especialidade_id: v === "__any__" ? null : v })}
-                placeholder="Qualquer"
-                disabled={!!r.procedimento_id}
-              />
+              {isEdit ? (
+                <SearchableSelect
+                  options={espOpts}
+                  value={r.especialidade_id ?? "__any__"}
+                  onChange={(v) => upd({ especialidade_id: v === "__any__" ? null : v })}
+                  placeholder="Qualquer"
+                  disabled={!!r.procedimento_id}
+                />
+              ) : (
+                <SearchableMultiSelect
+                  options={espOpts.filter((o) => o.value !== "__any__")}
+                  value={espIds}
+                  onChange={setEspIds}
+                  placeholder="Qualquer especialidade"
+                />
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Categoria</Label>
@@ -1505,7 +1604,7 @@ function NovaRegraDialog({
                   }
                   upd(patch);
                 }}
-                disabled={!!r.procedimento_id}
+                disabled={isEdit && !!r.procedimento_id}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -1523,20 +1622,35 @@ function NovaRegraDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Serviço específico (opcional)</Label>
-            <SearchableSelect
-              options={procOptsFiltrados}
-              value={r.procedimento_id ?? "__any__"}
-              onChange={(v) =>
-                upd({
-                  procedimento_id: v === "__any__" ? null : v,
-                  ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
-                })
-              }
-              placeholder="Qualquer serviço"
-            />
+            <Label className="text-xs">
+              {isEdit ? "Serviço específico (opcional)" : "Serviços específicos (opcional)"}
+            </Label>
+            {isEdit ? (
+              <SearchableSelect
+                options={procOptsFiltrados}
+                value={r.procedimento_id ?? "__any__"}
+                onChange={(v) =>
+                  upd({
+                    procedimento_id: v === "__any__" ? null : v,
+                    ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+                  })
+                }
+                placeholder="Qualquer serviço"
+              />
+            ) : (
+              <SearchableMultiSelect
+                options={procOptsFiltrados
+                  .filter((o) => o.value !== "__any__")
+                  .map((o) => ({ value: o.value, label: o.label }))}
+                value={procIds}
+                onChange={setProcIds}
+                placeholder="Qualquer serviço"
+              />
+            )}
             <p className="text-[12px] text-muted-foreground">
-              Quando escolhido, esta regra vale apenas para este serviço.
+              {isEdit
+                ? "Quando escolhido, esta regra vale apenas para este serviço."
+                : "Quando escolhidos, é criada uma regra para cada serviço — especialidade e categoria servem só para filtrar a lista. Sem serviço, é criada uma regra para cada especialidade marcada."}
               {filtraPorEsp && espNome && r.tipo
                 ? ` Mostrando apenas serviços de ${espNome} na categoria "${r.tipo}".`
                 : filtraPorEsp && espNome
@@ -1797,18 +1911,48 @@ function NovaRegraDialog({
                 )}
               </div>
             )}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Grupo de gratuidade (opcional)</Label>
-              <Input
-                value={r.grupo_gratuidade ?? ""}
-                onChange={(e) => upd({ grupo_gratuidade: e.target.value })}
-                placeholder='Ex.: "mama-preventivo"'
-              />
-              <p className="text-[12px] text-muted-foreground">
-                Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis que pode ser
-                Mamografia OU USG Mama).
-              </p>
-            </div>
+            {variosAlvos && (
+              <div className="space-y-1.5">
+                <Label htmlFor="uso-limite-itens" className="text-xs">
+                  Uso do limite entre os {qtdAlvos} itens
+                </Label>
+                <Select
+                  value={usoCompartilhado ? "compartilhado" : "independente"}
+                  onValueChange={(v) => setUsoCompartilhado(v === "compartilhado")}
+                >
+                  <SelectTrigger id="uso-limite-itens">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="independente">Uso independente</SelectItem>
+                    <SelectItem value="compartilhado">Uso compartilhado (grupo)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[12px] text-muted-foreground">
+                  {usoCompartilhado
+                    ? "Os itens dividem a mesma cota: usar um deles consome o limite de todos no período (ex.: 1 cortesia anual para Mamografia OU USG Mama)."
+                    : "Cada item tem o próprio limite (ex.: 1 consulta + 1 exame)."}
+                </p>
+              </div>
+            )}
+            {(!variosAlvos || usoCompartilhado) && (
+              <div className="space-y-1.5">
+                <Label htmlFor="grupo-gratuidade" className="text-xs">
+                  {variosAlvos ? "Nome do grupo (opcional)" : "Grupo de gratuidade (opcional)"}
+                </Label>
+                <Input
+                  id="grupo-gratuidade"
+                  value={r.grupo_gratuidade ?? ""}
+                  onChange={(e) => upd({ grupo_gratuidade: e.target.value })}
+                  placeholder='Ex.: "mama-preventivo"'
+                />
+                <p className="text-[12px] text-muted-foreground">
+                  {variosAlvos
+                    ? "Em branco, o sistema cria um nome. Use um nome já existente para somar estes itens a um grupo que já existe."
+                    : "Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis que pode ser Mamografia OU USG Mama)."}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="border-t pt-3 text-xs text-muted-foreground">
@@ -1821,7 +1965,13 @@ function NovaRegraDialog({
             Cancelar
           </Button>
           <Button onClick={() => void salvarNovo()} disabled={saving}>
-            {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Salvar regra"}
+            {saving
+              ? "Salvando…"
+              : isEdit
+                ? "Salvar alterações"
+                : variosAlvos
+                  ? `Salvar ${qtdAlvos} regras`
+                  : "Salvar regra"}
           </Button>
         </DialogFooter>
       </DialogContent>
