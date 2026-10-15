@@ -1616,16 +1616,17 @@ function NovoOrcamentoDialog({
       .toLowerCase()
       .replace(/\s+/g, " ")
       .trim();
-  const buscarCadastroPorNome = async () => {
+  // Devolve o cadastro escolhido automaticamente (nome idêntico, único) ou null.
+  const buscarCadastroPorNome = async (): Promise<PatientOption | null> => {
     const termo = pacienteNome.trim();
-    if (pacienteSelecionado || termo.length < 3) return;
-    if (sugestaoPaciente && sugestaoPaciente.termo === termo) return;
+    if (pacienteSelecionado || termo.length < 3) return null;
+    if (sugestaoPaciente && sugestaoPaciente.termo === termo) return null;
     const { data, error } = await supabase.rpc("buscar_pacientes_global", {
       _clinica_ids: clinicaIds.length > 0 ? clinicaIds : [clinicaId],
       _termo: termo,
       _limite: 5,
     });
-    if (error) return;
+    if (error) return null;
     const pacientes = (data ?? []) as PatientOption[];
     setSugestaoPaciente({ termo, pacientes });
     // Só um resultado com o nome idêntico: deixa escolhido, visível e removível.
@@ -1635,7 +1636,9 @@ function NovoOrcamentoDialog({
     ) {
       selecionarPaciente(pacientes[0]);
       setPacienteAuto(true);
+      return pacientes[0];
     }
+    return null;
   };
 
   // Preenche o orçamento com o pedido lido (foto do computador ou do celular).
@@ -1870,13 +1873,24 @@ function NovoOrcamentoDialog({
         : null;
     setSaving(true);
 
+    // Nome digitado sem busca concluída (ex.: clicou direto em salvar): aguarda a
+    // busca, com prazo curto. Falha ou demora → grava sem vínculo, como antes.
+    let pacienteIdFinal: string | null = pacienteId || null;
+    if (!pacienteIdFinal) {
+      const achado = await Promise.race([
+        buscarCadastroPorNome().catch(() => null),
+        new Promise<null>((res) => setTimeout(() => res(null), 4000)),
+      ]);
+      if (achado) pacienteIdFinal = achado.id;
+    }
+
     const { data: orc, error } = await supabase
       .from("orcamentos")
       .insert({
         clinica_id: clinicaId,
         numero: 0,
         categoria,
-        paciente_id: pacienteId || null,
+        paciente_id: pacienteIdFinal,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
         medico_nome: medicoParticular ? "Particular" : medicoNome.trim() || null,
