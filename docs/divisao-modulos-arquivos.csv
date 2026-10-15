@@ -946,7 +946,7 @@ src/components/nina/CargaTeste.tsx;OS ZAP (fora da divisao);955
 src/components/nina/catalogo/CatalogoNina.tsx;OS ZAP (fora da divisao);916
 src/components/nina/catalogo/DadosClinicaBase.tsx;OS ZAP (fora da divisao);55
 src/components/nina/catalogo/DicionarioCatalogoEditor.tsx;OS ZAP (fora da divisao);266
-src/components/nina/catalogo/EdicaoLoteIA.tsx;OS ZAP (fora da divisao);335
+src/components/nina/catalogo/PreenchimentoIA.tsx;OS ZAP (fora da divisao);528
 src/components/nina/catalogo/EstruturaCatalogoEditor.tsx;OS ZAP (fora da divisao);357
 src/components/nina/catalogo/FonteConsultaMaria.tsx;OS ZAP (fora da divisao);173
 src/components/nina/catalogo/FormasPagamentoEditor.tsx;OS ZAP (fora da divisao);113

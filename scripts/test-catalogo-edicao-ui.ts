@@ -32,17 +32,30 @@ export const salvarServicoCatalogo = async ({data}) => {
   estado.saves.push(data); return {id,status:"PUBLICADO",emRevisao:false};
 };
 export const salvarProfissionalCatalogo = salvarServicoCatalogo;
-export const selecionarEdicoesCatalogoIA = async ({data}) => data.texto.includes("ambiguo")
-  ? {itens:[],esclarecimentos:["Cardiologia de qual médico e forma de pagamento?"]}
-  : {itens:[{id,tipo:"servico",nome:servico.nome,pedido:"Altere o dinheiro da mamografia para 180."},{id,tipo:"profissional",nome:profissional.nome,pedido:"Altere a quinta-feira para 14:30."}],esclarecimentos:[]};
+export const selecionarEdicoesCatalogoIA = async ({data}) => {
+  if (data.texto.includes("ambiguo")) return {itens:[],esclarecimentos:["Cardiologia de qual médico e forma de pagamento?"]};
+  const itens = [];
+  if (/mamografia/i.test(data.texto)) itens.push({id,tipo:"servico",nome:servico.nome,pedido:"Altere o dinheiro da mamografia para 180."});
+  if (/Ana/.test(data.texto)) itens.push({id,tipo:"profissional",nome:profissional.nome,pedido:"Altere a quinta-feira para 14:30."});
+  if (/novo/i.test(data.texto)) itens.push({id:null,tipo:"servico",nome:"Exame criado por IA",pedido:"Exame novo custa R$ 100 no dinheiro."});
+  return {itens,esclarecimentos:[]};
+};
 export const publicarEdicoesCatalogoIA = async ({data}) => {
   if (estado.falhar) throw new Error("Este cadastro mudou depois da prévia. Gere uma nova prévia antes de publicar.");
   data.itens.forEach(item => estado.saves.push(item));
   return {publicados:data.itens.map(i=>i.tipo+":"+i.id),falha:null};
 };
-export const organizarTextoCatalogoIA = async () => ({ servicos:[{nome:"Exame criado por IA",valor:100}],profissionais:[],pendencias:[],ambiguidades:[] });
+export const organizarTextoCatalogoIA = async () => ({ servicos:[{nome:"Exame criado por IA",formas_pagamento:[{forma:"Dinheiro",valor:100}]}],profissionais:[],pendencias:[],ambiguidades:[] });
 export const alterarStatusCatalogo = async () => { throw new Error("Fora do teste"); };
 export const excluirItemCatalogo = alterarStatusCatalogo;
+export const gerarVariacoesCatalogoIA = alterarStatusCatalogo;
+`;
+const sincronizacaoSimulada = `
+const fora = async () => { throw new Error("Fora do teste"); };
+export const opcoesSincronizacaoManual = fora;
+export const mapearCatalogoComJev = fora;
+export const preverSincronizacaoManual = fora;
+export const aplicarSincronizacaoManual = fora;
 `;
 const app = `
 import React from "react";
@@ -79,6 +92,15 @@ const resultado = await Bun.build({
           path: "webmcp",
           namespace: "fixture",
         }));
+        // Sincronização e flag por clínica ficam fora deste teste (exigem servidor e login).
+        build.onResolve({ filter: /catalogo-sincronizacao\.functions$/ }, () => ({
+          path: "sincronizacao",
+          namespace: "fixture",
+        }));
+        build.onResolve({ filter: /use-clinic-feature-flag$/ }, () => ({
+          path: "flag",
+          namespace: "fixture",
+        }));
         build.onLoad({ filter: /.*/, namespace: "fixture" }, (args) => ({
           contents:
             args.path === "entry"
@@ -87,7 +109,11 @@ const resultado = await Bun.build({
                 ? servicosSimulados
                 : args.path === "start"
                   ? "export const useServerFn = fn => fn;"
-                  : "export const assinarAtualizacao = () => () => {};",
+                  : args.path === "sincronizacao"
+                    ? sincronizacaoSimulada
+                    : args.path === "flag"
+                      ? "export const useClinicFeatureFlag = () => ({ enabled: false, loading: false });"
+                      : "export const assinarAtualizacao = () => () => {};",
           loader: "tsx",
           resolveDir: root,
         }));

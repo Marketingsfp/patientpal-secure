@@ -5,13 +5,10 @@ import { assinarAtualizacao } from "@/lib/webmcp/atualizacao";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TextoCatalogo as Textarea } from "./TextoCatalogo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import type { PreviaEdicaoCatalogo } from "@/lib/nina/catalogo-edicao-ia";
 import { normalizarNomeBusca } from "@/lib/busca-texto";
-import { EdicaoLoteIA } from "./EdicaoLoteIA";
+import { PreenchimentoIA, type EstadoNovoCatalogo } from "./PreenchimentoIA";
 import { rotuloPedidoMedico } from "./PedidoMedicoEditor";
 import { DicionarioCatalogoEditor } from "./DicionarioCatalogoEditor";
 import { ResumoDecisaoNina } from "./ResumoDecisaoNina";
@@ -27,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Loader2, Pencil, Trash2, Archive, Send, Sparkles, Search, X } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Archive, Send, Search, X } from "lucide-react";
 import {
   listarCatalogoNina,
   opcoesCatalogoNina,
@@ -35,20 +32,11 @@ import {
   salvarProfissionalCatalogo,
   alterarStatusCatalogo,
   excluirItemCatalogo,
-  organizarTextoCatalogoIA,
-  preverEdicaoCatalogoIA,
 } from "@/lib/nina/catalogo.functions";
-import {
-  MODELO_CATALOGO_IA,
-  paraEstadoProfissional,
-  paraEstadoServico,
-} from "@/lib/nina/catalogo-ia";
 import {
   ROTULO_STATUS,
   formatarBRL,
   resumoHorarios,
-  servicoSchema,
-  profissionalSchema,
   type StatusCatalogo,
 } from "@/lib/nina/catalogo";
 import {
@@ -109,8 +97,6 @@ export function CatalogoNina({
   const salvarProfFn = useServerFn(salvarProfissionalCatalogo);
   const statusFn = useServerFn(alterarStatusCatalogo);
   const excluirFn = useServerFn(excluirItemCatalogo);
-  const iaFn = useServerFn(organizarTextoCatalogoIA);
-  const previaFn = useServerFn(preverEdicaoCatalogoIA);
 
   const [carregando, setCarregando] = useState(false);
   const [erroCarga, setErroCarga] = useState("");
@@ -148,20 +134,7 @@ export function CatalogoNina({
   const [profissional, setProfissional] = useState<EstadoProfissional>(profissionalVazio);
 
   // A IA propõe; somente a confirmação humana grava e publica.
-  const [iaAberta, setIaAberta] = useState(false);
-  const [iaTexto, setIaTexto] = useState("");
-  const [iaProcessando, setIaProcessando] = useState(false);
-  const [iaModo, setIaModo] = useState<"criar" | "editar">("criar");
-  const [iaRegistroId, setIaRegistroId] = useState("");
-  const [iaPrevia, setIaPrevia] = useState<PreviaEdicaoCatalogo | null>(null);
-  const [iaErro, setIaErro] = useState("");
-  const iaTextoId = useId();
-  const publicandoIA = useRef(false);
   const [avisos, setAvisos] = useState<string[]>([]);
-  const [fila, setFila] = useState<any[]>([]);
-  const [posicao, setPosicao] = useState(0);
-  // Resposta atrasada não pode sobrescrever uma edição posterior do usuário.
-  const pedidoRef = useRef(0);
 
   const carregar = useCallback(async () => {
     if (!clinicaId) return;
@@ -185,19 +158,6 @@ export function CatalogoNina({
     setBusca("");
   }, [clinicaId, tipo]);
 
-  useEffect(() => {
-    setIaAberta(false);
-    setIaPrevia(null);
-    setIaRegistroId("");
-    setIaTexto("");
-    setIaErro("");
-    setIaProcessando(false);
-    // Trocar clínica/aba ou desmontar invalida respostas ainda em processamento.
-    return () => {
-      pedidoRef.current++;
-    };
-  }, [clinicaId, tipo, podeEditar]);
-
   // Recarga incremental após uma operação feita pela automação (WebMCP).
   useEffect(() => assinarAtualizacao("catalogo", () => void carregar()), [carregar]);
 
@@ -215,8 +175,6 @@ export function CatalogoNina({
   function abrirNovo() {
     setServico(servicoVazio());
     setProfissional(profissionalVazio());
-    setFila([]);
-    setPosicao(0);
     setAvisos([]);
     setAberto(true);
   }
@@ -224,126 +182,16 @@ export function CatalogoNina({
   function abrirEdicao(registro: any) {
     if (tipo === "servico") setServico(servicoDoRegistro(registro));
     else setProfissional(profissionalDoRegistro(registro));
-    setFila([]);
-    setPosicao(0);
     setAvisos([]);
     setAberto(true);
   }
 
-  /** Carrega no formulário o registro `i` gerado pela IA. */
-  function carregarDaFila(lista: any[], i: number, avisosBase: string[]) {
-    const item = lista[i];
-    if (!item) return;
-    if (tipo === "servico") {
-      setServico(paraEstadoServico(item) as EstadoServico);
-      setAvisos(avisosBase);
-    } else {
-      const { estado, ambiguidades } = paraEstadoProfissional(item, {
-        medicos: opcoes.medicos,
-        especialidades: opcoes.especialidades,
-        convenios: opcoes.convenios,
-      });
-      setProfissional(estado as unknown as EstadoProfissional);
-      setAvisos([...avisosBase, ...ambiguidades]);
-    }
-  }
-
-  /** Só roda no clique. Nada é salvo nem publicado automaticamente. */
-  async function organizarComIA() {
-    if (!podeEditar || iaProcessando) return;
-    if (!clinicaId || iaTexto.trim().length < 10 || (iaModo === "editar" && !iaRegistroId)) {
-      setIaErro(
-        iaModo === "editar"
-          ? "Selecione o cadastro e descreva a alteração com pelo menos 10 caracteres."
-          : "Escreva as informações com pelo menos 10 caracteres.",
-      );
-      return;
-    }
-    const meu = ++pedidoRef.current;
-    setIaProcessando(true);
-    setIaErro("");
-    try {
-      if (iaModo === "editar") {
-        const previa = await previaFn({
-          data: { clinicaId, tipo, id: iaRegistroId, texto: iaTexto.trim() },
-        });
-        if (meu !== pedidoRef.current) return;
-        setIaPrevia(previa);
-        return;
-      }
-      const r = (await iaFn({ data: { clinicaId, tipo, texto: iaTexto.trim() } })) as any;
-      if (meu !== pedidoRef.current) return; // resposta atrasada: descartar
-      const lista: any[] = tipo === "servico" ? r.servicos : r.profissionais;
-      if (!lista?.length) {
-        toast.error("A IA não encontrou registros neste texto. Revise e tente novamente.");
-        return;
-      }
-      const base = [...(r.pendencias ?? []), ...(r.ambiguidades ?? [])];
-      setFila(lista);
-      setPosicao(0);
-      carregarDaFila(lista, 0, base);
-      setIaAberta(false);
-      setAberto(true);
-      toast.success(
-        lista.length > 1
-          ? `${lista.length} registros organizados. Revise um a um antes de salvar.`
-          : "Campos preenchidos. Revise antes de salvar.",
-      );
-    } catch (e: any) {
-      if (meu !== pedidoRef.current) return;
-      // O texto digitado é preservado: a janela continua aberta.
-      setIaErro(e?.message ?? "A IA não respondeu agora. Seu texto foi preservado.");
-    } finally {
-      if (meu === pedidoRef.current) setIaProcessando(false);
-    }
-  }
-
-  function fecharIA() {
-    if (publicandoIA.current) return;
-    pedidoRef.current++;
-    setIaProcessando(false);
-    setIaPrevia(null);
-    setIaErro("");
-    setIaAberta(false);
-  }
-
-  async function publicarEdicaoIA() {
-    if (!clinicaId || !podeEditar || !iaPrevia || publicandoIA.current) return;
-    publicandoIA.current = true;
-    setSalvando(true);
-    setIaErro("");
-    const meu = pedidoRef.current;
-    try {
-      const comum = {
-        clinicaId,
-        id: iaPrevia.id,
-        publicar: true,
-        esperadoUpdatedAt: iaPrevia.esperadoUpdatedAt,
-      };
-      if (iaPrevia.tipo === "servico") {
-        await salvarServicoFn({ data: { ...comum, dados: servicoSchema.parse(iaPrevia.dados) } });
-      } else {
-        await salvarProfFn({ data: { ...comum, dados: profissionalSchema.parse(iaPrevia.dados) } });
-      }
-      if (meu !== pedidoRef.current) return;
-      toast.success("Alterações confirmadas e publicadas no cadastro existente.");
-      setIaAberta(false);
-      setIaPrevia(null);
-      setIaTexto("");
-      await carregar();
-    } catch (e: any) {
-      if (meu === pedidoRef.current) setIaErro(e?.message ?? "Não foi possível publicar a edição.");
-    } finally {
-      publicandoIA.current = false;
-      setSalvando(false);
-    }
-  }
-
-  function proximoDaFila() {
-    const prox = posicao + 1;
-    if (prox >= fila.length) return;
-    setPosicao(prox);
-    carregarDaFila(fila, prox, []);
+  /** Cadastro novo montado pela IA, revisado no formulário completo antes de salvar. */
+  function abrirComEstado(estado: EstadoNovoCatalogo, avisosIA: string[]) {
+    if (tipo === "servico") setServico(estado as EstadoServico);
+    else setProfissional(estado as EstadoProfissional);
+    setAvisos(avisosIA);
+    setAberto(true);
   }
 
   async function salvar(publicar: boolean) {
@@ -375,8 +223,7 @@ export function CatalogoNina({
               : "Rascunho salvo.",
         );
       }
-      if (posicao + 1 < fila.length) proximoDaFila();
-      else setAberto(false);
+      setAberto(false);
       await carregar();
     } catch (e: any) {
       const msg =
@@ -418,12 +265,12 @@ export function CatalogoNina({
         <div>
           <h3 className="text-base font-semibold">{titulo}</h3>
           <p className="text-sm text-muted-foreground">
-            Pesquise um registro ou organize o conteúdo manualmente e com IA.
+            Pesquise um registro, cadastre manualmente ou preencha com IA.
           </p>
         </div>
-        {podeEditar && !erroCarga && !carregando && (
+        {podeEditar && !erroCarga && (
           <div className="oszap-base-toolbar-actions flex flex-wrap items-center gap-2">
-            {clinicaId && (
+            {clinicaId && !carregando && (
               <SincronizacaoCatalogo
                 key={`${clinicaId}:${tipo}`}
                 clinicaId={clinicaId}
@@ -432,19 +279,20 @@ export function CatalogoNina({
                 onSincronizado={carregar}
               />
             )}
-            <EdicaoLoteIA clinicaId={clinicaId} podeEditar={podeEditar} onPublicado={carregar} />
-            <Button
-              onClick={() => {
-                setIaAberta(true);
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <Sparkles className="mr-2 h-4 w-4" /> Criar ou editar com IA
-            </Button>
-            <Button onClick={abrirNovo} size="sm">
-              <Plus className="mr-2 h-4 w-4" /> Novo
-            </Button>
+            {/* Fica montado durante a recarga: a revisão aberta não pode sumir após publicar. */}
+            <PreenchimentoIA
+              clinicaId={clinicaId}
+              podeEditar={podeEditar}
+              opcoes={opcoes}
+              tipoAtual={tipo}
+              onPublicado={carregar}
+              onAbrirFormulario={abrirComEstado}
+            />
+            {!carregando && (
+              <Button onClick={abrirNovo} size="sm">
+                <Plus className="mr-2 h-4 w-4" /> Novo
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -517,194 +365,6 @@ export function CatalogoNina({
       )}
 
       <MapaCamposCatalogo tipo={tipo} />
-
-      <Dialog
-        open={iaAberta}
-        onOpenChange={(v) => {
-          if (!v) fecharIA();
-        }}
-      >
-        <DialogContent
-          data-os-zap="true"
-          className="oszap-base-dialog"
-          aria-describedby={undefined}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {iaPrevia ? "Prévia da edição" : "Criar ou editar com IA"} — {titulo.toLowerCase()}
-            </DialogTitle>
-          </DialogHeader>
-          {iaPrevia ? (
-            <div className="space-y-4">
-              <p className="text-sm">
-                Cadastro: <strong>{iaPrevia.nome}</strong>
-              </p>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                Seu pedido: {iaTexto}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Confira as diferenças. Ao confirmar, este cadastro será atualizado e publicado
-                apenas nesta base, sem uso pela Maria.
-              </p>
-              {iaPrevia.incluiRascunho && (
-                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                  Esta prévia inclui também as alterações que já estavam salvas em revisão.
-                </p>
-              )}
-              {iaPrevia.mudancas.length === 0 && (
-                <p className="text-sm">
-                  A proposta descarta as alterações em revisão e mantém o conteúdo publicado.
-                </p>
-              )}
-              {iaPrevia.mudancas.map((mudanca) => (
-                <section key={mudanca.campo} className="rounded-md border p-3 space-y-2">
-                  <h4 className="font-medium text-sm">{mudanca.campo}</h4>
-                  <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                    <div className="min-w-0">
-                      <p className="font-medium text-muted-foreground">Antes</p>
-                      <p className="whitespace-pre-wrap break-words">{mudanca.antes}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-primary">Depois</p>
-                      <p className="whitespace-pre-wrap break-words">{mudanca.depois}</p>
-                    </div>
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Operação da IA">
-                <Button
-                  variant={iaModo === "criar" ? "default" : "outline"}
-                  aria-pressed={iaModo === "criar"}
-                  disabled={iaProcessando}
-                  onClick={() => {
-                    setIaModo("criar");
-                    setIaErro("");
-                  }}
-                >
-                  Criar cadastro
-                </Button>
-                <Button
-                  variant={iaModo === "editar" ? "default" : "outline"}
-                  aria-pressed={iaModo === "editar"}
-                  disabled={iaProcessando}
-                  onClick={() => {
-                    setIaModo("editar");
-                    setIaErro("");
-                  }}
-                >
-                  Editar cadastro existente
-                </Button>
-              </div>
-              {iaModo === "editar" && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Qual cadastro deseja editar?</p>
-                  <SearchableSelect
-                    options={itens.map((item) => ({
-                      value: item.id,
-                      label: `${item.nome} · ${ROTULO_STATUS[item.status as StatusCatalogo] ?? item.status}${tipo === "profissional" && item.especialidades?.length ? ` · ${item.especialidades.map((e: { nome: string }) => e.nome).join(", ")}` : ""}`,
-                    }))}
-                    value={iaRegistroId}
-                    onChange={(id) => {
-                      setIaRegistroId(id);
-                      setIaErro("");
-                    }}
-                    placeholder="Pesquisar e selecionar cadastro"
-                    searchPlaceholder={
-                      tipo === "servico"
-                        ? "Buscar exame ou procedimento…"
-                        : "Buscar profissional ou especialidade…"
-                    }
-                    emptyText="Nenhum cadastro encontrado."
-                    disabled={iaProcessando || carregando}
-                  />
-                </div>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {iaModo === "editar"
-                  ? "Descreva o que deseja alterar no cadastro selecionado. Você verá o antes e depois para confirmar e publicar."
-                  : "Escreva ou cole as informações. A IA organiza os campos e você revisa antes de salvar."}{" "}
-                Nada é salvo nem publicado automaticamente.
-              </p>
-              <Label htmlFor={iaTextoId}>
-                {iaModo === "editar" ? "O que deseja mudar?" : "Informações para o novo cadastro"}
-              </Label>
-              <Textarea
-                id={iaTextoId}
-                value={iaTexto}
-                onChange={(e) => setIaTexto(e.target.value)}
-                disabled={iaProcessando}
-                rows={7}
-                maxLength={20000}
-                placeholder={
-                  iaModo === "editar"
-                    ? tipo === "servico"
-                      ? "Ex.: Altere o valor no dinheiro da mamografia para R$ 180. Mantenha o cartão e as demais informações."
-                      : "Ex.: Altere o horário de início de quinta-feira para 14:30. Mantenha os demais dias."
-                    : tipo === "servico"
-                      ? "Ex.: Ultrassom de tireoide 130 em dinheiro, 150 no Pix/cartão (cartão em 3x). Precisa de pedido médico..."
-                      : "Ex.: Dra. Ana Paula, cardiologista, atende quinzenal às quintas das 14h às 18h..."
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Modelo utilizado: {MODELO_CATALOGO_IA}.
-              </p>
-            </div>
-          )}
-          {iaErro && (
-            <p
-              role="alert"
-              className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
-            >
-              {iaErro}
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={fecharIA} disabled={salvando}>
-              Cancelar
-            </Button>
-            {iaPrevia ? (
-              <>
-                <Button
-                  variant="outline"
-                  disabled={salvando}
-                  onClick={() => {
-                    setIaPrevia(null);
-                    setIaErro("");
-                  }}
-                >
-                  Ajustar pedido
-                </Button>
-                <Button disabled={salvando || !podeEditar} onClick={() => void publicarEdicaoIA()}>
-                  {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar e
-                  publicar
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={() => void organizarComIA()}
-                disabled={
-                  iaProcessando ||
-                  !podeEditar ||
-                  iaTexto.trim().length < 10 ||
-                  (iaModo === "editar" && !iaRegistroId)
-                }
-              >
-                {iaProcessando ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                {iaModo === "editar"
-                  ? "Gerar prévia da edição"
-                  : "Organizar e preencher campos com IA"}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {erroCarga ? (
         <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-4 text-sm">
@@ -827,14 +487,7 @@ export function CatalogoNina({
         <DialogContent data-os-zap="true" className="oszap-base-dialog">
           <CatalogoOrganizado.Provider value={catalogoOrganizado}>
             <DialogHeader>
-              <DialogTitle>
-                {titulo}
-                {fila.length > 1 && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    Registro {posicao + 1} de {fila.length}
-                  </span>
-                )}
-              </DialogTitle>
+              <DialogTitle>{titulo}</DialogTitle>
             </DialogHeader>
             {avisos.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
@@ -848,7 +501,7 @@ export function CatalogoNina({
             )}
             {/* Chave própria: igual à do formulário ao lado, o React duplicava o dicionário. */}
             <DicionarioCatalogoEditor
-              key={`dicionario-${tipo}-${tipo === "servico" ? servico.id : profissional.id}-${posicao}`}
+              key={`dicionario-${tipo}-${tipo === "servico" ? servico.id : profissional.id}`}
               clinicaId={clinicaId}
               somenteLeitura={!podeEditar || salvando}
               contexto={
@@ -889,7 +542,7 @@ export function CatalogoNina({
             />
             {tipo === "servico" ? (
               <FormServico
-                key={`servico-${servico.id ?? "novo"}-${posicao}`}
+                key={`servico-${servico.id ?? "novo"}`}
                 estado={servico}
                 onChange={setServico}
                 opcoes={opcoes}
@@ -897,7 +550,7 @@ export function CatalogoNina({
               />
             ) : (
               <FormProfissional
-                key={`profissional-${profissional.id ?? "novo"}-${posicao}`}
+                key={`profissional-${profissional.id ?? "novo"}`}
                 estado={profissional}
                 onChange={setProfissional}
                 opcoes={opcoes}
@@ -908,11 +561,6 @@ export function CatalogoNina({
               <Button variant="outline" onClick={() => setAberto(false)} disabled={salvando}>
                 Cancelar
               </Button>
-              {posicao + 1 < fila.length && (
-                <Button variant="ghost" onClick={proximoDaFila} disabled={salvando}>
-                  Pular para o próximo
-                </Button>
-              )}
               {podeEditar && (
                 <>
                   <Button variant="secondary" onClick={() => salvar(false)} disabled={salvando}>

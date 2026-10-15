@@ -22,6 +22,34 @@ test("seleção mista identifica ambos os cadastros sem aceitar nomes/IDs invent
     validarSelecaoLote({ itens: [{ ...itens[0], id: b }], esclarecimentos: [] }, catalogo),
   ).toThrow("inexistente");
 });
+test("botão único: cadastro novo vem sem id, com nome, junto das edições", () => {
+  const r = validarSelecaoLote(
+    {
+      itens: [
+        { id: a, tipo: "servico", pedido },
+        { id: null, tipo: "servico", nome: "Ultrassom de tireoide", pedido: "R$ 130 no dinheiro" },
+      ],
+      esclarecimentos: [],
+    },
+    catalogo,
+  );
+  expect(r.itens.map((i) => [i.id, i.nome])).toEqual([
+    [a, "Mamografia"],
+    [null, "Ultrassom de tireoide"],
+  ]);
+});
+test("botão único: novo sem nome, repetido ou já cadastrado é recusado", () => {
+  const novo = (nome: string) => ({ id: null, tipo: "servico" as const, nome, pedido });
+  expect(() => validarSelecaoLote({ itens: [novo("")], esclarecimentos: [] }, catalogo)).toThrow(
+    "sem nome",
+  );
+  expect(() =>
+    validarSelecaoLote({ itens: [novo("Raio X"), novo("raio x")], esclarecimentos: [] }, catalogo),
+  ).toThrow("repetido");
+  expect(() =>
+    validarSelecaoLote({ itens: [novo("MAMOGRAFIA")], esclarecimentos: [] }, catalogo),
+  ).toThrow("já está cadastrado");
+});
 test("pedido ambíguo não retorna seleção parcial", () => {
   expect(
     validarSelecaoLote(

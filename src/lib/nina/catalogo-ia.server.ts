@@ -1,5 +1,5 @@
 /**
- * "Criar ou editar com IA" do catálogo — chamada ao modelo, somente no servidor.
+ * "Preencher com IA" do catálogo — chamada ao modelo, somente no servidor.
  *
  * Usa a Responses API do gateway de IA da Lovable com saída estruturada
  * estrita, em streaming (modelos de raciocínio podem demorar; sem streaming a
