@@ -1,39 +1,34 @@
-# Ferramenta "Importar Clínica Total" (SFP) — plano para aprovação
+# Ligação da Nina com a voz GPT-Live 1 — plano para aprovação
 
-Área crítica (cadastro de clientes, prontuário, histórico). Nada é importado agora: só a ferramenta + testes com dados fictícios.
+Área sensível: conversa com paciente (simulada), ferramentas da Nina e gasto de IA. Nada é publicado.
 
-## O que já existe
-- A importação da MJ (junho) **não tem tela**: foi feita por funções no banco (`_do_import_pacientes_mj`, `_mj_apply_batch` etc.), específicas para a MJ. Vou reaproveitar a lógica (casamento, normalização), não as funções em si.
-- `prontuarios` não tem coluna para o número antigo → precisa de coluna nova.
-- `pacientes` tem gatilhos que afetam a importação: telefone obrigatório, gera `codigo_prontuario` novo e avança a sequência, auditoria por linha, alerta crítico, MAIÚSCULAS, valida nome, sincroniza nome na agenda.
+## Por que não cabe só em 2 arquivos
+O formato que já está no código (pedido único que devolve o SDP; o navegador recebe a chamada de ferramenta e a devolve pelo canal de dados; o modelo de apoio e as ferramentas vão dentro da sessão) não é aceito pela voz da Lovable:
+- a sessão precisa de uma **conexão contínua pelo servidor durante a ligação toda** (o servidor manda um "estou vivo" a cada segundo; se fechar depois do SDP, a ligação cai);
+- só é aceita a delegação do tipo "cliente": o modelo de apoio, as instruções de apoio e as ferramentas **rodam no nosso servidor** e não vão dentro da sessão;
+- o navegador **não pode** mandar comandos pelo canal de dados (`response.item.create`, `response.create`, `session.close` são recusados). Resultados de ferramenta voltam pela conexão do servidor, como `session.commentary.append`.
 
-## Banco (uma migração, só aditiva)
-1. `prontuarios.legado_origem text` + `legado_id text`, índice único parcial `(clinica_id, legado_origem, legado_id)`.
-2. Tabela nova `paciente_observacoes_legado` (clinica_id, paciente_id, legado_id único por clínica, tipo, texto, situacao, usuario_legado, data, data_observacao, data_ate) — RLS por `is_member`, escrita só pela função.
-3. Tabela `importacao_legado_execucoes` (clinica, arquivo/tipo, nome+tamanho do arquivo, última linha confirmada, contadores, status, quem) para retomar.
-4. Tabela `importacao_legado_erros` (execução, linha, motivo — sem copiar a linha inteira do paciente).
-5. Tabela `importacao_legado_profissionais` (codigo_pessoa → nome, cpf, medico_id escolhido ou nulo).
-6. Funções SECURITY DEFINER (`SET search_path = public`), uma por tipo, recebendo um lote JSON: checam admin/gestor ativo da clínica, fazem upsert idempotente e devolvem contadores + erros + lista de órfãos. Ao final, uma função de "responsáveis" e uma de "resumo".
+## O que muda (arquivos)
+1. `src/lib/nina/ligacao/sessao-live.server.ts` — vira o "intermediário" da ligação: abre a conexão com a voz usando a LOVABLE_API_KEY (só no servidor), manda `session.start` com a voz em `audio.output.voice`, as instruções de voz e `delegation: { type: "client" }`; repassa os eventos para a tela; quando a voz pede ajuda (`session.delegation.created`), chama o modelo de apoio com as `instrucoesApoio` e as ferramentas de `contrato-ligacao.server.ts`, executa as ferramentas com o `executarFerramentaLigacao` que já existe e devolve a resposta à voz. Sem gravar áudio e sem registrar falas nem instruções em log.
+2. Nova rota de servidor `/api/nina-ligacao` (conexão contínua navegador ↔ servidor), com a **mesma checagem** de hoje antes de abrir a sessão: login, vínculo com a clínica, permissão `nina-ligacao` de escrita e flag `nina_ligacao_demo`.
+3. `src/server.ts` — 3 linhas para encaminhar `/api/nina-ligacao` à rota acima (o resto fica igual).
+4. `vite.config.ts` — acrescentar o adaptador que faz a mesma rota funcionar na pré-visualização.
+5. `src/lib/nina/ligacao/conexao-live.ts` — passa a usar a conexão contínua: gera a oferta, recebe a resposta, manda o "estou vivo" a cada segundo, `Desligar` pede o encerramento ao servidor. Canal de dados `oai-events` só para receber eventos.
+6. `src/lib/nina/ligacao/eventos-ligacao.ts` — acrescentar a leitura dos eventos de "consultando" (para os Bastidores mostrarem "Consultou o catálogo publicado"); a leitura das transcrições continua igual.
+7. `src/components/nina/LigacaoNina.tsx` — ajuste mínimo: deixa de executar ferramentas no navegador (o servidor faz) e passa a mostrar os Bastidores a partir dos eventos do servidor. Visual, botões, textos e voz escolhida não mudam.
+8. Pacotes: `ai` e `@ai-sdk/openai` (e `ws` só para desenvolvimento).
 
-## Regras de mapeamento (como pedido)
-- Pessoa → paciente por `clinica_id + codigo_prontuario_anterior = codigo_pessoa`; se não houver, tenta CPF (11 dígitos, resultado único) ou nome + nascimento (único) — só completa vazios, nunca sobrescreve.
-- `nome_mae`, `nome_pai`, `observacao`, `observacao_clinica`, `cartao_numero`: vão para `paciente_observacoes_legado` com tipo próprio (não perde nada, não mexe em campos clínicos existentes).
-- Prontuário: `queixa_principal` = descrição original; `observacoes` = "[Importado do sistema antigo SFP - prontuario #N]" + procedimento (+ nome do profissional quando sem médico); data em America/Sao_Paulo; órfão é contado e listado.
-- Observações vinculadas pelo `codigo_pessoa`; idempotente por `codigo_observacao`.
+## Modelos
+- Voz: `openai/gpt-live-1`.
+- Apoio: `openai/gpt-6-astra` (o `openai/gpt-5.6-terra` escrito hoje não é o modelo indicado para isso). **Se preferirem outro, digam qual.**
 
-## Tela
-`/app/configuracoes/importar-clinica-total`, só admin/gestor, unidade padrão SFP, 4 passos em ordem obrigatória, leitura do arquivo em pedaços (sem carregar tudo), lotes de 500, barra de progresso, contadores, pausar/retomar, retomar após fechar a aba (mesmo arquivo = mesmo nome e tamanho), log de erros baixável (CSV), associação manual dos profissionais não casados, resumo final.
+## Não muda
+Instruções, regras, ferramentas e o que cada uma faz (`contrato-ligacao.server.ts`, `ferramentas-ligacao.server.ts`), permissões, menu, flag, banco (nenhuma tabela ou migration).
 
-## Testes
-- Testes do leitor de linhas (quebras de linha dentro do texto, acentos, aspas, linha cortada entre pedaços) e do mapeamento (sexo, datas, telefone, CPF).
-- Teste das funções no banco com uma clínica de teste fictícia, revertido ao final (sem tocar SFP/MJ).
+## Validação
+- Testes dos formatos de evento (transcrição, pedido de ajuda, encerramento).
+- Ligação real na pré-visualização com a flag ligada numa clínica: Ligar → pede microfone → a Nina se apresenta → perguntar por um exame → Bastidores mostram a consulta ao catálogo → Desligar encerra. Precisa de alguém logado com acesso para o teste falado; o áudio eu não consigo ouvir daqui, só confirmar os eventos.
 
-## Decisões que preciso de você antes de começar
-1. **Número de prontuário novo:** o gatilho atual dá um `codigo_prontuario` novo para cada cliente importado (488 mil números, avançando a sequência da SFP). Usar o `codigo_pessoa` antigo como `codigo_prontuario` também, ou deixar o sistema numerar?
-2. **Telefone obrigatório:** muitos cadastros antigos não têm telefone. Liberar só durante a importação (como já é feito no cadastro de funcionário)?
-3. **Auditoria / MAIÚSCULAS / alerta crítico:** manter os gatilhos rodando (488 mil linhas de auditoria, nomes em maiúsculas, mais lento) ou desligá-los só dentro da função de importação? Proposta: manter MAIÚSCULAS e validação de nome; pular auditoria por linha e registrar uma linha de auditoria por lote.
-4. **Gestor:** o pedido diz "admin/gestor". Confirmar que gestor também pode rodar uma importação desse tamanho.
-5. **`ativo = 'N'`:** importar como cliente inativo (proposta) ou não importar?
-
-## Fora do escopo
-Fotos e anexos (2ª etapa), qualquer importação real, publicação, agenda, financeiro, médicos (só leitura para casar).
+## Riscos
+- Cada ligação gasta créditos de IA (voz + modelo de apoio).
+- Se a conta da Lovable não tiver a voz liberada, a ligação não abre — aviso com a mensagem certa, sem tentar outro modelo.
