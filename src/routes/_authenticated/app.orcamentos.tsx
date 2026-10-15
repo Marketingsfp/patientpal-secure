@@ -44,6 +44,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { printOrcamento } from "@/lib/print-orcamento";
 import {
   PREPAROS_PADRAO,
@@ -1155,6 +1156,14 @@ function NovoOrcamentoDialog({
   const [categoria, setCategoria] = useState<"laboratorio" | "demais" | null>(null);
   const [pacienteId, setPacienteId] = useState<string>("");
   const [pacienteSelecionado, setPacienteSelecionado] = useState<PatientOption | null>(null);
+  // Resultado da busca de cadastro pelo nome (foto do pedido ou digitado à mão).
+  // É sempre dica: a recepção confirma qual é o paciente.
+  const [sugestaoPaciente, setSugestaoPaciente] = useState<{
+    termo: string;
+    pacientes: PatientOption[];
+  } | null>(null);
+  const [pacienteAuto, setPacienteAuto] = useState(false);
+  const [quickPacienteOpen, setQuickPacienteOpen] = useState(false);
   const [medicoId, setMedicoId] = useState<string>("");
   const [medicoExterno, setMedicoExterno] = useState(false);
   const [clinicaSolicitante, setClinicaSolicitante] = useState("");
@@ -1237,6 +1246,7 @@ function NovoOrcamentoDialog({
   const selecionarPaciente = (p: PatientOption | null) => {
     setPacienteSelecionado(p);
     setPacienteId(p?.id ?? "");
+    setPacienteAuto(false);
     if (p) {
       setPacienteNome(p.nome ?? "");
       setPacienteTelefone(p.telefone ?? "");
@@ -1598,6 +1608,36 @@ function NovoOrcamentoDialog({
     }
   };
 
+  // Busca cadastro pelo nome digitado no campo Paciente (mesma RPC da foto).
+  const normalizarNomePaciente = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  const buscarCadastroPorNome = async () => {
+    const termo = pacienteNome.trim();
+    if (pacienteSelecionado || termo.length < 3) return;
+    if (sugestaoPaciente && sugestaoPaciente.termo === termo) return;
+    const { data, error } = await supabase.rpc("buscar_pacientes_global", {
+      _clinica_ids: clinicaIds.length > 0 ? clinicaIds : [clinicaId],
+      _termo: termo,
+      _limite: 5,
+    });
+    if (error) return;
+    const pacientes = (data ?? []) as PatientOption[];
+    setSugestaoPaciente({ termo, pacientes });
+    // Só um resultado com o nome idêntico: deixa escolhido, visível e removível.
+    if (
+      pacientes.length === 1 &&
+      normalizarNomePaciente(pacientes[0].nome ?? "") === normalizarNomePaciente(termo)
+    ) {
+      selecionarPaciente(pacientes[0]);
+      setPacienteAuto(true);
+    }
+  };
+
   // Preenche o orçamento com o pedido lido (foto do computador ou do celular).
   const aplicarLeituraDoPedido = async (r: LeituraPedidoBalcao) => {
     if (!categoria) return;
@@ -1616,6 +1656,7 @@ function NovoOrcamentoDialog({
         _limite: 5,
       });
       pacientes = (data ?? []) as PatientOption[];
+      setSugestaoPaciente({ termo: r.pacienteNome, pacientes });
     }
 
     // Médico: preenche só se o campo ainda está vazio.
@@ -1835,6 +1876,7 @@ function NovoOrcamentoDialog({
         clinica_id: clinicaId,
         numero: 0,
         categoria,
+        paciente_id: pacienteId || null,
         paciente_nome: pacienteNome.trim(),
         paciente_telefone: pacienteTelefone.trim() || null,
         medico_nome: medicoParticular ? "Particular" : medicoNome.trim() || null,
@@ -2033,31 +2075,6 @@ function NovoOrcamentoDialog({
                     {pedidoLido.pacienteNome ?? (
                       <span className="text-muted-foreground">não lido — preencha abaixo</span>
                     )}
-                    {pedidoLido.pacienteNome && !pacienteSelecionado && (
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {pedidoLido.pacientes.length > 0 ? (
-                          <>
-                            <span className="text-xs text-muted-foreground">É um destes?</span>
-                            {pedidoLido.pacientes.map((p) => (
-                              <Button
-                                key={p.id}
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
-                                onClick={() => selecionarPaciente(p)}
-                              >
-                                {p.nome}
-                                {p.data_nascimento &&
-                                  ` · ${p.data_nascimento.split("-").reverse().join("/")}`}
-                              </Button>
-                            ))}
-                          </>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Nenhum cadastro parecido — confira se é paciente novo.
-                          </span>
-                        )}
                       </div>
                     )}
                   </div>
@@ -2206,11 +2223,72 @@ function NovoOrcamentoDialog({
                 <PatientSearchInput
                   value={pacienteSelecionado}
                   onSelect={selecionarPaciente}
+                  onRequestCreate={() => setQuickPacienteOpen(true)}
                   placeholder="Buscar por nome, CPF ou prontuário..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  Ou preencha manualmente abaixo para paciente novo.
+                  Procure primeiro o cadastro do paciente. Preencha à mão abaixo só se ele
+                  realmente não tiver cadastro.
                 </p>
+                {pacienteSelecionado && pacienteAuto && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-xs">
+                    <span>
+                      Cadastro encontrado com o mesmo nome e já escolhido:{" "}
+                      <b>{pacienteSelecionado.nome}</b>
+                      {pacienteSelecionado.data_nascimento &&
+                        ` · ${pacienteSelecionado.data_nascimento.split("-").reverse().join("/")}`}
+                      . Confira se é a pessoa certa.
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-xs"
+                      onClick={() => selecionarPaciente(null)}
+                    >
+                      Não é este
+                    </Button>
+                  </div>
+                )}
+                {!pacienteSelecionado && sugestaoPaciente && (
+                  <div className="mt-1">
+                    {sugestaoPaciente.pacientes.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-xs text-muted-foreground">É um destes?</span>
+                        {sugestaoPaciente.pacientes.map((p) => (
+                          <Button
+                            key={p.id}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => selecionarPaciente(p)}
+                          >
+                            {p.nome}
+                            {p.data_nascimento &&
+                              ` · ${p.data_nascimento.split("-").reverse().join("/")}`}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span className="flex-1">
+                          Não foi encontrado cadastro com o nome “{sugestaoPaciente.termo}”.
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => setQuickPacienteOpen(true)}
+                        >
+                          Cadastrar agora
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2219,7 +2297,14 @@ function NovoOrcamentoDialog({
                   <Input
                     maxLength={120}
                     value={pacienteNome}
-                    onChange={(e) => setPacienteNome(e.target.value.replace(/[<>]/g, ""))}
+                    onChange={(e) => {
+                      const novo = e.target.value.replace(/[<>]/g, "");
+                      setPacienteNome(novo);
+                      // Nome mudou em relação ao cadastro escolhido: desfaz o vínculo.
+                      if (pacienteSelecionado && novo.trim() !== (pacienteSelecionado.nome ?? "").trim())
+                        selecionarPaciente(null);
+                    }}
+                    onBlur={() => void buscarCadastroPorNome()}
                   />
                 </div>
                 <div className="space-y-1">
@@ -2685,6 +2770,16 @@ function NovoOrcamentoDialog({
             </Button>
           </DialogFooter>
         )}
+      <QuickPatientDialog
+        open={quickPacienteOpen}
+        onOpenChange={setQuickPacienteOpen}
+        clinicaId={clinicaId}
+        nomeInicial={pacienteNome.trim()}
+        onCreated={(p) => {
+          selecionarPaciente(p);
+          setQuickPacienteOpen(false);
+        }}
+      />
       </DialogContent>
     </Dialog>
   );
