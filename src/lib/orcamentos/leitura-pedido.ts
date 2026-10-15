@@ -17,7 +17,12 @@ import { normalizarBusca } from "@/lib/busca/relevancia";
 const limparPrefixoMedico = (nome: string) => nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
 
 export const PROMPT_LEITURA_PEDIDO_BALCAO = `${PROMPT_LEITURA_IMAGEM}
-Nesta leitura a imagem foi enviada pela recepção da clínica (não pelo WhatsApp). Acrescente sempre ao JSON os campos "paciente_nome" e "medico_nome": o nome do paciente e o nome do médico solicitante exatamente como escritos no pedido (cabeçalho, campo do paciente, carimbo ou assinatura). Use null quando o nome não aparecer ou não estiver legível com segurança. Não complete, não corrija e não adivinhe nomes de pessoas. Não inclua CRM, título ("Dr.", "Dra.") nem especialidade no nome.
+Nesta leitura a imagem foi enviada pela recepção da clínica (não pelo WhatsApp). Acrescente sempre ao JSON os campos "paciente_nome" e "medico_nome": o nome do paciente e o nome do médico solicitante exatamente como escritos no pedido (cabeçalho, campo do paciente, carimbo ou assinatura). Use null quando o nome não aparecer ou não estiver legível com segurança. Não invente nem acrescente palavras que não estão escritas. Não inclua CRM, título ("Dr.", "Dra.") nem especialidade no nome.
+Leitura de nomes manuscritos (pacientes brasileiros):
+- Transcreva o nome COMPLETO, palavra por palavra, até o último sobrenome escrito. Não pare no meio nem termine em "e", "de" ou "da".
+- NUNCA abrevie: escreva cada sobrenome por extenso como está no papel (ex.: "Soares", nunca "S."). Só use inicial com ponto quando o próprio papel trouxer a abreviação.
+- Quando uma letra cursiva for ambígua, prefira a leitura que forma um nome ou sobrenome usado no Brasil, em português. Na letra cursiva "e" se confunde com "ai"/"ei", "u" com "n"/"v", "m" com "nn"/"rn", "a" com "o", "l" com "e": "Que" é mais provável que "Quai", e "Suelen" que "Snelen".
+- Não troque o nome por outro parecido mais comum: só escolha entre leituras que o traçado permite.
 Exemplo: {"tipo":"pedido_medico","itens":["Hemograma completo"],"paciente_nome":"Maria da Silva","medico_nome":"João Souza"}`;
 
 export type LeituraPedidoBalcao = {

@@ -69,6 +69,7 @@ import type { LeituraPedidoBalcao } from "@/lib/orcamentos/leitura-pedido";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import QRCode from "qrcode";
 import { medicosComNomeLido } from "@/lib/orcamentos/leitura-pedido";
+import { pacientesComNomeParecido, termosParaBuscaParecida } from "@/lib/orcamentos/nome-parecido";
 import { escolhaSegura, ordenarServicosDoPedido } from "@/lib/orcamentos/correspondencia-servico";
 import { normalizarBusca } from "@/lib/busca/relevancia";
 
@@ -1161,6 +1162,8 @@ function NovoOrcamentoDialog({
   const [sugestaoPaciente, setSugestaoPaciente] = useState<{
     termo: string;
     pacientes: PatientOption[];
+    /** Achados pela 2ª tentativa (nome parecido, não idêntico ao lido). */
+    parecido?: boolean;
   } | null>(null);
   const [pacienteAuto, setPacienteAuto] = useState(false);
   const [quickPacienteOpen, setQuickPacienteOpen] = useState(false);
@@ -1659,7 +1662,25 @@ function NovoOrcamentoDialog({
         _limite: 5,
       });
       pacientes = (data ?? []) as PatientOption[];
-      setSugestaoPaciente({ termo: r.pacienteNome, pacientes });
+      // Letra de médico: uma letra lida errada zera a busca pelo nome inteiro.
+      // Segunda tentativa: busca por cada palavra e fica só com os nomes parecidos.
+      let parecido = false;
+      if (pacientes.length === 0) {
+        const termos = termosParaBuscaParecida(r.pacienteNome);
+        const respostas = await Promise.all(
+          termos.map((t) =>
+            supabase.rpc("buscar_pacientes_global", {
+              _clinica_ids: clinicaIds.length > 0 ? clinicaIds : [clinicaId],
+              _termo: t,
+              _limite: 50,
+            }),
+          ),
+        );
+        const candidatos = respostas.flatMap((x) => (x.data ?? []) as PatientOption[]);
+        pacientes = pacientesComNomeParecido(r.pacienteNome, candidatos);
+        parecido = pacientes.length > 0;
+      }
+      setSugestaoPaciente({ termo: r.pacienteNome, pacientes, parecido });
     }
 
     // Médico: preenche só se o campo ainda está vazio.
@@ -2266,7 +2287,11 @@ function NovoOrcamentoDialog({
                   <div className="mt-1">
                     {sugestaoPaciente.pacientes.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-xs text-muted-foreground">É um destes?</span>
+                        <span className="text-xs text-muted-foreground">
+                          {sugestaoPaciente.parecido
+                            ? `Nome parecido com “${sugestaoPaciente.termo}”. É um destes?`
+                            : "É um destes?"}
+                        </span>
                         {sugestaoPaciente.pacientes.map((p) => (
                           <Button
                             key={p.id}
