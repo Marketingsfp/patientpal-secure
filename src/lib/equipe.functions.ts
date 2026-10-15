@@ -24,6 +24,24 @@ async function assertManager(userId: string, clinicaId: string) {
   if (!data) throw new Error("Sem permissão para gerenciar a equipe desta clínica");
 }
 
+/** Admin ativo da clínica ou admin da plataforma. Gestor não basta. */
+async function assertAdminDaClinicaOuPlataforma(userId: string, clinicaId: string) {
+  const { data: mem, error } = await supabaseAdmin
+    .from("clinica_memberships")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("clinica_id", clinicaId)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw new Error("Não foi possível verificar sua permissão. Tente novamente.");
+  if (mem?.role === "admin") return;
+  const { data: plataforma, error: pErr } = await supabaseAdmin.rpc("is_platform_admin", {
+    _user_id: userId,
+  });
+  if (pErr) throw new Error("Não foi possível verificar sua permissão. Tente novamente.");
+  if (plataforma !== true) throw new Error(MSG_SO_ADMIN);
+}
+
 /**
  * Perfil customizado escolhido na tela (ex.: CARTÃO BENEFÍCIOS): confere que
  * é desta clínica e devolve o perfil base, que é o que vai em `role`. O
