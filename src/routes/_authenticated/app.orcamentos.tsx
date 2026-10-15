@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { filtrosOrNomeServico } from "@/lib/busca-servico";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -447,6 +448,8 @@ function OrcamentosCompactList({
   onAgendar,
   onImprimir,
   onConverter,
+  onHistorico,
+  onExcluir,
 }: {
   itens: Orc[];
   loading: boolean;
@@ -455,6 +458,9 @@ function OrcamentosCompactList({
   onAgendar: (o: Orc) => void;
   onImprimir: (id: string) => void;
   onConverter: (id: string) => void;
+  /** Só na tela inteira pelo celular (no split embutido não aparecem). */
+  onHistorico?: (id: string) => void;
+  onExcluir?: (id: string) => void;
 }) {
   if (loading) {
     return (
@@ -495,6 +501,8 @@ function OrcamentosCompactList({
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{o.paciente_nome}</p>
                     <p className="text-[12px] text-muted-foreground truncate">
+                      <span className="font-mono">#{String(o.numero).padStart(5, "0")}</span>
+                      {" · "}
                       {new Date(o.created_at).toLocaleDateString("pt-BR")}
                       {o.medico_nome?.trim() ? ` · ${o.medico_nome}` : ""}
                     </p>
@@ -503,7 +511,7 @@ function OrcamentosCompactList({
                     {BRL(Number(o.valor_total))}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                       realizado
@@ -525,6 +533,16 @@ function OrcamentosCompactList({
                     {podeEscrever && (
                       <IconAction label="Converter itens" onClick={() => onConverter(o.id)}>
                         <Workflow className="h-4 w-4 text-primary" />
+                      </IconAction>
+                    )}
+                    {onHistorico && (
+                      <IconAction label="Histórico" onClick={() => onHistorico(o.id)}>
+                        <History className="h-4 w-4" />
+                      </IconAction>
+                    )}
+                    {onExcluir && (
+                      <IconAction label="Excluir" onClick={() => onExcluir(o.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </IconAction>
                     )}
                     <Button size="sm" className="h-8 gap-1.5" onClick={() => onAgendar(o)}>
@@ -569,6 +587,8 @@ function OrcamentosPage() {
     const sp = new URLSearchParams(window.location.search);
     return sp.get("embed") === "1" && sp.get("compact") === "1";
   });
+  // No celular a tabela de 7 colunas não cabe: usa os mesmos cartões do modo compacto.
+  const celular = useIsMobile();
   // Embutido no split "Orçamentos + Agenda": o cabeçalho vem do painel pai.
   const [embedded] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -846,7 +866,7 @@ function OrcamentosPage() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="bg-muted/50 p-1 rounded-full border border-border/40 inline-flex gap-1">
+        <div className="bg-muted/50 p-1 rounded-2xl sm:rounded-full border border-border/40 flex flex-wrap sm:inline-flex gap-1">
           {(
             [
               ["hoje", "Dia"],
@@ -882,7 +902,7 @@ function OrcamentosPage() {
             />
           </div>
         )}
-        <div className="inline-flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {(
             [
               ["todos", "Todos"],
@@ -929,7 +949,7 @@ function OrcamentosPage() {
         </p>
       )}
 
-      {embedCompact ? (
+      {embedCompact || celular ? (
         <OrcamentosCompactList
           itens={filtered}
           loading={loading}
@@ -938,6 +958,8 @@ function OrcamentosPage() {
           onAgendar={enviarParaAgenda}
           onImprimir={(id) => void imprimir(id)}
           onConverter={(id) => setConversaoId(id)}
+          onHistorico={!embedCompact && podeVerHistorico ? setHistoricoId : undefined}
+          onExcluir={!embedCompact && podeEscrever ? (id) => void remover(id) : undefined}
         />
       ) : (
         <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
@@ -2099,7 +2121,7 @@ function NovoOrcamentoDialog({
               </div>
 
               {pedidoLido && (
-                <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2 text-sm break-words">
+                <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2 text-sm wrap-break-word">
                   <div className="flex items-start justify-between gap-2">
                     <span className="min-w-0 font-semibold">
                       Lido do pedido — confira antes de gerar
