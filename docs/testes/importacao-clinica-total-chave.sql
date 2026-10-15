@@ -6,6 +6,7 @@ SELECT user_id AS adm FROM public.user_roles
  WHERE role = 'admin'::app_role_global AND clinica_id IS NULL LIMIT 1 \gset
 INSERT INTO public.clinicas (nome) VALUES ('CLINICA TESTE CHAVE') RETURNING id AS cli \gset
 SELECT set_config('request.jwt.claims', json_build_object('sub', :'adm', 'role', 'authenticated')::text, true);
+SET LOCAL ROLE authenticated;
 
 -- Pessoa 30 chega antes da 10 com a mesma pasta: a 10 (menor código) fica com o número.
 SELECT (public.importacao_legado_iniciar(:'cli', 'pessoas', 'teste.jsonl', 1)).id AS ex \gset
