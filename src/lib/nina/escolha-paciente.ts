@@ -16,6 +16,8 @@ const CONECTORES = new Set(["de", "da", "do", "das", "dos", "e"]);
 const TITULOS = new Set(["dr", "dra", "doutor", "doutora", "prof", "profa"]);
 
 const chave = (t: string) => normalizarRespostaInformal(t ?? "").replace(/[?]/g, " ");
+/** Texto literal dentro de uma expressão ("(urina" derrubava o turno, 15/10/2026). */
+const literal = (t: string) => t.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
 function partesDoNome(nome: string): string[] {
   return chave(nome)
@@ -38,7 +40,7 @@ export function profissionaisCitados(texto: string, nomes: readonly string[]): s
     const partes = partesDoNome(nome);
     const citadas = partes.filter((p) => t.includes(` ${p} `));
     const comTitulo = citadas.some((p) =>
-      new RegExp(`\\b(?:dr|dra|doutor|doutora)\\.? ${p}\\b`).test(t),
+      new RegExp(`\\b(?:dr|dra|doutor|doutora)\\.? ${literal(p)}\\b`).test(t),
     );
     const aceito = citadas.includes(partes[0] ?? "") || citadas.length >= 2 || comTitulo;
     return { nome, n: aceito ? citadas.length : 0 };
@@ -145,7 +147,7 @@ function semNomesDoPaciente(texto: string): string {
   for (const nome of [lido.nome_completo, lido.responsavel])
     for (const parte of String(nome ?? "").split(/\s+/))
       if (parte.length >= 3)
-        limpo = limpo.replace(new RegExp(`(?<![\\p{L}])${parte}(?![\\p{L}])`, "giu"), " ");
+        limpo = limpo.replace(new RegExp(`(?<![\\p{L}])${literal(parte)}(?![\\p{L}])`, "giu"), " ");
   return limpo;
 }
 
