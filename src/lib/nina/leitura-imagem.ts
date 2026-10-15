@@ -79,8 +79,8 @@ export function interpretarLeituraImagem(bruto: string | null | undefined): Leit
   const limpos: string[] = [];
   for (const item of itens) {
     const limpo = limparItem(item);
-    if (!limpo || (typeof item === "string" && item.length > MAX_CARACTERES_ITEM))
-      return { tipo: "ilegivel" };
+    // Item longo é cortado em MAX_CARACTERES_ITEM (limparItem); só item inválido derruba a leitura.
+    if (!limpo) return { tipo: "ilegivel" };
     const chave = limpo.toLocaleLowerCase("pt-BR");
     if (vistos.has(chave)) continue;
     vistos.add(chave);

@@ -3,7 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { comprimirImagem } from "@/lib/odonto-imagens";
+import { comprimirDocumento } from "@/lib/orcamentos/comprimir-documento";
+import { MAX_BYTES_FOTO } from "@/lib/orcamentos/foto-celular";
 import {
   consultarFotoCelular,
   enviarFotoCelular,
@@ -50,9 +51,11 @@ function FotoPedidoCelular() {
     setErro(null);
     setEtapa("enviando");
     try {
-      const { blob, mime } = await comprimirImagem(arquivo);
-      if (!/^image\/(jpeg|png|webp)$/i.test(mime) || blob.size > 8_000_000) {
-        setErro("Não foi possível usar esta foto. Tire outra.");
+      const doc = await comprimirDocumento(arquivo);
+      const { blob } = doc;
+      const mime = /^image\//i.test(doc.mime) ? doc.mime : "image/jpeg";
+      if (blob.size > MAX_BYTES_FOTO) {
+        setErro("A foto ficou grande demais para enviar. Tire outra foto, só do papel.");
         return setEtapa("pronto");
       }
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -62,7 +65,19 @@ function FotoPedidoCelular() {
         leitor.onerror = () => reject(leitor.error);
         leitor.readAsDataURL(blob);
       });
-      const r = await enviar({ data: { token, arquivo: dataUrl } });
+      const r = await enviar({
+        data: {
+          token,
+          arquivo: dataUrl,
+          meta: {
+            mime: (arquivo.type || "desconhecido").slice(0, 100),
+            larguraOriginal: doc.larguraOriginal,
+            alturaOriginal: doc.alturaOriginal,
+            larguraEnviada: doc.largura,
+            alturaEnviada: doc.altura,
+          },
+        },
+      });
       if (r.ok) return setEtapa("enviado");
       setErro(MENSAGEM_ERRO[r.motivo]);
       setEtapa(

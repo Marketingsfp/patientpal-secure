@@ -13,3 +13,8 @@ export function novoTokenFoto(): string {
 
 /** Endereço que o QR code abre no celular. */
 export const linkFotoCelular = (origem: string, token: string) => `${origem}/p/pedido/${token}`;
+
+/** Teto do arquivo enviado de fato (bytes) — cabe uma foto grande sem recompressão agressiva. */
+export const MAX_BYTES_FOTO = 15_000_000;
+/** Mesmo teto em data URL (base64 ≈ 4/3 + cabeçalho). */
+export const MAX_DATA_URL_FOTO = Math.ceil((MAX_BYTES_FOTO * 4) / 3) + 200;
