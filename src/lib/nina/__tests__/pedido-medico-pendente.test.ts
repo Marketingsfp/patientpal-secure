@@ -1,6 +1,11 @@
 import { expect, it } from "bun:test";
-import { MOTIVO_PEDIDO_NAO_ENVIADO, pedidoMedicoPendente } from "../pedido-medico";
-import { transferenciaDispensaDados } from "../dados-transferencia";
+import {
+  MOTIVO_PEDIDO_NAO_ENVIADO,
+  fotoPendenteNoTurno,
+  pedidoMedicoPendente,
+  type SolicitacaoPedidoMedico,
+} from "../pedido-medico";
+import { respostaAntesDaTransferencia, transferenciaDispensaDados } from "../dados-transferencia";
 
 const ctx = { conversaId: "conversa-1", inicioSessao: "2026-10-15T10:00:00Z", teste: false };
 const pedido = (item = "Eletrocardiograma") =>
@@ -79,4 +84,38 @@ it("encaminhamento por pedido não enviado dispensa nome e data", () => {
       motivo: `[Normal] ${MOTIVO_PEDIDO_NAO_ENVIADO}: Eletrocardiograma`,
     }),
   ).toBe(true);
+});
+
+const solicitacao = (acao: SolicitacaoPedidoMedico["acao"]): SolicitacaoPedidoMedico => ({
+  id: "item-1",
+  nome: "Eletrocardiograma",
+  acao,
+  pergunta: pedido(),
+  bloqueia_agenda: false,
+});
+
+it("foto primeiro: pendente quando o item pede a foto neste turno ou já pediu uma vez", () => {
+  expect(fotoPendenteNoTurno(null, [solicitacao("solicitar_foto")])).toBe(true);
+  expect(fotoPendenteNoTurno(null, [solicitacao("ja_solicitado")])).toBe(true);
+  expect(fotoPendenteNoTurno({ nome: "Eletrocardiograma", vezes: 1, pergunta: pedido() }, [])).toBe(
+    true,
+  );
+});
+
+it("foto primeiro: não segura com foto recebida, sem pedido ou depois do segundo pedido", () => {
+  expect(fotoPendenteNoTurno(null, [])).toBe(false);
+  expect(fotoPendenteNoTurno(null, [solicitacao("foto_recebida")])).toBe(false);
+  expect(
+    fotoPendenteNoTurno({ nome: "Eletrocardiograma", vezes: 2, pergunta: pedido() }, [
+      solicitacao("ja_solicitado"),
+    ]),
+  ).toBe(false);
+});
+
+it("foto primeiro: a resposta mantém a dúvida respondida e tira encaminhamento e dados", () => {
+  const texto =
+    "Sim, o valor no cartão de crédito é R$ 132,00 e o pagamento pode ser feito na clínica.\n\nVou encaminhar você para a nossa equipe. Para agilizar o seu atendimento, me envie, por favor, o seu nome completo e a sua data de nascimento.";
+  const limpo = respostaAntesDaTransferencia(texto);
+  expect(limpo).toContain("R$ 132,00");
+  expect(limpo).not.toMatch(/encaminh|nome completo|data de nascimento/i);
 });
