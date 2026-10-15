@@ -40,8 +40,11 @@ import { confirmDialog } from "@/lib/confirm";
 import { exportToExcel } from "@/lib/export-csv";
 import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import {
+  categoriaParaGravar,
+  categoriaPredominante,
   chaveNomeServico,
   lerPlanilhaServicos,
+  type CategoriaServico,
   type LinhaRecusada,
   type LinhaServico,
   type RepasseDoServico,
@@ -100,7 +103,13 @@ export const Route = createFileRoute("/_authenticated/app/procedimentos_/importa
 const TAMANHO_MAXIMO = 15 * 1024 * 1024; // 15 MB
 const LOTE = 200;
 
-type ServicoExistente = { id: string; nome: string; ativo: boolean };
+type ServicoExistente = {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  grupo: string | null;
+  tipo: string | null;
+};
 
 type Resultado = {
   criados: number;
@@ -137,12 +146,12 @@ function pedacos<T>(itens: T[], tamanho: number): T[][] {
 }
 
 /** Mesmo mapeamento de colunas que o formulário de serviço usa ao salvar. */
-function montarPayload(l: LinhaServico, clinicaId: string) {
+function montarPayload(l: LinhaServico, clinicaId: string, tipo: CategoriaServico) {
   return {
     clinica_id: clinicaId,
     nome: l.nome,
     grupo: l.especialidade,
-    tipo: l.categoria,
+    tipo,
     codigo: l.codigo,
     valor_padrao: l.valorDinheiro,
     valor_dinheiro: l.valorDinheiro,
@@ -215,7 +224,7 @@ function ImportarServicosPage() {
       for (;;) {
         const { data, error } = await supabase
           .from("procedimentos")
-          .select("id,nome,ativo")
+          .select("id,nome,ativo,grupo,tipo")
           .eq("clinica_id", clinicaId)
           .order("nome")
           .range(de, de + 999);
@@ -252,6 +261,14 @@ function ImportarServicosPage() {
     }
     return m;
   }, [existentes]);
+
+  const predominante = useMemo(() => categoriaPredominante(existentes), [existentes]);
+  /** Categoria que será gravada (a da planilha, ou a do catálogo quando ela falta). */
+  const categoriaDe = useCallback(
+    (l: LinhaServico) =>
+      categoriaParaGravar(l, mapaExistentes.get(chaveNomeServico(l.nome))?.tipo, predominante),
+    [mapaExistentes, predominante],
+  );
 
   const novas = useMemo(
     () => (leitura?.linhas ?? []).filter((l) => !mapaExistentes.has(chaveNomeServico(l.nome))),
@@ -588,7 +605,7 @@ function ImportarServicosPage() {
       for (const lote of pedacos(novas, LOTE)) {
         const { error } = await supabase
           .from("procedimentos")
-          .insert(lote.map((l) => montarPayload(l, clinicaId)));
+          .insert(lote.map((l) => montarPayload(l, clinicaId, categoriaDe(l))));
         if (error) {
           for (const l of lote) {
             problemas.push({
@@ -607,7 +624,7 @@ function ImportarServicosPage() {
         for (const l of jaExistem) {
           const alvo = mapaExistentes.get(chaveNomeServico(l.nome));
           if (!alvo) continue;
-          const { clinica_id: _ignorado, ...dados } = montarPayload(l, clinicaId);
+          const { clinica_id: _ignorado, ...dados } = montarPayload(l, clinicaId, categoriaDe(l));
           const { error } = await supabase.from("procedimentos").update(dados).eq("id", alvo.id);
           if (error) {
             problemas.push({
@@ -656,6 +673,7 @@ function ImportarServicosPage() {
     quandoExiste,
     criarEspecialidades,
     faltamEspecialidades,
+    categoriaDe,
   ]);
 
   // --- tela -----------------------------------------------------------------
@@ -883,13 +901,17 @@ function ImportarServicosPage() {
                         <TableCell className="font-medium">{l.nome}</TableCell>
                         <TableCell>{l.especialidade ?? "—"}</TableCell>
                         <TableCell>
-                          {l.categoria}
+                          {categoriaDe(l)}
                           {l.categoriaDeduzida && (
                             <span
                               className="ml-1 text-xs text-muted-foreground"
-                              title="A planilha não tem coluna Categoria: deduzida pelo grupo ou pelo nome."
+                              title={
+                                existe
+                                  ? "A planilha não tem coluna Categoria: o serviço mantém a categoria que já tem."
+                                  : "A planilha não tem coluna Categoria: segue a categoria da especialidade no catálogo (ou o grupo/nome)."
+                              }
                             >
-                              (deduzida)
+                              {existe ? "(mantida)" : "(deduzida)"}
                             </span>
                           )}
                         </TableCell>

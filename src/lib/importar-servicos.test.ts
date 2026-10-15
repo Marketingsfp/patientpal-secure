@@ -10,6 +10,8 @@ import { describe, expect, it } from "bun:test";
 import * as XLSX from "xlsx";
 
 import {
+  categoriaParaGravar,
+  categoriaPredominante,
   deduzirCategoria,
   repasseDaLinha,
   unidadeConfere,
@@ -276,5 +278,58 @@ describe("planilha da São Francisco (ITEM, CLASSE, UNIDADE, VALOR DO MÉDICO)",
     expect(deduzirCategoria("", "PROCEDIMENTOS CIRURGICOS", "X")).toBe("procedimento");
     expect(deduzirCategoria("LABORATORIO", "", "CONSULTA RETORNO")).toBe("consulta");
     expect(deduzirCategoria("LABORATORIO", "", "HEMOGRAMA")).toBe("exame");
+  });
+});
+
+describe("planilha da Odontologia (CLASSE, ITEM, VALOR DINHEIRO, VALOR CARTÃO (+10%))", () => {
+  function xlsx(linhas: (string | number | null)[][]): ArrayBuffer {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(linhas), "Odontologia");
+    return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  }
+
+  it("lê o cartão mesmo com '%' entre parênteses no cabeçalho", async () => {
+    const r = await lerPlanilhaServicos(
+      xlsx([
+        ["SERVIÇOS PRESTADOS - ODONTOLOGIA", null, null, null],
+        ["CLASSE", "ITEM", "VALOR DINHEIRO", "VALOR CARTÃO\r\n(+10%)"],
+        ["ODONTO", "SERVICO TESTE A", 140, 154],
+        ["ODONTO", "CONSULTA TESTE", 40, 44],
+      ]),
+      { nomeArquivo: "odonto.xlsx" },
+    );
+    expect(r.colunas["Cartão (R$)"]).toBe("VALOR CARTÃO\r\n(+10%)");
+    expect(r.colunas["% do médico"]).toBeNull();
+    expect(r.linhas.map((l) => [l.nome, l.valorDinheiro, l.valorCartao])).toEqual([
+      ["SERVICO TESTE A", 140, 154],
+      ["CONSULTA TESTE", 40, 44],
+    ]);
+  });
+
+  it("sem coluna Categoria: existente mantém a sua, novo segue a especialidade", () => {
+    const predominante = categoriaPredominante([
+      { grupo: "ODONTO", tipo: "procedimento" },
+      { grupo: "ODONTO", tipo: "procedimento" },
+      { grupo: "ODONTO", tipo: "consulta" },
+      { grupo: "EMPATE", tipo: "exame" },
+      { grupo: "EMPATE", tipo: "procedimento" },
+    ]);
+    const deduzida = {
+      categoria: "exame" as const,
+      categoriaDeduzida: true,
+      especialidade: "Odonto",
+    };
+    expect(categoriaParaGravar(deduzida, "procedimento", predominante)).toBe("procedimento");
+    expect(categoriaParaGravar(deduzida, null, predominante)).toBe("procedimento");
+    expect(categoriaParaGravar({ ...deduzida, categoria: "consulta" }, null, predominante)).toBe(
+      "consulta",
+    );
+    expect(categoriaParaGravar({ ...deduzida, especialidade: "EMPATE" }, null, predominante)).toBe(
+      "exame",
+    );
+    // Coluna Categoria na planilha sempre vale.
+    expect(
+      categoriaParaGravar({ ...deduzida, categoriaDeduzida: false }, "procedimento", predominante),
+    ).toBe("exame");
   });
 });

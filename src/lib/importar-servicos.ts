@@ -389,6 +389,53 @@ export function deduzirCategoria(
   return "exame";
 }
 
+/**
+ * Categoria que predomina em cada especialidade do catálogo da clínica
+ * (chave = `chaveTexto` da especialidade). Empate não define nada.
+ */
+export function categoriaPredominante(
+  servicos: { grupo: string | null; tipo: string | null }[],
+): Map<string, CategoriaServico> {
+  const contagem = new Map<string, Map<CategoriaServico, number>>();
+  for (const s of servicos) {
+    const k = chaveTexto(s.grupo);
+    const tipo = normalizarCategoria(s.tipo);
+    if (!k || !s.tipo || !tipo) continue;
+    const porTipo = contagem.get(k) ?? new Map<CategoriaServico, number>();
+    porTipo.set(tipo, (porTipo.get(tipo) ?? 0) + 1);
+    contagem.set(k, porTipo);
+  }
+  const saida = new Map<string, CategoriaServico>();
+  for (const [k, porTipo] of contagem) {
+    const ordenado = [...porTipo].sort((a, b) => b[1] - a[1]);
+    if (ordenado.length > 1 && ordenado[0][1] === ordenado[1][1]) continue;
+    saida.set(k, ordenado[0][0]);
+  }
+  return saida;
+}
+
+/**
+ * Categoria que vai para o banco. Com coluna Categoria na planilha, vale a
+ * planilha. Sem ela, a dedução pelo nome/grupo é só um palpite ("exame" na
+ * falta de pista), e um palpite não pode reescrever o catálogo:
+ * - serviço que já existe mantém a categoria que tem;
+ * - serviço novo segue a categoria que predomina na especialidade dele
+ *   (Odontologia é "procedimento"), salvo quando o nome/grupo diz "consulta".
+ * Em 15/10/2026 a planilha de Odontologia (sem coluna Categoria) virou 211
+ * procedimentos em "exame" por falta desta regra.
+ */
+export function categoriaParaGravar(
+  linha: Pick<LinhaServico, "categoria" | "categoriaDeduzida" | "especialidade">,
+  categoriaAtual: string | null | undefined,
+  predominante: Map<string, CategoriaServico>,
+): CategoriaServico {
+  if (!linha.categoriaDeduzida) return linha.categoria;
+  const atual = normalizarCategoria(categoriaAtual);
+  if (categoriaAtual && atual) return atual;
+  if (linha.categoria === "consulta") return "consulta";
+  return predominante.get(chaveTexto(linha.especialidade)) ?? linha.categoria;
+}
+
 /** A unidade da linha é a clínica aberta? Célula vazia conta como sim. */
 export function unidadeConfere(unidade: unknown, nomeClinica: string | undefined): boolean {
   // "Policlínica" sozinho não identifica unidade nenhuma: sem tirar essas
@@ -451,8 +498,11 @@ export async function lerPlanilhaServicos(
   const todosCabecalhos = brutas.length ? Object.keys(brutas[0]) : [];
   // Cabeçalho com "%" ("% MÉDICO", "% SERVIÇO") só vale para percentual: sem
   // o símbolo, "% SERVIÇO" viraria a coluna do nome e "% MÉDICO" a do repasse.
-  const cabecalhos = todosCabecalhos.filter((h) => !h.includes("%"));
-  const percentuais = todosCabecalhos.filter((h) => h.includes("%"));
+  // O "%" entre parênteses só explica o valor ("VALOR CARTÃO (+10%)", planilha
+  // da Odontologia de 15/10/2026) e não faz da coluna um percentual.
+  const ehPercentual = (h: string) => h.replace(/\([^)]*\)/g, "").includes("%");
+  const cabecalhos = todosCabecalhos.filter((h) => !ehPercentual(h));
+  const percentuais = todosCabecalhos.filter(ehPercentual);
   const col = {
     nome: acharColuna(cabecalhos, COLUNAS.nome),
     especialidade: acharColuna(cabecalhos, COLUNAS.especialidade),
