@@ -32,6 +32,22 @@ export function perguntaEmVezDosDados(mensagem: string): boolean {
   );
 }
 
+/**
+ * A mensagem que escolhe também pergunta algo ("quinta com a Eneida, no débito
+ * é 150?", "sábado cedo, é por ordem de chegada?"): a Nina responde primeiro e
+ * pede os dados na mesma mensagem (homologação 15/10/2026, ~60 ciclos em que a
+ * pergunta ficava sem resposta).
+ */
+export function perguntaJuntoDaEscolha(mensagem: string): boolean {
+  if ((mensagem ?? "").includes("?")) return true;
+  return /\b(?:quanto (?:custa|e|fica)|qual (?:o |a )?(?:valor|preco|horario|dia)|que (?:dia|dias|horas)|precisa (?:de |marcar|agendar|levar|jejum|pedido|chegar)|aceita[m]?|(?:no|pelo|e no|e) (?:debito|credito)\w* (?:tb|tambem|tbm|pode|e|fica|da)|(?:debito|credito)\w* (?:tb|tambem|tbm|pode la|na hora|la)|e por (?:ordem|chegada|hora)|e (?:chegada|hora marcada)|tem (?:jejum|preparo|estacionamento)|pago (?:la|na hora|no dia)|posso (?:pagar|levar|ir|chegar))\b/.test(
+    normalizarRespostaInformal(mensagem ?? ""),
+  );
+}
+
+export const INSTRUCAO_RESPONDER_E_ENCAMINHAR =
+  "O paciente escolheu o atendimento e, na mesma mensagem, fez uma pergunta. Responda somente a pergunta, com o que o cadastro traz (débito e crédito à vista têm o valor de Pix/cartão). Não peça nome nem data de nascimento, não pergunte nada no final e não diga que vai encaminhar: o sistema pede os dados logo depois da sua resposta.";
+
 export const REGRA_RESPONDER_ANTES_DA_TRANSFERENCIA = `TRANSFERENCIA AGUARDANDO DADOS — REGRA INEGOCIAVEL:
 - A transferencia para a equipe ja foi pedida. O paciente fez uma pergunta em vez de enviar nome e data de nascimento.
 - Responda somente a pergunta, com o que o cadastro traz. Nao peca nome nem data de nascimento de novo, nao pergunte nada no final e nao diga que vai encaminhar: o sistema transfere logo depois da sua resposta.`;
