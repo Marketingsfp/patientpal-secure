@@ -942,6 +942,12 @@ function Page() {
   const [openAbrir, setOpenAbrir] = useState(false);
   const [openMov, setOpenMov] = useState<{ tipo: MovTipo } | null>(null);
   const [openFechar, setOpenFechar] = useState(false);
+  /** Segunda etapa do fechamento: "Encerrar" só pede confirmação, e o caixa
+   *  fecha no botão do quadro de confirmação. O modal abre com todas as formas
+   *  já preenchidas e um Enter em qualquer campo aciona o botão principal
+   *  (KeyboardShortcuts → data-primary), então um toque só encerrava o caixa —
+   *  foi o fechamento não percebido das 09:42 de 14/10/2026. */
+  const [confirmandoFechamento, setConfirmandoFechamento] = useState(false);
   /** Papel do comprovante de fechamento. Continua em bobina 80mm por padrão:
    *  o fechamento é impresso numa impressora diferente da que a recepção usa
    *  para os recibos do financeiro (esses sim vão para folha A4). Quem quiser
@@ -3615,8 +3621,14 @@ function Page() {
     void load();
   };
 
-  const fecharCaixa = async (e: FormEvent) => {
+  const pedirConfirmacaoFechamento = (e: FormEvent) => {
     e.preventDefault();
+    if (saving || formasNegativasFechamento.length > 0) return;
+    setConfirmandoFechamento(true);
+  };
+
+  const fecharCaixa = async () => {
+    setConfirmandoFechamento(false);
     if (!minhaSessao || !clinicaAtual || !user) return;
     // Trava: forma de pagamento negativa não pode virar fechamento "confere".
     // Ver formasNegativasFechamento — o caixa precisa ser corrigido antes.
@@ -4437,6 +4449,7 @@ function Page() {
                           if (minhaSessao) {
                             setConferidoOwn(conferenciaInicial(porFormaDoDiaFechamento));
                           }
+                          setConfirmandoFechamento(false);
                           setOpenFechar(true);
                         }}
                       >
@@ -5772,7 +5785,13 @@ function Page() {
       </Dialog>
 
       {/* === Modal Fechar === */}
-      <Dialog open={openFechar} onOpenChange={setOpenFechar}>
+      <Dialog
+        open={openFechar}
+        onOpenChange={(o) => {
+          setOpenFechar(o);
+          if (!o) setConfirmandoFechamento(false);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Fechar caixa</DialogTitle>
@@ -5887,7 +5906,7 @@ function Page() {
               </p>
             </div>
           )}
-          <form onSubmit={fecharCaixa} className="space-y-3">
+          <form onSubmit={pedirConfirmacaoFechamento} className="space-y-3">
             <div>
               <Label>Dia a fechar</Label>
               {/* Campo fixo, de propósito.
@@ -6057,19 +6076,54 @@ function Page() {
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                variant="destructive"
-                disabled={saving || formasNegativasFechamento.length > 0}
-                data-primary
-              >
-                <Printer className="h-4 w-4 mr-2" /> Encerrar e imprimir fechamento
-              </Button>
-            </DialogFooter>
+            {confirmandoFechamento ? (
+              // Sem data-primary e fora do submit do form: Enter num campo não
+              // chega aqui, só o clique (ou Enter com o foco no próprio botão).
+              <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 space-y-3">
+                <p className="text-sm font-bold text-destructive">
+                  Tem certeza que quer FECHAR o caixa agora?
+                </p>
+                <p className="text-xs">
+                  Agora são{" "}
+                  <strong>
+                    {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </strong>
+                  . Depois de fechado, este caixa só volta a abrir pelo gestor, e o próximo
+                  recebimento abre um caixa novo.
+                </p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setConfirmandoFechamento(false)}
+                  >
+                    Não, voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={saving || formasNegativasFechamento.length > 0}
+                    onClick={() => void fecharCaixa()}
+                  >
+                    <Printer className="h-4 w-4 mr-2" /> Sim, fechar e imprimir
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={saving || formasNegativasFechamento.length > 0}
+                  data-primary
+                >
+                  <Printer className="h-4 w-4 mr-2" /> Encerrar e imprimir fechamento
+                </Button>
+              </DialogFooter>
+            )}
           </form>
         </DialogContent>
       </Dialog>
