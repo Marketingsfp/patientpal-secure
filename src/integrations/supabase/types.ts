@@ -7222,6 +7222,192 @@ export type Database = {
           },
         ]
       }
+      importacao_legado_erros: {
+        Row: {
+          chave: string | null
+          clinica_id: string
+          created_at: string
+          execucao_id: string
+          id: number
+          linha: number | null
+          motivo: string
+          tipo: string
+        }
+        Insert: {
+          chave?: string | null
+          clinica_id: string
+          created_at?: string
+          execucao_id: string
+          id?: number
+          linha?: number | null
+          motivo: string
+          tipo?: string
+        }
+        Update: {
+          chave?: string | null
+          clinica_id?: string
+          created_at?: string
+          execucao_id?: string
+          id?: number
+          linha?: number | null
+          motivo?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_legado_erros_execucao_id_fkey"
+            columns: ["execucao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_legado_execucoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importacao_legado_execucoes: {
+        Row: {
+          arquivo_nome: string
+          arquivo_tamanho: number
+          atualizadas: number
+          clinica_id: string
+          concluido_em: string | null
+          created_at: string
+          erros: number
+          id: string
+          ignoradas: number
+          iniciado_por: string | null
+          inseridas: number
+          lidas: number
+          orfaos: number
+          status: string
+          tipo: string
+          ultima_linha: number
+          updated_at: string
+        }
+        Insert: {
+          arquivo_nome: string
+          arquivo_tamanho: number
+          atualizadas?: number
+          clinica_id: string
+          concluido_em?: string | null
+          created_at?: string
+          erros?: number
+          id?: string
+          ignoradas?: number
+          iniciado_por?: string | null
+          inseridas?: number
+          lidas?: number
+          orfaos?: number
+          status?: string
+          tipo: string
+          ultima_linha?: number
+          updated_at?: string
+        }
+        Update: {
+          arquivo_nome?: string
+          arquivo_tamanho?: number
+          atualizadas?: number
+          clinica_id?: string
+          concluido_em?: string | null
+          created_at?: string
+          erros?: number
+          id?: string
+          ignoradas?: number
+          iniciado_por?: string | null
+          inseridas?: number
+          lidas?: number
+          orfaos?: number
+          status?: string
+          tipo?: string
+          ultima_linha?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_legado_execucoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importacao_legado_profissionais: {
+        Row: {
+          casado_por: string | null
+          clinica_id: string
+          codigo_pessoa: string
+          cpf_digits: string | null
+          medico_id: string | null
+          nome: string | null
+          sem_medico: boolean
+          updated_at: string
+        }
+        Insert: {
+          casado_por?: string | null
+          clinica_id: string
+          codigo_pessoa: string
+          cpf_digits?: string | null
+          medico_id?: string | null
+          nome?: string | null
+          sem_medico?: boolean
+          updated_at?: string
+        }
+        Update: {
+          casado_por?: string | null
+          clinica_id?: string
+          codigo_pessoa?: string
+          cpf_digits?: string | null
+          medico_id?: string | null
+          nome?: string | null
+          sem_medico?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_legado_profissionais_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "importacao_legado_profissionais_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importacao_legado_responsaveis: {
+        Row: {
+          clinica_id: string
+          codigo_pessoa: string
+          codigo_responsavel: string
+          resultado: string | null
+        }
+        Insert: {
+          clinica_id: string
+          codigo_pessoa: string
+          codigo_responsavel: string
+          resultado?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          codigo_pessoa?: string
+          codigo_responsavel?: string
+          resultado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_legado_responsaveis_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intake_rate_limit: {
         Row: {
           chave: string
@@ -13984,6 +14170,69 @@ export type Database = {
           },
         ]
       }
+      paciente_observacoes_legado: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          data: string | null
+          data_ate: string | null
+          data_observacao: string | null
+          id: string
+          legado_id: string
+          origem: string
+          paciente_id: string
+          situacao: string | null
+          texto: string | null
+          tipo: string | null
+          usuario_legado: string | null
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          data?: string | null
+          data_ate?: string | null
+          data_observacao?: string | null
+          id?: string
+          legado_id: string
+          origem?: string
+          paciente_id: string
+          situacao?: string | null
+          texto?: string | null
+          tipo?: string | null
+          usuario_legado?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          data?: string | null
+          data_ate?: string | null
+          data_observacao?: string | null
+          id?: string
+          legado_id?: string
+          origem?: string
+          paciente_id?: string
+          situacao?: string | null
+          texto?: string | null
+          tipo?: string | null
+          usuario_legado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paciente_observacoes_legado_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paciente_observacoes_legado_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pacientes: {
         Row: {
           alerta_critico: boolean
@@ -15057,6 +15306,8 @@ export type Database = {
           hipotese_diagnostica: string | null
           historia_doenca: string | null
           id: string
+          legado_id: string | null
+          legado_origem: string | null
           medico_id: string | null
           observacoes: string | null
           paciente_id: string
@@ -15075,6 +15326,8 @@ export type Database = {
           hipotese_diagnostica?: string | null
           historia_doenca?: string | null
           id?: string
+          legado_id?: string | null
+          legado_origem?: string | null
           medico_id?: string | null
           observacoes?: string | null
           paciente_id: string
@@ -15093,6 +15346,8 @@ export type Database = {
           hipotese_diagnostica?: string | null
           historia_doenca?: string | null
           id?: string
+          legado_id?: string | null
+          legado_origem?: string | null
           medico_id?: string | null
           observacoes?: string | null
           paciente_id?: string
@@ -16672,6 +16927,11 @@ export type Database = {
           mesclados: number
         }[]
       }
+      _imp_date: { Args: { _t: string }; Returns: string }
+      _imp_legado_eh_admin: { Args: { _clinica: string }; Returns: boolean }
+      _imp_norm_nome: { Args: { _t: string }; Returns: string }
+      _imp_ts: { Args: { _t: string }; Returns: string }
+      _imp_txt: { Args: { _j: Json; _k: string }; Returns: string }
       _mj_apply_batch: { Args: { p_limit?: number }; Returns: number }
       _mj_null_all: { Args: never; Returns: number }
       _mj_set_batch: { Args: { _limit?: number }; Returns: number }
@@ -17903,6 +18163,85 @@ export type Database = {
         }
         Returns: string
       }
+      importacao_legado_aplicar_responsaveis: {
+        Args: { _clinica: string; _limite?: number }
+        Returns: Json
+      }
+      importacao_legado_associar_profissional: {
+        Args: {
+          _clinica: string
+          _codigo_pessoa: string
+          _medico_id: string
+          _sem_medico?: boolean
+        }
+        Returns: undefined
+      }
+      importacao_legado_concluir: {
+        Args: { _execucao: string }
+        Returns: {
+          arquivo_nome: string
+          arquivo_tamanho: number
+          atualizadas: number
+          clinica_id: string
+          concluido_em: string | null
+          created_at: string
+          erros: number
+          id: string
+          ignoradas: number
+          iniciado_por: string | null
+          inseridas: number
+          lidas: number
+          orfaos: number
+          status: string
+          tipo: string
+          ultima_linha: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "importacao_legado_execucoes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      importacao_legado_iniciar: {
+        Args: {
+          _arquivo_nome: string
+          _arquivo_tamanho: number
+          _clinica: string
+          _tipo: string
+        }
+        Returns: {
+          arquivo_nome: string
+          arquivo_tamanho: number
+          atualizadas: number
+          clinica_id: string
+          concluido_em: string | null
+          created_at: string
+          erros: number
+          id: string
+          ignoradas: number
+          iniciado_por: string | null
+          inseridas: number
+          lidas: number
+          orfaos: number
+          status: string
+          tipo: string
+          ultima_linha: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "importacao_legado_execucoes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      importacao_legado_lote: {
+        Args: { _execucao: string; _linha_final: number; _linhas: Json }
+        Returns: Json
+      }
+      importacao_legado_resumo: { Args: { _clinica: string }; Returns: Json }
       intake_consumir_rate_limit: {
         Args: {
           _chave: string
