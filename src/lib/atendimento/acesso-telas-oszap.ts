@@ -11,6 +11,7 @@ const ABAS_RESTRITAS = new Set([
   "ambiente-testes",
   "config",
   "templates",
+  "ligacao", // Demonstração da Nina por voz.
 ]);
 const ROTAS_RESTRITAS = [
   "/app/francisco",

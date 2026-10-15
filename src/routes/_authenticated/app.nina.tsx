@@ -75,6 +75,9 @@ const VozNina = lazy(() =>
 const DashboardOsZap = lazy(() =>
   import("@/components/nina/DashboardOsZap").then((m) => ({ default: m.DashboardOsZap })),
 );
+const LigacaoNina = lazy(() =>
+  import("@/components/nina/LigacaoNina").then((m) => ({ default: m.LigacaoNina })),
+);
 
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
@@ -124,6 +127,7 @@ function NinaPage() {
     "informacoes-clinica",
     "base-conhecimento",
     "voz-nina",
+    "ligacao",
   ].includes(hashAba)
     ? hashAba === "chat"
       ? "atend-inbox"
@@ -264,6 +268,19 @@ function NinaPage() {
             }
           >
             <VozNina key={clinicaId} />
+          </Suspense>
+        </TabsContent>
+
+        {/* ============ LIGAÇÃO (demonstração por voz) ============ */}
+        <TabsContent value="ligacao">
+          <Suspense
+            fallback={
+              <p role="status" className="p-6 text-sm text-muted-foreground">
+                Carregando ligação…
+              </p>
+            }
+          >
+            <LigacaoNina key={clinicaId} />
           </Suspense>
         </TabsContent>
       </Tabs>
