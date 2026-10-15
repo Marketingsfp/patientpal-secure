@@ -51,7 +51,13 @@ for (const ambiente of ["producao", "homologacao"]) {
         expect(entrada).toContain("sem perguntar de novo se quer agendar");
         expect(entrada).not.toContain("não cria, por si só, bloqueio");
       } else expect(entrada).not.toContain("SOLICITAR_FOTO_PEDIDO_MEDICO");
-      const solicita = caso === "consulta" || caso.startsWith("obrigatorio") || caso === "legado";
+      // "solicitado": já pedido uma vez e sem foto, o sistema pede a segunda vez
+      // (regra da clínica de 15/10/2026).
+      const solicita =
+        caso === "consulta" ||
+        caso.startsWith("obrigatorio") ||
+        caso === "legado" ||
+        caso === "solicitado";
       expect(r.resposta.includes("Pode enviar uma foto legível do pedido médico por aqui?")).toBe(
         solicita,
       );

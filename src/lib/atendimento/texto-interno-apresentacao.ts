@@ -54,6 +54,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
       "O paciente solicitou remarcação. A Nina encaminhou para a equipe humana realizar a alteração; não remarcou nem cancelou a reserva anterior.",
     ],
     [
+      /\bPEDIDO_MEDICO_NAO_ENVIADO\b/i,
+      "A Nina pediu a foto do pedido médico (obrigatório para este atendimento) e o paciente não enviou. A equipe deve solicitar o pedido e continuar o atendimento.",
+    ],
+    [
       /\bINFORMACAO_COM_RECEPCAO\b/i,
       "O paciente pediu uma informação que não está no cadastro da Nina. A recepção responde.",
     ],

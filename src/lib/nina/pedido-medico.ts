@@ -170,3 +170,56 @@ export function atualizarSolicitacoesPedido(
   const manter = novaSolicitacao ? [] : anteriores.filter((p) => !ids.has(p.id));
   return [...manter, ...avaliarPedidoMedico(resultado, ctx)];
 }
+
+/**
+ * Regra da clínica (15/10/2026): o pedido médico pode mudar valores e condições
+ * do exame ou procedimento, então precisa chegar no atendimento. A Nina pede a
+ * foto duas vezes; sem a foto depois do segundo pedido, a conversa vai direto
+ * para a equipe (qualquer que seja o motivo: não tem, depois, original…).
+ */
+export const MOTIVO_PEDIDO_NAO_ENVIADO = "PEDIDO_MEDICO_NAO_ENVIADO";
+
+export type PedidoMedicoPendente = { nome: string; vezes: number; pergunta: string };
+
+const SOLICITACAO_DO_SISTEMA =
+  /Para (.+?), é necessário pedido médico\.\s+Pode enviar uma foto legível do pedido médico por aqui\?/;
+
+/**
+ * Foto do pedido pedida pelo sistema nesta sessão e ainda não recebida (nenhuma
+ * imagem do paciente depois do último pedido). `vezes` conta os pedidos feitos.
+ */
+export function pedidoMedicoPendente(
+  mensagens: readonly Mensagem[],
+  ctx: { conversaId: string | null; inicioSessao: string | null; teste: boolean },
+): PedidoMedicoPendente | null {
+  const inicio = Date.parse(ctx.inicioSessao ?? "");
+  const lista = mensagens
+    .filter(
+      (m) =>
+        ctx.conversaId &&
+        m.conversa_id === ctx.conversaId &&
+        (!Number.isFinite(inicio) || Date.parse(m.created_at ?? "") >= inicio) &&
+        (ctx.teste ? m.is_teste === true : m.is_teste !== true),
+    )
+    .sort((a, b) => Date.parse(a.created_at ?? "") - Date.parse(b.created_at ?? ""));
+  let ultimo: { nome: string; pergunta: string; pos: number } | null = null;
+  let vezes = 0;
+  lista.forEach((m, pos) => {
+    if (m.direction === "in") return;
+    const achado = SOLICITACAO_DO_SISTEMA.exec(m.body ?? "");
+    if (!achado) return;
+    vezes += 1;
+    const nome = achado[1]!.trim();
+    ultimo = {
+      nome,
+      pergunta: `Para ${nome}, é necessário pedido médico. Pode enviar uma foto legível do pedido médico por aqui?`,
+      pos,
+    };
+  });
+  if (!ultimo) return null;
+  const { nome, pergunta, pos } = ultimo as { nome: string; pergunta: string; pos: number };
+  const imagemDepois = lista
+    .slice(pos + 1)
+    .some((m) => m.direction === "in" && (m.tipo === "image" || m.tipo === "document"));
+  return imagemDepois ? null : { nome, vezes, pergunta };
+}

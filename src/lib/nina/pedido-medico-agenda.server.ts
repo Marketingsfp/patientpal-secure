@@ -54,6 +54,6 @@ export async function conferirPedidoMedicoAgenda(
     aguardando_paciente: true,
     pedido_medico_do_turno: solicitacoes,
     instrucao:
-      "Aguarde a foto legível do pedido deste exame. Não consulte nem ofereça vagas, não selecione horário e não reserve. Responda dúvidas informativas com fatos publicados. Se a foto já foi solicitada, não repita a pergunta nem encaminhe apenas por essa pendência; se ainda não foi solicitada, peça o pedido médico.",
+      "Aguarde a foto legível do pedido deste exame. Não consulte nem ofereça vagas, não selecione horário e não reserve. Responda dúvidas informativas com fatos publicados. Se a foto já foi solicitada, não repita a pergunta: o sistema pede de novo uma vez e, sem a foto, encaminha para a equipe; se ainda não foi solicitada, peça o pedido médico.",
   };
 }

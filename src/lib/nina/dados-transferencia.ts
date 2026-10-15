@@ -127,6 +127,8 @@ export function transferenciaDispensaDados(p: {
 }): boolean {
   if (p.urgencia === "alta" || p.avisarPaciente === false || p.pedidoExplicitoAtendente)
     return true;
+  // Pedido médico não enviado: a equipe assume direto (regra de 15/10/2026).
+  if (/^\s*(?:\[[^\]]*\]\s*)?PEDIDO_MEDICO_NAO_ENVIADO\b/.test(p.motivo ?? "")) return true;
   const motivo = normalizarRespostaInformal(p.motivo ?? "");
   return /urgen|emergen|reclama|(?:solicitou|pediu|quer|deseja|pedido explicito (?:de|por)|pedido (?:de|por)) (?:falar com |um |uma |o |a )?(?:atendente|humano|pessoa|atendimento humano)|falar com (?:um |uma )?(?:atendente|humano|pessoa)/.test(
     motivo,
