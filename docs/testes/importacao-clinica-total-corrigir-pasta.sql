@@ -22,7 +22,7 @@ BEGIN
   PERFORM set_config('app.skip_telefone_check', '1', true);
   INSERT INTO public.clinicas (nome) VALUES ('CLINICA TESTE PASTA') RETURNING id INTO c;
   INSERT INTO public.pacientes (clinica_id, nome, codigo_prontuario) VALUES (c, 'JA EXISTIA TESTE', '9000');
-  INSERT INTO public.medicos (clinica_id, nome, crm) VALUES (c, 'DRA TESTE', 'TESTE0') RETURNING id INTO v_med;
+  INSERT INTO public.medicos (clinica_id, nome, crm, crm_uf) VALUES (c, 'DRA TESTE', 'TESTE0', 'RS') RETURNING id INTO v_med;
 
   -- Etapas 1–4 como foram rodadas.
   ex := (public.importacao_legado_iniciar(c, 'profissionais', 'prof.jsonl', 1)).id;
