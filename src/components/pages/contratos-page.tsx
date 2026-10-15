@@ -1752,7 +1752,8 @@ export function ContratosPage({
               <strong>Troca de convênio</strong>: o paciente desiste do convênio atual antes do fim
               do ciclo para aderir a outro — cancela o contrato atual e as mensalidades pendentes.
               <br />
-              Em ambos os casos, não há cobrança de taxa de adesão e a carência não se aplica.
+              Em ambos os casos, não há cobrança de taxa de adesão. A carência não se aplica, exceto
+              na renovação feita mais de 3 meses depois do fim do contrato — aí ela recomeça.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row sm:justify-end gap-2">
