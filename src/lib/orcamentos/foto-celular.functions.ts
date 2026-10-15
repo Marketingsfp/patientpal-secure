@@ -119,7 +119,9 @@ export const enviarFotoCelular = createServerFn({ method: "POST" })
           clinica_id: s.clinica_id,
           sessao_id: s.id,
           mime_recebido: /^data:([^;]{1,100});/.exec(data.arquivo)?.[1] ?? null,
-          bytes_enviados: Math.floor(((data.arquivo.length - data.arquivo.indexOf(",") - 1) * 3) / 4),
+          bytes_enviados: Math.floor(
+            ((data.arquivo.length - data.arquivo.indexOf(",") - 1) * 3) / 4,
+          ),
           largura_original: data.meta?.larguraOriginal ?? null,
           altura_original: data.meta?.alturaOriginal ?? null,
           largura_enviada: data.meta?.larguraEnviada ?? null,
