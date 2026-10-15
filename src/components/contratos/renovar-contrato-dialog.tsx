@@ -35,6 +35,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { hojeBR, formatDatePura } from "@/lib/date-utils";
+import { limiteJanelaRenovacao, renovacaoReiniciaCarencia } from "@/lib/cartao/renovacao-carencia";
 
 const BRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -199,6 +200,8 @@ export function RenovarContratoDialog({
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [erroRenovacao, setErroRenovacao] = useState<RenovacaoError | null>(null);
   const [dataRenovacao, setDataRenovacao] = useState<string>(hojeBR());
+  /** Fim do contrato que está sendo renovado — base da janela de 3 meses. */
+  const [fimAnterior, setFimAnterior] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -207,9 +210,16 @@ export function RenovarContratoDialog({
     setConfirmacaoAberta(false);
     setErroRenovacao(null);
     setDataRenovacao(hojeBR());
+    setFimAnterior(null);
 
     (async () => {
-      const [{ data: conv }, { data: depsData }, { data: faixasData }] = await Promise.all([
+      const [
+        { data: conv },
+        { data: depsData },
+        { data: faixasData },
+        { data: contratoAtual },
+        { data: ultimaParcela },
+      ] = await Promise.all([
         supabase
           .from("cb_convenios")
           .select(
@@ -228,7 +238,18 @@ export function RenovarContratoDialog({
           .from("cb_convenio_faixas")
           .select("id, convenio_id, vidas_de, vidas_ate, valor_mensal")
           .order("vidas_de"),
+        supabase.from("contratos_assinatura").select("data_fim").eq("id", contratoId).maybeSingle(),
+        // Mesma reserva do banco quando o contrato não tem data de fim.
+        supabase
+          .from("contrato_mensalidades")
+          .select("vencimento")
+          .eq("contrato_id", contratoId)
+          .gt("numero_parcela", 0)
+          .order("vencimento", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
+      setFimAnterior(contratoAtual?.data_fim ?? ultimaParcela?.vencimento ?? null);
       setConvenios((conv ?? []) as Convenio[]);
       setFaixas((faixasData ?? []) as Faixa[]);
       const lista = (depsData ?? []) as DepExistente[];
@@ -314,6 +335,9 @@ export function RenovarContratoDialog({
 
   const hoje = hojeBR();
   const retroativa = !!dataRenovacao && dataRenovacao < hoje;
+  // Troca de convênio acontece no meio do ciclo e segue sem carência; a
+  // janela de 3 meses vale só para a renovação.
+  const carenciaReinicia = !isTroca && renovacaoReiniciaCarencia(fimAnterior, dataRenovacao);
 
   const podeConfirmar =
     !saving && !!novoConvenioId && !depsIncompletos && (faixasDoConvenio.length === 0 || !!faixaId);
@@ -414,6 +438,8 @@ export function RenovarContratoDialog({
         toast.success(
           `Contrato renovado — ${(data as any)?.parcelas_geradas ?? parcelasRenovacao} novas parcelas geradas`,
         );
+        if ((data as { carencia_reiniciada?: boolean } | null)?.carencia_reiniciada)
+          toast.info("Renovação após 3 meses do fim do contrato: a carência recomeçou.");
         onRenovado({ tipo: "extensao" });
       } else {
         const { data, error } = await (supabase.rpc as any)("renovar_contrato_troca_plano", {
@@ -427,6 +453,8 @@ export function RenovarContratoDialog({
         });
         if (error) throw error;
         toast.success("Novo contrato criado a partir da renovação");
+        if ((data as { carencia_reiniciada?: boolean } | null)?.carencia_reiniciada)
+          toast.info("Renovação após 3 meses do fim do contrato: a carência recomeçou.");
         onRenovado({
           tipo: "troca_plano",
           contratoNovoId: (data as any)?.contrato_novo_id ?? null,
@@ -488,7 +516,7 @@ export function RenovarContratoDialog({
                   ? "Sem taxa de adesão e sem carência. O contrato atual será cancelado."
                   : mode === "extensao"
                     ? "Mesmo convênio: estende este contrato sem cobrar taxa de adesão."
-                    : "Convênio diferente: cria um novo contrato e cobra a taxa de adesão do convênio escolhido."}
+                    : "Convênio diferente: cria um novo contrato, sem cobrar taxa de adesão."}
               </p>
             </div>
             <div className="space-y-1.5">
@@ -638,6 +666,10 @@ export function RenovarContratoDialog({
               </p>
             )}
           </div>
+
+          {!isTroca && fimAnterior ? (
+            <AvisoCarencia reinicia={carenciaReinicia} fimAnterior={fimAnterior} />
+          ) : null}
         </div>
 
         <DialogFooter>
@@ -701,6 +733,10 @@ export function RenovarContratoDialog({
                 </span>
               </div>
             </div>
+
+            {!isTroca && fimAnterior ? (
+              <AvisoCarencia reinicia={carenciaReinicia} fimAnterior={fimAnterior} />
+            ) : null}
 
             <div className="rounded-md border p-3 space-y-2">
               <div className="font-medium">Dependentes</div>
@@ -780,6 +816,31 @@ export function RenovarContratoDialog({
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
+  );
+}
+
+/** Diz à atendente, antes de confirmar, se a carência do paciente se mantém
+ *  ou recomeça — pela janela de 3 meses depois do fim do contrato anterior. */
+function AvisoCarencia({ reinicia, fimAnterior }: { reinicia: boolean; fimAnterior: string }) {
+  const limite = formatDatePura(limiteJanelaRenovacao(fimAnterior));
+  return reinicia ? (
+    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+      <div className="flex items-center gap-2 font-medium text-sm">
+        <AlertTriangle className="h-4 w-4" />
+        Carência recomeça
+      </div>
+      <p>
+        O contrato anterior terminou em {formatDatePura(fimAnterior)} e a renovação passou do prazo
+        de 3 meses (até {limite}). As carências voltam a contar do zero, como num contrato novo. A
+        taxa de adesão continua isenta.
+      </p>
+    </div>
+  ) : (
+    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+      <span className="font-medium">Carência mantida.</span> Renovação dentro de 3 meses do fim do
+      contrato anterior ({formatDatePura(fimAnterior)}, prazo até {limite}): o paciente continua sem
+      carência e sem taxa de adesão.
+    </div>
   );
 }
 

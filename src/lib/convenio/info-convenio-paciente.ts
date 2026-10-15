@@ -92,7 +92,7 @@ export async function obterInfoConvenioPaciente(params: {
   const { data: titularContratos } = await supabase
     .from("contratos_assinatura")
     .select(
-      "id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,created_at,titular_apenas_financeiro,cb_convenios(nome)",
+      "id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,carencia_desde,data_inicio,renovado_em,created_at,titular_apenas_financeiro,cb_convenios(nome)",
     )
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
@@ -110,6 +110,8 @@ export async function obterInfoConvenioPaciente(params: {
     contrato_origem_id?: string | null;
     numero_renovacoes?: number | null;
     sem_carencia?: boolean | null;
+    /** Renovação com mais de 3 meses de atraso: a carência recomeça nesta data. */
+    carencia_desde?: string | null;
     data_inicio?: string | null;
     renovado_em?: string | null;
     created_at?: string | null;
@@ -130,7 +132,7 @@ export async function obterInfoConvenioPaciente(params: {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
       .select(
-        "contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,created_at,cb_convenios(nome))",
+        "contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,carencia_desde,data_inicio,renovado_em,created_at,cb_convenios(nome))",
       )
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
@@ -186,12 +188,16 @@ export async function obterInfoConvenioPaciente(params: {
   //     mês antes do cadastrado — quem tinha pago a 1ª mensalidade contava 2, e
   //     num cartão de adesão cobrada no ato bastavam os R$ 20,00 para liberar
   //     benefício sem nenhuma mensalidade paga.
-  const { count: pagasCount } = await supabase
+  //    Renovação atrasada (`carencia_desde`): a carência recomeça, então só
+  //    contam as mensalidades do novo período.
+  let pagasQuery = supabase
     .from("contrato_mensalidades")
     .select("id", { count: "exact", head: true })
     .eq("contrato_id", contrato.id)
     .eq("status", "pago")
     .gt("numero_parcela", 0);
+  if (contrato.carencia_desde) pagasQuery = pagasQuery.gte("vencimento", contrato.carencia_desde);
+  const { count: pagasCount } = await pagasQuery;
   const mensalidadesPagas = pagasCount ?? 0;
 
   // 3) Busca procedimento_id e especialidade do médico
@@ -424,9 +430,13 @@ export async function obterInfoConvenioPaciente(params: {
   // plano gerando novo contrato) não têm carência — o paciente já é cliente
   // do convênio há pelo menos um ciclo. Considera renovação quando o contrato
   // já foi renovado ao menos uma vez ou tem contrato de origem.
+  // Exceção: renovação feita mais de 3 meses depois do fim do contrato anterior
+  // grava `carencia_desde` e volta a cumprir carência como contrato novo. A
+  // isenção manual (`sem_carencia`) vale sempre.
   const isRenovacao =
-    Number((contrato as any)?.numero_renovacoes ?? 0) > 0 ||
-    !!(contrato as any)?.contrato_origem_id ||
+    ((Number((contrato as any)?.numero_renovacoes ?? 0) > 0 ||
+      !!(contrato as any)?.contrato_origem_id) &&
+      !contrato.carencia_desde) ||
     !!(contrato as any)?.sem_carencia;
   if (regraMatch && !isRenovacao && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
     const regraOriginal = regraMatch;

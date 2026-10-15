@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { filtrosOrNomeServico } from "@/lib/busca-servico";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,13 @@ import { normalizarBusca } from "@/lib/busca/relevancia";
 
 /** Teto de linhas que o banco devolve por consulta (max-rows do PostgREST). */
 const LIMITE_ORCAMENTOS = 1000;
+
+/**
+ * Colunas dos serviços do Novo orçamento. Celular: qtd | valor | lixeira (descrição e total
+ * ocupam a linha inteira). A partir de md: a tabela de sempre, em 5 colunas.
+ */
+const COLUNAS_ITENS =
+  "grid-cols-[4.5rem_minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_5rem_8rem_8rem_2.5rem]";
 
 /** Soma `dias` a uma data pura YYYY-MM-DD, sem passar pelo fuso do runtime. */
 function somarDias(dataYYYYMMDD: string, dias: number): string {
@@ -440,6 +448,8 @@ function OrcamentosCompactList({
   onAgendar,
   onImprimir,
   onConverter,
+  onHistorico,
+  onExcluir,
 }: {
   itens: Orc[];
   loading: boolean;
@@ -448,6 +458,9 @@ function OrcamentosCompactList({
   onAgendar: (o: Orc) => void;
   onImprimir: (id: string) => void;
   onConverter: (id: string) => void;
+  /** Só na tela inteira pelo celular (no split embutido não aparecem). */
+  onHistorico?: (id: string) => void;
+  onExcluir?: (id: string) => void;
 }) {
   if (loading) {
     return (
@@ -488,6 +501,8 @@ function OrcamentosCompactList({
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{o.paciente_nome}</p>
                     <p className="text-[12px] text-muted-foreground truncate">
+                      <span className="font-mono">#{String(o.numero).padStart(5, "0")}</span>
+                      {" · "}
                       {new Date(o.created_at).toLocaleDateString("pt-BR")}
                       {o.medico_nome?.trim() ? ` · ${o.medico_nome}` : ""}
                     </p>
@@ -496,7 +511,7 @@ function OrcamentosCompactList({
                     {BRL(Number(o.valor_total))}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                       realizado
@@ -518,6 +533,16 @@ function OrcamentosCompactList({
                     {podeEscrever && (
                       <IconAction label="Converter itens" onClick={() => onConverter(o.id)}>
                         <Workflow className="h-4 w-4 text-primary" />
+                      </IconAction>
+                    )}
+                    {onHistorico && (
+                      <IconAction label="Histórico" onClick={() => onHistorico(o.id)}>
+                        <History className="h-4 w-4" />
+                      </IconAction>
+                    )}
+                    {onExcluir && (
+                      <IconAction label="Excluir" onClick={() => onExcluir(o.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </IconAction>
                     )}
                     <Button size="sm" className="h-8 gap-1.5" onClick={() => onAgendar(o)}>
@@ -562,6 +587,8 @@ function OrcamentosPage() {
     const sp = new URLSearchParams(window.location.search);
     return sp.get("embed") === "1" && sp.get("compact") === "1";
   });
+  // No celular a tabela de 7 colunas não cabe: usa os mesmos cartões do modo compacto.
+  const celular = useIsMobile();
   // Embutido no split "Orçamentos + Agenda": o cabeçalho vem do painel pai.
   const [embedded] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -839,7 +866,7 @@ function OrcamentosPage() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="bg-muted/50 p-1 rounded-full border border-border/40 inline-flex gap-1">
+        <div className="bg-muted/50 p-1 rounded-2xl sm:rounded-full border border-border/40 flex flex-wrap sm:inline-flex gap-1">
           {(
             [
               ["hoje", "Dia"],
@@ -875,7 +902,7 @@ function OrcamentosPage() {
             />
           </div>
         )}
-        <div className="inline-flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {(
             [
               ["todos", "Todos"],
@@ -922,7 +949,7 @@ function OrcamentosPage() {
         </p>
       )}
 
-      {embedCompact ? (
+      {embedCompact || celular ? (
         <OrcamentosCompactList
           itens={filtered}
           loading={loading}
@@ -931,6 +958,8 @@ function OrcamentosPage() {
           onAgendar={enviarParaAgenda}
           onImprimir={(id) => void imprimir(id)}
           onConverter={(id) => setConversaoId(id)}
+          onHistorico={!embedCompact && podeVerHistorico ? setHistoricoId : undefined}
+          onExcluir={!embedCompact && podeEscrever ? (id) => void remover(id) : undefined}
         />
       ) : (
         <div className="rounded-2xl border border-border/50 bg-card shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
@@ -1957,10 +1986,10 @@ function NovoOrcamentoDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="max-w-3xl max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
+        className="max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
         overlayClassName="bg-transparent backdrop-blur-none pointer-events-none"
       >
-        <DialogHeader className="shrink-0 border-b px-6 py-4">
+        <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle>
             Novo orçamento
             {categoria && (
@@ -1978,7 +2007,7 @@ function NovoOrcamentoDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           {!categoria ? (
             <div className="py-8 space-y-4">
               <p className="text-center text-sm text-muted-foreground">
@@ -2014,12 +2043,12 @@ function NovoOrcamentoDialog({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-dashed p-2">
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-md border border-dashed p-3 sm:justify-start sm:gap-y-1 sm:p-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1"
+                  className="h-11 w-full gap-2 text-sm sm:h-8 sm:w-auto sm:gap-1"
                   disabled={lendoPedido}
                   onClick={() => fotoRef.current?.click()}
                 >
@@ -2041,7 +2070,7 @@ function NovoOrcamentoDialog({
                   <Smartphone className="h-3.5 w-3.5" />
                   Tirar com o celular
                 </Button>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-center text-xs text-muted-foreground sm:text-left">
                   Tire ou escolha a foto do pedido: paciente, médico e exames são preenchidos para
                   você conferir.
                 </span>
@@ -2092,13 +2121,15 @@ function NovoOrcamentoDialog({
               </div>
 
               {pedidoLido && (
-                <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">Lido do pedido — confira antes de gerar</span>
+                <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2 text-sm wrap-break-word">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 font-semibold">
+                      Lido do pedido — confira antes de gerar
+                    </span>
                     <button
                       type="button"
                       onClick={() => setPedidoLido(null)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="-m-2 shrink-0 p-2 text-muted-foreground hover:text-foreground"
                       aria-label="Fechar conferência do pedido"
                     >
                       <X className="h-4 w-4" />
@@ -2136,7 +2167,7 @@ function NovoOrcamentoDialog({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-xs"
+                                className="h-auto min-h-9 max-w-full whitespace-normal text-left text-xs sm:min-h-7"
                                 onClick={() => selecionarMedico(m.id)}
                               >
                                 {m.nome}
@@ -2298,7 +2329,7 @@ function NovoOrcamentoDialog({
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs"
+                            className="h-auto min-h-9 max-w-full whitespace-normal text-left text-xs sm:min-h-7"
                             onClick={() => selecionarPaciente(p)}
                           >
                             {p.nome}
@@ -2354,25 +2385,25 @@ function NovoOrcamentoDialog({
                 </div>
                 <div className="space-y-1 md:col-span-2">
                   <Label>Médico solicitante</Label>
-                  <div className="flex flex-wrap gap-1 rounded-md border p-1 w-fit">
+                  <div className="grid grid-cols-1 gap-1 rounded-md border p-1 sm:flex sm:w-fit sm:flex-wrap">
                     <button
                       type="button"
                       onClick={() => alternarMedicoExterno(false)}
-                      className={`px-3 py-1 text-sm rounded ${!medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                      className={`px-3 py-2 sm:py-1 text-sm rounded ${!medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                     >
                       Da nossa clínica
                     </button>
                     <button
                       type="button"
                       onClick={() => alternarMedicoExterno(true)}
-                      className={`px-3 py-1 text-sm rounded ${medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                      className={`px-3 py-2 sm:py-1 text-sm rounded ${medicoExterno && !medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                     >
                       De outro local
                     </button>
                     <button
                       type="button"
                       onClick={ativarParticular}
-                      className={`px-3 py-1 text-sm rounded ${medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                      className={`px-3 py-2 sm:py-1 text-sm rounded ${medicoParticular ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                     >
                       Particular
                     </button>
@@ -2434,14 +2465,14 @@ function NovoOrcamentoDialog({
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-2 rounded-md border p-2">
+                    <div className="grid grid-cols-1 gap-2 rounded-md border p-2 sm:flex sm:flex-wrap">
                       {formasDisponiveis.map((f) => {
                         const checked = formasPagamento.includes(f);
                         const disabled = !checked && formasPagamento.length >= 2;
                         return (
                           <label
                             key={f}
-                            className={`flex items-center gap-2 px-2 py-1 rounded-md text-sm border ${
+                            className={`flex items-center gap-2 px-2 py-2 sm:py-1 rounded-md text-sm border ${
                               checked
                                 ? "bg-primary/10 border-primary/40 cursor-pointer"
                                 : disabled
@@ -2511,9 +2542,9 @@ function NovoOrcamentoDialog({
                           key={p.id}
                           type="button"
                           onClick={() => adicionarProc(p)}
-                          className="w-full text-left px-3 py-2 hover:bg-muted flex justify-between items-center gap-2 border-b last:border-0"
+                          className="w-full text-left px-3 py-2 hover:bg-muted flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 border-b last:border-0"
                         >
-                          <span className="text-sm flex items-center gap-2">
+                          <span className="min-w-0 text-sm flex flex-wrap items-center gap-2">
                             {p.nome}
                             {p.preparo && p.preparo.trim() && (
                               <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
@@ -2521,7 +2552,7 @@ function NovoOrcamentoDialog({
                               </span>
                             )}
                           </span>
-                          <span className="text-sm font-semibold whitespace-nowrap flex gap-2">
+                          <span className="text-sm font-semibold whitespace-nowrap flex flex-wrap gap-x-2 sm:shrink-0">
                             {(formasPagamento.length ? formasPagamento : ["Dinheiro"]).map(
                               (f, i) => (
                                 <span
@@ -2591,21 +2622,40 @@ function NovoOrcamentoDialog({
                       </ul>
                     </div>
                   )}
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-xs font-bold uppercase tracking-wide text-primary">
-                      <tr className="text-left">
-                        <th className="px-2 py-1.5">Descrição</th>
-                        <th className="px-2 py-1.5 w-20">Qtd</th>
-                        <th className="px-2 py-1.5 w-32">Valor unit.</th>
-                        <th className="px-2 py-1.5 w-32 text-right">Total</th>
-                        <th className="px-2 py-1.5 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  {/* Tabela no computador; no celular cada serviço vira um cartão
+                      (descrição em cima; qtd, valor e lixeira embaixo; total por último). */}
+                  <div className="text-sm" role="table" aria-label="Serviços do orçamento">
+                    <div
+                      role="row"
+                      className={`hidden md:grid ${COLUNAS_ITENS} bg-muted/50 text-xs font-bold uppercase tracking-wide text-primary`}
+                    >
+                      <span role="columnheader" className="px-2 py-1.5">
+                        Descrição
+                      </span>
+                      <span role="columnheader" className="px-2 py-1.5">
+                        Qtd
+                      </span>
+                      <span role="columnheader" className="px-2 py-1.5">
+                        Valor unit.
+                      </span>
+                      <span role="columnheader" className="px-2 py-1.5 text-right">
+                        Total
+                      </span>
+                      <span role="columnheader" className="px-2 py-1.5" />
+                    </div>
+                    <div role="rowgroup">
                       {itens.map((it, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="px-2 py-1">
+                        <div
+                          key={idx}
+                          role="row"
+                          className={`grid ${COLUNAS_ITENS} items-start gap-y-1 border-t py-2 md:py-0`}
+                        >
+                          <div role="cell" className="col-span-3 px-2 md:col-span-1 md:py-1">
+                            <span className="text-[11px] text-muted-foreground md:hidden">
+                              Descrição
+                            </span>
                             <Input
+                              aria-label="Descrição"
                               value={it.descricao}
                               onChange={(e) =>
                                 setItens((a) =>
@@ -2615,9 +2665,11 @@ function NovoOrcamentoDialog({
                                 )
                               }
                             />
-                          </td>
-                          <td className="px-2 py-1">
+                          </div>
+                          <div role="cell" className="px-2 md:py-1">
+                            <span className="text-[11px] text-muted-foreground md:hidden">Qtd</span>
                             <Input
+                              aria-label="Quantidade"
                               type="number"
                               min={1}
                               max={999}
@@ -2633,9 +2685,13 @@ function NovoOrcamentoDialog({
                                 );
                               }}
                             />
-                          </td>
-                          <td className="px-2 py-1">
+                          </div>
+                          <div role="cell" className="px-2 md:py-1">
+                            <span className="text-[11px] text-muted-foreground md:hidden">
+                              Valor unit.
+                            </span>
                             <CurrencyInput
+                              aria-label="Valor unitário"
                               value={String(it.valor_unitario ?? "")}
                               onChange={(v) =>
                                 setItens((a) =>
@@ -2658,12 +2714,18 @@ function NovoOrcamentoDialog({
                                 )
                               }
                             />
-                          </td>
-                          <td className="px-2 py-1 text-right font-medium">
+                          </div>
+                          <div
+                            role="cell"
+                            className="order-last col-span-3 flex flex-wrap items-baseline justify-between gap-x-2 px-2 font-medium md:order-0 md:col-span-1 md:block md:py-2 md:text-right"
+                          >
+                            <span className="text-[11px] font-normal text-muted-foreground md:hidden">
+                              Total
+                            </span>
                             {BRL(it.quantidade * it.valor_unitario)}
                             {(precoVariaPorForma || formasPagamento.length > 1) &&
                               it.valores_formas && (
-                                <div className="mt-1 text-[12px] font-normal text-muted-foreground space-y-0.5">
+                                <div className="basis-full mt-1 text-right text-[12px] font-normal text-muted-foreground space-y-0.5">
                                   {gruposPorForma(it.valores_formas, formasPagamento).map((g) => (
                                     <div key={g.rotulo}>
                                       <b className="uppercase">{g.rotulo}:</b>{" "}
@@ -2672,26 +2734,28 @@ function NovoOrcamentoDialog({
                                   ))}
                                 </div>
                               )}
-                          </td>
-                          <td className="px-2 py-1">
+                          </div>
+                          <div role="cell" className="self-end px-1 md:self-start md:py-1">
                             <Button
                               size="sm"
                               variant="ghost"
+                              className="h-10 w-10 p-0 md:h-8 md:w-8"
+                              aria-label="Remover serviço"
                               onClick={() => setItens((a) => a.filter((_, i) => i !== idx))}
                             >
-                              <Trash2 className="h-3 w-3 text-destructive" />
+                              <Trash2 className="h-4 w-4 text-destructive md:h-3 md:w-3" />
                             </Button>
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {categoria === "laboratorio" && (
                 <div className="space-y-2 border-t pt-3">
-                  <div className="flex items-baseline justify-between gap-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-2">
                     <Label>Preparo de exames</Label>
                     <span className="text-[12px] text-muted-foreground">
                       Vai para as Observações e sai impresso para o paciente
@@ -2798,7 +2862,7 @@ function NovoOrcamentoDialog({
         </div>
 
         {categoria && (
-          <DialogFooter className="shrink-0 border-t bg-background p-4 flex justify-end gap-2 rounded-b-xl">
+          <DialogFooter className="shrink-0 border-t bg-background p-3 sm:p-4 flex justify-end gap-2 rounded-b-xl">
             <Button variant="outline" onClick={onClose} disabled={saving}>
               Cancelar
             </Button>
