@@ -4306,7 +4306,6 @@ export type Database = {
           assinatura_svg: string | null
           cancelado_em: string | null
           cancelamento_motivo: string | null
-          carencia_desde: string | null
           clinica_id: string
           contrato_origem_id: string | null
           convenio_id: string | null
@@ -4348,7 +4347,6 @@ export type Database = {
           assinatura_svg?: string | null
           cancelado_em?: string | null
           cancelamento_motivo?: string | null
-          carencia_desde?: string | null
           clinica_id: string
           contrato_origem_id?: string | null
           convenio_id?: string | null
@@ -4390,7 +4388,6 @@ export type Database = {
           assinatura_svg?: string | null
           cancelado_em?: string | null
           cancelamento_motivo?: string | null
-          carencia_desde?: string | null
           clinica_id?: string
           contrato_origem_id?: string | null
           convenio_id?: string | null
