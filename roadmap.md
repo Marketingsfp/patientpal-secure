@@ -48,4 +48,4 @@
 - [x] Etapa 5 "Corrigir número da pasta" + painel de problemas + religar médico nos prontuários (testado em clínica fictícia; aguarda publicar e o dono rodar)
 
 ## Ligação da Nina (GPT-Live 1)
-- [ ] Conectar GPT-Live 1 à aba "Ligação" do OS ZAP (pedido do Jean, arquivo enviado) — bloqueado: os arquivos citados (LigacaoNina.tsx, pasta src/lib/nina/ligacao) não existem neste projeto
+- [x] Conectar GPT-Live 1 à aba "Ligação" do OS ZAP (plano aprovado) — falta teste falado por alguém na pré-visualização
