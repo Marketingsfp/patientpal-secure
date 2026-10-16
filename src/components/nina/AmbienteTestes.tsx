@@ -1,5 +1,5 @@
 /**
- * Ambiente de testes da Nina: 10 conversas simultâneas, cada lead com um modo
+ * Ambiente de testes da Nina: 10 ou 20 conversas simultâneas, cada lead com um modo
  * de paciente difícil (Claude Opus 5.5) e um juiz que lista as falhas da Nina
  * ao fim de cada conversa. Esta tela conduz as conversas: mantê-la aberta.
  */
@@ -128,6 +128,7 @@ export function AmbienteTestes() {
   const [modos, setModos] = useState<Modo[]>([]);
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [turnosMax, setTurnosMax] = useState("10");
+  const [quantidade, setQuantidade] = useState("20");
   const [rodando, setRodando] = useState(false);
   const [iniciando, setIniciando] = useState(false);
   const [rodadas, setRodadas] = useState<Rodada[]>([]);
@@ -276,7 +277,9 @@ export function AmbienteTestes() {
     pararRef.current = false;
     setRodadaAberta(null);
     try {
-      const r: any = await iniciar({ data: { clinicaId, turnos: Number(turnosMax) } });
+      const r: any = await iniciar({
+        data: { clinicaId, turnos: Number(turnosMax), quantidade: Number(quantidade) as 10 | 20 },
+      });
       const novas: Conversa[] = (r.itens as any[]).map((it) => ({
         posicao: it.posicao,
         modo: it.modo,
@@ -294,7 +297,7 @@ export function AmbienteTestes() {
       setConversas(novas);
       setRodando(true);
       setIniciando(false);
-      // Início escalonado: as 10 conversas não chegam no mesmo segundo.
+      // Início escalonado: as conversas não chegam no mesmo segundo (1,5 s entre elas).
       await Promise.all(novas.map((c, i) => espera(i * 1500).then(() => conduzir(c))));
       toast.success("Rodada concluída. As avaliações estão nos cards.");
     } catch (e) {
@@ -372,6 +375,10 @@ export function AmbienteTestes() {
       </p>
     );
 
+  // Antes da primeira rodada, a grade mostra só os leads que a rodada escolhida vai usar.
+  const grade = conversas.some((c) => c.simulacaoId)
+    ? conversas
+    : conversas.slice(0, Number(quantidade));
   const concluidas = conversas.filter((c) => c.avaliacao);
   const media = concluidas.length
     ? Math.round(concluidas.reduce((t, c) => t + (c.avaliacao?.nota ?? 0), 0) / concluidas.length)
@@ -387,12 +394,32 @@ export function AmbienteTestes() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">
-            10 conversas ao mesmo tempo. Em cada uma, um paciente simulado (Claude Opus 5.5) tenta
-            dificultar a Nina de um jeito diferente, sem ver nada do prompt, das ferramentas ou do
-            catálogo dela. No fim, um juiz lista as falhas de cada conversa. Os leads são próprios
-            deste ambiente (não mexem nos 10 leads da Homologação).
+            10 ou 20 conversas ao mesmo tempo. Em cada uma, um paciente simulado (Claude Opus 5.5)
+            tenta dificultar a Nina de um jeito diferente, sem ver nada do prompt, das ferramentas
+            ou do catálogo dela. No fim, um juiz lista as falhas de cada conversa. Os leads são
+            próprios deste ambiente (não mexem nos 10 leads da Homologação). Com 20, os modos se
+            repetem com assuntos diferentes.
           </p>
           <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="ambiente-quantidade" className="text-sm">
+              Conversas
+            </label>
+            <Select
+              value={quantidade}
+              onValueChange={setQuantidade}
+              disabled={rodando || iniciando}
+            >
+              <SelectTrigger id="ambiente-quantidade" className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {["10", "20"].map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <label htmlFor="ambiente-turnos" className="text-sm">
               Mensagens do paciente por conversa
             </label>
@@ -423,7 +450,7 @@ export function AmbienteTestes() {
                 ) : (
                   <Play className="mr-1 h-4 w-4" aria-hidden="true" />
                 )}
-                Iniciar 10 conversas
+                Iniciar {quantidade} conversas
               </Button>
             )}
             {media !== null && (
@@ -444,7 +471,7 @@ export function AmbienteTestes() {
       </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {conversas.map((c) => {
+        {grade.map((c) => {
           const modo = modoPorId(c.modo);
           const ativo = c.estado === "paciente" || c.estado === "nina" || c.estado === "avaliando";
           return (
