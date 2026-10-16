@@ -41,6 +41,10 @@ BEGIN
         FROM public.pacientes WHERE clinica_id = c);
   END IF;
 
+  -- Etapas 3 e 4 vazias (só para liberar a etapa 5).
+  PERFORM public.importacao_legado_concluir((public.importacao_legado_iniciar(c, 'prontuarios', 'pr.jsonl', 1)).id);
+  PERFORM public.importacao_legado_concluir((public.importacao_legado_iniciar(c, 'observacoes', 'ob.jsonl', 1)).id);
+
   -- Etapa 5: lote só sem "chave" recusado; linha sem "chave" no meio aceita.
   ex := (public.importacao_legado_iniciar(c, 'corrigir_pasta', 'pessoas_v2.jsonl', 1)).id;
   recusou := false;
