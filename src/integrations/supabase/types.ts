@@ -3529,6 +3529,7 @@ export type Database = {
           created_at: string
           hostname: string
           id: string
+          restringir_acesso: boolean
         }
         Insert: {
           ativo?: boolean
@@ -3536,6 +3537,7 @@ export type Database = {
           created_at?: string
           hostname: string
           id?: string
+          restringir_acesso?: boolean
         }
         Update: {
           ativo?: boolean
@@ -3543,6 +3545,7 @@ export type Database = {
           created_at?: string
           hostname?: string
           id?: string
+          restringir_acesso?: boolean
         }
         Relationships: [
           {
@@ -17192,6 +17195,15 @@ export type Database = {
       _totem_checkin_executar: {
         Args: { _clinica_id: string; _origem: string; _paciente_id: string }
         Returns: Json
+      }
+      acesso_por_dominio: {
+        Args: { _hostname: string }
+        Returns: {
+          clinica_id: string
+          clinica_nome: string
+          pode: boolean
+          restrito: boolean
+        }[]
       }
       agenda_slot_lock: { Args: { _id: string }; Returns: Json }
       agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
