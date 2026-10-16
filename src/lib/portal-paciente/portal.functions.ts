@@ -289,7 +289,7 @@ async function lerAgendamentos(clinicaId: string, pacienteId: string, id?: strin
   const db = await admin();
   let q = db
     .from("agendamentos")
-    .select("id, inicio, status, procedimento, pacote_id, data_pagamento, medicos(nome, especialidades(nome))")
+    .select("id, inicio, status, procedimento, pacote_id, data_pagamento, medicos(nome, especialidades!medicos_especialidade_id_fkey(nome))")
     .eq("clinica_id", clinicaId)
     .eq("paciente_id", pacienteId)
     .order("inicio", { ascending: false })
