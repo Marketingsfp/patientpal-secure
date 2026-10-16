@@ -27,6 +27,7 @@ describe("modos de paciente", () => {
     expect(modos[0]!.id).toBe(MODOS_PACIENTE[0]!.id);
     expect(modos[10]!.id).toBe(MODOS_PACIENTE[0]!.id);
     expect(modos[19]!.id).toBe(MODOS_PACIENTE[9]!.id);
+    expect(modoDaPosicao(29).id).toBe(MODOS_PACIENTE[9]!.id);
     const catalogo = {
       consultas: Array.from({ length: 12 }, (_, i) => `Especialidade Ficticia ${i + 1}`),
       exames: Array.from({ length: 12 }, (_, i) => `Exame Ficticio ${i + 1}`),

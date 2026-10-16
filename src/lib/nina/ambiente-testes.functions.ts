@@ -1,5 +1,5 @@
 /**
- * Ambiente de testes da Nina — 10 ou 20 conversas simultâneas.
+ * Ambiente de testes da Nina — 10, 20 ou 30 conversas simultâneas.
  *
  * O navegador conduz as conversas em paralelo: para cada lead, pede a
  * próxima mensagem ao paciente difícil (`turnoPacienteAmbiente`), envia pela
@@ -77,7 +77,7 @@ export const prepararAmbienteTestes = createServerFn({ method: "POST" })
     };
   });
 
-/** Reinicia os leads da rodada (10 ou 20), sorteia os assuntos e registra a rodada. */
+/** Reinicia os leads da rodada (10, 20 ou 30), sorteia os assuntos e registra a rodada. */
 export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -85,7 +85,7 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
       .object({
         clinicaId: z.string().uuid(),
         turnos: z.number().int().min(1).max(50).optional(),
-        quantidade: z.union([z.literal(10), z.literal(20)]).optional(),
+        quantidade: z.union([z.literal(10), z.literal(20), z.literal(30)]).optional(),
       })
       .parse(input),
   )
@@ -94,8 +94,8 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
     const srv = await import("@/lib/nina/ambiente-testes.server");
     const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
     const todos = await srv.garantirLeadsAmbiente(admin, data.clinicaId);
-    // Rodada de 10 usa os 10 primeiros leads; a de 20, todos.
-    const leads = todos.slice(0, data.quantidade ?? srv.TOTAL_LEADS_AMBIENTE);
+    // A rodada usa os primeiros leads (10 → 11 a 20; 20 → 11 a 30; 30 → todos).
+    const leads = todos.slice(0, data.quantidade ?? 20);
     const ids = todos.map((l) => l.id);
 
     // Uma rodada por vez: o que ficou "executando" de antes é encerrado.
@@ -269,7 +269,7 @@ export const encerrarConversaAmbiente = createServerFn({ method: "POST" })
     z
       .object({
         clinicaId: z.string().uuid(),
-        simulacaoIds: z.array(z.string().uuid()).min(1).max(20),
+        simulacaoIds: z.array(z.string().uuid()).min(1).max(30),
         status: z.enum(["concluida", "parada", "erro"]),
         motivo: z.string().max(300),
       })
@@ -366,7 +366,7 @@ export const listarRodadasAmbiente = createServerFn({ method: "POST" })
       )
       .eq("clinica_id", data.clinicaId)
       .order("created_at", { ascending: false })
-      .limit(data.rodada ? 20 : 400);
+      .limit(data.rodada ? 30 : 600);
     consulta = data.rodada
       ? consulta.contains("persona", { ambiente: AMBIENTE, rodada: data.rodada })
       : consulta.contains("persona", { ambiente: AMBIENTE });
