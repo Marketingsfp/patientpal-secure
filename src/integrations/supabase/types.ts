@@ -286,6 +286,8 @@ export type Database = {
           especialidade_id: string | null
           executado_em: string | null
           executado_por: string | null
+          ficha_encaixe: boolean
+          ficha_encaixe_numero: number | null
           ficha_numero: number | null
           fim: string
           fluxo_atualizado_em: string
@@ -352,6 +354,8 @@ export type Database = {
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
+          ficha_encaixe?: boolean
+          ficha_encaixe_numero?: number | null
           ficha_numero?: number | null
           fim: string
           fluxo_atualizado_em?: string
@@ -418,6 +422,8 @@ export type Database = {
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
+          ficha_encaixe?: boolean
+          ficha_encaixe_numero?: number | null
           ficha_numero?: number | null
           fim?: string
           fluxo_atualizado_em?: string
