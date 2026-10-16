@@ -1,5 +1,6 @@
 /** Leitura das mensagens para inspeção técnica, sem nota de confiança. */
 import { queryOptions, useQueries } from "@tanstack/react-query";
+import { useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { saidasDasMensagens, type SaidaMensagemView } from "@/lib/nina/saida-mensagem.functions";
 import { revisaoInspecaoMensagens, type MensagemInspecao } from "@/lib/nina/inspecao-mensagem";
@@ -21,6 +22,12 @@ export function useSaidasDasMensagens(
   mensagens?: readonly MensagemInspecao[],
 ): MapaSaidas {
   const buscar = useServerFn(saidasDasMensagens);
+  const mapaAnterior = useRef<{
+    chave: string;
+    erros: string;
+    dados: unknown[];
+    mapa: MapaSaidas;
+  } | null>(null);
   const ids = [...new Set(mensagemIds)].sort();
   const porMensagem = new Map((mensagens ?? []).map((m) => [String(m.id), m]));
   const porConversa = new Map<string | null, string[]>();
@@ -90,10 +97,25 @@ export function useSaidasDasMensagens(
       }),
     ),
   });
+  // Mesmo objeto enquanto os dados não mudam (desempenho, 16/10/2026): antes,
+  // um mapa novo a cada renderização redesenhava todas as bolhas a cada tecla.
+  const dados = consultas.map((consulta) => (consulta.isError ? null : consulta.data));
+  const chave = grupos.map(([c, ids]) => `${c}:${ids.join(",")}`).join("|");
+  const erros = consultas.map((consulta) => (consulta.isError ? "1" : "0")).join("");
+  const anterior = mapaAnterior.current;
+  if (
+    anterior &&
+    anterior.chave === chave &&
+    anterior.erros === erros &&
+    anterior.dados.length === dados.length &&
+    anterior.dados.every((d, i) => d === dados[i])
+  )
+    return anterior.mapa;
   const mapa: MapaSaidas = {};
   consultas.forEach((consulta, indice) => {
     if (consulta.isError) for (const id of grupos[indice]![1]) mapa[id] = "falha";
     else Object.assign(mapa, consulta.data ?? {});
   });
+  mapaAnterior.current = { chave, erros, dados, mapa };
   return mapa;
 }

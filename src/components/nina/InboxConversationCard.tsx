@@ -84,7 +84,9 @@ export function InboxConversationCard({
           : "bg-atd-surface"
       }`}
     >
-      <div ref={linhaTitulo} className="flex items-center gap-2">
+      {/* A animação só é ligada ao elemento com a flag ativa: sem ela, nenhum
+          observador é criado (eram 2 por card, ~400 com a lista cheia). */}
+      <div ref={fluido ? linhaTitulo : undefined} className="flex items-center gap-2">
         <span className="font-semibold text-sm truncate flex-1" title={tituloConversa(c)}>
           {tituloConversa(c)}
         </span>
@@ -98,7 +100,10 @@ export function InboxConversationCard({
           </Badge>
         )}
       </div>
-      <div ref={linhaBadges} className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden">
+      <div
+        ref={fluido ? linhaBadges : undefined}
+        className="mt-1 flex flex-wrap items-center gap-1.5 empty:hidden"
+      >
         {/* Lista canônica e já deduplicada por chave semântica. */}
         {tiposDeBadgeDoCard(c, meuId).map((tipo) => {
           // Cards mais limpos: sem status nem aviso de timeout (o cabeçalho da conversa mantém o status).

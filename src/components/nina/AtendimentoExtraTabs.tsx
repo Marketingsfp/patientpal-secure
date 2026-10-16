@@ -1,11 +1,14 @@
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
+  type MutableRefObject,
 } from "react";
 import {
   carregarLotesAtivas,
@@ -339,6 +342,39 @@ import {
  */
 const MSG_JANELA_24H_META =
   "Bloqueio da Meta: já se passaram mais de 24 horas desde a última mensagem do paciente. Fora dessa janela o WhatsApp só permite enviar modelos (templates) aprovados pela Meta. A conversa é liberada de novo assim que o paciente enviar uma nova mensagem.";
+
+/** Conferência da conversa aberta com o tempo real confirmado (rede de segurança). */
+const SINCRONIA_CONVERSA_SAUDAVEL_MS = 60_000;
+
+type AcoesCardInbox = {
+  abrir: (id: string) => void;
+  prefetch: (id: string) => void;
+  cancelar: (id: string) => void;
+};
+/**
+ * Card da lista memorizado (desempenho, 16/10/2026): só redesenha quando os
+ * dados dele mudam (conversa, seleção, prévia, espera). Antes, cada tecla
+ * digitada no campo de mensagem redesenhava todos os cards.
+ */
+const CardInboxMemorizado = memo(function CardInboxMemorizado({
+  acoes,
+  ...props
+}: Omit<
+  ComponentProps<typeof InboxConversationCard>,
+  "onClick" | "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
+> & { acoes: MutableRefObject<AcoesCardInbox> }) {
+  const id = String(props.conversa.id);
+  return (
+    <InboxConversationCard
+      {...props}
+      onClick={() => acoes.current.abrir(id)}
+      onMouseEnter={() => acoes.current.prefetch(id)}
+      onMouseLeave={() => acoes.current.cancelar(id)}
+      onFocus={() => acoes.current.prefetch(id)}
+      onBlur={() => acoes.current.cancelar(id)}
+    />
+  );
+});
 
 /**
  * Copia apenas o número visível da conversa (ex.: "#1342").
@@ -722,7 +758,14 @@ function AtendInboxOperacional({
   const [alvoIndisponivel, setAlvoIndisponivel] = useState(false);
   const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
-  const convsVisiveis: any[] = (() => {
+  const acoesCardRef = useRef<AcoesCardInbox>({
+    abrir: () => {},
+    prefetch: () => {},
+    cancelar: () => {},
+  });
+  // Desempenho (16/10/2026): memorizado — antes era refeito a cada renderização,
+  // inclusive a cada tecla digitada no campo de mensagem.
+  const convsVisiveis: any[] = useMemo(() => {
     // A troca de categoria vale já neste render, antes da nova consulta.
     let base = filtrarPorEscopo(convs, {
       escopo,
@@ -744,7 +787,18 @@ function AtendInboxOperacional({
       const tb = espera[b.id] ? new Date(espera[b.id]).getTime() : Infinity;
       return ta - tb;
     });
-  })();
+  }, [
+    convs,
+    escopo,
+    meuId,
+    souGestor,
+    atendenteSelecionadoId,
+    mostrarTestes,
+    soCriticas,
+    espera,
+    ordem,
+    visualizacao,
+  ]);
   // Cards que chegam, saem e reordenam com transição (flag ux_melhorias).
   const { enabled: listaFluidaAtiva } = useClinicFeatureFlag("ux_melhorias");
   const chaveIdsVisiveis = convsVisiveis.map((c: any) => String(c.id)).join("|");
@@ -2249,9 +2303,17 @@ function AtendInboxOperacional({
     carregarConversa();
   }, [carregarConversa]);
   // Mantém mensagens/contato sincronizados enquanto a conversa está aberta.
+  // Desempenho (16/10/2026): com o tempo real confirmado, as mensagens chegam
+  // por ele; a conferência vira uma rede de segurança a cada 60 s. Com o canal
+  // com problema, volta a ser a cada 8 s. Antes eram 8 s sempre, por atendente.
   useEffect(() => {
     if (!sel?.id) return;
+    let ultima = Date.now();
     const t = setInterval(() => {
+      const canal = watchdog.current.snapshot();
+      const saudavel = canal.status === "SUBSCRIBED" && !canal.fallbackAtivo;
+      if (saudavel && Date.now() - ultima < SINCRONIA_CONVERSA_SAUDAVEL_MS) return;
+      ultima = Date.now();
       void sincronizarConversa();
     }, 8000);
     return () => clearInterval(t);
@@ -3396,6 +3458,192 @@ function AtendInboxOperacional({
     return <Badge variant="outline">{s}</Badge>;
   };
 
+  // Bolhas da conversa memorizadas (desempenho, 16/10/2026): antes, cada tecla
+  // digitada no campo de mensagem redesenhava todas as bolhas, com mídia e
+  // inspeção da Nina. Só refaz quando mensagens, resumos, avaliações ou destaque mudam.
+  const tentarNovamenteRef = useRef(tentarNovamente);
+  tentarNovamenteRef.current = tentarNovamente;
+  const bolhasDaConversa = useMemo(
+    () =>
+      (conteudoDaConversa ? timelineComResumos : []).map((item) => {
+        // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
+        if (item.kind === "resumo") {
+          return (
+            <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
+              <ResumoAvulsoCard resumo={item.resumo} />
+            </div>
+          );
+        }
+        if (item.kind === "grupo") {
+          const g = item.item;
+          if (g.tipo === "HANDOFF") {
+            return (
+              <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
+                <HandoffGroupCard
+                  grupo={g}
+                  resumo={(item as { resumo?: ResumoDaConversa }).resumo}
+                />
+                {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
+              </div>
+            );
+          }
+          if (g.tipo === "ATRIBUICAO") {
+            return (
+              <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
+                <AtribuicaoGroupCard grupo={g} />
+              </div>
+            );
+          }
+          // O resumo da Nina fica apenas no painel superior da
+          // conversa: o aviso de geração não vira bloco na timeline.
+          if (g.evento.evento === "RESUMO_IA_GERADO") return null;
+          return (
+            <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
+              <ConversationSystemEvent evento={g.evento as unknown as ConversaEvento} />
+            </div>
+          );
+        }
+        const m = item.msg;
+        const out = m.direction === "out";
+        const autorSupervisao = out
+          ? rotuloAutorSupervisao(
+              m.enviada_por_perfil,
+              autores && autores.clinicaId === clinicaId
+                ? autores.nomes[m.enviada_por_user_id]
+                : null,
+            )
+          : null;
+        // Só marcador interno vira faixa central. Mensagem real
+        // enviada ao paciente (status de envio) fica como conversa.
+        if (marcadorInternoSistema(m)) {
+          const texto = textoMarcadorSistema(m.body);
+          if (!texto) return null;
+          return (
+            <div key={`m-${m.id}`} data-historico-id={`m-${m.id}`} className="flex justify-center">
+              <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
+                {texto}
+                <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
+              </div>
+            </div>
+          );
+        }
+        // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
+
+        const destacada = msgDestacada === m.id;
+        return (
+          <div
+            key={`m-${m.id}`}
+            data-msg-id={m.id}
+            data-historico-id={`m-${m.id}`}
+            className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+              destacada
+                ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
+                : ""
+            }`}
+          >
+            {destacada && (
+              <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+                Mensagem reportada
+              </span>
+            )}
+            {/* Botão de reporte rápido: fora do balão, sempre visível. */}
+            {clinicaId && (
+              <InspecaoMensagemNina
+                parte="reporte"
+                clinicaId={clinicaId}
+                conversaId={m.conversa_id ?? sel?.id}
+                mensagem={m}
+                saida={saidasPorMensagem[String(m.id)]}
+              />
+            )}
+            <div
+              className={`oszap-bubble max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
+                out
+                  ? "oszap-bubble-out bg-atd-go text-atd-on-strong rounded-br-sm"
+                  : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
+              }`}
+            >
+              {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
+              {textoDaBolha(m) && <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>}
+              {ehOtimista(m) && m.status === "failed" && (
+                <div className="mt-1 flex items-center gap-2 text-[11px]">
+                  <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
+                  <button
+                    type="button"
+                    className="underline underline-offset-2"
+                    onClick={() => tentarNovamenteRef.current(m)}
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+              <div
+                className={`oszap-message-meta text-[11px] mt-2 flex flex-wrap items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+              >
+                {/* Envio otimista: durante o envio normal a bolha não
+                              exibe nenhum status — só a hora. Falha aparece acima. */}
+                <span className="min-w-0 break-words">
+                  {fmtHora(m.recebida_em)}{" "}
+                  {mensagemDoFrancisco(m.raw)
+                    ? "· Francisco"
+                    : m.enviada_por === "nina" && "· Nina"}
+                  {autorSupervisao && (
+                    <span
+                      data-testid="autor-supervisao"
+                      title={`Resposta da supervisão (${autorSupervisao})`}
+                    >
+                      · {autorSupervisao}
+                    </span>
+                  )}
+                </span>
+                {clinicaId && (
+                  <InspecaoMensagemNina
+                    parte="detalhes"
+                    clinicaId={clinicaId}
+                    conversaId={m.conversa_id ?? sel?.id}
+                    mensagem={m}
+                    saida={saidasPorMensagem[String(m.id)]}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }),
+    [
+      conteudoDaConversa,
+      timelineComResumos,
+      autores,
+      clinicaId,
+      msgDestacada,
+      saidasPorMensagem,
+      sel?.id,
+    ],
+  );
+
+  // Ações dos cards por referência fixa: o card memorizado não redesenha por
+  // causa de função nova a cada renderização (desempenho, 16/10/2026).
+  acoesCardRef.current = {
+    abrir: (id: string) => {
+      // A busca da conversa sai já no clique (antes, só depois de duas
+      // renderizações). O pré-carregamento reaproveita a busca em andamento.
+      cancelarPrefetch(id);
+      prefetchConversa(id);
+      setListaMobile(false);
+      iniciarTroca(id, "clique");
+      // Abertura normal pela Inbox: volta a valer a leitura
+      // automática, mesmo que antes tenha vindo de um erro.
+      aberturaPorAlvoRef.current.delete(id);
+
+      medidor.current = criarMedidorConversa(`conversa ${id}`);
+      medidor.current.marcar("click");
+      // Seleção interna: a conversa aberta é escolhida aqui mesmo.
+      abrirConversa(id);
+    },
+    prefetch: agendarPrefetch,
+    cancelar: cancelarPrefetch,
+  };
+
   return (
     <RelogioEsperaProvider>
       <div
@@ -3714,7 +3962,7 @@ function AtendInboxOperacional({
                     ))}
                   <div ref={listaFluidaRef}>
                     {convsVisiveis.map((c) => (
-                      <InboxConversationCard
+                      <CardInboxMemorizado
                         key={c.id}
                         conversa={c}
                         selecionada={sel?.id === c.id}
@@ -3724,22 +3972,7 @@ function AtendInboxOperacional({
                         esperaDesde={espera[c.id]}
                         previa={previas[c.id]?.texto}
                         autorPrevia={previas[c.id]?.autor}
-                        onClick={() => {
-                          setListaMobile(false);
-                          iniciarTroca(c.id, "clique");
-                          // Abertura normal pela Inbox: volta a valer a leitura
-                          // automática, mesmo que antes tenha vindo de um erro.
-                          aberturaPorAlvoRef.current.delete(c.id);
-
-                          medidor.current = criarMedidorConversa(`conversa ${c.id}`);
-                          medidor.current.marcar("click");
-                          // Seleção interna: a conversa aberta é escolhida aqui mesmo.
-                          abrirConversa(c.id);
-                        }}
-                        onMouseEnter={() => agendarPrefetch(c.id)}
-                        onMouseLeave={() => cancelarPrefetch(c.id)}
-                        onFocus={() => agendarPrefetch(c.id)}
-                        onBlur={() => cancelarPrefetch(c.id)}
+                        acoes={acoesCardRef}
                       />
                     ))}
                   </div>
@@ -4070,164 +4303,7 @@ function AtendInboxOperacional({
                       <p className="text-sm text-muted-foreground text-center">Sem mensagens.</p>
                     )}
 
-                    {(conteudoDaConversa ? timelineComResumos : []).map((item) => {
-                      // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
-                      if (item.kind === "resumo") {
-                        return (
-                          <div
-                            key={`resumo-${item.resumo.id}`}
-                            data-historico-id={`resumo-${item.resumo.id}`}
-                          >
-                            <ResumoAvulsoCard resumo={item.resumo} />
-                          </div>
-                        );
-                      }
-                      if (item.kind === "grupo") {
-                        const g = item.item;
-                        if (g.tipo === "HANDOFF") {
-                          return (
-                            <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                              <HandoffGroupCard
-                                grupo={g}
-                                resumo={(item as { resumo?: ResumoDaConversa }).resumo}
-                              />
-                              {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
-                            </div>
-                          );
-                        }
-                        if (g.tipo === "ATRIBUICAO") {
-                          return (
-                            <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                              <AtribuicaoGroupCard grupo={g} />
-                            </div>
-                          );
-                        }
-                        // O resumo da Nina fica apenas no painel superior da
-                        // conversa: o aviso de geração não vira bloco na timeline.
-                        if (g.evento.evento === "RESUMO_IA_GERADO") return null;
-                        return (
-                          <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
-                            <ConversationSystemEvent
-                              evento={g.evento as unknown as ConversaEvento}
-                            />
-                          </div>
-                        );
-                      }
-                      const m = item.msg;
-                      const out = m.direction === "out";
-                      const autorSupervisao = out
-                        ? rotuloAutorSupervisao(
-                            m.enviada_por_perfil,
-                            autores && autores.clinicaId === clinicaId
-                              ? autores.nomes[m.enviada_por_user_id]
-                              : null,
-                          )
-                        : null;
-                      // Só marcador interno vira faixa central. Mensagem real
-                      // enviada ao paciente (status de envio) fica como conversa.
-                      if (marcadorInternoSistema(m)) {
-                        const texto = textoMarcadorSistema(m.body);
-                        if (!texto) return null;
-                        return (
-                          <div
-                            key={`m-${m.id}`}
-                            data-historico-id={`m-${m.id}`}
-                            className="flex justify-center"
-                          >
-                            <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
-                              {texto}
-                              <div className="mt-1 text-[10px] opacity-70">
-                                {fmtHora(m.recebida_em)}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
-
-                      const destacada = msgDestacada === m.id;
-                      return (
-                        <div
-                          key={`m-${m.id}`}
-                          data-msg-id={m.id}
-                          data-historico-id={`m-${m.id}`}
-                          className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
-                            destacada
-                              ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
-                              : ""
-                          }`}
-                        >
-                          {destacada && (
-                            <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
-                              Mensagem reportada
-                            </span>
-                          )}
-                          {/* Botão de reporte rápido: fora do balão, sempre visível. */}
-                          {clinicaId && (
-                            <InspecaoMensagemNina
-                              parte="reporte"
-                              clinicaId={clinicaId}
-                              conversaId={m.conversa_id ?? sel.id}
-                              mensagem={m}
-                              saida={saidasPorMensagem[String(m.id)]}
-                            />
-                          )}
-                          <div
-                            className={`oszap-bubble max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
-                              out
-                                ? "oszap-bubble-out bg-atd-go text-atd-on-strong rounded-br-sm"
-                                : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
-                            }`}
-                          >
-                            {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
-                            {textoDaBolha(m) && (
-                              <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>
-                            )}
-                            {ehOtimista(m) && m.status === "failed" && (
-                              <div className="mt-1 flex items-center gap-2 text-[11px]">
-                                <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
-                                <button
-                                  type="button"
-                                  className="underline underline-offset-2"
-                                  onClick={() => tentarNovamente(m)}
-                                >
-                                  Tentar novamente
-                                </button>
-                              </div>
-                            )}
-                            <div
-                              className={`oszap-message-meta text-[11px] mt-2 flex flex-wrap items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
-                            >
-                              {/* Envio otimista: durante o envio normal a bolha não
-                              exibe nenhum status — só a hora. Falha aparece acima. */}
-                              <span className="min-w-0 break-words">
-                                {fmtHora(m.recebida_em)}{" "}
-                                {mensagemDoFrancisco(m.raw)
-                                  ? "· Francisco"
-                                  : m.enviada_por === "nina" && "· Nina"}
-                                {autorSupervisao && (
-                                  <span
-                                    data-testid="autor-supervisao"
-                                    title={`Resposta da supervisão (${autorSupervisao})`}
-                                  >
-                                    · {autorSupervisao}
-                                  </span>
-                                )}
-                              </span>
-                              {clinicaId && (
-                                <InspecaoMensagemNina
-                                  parte="detalhes"
-                                  clinicaId={clinicaId}
-                                  conversaId={m.conversa_id ?? sel.id}
-                                  mensagem={m}
-                                  saida={saidasPorMensagem[String(m.id)]}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {bolhasDaConversa}
                     {/* Âncora do fim da conversa: é para cá que a tela vai ao abrir. */}
                     <div ref={chat.ancoraRef} />
                   </div>
