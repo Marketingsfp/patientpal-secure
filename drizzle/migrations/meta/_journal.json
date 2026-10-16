@@ -183,6 +183,13 @@
       "when": 1792107788245,
       "tag": "0025_importacao_clinica_total_corrigir_pasta",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792149069006,
+      "tag": "0026_importacao_legado_chave_ausente_por_linha",
+      "breakpoints": true
     }
   ]
 }
