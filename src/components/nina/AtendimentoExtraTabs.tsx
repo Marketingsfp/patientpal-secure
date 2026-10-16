@@ -19,6 +19,7 @@ import { acrescentarBaseAoRascunho } from "@/lib/atendimento/consulta-base-chat"
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadeProvider";
 import { deveEnviarPorTecla } from "@/lib/atendimento/teclado-envio";
+import { ehAvisoDeTransferencia } from "@/lib/atendimento/previa-conversa";
 import {
   ListaRespostasRapidas,
   useRespostasFiltradas,
@@ -754,7 +755,8 @@ function AtendInboxOperacional({
   const listaFluidaRef = useListaFluida<HTMLDivElement>(listaFluidaAtiva, idsVisiveis);
 
   // Prévia do card: última mensagem trocada com o paciente (recebida ou
-  // enviada). Avisos internos do sistema (status "system") ficam de fora.
+  // enviada). Avisos internos do sistema (status "system") e o aviso de
+  // transferência ao paciente ficam de fora.
   const [previas, setPrevias] = useState<
     Record<string, { texto: string; autor: AutorPreviaConversa }>
   >({});
@@ -786,7 +788,7 @@ function AtendInboxOperacional({
         enviada_por: string | null;
       }>) {
         const id = String(m.conversa_id ?? "");
-        if (!id || id in novo) continue;
+        if (!id || id in novo || ehAvisoDeTransferencia(m)) continue;
         const texto = (m.body ?? "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
         novo[id] = {
           texto:
