@@ -819,8 +819,15 @@ export function AppShell() {
 
 function AppShellInner() {
   const { user, signOut, loading } = useAuth();
-  const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } =
-    useClinica();
+  const {
+    memberships,
+    clinicaAtual,
+    setClinicaAtual,
+    modoTodas,
+    setModoTodas,
+    branding,
+    unidadeTravada,
+  } = useClinica();
   const {
     allowed: allowedModules,
     configured: configuredModules,
@@ -1747,6 +1754,7 @@ function AppShellInner() {
             )}
             {memberships.length > 0 && (
               <Select
+                disabled={unidadeTravada}
                 value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
                 onValueChange={(v) => {
                   if (v === "__todas__") setModoTodas(true);
@@ -1761,7 +1769,7 @@ function AppShellInner() {
                   <SelectValue placeholder="Selecione a clínica" />
                 </SelectTrigger>
                 <SelectContent>
-                  {memberships.length > 1 && (
+                  {memberships.length > 1 && !unidadeTravada && (
                     <SelectItem value="__todas__">
                       <span className="flex items-center gap-2">
                         <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />

@@ -1,7 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
-import { aplicarMarcaNaAba, resolverClinicaAcesso, type ClinicaAcesso } from "@/lib/clinica-acesso";
+import {
+  aplicarMarcaNaAba,
+  CHAVE_BLOQUEIO_DOMINIO,
+  mensagemBloqueioDominio,
+  resolverClinicaAcesso,
+  verificarAcessoDominio,
+  type AcessoDominio,
+  type ClinicaAcesso,
+} from "@/lib/clinica-acesso";
 
 export interface ClinicaMembership {
   id: string;
@@ -49,6 +57,8 @@ interface ClinicaContextValue {
    * representam numa TV devem se recusar a operar com palpite.
    */
   clinicaFixada: boolean;
+  /** Endereço com "restringir acesso": unidade fixa, sem trocar nem "todas". */
+  unidadeTravada?: boolean;
   branding: ClinicaBranding | null;
   loading: boolean;
   refresh: () => Promise<void>;

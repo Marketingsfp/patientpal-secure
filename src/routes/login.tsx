@@ -83,6 +83,18 @@ function LoginPage() {
   const navigate = useNavigate();
   const { next, clinica } = Route.useSearch();
   const [marca, setMarca] = useState<ClinicaAcesso | null>(null);
+  const [bloqueio, setBloqueio] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const m = window.sessionStorage.getItem(CHAVE_BLOQUEIO_DOMINIO);
+      if (m) {
+        setBloqueio(m);
+        window.sessionStorage.removeItem(CHAVE_BLOQUEIO_DOMINIO);
+      }
+    } catch {
+      /* sem armazenamento */
+    }
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -246,6 +258,11 @@ function LoginPage() {
                   <p className="text-sm font-medium" style={marca.primary ? { color: marca.primary } : undefined}>
                     Acesso ao sistema – {marca.nome}
                   </p>
+                </div>
+              )}
+              {bloqueio && (
+                <div role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {bloqueio}
                 </div>
               )}
               <h1 className="text-3xl font-semibold tracking-tight">Bem-vindo de volta</h1>
