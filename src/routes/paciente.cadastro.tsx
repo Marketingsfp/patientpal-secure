@@ -44,7 +44,10 @@ function Cadastro({ clinica }: { clinica: string | null }) {
   const ler = useServerFn(meuCadastro);
   const solicitar = useServerFn(solicitarAlteracaoCadastro);
   const chave = ["portal-cadastro", clinica];
-  const { data, isLoading, error } = useQuery({ queryKey: chave, queryFn: () => ler({ data: { clinica } }) });
+  const { data, isLoading, error } = useQuery({
+    queryKey: chave,
+    queryFn: () => ler({ data: { clinica } }),
+  });
   const [form, setForm] = useState<Record<string, string>>({});
   const [editando, setEditando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -70,7 +73,10 @@ function Cadastro({ clinica }: { clinica: string | null }) {
 
   return (
     <>
-      <Link to="/paciente" className="mb-4 inline-flex items-center text-sm text-primary hover:underline">
+      <Link
+        to="/paciente"
+        className="mb-4 inline-flex items-center text-sm text-primary hover:underline"
+      >
         <ArrowLeft className="mr-1 h-4 w-4" /> Início
       </Link>
       <h1 className="text-2xl font-semibold">Meu cadastro</h1>
@@ -79,23 +85,40 @@ function Cadastro({ clinica }: { clinica: string | null }) {
       {data && (
         <>
           <Card className="mt-4 space-y-1 p-4 text-sm">
-            <p><span className="text-muted-foreground">Nome:</span> {data.nome}</p>
-            <p><span className="text-muted-foreground">CPF:</span> {data.cpfMascarado}</p>
+            <p>
+              <span className="text-muted-foreground">Nome:</span> {data.nome}
+            </p>
+            <p>
+              <span className="text-muted-foreground">CPF:</span> {data.cpfMascarado}
+            </p>
             {data.dataNascimento && (
-              <p><span className="text-muted-foreground">Nascimento:</span> {data.dataNascimento.split("-").reverse().join("/")}</p>
+              <p>
+                <span className="text-muted-foreground">Nascimento:</span>{" "}
+                {data.dataNascimento.split("-").reverse().join("/")}
+              </p>
             )}
-            <p className="pt-2 text-xs text-muted-foreground">Nome, CPF e nascimento só podem ser alterados na recepção.</p>
+            <p className="pt-2 text-xs text-muted-foreground">
+              Nome, CPF e nascimento só podem ser alterados na recepção.
+            </p>
           </Card>
           {data.pendente && (
             <div className="mt-4 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
               Você tem um pedido de atualização aguardando a recepção (
-              {Object.keys(data.pendente.dados_novos).map((k) => ROTULO[k] ?? k).join(", ")}).
+              {Object.keys(data.pendente.dados_novos)
+                .map((k) => ROTULO[k] ?? k)
+                .join(", ")}
+              ).
             </div>
           )}
           <form onSubmit={enviar} className="mt-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               {CAMPOS_SOLICITAVEIS.map((k) => (
-                <div key={k} className={k === "logradouro" || k === "email" ? "col-span-2 space-y-1" : "space-y-1"}>
+                <div
+                  key={k}
+                  className={
+                    k === "logradouro" || k === "email" ? "col-span-2 space-y-1" : "space-y-1"
+                  }
+                >
                   <Label htmlFor={k}>{ROTULO[k]}</Label>
                   <Input
                     id={k}
@@ -109,11 +132,17 @@ function Cadastro({ clinica }: { clinica: string | null }) {
             </div>
             {editando ? (
               <div className="flex gap-2">
-                <Button type="submit" disabled={enviando}>{enviando ? "Enviando…" : "Enviar para a recepção"}</Button>
-                <Button type="button" variant="outline" onClick={() => setEditando(false)}>Desistir</Button>
+                <Button type="submit" disabled={enviando}>
+                  {enviando ? "Enviando…" : "Enviar para a recepção"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setEditando(false)}>
+                  Desistir
+                </Button>
               </div>
             ) : (
-              <Button type="button" variant="outline" onClick={() => setEditando(true)}>Pedir atualização</Button>
+              <Button type="button" variant="outline" onClick={() => setEditando(true)}>
+                Pedir atualização
+              </Button>
             )}
           </form>
         </>

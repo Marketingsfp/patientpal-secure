@@ -28,7 +28,10 @@ export const Route = createFileRoute("/paciente/")({
       { title: "Área do Paciente" },
       { name: "description", content: "Veja seus agendamentos e dados de cadastro com segurança." },
       { property: "og:title", content: "Área do Paciente" },
-      { property: "og:description", content: "Veja seus agendamentos e dados de cadastro com segurança." },
+      {
+        property: "og:description",
+        content: "Veja seus agendamentos e dados de cadastro com segurança.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex, nofollow" },
@@ -141,7 +144,10 @@ function Entrar({ clinica, carregando }: { clinica: string | null; carregando: b
             A Área do Paciente não está disponível neste endereço.
           </p>
         ) : pendencia ? (
-          <div role="alert" className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <div
+            role="alert"
+            className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+          >
             {pendencia}
             {info.telefone && <p className="mt-2 font-medium">Telefone: {info.telefone}</p>}
           </div>
@@ -185,10 +191,23 @@ function Entrar({ clinica, carregando }: { clinica: string | null; carregando: b
               {enviando ? "Conferindo…" : "Entrar"}
             </Button>
             <div className="flex justify-between text-sm">
-              <button type="button" className="text-primary hover:underline" onClick={() => { setEtapa("cpf"); setCodigo(""); setErro(null); }}>
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => {
+                  setEtapa("cpf");
+                  setCodigo("");
+                  setErro(null);
+                }}
+              >
                 Trocar CPF
               </button>
-              <button type="button" className="text-primary hover:underline" disabled={enviando} onClick={() => void pedir()}>
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                disabled={enviando}
+                onClick={() => void pedir()}
+              >
                 Enviar novo código
               </button>
             </div>

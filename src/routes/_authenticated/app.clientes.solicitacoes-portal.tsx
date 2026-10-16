@@ -58,7 +58,10 @@ function Pagina() {
 
   const decidir = async (s: Solic, aprovar: boolean) => {
     setOcupado(s.id);
-    const { error } = await supabase.rpc("portal_decidir_solicitacao", { _id: s.id, _aprovar: aprovar });
+    const { error } = await supabase.rpc("portal_decidir_solicitacao", {
+      _id: s.id,
+      _aprovar: aprovar,
+    });
     setOcupado(null);
     if (error) return mostrarErro(error);
     toast.success(aprovar ? "Cadastro atualizado." : "Pedido recusado.");
@@ -76,7 +79,9 @@ function Pagina() {
       </p>
       {!clinicaId && <p className="text-sm text-muted-foreground">Escolha uma unidade.</p>}
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {data && data.length === 0 && <p className="text-sm text-muted-foreground">Nenhum pedido aguardando.</p>}
+      {data && data.length === 0 && (
+        <p className="text-sm text-muted-foreground">Nenhum pedido aguardando.</p>
+      )}
       {data?.map((s) => (
         <Card key={s.id} className="p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -110,8 +115,17 @@ function Pagina() {
             </tbody>
           </table>
           <div className="mt-3 flex gap-2">
-            <Button size="sm" disabled={ocupado === s.id} onClick={() => decidir(s, true)}>Aprovar</Button>
-            <Button size="sm" variant="outline" disabled={ocupado === s.id} onClick={() => decidir(s, false)}>Recusar</Button>
+            <Button size="sm" disabled={ocupado === s.id} onClick={() => decidir(s, true)}>
+              Aprovar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={ocupado === s.id}
+              onClick={() => decidir(s, false)}
+            >
+              Recusar
+            </Button>
           </div>
         </Card>
       ))}

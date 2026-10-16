@@ -3,7 +3,13 @@
 // por clinica_id + paciente_id da sessão. Usa service_role, então este
 // arquivo é a única barreira — nunca aceitar paciente_id vindo do navegador.
 
-import { getCookie, getRequestHeader, getRequestIP, setCookie, deleteCookie } from "@tanstack/react-start/server";
+import {
+  getCookie,
+  getRequestHeader,
+  getRequestIP,
+  setCookie,
+  deleteCookie,
+} from "@tanstack/react-start/server";
 import { hostnamePadrao, idClinicaValido, normalizarHostname } from "@/lib/clinica-acesso";
 import { SESSAO_MAX_HORAS, sessaoValida } from "./regras";
 
@@ -38,7 +44,10 @@ export async function hmac(tipo: string, valor: string): Promise<string> {
 
 export function tokenAleatorio(): string {
   const b = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(String.fromCharCode(...b))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 export function codigoAleatorio(): string {
@@ -139,7 +148,10 @@ export async function sessaoAtual(clinicaParam?: string | null): Promise<SessaoP
   }
   const clinica = await clinicaDoPortal(clinicaParam);
   if (clinica !== s.clinica_id) return null;
-  await db.from("portal_sessoes").update({ ultimo_uso_em: new Date().toISOString() }).eq("id", s.id);
+  await db
+    .from("portal_sessoes")
+    .update({ ultimo_uso_em: new Date().toISOString() })
+    .eq("id", s.id);
   return { id: s.id, clinica_id: s.clinica_id, paciente_id: s.paciente_id };
 }
 

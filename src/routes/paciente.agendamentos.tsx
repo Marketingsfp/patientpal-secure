@@ -87,12 +87,17 @@ function Lista({ clinica }: { clinica: string | null }) {
     }
   };
 
-  const proximos = (data?.itens ?? []).filter((i) => i.futuro && i.status !== "cancelado").reverse();
+  const proximos = (data?.itens ?? [])
+    .filter((i) => i.futuro && i.status !== "cancelado")
+    .reverse();
   const historico = (data?.itens ?? []).filter((i) => !(i.futuro && i.status !== "cancelado"));
 
   return (
     <>
-      <Link to="/paciente" className="mb-4 inline-flex items-center text-sm text-primary hover:underline">
+      <Link
+        to="/paciente"
+        className="mb-4 inline-flex items-center text-sm text-primary hover:underline"
+      >
         <ArrowLeft className="mr-1 h-4 w-4" /> Início
       </Link>
       <h1 className="text-2xl font-semibold">Meus agendamentos</h1>
@@ -101,7 +106,9 @@ function Lista({ clinica }: { clinica: string | null }) {
       {data && (
         <>
           <h2 className="mt-6 font-semibold">Próximos</h2>
-          {proximos.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Nenhum agendamento futuro.</p>}
+          {proximos.length === 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">Nenhum agendamento futuro.</p>
+          )}
           <div className="mt-2 space-y-3">
             {proximos.map((a) => (
               <Card key={a.id} className="p-4">
@@ -109,19 +116,35 @@ function Lista({ clinica }: { clinica: string | null }) {
                   <div>
                     <p className="font-medium capitalize">{quando(a.inicio)}</p>
                     <p className="text-sm text-muted-foreground">
-                      {[a.procedimento, a.profissional, a.especialidade].filter(Boolean).join(" · ")}
+                      {[a.procedimento, a.profissional, a.especialidade]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   </div>
                   <Badge variant="secondary">{STATUS[a.status] ?? a.status}</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {a.podeConfirmar && (
-                    <Button size="sm" disabled={ocupado} onClick={() => agir(() => confirmarFn({ data: { clinica, id: a.id } }), "Presença confirmada.")}>
+                    <Button
+                      size="sm"
+                      disabled={ocupado}
+                      onClick={() =>
+                        agir(
+                          () => confirmarFn({ data: { clinica, id: a.id } }),
+                          "Presença confirmada.",
+                        )
+                      }
+                    >
                       Confirmar presença
                     </Button>
                   )}
                   {!a.motivoNaoCancela ? (
-                    <Button size="sm" variant="outline" disabled={ocupado} onClick={() => setCancelarId(a.id)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={ocupado}
+                      onClick={() => setCancelarId(a.id)}
+                    >
                       Cancelar
                     </Button>
                   ) : (
@@ -132,15 +155,24 @@ function Lista({ clinica }: { clinica: string | null }) {
             ))}
           </div>
           <h2 className="mt-8 font-semibold">Histórico</h2>
-          {historico.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Nada por aqui ainda.</p>}
+          {historico.length === 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">Nada por aqui ainda.</p>
+          )}
           <div className="mt-2 space-y-2">
             {historico.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm">
+              <div
+                key={a.id}
+                className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm"
+              >
                 <div>
                   <p className="capitalize">{quando(a.inicio)}</p>
-                  <p className="text-xs text-muted-foreground">{[a.procedimento, a.profissional].filter(Boolean).join(" · ")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[a.procedimento, a.profissional].filter(Boolean).join(" · ")}
+                  </p>
                 </div>
-                <span className="text-xs text-muted-foreground">{STATUS[a.status] ?? a.status}</span>
+                <span className="text-xs text-muted-foreground">
+                  {STATUS[a.status] ?? a.status}
+                </span>
               </div>
             ))}
           </div>
@@ -158,7 +190,13 @@ function Lista({ clinica }: { clinica: string | null }) {
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction
               disabled={ocupado}
-              onClick={() => cancelarId && agir(() => cancelarFn({ data: { clinica, id: cancelarId } }), "Agendamento cancelado.")}
+              onClick={() =>
+                cancelarId &&
+                agir(
+                  () => cancelarFn({ data: { clinica, id: cancelarId } }),
+                  "Agendamento cancelado.",
+                )
+              }
             >
               Sim, cancelar
             </AlertDialogAction>

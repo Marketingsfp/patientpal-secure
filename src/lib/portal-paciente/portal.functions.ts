@@ -56,7 +56,11 @@ export const portalInfo = createServerFn({ method: "POST" })
     const clinicaId = await clinicaDoPortal(data.clinica);
     if (!clinicaId) return { ativo: false as const };
     const db = await admin();
-    const { data: c } = await db.from("clinicas").select("nome, telefone").eq("id", clinicaId).maybeSingle();
+    const { data: c } = await db
+      .from("clinicas")
+      .select("nome, telefone")
+      .eq("id", clinicaId)
+      .maybeSingle();
     return { ativo: true as const, nome: c?.nome ?? "", telefone: c?.telefone ?? null };
   });
 
@@ -76,8 +80,17 @@ export const solicitarCodigo = createServerFn({ method: "POST" })
     const db = await s.admin();
     const agora = Date.now();
     const iso = (ms: number) => new Date(agora - ms).toISOString();
-    const conta = async (col: "cpf_hash" | "ip_hash", v: string, desde: string, extra?: "invalidado") => {
-      let q = db.from("portal_otps").select("id", { count: "exact", head: true }).eq(col, v).gte("criado_em", desde);
+    const conta = async (
+      col: "cpf_hash" | "ip_hash",
+      v: string,
+      desde: string,
+      extra?: "invalidado",
+    ) => {
+      let q = db
+        .from("portal_otps")
+        .select("id", { count: "exact", head: true })
+        .eq(col, v)
+        .gte("criado_em", desde);
       if (col === "cpf_hash") q = q.eq("clinica_id", clinicaId);
       if (extra) q = q.eq("invalidado", true);
       const { count } = await q;
@@ -101,7 +114,12 @@ export const solicitarCodigo = createServerFn({ method: "POST" })
     };
 
     if (recusa) {
-      await s.auditar({ clinica_id: clinicaId, evento: "codigo_recusado", cpf_hash: cpfHash, detalhe: { motivo: recusa } });
+      await s.auditar({
+        clinica_id: clinicaId,
+        evento: "codigo_recusado",
+        cpf_hash: cpfHash,
+        detalhe: { motivo: recusa },
+      });
       return resposta;
     }
 
@@ -140,7 +158,11 @@ export const solicitarCodigo = createServerFn({ method: "POST" })
       .neq("id", otp!.id)
       .lt("tentativas", CODIGO_MAX_TENTATIVAS);
     const { data: cl } = await db.from("clinicas").select("nome").eq("id", clinicaId).maybeSingle();
-    const enviado = await s.enviarCodigoEmail({ clinicaNome: cl?.nome ?? "", email: comEmail.email!, codigo });
+    const enviado = await s.enviarCodigoEmail({
+      clinicaNome: cl?.nome ?? "",
+      email: comEmail.email!,
+      codigo,
+    });
     if (enviado) await db.from("portal_otps").update({ enviado: true }).eq("id", otp!.id);
     await s.auditar({
       clinica_id: clinicaId,
@@ -154,7 +176,9 @@ export const solicitarCodigo = createServerFn({ method: "POST" })
 /** Passo 2. Confere o código; cria a sessão. */
 export const verificarCodigo = createServerFn({ method: "POST" })
   .inputValidator((d: { clinica?: string | null; cpf: string; codigo: string }) =>
-    z.object({ clinica: clinicaParam, cpf: z.string().max(20), codigo: z.string().max(10) }).parse(d),
+    z
+      .object({ clinica: clinicaParam, cpf: z.string().max(20), codigo: z.string().max(10) })
+      .parse(d),
   )
   .handler(async ({ data }) => {
     const s = await srv();
@@ -175,17 +199,28 @@ export const verificarCodigo = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     if (!otp || new Date(otp.expira_em).getTime() < Date.now()) {
-      await s.auditar({ clinica_id: clinicaId, evento: "login_falhou", cpf_hash: cpfHash, detalhe: { motivo: "sem_codigo" } });
+      await s.auditar({
+        clinica_id: clinicaId,
+        evento: "login_falhou",
+        cpf_hash: cpfHash,
+        detalhe: { motivo: "sem_codigo" },
+      });
       return { status: "erro" as const, mensagem: MSG_CODIGO_INVALIDO };
     }
-    const confere = !!otp.codigo_hash && codigo.length === 6 && (await s.hmac("otp", codigo)) === otp.codigo_hash;
+    const confere =
+      !!otp.codigo_hash && codigo.length === 6 && (await s.hmac("otp", codigo)) === otp.codigo_hash;
     if (!confere) {
       const tentativas = otp.tentativas + 1;
       await db
         .from("portal_otps")
         .update({ tentativas, invalidado: tentativas >= CODIGO_MAX_TENTATIVAS })
         .eq("id", otp.id);
-      await s.auditar({ clinica_id: clinicaId, evento: "login_falhou", cpf_hash: cpfHash, detalhe: { tentativas } });
+      await s.auditar({
+        clinica_id: clinicaId,
+        evento: "login_falhou",
+        cpf_hash: cpfHash,
+        detalhe: { tentativas },
+      });
       return { status: "erro" as const, mensagem: MSG_CODIGO_INVALIDO };
     }
     await db.from("portal_otps").update({ usado_em: new Date().toISOString() }).eq("id", otp.id);
@@ -203,11 +238,21 @@ export const verificarCodigo = createServerFn({ method: "POST" })
     const p = pacientes[0];
     const idade = idadeEm(p.data_nascimento, new Date());
     if (idade !== null && idade < 18) {
-      await s.auditar({ clinica_id: clinicaId, evento: "pendencia_menor", cpf_hash: cpfHash, paciente_id: p.id });
+      await s.auditar({
+        clinica_id: clinicaId,
+        evento: "pendencia_menor",
+        cpf_hash: cpfHash,
+        paciente_id: p.id,
+      });
       return { status: "pendencia" as const, mensagem: MSG_PENDENCIA };
     }
     await s.criarSessao(clinicaId, p.id);
-    await s.auditar({ clinica_id: clinicaId, evento: "login_ok", cpf_hash: cpfHash, paciente_id: p.id });
+    await s.auditar({
+      clinica_id: clinicaId,
+      evento: "login_ok",
+      cpf_hash: cpfHash,
+      paciente_id: p.id,
+    });
     return { status: "ok" as const };
   });
 
@@ -242,7 +287,8 @@ export const aceitarTermo = createServerFn({ method: "POST" })
     const sessao = await s.sessaoAtual(data.clinica);
     if (!sessao) throw new Error("Sua sessão terminou. Entre novamente.");
     const termo = await s.termoAtual(sessao.clinica_id);
-    if (!termo || termo.id !== data.termoId) throw new Error("O termo foi atualizado. Recarregue a página.");
+    if (!termo || termo.id !== data.termoId)
+      throw new Error("O termo foi atualizado. Recarregue a página.");
     const db = await s.admin();
     await db.from("portal_termo_aceites").upsert(
       {
@@ -267,7 +313,12 @@ export const sairPortal = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const s = await srv();
     const sessao = await s.sessaoAtual(data.clinica);
-    if (sessao) await s.auditar({ clinica_id: sessao.clinica_id, paciente_id: sessao.paciente_id, evento: "logout" });
+    if (sessao)
+      await s.auditar({
+        clinica_id: sessao.clinica_id,
+        paciente_id: sessao.paciente_id,
+        evento: "logout",
+      });
     await s.encerrarSessao();
     return { ok: true };
   });
@@ -289,7 +340,9 @@ async function lerAgendamentos(clinicaId: string, pacienteId: string, id?: strin
   const db = await admin();
   let q = db
     .from("agendamentos")
-    .select("id, inicio, status, procedimento, pacote_id, data_pagamento, medicos(nome, especialidades!medicos_especialidade_id_fkey(nome))")
+    .select(
+      "id, inicio, status, procedimento, pacote_id, data_pagamento, medicos(nome, especialidades!medicos_especialidade_id_fkey(nome))",
+    )
     .eq("clinica_id", clinicaId)
     .eq("paciente_id", pacienteId)
     .order("inicio", { ascending: false })
@@ -308,7 +361,8 @@ async function lerAgendamentos(clinicaId: string, pacienteId: string, id?: strin
       .from("fin_atendimentos")
       .select("agendamento_id, status")
       .in("agendamento_id", ids);
-    for (const f of fin ?? []) if (f.agendamento_id && f.status !== "cancelado") pagos.add(f.agendamento_id);
+    for (const f of fin ?? [])
+      if (f.agendamento_id && f.status !== "cancelado") pagos.add(f.agendamento_id);
   }
   return linhas.map((l) => ({ ...l, pago: !!l.data_pagamento || pagos.has(l.id) }));
 }
@@ -334,7 +388,11 @@ export const meusAgendamentos = createServerFn({ method: "POST" })
       horasCancelar(sessao.clinica_id),
     ]);
     const agora = new Date();
-    await s.auditar({ clinica_id: sessao.clinica_id, paciente_id: sessao.paciente_id, evento: "ver_agendamentos" });
+    await s.auditar({
+      clinica_id: sessao.clinica_id,
+      paciente_id: sessao.paciente_id,
+      evento: "ver_agendamentos",
+    });
     return {
       horasCancelar: horas,
       itens: linhas.map((l) => {
@@ -363,7 +421,12 @@ export const confirmarAgendamento = createServerFn({ method: "POST" })
     const sessao = await s.exigirSessao(data.clinica);
     const [ag] = await lerAgendamentos(sessao.clinica_id, sessao.paciente_id, data.id);
     if (!ag) throw new Error("Agendamento não encontrado.");
-    if (!podeConfirmar({ inicio: ag.inicio, status: ag.status, pago: ag.pago, pacote: !!ag.pacote_id }, new Date()))
+    if (
+      !podeConfirmar(
+        { inicio: ag.inicio, status: ag.status, pago: ag.pago, pacote: !!ag.pacote_id },
+        new Date(),
+      )
+    )
       throw new Error("Este agendamento não pode ser confirmado.");
     const db = await s.admin();
     const { error } = await db
@@ -374,7 +437,12 @@ export const confirmarAgendamento = createServerFn({ method: "POST" })
       .eq("paciente_id", sessao.paciente_id)
       .eq("status", "agendado");
     if (error) throw new Error("Não foi possível confirmar agora.");
-    await s.auditar({ clinica_id: sessao.clinica_id, paciente_id: sessao.paciente_id, evento: "confirmou_agendamento", detalhe: { agendamento_id: ag.id } });
+    await s.auditar({
+      clinica_id: sessao.clinica_id,
+      paciente_id: sessao.paciente_id,
+      evento: "confirmou_agendamento",
+      detalhe: { agendamento_id: ag.id },
+    });
     return { ok: true };
   });
 
@@ -394,7 +462,8 @@ export const cancelarAgendamento = createServerFn({ method: "POST" })
     );
     if (motivo) throw new Error(motivo);
     // Mesmo núcleo da agenda (libera orçamento, desfaz atendimento externo, auditoria).
-    const { atualizarStatusAgendamentoCore } = await import("@/lib/agenda/status-agendamento.core.server");
+    const { atualizarStatusAgendamentoCore } =
+      await import("@/lib/agenda/status-agendamento.core.server");
     await atualizarStatusAgendamentoCore(
       {
         db: (await s.admin()) as never,
@@ -412,7 +481,12 @@ export const cancelarAgendamento = createServerFn({ method: "POST" })
         motivo: "Cancelado pelo paciente na Área do Paciente",
       },
     );
-    await s.auditar({ clinica_id: sessao.clinica_id, paciente_id: sessao.paciente_id, evento: "cancelou_agendamento", detalhe: { agendamento_id: ag.id } });
+    await s.auditar({
+      clinica_id: sessao.clinica_id,
+      paciente_id: sessao.paciente_id,
+      evento: "cancelou_agendamento",
+      detalhe: { agendamento_id: ag.id },
+    });
     return { ok: true };
   });
 
@@ -443,7 +517,11 @@ export const meuCadastro = createServerFn({ method: "POST" })
       .order("criado_em", { ascending: false })
       .limit(1)
       .maybeSingle();
-    await s.auditar({ clinica_id: sessao.clinica_id, paciente_id: sessao.paciente_id, evento: "ver_cadastro" });
+    await s.auditar({
+      clinica_id: sessao.clinica_id,
+      paciente_id: sessao.paciente_id,
+      evento: "ver_cadastro",
+    });
     const cpf = reg.cpf_digits ?? "";
     const dados: Record<string, string | null> = {};
     for (const k of CAMPOS_SOLICITAVEIS) dados[k] = reg[k] ?? null;
@@ -452,7 +530,9 @@ export const meuCadastro = createServerFn({ method: "POST" })
       cpfMascarado: cpf.length === 11 ? `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**` : "",
       dataNascimento: reg.data_nascimento,
       dados,
-      pendente: pend ? { criado_em: pend.criado_em, dados_novos: pend.dados_novos as Record<string, string> } : null,
+      pendente: pend
+        ? { criado_em: pend.criado_em, dados_novos: pend.dados_novos as Record<string, string> }
+        : null,
     };
   });
 
@@ -480,7 +560,8 @@ export const solicitarAlteracaoCadastro = createServerFn({ method: "POST" })
     if (!p) throw new Error("Cadastro não encontrado.");
     const atual = p as unknown as Record<string, string | null>;
     const novos = diferencasCadastro(atual, data.dados);
-    if (novos.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novos.email)) throw new Error("Confira o e-mail.");
+    if (novos.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novos.email))
+      throw new Error("Confira o e-mail.");
     if (novos.telefone && (novos.telefone.length < 10 || novos.telefone.length > 11))
       throw new Error("Confira o telefone com DDD.");
     const chaves = Object.keys(novos);
@@ -490,7 +571,11 @@ export const solicitarAlteracaoCadastro = createServerFn({ method: "POST" })
     // Uma solicitação aberta por vez: a nova substitui a anterior.
     await db
       .from("portal_solicitacoes_cadastro")
-      .update({ status: "cancelada", decidido_em: new Date().toISOString(), observacao: "Substituída pelo paciente" })
+      .update({
+        status: "cancelada",
+        decidido_em: new Date().toISOString(),
+        observacao: "Substituída pelo paciente",
+      })
       .eq("paciente_id", sessao.paciente_id)
       .eq("clinica_id", sessao.clinica_id)
       .eq("status", "pendente");
@@ -501,6 +586,11 @@ export const solicitarAlteracaoCadastro = createServerFn({ method: "POST" })
       dados_anteriores: anteriores as never,
     });
     if (error) throw new Error("Não foi possível enviar agora.");
-    await s.auditar({ clinica_id: sessao.clinica_id, paciente_id: sessao.paciente_id, evento: "solicitou_alteracao", detalhe: { campos: chaves } });
+    await s.auditar({
+      clinica_id: sessao.clinica_id,
+      paciente_id: sessao.paciente_id,
+      evento: "solicitou_alteracao",
+      detalhe: { campos: chaves },
+    });
     return { ok: true };
   });

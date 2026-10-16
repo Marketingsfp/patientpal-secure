@@ -94,7 +94,8 @@ export function motivoNaoCancela(
   agora: Date,
   horasMin: number,
 ): string | null {
-  if (!["agendado", "confirmado"].includes(a.status)) return "Este agendamento não pode mais ser cancelado.";
+  if (!["agendado", "confirmado"].includes(a.status))
+    return "Este agendamento não pode mais ser cancelado.";
   if (a.pago) return "Consulta já paga: o cancelamento é feito pela recepção.";
   if (a.pacote) return "Faz parte de um pacote: o cancelamento é feito pela recepção.";
   const limite = new Date(a.inicio).getTime() - horasMin * 3_600_000;

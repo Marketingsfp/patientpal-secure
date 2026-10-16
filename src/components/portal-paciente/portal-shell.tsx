@@ -75,7 +75,11 @@ export function MolduraPortal({
 }
 
 /** Exige sessão + termo aceito; senão volta para /paciente. */
-export function PortalAutenticado({ children }: { children: (clinica: string | null) => ReactNode }) {
+export function PortalAutenticado({
+  children,
+}: {
+  children: (clinica: string | null) => ReactNode;
+}) {
   const clinica = useClinicaParamPortal();
   const marca = useMarcaPortal(clinica);
   const navigate = useNavigate();

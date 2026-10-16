@@ -40,13 +40,21 @@ describe("sessão", () => {
   it("expira após 30 min sem uso", () => {
     expect(
       sessaoValida(
-        { ultimo_uso_em: "2026-10-16T11:31:00Z", expira_max_em: "2026-10-16T18:00:00Z", encerrada_em: null },
+        {
+          ultimo_uso_em: "2026-10-16T11:31:00Z",
+          expira_max_em: "2026-10-16T18:00:00Z",
+          encerrada_em: null,
+        },
         agora,
       ),
     ).toBe(true);
     expect(
       sessaoValida(
-        { ultimo_uso_em: "2026-10-16T11:30:00Z", expira_max_em: "2026-10-16T18:00:00Z", encerrada_em: null },
+        {
+          ultimo_uso_em: "2026-10-16T11:30:00Z",
+          expira_max_em: "2026-10-16T18:00:00Z",
+          encerrada_em: null,
+        },
         agora,
       ),
     ).toBe(false);
@@ -54,13 +62,21 @@ describe("sessão", () => {
   it("expira no máximo de 8 h e após sair", () => {
     expect(
       sessaoValida(
-        { ultimo_uso_em: "2026-10-16T11:59:00Z", expira_max_em: "2026-10-16T12:00:00Z", encerrada_em: null },
+        {
+          ultimo_uso_em: "2026-10-16T11:59:00Z",
+          expira_max_em: "2026-10-16T12:00:00Z",
+          encerrada_em: null,
+        },
         agora,
       ),
     ).toBe(false);
     expect(
       sessaoValida(
-        { ultimo_uso_em: "2026-10-16T11:59:00Z", expira_max_em: "2026-10-16T18:00:00Z", encerrada_em: "x" },
+        {
+          ultimo_uso_em: "2026-10-16T11:59:00Z",
+          expira_max_em: "2026-10-16T18:00:00Z",
+          encerrada_em: "x",
+        },
         agora,
       ),
     ).toBe(false);
