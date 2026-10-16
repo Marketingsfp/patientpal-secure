@@ -24,7 +24,11 @@ import {
   chamadaDoEvento,
   eventosResultadoFerramenta,
 } from "../ligacao/eventos-ligacao";
-import { FERRAMENTAS_SIMULADAS_LIGACAO } from "../ligacao/config";
+import {
+  FERRAMENTAS_SIMULADAS_LIGACAO,
+  VOZ_PADRAO_LIGACAO,
+  vozSalvaValida,
+} from "../ligacao/config";
 import { instrucoesCamadaVoz } from "../ligacao/regras-ligacao";
 
 const codigos = (o: Parameters<typeof instrucoesDaLigacao>[0]) =>
@@ -241,5 +245,20 @@ describe("velocidade da ligação", () => {
     expect(codigoDoErro({ statusCode: 400, message: "conteúdo do pedido" })).toBe("HTTP 400");
     expect(codigoDoErro(new TypeError("x"))).toBe("TypeError");
     expect(codigoDoErro(null)).toBe("desconhecido");
+  });
+});
+
+describe("voz da ligação", () => {
+  it("lembra só vozes conhecidas; o resto volta para a padrão", () => {
+    expect(vozSalvaValida("vesper")).toBe("vesper");
+    expect(vozSalvaValida("voz-inexistente")).toBe(VOZ_PADRAO_LIGACAO);
+    expect(vozSalvaValida(null)).toBe(VOZ_PADRAO_LIGACAO);
+  });
+
+  it("instrui a falar como atendente ao telefone, sem mudar os fatos", () => {
+    const t = instrucoesCamadaVoz("Maria", "Clínica Teste");
+    expect(t).toContain("JEITO DE FALAR");
+    expect(t).toMatch(/mesmos fatos/);
+    expect(t).toMatch(/não repita a mesma frase/);
   });
 });

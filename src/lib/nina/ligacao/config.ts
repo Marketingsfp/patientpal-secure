@@ -31,6 +31,16 @@ export const VOZES_LIGACAO = [
 export type VozLigacao = (typeof VOZES_LIGACAO)[number];
 export const VOZ_PADRAO_LIGACAO: VozLigacao = "marin";
 
+/** Preferência do navegador de quem usa a tela (não é dado compartilhado). */
+export const CHAVE_VOZ_SALVA = "nina-ligacao:voz";
+
+/** Valor salvo que não seja uma voz conhecida volta para a padrão. */
+export function vozSalvaValida(valor: string | null | undefined): VozLigacao {
+  return (VOZES_LIGACAO as readonly string[]).includes(valor ?? "")
+    ? (valor as VozLigacao)
+    : VOZ_PADRAO_LIGACAO;
+}
+
 /**
  * Ferramentas que gravam, identificam ou encaminham: na ligação respondem com
  * resultado simulado, sem tocar no banco. As demais são leituras reais do
