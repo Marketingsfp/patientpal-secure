@@ -14,6 +14,7 @@ import {
 } from "@/lib/atendimento/dashboard-oszap-periodos";
 import { formatDatePura, hojeBR } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
+import { AnaliseDashboardIA, type AnaliseDashboard } from "./AnaliseDashboardIA";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Resumo = Awaited<ReturnType<typeof carregarResumoDashboardOsZap>>;
@@ -606,6 +607,7 @@ export function DashboardOsZapView({
   clinica,
   atualizando,
   erro,
+  analisar,
 }: {
   resumo?: Resumo;
   periodo: PeriodoDashboard;
@@ -615,6 +617,8 @@ export function DashboardOsZapView({
   clinica: string;
   atualizando: boolean;
   erro?: string;
+  /** Análise por IA do período já consultado (só aparece quando informada). */
+  analisar?: () => Promise<AnaliseDashboard>;
 }) {
   const [rascunho, setRascunho] = useState(periodo);
   // Abre em "Hoje" (o período inicial vem do DashboardOsZap).
@@ -791,6 +795,10 @@ export function DashboardOsZapView({
               })}
             </p>
           </div>
+          {analisar && (
+            // Nova consulta recria o bloco: a análise antiga não fica sobre números novos.
+            <AnaliseDashboardIA key={resumo.atualizadoEm} analisar={analisar} />
+          )}
           {resumo.avisos.length > 0 && (
             <div
               role="status"

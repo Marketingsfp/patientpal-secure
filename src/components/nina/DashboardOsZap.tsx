@@ -3,7 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
-import { consultarResumoDashboardOsZap } from "@/lib/atendimento/dashboard-oszap.functions";
+import {
+  analisarDashboardOsZapIA,
+  consultarResumoDashboardOsZap,
+} from "@/lib/atendimento/dashboard-oszap.functions";
 import {
   periodoInicialDashboard,
   type AgrupamentoDashboard,
@@ -17,6 +20,7 @@ export function DashboardOsZap() {
   const [periodo, setPeriodo] = useState(periodoInicialDashboard);
   const [agrupamento, setAgrupamento] = useState<AgrupamentoDashboard>("dia");
   const resumoFn = useServerFn(consultarResumoDashboardOsZap);
+  const analisarFn = useServerFn(analisarDashboardOsZapIA);
   const resumo = useQuery({
     queryKey: ["oszap-dashboard-historico", user?.id, clinicaId, periodo],
     queryFn: () => resumoFn({ data: { clinicaId: clinicaId!, periodo } }),
@@ -43,6 +47,7 @@ export function DashboardOsZap() {
       clinica={clinicaAtual?.clinica.nome ?? ""}
       atualizando={resumo.isFetching}
       erro={resumo.error?.message}
+      analisar={() => analisarFn({ data: { clinicaId, periodo } })}
     />
   );
 }
