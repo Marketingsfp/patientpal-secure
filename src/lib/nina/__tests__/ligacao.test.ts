@@ -6,7 +6,16 @@ import {
   instrucoesDaLigacao,
 } from "../ligacao/contrato-ligacao.server";
 import { resultadoSimulado } from "../ligacao/ferramentas-ligacao.server";
-import { corpoInicioSessao, MODELO_VOZ_LIGACAO } from "../ligacao/sessao-live.server";
+import {
+  corpoInicioSessao,
+  fetchComRaciocinioBaixo,
+  juntarFala,
+  LIMITE_PASSOS_LIGACAO,
+  MODELO_APOIO_LIGACAO,
+  MODELO_VOZ_LIGACAO,
+} from "../ligacao/sessao-live.server";
+import { MODELO_NINA_ALVO } from "../modelo-nina";
+import { LIMITE_RODADAS_COMUM } from "../eficiencia-turno";
 import {
   ESTADO_INICIAL_LIGACAO,
   ROTULOS_FERRAMENTAS,
@@ -180,5 +189,57 @@ describe("eventos da ligação", () => {
       error: { code: "x", message: "segredo interno" },
     });
     expect(erro.erro).toBe("Erro na ligação (x).");
+  });
+});
+
+describe("velocidade da ligação", () => {
+  it("usa o mesmo modelo e o mesmo limite de rodadas do chat", () => {
+    expect(MODELO_APOIO_LIGACAO).toBe(MODELO_NINA_ALVO);
+    expect(LIMITE_PASSOS_LIGACAO).toBe(LIMITE_RODADAS_COMUM);
+  });
+
+  it("junta os trechos da transcrição numa fala por pessoa", () => {
+    const falas: { role: "user" | "assistant"; text: string }[] = [];
+    juntarFala(falas, "user", "Quero");
+    juntarFala(falas, "user", " marcar");
+    juntarFala(falas, "assistant", "Claro");
+    juntarFala(falas, "user", "cardiologia");
+    expect(falas).toEqual([
+      { role: "user", text: "Quero marcar" },
+      { role: "assistant", text: "Claro" },
+      { role: "user", text: "cardiologia" },
+    ]);
+  });
+
+  it("trecho que chega depois de a fala ir para o modelo abre fala nova", () => {
+    const falas: { role: "user" | "assistant"; text: string }[] = [{ role: "user", text: "Quero" }];
+    juntarFala(falas, "user", " marcar", 1);
+    expect(falas).toEqual([
+      { role: "user", text: "Quero" },
+      { role: "user", text: " marcar" },
+    ]);
+  });
+
+  it("envia raciocínio baixo ao gateway, como o chat", async () => {
+    const original = globalThis.fetch;
+    let corpo = "";
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      corpo = String(init?.body);
+      return new Response("{}");
+    }) as typeof fetch;
+    try {
+      await fetchComRaciocinioBaixo("https://exemplo.test", {
+        method: "POST",
+        body: JSON.stringify({ model: "m" }),
+      });
+      expect(JSON.parse(corpo)).toEqual({ model: "m", reasoning_effort: "low" });
+      await fetchComRaciocinioBaixo("https://exemplo.test", {
+        method: "POST",
+        body: JSON.stringify({ model: "m", reasoning_effort: "medium" }),
+      });
+      expect(JSON.parse(corpo).reasoning_effort).toBe("medium");
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });
