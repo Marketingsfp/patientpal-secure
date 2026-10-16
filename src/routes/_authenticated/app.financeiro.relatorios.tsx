@@ -292,6 +292,21 @@ const POR_PAGINA = 50;
 /** Quantos serviços o combobox desenha por vez — o cadastro tem milhares. */
 const SERVICOS_VISIVEIS = 60;
 
+/** Quadradinho de marcar do filtro de Serviço (seleção múltipla). */
+function MarcaServico({ marcado }: { marcado: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "mr-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
+        marcado ? "bg-primary text-primary-foreground" : "opacity-50",
+      )}
+    >
+      {marcado && <Check className="h-3 w-3" />}
+    </span>
+  );
+}
+
 /**
  * Altura e borda comuns de todo campo do card de filtros. São oito campos em
  * três blocos diferentes; sem uma classe única eles vinham com alturas
@@ -809,7 +824,9 @@ function Page() {
   const [rTipoServico, setRTipoServico] = useState("todos");
   // Particular x Cartão Benefícios — a mesma condição da coluna Modalidade.
   const [rModalidade, setRModalidade] = useState<"todas" | RateioModalidade>("todas");
-  const [rServico, setRServico] = useState("todos");
+  // Vários serviços podem ser marcados juntos (o relatório soma os
+  // escolhidos). Lista vazia = TODOS OS SERVIÇOS.
+  const [rServicos, setRServicos] = useState<string[]>([]);
   const [rTipo, setRTipo] = useState<RateioTipo>("sintetico");
   const [rAgrupar, setRAgrupar] = useState<RateioAgruparPor>("data");
   /**
@@ -977,7 +994,7 @@ function Page() {
             rGrupo,
             rTipoServico,
             rModalidade,
-            rServico,
+            rServicos.join("+"),
             comparar ? `${periodoComp.de}:${periodoComp.ate}` : "sem-comparacao",
           ].join("|")
         : `${tipo}|${from}|${to}`;
@@ -1652,7 +1669,9 @@ function Page() {
     if (rModalidade !== "todas") {
       partes.push(`Modalidade: ${rModalidade === "cartao" ? "Cartão Benefícios" : "Particular"}`);
     }
-    if (rServico !== "todos") partes.push(`Serviço: ${rServico}`);
+    if (rServicos.length > 0) {
+      partes.push(`${rServicos.length > 1 ? "Serviços" : "Serviço"}: ${rServicos.join(", ")}`);
+    }
     // Sem esta linha, uma folha com o total menor circula sem dizer por que o
     // total é menor — que é exatamente a dúvida de quem confere.
     if (categorias.length > 0) partes.push(descricaoSelecao(categorias));
@@ -1714,7 +1733,7 @@ function Page() {
           grupo: rGrupo === "todos" ? null : rGrupo,
           tipo: rTipoServico === "todos" ? null : rTipoServico,
           modalidade: rModalidade === "todas" ? null : rModalidade,
-          servico: rServico === "todos" ? null : rServico,
+          servico: rServicos.length > 0 ? rServicos : null,
         };
         // Sem recorte de profissional/serviço, o fechamento de caixa do
         // período inteiro é o mesmo do Dashboard — só então faz sentido
@@ -1725,7 +1744,7 @@ function Page() {
           rGrupo === "todos" &&
           rTipoServico === "todos" &&
           rModalidade === "todas" &&
-          rServico === "todos" &&
+          rServicos.length === 0 &&
           categorias.length === 0;
         const [atualTodas, anteriorTodas, fora, foraComp, pago, painel] = await Promise.all([
           carregarRateio(ctxRateio, { ...filtrosComuns, de: from, ate: to }),
@@ -2379,7 +2398,7 @@ function Page() {
                     onValueChange={(v) => {
                       setRGrupo(v);
                       // O serviço escolhido pode não pertencer ao novo grupo.
-                      setRServico("todos");
+                      setRServicos([]);
                     }}
                     disabled={!ctxRateio}
                   >
@@ -2403,7 +2422,7 @@ function Page() {
                     onValueChange={(v) => {
                       setRTipoServico(v);
                       // O serviço escolhido pode não ser do novo tipo.
-                      setRServico("todos");
+                      setRServicos([]);
                     }}
                     disabled={!ctxRateio}
                   >
@@ -2446,8 +2465,15 @@ function Page() {
                         className={cn("w-full justify-between font-normal", CAMPO)}
                         disabled={!ctxRateio}
                       >
-                        <span className="truncate">
-                          {rServico === "todos" ? "TODOS OS SERVIÇOS" : rServico}
+                        <span
+                          className="truncate"
+                          title={rServicos.length > 1 ? rServicos.join("\n") : undefined}
+                        >
+                          {rServicos.length === 0
+                            ? "TODOS OS SERVIÇOS"
+                            : rServicos.length === 1
+                              ? rServicos[0]
+                              : `${rServicos.length} SERVIÇOS SELECIONADOS`}
                         </span>
                         <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
                       </Button>
@@ -2470,36 +2496,36 @@ function Page() {
                             <CommandItem
                               value="todos"
                               onSelect={() => {
-                                setRServico("todos");
+                                setRServicos([]);
                                 setServicoAberto(false);
                               }}
                             >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  rServico === "todos" ? "opacity-100" : "opacity-0",
-                                )}
-                              />
+                              <MarcaServico marcado={rServicos.length === 0} />
                               TODOS OS SERVIÇOS
                             </CommandItem>
-                            {servicosFiltrados.map((nome) => (
-                              <CommandItem
-                                key={nome}
-                                value={nome}
-                                onSelect={() => {
-                                  setRServico(nome);
-                                  setServicoAberto(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    rServico === nome ? "opacity-100" : "opacity-0",
-                                  )}
-                                />
-                                <span className="truncate">{nome}</span>
-                              </CommandItem>
-                            ))}
+                            {/* Os já marcados ficam sempre no topo, mesmo que a
+                                busca atual não os encontre — dá para desmarcar
+                                sem ter de redigitar o nome. */}
+                            {[
+                              ...rServicos,
+                              ...servicosFiltrados.filter((n) => !rServicos.includes(n)),
+                            ].map((nome) => {
+                              const marcado = rServicos.includes(nome);
+                              return (
+                                <CommandItem
+                                  key={nome}
+                                  value={nome}
+                                  onSelect={() =>
+                                    setRServicos((atual) =>
+                                      marcado ? atual.filter((n) => n !== nome) : [...atual, nome],
+                                    )
+                                  }
+                                >
+                                  <MarcaServico marcado={marcado} />
+                                  <span className="truncate">{nome}</span>
+                                </CommandItem>
+                              );
+                            })}
                           </CommandGroup>
                         </CommandList>
                       </Command>

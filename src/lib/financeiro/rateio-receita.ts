@@ -362,8 +362,11 @@ export interface RateioFiltros {
   especialidadeId?: string | null;
   /** Grupo de serviço normalizado (ver `chaveGrupo`). `null` = todos. */
   grupo?: string | null;
-  /** Nome do serviço como está no cadastro. `null` = todos. */
-  servico?: string | null;
+  /**
+   * Nome do serviço como está no cadastro, ou vários nomes (o relatório soma
+   * os escolhidos). `null` ou lista vazia = todos.
+   */
+  servico?: string | string[] | null;
   /** Tipo do serviço em caixa alta (CONSULTA/EXAME/...). `null` = todos. */
   tipo?: string | null;
   /** Particular ou Cartão (ver `RateioModalidade`). `null` = todas. */
@@ -1388,7 +1391,12 @@ export function filtrarRateio(
   linhas: RateioLinha[],
   filtros: RateioFiltros,
 ): RateioLinha[] {
-  const servicoAlvo = filtros.servico ? normRepasse(filtros.servico) : null;
+  const listaServicos = Array.isArray(filtros.servico)
+    ? filtros.servico
+    : filtros.servico
+      ? [filtros.servico]
+      : [];
+  const servicoAlvo = listaServicos.length > 0 ? new Set(listaServicos.map(normRepasse)) : null;
   const grupoAlvo = filtros.grupo ?? null;
   const tipoAlvo = filtros.tipo ? rotuloTipo(filtros.tipo) : null;
   return linhas.filter((l) => {
@@ -1410,7 +1418,7 @@ export function filtrarRateio(
       const chave = chaveDoServico(ctx, l.procedimento, l.medico_id);
       // Atendimento sem serviço identificado não pertence a grupo nenhum.
       if (!chave) return false;
-      if (servicoAlvo && chave !== servicoAlvo) return false;
+      if (servicoAlvo && !servicoAlvo.has(chave)) return false;
       if (grupoAlvo && ctx.grupoPorServico.get(chave) !== grupoAlvo) return false;
     }
     return true;

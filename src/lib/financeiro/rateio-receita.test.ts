@@ -187,6 +187,12 @@ describe("filtrarRateio", () => {
     expect(r.map((l) => l.id)).toEqual(["1"]);
   });
 
+  it("soma varios servicos escolhidos juntos; lista vazia = todos", () => {
+    const r = filtrarRateio(ctx, linhas, { ...base, servico: ["CONSULTA", "raio-x torax"] });
+    expect(r.map((l) => l.id)).toEqual(["1", "2"]);
+    expect(filtrarRateio(ctx, linhas, { ...base, servico: [] })).toHaveLength(3);
+  });
+
   /**
    * O tipo é o único recorte que separa consulta de exame de um mesmo médico:
    * em oftalmologia, os dois estão no mesmo Grupo de serviço.
