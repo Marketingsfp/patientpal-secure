@@ -2714,6 +2714,10 @@ export const revisarVinculoPacienteConversa = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertMember(context.supabase, context.userId, data.clinicaId);
+    // Trocar o paciente da conversa é escrita: perfil só de leitura não pode.
+    const acessos = await carregarAcessosOsZap(context.supabase, context.userId, data.clinicaId);
+    if (acessos["oszap-conversas"] !== "write")
+      throw new Error("Sem permissão para alterar o paciente desta conversa.");
     {
       const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);

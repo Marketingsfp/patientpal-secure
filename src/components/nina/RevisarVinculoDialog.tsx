@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { buscarPacientesChat } from "@/lib/agenda/chat-agenda.functions";
 import { revisarVinculoPacienteConversa } from "@/lib/atendimento.functions";
+import { formatDatePura } from "@/lib/date-utils";
 
 type Paciente = {
   id: string;
@@ -125,7 +126,14 @@ export function RevisarVinculoDialog(props: {
             >
               <div className="font-medium">{p.nome}</div>
               <div className="text-xs text-muted-foreground">
-                {[p.cpf, p.telefone].filter(Boolean).join(" · ") || "sem CPF/telefone"}
+                {/* Data de nascimento separa pacientes com o mesmo nome. */}
+                {[
+                  p.data_nascimento ? `Nasc. ${formatDatePura(p.data_nascimento)}` : null,
+                  p.cpf,
+                  p.telefone,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "sem nascimento, CPF ou telefone"}
               </div>
             </button>
           ))}

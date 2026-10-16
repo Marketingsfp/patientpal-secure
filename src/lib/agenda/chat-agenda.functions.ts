@@ -14,6 +14,27 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const SEM_RESULTADO = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * O termo entra num filtro `or` do PostgREST: vírgula, parênteses, aspas e
+ * curingas mudariam o filtro. Fica só o texto de busca.
+ */
+export function termoBuscaPaciente(termo: string): string {
+  return termo
+    .replace(/[,()"'\\%*:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Dados de paciente e agenda só para quem é da clínica (além do RLS). */
+async function exigirMembro(supabase: any, userId: string, clinicaId: string) {
+  const { data, error } = await supabase.rpc("is_member", {
+    _user_id: userId,
+    _clinica_id: clinicaId,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sem acesso a esta clínica");
+}
 const TZ = "America/Sao_Paulo";
 
 function normalizar(s: string) {
@@ -51,6 +72,7 @@ export const catalogoAgendaChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
     const [proc, med, esp, agendas] = await Promise.all([
       context.supabase
         .from("procedimentos")
@@ -117,6 +139,7 @@ export const slotsAgendaChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => SlotsInput.parse(d))
   .handler(async ({ data, context }): Promise<SlotChat[]> => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
     const { ini, fim } = janelaDia(data.data);
     let q = context.supabase
       .from("agendamentos")
@@ -191,6 +214,7 @@ export const diasComVagaChat = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }): Promise<string[]> => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
     let q = context.supabase
       .from("agendamentos")
       .select("inicio, paciente_nome")
@@ -222,6 +246,7 @@ export const proximaVagaChat = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
     const agora = new Date();
     const ate = new Date(agora.getTime() + (data.dias ?? 60) * 86_400_000);
     let q = context.supabase
@@ -289,8 +314,11 @@ export const buscarPacientesChat = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), termo: z.string().trim().min(2).max(120) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const digitos = data.termo.replace(/\D/g, "");
-    const filtros = [`nome.ilike.%${data.termo}%`];
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
+    const termo = termoBuscaPaciente(data.termo);
+    if (termo.length < 2) return [];
+    const digitos = termo.replace(/\D/g, "");
+    const filtros = [`nome.ilike.%${termo}%`];
     if (digitos.length >= 3) filtros.push(`cpf.ilike.%${digitos}%`, `telefone.ilike.%${digitos}%`);
     const { data: rows } = await context.supabase
       .from("pacientes")
@@ -315,6 +343,7 @@ export const agendamentosFuturosChat = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), pacienteId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
     const { data: rows } = await context.supabase
       .from("agendamentos")
       .select("id, inicio, procedimento, medico_id, status")
@@ -362,6 +391,19 @@ export const registrarAgendamentoNaConversa = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await exigirMembro(context.supabase, context.userId, data.clinicaId);
+    {
+      const { assertAcessoConversa } = await import("@/lib/atendimento/acesso-conversa.server");
+      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
+    }
+    // O agendamento precisa existir nesta clínica (o evento só aponta para ele).
+    const { data: ag } = await context.supabase
+      .from("agendamentos")
+      .select("id")
+      .eq("id", data.agendamentoId)
+      .eq("clinica_id", data.clinicaId)
+      .maybeSingle();
+    if (!ag) throw new Error("Agendamento não encontrado nesta clínica.");
     // Evento interno da timeline. Não vai para o WhatsApp.
     const { error } = await context.supabase.from("atend_conversa_eventos").insert({
       clinica_id: data.clinicaId,

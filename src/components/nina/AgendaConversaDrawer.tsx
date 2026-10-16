@@ -79,6 +79,7 @@ export function AgendaConversaDrawer({
   contatoNome,
   contatoTelefone,
   pacienteIdVinculado,
+  pacienteVinculado,
   sugestao,
   onMensagemPronta,
 }: {
@@ -89,6 +90,8 @@ export function AgendaConversaDrawer({
   contatoNome: string | null;
   contatoTelefone: string | null;
   pacienteIdVinculado: string | null;
+  /** Cadastro já vinculado à conversa: vem pronto, sem nova busca por nome. */
+  pacienteVinculado?: Paciente | null;
   sugestao?: SugestaoAgenda;
   onMensagemPronta?: (texto: string) => void;
 }) {
@@ -156,7 +159,11 @@ export function AgendaConversaDrawer({
 
   // Paciente já vinculado à conversa: nunca criar duplicado.
   useEffect(() => {
-    if (!open || !clinicaId || !pacienteIdVinculado) return;
+    if (!open || !pacienteVinculado) return;
+    setPaciente(pacienteVinculado);
+  }, [open, pacienteVinculado]);
+  useEffect(() => {
+    if (!open || !clinicaId || !pacienteIdVinculado || pacienteVinculado) return;
     void (async () => {
       const r = (await fnPacientes({
         data: { clinicaId, termo: (contatoNome || contatoTelefone || "").slice(0, 60) || "aa" },
@@ -164,7 +171,15 @@ export function AgendaConversaDrawer({
       const achou = r.find((p) => p.id === pacienteIdVinculado);
       if (achou) setPaciente(achou);
     })();
-  }, [open, clinicaId, pacienteIdVinculado, contatoNome, contatoTelefone, fnPacientes]);
+  }, [
+    open,
+    clinicaId,
+    pacienteIdVinculado,
+    pacienteVinculado,
+    contatoNome,
+    contatoTelefone,
+    fnPacientes,
+  ]);
 
   /* --------------------------------------------------------------- buscas */
   useEffect(() => {
@@ -232,11 +247,11 @@ export function AgendaConversaDrawer({
     return t ? lista.filter((p) => p.nome.toLowerCase().includes(t)).slice(0, 30) : [];
   }, [catalogo, buscaProc]);
 
-  const livres = slots.filter((s) => s.livre);
+  const livres = slots.filter((s) => s.livre && !s.ordem_chegada);
   const ocupados = slots.filter((s) => !s.livre);
   const porPeriodo = (p: "manha" | "tarde" | "noite") =>
     livres.filter((s) => periodoDe(s.hora) === p && (periodo === "todos" || periodo === p));
-  const ordemChegada = livres.some((s) => s.ordem_chegada);
+  const ordemChegada = slots.some((s) => s.livre && s.ordem_chegada);
 
   const faltando: string[] = [];
   if (!paciente) faltando.push("paciente");
@@ -619,7 +634,10 @@ export function AgendaConversaDrawer({
             <div className="space-y-2">
               <Label className="text-xs">Horários</Label>
               {ordemChegada && (
-                <p className="text-xs text-atd-ink-soft">Atendimento por ordem de chegada.</p>
+                <p className="rounded-md border border-atd-border bg-atd-bg px-2 py-1.5 text-xs text-atd-ink-soft">
+                  Atendimento por ordem de chegada: não há horário marcado. Oriente o paciente a
+                  comparecer no período de atendimento do profissional.
+                </p>
               )}
               {carregandoSlots ? (
                 <p className="text-xs text-atd-ink-soft">Buscando horários disponíveis…</p>

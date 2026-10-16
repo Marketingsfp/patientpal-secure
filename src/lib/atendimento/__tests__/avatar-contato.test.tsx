@@ -35,9 +35,9 @@ describe("avatar do contato", () => {
 describe("painel Contato da caixa de entrada", () => {
   const fonte = readFileSync("src/components/nina/AtendimentoExtraTabs.tsx", "utf8");
 
-  it("não tem mais o botão Revisar vínculo nem as notas internas", () => {
-    expect(fonte).not.toContain("Revisar vínculo");
-    expect(fonte).not.toContain("RevisarVinculoDialog");
+  // 30/09: vínculo e notas saíram; 16/10 o usuário pediu o vínculo de volta (notas continuam fora).
+  it("tem o vínculo com paciente, mas não as notas internas", () => {
+    expect(fonte).toContain("<RevisarVinculoDialog");
     expect(fonte).not.toContain("Notas internas");
     expect(fonte).not.toContain("listarNotas");
     expect(fonte).not.toContain("criarNota");

@@ -117,6 +117,7 @@ import {
   AlertTriangle,
   Reply,
   X,
+  CalendarDays,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
@@ -231,6 +232,8 @@ import { idConversaValido } from "@/lib/atendimento/abrir-conversa";
 import { statusEhRepresentacaoDaNina } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AvatarContato } from "@/components/nina/AvatarContato";
+import { RevisarVinculoDialog } from "@/components/nina/RevisarVinculoDialog";
+import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
 import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -3066,6 +3069,10 @@ function AtendInboxOperacional({
   const conversaEncerrada = sel?.status === "closed" || sel?.status === "finished";
   const [assumindo, setAssumindo] = useState(false);
   const [assumirOpen, setAssumirOpen] = useState(false);
+  // Vínculo da conversa com o cadastro do paciente (volta em 16/10/2026).
+  const [vinculoAberto, setVinculoAberto] = useState(false);
+  // Agenda dentro da conversa (volta em 16/10/2026): exige paciente vinculado.
+  const [agendaAberta, setAgendaAberta] = useState(false);
 
   /* ---------- Mensagens rápidas (comandos "/") ---------- */
   const respostasRapidas = useRespostasRapidas(clinicaId);
@@ -4306,6 +4313,24 @@ function AtendInboxOperacional({
                         )}
                       {/* Conversas não atribuídas são distribuídas automaticamente
                         quando alguém fica online — sem botões manuais. */}
+                      {podeAtender && !conversaEncerrada && !sel.is_teste && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={carregandoConversa}
+                          className="border-atd-border text-atd-blue-ink hover:bg-atd-blue-tint hover:text-atd-blue-ink"
+                          onClick={() => {
+                            if (!contato?.paciente?.id) {
+                              toast.info("Vincule o paciente antes de agendar.");
+                              setVinculoAberto(true);
+                              return;
+                            }
+                            setAgendaAberta(true);
+                          }}
+                        >
+                          <CalendarDays className="h-3.5 w-3.5 mr-1" /> Agendar
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -4685,6 +4710,33 @@ function AtendInboxOperacional({
                           )}
                         </div>
                       </div>
+                      <div
+                        data-testid="vinculo-paciente"
+                        className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-atd-border bg-atd-bg px-2 py-1.5 text-xs"
+                      >
+                        <span className="min-w-0 break-words">
+                          {contatoAtual.paciente?.nome ? (
+                            <>
+                              Paciente:{" "}
+                              <span className="font-medium text-atd-ink">
+                                {contatoAtual.paciente.nome}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-atd-ink-soft">Sem paciente vinculado</span>
+                          )}
+                        </span>
+                        {podeAtender && clinicaId && sel && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => setVinculoAberto(true)}
+                          >
+                            {contatoAtual.paciente?.nome ? "Trocar paciente" : "Vincular paciente"}
+                          </Button>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
                         {contatoAtual.paciente?.email && (
                           <div>✉️ {contatoAtual.paciente.email}</div>
@@ -4745,6 +4797,47 @@ function AtendInboxOperacional({
           </Card>
 
           {/* DIALOGS */}
+
+          {clinicaId && sel && (
+            <RevisarVinculoDialog
+              open={vinculoAberto}
+              onOpenChange={setVinculoAberto}
+              clinicaId={clinicaId}
+              conversaId={sel.id}
+              contatoNome={contatoAtual ? tituloConversa(contatoAtual.conversa) || null : null}
+              contatoTelefone={contatoAtual?.conversa?.contato_telefone ?? null}
+              pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
+              onVinculado={() => void atualizarContatoRef.current()}
+            />
+          )}
+          {clinicaId && sel && contato?.paciente?.id && (
+            <AgendaConversaDrawer
+              open={agendaAberta}
+              onOpenChange={(aberta) => {
+                setAgendaAberta(aberta);
+                // Agendamento novo aparece no painel do contato.
+                if (!aberta) void atualizarContatoRef.current();
+              }}
+              clinicaId={clinicaId}
+              conversaId={sel.id}
+              contatoNome={contato ? tituloConversa(contato.conversa) || null : null}
+              contatoTelefone={contato?.conversa?.contato_telefone ?? null}
+              pacienteIdVinculado={contato.paciente.id}
+              pacienteVinculado={{
+                id: contato.paciente.id,
+                nome: contato.paciente.nome,
+                cpf: contato.paciente.cpf ?? null,
+                telefone: contato.paciente.telefone ?? null,
+                data_nascimento: contato.paciente.data_nascimento ?? null,
+              }}
+              // A confirmação vai para o campo de mensagem; a atendente revisa e envia.
+              onMensagemPronta={(texto) => {
+                setDraft(texto);
+                setAgendaAberta(false);
+                composerRef.current?.focus();
+              }}
+            />
+          )}
 
           <Dialog open={assumirOpen} onOpenChange={setAssumirOpen}>
             <DialogContent>
