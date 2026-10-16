@@ -218,6 +218,13 @@
       "when": 1792170615135,
       "tag": "0030_clinica_dominios_restringir_acesso",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792171240471,
+      "tag": "0031_idx_whatsapp_mensagens_to",
+      "breakpoints": true
     }
   ]
 }
