@@ -34,5 +34,5 @@ complementam este arquivo. Em caso de conflito, prevalece a interpretação
 - Etapa 5 (corrigir pasta) troca `codigo_prontuario` em duas fases (`IMP-PROV-*`, depois a chave) via `importacao_legado_execucoes.fase`, só em `origem = 'importacao_clinica_total'` — por quê: números antigos e chaves se cruzam e há unicidade por clínica.
 - Ligação por voz da Nina usa conexão contínua `/api/nina-ligacao` (`sessao-live.server.ts`), delegação "client" e ferramentas no servidor — por quê: o gateway exige servidor conectado e recusa comandos do navegador.
 - Agendamento não repete `inicio` por médico/agenda (gatilho soma 1s); encaixe (`ficha_encaixe`) grava `ficha_encaixe_numero` no fim da fila, demais fichas são posicionais em `numerarFichas` — por quê: nenhum fluxo escapa e ninguém muda de número.
-- CI roda lint, tipos e testes em jobs independentes — uma falha não esconde as outras. Formatação segue `.prettierrc`; cópias locais ignoradas em `output/` e `outputs/` não entram no lint.
+- CI roda lint, tipos e testes em jobs independentes — uma falha não esconde as outras. Formatação: `.prettierrc`; `output/`/`outputs/` fora do lint.
 - Domínio por clínica (`clinica_dominios`) muda só visual e unidade inicial; acesso é do RLS.
