@@ -28,26 +28,14 @@ describe("numerarFichas", () => {
     expect(m.get("c")).toBe(3);
   });
 
-  it("encaixe no mesmo minuto divide a ficha e não empurra as seguintes", () => {
-    const semEncaixe = numerarFichas([
-      linha("s6", "08:50"),
-      linha("s7", "09:00", "ANA"),
-      linha("s8", "09:10"),
-      linha("s9", "09:20"),
-    ]);
-    const comEncaixe = numerarFichas([
-      linha("s6", "08:50"),
-      linha("s7", "09:00", "ANA"),
-      linha("enc", "09:00", "ZULMIRA"),
-      linha("s8", "09:10"),
-      linha("s9", "09:20"),
-    ]);
-    // O encaixe recebe o número da ficha em que foi sobreposto...
-    expect(comEncaixe.get("s7")).toBe(semEncaixe.get("s7"));
-    expect(comEncaixe.get("enc")).toBe(comEncaixe.get("s7"));
-    // ...e nenhuma ficha do resto do dia muda de número.
-    expect(comEncaixe.get("s8")).toBe(semEncaixe.get("s8"));
-    expect(comEncaixe.get("s9")).toBe(semEncaixe.get("s9"));
+  it("dois agendamentos no mesmo horário recebem números diferentes, por ordem de lançamento", () => {
+    const leticia = { ...linha("let", "14:51", "LETICIA"), created_at: "2026-10-15T10:20:26Z" };
+    const denise = { ...linha("den", "14:51", "DENISE"), created_at: "2026-10-15T11:18:13Z" };
+    const vitoria = { ...linha("vit", "14:51"), inicio: "2026-09-09T14:51:01-03:00" };
+    const m = numerarFichas([denise, vitoria, leticia]);
+    expect(m.get("let")).toBe(1);
+    expect(m.get("den")).toBe(2);
+    expect(m.get("vit")).toBe(3);
   });
 
   it("cada agenda do mesmo médico tem sequência própria", () => {

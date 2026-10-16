@@ -1067,7 +1067,7 @@ async function printGuiaAtendimentoCore({
     try {
       const q = supabase
         .from("agendamentos")
-        .select("id, inicio, paciente_nome, medico_id, agenda_id")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id, created_at")
         .eq("clinica_id", clinicaId)
         .gte("inicio", diaIni.toISOString())
         .lte("inicio", diaFim.toISOString());
@@ -1698,7 +1698,7 @@ async function calcularFichas(
         fim.setHours(23, 59, 59, 999);
         const q = supabase
           .from("agendamentos")
-          .select("id, inicio, paciente_nome, medico_id, agenda_id")
+          .select("id, inicio, paciente_nome, medico_id, agenda_id, created_at")
           .eq("clinica_id", clinicaId)
           .gte("inicio", ini.toISOString())
           .lte("inicio", fim.toISOString());

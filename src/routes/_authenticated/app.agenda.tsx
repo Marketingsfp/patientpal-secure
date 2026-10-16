@@ -451,7 +451,7 @@ const LIMITE_PATCH_REALTIME = 40;
 // porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
 // as linhas que mudaram.
 const AGENDA_SELECT =
-  "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,sem_faturamento_motivo,sem_faturamento_autorizado_por,sem_faturamento_autorizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+  "id,created_at,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,sem_faturamento_motivo,sem_faturamento_autorizado_por,sem_faturamento_autorizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
 
 type AgendaRowBruta = Agendamento & {
   medico?: { nome: string | null; sexo: string | null } | null;
@@ -4460,8 +4460,8 @@ function AgendaPage() {
   };
 
   const fichaPorId = useMemo(() => {
-    // Regra única da ficha (posicional por dia/profissional/agenda, com o
-    // encaixe compartilhando o número da ficha sobreposta) vive em
+    // Regra única da ficha (posicional por dia/profissional/agenda, sem
+    // número repetido; empate por ordem de lançamento) vive em
     // src/lib/agenda/ficha-numero.ts — a guia impressa usa exatamente a mesma.
     // O filtro visual (médico, status, cliente…) NÃO afeta esses números:
     // numeramos sempre sobre TODOS os items carregados, para que a ficha
