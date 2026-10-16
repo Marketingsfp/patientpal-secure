@@ -35,4 +35,4 @@ complementam este arquivo. Em caso de conflito, prevalece a interpretação
 - Ligação por voz da Nina usa conexão contínua `/api/nina-ligacao` (`sessao-live.server.ts`), delegação "client" e ferramentas no servidor — por quê: o gateway exige servidor conectado e recusa comandos do navegador.
 - Agendamento não repete `inicio` por médico/agenda (gatilho soma 1s); encaixe (`ficha_encaixe`) grava `ficha_encaixe_numero` no fim da fila, demais fichas são posicionais em `numerarFichas` — por quê: nenhum fluxo escapa e ninguém muda de número.
 - CI roda lint, tipos e testes em jobs separados — uma falha não esconde outra. Formatação: `.prettierrc`; `output/`/`outputs/` fora do lint.
-- Domínio por clínica (`clinica_dominios`) muda só visual e unidade inicial; acesso é do RLS.
+- Domínio por clínica (`clinica_dominios`) muda só visual e unidade; acesso é do RLS.
