@@ -1,83 +1,157 @@
 /**
- * Conexão WebRTC do navegador com a sessão de voz. O navegador nunca vê a
- * chave: ele gera a oferta, o servidor abre a sessão (`iniciarLigacaoNina`) e
- * devolve a resposta SDP. Áudio vai pelas trilhas de mídia; eventos JSON pelo
- * canal de dados.
- *
- * PARA A LOVABLE: se o GPT-Live 1 no gateway usar outro nome de canal de dados
- * ou outro transporte, o ajuste fica só aqui e em `sessao-live.server.ts`.
+ * Conexão do navegador com a ligação. O navegador nunca vê a chave:
+ * gera a oferta WebRTC, abre a conexão contínua com o servidor
+ * (`/api/nina-ligacao`, ver `sessao-live.server.ts`) e recebe por ela a
+ * resposta SDP e todos os eventos. O áudio vai pelas trilhas de mídia; o canal
+ * de dados `oai-events` só confirma que a mídia está pronta (o gateway não
+ * aceita comandos por ele). Enquanto a ligação dura, manda o "estou vivo" a
+ * cada segundo; sem ele, a voz encerra a sessão.
  */
-import { CANAL_EVENTOS_LIVE, eventoEncerrar } from "./eventos-ligacao";
+import { CANAL_EVENTOS_LIVE } from "./eventos-ligacao";
 
 export type ConexaoLigacao = {
-  enviar: (evento: Record<string, unknown>) => void;
   mutar: (mudo: boolean) => void;
-  /** Encerramento gracioso: pede `session.close` e aguarda `session.closed`. */
+  /** Pede `session.close` e aguarda `session.closed` (no máximo 15 s). */
   encerrar: () => Promise<void>;
 };
 
 export async function conectarLigacao(o: {
-  iniciar: (sdpOferta: string) => Promise<{ sdp: string }>;
+  clinicaId: string;
+  voz: string;
+  token: string;
   aoEvento: (evento: unknown) => void;
-  aoCair: () => void;
+  aoCair: (motivo?: string) => void;
 }): Promise<ConexaoLigacao> {
-  const microfone = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const microfone = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true },
+  });
   const pc = new RTCPeerConnection();
   const audio = new Audio();
   audio.autoplay = true;
+  let socket: WebSocket | undefined;
   let fechado = false;
+  let ativo = false;
+  let respostaAplicada = false;
+  let pulso: ReturnType<typeof setInterval> | undefined;
+  let ultimoAck = 0;
   let aoFechar: (() => void) | null = null;
 
-  const liberar = () => {
+  const liberar = (motivo?: string, avisar = false) => {
     if (fechado) return;
     fechado = true;
+    clearInterval(pulso);
     microfone.getTracks().forEach((t) => t.stop());
     audio.srcObject = null;
     pc.close();
+    socket?.close();
+    aoFechar?.();
+    if (avisar) o.aoCair(motivo);
+  };
+
+  const enviar = (e: object) => {
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(e));
+  };
+
+  const canal = pc.createDataChannel(CANAL_EVENTOS_LIVE);
+  const midiaPronta = () => pc.connectionState === "connected" && canal.readyState === "open";
+  const ativar = () => {
+    if (ativo || !respostaAplicada || !midiaPronta()) return;
+    ativo = true;
+    ultimoAck = Date.now();
+    pulso = setInterval(() => {
+      if (Date.now() - ultimoAck > 5000) return liberar("A conexão de voz caiu.", true);
+      if (midiaPronta()) enviar({ type: "gateway.heartbeat" });
+    }, 1000);
+    enviar({ type: "gateway.heartbeat" });
+    enviar({ type: "app.ready" });
+    o.aoEvento({ type: "session.started" });
   };
 
   try {
-    microfone.getTracks().forEach((t) => pc.addTrack(t, microfone));
+    microfone.getAudioTracks().forEach((t) => pc.addTrack(t, microfone));
     pc.ontrack = (e) => {
-      audio.srcObject = e.streams[0] ?? null;
+      audio.srcObject = e.streams[0] ?? new MediaStream([e.track]);
+      void audio.play().catch(() => undefined);
     };
     pc.onconnectionstatechange = () => {
-      if (["failed", "disconnected", "closed"].includes(pc.connectionState) && !fechado) {
-        liberar();
-        o.aoCair();
-      }
+      if (pc.connectionState === "failed" || pc.connectionState === "closed")
+        liberar("A conexão de voz caiu.", true);
+      else ativar();
     };
-    const canal = pc.createDataChannel(CANAL_EVENTOS_LIVE);
-    canal.onmessage = (m) => {
-      let evento: unknown;
-      try {
-        evento = JSON.parse(String(m.data));
-      } catch {
-        return;
-      }
-      o.aoEvento(evento);
-      if ((evento as { type?: unknown })?.type === "session.closed") aoFechar?.();
-    };
+    canal.onopen = ativar;
 
-    const oferta = await pc.createOffer();
-    await pc.setLocalDescription(oferta);
-    const { sdp } = await o.iniciar(oferta.sdp ?? "");
-    await pc.setRemoteDescription({ type: "answer", sdp });
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise<void>((resolve) => {
+      if (pc.iceGatheringState === "complete") return resolve();
+      const t = setTimeout(resolve, 5000);
+      pc.addEventListener("icegatheringstatechange", () => {
+        if (pc.iceGatheringState === "complete") {
+          clearTimeout(t);
+          resolve();
+        }
+      });
+    });
+    const sdp = pc.localDescription?.sdp;
+    if (!sdp) throw new Error("Não foi possível preparar a ligação.");
 
-    const enviar = (evento: Record<string, unknown>) => {
-      if (canal.readyState === "open") canal.send(JSON.stringify(evento));
-    };
+    const url = new URL("/api/nina-ligacao", window.location.href);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(url.href);
+      socket = ws;
+      const prazo = setTimeout(() => reject(new Error("A voz demorou para responder.")), 50_000);
+      ws.onopen = () =>
+        ws.send(
+          JSON.stringify({ type: "app.start", sdp, token: o.token, clinicaId: o.clinicaId, voz: o.voz }),
+        );
+      ws.onmessage = ({ data }) => {
+        let e: { type?: string; transport?: { sdp?: string }; error?: { message?: string } };
+        try {
+          e = JSON.parse(String(data));
+        } catch {
+          return;
+        }
+        if (e.type === "gateway.heartbeat.ack") {
+          ultimoAck = Date.now();
+          return;
+        }
+        if (e.type === "gateway.session.created" && !respostaAplicada && e.transport?.sdp) {
+          respostaAplicada = true;
+          clearTimeout(prazo);
+          void pc
+            .setRemoteDescription({ type: "answer", sdp: e.transport.sdp })
+            .then(() => {
+              resolve();
+              ativar();
+            })
+            .catch(() => reject(new Error("Não foi possível conectar o áudio.")));
+          return;
+        }
+        if (e.type === "session.started") return; // o início é marcado em ativar()
+        o.aoEvento(e);
+        if (!respostaAplicada && (e.type === "app.error" || e.type === "gateway.error")) {
+          clearTimeout(prazo);
+          reject(new Error(e.error?.message ?? "Não foi possível ligar agora."));
+        }
+        if (e.type === "session.closed") liberar(undefined, true);
+      };
+      ws.onerror = () => reject(new Error("Não foi possível ligar agora."));
+      ws.onclose = () => {
+        clearTimeout(prazo);
+        reject(new Error("Não foi possível ligar agora."));
+        liberar(undefined, true);
+      };
+    });
+
     return {
-      enviar,
       mutar: (mudo) => microfone.getAudioTracks().forEach((t) => (t.enabled = !mudo)),
       encerrar: async () => {
         if (fechado) return;
-        if (canal.readyState === "open") {
-          const fechou = new Promise<void>((r) => (aoFechar = r));
-          enviar(eventoEncerrar());
-          // Sem confirmação em 3 s, a ligação é desfeita assim mesmo.
-          await Promise.race([fechou, new Promise((r) => setTimeout(r, 3000))]);
-        }
+        const fechou = new Promise<void>((r) => (aoFechar = r));
+        enviar({ type: "session.close" });
+        clearInterval(pulso);
+        microfone.getTracks().forEach((t) => t.stop());
+        await Promise.race([fechou, new Promise((r) => setTimeout(r, 15_000))]);
         liberar();
       },
     };
