@@ -238,41 +238,101 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [acesso, user?.id, loading, memberships]);
 
+  // Domínio com "restringir acesso" (só endereço real, nunca ?clinica=/prévia).
+  // Revalida a cada sessão e a cada recarga. Só UX: dados seguem pelo RLS.
+  const [trava, setTrava] = useState<AcessoDominio | null>(null);
+  const [travaVerificada, setTravaVerificada] = useState(false);
+  useEffect(() => {
+    if (!user?.id) {
+      setTrava(null);
+      setTravaVerificada(false);
+      return;
+    }
+    let vivo = true;
+    setTravaVerificada(false);
+    void verificarAcessoDominio().then(async (r) => {
+      if (!vivo) return;
+      if (r && !r.pode) {
+        try {
+          window.sessionStorage.setItem(
+            CHAVE_BLOQUEIO_DOMINIO,
+            mensagemBloqueioDominio(r.clinica_nome ?? "clínica deste endereço"),
+          );
+        } catch {
+          /* sem armazenamento: só não mostra a mensagem */
+        }
+        await supabase.auth.signOut().catch(() => undefined);
+        window.location.replace("/login");
+        return;
+      }
+      setTrava(r && r.clinica_id ? r : null);
+      setTravaVerificada(true);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [user?.id]);
+
+  const travadaId = trava?.clinica_id ?? null;
+  // Admin de plataforma sem vínculo: entra travado na clínica do domínio.
+  // O vínculo aqui é só para a tela; o que ele vê continua decidido pelo RLS.
+  const membershipsEfetivas: ClinicaMembership[] = travadaId
+    ? memberships.some((m) => m.clinica_id === travadaId)
+      ? memberships.filter((m) => m.clinica_id === travadaId)
+      : [
+          {
+            id: `dominio-${travadaId}`,
+            clinica_id: travadaId,
+            role: "admin",
+            clinica: { id: travadaId, nome: trava?.clinica_nome ?? "", cidade: null, estado: null },
+          },
+        ]
+    : memberships;
+
   const setModoTodas = (v: boolean) => {
+    if (travadaId) return;
     setModoTodasState(v);
     gravarPreferencia(TODAS_KEY, v ? "1" : "0");
   };
 
   // A escolha explícita do usuário (salva no navegador) só vale se a unidade
   // ainda estiver entre os vínculos ativos.
-  const clinicaEscolhida = memberships.find((m) => m.clinica_id === clinicaAtualId) ?? null;
+  const clinicaEscolhida = travadaId
+    ? membershipsEfetivas[0]
+    : (memberships.find((m) => m.clinica_id === clinicaAtualId) ?? null);
   const clinicaAtual = clinicaEscolhida ?? memberships[0] ?? null;
   // Quem tem uma única unidade nunca está adivinhando. Com várias, cair na
   // primeira da lista é palpite — foi assim que, depois de uma queda de
   // energia que apagou o armazenamento do navegador, um totem passou a
   // emitir senhas em nome da unidade errada.
   const clinicaFixada = clinicaEscolhida !== null || memberships.length === 1;
+  const modoTodasEfetivo = travadaId ? false : modoTodas;
 
-  const clinicaIds = modoTodas
+  const clinicaIds = modoTodasEfetivo
     ? memberships.map((m) => m.clinica_id)
     : clinicaAtual
       ? [clinicaAtual.clinica_id]
       : [];
 
   const branding = (clinicaAtual?.clinica.branding ?? null) as ClinicaBranding | null;
+  const aguardandoTrava = !!user?.id && !travaVerificada;
 
   return (
     <ClinicaContext.Provider
       value={{
-        memberships,
+        memberships: membershipsEfetivas,
         clinicaAtual,
-        setClinicaAtual,
-        modoTodas,
+        setClinicaAtual: (id: string) => {
+          if (travadaId) return;
+          setClinicaAtual(id);
+        },
+        modoTodas: modoTodasEfetivo,
         setModoTodas,
         clinicaIds,
         clinicaFixada,
+        unidadeTravada: !!travadaId,
         branding,
-        loading,
+        loading: loading || aguardandoTrava,
         refresh: load,
       }}
     >
