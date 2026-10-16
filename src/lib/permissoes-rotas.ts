@@ -302,6 +302,28 @@ export function moduloPermitido(
   return false;
 }
 
+/** Telas do portal Funcionários / RH (grupo "Recursos Humanos" do menu). */
+const TELAS_RH = [
+  "/app/hr-ponto",
+  "/app/hr-contratos",
+  "/app/hr-ferias",
+  "/app/hr-holerites",
+  "/app/treinamentos",
+  "/app/lms-admin",
+] as const;
+
+/**
+ * Portal Funcionários / RH só aparece (hub e seletor) para quem pode abrir ao
+ * menos uma tela dele — mesma regra do OS ZAP e do Coach. Quem decide é a
+ * matriz de Perfis de Acesso; nada aqui é fixo por cargo.
+ */
+export function podeAbrirPortalRh(
+  allowed: Set<string> | null,
+  configured?: Set<string> | null,
+): boolean {
+  return TELAS_RH.some((t) => moduloPermitido(ROUTE_TO_MODULE[t], allowed, configured));
+}
+
 /**
  * Lista de prefixos ordenada do mais específico para o mais genérico.
  * Usada para casar rotas com parâmetros dinâmicos (ex.: /app/clientes/abc/editar).

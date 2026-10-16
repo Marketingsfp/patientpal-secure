@@ -94,6 +94,7 @@ import {
   ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE,
   moduloDaTela,
   moduloPermitido,
+  podeAbrirPortalRh,
   rotaSomenteAdmin,
 } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
@@ -1362,6 +1363,8 @@ function AppShellInner() {
       ocultos.push("os-zap");
     // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
     if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
+    // Funcionários / RH: mesma regra, pelas telas do grupo Recursos Humanos.
+    if (!podeAbrirPortalRh(allowedModules, configuredModules)) ocultos.push("gestao-pessoas");
     return ocultos;
   }, [allowedModules, configuredModules, clinicaAtual?.role]);
 
