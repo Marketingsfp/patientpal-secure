@@ -19,6 +19,7 @@ import {
 import { ordenarInbox } from "@/lib/atendimento/ordem-inbox";
 import { ConsultaBaseChat } from "./ConsultaBaseChat";
 import { AssistenteEscritaChat } from "./AssistenteEscritaChat";
+import { BotaoBloquearContato } from "./BloquearContato";
 import { acrescentarBaseAoRascunho } from "@/lib/atendimento/consulta-base-chat";
 import { useHoverTolerante } from "@/hooks/use-hover-tolerante";
 import { useAcessibilidade } from "@/components/acessibilidade/AcessibilidadeProvider";
@@ -4345,6 +4346,17 @@ function AtendInboxOperacional({
                           )}
                           {fechando ? "Encerrando…" : "Encerrar"}
                         </Button>
+                      )}
+                      {clinicaId && (
+                        <BotaoBloquearContato
+                          clinicaId={clinicaId}
+                          conversaId={sel.id}
+                          onBloqueado={() => {
+                            cacheConversas.current.invalidar(sel.id);
+                            prefetchMsgs.current.invalidar(sel.id);
+                            void Promise.all([carregarConvs(), carregarConversa()]);
+                          }}
+                        />
                       )}
                     </div>
                   </div>
