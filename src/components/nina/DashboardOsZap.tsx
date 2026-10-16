@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { consultarResumoDashboardOsZap } from "@/lib/atendimento/dashboard-oszap.functions";
 import {
-  periodoPadraoDashboard,
+  periodoInicialDashboard,
   type AgrupamentoDashboard,
 } from "@/lib/atendimento/dashboard-oszap-periodos";
 import { DashboardOsZapView } from "./DashboardOsZapView";
@@ -14,7 +14,7 @@ export function DashboardOsZap() {
   const { user } = useAuth();
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id;
-  const [periodo, setPeriodo] = useState(periodoPadraoDashboard);
+  const [periodo, setPeriodo] = useState(periodoInicialDashboard);
   const [agrupamento, setAgrupamento] = useState<AgrupamentoDashboard>("dia");
   const resumoFn = useServerFn(consultarResumoDashboardOsZap);
   const resumo = useQuery({

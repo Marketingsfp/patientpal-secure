@@ -43,8 +43,17 @@ export function limitesAgrupamento(dia: string, tipo: AgrupamentoDashboard): Per
 export function periodoAnterior(tipo: AgrupamentoDashboard, hoje = hojeBR()) {
   return limitesAgrupamento(deslocarDia(limitesAgrupamento(hoje, tipo).de, -1), tipo);
 }
+/** Atalho "Últimos 30 dias completos" (sem o dia em andamento). */
 export function periodoPadraoDashboard(hoje = hojeBR()): PeriodoDashboard {
   return { de: deslocarDia(hoje, -30), ate: deslocarDia(hoje, -1) };
+}
+/** O dashboard abre no dia de hoje, até agora (pedido do usuário, 16/10/2026). */
+export function periodoInicialDashboard(hoje = hojeBR()): PeriodoDashboard {
+  return { de: hoje, ate: hoje };
+}
+/** Período civil em andamento (semana a partir de segunda), do início até hoje. */
+export function periodoAtual(tipo: "semana" | "mes" | "ano", hoje = hojeBR()): PeriodoDashboard {
+  return { de: limitesAgrupamento(hoje, tipo).de, ate: hoje };
 }
 /** Período imediatamente anterior, com o mesmo número de dias, para comparação. */
 export function periodoComparacao(p: PeriodoDashboard): PeriodoDashboard {

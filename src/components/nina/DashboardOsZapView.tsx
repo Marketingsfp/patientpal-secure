@@ -6,6 +6,7 @@ import {
   agruparDiasDashboard,
   agrupamentosDashboard,
   periodoAnterior,
+  periodoAtual,
   periodoDashboardSchema,
   periodoPadraoDashboard,
   type AgrupamentoDashboard,
@@ -616,7 +617,8 @@ export function DashboardOsZapView({
   erro?: string;
 }) {
   const [rascunho, setRascunho] = useState(periodo);
-  const [atalho, setAtalho] = useState("30");
+  // Abre em "Hoje" (o período inicial vem do DashboardOsZap).
+  const [atalho, setAtalho] = useState("hoje");
   const [erroData, setErroData] = useState<string>();
   const grupos = useMemo(
     () =>
@@ -673,8 +675,15 @@ export function DashboardOsZapView({
                 const v = e.target.value;
                 setAtalho(v);
                 if (v === "30") setRascunho(periodoPadraoDashboard());
-                else if (v === "hoje") setRascunho({ de: hojeBR(), ate: hojeBR() });
-                else if (v !== "personalizado") {
+                else if (v === "hoje") {
+                  setRascunho({ de: hojeBR(), ate: hojeBR() });
+                  onAgrupamento("dia");
+                } else if (v === "esta-semana" || v === "este-mes" || v === "este-ano") {
+                  // Período em andamento, do início até agora (inclui hoje).
+                  const tipo = v === "esta-semana" ? "semana" : v === "este-mes" ? "mes" : "ano";
+                  setRascunho(periodoAtual(tipo));
+                  onAgrupamento(tipo === "ano" ? "mes" : "dia");
+                } else if (v !== "personalizado") {
                   setRascunho(periodoAnterior(v as AgrupamentoDashboard));
                   onAgrupamento(
                     v === "dia" || v === "semana" ? "dia" : v === "ano" ? "mes" : "semana",
@@ -683,6 +692,9 @@ export function DashboardOsZapView({
               }}
             >
               <option value="hoje">Hoje</option>
+              <option value="esta-semana">Esta semana (até agora)</option>
+              <option value="este-mes">Este mês (até agora)</option>
+              <option value="este-ano">Este ano (até agora)</option>
               <option value="30">Últimos 30 dias completos</option>
               <option value="dia">Ontem</option>
               <option value="semana">Semana passada</option>

@@ -9,7 +9,7 @@ import {
 } from "@/lib/atendimento/dashboard-oszap";
 import {
   periodoComparacao,
-  periodoPadraoDashboard,
+  periodoInicialDashboard,
   type AgrupamentoDashboard,
 } from "@/lib/atendimento/dashboard-oszap-periodos";
 import { janelaDiaClinica } from "@/lib/date-utils";
@@ -233,7 +233,7 @@ function dadosFicticios(periodo: { de: string; ate: string }) {
 }
 
 function DemonstracaoDashboard() {
-  const [periodo, setPeriodo] = useState(periodoPadraoDashboard);
+  const [periodo, setPeriodo] = useState(periodoInicialDashboard);
   const [agrupamento, setAgrupamento] = useState<AgrupamentoDashboard>("dia");
   const resumo = useMemo(() => {
     const r = dadosFicticios(periodo);
