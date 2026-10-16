@@ -87,6 +87,8 @@ function ambiente() {
     devoAutoSelecionarComSelecao: () => false,
     devoAutoSelecionar: () => false,
     carregarContadores() {},
+    // Contadores pelo agrupador (desempenho, 16/10/2026); sem agrupador, chamada direta.
+    agrupadores: { current: null },
     mostrarErro(e: unknown) {
       throw e;
     },

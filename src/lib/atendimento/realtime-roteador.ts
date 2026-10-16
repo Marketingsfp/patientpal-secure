@@ -77,7 +77,11 @@ export function classificarEvento(ev: EventoRealtime, ctx: ContextoTela): AlvoAt
       // FASE 4 — mensagem comum não recalcula a fila de espera: a espera muda
       // quando a própria conversa muda (transferência, atribuição, desfecho),
       // e isso chega por `atend_conversas`.
-      const alvos: AlvoAtualizacao[] = ["lista"];
+      // Desempenho (16/10/2026): atualização de mensagem (enviada/entregue/lida,
+      // estado da Nina, transcrição) não muda nada no card — prévia, horário e
+      // não lidas vêm da mensagem nova, da conversa e da leitura da equipe. Só
+      // a conversa aberta é atualizada; antes, cada uma recarregava a lista.
+      const alvos: AlvoAtualizacao[] = ev.eventType === "UPDATE" ? [] : ["lista"];
       if (aberta && linha.conversa_id === aberta) alvos.push("conversa");
       return alvos;
     }
