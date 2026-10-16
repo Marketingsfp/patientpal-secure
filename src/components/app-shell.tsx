@@ -855,17 +855,16 @@ function AppShellInner() {
   const navigate = useNavigate();
   const router = useRouter();
   const navScrollRef = useRef<HTMLElement | null>(null);
-  // Navegação do menu: com `ux_melhorias` ligada, troca de tela via SPA (sem
-  // recarregar a página). Nas demais clínicas mantém o reload completo atual.
+  // Navegação do menu: troca de tela via SPA (sem recarregar a página), em
+  // todas as clínicas. Antes isso dependia da flag `ux_melhorias`, e onde ela
+  // estava desligada (a São Francisco) cada clique recarregava o sistema
+  // inteiro — sessão, unidades, permissões e sino de estornos do zero — e a
+  // troca de tela engasgava.
   // Guarda o último destino pedido: se o usuário clicar em dois itens
   // seguidos, a rede de segurança abaixo não pode puxar a tela de volta para o
   // primeiro.
   const ultimoDestinoRef = useRef<string | null>(null);
   const irPara = (href: string) => {
-    if (!uxMelhorias) {
-      window.location.assign(href);
-      return;
-    }
     // Navegação SPA pela API oficial do roteador. Antes aqui havia
     // `router.history.push(href)`, que empurra o endereço direto no histórico
     // sem passar pelo roteador: quando o histórico saía de sincronia, o clique
@@ -889,9 +888,8 @@ function AppShellInner() {
   };
   const queryClient = useQueryClient();
   // Pré-carrega o código da rota ao passar o mouse no item do menu — quando o
-  // clique acontece, o chunk JS já chegou. Só com a flag de UX ligada.
+  // clique acontece, o chunk JS já chegou.
   const preCarregar = (href: string) => {
-    if (!uxMelhorias) return;
     const to = href.split("#")[0];
     // Cast necessário: os paths do menu vêm de configuração em runtime
     // (string), não do union de rotas tipado do router.
@@ -1157,12 +1155,36 @@ function AppShellInner() {
   // Trocar de portal não desmonta a tela atual: o seletor entra como camada
   // por cima. Ao voltar para o mesmo portal, apenas escondemos a camada — a
   // Agenda reaparece instantaneamente, sem spinner nem skeleton.
+  // A tela principal da Clínica Médica é o Dashboard, que a maioria dos perfis
+  // operacionais não tem. Antes navegávamos para ele e só então a guarda de
+  // rota redirecionava para a primeira tela liberada — duas trocas de tela
+  // seguidas, cada uma com o seu carregamento. Agora o destino é decidido aqui,
+  // com a mesma regra da guarda, e a navegação acontece uma vez só.
   const escolherPortal = (id: SubsystemId) => {
     const mudou = id !== subsystem;
     setSubsystem(id);
     fecharSeletorPortais();
-    if (mudou) navigate({ to: SUBSYSTEMS[id].home });
+    if (!mudou) return;
+    const home = SUBSYSTEMS[id].home;
+    // Permissões ainda carregando: vai para a home e a guarda decide depois.
+    const destino =
+      permsLoading || telaPermitida(home, "")
+        ? { to: home }
+        : (primeiraRotaVisivel(ordenarMenu(montarMenu(id))) ?? { to: home });
+    navigate({ to: destino.to, hash: destino.hash });
   };
+  // Guarda de rota (mesma regra do menu lateral). Admin (allowedModules ===
+  // null) passa por padrão.
+  function telaPermitida(path: string, hash: string): boolean {
+    // Mesma restrição do menu, inclusive para favoritos e links com hash.
+    if (!podeAbrirTelaOsZap(clinicaAtual?.role, path, hash)) return false;
+    // Rotas administrativas: só o admin da clínica entra, mesmo digitando a URL.
+    if (rotaSomenteAdmin(path)) return allowedModules === null;
+    // Mesma regra do menu lateral (`leafAllowed`): submódulo sem linha salva
+    // herda o pai, submódulo com linha salva vale pelo que está salvo, e a
+    // casca de abas do Financeiro abre quando uma aba está liberada.
+    return moduloPermitido(moduloDaTela(path, hash), allowedModules, configuredModules);
+  }
   // Link antigo/atalho para uma tela de outro portal: assume o portal dono da
   // tela em vez de deixar o menu sem o item. Não navega, não mexe em permissão.
   const caminhoAtivo = location.pathname;
@@ -1196,74 +1218,78 @@ function AppShellInner() {
   // (O filtro de subsystem segue valendo para papéis operacionais.)
   // O portal escolhido no hub (/app) define o contexto do menu para todos os
   // perfis — inclusive admin. Sem portal escolhido, mostra tudo.
-  const bypassSubsystem = !subsystem;
-
-  const filteredByGroup = bypassSubsystem
-    ? navRows
-    : subsystem
-      ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
-      : navRows;
-  const scopedNavRows = filteredByGroup
-    .map((row) => {
-      if (row.label !== "Gestão") return row;
-      const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
-      const items =
-        !bypassSubsystem && subsystem === "gestao-pessoas"
-          ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
-          : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
-      return { ...row, items };
-    })
-    .filter((row) => row.items.length > 0);
-  // Antes havia aqui um bypass por e-mail fixo ("isRodrigoFullAccess"), que
-  // liberava o menu inteiro para um endereço específico. Autorização baseada
-  // em string de e-mail é trocável no painel do Supabase e não deixa rastro
-  // de auditoria — quem precisar de acesso amplo deve receber o papel/perfil
-  // correspondente em Perfis de Acesso.
-  const permissionFilteredRows = scopedNavRows
-    .map((row) => {
-      const items = row.items
-        .map((item): NavItem | null => {
-          if (isParent(item)) {
-            // Grupo expansível (Odontologia, Fisioterapia): cada filho tem o
-            // módulo dele, então o grupo aparece quando pelo menos um filho
-            // está liberado — e mostra só os filhos liberados. Antes olhava
-            // apenas o primeiro filho, e fechar a tela principal escondia
-            // junto a tela de orçamentos/pacotes que continuava liberada.
-            const filhos = item.children.filter((c) =>
-              leafAllowed(c.to, allowedModules, configuredModules, c.hash),
-            );
-            if (filhos.length === 0) return null;
-            return { ...item, children: filhos };
-          }
-          if (!podeAbrirTelaOsZap(clinicaAtual?.role, item.to, item.hash)) return null;
-          return leafAllowed(item.to, allowedModules, configuredModules, item.hash) ? item : null;
-        })
-        .filter((it): it is NavItem => it !== null);
-      return { ...row, items };
-    })
-    .filter((row) => row.items.length > 0);
   // Feature flag por clínica: `atendimento_multiplo_disabled` remove o item
   // "Atendimento Múltiplo" do menu para a clínica atual.
   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
-  // Obs.: a flag `nina_desativada` desliga apenas a ASSISTENTE de IA (chat e
-  // respostas automáticas). A ferramenta de atendimento do WhatsApp continua
-  // no menu, pois é usada pela equipe manualmente.
-  const semAtendimentoMultiplo = atendimentoMultiploDisabled
-    ? permissionFilteredRows
-        .map((row) => ({
-          ...row,
-          items: row.items.filter((it) => isParent(it) || it.to !== "/app/atendimento-multiplo"),
-        }))
-        .filter((row) => row.items.length > 0)
-    : permissionFilteredRows;
-  // Ambiente de testes da Nina (10 leads simultâneos): só com a flag ux_melhorias.
-  // Ligação de demonstração por voz: só com a flag nina_ligacao_demo.
-  const abasOcultas = new Set([
-    ...(uxMelhorias ? [] : ["ambiente-testes"]),
-    ...(ligacaoDemo ? [] : ["ligacao"]),
-  ]);
-  const flagFilteredRows =
-    abasOcultas.size === 0
+
+  // Menu de um portal, já filtrado por permissão e flags. É uma função (e não
+  // só o menu do portal atual) porque a troca de portal precisa saber, ANTES
+  // de navegar, qual é a primeira tela que o usuário pode abrir no portal novo.
+  const montarMenu = (portal: SubsystemId | null) => {
+    const bypassSubsystem = !portal;
+
+    const filteredByGroup = bypassSubsystem
+      ? navRows
+      : portal
+        ? navRows.filter((r) => SUBSYSTEMS[portal].groups.includes(r.label))
+        : navRows;
+    const scopedNavRows = filteredByGroup
+      .map((row) => {
+        if (row.label !== "Gestão") return row;
+        const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
+        const items =
+          !bypassSubsystem && portal === "gestao-pessoas"
+            ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
+            : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
+        return { ...row, items };
+      })
+      .filter((row) => row.items.length > 0);
+    // Antes havia aqui um bypass por e-mail fixo ("isRodrigoFullAccess"), que
+    // liberava o menu inteiro para um endereço específico. Autorização baseada
+    // em string de e-mail é trocável no painel do Supabase e não deixa rastro
+    // de auditoria — quem precisar de acesso amplo deve receber o papel/perfil
+    // correspondente em Perfis de Acesso.
+    const permissionFilteredRows = scopedNavRows
+      .map((row) => {
+        const items = row.items
+          .map((item): NavItem | null => {
+            if (isParent(item)) {
+              // Grupo expansível (Odontologia, Fisioterapia): cada filho tem o
+              // módulo dele, então o grupo aparece quando pelo menos um filho
+              // está liberado — e mostra só os filhos liberados. Antes olhava
+              // apenas o primeiro filho, e fechar a tela principal escondia
+              // junto a tela de orçamentos/pacotes que continuava liberada.
+              const filhos = item.children.filter((c) =>
+                leafAllowed(c.to, allowedModules, configuredModules, c.hash),
+              );
+              if (filhos.length === 0) return null;
+              return { ...item, children: filhos };
+            }
+            if (!podeAbrirTelaOsZap(clinicaAtual?.role, item.to, item.hash)) return null;
+            return leafAllowed(item.to, allowedModules, configuredModules, item.hash) ? item : null;
+          })
+          .filter((it): it is NavItem => it !== null);
+        return { ...row, items };
+      })
+      .filter((row) => row.items.length > 0);
+    // Obs.: a flag `nina_desativada` desliga apenas a ASSISTENTE de IA (chat e
+    // respostas automáticas). A ferramenta de atendimento do WhatsApp continua
+    // no menu, pois é usada pela equipe manualmente.
+    const semAtendimentoMultiplo = atendimentoMultiploDisabled
+      ? permissionFilteredRows
+          .map((row) => ({
+            ...row,
+            items: row.items.filter((it) => isParent(it) || it.to !== "/app/atendimento-multiplo"),
+          }))
+          .filter((row) => row.items.length > 0)
+      : permissionFilteredRows;
+    // Ambiente de testes da Nina (10 leads simultâneos): só com a flag ux_melhorias.
+    // Ligação de demonstração por voz: só com a flag nina_ligacao_demo.
+    const abasOcultas = new Set([
+      ...(uxMelhorias ? [] : ["ambiente-testes"]),
+      ...(ligacaoDemo ? [] : ["ligacao"]),
+    ]);
+    return abasOcultas.size === 0
       ? semAtendimentoMultiplo
       : semAtendimentoMultiplo
           .map((row) => ({
@@ -1271,6 +1297,8 @@ function AppShellInner() {
             items: row.items.filter((it) => isParent(it) || !abasOcultas.has(it.hash ?? "")),
           }))
           .filter((row) => row.items.length > 0);
+  };
+  const flagFilteredRows = montarMenu(subsystem);
 
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
@@ -1278,9 +1306,9 @@ function AppShellInner() {
   // Ordem personalizada por usuário (arrastar e soltar) — só com a flag.
   // Itens sem posição salva (ex.: telas novas) vão para o fim do grupo,
   // mantendo a ordem padrão entre si.
-  const visibleNavRows = useMemo(() => {
-    if (!uxMelhorias) return flagFilteredRows;
-    return flagFilteredRows.map((row) => {
+  const ordenarMenu = (linhas: typeof flagFilteredRows) => {
+    if (!uxMelhorias) return linhas;
+    return linhas.map((row) => {
       const salvos = menuOrdem[row.label];
       if (!salvos || salvos.length === 0) return row;
       const pos = new Map(salvos.map((k, i) => [k, i] as const));
@@ -1294,7 +1322,8 @@ function AppShellInner() {
       });
       return { ...row, items };
     });
-  }, [flagFilteredRows, menuOrdem, uxMelhorias]);
+  };
+  const visibleNavRows = ordenarMenu(flagFilteredRows);
 
   // "Meus Favoritos": só entram as telas que o menu já está mostrando (mesmo
   // filtro de permissão, portal e flags). Favorito de tela que deixou de ser
@@ -1576,16 +1605,7 @@ function AppShellInner() {
   // por padrão. Enquanto as permissões carregam, mostramos o próprio outlet
   // para evitar flash de "Acesso negado".
   const currentModulo = moduloDaTela(location.pathname, location.hash);
-  const rotaPermitida = (() => {
-    // Mesma restrição do menu, inclusive para favoritos e links com hash.
-    if (!podeAbrirTelaOsZap(clinicaAtual?.role, location.pathname, location.hash)) return false;
-    // Rotas administrativas: só o admin da clínica entra, mesmo digitando a URL.
-    if (rotaSomenteAdmin(location.pathname)) return allowedModules === null;
-    // Mesma regra do menu lateral (`leafAllowed`): submódulo sem linha salva
-    // herda o pai, submódulo com linha salva vale pelo que está salvo, e a
-    // casca de abas do Financeiro abre quando uma aba está liberada.
-    return moduloPermitido(currentModulo, allowedModules, configuredModules);
-  })();
+  const rotaPermitida = telaPermitida(location.pathname, location.hash);
   // Entrar num portal não pode terminar em "Acesso negado". A rota principal
   // da Clínica Médica é o Dashboard (/app/painel), que perfis operacionais
   // (Recepção, Médico, Caixa, Financeiro, Enfermagem) normalmente não têm —
