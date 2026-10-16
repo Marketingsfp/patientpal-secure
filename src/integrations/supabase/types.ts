@@ -3218,6 +3218,101 @@ export type Database = {
           },
         ]
       }
+      cb_importacao_lote_itens: {
+        Row: {
+          created_at: string
+          lote_id: string
+          registro_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          lote_id: string
+          registro_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          lote_id?: string
+          registro_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cb_importacao_lote_itens_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "cb_importacao_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cb_importacao_lotes: {
+        Row: {
+          arquivo_nome: string
+          atualizado_em: string
+          clinica_id: string
+          concluido_em: string | null
+          convenio_id: string | null
+          created_at: string
+          criado_por: string
+          id: string
+          pendencias: number
+          produto: string
+          removidos: Json | null
+          revertido_em: string | null
+          revertido_por: string | null
+          status: string
+        }
+        Insert: {
+          arquivo_nome: string
+          atualizado_em?: string
+          clinica_id: string
+          concluido_em?: string | null
+          convenio_id?: string | null
+          created_at?: string
+          criado_por: string
+          id?: string
+          pendencias?: number
+          produto: string
+          removidos?: Json | null
+          revertido_em?: string | null
+          revertido_por?: string | null
+          status?: string
+        }
+        Update: {
+          arquivo_nome?: string
+          atualizado_em?: string
+          clinica_id?: string
+          concluido_em?: string | null
+          convenio_id?: string | null
+          created_at?: string
+          criado_por?: string
+          id?: string
+          pendencias?: number
+          produto?: string
+          removidos?: Json | null
+          revertido_em?: string | null
+          revertido_por?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cb_importacao_lotes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cb_importacao_lotes_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_canais: {
         Row: {
           clinica_id: string
@@ -17531,6 +17626,31 @@ export type Database = {
           p_item_id: string
           p_motivo: string
         }
+        Returns: Json
+      }
+      cb_importacao_concluir: {
+        Args: { _lote_id: string; _pendencias: number }
+        Returns: undefined
+      }
+      cb_importacao_iniciar: {
+        Args: {
+          _arquivo_nome: string
+          _clinica_id: string
+          _convenio_id: string
+          _produto: string
+        }
+        Returns: string
+      }
+      cb_importacao_listar: {
+        Args: { _clinica_id: string; _limite?: number; _produto: string }
+        Returns: Json
+      }
+      cb_importacao_registrar: {
+        Args: { _ids: string[]; _lote_id: string; _tipo: string }
+        Returns: number
+      }
+      cb_importacao_reverter: {
+        Args: { _lote_id: string; _simular?: boolean }
         Returns: Json
       }
       chamar_proxima_senha: {
