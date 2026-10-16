@@ -53,7 +53,12 @@ export function BotaoLiberarPaciente({
 
   return (
     <span className="inline-flex flex-col items-end gap-0.5">
-      <Button size="sm" variant={em ? "secondary" : "outline"} onClick={alternar} disabled={salvando}>
+      <Button
+        size="sm"
+        variant={em ? "secondary" : "outline"}
+        onClick={alternar}
+        disabled={salvando}
+      >
         {em ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         {em ? "Retirar liberação" : "Liberar ao paciente"}
       </Button>

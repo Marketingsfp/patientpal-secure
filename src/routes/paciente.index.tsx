@@ -210,10 +210,30 @@ function Inicio({ clinica, primeiroNome }: { clinica: string | null; primeiroNom
     queryFn: () => resumoFn({ data: { clinica } }),
   });
   const atalhos = [
-    { to: "/paciente/agendamentos" as const, Icone: Calendar, t: "Agendamentos", s: "Confirmar ou cancelar" },
-    { to: "/paciente/documentos" as const, Icone: FileText, t: "Documentos", s: "Resultados e laudos" },
-    { to: "/paciente/financeiro" as const, Icone: Wallet, t: "Financeiro", s: "Pagamentos e notas" },
-    { to: "/paciente/cadastro" as const, Icone: User, t: "Meu cadastro", s: "Ver e pedir atualização" },
+    {
+      to: "/paciente/agendamentos" as const,
+      Icone: Calendar,
+      t: "Agendamentos",
+      s: "Confirmar ou cancelar",
+    },
+    {
+      to: "/paciente/documentos" as const,
+      Icone: FileText,
+      t: "Documentos",
+      s: "Resultados e laudos",
+    },
+    {
+      to: "/paciente/financeiro" as const,
+      Icone: Wallet,
+      t: "Financeiro",
+      s: "Pagamentos e notas",
+    },
+    {
+      to: "/paciente/cadastro" as const,
+      Icone: User,
+      t: "Meu cadastro",
+      s: "Ver e pedir atualização",
+    },
   ];
   return (
     <>

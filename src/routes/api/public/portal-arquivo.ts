@@ -37,7 +37,9 @@ export const Route = createFileRoute("/api/public/portal-arquivo")({
         if (!cookie) return NEGADO();
         const { data: sessao } = await db
           .from("portal_sessoes")
-          .select("id, clinica_id, paciente_id, token_hash, ultimo_uso_em, expira_max_em, encerrada_em")
+          .select(
+            "id, clinica_id, paciente_id, token_hash, ultimo_uso_em, expira_max_em, encerrada_em",
+          )
           .eq("id", link.sessao_id)
           .maybeSingle();
         if (
@@ -57,7 +59,9 @@ export const Route = createFileRoute("/api/public/portal-arquivo")({
 
         const { carregarArquivo } = await import("@/lib/portal-paciente/arquivos.server");
         const dono = { clinica_id: link.clinica_id, paciente_id: link.paciente_id };
-        const arq = await carregarArquivo(dono, link.tipo as never, link.ref_id, { conteudo: true });
+        const arq = await carregarArquivo(dono, link.tipo as never, link.ref_id, {
+          conteudo: true,
+        });
         if (!arq) return NEGADO();
         const comum = {
           "cache-control": "no-store, private",

@@ -6,7 +6,14 @@ export const LINK_VALIDADE_MIN = 5;
 export type TipoLink = "documento" | "exame" | "recibo" | "nfse_pdf" | "nfse_xml";
 
 /** Tipos que podem ir para o portal (contrato nunca). "exame" = resultado de exame. */
-export const TIPOS_LIBERAVEIS = ["atestado", "receita", "laudo", "declaracao", "outro", "exame"] as const;
+export const TIPOS_LIBERAVEIS = [
+  "atestado",
+  "receita",
+  "laudo",
+  "declaracao",
+  "outro",
+  "exame",
+] as const;
 export type TipoLiberavel = (typeof TIPOS_LIBERAVEIS)[number];
 
 export const NOME_TIPO: Record<string, string> = {

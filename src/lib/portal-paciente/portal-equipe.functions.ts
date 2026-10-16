@@ -64,7 +64,14 @@ export const gerarCodigoTeste = createServerFn({ method: "POST" })
     return { codigo, validadeMin: CODIGO_VALIDADE_MIN };
   });
 
-const PAPEIS_LIBERAM = ["admin", "gestor", "medico", "enfermeiro", "recepcao", "supervisor"] as const;
+const PAPEIS_LIBERAM = [
+  "admin",
+  "gestor",
+  "medico",
+  "enfermeiro",
+  "recepcao",
+  "supervisor",
+] as const;
 
 /**
  * Liberar / retirar um documento ou resultado de exame da Área do Paciente.
@@ -86,10 +93,19 @@ export const liberarParaPaciente = createServerFn({ method: "POST" })
     const tabela = data.origem === "documento" ? "documentos_emitidos" : "exame_resultados";
     const { data: reg } = await context.supabase
       .from(tabela)
-      .select(data.origem === "documento" ? "id, clinica_id, paciente_id, tipo" : "id, clinica_id, paciente_id")
+      .select(
+        data.origem === "documento"
+          ? "id, clinica_id, paciente_id, tipo"
+          : "id, clinica_id, paciente_id",
+      )
       .eq("id", data.id)
       .maybeSingle();
-    const r = reg as { id: string; clinica_id: string; paciente_id: string | null; tipo?: string } | null;
+    const r = reg as {
+      id: string;
+      clinica_id: string;
+      paciente_id: string | null;
+      tipo?: string;
+    } | null;
     if (!r) throw new Error("Registro não encontrado.");
     if (!r.paciente_id) throw new Error("Este registro não está ligado a um cadastro de paciente.");
     if (r.tipo === "contrato") throw new Error("Contratos não vão para a Área do Paciente.");

@@ -817,7 +817,9 @@ export function DocumentosDialog({ open, onOpenChange, pacienteId, pacienteNome 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("documentos_emitidos")
-        .select("id, tipo, titulo, conteudo, created_at, liberado_paciente_em, liberado_paciente_por")
+        .select(
+          "id, tipo, titulo, conteudo, created_at, liberado_paciente_em, liberado_paciente_por",
+        )
         .eq("paciente_id", pacienteId)
         .order("created_at", { ascending: false })
         .limit(200);

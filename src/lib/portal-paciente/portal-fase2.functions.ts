@@ -23,7 +23,9 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
   const [docs, exames] = await Promise.all([
     db
       .from("documentos_emitidos")
-      .select("id, clinica_id, paciente_id, tipo, titulo, created_at, liberado_paciente_em, medicos(nome)")
+      .select(
+        "id, clinica_id, paciente_id, tipo, titulo, created_at, liberado_paciente_em, medicos(nome)",
+      )
       .eq("clinica_id", s.clinica_id)
       .eq("paciente_id", s.paciente_id)
       .not("liberado_paciente_em", "is", null)
@@ -32,7 +34,9 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
       .limit(200),
     db
       .from("exame_resultados")
-      .select("id, clinica_id, paciente_id, tipo_exame, data_coleta, created_at, liberado_paciente_em")
+      .select(
+        "id, clinica_id, paciente_id, tipo_exame, data_coleta, created_at, liberado_paciente_em",
+      )
       .eq("clinica_id", s.clinica_id)
       .eq("paciente_id", s.paciente_id)
       .not("liberado_paciente_em", "is", null)
@@ -125,7 +129,9 @@ export const meuFinanceiro = createServerFn({ method: "POST" })
     const [lanc, notas] = await Promise.all([
       db
         .from("fin_lancamentos")
-        .select("id, clinica_id, paciente_id, data, data_vencimento, descricao, valor, forma_pagamento, status")
+        .select(
+          "id, clinica_id, paciente_id, data, data_vencimento, descricao, valor, forma_pagamento, status",
+        )
         .eq("clinica_id", sessao.clinica_id)
         .eq("paciente_id", sessao.paciente_id)
         .eq("tipo", "receita")
@@ -133,7 +139,9 @@ export const meuFinanceiro = createServerFn({ method: "POST" })
         .limit(150),
       db
         .from("nfse")
-        .select("id, clinica_id, paciente_id, numero, data_emissao, valor_servicos, url_pdf, url_xml")
+        .select(
+          "id, clinica_id, paciente_id, numero, data_emissao, valor_servicos, url_pdf, url_xml",
+        )
         .eq("clinica_id", sessao.clinica_id)
         .eq("paciente_id", sessao.paciente_id)
         .eq("status", "emitida")

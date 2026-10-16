@@ -123,14 +123,12 @@ function Pagina() {
     auto_liberar?: Record<string, boolean>;
   }) => {
     if (!clinicaId) return;
-    const { error } = await supabase
-      .from("portal_paciente_config")
-      .upsert({
-        clinica_id: clinicaId,
-        ...cfg.data,
-        ...patch,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("portal_paciente_config").upsert({
+      clinica_id: clinicaId,
+      ...cfg.data,
+      ...patch,
+      updated_at: new Date().toISOString(),
+    });
     if (error) return mostrarErro(error);
     toast.success("Salvo.");
     void qc.invalidateQueries({ queryKey: ["portal-config", clinicaId] });

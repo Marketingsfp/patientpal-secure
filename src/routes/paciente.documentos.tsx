@@ -14,7 +14,10 @@ export const Route = createFileRoute("/paciente/documentos")({
   head: () => ({
     meta: [
       { title: "Meus documentos — Área do Paciente" },
-      { name: "description", content: "Resultados, laudos, receitas e atestados liberados pela clínica." },
+      {
+        name: "description",
+        content: "Resultados, laudos, receitas e atestados liberados pela clínica.",
+      },
       { property: "og:title", content: "Meus documentos — Área do Paciente" },
       {
         property: "og:description",
