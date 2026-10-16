@@ -1075,6 +1075,41 @@ export type Database = {
         }
         Relationships: []
       }
+      atend_contatos_bloqueados: {
+        Row: {
+          bloqueado_em: string
+          bloqueado_por: string
+          clinica_id: string
+          id: string
+          motivo: string
+          telefone: string
+        }
+        Insert: {
+          bloqueado_em?: string
+          bloqueado_por: string
+          clinica_id: string
+          id?: string
+          motivo: string
+          telefone: string
+        }
+        Update: {
+          bloqueado_em?: string
+          bloqueado_por?: string
+          clinica_id?: string
+          id?: string
+          motivo?: string
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atend_contatos_bloqueados_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atend_conversa_eventos: {
         Row: {
           clinica_id: string
@@ -17383,6 +17418,10 @@ export type Database = {
       atend_nome_departamento: { Args: { _nome: string }; Returns: string }
       atend_permite_leitura_operacional: {
         Args: { _clinica_id: string }
+        Returns: boolean
+      }
+      atend_pode_bloquear_contato: {
+        Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
       atend_pode_ver_leitura: {
