@@ -104,6 +104,11 @@ export const MODOS_PACIENTE: readonly ModoPaciente[] = [
   },
 ] as const;
 
+/** Modo do lead na posição `i` (0, 1, …): com mais leads que modos, os modos se repetem em ciclo. */
+export function modoDaPosicao(i: number): ModoPaciente {
+  return MODOS_PACIENTE[i % MODOS_PACIENTE.length]!;
+}
+
 /** Modo pelo id (null quando não existe). */
 export function modoPorId(id: string | null | undefined): ModoPaciente | null {
   return MODOS_PACIENTE.find((m) => m.id === id) ?? null;

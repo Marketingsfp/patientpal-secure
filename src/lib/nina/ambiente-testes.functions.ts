@@ -1,7 +1,7 @@
 /**
- * Ambiente de testes da Nina — 10 conversas simultâneas.
+ * Ambiente de testes da Nina — 10 ou 20 conversas simultâneas.
  *
- * O navegador conduz as 10 conversas em paralelo: para cada lead, pede a
+ * O navegador conduz as conversas em paralelo: para cada lead, pede a
  * próxima mensagem ao paciente difícil (`turnoPacienteAmbiente`), envia pela
  * mesma função do console (`enviarMensagemTeste`, núcleo real da Nina) e, ao
  * fim, chama o juiz (`avaliarConversaAmbiente`).
@@ -13,7 +13,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { MODOS_PACIENTE, modoPorId } from "@/lib/nina/ambiente-testes/modos";
+import { MODOS_PACIENTE, modoDaPosicao, modoPorId } from "@/lib/nina/ambiente-testes/modos";
 import {
   LIMITES_AMBIENTE,
   SCHEMA_PACIENTE,
@@ -67,7 +67,7 @@ export const prepararAmbienteTestes = createServerFn({ method: "POST" })
     const { garantirLeadsAmbiente } = await import("@/lib/nina/ambiente-testes.server");
     const leads = await garantirLeadsAmbiente(admin, data.clinicaId);
     return {
-      leads: leads.map((l, i) => ({ leadId: l.id, indice: l.indice, modo: MODOS_PACIENTE[i]!.id })),
+      leads: leads.map((l, i) => ({ leadId: l.id, indice: l.indice, modo: modoDaPosicao(i).id })),
       modos: MODOS_PACIENTE.map(({ id, nome, resumo }) => ({ id, nome, resumo })),
       limites: {
         turnosPadrao: LIMITES_AMBIENTE.turnosPadrao,
@@ -77,20 +77,26 @@ export const prepararAmbienteTestes = createServerFn({ method: "POST" })
     };
   });
 
-/** Reinicia os 10 leads, sorteia os assuntos e registra a rodada. */
+/** Reinicia os leads da rodada (10 ou 20), sorteia os assuntos e registra a rodada. */
 export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
-      .object({ clinicaId: z.string().uuid(), turnos: z.number().int().min(1).max(50).optional() })
+      .object({
+        clinicaId: z.string().uuid(),
+        turnos: z.number().int().min(1).max(50).optional(),
+        quantidade: z.union([z.literal(10), z.literal(20)]).optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const admin = await exigirAcesso(context, data.clinicaId);
     const srv = await import("@/lib/nina/ambiente-testes.server");
     const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
-    const leads = await srv.garantirLeadsAmbiente(admin, data.clinicaId);
-    const ids = leads.map((l) => l.id);
+    const todos = await srv.garantirLeadsAmbiente(admin, data.clinicaId);
+    // Rodada de 10 usa os 10 primeiros leads; a de 20, todos.
+    const leads = todos.slice(0, data.quantidade ?? srv.TOTAL_LEADS_AMBIENTE);
+    const ids = todos.map((l) => l.id);
 
     // Uma rodada por vez: o que ficou "executando" de antes é encerrado.
     await admin
@@ -118,7 +124,7 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
         });
 
     const assuntos = sortearAssuntos(
-      MODOS_PACIENTE.map((m) => m.assunto),
+      leads.map((_, i) => modoDaPosicao(i).assunto),
       await srv.catalogoParaAssuntos(admin, data.clinicaId),
     );
     const rodada = crypto.randomUUID();
@@ -129,11 +135,11 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
       modelo: MODELO_SOL,
       provedor: "lovable-ai-gateway",
       cenario: assuntos[i]!,
-      persona: { ambiente: AMBIENTE, rodada, modo: MODOS_PACIENTE[i]!.id, posicao: i + 1 },
+      persona: { ambiente: AMBIENTE, rodada, modo: modoDaPosicao(i).id, posicao: i + 1 },
       max_turnos: turnos,
       max_mensagens: turnos,
       max_duracao_s: 3600,
-      max_tokens: LIMITES_AMBIENTE.tokensRodada,
+      max_tokens: LIMITES_AMBIENTE.tokensPorConversa * leads.length,
       timeout_s: 180,
       max_custo_creditos: 0,
       creditos_por_mil_tokens: 0,
@@ -208,7 +214,8 @@ export const turnoPacienteAmbiente = createServerFn({ method: "POST" })
       (t, s) => t + (s.input_tokens ?? 0) + (s.output_tokens ?? 0),
       0,
     );
-    if (gastos >= LIMITES_AMBIENTE.tokensRodada) {
+    const teto = LIMITES_AMBIENTE.tokensPorConversa * Math.max(1, (daRodada ?? []).length);
+    if (gastos >= teto) {
       await admin
         .from("nina_teste_simulacoes")
         .update({
@@ -262,7 +269,7 @@ export const encerrarConversaAmbiente = createServerFn({ method: "POST" })
     z
       .object({
         clinicaId: z.string().uuid(),
-        simulacaoIds: z.array(z.string().uuid()).min(1).max(10),
+        simulacaoIds: z.array(z.string().uuid()).min(1).max(20),
         status: z.enum(["concluida", "parada", "erro"]),
         motivo: z.string().max(300),
       })
@@ -359,7 +366,7 @@ export const listarRodadasAmbiente = createServerFn({ method: "POST" })
       )
       .eq("clinica_id", data.clinicaId)
       .order("created_at", { ascending: false })
-      .limit(data.rodada ? 10 : 200);
+      .limit(data.rodada ? 20 : 400);
     consulta = data.rodada
       ? consulta.contains("persona", { ambiente: AMBIENTE, rodada: data.rodada })
       : consulta.contains("persona", { ambiente: AMBIENTE });

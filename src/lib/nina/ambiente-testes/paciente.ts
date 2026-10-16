@@ -18,8 +18,8 @@ export const LIMITES_AMBIENTE = {
   caracteresMensagem: 500,
   /** Mensagens do histórico enviadas ao paciente. */
   historico: 40,
-  /** Teto de tokens (entrada + saída) somados de uma rodada inteira. */
-  tokensRodada: 3_000_000,
+  /** Teto de tokens (entrada + saída) por conversa, somado na rodada inteira. */
+  tokensPorConversa: 300_000,
 } as const;
 
 export type AcaoPaciente = { acao: "enviar" | "encerrar"; mensagem: string; motivo: string };

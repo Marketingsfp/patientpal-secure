@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MODOS_PACIENTE, modoPorId } from "../ambiente-testes/modos";
+import { MODOS_PACIENTE, modoDaPosicao, modoPorId } from "../ambiente-testes/modos";
 import {
   LIMITES_AMBIENTE,
   entradaPaciente,
@@ -20,6 +20,24 @@ describe("modos de paciente", () => {
     expect(new Set(MODOS_PACIENTE.map((m) => m.id)).size).toBe(10);
     expect(modoPorId("indeciso")?.nome).toBe("Indeciso");
     expect(modoPorId("nao-existe")).toBeNull();
+  });
+
+  test("com 20 leads, os modos se repetem em ciclo e os assuntos não repetem", () => {
+    const modos = Array.from({ length: 20 }, (_, i) => modoDaPosicao(i));
+    expect(modos[0]!.id).toBe(MODOS_PACIENTE[0]!.id);
+    expect(modos[10]!.id).toBe(MODOS_PACIENTE[0]!.id);
+    expect(modos[19]!.id).toBe(MODOS_PACIENTE[9]!.id);
+    const catalogo = {
+      consultas: Array.from({ length: 12 }, (_, i) => `Especialidade Ficticia ${i + 1}`),
+      exames: Array.from({ length: 12 }, (_, i) => `Exame Ficticio ${i + 1}`),
+    };
+    const assuntos = sortearAssuntos(
+      modos.map((m) => m.assunto),
+      catalogo,
+      () => 0,
+    ).filter((a) => !a.startsWith("algo que"));
+    expect(assuntos).toHaveLength(18);
+    expect(new Set(assuntos).size).toBe(18);
   });
 
   test("as instruções do paciente não trazem nada da Nina", () => {
