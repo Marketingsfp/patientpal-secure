@@ -34,6 +34,8 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // mesma recepção que cadastra. Sem chave própria, senão a tela nasceria
   // invisível até o gestor configurar permissão.
   "/app/clientes/recentes": "clientes",
+  // Pedidos de atualização vindos da Área do Paciente: mesma recepção de Clientes.
+  "/app/clientes/solicitacoes-portal": "clientes",
   // Módulo próprio: a tela altera em lote a classificação de atendimentos já
   // gravados e vincula convênio a contrato — mexe em relatório e em preço do
   // cartão, então não acompanha o acesso normal a Clientes ou Agenda.
@@ -210,6 +212,7 @@ export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = [
   "/app/configuracoes/voz",
   "/app/configuracoes/site-agendamento",
   "/app/configuracoes/dominios",
+  "/app/configuracoes/area-paciente",
   "/app/configuracoes/importar-clinica-total",
   "/app/planos",
   // Previews internos de telas em desenvolvimento: mostram dados reais e

@@ -182,8 +182,8 @@ function Pagina() {
             Enquanto o envio de e-mail não estiver configurado, gere aqui um código para um paciente (vale 10 minutos, uma vez). Fica registrado.
           </p>
           <PatientSearchInput
-            clinicaId={clinicaId}
-            onSelect={(p: { id: string; nome: string }) => { setPacienteTeste(p); setCodigo(null); }}
+            clinicaIdsOverride={[clinicaId]}
+            onSelect={(p) => { setPacienteTeste(p ? { id: p.id, nome: p.nome } : null); setCodigo(null); }}
           />
           {pacienteTeste && <p className="text-sm">Paciente: <b>{pacienteTeste.nome}</b></p>}
           <Button variant="outline" disabled={!pacienteTeste} onClick={gerar}>Gerar código</Button>
