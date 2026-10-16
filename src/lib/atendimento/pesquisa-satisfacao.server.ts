@@ -12,6 +12,8 @@ import {
 
 type Db = Pick<SupabaseClient<Database>, "from">;
 
+const TEMPO_MAXIMO_PESQUISA_MS = 10_000;
+
 type SolicitarArgs = {
   db: Db;
   clinicaId: string;
@@ -69,15 +71,20 @@ export async function solicitarPesquisaSatisfacao(args: SolicitarArgs) {
     // Lista de toque com as 5 notas; se a Meta recusar, vai o texto com os números.
     let corpoEnviado = ESPELHO_PESQUISA_LISTA;
     let tipoEnviado = "interactive";
-    const { wa_message_id } = await metaSendList(numeroId, token, to, PESQUISA_LISTA).catch(
+    // Com limite de tempo (desempenho, 16/10/2026): o encerramento espera este envio.
+    const limite = { timeoutMs: TEMPO_MAXIMO_PESQUISA_MS };
+    const { wa_message_id } = await metaSendList(numeroId, token, to, PESQUISA_LISTA, limite).catch(
       (erroLista: unknown) => {
+        // Sem resposta a tempo, a lista pode ter chegado: o texto de reserva
+        // duplicaria a pesquisa. Vale como falha de envio (registrada abaixo).
+        if ((erroLista as { name?: string } | null)?.name === "TimeoutError") throw erroLista;
         console.error(
           "[pesquisa-satisfacao] lista recusada, enviando texto",
           erroLista instanceof Error ? erroLista.message.slice(0, 200) : "erro",
         );
         corpoEnviado = MENSAGEM_PESQUISA_SATISFACAO;
         tipoEnviado = "text";
-        return metaSendText(numeroId, token, to, MENSAGEM_PESQUISA_SATISFACAO);
+        return metaSendText(numeroId, token, to, MENSAGEM_PESQUISA_SATISFACAO, limite);
       },
     );
     // A Meta já aceitou o envio: mantenha a pesquisa pendente mesmo se o

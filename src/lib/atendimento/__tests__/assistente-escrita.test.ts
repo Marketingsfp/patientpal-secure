@@ -117,7 +117,15 @@ describe("Assistente humano de escrita", () => {
       },
       gerar: async () => JSON.stringify({ texto: pedido.rascunho, fontes: [] }),
     });
-    expect(consultas).toEqual(["atend_conversas", "atend_conversas"]);
+    // Só leituras de acesso: a conversa e, em paralelo, a supervisão do usuário
+    // (desde 16/10/2026 as checagens de papel saem juntas, sem atalho em série).
+    expect(consultas.filter((t) => t !== "atend_departamento_membros")).toEqual([
+      "atend_conversas",
+      "atend_conversas",
+    ]);
+    expect(
+      consultas.every((t) => ["atend_conversas", "atend_departamento_membros"].includes(t)),
+    ).toBe(true);
     expect(resultado.fontes).toEqual([]);
     expect(resultado.consultadoEm).toBeNull();
   });
