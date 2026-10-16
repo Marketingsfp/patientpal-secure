@@ -62,3 +62,16 @@ test("lista só as citadas que faltam carregar, sem repetir", () => {
     ]),
   ).toEqual(["wamid.Z"]);
 });
+
+test("toda carga de mensagens da conversa traz os campos da citação", async () => {
+  const { readFileSync } = await import("node:fs");
+  // 16/10: a abertura usa o histórico paginado; sem estes campos o botão Responder some.
+  for (const arquivo of [
+    "src/lib/atendimento/historico-paginado.server.ts",
+    "src/lib/atendimento.functions.ts",
+  ]) {
+    const fonte = readFileSync(arquivo, "utf8");
+    expect(fonte).toContain("client_message_id, wa_message_id, quoted_message_id");
+    expect(fonte).toContain("anexarCitacoes(");
+  }
+});

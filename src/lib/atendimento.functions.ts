@@ -2207,34 +2207,15 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     );
   });
 
-/**
- * Citada fora da página carregada (mensagem antiga): busca só o trecho dela,
- * na mesma conversa, para a bolha mostrar o que foi respondido.
- */
-async function anexarCitacoes<T extends { quoted_message_id?: string | null }>(
+/** Mesma regra do histórico paginado (abertura da conversa). */
+async function anexarCitacoes<T extends object>(
   supabase: any,
   clinicaId: string,
   conversaId: string,
   rows: T[],
 ): Promise<Array<T & { citacao?: MensagemCitada }>> {
-  const { citacoesFaltantes } = await import("./atendimento/citacao-mensagem");
-  const faltam = citacoesFaltantes(rows as any[]);
-  if (!faltam.length) return rows;
-  const { data, error } = await supabase
-    .from("whatsapp_mensagens")
-    .select("wa_message_id, direction, enviada_por, tipo, body")
-    .eq("clinica_id", clinicaId)
-    .eq("conversa_id", conversaId)
-    .in("wa_message_id", faltam);
-  // Sem o trecho, a bolha avisa que a citada não está disponível.
-  if (error) return rows;
-  const porId = new Map<string, MensagemCitada>(
-    ((data ?? []) as MensagemCitada[]).map((c) => [c.wa_message_id, c]),
-  );
-  return rows.map((r) => {
-    const citacao = r.quoted_message_id ? porId.get(r.quoted_message_id) : undefined;
-    return citacao ? { ...r, citacao } : r;
-  });
+  const m = await import("./atendimento/citacao-mensagem.server");
+  return m.anexarCitacoes(supabase, clinicaId, conversaId, rows);
 }
 
 /**

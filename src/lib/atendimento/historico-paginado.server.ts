@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { assertAcessoConversa } from "./acesso-conversa.server";
+import { anexarCitacoes } from "./citacao-mensagem.server";
 import {
   filtroCursorHistorico,
   montarPaginaHistorico,
@@ -29,7 +30,8 @@ export async function carregarPaginaHistorico(
   let mensagens = supabase
     .from("whatsapp_mensagens")
     .select(
-      "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
+      // wa_message_id/quoted_message_id: botão "Responder" e trecho citado na bolha.
+      "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id",
     )
     .eq("clinica_id", args.clinicaId)
     .eq("conversa_id", args.conversaId);
@@ -56,6 +58,12 @@ export async function carregarPaginaHistorico(
   if (m.error) throw new Error(m.error.message);
   if (e.error) throw new Error(e.error.message);
   const pagina = montarPaginaHistorico(m.data ?? [], e.data ?? [], sentido);
+  pagina.mensagens = await anexarCitacoes(
+    supabase,
+    args.clinicaId,
+    args.conversaId,
+    pagina.mensagens,
+  );
   pagina.eventos = await preencherNomesEventos(supabase, pagina.eventos);
   return pagina;
 }
