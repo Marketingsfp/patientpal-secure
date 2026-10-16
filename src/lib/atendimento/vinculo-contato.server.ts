@@ -84,7 +84,12 @@ export async function resolverContatoConversa(
     return (data ?? []) as Array<{ id: string; nome?: string | null }>;
   };
 
-  const linhas = [...(await porColuna("telefone_norm")), ...(await porColuna("telefone2_norm"))];
+  // As duas colunas saem juntas (eram em série); a ordem do resultado é a mesma.
+  const [principal, secundario] = await Promise.all([
+    porColuna("telefone_norm"),
+    porColuna("telefone2_norm"),
+  ]);
+  const linhas = [...principal, ...secundario];
   const candidatos: CandidatoPaciente[] = [];
   for (const l of linhas) {
     if (!l?.id || candidatos.some((c) => c.id === l.id)) continue;

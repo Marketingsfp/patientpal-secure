@@ -69,6 +69,16 @@ const TEMPO_MAXIMO_META_MS = 15_000;
 const MSG_META_SEM_RESPOSTA =
   "O WhatsApp não respondeu a tempo. Confira na conversa se a mensagem chegou antes de reenviar.";
 
+/**
+ * Dispara uma leitura já, para ser conferida depois na ordem de antes
+ * (desempenho, 16/10/2026). O `catch` vazio só evita "rejeição solta" se uma
+ * conferência anterior falhar primeiro; o `await` posterior ainda lança.
+ */
+function emParalelo<T>(p: Promise<T>): Promise<T> {
+  p.catch(() => {});
+  return p;
+}
+
 async function assertMember(supabase: SupabaseClient<Database>, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("is_member", {
     _user_id: userId,
@@ -2317,10 +2327,6 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     // conferidos na mesma ordem de antes; nada é gravado nem enviado antes de
     // acesso, papéis e conversa estarem confirmados.
     const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
-    const emParalelo = <T>(p: Promise<T>) => {
-      p.catch(() => {}); // conferida mais abaixo, na ordem; evita rejeição solta
-      return p;
-    };
     const pMembro = emParalelo(assertMember(context.supabase, context.userId, data.clinicaId));
     const pAcesso = emParalelo(
       assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId),
@@ -2576,20 +2582,41 @@ export const obterDadosContato = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), conversaId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.supabase, context.userId, data.clinicaId);
-    {
-      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
-      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
-    }
-    const { data: conv, error: erroConversa } = await context.supabase
-      .from("atend_conversas")
-      .select("*, atend_departamentos(nome)")
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
+    // Desempenho (16/10/2026): membro, acesso e conversa saem juntos e são
+    // conferidos na mesma ordem de antes (eram em série, a cada abertura).
+    const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+    const pMembro = emParalelo(assertMember(context.supabase, context.userId, data.clinicaId));
+    const pAcesso = emParalelo(
+      assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId),
+    );
+    const pConversa = emParalelo(
+      Promise.resolve(
+        context.supabase
+          .from("atend_conversas")
+          .select("*, atend_departamentos(nome)")
+          .eq("id", data.conversaId)
+          .eq("clinica_id", data.clinicaId)
+          .maybeSingle(),
+      ),
+    );
+    await pMembro;
+    await pAcesso;
+    const { data: conv, error: erroConversa } = await pConversa;
     if (erroConversa) throw new Error(erroConversa.message);
     // Apenas inexistência confirmada devolve null; falha de consulta não limpa o chat.
     if (!conv) return null;
+    // Nome de quem atende: independe do paciente, sai junto com o vínculo.
+    const pAtribuido = conv.atribuida_user_id
+      ? emParalelo(
+          Promise.resolve(
+            context.supabase
+              .from("profiles")
+              .select("nome")
+              .eq("id", conv.atribuida_user_id)
+              .maybeSingle(),
+          ),
+        )
+      : Promise.resolve({ data: null as { nome?: string | null } | null });
 
     let paciente: any = null;
     let agendamentos: any[] = [];
@@ -2613,53 +2640,49 @@ export const obterDadosContato = createServerFn({ method: "POST" })
       identidadeStatus = resolvido.status;
       candidatos = resolvido.candidatos;
       if (resolvido.status === "EXPLICIT_LINK" && resolvido.pacienteId) {
-        const { data: p } = await context.supabase
-          .from("pacientes")
-          .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
-          .eq("id", resolvido.pacienteId)
-          .maybeSingle();
+        const pacienteId = resolvido.pacienteId;
+        // Paciente, agendamentos e contratos saem juntos (eram em série).
+        // Agendamentos e contratos só valem se o cadastro existir, como antes.
+        const [{ data: p }, agR, ctR] = await Promise.all([
+          context.supabase
+            .from("pacientes")
+            .select("id, nome, telefone, email, cpf, data_nascimento, sexo, cidade, estado")
+            .eq("id", pacienteId)
+            .maybeSingle(),
+          context.supabase
+            .from("agendamentos")
+            // O nome do médico não fica em `agendamentos`; vem do vínculo com
+            // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
+            .select("id, inicio, procedimento, tipo_atendimento, status, medicos(nome)")
+            .eq("clinica_id", data.clinicaId)
+            .eq("paciente_id", pacienteId)
+            .gte("inicio", janelaDiaClinica(hojeBR()).inicio)
+            .neq("status", "cancelado")
+            .order("inicio", { ascending: true })
+            .limit(5),
+          context.supabase
+            .from("contratos_assinatura")
+            .select("id, numero, status, data_inicio")
+            .eq("paciente_id", pacienteId)
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ]);
         paciente = p;
         contatoVia = "id";
+        if (paciente?.id) {
+          // Mantém o formato antigo (`medico_nome`) para quem consome no front.
+          agendamentos = ((agR.data ?? []) as Array<Record<string, unknown>>).map((a) => {
+            const m = a.medicos as { nome?: string } | Array<{ nome?: string }> | null;
+            const nome = Array.isArray(m) ? (m[0]?.nome ?? null) : (m?.nome ?? null);
+            const { medicos: _m, ...resto } = a;
+            return { ...resto, medico_nome: nome };
+          });
+          contratos = ctR.data ?? [];
+        }
       }
     }
 
-    if (paciente?.id) {
-      const [agR, ctR] = await Promise.all([
-        context.supabase
-          .from("agendamentos")
-          // O nome do médico não fica em `agendamentos`; vem do vínculo com
-          // `medicos` (a coluna medico_nome nunca existiu e derrubava o drawer).
-          .select("id, inicio, procedimento, tipo_atendimento, status, medicos(nome)")
-          .eq("clinica_id", data.clinicaId)
-          .eq("paciente_id", paciente.id)
-          .gte("inicio", janelaDiaClinica(hojeBR()).inicio)
-          .neq("status", "cancelado")
-          .order("inicio", { ascending: true })
-          .limit(5),
-        context.supabase
-          .from("contratos_assinatura")
-          .select("id, numero, status, data_inicio")
-          .eq("paciente_id", paciente.id)
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
-      // Mantém o formato antigo (`medico_nome`) para quem consome no front.
-      agendamentos = ((agR.data ?? []) as Array<Record<string, unknown>>).map((a) => {
-        const m = a.medicos as { nome?: string } | Array<{ nome?: string }> | null;
-        const nome = Array.isArray(m) ? (m[0]?.nome ?? null) : (m?.nome ?? null);
-        const { medicos: _m, ...resto } = a;
-        return { ...resto, medico_nome: nome };
-      });
-      contratos = ctR.data ?? [];
-    }
-
-    const { data: atribuidoProfile } = conv.atribuida_user_id
-      ? await context.supabase
-          .from("profiles")
-          .select("nome")
-          .eq("id", conv.atribuida_user_id)
-          .maybeSingle()
-      : { data: null };
+    const { data: atribuidoProfile } = await pAtribuido;
 
     return {
       conversa: conv,

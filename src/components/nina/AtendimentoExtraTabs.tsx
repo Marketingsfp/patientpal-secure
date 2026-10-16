@@ -776,6 +776,8 @@ function AtendInboxOperacional({
   const [alvoIndisponivel, setAlvoIndisponivel] = useState(false);
   const [msgDestacada, setMsgDestacada] = useState<string | null>(null);
   const seqEspera = useRef(0);
+  const abortContatoRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortContatoRef.current?.abort(), []);
   const acoesCardRef = useRef<AcoesCardInbox>({
     abrir: () => {},
     prefetch: () => {},
@@ -1815,9 +1817,15 @@ function AtendInboxOperacional({
     const entradaMsgs = entradaEmVoo ?? prefetchMsgs.current.registrar(alvo, chavePf, pMensagens);
     const podeGravarCache = () =>
       prefetchMsgs.current.resultadoValido(alvo, entradaMsgs, chavePrefetch(clinicaId, meuId));
+    // Troca rápida A→B→C (desempenho, 16/10/2026): a busca dos dados do contato
+    // da conversa anterior é cancelada, em vez de rodar até o fim no servidor.
+    // As mensagens não são canceladas: a busca é compartilhada com o pré-carregamento.
+    abortContatoRef.current?.abort();
+    const ctrlContato = new AbortController();
+    abortContatoRef.current = ctrlContato;
     const pContato = medirRequest(
       "obterDadosContato",
-      obterContato({ data: { clinicaId, conversaId: alvo } }),
+      obterContato({ data: { clinicaId, conversaId: alvo }, signal: ctrlContato.signal }),
       alvo,
     );
 
