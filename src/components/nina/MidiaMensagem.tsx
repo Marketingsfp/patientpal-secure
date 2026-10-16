@@ -86,6 +86,15 @@ function useLinkDaMidia(clinicaId: string, mensagemId: string, ativo: boolean) {
   return { url, estado };
 }
 
+/** Área com rolagem mais próxima (a lista de mensagens do chat). */
+function areaDeRolagem(el: HTMLElement): Element | null {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const rolagem = getComputedStyle(p).overflowY;
+    if (rolagem === "auto" || rolagem === "scroll") return p;
+  }
+  return null;
+}
+
 /** Só busca o link quando a bolha chega perto da tela (conversas longas não disparam dezenas de pedidos). */
 function useNaTela() {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -104,7 +113,9 @@ function useNaTela() {
           obs.disconnect();
         }
       },
-      { rootMargin: "300px" },
+      // A margem vale dentro da área de rolagem do chat (desempenho, 16/10/2026):
+      // medida pela janela, a imagem só começava a carregar ao aparecer.
+      { root: areaDeRolagem(el), rootMargin: "300px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
