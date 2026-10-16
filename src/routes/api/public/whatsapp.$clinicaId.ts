@@ -715,7 +715,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   iaLiberada &&
                   (Boolean(textoPaciente) ||
                     audioFalhou ||
-                    ["image", "document", "sticker"].includes(tipo));
+                    ["image", "document", "sticker"].includes(tipo) ||
+                    // Visualização única, enquete, vídeo, localização, contato:
+                    // a Nina pede para reenviar (antes, ninguém respondia).
+                    (await import("@/lib/nina/mensagem-nao-lida")).ehMensagemNaoLida(tipo));
 
                 // Se a conversa é de gente (Nina desligada ou já encaminhada) e
                 // ainda não tem responsável, distribui na hora para quem está
