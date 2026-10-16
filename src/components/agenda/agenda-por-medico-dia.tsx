@@ -141,7 +141,7 @@ export function AgendaPorMedicoDia({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={compacto ? "flex h-full min-h-0 flex-col gap-3" : "space-y-3"}>
       {mostrarResumo && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
@@ -153,11 +153,18 @@ export function AgendaPorMedicoDia({
         </div>
       )}
 
-      <div className="w-full max-w-full overflow-x-hidden pb-10">
+      <div
+        className={
+          compacto
+            ? "min-h-0 w-full max-w-full flex-1 overflow-x-hidden"
+            : "w-full max-w-full overflow-x-hidden pb-10"
+        }
+      >
         <div
           className={
             compacto
-              ? "grid w-full max-w-full grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-3"
+              ? // Cada fileira de colunas ocupa a altura do painel; a rolagem fica dentro da coluna.
+                "grid h-full w-full max-w-full auto-rows-[100%] grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-3"
               : "grid w-full max-w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           }
         >
@@ -169,7 +176,9 @@ export function AgendaPorMedicoDia({
             return (
               <section
                 key={m.id}
-                className="flex w-full min-w-0 flex-col rounded-xl border border-slate-200/80 bg-card shadow-xs"
+                className={`flex w-full min-w-0 flex-col rounded-xl border border-slate-200/80 bg-card shadow-xs ${
+                  compacto ? "h-full min-h-0" : ""
+                }`}
               >
                 <header className="flex items-center gap-2.5 rounded-t-xl border-b-2 border-b-primary bg-card p-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -200,7 +209,7 @@ export function AgendaPorMedicoDia({
 
                 <div
                   className={`scrollbar-thin w-full min-w-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto p-2 ${
-                    compacto ? "max-h-[max(24rem,calc(100dvh-20rem))]" : "max-h-96"
+                    compacto ? "min-h-0" : "max-h-96"
                   }`}
                 >
                   {ags.length === 0 && (

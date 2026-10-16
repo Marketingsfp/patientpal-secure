@@ -190,6 +190,24 @@ export function AgendaConversaPainel({
     return linhas.filter((a) => a.medico_id && ids.has(a.medico_id));
   }, [linhas, colunas]);
 
+  // Mesma regra da grade: sem busca, só quem tem horários no dia (ou todos, se ninguém tiver).
+  const totalProfissionais = useMemo(() => {
+    if (busca.trim()) return colunas.length;
+    const comHorario = new Set(itens.map((a) => a.medico_id));
+    const n = colunas.filter((m) => comHorario.has(m.id)).length;
+    return n || colunas.length;
+  }, [busca, colunas, itens]);
+  const dataPorExtenso = useMemo(
+    () =>
+      new Intl.DateTimeFormat("pt-BR", {
+        timeZone: "UTC",
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+      }).format(new Date(`${dataRef}T00:00:00Z`)),
+    [dataRef],
+  );
+
   const medicoDaVaga = vaga ? medicos.find((m) => m.id === vaga.medico_id) : undefined;
   const ordemChegada = !!(
     vaga && catalogo?.medicos.find((m) => m.id === vaga.medico_id)?.ordem_chegada
@@ -288,13 +306,13 @@ export function AgendaConversaPainel({
         }
       }}
     >
-      <header className="space-y-2 border-b p-3">
+      <header className="space-y-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
             <CalendarDays className="h-4 w-4" aria-hidden />
           </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-bold">Agenda</h2>
+          <div className="flex min-w-0 flex-1 items-baseline gap-2">
+            <h2 className="shrink-0 text-sm font-bold">Agenda</h2>
             <p className="truncate text-xs text-muted-foreground">
               Agendando para <span className="font-semibold text-foreground">{paciente.nome}</span>
             </p>
@@ -348,8 +366,8 @@ export function AgendaConversaPainel({
             aria-label="Buscar profissional ou especialidade"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Profissional ou especialidade"
-            className="h-8 min-w-0 flex-1 text-xs"
+            placeholder="Médico ou especialidade"
+            className="h-8 w-48 min-w-0 shrink text-xs"
           />
           <Button
             size="sm"
@@ -365,6 +383,12 @@ export function AgendaConversaPainel({
               <RefreshCw className="h-3.5 w-3.5" />
             )}
           </Button>
+          <span className="rounded-md bg-muted px-2 py-1 text-xs font-semibold capitalize">
+            {dataPorExtenso}
+          </span>
+          <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+            {totalProfissionais} profissiona{totalProfissionais === 1 ? "l" : "is"}
+          </span>
         </div>
         {futuros.length > 0 && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs">
@@ -387,7 +411,7 @@ export function AgendaConversaPainel({
           items={itens}
           fmtHora={fmtHora}
           ocultarPaciente={ocultarPaciente}
-          mostrarResumo
+          mostrarResumo={false}
           onAgClick={() => {}}
           onSlotClick={escolherVaga}
         />
