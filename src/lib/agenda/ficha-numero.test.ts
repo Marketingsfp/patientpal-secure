@@ -62,3 +62,31 @@ describe("numerarFichas", () => {
     expect(numerarFichasFormatadas([linha("a", "08:00")]).get("a")).toBe("001");
   });
 });
+
+describe("encaixe no fim da fila (16/10/2026)", () => {
+  const grade = Array.from({ length: 37 }, (_, i) => {
+    const min = 8 * 60 + i * 10 + (i >= 35 ? 20 : 0); // 35ª às 13:40, 36ª às 14:50+
+    const h = String(Math.floor(min / 60)).padStart(2, "0");
+    const m = String(min % 60).padStart(2, "0");
+    return linha(`g${i + 1}`, `${h}:${m}`);
+  });
+  it("encaixe às 14:51 recebe 38; 36 e 37 não mudam; segundo encaixe recebe 39", () => {
+    const antes = numerarFichas(grade);
+    expect(antes.get("g36")).toBe(36);
+    const enc1 = { ...linha("e1", "14:51"), ficha_encaixe_numero: 38 };
+    const enc2 = { ...linha("e2", "14:51"), ficha_encaixe_numero: 39 };
+    const depois = numerarFichas([...grade, enc1, enc2]);
+    expect(depois.get("e1")).toBe(38);
+    expect(depois.get("e2")).toBe(39);
+    expect(depois.get("g35")).toBe(35);
+    expect(depois.get("g36")).toBe(36);
+    expect(depois.get("g37")).toBe(37);
+  });
+  it("ficha nova da grade pula o número já dado ao encaixe", () => {
+    const enc = { ...linha("e1", "09:05"), ficha_encaixe_numero: 2 };
+    const m = numerarFichas([linha("a", "08:00"), enc, linha("b", "10:00"), linha("c", "11:00")]);
+    expect(m.get("a")).toBe(1);
+    expect(m.get("b")).toBe(3);
+    expect(m.get("c")).toBe(4);
+  });
+});

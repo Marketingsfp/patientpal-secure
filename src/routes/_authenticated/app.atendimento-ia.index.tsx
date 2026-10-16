@@ -341,7 +341,7 @@ function AtendimentoIaPage() {
     // linhas sem paciente, o que desloca a numeração.
     const { data: todasDoDia } = await supabase
       .from("agendamentos")
-      .select("id, inicio, paciente_nome, medico_id, agenda_id, created_at")
+      .select("id, inicio, paciente_nome, medico_id, agenda_id, created_at, ficha_encaixe_numero")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("medico_id", medId)
       .gte("inicio", `${hoje}T00:00:00`)

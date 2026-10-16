@@ -18,6 +18,8 @@ export type LinhaParaFicha = {
   medico_id?: string | null;
   agenda_id?: string | null;
   created_at?: string | null;
+  /** Número gravado do ENCAIXE (fim da fila). Nulo = ficha da grade, calculada pela posição. */
+  ficha_encaixe_numero?: number | null;
 };
 
 /**
@@ -27,7 +29,23 @@ export type LinhaParaFicha = {
  */
 export function numerarFichas(linhas: readonly LinhaParaFicha[]): Map<string, number> {
   const numeros = new Map<string, number>();
-  const ordenados = [...linhas].sort((a, b) => {
+  const chaveDe = (a: LinhaParaFicha) => {
+    const dia = new Date(a.inicio).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    return `${dia}::${a.medico_id ?? "__sem_profissional__"}::${a.agenda_id ?? "__sem_agenda__"}`;
+  };
+  // ENCAIXE (16/10/2026, decisão do João): número gravado no lançamento, no fim
+  // da fila. As fichas da grade seguem posicionais e pulam números já usados
+  // por encaixes, para nunca repetir.
+  const usados = new Map<string, Set<number>>();
+  for (const a of linhas) {
+    const n = a.ficha_encaixe_numero;
+    if (typeof n !== "number" || n <= 0) continue;
+    numeros.set(a.id, n);
+    const k = chaveDe(a);
+    if (!usados.has(k)) usados.set(k, new Set());
+    usados.get(k)!.add(n);
+  }
+  const ordenados = linhas.filter((a) => !numeros.has(a.id)).sort((a, b) => {
     const t = a.inicio.localeCompare(b.inicio);
     if (t !== 0) return t;
     // Mesmo horário (linhas antigas, antes da trava no banco): quem foi lançado
@@ -54,7 +72,8 @@ export function numerarFichas(linhas: readonly LinhaParaFicha[]): Map<string, nu
     // são filas distintas, não duplicação.
     const agenda = a.agenda_id ?? "__sem_agenda__";
     const chave = `${dia}::${prof}::${agenda}`;
-    const n = (contadores.get(chave) ?? 0) + 1;
+    let n = (contadores.get(chave) ?? 0) + 1;
+    while (usados.get(chave)?.has(n)) n++;
     contadores.set(chave, n);
     numeros.set(a.id, n);
   }

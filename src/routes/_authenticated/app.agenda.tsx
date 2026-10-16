@@ -319,6 +319,7 @@ type Agendamento = {
   convenio_autorizado?: boolean | null;
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
+  ficha_encaixe_numero?: number | null;
   forma_pagamento_prevista?: string | null;
   edit_lock_by?: string | null;
   edit_lock_by_nome?: string | null;
@@ -451,7 +452,7 @@ const LIMITE_PATCH_REALTIME = 40;
 // porque o refresh pontual do realtime precisa buscar as MESMAS colunas para
 // as linhas que mudaram.
 const AGENDA_SELECT =
-  "id,created_at,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,sem_faturamento_motivo,sem_faturamento_autorizado_por,sem_faturamento_autorizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+  "id,created_at,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,ficha_encaixe_numero,orcamento_id,pacote_id,tipo_atendimento,convenio_autorizado,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,sinalizado_em,sinalizado_por,sinalizado_por_nome,sem_faturamento,sem_faturamento_em,sem_faturamento_por,sem_faturamento_por_nome,sem_faturamento_motivo,sem_faturamento_autorizado_por,sem_faturamento_autorizado_por_nome,valor_cobranca,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
 
 type AgendaRowBruta = Agendamento & {
   medico?: { nome: string | null; sexo: string | null } | null;
@@ -5690,6 +5691,7 @@ function AgendaPage() {
           fim: ficha.fim.toISOString(),
           status: "agendado" as const,
           observacoes: "Ficha extra gerada na Agenda",
+          ficha_encaixe: true,
           ...(procedimento ? { procedimento } : {}),
         })),
       );
