@@ -112,14 +112,12 @@ function Pagina() {
 
   const salvarCfg = async (patch: { ativo?: boolean; cancelar_horas_min?: number }) => {
     if (!clinicaId) return;
-    const { error } = await supabase
-      .from("portal_paciente_config")
-      .upsert({
-        clinica_id: clinicaId,
-        ...cfg.data,
-        ...patch,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("portal_paciente_config").upsert({
+      clinica_id: clinicaId,
+      ...cfg.data,
+      ...patch,
+      updated_at: new Date().toISOString(),
+    });
     if (error) return mostrarErro(error);
     toast.success("Salvo.");
     void qc.invalidateQueries({ queryKey: ["portal-config", clinicaId] });
