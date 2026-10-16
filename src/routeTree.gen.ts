@@ -36,10 +36,8 @@ import { Route as DevSimulacaoAtendimentoRouteImport } from './routes/dev.simula
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
-import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
-import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
-import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
-import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
+import { Route as PacienteAgendamentosRouteImport } from './routes/paciente.agendamentos'
+import { Route as PacienteCadastroRouteImport } from './routes/paciente.cadastro'
 import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
@@ -149,7 +147,9 @@ import { Route as AuthenticatedAppCartaoTerapeuticoRelatoriosRouteImport } from 
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
 import { Route as AuthenticatedAppClientesRecentesRouteImport } from './routes/_authenticated/app.clientes.recentes'
+import { Route as AuthenticatedAppClientesSolicitacoesPortalRouteImport } from './routes/_authenticated/app.clientes.solicitacoes-portal'
 import { Route as AuthenticatedAppCoachIndexRouteImport } from './routes/_authenticated/app.coach.index'
+import { Route as AuthenticatedAppConfiguracoesAreaPacienteRouteImport } from './routes/_authenticated/app.configuracoes.area-paciente'
 import { Route as AuthenticatedAppConfiguracoesDominiosRouteImport } from './routes/_authenticated/app.configuracoes.dominios'
 import { Route as AuthenticatedAppConfiguracoesImportarClinicaTotalRouteImport } from './routes/_authenticated/app.configuracoes.importar-clinica-total'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
@@ -344,24 +344,14 @@ const PacienteIndexRoute = PacienteIndexRouteImport.update({
   path: '/paciente/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PacienteCartoesRoute = PacienteCartoesRouteImport.update({
-  id: '/paciente/cartoes',
-  path: '/paciente/cartoes',
+const PacienteAgendamentosRoute = PacienteAgendamentosRouteImport.update({
+  id: '/paciente/agendamentos',
+  path: '/paciente/agendamentos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
-  id: '/paciente/consultas',
-  path: '/paciente/consultas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PacienteFinanceiroRoute = PacienteFinanceiroRouteImport.update({
-  id: '/paciente/financeiro',
-  path: '/paciente/financeiro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PacientePerfilRoute = PacientePerfilRouteImport.update({
-  id: '/paciente/perfil',
-  path: '/paciente/perfil',
+const PacienteCadastroRoute = PacienteCadastroRouteImport.update({
+  id: '/paciente/cadastro',
+  path: '/paciente/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
@@ -983,10 +973,22 @@ const AuthenticatedAppClientesRecentesRoute =
     path: '/clientes/recentes',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppClientesSolicitacoesPortalRoute =
+  AuthenticatedAppClientesSolicitacoesPortalRouteImport.update({
+    id: '/clientes/solicitacoes-portal',
+    path: '/clientes/solicitacoes-portal',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppCoachIndexRoute =
   AuthenticatedAppCoachIndexRouteImport.update({
     id: '/coach/',
     path: '/coach/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppConfiguracoesAreaPacienteRoute =
+  AuthenticatedAppConfiguracoesAreaPacienteRouteImport.update({
+    id: '/configuracoes/area-paciente',
+    path: '/configuracoes/area-paciente',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppConfiguracoesDominiosRoute =
@@ -1354,10 +1356,8 @@ export interface FileRoutesByFullPath {
   '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
-  '/paciente/cartoes': typeof PacienteCartoesRoute
-  '/paciente/consultas': typeof PacienteConsultasRoute
-  '/paciente/financeiro': typeof PacienteFinanceiroRoute
-  '/paciente/perfil': typeof PacientePerfilRoute
+  '/paciente/agendamentos': typeof PacienteAgendamentosRoute
+  '/paciente/cadastro': typeof PacienteCadastroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1466,6 +1466,8 @@ export interface FileRoutesByFullPath {
   '/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
+  '/app/clientes/solicitacoes-portal': typeof AuthenticatedAppClientesSolicitacoesPortalRoute
+  '/app/configuracoes/area-paciente': typeof AuthenticatedAppConfiguracoesAreaPacienteRoute
   '/app/configuracoes/dominios': typeof AuthenticatedAppConfiguracoesDominiosRoute
   '/app/configuracoes/importar-clinica-total': typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -1552,10 +1554,8 @@ export interface FileRoutesByTo {
   '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
-  '/paciente/cartoes': typeof PacienteCartoesRoute
-  '/paciente/consultas': typeof PacienteConsultasRoute
-  '/paciente/financeiro': typeof PacienteFinanceiroRoute
-  '/paciente/perfil': typeof PacientePerfilRoute
+  '/paciente/agendamentos': typeof PacienteAgendamentosRoute
+  '/paciente/cadastro': typeof PacienteCadastroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1661,6 +1661,8 @@ export interface FileRoutesByTo {
   '/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
+  '/app/clientes/solicitacoes-portal': typeof AuthenticatedAppClientesSolicitacoesPortalRoute
+  '/app/configuracoes/area-paciente': typeof AuthenticatedAppConfiguracoesAreaPacienteRoute
   '/app/configuracoes/dominios': typeof AuthenticatedAppConfiguracoesDominiosRoute
   '/app/configuracoes/importar-clinica-total': typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -1750,10 +1752,8 @@ export interface FileRoutesById {
   '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
-  '/paciente/cartoes': typeof PacienteCartoesRoute
-  '/paciente/consultas': typeof PacienteConsultasRoute
-  '/paciente/financeiro': typeof PacienteFinanceiroRoute
-  '/paciente/perfil': typeof PacientePerfilRoute
+  '/paciente/agendamentos': typeof PacienteAgendamentosRoute
+  '/paciente/cadastro': typeof PacienteCadastroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1862,6 +1862,8 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-terapeutico/relatorios': typeof AuthenticatedAppCartaoTerapeuticoRelatoriosRoute
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/clientes/recentes': typeof AuthenticatedAppClientesRecentesRoute
+  '/_authenticated/app/clientes/solicitacoes-portal': typeof AuthenticatedAppClientesSolicitacoesPortalRoute
+  '/_authenticated/app/configuracoes/area-paciente': typeof AuthenticatedAppConfiguracoesAreaPacienteRoute
   '/_authenticated/app/configuracoes/dominios': typeof AuthenticatedAppConfiguracoesDominiosRoute
   '/_authenticated/app/configuracoes/importar-clinica-total': typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -1951,10 +1953,8 @@ export interface FileRouteTypes {
     | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
-    | '/paciente/cartoes'
-    | '/paciente/consultas'
-    | '/paciente/financeiro'
-    | '/paciente/perfil'
+    | '/paciente/agendamentos'
+    | '/paciente/cadastro'
     | '/painel/$clinicaId'
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
@@ -2063,6 +2063,8 @@ export interface FileRouteTypes {
     | '/app/cartao-terapeutico/relatorios'
     | '/app/clientes/duplicados'
     | '/app/clientes/recentes'
+    | '/app/clientes/solicitacoes-portal'
+    | '/app/configuracoes/area-paciente'
     | '/app/configuracoes/dominios'
     | '/app/configuracoes/importar-clinica-total'
     | '/app/configuracoes/nfse'
@@ -2149,10 +2151,8 @@ export interface FileRouteTypes {
     | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
-    | '/paciente/cartoes'
-    | '/paciente/consultas'
-    | '/paciente/financeiro'
-    | '/paciente/perfil'
+    | '/paciente/agendamentos'
+    | '/paciente/cadastro'
     | '/painel/$clinicaId'
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
@@ -2258,6 +2258,8 @@ export interface FileRouteTypes {
     | '/app/cartao-terapeutico/relatorios'
     | '/app/clientes/duplicados'
     | '/app/clientes/recentes'
+    | '/app/clientes/solicitacoes-portal'
+    | '/app/configuracoes/area-paciente'
     | '/app/configuracoes/dominios'
     | '/app/configuracoes/importar-clinica-total'
     | '/app/configuracoes/nfse'
@@ -2346,10 +2348,8 @@ export interface FileRouteTypes {
     | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
-    | '/paciente/cartoes'
-    | '/paciente/consultas'
-    | '/paciente/financeiro'
-    | '/paciente/perfil'
+    | '/paciente/agendamentos'
+    | '/paciente/cadastro'
     | '/painel/$clinicaId'
     | '/totem_/$clinicaId'
     | '/verificar/$codigo'
@@ -2458,6 +2458,8 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-terapeutico/relatorios'
     | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/clientes/recentes'
+    | '/_authenticated/app/clientes/solicitacoes-portal'
+    | '/_authenticated/app/configuracoes/area-paciente'
     | '/_authenticated/app/configuracoes/dominios'
     | '/_authenticated/app/configuracoes/importar-clinica-total'
     | '/_authenticated/app/configuracoes/nfse'
@@ -2546,10 +2548,8 @@ export interface RootRouteChildren {
   DevSimulacaoAtendimentoRoute: typeof DevSimulacaoAtendimentoRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
-  PacienteCartoesRoute: typeof PacienteCartoesRoute
-  PacienteConsultasRoute: typeof PacienteConsultasRoute
-  PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
-  PacientePerfilRoute: typeof PacientePerfilRoute
+  PacienteAgendamentosRoute: typeof PacienteAgendamentosRoute
+  PacienteCadastroRoute: typeof PacienteCadastroRoute
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
@@ -2768,32 +2768,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PacienteIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/paciente/cartoes': {
-      id: '/paciente/cartoes'
-      path: '/paciente/cartoes'
-      fullPath: '/paciente/cartoes'
-      preLoaderRoute: typeof PacienteCartoesRouteImport
+    '/paciente/agendamentos': {
+      id: '/paciente/agendamentos'
+      path: '/paciente/agendamentos'
+      fullPath: '/paciente/agendamentos'
+      preLoaderRoute: typeof PacienteAgendamentosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/paciente/consultas': {
-      id: '/paciente/consultas'
-      path: '/paciente/consultas'
-      fullPath: '/paciente/consultas'
-      preLoaderRoute: typeof PacienteConsultasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paciente/financeiro': {
-      id: '/paciente/financeiro'
-      path: '/paciente/financeiro'
-      fullPath: '/paciente/financeiro'
-      preLoaderRoute: typeof PacienteFinanceiroRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paciente/perfil': {
-      id: '/paciente/perfil'
-      path: '/paciente/perfil'
-      fullPath: '/paciente/perfil'
-      preLoaderRoute: typeof PacientePerfilRouteImport
+    '/paciente/cadastro': {
+      id: '/paciente/cadastro'
+      path: '/paciente/cadastro'
+      fullPath: '/paciente/cadastro'
+      preLoaderRoute: typeof PacienteCadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel/$clinicaId': {
@@ -3559,11 +3545,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppClientesRecentesRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/clientes/solicitacoes-portal': {
+      id: '/_authenticated/app/clientes/solicitacoes-portal'
+      path: '/clientes/solicitacoes-portal'
+      fullPath: '/app/clientes/solicitacoes-portal'
+      preLoaderRoute: typeof AuthenticatedAppClientesSolicitacoesPortalRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/coach/': {
       id: '/_authenticated/app/coach/'
       path: '/coach'
       fullPath: '/app/coach/'
       preLoaderRoute: typeof AuthenticatedAppCoachIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/configuracoes/area-paciente': {
+      id: '/_authenticated/app/configuracoes/area-paciente'
+      path: '/configuracoes/area-paciente'
+      fullPath: '/app/configuracoes/area-paciente'
+      preLoaderRoute: typeof AuthenticatedAppConfiguracoesAreaPacienteRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/configuracoes/dominios': {
@@ -4230,6 +4230,8 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppClientesDuplicadosRoute: typeof AuthenticatedAppClientesDuplicadosRoute
   AuthenticatedAppClientesRecentesRoute: typeof AuthenticatedAppClientesRecentesRoute
+  AuthenticatedAppClientesSolicitacoesPortalRoute: typeof AuthenticatedAppClientesSolicitacoesPortalRoute
+  AuthenticatedAppConfiguracoesAreaPacienteRoute: typeof AuthenticatedAppConfiguracoesAreaPacienteRoute
   AuthenticatedAppConfiguracoesDominiosRoute: typeof AuthenticatedAppConfiguracoesDominiosRoute
   AuthenticatedAppConfiguracoesImportarClinicaTotalRoute: typeof AuthenticatedAppConfiguracoesImportarClinicaTotalRoute
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
@@ -4347,6 +4349,10 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppClientesDuplicadosRoute:
     AuthenticatedAppClientesDuplicadosRoute,
   AuthenticatedAppClientesRecentesRoute: AuthenticatedAppClientesRecentesRoute,
+  AuthenticatedAppClientesSolicitacoesPortalRoute:
+    AuthenticatedAppClientesSolicitacoesPortalRoute,
+  AuthenticatedAppConfiguracoesAreaPacienteRoute:
+    AuthenticatedAppConfiguracoesAreaPacienteRoute,
   AuthenticatedAppConfiguracoesDominiosRoute:
     AuthenticatedAppConfiguracoesDominiosRoute,
   AuthenticatedAppConfiguracoesImportarClinicaTotalRoute:
@@ -4442,10 +4448,8 @@ const rootRouteChildren: RootRouteChildren = {
   DevSimulacaoAtendimentoRoute: DevSimulacaoAtendimentoRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
-  PacienteCartoesRoute: PacienteCartoesRoute,
-  PacienteConsultasRoute: PacienteConsultasRoute,
-  PacienteFinanceiroRoute: PacienteFinanceiroRoute,
-  PacientePerfilRoute: PacientePerfilRoute,
+  PacienteAgendamentosRoute: PacienteAgendamentosRoute,
+  PacienteCadastroRoute: PacienteCadastroRoute,
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,

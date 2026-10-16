@@ -20,6 +20,7 @@ import {
 } from "./status-utils";
 import { prontuarioExibicao } from "@/lib/prontuario";
 import { BannerAlertaCritico } from "@/components/paciente/alerta-critico";
+import { AvisoSolicitacaoPortal } from "@/components/portal-paciente/aviso-solicitacao-portal";
 
 interface Props {
   paciente: PacienteV2 | null;
@@ -46,6 +47,7 @@ export function ClienteDrawer({ paciente, onClose }: Props) {
             </SheetHeader>
 
             <BannerAlertaCritico pacienteId={p.id} className="mt-2" />
+            <AvisoSolicitacaoPortal pacienteId={p.id} className="mt-2" />
 
             <Separator className="my-3" />
 
