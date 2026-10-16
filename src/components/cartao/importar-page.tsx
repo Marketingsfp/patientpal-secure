@@ -30,10 +30,24 @@ import {
   Loader2,
   X,
   Info,
+  History,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { formatDateTime } from "@/lib/date-utils";
+import { confirmDialog } from "@/lib/confirm";
+import {
+  concluirLote,
+  ehFuncaoAusente,
+  iniciarLote,
+  listarLotes,
+  registrarNoLote,
+  reverterLote,
+  type LoteImportacao,
+  type ResultadoReversao,
+} from "@/lib/cartao/importacao-lotes";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -153,6 +167,16 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
   const [etapa, setEtapa] = useState<Etapa | null>(null);
   const [relatorio, setRelatorio] = useState<string[] | null>(null);
 
+  const [lotes, setLotes] = useState<LoteImportacao[]>([]);
+  const [carregandoLotes, setCarregandoLotes] = useState(false);
+  /** null = carregou; "ausente" = falta aplicar a atualização do banco; "erro" = falhou. */
+  const [falhaLotes, setFalhaLotes] = useState<"ausente" | "erro" | null>(null);
+  const [revertendoId, setRevertendoId] = useState<string | null>(null);
+  const [bloqueio, setBloqueio] = useState<{
+    lote: LoteImportacao;
+    lista: ResultadoReversao["bloqueios"];
+  } | null>(null);
+
   const convenio = useMemo(
     () => convenios.find((c) => c.id === convenioId) ?? null,
     [convenios, convenioId],
@@ -202,6 +226,79 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
       cancelado = true;
     };
   }, [clinicaId]);
+
+  // --- histórico de importações ---------------------------------------------
+  const carregarLotes = useCallback(async () => {
+    if (!clinicaId) return;
+    setCarregandoLotes(true);
+    try {
+      setLotes(await listarLotes(clinicaId, produto));
+      setFalhaLotes(null);
+    } catch (e) {
+      setLotes([]);
+      setFalhaLotes(ehFuncaoAusente(e) ? "ausente" : "erro");
+    } finally {
+      setCarregandoLotes(false);
+    }
+  }, [clinicaId, produto]);
+
+  useEffect(() => {
+    void carregarLotes();
+  }, [carregarLotes]);
+
+  const desfazer = useCallback(
+    async (lote: LoteImportacao) => {
+      setBloqueio(null);
+      setRevertendoId(lote.id);
+      try {
+        // Primeiro só confere: nada é apagado sem o operador ver o que sai.
+        const previa = await reverterLote(lote.id, true);
+        if (!previa.ok) {
+          setBloqueio({ lote, lista: previa.bloqueios });
+          return;
+        }
+        const confirmou = await confirmDialog({
+          title: "Desfazer esta importação?",
+          tone: "danger",
+          confirmText: "Desfazer importação",
+          description: (
+            <span className="block space-y-2">
+              <span className="block">
+                Vão ser apagados os cadastros que a importação de{" "}
+                <strong>{formatDateTime(lote.created_at)}</strong> criou:
+              </span>
+              <span className="block">
+                {contar(previa.titulares, "titular", "titulares")},{" "}
+                {contar(previa.dependentes, "dependente", "dependentes")},{" "}
+                {contar(previa.contratos, "contrato", "contratos")} e{" "}
+                {contar(previa.vinculos, "vínculo de dependente", "vínculos de dependente")}.
+              </span>
+              <span className="block">
+                Quem já estava cadastrado antes da importação não é tocado. Não dá para voltar atrás
+                — se precisar, importe a planilha de novo.
+              </span>
+            </span>
+          ),
+        });
+        if (!confirmou) return;
+        const feito = await reverterLote(lote.id, false);
+        if (!feito.ok) {
+          // Alguém usou um dos cadastros entre a conferência e o clique.
+          setBloqueio({ lote, lista: feito.bloqueios });
+          return;
+        }
+        toast.success(
+          `Importação desfeita: ${contar(feito.titulares + feito.dependentes, "paciente removido", "pacientes removidos")} e ${contar(feito.contratos, "contrato removido", "contratos removidos")}.`,
+        );
+      } catch (e) {
+        mostrarErro(e, "desfazer a importação");
+      } finally {
+        setRevertendoId(null);
+        void carregarLotes();
+      }
+    },
+    [carregarLotes],
+  );
 
   // --- leitura do arquivo ---------------------------------------------------
   const receberArquivo = useCallback(async (arquivo: File) => {
@@ -349,11 +446,39 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
     const idPorMatricula = new Map<string, string>(conferencia.reaproveitar);
     const contratoPorMatricula = new Map<string, string>();
 
+    // Abre o registro da importação ANTES de gravar qualquer coisa: é ele que
+    // permite desfazer depois. Sem ele, a importação não começa.
+    let loteId: string;
+    try {
+      loteId = await iniciarLote({
+        clinicaId,
+        produto,
+        convenioId: convenio.id,
+        arquivoNome: nomeArquivo ?? "planilha",
+      });
+    } catch (e) {
+      setImportando(false);
+      if (ehFuncaoAusente(e)) {
+        toast.error(
+          "A importação está parada até a atualização do banco ser aplicada (opção de desfazer). Nada foi gravado.",
+          { duration: 10000 },
+        );
+      } else {
+        mostrarErro(e, "iniciar a importação");
+      }
+      return;
+    }
+
     /** Insere pacientes em lote; se o lote falhar, tenta um a um para não perder o resto. */
-    const gravarPacientes = async (linhas: LinhaBeneficiario[], titulo: string) => {
+    const gravarPacientes = async (
+      linhas: LinhaBeneficiario[],
+      titulo: string,
+      tipo: "titular" | "dependente",
+    ) => {
       setEtapa({ titulo, feitos: 0, total: linhas.length });
       let feitos = 0;
       for (const lote of pedacos(linhas, LOTE_PACIENTES)) {
+        const criados: string[] = [];
         const registros = lote.map((l) => ({
           clinica_id: clinicaId,
           nome: l.nome,
@@ -373,6 +498,7 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
           .select("id, codigo_prontuario");
         if (!error) {
           for (const p of (data ?? []) as PacienteExistente[]) {
+            criados.push(p.id);
             if (p.codigo_prontuario) idPorMatricula.set(p.codigo_prontuario, p.id);
           }
         } else {
@@ -388,12 +514,16 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
                   (erroUm as { message?: string }).message ?? "erro no banco"
                 }`,
               );
-            } else if ((um as PacienteExistente)?.codigo_prontuario) {
+            } else if (um) {
               const p = um as PacienteExistente;
-              idPorMatricula.set(p.codigo_prontuario as string, p.id);
+              criados.push(p.id);
+              if (p.codigo_prontuario) idPorMatricula.set(p.codigo_prontuario, p.id);
             }
           }
         }
+        // Se a anotação falhar, a importação para aqui: seguir gravando
+        // cadastros que o "Desfazer" não enxerga é exatamente o que não pode.
+        await registrarNoLote(loteId, tipo, criados);
         feitos += lote.length;
         setEtapa({ titulo, feitos, total: linhas.length });
       }
@@ -409,6 +539,7 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
       await gravarPacientes(
         leitura.titulares.filter((t) => novosPorMatricula.has(t.matricula)),
         "1 de 4 — cadastrando titulares",
+        "titular",
       );
 
       // ETAPA 2 — contrato do plano para cada titular
@@ -480,13 +611,17 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
           continue;
         }
         const contrato = criado as { id?: string } | null;
-        if (contrato?.id) contratoPorMatricula.set(titular.matricula, contrato.id);
+        if (contrato?.id) {
+          await registrarNoLote(loteId, "contrato", [contrato.id]);
+          contratoPorMatricula.set(titular.matricula, contrato.id);
+        }
       }
 
       // ETAPA 3 — dependentes viram pacientes
       await gravarPacientes(
         leitura.dependentes.filter((d) => novosPorMatricula.has(d.matricula)),
         "3 de 4 — cadastrando dependentes",
+        "dependente",
       );
 
       // ETAPA 4 — amarra cada dependente ao contrato do titular
@@ -531,6 +666,7 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
           confirmarVinculoDuplicado: true,
         });
         if (resultado.ok) {
+          await registrarNoLote(loteId, "vinculo", [resultado.dependente.id]);
           vinculadosOk++;
           if (resultado.avisoVinculoDuplicado) {
             problemas.push(
@@ -561,9 +697,27 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
       setRelatorio(problemas);
       mostrarErro(e, "importar a planilha");
     } finally {
+      // Fecha o registro mesmo se parou no meio: o que entrou até ali já pode
+      // ser desfeito pelo histórico.
+      try {
+        await concluirLote(loteId, problemas.length);
+      } catch {
+        // Sem fechar, o histórico libera o desfazer sozinho depois de 10 minutos.
+      }
       setImportando(false);
+      void carregarLotes();
     }
-  }, [leitura, conferencia, clinicaId, convenio, user, diaVencimento]);
+  }, [
+    leitura,
+    conferencia,
+    clinicaId,
+    convenio,
+    user,
+    diaVencimento,
+    produto,
+    nomeArquivo,
+    carregarLotes,
+  ]);
 
   // --- tela -----------------------------------------------------------------
   if (!podeEscrever) {
@@ -578,7 +732,10 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
     );
   }
 
-  const totalNovos = conferencia?.novos.length ?? 0;
+  const titularesNovos = (conferencia?.novos ?? []).filter((l) => l.tipo === "titular").length;
+  const dependentesNovos = (conferencia?.novos ?? []).filter((l) => l.tipo === "dependente").length;
+  // Erro = linha que não vai entrar: matrícula de outro paciente ou dependente sem titular.
+  const totalErros = (conferencia?.conflitos.length ?? 0) + (leitura?.orfaos.length ?? 0);
   const novosSemTelefone = (conferencia?.novos ?? []).filter((l) => !l.telefone).length;
   const podeImportar =
     Boolean(conferencia) && Boolean(convenio) && !importando && !conferindo && Boolean(user?.id);
@@ -594,7 +751,8 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
           linha do cabeçalho é procurada em cada aba separadamente (elas não começam na mesma
           altura). A coluna <strong>Matrícula</strong> vira o número de prontuário do paciente.
           Dependente sem titular identificável fica de fora e é listado nos avisos. Rodar duas vezes
-          não duplica: quem já existe é reaproveitado.
+          não duplica: quem já existe é reaproveitado. Se a planilha errada for importada, o gestor
+          da unidade desfaz pelo quadro <strong>Importações recentes</strong>, no fim da página.
         </AlertDescription>
       </Alert>
 
@@ -771,9 +929,19 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
             {conferencia && (
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{totalNovos} cadastros novos</Badge>
+                  <Badge variant="secondary">
+                    {contar(titularesNovos, "titular novo", "titulares novos")}
+                  </Badge>
+                  <Badge variant="secondary">
+                    {contar(dependentesNovos, "dependente novo", "dependentes novos")}
+                  </Badge>
                   <Badge variant="secondary">
                     {conferencia.reaproveitar.size} já existem (serão reaproveitados)
+                  </Badge>
+                  <Badge variant={totalErros > 0 ? "destructive" : "outline"}>
+                    {totalErros === 0
+                      ? "Nenhum erro"
+                      : contar(totalErros, "erro (fica de fora)", "erros (ficam de fora)")}
                   </Badge>
                   {conferencia.conflitos.length > 0 && (
                     <Badge variant="destructive">
@@ -935,6 +1103,157 @@ export function ImportarBeneficiariosPage({ produto }: { produto: ProdutoCartao 
           )}
         </Card>
       )}
+
+      {/* Histórico */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="h-4 w-4" /> Importações recentes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {bloqueio && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Esta importação não pode ser desfeita</AlertTitle>
+              <AlertDescription>
+                <p className="mb-2 text-sm">
+                  Depois da importação de {formatDateTime(bloqueio.lote.created_at)}, alguns desses
+                  cadastros já foram usados no sistema. Para não apagar agenda, financeiro ou ficha
+                  de ninguém, nada foi removido. Quem está nessa situação:
+                </p>
+                <ul className="max-h-56 list-disc space-y-1 overflow-auto pl-5 text-xs">
+                  {bloqueio.lista.map((b, i) => (
+                    <li key={i}>
+                      <strong>{b.nome}</strong> — {b.onde}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setBloqueio(null)}
+                >
+                  Fechar
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {carregandoLotes && lotes.length === 0 ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+            </p>
+          ) : falhaLotes === "ausente" ? (
+            <p className="text-sm text-muted-foreground">
+              O histórico e a opção de desfazer aparecem depois que a atualização do banco for
+              aplicada.
+            </p>
+          ) : falhaLotes === "erro" ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              Não foi possível carregar o histórico.
+              <Button variant="outline" size="sm" onClick={() => void carregarLotes()}>
+                Tentar de novo
+              </Button>
+            </div>
+          ) : lotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma importação registrada ainda. As importações feitas antes desta opção existir
+              não aparecem aqui.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Quando</TableHead>
+                    <TableHead>Planilha</TableHead>
+                    <TableHead>O que entrou</TableHead>
+                    <TableHead>Situação</TableHead>
+                    <TableHead className="text-right" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lotes.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {formatDateTime(l.created_at)}
+                        <span className="block text-muted-foreground">
+                          {l.criado_por_nome ?? "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {l.arquivo_nome}
+                        {l.convenio_nome && (
+                          <span className="block text-muted-foreground">{l.convenio_nome}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {l.status === "revertido" && l.removidos ? (
+                          <span className="text-muted-foreground">
+                            Removidos: {contar(l.removidos.titulares, "titular", "titulares")},{" "}
+                            {contar(l.removidos.dependentes, "dependente", "dependentes")},{" "}
+                            {contar(l.removidos.contratos, "contrato", "contratos")}
+                          </span>
+                        ) : (
+                          <>
+                            {contar(l.titulares, "titular novo", "titulares novos")},{" "}
+                            {contar(l.dependentes, "dependente novo", "dependentes novos")},{" "}
+                            {contar(l.contratos, "contrato", "contratos")},{" "}
+                            {contar(l.vinculos, "vínculo", "vínculos")}
+                            {l.pendencias > 0 && (
+                              <span className="block text-amber-700">
+                                {contar(l.pendencias, "pendência", "pendências")}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {l.status === "revertido" ? (
+                          <Badge variant="outline">
+                            Desfeita em {formatDateTime(l.revertido_em)}
+                            {l.revertido_por_nome ? ` por ${l.revertido_por_nome}` : ""}
+                          </Badge>
+                        ) : l.status === "em_andamento" ? (
+                          <Badge variant="outline" className="border-amber-500 text-amber-700">
+                            Não terminou
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Concluída</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {l.status !== "revertido" &&
+                          (l.pode_desfazer ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={importando || revertendoId !== null}
+                              onClick={() => void desfazer(l)}
+                            >
+                              {revertendoId === l.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Undo2 className="mr-2 h-4 w-4" />
+                              )}
+                              Desfazer importação
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Só o gestor desfaz
+                            </span>
+                          ))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
