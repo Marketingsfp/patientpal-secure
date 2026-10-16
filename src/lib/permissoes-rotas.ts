@@ -209,6 +209,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
 export const ADMIN_ONLY_ROUTES: ReadonlyArray<string> = [
   "/app/configuracoes/voz",
   "/app/configuracoes/site-agendamento",
+  "/app/configuracoes/dominios",
   "/app/configuracoes/importar-clinica-total",
   "/app/planos",
   // Previews internos de telas em desenvolvimento: mostram dados reais e

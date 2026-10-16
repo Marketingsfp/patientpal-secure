@@ -8,6 +8,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { isMedicoOnlyUser } from "@/lib/medico-only";
 import { setSubsystem } from "@/lib/subsystem";
 import { Button } from "@/components/ui/button";
+import {
+  aplicarMarcaNaAba,
+  idClinicaValido,
+  resolverClinicaAcesso,
+  type ClinicaAcesso,
+} from "@/lib/clinica-acesso";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -15,9 +21,14 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
   // `next` preserva um destino interno (ex.: a tela de consentimento OAuth)
   // para onde o usuário volta depois de entrar.
-  validateSearch: (s: Record<string, unknown>): { next?: string } => {
+  // `clinica` é só o modo de teste do endereço próprio da clínica (antes do
+  // DNS): muda o visual e pré-seleciona a unidade, nunca libera acesso.
+  validateSearch: (s: Record<string, unknown>): { next?: string; clinica?: string } => {
     const next = typeof s.next === "string" ? s.next : "";
-    return next.startsWith("/") && !next.startsWith("//") ? { next } : {};
+    const out: { next?: string; clinica?: string } = {};
+    if (next.startsWith("/") && !next.startsWith("//")) out.next = next;
+    if (idClinicaValido(s.clinica)) out.clinica = s.clinica;
+    return out;
   },
   head: () => ({
     meta: [
@@ -69,7 +80,20 @@ function entrarComoMedico() {
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { next } = Route.useSearch();
+  const { next, clinica } = Route.useSearch();
+  const [marca, setMarca] = useState<ClinicaAcesso | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    void resolverClinicaAcesso(clinica).then((c) => {
+      if (!vivo || !c) return;
+      setMarca(c);
+      aplicarMarcaNaAba(c, "Acesso ao sistema");
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [clinica]);
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -143,12 +167,25 @@ function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       {/* Brand panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-[#16a34a] via-[#15803d] to-[#166534]">
+      <div
+        className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-[#16a34a] via-[#15803d] to-[#166534]"
+        style={
+          marca?.primary
+            ? {
+                backgroundImage: `linear-gradient(to bottom right, ${marca.primary}, ${marca.accent || marca.primary})`,
+              }
+            : undefined
+        }
+      >
         <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-            <Activity className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-white/15 backdrop-blur">
+            {marca?.logo_url ? (
+              <img src={marca.logo_url} alt="" className="h-full w-full object-contain" />
+            ) : (
+              <Activity className="h-5 w-5" />
+            )}
           </div>
-          <span className="text-xl font-semibold tracking-tight">ClinicaOS</span>
+          <span className="text-xl font-semibold tracking-tight">{marca?.nome ?? "ClinicaOS"}</span>
         </div>
 
         <div className="space-y-6 max-w-md">
@@ -197,6 +234,16 @@ function LoginPage() {
           </Link>
           <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
             <div className="mb-6">
+              {marca && (
+                <div className="mb-4 flex items-center gap-3">
+                  {marca.logo_url && (
+                    <img src={marca.logo_url} alt={`Logo ${marca.nome}`} className="h-12 w-12 object-contain" />
+                  )}
+                  <p className="text-sm font-medium" style={marca.primary ? { color: marca.primary } : undefined}>
+                    Acesso ao sistema – {marca.nome}
+                  </p>
+                </div>
+              )}
               <h1 className="text-3xl font-semibold tracking-tight">Bem-vindo de volta</h1>
               <p className="text-sm text-muted-foreground mt-1.5">
                 Acesse sua clínica com seu e-mail e senha
