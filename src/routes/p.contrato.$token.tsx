@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { documentoContratoPublico } from "@/lib/contrato-publico.functions";
 import { Check, Eraser } from "lucide-react";
 
 export const Route = createFileRoute("/p/contrato/$token")({
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/p/contrato/$token")({
 function AssinarContrato() {
   const { token } = useParams({ from: "/p/contrato/$token" });
   const [data, setData] = useState<any>(null);
+  const [documento, setDocumento] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,9 +29,13 @@ function AssinarContrato() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.rpc("contrato_publico", { _token: token });
+      const [{ data, error }, doc] = await Promise.all([
+        supabase.rpc("contrato_publico", { _token: token }),
+        documentoContratoPublico({ data: { token } }).catch(() => ({ html: null })),
+      ]);
       if (error) mostrarErro(error);
       setData(data);
+      setDocumento(doc.html);
       setLoading(false);
     })();
   }, [token]);
@@ -112,9 +118,20 @@ function AssinarContrato() {
             Titular: <strong>{c.paciente_nome}</strong>
           </div>
         </div>
-        <div className="rounded-md border bg-muted/30 p-3 max-h-80 overflow-auto whitespace-pre-wrap text-sm">
-          {c.template_contrato ?? c.descricao_beneficios ?? "Termo de adesão"}
-        </div>
+        {documento ? (
+          // sandbox vazio: o contrato é exibido formatado, mas nenhum script,
+          // formulário ou link do modelo roda dentro da página de assinatura.
+          <iframe
+            title={`Contrato Nº ${c.numero}`}
+            srcDoc={documento}
+            sandbox=""
+            className="w-full h-[60vh] rounded-md border bg-white"
+          />
+        ) : (
+          <div className="rounded-md border bg-muted/30 p-3 max-h-80 overflow-auto whitespace-pre-wrap text-sm">
+            {c.descricao_beneficios ?? "Termo de adesão"}
+          </div>
+        )}
         {data.dependentes?.length > 0 ? (
           <div className="text-sm">
             <strong>Dependentes/Agregados:</strong>

@@ -339,29 +339,35 @@ const TEXTO_CONTRATO_HTML = `
 export const modeloPadraoContrato = (convenioId?: string | null) =>
   (convenioId ? CONVENIO_TEMPLATE_OVERRIDES[convenioId] : null) ?? TEXTO_CONTRATO_HTML;
 
-export async function printContrato(contratoId: string) {
-  const { data: c, error } = await supabase
+/** Monta o corpo do contrato do paciente com todos os campos {{...}}
+ *  preenchidos. `db` é o cliente do navegador na impressão interna e o
+ *  cliente do servidor na página pública de assinatura. */
+export async function montarCorpoContrato(
+  db: typeof supabase,
+  contratoId: string,
+): Promise<{ corpo: string; titulo: string }> {
+  const { data: c, error } = await db
     .from("contratos_assinatura")
     .select("*")
     .eq("id", contratoId)
     .maybeSingle();
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
 
-  const { data: cl } = await supabase
+  const { data: cl } = await db
     .from("clinicas")
     .select("nome, cnpj, endereco, cidade, estado, telefone")
     .eq("id", (c as any).clinica_id)
     .maybeSingle();
 
   const { data: cv } = (c as any).convenio_id
-    ? await supabase
+    ? await db
         .from("cb_convenios")
         .select("modelo_contrato")
         .eq("id", (c as any).convenio_id)
         .maybeSingle()
     : { data: null as any };
 
-  const { data: pa } = await supabase
+  const { data: pa } = await db
     .from("pacientes")
     .select(
       "cpf, data_nascimento, telefone, telefone2, email, logradouro, numero, bairro, cidade, estado, cep",
@@ -369,7 +375,7 @@ export async function printContrato(contratoId: string) {
     .eq("id", (c as any).paciente_id)
     .maybeSingle();
 
-  const { data: depsRaw } = await supabase
+  const { data: depsRaw } = await db
     .from("contrato_dependentes")
     .select("*")
     .eq("contrato_id", contratoId)
@@ -401,7 +407,7 @@ export async function printContrato(contratoId: string) {
   const pids = deps.map((d: any) => d.paciente_id).filter(Boolean);
   const pacsMap: Record<string, any> = {};
   if (pids.length > 0) {
-    const { data: pacsData } = await supabase
+    const { data: pacsData } = await db
       .from("pacientes")
       .select("id, cpf, data_nascimento, telefone")
       .in("id", pids);
@@ -477,7 +483,12 @@ export async function printContrato(contratoId: string) {
     !((c as any).convenio_id && OVERRIDES_SEM_REDUCAO.has((c as any).convenio_id)),
   );
 
-  imprimirCorpoContrato(corpo, `Contrato #${c.numero} - ${c.paciente_nome ?? ""}`);
+  return { corpo, titulo: `Contrato #${c.numero} - ${c.paciente_nome ?? ""}` };
+}
+
+export async function printContrato(contratoId: string) {
+  const { corpo, titulo } = await montarCorpoContrato(supabase, contratoId);
+  imprimirCorpoContrato(corpo, titulo);
 }
 
 /** Imprime o modelo do convênio com a mesma diagramação do contrato do
@@ -497,6 +508,12 @@ export function printModeloContrato(convenioId: string | null | undefined, model
 }
 
 function imprimirCorpoContrato(corpo: string, titulo: string) {
+  const cleanHtml = montarDocumentoContrato(corpo, titulo);
+  imprimirDocumento(cleanHtml);
+}
+
+/** Documento HTML completo do contrato, com a mesma diagramação da impressão. */
+export function montarDocumentoContrato(corpo: string, titulo: string): string {
   const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
 
   // CSS aplicado sempre — inclusive quando o template já é um HTML completo —
@@ -758,11 +775,10 @@ ${corpo}
 </body></html>`;
 
   // Remove qualquer auto-print embutido no template — vamos disparar via iframe.
-  const cleanHtml = bodyHtml.replace(
-    /<script[^>]*>[\s\S]*?window\.print\([\s\S]*?<\/script>/gi,
-    "",
-  );
+  return bodyHtml.replace(/<script[^>]*>[\s\S]*?window\.print\([\s\S]*?<\/script>/gi, "");
+}
 
+function imprimirDocumento(cleanHtml: string) {
   // Iframe invisível: imprime sem bloquear a janela mãe e é removido ao final.
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
