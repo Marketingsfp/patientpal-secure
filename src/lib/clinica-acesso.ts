@@ -130,3 +130,49 @@ export function estiloCoresMarca(
     "--ring": c.primary,
   };
 }
+
+/**
+ * Domínio com "restringir acesso": decide se o usuário logado pode usar o
+ * endereço e em qual clínica a unidade fica travada. Espelha a função do
+ * banco `acesso_por_dominio` (que é quem decide de fato). Só UX/política:
+ * o isolamento real continua no RLS.
+ */
+export interface AcessoDominio {
+  restrito: boolean;
+  pode: boolean;
+  clinica_id: string | null;
+  clinica_nome: string | null;
+}
+
+export function decidirAcessoDominio(p: {
+  restrito: boolean;
+  temVinculo: boolean;
+  adminPlataforma: boolean;
+}): boolean {
+  return !p.restrito || p.temVinculo || p.adminPlataforma;
+}
+
+export const CHAVE_BLOQUEIO_DOMINIO = "clinica_dominio_bloqueio_v1";
+
+export function mensagemBloqueioDominio(nome: string): string {
+  return `Este endereço é exclusivo da equipe da ${nome}. Use o endereço da sua clínica.`;
+}
+
+/**
+ * Consulta sempre (sem cache) para revalidar a cada sessão/recarga.
+ * Prévia/localhost/lovable.app e o `?clinica=` de teste nunca restringem.
+ * Falha na consulta = sem restrição (nunca travar o balcão por rede).
+ */
+export async function verificarAcessoDominio(): Promise<AcessoDominio | null> {
+  if (typeof window === "undefined") return null;
+  const host = normalizarHostname(window.location.hostname);
+  if (hostnamePadrao(host)) return null;
+  try {
+    const { data, error } = await supabase.rpc("acesso_por_dominio", { _hostname: host });
+    if (error) return null;
+    const linha = ((data ?? []) as AcessoDominio[])[0];
+    return linha?.restrito ? linha : null;
+  } catch {
+    return null;
+  }
+}
