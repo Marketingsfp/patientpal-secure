@@ -90,7 +90,10 @@ export function PortalLauncher({
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-8">
+        {/* Fileira centralizada em vez de grade fixa: quando um portal fica
+            oculto pela permissão, os cartões restantes não ficam encostados à
+            esquerda. As larguras reproduzem as colunas da grade antiga. */}
+        <div className="flex flex-wrap justify-center gap-6 lg:gap-8">
           {visiveis.map((portal) => {
             const Icon = portal.icon;
             return (
@@ -98,7 +101,7 @@ export function PortalLauncher({
                 key={portal.id}
                 type="button"
                 onClick={() => onPick(portal.id)}
-                className="group relative overflow-hidden text-left rounded-3xl border border-slate-200/80 bg-white/90 p-7 shadow-xl backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-brand-1-soft/15 hover:border-brand-1-soft/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-1-soft focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800/90 dark:focus-visible:ring-offset-slate-900"
+                className="group relative w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc((100%-4rem)/3)] xl:w-[calc(25%-1.5rem)] overflow-hidden text-left rounded-3xl border border-slate-200/80 bg-white/90 p-7 shadow-xl backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-brand-1-soft/15 hover:border-brand-1-soft/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-1-soft focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800/90 dark:focus-visible:ring-offset-slate-900"
               >
                 <span
                   aria-hidden
