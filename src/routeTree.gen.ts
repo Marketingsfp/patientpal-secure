@@ -36,10 +36,8 @@ import { Route as DevSimulacaoAtendimentoRouteImport } from './routes/dev.simula
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
-import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
-import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
-import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
-import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
+import { Route as PacienteAgendamentosRouteImport } from './routes/paciente.agendamentos'
+import { Route as PacienteCadastroRouteImport } from './routes/paciente.cadastro'
 import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
@@ -344,24 +342,14 @@ const PacienteIndexRoute = PacienteIndexRouteImport.update({
   path: '/paciente/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PacienteCartoesRoute = PacienteCartoesRouteImport.update({
-  id: '/paciente/cartoes',
-  path: '/paciente/cartoes',
+const PacienteAgendamentosRoute = PacienteAgendamentosRouteImport.update({
+  id: '/paciente/agendamentos',
+  path: '/paciente/agendamentos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PacienteConsultasRoute = PacienteConsultasRouteImport.update({
-  id: '/paciente/consultas',
-  path: '/paciente/consultas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PacienteFinanceiroRoute = PacienteFinanceiroRouteImport.update({
-  id: '/paciente/financeiro',
-  path: '/paciente/financeiro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PacientePerfilRoute = PacientePerfilRouteImport.update({
-  id: '/paciente/perfil',
-  path: '/paciente/perfil',
+const PacienteCadastroRoute = PacienteCadastroRouteImport.update({
+  id: '/paciente/cadastro',
+  path: '/paciente/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
@@ -1354,10 +1342,8 @@ export interface FileRoutesByFullPath {
   '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
-  '/paciente/cartoes': typeof PacienteCartoesRoute
-  '/paciente/consultas': typeof PacienteConsultasRoute
-  '/paciente/financeiro': typeof PacienteFinanceiroRoute
-  '/paciente/perfil': typeof PacientePerfilRoute
+  '/paciente/agendamentos': typeof PacienteAgendamentosRoute
+  '/paciente/cadastro': typeof PacienteCadastroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1552,10 +1538,8 @@ export interface FileRoutesByTo {
   '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
-  '/paciente/cartoes': typeof PacienteCartoesRoute
-  '/paciente/consultas': typeof PacienteConsultasRoute
-  '/paciente/financeiro': typeof PacienteFinanceiroRoute
-  '/paciente/perfil': typeof PacientePerfilRoute
+  '/paciente/agendamentos': typeof PacienteAgendamentosRoute
+  '/paciente/cadastro': typeof PacienteCadastroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1750,10 +1734,8 @@ export interface FileRoutesById {
   '/dev/simulacao-atendimento': typeof DevSimulacaoAtendimentoRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
-  '/paciente/cartoes': typeof PacienteCartoesRoute
-  '/paciente/consultas': typeof PacienteConsultasRoute
-  '/paciente/financeiro': typeof PacienteFinanceiroRoute
-  '/paciente/perfil': typeof PacientePerfilRoute
+  '/paciente/agendamentos': typeof PacienteAgendamentosRoute
+  '/paciente/cadastro': typeof PacienteCadastroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1951,10 +1933,8 @@ export interface FileRouteTypes {
     | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
-    | '/paciente/cartoes'
-    | '/paciente/consultas'
-    | '/paciente/financeiro'
-    | '/paciente/perfil'
+    | '/paciente/agendamentos'
+    | '/paciente/cadastro'
     | '/painel/$clinicaId'
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
@@ -2149,10 +2129,8 @@ export interface FileRouteTypes {
     | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
-    | '/paciente/cartoes'
-    | '/paciente/consultas'
-    | '/paciente/financeiro'
-    | '/paciente/perfil'
+    | '/paciente/agendamentos'
+    | '/paciente/cadastro'
     | '/painel/$clinicaId'
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
@@ -2346,10 +2324,8 @@ export interface FileRouteTypes {
     | '/dev/simulacao-atendimento'
     | '/lp/$slug'
     | '/p/$token'
-    | '/paciente/cartoes'
-    | '/paciente/consultas'
-    | '/paciente/financeiro'
-    | '/paciente/perfil'
+    | '/paciente/agendamentos'
+    | '/paciente/cadastro'
     | '/painel/$clinicaId'
     | '/totem_/$clinicaId'
     | '/verificar/$codigo'
@@ -2546,10 +2522,8 @@ export interface RootRouteChildren {
   DevSimulacaoAtendimentoRoute: typeof DevSimulacaoAtendimentoRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
-  PacienteCartoesRoute: typeof PacienteCartoesRoute
-  PacienteConsultasRoute: typeof PacienteConsultasRoute
-  PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
-  PacientePerfilRoute: typeof PacientePerfilRoute
+  PacienteAgendamentosRoute: typeof PacienteAgendamentosRoute
+  PacienteCadastroRoute: typeof PacienteCadastroRoute
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
@@ -2768,32 +2742,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PacienteIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/paciente/cartoes': {
-      id: '/paciente/cartoes'
-      path: '/paciente/cartoes'
-      fullPath: '/paciente/cartoes'
-      preLoaderRoute: typeof PacienteCartoesRouteImport
+    '/paciente/agendamentos': {
+      id: '/paciente/agendamentos'
+      path: '/paciente/agendamentos'
+      fullPath: '/paciente/agendamentos'
+      preLoaderRoute: typeof PacienteAgendamentosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/paciente/consultas': {
-      id: '/paciente/consultas'
-      path: '/paciente/consultas'
-      fullPath: '/paciente/consultas'
-      preLoaderRoute: typeof PacienteConsultasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paciente/financeiro': {
-      id: '/paciente/financeiro'
-      path: '/paciente/financeiro'
-      fullPath: '/paciente/financeiro'
-      preLoaderRoute: typeof PacienteFinanceiroRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paciente/perfil': {
-      id: '/paciente/perfil'
-      path: '/paciente/perfil'
-      fullPath: '/paciente/perfil'
-      preLoaderRoute: typeof PacientePerfilRouteImport
+    '/paciente/cadastro': {
+      id: '/paciente/cadastro'
+      path: '/paciente/cadastro'
+      fullPath: '/paciente/cadastro'
+      preLoaderRoute: typeof PacienteCadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel/$clinicaId': {
@@ -4442,10 +4402,8 @@ const rootRouteChildren: RootRouteChildren = {
   DevSimulacaoAtendimentoRoute: DevSimulacaoAtendimentoRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
-  PacienteCartoesRoute: PacienteCartoesRoute,
-  PacienteConsultasRoute: PacienteConsultasRoute,
-  PacienteFinanceiroRoute: PacienteFinanceiroRoute,
-  PacientePerfilRoute: PacientePerfilRoute,
+  PacienteAgendamentosRoute: PacienteAgendamentosRoute,
+  PacienteCadastroRoute: PacienteCadastroRoute,
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
