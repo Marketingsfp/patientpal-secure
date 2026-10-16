@@ -163,7 +163,14 @@ type Modulo = {
    */
   sub?: boolean;
 };
-type Grupo = { label: string; modulos: Modulo[] };
+/**
+ * Item do menu que só o administrador da clínica abre (ADMIN_ONLY_ROUTES em
+ * permissoes-rotas.ts). Aparece na matriz só para o gestor saber que ele
+ * existe e por que não tem opção de acesso: não é salvo em
+ * `perfil_permissoes` e nenhum perfil não-admin o enxerga no menu.
+ */
+type ItemSomenteAdmin = { rota: string; nome: string; descricao: string; menu: string };
+type Grupo = { label: string; modulos: Modulo[]; somenteAdmin?: ItemSomenteAdmin[] };
 
 const SUBMODULOS_FINANCEIRO: Modulo[] = [
   {
@@ -250,13 +257,6 @@ const GRUPOS_BASE: Grupo[] = [
         nome: "Clientes",
         descricao: "Cadastro de pacientes",
         menu: "Operação › Clientes",
-      },
-      {
-        key: "clientes-numeracao",
-        nome: "Clientes › Numeração de Prontuário",
-        descricao: "Ponteiro da numeração do arquivo físico de prontuários",
-        menu: "Configurações › Numeração de Prontuário",
-        sub: true,
       },
       {
         key: "painel-executivo",
@@ -662,12 +662,22 @@ const GRUPOS_BASE: Grupo[] = [
     ],
   },
   {
-    // Espelha a seção "Configurações" do menu lateral. A tela
-    // "Voz & Áudio (TTS)" não entra aqui de propósito: ela é restrita a
-    // administradores da clínica (ADMIN_ONLY_ROUTES), regra mais forte que
+    // Espelha a seção "Configurações" do menu lateral. As telas restritas a
+    // administradores da clínica (ADMIN_ONLY_ROUTES) aparecem em
+    // `somenteAdmin`, sem opção de acesso: essa trava é mais forte que
     // qualquer configuração desta matriz.
     label: "Configurações",
     modulos: [
+      {
+        // Herda "clientes" enquanto não for configurada (SUBMODULE_PARENT).
+        // Fica aqui, e não embaixo de Clientes, porque é aqui que ela está no
+        // menu lateral.
+        key: "clientes-numeracao",
+        nome: "Numeração de Prontuário",
+        descricao:
+          "Ponteiro da numeração do arquivo físico de prontuários. Enquanto ninguém mexer nesta linha, acompanha o acesso de Operação › Clientes.",
+        menu: "Configurações › Numeração de Prontuário",
+      },
       {
         key: "painel-totem",
         nome: "Painel & Totem",
@@ -685,6 +695,32 @@ const GRUPOS_BASE: Grupo[] = [
         nome: "Backups",
         descricao: "Geração e download de cópias de segurança do banco",
         menu: "Configurações › Backups",
+      },
+    ],
+    somenteAdmin: [
+      {
+        rota: "/app/configuracoes/voz",
+        nome: "Voz & Áudio (TTS)",
+        descricao: "Síntese de voz do painel de senhas, alertas sonoros e leitura de anamnese",
+        menu: "Configurações › Voz & Áudio (TTS)",
+      },
+      {
+        rota: "/app/configuracoes/site-agendamento",
+        nome: "Agendamento pelo site",
+        descricao: "Liga ou desliga o formulário de agendamento do site institucional",
+        menu: "Configurações › Agendamento pelo site",
+      },
+      {
+        rota: "/app/configuracoes/dominios",
+        nome: "Domínios de acesso",
+        descricao: "Endereços próprios da clínica, com o login na marca dela",
+        menu: "Configurações › Domínios de acesso",
+      },
+      {
+        rota: "/app/configuracoes/importar-clinica-total",
+        nome: "Importar Clínica Total",
+        descricao: "Traz clientes, prontuários e observações do sistema antigo",
+        menu: "Configurações › Importar Clínica Total",
       },
     ],
   },
@@ -2008,6 +2044,28 @@ function PerfisPage() {
                             </TableRow>
                           );
                         })}
+                        {grupo.somenteAdmin?.map((item) => (
+                          <TableRow key={item.rota}>
+                            <TableCell className="font-medium">
+                              {item.nome}
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                Menu: {item.menu}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {item.descricao}
+                              <span className="mt-0.5 block text-xs">
+                                Só o administrador da clínica abre esta tela. Para os demais perfis
+                                ela fica fora do menu e não abre nem pelo endereço.
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="text-xs">
+                                Somente administrador
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </CollapsibleContent>
