@@ -1,7 +1,7 @@
 /**
- * Ambiente de testes da Nina: 10 ou 20 conversas simultâneas, cada lead com um modo
- * de paciente difícil (Claude Opus 5.5) e um juiz que lista as falhas da Nina
- * ao fim de cada conversa. Esta tela conduz as conversas: mantê-la aberta.
+ * Ambiente de testes da Nina: 10, 20 ou 30 conversas simultâneas, cada lead com um modo
+ * de paciente difícil (Claude Opus 5.5) e, se ligado, um juiz que lista as
+ * falhas da Nina ao fim de cada conversa. Esta tela conduz as conversas: mantê-la aberta.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,6 +13,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -68,7 +69,11 @@ type Conversa = {
   avaliacao: Avaliacao | null;
   erro: string | null;
   motivoFim: string | null;
+  /** Tempo de cada resposta da Nina nesta tela (envio → resposta), em ms. */
+  tempos: number[];
 };
+
+const segundos = (ms: number) => `${Math.round(ms / 1000)} s`;
 
 type Rodada = {
   rodada: string;
@@ -129,6 +134,8 @@ export function AmbienteTestes() {
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [turnosMax, setTurnosMax] = useState("10");
   const [quantidade, setQuantidade] = useState("20");
+  // Juiz desligado por padrão: o foco agora é a Nina respondendo em paralelo.
+  const [comJuiz, setComJuiz] = useState(false);
   const [rodando, setRodando] = useState(false);
   const [iniciando, setIniciando] = useState(false);
   const [rodadas, setRodadas] = useState<Rodada[]>([]);
@@ -147,6 +154,12 @@ export function AmbienteTestes() {
   const acrescentar = useCallback((posicao: number, linha: Linha) => {
     setConversas((lista) =>
       lista.map((c) => (c.posicao === posicao ? { ...c, linhas: [...c.linhas, linha] } : c)),
+    );
+  }, []);
+
+  const registrarTempo = useCallback((posicao: number, ms: number) => {
+    setConversas((lista) =>
+      lista.map((c) => (c.posicao === posicao ? { ...c, tempos: [...c.tempos, ms] } : c)),
     );
   }, []);
 
@@ -182,6 +195,7 @@ export function AmbienteTestes() {
             avaliacao: null,
             erro: null,
             motivoFim: null,
+            tempos: [],
           })),
         );
       })
@@ -202,7 +216,7 @@ export function AmbienteTestes() {
     return () => window.removeEventListener("beforeunload", aviso);
   }, [rodando]);
 
-  async function conduzir(c: Conversa) {
+  async function conduzir(c: Conversa, avaliarNoFim: boolean) {
     const { simulacaoId, leadId, posicao } = c;
     if (!clinicaId || !simulacaoId || !leadId) return;
     let turnos = 0;
@@ -219,6 +233,7 @@ export function AmbienteTestes() {
         acrescentar(posicao, { autor: "paciente", texto: passo.mensagem });
         turnos += 1;
         atualizar(posicao, { estado: "nina", turnos });
+        const inicioEnvio = performance.now();
         const envio: any = await enviar({
           data: {
             clinicaId,
@@ -229,6 +244,7 @@ export function AmbienteTestes() {
           },
         });
         if (envio?.processamento === "ERRO" && envio?.erro) throw new Error(envio.erro);
+        if (envio?.reply) registrarTempo(posicao, performance.now() - inicioEnvio);
         if (envio?.reply) acrescentar(posicao, { autor: "nina", texto: String(envio.reply) });
         if (envio?.transferida) {
           await encerrar({
@@ -255,7 +271,7 @@ export function AmbienteTestes() {
         atualizar(posicao, { estado: "parada" });
         return;
       }
-      if (!turnos) {
+      if (!turnos || !avaliarNoFim) {
         atualizar(posicao, { estado: "concluida" });
         return;
       }
@@ -276,9 +292,14 @@ export function AmbienteTestes() {
     setIniciando(true);
     pararRef.current = false;
     setRodadaAberta(null);
+    const avaliarNoFim = comJuiz;
     try {
       const r: any = await iniciar({
-        data: { clinicaId, turnos: Number(turnosMax), quantidade: Number(quantidade) as 10 | 20 },
+        data: {
+          clinicaId,
+          turnos: Number(turnosMax),
+          quantidade: Number(quantidade) as 10 | 20 | 30,
+        },
       });
       const novas: Conversa[] = (r.itens as any[]).map((it) => ({
         posicao: it.posicao,
@@ -293,13 +314,18 @@ export function AmbienteTestes() {
         avaliacao: null,
         erro: null,
         motivoFim: null,
+        tempos: [],
       }));
       setConversas(novas);
       setRodando(true);
       setIniciando(false);
       // Início escalonado: as conversas não chegam no mesmo segundo (1,5 s entre elas).
-      await Promise.all(novas.map((c, i) => espera(i * 1500).then(() => conduzir(c))));
-      toast.success("Rodada concluída. As avaliações estão nos cards.");
+      await Promise.all(
+        novas.map((c, i) => espera(i * 1500).then(() => conduzir(c, avaliarNoFim))),
+      );
+      toast.success(
+        avaliarNoFim ? "Rodada concluída. As avaliações estão nos cards." : "Rodada concluída.",
+      );
     } catch (e) {
       mostrarErro(e as never, "iniciar a rodada do ambiente de testes");
     } finally {
@@ -340,6 +366,7 @@ export function AmbienteTestes() {
           avaliacao: c.avaliacao as Avaliacao | null,
           erro: null,
           motivoFim: c.motivoFim,
+          tempos: [],
         })),
       );
     } catch (e) {
@@ -379,6 +406,9 @@ export function AmbienteTestes() {
   const grade = conversas.some((c) => c.simulacaoId)
     ? conversas
     : conversas.slice(0, Number(quantidade));
+  const todosTempos = conversas.flatMap((c) => c.tempos);
+  const ordenados = [...todosTempos].sort((a, b) => a - b);
+  const mediana = ordenados.length ? ordenados[Math.floor(ordenados.length / 2)]! : null;
   const concluidas = conversas.filter((c) => c.avaliacao);
   const media = concluidas.length
     ? Math.round(concluidas.reduce((t, c) => t + (c.avaliacao?.nota ?? 0), 0) / concluidas.length)
@@ -394,13 +424,22 @@ export function AmbienteTestes() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">
-            10 ou 20 conversas ao mesmo tempo. Em cada uma, um paciente simulado (Claude Opus 5.5)
-            tenta dificultar a Nina de um jeito diferente, sem ver nada do prompt, das ferramentas
-            ou do catálogo dela. No fim, um juiz lista as falhas de cada conversa. Os leads são
-            próprios deste ambiente (não mexem nos 10 leads da Homologação). Com 20, os modos se
-            repetem com assuntos diferentes.
+            10, 20 ou 30 conversas ao mesmo tempo. Em cada uma, um paciente simulado (Claude Opus
+            5.5) tenta dificultar a Nina de um jeito diferente, sem ver nada do prompt, das
+            ferramentas ou do catálogo dela. Com "Avaliar com o juiz" ligado, um juiz lista no fim
+            as falhas de cada conversa. Os leads são próprios deste ambiente (não mexem nos 10 leads
+            da Homologação). Com 20 ou 30, os modos se repetem com assuntos diferentes.
           </p>
           <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="ambiente-juiz" className="flex items-center gap-2 text-sm">
+              <Switch
+                id="ambiente-juiz"
+                checked={comJuiz}
+                onCheckedChange={setComJuiz}
+                disabled={rodando || iniciando}
+              />
+              Avaliar com o juiz
+            </label>
             <label htmlFor="ambiente-quantidade" className="text-sm">
               Conversas
             </label>
@@ -413,7 +452,7 @@ export function AmbienteTestes() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["10", "20"].map((n) => (
+                {["10", "20", "30"].map((n) => (
                   <SelectItem key={n} value={n}>
                     {n}
                   </SelectItem>
@@ -452,6 +491,12 @@ export function AmbienteTestes() {
                 )}
                 Iniciar {quantidade} conversas
               </Button>
+            )}
+            {mediana !== null && (
+              <Badge variant="outline" className="text-sm">
+                Respostas da Nina: {todosTempos.length} · mediana {segundos(mediana)} · pior{" "}
+                {segundos(ordenados[ordenados.length - 1]!)}
+              </Badge>
             )}
             {media !== null && (
               <Badge variant="outline" className="ml-auto text-sm">
@@ -520,6 +565,9 @@ export function AmbienteTestes() {
                 )}
                 <p className="text-[11px] text-muted-foreground">
                   {c.turnos} mensagem(ns) do paciente
+                  {c.tempos.length
+                    ? ` · Nina: última ${segundos(c.tempos[c.tempos.length - 1]!)}, pior ${segundos(Math.max(...c.tempos))}`
+                    : ""}
                   {c.motivoFim ? ` · ${c.motivoFim}` : ""}
                 </p>
                 {c.erro && (

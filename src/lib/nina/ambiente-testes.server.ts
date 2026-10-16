@@ -1,7 +1,7 @@
 /**
  * Ambiente de testes da Nina — peças de servidor.
  *
- * Usa um grupo PRÓPRIO de 20 leads (índices 11 a 30), separado dos leads 1 a
+ * Usa um grupo PRÓPRIO de 30 leads (índices 11 a 40), separado dos leads 1 a
  * 10 do console de homologação: a automação externa que conversa pelo console
  * e o ambiente de testes podem rodar ao mesmo tempo sem um reiniciar o ciclo
  * do outro. A Nina responde pelo mesmo núcleo do WhatsApp real
@@ -14,9 +14,9 @@ import type { LinhaTranscricao } from "@/lib/nina/ambiente-testes/juiz";
 import type { CatalogoAssuntos } from "@/lib/nina/ambiente-testes/assuntos";
 
 export const PRIMEIRO_LEAD_AMBIENTE = 11;
-export const TOTAL_LEADS_AMBIENTE = 20;
+export const TOTAL_LEADS_AMBIENTE = 30;
 /** Quantas conversas uma rodada pode ter (a tela escolhe entre elas). */
-export const QUANTIDADES_RODADA = [10, 20] as const;
+export const QUANTIDADES_RODADA = [10, 20, 30] as const;
 
 export type LeadAmbiente = {
   id: string;
@@ -30,7 +30,7 @@ function telefoneSessao(indice: number, sessao: number) {
   return `5500${String(indice).padStart(2, "0")}${String(sessao).padStart(5, "0")}`;
 }
 
-/** Cria (uma vez) e devolve os 20 leads do ambiente de testes. */
+/** Cria (uma vez) e devolve os 30 leads do ambiente de testes. */
 export async function garantirLeadsAmbiente(
   admin: any,
   clinicaId: string,
