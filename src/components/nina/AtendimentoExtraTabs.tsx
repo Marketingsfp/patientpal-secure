@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   carregarLotesAtivas,
+  LIMITE_RECARGA_LISTA,
   TAMANHO_LOTE_ATIVAS,
   type CursorInbox,
 } from "@/lib/atendimento/paginacao-inbox";
@@ -139,7 +140,11 @@ import {
   atualizarMensagemNoCache,
   transformarMensagensNoCache,
 } from "@/lib/atendimento/pos-envio";
-import { patchListaPorConversa, patchListaPorMensagem } from "@/lib/atendimento/patch-inbox";
+import {
+  patchListaPorConversa,
+  patchListaPorLeitura,
+  patchListaPorMensagem,
+} from "@/lib/atendimento/patch-inbox";
 import { mesclarNovas, mesclarEventos } from "@/lib/atendimento/atualizacao-incremental";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { useHistoricoAnterior } from "@/hooks/use-historico-anterior";
@@ -764,9 +769,17 @@ function AtendInboxOperacional({
     .slice(0, 200)
     .map((c) => `${c.id}:${c.ultima_msg_em ?? ""}`)
     .join("|");
+  // Desempenho (16/10/2026): só as conversas cuja última mensagem mudou desde a
+  // prévia anterior são buscadas (antes, toda mensagem nova buscava até 3.000
+  // mensagens das 200 conversas visíveis, em cada tela aberta).
+  const previaFeitaPara = useRef(new Map<string, string>());
   useEffect(() => {
-    const ids = convsVisiveis.slice(0, 200).map((c) => String(c.id));
+    const visiveis = convsVisiveis.slice(0, 200);
+    const ids = visiveis
+      .filter((c) => previaFeitaPara.current.get(String(c.id)) !== String(c.ultima_msg_em ?? ""))
+      .map((c) => String(c.id));
     if (!ids.length) return;
+    const chaves = new Map(visiveis.map((c) => [String(c.id), String(c.ultima_msg_em ?? "")]));
     let vale = true;
     const t = setTimeout(async () => {
       const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -777,8 +790,9 @@ function AtendInboxOperacional({
         .neq("status", "system")
         .gte("created_at", desde)
         .order("created_at", { ascending: false })
-        .limit(3000);
+        .limit(Math.min(3000, ids.length * 30));
       if (!vale || !data) return;
+      for (const id of ids) previaFeitaPara.current.set(id, chaves.get(id) ?? "");
       const novo: Record<string, { texto: string; autor: AutorPreviaConversa }> = {};
       for (const m of data as Array<{
         conversa_id: string | null;
@@ -1047,27 +1061,37 @@ function AtendInboxOperacional({
     };
   }, [clinicaId, carregarStatusAgente]);
 
-  // Realtime: qualquer mudança de presença (minha ou de outro atendente
-  // autorizado) atualiza a tela na hora, sem esperar o próximo heartbeat.
+  // Realtime: mudança na MINHA presença (por mim, outra aba ou supervisão)
+  // atualiza a tela na hora, sem esperar o próximo heartbeat.
+  // Desempenho (16/10/2026): o canal escutava a clínica inteira, e o "estou
+  // online" de cada colega (a cada 30 s) fazia cada tela buscar o próprio
+  // status de novo — com 15 atendentes, ~450 chamadas a cada 30 s. A tela só
+  // usa a minha presença (status e fila aberta), então o filtro é pelo usuário.
   useEffect(() => {
-    if (!clinicaId) return;
+    if (!clinicaId || !meuId) return;
     const canal = supabase
-      .channel(`presenca-atend:${clinicaId}`)
+      .channel(`presenca-atend:${clinicaId}:${meuId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "atend_agente_presenca",
-          filter: `clinica_id=eq.${clinicaId}`,
+          filter: `user_id=eq.${meuId}`,
         },
-        () => carregarStatusAgente(),
+        (payload: {
+          new?: { clinica_id?: string } | null;
+          old?: { clinica_id?: string } | null;
+        }) => {
+          const clinicaDaLinha = payload.new?.clinica_id ?? payload.old?.clinica_id;
+          if (!clinicaDaLinha || clinicaDaLinha === clinicaId) carregarStatusAgente();
+        },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [clinicaId, carregarStatusAgente]);
+  }, [clinicaId, meuId, carregarStatusAgente]);
 
   const alternarFila = async (abrir: boolean) => {
     if (!clinicaId) return;
@@ -1255,7 +1279,7 @@ function AtendInboxOperacional({
         incluirTeste: mostrarTestes,
       });
       try {
-        const buscarPagina = (apos: CursorInbox | null) =>
+        const buscarPagina = (apos: CursorInbox | null, tamanho?: number) =>
           medirRequest(
             "listarConversas",
             listarConvs({
@@ -1266,21 +1290,30 @@ function AtendInboxOperacional({
                 escopo,
                 atendenteId: atendenteSelecionadoId,
                 visualizacao,
-                limit: visualizacao === "recentes" ? TAMANHO_LOTE_ATIVAS : 100,
+                limit: tamanho ?? (visualizacao === "recentes" ? TAMANHO_LOTE_ATIVAS : 100),
                 apos,
                 incluirTeste: mostrarTestes,
               },
             }),
           );
         const vigente = () => pedido === seqConvs.current && chavePedido === chaveAtualRef.current;
+        // Desempenho (16/10/2026): a recarga traz o que já estava rolado numa
+        // chamada só (eram lotes de 20 em série: 200 cards = 10 chamadas).
+        // "Carregar mais" continua em lotes de 20.
+        const loteRecentes = () =>
+          mais
+            ? TAMANHO_LOTE_ATIVAS
+            : Math.min(
+                LIMITE_RECARGA_LISTA,
+                Math.max(TAMANHO_LOTE_ATIVAS, paginaConvsRef.current.quantidade),
+              );
         const pagina =
           visualizacao === "recentes"
             ? await carregarLotesAtivas({
                 buscar: buscarPagina,
                 cursor: mais ? paginaConvsRef.current.cursor : null,
-                quantidade: mais
-                  ? TAMANHO_LOTE_ATIVAS
-                  : Math.max(TAMANHO_LOTE_ATIVAS, paginaConvsRef.current.quantidade),
+                quantidade: loteRecentes(),
+                tamanhoLote: loteRecentes(),
                 vigente,
               })
             : null;
@@ -1429,7 +1462,10 @@ function AtendInboxOperacional({
           // A seleção automática usa o mesmo caminho central de abertura.
           abrirConversa((rows[0] as any)?.id ?? null);
         // Os números de cada filtro acompanham a movimentação em tempo real.
-        void carregarContadores();
+        // Pelo agrupador (desempenho, 16/10/2026): várias cargas seguidas viram
+        // uma contagem só (eram ~9 consultas a cada carga de lista).
+        if (agrupadores.current) agrupadores.current.contadores.agendar();
+        else void carregarContadores();
       } catch (e: any) {
         if (pedido !== seqConvs.current || chavePedido !== chaveAtualRef.current) return;
         setErroPaginaConvs(true);
@@ -2651,6 +2687,21 @@ function AtendInboxOperacional({
           if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
           g.contadores.agendar();
         }
+      } else if (evento.table === "atend_leitura_operacional") {
+        // Desempenho (16/10/2026): leitura de qualquer atendente só mexe no
+        // contador daquele card; fora da lista, nada a fazer.
+        const r = patchListaPorLeitura(convsRef.current, (evento as any).new);
+        if (r.aplicado) {
+          listaPorPatch = true;
+          if (r.lista !== convsRef.current) setConvs(r.lista as any[]);
+        }
+      } else if (
+        evento.table === "atend_conversa_eventos" &&
+        (evento as any).new?.evento === "INBOX_ABERTA_ATENDENTE" &&
+        !convsRef.current.some((c: any) => c.id === (evento as any).new?.conversa_id)
+      ) {
+        // "Aberta pela atendente" é um selo do card: conversa fora da lista não muda nada.
+        listaPorPatch = true;
       }
       registrarDiagnostico("atendimento-realtime", {
         table: evento.table,

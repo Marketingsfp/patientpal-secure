@@ -116,6 +116,36 @@ export function patchListaPorMensagem(
   };
 }
 
+/**
+ * Leitura da equipe (Realtime de `atend_leitura_operacional`, uma linha por
+ * conversa) → só o contador de não lidas do card muda (desempenho, 16/10/2026).
+ * Antes, toda leitura de qualquer atendente recarregava a lista inteira em
+ * todas as telas.
+ * - Conversa fora da lista: nada a fazer (as contagens das abas não dependem
+ *   de leitura).
+ * - Leitura até a última mensagem do card: zera o contador localmente.
+ * - Senão (leitura parcial): pede conferência no servidor.
+ */
+export function patchListaPorLeitura(
+  lista: LinhaLista[],
+  linha: Record<string, any> | null | undefined,
+): ResultadoPatch {
+  const conversaId = String(linha?.["conversa_id"] ?? "");
+  if (!conversaId || !Array.isArray(lista))
+    return { lista: lista ?? [], aplicado: false, reconciliar: true };
+  const alvo = lista.find((c) => c.id === conversaId);
+  if (!alvo) return { lista, aplicado: true, reconciliar: false };
+  const lidaEm = linha?.["ultima_msg_lida_em"];
+  if (!lidaEm || !alvo.ultima_msg_em || instante(lidaEm) < instante(alvo.ultima_msg_em))
+    return { lista, aplicado: false, reconciliar: true };
+  if (!Number(alvo.nao_lidas ?? 0)) return { lista, aplicado: true, reconciliar: false };
+  return {
+    lista: lista.map((c) => (c.id === conversaId ? { ...c, nao_lidas: 0 } : c)),
+    aplicado: true,
+    reconciliar: false,
+  };
+}
+
 /** O estado escolhido no seletor "Todas / Em espera / Ativas / Fechadas". */
 export type FiltroStatusInbox = "all" | "active" | "waiting" | "closed" | string;
 
