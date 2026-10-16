@@ -10,6 +10,8 @@ export interface ClinicaAcesso {
   clinica_id: string;
   nome: string;
   logo_url: string | null;
+  /** Logo horizontal com o nome (opcional). */
+  logo_full_url?: string | null;
   primary: string | null;
   accent: string | null;
 }

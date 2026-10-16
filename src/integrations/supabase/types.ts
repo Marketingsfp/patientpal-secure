@@ -17766,6 +17766,7 @@ export type Database = {
         Returns: {
           accent: string
           clinica_id: string
+          logo_full_url: string
           logo_url: string
           nome: string
           primary: string
@@ -17776,6 +17777,7 @@ export type Database = {
         Returns: {
           accent: string
           clinica_id: string
+          logo_full_url: string
           logo_url: string
           nome: string
           primary: string
