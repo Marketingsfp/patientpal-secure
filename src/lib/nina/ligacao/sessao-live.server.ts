@@ -162,6 +162,22 @@ function* pedacos(texto: string) {
   if (atual) yield atual;
 }
 
+/** Corpo do `session.start` (voz, instruções da voz, delegação "client", oferta WebRTC). */
+export function corpoInicioSessao(instrucoesVoz: string, voz: VozLigacao, sdp: string) {
+  return {
+    type: "session.start",
+    session: {
+      model: MODELO_VOZ_LIGACAO,
+      instructions: instrucoesVoz,
+      audio: { output: { voice: voz } },
+      // Sem gravação do áudio da ligação (LGPD).
+      store: false,
+      delegation: { type: "client" as const },
+    },
+    transport: { type: "webrtc" as const, sdp },
+  };
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function ligarSessao(
@@ -468,20 +484,7 @@ export function ligarSessao(
       emitir({ type: "app.error", error: { message: "Falha na conexão de voz." } });
       parar();
     });
-    gateway.send(
-      JSON.stringify({
-        type: "session.start",
-        session: {
-          model: MODELO_VOZ_LIGACAO,
-          instructions: s.instrucoesVoz,
-          audio: { output: { voice: voz } },
-          // Sem gravação do áudio da ligação (LGPD).
-          store: false,
-          delegation: { type: "client" },
-        },
-        transport: { type: "webrtc", sdp },
-      }),
-    );
+    gateway.send(JSON.stringify(corpoInicioSessao(s.instrucoesVoz, voz, sdp)));
   }
 
   navegador.onMessage((data) => {

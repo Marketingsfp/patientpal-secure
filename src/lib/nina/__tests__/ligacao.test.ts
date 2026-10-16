@@ -6,7 +6,7 @@ import {
   instrucoesDaLigacao,
 } from "../ligacao/contrato-ligacao.server";
 import { resultadoSimulado } from "../ligacao/ferramentas-ligacao.server";
-import { corpoSessaoLive, ferramentaParaResponses } from "../ligacao/sessao-live.server";
+import { corpoInicioSessao, MODELO_VOZ_LIGACAO } from "../ligacao/sessao-live.server";
 import {
   ESTADO_INICIAL_LIGACAO,
   ROTULOS_FERRAMENTAS,
@@ -114,21 +114,14 @@ describe("ferramentas simuladas", () => {
 });
 
 describe("sessão de voz", () => {
-  it("converte ferramenta para o formato Responses e não grava o áudio", () => {
-    const [f] = ferramentasDaLigacao(false);
-    const r = ferramentaParaResponses(f as never);
-    expect(r).toMatchObject({ type: "function", name: f!.function.name });
-    const corpo = corpoSessaoLive({
-      sdpOferta: "v=0",
-      voz: "marin",
-      instrucoesVoz: "voz",
-      instrucoesApoio: "apoio",
-      ferramentas: ferramentasDaLigacao(false),
-    });
+  it("abre a voz com delegação client e sem gravar o áudio", () => {
+    const corpo = corpoInicioSessao("voz", "marin", "v=0");
+    expect(corpo.type).toBe("session.start");
+    expect(corpo.session.model).toBe(MODELO_VOZ_LIGACAO);
     expect(corpo.session.store).toBe(false);
-    expect(corpo.session.delegation.type).toBe("responses");
-    expect(corpo.session.delegation.responses.instructions).toBe("apoio");
-    expect(corpo.session.transport).toEqual({ type: "webrtc", sdp: "v=0" });
+    expect(corpo.session.audio.output.voice).toBe("marin");
+    expect(corpo.session.delegation).toEqual({ type: "client" });
+    expect(corpo.transport).toEqual({ type: "webrtc", sdp: "v=0" });
   });
 });
 
