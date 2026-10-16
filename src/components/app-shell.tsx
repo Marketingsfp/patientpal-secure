@@ -22,6 +22,7 @@ import {
 } from "react";
 import {
   Activity,
+  Loader2,
   Building2,
   Users,
   LayoutDashboard,
@@ -1645,8 +1646,11 @@ function AppShellInner() {
       ? primeiraRotaVisivel(visibleNavRows)
       : null;
   const guardedOutlet = permsLoading ? (
-    <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-      Carregando permissões…
+    // Só um spinner discreto: o texto "Carregando permissões…" aparecia em todo
+    // login de perfil operacional e passava a impressão de tela travada.
+    <div role="status" className="flex min-h-[40vh] items-center justify-center">
+      <Loader2 aria-hidden className="h-5 w-5 animate-spin text-muted-foreground/60" />
+      <span className="sr-only">Carregando…</span>
     </div>
   ) : rotaPermitida ? (
     <Outlet />
