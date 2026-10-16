@@ -452,6 +452,23 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   mensagemId: msgInserida.id,
                 });
 
+                // Contato bloqueado pela supervisão (16/10/2026): a mensagem fica
+                // guardada acima, mas nada é acionado — Nina, fila, distribuição,
+                // lembretes e pesquisa.
+                {
+                  const { contatoBloqueado } =
+                    await import("@/lib/atendimento/contatos-bloqueados.server");
+                  if (await contatoBloqueado(params.clinicaId, from)) {
+                    await supabaseAdmin
+                      .from("whatsapp_mensagens")
+                      .update({ nina_status: "completed", tratada_internamente: true })
+                      .eq("id", msgInserida.id)
+                      .eq("clinica_id", params.clinicaId);
+                    resultado = "contato_bloqueado";
+                    continue;
+                  }
+                }
+
                 // Francisco trata respostas antes de qualquer automação da Nina.
                 if (assinaturaOk) {
                   try {

@@ -82,6 +82,7 @@ const LigacaoNina = lazy(() =>
 import { RespostasRapidasManager } from "@/components/nina/RespostasRapidasManager";
 import { AtendInbox } from "@/components/nina/AtendimentoExtraTabs";
 import { PesquisaConversas } from "@/components/nina/PesquisaConversas";
+import { ListaContatosBloqueados } from "@/components/nina/BloquearContato";
 import { SemCaixaAlta } from "@/components/ui/caixa-alta";
 const Departamentos = lazy(() =>
   import("@/components/atendimento/Departamentos").then((m) => ({ default: m.Departamentos })),
@@ -1127,6 +1128,7 @@ function ConfiguracaoWhatsApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {clinicaAtual?.clinica_id && <ListaContatosBloqueados clinicaId={clinicaAtual.clinica_id} />}
     </div>
   );
 }
