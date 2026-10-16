@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.93",
     "@cloudflare/vite-plugin": "^1.2.2",
     "@formkit/auto-animate": "0.8.2",
     "@lovable.dev/mcp-js": "^0.26.3",
@@ -68,6 +69,7 @@
     "@tiptap/pm": "^3.23.6",
     "@tiptap/react": "^3.23.6",
     "@tiptap/starter-kit": "^3.23.6",
+    "ai": "^7.0.137",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -109,6 +111,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^5.0.4",
     "drizzle-kit": "0.x",
     "drizzle-orm": "0.x",
@@ -122,7 +125,8 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "ws": "^8.22.0"
   },
   "overrides": {
     "seroval": "^1.6.2",

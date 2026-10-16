@@ -21,17 +21,12 @@ import {
   ESTADO_INICIAL_LIGACAO,
   ROTULOS_FERRAMENTAS,
   aplicarEventoLigacao,
-  chamadaDoEvento,
-  eventosResultadoFerramenta,
   type EstadoLigacao,
   type StatusLigacao,
 } from "@/lib/nina/ligacao/eventos-ligacao";
 import { conectarLigacao, type ConexaoLigacao } from "@/lib/nina/ligacao/conexao-live";
-import {
-  executarFerramentaLigacaoNina,
-  iniciarLigacaoNina,
-  resumoLigacaoNina,
-} from "@/lib/nina/ligacao/ligacao.functions";
+import { resumoLigacaoNina } from "@/lib/nina/ligacao/ligacao.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 const selectClass =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50";
@@ -92,8 +87,6 @@ export function LigacaoNina() {
 function PainelLigacao({ clinicaId }: { clinicaId: string }) {
   const podeLigar = usePodeEscrever(MODULO_LIGACAO);
   const carregarResumo = useServerFn(resumoLigacaoNina);
-  const iniciar = useServerFn(iniciarLigacaoNina);
-  const executar = useServerFn(executarFerramentaLigacaoNina);
   const resumo = useQuery({
     queryKey: ["nina-ligacao-resumo", clinicaId],
     queryFn: () => carregarResumo({ data: { clinicaId } }),
@@ -107,8 +100,6 @@ function PainelLigacao({ clinicaId }: { clinicaId: string }) {
   const [relogio, setRelogio] = useState(0);
   const [bastidores, setBastidores] = useState<Bastidor[]>([]);
   const conexao = useRef<ConexaoLigacao | null>(null);
-  const chamadasVistas = useRef(new Set<string>());
-  const fila = useRef<Promise<void>>(Promise.resolve());
   const fimDaConversa = useRef<HTMLDivElement | null>(null);
 
   const emLigacao = estado.status === "conectando" || estado.status === "em_andamento";
@@ -139,33 +130,20 @@ function PainelLigacao({ clinicaId }: { clinicaId: string }) {
 
   function tratarEvento(evento: unknown) {
     despachar({ tipo: "evento", evento });
-    const chamada = chamadaDoEvento(evento);
-    if (!chamada || chamadasVistas.current.has(chamada.callId)) return;
-    chamadasVistas.current.add(chamada.callId);
-    // Uma ferramenta por vez, na ordem em que o modelo pediu.
-    fila.current = fila.current.then(async () => {
-      try {
-        const r = await executar({
-          data: { clinicaId, nome: chamada.nome, argumentos: chamada.argumentos },
-        });
-        registrar(ROTULOS_FERRAMENTAS[chamada.nome] ?? chamada.nome);
-        if (r.encaminhamento)
-          registrar(
-            `Encaminhado à equipe${r.encaminhamento.setor ? ` (${r.encaminhamento.setor})` : ""}: ${r.encaminhamento.motivo}`,
-            true,
-          );
-        for (const e of eventosResultadoFerramenta(chamada.callId, r.saida))
-          conexao.current?.enviar(e);
-      } catch (e) {
-        registrar(`Falha ao executar: ${ROTULOS_FERRAMENTAS[chamada.nome] ?? chamada.nome}`, true);
-        for (const ev of eventosResultadoFerramenta(
-          chamada.callId,
-          JSON.stringify({ ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar." }),
-        ))
-          conexao.current?.enviar(ev);
-        console.error("[nina-ligacao] ferramenta", chamada.nome, e);
-      }
-    });
+    // A ferramenta roda no servidor; aqui só aparece nos bastidores.
+    const e = evento as {
+      type?: string;
+      rotulo?: string;
+      falhou?: boolean;
+      encaminhamento?: { motivo: string; setor: string | null } | null;
+    };
+    if (e?.type !== "app.ferramenta" || !e.rotulo) return;
+    registrar(e.falhou ? `Falha ao executar: ${e.rotulo}` : e.rotulo, Boolean(e.falhou));
+    if (e.encaminhamento)
+      registrar(
+        `Encaminhado à equipe${e.encaminhamento.setor ? ` (${e.encaminhamento.setor})` : ""}: ${e.encaminhamento.motivo}`,
+        true,
+      );
   }
 
   async function ligar() {
@@ -174,16 +152,18 @@ function PainelLigacao({ clinicaId }: { clinicaId: string }) {
     setBastidores([]);
     setRelogio(0);
     setMudo(false);
-    chamadasVistas.current = new Set();
     try {
+      const { data: sessaoLogin } = await supabase.auth.getSession();
+      const token = sessaoLogin.session?.access_token;
+      if (!token) throw new Error("Entre novamente para ligar.");
       conexao.current = await conectarLigacao({
-        iniciar: async (sdp) => {
-          const r = await iniciar({ data: { clinicaId, sdp, voz } });
-          return { sdp: r.sdp };
-        },
+        clinicaId,
+        voz,
+        token,
         aoEvento: tratarEvento,
-        aoCair: () => {
+        aoCair: (motivo) => {
           conexao.current = null;
+          if (motivo) despachar({ tipo: "erro", erro: motivo });
           despachar({ tipo: "status", status: "encerrada" });
         },
       });

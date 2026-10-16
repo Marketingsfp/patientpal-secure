@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
-import { MODULO_LIGACAO, VOZES_LIGACAO } from "./config";
+import { MODULO_LIGACAO } from "./config";
 
 async function autorizar(
   supabase: SupabaseClient<Database>,
@@ -41,32 +41,7 @@ export const resumoLigacaoNina = createServerFn({ method: "POST" })
     return (await montarSessaoLigacao(data.clinicaId)).resumo;
   });
 
-export const iniciarLigacaoNina = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((v: unknown) =>
-    entrada
-      .extend({
-        sdp: z.string().min(1).max(20_000),
-        voz: z.enum(VOZES_LIGACAO),
-      })
-      .parse(v),
-  )
-  .handler(async ({ data, context }) => {
-    await autorizar(context.supabase, context.userId, data.clinicaId, true);
-    const [{ montarSessaoLigacao }, { abrirSessaoLive }] = await Promise.all([
-      import("./contrato-ligacao.server"),
-      import("./sessao-live.server"),
-    ]);
-    const sessao = await montarSessaoLigacao(data.clinicaId);
-    const aberta = await abrirSessaoLive({
-      sdpOferta: data.sdp,
-      voz: data.voz,
-      instrucoesVoz: sessao.instrucoesVoz,
-      instrucoesApoio: sessao.instrucoesApoio,
-      ferramentas: sessao.ferramentas,
-    });
-    return { sdp: aberta.sdpResposta, sessaoId: aberta.sessaoId, resumo: sessao.resumo };
-  });
+// Abrir a ligação agora é feito pela conexão contínua `/api/nina-ligacao` (sessao-live.server.ts).
 
 export const executarFerramentaLigacaoNina = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
