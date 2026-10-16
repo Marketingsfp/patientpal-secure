@@ -14,6 +14,7 @@ import {
   resolverClinicaAcesso,
   type ClinicaAcesso,
   estiloCoresMarca,
+  CHAVE_BLOQUEIO_DOMINIO,
 } from "@/lib/clinica-acesso";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

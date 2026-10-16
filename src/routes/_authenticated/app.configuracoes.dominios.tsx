@@ -21,6 +21,7 @@ interface Dominio {
   id: string;
   hostname: string;
   ativo: boolean;
+  restringir_acesso: boolean;
 }
 
 function Pagina() {
@@ -37,7 +38,7 @@ function Pagina() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clinica_dominios")
-        .select("id, hostname, ativo")
+        .select("id, hostname, ativo, restringir_acesso")
         .eq("clinica_id", clinicaId as string)
         .order("hostname");
       if (error) throw error;
@@ -59,6 +60,15 @@ function Pagina() {
 
   const alternar = async (d: Dominio, ativo: boolean) => {
     const { error } = await supabase.from("clinica_dominios").update({ ativo }).eq("id", d.id);
+    if (error) return mostrarErro(error);
+    void qc.invalidateQueries({ queryKey: chave });
+  };
+
+  const alternarRestricao = async (d: Dominio, restringir_acesso: boolean) => {
+    const { error } = await supabase
+      .from("clinica_dominios")
+      .update({ restringir_acesso })
+      .eq("id", d.id);
     if (error) return mostrarErro(error);
     void qc.invalidateQueries({ queryKey: chave });
   };
@@ -104,10 +114,17 @@ function Pagina() {
               </p>
             )}
             {data?.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 rounded-md border p-2">
+              <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-md border p-2">
                 <span className="flex-1 font-mono text-sm">{d.hostname}</span>
                 <span className="text-xs text-muted-foreground">{d.ativo ? "Ativo" : "Inativo"}</span>
                 <Switch checked={d.ativo} onCheckedChange={(v) => void alternar(d, v)} />
+                <label className="flex basis-full items-center gap-2 text-xs text-muted-foreground">
+                  <Switch
+                    checked={d.restringir_acesso}
+                    onCheckedChange={(v) => void alternarRestricao(d, v)}
+                  />
+                  Restringir acesso a usuários desta clínica
+                </label>
                 <Button variant="ghost" size="icon" aria-label="Remover" onClick={() => void remover(d)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
