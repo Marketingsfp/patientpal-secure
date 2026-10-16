@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Lock, Eye, EyeOff, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -60,7 +60,7 @@ function ResetPasswordPage() {
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-background px-4 py-12"
-      style={estiloCoresMarca(marca) as React.CSSProperties | undefined}
+      style={estiloCoresMarca(marca) as CSSProperties | undefined}
     >
       <div className="w-full max-w-md">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">

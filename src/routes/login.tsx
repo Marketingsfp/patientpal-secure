@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Activity, Mail, Lock, Eye, EyeOff, CalendarDays, Users, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -13,6 +13,7 @@ import {
   idClinicaValido,
   resolverClinicaAcesso,
   type ClinicaAcesso,
+  estiloCoresMarca,
 } from "@/lib/clinica-acesso";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -167,7 +168,7 @@ function LoginPage() {
   return (
     <div
       className="min-h-screen grid lg:grid-cols-2 bg-background"
-      style={estiloCoresMarca(marca) as React.CSSProperties | undefined}
+      style={estiloCoresMarca(marca) as CSSProperties | undefined}
     >
       {/* Brand panel */}
       <div
