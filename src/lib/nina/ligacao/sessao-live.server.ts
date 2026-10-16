@@ -22,18 +22,23 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { MODULO_LIGACAO, VOZES_LIGACAO, VOZ_PADRAO_LIGACAO, type VozLigacao } from "./config";
 import { ROTULOS_FERRAMENTAS } from "./eventos-ligacao";
-import { MODELO_NINA_ALVO } from "../modelo-nina";
 import { LIMITE_RODADAS_COMUM } from "../eficiencia-turno";
 
 export const GATEWAY_LIVE = "https://ai.gateway.lovable.dev/v1";
 export const ENDPOINT_SESSAO_LIVE = `${GATEWAY_LIVE}/live/sessions`;
 export const MODELO_VOZ_LIGACAO = "openai/gpt-live-1";
 /**
- * Modelo de apoio que recebe as instruções da Nina e chama as ferramentas: o
- * mesmo da Nina do chat, com raciocínio baixo como no chat (o modelo com
- * raciocínio forçado levava de 8 a 14 s por passo na primeira ligação).
+ * Modelo de apoio que recebe as instruções da Nina e chama as ferramentas, pela
+ * API Responses do gateway (formato validado na primeira ligação). O
+ * `gpt-6-astra` levava de 8 a 14 s por passo; o `gpt-5.6-luna`, já usado no
+ * projeto pela mesma API, é o menor da família. O modelo do chat (Gemini) não
+ * serve por aqui: a biblioteca descarta campos que ele exige nas chamadas de
+ * ferramenta (16/10/2026, a Nina não conseguia consultar o catálogo).
  */
-export const MODELO_APOIO_LIGACAO = MODELO_NINA_ALVO;
+export const MODELO_APOIO_LIGACAO = "openai/gpt-5.6-luna";
+/** Reserva: se o principal falhar, a mesma resposta é refeita com o da primeira ligação. */
+export const MODELO_APOIO_RESERVA = "openai/gpt-6-astra";
+export const MODELOS_APOIO_LIGACAO = [MODELO_APOIO_LIGACAO, MODELO_APOIO_RESERVA] as const;
 /** Mesmo limite de rodadas de ferramenta por resposta do chat. */
 export const LIMITE_PASSOS_LIGACAO = LIMITE_RODADAS_COMUM;
 /** Consultas iguais na mesma ligação reaproveitam o resultado por este tempo. */
@@ -41,22 +46,31 @@ export const VALIDADE_CACHE_FERRAMENTA_MS = 60_000;
 /** Espera o paciente parar de falar antes de chamar o modelo de apoio. */
 export const ESPERA_FIM_DA_FALA_MS = 800;
 
-/** Mesmo `reasoning_effort` que o chat envia ao gateway (nível LOW). */
-export const fetchComRaciocinioBaixo = ((
-  entrada: Parameters<typeof fetch>[0],
-  init?: RequestInit,
-): Promise<Response> => {
-  if (typeof init?.body === "string") {
-    try {
-      const corpo = JSON.parse(init.body) as Record<string, unknown>;
-      if (corpo.reasoning_effort === undefined)
-        init = { ...init, body: JSON.stringify({ ...corpo, reasoning_effort: "low" }) };
-    } catch {
-      /* corpo que não é JSON segue como está */
-    }
+/**
+ * As falas finais da voz ("Só um instante, vou verificar") não vão no pedido:
+ * o modelo deve responder à última fala do paciente, e alguns provedores
+ * recusam pedido que termina no turno do assistente (o chat trata o mesmo caso
+ * em `normalizarMensagensParaProvedor`). Turnos com chamada de ferramenta ficam.
+ */
+export function semTurnoFinalDoAssistente(mensagens: readonly ModelMessage[]): ModelMessage[] {
+  const copia = [...mensagens];
+  while (copia.length > 0) {
+    const ultima = copia[copia.length - 1]!;
+    const chamaFerramenta =
+      Array.isArray(ultima.content) &&
+      (ultima.content as { type?: string }[]).some((p) => p.type === "tool-call");
+    if (ultima.role !== "assistant" || chamaFerramenta) break;
+    copia.pop();
   }
-  return fetch(entrada, init);
-}) as typeof fetch;
+  return copia;
+}
+
+/** Código de erro para log, sem conteúdo da conversa nem das instruções. */
+export function codigoDoErro(erro: unknown): string {
+  const e = erro as { statusCode?: unknown; name?: unknown } | null;
+  if (typeof e?.statusCode === "number") return `HTTP ${e.statusCode}`;
+  return typeof e?.name === "string" ? e.name : "desconhecido";
+}
 
 /**
  * Junta o trecho transcrito à última fala da mesma pessoa. Fala de índice
@@ -364,25 +378,28 @@ export function ligarSessao(
     return set;
   }
 
-  async function responder(delegacaoId: string, sinal: AbortSignal, consumir: () => void) {
+  async function responder(
+    delegacaoId: string,
+    sinal: AbortSignal,
+    consumir: () => void,
+    modelo: string,
+  ) {
     const k = chave();
     const provedor = createOpenAI({
       baseURL: GATEWAY_LIVE,
       apiKey: k,
       headers: { "Lovable-API-Key": k, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-      fetch: fetchComRaciocinioBaixo,
     });
     let cursorResp = 0;
     consumir();
     const r = streamText({
-      // Mesmo endpoint do chat (/v1/chat/completions), que atende o modelo da Nina.
-      model: provedor.chat(MODELO_APOIO_LIGACAO),
+      model: provedor.responses(modelo),
       abortSignal: sinal,
       maxRetries: 0,
       stopWhen: stepCountIs(LIMITE_PASSOS_LIGACAO),
       prepareStep() {
         consumir();
-        return { messages: [...historico] };
+        return { messages: semTurnoFinalDoAssistente(historico) };
       },
       onStepFinish(step) {
         historico.push(...step.response.messages.slice(cursorResp));
@@ -395,18 +412,28 @@ export function ligarSessao(
           delegation_id: delegacaoId,
         }),
       },
+      // Mesmas opções da primeira ligação, que consultou o catálogo; raciocínio baixo.
+      providerOptions: {
+        openai: {
+          store: false,
+          forceReasoning: true,
+          reasoningEffort: "low",
+          include: ["reasoning.encrypted_content"],
+        },
+      },
       system:
         (sessao?.instrucoesApoio ?? "") +
         "\n\n# Canal de voz\nVocê apoia a voz da Nina numa ligação. As falas chegam transcritas e podem vir incompletas ou corrigidas; vale a correção mais recente. Use as ferramentas antes de afirmar qualquer dado, mas antes de chamar uma ferramenta veja se o resultado já está nesta ligação: não repita a mesma consulta. Responda só com o que a Nina deve dizer agora, curto, falado, sem listas, links nem formatação.",
-      messages: historico,
+      messages: semTurnoFinalDoAssistente(historico),
       tools: ferramentasDoApoio(sinal),
     });
-    let falhou = false;
+    let falha: unknown = null;
     for await (const p of r.fullStream) {
-      if (p.type === "error" || p.type === "abort") falhou = true;
+      if (p.type === "error") falha = p.error ?? new Error("erro no modelo de apoio");
+      if (p.type === "abort") falha = new Error("abortada");
     }
     sinal.throwIfAborted();
-    if (falhou) throw new Error("incompleta");
+    if (falha) throw falha;
     // Ao atingir o limite de rodadas sem texto final, cai na mensagem de falha abaixo.
     const texto = (await r.text).trim();
     if (!texto) throw new Error("vazia");
@@ -426,15 +453,26 @@ export function ligarSessao(
     if (!falas.some((f) => f.role === "user" && f.text.trim())) return;
     const ctrl = new AbortController();
     tarefa = ctrl;
-    let resposta: string;
+    const consumir = () => {
+      historico.push(...falas.slice(cursor).map((f) => ({ role: f.role, content: f.text })));
+      cursor = falas.length;
+    };
+    let resposta = "Não consegui consultar agora. Pergunte se o paciente quer tentar de novo.";
     try {
-      resposta = await responder(id, ctrl.signal, () => {
-        historico.push(...falas.slice(cursor).map((f) => ({ role: f.role, content: f.text })));
-        cursor = falas.length;
-      });
-    } catch {
-      if (fechando || ctrl.signal.aborted) return;
-      resposta = "Não consegui consultar agora. Pergunte se o paciente quer tentar de novo.";
+      for (const modelo of MODELOS_APOIO_LIGACAO) {
+        consumir();
+        // Uma tentativa que falhou não deixa passos pela metade no histórico.
+        const inicio = historico.length;
+        try {
+          resposta = await responder(id, ctrl.signal, consumir, modelo);
+          break;
+        } catch (erro) {
+          if (fechando || ctrl.signal.aborted) return;
+          historico.length = inicio;
+          // Só o código do erro: a mensagem do provedor pode repetir o pedido.
+          console.error("[nina-ligacao] modelo de apoio falhou", modelo, codigoDoErro(erro));
+        }
+      }
     } finally {
       if (tarefa === ctrl) tarefa = undefined;
     }

@@ -7,14 +7,15 @@ import {
 } from "../ligacao/contrato-ligacao.server";
 import { resultadoSimulado } from "../ligacao/ferramentas-ligacao.server";
 import {
+  codigoDoErro,
   corpoInicioSessao,
-  fetchComRaciocinioBaixo,
   juntarFala,
   LIMITE_PASSOS_LIGACAO,
   MODELO_APOIO_LIGACAO,
+  MODELOS_APOIO_LIGACAO,
   MODELO_VOZ_LIGACAO,
+  semTurnoFinalDoAssistente,
 } from "../ligacao/sessao-live.server";
-import { MODELO_NINA_ALVO } from "../modelo-nina";
 import { LIMITE_RODADAS_COMUM } from "../eficiencia-turno";
 import {
   ESTADO_INICIAL_LIGACAO,
@@ -193,8 +194,9 @@ describe("eventos da ligação", () => {
 });
 
 describe("velocidade da ligação", () => {
-  it("usa o mesmo modelo e o mesmo limite de rodadas do chat", () => {
-    expect(MODELO_APOIO_LIGACAO).toBe(MODELO_NINA_ALVO);
+  it("usa o modelo de apoio leve pela API Responses e o limite de rodadas do chat", () => {
+    expect(MODELO_APOIO_LIGACAO).toBe("openai/gpt-5.6-luna");
+    expect(MODELOS_APOIO_LIGACAO).toEqual(["openai/gpt-5.6-luna", "openai/gpt-6-astra"]);
     expect(LIMITE_PASSOS_LIGACAO).toBe(LIMITE_RODADAS_COMUM);
   });
 
@@ -220,26 +222,24 @@ describe("velocidade da ligação", () => {
     ]);
   });
 
-  it("envia raciocínio baixo ao gateway, como o chat", async () => {
-    const original = globalThis.fetch;
-    let corpo = "";
-    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
-      corpo = String(init?.body);
-      return new Response("{}");
-    }) as typeof fetch;
-    try {
-      await fetchComRaciocinioBaixo("https://exemplo.test", {
-        method: "POST",
-        body: JSON.stringify({ model: "m" }),
-      });
-      expect(JSON.parse(corpo)).toEqual({ model: "m", reasoning_effort: "low" });
-      await fetchComRaciocinioBaixo("https://exemplo.test", {
-        method: "POST",
-        body: JSON.stringify({ model: "m", reasoning_effort: "medium" }),
-      });
-      expect(JSON.parse(corpo).reasoning_effort).toBe("medium");
-    } finally {
-      globalThis.fetch = original;
-    }
+  it("não manda ao modelo o 'só um instante' final da voz", () => {
+    const chamada = {
+      role: "assistant" as const,
+      content: [{ type: "tool-call" as const, toolCallId: "c1", toolName: "x", input: {} }],
+    };
+    expect(
+      semTurnoFinalDoAssistente([
+        { role: "user", content: "clínico geral" },
+        { role: "assistant", content: "Um instante, vou verificar." },
+      ]),
+    ).toEqual([{ role: "user", content: "clínico geral" }]);
+    const comFerramenta = [{ role: "user" as const, content: "oi" }, chamada];
+    expect(semTurnoFinalDoAssistente(comFerramenta)).toEqual(comFerramenta);
+  });
+
+  it("registra só o código do erro, sem conteúdo", () => {
+    expect(codigoDoErro({ statusCode: 400, message: "conteúdo do pedido" })).toBe("HTTP 400");
+    expect(codigoDoErro(new TypeError("x"))).toBe("TypeError");
+    expect(codigoDoErro(null)).toBe("desconhecido");
   });
 });
