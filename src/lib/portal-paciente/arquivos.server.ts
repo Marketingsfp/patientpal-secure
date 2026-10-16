@@ -58,7 +58,7 @@ export async function carregarArquivo(
   if (tipo === "documento") {
     const { data: d } = await db
       .from("documentos_emitidos")
-      .select("id, tipo, titulo, conteudo, created_at, liberado_paciente_em, medicos(nome)")
+      .select("id, tipo, titulo, conteudo, created_at, liberado_paciente_em, medico_id")
       .eq("id", id)
       .eq("clinica_id", s.clinica_id)
       .eq("paciente_id", s.paciente_id)
@@ -68,7 +68,15 @@ export async function carregarArquivo(
     if (!d) return null;
     const nome = `${d.titulo || "Documento"}.html`;
     if (!opcoes.conteudo) return { tipo: "html", nome, html: "" };
-    const med = (d as unknown as { medicos: { nome: string | null } | null }).medicos?.nome;
+    const { data: m } = d.medico_id
+      ? await db
+          .from("medicos")
+          .select("nome")
+          .eq("id", d.medico_id)
+          .eq("clinica_id", s.clinica_id)
+          .maybeSingle()
+      : { data: null };
+    const med = m?.nome;
     return {
       tipo: "html",
       nome,

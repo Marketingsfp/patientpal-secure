@@ -24,7 +24,7 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
     db
       .from("documentos_emitidos")
       .select(
-        "id, clinica_id, paciente_id, tipo, titulo, created_at, liberado_paciente_em, medicos(nome)",
+        "id, clinica_id, paciente_id, medico_id, tipo, titulo, created_at, liberado_paciente_em",
       )
       .eq("clinica_id", s.clinica_id)
       .eq("paciente_id", s.paciente_id)
@@ -52,15 +52,26 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
     titulo: string;
     created_at: string;
     liberado_paciente_em: string | null;
-    medicos: { nome: string | null } | null;
+    medico_id: string | null;
   };
-  const d = somenteDoPaciente((docs.data ?? []) as unknown as D[], s, true).map((x) => ({
+  const listaD = somenteDoPaciente((docs.data ?? []) as unknown as D[], s, true);
+  const medIds = [...new Set(listaD.map((x) => x.medico_id).filter((v): v is string => !!v))];
+  const nomes = new Map<string, string>();
+  if (medIds.length) {
+    const { data: ms } = await db
+      .from("medicos")
+      .select("id, nome")
+      .in("id", medIds)
+      .eq("clinica_id", s.clinica_id);
+    for (const m of ms ?? []) nomes.set(m.id, m.nome);
+  }
+  const d = listaD.map((x) => ({
     id: x.id,
     origem: "documento" as const,
     tipo: x.tipo,
     titulo: x.titulo,
     data: x.created_at,
-    profissional: x.medicos?.nome ?? null,
+    profissional: (x.medico_id && nomes.get(x.medico_id)) || null,
     liberadoEm: x.liberado_paciente_em as string,
   }));
   const e = somenteDoPaciente(exames.data ?? [], s, true).map((x) => ({
