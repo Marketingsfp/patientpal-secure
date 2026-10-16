@@ -40,6 +40,8 @@ const db = {
         selecionadas.forEach((l) => Object.assign(l, structuredClone(valores)));
       }
       if (cursor) selecionadas = selecionadas.filter((l) => l.id > cursor);
+      // `count: "exact"` devolve o total filtrado, antes da página.
+      const total = selecionadas.length;
       // Simula servidor limitando páginas a 100 mesmo com limit(250).
       selecionadas = selecionadas
         .sort((a, b) => String(a.id).localeCompare(String(b.id)))
@@ -55,11 +57,17 @@ const db = {
                 .map((c) => [c, structuredClone(l[c])]),
             ),
       );
-      return { data: unico ? (projecao[0] ?? null) : projecao, error: null };
+      return {
+        data: unico ? (projecao[0] ?? null) : projecao,
+        error: null,
+        ...(contar ? { count: total } : {}),
+      };
     };
+    let contar = false;
     const q: any = {
-      select(c: string) {
+      select(c: string, opcoes?: { count?: string }) {
         colunas = c;
+        contar = Boolean(opcoes?.count);
         return q;
       },
       eq(k: string, v: unknown) {
@@ -108,7 +116,7 @@ mock.module("../fonte-operacional.server", () => ({
     };
   },
 }));
-const { lerFonteEditorial } = await import("../fonte-editorial.server");
+const { lerFonteEditorial, limparCacheBaseEditorial } = await import("../fonte-editorial.server");
 const { gerenciarFonteConsulta } = await import("../fonte-consulta-admin.server");
 const { catalogoDoTurno, comCatalogoDoTurno } = await import("../catalogo-turno.server");
 const { lerSelecaoFonte } = await import("../fonte-consulta-config.server");
@@ -125,8 +133,11 @@ it("consulta dicionário só na base, reutiliza leitura concorrente e atualiza n
     expect(a).toEqual(b);
     expect(a.status).toBe("consultado");
     expect(JSON.stringify(a)).toContain("base-exame");
-    expect(chamadas.filter((c) => c.tabela === "nina_cat_servicos")).toHaveLength(2); // página e fim
+    // Assinatura (quantidade e última alteração), página e fim.
+    expect(chamadas.filter((c) => c.tabela === "nina_cat_servicos")).toHaveLength(3);
     tabelas.nina_cat_servicos[0].estrutura.aliases = ["novo termo"];
+    // No banco, o gatilho _touch_updated_at muda updated_at em toda edição.
+    tabelas.nina_cat_servicos[0].updated_at = "2026-10-16T12:00:01Z";
     expect(JSON.stringify(await lerDicionarioDaMensagem("clinica-a", "ultra"))).toContain(
       "base-exame",
     );
@@ -180,11 +191,13 @@ beforeEach(() => {
         estrutura: { aliases: ["ultra"] },
         nota_interna: "SEGREDO",
         rascunho: { valor: 777 },
+        updated_at: "2026-10-16T12:00:00Z",
       },
     ],
     nina_cat_profissionais: [],
     clinica_feature_flags: [],
   };
+  limparCacheBaseEditorial();
   falha = null;
   conflito = false;
   leiturasOS = [];
@@ -205,7 +218,10 @@ it("consulta só a fonte selecionada, fixa no turno e atualizada no próximo", a
     const base = await catalogoDoTurno("clinica-a");
     expect(base.servicos[0].valor).toBe(150);
     expect(base.selecao.fonte).toBe("base_conhecimento");
-    base.servicos[0].valor = 999;
+    // O catálogo é só leitura: alterar falha na hora e não muda a próxima leitura.
+    expect(() => {
+      base.servicos[0].valor = 999;
+    }).toThrow();
     expect((await catalogoDoTurno("clinica-a")).servicos[0].valor).toBe(150);
   });
   expect(leiturasOS).toEqual(["clinica-a"]);
@@ -351,4 +367,33 @@ it("não desfaz reserva existente durante troca de fonte", () => {
   alinharFonteDaSessao(e, { fonte: "base_conhecimento", revisao: "v1" });
   expect(e.appointment.appointment_id).toBe("reserva");
   expect(e.appointment.doctor_id).toBe("medico");
+});
+
+// Capacidade (16/10/2026): a base publicada é lida uma vez por clínica e
+// compartilhada entre respostas; a leitura completa só se repete quando a base muda.
+const paginasLidas = () =>
+  chamadas.filter((c) => c.tabela === "nina_cat_servicos" && c.colunas !== "updated_at").length;
+it("base do atendimento: uma leitura compartilhada, relida só quando a base muda", async () => {
+  configurar();
+  const turno = () => comCatalogoDoTurno("clinica-a", () => catalogoDoTurno("clinica-a"));
+  const [a, b] = await Promise.all([turno(), turno()]);
+  expect(a.servicos).toBe(b.servicos);
+  await turno();
+  expect(paginasLidas()).toBe(2); // página e fim, uma única vez
+  tabelas.nina_cat_servicos[0].valor = 160;
+  tabelas.nina_cat_servicos[0].updated_at = "2026-10-16T12:00:05Z";
+  expect((await turno()).servicos[0].valor).toBe(160);
+  expect(paginasLidas()).toBe(4);
+  tabelas.nina_cat_servicos.push({ ...tabelas.nina_cat_servicos[0], id: "base-novo" });
+  expect((await turno()).servicos).toHaveLength(2);
+});
+it("base do atendimento: sem a cópia antiga do cadastro, que só o editor usa", async () => {
+  configurar();
+  tabelas.nina_cat_servicos[0].estrutura = { aliases: ["ultra"], formato_antigo: "x".repeat(5000) };
+  const base = await comCatalogoDoTurno("clinica-a", () => catalogoDoTurno("clinica-a"));
+  expect(base.servicos[0].estrutura).toEqual({ aliases: ["ultra"] });
+  // O editor continua recebendo o registro completo.
+  expect((await lerFonteEditorial("clinica-a")).servicos[0].estrutura).toHaveProperty(
+    "formato_antigo",
+  );
 });

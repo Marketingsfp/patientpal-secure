@@ -460,8 +460,13 @@ describe("uma leitura do catálogo por resposta", () => {
       const primeiro = (await catalogoDoTurno(CLINICA))!;
       expect(primeiro.servicos).toHaveLength(1);
       expect(JSON.stringify(primeiro)).not.toMatch(/nota_interna|rascunho|repasse/);
-      primeiro.servicos[0]!.nome = "Alterado pelo consumidor";
-      primeiro.profissionais.length = 0;
+      // O catálogo é só leitura (compartilhado entre respostas): alterar falha na hora.
+      expect(() => {
+        primeiro.servicos[0]!.nome = "Alterado pelo consumidor";
+      }).toThrow();
+      expect(() => {
+        primeiro.profissionais.length = 0;
+      }).toThrow();
       const segundo = (await catalogoDoTurno(CLINICA))!;
       expect(segundo.servicos[0]!.nome).toBe("Mamografia");
       expect(segundo.profissionais).toHaveLength(1);

@@ -7,7 +7,8 @@ import type { ProfissionalPublicado, ServicoPublicado } from "./catalogo-conheci
 import { registrarEtapa } from "./evidencias.server";
 import { lerFonteOperacional } from "./fonte-operacional.server";
 import { lerSelecaoFonte } from "./fonte-consulta-config.server";
-import { lerFonteEditorial } from "./fonte-editorial.server";
+import { lerFonteEditorialDoAtendimento } from "./fonte-editorial.server";
+import { congelarProfundo } from "./congelar";
 import { ROTULOS_FONTE, type SelecaoFonte } from "./fonte-consulta";
 
 /** Apenas campos publicados; nunca carregar nota interna ou rascunho. */
@@ -37,10 +38,13 @@ export function comCatalogoDoTurno<T>(clinicaId: string, fn: () => Promise<T>): 
 
 async function lerFonteSelecionada(clinicaId: string): Promise<Catalogo> {
   const selecao = await lerSelecaoFonte(clinicaId);
+  // Base publicada: leitura compartilhada e congelada (fonte-editorial.server.ts).
+  // Cadastro: o cache dele é usado também fora da Nina, então a resposta
+  // congela uma cópia própria, feita uma vez por resposta.
   const dados =
     selecao.fonte === "base_conhecimento"
-      ? await lerFonteEditorial(clinicaId)
-      : await lerFonteOperacional(clinicaId);
+      ? await lerFonteEditorialDoAtendimento(clinicaId)
+      : congelarProfundo(structuredClone(await lerFonteOperacional(clinicaId)));
   registrarEtapa({
     tipo: "consulta",
     fonte: "sistema",
@@ -55,7 +59,7 @@ async function lerFonteSelecionada(clinicaId: string): Promise<Catalogo> {
     },
     codigo: { arquivo: "src/lib/nina/catalogo-turno.server.ts", funcao: "lerFonteSelecionada" },
   });
-  return { ...dados, selecao };
+  return Object.freeze({ ...dados, selecao: Object.freeze({ ...selecao }) });
 }
 
 export function temCatalogoDoTurno(): boolean {
@@ -74,11 +78,14 @@ function leituraDoTurno(clinicaId: string): Promise<Catalogo> | null {
   return turno.leitura;
 }
 
-/** Fonte completa da clínica; fora de um turno, confere novamente a seleção. */
+/**
+ * Fonte completa da clínica; fora de um turno, confere novamente a seleção.
+ * Devolve o catálogo congelado, sem cópia: antes, cada ferramenta recebia uma
+ * cópia inteira (até ~10 por resposta), o que derrubava o worker por memória
+ * com várias respostas ao mesmo tempo (16/10/2026).
+ */
 export function catalogoDoTurno(clinicaId: string): Promise<Catalogo> {
-  return (leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId)).then((catalogo) =>
-    structuredClone(catalogo),
-  );
+  return leituraDoTurno(clinicaId) ?? lerFonteSelecionada(clinicaId);
 }
 
 /** A contagem não precisa criar uma cópia de todos os registros. */
