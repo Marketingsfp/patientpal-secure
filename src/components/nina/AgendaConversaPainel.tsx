@@ -380,6 +380,8 @@ export function AgendaConversaPainel({
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <AgendaPorMedicoDia
           compacto
+          // Com busca, aparece quem bate com o texto, mesmo sem horários no dia.
+          incluirSemHorarios={!!busca.trim()}
           dataRef={dataRef}
           medicos={colunas}
           items={itens}

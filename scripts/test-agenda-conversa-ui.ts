@@ -18,13 +18,14 @@ const medicos = [
   { id: "m1", nome: "Dra. Ana Demonstração", especialidade_id: "e1" },
   { id: "m2", nome: "Dr. Bruno Demonstração", especialidade_id: "e2" },
   { id: "m3", nome: "Dra. Carla Demonstração", especialidade_id: "e3" },
+  { id: "m4", nome: "Dra. Valéria Nome Bem Comprido Demonstração", especialidade_id: "e1" },
 ];
 const especialidades = [
   { id: "e1", nome: "Cardiologia" }, { id: "e2", nome: "Pediatria" }, { id: "e3", nome: "Ultrassonografia" },
 ];
 const ags = [];
 let n = 0;
-for (const m of medicos) for (let h = 8; h < 12; h++) for (const min of [0, 30]) {
+for (const m of medicos.filter((x) => x.id !== "m4")) for (let h = 8; h < 12; h++) for (const min of [0, 30]) {
   n++;
   const livre = (n + h) % 3 === 0;
   ags.push({ id: "a" + n, medico_id: m.id, inicio: dia(h, min), fim: dia(h, min + 29),

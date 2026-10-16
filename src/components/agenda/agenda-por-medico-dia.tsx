@@ -78,6 +78,7 @@ export function AgendaPorMedicoDia({
   onCobrar,
   onFinalizar,
   compacto = false,
+  incluirSemHorarios = false,
 }: {
   dataRef: string;
   medicos: AgendaMedicoColuna[];
@@ -98,6 +99,8 @@ export function AgendaPorMedicoDia({
    * próprio painel, não da tela. Sem a opção, nada muda nas telas do ClinicaOS.
    */
   compacto?: boolean;
+  /** Mostra todos os profissionais recebidos, mesmo sem horários no dia (busca). */
+  incluirSemHorarios?: boolean;
 }) {
   const porMedico = useMemo(() => {
     const map = new Map<string, AgendaMedicoItem[]>();
@@ -112,9 +115,9 @@ export function AgendaPorMedicoDia({
 
   const colunas = useMemo(() => {
     const base = medicos.filter((m) => (porMedico.get(m.id)?.length ?? 0) > 0);
-    const lista = base.length > 0 ? base : medicos;
+    const lista = incluirSemHorarios || base.length === 0 ? medicos : base;
     return lista.slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  }, [medicos, porMedico]);
+  }, [medicos, porMedico, incluirSemHorarios]);
 
   const dataLabel = useMemo(() => {
     try {
@@ -154,7 +157,7 @@ export function AgendaPorMedicoDia({
         <div
           className={
             compacto
-              ? "grid w-full max-w-full grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3"
+              ? "grid w-full max-w-full grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-3"
               : "grid w-full max-w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           }
         >
@@ -173,23 +176,37 @@ export function AgendaPorMedicoDia({
                     {iniciais(m.nome)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-primary" title={m.nome}>
+                    <p
+                      className={`text-sm font-bold text-primary ${
+                        compacto ? "line-clamp-2 break-words leading-snug" : "truncate"
+                      }`}
+                      title={m.nome}
+                    >
                       {m.nome}
                     </p>
                     <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       {m.especialidade_nome || "Profissional"}
                     </p>
                   </div>
-                  <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">
-                    <span className="text-emerald-700">{livres.length} livres</span>
-                    <span className="mx-1 text-slate-300">·</span>
-                    <span className="text-indigo-700">{ocupados.length} agend.</span>
-                  </span>
+                  {/* No modo compacto os números ficam só no rodapé: o nome usa a largura toda. */}
+                  {!compacto && (
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                      <span className="text-emerald-700">{livres.length} livres</span>
+                      <span className="mx-1 text-slate-300">·</span>
+                      <span className="text-indigo-700">{ocupados.length} agend.</span>
+                    </span>
+                  )}
                 </header>
 
-                <div className="scrollbar-thin max-h-96 w-full min-w-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto p-2">
+                <div
+                  className={`scrollbar-thin w-full min-w-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto p-2 ${
+                    compacto ? "max-h-[max(24rem,calc(100dvh-20rem))]" : "max-h-96"
+                  }`}
+                >
                   {ags.length === 0 && (
-                    <p className="px-2 py-6 text-center text-[12px] text-slate-400">Sem horários</p>
+                    <p className="px-2 py-6 text-center text-[12px] text-slate-400">
+                      {compacto ? "Sem horários neste dia" : "Sem horários"}
+                    </p>
                   )}
                   {ags.map((a) => {
                     const livre = !!a.livre;

@@ -18,6 +18,21 @@ try {
   await page.screenshot({ path: resolve(saida, "desktop-1600.png") });
   console.log("PASS agenda ao lado do chat (1600px)");
 
+  // Busca por parte do nome acha quem não tem horários no dia; poucas colunas esticam.
+  await page.getByLabel("Buscar profissional ou especialidade").fill("val");
+  await expect(page.getByText("Dra. Valéria Nome Bem Comprido Demonstração")).toBeVisible();
+  await expect(page.getByText("Sem horários neste dia")).toBeVisible();
+  const largura = await page
+    .locator("section", { hasText: "Sem horários neste dia" })
+    .last()
+    .evaluate((e) => e.getBoundingClientRect().width);
+  if (largura < 600) throw new Error("Coluna única não esticou: " + largura);
+  await page.screenshot({ path: resolve(saida, "busca-val.png") });
+  await page.getByLabel("Buscar profissional ou especialidade").fill("dra");
+  await page.screenshot({ path: resolve(saida, "busca-dra.png") });
+  await page.getByLabel("Buscar profissional ou especialidade").fill("");
+  console.log("PASS busca por parte do nome e colunas responsivas");
+
   // Ordem de chegada: só orienta, sem confirmar.
   const colunaBruno = page.locator("section", { hasText: "Dr. Bruno Demonstração" }).last();
   await colunaBruno
