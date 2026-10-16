@@ -281,7 +281,12 @@ export function ligarSessao(
             });
             return JSON.parse(r.saida) as unknown;
           } catch {
-            emitir({ type: "app.ferramenta", nome, rotulo: ROTULOS_FERRAMENTAS[nome] ?? nome, falhou: true });
+            emitir({
+              type: "app.ferramenta",
+              nome,
+              rotulo: ROTULOS_FERRAMENTAS[nome] ?? nome,
+              falhou: true,
+            });
             return { ok: false, erro: "INTERNAL_ERROR", mensagem: "Falha ao consultar." };
           }
         },
@@ -340,7 +345,12 @@ export function ligarSessao(
     let falhou = false;
     for await (const p of r.fullStream) {
       if (p.type === "start-step") passoOk = false;
-      if (p.type === "raw" && p.rawValue && typeof p.rawValue === "object" && "type" in p.rawValue) {
+      if (
+        p.type === "raw" &&
+        p.rawValue &&
+        typeof p.rawValue === "object" &&
+        "type" in p.rawValue
+      ) {
         const t = (p.rawValue as { type: unknown }).type;
         if (t === "response.completed") passoOk = true;
         if (t === "response.failed" || t === "response.incomplete") falhou = true;
@@ -405,7 +415,8 @@ export function ligarSessao(
       const e = JSON.parse(data) as EventoVoz;
       if (navegador.readyState === 1) navegador.send(data);
       if (e.type === "session.closed") return terminar();
-      if (["gateway.session.closing", "gateway.error", "app.error"].includes(e.type)) return parar();
+      if (["gateway.session.closing", "gateway.error", "app.error"].includes(e.type))
+        return parar();
       if (fechando) return;
       if (e.type === "gateway.session.created") {
         sessaoId = e.session?.id;

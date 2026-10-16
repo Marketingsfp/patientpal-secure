@@ -102,7 +102,13 @@ export async function conectarLigacao(o: {
       const prazo = setTimeout(() => reject(new Error("A voz demorou para responder.")), 50_000);
       ws.onopen = () =>
         ws.send(
-          JSON.stringify({ type: "app.start", sdp, token: o.token, clinicaId: o.clinicaId, voz: o.voz }),
+          JSON.stringify({
+            type: "app.start",
+            sdp,
+            token: o.token,
+            clinicaId: o.clinicaId,
+            voz: o.voz,
+          }),
         );
       ws.onmessage = ({ data }) => {
         let e: { type?: string; transport?: { sdp?: string }; error?: { message?: string } };
