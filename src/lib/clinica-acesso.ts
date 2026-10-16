@@ -115,3 +115,18 @@ export function aplicarMarcaNaAba(c: ClinicaAcesso | null, prefixo?: string) {
     link.href = c.logo_url;
   }
 }
+
+/**
+ * Variáveis de cor para aplicar a cor da clínica só no trecho da tela que
+ * recebe o estilo (login/recuperação). Sem marca devolve undefined: nada muda.
+ */
+export function estiloCoresMarca(
+  c: ClinicaAcesso | null,
+): Record<string, string> | undefined {
+  if (!c?.primary || !/^#[0-9a-f]{3,8}$/i.test(c.primary)) return undefined;
+  return {
+    "--primary": c.primary,
+    "--primary-foreground": "#ffffff",
+    "--ring": c.primary,
+  };
+}

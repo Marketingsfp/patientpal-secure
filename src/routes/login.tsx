@@ -165,7 +165,10 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
+    <div
+      className="min-h-screen grid lg:grid-cols-2 bg-background"
+      style={estiloCoresMarca(marca) as React.CSSProperties | undefined}
+    >
       {/* Brand panel */}
       <div
         className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-[#16a34a] via-[#15803d] to-[#166534]"
@@ -303,7 +306,7 @@ function LoginPage() {
               </div>
               <Button
                 type="submit"
-                className="w-full h-11 text-base font-medium"
+                className={`w-full h-11 text-base font-medium${estiloCoresMarca(marca) ? " hover:bg-primary hover:brightness-90" : ""}`}
                 disabled={loading}
               >
                 {loading ? "Entrando..." : "Entrar"}
