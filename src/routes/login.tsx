@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Activity, Mail, Lock, Eye, EyeOff, CalendarDays, Users, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -13,6 +13,7 @@ import {
   idClinicaValido,
   resolverClinicaAcesso,
   type ClinicaAcesso,
+  estiloCoresMarca,
 } from "@/lib/clinica-acesso";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -165,7 +166,10 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
+    <div
+      className="min-h-screen grid lg:grid-cols-2 bg-background"
+      style={estiloCoresMarca(marca) as CSSProperties | undefined}
+    >
       {/* Brand panel */}
       <div
         className="hidden lg:flex flex-col justify-between p-12 text-white relative overflow-hidden bg-gradient-to-br from-[#16a34a] via-[#15803d] to-[#166534]"
@@ -303,7 +307,7 @@ function LoginPage() {
               </div>
               <Button
                 type="submit"
-                className="w-full h-11 text-base font-medium"
+                className={`w-full h-11 text-base font-medium${estiloCoresMarca(marca) ? " hover:bg-primary hover:brightness-90" : ""}`}
                 disabled={loading}
               >
                 {loading ? "Entrando..." : "Entrar"}

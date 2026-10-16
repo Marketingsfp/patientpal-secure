@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Lock, Eye, EyeOff, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { clinicaAcessoEmCache, estiloCoresMarca, type ClinicaAcesso } from "@/lib/clinica-acesso";
 
 export const Route = createFileRoute("/reset-password")({
   component: ResetPasswordPage,
@@ -20,6 +21,8 @@ function ResetPasswordPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [marca, setMarca] = useState<ClinicaAcesso | null>(null);
+  useEffect(() => setMarca(clinicaAcessoEmCache()), []);
 
   useEffect(() => {
     const {
@@ -55,7 +58,10 @@ function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+    <div
+      className="min-h-screen flex items-center justify-center bg-background px-4 py-12"
+      style={estiloCoresMarca(marca) as CSSProperties | undefined}
+    >
       <div className="w-full max-w-md">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -115,7 +121,7 @@ function ResetPasswordPage() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 text-base font-medium"
+              className={`w-full h-11 text-base font-medium${estiloCoresMarca(marca) ? " hover:bg-primary hover:brightness-90" : ""}`}
               disabled={loading || !ready}
             >
               {loading ? "Salvando..." : "Salvar nova senha"}
