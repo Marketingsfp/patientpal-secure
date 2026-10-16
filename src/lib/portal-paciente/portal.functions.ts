@@ -296,7 +296,10 @@ async function lerAgendamentos(clinicaId: string, pacienteId: string, id?: strin
     .limit(60);
   if (id) q = q.eq("id", id);
   const { data, error } = await q;
-  if (error) throw new Error("Não foi possível carregar seus agendamentos.");
+  if (error) {
+    console.error("[portal] agendamentos", error.code, error.message);
+    throw new Error("Não foi possível carregar seus agendamentos.");
+  }
   const linhas = (data ?? []) as unknown as AgLinha[];
   const ids = linhas.map((l) => l.id);
   const pagos = new Set<string>();
