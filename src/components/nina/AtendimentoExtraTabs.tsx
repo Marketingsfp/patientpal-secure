@@ -115,6 +115,8 @@ import {
   PinOff,
   Copy,
   AlertTriangle,
+  Reply,
+  X,
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
@@ -125,6 +127,13 @@ import { useRealtimeAtendimento } from "@/hooks/use-realtime-atendimento";
 import { criarAgrupador, type Agrupador } from "@/lib/atendimento/realtime-roteador";
 // FASE 3 — a linha entregue pelo tempo real é usada direto (sem nova consulta).
 import { normalizarMensagemRealtime } from "@/lib/atendimento/mensagem-realtime";
+import {
+  autorDaCitacao,
+  exibirCitacao,
+  textoDaCitacao,
+  waIdCitavel,
+  type MensagemCitada,
+} from "@/lib/atendimento/citacao-mensagem";
 // FASE 1 — telemetria de latência (só medição; desligada por padrão).
 import {
   abrirTrace,
@@ -3063,6 +3072,44 @@ function AtendInboxOperacional({
   const registrarUsoFn = useServerFn(registrarUsoResposta);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const colunaChatRef = useRef<HTMLDivElement | null>(null);
+
+  /* ---------- Responder citando (16/10/2026) ---------- */
+  // Mensagem escolhida em "Responder"; só aparece na conversa em que foi escolhida.
+  const [citando, setCitando] = useState<{
+    conversaId: string;
+    waMessageId: string;
+    autor: string;
+    texto: string;
+  } | null>(null);
+  const citandoAgora = citando && citando.conversaId === sel?.id ? citando : null;
+  const responderMensagem = (m: any) => {
+    const waId = waIdCitavel(m);
+    const conversaId = String(m?.conversa_id ?? selIdRef.current ?? "");
+    if (!waId || !conversaId) return;
+    const citada: MensagemCitada = {
+      wa_message_id: waId,
+      direction: m.direction ?? null,
+      enviada_por: m.enviada_por ?? null,
+      tipo: m.tipo ?? null,
+      body: m.body ?? null,
+    };
+    setCitando({
+      conversaId,
+      waMessageId: waId,
+      autor: autorDaCitacao(citada),
+      texto: textoDaCitacao(citada),
+    });
+    composerRef.current?.focus();
+  };
+  const irParaCitada = (waId: string) => {
+    const alvo = colunaChatRef.current?.querySelector(`[data-wa-id="${CSS.escape(waId)}"]`);
+    if (alvo) alvo.scrollIntoView({ block: "center", behavior: "smooth" });
+    else toast.info("A mensagem citada é mais antiga e não está carregada nesta tela.");
+  };
+  const responderRef = useRef(responderMensagem);
+  responderRef.current = responderMensagem;
+  const irParaCitadaRef = useRef(irParaCitada);
+  irParaCitadaRef.current = irParaCitada;
   // Campo de escrever: cresce e diminui com o texto, sem limite de linhas. Sempre sobra um espaço
   // mínimo para a conversa (cabeçalho + mensagens); só então o campo passa a rolar por dentro.
   const ESPACO_MIN_CONVERSA_PX = 280;
@@ -3215,6 +3262,8 @@ function AtendInboxOperacional({
                   : janela24hExpirada
                     ? MSG_JANELA_24H_META
                     : null;
+  // "Responder citando" só aparece quando a pessoa pode enviar nesta conversa.
+  const podeCitar = !!sel && !motivoBloqueio;
 
   /**
    * Assume a conversa. O servidor decide de forma atômica: se outra pessoa
@@ -3270,7 +3319,12 @@ function AtendInboxOperacional({
    * eventos e a Inbox inteira não são buscados de novo (nada disso muda por
    * causa de um texto enviado). O tempo real segue corrigindo o que vem de fora.
    */
-  const despacharEnvio = (origem: string, texto: string, clientMessageId: string) => {
+  const despacharEnvio = (
+    origem: string,
+    texto: string,
+    clientMessageId: string,
+    citarWaMessageId?: string | null,
+  ) => {
     if (!clinicaId) return;
     // FASE 2 — a bolha é imediata, mas o transporte sai em ordem: uma fila por
     // conversa garante A → B → C. Conversas diferentes não se atrapalham.
@@ -3278,7 +3332,13 @@ function AtendInboxOperacional({
       try {
         marcarEtapa(clientMessageId, "SEND_T2_REQUEST_STARTED", "send");
         const r: any = await enviarMsg({
-          data: { clinicaId, conversaId: origem, text: texto, clientMessageId },
+          data: {
+            clinicaId,
+            conversaId: origem,
+            text: texto,
+            clientMessageId,
+            ...(citarWaMessageId ? { citarWaMessageId } : {}),
+          },
         });
         marcarEtapa(clientMessageId, "SEND_T10_BACKEND_RESPONSE", "send");
         anexarMarcasDoServidor(clientMessageId, r?.latencia?.marcas);
@@ -3329,7 +3389,12 @@ function AtendInboxOperacional({
     const c = cacheConversas.current.obter(origem);
     if (c) cacheConversas.current.guardar(origem, { ...c, msgs: voltarAEnviando(c.msgs) });
     // O servidor assina o texto: reenviar o corpo já assinado duplicaria a assinatura.
-    despacharEnvio(origem, String(m.texto_original ?? m.body ?? ""), String(m.client_message_id));
+    despacharEnvio(
+      origem,
+      String(m.texto_original ?? m.body ?? ""),
+      String(m.client_message_id),
+      m.quoted_message_id ?? null,
+    );
   };
 
   const enviar = () => {
@@ -3365,6 +3430,12 @@ function AtendInboxOperacional({
       nomeAutor: meuNomeRef.current,
       clientMessageId,
     });
+    // Citação vale só para a conversa em que foi escolhida; sai junto com o envio.
+    const citacao = citando && citando.conversaId === origem ? citando.waMessageId : null;
+    if (citacao) {
+      (otimista as { quoted_message_id?: string }).quoted_message_id = citacao;
+      setCitando(null);
+    }
 
     // 1) Campo livre na hora e bolha visível no mesmo frame.
     limparRascunhoDe(origem);
@@ -3382,7 +3453,7 @@ function AtendInboxOperacional({
     }
 
     marcarEtapa(clientMessageId, "SEND_T1_OPTIMISTIC_RENDER", "send");
-    despacharEnvio(origem, t, clientMessageId);
+    despacharEnvio(origem, t, clientMessageId, citacao);
   };
 
   const transferir = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -3517,163 +3588,195 @@ function AtendInboxOperacional({
   // inspeção da Nina. Só refaz quando mensagens, resumos, avaliações ou destaque mudam.
   const tentarNovamenteRef = useRef(tentarNovamente);
   tentarNovamenteRef.current = tentarNovamente;
-  const bolhasDaConversa = useMemo(
-    () =>
-      (conteudoDaConversa ? timelineComResumos : []).map((item) => {
-        // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
-        if (item.kind === "resumo") {
-          return (
-            <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
-              <ResumoAvulsoCard resumo={item.resumo} />
-            </div>
-          );
-        }
-        if (item.kind === "grupo") {
-          const g = item.item;
-          if (g.tipo === "HANDOFF") {
-            return (
-              <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                <HandoffGroupCard
-                  grupo={g}
-                  resumo={(item as { resumo?: ResumoDaConversa }).resumo}
-                />
-                {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
-              </div>
-            );
-          }
-          if (g.tipo === "ATRIBUICAO") {
-            return (
-              <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
-                <AtribuicaoGroupCard grupo={g} />
-              </div>
-            );
-          }
-          // O resumo da Nina fica apenas no painel superior da
-          // conversa: o aviso de geração não vira bloco na timeline.
-          if (g.evento.evento === "RESUMO_IA_GERADO") return null;
-          return (
-            <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
-              <ConversationSystemEvent evento={g.evento as unknown as ConversaEvento} />
-            </div>
-          );
-        }
-        const m = item.msg;
-        const out = m.direction === "out";
-        const autorSupervisao = out
-          ? rotuloAutorSupervisao(
-              m.enviada_por_perfil,
-              autores && autores.clinicaId === clinicaId
-                ? autores.nomes[m.enviada_por_user_id]
-                : null,
-            )
-          : null;
-        // Só marcador interno vira faixa central. Mensagem real
-        // enviada ao paciente (status de envio) fica como conversa.
-        if (marcadorInternoSistema(m)) {
-          const texto = textoMarcadorSistema(m.body);
-          if (!texto) return null;
-          return (
-            <div key={`m-${m.id}`} data-historico-id={`m-${m.id}`} className="flex justify-center">
-              <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
-                {texto}
-                <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
-              </div>
-            </div>
-          );
-        }
-        // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
-
-        const destacada = msgDestacada === m.id;
+  const bolhasDaConversa = useMemo(() => {
+    // Citações: a citada é achada entre as mensagens já carregadas.
+    const porWaId = new Map<string, MensagemCitada>();
+    for (const item of conteudoDaConversa ? timelineComResumos : []) {
+      if (item.kind !== "msg" || typeof item.msg?.wa_message_id !== "string") continue;
+      porWaId.set(item.msg.wa_message_id, item.msg as MensagemCitada);
+    }
+    return (conteudoDaConversa ? timelineComResumos : []).map((item) => {
+      // O resumo da Nina é um item da conversa, no ponto em que ela concluiu (não fica mais fixo no topo).
+      if (item.kind === "resumo") {
         return (
-          <div
-            key={`m-${m.id}`}
-            data-msg-id={m.id}
-            data-historico-id={`m-${m.id}`}
-            className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
-              destacada
-                ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
-                : ""
-            }`}
-          >
-            {destacada && (
-              <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
-                Mensagem reportada
-              </span>
-            )}
-            {/* Botão de reporte rápido: fora do balão, sempre visível. */}
-            {clinicaId && (
-              <InspecaoMensagemNina
-                parte="reporte"
-                clinicaId={clinicaId}
-                conversaId={m.conversa_id ?? sel?.id}
-                mensagem={m}
-                saida={saidasPorMensagem[String(m.id)]}
-              />
-            )}
-            <div
-              className={`oszap-bubble max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
-                out
-                  ? "oszap-bubble-out bg-atd-go text-atd-on-strong rounded-br-sm"
-                  : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
-              }`}
-            >
-              {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
-              {textoDaBolha(m) && <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>}
-              {ehOtimista(m) && m.status === "failed" && (
-                <div className="mt-1 flex items-center gap-2 text-[11px]">
-                  <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
-                  <button
-                    type="button"
-                    className="underline underline-offset-2"
-                    onClick={() => tentarNovamenteRef.current(m)}
-                  >
-                    Tentar novamente
-                  </button>
-                </div>
-              )}
-              <div
-                className={`oszap-message-meta text-[11px] mt-2 flex flex-wrap items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
-              >
-                {/* Envio otimista: durante o envio normal a bolha não
-                              exibe nenhum status — só a hora. Falha aparece acima. */}
-                <span className="min-w-0 break-words">
-                  {fmtHora(m.recebida_em)}{" "}
-                  {mensagemDoFrancisco(m.raw)
-                    ? "· Francisco"
-                    : m.enviada_por === "nina" && "· Nina"}
-                  {autorSupervisao && (
-                    <span
-                      data-testid="autor-supervisao"
-                      title={`Resposta da supervisão (${autorSupervisao})`}
-                    >
-                      · {autorSupervisao}
-                    </span>
-                  )}
-                </span>
-                {clinicaId && (
-                  <InspecaoMensagemNina
-                    parte="detalhes"
-                    clinicaId={clinicaId}
-                    conversaId={m.conversa_id ?? sel?.id}
-                    mensagem={m}
-                    saida={saidasPorMensagem[String(m.id)]}
-                  />
-                )}
-              </div>
+          <div key={`resumo-${item.resumo.id}`} data-historico-id={`resumo-${item.resumo.id}`}>
+            <ResumoAvulsoCard resumo={item.resumo} />
+          </div>
+        );
+      }
+      if (item.kind === "grupo") {
+        const g = item.item;
+        if (g.tipo === "HANDOFF") {
+          return (
+            <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
+              <HandoffGroupCard grupo={g} resumo={(item as { resumo?: ResumoDaConversa }).resumo} />
+              {item.aguardando && <EsperaAtendenteCard protocolo={g.protocolo} />}
+            </div>
+          );
+        }
+        if (g.tipo === "ATRIBUICAO") {
+          return (
+            <div key={`g-${g.chave}`} data-historico-id={`g-${g.chave}`}>
+              <AtribuicaoGroupCard grupo={g} />
+            </div>
+          );
+        }
+        // O resumo da Nina fica apenas no painel superior da
+        // conversa: o aviso de geração não vira bloco na timeline.
+        if (g.evento.evento === "RESUMO_IA_GERADO") return null;
+        return (
+          <div key={`ev-${g.chave}`} data-historico-id={`ev-${g.chave}`}>
+            <ConversationSystemEvent evento={g.evento as unknown as ConversaEvento} />
+          </div>
+        );
+      }
+      const m = item.msg;
+      const out = m.direction === "out";
+      const autorSupervisao = out
+        ? rotuloAutorSupervisao(
+            m.enviada_por_perfil,
+            autores && autores.clinicaId === clinicaId
+              ? autores.nomes[m.enviada_por_user_id]
+              : null,
+          )
+        : null;
+      // Só marcador interno vira faixa central. Mensagem real
+      // enviada ao paciente (status de envio) fica como conversa.
+      if (marcadorInternoSistema(m)) {
+        const texto = textoMarcadorSistema(m.body);
+        if (!texto) return null;
+        return (
+          <div key={`m-${m.id}`} data-historico-id={`m-${m.id}`} className="flex justify-center">
+            <div className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-atd-blue/20 bg-atd-blue-tint px-3 py-2 text-center text-xs text-atd-blue-ink">
+              {texto}
+              <div className="mt-1 text-[10px] opacity-70">{fmtHora(m.recebida_em)}</div>
             </div>
           </div>
         );
-      }),
-    [
-      conteudoDaConversa,
-      timelineComResumos,
-      autores,
-      clinicaId,
-      msgDestacada,
-      saidasPorMensagem,
-      sel?.id,
-    ],
-  );
+      }
+      // Autoria pelo campo do sistema, nunca pelo texto da mensagem.
+
+      const destacada = msgDestacada === m.id;
+      const citacao = exibirCitacao(m, porWaId);
+      const waIdDaMensagem = waIdCitavel(m);
+      return (
+        <div
+          key={`m-${m.id}`}
+          data-msg-id={m.id}
+          data-wa-id={waIdDaMensagem ?? undefined}
+          data-historico-id={`m-${m.id}`}
+          className={`flex items-start gap-2 ${out ? "justify-end" : "justify-start"} ${
+            destacada
+              ? "motion-safe:transition-colors rounded-xl ring-2 ring-destructive bg-destructive/10 px-1 py-1 scroll-my-24"
+              : ""
+          }`}
+        >
+          {destacada && (
+            <span className="self-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground">
+              Mensagem reportada
+            </span>
+          )}
+          {/* Botão de reporte rápido: fora do balão, sempre visível. */}
+          {clinicaId && (
+            <InspecaoMensagemNina
+              parte="reporte"
+              clinicaId={clinicaId}
+              conversaId={m.conversa_id ?? sel?.id}
+              mensagem={m}
+              saida={saidasPorMensagem[String(m.id)]}
+            />
+          )}
+          {podeCitar && waIdDaMensagem && (
+            <button
+              type="button"
+              aria-label="Responder citando esta mensagem"
+              title="Responder citando esta mensagem"
+              onClick={() => responderRef.current(m)}
+              className={`self-center rounded-full p-1 text-atd-ink-soft hover:bg-atd-bg hover:text-atd-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-atd-blue/40 ${out ? "order-first" : "order-last"}`}
+            >
+              <Reply className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+          <div
+            className={`oszap-bubble max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm break-words ${
+              out
+                ? "oszap-bubble-out bg-atd-go text-atd-on-strong rounded-br-sm"
+                : "bg-atd-surface border border-atd-border text-atd-ink rounded-bl-sm"
+            }`}
+          >
+            {citacao && (
+              <button
+                type="button"
+                data-testid="citacao-bolha"
+                disabled={!citacao.encontrada}
+                onClick={() => irParaCitadaRef.current(String(m.quoted_message_id))}
+                className={`mb-1.5 block w-full rounded-md border-l-4 px-2 py-1 text-left text-xs disabled:cursor-default ${
+                  out
+                    ? "border-atd-on-strong/70 bg-black/15 text-atd-on-strong"
+                    : "border-atd-blue bg-atd-bg text-atd-ink"
+                }`}
+              >
+                {citacao.autor && <span className="block font-semibold">{citacao.autor}</span>}
+                <span className={`line-clamp-3 ${citacao.encontrada ? "" : "italic"}`}>
+                  {citacao.texto}
+                </span>
+              </button>
+            )}
+            {clinicaId && <MidiaMensagem clinicaId={clinicaId} mensagem={m} />}
+            {textoDaBolha(m) && <div className="whitespace-pre-wrap">{textoDaBolha(m)}</div>}
+            {ehOtimista(m) && m.status === "failed" && (
+              <div className="mt-1 flex items-center gap-2 text-[11px]">
+                <span className="whitespace-nowrap">⚠ Falha ao enviar</span>
+                <button
+                  type="button"
+                  className="underline underline-offset-2"
+                  onClick={() => tentarNovamenteRef.current(m)}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+            <div
+              className={`oszap-message-meta text-[11px] mt-2 flex flex-wrap items-center justify-between gap-2 ${out ? "text-atd-on-strong/80" : "text-atd-ink-soft"}`}
+            >
+              {/* Envio otimista: durante o envio normal a bolha não
+                              exibe nenhum status — só a hora. Falha aparece acima. */}
+              <span className="min-w-0 break-words">
+                {fmtHora(m.recebida_em)}{" "}
+                {mensagemDoFrancisco(m.raw) ? "· Francisco" : m.enviada_por === "nina" && "· Nina"}
+                {autorSupervisao && (
+                  <span
+                    data-testid="autor-supervisao"
+                    title={`Resposta da supervisão (${autorSupervisao})`}
+                  >
+                    · {autorSupervisao}
+                  </span>
+                )}
+              </span>
+              {clinicaId && (
+                <InspecaoMensagemNina
+                  parte="detalhes"
+                  clinicaId={clinicaId}
+                  conversaId={m.conversa_id ?? sel?.id}
+                  mensagem={m}
+                  saida={saidasPorMensagem[String(m.id)]}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    });
+  }, [
+    conteudoDaConversa,
+    timelineComResumos,
+    autores,
+    clinicaId,
+    msgDestacada,
+    saidasPorMensagem,
+    sel?.id,
+    podeCitar,
+  ]);
 
   // Ações dos cards por referência fixa: o card memorizado não redesenha por
   // causa de função nova a cada renderização (desempenho, 16/10/2026).
@@ -4388,6 +4491,31 @@ function AtendInboxOperacional({
                       <span>{motivoBloqueio}</span>
                     </div>
                   )}
+                  {citandoAgora && (
+                    <div
+                      data-testid="citacao-composer"
+                      className="mb-2 flex items-start gap-2 rounded-md border border-atd-border border-l-4 border-l-atd-blue bg-atd-bg px-3 py-2 text-xs"
+                    >
+                      <Reply
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-atd-blue"
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-semibold text-atd-ink">
+                          Respondendo a {citandoAgora.autor}
+                        </span>
+                        <span className="line-clamp-2 text-atd-ink-soft">{citandoAgora.texto}</span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Cancelar citação"
+                        onClick={() => setCitando(null)}
+                        className="rounded p-0.5 text-atd-ink-soft hover:bg-atd-surface hover:text-atd-ink"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
                   <div className="relative flex gap-2">
                     {slash && (
                       <ListaRespostasRapidas
@@ -4441,6 +4569,11 @@ function AtendInboxOperacional({
                         if (slash && e.key === "Escape") {
                           e.preventDefault();
                           setSlash(null);
+                          return;
+                        }
+                        if (!slash && citandoAgora && e.key === "Escape") {
+                          e.preventDefault();
+                          setCitando(null);
                           return;
                         }
                         if (

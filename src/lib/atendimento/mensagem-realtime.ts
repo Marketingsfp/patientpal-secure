@@ -35,6 +35,8 @@ const CAMPOS = [
   "status",
   "execucao_id",
   "client_message_id",
+  "wa_message_id",
+  "quoted_message_id",
 ] as const;
 
 export type ResultadoRealtime =

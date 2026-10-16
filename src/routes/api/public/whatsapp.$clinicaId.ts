@@ -411,6 +411,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   media_url: caminhoMidia,
                   status: "received",
                   enviada_por: "paciente",
+                  // Paciente respondeu citando uma mensagem (id da Meta da citada).
+                  quoted_message_id: typeof msg.context?.id === "string" ? msg.context.id : null,
                   raw: {
                     ...msg,
                     ...(ehImagem ? { nina_leitura_imagem: leituraImagem } : {}),

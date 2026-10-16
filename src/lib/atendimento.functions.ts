@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { JANELA_INICIAL } from "@/lib/atendimento/mensagens-janela";
+import type { MensagemCitada } from "@/lib/atendimento/citacao-mensagem";
 import { periodoCentralSchema, aplicarPeriodoCentral } from "@/lib/atendimento/periodo-central";
 import { z } from "zod";
 import { DEPARTAMENTOS_HABILITADOS } from "./atendimento/departamentos-flag";
@@ -2187,7 +2188,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id",
+        "id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);
@@ -2198,8 +2199,43 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
       .order("id", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);
-    return (rows ?? []).slice().reverse();
+    return anexarCitacoes(
+      context.supabase,
+      data.clinicaId,
+      data.conversaId,
+      (rows ?? []).slice().reverse(),
+    );
   });
+
+/**
+ * Citada fora da página carregada (mensagem antiga): busca só o trecho dela,
+ * na mesma conversa, para a bolha mostrar o que foi respondido.
+ */
+async function anexarCitacoes<T extends { quoted_message_id?: string | null }>(
+  supabase: any,
+  clinicaId: string,
+  conversaId: string,
+  rows: T[],
+): Promise<Array<T & { citacao?: MensagemCitada }>> {
+  const { citacoesFaltantes } = await import("./atendimento/citacao-mensagem");
+  const faltam = citacoesFaltantes(rows as any[]);
+  if (!faltam.length) return rows;
+  const { data, error } = await supabase
+    .from("whatsapp_mensagens")
+    .select("wa_message_id, direction, enviada_por, tipo, body")
+    .eq("clinica_id", clinicaId)
+    .eq("conversa_id", conversaId)
+    .in("wa_message_id", faltam);
+  // Sem o trecho, a bolha avisa que a citada não está disponível.
+  if (error) return rows;
+  const porId = new Map<string, MensagemCitada>(
+    ((data ?? []) as MensagemCitada[]).map((c) => [c.wa_message_id, c]),
+  );
+  return rows.map((r) => {
+    const citacao = r.quoted_message_id ? porId.get(r.quoted_message_id) : undefined;
+    return citacao ? { ...r, citacao } : r;
+  });
+}
 
 /**
  * Janela de contexto em volta de UMA mensagem específica (id interno).
@@ -2229,7 +2265,7 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
     const COLUNAS =
-      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id";
+      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id";
     const { data: alvo, error: eAlvo } = await context.supabase
       .from("whatsapp_mensagens")
       .select(COLUNAS)
@@ -2264,7 +2300,11 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
     if (dep.error) throw new Error(dep.error.message);
     return {
       encontrada: true as const,
-      mensagens: [...(ant.data ?? []).slice().reverse(), alvo, ...(dep.data ?? [])],
+      mensagens: await anexarCitacoes(context.supabase, data.clinicaId, data.conversaId, [
+        ...(ant.data ?? []).slice().reverse(),
+        alvo,
+        ...(dep.data ?? []),
+      ]),
     };
   });
 
@@ -2280,6 +2320,8 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         // bolha otimista e da linha gravada: garante que duplo clique ou
         // retry não criem uma segunda mensagem no WhatsApp.
         clientMessageId: z.string().uuid().optional(),
+        // Responder citando: id da Meta da mensagem respondida (desta conversa).
+        citarWaMessageId: z.string().trim().min(1).max(256).optional(),
       })
       .parse(i),
   )
@@ -2321,7 +2363,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
             context.supabase
               .from("whatsapp_mensagens")
               .select(
-                "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
+                "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id, quoted_message_id",
               )
               .eq("clinica_id", data.clinicaId)
               .eq("client_message_id", data.clientMessageId)
@@ -2351,6 +2393,20 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         context.supabase.from("profiles").select("nome").eq("id", context.userId).maybeSingle(),
       ),
     );
+    // A citada precisa ser desta conversa: nunca citar mensagem de outro paciente.
+    const pCitada = data.citarWaMessageId
+      ? emParalelo(
+          Promise.resolve(
+            context.supabase
+              .from("whatsapp_mensagens")
+              .select("wa_message_id, direction, enviada_por, tipo, body")
+              .eq("clinica_id", data.clinicaId)
+              .eq("conversa_id", data.conversaId)
+              .eq("wa_message_id", data.citarWaMessageId)
+              .maybeSingle(),
+          ),
+        )
+      : null;
 
     await pMembro;
     await pAcesso;
@@ -2388,6 +2444,12 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     if (conv.atribuida_user_id && conv.atribuida_user_id !== context.userId && !perfilSup)
       throw new Error(
         "Esta conversa está sendo atendida por outra pessoa. Use “Assumir conversa” para responder.",
+      );
+    // Conferida antes de qualquer gravação: citação inválida não assume a conversa.
+    const citada = pCitada ? (await pCitada).data : null;
+    if (data.citarWaMessageId && !citada)
+      throw new Error(
+        "A mensagem citada não foi encontrada nesta conversa. Cancele a citação e envie de novo.",
       );
     if (!conv.atribuida_user_id && !respondeSemAssumir) {
       // Conversa livre: quem responde primeiro vira responsável, de forma atômica.
@@ -2442,7 +2504,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
       cfg.access_token,
       to,
       textoEnviado,
-      { timeoutMs: TEMPO_MAXIMO_META_MS },
+      { timeoutMs: TEMPO_MAXIMO_META_MS, citarWaMessageId: citada?.wa_message_id ?? null },
     ).catch((erro: unknown) => {
       if ((erro as { name?: string } | null)?.name === "TimeoutError")
         throw new Error(MSG_META_SEM_RESPOSTA);
@@ -2496,9 +2558,10 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         enviada_por_perfil: perfilSup,
         // Mesmo identificador do clique — nada é gerado de novo aqui.
         client_message_id: data.clientMessageId ?? null,
+        quoted_message_id: citada?.wa_message_id ?? null,
       } as any)
       .select(
-        "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
+        "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id, quoted_message_id",
       )
       .maybeSingle();
     // A mensagem já saiu pela Meta: a falha de gravação não pode virar erro
@@ -2517,7 +2580,7 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     return {
       ok: true,
       wa_message_id,
-      mensagem: gravada ?? null,
+      mensagem: gravada ? { ...gravada, ...(citada ? { citacao: citada } : {}) } : null,
       latencia: {
         traceId: trace.traceId,
         marcas: trace.marcas(),

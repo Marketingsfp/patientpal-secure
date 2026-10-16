@@ -237,7 +237,7 @@ export async function metaSendText(
   accessToken: string,
   to: string,
   text: string,
-  opcoes?: { timeoutMs?: number },
+  opcoes?: { timeoutMs?: number; citarWaMessageId?: string | null },
 ): Promise<{ wa_message_id: string | null }> {
   const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
     signal: opcoes?.timeoutMs ? AbortSignal.timeout(opcoes.timeoutMs) : undefined,
@@ -252,6 +252,8 @@ export async function metaSendText(
       to,
       type: "text",
       text: { body: text.slice(0, 4000) },
+      // Resposta citando: o WhatsApp mostra a mensagem original acima do texto.
+      ...(opcoes?.citarWaMessageId ? { context: { message_id: opcoes.citarWaMessageId } } : {}),
     }),
   });
   const json = await res.json().catch(() => ({}));
