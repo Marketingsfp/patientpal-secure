@@ -530,6 +530,11 @@ export const CHAVES_TEMPLATE_MIDIA: Record<string, string> = {
   image_receita: "midia.receita_remedio",
   document: "midia.documento",
   sticker: "midia.figurinha",
+  // Mensagens que a Nina não lê: pede para reenviar (mensagem-nao-lida.ts).
+  unsupported: "midia.nao_lida",
+  video: "midia.nao_lida",
+  location: "midia.nao_lida",
+  contacts: "midia.nao_lida",
 };
 
 export function chaveTemplateMidia(tipo: string): string {
