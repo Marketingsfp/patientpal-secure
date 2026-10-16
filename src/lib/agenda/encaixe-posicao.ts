@@ -165,7 +165,7 @@ export function posicionarEncaixe(args: {
   const rotulo = agendaNome ? `A agenda ${agendaNome}` : "A agenda deste médico";
   const hora = formatarHora(args.inicio);
   const saida =
-    `Para encaixar, use o horário de uma ficha que já existe (o encaixe divide a ficha com ela) ` +
+    `Para encaixar, use o horário de uma ficha que já existe (o encaixe recebe o próximo número no fim da fila) ` +
     `ou um horário a partir das ${formatarHora(fimDaAgenda!)}, depois da última ficha do dia.`;
   if (inicioMs < primeiroInicio) {
     return {

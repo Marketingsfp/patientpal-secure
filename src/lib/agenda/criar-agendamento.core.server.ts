@@ -495,7 +495,7 @@ export async function criarAgendamentoCore(
           message =
             `Não há vaga livre desse ${rotuloRecurso} às ${hora}${naAgenda} — o horário já está ocupado${quem}.\n\n` +
             `Deseja lançar como ENCAIXE, no mesmo horário, por cima da ficha existente?${ajuste}\n\n` +
-            `O encaixe divide a ficha com o paciente que já está nesse horário; as fichas seguintes do dia não mudam de número.`;
+            `O encaixe recebe o próximo número no fim da fila; nenhuma ficha do dia muda de número.`;
         } else {
           const termina = posicao.fimDaAgenda
             ? ` — a agenda termina às ${formatarHora(posicao.fimDaAgenda)}`
@@ -691,14 +691,14 @@ export async function criarAgendamentoCore(
   if (agendaIdParaGravarNoEncaixe && novoId) {
     const { error: eAgenda } = await supabase
       .from("agendamentos")
-      .update({ agenda_id: agendaIdParaGravarNoEncaixe } as never)
+      .update({ agenda_id: agendaIdParaGravarNoEncaixe, ficha_encaixe: true } as never)
       .eq("id", novoId)
       .eq("clinica_id", clinica_id);
     if (eAgenda) return { ok: false, pg_error: toPgErrorLikeLocal(eAgenda) };
     if (siblingIds.length > 0) {
       await supabase
         .from("agendamentos")
-        .update({ agenda_id: agendaIdParaGravarNoEncaixe } as never)
+        .update({ agenda_id: agendaIdParaGravarNoEncaixe, ficha_encaixe: true } as never)
         .in("id", siblingIds)
         .eq("clinica_id", clinica_id);
     }

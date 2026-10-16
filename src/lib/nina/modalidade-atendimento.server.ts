@@ -50,7 +50,7 @@ export async function fichaDoAgendamento(
   for (let pagina = 0; ; pagina++) {
     const { data, error } = await supabaseAdmin
       .from("agendamentos")
-      .select("id, inicio, paciente_nome, medico_id, agenda_id, created_at")
+      .select("id, inicio, paciente_nome, medico_id, agenda_id, created_at, ficha_encaixe_numero")
       .eq("clinica_id", clinicaId)
       .eq("medico_id", medicoId)
       .gte("inicio", janela.inicio)
