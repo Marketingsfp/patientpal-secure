@@ -5839,7 +5839,6 @@ function AgendaPage() {
           fim: f.fim.toISOString(),
           status: "agendado" as const,
           observacoes: "Ficha extra gerada na Agenda",
-          ficha_encaixe: true,
           ...(procedimento ? { procedimento } : {}),
         })),
       );
