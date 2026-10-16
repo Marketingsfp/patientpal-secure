@@ -6,3 +6,4 @@
 - CPF repetido e menor de idade só são barrados depois do código certo — por quê: o 1º passo não pode revelar nada.
 - Cancelar usa `atualizarStatusAgendamentoCore` com ator integração `area_do_paciente` — por quê: mesmas regras e limpeza da agenda.
 - Regras puras e limites em `regras.ts` (testadas em `regras.test.ts`).
+- Fase 2: download só por `portal_links` (hash, 5 min) em `/api/public/portal-arquivo`, que exige o cookie da MESMA sessão e reconfere dono + liberação na hora (`arquivos.server.ts`) — por quê: retirar a liberação precisa esconder na hora. Conteúdo da equipe vira texto escapado; NFS-e só de hosts do emissor e status emitida.
