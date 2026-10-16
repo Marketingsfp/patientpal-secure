@@ -3129,8 +3129,8 @@ function AtendInboxOperacional({
           `Esta conversa já está com ${nomeUsuario(r?.atribuidaUserId) ?? "outro atendente"}.`,
         );
       }
-      await carregarConvs();
-      await carregarConversa();
+      // Lista e conversa recarregam juntas (eram em série).
+      await Promise.all([carregarConvs(), carregarConversa()]);
     } catch (e: any) {
       mostrarErro(e);
     } finally {
@@ -3310,8 +3310,11 @@ function AtendInboxOperacional({
       cacheConversas.current.invalidar(origem);
       prefetchMsgs.current.invalidar(origem);
       setTransferOpen(false);
-      await carregarConvs();
-      if (selIdRef.current === origem) await carregarConversa();
+      // Lista e conversa recarregam juntas (eram em série).
+      await Promise.all([
+        carregarConvs(),
+        selIdRef.current === origem ? carregarConversa() : Promise.resolve(),
+      ]);
     } catch (e: any) {
       mostrarErro(e);
     } finally {

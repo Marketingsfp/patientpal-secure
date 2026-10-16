@@ -298,8 +298,10 @@ export async function metaSendList(
     secao: string;
     opcoes: readonly { id: string; titulo: string }[];
   },
+  opcoesEnvio?: { timeoutMs?: number },
 ): Promise<{ wa_message_id: string | null }> {
   const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
+    signal: opcoesEnvio?.timeoutMs ? AbortSignal.timeout(opcoesEnvio.timeoutMs) : undefined,
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

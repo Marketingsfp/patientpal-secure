@@ -63,6 +63,11 @@ import {
 /* =========================================================
  *  Helpers
  * ======================================================= */
+/** Tempo máximo de espera pela Meta num envio da atendente (desempenho, 16/10/2026). */
+const TEMPO_MAXIMO_META_MS = 15_000;
+const MSG_META_SEM_RESPOSTA =
+  "O WhatsApp não respondeu a tempo. Confira na conversa se a mensagem chegou antes de reenviar.";
+
 async function assertMember(supabase: SupabaseClient<Database>, userId: string, clinicaId: string) {
   const { data, error } = await supabase.rpc("is_member", {
     _user_id: userId,
@@ -2284,50 +2289,85 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const { iniciarTraceServidor } = await import("./atendimento/latencia.server");
     const trace = iniciarTraceServidor({ fluxo: "send", conversationId: data.conversaId });
     trace.marcar("SEND_T3_BACKEND_RECEIVED");
-    await assertMember(context.supabase, context.userId, data.clinicaId);
-    {
-      const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
-      await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
-    }
-    // Supervisão (admin/gestor) pode responder no chat da atendente, sem assumir a conversa.
-    // O perfil exato fica gravado na mensagem. O admin só responde conversas que estão com uma atendente.
-    const ehAdmin = await ehAdminClinica(context.supabase, context.userId, data.clinicaId);
-    const ehGestor = ehAdmin
-      ? true
-      : !!(
-          await context.supabase.rpc("can_manage_clinica", {
-            _user_id: context.userId,
-            _clinica_id: data.clinicaId,
-          })
-        ).data;
-    const perfilSup = perfilSupervisao({ admin: ehAdmin, gestor: ehGestor });
-    trace.marcar("SEND_T4_AUTH_DONE");
+    // Desempenho (16/10/2026): todas as leituras antes do envio saem juntas
+    // (eram ~11 idas ao banco em série). Os resultados continuam sendo
+    // conferidos na mesma ordem de antes; nada é gravado nem enviado antes de
+    // acesso, papéis e conversa estarem confirmados.
+    const { assertAcessoConversa } = await import("./atendimento/acesso-conversa.server");
+    const emParalelo = <T>(p: Promise<T>) => {
+      p.catch(() => {}); // conferida mais abaixo, na ordem; evita rejeição solta
+      return p;
+    };
+    const pMembro = emParalelo(assertMember(context.supabase, context.userId, data.clinicaId));
+    const pAcesso = emParalelo(
+      assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId),
+    );
+    const pAdmin = emParalelo(ehAdminClinica(context.supabase, context.userId, data.clinicaId));
+    const pGestor = emParalelo(
+      Promise.resolve(
+        context.supabase.rpc("can_manage_clinica", {
+          _user_id: context.userId,
+          _clinica_id: data.clinicaId,
+        }),
+      ),
+    );
     // IDEMPOTÊNCIA: se este mesmo envio já foi concluído (duplo clique, retry,
     // reenvio acidental), devolvemos a mensagem existente sem chamar o
     // WhatsApp de novo. A checagem é pelo identificador do envio, nunca pelo
     // texto — duas mensagens iguais podem ser legítimas.
-    if (data.clientMessageId) {
-      const { data: jaExiste } = await context.supabase
-        .from("whatsapp_mensagens")
-        .select(
-          "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
+    const pJaExiste = data.clientMessageId
+      ? emParalelo(
+          Promise.resolve(
+            context.supabase
+              .from("whatsapp_mensagens")
+              .select(
+                "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
+              )
+              .eq("clinica_id", data.clinicaId)
+              .eq("client_message_id", data.clientMessageId)
+              .maybeSingle(),
+          ),
         )
-        .eq("clinica_id", data.clinicaId)
-        .eq("client_message_id", data.clientMessageId)
-        .maybeSingle();
+      : null;
+    const pCfg = emParalelo(
+      trace.medir("loadWhatsAppConfig", () => loadWhatsAppConfig(data.clinicaId)),
+    );
+    const pConv = emParalelo(
+      Promise.resolve(
+        context.supabase
+          .from("atend_conversas")
+          .select(
+            "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status, owner_type, is_teste",
+          )
+          .eq("id", data.conversaId)
+          .eq("clinica_id", data.clinicaId)
+          .maybeSingle(),
+      ),
+    );
+    // Assinatura: nome de quem escreveu, em negrito no WhatsApp, para o
+    // paciente distinguir uma atendente da outra. Sem nome cadastrado, vai sem.
+    const pPerfilAutor = emParalelo(
+      Promise.resolve(
+        context.supabase.from("profiles").select("nome").eq("id", context.userId).maybeSingle(),
+      ),
+    );
+
+    await pMembro;
+    await pAcesso;
+    // Supervisão (admin/gestor) pode responder no chat da atendente, sem assumir a conversa.
+    // O perfil exato fica gravado na mensagem. O admin só responde conversas que estão com uma atendente.
+    const ehAdmin = await pAdmin;
+    const ehGestor = ehAdmin ? true : !!(await pGestor).data;
+    const perfilSup = perfilSupervisao({ admin: ehAdmin, gestor: ehGestor });
+    trace.marcar("SEND_T4_AUTH_DONE");
+    if (pJaExiste) {
+      const { data: jaExiste } = await pJaExiste;
       if (jaExiste) return { duplicada: true as const, mensagem: jaExiste };
     }
-    const cfg = await trace.medir("loadWhatsAppConfig", () => loadWhatsAppConfig(data.clinicaId));
+    const cfg = await pCfg;
     if (!cfg?.phone_number_id || !cfg?.access_token) throw new Error("WhatsApp não configurado.");
     trace.marcar("SEND_T5_CONFIG_READY");
-    const { data: conv, error: cErr } = await context.supabase
-      .from("atend_conversas")
-      .select(
-        "id, contato_telefone, primeiro_resp_em, aguardando_desde, atribuida_user_id, status, owner_type, is_teste",
-      )
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
+    const { data: conv, error: cErr } = await pConv;
     if (cErr) throw new Error(cErr.message);
     // A conversa pode ter sido encerrada/removida enquanto estava selecionada
     // no inbox. Nesse caso devolvemos `null` em vez de derrubar a tela.
@@ -2391,25 +2431,54 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
     const to = conv.contato_telefone.startsWith("+")
       ? conv.contato_telefone
       : `+${conv.contato_telefone}`;
-    // Assinatura: nome de quem escreveu, em negrito no WhatsApp, para o
-    // paciente distinguir uma atendente da outra. Sem nome cadastrado, vai sem.
-    const { data: perfilAutor } = await context.supabase
-      .from("profiles")
-      .select("nome")
-      .eq("id", context.userId)
-      .maybeSingle();
+    const { data: perfilAutor } = await pPerfilAutor;
     const { assinarTexto } = await import("@/lib/atendimento/envio-otimista");
     const textoEnviado = assinarTexto((perfilAutor as any)?.nome, data.text);
     trace.marcar("SEND_T6_META_REQUEST_START");
+    // Sem limite de tempo, uma Meta lenta deixava a bolha "enviando" e travava
+    // as próximas mensagens da conversa (a fila do navegador é em ordem).
     const { wa_message_id } = await metaSendText(
       cfg.phone_number_id,
       cfg.access_token,
       to,
       textoEnviado,
-    );
+      { timeoutMs: TEMPO_MAXIMO_META_MS },
+    ).catch((erro: unknown) => {
+      if ((erro as { name?: string } | null)?.name === "TimeoutError")
+        throw new Error(MSG_META_SEM_RESPOSTA);
+      throw erro;
+    });
     trace.marcar("SEND_T7_META_RESPONSE");
 
-    const { data: gravada } = await context.supabase
+    // SLA primeira resposta
+    // Resposta da supervisão numa conversa sem responsável não atribui nem muda o andamento dela.
+    const patch: any = respondeSemAssumir
+      ? {}
+      : {
+          atribuida_user_id: conv.atribuida_user_id ?? context.userId,
+          status: "active",
+        };
+    if (!conv.primeiro_resp_em) {
+      const ref = conv.aguardando_desde ?? conv.primeiro_resp_em;
+      patch.primeiro_resp_em = new Date().toISOString();
+      if (ref) {
+        patch.sla_first_response_seg = Math.max(
+          0,
+          Math.round((Date.now() - new Date(ref).getTime()) / 1000),
+        );
+      }
+    }
+    // Gravação da mensagem e atualização da conversa são independentes: saem juntas.
+    // Promise.resolve dispara a consulta já (o construtor do Supabase só executa ao ser aguardado).
+    const pAtualizarConversa = Promise.resolve(
+      context.supabase
+        .from("atend_conversas")
+        .update(patch)
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId),
+    );
+
+    const { data: gravada, error: erroGravacao } = await context.supabase
       .from("whatsapp_mensagens")
       .insert({
         clinica_id: data.clinicaId,
@@ -2432,31 +2501,13 @@ export const enviarMensagemConversa = createServerFn({ method: "POST" })
         "id, conversa_id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, status, client_message_id, wa_message_id",
       )
       .maybeSingle();
+    // A mensagem já saiu pela Meta: a falha de gravação não pode virar erro
+    // para a atendente (ela reenviaria). Fica no log; a bolha é confirmada
+    // pelo tempo real ou pela próxima carga da conversa.
+    if (erroGravacao)
+      console.error("[atendimento] mensagem enviada, mas não gravada", erroGravacao.message);
     trace.marcar("SEND_T8_DB_INSERT_DONE");
-
-    // SLA primeira resposta
-    // Resposta da supervisão numa conversa sem responsável não atribui nem muda o andamento dela.
-    const patch: any = respondeSemAssumir
-      ? {}
-      : {
-          atribuida_user_id: conv.atribuida_user_id ?? context.userId,
-          status: "active",
-        };
-    if (!conv.primeiro_resp_em) {
-      const ref = conv.aguardando_desde ?? conv.primeiro_resp_em;
-      patch.primeiro_resp_em = new Date().toISOString();
-      if (ref) {
-        patch.sla_first_response_seg = Math.max(
-          0,
-          Math.round((Date.now() - new Date(ref).getTime()) / 1000),
-        );
-      }
-    }
-    await context.supabase
-      .from("atend_conversas")
-      .update(patch)
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId);
+    await pAtualizarConversa;
     trace.marcar("SEND_T9_CONVERSATION_UPDATE_DONE");
     trace.marcar("SEND_T10_BACKEND_RESPONSE");
     trace.publicar();

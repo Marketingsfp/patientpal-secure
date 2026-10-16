@@ -69,23 +69,23 @@ export async function usuarioSupervisionaAtendimento(
   userId: string,
   clinicaId: string,
 ): Promise<boolean> {
-  try {
-    const { data: admin } = await supabase.rpc("atend_usuario_e_admin", {
-      _user_id: userId,
-      _clinica_id: clinicaId,
-    });
-    if (admin) return true;
-    const { data: sup } = await supabase
-      .from("atend_departamento_membros")
-      .select("id")
-      .eq("clinica_id", clinicaId)
-      .eq("user_id", userId)
-      .in("role", ["supervisor", "gestor", "admin"])
-      .limit(1);
-    return (sup?.length ?? 0) > 0;
-  } catch {
-    return false;
-  }
+  // As duas consultas saem juntas (desempenho, 16/10/2026); a regra é a mesma:
+  // admin da clínica OU supervisão em algum departamento. Falha vale "não".
+  // Funções assíncronas: um erro ao montar a consulta também vira "não", como antes.
+  const [admin, sup] = await Promise.allSettled([
+    (async () =>
+      supabase.rpc("atend_usuario_e_admin", { _user_id: userId, _clinica_id: clinicaId }))(),
+    (async () =>
+      supabase
+        .from("atend_departamento_membros")
+        .select("id")
+        .eq("clinica_id", clinicaId)
+        .eq("user_id", userId)
+        .in("role", ["supervisor", "gestor", "admin"])
+        .limit(1))(),
+  ]);
+  if (admin.status === "fulfilled" && admin.value.data) return true;
+  return sup.status === "fulfilled" && (sup.value.data?.length ?? 0) > 0;
 }
 
 /**
@@ -98,20 +98,24 @@ export async function assertAcessoConversa(
   clinicaId: string,
   conversaId: string,
 ): Promise<ConversaEscopo & { id: string; is_teste?: boolean | null }> {
-  const { data: conv, error } = await supabase
-    .from("atend_conversas")
-    .select(
-      "id, atribuida_user_id, last_assigned_user_id, resolved_by, owner_type, status, is_teste",
-    )
-    .eq("id", conversaId)
-    .eq("clinica_id", clinicaId)
-    .maybeSingle();
+  // Conversa e papéis saem juntos: antes eram 4 idas ao banco em série, em
+  // toda abertura, envio e mídia (desempenho, 16/10/2026). Mesma regra.
+  const [{ data: conv, error }, ehGestor, supervisiona] = await Promise.all([
+    supabase
+      .from("atend_conversas")
+      .select(
+        "id, atribuida_user_id, last_assigned_user_id, resolved_by, owner_type, status, is_teste",
+      )
+      .eq("id", conversaId)
+      .eq("clinica_id", clinicaId)
+      .maybeSingle(),
+    usuarioEhGestor(supabase, userId, clinicaId),
+    usuarioSupervisionaAtendimento(supabase, userId, clinicaId),
+  ]);
   if (error) throw new Error(error.message);
   if (!conv) throw new AcessoConversaNegado(ERRO_CONVERSA_NAO_ENCONTRADA);
 
-  const gestor =
-    (await usuarioEhGestor(supabase, userId, clinicaId)) ||
-    (await usuarioSupervisionaAtendimento(supabase, userId, clinicaId));
+  const gestor = ehGestor || supervisiona;
   if (!usuarioPodeVerConversa(conv, { userId, gestor })) {
     throw new AcessoConversaNegado(ERRO_CONVERSA_SEM_PERMISSAO);
   }
