@@ -250,16 +250,13 @@ function LoginPage() {
             <span className="text-xl font-semibold">ClinicaOS</span>
           </Link>
           <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
-            <div className="mb-6">
-              {marca && (
-                <div className="mb-4 flex items-center gap-3">
-                  {marca.logo_url && (
-                    <img src={marca.logo_url} alt={`Logo ${marca.nome}`} className="h-12 w-12 object-contain" />
-                  )}
-                  <p className="text-sm font-medium" style={marca.primary ? { color: marca.primary } : undefined}>
-                    Acesso ao sistema – {marca.nome}
-                  </p>
-                </div>
+            <div className={marca ? "mb-6 text-center" : "mb-6"}>
+              {marca && (marca.logo_full_url || marca.logo_url) && (
+                <img
+                  src={(marca.logo_full_url || marca.logo_url) as string}
+                  alt={`Logo ${marca.nome}`}
+                  className="mx-auto mb-6 h-16 max-w-full object-contain"
+                />
               )}
               {bloqueio && (
                 <div role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
