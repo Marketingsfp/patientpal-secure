@@ -15011,6 +15011,267 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_acessos: {
+        Row: {
+          clinica_id: string
+          cpf_hash: string | null
+          criado_em: string
+          detalhe: Json
+          evento: string
+          id: string
+          ip_hash: string | null
+          paciente_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          cpf_hash?: string | null
+          criado_em?: string
+          detalhe?: Json
+          evento: string
+          id?: string
+          ip_hash?: string | null
+          paciente_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          cpf_hash?: string | null
+          criado_em?: string
+          detalhe?: Json
+          evento?: string
+          id?: string
+          ip_hash?: string | null
+          paciente_id?: string | null
+        }
+        Relationships: []
+      }
+      portal_otps: {
+        Row: {
+          clinica_id: string
+          codigo_hash: string | null
+          cpf_hash: string
+          criado_em: string
+          enviado: boolean
+          expira_em: string
+          id: string
+          invalidado: boolean
+          ip_hash: string | null
+          paciente_id: string | null
+          tentativas: number
+          usado_em: string | null
+        }
+        Insert: {
+          clinica_id: string
+          codigo_hash?: string | null
+          cpf_hash: string
+          criado_em?: string
+          enviado?: boolean
+          expira_em: string
+          id?: string
+          invalidado?: boolean
+          ip_hash?: string | null
+          paciente_id?: string | null
+          tentativas?: number
+          usado_em?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          codigo_hash?: string | null
+          cpf_hash?: string
+          criado_em?: string
+          enviado?: boolean
+          expira_em?: string
+          id?: string
+          invalidado?: boolean
+          ip_hash?: string | null
+          paciente_id?: string | null
+          tentativas?: number
+          usado_em?: string | null
+        }
+        Relationships: []
+      }
+      portal_paciente_config: {
+        Row: {
+          ativo: boolean
+          cancelar_horas_min: number
+          clinica_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          cancelar_horas_min?: number
+          clinica_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          cancelar_horas_min?: number
+          clinica_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_paciente_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_sessoes: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          encerrada_em: string | null
+          expira_max_em: string
+          id: string
+          ip_hash: string | null
+          paciente_id: string
+          token_hash: string
+          ultimo_uso_em: string
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          encerrada_em?: string | null
+          expira_max_em: string
+          id?: string
+          ip_hash?: string | null
+          paciente_id: string
+          token_hash: string
+          ultimo_uso_em?: string
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          encerrada_em?: string | null
+          expira_max_em?: string
+          id?: string
+          ip_hash?: string | null
+          paciente_id?: string
+          token_hash?: string
+          ultimo_uso_em?: string
+        }
+        Relationships: []
+      }
+      portal_solicitacoes_cadastro: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          dados_anteriores: Json
+          dados_novos: Json
+          decidido_em: string | null
+          decidido_por: string | null
+          id: string
+          observacao: string | null
+          paciente_id: string
+          status: string
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          dados_anteriores?: Json
+          dados_novos: Json
+          decidido_em?: string | null
+          decidido_por?: string | null
+          id?: string
+          observacao?: string | null
+          paciente_id: string
+          status?: string
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          dados_anteriores?: Json
+          dados_novos?: Json
+          decidido_em?: string | null
+          decidido_por?: string | null
+          id?: string
+          observacao?: string | null
+          paciente_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      portal_termo_aceites: {
+        Row: {
+          aceito_em: string
+          clinica_id: string
+          id: string
+          ip_hash: string | null
+          paciente_id: string
+          termo_id: string
+        }
+        Insert: {
+          aceito_em?: string
+          clinica_id: string
+          id?: string
+          ip_hash?: string | null
+          paciente_id: string
+          termo_id: string
+        }
+        Update: {
+          aceito_em?: string
+          clinica_id?: string
+          id?: string
+          ip_hash?: string | null
+          paciente_id?: string
+          termo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_termo_aceites_termo_id_fkey"
+            columns: ["termo_id"]
+            isOneToOne: false
+            referencedRelation: "portal_termos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_termos: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          criado_por: string | null
+          id: string
+          rascunho_juridico: boolean
+          texto: string
+          titulo: string
+          versao: number
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          rascunho_juridico?: boolean
+          texto: string
+          titulo: string
+          versao: number
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          rascunho_juridico?: boolean
+          texto?: string
+          titulo?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_termos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prestadores: {
         Row: {
           agencia: string | null
@@ -19820,6 +20081,10 @@ export type Database = {
       pode_marcar_alerta_critico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
+      }
+      portal_decidir_solicitacao: {
+        Args: { _aprovar: boolean; _id: string; _observacao?: string }
+        Returns: undefined
       }
       procedimentos_popularidade: {
         Args: { p_clinica_id: string }
