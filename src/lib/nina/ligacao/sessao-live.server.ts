@@ -22,12 +22,57 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { MODULO_LIGACAO, VOZES_LIGACAO, VOZ_PADRAO_LIGACAO, type VozLigacao } from "./config";
 import { ROTULOS_FERRAMENTAS } from "./eventos-ligacao";
+import { MODELO_NINA_ALVO } from "../modelo-nina";
+import { LIMITE_RODADAS_COMUM } from "../eficiencia-turno";
 
 export const GATEWAY_LIVE = "https://ai.gateway.lovable.dev/v1";
 export const ENDPOINT_SESSAO_LIVE = `${GATEWAY_LIVE}/live/sessions`;
 export const MODELO_VOZ_LIGACAO = "openai/gpt-live-1";
-/** Modelo de apoio que recebe as instruções da Nina e chama as ferramentas. */
-export const MODELO_APOIO_LIGACAO = "openai/gpt-6-astra";
+/**
+ * Modelo de apoio que recebe as instruções da Nina e chama as ferramentas: o
+ * mesmo da Nina do chat, com raciocínio baixo como no chat (o modelo com
+ * raciocínio forçado levava de 8 a 14 s por passo na primeira ligação).
+ */
+export const MODELO_APOIO_LIGACAO = MODELO_NINA_ALVO;
+/** Mesmo limite de rodadas de ferramenta por resposta do chat. */
+export const LIMITE_PASSOS_LIGACAO = LIMITE_RODADAS_COMUM;
+/** Consultas iguais na mesma ligação reaproveitam o resultado por este tempo. */
+export const VALIDADE_CACHE_FERRAMENTA_MS = 60_000;
+/** Espera o paciente parar de falar antes de chamar o modelo de apoio. */
+export const ESPERA_FIM_DA_FALA_MS = 800;
+
+/** Mesmo `reasoning_effort` que o chat envia ao gateway (nível LOW). */
+export const fetchComRaciocinioBaixo = ((
+  entrada: Parameters<typeof fetch>[0],
+  init?: RequestInit,
+): Promise<Response> => {
+  if (typeof init?.body === "string") {
+    try {
+      const corpo = JSON.parse(init.body) as Record<string, unknown>;
+      if (corpo.reasoning_effort === undefined)
+        init = { ...init, body: JSON.stringify({ ...corpo, reasoning_effort: "low" }) };
+    } catch {
+      /* corpo que não é JSON segue como está */
+    }
+  }
+  return fetch(entrada, init);
+}) as typeof fetch;
+
+/**
+ * Junta o trecho transcrito à última fala da mesma pessoa. Fala de índice
+ * menor que `jaEnviadas` já foi para o modelo: o trecho abre uma fala nova
+ * para não se perder.
+ */
+export function juntarFala(
+  falas: { role: "user" | "assistant"; text: string }[],
+  role: "user" | "assistant",
+  delta: string,
+  jaEnviadas = 0,
+): void {
+  const ultima = falas[falas.length - 1];
+  if (ultima && ultima.role === role && falas.length - 1 >= jaEnviadas) ultima.text += delta;
+  else falas.push({ role, text: delta });
+}
 export const ROTA_LIGACAO = "/api/nina-ligacao";
 
 type FerramentaChat = {
@@ -196,7 +241,6 @@ export function ligarSessao(
   let terminado = false;
   let pronto = false;
   let saudou = false;
-  let revisao = 0;
   let tarefa: AbortController | undefined;
   let terminarDreno: (() => void) | undefined;
   let tFechar: ReturnType<typeof setTimeout> | undefined;
@@ -211,6 +255,7 @@ export function ligarSessao(
   const historico: ModelMessage[] = [];
   const pendentes: string[] = [];
   const vistas = new Set<string>();
+  const cacheFerramentas = new Map<string, { em: number; resultado: unknown }>();
 
   function emitir(e: object) {
     if (navegador.readyState !== 1) return;
@@ -286,16 +331,24 @@ export function ligarSessao(
         ),
         execute: async (args: unknown) => {
           sinal.throwIfAborted();
+          const argumentos = JSON.stringify(args ?? {});
+          const chaveCache = `${nome}:${argumentos}`;
+          const guardado = cacheFerramentas.get(chaveCache);
+          if (guardado && Date.now() - guardado.em < VALIDADE_CACHE_FERRAMENTA_MS)
+            return guardado.resultado;
           const { executarFerramentaLigacao } = await import("./ferramentas-ligacao.server");
           try {
-            const r = await executarFerramentaLigacao(clinicaId, nome, JSON.stringify(args ?? {}));
+            const r = await executarFerramentaLigacao(clinicaId, nome, argumentos);
+            const resultado = JSON.parse(r.saida) as unknown;
+            // Leituras repetidas na mesma ligação não voltam ao banco (4 a 5 s cada).
+            if (!r.simulado) cacheFerramentas.set(chaveCache, { em: Date.now(), resultado });
             emitir({
               type: "app.ferramenta",
               nome,
               rotulo: ROTULOS_FERRAMENTAS[nome] ?? nome,
               encaminhamento: r.encaminhamento,
             });
-            return JSON.parse(r.saida) as unknown;
+            return resultado;
           } catch {
             emitir({
               type: "app.ferramenta",
@@ -317,15 +370,16 @@ export function ligarSessao(
       baseURL: GATEWAY_LIVE,
       apiKey: k,
       headers: { "Lovable-API-Key": k, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+      fetch: fetchComRaciocinioBaixo,
     });
     let cursorResp = 0;
     consumir();
     const r = streamText({
-      model: provedor.responses(MODELO_APOIO_LIGACAO),
+      // Mesmo endpoint do chat (/v1/chat/completions), que atende o modelo da Nina.
+      model: provedor.chat(MODELO_APOIO_LIGACAO),
       abortSignal: sinal,
       maxRetries: 0,
-      stopWhen: stepCountIs(20),
-      includeRawChunks: true,
+      stopWhen: stepCountIs(LIMITE_PASSOS_LIGACAO),
       prepareStep() {
         consumir();
         return { messages: [...historico] };
@@ -341,42 +395,19 @@ export function ligarSessao(
           delegation_id: delegacaoId,
         }),
       },
-      providerOptions: {
-        openai: {
-          store: false,
-          forceReasoning: true,
-          reasoningEffort: "low",
-          reasoningSummary: "auto",
-          include: ["reasoning.encrypted_content"],
-        },
-      },
       system:
         (sessao?.instrucoesApoio ?? "") +
-        "\n\n# Canal de voz\nVocê apoia a voz da Nina numa ligação. As falas chegam transcritas e podem vir incompletas ou corrigidas; vale a correção mais recente. Use as ferramentas antes de afirmar qualquer dado. Responda só com o que a Nina deve dizer agora, curto, falado, sem listas, links nem formatação.",
+        "\n\n# Canal de voz\nVocê apoia a voz da Nina numa ligação. As falas chegam transcritas e podem vir incompletas ou corrigidas; vale a correção mais recente. Use as ferramentas antes de afirmar qualquer dado, mas antes de chamar uma ferramenta veja se o resultado já está nesta ligação: não repita a mesma consulta. Responda só com o que a Nina deve dizer agora, curto, falado, sem listas, links nem formatação.",
       messages: historico,
       tools: ferramentasDoApoio(sinal),
     });
-    let concluiu = false;
-    let passoOk = false;
     let falhou = false;
     for await (const p of r.fullStream) {
-      if (p.type === "start-step") passoOk = false;
-      if (
-        p.type === "raw" &&
-        p.rawValue &&
-        typeof p.rawValue === "object" &&
-        "type" in p.rawValue
-      ) {
-        const t = (p.rawValue as { type: unknown }).type;
-        if (t === "response.completed") passoOk = true;
-        if (t === "response.failed" || t === "response.incomplete") falhou = true;
-      }
-      if (p.type === "finish-step" && !passoOk) falhou = true;
       if (p.type === "error" || p.type === "abort") falhou = true;
-      if (p.type === "finish") concluiu = p.finishReason === "stop";
     }
     sinal.throwIfAborted();
-    if (falhou || !concluiu) throw new Error("incompleta");
+    if (falhou) throw new Error("incompleta");
+    // Ao atingir o limite de rodadas sem texto final, cai na mensagem de falha abaixo.
     const texto = (await r.text).trim();
     if (!texto) throw new Error("vazia");
     return texto;
@@ -385,7 +416,8 @@ export function ligarSessao(
   function agendar() {
     clearTimeout(tRetomar);
     if (fechando || tarefa || pendentes.length === 0) return;
-    tRetomar = setTimeout(() => void executar(), 300);
+    // Cada trecho novo da fala do paciente reinicia a espera.
+    tRetomar = setTimeout(() => void executar(), ESPERA_FIM_DA_FALA_MS);
   }
 
   async function executar() {
@@ -394,13 +426,11 @@ export function ligarSessao(
     if (!falas.some((f) => f.role === "user" && f.text.trim())) return;
     const ctrl = new AbortController();
     tarefa = ctrl;
-    let rev = revisao;
     let resposta: string;
     try {
       resposta = await responder(id, ctrl.signal, () => {
         historico.push(...falas.slice(cursor).map((f) => ({ role: f.role, content: f.text })));
         cursor = falas.length;
-        rev = revisao;
       });
     } catch {
       if (fechando || ctrl.signal.aborted) return;
@@ -408,7 +438,10 @@ export function ligarSessao(
     } finally {
       if (tarefa === ctrl) tarefa = undefined;
     }
-    if (!fechando && rev === revisao) {
+    // A resposta é entregue mesmo que o paciente tenha continuado a falar:
+    // descartá-la fazia a Nina buscar de novo e não responder. A fala nova
+    // segue na próxima delegação.
+    if (!fechando) {
       try {
         for (const content of pedacos(resposta))
           enviarGateway({
@@ -444,9 +477,9 @@ export function ligarSessao(
       ) {
         if (!e.delta?.trim()) return;
         const role = e.type === "session.input_transcript.delta" ? "user" : "assistant";
-        falas.push({ role, text: e.delta });
-        if (role === "user") revisao++;
-        agendar();
+        // Os trechos chegam palavra a palavra: viram uma fala só por pessoa.
+        juntarFala(falas, role, e.delta, cursor);
+        if (role === "user") agendar();
       } else if (e.type === "session.delegation.created") {
         const id = e.delegation?.id;
         if (id && e.delegation?.target === "client" && !vistas.has(id)) {
