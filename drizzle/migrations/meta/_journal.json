@@ -225,6 +225,13 @@
       "when": 1792171240471,
       "tag": "0031_idx_whatsapp_mensagens_to",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792173903914,
+      "tag": "0032_atend_contatos_bloqueados",
+      "breakpoints": true
     }
   ]
 }
