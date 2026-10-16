@@ -5037,8 +5037,14 @@ function DetalheContrato({
 
   const copiarLink = async () => {
     const url = `${window.location.origin}/p/contrato/${contrato.token_publico}`;
-    await navigator.clipboard.writeText(url);
-    toast.success("Link de assinatura copiado");
+    // Abre antes de qualquer await, senão o navegador trata como pop-up e bloqueia.
+    window.open(url, "_blank", "noopener,noreferrer");
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link de assinatura aberto em nova aba e copiado");
+    } catch {
+      // Sem permissão de área de transferência o link ainda abre na nova aba.
+    }
   };
 
   const mensalidades = mens.filter((m) => !isEncargoAvulso(m));
