@@ -25,7 +25,7 @@ type OAuthApi = {
   ) => Promise<{ data: OAuthClienteInfo | null; error: { message: string } | null }>;
 };
 
-function oauthApi(): OAuthApi {
+export function oauthApi(): OAuthApi {
   return (supabase.auth as unknown as { oauth: OAuthApi }).oauth;
 }
 
