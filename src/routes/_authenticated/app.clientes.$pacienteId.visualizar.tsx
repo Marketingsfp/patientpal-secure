@@ -1,3 +1,4 @@
+import { AvisoSolicitacaoPortal } from "@/components/portal-paciente/aviso-solicitacao-portal";
 import { AlertasAtivosBanner } from "@/components/medico/paciente-dialogs";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -106,6 +107,8 @@ function VisualizarClientePage() {
           </Button>
         )}
       </div>
+
+      <AvisoSolicitacaoPortal pacienteId={pacienteId} />
 
       {loading ? (
         <div className="rounded-lg border border-border bg-card p-6">
