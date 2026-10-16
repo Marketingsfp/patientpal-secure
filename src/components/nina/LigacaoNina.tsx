@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  CHAVE_VOZ_SALVA,
   FLAG_NINA_LIGACAO,
   MODULO_LIGACAO,
   VOZES_LIGACAO,
   VOZ_PADRAO_LIGACAO,
+  vozSalvaValida,
   type VozLigacao,
 } from "@/lib/nina/ligacao/config";
 import {
@@ -103,6 +105,25 @@ function PainelLigacao({ clinicaId }: { clinicaId: string }) {
   const fimDaConversa = useRef<HTMLDivElement | null>(null);
 
   const emLigacao = estado.status === "conectando" || estado.status === "em_andamento";
+
+  // Última voz escolhida neste navegador; lida depois de montar para não
+  // diferir do que o servidor desenhou. Sem acesso ao armazenamento, fica a padrão.
+  useEffect(() => {
+    try {
+      setVoz(vozSalvaValida(window.localStorage.getItem(CHAVE_VOZ_SALVA)));
+    } catch {
+      /* navegador sem armazenamento: segue a voz padrão */
+    }
+  }, []);
+
+  function escolherVoz(nova: VozLigacao) {
+    setVoz(nova);
+    try {
+      window.localStorage.setItem(CHAVE_VOZ_SALVA, nova);
+    } catch {
+      /* sem armazenamento: a escolha vale só nesta tela */
+    }
+  }
 
   useEffect(() => {
     if (estado.status !== "em_andamento") return;
@@ -220,7 +241,7 @@ function PainelLigacao({ clinicaId }: { clinicaId: string }) {
                 className={selectClass}
                 value={voz}
                 disabled={emLigacao}
-                onChange={(e) => setVoz(e.target.value as VozLigacao)}
+                onChange={(e) => escolherVoz(vozSalvaValida(e.target.value))}
               >
                 {VOZES_LIGACAO.map((v) => (
                   <option key={v} value={v}>
