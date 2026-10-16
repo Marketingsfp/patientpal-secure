@@ -234,7 +234,7 @@ import { statusEhRepresentacaoDaNina } from "@/lib/atendimento/badge-nina";
 import { assinarSelecaoConversa } from "@/lib/webmcp/selecao-conversa";
 import { AvatarContato } from "@/components/nina/AvatarContato";
 import { RevisarVinculoDialog } from "@/components/nina/RevisarVinculoDialog";
-import { AgendaConversaDrawer } from "@/components/nina/AgendaConversaDrawer";
+import { AgendaConversaPainel } from "@/components/nina/AgendaConversaPainel";
 import { MidiaMensagem, textoDaBolha } from "@/components/nina/MidiaMensagem";
 import { ConversaSkeleton, ContatoSkeleton } from "@/components/nina/ConversaSkeleton";
 import {
@@ -3082,6 +3082,8 @@ function AtendInboxOperacional({
   const [vinculoAberto, setVinculoAberto] = useState(false);
   // Agenda dentro da conversa (volta em 16/10/2026): exige paciente vinculado.
   const [agendaAberta, setAgendaAberta] = useState(false);
+  // Trocar de conversa fecha a agenda: nunca agendar no paciente de outra conversa.
+  useEffect(() => setAgendaAberta(false), [sel?.id]);
 
   /* ---------- Mensagens rápidas (comandos "/") ---------- */
   const respostasRapidas = useRespostasRapidas(clinicaId);
@@ -3823,15 +3825,20 @@ function AtendInboxOperacional({
         className={`oszap-inbox h-full overflow-hidden ${modoCentral ? "" : "-mx-3 sm:-mx-4 lg:-mx-6 px-2 sm:px-3 lg:px-3"}`}
         data-mobile-view={modoCentral ? "conversa" : listaMobile || !sel ? "lista" : "conversa"}
       >
-        <div className="oszap-columns flex h-full gap-2 overflow-hidden">
+        <div
+          className="oszap-columns flex h-full gap-2 overflow-hidden"
+          data-agenda-aberta={agendaAberta || undefined}
+          style={{ "--oszap-chat-com-agenda": "clamp(20rem, 30%, 28rem)" } as React.CSSProperties}
+        >
           {/* COLUNA 1 — LISTA (encolhe/expande no hover, ou fica fixa) */}
           {!modoCentral && (
             <Card
               data-a11y-secundario="true"
               ref={painelRef}
-              className={`oszap-queue shrink-0 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
-                painelAberto ? "w-[300px]" : "w-[52px]"
-              }`}
+              aria-hidden={agendaAberta || undefined}
+              className={`oszap-queue shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+                agendaAberta ? "hidden" : "flex"
+              } ${painelAberto ? "w-[300px]" : "w-[52px]"}`}
             >
               {!painelAberto && (
                 <button
@@ -4178,7 +4185,11 @@ function AtendInboxOperacional({
           <Card
             data-a11y-principal="true"
             ref={colunaChatRef}
-            className="oszap-chat flex min-w-0 flex-1 flex-col overflow-hidden"
+            className={`oszap-chat min-w-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+              agendaAberta
+                ? "hidden lg:flex lg:flex-none lg:w-[var(--oszap-chat-com-agenda)]"
+                : "flex flex-1"
+            }`}
           >
             {!sel ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
@@ -4667,11 +4678,41 @@ function AtendInboxOperacional({
             )}
           </Card>
 
+          {/* COLUNA DA AGENDA — abre da direita para a esquerda, como a Acessibilidade */}
+          {agendaAberta && clinicaId && sel && contato?.paciente?.id && (
+            <div className="oszap-agenda flex min-w-0 flex-1 animate-in fade-in slide-in-from-right-8 duration-200 motion-reduce:animate-none">
+              <AgendaConversaPainel
+                clinicaId={clinicaId}
+                conversaId={sel.id}
+                paciente={{
+                  id: contato.paciente.id,
+                  nome: contato.paciente.nome,
+                  cpf: contato.paciente.cpf ?? null,
+                  telefone: contato.paciente.telefone ?? null,
+                  data_nascimento: contato.paciente.data_nascimento ?? null,
+                }}
+                onFechar={() => {
+                  setAgendaAberta(false);
+                  // Agendamento novo aparece no painel do contato.
+                  void atualizarContatoRef.current();
+                }}
+                // A confirmação vai para o campo de mensagem; a atendente revisa e envia.
+                onMensagemPronta={(texto) => {
+                  setDraft(texto);
+                  setAgendaAberta(false);
+                  void atualizarContatoRef.current();
+                  composerRef.current?.focus();
+                }}
+              />
+            </div>
+          )}
+
           {/* COLUNA 3 — CONTATO (encolhe/expande no hover, ou fica fixa) */}
           <Card
             data-a11y-secundario="true"
             ref={contatoRef}
-            className={`oszap-contact hidden lg:flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            aria-hidden={agendaAberta || undefined}
+            className={`oszap-contact hidden ${agendaAberta ? "" : "lg:flex"} shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out ${
               contatoAberto ? "w-[260px] xl:w-[300px]" : "w-[52px]"
             }`}
           >
@@ -4828,34 +4869,6 @@ function AtendInboxOperacional({
               contatoTelefone={contatoAtual?.conversa?.contato_telefone ?? null}
               pacienteVinculadoNome={contatoAtual?.paciente?.nome ?? null}
               onVinculado={() => void atualizarContatoRef.current()}
-            />
-          )}
-          {clinicaId && sel && contato?.paciente?.id && (
-            <AgendaConversaDrawer
-              open={agendaAberta}
-              onOpenChange={(aberta) => {
-                setAgendaAberta(aberta);
-                // Agendamento novo aparece no painel do contato.
-                if (!aberta) void atualizarContatoRef.current();
-              }}
-              clinicaId={clinicaId}
-              conversaId={sel.id}
-              contatoNome={contato ? tituloConversa(contato.conversa) || null : null}
-              contatoTelefone={contato?.conversa?.contato_telefone ?? null}
-              pacienteIdVinculado={contato.paciente.id}
-              pacienteVinculado={{
-                id: contato.paciente.id,
-                nome: contato.paciente.nome,
-                cpf: contato.paciente.cpf ?? null,
-                telefone: contato.paciente.telefone ?? null,
-                data_nascimento: contato.paciente.data_nascimento ?? null,
-              }}
-              // A confirmação vai para o campo de mensagem; a atendente revisa e envia.
-              onMensagemPronta={(texto) => {
-                setDraft(texto);
-                setAgendaAberta(false);
-                composerRef.current?.focus();
-              }}
             />
           )}
 

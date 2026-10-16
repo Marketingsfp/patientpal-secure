@@ -77,6 +77,7 @@ export function AgendaPorMedicoDia({
   somenteLeitura = false,
   onCobrar,
   onFinalizar,
+  compacto = false,
 }: {
   dataRef: string;
   medicos: AgendaMedicoColuna[];
@@ -92,6 +93,11 @@ export function AgendaPorMedicoDia({
   onCobrar?: (a: AgendaMedicoItem) => void;
   /** Atalho ✅: marca como Realizado, com as mesmas regras da visão em lista. */
   onFinalizar?: (a: AgendaMedicoItem) => void;
+  /**
+   * Painel estreito (agenda dentro do OS Zap): as colunas se ajustam à largura do
+   * próprio painel, não da tela. Sem a opção, nada muda nas telas do ClinicaOS.
+   */
+  compacto?: boolean;
 }) {
   const porMedico = useMemo(() => {
     const map = new Map<string, AgendaMedicoItem[]>();
@@ -145,7 +151,13 @@ export function AgendaPorMedicoDia({
       )}
 
       <div className="w-full max-w-full overflow-x-hidden pb-10">
-        <div className="grid w-full max-w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          className={
+            compacto
+              ? "grid w-full max-w-full grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3"
+              : "grid w-full max-w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          }
+        >
           {colunas.map((m) => {
             const ags = porMedico.get(m.id) ?? [];
             const ocupados = ags.filter((a) => !a.livre);
