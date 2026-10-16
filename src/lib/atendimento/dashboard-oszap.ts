@@ -67,6 +67,8 @@ export type EntradaDashboard = {
     status?: string;
     nota: number | null;
     atendente_user_id: string | null;
+    conversa_id?: string | null;
+    atend_conversas?: { contato_nome?: string | null } | null;
   }[];
   transferencias: { created_at: string; para_departamento_id: string | null }[];
   departamentos: { id: string; nome: string }[];
@@ -380,6 +382,15 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
   };
   const somaNotas = { atual: [] as number[], anterior: [] as number[] };
   const avaliacoesPorPessoa = new Map<string, number[]>();
+  const registrosAvaliacoes: {
+    id: string;
+    respondidaEm: string;
+    atendenteId: string;
+    atendente: string;
+    nota: number;
+    paciente: string;
+    conversaId: string | null;
+  }[] = [];
   for (const a of e.avaliacoes) {
     const solicitadaEm = a.solicitada_em ?? a.created_at ?? a.respondida_em;
     const janelaSolicitacao = solicitadaEm ? janela(solicitadaEm) : null;
@@ -402,7 +413,19 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
         ...(avaliacoesPorPessoa.get(a.atendente_user_id) ?? []),
         a.nota,
       ]);
+    // Registro de cada avaliação, das atendentes com perfil Telefonia (16/10/2026).
+    if (j === "atual" && a.atendente_user_id && e.telefonia.has(a.atendente_user_id))
+      registrosAvaliacoes.push({
+        id: `${a.conversa_id ?? "sem-conversa"}:${a.respondida_em}`,
+        respondidaEm: a.respondida_em,
+        atendenteId: a.atendente_user_id,
+        atendente: e.nomes.get(a.atendente_user_id) ?? "Nome não disponível",
+        nota: a.nota,
+        paciente: a.atend_conversas?.contato_nome?.trim() || "Sem nome",
+        conversaId: a.conversa_id ?? null,
+      });
   }
+  registrosAvaliacoes.sort((x, y) => y.respondidaEm.localeCompare(x.respondidaEm));
   ind.notaMedia = { atual: media(somaNotas.atual, 2), anterior: media(somaNotas.anterior, 2) };
 
   // Agora
@@ -624,6 +647,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     porDia,
     porHora: horas,
     equipe,
+    registrosAvaliacoes,
     departamentos,
     pausas: [...pausasMotivo.entries()]
       .map(([motivo, v]) => ({ motivo, pausas: v.pausas, minutos: Math.round(v.minutos) }))

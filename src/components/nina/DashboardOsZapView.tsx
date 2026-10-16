@@ -29,6 +29,23 @@ const numero = (n: number | undefined | null) =>
       : fmt.format(n);
 const pct = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+/** Mesmos nomes das notas da pesquisa de satisfação. */
+const ROTULO_NOTA: Record<number, string> = {
+  5: "Excelente",
+  4: "Muito bom",
+  3: "Bom",
+  2: "Regular",
+  1: "Ruim",
+};
+const dataHoraAvaliacao = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 const intervalo = (p: PeriodoDashboard) =>
   p.de === p.ate ? formatDatePura(p.de) : `${formatDatePura(p.de)} a ${formatDatePura(p.ate)}`;
 const curto = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
@@ -985,6 +1002,44 @@ export function DashboardOsZapView({
                       titulo: "Sem reabrir",
                       formato: (v) => pct(v as number | null),
                     },
+                  ]}
+                />
+              </Secao>
+              <Secao
+                titulo="Registros de avaliações"
+                descricao="Cada nota dada pelo paciente no período, vinculada à atendente responsável no encerramento. Só atendentes com perfil Telefonia. Busque pelo nome da atendente para ver as avaliações dela."
+              >
+                <Tabela
+                  linhas={resumo.registrosAvaliacoes}
+                  chave={(l) => l.id}
+                  busca="Buscar atendente ou paciente"
+                  vazio="Nenhuma avaliação no período."
+                  colunas={[
+                    {
+                      campo: "respondidaEm",
+                      titulo: "Data",
+                      texto: true,
+                      formato: (v) => dataHoraAvaliacao(String(v)),
+                    },
+                    { campo: "atendente", titulo: "Atendente", texto: true },
+                    {
+                      campo: "nota",
+                      titulo: "Nota",
+                      formato: (v) => (
+                        <span
+                          className={
+                            Number(v) >= 4
+                              ? "font-semibold text-emerald-700 dark:text-emerald-400"
+                              : Number(v) <= 2
+                                ? "font-semibold text-destructive"
+                                : "font-semibold"
+                          }
+                        >
+                          {`${Number(v)} · ${ROTULO_NOTA[Number(v)] ?? ""}`}
+                        </span>
+                      ),
+                    },
+                    { campo: "paciente", titulo: "Paciente", texto: true },
                   ]}
                 />
               </Secao>

@@ -154,6 +154,58 @@ describe("Números do dashboard", () => {
     expect(r.indicadores.avaliacoes.atual).toBe(3);
   });
 
+  it("registra cada avaliação das atendentes de Telefonia, da mais recente para a mais antiga", () => {
+    const r = montarDashboardOsZap(
+      base({
+        nomes: new Map([
+          ["ana", "Ana"],
+          ["caio", "Caio"],
+        ]),
+        avaliacoes: [
+          {
+            respondida_em: "2024-10-01T12:00:00Z",
+            nota: 5,
+            atendente_user_id: "ana",
+            conversa_id: "c1",
+            atend_conversas: { contato_nome: "Paciente Teste" },
+          },
+          {
+            respondida_em: "2024-10-01T15:00:00Z",
+            nota: 2,
+            atendente_user_id: "ana",
+            conversa_id: "c2",
+            atend_conversas: { contato_nome: null },
+          },
+          // Fora do perfil Telefonia (ex.: administração) e sem atendente: fora do registro.
+          { respondida_em: "2024-10-01T13:00:00Z", nota: 4, atendente_user_id: "caio" },
+          { respondida_em: "2024-10-01T14:00:00Z", nota: 4, atendente_user_id: null },
+          // Pesquisa sem resposta não vira registro.
+          { respondida_em: null, nota: null, atendente_user_id: "ana" },
+        ],
+      }),
+    );
+    expect(r.registrosAvaliacoes).toEqual([
+      {
+        id: "c2:2024-10-01T15:00:00Z",
+        respondidaEm: "2024-10-01T15:00:00Z",
+        atendenteId: "ana",
+        atendente: "Ana",
+        nota: 2,
+        paciente: "Sem nome",
+        conversaId: "c2",
+      },
+      {
+        id: "c1:2024-10-01T12:00:00Z",
+        respondidaEm: "2024-10-01T12:00:00Z",
+        atendenteId: "ana",
+        atendente: "Ana",
+        nota: 5,
+        paciente: "Paciente Teste",
+        conversaId: "c1",
+      },
+    ]);
+  });
+
   it("separa respostas da equipe e da Nina; só conta envio confirmado", () => {
     const r = montarDashboardOsZap(
       base({
