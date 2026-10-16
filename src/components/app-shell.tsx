@@ -94,9 +94,9 @@ import {
   ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE,
   moduloDaTela,
   moduloPermitido,
-  podeAbrirPortalRh,
   rotaSomenteAdmin,
 } from "@/lib/permissoes-rotas";
+import { portaisOcultos as calcularPortaisOcultos } from "@/lib/portais-visiveis";
 import { SemPermissao } from "@/components/sem-permissao";
 import { podeAbrirTelaOsZap } from "@/lib/atendimento/acesso-telas-oszap";
 import { moduloTelaOsZap, TELAS_OSZAP } from "@/lib/permissoes-oszap";
@@ -1168,14 +1168,16 @@ function AppShellInner() {
     setSubsystem(id);
     fecharSeletorPortais();
     if (!mudou) return;
-    const home = SUBSYSTEMS[id].home;
-    // Permissões ainda carregando: vai para a home e a guarda decide depois.
-    const destino =
-      permsLoading || telaPermitida(home, "")
-        ? { to: home }
-        : (primeiraRotaVisivel(ordenarMenu(montarMenu(id))) ?? { to: home });
+    const destino = destinoDoPortal(id);
     navigate({ to: destino.to, hash: destino.hash });
   };
+  function destinoDoPortal(id: SubsystemId): { to: string; hash?: string } {
+    const home = SUBSYSTEMS[id].home;
+    // Permissões ainda carregando: vai para a home e a guarda decide depois.
+    return permsLoading || telaPermitida(home, "")
+      ? { to: home }
+      : (primeiraRotaVisivel(ordenarMenu(montarMenu(id))) ?? { to: home });
+  }
   // Guarda de rota (mesma regra do menu lateral). Admin (allowedModules ===
   // null) passa por padrão.
   function telaPermitida(path: string, hash: string): boolean {
@@ -1353,22 +1355,29 @@ function AppShellInner() {
 
   // Portal sem nenhuma tela liberada não aparece no hub nem no seletor.
   // Nina e Francisco têm permissões independentes dentro do OS ZAP.
-  const portaisOcultos = useMemo<SubsystemId[]>(() => {
-    const ocultos: SubsystemId[] = [];
-    if (
-      !TELAS_OSZAP.some(
-        (t) =>
-          podeAbrirTelaOsZap(clinicaAtual?.role, t.to, t.hash) &&
-          leafAllowed(t.to, allowedModules, configuredModules, t.hash),
-      )
-    )
-      ocultos.push("os-zap");
-    // Coach WhatsApp: some para quem não tem o módulo, como já era com o OS ZAP.
-    if (!leafAllowed("/app/coach", allowedModules, configuredModules)) ocultos.push("coach");
-    // Funcionários / RH: mesma regra, pelas telas do grupo Recursos Humanos.
-    if (!podeAbrirPortalRh(allowedModules, configuredModules)) ocultos.push("gestao-pessoas");
-    return ocultos;
-  }, [allowedModules, configuredModules, clinicaAtual?.role]);
+  // A regra vive em src/lib/portais-visiveis.ts, a mesma do hub (/app).
+  const portaisOcultos = useMemo<SubsystemId[]>(
+    () => calcularPortaisOcultos(allowedModules, configuredModules, clinicaAtual?.role),
+    [allowedModules, configuredModules, clinicaAtual?.role],
+  );
+
+  // Quem só tem a Clínica Médica não precisa escolher nada: sai do hub direto
+  // para a primeira tela liberada, sem passar pelo cartão único.
+  const portalUnico = useMemo<SubsystemId | null>(() => {
+    if (permsLoading) return null;
+    const visiveis = (Object.keys(SUBSYSTEMS) as SubsystemId[]).filter(
+      (id) => !portaisOcultos.includes(id),
+    );
+    return visiveis.length === 1 ? visiveis[0]! : null;
+  }, [permsLoading, portaisOcultos]);
+  useEffect(() => {
+    if (!isChooser || !portalUnico) return;
+    setSubsystem(portalUnico);
+    const destino = destinoDoPortal(portalUnico);
+    navigate({ to: destino.to, hash: destino.hash, replace: true });
+    // destinoDoPortal muda a cada render; o que importa é o portal e a rota.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isChooser, portalUnico]);
 
   // Resultado da busca do menu lateral (sem acento, case-insensitive).
   const termoMenu = buscaMenu.trim();
