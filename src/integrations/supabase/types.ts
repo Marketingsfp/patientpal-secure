@@ -4953,6 +4953,8 @@ export type Database = {
           conteudo: string
           created_at: string
           id: string
+          liberado_paciente_em: string | null
+          liberado_paciente_por: string | null
           medico_id: string | null
           modelo_id: string | null
           paciente_id: string | null
@@ -4967,6 +4969,8 @@ export type Database = {
           conteudo: string
           created_at?: string
           id?: string
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
           medico_id?: string | null
           modelo_id?: string | null
           paciente_id?: string | null
@@ -4981,6 +4985,8 @@ export type Database = {
           conteudo?: string
           created_at?: string
           id?: string
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
           medico_id?: string | null
           modelo_id?: string | null
           paciente_id?: string | null
@@ -5483,6 +5489,8 @@ export type Database = {
           ia_recomendacao: string | null
           ia_resumo: string | null
           id: string
+          liberado_paciente_em: string | null
+          liberado_paciente_por: string | null
           origem: string | null
           paciente_id: string
           paciente_nome: string | null
@@ -5503,6 +5511,8 @@ export type Database = {
           ia_recomendacao?: string | null
           ia_resumo?: string | null
           id?: string
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
           origem?: string | null
           paciente_id: string
           paciente_nome?: string | null
@@ -5523,6 +5533,8 @@ export type Database = {
           ia_recomendacao?: string | null
           ia_resumo?: string | null
           id?: string
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
           origem?: string | null
           paciente_id?: string
           paciente_nome?: string | null
@@ -15044,6 +15056,50 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_links: {
+        Row: {
+          clinica_id: string
+          criado_em: string
+          expira_em: string
+          id: string
+          paciente_id: string
+          ref_id: string
+          sessao_id: string
+          tipo: string
+          token_hash: string
+        }
+        Insert: {
+          clinica_id: string
+          criado_em?: string
+          expira_em: string
+          id?: string
+          paciente_id: string
+          ref_id: string
+          sessao_id: string
+          tipo: string
+          token_hash: string
+        }
+        Update: {
+          clinica_id?: string
+          criado_em?: string
+          expira_em?: string
+          id?: string
+          paciente_id?: string
+          ref_id?: string
+          sessao_id?: string
+          tipo?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_links_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portal_otps: {
         Row: {
           clinica_id: string
@@ -15092,6 +15148,7 @@ export type Database = {
       portal_paciente_config: {
         Row: {
           ativo: boolean
+          auto_liberar: Json
           cancelar_horas_min: number
           clinica_id: string
           updated_at: string
@@ -15099,6 +15156,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          auto_liberar?: Json
           cancelar_horas_min?: number
           clinica_id: string
           updated_at?: string
@@ -15106,6 +15164,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          auto_liberar?: Json
           cancelar_horas_min?: number
           clinica_id?: string
           updated_at?: string

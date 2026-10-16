@@ -3,6 +3,7 @@
  * Cada uma recebe o paciente e a clínica; as regras de acesso ficam no banco.
  */
 import { hojeBR } from "@/lib/date-utils";
+import { BotaoLiberarPaciente } from "@/components/portal-paciente/botao-liberar-paciente";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Download, Printer, Plus, Trash2, Upload } from "lucide-react";
@@ -816,7 +817,9 @@ export function DocumentosDialog({ open, onOpenChange, pacienteId, pacienteNome 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("documentos_emitidos")
-        .select("id, tipo, titulo, conteudo, created_at")
+        .select(
+          "id, tipo, titulo, conteudo, created_at, liberado_paciente_em, liberado_paciente_por",
+        )
         .eq("paciente_id", pacienteId)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -859,6 +862,16 @@ export function DocumentosDialog({ open, onOpenChange, pacienteId, pacienteNome 
                     >
                       <Printer className="h-3.5 w-3.5" /> Reimprimir
                     </Button>
+                    {d.tipo !== "contrato" && (
+                      <div className="mt-1">
+                        <BotaoLiberarPaciente
+                          origem="documento"
+                          id={d.id}
+                          liberadoEm={d.liberado_paciente_em}
+                          liberadoPor={d.liberado_paciente_por}
+                        />
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
