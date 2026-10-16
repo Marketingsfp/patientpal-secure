@@ -69,6 +69,24 @@ export function useRealtimeAtendimento(params: {
   const onEstadoRef = useRef(onEstado);
   onEstadoRef.current = onEstado;
   const canalId = useId();
+  // Classifica o evento com a tela atual e avisa só quem precisa ser atualizado.
+  const despacharRef = useRef((tabela: string, clinica: string, payload: any) => {
+    const ev: EventoRealtime = {
+      table: tabela,
+      eventType: payload?.eventType,
+      new: payload?.new ?? null,
+      old: payload?.old ?? null,
+    };
+    const alvos = classificarEvento(ev, {
+      clinicaId: clinica,
+      conversaAberta: abertaRef.current,
+      pacienteAberto: pacienteRef.current,
+      agendamentosAbertos: agendamentosRef.current,
+      incluirTeste: incluirTesteRef.current,
+    });
+    if (alvos.length === 0) return;
+    onAlvosRef.current(alvos, ev);
+  });
 
   useEffect(() => {
     if (!enabled || !clinicaId) return;
@@ -78,6 +96,8 @@ export function useRealtimeAtendimento(params: {
     onEstadoRef.current?.(maquina.estado());
     const ch = supabase.channel(chaveCanalAtendimento(clinicaId, canalId));
     for (const tabela of TABELAS_ATENDIMENTO) {
+      // Agendamentos têm canal próprio, só do paciente aberto (abaixo).
+      if (tabela === "agendamentos") continue;
       ch.on(
         "postgres_changes" as any,
         {
@@ -86,23 +106,7 @@ export function useRealtimeAtendimento(params: {
           table: tabela,
           filter: `clinica_id=eq.${clinicaId}`,
         },
-        (payload: any) => {
-          const ev: EventoRealtime = {
-            table: tabela,
-            eventType: payload?.eventType,
-            new: payload?.new ?? null,
-            old: payload?.old ?? null,
-          };
-          const alvos = classificarEvento(ev, {
-            clinicaId,
-            conversaAberta: abertaRef.current,
-            pacienteAberto: pacienteRef.current,
-            agendamentosAbertos: agendamentosRef.current,
-            incluirTeste: incluirTesteRef.current,
-          });
-          if (alvos.length === 0) return;
-          onAlvosRef.current(alvos, ev);
-        },
+        (payload: any) => despacharRef.current(tabela, clinicaId, payload),
       );
     }
     ch.subscribe((status: string) => {
@@ -119,4 +123,49 @@ export function useRealtimeAtendimento(params: {
       supabase.removeChannel(ch);
     };
   }, [enabled, clinicaId, canalId]);
+
+  // Desempenho (16/10/2026): os agendamentos da clínica inteira chegavam a
+  // cada tela do OS ZAP (a recepção mexe na agenda o dia todo) e só eram
+  // descartados no navegador. Agora o canal escuta só o paciente aberto.
+  // Exclusão não aceita filtro no tempo real: vai pela clínica (é rara).
+  const pacienteAberto = params.pacienteAberto ?? null;
+  useEffect(() => {
+    if (!enabled || !clinicaId || !pacienteAberto) return;
+    const ch = supabase
+      .channel(`agenda-paciente:${clinicaId}:${pacienteAberto}:${canalId}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "agendamentos",
+          filter: `paciente_id=eq.${pacienteAberto}`,
+        },
+        (payload: any) => despacharRef.current("agendamentos", clinicaId, payload),
+      )
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "agendamentos",
+          filter: `paciente_id=eq.${pacienteAberto}`,
+        },
+        (payload: any) => despacharRef.current("agendamentos", clinicaId, payload),
+      )
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "agendamentos",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
+        (payload: any) => despacharRef.current("agendamentos", clinicaId, payload),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [enabled, clinicaId, pacienteAberto, canalId]);
 }

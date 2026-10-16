@@ -14,20 +14,26 @@ export const urlMidiaMensagem = createServerFn({ method: "POST" })
     z.object({ clinicaId: z.string().uuid(), mensagemId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { data: membro, error: erroMembro } = await context.supabase.rpc("is_member", {
-      _user_id: context.userId,
-      _clinica_id: data.clinicaId,
-    });
+    // Desempenho (16/10/2026): associação à clínica e a mensagem saem juntas e
+    // são conferidas na mesma ordem (a mensagem já passa pelo RLS do usuário).
+    const [membroR, msgR] = await Promise.all([
+      context.supabase.rpc("is_member", {
+        _user_id: context.userId,
+        _clinica_id: data.clinicaId,
+      }),
+      // Leitura pelo cliente do usuário: a política de acesso do banco também vale aqui.
+      context.supabase
+        .from("whatsapp_mensagens")
+        .select("id, conversa_id, tipo, body, media_url, media_mime")
+        .eq("id", data.mensagemId)
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle(),
+    ]);
+    const { data: membro, error: erroMembro } = membroR;
     if (erroMembro) throw new Error(erroMembro.message);
     if (!membro) throw new Error("Sem acesso a esta clínica");
 
-    // Leitura pelo cliente do usuário: a política de acesso do banco também vale aqui.
-    const { data: msg, error } = await context.supabase
-      .from("whatsapp_mensagens")
-      .select("id, conversa_id, tipo, body, media_url, media_mime")
-      .eq("id", data.mensagemId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
+    const { data: msg, error } = msgR;
     if (error) throw new Error(error.message);
     if (!msg?.conversa_id) return { url: null, mime: null, nome: "" };
 
