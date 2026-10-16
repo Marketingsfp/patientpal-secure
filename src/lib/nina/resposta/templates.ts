@@ -259,6 +259,15 @@ export const TEMPLATES_PADRAO: readonly DefinicaoTemplate[] = [
     padrao: "Recebi. Como posso te ajudar?",
   }),
   D({
+    chave: "midia.nao_lida",
+    categoria: "midia",
+    descricao:
+      "Mensagem que o WhatsApp não entrega pela API (visualização única, enquete, editada) ou que a Nina não lê (vídeo, localização, contato).",
+    variaveis: [],
+    padrao:
+      "Não consegui abrir essa mensagem por aqui (por exemplo, foto ou vídeo de visualização única, enquete ou mensagem editada). Pode me enviar de novo como texto, foto comum ou áudio?",
+  }),
+  D({
     chave: "midia.outro",
     categoria: "midia",
     descricao: "Outros tipos de mídia.",

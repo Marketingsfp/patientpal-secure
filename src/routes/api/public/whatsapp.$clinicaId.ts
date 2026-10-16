@@ -454,6 +454,23 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   mensagemId: msgInserida.id,
                 });
 
+                // Contato bloqueado pela supervisão (16/10/2026): a mensagem fica
+                // guardada acima, mas nada é acionado — Nina, fila, distribuição,
+                // lembretes e pesquisa.
+                {
+                  const { contatoBloqueado } =
+                    await import("@/lib/atendimento/contatos-bloqueados.server");
+                  if (await contatoBloqueado(params.clinicaId, from)) {
+                    await supabaseAdmin
+                      .from("whatsapp_mensagens")
+                      .update({ nina_status: "completed", tratada_internamente: true })
+                      .eq("id", msgInserida.id)
+                      .eq("clinica_id", params.clinicaId);
+                    resultado = "contato_bloqueado";
+                    continue;
+                  }
+                }
+
                 // Francisco trata respostas antes de qualquer automação da Nina.
                 if (assinaturaOk) {
                   try {
@@ -715,7 +732,10 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   iaLiberada &&
                   (Boolean(textoPaciente) ||
                     audioFalhou ||
-                    ["image", "document", "sticker"].includes(tipo));
+                    ["image", "document", "sticker"].includes(tipo) ||
+                    // Visualização única, enquete, vídeo, localização, contato:
+                    // a Nina pede para reenviar (antes, ninguém respondia).
+                    (await import("@/lib/nina/mensagem-nao-lida")).ehMensagemNaoLida(tipo));
 
                 // Se a conversa é de gente (Nina desligada ou já encaminhada) e
                 // ainda não tem responsável, distribui na hora para quem está

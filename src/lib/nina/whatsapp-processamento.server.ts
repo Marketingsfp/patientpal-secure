@@ -190,12 +190,47 @@ export async function processarRespostaWhatsappNina(entrada: EntradaRespostaWhat
       reply = resultadoTurno.texto;
     } else {
       const { chaveTemplateMidia } = await import("@/lib/whatsapp-midia.server");
-      resultadoTurno = criarResultado({
-        origem: "midia",
-        texto: respostaMidiaNaoSuportada(tipo),
-        chaveTemplate: chaveTemplateMidia(tipo),
-      });
-      reply = resultadoTurno.texto;
+      const { ehMensagemNaoLida, segundaNaoLidaSeguida, MOTIVO_MENSAGEM_NAO_LIDA } =
+        await import("@/lib/nina/mensagem-nao-lida");
+      // Segunda mensagem ilegível seguida (a Nina já pediu para reenviar): equipe.
+      let encaminhadaNaoLida = false;
+      if (ehMensagemNaoLida(tipo) && convId) {
+        const { data: recentes } = await supabaseAdmin
+          .from("whatsapp_mensagens")
+          .select("tipo, created_at")
+          .eq("clinica_id", params.clinicaId)
+          .eq("conversa_id", convId)
+          .eq("direction", "in")
+          .order("created_at", { ascending: false })
+          .limit(2);
+        if (segundaNaoLidaSeguida(recentes ?? [])) {
+          const { encaminharParaHumano } = await import("@/lib/atendimento/handoff.server");
+          const r = await encaminharParaHumano({
+            clinicaId: params.clinicaId,
+            conversaId: convId,
+            motivo: `${MOTIVO_MENSAGEM_NAO_LIDA}: o paciente enviou de novo uma mensagem que não pôde ser lida`,
+            resumo:
+              "A Nina pediu para o paciente reenviar, e a mensagem seguinte também não pôde ser lida pelo WhatsApp (ex.: visualização única, vídeo, enquete, localização ou contato). A equipe deve continuar o atendimento.",
+            solicitadoPor: "SISTEMA",
+          });
+          encaminhadaNaoLida = r.ok;
+          if (r.ok && msgInserida.id)
+            await supabaseAdmin
+              .from("whatsapp_mensagens")
+              .update({ nina_status: "handoff", nina_finished_at: new Date().toISOString() })
+              .eq("id", msgInserida.id)
+              .eq("nina_status", "received");
+          resultado = r.ok ? "handoff_mensagem_nao_lida" : "handoff_mensagem_nao_lida_falhou";
+        }
+      }
+      if (!encaminhadaNaoLida) {
+        resultadoTurno = criarResultado({
+          origem: "midia",
+          texto: respostaMidiaNaoSuportada(tipo),
+          chaveTemplate: chaveTemplateMidia(tipo),
+        });
+        reply = resultadoTurno.texto;
+      }
     }
     // Gate de identificação: o contrato veio junto da geração.
     if (!resultadoTurno) {

@@ -58,6 +58,10 @@ export function motivoParaAtendimento(valor: unknown): string | null {
       "A Nina pediu a foto do pedido médico (obrigatório para este atendimento) e o paciente não enviou. A equipe deve solicitar o pedido e continuar o atendimento.",
     ],
     [
+      /\bMENSAGEM_NAO_LIDA\b/i,
+      "O paciente enviou duas mensagens seguidas que a Nina não consegue ler (por exemplo, foto de visualização única, vídeo, enquete, localização ou contato). A equipe deve continuar o atendimento.",
+    ],
+    [
       /\bINFORMACAO_COM_RECEPCAO\b/i,
       "O paciente pediu uma informação que não está no cadastro da Nina. A recepção responde.",
     ],
