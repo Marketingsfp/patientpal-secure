@@ -151,9 +151,12 @@ const css = compilador.build(
     sources: [{ base: resolve(root, "src"), pattern: "**/*.{ts,tsx}", negated: false }],
   }).scan(),
 );
+// `--servir <porta>`: só serve a prévia para conferência no navegador (sem teste).
+const iServir = process.argv.indexOf("--servir");
+const portaPrevia = iServir >= 0 ? Number(process.argv[iServir + 1] ?? 8095) : 0;
 const server = Bun.serve({
   hostname: "127.0.0.1",
-  port: 0,
+  port: portaPrevia,
   fetch(req) {
     const p = new URL(req.url).pathname;
     if (p === "/app.js")
@@ -165,6 +168,10 @@ const server = Bun.serve({
     );
   },
 });
+if (portaPrevia) {
+  console.log(`Prévia da agenda (dados fictícios): ${server.url}`);
+  await new Promise(() => {});
+}
 try {
   const teste = Bun.spawn(
     ["node", resolve(root, "scripts/fixtures/agenda-conversa-ui.mjs"), String(server.url), saida],
