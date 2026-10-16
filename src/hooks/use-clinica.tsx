@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./use-auth";
+import { aplicarMarcaNaAba, resolverClinicaAcesso, type ClinicaAcesso } from "@/lib/clinica-acesso";
 
 export interface ClinicaMembership {
   id: string;
@@ -204,6 +205,38 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     gravarPreferencia(STORAGE_KEY, id);
     gravarPreferencia(TODAS_KEY, "0");
   };
+
+  // Clínica do acesso (endereço próprio ou ?clinica= no login): pré-seleciona
+  // a unidade UMA vez por sessão, só se o usuário já tiver vínculo com ela.
+  // Sem vínculo, apenas avisa — nada além do RLS atual é liberado.
+  const [acesso, setAcesso] = useState<ClinicaAcesso | null>(null);
+  useEffect(() => {
+    void resolverClinicaAcesso().then((c) => {
+      setAcesso(c);
+      aplicarMarcaNaAba(c);
+    });
+  }, []);
+  useEffect(() => {
+    if (!acesso || !user?.id || loading || memberships.length === 0) return;
+    const marca = `clinica_acesso_aplicada:${user.id}:${acesso.clinica_id}`;
+    try {
+      if (window.sessionStorage.getItem(marca)) return;
+      window.sessionStorage.setItem(marca, "1");
+    } catch {
+      /* sem armazenamento: aplica sem lembrar */
+    }
+    if (memberships.some((m) => m.clinica_id === acesso.clinica_id)) {
+      setClinicaAtual(acesso.clinica_id);
+    } else {
+      void import("sonner").then(({ toast }) =>
+        toast.warning(
+          `Você não tem acesso à ${acesso.nome}. Escolha uma das suas unidades no seletor do topo.`,
+          { id: "clinica-acesso-sem-vinculo", duration: 12000 },
+        ),
+      );
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [acesso, user?.id, loading, memberships]);
 
   const setModoTodas = (v: boolean) => {
     setModoTodasState(v);

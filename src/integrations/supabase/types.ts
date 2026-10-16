@@ -3427,6 +3427,38 @@ export type Database = {
           },
         ]
       }
+      clinica_dominios: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          hostname: string
+          id: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          hostname: string
+          id?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          hostname?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinica_dominios_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinica_feature_flags: {
         Row: {
           ativo: boolean
@@ -17558,6 +17590,26 @@ export type Database = {
         }
       }
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
+      clinica_acesso_por_id: {
+        Args: { _clinica_id: string }
+        Returns: {
+          accent: string
+          clinica_id: string
+          logo_url: string
+          nome: string
+          primary: string
+        }[]
+      }
+      clinica_por_dominio: {
+        Args: { _hostname: string }
+        Returns: {
+          accent: string
+          clinica_id: string
+          logo_url: string
+          nome: string
+          primary: string
+        }[]
+      }
       clinicas_do_usuario: { Args: never; Returns: string[] }
       clinicas_publicas: {
         Args: never
@@ -19080,6 +19132,7 @@ export type Database = {
         Returns: boolean
       }
       nina_zap_retencao_executar: { Args: never; Returns: Json }
+      normalizar_hostname: { Args: { _h: string }; Returns: string }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }
       normalizar_termo_busca: { Args: { _termo: string }; Returns: string }
       paciente_cartao_inadimplente: {

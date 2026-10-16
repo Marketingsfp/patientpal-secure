@@ -204,6 +204,13 @@
       "when": 1792153843626,
       "tag": "0028_ficha_encaixe_fim_da_fila",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792156380521,
+      "tag": "0029_clinica_dominios",
+      "breakpoints": true
     }
   ]
 }
