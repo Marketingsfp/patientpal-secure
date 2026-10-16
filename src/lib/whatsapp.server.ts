@@ -284,6 +284,61 @@ export async function metaSendText(
 }
 
 /**
+ * Mensagem com lista de toque (até 10 itens), dentro da janela de 24h. O
+ * paciente toca no botão, escolhe um item e a resposta chega como
+ * `interactive.list_reply` com o `id` do item.
+ */
+export async function metaSendList(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  lista: {
+    corpo: string;
+    botao: string;
+    secao: string;
+    opcoes: readonly { id: string; titulo: string }[];
+  },
+): Promise<{ wa_message_id: string | null }> {
+  const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        body: { text: lista.corpo.slice(0, 1024) },
+        action: {
+          button: lista.botao.slice(0, 20),
+          sections: [
+            {
+              title: lista.secao.slice(0, 24),
+              rows: lista.opcoes.slice(0, 10).map((o) => ({
+                id: o.id.slice(0, 200),
+                title: o.titulo.slice(0, 24),
+              })),
+            },
+          ],
+        },
+      },
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const metaErr = (json as any)?.error ?? {};
+    throw Object.assign(new Error(`WhatsApp: ${metaErr.message ?? `HTTP ${res.status}`}`), {
+      status: res.status,
+    });
+  }
+  return { wa_message_id: (json as any)?.messages?.[0]?.id ?? null };
+}
+
+/**
  * Envia um template aprovado (HSM) — funciona fora da janela de 24h.
  */
 export async function metaSendTemplate(

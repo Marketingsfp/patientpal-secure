@@ -226,6 +226,16 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 };
 
                 // Texto do paciente que a Nina vai processar (áudio vira transcrição).
+                // Toque em lista ou botão de mensagem interativa: fica salvo o
+                // título do item (ex.: pesquisa de satisfação, "5 - Excelente").
+                const tituloInterativo =
+                  tipo === "interactive"
+                    ? String(
+                        msg.interactive?.list_reply?.title ??
+                          msg.interactive?.button_reply?.title ??
+                          "",
+                      ).trim()
+                    : "";
                 let textoPaciente = tipo === "text" ? String(msg.text?.body ?? "") : "";
                 let transcricao: string | null = null;
                 let audioFalhou = false;
@@ -377,7 +387,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                           ? legendaArquivo
                             ? `🎞️ ${legendaArquivo}`
                             : "🎞️ Vídeo"
-                          : `[${tipo}]`;
+                          : tituloInterativo
+                            ? tituloInterativo
+                            : `[${tipo}]`;
 
                 // Idempotência: `wa_message_id` é único. Se a Meta reenviar o
                 // mesmo evento (retry/duplicidade), o insert falha aqui e a
@@ -420,7 +432,13 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                       ? (msgInserida.transcricao ?? "")
                       : msgInserida.tipo === "text"
                         ? (msgInserida.body ?? "")
-                        : "";
+                        : msgInserida.tipo === "interactive" &&
+                            msgInserida.body &&
+                            msgInserida.body !== "[interactive]"
+                          ? (
+                              await import("@/lib/atendimento/pesquisa-satisfacao")
+                            ).textoDaRespostaInterativa(msgInserida.body)
+                          : "";
                 }
 
                 // FASE 4 — Stale Response Guard: cada mensagem recebida avança

@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { loadWhatsAppConfig, metaSendText } from "@/lib/whatsapp.server";
+import { loadWhatsAppConfig, metaSendList, metaSendText } from "@/lib/whatsapp.server";
 import {
   classificarMensagemAposPesquisa,
+  ESPELHO_PESQUISA_LISTA,
   MENSAGEM_AGRADECIMENTO_AVALIACAO,
   MENSAGEM_PESQUISA_SATISFACAO,
+  PESQUISA_LISTA,
   PRAZO_RESPOSTA_PESQUISA_MS,
 } from "./pesquisa-satisfacao";
 
@@ -63,11 +65,20 @@ export async function solicitarPesquisaSatisfacao(args: SolicitarArgs) {
     const to = conversa.contato_telefone.startsWith("+")
       ? conversa.contato_telefone
       : `+${conversa.contato_telefone}`;
-    const { wa_message_id } = await metaSendText(
-      cfg.phone_number_id,
-      cfg.access_token,
-      to,
-      MENSAGEM_PESQUISA_SATISFACAO,
+    const { phone_number_id: numeroId, access_token: token } = cfg;
+    // Lista de toque com as 5 notas; se a Meta recusar, vai o texto com os números.
+    let corpoEnviado = ESPELHO_PESQUISA_LISTA;
+    let tipoEnviado = "interactive";
+    const { wa_message_id } = await metaSendList(numeroId, token, to, PESQUISA_LISTA).catch(
+      (erroLista: unknown) => {
+        console.error(
+          "[pesquisa-satisfacao] lista recusada, enviando texto",
+          erroLista instanceof Error ? erroLista.message.slice(0, 200) : "erro",
+        );
+        corpoEnviado = MENSAGEM_PESQUISA_SATISFACAO;
+        tipoEnviado = "text";
+        return metaSendText(numeroId, token, to, MENSAGEM_PESQUISA_SATISFACAO);
+      },
     );
     // A Meta já aceitou o envio: mantenha a pesquisa pendente mesmo se o
     // espelho local da mensagem falhar, para a resposta ainda ser coletada.
@@ -82,8 +93,8 @@ export async function solicitarPesquisaSatisfacao(args: SolicitarArgs) {
       direction: "out",
       from_number: cfg.display_phone_number,
       to_number: to,
-      body: MENSAGEM_PESQUISA_SATISFACAO,
-      tipo: "text",
+      body: corpoEnviado,
+      tipo: tipoEnviado,
       status: "sent",
       enviada_por: "sistema",
       tratada_internamente: true,
