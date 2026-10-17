@@ -12,3 +12,7 @@ type: feature
 - Termo LGPD: rascunho para revisão jurídica, versionado, editável por admin; aceite obrigatório.
 - Cancelamento pelo portal: padrão 2 h antes, configurável por clínica; consulta paga ou de pacote só pela recepção.
 - Fase 2 (documentos liberados + financeiro/NFS-e) só depois de o dono validar a fase 1.
+- Decisões confirmadas em 17/10/2026: admin, gestão, médico, enfermagem, recepção e supervisão podem liberar e retirar documentos do paciente.
+- Anexos clínicos da ficha também podem ser liberados; anexos internos, administrativos e contratos nunca são liberáveis. Liberação começa desligada, inclusive automática por tipo e por clínica; download dura 5 minutos e fica preso à sessão, com auditoria.
+- Pedido de exame tem registro próprio, exames do catálogo quando houver e texto livre, indicação/observação, emissão em PDF e cancelamento; aparece como Pedido de exame no portal somente quando liberado.
+- Não publicar estas mudanças sem autorização.
