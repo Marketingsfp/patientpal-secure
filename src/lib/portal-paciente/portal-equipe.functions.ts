@@ -129,8 +129,12 @@ export const liberarParaPaciente = createServerFn({ method: "POST" })
     });
     if (permissaoErro || !pode)
       throw new Error("Você não tem permissão para liberar documentos ao paciente.");
-    const { data: paciente } = await context.supabase.from("pacientes").select("id")
-      .eq("id", r.paciente_id).eq("clinica_id", r.clinica_id).maybeSingle();
+    const { data: paciente } = await context.supabase
+      .from("pacientes")
+      .select("id")
+      .eq("id", r.paciente_id)
+      .eq("clinica_id", r.clinica_id)
+      .maybeSingle();
     if (!paciente) throw new Error("Vínculo de paciente inválido.");
     const s = await import("./portal.server");
     const db =

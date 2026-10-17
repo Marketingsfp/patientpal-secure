@@ -117,24 +117,32 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
       .in("id", pedidoMedicos);
     for (const m of ms ?? []) nomes.set(m.id, m.nome);
   }
-  const a = (anexos.data ?? []).filter(x => caminhoClinicoValido(x.caminho, s.clinica_id, s.paciente_id, x.tipo)).map((x) => ({
-    id: x.id,
-    origem: "anexo" as const,
-    tipo: x.tipo === "foto" ? "foto_clinica" : "anexo_clinico",
-    titulo: x.nome_arquivo,
-    data: x.data,
-    profissional: x.enviado_por_nome,
-    liberadoEm: x.liberado_paciente_em as string,
-  }));
-  const p = (pedidos.data ?? []).filter(x => x.pdf_caminho && caminhoClinicoValido(x.pdf_caminho, s.clinica_id, s.paciente_id, "pedidos-exame")).map((x) => ({
-    id: x.id,
-    origem: "pedido_exame" as const,
-    tipo: "pedido_exame",
-    titulo: "Pedido de exame",
-    data: x.data,
-    profissional: x.medico_id ? (nomes.get(x.medico_id) ?? null) : null,
-    liberadoEm: x.liberado_paciente_em as string,
-  }));
+  const a = (anexos.data ?? [])
+    .filter((x) => caminhoClinicoValido(x.caminho, s.clinica_id, s.paciente_id, x.tipo))
+    .map((x) => ({
+      id: x.id,
+      origem: "anexo" as const,
+      tipo: x.tipo === "foto" ? "foto_clinica" : "anexo_clinico",
+      titulo: x.nome_arquivo,
+      data: x.data,
+      profissional: x.enviado_por_nome,
+      liberadoEm: x.liberado_paciente_em as string,
+    }));
+  const p = (pedidos.data ?? [])
+    .filter(
+      (x) =>
+        x.pdf_caminho &&
+        caminhoClinicoValido(x.pdf_caminho, s.clinica_id, s.paciente_id, "pedidos-exame"),
+    )
+    .map((x) => ({
+      id: x.id,
+      origem: "pedido_exame" as const,
+      tipo: "pedido_exame",
+      titulo: "Pedido de exame",
+      data: x.data,
+      profissional: x.medico_id ? (nomes.get(x.medico_id) ?? null) : null,
+      liberadoEm: x.liberado_paciente_em as string,
+    }));
   return [...d, ...e, ...a, ...p].sort((a, b) => (a.data < b.data ? 1 : -1));
 }
 
