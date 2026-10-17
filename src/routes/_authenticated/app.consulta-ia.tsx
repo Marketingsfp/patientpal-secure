@@ -111,7 +111,7 @@ function ApoioClinicoPage() {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
         <header className="mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-600/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
               <ClipboardCheck className="h-5 w-5" />
             </span>
             <div className="min-w-0">
@@ -141,7 +141,7 @@ function ApoioClinicoPage() {
           {/* Coluna esquerda — anamnese */}
           <section className="rounded-2xl border border-slate-200 bg-card shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-              <Stethoscope className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+              <Stethoscope className="h-4 w-4 shrink-0 text-primary" />
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Anamnese livre
               </h2>
@@ -177,7 +177,7 @@ function ApoioClinicoPage() {
                       type="button"
                       disabled={loading}
                       onClick={() => void enviar(s)}
-                      className="rounded-full border border-slate-200 bg-card px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                      className="rounded-full border border-slate-200 bg-card px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-primary/40 hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       {s}
                     </button>
@@ -190,7 +190,7 @@ function ApoioClinicoPage() {
           {/* Coluna direita — análise do caso */}
           <section className="flex flex-col rounded-2xl border border-slate-200 bg-card shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-4">
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-              <MessagesSquare className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+              <MessagesSquare className="h-4 w-4 shrink-0 text-primary" />
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Análise do caso
               </h2>
@@ -218,7 +218,7 @@ function ApoioClinicoPage() {
                     className={cn(
                       "max-w-[92%] rounded-2xl px-4 py-3 text-[1.05rem] leading-relaxed",
                       m.role === "user"
-                        ? "bg-blue-600 text-white shadow-sm"
+                        ? "bg-primary text-primary-foreground shadow-sm"
                         : "border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200",
                     )}
                   >
@@ -240,7 +240,7 @@ function ApoioClinicoPage() {
                   className="space-y-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40"
                   aria-live="polite"
                 >
-                  <div className="mb-3 flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400">
+                  <div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Analisando o caso…
                   </div>
@@ -279,7 +279,7 @@ function ApoioClinicoPage() {
                 <Button
                   type="submit"
                   disabled={loading || !pergunta.trim()}
-                  className="h-[56px] shrink-0 gap-1.5 rounded-xl bg-blue-600 px-5 text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
+                  className="h-[56px] shrink-0 gap-1.5 rounded-xl bg-primary px-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
