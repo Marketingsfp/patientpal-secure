@@ -9,18 +9,17 @@ export const SUBSYSTEMS: Record<SubsystemId, { label: string; home: string; grou
     home: "/app/painel",
     groups: [
       "Operação",
-      "Cartão Benefícios",
-      "Inteligência",
-      "Marketing",
+      "Atendimento Clínico",
+      "Gestão & Financeiro",
       "Cadastros",
-      "Gestão",
+      "Marketing & Inteligência",
       "Configurações",
     ],
   },
   "gestao-pessoas": {
     label: "Funcionários / RH",
     home: "/app/hr-ponto",
-    groups: ["Recursos Humanos", "Gestão", "Configurações"],
+    groups: ["Recursos Humanos", "Gestão & Financeiro", "Configurações"],
   },
   "os-zap": {
     label: "OS ZAP",

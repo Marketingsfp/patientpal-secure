@@ -473,99 +473,54 @@ function leafAllowed(
 }
 
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
+  // Portal Clínica Médica. Telas da mesma família ficam juntas num grupo
+  // expansível ("Caixa & Atendimento Múltiplo"), que começa fechado e abre
+  // sozinho quando a tela atual está dentro dele — assim a seção cabe na tela
+  // sem rolar. Grupo que, depois das permissões, fica com uma tela só vira
+  // item simples (ver `montarMenu`).
   {
     label: "Operação",
     items: [
       { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
       { to: "/app/agenda-medicos", label: "Escala e Horários", icon: Columns3 },
-      { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
-      { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
-      { to: "/app/caixa", label: "Caixa", icon: Wallet },
+      {
+        label: "Check-in & Recepção",
+        icon: ConciergeBell,
+        children: [
+          { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
+          { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
+        ],
+      },
+      {
+        label: "Caixa & Atendimento Múltiplo",
+        icon: Wallet,
+        children: [
+          { to: "/app/caixa", label: "Caixa", icon: Wallet },
+          { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
+        ],
+      },
+      {
+        label: "Orçamentos & Tabela de Valores",
+        icon: FileText,
+        children: [
+          { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
+          { to: "/app/tabela-valores", label: "Tabela de valores", icon: Tag },
+        ],
+      },
+      {
+        label: "Clientes & Fluxo do Paciente",
+        icon: Contact,
+        children: [
+          { to: "/app/clientes", label: "Clientes", icon: Contact },
+          { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
+        ],
+      },
       { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
-      { to: "/app/clientes", label: "Clientes", icon: Contact },
-      { to: "/app/painel-executivo", label: "Painel Executivo", icon: FileBarChart2 },
-      { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
-      { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
-      { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
-      { to: "/app/tabela-valores", label: "Tabela de valores", icon: Tag },
-      { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
-      { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
-      {
-        to: "/app/cartao-terapeutico/contratos",
-        label: "Cartão Terapêutico",
-        icon: HeartHandshake,
-      },
-      { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
-      { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
-      { to: "/app/hiperdia", label: "Hiperdia", icon: HeartPulse },
-      { to: "/app/consulta-ia", label: "Apoio Clínico", icon: ClipboardCheck },
     ],
   },
   {
-    label: "Gestão",
-    items: [
-      { to: "/app/cargos", label: "Cargos", icon: Briefcase },
-      { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
-      { to: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: FileText },
-      { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-      { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
-      { to: "/app/setores", label: "Setores", icon: Building2 },
-      { to: "/app/boletos", label: "Boletos", icon: FileText },
-      { to: "/app/contratos", label: "Contratos de assinatura", icon: FileText },
-      { to: "/app/nfse", label: "NFS-e", icon: FileText },
-      { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
-      { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
-    ],
-  },
-  {
-    label: "Cadastros",
-    items: [
-      { to: "/app/equipe", label: "Médicos", icon: Users },
-      // "Perfis" define o que cada PERFIL abre; "Equipe e acessos" marca, pessoa
-      // a pessoa, quem é da gestão. São coisas diferentes e ficam lado a lado
-      // de propósito: quem procura uma costuma querer a outra.
-      { to: "/app/equipe-acessos", label: "Equipe e acessos", icon: ShieldCheck },
-      { to: "/app/perfis", label: "Perfis", icon: KeyRound },
-      {
-        to: "/app/especialidades",
-        label: "Serviços",
-        icon: Stethoscope,
-        aliases: ["/app/tipos-servico", "/app/procedimentos"],
-      },
-      { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
-      { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
-      { to: "/app/unidades", label: "Unidades", icon: MapPin },
-      { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
-      { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
-      { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
-      { to: "/app/clientes/solicitacoes-portal", label: "Pedidos da Área do Paciente", icon: Users },
-      { to: "/app/revisao-convenio", label: "Revisão de convênio", icon: ShieldCheck },
-    ],
-  },
-  {
-    label: "Marketing",
-    items: [
-      { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
-      { to: "/app/campanhas", label: "Campanhas", icon: Send },
-      { to: "/app/mkt-envios", label: "Envios", icon: Send },
-      { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles },
-      { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter },
-    ],
-  },
-  {
-    label: "Recursos Humanos",
-    items: [
-      { to: "/app/hr-ponto", label: "Marcação de ponto", icon: GraduationCap },
-      { to: "/app/hr-contratos", label: "Funcionários", icon: FileText },
-      { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
-      { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
-      { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
-      { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
-    ],
-  },
-  {
-    label: "Inteligência",
+    label: "Atendimento Clínico",
     items: [
       // Tela clínica do médico: fila dos pacientes do dia dele com o botão de
       // abrir o prontuário. O rótulo começa por "Meus Pacientes" porque é o
@@ -600,12 +555,28 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
           "consultas anteriores",
         ],
       },
-      { to: "/app/crm", label: "CRM", icon: Target },
-      { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
-      { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
-      // O antigo grupo "Nina — WhatsApp" saiu daqui: tudo de atendimento por
-      // mensagem passou a viver no portal "OS ZAP", nas seções
-      // "Atendimento", "Nina" e "Configurações do WhatsApp" logo abaixo.
+      { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
+      {
+        label: "Anamneses & Documentos",
+        icon: FileHeart,
+        children: [
+          { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
+          { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
+        ],
+      },
+      {
+        label: "Hiperdia & Cartão Terapêutico",
+        icon: HeartHandshake,
+        children: [
+          { to: "/app/hiperdia", label: "Hiperdia", icon: HeartPulse },
+          {
+            to: "/app/cartao-terapeutico/contratos",
+            label: "Cartão Terapêutico",
+            icon: HeartHandshake,
+          },
+        ],
+      },
+      { to: "/app/consulta-ia", label: "Apoio Clínico", icon: ClipboardCheck },
       {
         // Grupo expansível por especialidade. Cada filho tem rota própria —
         // antes os dois apontavam para a mesma rota e a tela escolhia a aba
@@ -647,17 +618,173 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
   {
+    // Seção compartilhada com o portal Funcionários / RH (ver SUBSYSTEMS).
+    // Cargos e Setores só aparecem lá — o filtro fica em `montarMenu`.
+    label: "Gestão & Financeiro",
+    items: [
+      {
+        label: "Financeiro & Painel Executivo",
+        icon: DollarSign,
+        children: [
+          { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
+          { to: "/app/painel-executivo", label: "Painel Executivo", icon: FileBarChart2 },
+        ],
+      },
+      { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
+      {
+        label: "Boletos, Contratos & NFS-e",
+        icon: FileText,
+        children: [
+          { to: "/app/boletos", label: "Boletos", icon: FileText },
+          { to: "/app/contratos", label: "Contratos de assinatura", icon: FileText },
+          { to: "/app/nfse", label: "NFS-e", icon: FileText },
+          { to: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: FileText },
+        ],
+      },
+      { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
+      {
+        label: "Segurança & LGPD",
+        icon: ShieldCheck,
+        children: [
+          { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
+          { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
+        ],
+      },
+      { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
+      { to: "/app/cargos", label: "Cargos", icon: Briefcase },
+      { to: "/app/setores", label: "Setores", icon: Building2 },
+    ],
+  },
+  {
+    label: "Cadastros",
+    items: [
+      {
+        label: "Médicos & Horários",
+        icon: Users,
+        children: [
+          { to: "/app/equipe", label: "Médicos", icon: Users },
+          { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
+        ],
+      },
+      {
+        to: "/app/especialidades",
+        label: "Serviços",
+        icon: Stethoscope,
+        aliases: ["/app/tipos-servico", "/app/procedimentos"],
+      },
+      {
+        label: "Modelos",
+        icon: FileHeart,
+        children: [
+          { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
+          { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
+        ],
+      },
+      {
+        label: "Unidades & Estoque",
+        icon: MapPin,
+        children: [
+          { to: "/app/unidades", label: "Unidades", icon: MapPin },
+          { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
+        ],
+      },
+      { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
+      {
+        to: "/app/clientes/solicitacoes-portal",
+        label: "Pedidos da Área do Paciente",
+        icon: Users,
+      },
+      { to: "/app/revisao-convenio", label: "Revisão de convênio", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "Marketing & Inteligência",
+    items: [
+      { to: "/app/crm", label: "CRM", icon: Target },
+      {
+        label: "Campanhas, Envios & Landing Pages",
+        icon: Megaphone,
+        children: [
+          { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
+          { to: "/app/campanhas", label: "Campanhas", icon: Send },
+          { to: "/app/mkt-envios", label: "Envios", icon: Send },
+          { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles },
+          { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter },
+        ],
+      },
+      {
+        label: "Enfermeira IA & Informações Rápidas",
+        icon: BellRing,
+        children: [
+          { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
+          { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
+        ],
+      },
+      // O antigo grupo "Nina — WhatsApp" saiu daqui: tudo de atendimento por
+      // mensagem passou a viver no portal "OS ZAP", nas seções
+      // "Atendimento", "Nina" e "Configurações do WhatsApp" logo abaixo.
+    ],
+  },
+  {
+    label: "Recursos Humanos",
+    items: [
+      { to: "/app/hr-ponto", label: "Marcação de ponto", icon: GraduationCap },
+      { to: "/app/hr-contratos", label: "Funcionários", icon: FileText },
+      { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
+      { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
+      { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
+      { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
+    ],
+  },
+  {
     label: "Configurações",
     items: [
+      // "Perfis" define o que cada PERFIL abre; "Equipe e acessos" marca, pessoa
+      // a pessoa, quem é da gestão. São coisas diferentes e ficam lado a lado
+      // de propósito: quem procura uma costuma querer a outra.
+      {
+        label: "Equipe & Acessos",
+        icon: ShieldCheck,
+        children: [
+          { to: "/app/equipe-acessos", label: "Equipe e acessos", icon: ShieldCheck },
+          { to: "/app/perfis", label: "Perfis", icon: KeyRound },
+        ],
+      },
       { to: "/app/configuracoes/prontuario", label: "Numeração de Prontuário", icon: FolderOpen },
-      { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
-      { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
-      { to: "/app/configuracoes/site-agendamento", label: "Agendamento pelo site", icon: KeyRound },
-      { to: "/app/configuracoes/dominios", label: "Domínios de acesso", icon: KeyRound },
-      { to: "/app/configuracoes/area-paciente", label: "Área do Paciente", icon: KeyRound },
-      { to: "/app/configuracoes/importar-clinica-total", label: "Importar Clínica Total", icon: FolderOpen },
-      { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
-      { to: "/app/backups", label: "Backups", icon: ShieldCheck },
+      {
+        label: "Painel & Totem / Voz",
+        icon: Monitor,
+        children: [
+          { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
+          { to: "/app/configuracoes/voz", label: "Voz & Áudio (TTS)", icon: KeyRound },
+        ],
+      },
+      {
+        label: "Domínios & Área do Paciente",
+        icon: KeyRound,
+        children: [
+          { to: "/app/configuracoes/dominios", label: "Domínios de acesso", icon: KeyRound },
+          { to: "/app/configuracoes/area-paciente", label: "Área do Paciente", icon: KeyRound },
+          {
+            to: "/app/configuracoes/site-agendamento",
+            label: "Agendamento pelo site",
+            icon: KeyRound,
+          },
+        ],
+      },
+      {
+        label: "Clínicas & Backups",
+        icon: Building2,
+        children: [
+          { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
+          { to: "/app/backups", label: "Backups", icon: ShieldCheck },
+          {
+            to: "/app/configuracoes/importar-clinica-total",
+            label: "Importar Clínica Total",
+            icon: FolderOpen,
+          },
+        ],
+      },
     ],
   },
   // ---------------------------------------------------------------------
@@ -1241,7 +1368,7 @@ function AppShellInner() {
         : navRows;
     const scopedNavRows = filteredByGroup
       .map((row) => {
-        if (row.label !== "Gestão") return row;
+        if (row.label !== "Gestão & Financeiro") return row;
         const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
         const items =
           !bypassSubsystem && portal === "gestao-pessoas"
@@ -1281,28 +1408,33 @@ function AppShellInner() {
     // Obs.: a flag `nina_desativada` desliga apenas a ASSISTENTE de IA (chat e
     // respostas automáticas). A ferramenta de atendimento do WhatsApp continua
     // no menu, pois é usada pela equipe manualmente.
-    const semAtendimentoMultiplo = atendimentoMultiploDisabled
-      ? permissionFilteredRows
-          .map((row) => ({
-            ...row,
-            items: row.items.filter((it) => isParent(it) || it.to !== "/app/atendimento-multiplo"),
-          }))
-          .filter((row) => row.items.length > 0)
-      : permissionFilteredRows;
     // Ambiente de testes da Nina (10 leads simultâneos): só com a flag ux_melhorias.
     // Ligação de demonstração por voz: só com a flag nina_ligacao_demo.
     const abasOcultas = new Set([
       ...(uxMelhorias ? [] : ["ambiente-testes"]),
       ...(ligacaoDemo ? [] : ["ligacao"]),
     ]);
-    return abasOcultas.size === 0
-      ? semAtendimentoMultiplo
-      : semAtendimentoMultiplo
-          .map((row) => ({
-            ...row,
-            items: row.items.filter((it) => isParent(it) || !abasOcultas.has(it.hash ?? "")),
-          }))
-          .filter((row) => row.items.length > 0);
+    const folhaVisivel = (it: NavLeaf) =>
+      !(atendimentoMultiploDisabled && it.to === "/app/atendimento-multiplo") &&
+      !abasOcultas.has(it.hash ?? "");
+    // As flags valem também para as telas dentro de grupos expansíveis
+    // (Atendimento Múltiplo fica dentro de "Caixa & Atendimento Múltiplo").
+    // Grupo que sobra com uma tela só vira item simples: abrir um grupo para
+    // achar um único link é um clique a mais sem motivo.
+    return permissionFilteredRows
+      .map((row) => ({
+        ...row,
+        items: row.items
+          .map((it): NavItem | null => {
+            if (!isParent(it)) return folhaVisivel(it) ? it : null;
+            const filhos = it.children.filter(folhaVisivel);
+            if (filhos.length === 0) return null;
+            if (filhos.length === 1) return filhos[0]!;
+            return { ...it, children: filhos };
+          })
+          .filter((it): it is NavItem => it !== null),
+      }))
+      .filter((row) => row.items.length > 0);
   };
   const flagFilteredRows = montarMenu(subsystem);
 
@@ -2086,7 +2218,9 @@ function AppShellInner() {
                           if (isParent(item)) {
                             const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                             const subKey = `${row.label}::${item.label}`;
-                            const subOpen = buscandoMenu ? true : (openGroups[subKey] ?? false);
+                            // Começa fechado, mas abre sozinho quando a tela
+                            // atual está dentro dele.
+                            const subOpen = buscandoMenu ? true : (openGroups[subKey] ?? subActive);
                             return (
                               <div
                                 key={subKey}
