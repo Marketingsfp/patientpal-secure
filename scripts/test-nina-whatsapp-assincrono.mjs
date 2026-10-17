@@ -52,6 +52,11 @@ try {
     "migration reexecutável sem duplicar a varredura",
   );
   check(
+    (await um("SELECT schedule FROM cron.job WHERE jobname='nina-whatsapp-varredura'")).schedule ===
+      "* * * * *",
+    "varredura a cada minuto (rede de segurança)",
+  );
+  check(
     (await um("SELECT job_url FROM nina_whatsapp_assincrono_config")).job_url ===
       "https://example.invalid/api/public/nina/processar",
     "URL derivada da configuração do vigia",
@@ -130,31 +135,51 @@ try {
     "desfecho repetido é ignorado",
   );
 
-  // "Conversa ocupada": sem espera aciona na hora; com espera, a varredura aciona depois.
+  // "Conversa ocupada": aciona de novo na hora; a rota recebe quanto esperar.
   const m3 = await msg();
   const t3 = (await um("SELECT nina_whatsapp_despachar($1,$2) id", [cid, m3])).id;
   const tok = async (id) =>
     (await um("SELECT token FROM nina_whatsapp_tarefas WHERE id=$1", [id])).token;
   let k = await tok(t3);
-  await q("SELECT * FROM nina_whatsapp_assumir($1,$2)", [t3, k]);
+  const primeira = await q("SELECT * FROM nina_whatsapp_assumir($1,$2)", [t3, k]);
+  check(primeira[0].aguardar_ms === 0, "primeira tentativa sem espera");
   await um("SELECT nina_whatsapp_finalizar($1,$2,'repetir',0,'CONVERSA_OCUPADA')", [t3, k]);
   t = await um("SELECT * FROM nina_whatsapp_tarefas WHERE id=$1", [t3]);
   check(t.estado === "enviada" && t.tentativas === 2, "ocupada sem espera: aciona de novo");
   k = t.token;
   await q("SELECT * FROM nina_whatsapp_assumir($1,$2)", [t3, k]);
-  await um("SELECT nina_whatsapp_finalizar($1,$2,'repetir',30000,'CONVERSA_OCUPADA')", [t3, k]);
+  const antes = (await um("SELECT count(*)::int n FROM net.requests")).n;
+  await um("SELECT nina_whatsapp_finalizar($1,$2,'repetir',20000,'CONVERSA_OCUPADA')", [t3, k]);
   t = await um("SELECT * FROM nina_whatsapp_tarefas WHERE id=$1", [t3]);
-  check(t.estado === "pendente" && t.token === null, "ocupada com espera: volta para a fila");
-  check((await um("SELECT nina_whatsapp_varrer() n")).n === 0, "varredura respeita a espera");
-  await q("UPDATE nina_whatsapp_tarefas SET disponivel_em=now()-interval '1 second' WHERE id=$1", [
-    t3,
-  ]);
+  check(t.estado === "enviada" && t.tentativas === 3, "ocupada com espera: aciona na hora mesmo");
   check(
-    (await um("SELECT nina_whatsapp_varrer() n")).n === 1,
-    "varredura aciona quando chega a hora",
+    (await um("SELECT count(*)::int n FROM net.requests")).n === antes + 1,
+    "sem depender da varredura",
   );
+  const comEspera = await q("SELECT * FROM nina_whatsapp_assumir($1,$2)", [t3, t.token]);
+  check(
+    comEspera[0].aguardar_ms > 15000 && comEspera[0].aguardar_ms <= 20000,
+    "a rota recebe quanto esperar",
+  );
+  await q("UPDATE nina_whatsapp_tarefas SET estado='enviada' WHERE id=$1", [t3]);
   t = await um("SELECT * FROM nina_whatsapp_tarefas WHERE id=$1", [t3]);
-  check(t.estado === "enviada" && t.tentativas === 3, "acionada pela varredura");
+  // Configuração desligada no meio: fica pendente e a varredura retoma depois.
+  const m7 = await msg();
+  const t7 = (await um("SELECT nina_whatsapp_despachar($1,$2) id", [cid, m7])).id;
+  const k7 = await tok(t7);
+  await q("SELECT * FROM nina_whatsapp_assumir($1,$2)", [t7, k7]);
+  await db.exec("UPDATE nina_whatsapp_assincrono_config SET ativo=false");
+  await um("SELECT nina_whatsapp_finalizar($1,$2,'repetir',0)", [t7, k7]);
+  check(
+    (await um("SELECT estado FROM nina_whatsapp_tarefas WHERE id=$1", [t7])).estado === "pendente",
+    "sem configuração: fica pendente",
+  );
+  await db.exec("UPDATE nina_whatsapp_assincrono_config SET ativo=true");
+  check((await um("SELECT nina_whatsapp_varrer() n")).n === 1, "varredura retoma a pendente");
+  check(
+    (await um("SELECT estado FROM nina_whatsapp_tarefas WHERE id=$1", [t7])).estado === "enviada",
+    "pendente acionada pela varredura",
+  );
 
   // Muitas tentativas ocupadas: vira encaminhamento para a equipe.
   await q("UPDATE nina_whatsapp_tarefas SET tentativas=10 WHERE id=$1", [t3]);
