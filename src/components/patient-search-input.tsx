@@ -3,6 +3,7 @@ import { FileText, Search, User, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { VoiceInput } from "@/components/voice-input";
 import { prontuarioExibicao } from "@/lib/prontuario";
@@ -94,6 +95,20 @@ function numerosOrcamentoBusca(term: string): { serie: string | null; numeros: n
     (n): n is number => typeof n === "number" && n > 0,
   );
   return numeros.length ? { serie: p.serie, numeros } : null;
+}
+
+// Foto do paciente na lista de sugestões. A foto fica em bucket privado, então
+// cada uma precisa de endereço assinado. O cache é do módulo (vale para todos
+// os campos de busca abertos) e guarda também "sem foto", para a mesma pessoa
+// não ser consultada de novo a cada tecla. Validade menor que a da assinatura
+// (1 h) para nunca entregar um endereço vencido.
+const FOTO_ASSINATURA_S = 3600;
+const FOTO_CACHE_MS = 50 * 60 * 1000;
+const fotoCache = new Map<string, { url: string | null; ate: number }>();
+
+function fotoEmCache(pacienteId: string): string | null {
+  const c = fotoCache.get(pacienteId);
+  return c && c.ate > Date.now() ? c.url : null;
 }
 
 const BRL_ORC = (v: number | null) =>
@@ -251,6 +266,58 @@ export function PatientSearchInput({
     };
   }, [termoLimpo, open, escopoOrc, aceitaOrcamento]);
 
+  // Fotos dos pacientes listados: carregadas DEPOIS que a lista aparece, numa
+  // consulta só para todos (ids) e numa assinatura em lote — a busca em si não
+  // espera por elas. Quem não tem foto fica com a silhueta.
+  const [, setFotosVersao] = useState(0);
+  useEffect(() => {
+    const agora = Date.now();
+    const faltam = options
+      .map((o) => o.id)
+      .filter((id) => {
+        const c = fotoCache.get(id);
+        return !c || c.ate <= agora;
+      });
+    if (faltam.length === 0) return;
+    let vivo = true;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .select("id, foto_url")
+        .in("id", faltam)
+        .not("foto_url", "is", null);
+      if (error) {
+        console.error("[patient-search] fotos", error.message);
+        return;
+      }
+      const ate = Date.now() + FOTO_CACHE_MS;
+      for (const id of faltam) fotoCache.set(id, { url: null, ate });
+      const comFoto = (data ?? []).filter((r): r is { id: string; foto_url: string } =>
+        Boolean(r.foto_url),
+      );
+      if (comFoto.length > 0) {
+        const { data: assinadas, error: errAss } = await supabase.storage
+          .from("pacientes-fotos")
+          .createSignedUrls(
+            comFoto.map((r) => r.foto_url),
+            FOTO_ASSINATURA_S,
+          );
+        if (errAss) console.error("[patient-search] assinar fotos", errAss.message);
+        const porCaminho = new Map(
+          (assinadas ?? []).map((a) => [a.path ?? "", a.signedUrl] as const),
+        );
+        for (const r of comFoto) {
+          const url = porCaminho.get(r.foto_url);
+          if (url) fotoCache.set(r.id, { url, ate });
+        }
+      }
+      if (vivo) setFotosVersao((v) => v + 1);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [options]);
+
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
@@ -373,6 +440,7 @@ export function PatientSearchInput({
               // Idade colada no nome: é o que separa mãe e filha homônimas
               // e mostra na hora se o paciente é de faixa pediátrica.
               const idade = formatarIdadeCurta(p.data_nascimento);
+              const foto = fotoEmCache(p.id);
               return (
                 <button
                   key={p.id}
@@ -384,7 +452,20 @@ export function PatientSearchInput({
                   }}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2"
                 >
-                  <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <Avatar className="h-9 w-9 shrink-0">
+                    {foto && (
+                      <AvatarImage
+                        src={foto}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="object-cover"
+                      />
+                    )}
+                    <AvatarFallback className="bg-muted text-muted-foreground">
+                      <User className="h-4 w-4" aria-hidden="true" />
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       <span className="font-medium truncate">
