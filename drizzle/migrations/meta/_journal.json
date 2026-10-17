@@ -253,6 +253,13 @@
       "when": 1792241344445,
       "tag": "0035_portal_anexos_clinicos_pedidos_exame",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792256312247,
+      "tag": "0036_nina_whatsapp_assincrono",
+      "breakpoints": true
     }
   ]
 }
