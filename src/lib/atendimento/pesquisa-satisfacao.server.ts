@@ -25,7 +25,8 @@ export const TRAVA_ENVIO_PESQUISA = "enviando:";
 export const PRAZO_ENVIO_FILA_PESQUISA_MS = 2 * 60 * 60 * 1000;
 /** Trava mais velha que isso = envio interrompido; não reenvia para não duplicar. */
 export const TRAVA_MAXIMA_PESQUISA_MS = 5 * 60 * 1000;
-const LOTE_FILA_PESQUISA = 10;
+/** Pesquisas por rodada (decisão do usuário, 17/10/2026): ~1,5 s cada, rodada de ~30 s. */
+export const LOTE_FILA_PESQUISA = 20;
 
 type RegistrarArgs = {
   db: Db;

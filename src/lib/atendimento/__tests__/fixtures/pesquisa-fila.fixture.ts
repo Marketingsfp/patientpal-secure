@@ -9,6 +9,7 @@ mock.module("@/lib/whatsapp.server", () => ({
 }));
 const {
   enviarPesquisasNaFila,
+  LOTE_FILA_PESQUISA,
   processarRespostaPesquisaSatisfacao,
   registrarPesquisaNaFila,
   TRAVA_ENVIO_PESQUISA,
@@ -272,6 +273,23 @@ function metaFalsa(falhar = false) {
   assert.equal(enviada.tratada, true);
   assert.equal(db.tabelas.atend_avaliacoes[0].status, "respondida");
   assert.equal(db.tabelas.atend_avaliacoes[0].nota, 5);
+}
+
+// 9) Até 20 por rodada; o resto sai na rodada seguinte.
+{
+  assert.equal(LOTE_FILA_PESQUISA, 20);
+  const ids = Array.from({ length: 25 }, (_, i) => `c${i}`);
+  const db = banco({
+    atend_avaliacoes: ids.map((c, i) => pesquisa(`p${i}`, c)),
+    atend_conversas: ids.map((c) => conversa(c)),
+    whatsapp_mensagens: [],
+  });
+  const meta = metaFalsa();
+  const primeira = await enviarPesquisasNaFila({ db: db as never, agora, enviar: meta.enviar });
+  assert.equal(primeira.enviadas, 20);
+  const segunda = await enviarPesquisasNaFila({ db: db as never, agora, enviar: meta.enviar });
+  assert.equal(segunda.enviadas, 5);
+  assert.equal(meta.chamadas.length, 25);
 }
 
 console.log("Fila da pesquisa validada com banco simulado.");
