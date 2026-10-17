@@ -1,10 +1,24 @@
 import { mock } from "bun:test";
 import assert from "node:assert/strict";
-mock.module("@/lib/nina/espera-paciente.server", () => ({ limparEsperaPaciente: async () => {} }));
+let limpezas = 0;
+mock.module("@/lib/nina/espera-paciente.server", () => ({
+  limparEsperaPaciente: async () => {
+    limpezas++;
+  },
+}));
 const { resolverConversaCore } = await import("../../resolver-conversa.server");
-for (const actor of ["admin", "supervisor"]) {
+// Sem conversa lida (Nina e bloqueio de contato): igual a antes. Com ela
+// (botão Encerrar, 17/10/2026): não relê a conversa nem limpa o prazo à parte.
+for (const [actor, jaLida] of [
+  ["admin", false],
+  ["supervisor", false],
+  ["admin", true],
+  ["supervisor", true],
+] as const) {
   let update: any = null,
-    event: any = null;
+    event: any = null,
+    leituras = 0;
+  limpezas = 0;
   const db = {
     from(table: string) {
       const q: any = {
@@ -15,6 +29,7 @@ for (const actor of ["admin", "supervisor"]) {
           return q;
         },
         async maybeSingle() {
+          leituras++;
           return {
             data: {
               atribuida_user_id: "ana",
@@ -44,7 +59,24 @@ for (const actor of ["admin", "supervisor"]) {
     conversaId: "conversa",
     userId: actor,
     adiarResumo: true,
+    ...(jaLida
+      ? {
+          conversaLida: {
+            atribuida_user_id: "ana",
+            last_assigned_user_id: "ana",
+            nina_fluxo_estado: null,
+            protocolo_atendimento: "MJ-1",
+          },
+        }
+      : {}),
   });
+  assert.equal(leituras, jaLida ? 0 : 1);
+  assert.equal(limpezas, jaLida ? 0 : 1);
+  // O prazo de espera continua zerado pela própria atualização.
+  assert.equal(update.awaiting_patient_since, null);
+  assert.equal(update.patient_response_deadline, null);
+  assert.equal(update.status, "closed");
+  assert.equal(event.detalhes.protocolo, "MJ-1");
   assert.equal(update.resolved_by, actor);
   assert.equal(update.last_assigned_user_id, "ana");
   assert.equal(update.atribuida_user_id, null);

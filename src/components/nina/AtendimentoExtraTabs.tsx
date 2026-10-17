@@ -33,6 +33,7 @@ import {
 import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
 import { mensagemDoFrancisco } from "@/lib/francisco/autoria";
 import { rotuloRemetente } from "@/lib/atendimento/remetente-mensagem";
+import { aplicarEncerramentoLocal } from "@/lib/atendimento/encerramento-local";
 import {
   aplicarVariaveis,
   detectarComandoNoTexto,
@@ -3549,6 +3550,13 @@ function AtendInboxOperacional({
           conversaId: origem,
         },
       });
+      // Libera a tela já (17/10/2026): a conversa aparece encerrada na hora —
+      // sem o botão Encerrar e com o envio travado — e a lista recarrega em
+      // segundo plano, sem segurar o "Encerrando…".
+      setSel((atual: any) => (atual ? aplicarEncerramentoLocal(atual, origem, meuId) : atual));
+      setConvs((prev: any[]) => prev.map((c) => aplicarEncerramentoLocal(c, origem, meuId)));
+      fechandoRef.current = false;
+      setFechando(false);
       if (!resultado.pesquisaEnviada && resultado.pesquisaMotivo)
         toast.warning(
           `Conversa encerrada, mas a pesquisa não foi enviada: ${resultado.pesquisaMotivo}`,
@@ -3559,10 +3567,10 @@ function AtendInboxOperacional({
       );
       cacheConversas.current.invalidar(origem);
       prefetchMsgs.current.invalidar(origem);
-      await Promise.all([
+      void Promise.all([
         carregarConvs(),
         selIdRef.current === origem ? carregarConversa() : Promise.resolve(),
-      ]);
+      ]).catch((e) => console.error("[encerrar] recarga após encerrar", e));
     } catch (e: any) {
       mostrarErro(e);
     } finally {

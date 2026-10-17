@@ -20,18 +20,22 @@ type SolicitarArgs = {
   conversaId: string;
   atendenteUserId: string | null;
   solicitadaPorUserId: string;
+  /** Telefone e marca de teste já lidos pelo encerramento (17/10/2026): não relê a conversa. */
+  conversa?: { contato_telefone: string | null; is_teste: boolean | null };
 };
 
 export async function solicitarPesquisaSatisfacao(args: SolicitarArgs) {
   if (!args.atendenteUserId)
     return { enviada: false, motivo: "Conversa encerrada sem atendente responsável." } as const;
 
-  const { data: conversa, error: erroConversa } = await args.db
-    .from("atend_conversas")
-    .select("contato_telefone, is_teste")
-    .eq("id", args.conversaId)
-    .eq("clinica_id", args.clinicaId)
-    .maybeSingle();
+  const { data: conversa, error: erroConversa } = args.conversa
+    ? { data: args.conversa, error: null }
+    : await args.db
+        .from("atend_conversas")
+        .select("contato_telefone, is_teste")
+        .eq("id", args.conversaId)
+        .eq("clinica_id", args.clinicaId)
+        .maybeSingle();
   if (erroConversa || !conversa?.contato_telefone)
     return { enviada: false, motivo: "Conversa sem telefone para enviar a pesquisa." } as const;
   if (conversa.is_teste)

@@ -28,18 +28,37 @@ export type ResolverConversaArgs = {
   motivo?: string | null;
   /** Não espera a IA reescrever o resumo (o chamador dispara depois, em separado). */
   adiarResumo?: boolean;
+  /**
+   * Conversa já lida por quem chama (botão Encerrar, 17/10/2026): não relê a
+   * linha nem faz a limpeza separada do prazo de espera, que a atualização
+   * abaixo já zera. Nina e bloqueio de contato não passam isto e seguem iguais.
+   */
+  conversaLida?: ConversaLidaParaResolver;
+};
+
+export type ConversaLidaParaResolver = {
+  atribuida_user_id: string | null;
+  last_assigned_user_id: string | null;
+  nina_fluxo_estado: unknown;
+  protocolo_atendimento: string | null;
 };
 
 export async function resolverConversaCore(
   db: Db,
   args: ResolverConversaArgs,
 ): Promise<{ ok: true; protocol: string | null }> {
-  const { data: dono } = await db
-    .from("atend_conversas")
-    .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, protocolo_atendimento")
-    .eq("id", args.conversaId)
-    .eq("clinica_id", args.clinicaId)
-    .maybeSingle();
+  const dono =
+    args.conversaLida ??
+    (
+      await db
+        .from("atend_conversas")
+        .select(
+          "atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, protocolo_atendimento",
+        )
+        .eq("id", args.conversaId)
+        .eq("clinica_id", args.clinicaId)
+        .maybeSingle()
+    ).data;
 
   // O número legado ATD-* deixou de ser gerado: o atendimento tem UM único
   // protocolo, o oficial (`protocolo_atendimento`), criado no handoff. Aqui
@@ -48,8 +67,10 @@ export async function resolverConversaCore(
     (dono as { protocolo_atendimento?: string | null } | null)?.protocolo_atendimento ?? null;
 
   // Prazos de espera e estados transacionais morrem com a resolução.
-  const { limparEsperaPaciente } = await import("@/lib/nina/espera-paciente.server");
-  await limparEsperaPaciente(args.clinicaId, args.conversaId);
+  if (!args.conversaLida) {
+    const { limparEsperaPaciente } = await import("@/lib/nina/espera-paciente.server");
+    await limparEsperaPaciente(args.clinicaId, args.conversaId);
+  }
   const { encerrarEstadosTransacionais } = await import("@/lib/nina/sessao");
   const { normalizarEstado } = await import("@/lib/nina/fluxo-estado-normalizar");
   const estadoEncerrado = encerrarEstadosTransacionais(

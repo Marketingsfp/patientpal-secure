@@ -962,25 +962,37 @@ export const fecharConversa = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertMember(context.supabase, context.userId, data.clinicaId);
-    // Supervisão encerra sem assumir; autoria continua sendo a sessão autenticada.
-    const { data: dono, error: erroConversa } = await context.supabase
-      .from("atend_conversas")
-      .select("atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, status")
-      .eq("id", data.conversaId)
-      .eq("clinica_id", data.clinicaId)
-      .maybeSingle();
-    if (erroConversa) throw new Error(erroConversa.message);
-    if (!dono) throw new Error("Conversa não encontrada nesta clínica.");
-    if (dono.status === "closed" || dono.status === "finished")
-      throw new Error("Esta conversa já foi encerrada.");
-    const [{ data: gestao, error: erroGestao }, admin] = await Promise.all([
+    // Conferências e leitura da conversa saem juntas (desempenho, 17/10/2026);
+    // os resultados são lidos na mesma ordem de antes e nada é alterado sem
+    // todas aprovadas. Supervisão encerra sem assumir; autoria continua sendo
+    // a sessão autenticada.
+    const [membroR, conversaR, gestaoR, adminR] = await Promise.allSettled([
+      assertMember(context.supabase, context.userId, data.clinicaId),
+      context.supabase
+        .from("atend_conversas")
+        .select(
+          "atribuida_user_id, last_assigned_user_id, nina_fluxo_estado, status, protocolo_atendimento, contato_telefone, is_teste",
+        )
+        .eq("id", data.conversaId)
+        .eq("clinica_id", data.clinicaId)
+        .maybeSingle(),
       context.supabase.rpc("can_manage_clinica", {
         _user_id: context.userId,
         _clinica_id: data.clinicaId,
       }),
       ehAdminClinica(context.supabase, context.userId, data.clinicaId),
     ]);
+    if (membroR.status === "rejected") throw membroR.reason;
+    if (conversaR.status === "rejected") throw conversaR.reason;
+    const { data: dono, error: erroConversa } = conversaR.value;
+    if (erroConversa) throw new Error(erroConversa.message);
+    if (!dono) throw new Error("Conversa não encontrada nesta clínica.");
+    if (dono.status === "closed" || dono.status === "finished")
+      throw new Error("Esta conversa já foi encerrada.");
+    if (gestaoR.status === "rejected") throw gestaoR.reason;
+    if (adminR.status === "rejected") throw adminR.reason;
+    const { data: gestao, error: erroGestao } = gestaoR.value;
+    const admin = adminR.value;
     if (erroGestao) throw new Error(erroGestao.message);
     if (
       !podeEncerrarConversa({
@@ -1003,6 +1015,12 @@ export const fecharConversa = createServerFn({ method: "POST" })
       // A IA do resumo é lenta: o botão volta já; o resumo é atualizado em
       // seguida por `atualizarResumoEncerramento`, chamado pela tela.
       adiarResumo: true,
+      conversaLida: {
+        atribuida_user_id: dono.atribuida_user_id,
+        last_assigned_user_id: dono.last_assigned_user_id,
+        nina_fluxo_estado: dono.nina_fluxo_estado,
+        protocolo_atendimento: dono.protocolo_atendimento,
+      },
     });
     const atendenteAvaliada = dono.atribuida_user_id ?? dono.last_assigned_user_id ?? null;
     const { solicitarPesquisaSatisfacao } =
@@ -1014,6 +1032,7 @@ export const fecharConversa = createServerFn({ method: "POST" })
       conversaId: data.conversaId,
       atendenteUserId: atendenteAvaliada,
       solicitadaPorUserId: context.userId,
+      conversa: { contato_telefone: dono.contato_telefone, is_teste: dono.is_teste },
     });
     return {
       ok: true,
