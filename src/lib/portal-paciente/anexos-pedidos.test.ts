@@ -164,19 +164,33 @@ test("helper SQL autoriza os seis papéis ativos e recusa financeiro/inativo", a
     expect(r.rows[0]?.pode).toBe(true);
   }
   await db.exec(`UPDATE clinica_memberships SET role='financeiro' WHERE user_id='${u}'`);
-  expect((await db.query<{ pode: boolean }>(`SELECT portal_pode_liberar('${c1}') AS pode`)).rows[0]?.pode).toBe(false);
+  expect(
+    (await db.query<{ pode: boolean }>(`SELECT portal_pode_liberar('${c1}') AS pode`)).rows[0]
+      ?.pode,
+  ).toBe(false);
   await db.exec(`UPDATE clinica_memberships SET role='admin',ativo=false WHERE user_id='${u}'`);
-  expect((await db.query<{ pode: boolean }>(`SELECT portal_pode_liberar('${c1}') AS pode`)).rows[0]?.pode).toBe(false);
+  expect(
+    (await db.query<{ pode: boolean }>(`SELECT portal_pode_liberar('${c1}') AS pode`)).rows[0]
+      ?.pode,
+  ).toBe(false);
   await db.exec(`UPDATE clinica_memberships SET ativo=true WHERE user_id='${u}'`);
 });
 
 test("automático por clínica não libera internos ou arquivos de outra unidade", async () => {
-  await db.exec(`UPDATE portal_paciente_config SET auto_liberar='{"anexo_clinico":true}' WHERE clinica_id='${c1}'`);
-  const clinico = await db.query<{ liberado_paciente_por: string }>(`INSERT INTO paciente_arquivos(clinica_id,paciente_id,tipo,caminho,finalidade_portal) VALUES('${c1}','${p1}','anexo','${c1}/${p1}/anexo/auto.pdf','clinico') RETURNING liberado_paciente_por`);
+  await db.exec(
+    `UPDATE portal_paciente_config SET auto_liberar='{"anexo_clinico":true}' WHERE clinica_id='${c1}'`,
+  );
+  const clinico = await db.query<{ liberado_paciente_por: string }>(
+    `INSERT INTO paciente_arquivos(clinica_id,paciente_id,tipo,caminho,finalidade_portal) VALUES('${c1}','${p1}','anexo','${c1}/${p1}/anexo/auto.pdf','clinico') RETURNING liberado_paciente_por`,
+  );
   expect(clinico.rows[0]?.liberado_paciente_por).toBe(u);
-  const interno = await db.query<{ liberado_paciente_em: string | null }>(`INSERT INTO paciente_arquivos(clinica_id,paciente_id,tipo,caminho) VALUES('${c1}','${p1}','anexo','legado/interno-auto.pdf') RETURNING liberado_paciente_em`);
+  const interno = await db.query<{ liberado_paciente_em: string | null }>(
+    `INSERT INTO paciente_arquivos(clinica_id,paciente_id,tipo,caminho) VALUES('${c1}','${p1}','anexo','legado/interno-auto.pdf') RETURNING liberado_paciente_em`,
+  );
   expect(interno.rows[0]?.liberado_paciente_em).toBeNull();
   await db.exec("SELECT set_config('test.uid','',false)");
-  const outra = await db.query<{ liberado_paciente_em: string | null }>(`INSERT INTO paciente_arquivos(clinica_id,paciente_id,tipo,caminho,finalidade_portal) VALUES('${c2}','${p2}','anexo','${c2}/${p2}/anexo/teste.pdf','clinico') RETURNING liberado_paciente_em`);
+  const outra = await db.query<{ liberado_paciente_em: string | null }>(
+    `INSERT INTO paciente_arquivos(clinica_id,paciente_id,tipo,caminho,finalidade_portal) VALUES('${c2}','${p2}','anexo','${c2}/${p2}/anexo/teste.pdf','clinico') RETURNING liberado_paciente_em`,
+  );
   expect(outra.rows[0]?.liberado_paciente_em).toBeNull();
 });
