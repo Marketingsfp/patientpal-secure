@@ -69,9 +69,22 @@ function banco(ms: any[], es: any[]) {
   let membro = true,
     gestor = true,
     falha: string | null = null;
+  // Início e fim de cada ida ao banco: mostra o que roda ao mesmo tempo.
+  const linhaDoTempo: string[] = [];
+  const depois = <T>(marca: string, valor: () => T) =>
+    new Promise<T>((ok) =>
+      setTimeout(() => {
+        linhaDoTempo.push(`fim:${marca}`);
+        ok(valor());
+      }, 0),
+    );
   const client = {
-    rpc: async (nome: string) => ({ data: nome === "is_member" ? membro : gestor, error: null }),
+    rpc: (nome: string) => {
+      linhaDoTempo.push(`inicio:${nome}`);
+      return depois(nome, () => ({ data: nome === "is_member" ? membro : gestor, error: null }));
+    },
     from(tabela: string) {
+      linhaDoTempo.push(`inicio:${tabela}`);
       // Checagem de supervisão (permissão), não é leitura do histórico.
       if (tabela === "atend_departamento_membros") {
         const vazio: any = {
@@ -107,15 +120,16 @@ function banco(ms: any[], es: any[]) {
           limite = n;
           return q;
         },
-        maybeSingle: async () => ({
-          data: {
-            id: base.conversa_id,
-            owner_type: "HUMAN",
-            atribuida_user_id: uuid(4),
-            status: "open",
-          },
-          error: null,
-        }),
+        maybeSingle: () =>
+          depois(tabela, () => ({
+            data: {
+              id: base.conversa_id,
+              owner_type: "HUMAN",
+              atribuida_user_id: uuid(4),
+              status: "open",
+            },
+            error: null,
+          })),
         then(resolve: any) {
           const todas =
             tabela === "whatsapp_mensagens"
@@ -134,7 +148,7 @@ function banco(ms: any[], es: any[]) {
             })
             .slice(0, limite);
           leituras.push({ tabela, limite, linhas: rows.length });
-          return Promise.resolve(
+          return depois(tabela, () =>
             resolve({ data: rows, error: falha === tabela ? { message: "indisponível" } : null }),
           );
         },
@@ -144,6 +158,7 @@ function banco(ms: any[], es: any[]) {
   };
   return {
     leituras,
+    linhaDoTempo,
     negarClinica: () => {
       membro = false;
     },
@@ -296,6 +311,30 @@ describe("histórico conjunto paginado", () => {
       await expect(db.pagina()).rejects.toThrow();
       expect(db.leituras).toHaveLength(0);
     }
+  });
+
+  it("sem clínica e sem conversa, o erro continua sendo o da clínica", async () => {
+    const db = banco([mensagem(1)], [evento(1)]);
+    db.negarClinica();
+    db.negarConversa();
+    await expect(db.pagina()).rejects.toThrow("Sem acesso a esta clínica");
+    expect(db.leituras).toHaveLength(0);
+  });
+
+  it("confere clínica e conversa ao mesmo tempo; citações e nomes também (17/10/2026)", async () => {
+    const citando = { ...mensagem(1), quoted_message_id: "wamid.antiga" };
+    const db = banco([citando], [evento(2)]);
+    await db.pagina();
+    const t = db.linhaDoTempo;
+    // A conversa começa a ser conferida antes de a checagem da clínica terminar.
+    expect(t.indexOf("inicio:atend_conversas")).toBeLessThan(t.indexOf("fim:is_member"));
+    // Mensagens só são buscadas depois das duas conferências.
+    const mensagens = t.indexOf("inicio:whatsapp_mensagens");
+    expect(mensagens).toBeGreaterThan(t.indexOf("fim:is_member"));
+    expect(mensagens).toBeGreaterThan(t.indexOf("fim:atend_conversas"));
+    // Nomes dos avisos começam antes de a busca das citações terminar.
+    expect(t.indexOf("inicio:profiles")).toBeLessThan(t.lastIndexOf("fim:whatsapp_mensagens"));
+    expect(t.filter((m) => m === "inicio:whatsapp_mensagens")).toHaveLength(2);
   });
 
   it("erro em uma fonte não vira página parcial nem falso fim do histórico", async () => {

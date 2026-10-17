@@ -21,10 +21,18 @@ export async function carregarPaginaHistorico(
     depois?: CursorHistorico;
   },
 ) {
-  const membro = await supabase.rpc("is_member", { _user_id: userId, _clinica_id: args.clinicaId });
+  // As duas conferências saem juntas (desempenho, 17/10/2026), mas são lidas
+  // na mesma ordem de antes: clínica primeiro, depois a conversa. Nenhuma
+  // mensagem é buscada sem as duas aprovadas.
+  const [membroR, acessoR] = await Promise.allSettled([
+    supabase.rpc("is_member", { _user_id: userId, _clinica_id: args.clinicaId }),
+    assertAcessoConversa(supabase, userId, args.clinicaId, args.conversaId),
+  ]);
+  if (membroR.status === "rejected") throw membroR.reason;
+  const membro = membroR.value;
   if (membro.error) throw new Error(membro.error.message);
   if (!membro.data) throw new Error("Sem acesso a esta clínica");
-  await assertAcessoConversa(supabase, userId, args.clinicaId, args.conversaId);
+  if (acessoR.status === "rejected") throw acessoR.reason;
   const cursor = args.antes ?? args.depois;
   const sentido = args.depois ? "novas" : "anteriores";
   const crescente = sentido === "novas";
@@ -60,13 +68,11 @@ export async function carregarPaginaHistorico(
   if (m.error) throw new Error(m.error.message);
   if (e.error) throw new Error(e.error.message);
   const pagina = montarPaginaHistorico(m.data ?? [], e.data ?? [], sentido, tamanho);
-  pagina.mensagens = await anexarCitacoes(
-    supabase,
-    args.clinicaId,
-    args.conversaId,
-    pagina.mensagens,
-  );
-  pagina.eventos = await preencherNomesEventos(supabase, pagina.eventos);
+  // Citações e nomes dos avisos não dependem um do outro: saem juntos.
+  [pagina.mensagens, pagina.eventos] = await Promise.all([
+    anexarCitacoes(supabase, args.clinicaId, args.conversaId, pagina.mensagens),
+    preencherNomesEventos(supabase, pagina.eventos),
+  ]);
   return pagina;
 }
 
