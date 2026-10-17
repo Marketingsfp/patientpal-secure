@@ -1,5 +1,10 @@
 import { AvisoSolicitacaoPortal } from "@/components/portal-paciente/aviso-solicitacao-portal";
-import { AlertasAtivosBanner } from "@/components/medico/paciente-dialogs";
+import { PedidosExamePanel } from "@/components/medico/pedidos-exame-panel";
+import {
+  AlertasAtivosBanner,
+  ArquivosPacienteDialog,
+  DocumentosDialog,
+} from "@/components/medico/paciente-dialogs";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Pencil, Users } from "lucide-react";
@@ -23,7 +28,22 @@ import { LinhaDoTempoProntuario } from "@/components/prontuario/linha-do-tempo-p
 
 export const Route = createFileRoute("/_authenticated/app/clientes/$pacienteId/visualizar")({
   component: VisualizarClientePage,
-  head: () => ({ meta: [{ title: "Visualizar cliente — ClinicaOS" }] }),
+  head: () => ({
+    meta: [
+      { title: "Ficha do paciente — ClinicaOS" },
+      {
+        name: "description",
+        content: "Cadastro, documentos clínicos e pedidos de exame do paciente.",
+      },
+      { property: "og:title", content: "Ficha do paciente — ClinicaOS" },
+      {
+        property: "og:description",
+        content: "Cadastro, documentos clínicos e pedidos de exame do paciente.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
 function VisualizarClientePage() {
@@ -47,6 +67,7 @@ function VisualizarClientePage() {
   >(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [janelaArquivo, setJanelaArquivo] = useState<"anexo" | "foto" | "documentos" | null>(null);
   const [aba, setAba] = useState("cadastro");
 
   useEffect(() => {
@@ -134,6 +155,7 @@ function VisualizarClientePage() {
               <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
               <TabsTrigger value="cartoes">Cartões</TabsTrigger>
               <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+              <TabsTrigger value="documentos">Documentos e anexos</TabsTrigger>
               {verProntuario && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}
               <TabsTrigger value="hiperdia">Hiperdia</TabsTrigger>
               {/* Sem trava de módulo de propósito: a recepção precisa responder
@@ -157,6 +179,39 @@ function VisualizarClientePage() {
               </div>
             </TabsContent>
 
+            <TabsContent value="documentos" className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setJanelaArquivo("anexo")}>
+                  Anexos
+                </Button>
+                <Button variant="outline" onClick={() => setJanelaArquivo("foto")}>
+                  Fotos
+                </Button>
+                <Button variant="outline" onClick={() => setJanelaArquivo("documentos")}>
+                  Documentos emitidos
+                </Button>
+              </div>
+              <PedidosExamePanel clinicaId={clinicaAtual.clinica_id} pacienteId={paciente.id} />
+              {janelaArquivo === "documentos" && (
+                <DocumentosDialog
+                  open
+                  onOpenChange={(v) => !v && setJanelaArquivo(null)}
+                  clinicaId={clinicaAtual.clinica_id}
+                  pacienteId={paciente.id}
+                  pacienteNome={paciente.nome}
+                />
+              )}
+              {(janelaArquivo === "anexo" || janelaArquivo === "foto") && (
+                <ArquivosPacienteDialog
+                  open
+                  onOpenChange={(v) => !v && setJanelaArquivo(null)}
+                  clinicaId={clinicaAtual.clinica_id}
+                  pacienteId={paciente.id}
+                  pacienteNome={paciente.nome}
+                  tipo={janelaArquivo}
+                />
+              )}
+            </TabsContent>
             <TabsContent value="cartoes">
               <PacienteCartoesBeneficios
                 pacienteId={paciente.id}

@@ -3,7 +3,7 @@
 ## Área do Paciente — decisões de 17/10/2026 (não publicar)
 - [x] Registrar papéis confirmados para liberação de documentos.
 - [x] Conferir pré-requisitos ausentes da fase 2 e obter aprovação do plano.
-- [ ] Aplicar proposta SQL completa após confirmação explícita; banco compartilhado com produção.
+- [ ] Aplicar SQL aprovado em 17/10, após conferir escritores e compatibilidade de uploads internos/service_role.
 - [ ] Restabelecer fase 2 sem substituir alterações recentes.
 - [ ] Anexos clínicos: categorias seguras, liberação manual/automática, download de 5 minutos por sessão e auditoria.
 - [ ] Pedidos de exame: tabela própria, emissão/PDF/listagem/cancelamento e migração somente de pedidos identificados com segurança.

@@ -1,4 +1,4 @@
--- PROPOSTA PARA REVISÃO. NÃO APLICADA.
+-- APROVADA em 17/10/2026; validação de caminho restrita a arquivos clínicos.
 -- Banco compartilhado entre prévia e produção. Nenhum dado clínico é migrado aqui.
 -- As tabelas paciente_arquivos e documentos_emitidos estavam vazias na conferência.
 
@@ -105,7 +105,10 @@ BEGIN
     WHERE p.id = NEW.paciente_id AND p.clinica_id = NEW.clinica_id) THEN
     RAISE EXCEPTION 'Vínculo de paciente inválido.' USING ERRCODE = '42501';
   END IF;
-  IF NEW.caminho NOT LIKE NEW.clinica_id::text || '/' || NEW.paciente_id::text || '/' || NEW.tipo || '/%' THEN
+  -- Upload interno legado/service_role não depende do formato nem de auth.uid().
+  -- Classificar como clínico ou liberar exige o caminho isolado completo.
+  IF (NEW.finalidade_portal = 'clinico' OR NEW.liberado_paciente_em IS NOT NULL)
+    AND NEW.caminho NOT LIKE NEW.clinica_id::text || '/' || NEW.paciente_id::text || '/' || NEW.tipo || '/%' THEN
     RAISE EXCEPTION 'Caminho de arquivo inválido.' USING ERRCODE = '42501';
   END IF;
   IF TG_OP = 'UPDATE' THEN

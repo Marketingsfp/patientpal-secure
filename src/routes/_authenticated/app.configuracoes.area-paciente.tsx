@@ -14,10 +14,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { gerarCodigoTeste } from "@/lib/portal-paciente/portal-equipe.functions";
+import { NOME_TIPO, TIPOS_LIBERAVEIS } from "@/lib/portal-paciente/regras-fase2";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/area-paciente")({
   component: Pagina,
-  head: () => ({ meta: [{ title: "Área do Paciente — ClinicaOS" }] }),
+  head: () => ({
+    meta: [
+      { title: "Configurações da Área do Paciente — ClinicaOS" },
+      {
+        name: "description",
+        content: "Configuração por clínica, documentos e auditoria da Área do Paciente.",
+      },
+      { property: "og:title", content: "Configurações da Área do Paciente — ClinicaOS" },
+      {
+        property: "og:description",
+        content: "Configuração por clínica, documentos e auditoria da Área do Paciente.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
 const EVENTO: Record<string, string> = {
@@ -38,6 +54,12 @@ const EVENTO: Record<string, string> = {
   confirmou_agendamento: "Confirmou agendamento",
   cancelou_agendamento: "Cancelou agendamento",
   solicitou_alteracao: "Pediu atualização de cadastro",
+  ver_documentos: "Viu documentos",
+  ver_financeiro: "Viu financeiro",
+  gerou_link: "Pediu download",
+  baixou_arquivo: "Baixou arquivo",
+  equipe_liberou: "Equipe liberou documento",
+  equipe_retirou: "Equipe retirou liberação",
 };
 
 function Pagina() {
@@ -52,11 +74,11 @@ function Pagina() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("portal_paciente_config")
-        .select("ativo, cancelar_horas_min")
+        .select("ativo, cancelar_horas_min, auto_liberar")
         .eq("clinica_id", clinicaId as string)
         .maybeSingle();
       if (error) throw error;
-      return data ?? { ativo: false, cancelar_horas_min: 2 };
+      return data ?? { ativo: false, cancelar_horas_min: 2, auto_liberar: {} };
     },
   });
   const termo = useQuery({
@@ -110,16 +132,18 @@ function Pagina() {
     }
   }, [termo.data]);
 
-  const salvarCfg = async (patch: { ativo?: boolean; cancelar_horas_min?: number }) => {
+  const salvarCfg = async (patch: {
+    ativo?: boolean;
+    cancelar_horas_min?: number;
+    auto_liberar?: Record<string, boolean>;
+  }) => {
     if (!clinicaId) return;
-    const { error } = await supabase
-      .from("portal_paciente_config")
-      .upsert({
-        clinica_id: clinicaId,
-        ...cfg.data,
-        ...patch,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("portal_paciente_config").upsert({
+      clinica_id: clinicaId,
+      ...cfg.data,
+      ...patch,
+      updated_at: new Date().toISOString(),
+    });
     if (error) return mostrarErro(error);
     toast.success("Salvo.");
     void qc.invalidateQueries({ queryKey: ["portal-config", clinicaId] });
@@ -188,6 +212,30 @@ function Pagina() {
               Salvar
             </Button>
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Liberar automaticamente ao finalizar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Desligado: a equipe libera cada documento pelo botão "Liberar ao paciente". Ligado: o
+            documento vai para a Área do Paciente assim que é emitido (resultado de exame: quando
+            sai de "pendente"). Prontuário e evolução nunca vão.
+          </p>
+          {TIPOS_LIBERAVEIS.map((t) => {
+            const atual = (cfg.data?.auto_liberar ?? {}) as Record<string, boolean>;
+            return (
+              <div key={t} className="flex items-center gap-3">
+                <Switch
+                  checked={!!atual[t]}
+                  onCheckedChange={(v) => void salvarCfg({ auto_liberar: { ...atual, [t]: v } })}
+                />
+                <span className="text-sm">{NOME_TIPO[t]}</span>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

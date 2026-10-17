@@ -38,6 +38,8 @@ import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
 import { Route as PacienteAgendamentosRouteImport } from './routes/paciente.agendamentos'
 import { Route as PacienteCadastroRouteImport } from './routes/paciente.cadastro'
+import { Route as PacienteDocumentosRouteImport } from './routes/paciente.documentos'
+import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
 import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
@@ -122,6 +124,7 @@ import { Route as ApiPublicIntakeRouteImport } from './routes/api/public/intake'
 import { Route as ApiPublicIntakeConsultaHojeRouteImport } from './routes/api/public/intake-consulta-hoje'
 import { Route as ApiPublicIntakeSfpRouteImport } from './routes/api/public/intake-sfp'
 import { Route as ApiPublicNinaRuntimeRouteImport } from './routes/api/public/nina-runtime'
+import { Route as ApiPublicPortalArquivoRouteImport } from './routes/api/public/portal-arquivo'
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as ApiPublicTtsVoicesRouteImport } from './routes/api/public/tts-voices'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
@@ -352,6 +355,16 @@ const PacienteAgendamentosRoute = PacienteAgendamentosRouteImport.update({
 const PacienteCadastroRoute = PacienteCadastroRouteImport.update({
   id: '/paciente/cadastro',
   path: '/paciente/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteDocumentosRoute = PacienteDocumentosRouteImport.update({
+  id: '/paciente/documentos',
+  path: '/paciente/documentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteFinanceiroRoute = PacienteFinanceiroRouteImport.update({
+  id: '/paciente/financeiro',
+  path: '/paciente/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
@@ -827,6 +840,11 @@ const ApiPublicIntakeSfpRoute = ApiPublicIntakeSfpRouteImport.update({
 const ApiPublicNinaRuntimeRoute = ApiPublicNinaRuntimeRouteImport.update({
   id: '/api/public/nina-runtime',
   path: '/api/public/nina-runtime',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPortalArquivoRoute = ApiPublicPortalArquivoRouteImport.update({
+  id: '/api/public/portal-arquivo',
+  path: '/api/public/portal-arquivo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
@@ -1358,6 +1376,8 @@ export interface FileRoutesByFullPath {
   '/p/$token': typeof PTokenRoute
   '/paciente/agendamentos': typeof PacienteAgendamentosRoute
   '/paciente/cadastro': typeof PacienteCadastroRoute
+  '/paciente/documentos': typeof PacienteDocumentosRoute
+  '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1442,6 +1462,7 @@ export interface FileRoutesByFullPath {
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/nina-runtime': typeof ApiPublicNinaRuntimeRoute
+  '/api/public/portal-arquivo': typeof ApiPublicPortalArquivoRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1556,6 +1577,8 @@ export interface FileRoutesByTo {
   '/p/$token': typeof PTokenRoute
   '/paciente/agendamentos': typeof PacienteAgendamentosRoute
   '/paciente/cadastro': typeof PacienteCadastroRoute
+  '/paciente/documentos': typeof PacienteDocumentosRoute
+  '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1637,6 +1660,7 @@ export interface FileRoutesByTo {
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/nina-runtime': typeof ApiPublicNinaRuntimeRoute
+  '/api/public/portal-arquivo': typeof ApiPublicPortalArquivoRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1754,6 +1778,8 @@ export interface FileRoutesById {
   '/p/$token': typeof PTokenRoute
   '/paciente/agendamentos': typeof PacienteAgendamentosRoute
   '/paciente/cadastro': typeof PacienteCadastroRoute
+  '/paciente/documentos': typeof PacienteDocumentosRoute
+  '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
@@ -1838,6 +1864,7 @@ export interface FileRoutesById {
   '/api/public/intake-consulta-hoje': typeof ApiPublicIntakeConsultaHojeRoute
   '/api/public/intake-sfp': typeof ApiPublicIntakeSfpRoute
   '/api/public/nina-runtime': typeof ApiPublicNinaRuntimeRoute
+  '/api/public/portal-arquivo': typeof ApiPublicPortalArquivoRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
   '/api/public/tts-voices': typeof ApiPublicTtsVoicesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
@@ -1955,6 +1982,8 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/agendamentos'
     | '/paciente/cadastro'
+    | '/paciente/documentos'
+    | '/paciente/financeiro'
     | '/painel/$clinicaId'
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
@@ -2039,6 +2068,7 @@ export interface FileRouteTypes {
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
     | '/api/public/nina-runtime'
+    | '/api/public/portal-arquivo'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -2153,6 +2183,8 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/agendamentos'
     | '/paciente/cadastro'
+    | '/paciente/documentos'
+    | '/paciente/financeiro'
     | '/painel/$clinicaId'
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
@@ -2234,6 +2266,7 @@ export interface FileRouteTypes {
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
     | '/api/public/nina-runtime'
+    | '/api/public/portal-arquivo'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -2350,6 +2383,8 @@ export interface FileRouteTypes {
     | '/p/$token'
     | '/paciente/agendamentos'
     | '/paciente/cadastro'
+    | '/paciente/documentos'
+    | '/paciente/financeiro'
     | '/painel/$clinicaId'
     | '/totem_/$clinicaId'
     | '/verificar/$codigo'
@@ -2434,6 +2469,7 @@ export interface FileRouteTypes {
     | '/api/public/intake-consulta-hoje'
     | '/api/public/intake-sfp'
     | '/api/public/nina-runtime'
+    | '/api/public/portal-arquivo'
     | '/api/public/tts'
     | '/api/public/tts-voices'
     | '/p/contrato/$token'
@@ -2550,6 +2586,8 @@ export interface RootRouteChildren {
   PTokenRoute: typeof PTokenRoute
   PacienteAgendamentosRoute: typeof PacienteAgendamentosRoute
   PacienteCadastroRoute: typeof PacienteCadastroRoute
+  PacienteDocumentosRoute: typeof PacienteDocumentosRoute
+  PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
@@ -2559,6 +2597,7 @@ export interface RootRouteChildren {
   ApiPublicIntakeConsultaHojeRoute: typeof ApiPublicIntakeConsultaHojeRoute
   ApiPublicIntakeSfpRoute: typeof ApiPublicIntakeSfpRoute
   ApiPublicNinaRuntimeRoute: typeof ApiPublicNinaRuntimeRoute
+  ApiPublicPortalArquivoRoute: typeof ApiPublicPortalArquivoRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   ApiPublicTtsVoicesRoute: typeof ApiPublicTtsVoicesRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
@@ -2780,6 +2819,20 @@ declare module '@tanstack/react-router' {
       path: '/paciente/cadastro'
       fullPath: '/paciente/cadastro'
       preLoaderRoute: typeof PacienteCadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/documentos': {
+      id: '/paciente/documentos'
+      path: '/paciente/documentos'
+      fullPath: '/paciente/documentos'
+      preLoaderRoute: typeof PacienteDocumentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/financeiro': {
+      id: '/paciente/financeiro'
+      path: '/paciente/financeiro'
+      fullPath: '/paciente/financeiro'
+      preLoaderRoute: typeof PacienteFinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel/$clinicaId': {
@@ -3368,6 +3421,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/nina-runtime'
       fullPath: '/api/public/nina-runtime'
       preLoaderRoute: typeof ApiPublicNinaRuntimeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/portal-arquivo': {
+      id: '/api/public/portal-arquivo'
+      path: '/api/public/portal-arquivo'
+      fullPath: '/api/public/portal-arquivo'
+      preLoaderRoute: typeof ApiPublicPortalArquivoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/tts': {
@@ -4450,6 +4510,8 @@ const rootRouteChildren: RootRouteChildren = {
   PTokenRoute: PTokenRoute,
   PacienteAgendamentosRoute: PacienteAgendamentosRoute,
   PacienteCadastroRoute: PacienteCadastroRoute,
+  PacienteDocumentosRoute: PacienteDocumentosRoute,
+  PacienteFinanceiroRoute: PacienteFinanceiroRoute,
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
@@ -4459,6 +4521,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicIntakeConsultaHojeRoute: ApiPublicIntakeConsultaHojeRoute,
   ApiPublicIntakeSfpRoute: ApiPublicIntakeSfpRoute,
   ApiPublicNinaRuntimeRoute: ApiPublicNinaRuntimeRoute,
+  ApiPublicPortalArquivoRoute: ApiPublicPortalArquivoRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
   ApiPublicTtsVoicesRoute: ApiPublicTtsVoicesRoute,
   PContratoTokenRoute: PContratoTokenRoute,

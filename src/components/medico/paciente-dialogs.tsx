@@ -2,7 +2,11 @@
  * Janelas do menu "Opções" da fila do médico (Agenda do Profissional).
  * Cada uma recebe o paciente e a clínica; as regras de acesso ficam no banco.
  */
+import { useServerFn } from "@tanstack/react-start";
+import { classificarAnexoPortal } from "@/lib/portal-paciente/pedidos-exame.functions";
+import { PedidosExamePanel } from "./pedidos-exame-panel";
 import { hojeBR } from "@/lib/date-utils";
+import { BotaoLiberarPaciente } from "@/components/portal-paciente/botao-liberar-paciente";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Download, Printer, Plus, Trash2, Upload } from "lucide-react";
@@ -506,6 +510,9 @@ type Arquivo = {
   descricao: string | null;
   data: string;
   enviado_por_nome: string | null;
+  finalidade_portal: "interno" | "clinico";
+  liberado_paciente_em: string | null;
+  liberado_paciente_por: string | null;
 };
 
 function MiniaturaFoto({ caminho, alt }: { caminho: string; alt: string }) {
@@ -541,7 +548,10 @@ export function ArquivosPacienteDialog({
     queryFn: async () => {
       const { data, error } = await db
         .from("paciente_arquivos")
-        .select("id, tipo, caminho, nome_arquivo, mime, descricao, data, enviado_por_nome")
+        .select(
+          "id, tipo, caminho, nome_arquivo, mime, descricao, data, enviado_por_nome, finalidade_portal, liberado_paciente_em, liberado_paciente_por",
+        )
+        .eq("clinica_id", clinicaId)
         .eq("paciente_id", pacienteId)
         .eq("tipo", tipo)
         .order("data", { ascending: false });
@@ -549,6 +559,8 @@ export function ArquivosPacienteDialog({
       return (data ?? []) as Arquivo[];
     },
   });
+  const classificar = useServerFn(classificarAnexoPortal);
+  const [finalidade, setFinalidade] = useState<"interno" | "clinico">("interno");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [descricao, setDescricao] = useState("");
   const [data, setData] = useState("");
@@ -578,6 +590,7 @@ export function ArquivosPacienteDialog({
         descricao: descricao.trim() || null,
         data: data || hojeBR(),
         enviado_por_nome: nomeDoUsuario(user),
+        finalidade_portal: finalidade,
       });
       if (error) {
         await supabase.storage.from(BUCKET_ARQUIVOS).remove([caminho]);
@@ -612,6 +625,40 @@ export function ArquivosPacienteDialog({
     void qc.invalidateQueries({ queryKey: chave });
   }
 
+  function controlesPortal(a: Arquivo) {
+    return (
+      <div className="space-y-2">
+        <Select
+          value={a.finalidade_portal}
+          onValueChange={(v) =>
+            void classificar({ data: { id: a.id, finalidade: v as "interno" | "clinico" } })
+              .then(() => qc.invalidateQueries({ queryKey: chave }))
+              .catch((e) =>
+                toast.error(e instanceof Error ? e.message : "Não foi possível classificar."),
+              )
+          }
+        >
+          <SelectTrigger aria-label={`Finalidade de ${a.nome_arquivo}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="interno">Interno / administrativo</SelectItem>
+            <SelectItem value="clinico">Clínico</SelectItem>
+          </SelectContent>
+        </Select>
+        {a.finalidade_portal === "clinico" && (
+          <BotaoLiberarPaciente
+            origem="anexo"
+            id={a.id}
+            liberadoEm={a.liberado_paciente_em}
+            liberadoPor={a.liberado_paciente_por}
+            onMudou={() => void qc.invalidateQueries({ queryKey: chave })}
+          />
+        )}
+      </div>
+    );
+  }
+
   const titulo = tipo === "foto" ? "Fotos" : "Anexos";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -621,6 +668,21 @@ export function ArquivosPacienteDialog({
             {titulo} — {pacienteNome}
           </DialogTitle>
         </DialogHeader>
+        <div className="space-y-1">
+          <Label>Finalidade do arquivo</Label>
+          <Select
+            value={finalidade}
+            onValueChange={(v) => setFinalidade(v as "interno" | "clinico")}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="interno">Interno / administrativo</SelectItem>
+              <SelectItem value="clinico">Clínico</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Card className="grid gap-2 p-3 sm:grid-cols-[1fr_1fr_140px_auto] sm:items-end">
           <div className="space-y-1">
             <Label>Arquivo</Label>
@@ -655,6 +717,7 @@ export function ArquivosPacienteDialog({
                   <MiniaturaFoto caminho={a.caminho} alt={a.descricao ?? a.nome_arquivo} />
                 </button>
                 <div className="truncate font-medium">{a.descricao || a.nome_arquivo}</div>
+                {controlesPortal(a)}
                 <div className="flex items-center justify-between text-muted-foreground">
                   <span>{fmtData(a.data)}</span>
                   <Button
@@ -690,6 +753,7 @@ export function ArquivosPacienteDialog({
                     <TableCell>{a.descricao ?? "—"}</TableCell>
                     <TableCell className="text-xs">{a.enviado_por_nome ?? "—"}</TableCell>
                     <TableCell className="space-x-1 text-right">
+                      {controlesPortal(a)}
                       <Button size="sm" variant="outline" onClick={() => abrir(a)}>
                         <Download className="h-3.5 w-3.5" /> Baixar
                       </Button>
@@ -809,14 +873,23 @@ export function AtestadoDialog({
 /* Documentos emitidos                                                 */
 /* ------------------------------------------------------------------ */
 
-export function DocumentosDialog({ open, onOpenChange, pacienteId, pacienteNome }: BaseProps) {
+export function DocumentosDialog({
+  open,
+  onOpenChange,
+  clinicaId,
+  pacienteId,
+  pacienteNome,
+}: BaseProps) {
   const q = useQuery({
     queryKey: ["paciente-documentos", pacienteId],
     enabled: open,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("documentos_emitidos")
-        .select("id, tipo, titulo, conteudo, created_at")
+        .select(
+          "id, tipo, titulo, conteudo, created_at, liberado_paciente_em, liberado_paciente_por",
+        )
+        .eq("clinica_id", clinicaId)
         .eq("paciente_id", pacienteId)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -826,7 +899,8 @@ export function DocumentosDialog({ open, onOpenChange, pacienteId, pacienteNome 
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <PedidosExamePanel clinicaId={clinicaId} pacienteId={pacienteId} />
         <DialogHeader>
           <DialogTitle>Documentos — {pacienteNome}</DialogTitle>
         </DialogHeader>
@@ -859,6 +933,16 @@ export function DocumentosDialog({ open, onOpenChange, pacienteId, pacienteNome 
                     >
                       <Printer className="h-3.5 w-3.5" /> Reimprimir
                     </Button>
+                    {d.tipo !== "contrato" && (
+                      <div className="mt-1">
+                        <BotaoLiberarPaciente
+                          origem="documento"
+                          id={d.id}
+                          liberadoEm={d.liberado_paciente_em}
+                          liberadoPor={d.liberado_paciente_por}
+                        />
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

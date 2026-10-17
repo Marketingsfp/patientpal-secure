@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { Calendar, User } from "lucide-react";
+import { Calendar, FileText, User, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
   solicitarCodigo,
   verificarCodigo,
 } from "@/lib/portal-paciente/portal.functions";
+import { resumoInicio } from "@/lib/portal-paciente/portal-fase2.functions";
 
 export const Route = createFileRoute("/paciente/")({
   component: PortalInicio,
@@ -52,28 +53,7 @@ function PortalInicio() {
   if (data?.logado) {
     return (
       <PortalAutenticado>
-        {() => (
-          <>
-            <h1 className="text-2xl font-semibold">Olá, {data.primeiroNome}</h1>
-            <p className="text-sm text-muted-foreground">O que você quer ver?</p>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Link to="/paciente/agendamentos">
-                <Card className="cursor-pointer p-4 transition-all hover:border-primary/40 hover:shadow-md">
-                  <Calendar className="mb-2 h-6 w-6 text-primary" />
-                  <p className="font-semibold">Agendamentos</p>
-                  <p className="text-xs text-muted-foreground">Confirmar ou cancelar</p>
-                </Card>
-              </Link>
-              <Link to="/paciente/cadastro">
-                <Card className="cursor-pointer p-4 transition-all hover:border-primary/40 hover:shadow-md">
-                  <User className="mb-2 h-6 w-6 text-primary" />
-                  <p className="font-semibold">Meu cadastro</p>
-                  <p className="text-xs text-muted-foreground">Ver e pedir atualização</p>
-                </Card>
-              </Link>
-            </div>
-          </>
-        )}
+        {(c) => <Inicio clinica={c} primeiroNome={data.primeiroNome} />}
       </PortalAutenticado>
     );
   }
@@ -218,5 +198,93 @@ function Entrar({ clinica, carregando }: { clinica: string | null; carregando: b
         )}
       </div>
     </MolduraPortal>
+  );
+}
+
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function Inicio({ clinica, primeiroNome }: { clinica: string | null; primeiroNome: string }) {
+  const resumoFn = useServerFn(resumoInicio);
+  const { data: r } = useQuery({
+    queryKey: ["portal-resumo", clinica],
+    queryFn: () => resumoFn({ data: { clinica } }),
+  });
+  const atalhos = [
+    {
+      to: "/paciente/agendamentos" as const,
+      Icone: Calendar,
+      t: "Agendamentos",
+      s: "Confirmar ou cancelar",
+    },
+    {
+      to: "/paciente/documentos" as const,
+      Icone: FileText,
+      t: "Documentos",
+      s: "Resultados e laudos",
+    },
+    {
+      to: "/paciente/financeiro" as const,
+      Icone: Wallet,
+      t: "Financeiro",
+      s: "Pagamentos e notas",
+    },
+    {
+      to: "/paciente/cadastro" as const,
+      Icone: User,
+      t: "Meu cadastro",
+      s: "Ver e pedir atualização",
+    },
+  ];
+  return (
+    <>
+      <h1 className="text-2xl font-semibold">Olá, {primeiroNome}</h1>
+      <div className="mt-4 space-y-2">
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground">Próxima consulta</p>
+          {!r ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : r.proxima ? (
+            <p className="text-sm font-medium">
+              {new Date(r.proxima.inicio).toLocaleString("pt-BR", {
+                timeZone: "America/Sao_Paulo",
+                weekday: "short",
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              {r.proxima.profissional ? ` · ${r.proxima.profissional}` : ""}
+            </p>
+          ) : (
+            <p className="text-sm">Nenhuma consulta marcada.</p>
+          )}
+        </Card>
+        {r && (
+          <div className="grid grid-cols-2 gap-2">
+            <Card className="p-4">
+              <p className="text-xs text-muted-foreground">Documentos novos</p>
+              <p className="text-lg font-semibold">{r.documentosNovos}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs text-muted-foreground">Pendências</p>
+              <p className="text-lg font-semibold">
+                {r.pendencias.quantidade ? brl(r.pendencias.total) : "Nenhuma"}
+              </p>
+            </Card>
+          </div>
+        )}
+      </div>
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {atalhos.map(({ to, Icone, t, s }) => (
+          <Link key={to} to={to}>
+            <Card className="h-full cursor-pointer p-4 transition-all hover:border-primary/40 hover:shadow-md">
+              <Icone className="mb-2 h-6 w-6 text-primary" />
+              <p className="font-semibold">{t}</p>
+              <p className="text-xs text-muted-foreground">{s}</p>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }
