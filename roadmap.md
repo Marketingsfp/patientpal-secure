@@ -1,5 +1,10 @@
 # Roadmap — Instruções da Nina
 
+## Monitoramento — 17/10/2026 (não publicar)
+- [x] Verificar alerta de carência: coluna existente e consulta sem erro; alerta histórico encerrado como desatualizado, sem alterar banco ou regras.
+- [x] Conferir catálogo autenticado e usos atuais de modelos antigos.
+- [ ] Migrar chamadas confirmadas de modelos descontinuados e validar recursos — aguarda aprovação do plano por envolver vários módulos e voz.
+
 ## Área do Paciente — decisões de 17/10/2026 (não publicar)
 - [x] Registrar papéis confirmados para liberação de documentos.
 - [x] Conferir pré-requisitos ausentes da fase 2 e obter aprovação do plano.
