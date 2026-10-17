@@ -14264,7 +14264,10 @@ export type Database = {
           descricao: string | null
           enviado_por: string | null
           enviado_por_nome: string | null
+          finalidade_portal: string
           id: string
+          liberado_paciente_em: string | null
+          liberado_paciente_por: string | null
           mime: string | null
           nome_arquivo: string
           paciente_id: string
@@ -14279,7 +14282,10 @@ export type Database = {
           descricao?: string | null
           enviado_por?: string | null
           enviado_por_nome?: string | null
+          finalidade_portal?: string
           id?: string
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
           mime?: string | null
           nome_arquivo: string
           paciente_id: string
@@ -14294,7 +14300,10 @@ export type Database = {
           descricao?: string | null
           enviado_por?: string | null
           enviado_por_nome?: string | null
+          finalidade_portal?: string
           id?: string
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
           mime?: string | null
           nome_arquivo?: string
           paciente_id?: string
@@ -14803,6 +14812,121 @@ export type Database = {
         }
         Relationships: []
       }
+      pedidos_exame: {
+        Row: {
+          agendamento_id: string | null
+          atendimento_id: string | null
+          cancelado_em: string | null
+          cancelado_por: string | null
+          clinica_id: string
+          created_at: string
+          created_by: string
+          data: string
+          documento_origem_id: string | null
+          id: string
+          indicacao_clinica: string
+          itens: Json
+          liberado_paciente_em: string | null
+          liberado_paciente_por: string | null
+          medico_id: string | null
+          observacao: string
+          paciente_id: string
+          pdf_caminho: string | null
+          profissional_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          clinica_id: string
+          created_at?: string
+          created_by?: string
+          data?: string
+          documento_origem_id?: string | null
+          id?: string
+          indicacao_clinica?: string
+          itens?: Json
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
+          medico_id?: string | null
+          observacao?: string
+          paciente_id: string
+          pdf_caminho?: string | null
+          profissional_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          atendimento_id?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          clinica_id?: string
+          created_at?: string
+          created_by?: string
+          data?: string
+          documento_origem_id?: string | null
+          id?: string
+          indicacao_clinica?: string
+          itens?: Json
+          liberado_paciente_em?: string | null
+          liberado_paciente_por?: string | null
+          medico_id?: string | null
+          observacao?: string
+          paciente_id?: string
+          pdf_caminho?: string | null
+          profissional_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_exame_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_exame_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_exame_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_exame_documento_origem_id_fkey"
+            columns: ["documento_origem_id"]
+            isOneToOne: true
+            referencedRelation: "documentos_emitidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_exame_medico_id_fkey"
+            columns: ["medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_exame_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfil_permissoes: {
         Row: {
           acesso: Database["public"]["Enums"]["modulo_acesso"]
@@ -15062,6 +15186,7 @@ export type Database = {
           criado_em: string
           expira_em: string
           id: string
+          origem_extensao: string | null
           paciente_id: string
           ref_id: string
           sessao_id: string
@@ -15073,6 +15198,7 @@ export type Database = {
           criado_em?: string
           expira_em: string
           id?: string
+          origem_extensao?: string | null
           paciente_id: string
           ref_id: string
           sessao_id: string
@@ -15084,6 +15210,7 @@ export type Database = {
           criado_em?: string
           expira_em?: string
           id?: string
+          origem_extensao?: string | null
           paciente_id?: string
           ref_id?: string
           sessao_id?: string
@@ -20145,6 +20272,7 @@ export type Database = {
         Args: { _aprovar: boolean; _id: string; _observacao?: string }
         Returns: undefined
       }
+      portal_pode_liberar: { Args: { _clinica_id: string }; Returns: boolean }
       procedimentos_popularidade: {
         Args: { p_clinica_id: string }
         Returns: {
