@@ -7,7 +7,7 @@
 - [x] Restabelecer fase 2 sem substituir alterações recentes.
 - [x] Anexos clínicos: categorias seguras, liberação manual/automática, download de 5 minutos por sessão e auditoria.
 - [x] Pedidos de exame: tabela própria, emissão/PDF/listagem/cancelamento; nenhum documento antigo encontrado para migrar.
-- [x] Testes isolados de SQL, RLS, uploads sem auth.uid, liberação, cancelamento e links: 35 passaram.
+- [x] Testes isolados de SQL, RLS, uploads sem auth.uid, liberação, cancelamento e links: 37 passaram.
 - [ ] Validação completa emissão → liberação → portal → retirada com paciente fictício: sessão disponível sem acesso à configuração; aguarda usuário autorizado e autorização para dados fictícios no banco compartilhado.
 
 - [x] FASE 1 — Backend: tabela versionada de Instruções da Nina (global, escopos whatsapp + painel interno) + importação da v1 com o conteúdo atual; fallback do código mantido.

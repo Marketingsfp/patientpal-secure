@@ -19,7 +19,7 @@
 - Nenhuma cobrança, pagamento, nota fiscal, prontuário ou identificador legado foi alterado. Nenhuma publicação realizada. O banco da prévia é compartilhado com o site publicado; a migração já afeta ambos.
 
 ## Validação executada
-- `bun test src/lib/portal-paciente`: **35 testes aprovados** em três arquivos.
+- `bun test src/lib/portal-paciente`: **37 testes aprovados** em três arquivos.
 - Testes abrangem expiração exatamente em cinco minutos, mesma sessão, isolamento dos dados do paciente, RLS dos pedidos, tipos internos, carimbo padrão vazio, upload interno sem usuário com caminho legado, vínculo cruzado recusado, liberação/retirada, imutabilidade e cancelamento, seis papéis autorizados.
 - Lint nos arquivos alterados: zero erros; dois avisos já existentes em exports do diálogo médico.
 - Sinal automático da prévia: `build OK`.

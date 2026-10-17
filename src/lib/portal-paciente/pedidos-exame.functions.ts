@@ -63,7 +63,7 @@ export const emitirPedidoExame = createServerFn({ method: "POST" })
     const itens: ItemPedido[] = [];
     for (const item of data.itens) {
       if (!item.procedimento_id) {
-        itens.push({ nome: item.nome, texto_livre: item.texto_livre });
+        itens.push({ nome: item.nome, codigo: item.codigo, texto_livre: item.texto_livre });
         continue;
       }
       const { data: proc } = await context.supabase
@@ -195,6 +195,10 @@ export const baixarPedidoEquipe = createServerFn({ method: "POST" })
       !caminhoClinicoValido(p.pdf_caminho, p.clinica_id, p.paciente_id, "pedidos-exame")
     )
       throw new Error("PDF indisponível.");
+    const { data: pode, error: permissaoErro } = await context.supabase.rpc("portal_pode_liberar", {
+      _clinica_id: p.clinica_id,
+    });
+    if (permissaoErro || !pode) throw new Error("Sem permissão para baixar pedidos.");
     const { data: blob, error } = await context.supabase.storage
       .from("paciente-arquivos")
       .download(p.pdf_caminho);
