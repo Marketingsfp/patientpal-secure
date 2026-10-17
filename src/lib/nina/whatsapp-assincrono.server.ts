@@ -4,8 +4,9 @@
  * Com a chave `nina_whatsapp_assincrono` ligada na clínica, o webhook grava a
  * mensagem, registra uma tarefa e responde "ok" à Meta na hora. O banco (pg_net)
  * aciona `/api/public/nina/processar`, que gera e envia a resposta pela MESMA
- * função de sempre (`processarRespostaWhatsappNina`). Uma varredura do banco
- * aciona de novo o que não começou ou parou no meio.
+ * função de sempre (`processarRespostaWhatsappNina`). "Conversa ocupada" é
+ * acionada de novo na hora e esta rota espera o intervalo antes de tentar; a
+ * varredura do banco (a cada minuto) só retoma o que não começou ou parou no meio.
  *
  * Por que pelo banco: o Cloudflare corta trabalho feito depois da resposta em
  * 30 s, e parte das respostas da Nina passa disso. A chamada aberta pelo banco
@@ -73,6 +74,8 @@ type TarefaAssumida = {
   modo: "responder" | "encaminhar" | "diagnostico";
   diagnostico_segundos: number | null;
   tentativas: number;
+  /** Nova tentativa de conversa ocupada: quanto esperar antes de tentar (até 30 s). */
+  aguardar_ms?: number | null;
 };
 
 type ResultadoTarefa = { resultado: "concluida" | "repetir" | "falhou"; erro?: string };
@@ -254,14 +257,19 @@ export async function executarTarefaWhatsapp(
   }, d.heartbeatMs ?? 20_000);
   let r: ResultadoTarefa = { resultado: "falhou", erro: "TAREFA_INTERROMPIDA" };
   try {
+    const esperar = d.esperar ?? ((x: number) => new Promise<void>((ok) => setTimeout(ok, x)));
     if (tarefa.modo === "diagnostico") {
       // Prova de que uma chamada aberta pelo banco passa dos 30 s do Cloudflare.
       const ms = Math.min(280, Math.max(1, Number(tarefa.diagnostico_segundos) || 1)) * 1000;
-      await (d.esperar ?? ((x) => new Promise<void>((ok) => setTimeout(ok, x))))(ms);
+      await esperar(ms);
       r = { resultado: "concluida" };
     } else if (!tarefa.clinica_id || !tarefa.mensagem_id) {
       r = { resultado: "falhou", erro: "TAREFA_INCOMPLETA" };
     } else {
+      // Conversa ocupada: o banco já acionou de novo; a espera fica aqui, com a
+      // reserva sendo renovada, em vez de depender da varredura.
+      const aguardar = Math.min(30_000, Math.max(0, Number(tarefa.aguardar_ms) || 0));
+      if (aguardar > 0 && tarefa.modo === "responder") await esperar(aguardar);
       r = tarefa.modo === "encaminhar" ? await encaminhar(tarefa, d) : await responder(tarefa, d);
     }
     return Response.json({ resultado: r.resultado });

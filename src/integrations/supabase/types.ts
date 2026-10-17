@@ -13581,6 +13581,105 @@ export type Database = {
         }
         Relationships: []
       }
+      nina_whatsapp_assincrono_config: {
+        Row: {
+          ativo: boolean
+          id: boolean
+          job_url: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          id?: boolean
+          job_url?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          id?: boolean
+          job_url?: string | null
+        }
+        Relationships: []
+      }
+      nina_whatsapp_tarefas: {
+        Row: {
+          audio_falhou: boolean
+          clinica_id: string | null
+          concluido_em: string | null
+          created_at: string
+          diagnostico_segundos: number | null
+          disponivel_em: string
+          enviado_em: string | null
+          estado: string
+          expira_em: string | null
+          falhas: number
+          id: string
+          iniciado_em: string | null
+          mensagem_id: string | null
+          modo: string
+          phone_number_id: string | null
+          request_id: number | null
+          tentativas: number
+          token: string | null
+          ultimo_erro: string | null
+        }
+        Insert: {
+          audio_falhou?: boolean
+          clinica_id?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          diagnostico_segundos?: number | null
+          disponivel_em?: string
+          enviado_em?: string | null
+          estado?: string
+          expira_em?: string | null
+          falhas?: number
+          id?: string
+          iniciado_em?: string | null
+          mensagem_id?: string | null
+          modo?: string
+          phone_number_id?: string | null
+          request_id?: number | null
+          tentativas?: number
+          token?: string | null
+          ultimo_erro?: string | null
+        }
+        Update: {
+          audio_falhou?: boolean
+          clinica_id?: string | null
+          concluido_em?: string | null
+          created_at?: string
+          diagnostico_segundos?: number | null
+          disponivel_em?: string
+          enviado_em?: string | null
+          estado?: string
+          expira_em?: string | null
+          falhas?: number
+          id?: string
+          iniciado_em?: string | null
+          mensagem_id?: string | null
+          modo?: string
+          phone_number_id?: string | null
+          request_id?: number | null
+          tentativas?: number
+          token?: string | null
+          ultimo_erro?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nina_whatsapp_tarefas_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nina_whatsapp_tarefas_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: true
+            referencedRelation: "whatsapp_mensagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       odonto_anamnese: {
         Row: {
           alergias: string | null
@@ -19751,6 +19850,49 @@ export type Database = {
         }
         Returns: boolean
       }
+      nina_whatsapp_assincrono_disponivel: { Args: never; Returns: boolean }
+      nina_whatsapp_assumir: {
+        Args: { _tarefa: string; _token: string }
+        Returns: {
+          aguardar_ms: number
+          audio_falhou: boolean
+          clinica_id: string
+          diagnostico_segundos: number
+          mensagem_id: string
+          modo: string
+          phone_number_id: string
+          tentativas: number
+        }[]
+      }
+      nina_whatsapp_despachar: {
+        Args: {
+          _audio_falhou?: boolean
+          _clinica_id: string
+          _mensagem_id: string
+          _phone_number_id?: string
+        }
+        Returns: string
+      }
+      nina_whatsapp_diagnostico: {
+        Args: { _segundos?: number }
+        Returns: string
+      }
+      nina_whatsapp_enviar: { Args: { _id: string }; Returns: boolean }
+      nina_whatsapp_finalizar: {
+        Args: {
+          _aguardar_ms?: number
+          _erro?: string
+          _resultado: string
+          _tarefa: string
+          _token: string
+        }
+        Returns: boolean
+      }
+      nina_whatsapp_renovar: {
+        Args: { _tarefa: string; _token: string }
+        Returns: boolean
+      }
+      nina_whatsapp_varrer: { Args: never; Returns: number }
       nina_zap_retencao_executar: { Args: never; Returns: Json }
       normalizar_hostname: { Args: { _h: string }; Returns: string }
       normalizar_telefone: { Args: { _tel: string }; Returns: string }

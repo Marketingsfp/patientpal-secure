@@ -1,5 +1,10 @@
 # Roadmap — Instruções da Nina
 
+## WhatsApp assíncrono — 17/10/2026 (não publicar)
+- [x] Aplicar SQL aprovado com recuperação a cada minuto; configuração permanece desligada.
+- [x] Validar em banco descartável: 63 verificações SQL e 50 testes de fila/webhook aprovados.
+- [ ] Ativação e diagnóstico real: aguardam autorização para publicar e ativar, fora deste pedido.
+
 ## Área do Paciente — decisões de 17/10/2026 (não publicar)
 - [x] Registrar papéis confirmados para liberação de documentos.
 - [x] Conferir pré-requisitos ausentes da fase 2 e obter aprovação do plano.

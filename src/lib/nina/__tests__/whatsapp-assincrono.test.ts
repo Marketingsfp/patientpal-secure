@@ -330,6 +330,30 @@ describe("rota da tarefa: encaminhamento e diagnóstico", () => {
     expect(c.processados).toHaveLength(0);
     expect(c.desfecho()._resultado).toBe("concluida");
   });
+
+  test("nova tentativa de conversa ocupada: espera o intervalo antes de chamar a Nina", async () => {
+    const c = cenario({ tarefa: { aguardar_ms: 12_000 } });
+    const ordem: string[] = [];
+    c.d.esperar = async (ms) => {
+      ordem.push(`esperou ${ms}`);
+    };
+    c.d.processar = async () => {
+      ordem.push("Nina");
+      return {};
+    };
+    await executarTarefaWhatsapp(pedido(), c.d);
+    expect(ordem).toEqual(["esperou 12000", "Nina"]);
+  });
+
+  test("espera limitada a 30 s; sem espera, chama a Nina direto", async () => {
+    const longa = cenario({ tarefa: { aguardar_ms: 90_000 } });
+    await executarTarefaWhatsapp(pedido(), longa.d);
+    expect(longa.esperas).toEqual([30_000]);
+    const sem = cenario({ tarefa: { aguardar_ms: 0 } });
+    await executarTarefaWhatsapp(pedido(), sem.d);
+    expect(sem.esperas).toEqual([]);
+    expect(sem.processados).toHaveLength(1);
+  });
 });
 
 describe("webhook: chave e despacho", () => {
