@@ -38,6 +38,7 @@ import {
 import { hojeBR, janelaDiaClinica } from "@/lib/date-utils";
 import { deslocarDia } from "@/lib/atendimento/dashboard-oszap-periodos";
 import { normalizarNome } from "@/lib/nina/catalogo-ia";
+import { AgendarHorarioDialog, type DadosAgendamentoHorario } from "./AgendarHorarioDialog";
 
 export type PacienteDaConversa = {
   id: string;
@@ -92,8 +93,6 @@ export function AgendaConversaPainel({
     Array<{ data: string; hora: string; procedimento: string | null }>
   >([]);
   const [vaga, setVaga] = useState<AgendaMedicoItem | null>(null);
-  const [procedimento, setProcedimento] = useState("");
-  const [buscaProc, setBuscaProc] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [feito, setFeito] = useState<string | null>(null);
@@ -212,19 +211,17 @@ export function AgendaConversaPainel({
   const ordemChegada = !!(
     vaga && catalogo?.medicos.find((m) => m.id === vaga.medico_id)?.ordem_chegada
   );
-  const procs = useMemo(() => {
-    const t = normalizarNome(buscaProc);
-    if (!t || !catalogo) return [];
-    return catalogo.procedimentos.filter((p) => normalizarNome(p.nome).includes(t)).slice(0, 8);
-  }, [catalogo, buscaProc]);
-
   function escolherVaga(a: AgendaMedicoItem) {
     setVaga(a);
     setErro(null);
     setFeito(null);
   }
 
-  async function confirmar() {
+  async function confirmar({
+    procedimento,
+    formaPagamentoPrevista,
+    observacoes,
+  }: DadosAgendamentoHorario) {
     if (emVoo.current || !vaga || !procedimento || ordemChegada) return;
     emVoo.current = true;
     setSalvando(true);
@@ -243,11 +240,11 @@ export function AgendaConversaPainel({
             fim: vaga.fim,
             procedimento,
             status: "agendado",
-            observacoes: `Agendado pelo atendimento (conversa ${conversaId.slice(0, 8)})`,
+            observacoes: `${observacoes ? `${observacoes}\n` : ""}Agendado pelo atendimento (conversa ${conversaId.slice(0, 8)})`,
             data_pagamento: null,
             orcamento_id: null,
             tipo_atendimento: "particular",
-            forma_pagamento_prevista: null,
+            forma_pagamento_prevista: formaPagamentoPrevista,
           },
           checagens: {
             validar_paciente_completo: true,
@@ -282,8 +279,6 @@ export function AgendaConversaPainel({
         }. Procedimento: ${procedimento}.`,
       );
       setVaga(null);
-      setProcedimento("");
-      setBuscaProc("");
       await carregar();
     } catch (e) {
       setErro(
@@ -417,7 +412,7 @@ export function AgendaConversaPainel({
         />
       </div>
 
-      {(vaga || feito || erro) && (
+      {(feito || (erro && !vaga)) && (
         <footer className="space-y-2 border-t bg-muted/30 p-3 text-sm" aria-live="polite">
           {feito && (
             <div className="space-y-2">
@@ -434,80 +429,39 @@ export function AgendaConversaPainel({
               </div>
             </div>
           )}
-          {vaga && (
-            <div className="space-y-2">
-              <p>
-                <span className="font-semibold">{medicoDaVaga?.nome ?? "Profissional"}</span> ·{" "}
-                {fmtData(dataRef)} às {fmtHora(vaga.inicio)}
-              </p>
-              {ordemChegada ? (
-                <p className="rounded-md border px-2 py-1.5 text-xs text-muted-foreground">
-                  Atendimento por ordem de chegada: não há horário marcado. Oriente o paciente a
-                  comparecer no período de atendimento do profissional.
-                </p>
-              ) : (
-                <>
-                  <div className="relative">
-                    <Input
-                      aria-label="Procedimento"
-                      value={procedimento || buscaProc}
-                      onChange={(e) => {
-                        setProcedimento("");
-                        setBuscaProc(e.target.value);
-                      }}
-                      placeholder="O que será agendado? (procedimento ou consulta)"
-                      className="h-8 text-xs"
-                    />
-                    {!procedimento && procs.length > 0 && (
-                      <ul className="absolute bottom-full z-10 mb-1 max-h-48 w-full overflow-y-auto rounded-md border bg-popover p-1 text-xs shadow-md">
-                        {procs.map((p) => (
-                          <li key={p.id}>
-                            <button
-                              type="button"
-                              className="w-full rounded px-2 py-1 text-left hover:bg-muted"
-                              onClick={() => {
-                                setProcedimento(p.nome);
-                                setBuscaProc("");
-                              }}
-                            >
-                              {p.nome}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  {!paciente.data_nascimento && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      O cadastro do paciente está sem data de nascimento; a agenda pode recusar.
-                    </p>
-                  )}
-                </>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {!ordemChegada && (
-                  <Button
-                    size="sm"
-                    disabled={!procedimento || salvando}
-                    onClick={() => void confirmar()}
-                  >
-                    {salvando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                    Confirmar agendamento
-                  </Button>
-                )}
-                <Button size="sm" variant="ghost" disabled={salvando} onClick={() => setVaga(null)}>
-                  Escolher outro horário
-                </Button>
-              </div>
-            </div>
-          )}
-          {erro && (
+          {erro && !vaga && (
             <p role="alert" className="text-xs text-destructive">
               {erro}
             </p>
           )}
         </footer>
       )}
+
+      {/* Clique no horário vago: mesma janela de agendamento da Agenda, por cima. */}
+      <AgendarHorarioDialog
+        aberto={!!vaga}
+        onFechar={() => {
+          setVaga(null);
+          setErro(null);
+        }}
+        clinicaId={clinicaId}
+        pacienteNome={paciente.nome}
+        medicoId={vaga?.medico_id ?? null}
+        medicoNome={medicoDaVaga?.nome ?? "Profissional"}
+        quando={vaga ? `${fmtData(dataRef)} às ${fmtHora(vaga.inicio)}` : ""}
+        ordemChegada={ordemChegada}
+        avisoDuplicidade={
+          futuros.length
+            ? `Este paciente já tem ${futuros
+                .map((f) => `${f.procedimento ?? "atendimento"} em ${fmtData(f.data)} às ${f.hora}`)
+                .join("; ")}. Confira para não duplicar.`
+            : null
+        }
+        semNascimento={!paciente.data_nascimento}
+        salvando={salvando}
+        erro={vaga ? erro : null}
+        onSalvar={(dados) => void confirmar(dados)}
+      />
     </section>
   );
 }

@@ -33,31 +33,49 @@ try {
   await page.getByLabel("Buscar profissional ou especialidade").fill("");
   console.log("PASS busca por parte do nome e colunas responsivas");
 
-  // Ordem de chegada: só orienta, sem confirmar.
+  // Ordem de chegada: a janela só orienta, sem Salvar.
   const colunaBruno = page.locator("section", { hasText: "Dr. Bruno Demonstração" }).last();
   await colunaBruno
     .getByRole("button", { name: /Agendar/ })
     .first()
     .click();
-  await expect(page.getByText(/ordem de chegada: não há horário marcado/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Confirmar agendamento" })).toHaveCount(0);
+  const janela = page.getByRole("dialog", { name: "Novo agendamento" });
+  await expect(janela).toBeVisible();
+  await expect(janela.getByText(/ordem de chegada: não há horário marcado/)).toBeVisible();
+  await expect(janela.getByRole("button", { name: "Salvar" })).toHaveCount(0);
+  await janela.getByRole("button", { name: "Cancelar" }).click();
+  await expect(janela).toHaveCount(0);
   console.log("PASS ordem de chegada não oferece horário");
 
-  // Vaga normal: escolhe procedimento e confirma.
+  // Horário vago: abre a janela da Agenda com o paciente da conversa.
   const colunaAna = page.locator("section", { hasText: "Dra. Ana Demonstração" }).last();
   await colunaAna
     .getByRole("button", { name: /Agendar/ })
     .first()
     .click();
-  await page.getByLabel("Procedimento").fill("cardio");
-  await page.getByRole("button", { name: "Consulta cardiologia" }).click();
-  await page.screenshot({ path: resolve(saida, "confirmar.png") });
-  await page.getByRole("button", { name: "Confirmar agendamento" }).click();
+  await expect(janela).toBeVisible();
+  await expect(janela.locator('input[value="Maria Fictícia"]')).toBeVisible();
+  await expect(janela.locator('input[value="Dra. Ana Demonstração"]')).toBeVisible();
+  await expect(
+    janela.getByText("Mostrando apenas serviços configurados para este médico."),
+  ).toBeVisible();
+  await janela.getByRole("combobox").last().click();
+  await page.getByRole("option", { name: "Consulta cardiologia" }).click();
+  await janela.getByRole("combobox", { name: "Forma de pagamento prevista" }).click();
+  await page.getByRole("option", { name: "PIX" }).click();
+  await janela.getByLabel("Observações").fill("Paciente pediu horário cedo.");
+  await page.screenshot({ path: resolve(saida, "janela-agendamento.png") });
+  await janela.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByText("Agendamento realizado")).toBeVisible();
   const criados = await page.evaluate(() => window.__agendaTeste.criados);
   expect(criados).toHaveLength(1);
   expect(criados[0].payload.paciente_id).toBe("33333333-3333-4333-8333-333333333333");
   expect(criados[0].payload.medico_id).toBe("m1");
+  expect(criados[0].payload.procedimento).toBe("Consulta cardiologia");
+  expect(criados[0].payload.forma_pagamento_prevista).toBe("pix");
+  expect(criados[0].payload.observacoes).toMatch(
+    /^Paciente pediu horário cedo\.\nAgendado pelo atendimento/,
+  );
   await page.getByRole("button", { name: "Levar confirmação para a mensagem" }).click();
   await expect(page.getByRole("region", { name: "Agenda" })).toHaveCount(0);
   await expect(page.getByLabel("Mensagem")).toHaveValue(/Seu agendamento foi realizado/);

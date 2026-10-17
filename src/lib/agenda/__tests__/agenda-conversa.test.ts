@@ -15,6 +15,7 @@ describe("agenda dentro da conversa (16/10/2026)", () => {
   const funcoes = readFileSync("src/lib/agenda/chat-agenda.functions.ts", "utf8");
   const painel = readFileSync("src/components/nina/AgendaConversaPainel.tsx", "utf8");
   const inbox = readFileSync("src/components/nina/AtendimentoExtraTabs.tsx", "utf8");
+  const janela = readFileSync("src/components/nina/AgendarHorarioDialog.tsx", "utf8");
 
   test("toda função confere se a pessoa é da clínica", () => {
     const handlers = funcoes.split(".handler(").length - 1;
@@ -24,8 +25,17 @@ describe("agenda dentro da conversa (16/10/2026)", () => {
   });
 
   test("ordem de chegada não oferece horário", () => {
-    expect(painel).toContain("Atendimento por ordem de chegada");
+    expect(janela).toContain("Atendimento por ordem de chegada");
+    expect(janela).toContain("{!ordemChegada && (");
     expect(painel).toContain("!vaga || !procedimento || ordemChegada");
+  });
+
+  test("horário vago abre a janela da Agenda com o paciente da conversa", () => {
+    expect(painel).toContain("<AgendarHorarioDialog");
+    expect(painel).toContain("pacienteNome={paciente.nome}");
+    // Sem cobrança na janela: Pagar/Imprimir, NFS-e e Desconto ficam na Agenda.
+    const semComentarios = janela.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(semComentarios).not.toMatch(/NFS-e|Desconto|Imprimir/);
   });
 
   test("inbox só agenda com paciente vinculado e fora de conversa de teste", () => {

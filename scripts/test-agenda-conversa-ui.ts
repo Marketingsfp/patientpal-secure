@@ -106,7 +106,24 @@ const iconesSimulados = `import React from "react";
 const Icone = (p) => React.createElement("svg", { viewBox: "0 0 24 24", width: 16, height: 16, ...p },
   React.createElement("rect", { x: 4, y: 4, width: 16, height: 16, rx: 3, fill: "none", stroke: "currentColor", strokeWidth: 2 }));
 ${[...ICONES].map((n) => `export const ${n} = Icone;`).join("\n")}`;
+const refsSimuladas = `
+export const getProcedimentosAgenda = async () => [
+  { id: "p1", nome: "Consulta cardiologia" }, { id: "p2", nome: "Eletrocardiograma" },
+  { id: "p3", nome: "Consulta pediatria" }, { id: "p4", nome: "Ultrassom de tireoide" }];
+export const getMedicoProcedimentosAgenda = async () => [
+  { medico_id: "m1", procedimento_id: "p1" }, { medico_id: "m1", procedimento_id: "p2" },
+  { medico_id: "m2", procedimento_id: "p3" }, { medico_id: "m3", procedimento_id: "p4" }];
+export const getMedicosAgenda = async () => [];
+`;
+// Mesmo defeito do Bun com re-exportações: some o RemoveScroll das janelas
+// (Radix). Na prévia ele só repassa o conteúdo; no aplicativo é o real.
+const removeScrollSimulado = `
+export const RemoveScroll = ({ children }) => children;
+RemoveScroll.classNames = { fullWidth: "", zeroRight: "" };
+`;
 const mocks: Record<string, string> = {
+  "@/lib/agenda/refs-cache": refsSimuladas,
+  "react-remove-scroll": removeScrollSimulado,
   "lucide-react": iconesSimulados,
   "@/integrations/supabase/client": supabaseSimulado,
   "@/lib/agenda/chat-agenda.functions": funcoesSimuladas,
