@@ -12,5 +12,5 @@ it("histórico: efeitos React e rolagem sob demanda", async () => {
     p.exited,
   ]);
   expect(codigo, out + err).toBe(0);
-  expect(out + err).toContain("6 pass");
+  expect(out + err).toContain("7 pass");
 }, 30000);

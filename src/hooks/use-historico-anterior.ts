@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
+/** Pré-carga (17/10/2026): busca a página anterior quando faltam duas telas e meia
+ *  até o topo, para as mensagens chegarem antes de a pessoa alcançar o fim. */
+export const TELAS_PRE_CARGA_HISTORICO = 2.5;
+
 /** Uma página por gesto de subida; não baixa páginas em cascata ao abrir. */
 export function useHistoricoAnterior<T>(args: {
   chave: string;
@@ -85,7 +89,8 @@ export function useHistoricoAnterior<T>(args: {
     if (!box || !args.ativo) return;
     topoObservado.current = box.scrollTop;
     let toqueY: number | null = null;
-    const perto = () => box.scrollTop <= 100;
+    const perto = () =>
+      box.scrollTop <= Math.max(100, box.clientHeight * TELAS_PRE_CARGA_HISTORICO);
     const aoScroll = () => {
       const subindo = box.scrollTop < topoObservado.current;
       topoObservado.current = box.scrollTop;

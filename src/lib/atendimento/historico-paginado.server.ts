@@ -5,6 +5,7 @@ import { anexarCitacoes } from "./citacao-mensagem.server";
 import {
   filtroCursorHistorico,
   montarPaginaHistorico,
+  TAMANHO_PAGINA_ANTERIORES,
   TAMANHO_PAGINA_HISTORICO,
   type CursorHistorico,
   type EventoHistorico,
@@ -27,6 +28,7 @@ export async function carregarPaginaHistorico(
   const cursor = args.antes ?? args.depois;
   const sentido = args.depois ? "novas" : "anteriores";
   const crescente = sentido === "novas";
+  const tamanho = args.antes ? TAMANHO_PAGINA_ANTERIORES : TAMANHO_PAGINA_HISTORICO;
   let mensagens = supabase
     .from("whatsapp_mensagens")
     .select(
@@ -49,15 +51,15 @@ export async function carregarPaginaHistorico(
     mensagens
       .order("recebida_em", { ascending: crescente })
       .order("id", { ascending: crescente })
-      .limit(TAMANHO_PAGINA_HISTORICO + 1),
+      .limit(tamanho + 1),
     eventos
       .order("created_at", { ascending: crescente })
       .order("id", { ascending: crescente })
-      .limit(TAMANHO_PAGINA_HISTORICO + 1),
+      .limit(tamanho + 1),
   ]);
   if (m.error) throw new Error(m.error.message);
   if (e.error) throw new Error(e.error.message);
-  const pagina = montarPaginaHistorico(m.data ?? [], e.data ?? [], sentido);
+  const pagina = montarPaginaHistorico(m.data ?? [], e.data ?? [], sentido, tamanho);
   pagina.mensagens = await anexarCitacoes(
     supabase,
     args.clinicaId,

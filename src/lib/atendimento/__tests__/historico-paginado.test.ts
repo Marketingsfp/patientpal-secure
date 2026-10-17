@@ -208,27 +208,37 @@ describe("histórico conjunto paginado", () => {
       { tabela: "atend_conversa_eventos", limite: 16, linhas: 16 },
     ]);
 
+    // Rolar para cima traz 40 por vez; a abertura continua com 15.
+    db.leituras.length = 0;
     const anterior = await db.pagina({ antes: primeira.anterior! });
-    expect(ids(anterior)).toHaveLength(15);
-    expect(anterior.anterior?.em).toBe(em(9970));
+    expect(ids(anterior)).toHaveLength(40);
+    expect(anterior.anterior?.em).toBe(em(9945));
     expect(anterior.posterior?.em).toBe(em(9984));
-    expect(new Set([...ids(primeira), ...ids(anterior)]).size).toBe(30);
+    expect(new Set([...ids(primeira), ...ids(anterior)]).size).toBe(55);
+    expect(db.leituras.filter((l) => l.tabela !== "profiles")).toEqual([
+      { tabela: "whatsapp_mensagens", limite: 41, linhas: 41 },
+      { tabela: "atend_conversa_eventos", limite: 41, linhas: 41 },
+    ]);
   });
 
   it("percorre todos os empates entre tabelas sem lacunas nem repetição", async () => {
     const db = banco(
       Array.from({ length: 27 }, (_, i) => mensagem(i, 0)),
-      Array.from({ length: 16 }, (_, i) => evento(i, 0)),
+      Array.from({ length: 46 }, (_, i) => evento(i, 0)),
     );
+    // Páginas de 15 (abertura) e 40 (rolagem); a de 40 cruza avisos e mensagens.
     let p = await db.pagina();
     const encontrados = ids(p);
+    const tamanhos = [encontrados.length];
     while (p.temMais) {
       p = await db.pagina({ antes: p.anterior! });
       encontrados.push(...ids(p));
+      tamanhos.push(ids(p).length);
     }
-    expect(encontrados).toHaveLength(43);
-    expect(new Set(encontrados).size).toBe(43);
-    expect(p.eventos).toHaveLength(13);
+    expect(tamanhos).toEqual([15, 40, 18]);
+    expect(encontrados).toHaveLength(73);
+    expect(new Set(encontrados).size).toBe(73);
+    expect(p.eventos).toHaveLength(18);
   });
 
   it("recupera rajada de 35 novidades em páginas crescentes após reconexão", async () => {

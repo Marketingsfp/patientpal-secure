@@ -1,6 +1,8 @@
 /** Paginação conjunta: mensagens de todos os autores e eventos internos. */
 import type { Json } from "@/integrations/supabase/types";
 export const TAMANHO_PAGINA_HISTORICO = 15;
+/** Rolar para cima traz mais por vez (17/10/2026); a abertura segue com 15. */
+export const TAMANHO_PAGINA_ANTERIORES = 40;
 export type CursorHistorico = { em: string; id: string; tipo: "evento" | "mensagem" };
 export type MensagemHistorico = { id: string; recebida_em: string; [campo: string]: any };
 export type EventoHistorico = {
@@ -42,6 +44,7 @@ export function montarPaginaHistorico(
   mensagens: MensagemHistorico[],
   eventos: EventoHistorico[],
   sentido: "anteriores" | "novas" = "anteriores",
+  tamanho = TAMANHO_PAGINA_HISTORICO,
 ): PaginaHistorico {
   const itens = [
     ...mensagens.map((m) => ({
@@ -50,16 +53,13 @@ export function montarPaginaHistorico(
     })),
     ...eventos.map((e) => ({ cursor: { em: e.created_at, id: e.id, tipo: "evento" as const }, e })),
   ].sort((a, b) => compararCursor(a.cursor, b.cursor));
-  const pagina =
-    sentido === "novas"
-      ? itens.slice(0, TAMANHO_PAGINA_HISTORICO)
-      : itens.slice(-TAMANHO_PAGINA_HISTORICO);
+  const pagina = sentido === "novas" ? itens.slice(0, tamanho) : itens.slice(-tamanho);
   return {
     mensagens: pagina.flatMap((i) => ("m" in i ? [i.m] : [])),
     eventos: pagina.flatMap((i) => ("e" in i ? [i.e] : [])),
     anterior: pagina[0]?.cursor ?? null,
     posterior: pagina.at(-1)?.cursor ?? null,
-    temMais: itens.length > TAMANHO_PAGINA_HISTORICO,
+    temMais: itens.length > tamanho,
   };
 }
 

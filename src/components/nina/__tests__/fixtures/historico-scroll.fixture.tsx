@@ -152,6 +152,19 @@ it("resposta atrasada não invade outra conversa, inclusive A → B → A", asyn
   expect(box.firstElementChild!.textContent).toBe("a-11");
   expect(host.querySelector("output")!.textContent).toBe("Pronto");
 });
+it("pré-carga: a duas telas e meia do topo já busca; mais longe ainda não", async () => {
+  await act(async () => {
+    box.scrollTop = 320;
+    box.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }));
+  });
+  expect(chamadas).toHaveLength(0);
+  await act(async () => {
+    box.scrollTop = 290;
+    box.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }));
+  });
+  expect(chamadas).toEqual(["a"]);
+  await act(async () => responder(lote("a", 1)));
+});
 it("rolagem para baixo não carrega histórico; teclado para cima carrega", async () => {
   await act(async () => box.dispatchEvent(new WheelEvent("wheel", { deltaY: 100 })));
   expect(chamadas).toHaveLength(0);
