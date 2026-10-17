@@ -1,3 +1,4 @@
+import { BotaoLiberarPaciente } from "@/components/portal-paciente/botao-liberar-paciente";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,7 +33,19 @@ import {
 
 export const Route = createFileRoute("/_authenticated/app/exames-resultados")({
   component: ExamesResultadosPage,
-  head: () => ({ meta: [{ title: "Resultados de Exames / Laudos IA — ClinicaOS" }] }),
+  head: () => ({
+    meta: [
+      { title: "Resultados de exames — ClinicaOS" },
+      { name: "description", content: "Resultados e liberação segura de exames ao paciente." },
+      { property: "og:title", content: "Resultados de exames — ClinicaOS" },
+      {
+        property: "og:description",
+        content: "Resultados e liberação segura de exames ao paciente.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
 type Paciente = {
@@ -53,6 +66,9 @@ type Row = {
   ia_recomendacao: string | null;
   ia_mensagem_paciente: string | null;
   created_at: string;
+  paciente_id?: string | null;
+  liberado_paciente_em?: string | null;
+  liberado_paciente_por?: string | null;
 };
 
 const STATUS_COR: Record<Row["status"], string> = {
@@ -97,7 +113,7 @@ function ExamesResultadosPage() {
         supabase
           .from("exame_resultados")
           .select(
-            "id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at",
+            "id,paciente_id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at,liberado_paciente_em,liberado_paciente_por",
           )
           .eq("clinica_id", clinicaId)
           .order("created_at", { ascending: false })
@@ -249,7 +265,7 @@ function ExamesResultadosPage() {
           classificado_em: analise ? new Date().toISOString() : null,
         })
         .select(
-          "id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at",
+          "id,paciente_id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at,liberado_paciente_em,liberado_paciente_por",
         )
         .single();
       if (error) throw error;
@@ -488,6 +504,14 @@ function ExamesResultadosPage() {
                   {new Date(r.created_at).toLocaleString("pt-BR")}
                 </div>
               </div>
+              {r.paciente_id && (
+                <BotaoLiberarPaciente
+                  origem="exame"
+                  id={r.id}
+                  liberadoEm={r.liberado_paciente_em ?? null}
+                  liberadoPor={r.liberado_paciente_por ?? null}
+                />
+              )}
             </Card>
           ))}
         </div>

@@ -3,6 +3,7 @@
  * da fila do médico. Sem Consultas Avulsas e sem Controle Hiperbárico
  * (decisão da clínica: ficam para depois).
  */
+import { PedidosExamePanel } from "./pedidos-exame-panel";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -83,6 +84,7 @@ type Janela =
   | "alertas"
   | "anexos"
   | "fotos"
+  | "pedidos-exame"
   | "documentos"
   | "retornos"
   | "triagem";
@@ -141,6 +143,9 @@ export function OpcoesPacienteMenu({
           <DropdownMenuItem onSelect={() => setJanela("alertas")}>Alertas</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setJanela("anexos")}>Anexos</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setJanela("fotos")}>Fotos</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setJanela("pedidos-exame")}>
+            Pedido de exame
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setJanela("documentos")}>Documentos</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setJanela("retornos")}>Retornos</DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -164,6 +169,21 @@ export function OpcoesPacienteMenu({
       {janela === "alertas" && <AlertasPacienteDialog {...base} open />}
       {janela === "anexos" && <ArquivosPacienteDialog {...base} open tipo="anexo" />}
       {janela === "fotos" && <ArquivosPacienteDialog {...base} open tipo="foto" />}
+      {janela === "pedidos-exame" && (
+        <Dialog open onOpenChange={base.onOpenChange}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Pedidos de exame — {item.paciente_nome}</DialogTitle>
+            </DialogHeader>
+            <PedidosExamePanel
+              clinicaId={clinicaId}
+              pacienteId={item.paciente_id}
+              medicoId={medico?.id ?? null}
+              agendamentoId={item.id}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
       {janela === "documentos" && <DocumentosDialog {...base} open />}
       {janela === "retornos" && (
         <RetornosDialog {...base} open onAbrirAgenda={() => navigate({ to: "/app/agenda" })} />

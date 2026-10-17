@@ -6,3 +6,5 @@
 - CPF repetido e menor de idade só são barrados depois do código certo — por quê: o 1º passo não pode revelar nada.
 - Cancelar usa `atualizarStatusAgendamentoCore` com ator integração `area_do_paciente` — por quê: mesmas regras e limpeza da agenda.
 - Regras puras e limites em `regras.ts` (testadas em `regras.test.ts`).
+- Downloads use hashed, session-bound `portal_links` through the guarded public file endpoint and recheck domain, consent, ownership and release on every opening — why: revocation must also invalidate old links.
+- Clinical attachments retain their original upload type and use explicit portal classification; exam requests are immutable records with private server-generated PDFs — why: internal files and issued clinical history must not be inferred or overwritten.

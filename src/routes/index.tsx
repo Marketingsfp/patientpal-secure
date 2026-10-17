@@ -41,6 +41,7 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:url", content: "https://patientpal-secure.lovable.app/" },
       { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
     links: [{ rel: "canonical", href: "https://patientpal-secure.lovable.app/" }],
   }),
