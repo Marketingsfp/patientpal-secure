@@ -6,6 +6,11 @@
  * mesma função do console (`enviarMensagemTeste`, núcleo real da Nina) e, ao
  * fim, chama o juiz (`avaliarConversaAmbiente`).
  *
+ * Teste contínuo: cada lead abre a próxima conversa assim que a anterior
+ * termina (`novaConversaAmbiente`), dentro do tempo máximo da rodada. Com
+ * áudio e foto ligados, o paciente às vezes manda nota de voz (sintetizada
+ * aqui e transcrita pelo mesmo caminho do WhatsApp) ou a foto do pedido.
+ *
  * Estado: cada conversa é uma linha de `nina_teste_simulacoes` (persona com o
  * modo e o id da rodada); o resultado do juiz vai para `nina_teste_avaliacoes`.
  * Acesso: membro ativo com perfil que pode simular atendimento.
@@ -51,7 +56,14 @@ async function exigirAcesso(context: { supabase: any; userId: string }, clinicaI
   return supabaseAdmin as any;
 }
 
-type Persona = { ambiente: string; rodada: string; modo: string; posicao: number };
+type Persona = {
+  ambiente: string;
+  rodada: string;
+  modo: string;
+  posicao: number;
+  /** Áudio e foto do pedido ligados nesta rodada. */
+  midia?: boolean;
+};
 
 function persona(v: unknown): Persona | null {
   const p = v as Partial<Persona> | null;
@@ -86,6 +98,7 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
         clinicaId: z.string().uuid(),
         turnos: z.number().int().min(1).max(50).optional(),
         quantidade: z.union([z.literal(10), z.literal(20), z.literal(30)]).optional(),
+        midia: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -135,11 +148,17 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
       modelo: MODELO_SOL,
       provedor: "lovable-ai-gateway",
       cenario: assuntos[i]!,
-      persona: { ambiente: AMBIENTE, rodada, modo: modoDaPosicao(i).id, posicao: i + 1 },
+      persona: {
+        ambiente: AMBIENTE,
+        rodada,
+        modo: modoDaPosicao(i).id,
+        posicao: i + 1,
+        midia: !!data.midia,
+      },
       max_turnos: turnos,
       max_mensagens: turnos,
       max_duracao_s: 3600,
-      max_tokens: LIMITES_AMBIENTE.tokensPorConversa * leads.length,
+      max_tokens: LIMITES_AMBIENTE.tokensPorConversa,
       timeout_s: 180,
       max_custo_creditos: 0,
       creditos_por_mil_tokens: 0,
@@ -166,6 +185,143 @@ export const iniciarRodadaAmbiente = createServerFn({ method: "POST" })
           posicao: (s.persona as Persona).posicao,
         }))
         .sort((a, b) => a.posicao - b.posicao),
+    };
+  });
+
+/**
+ * Teste contínuo: abre a próxima conversa de um lead na MESMA rodada, assim
+ * que a anterior termina, para a carga ficar constante. Para sozinho no tempo
+ * máximo da rodada ou no teto de conversas.
+ */
+export const novaConversaAmbiente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        rodada: z.string().uuid(),
+        leadId: z.string().uuid(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await exigirAcesso(context, data.clinicaId);
+    const srv = await import("@/lib/nina/ambiente-testes.server");
+    const { data: daRodada, error } = await admin
+      .from("nina_teste_simulacoes")
+      .select("id, lead_id, cenario, persona, status, max_turnos, created_at")
+      .eq("clinica_id", data.clinicaId)
+      .contains("persona", { ambiente: AMBIENTE, rodada: data.rodada })
+      .order("created_at", { ascending: true })
+      .limit(LIMITES_AMBIENTE.conversasMaxRodada + 1);
+    if (error) throw new Error(error.message);
+    const sims = (daRodada ?? []) as any[];
+    const primeira = sims[0];
+    const p0 = persona(primeira?.persona);
+    if (!primeira || !p0) throw new Error("Rodada do ambiente de testes não encontrada.");
+    if (Date.now() - Date.parse(primeira.created_at) >= LIMITES_AMBIENTE.duracaoMaxMin * 60_000)
+      return { fim: true as const, motivo: "tempo máximo do teste contínuo" };
+    if (sims.length >= LIMITES_AMBIENTE.conversasMaxRodada)
+      return { fim: true as const, motivo: "teto de conversas da rodada" };
+
+    // Lugar do lead na rodada (ordem da primeira leva) → posição única da conversa nova.
+    const ordemLeads: string[] = [];
+    for (const s of sims) if (!ordemLeads.includes(s.lead_id)) ordemLeads.push(s.lead_id);
+    const lugar = ordemLeads.indexOf(data.leadId);
+    if (lugar < 0) throw new Error("Este lead não faz parte da rodada.");
+    const anteriores = sims.filter((s) => s.lead_id === data.leadId);
+
+    const { data: lead, error: erroLead } = await admin
+      .from("nina_teste_leads")
+      .select("id, indice, conversa_id")
+      .eq("clinica_id", data.clinicaId)
+      .eq("id", data.leadId)
+      .gte("indice", srv.PRIMEIRO_LEAD_AMBIENTE)
+      .lt("indice", srv.PRIMEIRO_LEAD_AMBIENTE + srv.TOTAL_LEADS_AMBIENTE)
+      .maybeSingle();
+    if (erroLead) throw new Error(erroLead.message);
+    if (!lead) throw new Error("Lead do ambiente de testes não encontrado.");
+
+    // A conversa anterior deste lead termina aqui, caso tenha ficado aberta.
+    await admin
+      .from("nina_teste_simulacoes")
+      .update({
+        status: "concluida",
+        motivo_fim: "fim da conversa",
+        finalizado_em: new Date().toISOString(),
+      })
+      .in(
+        "id",
+        anteriores.map((s) => s.id),
+      )
+      .eq("status", "executando");
+
+    if (lead.conversa_id) {
+      const { resetarLeadTeste } = await import("@/lib/nina/teste-console.server");
+      await resetarLeadTeste(admin, {
+        clinicaId: data.clinicaId,
+        leadId: lead.id,
+        conversaId: lead.conversa_id,
+        userId: context.userId,
+        removerAgendamentos: true,
+        origem: "ambiente_testes",
+        manual: true,
+      });
+    }
+
+    // Assunto novo: evita os já usados na rodada enquanto houver opções.
+    const modo = modoDaPosicao(lead.indice - srv.PRIMEIRO_LEAD_AMBIENTE);
+    const usados = new Set(sims.map((s) => String(s.cenario)));
+    const catalogo = await srv.catalogoParaAssuntos(admin, data.clinicaId);
+    const consultas = catalogo.consultas.filter(
+      (n) => !usados.has(`consulta de ${n.toLowerCase()}`),
+    );
+    const exames = catalogo.exames.filter((n) => !usados.has(n));
+    const [assunto] = sortearAssuntos([modo.assunto], {
+      consultas: consultas.length ? consultas : catalogo.consultas,
+      exames: exames.length ? exames : catalogo.exames,
+    });
+    const posicao = anteriores.length * ordemLeads.length + lugar + 1;
+    const { data: criada, error: erroNova } = await admin
+      .from("nina_teste_simulacoes")
+      .insert({
+        clinica_id: data.clinicaId,
+        lead_id: lead.id,
+        modelo: MODELO_SOL,
+        provedor: "lovable-ai-gateway",
+        cenario: assunto!,
+        persona: {
+          ambiente: AMBIENTE,
+          rodada: data.rodada,
+          modo: modo.id,
+          posicao,
+          midia: !!p0.midia,
+        },
+        max_turnos: primeira.max_turnos,
+        max_mensagens: primeira.max_turnos,
+        max_duracao_s: 3600,
+        max_tokens: LIMITES_AMBIENTE.tokensPorConversa,
+        timeout_s: 180,
+        max_custo_creditos: 0,
+        creditos_por_mil_tokens: 0,
+        status: "executando",
+        turnos: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        criado_por: context.userId,
+      })
+      .select("id")
+      .single();
+    if (erroNova) throw new Error(erroNova.message);
+    return {
+      fim: false as const,
+      item: {
+        simulacaoId: criada.id as string,
+        leadId: lead.id as string,
+        assunto: assunto!,
+        modo: modo.id,
+        posicao,
+      },
     };
   });
 
@@ -214,7 +370,10 @@ export const turnoPacienteAmbiente = createServerFn({ method: "POST" })
       (t, s) => t + (s.input_tokens ?? 0) + (s.output_tokens ?? 0),
       0,
     );
-    const teto = LIMITES_AMBIENTE.tokensPorConversa * Math.max(1, (daRodada ?? []).length);
+    const teto = Math.min(
+      LIMITES_AMBIENTE.tokensPorConversa * Math.max(1, (daRodada ?? []).length),
+      LIMITES_AMBIENTE.tokensRodadaMax,
+    );
     if (gastos >= teto) {
       await admin
         .from("nina_teste_simulacoes")
@@ -236,12 +395,12 @@ export const turnoPacienteAmbiente = createServerFn({ method: "POST" })
     const turnos = await srv.turnosParaPaciente(admin, data.clinicaId, lead?.conversa_id ?? null);
     const r = await srv.chamarClaudeJson(
       "paciente_dificil",
-      instrucoesPaciente(modo, sim.cenario),
+      instrucoesPaciente(modo, sim.cenario, !!p.midia),
       entradaPaciente(turnos),
       SCHEMA_PACIENTE as unknown as Record<string, unknown>,
       600,
     );
-    const acao = lerAcaoPaciente(r.texto);
+    const acao = lerAcaoPaciente(r.texto, !!p.midia);
     await admin
       .from("nina_teste_simulacoes")
       .update({
@@ -259,7 +418,17 @@ export const turnoPacienteAmbiente = createServerFn({ method: "POST" })
           : {}),
       })
       .eq("id", sim.id);
-    return acao;
+
+    // Nota de voz: a fala do paciente vira áudio aqui; a transcrição acontece
+    // no envio, pelo mesmo caminho do WhatsApp. Sem áudio, segue como texto.
+    let audio: { base64: string; mime: "audio/ogg" | "audio/mpeg" } | null = null;
+    if (acao.anexo === "audio") {
+      const { sintetizarFala } = await import("@/lib/nina-audio.server");
+      const fala = await sintetizarFala(acao.mensagem).catch(() => null);
+      if (fala && (fala.mime === "audio/ogg" || fala.mime === "audio/mpeg"))
+        audio = { base64: Buffer.from(fala.bytes).toString("base64"), mime: fala.mime };
+    }
+    return { ...acao, anexo: acao.anexo === "audio" && !audio ? "nenhum" : acao.anexo, audio };
   });
 
 /** Encerra uma conversa (ou a rodada inteira) sem apagar nada. */
@@ -366,7 +535,7 @@ export const listarRodadasAmbiente = createServerFn({ method: "POST" })
       )
       .eq("clinica_id", data.clinicaId)
       .order("created_at", { ascending: false })
-      .limit(data.rodada ? 30 : 600);
+      .limit(data.rodada ? LIMITES_AMBIENTE.conversasMaxRodada : 1500);
     consulta = data.rodada
       ? consulta.contains("persona", { ambiente: AMBIENTE, rodada: data.rodada })
       : consulta.contains("persona", { ambiente: AMBIENTE });
