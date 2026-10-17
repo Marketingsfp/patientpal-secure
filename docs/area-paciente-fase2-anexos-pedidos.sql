@@ -126,7 +126,7 @@ BEGIN
     NEW.liberado_paciente_por := NULL;
   ELSIF TG_OP = 'INSERT' AND NEW.liberado_paciente_em IS NULL
     AND EXISTS (SELECT 1 FROM public.portal_paciente_config c WHERE c.clinica_id = NEW.clinica_id
-      AND c.ativo AND c.auto_liberar ->> (NEW.tipo || '_clinico') = 'true') THEN
+      AND c.ativo AND c.auto_liberar ->> (CASE WHEN NEW.tipo = 'foto' THEN 'foto_clinica' ELSE 'anexo_clinico' END) = 'true') THEN
     NEW.liberado_paciente_em := now();
     NEW.liberado_paciente_por := NULL;
   END IF;

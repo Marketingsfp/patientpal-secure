@@ -2,7 +2,9 @@
 
 ## Área do Paciente — decisões de 17/10/2026 (não publicar)
 - [x] Registrar papéis confirmados para liberação de documentos.
-- [ ] Conferir/restabelecer pré-requisitos ausentes da fase 2, mediante aprovação do plano.
+- [x] Conferir pré-requisitos ausentes da fase 2 e obter aprovação do plano.
+- [ ] Aplicar proposta SQL completa após confirmação explícita; banco compartilhado com produção.
+- [ ] Restabelecer fase 2 sem substituir alterações recentes.
 - [ ] Anexos clínicos: categorias seguras, liberação manual/automática, download de 5 minutos por sessão e auditoria.
 - [ ] Pedidos de exame: tabela própria, emissão/PDF/listagem/cancelamento e migração somente de pedidos identificados com segurança.
 - [ ] Testes de isolamento e liberação; validação na prévia sem dados reais.
