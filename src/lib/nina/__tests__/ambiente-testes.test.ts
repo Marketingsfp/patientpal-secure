@@ -64,6 +64,7 @@ describe("paciente difícil", () => {
       acao: "enviar",
       mensagem: "tem eco?",
       motivo: "x",
+      anexo: "nenhum",
     });
     expect(lerAcaoPaciente('{"acao":"enviar","mensagem":"","motivo":"x"}').acao).toBe("encerrar");
     expect(lerAcaoPaciente("oi, vcs fazem raio x?").mensagem).toBe("oi, vcs fazem raio x?");
@@ -71,6 +72,19 @@ describe("paciente difícil", () => {
     expect(
       lerAcaoPaciente(`{"acao":"enviar","mensagem":"${"a".repeat(900)}","motivo":""}`).mensagem,
     ).toHaveLength(LIMITES_AMBIENTE.caracteresMensagem);
+  });
+
+  test("áudio e foto só valem com a opção ligada", () => {
+    const audio =
+      '{"acao":"enviar","mensagem":"oi queria saber do exame","motivo":"x","anexo":"audio"}';
+    expect(lerAcaoPaciente(audio).anexo).toBe("nenhum");
+    expect(lerAcaoPaciente(audio, true).anexo).toBe("audio");
+    const foto = '{"acao":"enviar","mensagem":"","motivo":"x","anexo":"foto_pedido"}';
+    expect(lerAcaoPaciente(foto, true)).toMatchObject({ acao: "enviar", anexo: "foto_pedido" });
+    // Sem a opção, foto sem legenda vira mensagem vazia: encerra.
+    expect(lerAcaoPaciente(foto).acao).toBe("encerrar");
+    expect(instrucoesPaciente(MODOS_PACIENTE[0]!, "consulta", true)).toContain("foto_pedido");
+    expect(instrucoesPaciente(MODOS_PACIENTE[0]!, "consulta")).toContain("sempre 'nenhum'");
   });
 
   test("turnos ficam dentro do intervalo", () => {

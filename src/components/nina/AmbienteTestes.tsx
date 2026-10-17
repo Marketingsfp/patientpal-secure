@@ -35,6 +35,7 @@ import {
   encerrarConversaAmbiente,
   iniciarRodadaAmbiente,
   listarRodadasAmbiente,
+  novaConversaAmbiente,
   prepararAmbienteTestes,
   turnoPacienteAmbiente,
 } from "@/lib/nina/ambiente-testes.functions";
@@ -71,7 +72,55 @@ type Conversa = {
   motivoFim: string | null;
   /** Tempo de cada resposta da Nina nesta tela (envio → resposta), em ms. */
   tempos: number[];
+  /** Teste contínuo: conversas já feitas neste lead e quantas terminaram com erro. */
+  feitas?: number;
+  erros?: number;
 };
+
+type FimConversa = "ok" | "erro" | "parada";
+
+/**
+ * Foto de um pedido médico FICTÍCIO, desenhada na própria tela, para a rodada
+ * exercitar a leitura de imagem da Nina. Nunca usa dado de paciente real.
+ */
+function fotoPedidoFicticio(assunto: string): { base64: string; mime: "image/jpeg" } | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = 900;
+  canvas.height = 1200;
+  const g = canvas.getContext("2d");
+  if (!g) return null;
+  g.fillStyle = "#fdfdf8";
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = "#1f2937";
+  g.font = "bold 40px sans-serif";
+  g.fillText("CLÍNICA EXEMPLO", 60, 100);
+  g.font = "bold 34px sans-serif";
+  g.fillText("SOLICITAÇÃO DE EXAMES", 60, 200);
+  g.font = "28px sans-serif";
+  g.fillText("Paciente: Paciente Teste", 60, 290);
+  g.fillText(`Data: ${new Date().toLocaleDateString("pt-BR")}`, 60, 340);
+  g.fillText("Solicito:", 60, 440);
+  const palavras = assunto
+    .replace(/^consulta de /i, "avaliação de ")
+    .toUpperCase()
+    .split(/\s+/);
+  let linha = "";
+  let y = 500;
+  for (const p of palavras) {
+    if ((linha + " " + p).trim().length > 40) {
+      g.fillText(linha, 90, y);
+      y += 44;
+      linha = p;
+    } else linha = (linha + " " + p).trim();
+  }
+  if (linha) g.fillText(linha, 90, y);
+  g.fillText("Indicação clínica: investigação", 60, y + 90);
+  g.fillText("Dr. Médico Fictício — CRM 00000", 60, 1000);
+  g.font = "20px sans-serif";
+  g.fillText("Ambiente de testes", 60, 1150);
+  const url = canvas.toDataURL("image/jpeg", 0.85);
+  return { base64: url.slice(url.indexOf(",") + 1), mime: "image/jpeg" };
+}
 
 const segundos = (ms: number) => `${Math.round(ms / 1000)} s`;
 
@@ -128,6 +177,7 @@ export function AmbienteTestes() {
   const encerrar = useServerFn(encerrarConversaAmbiente);
   const avaliar = useServerFn(avaliarConversaAmbiente);
   const listar = useServerFn(listarRodadasAmbiente);
+  const novaConversa = useServerFn(novaConversaAmbiente);
   const carregarConversa = useServerFn(conversaAmbiente);
 
   const [modos, setModos] = useState<Modo[]>([]);
@@ -136,6 +186,9 @@ export function AmbienteTestes() {
   const [quantidade, setQuantidade] = useState("20");
   // Juiz desligado por padrão: o foco agora é a Nina respondendo em paralelo.
   const [comJuiz, setComJuiz] = useState(false);
+  // "rodada" = uma conversa por lead; "30"/"60" = teste contínuo por esse tempo (min).
+  const [duracao, setDuracao] = useState("rodada");
+  const [comMidia, setComMidia] = useState(false);
   const [rodando, setRodando] = useState(false);
   const [iniciando, setIniciando] = useState(false);
   const [rodadas, setRodadas] = useState<Rodada[]>([]);
@@ -216,21 +269,31 @@ export function AmbienteTestes() {
     return () => window.removeEventListener("beforeunload", aviso);
   }, [rodando]);
 
-  async function conduzir(c: Conversa, avaliarNoFim: boolean) {
+  async function conduzir(c: Conversa, avaliarNoFim: boolean): Promise<FimConversa> {
     const { simulacaoId, leadId, posicao } = c;
-    if (!clinicaId || !simulacaoId || !leadId) return;
+    if (!clinicaId || !simulacaoId || !leadId) return "parada";
     let turnos = 0;
     try {
       for (;;) {
         if (pararRef.current) break;
         atualizar(posicao, { estado: "paciente" });
         const passo: any = await turno({ data: { clinicaId, simulacaoId } });
-        if (passo.acao === "encerrar" || !passo.mensagem) {
+        const foto = passo.anexo === "foto_pedido";
+        if (passo.acao === "encerrar" || (!passo.mensagem && !foto)) {
           atualizar(posicao, { motivoFim: passo.motivo ?? null });
           break;
         }
         if (pararRef.current) break;
-        acrescentar(posicao, { autor: "paciente", texto: passo.mensagem });
+        const audio = passo.anexo === "audio" && passo.audio ? passo.audio : null;
+        const imagem = foto ? fotoPedidoFicticio(c.assunto) : null;
+        acrescentar(posicao, {
+          autor: "paciente",
+          texto: audio
+            ? `🎤 ${passo.mensagem}`
+            : imagem
+              ? `📷 Pedido médico${passo.mensagem ? ` · ${passo.mensagem}` : ""}`
+              : passo.mensagem || "(foto não gerada)",
+        });
         turnos += 1;
         atualizar(posicao, { estado: "nina", turnos });
         const inicioEnvio = performance.now();
@@ -238,8 +301,12 @@ export function AmbienteTestes() {
           data: {
             clinicaId,
             leadId,
-            tipo: "text",
-            texto: passo.mensagem,
+            // Áudio vai sem texto: a transcrição real preenche.
+            ...(audio
+              ? { tipo: "audio" as const, texto: "", audioArquivo: audio }
+              : imagem
+                ? { tipo: "image" as const, texto: passo.mensagem, imagemArquivo: imagem }
+                : { tipo: "text" as const, texto: passo.mensagem || "segue o pedido" }),
             chave: `ambiente-${simulacaoId}-${turnos}`,
           },
         });
@@ -269,21 +336,83 @@ export function AmbienteTestes() {
           },
         }).catch(() => {});
         atualizar(posicao, { estado: "parada" });
-        return;
+        return "parada";
       }
       if (!turnos || !avaliarNoFim) {
         atualizar(posicao, { estado: "concluida" });
-        return;
+        return "ok";
       }
       atualizar(posicao, { estado: "avaliando" });
       const j: any = await avaliar({ data: { clinicaId, simulacaoId } });
       atualizar(posicao, { estado: "concluida", avaliacao: j as Avaliacao });
+      return "ok";
     } catch (e) {
       const msg = String((e as Error)?.message ?? e).slice(0, 300);
       await encerrar({
         data: { clinicaId, simulacaoIds: [simulacaoId], status: "erro", motivo: msg },
       }).catch(() => {});
       atualizar(posicao, { estado: "erro", erro: msg });
+      return "erro";
+    }
+  }
+
+  /**
+   * Um lead da rodada. No teste contínuo, abre a próxima conversa assim que a
+   * anterior termina, até o tempo acabar ou o operador parar.
+   */
+  async function conduzirLead(
+    primeira: Conversa,
+    rodada: string,
+    avaliarNoFim: boolean,
+    fim: number,
+  ) {
+    let atual = primeira;
+    let feitas = 0;
+    let erros = 0;
+    let errosSeguidos = 0;
+    for (;;) {
+      const resultado = await conduzir(atual, avaliarNoFim);
+      feitas += 1;
+      if (resultado === "erro") erros += 1;
+      errosSeguidos = resultado === "erro" ? errosSeguidos + 1 : 0;
+      atualizar(atual.posicao, { feitas, erros });
+      if (!fim || !clinicaId || !atual.leadId || resultado === "parada") return;
+      if (pararRef.current || Date.now() >= fim) return;
+      // Três erros seguidos no mesmo lead: para este lead (evita repetir a falha sem fim).
+      if (errosSeguidos >= 3) {
+        atualizar(atual.posicao, { motivoFim: "3 erros seguidos: lead parado" });
+        return;
+      }
+      if (resultado === "erro") await espera(10_000);
+      try {
+        const r: any = await novaConversa({
+          data: { clinicaId, rodada, leadId: atual.leadId },
+        });
+        if (r.fim) {
+          atualizar(atual.posicao, { motivoFim: r.motivo });
+          return;
+        }
+        const mudanca: Partial<Conversa> = {
+          simulacaoId: r.item.simulacaoId,
+          assunto: r.item.assunto,
+          modo: r.item.modo,
+          conversaId: null,
+          estado: "aguardando",
+          turnos: 0,
+          linhas: [],
+          avaliacao: null,
+          erro: null,
+          motivoFim: null,
+        };
+        atual = { ...atual, ...mudanca };
+        atualizar(atual.posicao, mudanca);
+      } catch (e) {
+        atualizar(atual.posicao, {
+          estado: "erro",
+          erro: String((e as Error)?.message ?? e).slice(0, 300),
+        });
+        return;
+      }
     }
   }
 
@@ -293,12 +422,14 @@ export function AmbienteTestes() {
     pararRef.current = false;
     setRodadaAberta(null);
     const avaliarNoFim = comJuiz;
+    const continuo = duracao !== "rodada";
     try {
       const r: any = await iniciar({
         data: {
           clinicaId,
           turnos: Number(turnosMax),
           quantidade: Number(quantidade) as 10 | 20 | 30,
+          midia: comMidia,
         },
       });
       const novas: Conversa[] = (r.itens as any[]).map((it) => ({
@@ -320,8 +451,12 @@ export function AmbienteTestes() {
       setRodando(true);
       setIniciando(false);
       // Início escalonado: as conversas não chegam no mesmo segundo (1,5 s entre elas).
+      // O relógio do contínuo começa com a rodada; o servidor também tem um teto próprio.
+      const fim = continuo ? Date.now() + Number(duracao) * 60_000 : 0;
       await Promise.all(
-        novas.map((c, i) => espera(i * 1500).then(() => conduzir(c, avaliarNoFim))),
+        novas.map((c, i) =>
+          espera(i * 1500).then(() => conduzirLead(c, r.rodada as string, avaliarNoFim, fim)),
+        ),
       );
       toast.success(
         avaliarNoFim ? "Rodada concluída. As avaliações estão nos cards." : "Rodada concluída.",
@@ -409,6 +544,8 @@ export function AmbienteTestes() {
   const todosTempos = conversas.flatMap((c) => c.tempos);
   const ordenados = [...todosTempos].sort((a, b) => a - b);
   const mediana = ordenados.length ? ordenados[Math.floor(ordenados.length / 2)]! : null;
+  const feitasSessao = conversas.reduce((s, c) => s + (c.feitas ?? 0), 0);
+  const errosSessao = conversas.reduce((s, c) => s + (c.erros ?? 0), 0);
   const concluidas = conversas.filter((c) => c.avaliacao);
   const media = concluidas.length
     ? Math.round(concluidas.reduce((t, c) => t + (c.avaliacao?.nota ?? 0), 0) / concluidas.length)
@@ -428,7 +565,10 @@ export function AmbienteTestes() {
             5.5) tenta dificultar a Nina de um jeito diferente, sem ver nada do prompt, das
             ferramentas ou do catálogo dela. Com "Avaliar com o juiz" ligado, um juiz lista no fim
             as falhas de cada conversa. Os leads são próprios deste ambiente (não mexem nos 10 leads
-            da Homologação). Com 20 ou 30, os modos se repetem com assuntos diferentes.
+            da Homologação). Com 20 ou 30, os modos se repetem com assuntos diferentes. "Contínuo"
+            abre uma conversa nova em cada lead assim que a anterior termina, até o tempo acabar.
+            "Incluir áudio e foto" faz o paciente mandar às vezes nota de voz (transcrita de
+            verdade) e a foto de um pedido médico fictício quando a Nina pedir.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="ambiente-juiz" className="flex items-center gap-2 text-sm">
@@ -440,6 +580,28 @@ export function AmbienteTestes() {
               />
               Avaliar com o juiz
             </label>
+            <label htmlFor="ambiente-midia" className="flex items-center gap-2 text-sm">
+              <Switch
+                id="ambiente-midia"
+                checked={comMidia}
+                onCheckedChange={setComMidia}
+                disabled={rodando || iniciando}
+              />
+              Incluir áudio e foto
+            </label>
+            <label htmlFor="ambiente-duracao" className="text-sm">
+              Duração
+            </label>
+            <Select value={duracao} onValueChange={setDuracao} disabled={rodando || iniciando}>
+              <SelectTrigger id="ambiente-duracao" className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rodada">Uma rodada</SelectItem>
+                <SelectItem value="30">Contínuo 30 min</SelectItem>
+                <SelectItem value="60">Contínuo 60 min</SelectItem>
+              </SelectContent>
+            </Select>
             <label htmlFor="ambiente-quantidade" className="text-sm">
               Conversas
             </label>
@@ -491,6 +653,11 @@ export function AmbienteTestes() {
                 )}
                 Iniciar {quantidade} conversas
               </Button>
+            )}
+            {feitasSessao > 0 && (
+              <Badge variant="outline" className="text-sm">
+                Conversas feitas: {feitasSessao} · com erro: {errosSessao}
+              </Badge>
             )}
             {mediana !== null && (
               <Badge variant="outline" className="text-sm">
@@ -564,6 +731,7 @@ export function AmbienteTestes() {
                   </div>
                 )}
                 <p className="text-[11px] text-muted-foreground">
+                  {(c.feitas ?? 0) > 0 && `${c.feitas} conversa(s) neste lead · `}
                   {c.turnos} mensagem(ns) do paciente
                   {c.tempos.length
                     ? ` · Nina: última ${segundos(c.tempos[c.tempos.length - 1]!)}, pior ${segundos(Math.max(...c.tempos))}`
