@@ -2198,7 +2198,7 @@ export const listarMensagensConversa = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("whatsapp_mensagens")
       .select(
-        "id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id",
+        "id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id, agente:raw->>agente",
       )
       .eq("clinica_id", data.clinicaId)
       .eq("conversa_id", data.conversaId);
@@ -2256,7 +2256,7 @@ export const carregarJanelaMensagem = createServerFn({ method: "POST" })
       await assertAcessoConversa(context.supabase, context.userId, data.clinicaId, data.conversaId);
     }
     const COLUNAS =
-      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id";
+      "id, conversa_id, direction, from_number, to_number, body, tipo, transcricao, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id, agente:raw->>agente";
     const { data: alvo, error: eAlvo } = await context.supabase
       .from("whatsapp_mensagens")
       .select(COLUNAS)

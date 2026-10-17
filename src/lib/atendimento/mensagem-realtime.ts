@@ -84,6 +84,9 @@ export function normalizarMensagemRealtime(
 
   const mensagem: Record<string, any> = {};
   for (const campo of CAMPOS) if (linha[campo] !== undefined) mensagem[campo] = linha[campo];
+  // Só a marca do agente (Francisco), sem copiar o raw inteiro para a tela.
+  const agente = (linha.raw as { agente?: unknown } | null | undefined)?.agente;
+  if (typeof agente === "string") mensagem.agente = agente;
   mensagem.optimistic = false;
 
   return { usar: true, mensagem, conversaId };

@@ -32,6 +32,7 @@ import {
 } from "@/components/nina/RespostasRapidas";
 import { registrarUsoResposta } from "@/lib/atendimento/respostas-rapidas.functions";
 import { mensagemDoFrancisco } from "@/lib/francisco/autoria";
+import { rotuloRemetente } from "@/lib/atendimento/remetente-mensagem";
 import {
   aplicarVariaveis,
   detectarComandoNoTexto,
@@ -3761,7 +3762,10 @@ function AtendInboxOperacional({
                               exibe nenhum status — só a hora. Falha aparece acima. */}
               <span className="min-w-0 break-words">
                 {fmtHora(m.recebida_em)}{" "}
-                {mensagemDoFrancisco(m.raw) ? "· Francisco" : m.enviada_por === "nina" && "· Nina"}
+                {/* Quem enviou: Nina, Francisco ou Sistema (mensagem pronta do código). */}
+                {rotuloRemetente(m) && (
+                  <span data-testid="remetente-mensagem">· {rotuloRemetente(m)}</span>
+                )}
                 {autorSupervisao && (
                   <span
                     data-testid="autor-supervisao"

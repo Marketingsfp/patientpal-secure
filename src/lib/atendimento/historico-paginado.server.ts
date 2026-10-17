@@ -31,7 +31,7 @@ export async function carregarPaginaHistorico(
     .from("whatsapp_mensagens")
     .select(
       // wa_message_id/quoted_message_id: botão "Responder" e trecho citado na bolha.
-      "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id",
+      "id, direction, from_number, to_number, body, tipo, enviada_por, enviada_por_user_id, enviada_por_perfil, recebida_em, media_url, media_mime, status, execucao_id, client_message_id, wa_message_id, quoted_message_id, agente:raw->>agente",
     )
     .eq("clinica_id", args.clinicaId)
     .eq("conversa_id", args.conversaId);
