@@ -151,3 +151,7 @@ export function origemLink(tipo: TipoLink) {
     ? { tipo: "documento" as const, origem_extensao: tipo }
     : { tipo, origem_extensao: null };
 }
+
+export function linkDaSessao(link: {sessao_id: string; clinica_id: string; paciente_id: string}, sessao: {id: string; clinica_id: string; paciente_id: string}) {
+  return link.sessao_id === sessao.id && link.clinica_id === sessao.clinica_id && link.paciente_id === sessao.paciente_id;
+}

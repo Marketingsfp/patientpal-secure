@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/public/portal-arquivo")({
         if (token.length < 20 || token.length > 100) return NEGADO();
         const s = await import("@/lib/portal-paciente/portal.server");
         const { getCookie } = await import("@tanstack/react-start/server");
-        const { linkValido } = await import("@/lib/portal-paciente/regras-fase2");
+        const { linkValido, linkDaSessao } = await import("@/lib/portal-paciente/regras-fase2");
         const { sessaoValida } = await import("@/lib/portal-paciente/regras");
         const db = await s.admin();
         const { data: link } = await db
@@ -46,8 +46,7 @@ export const Route = createFileRoute("/api/public/portal-arquivo")({
           !sessao ||
           sessao.token_hash !== (await s.hmac("sessao", cookie)) ||
           !sessaoValida(sessao, new Date()) ||
-          sessao.clinica_id !== link.clinica_id ||
-          sessao.paciente_id !== link.paciente_id
+          !linkDaSessao(link, sessao)
         )
           return NEGADO();
         const { data: cfg } = await db

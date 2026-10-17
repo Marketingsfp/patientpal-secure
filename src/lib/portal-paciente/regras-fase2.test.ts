@@ -4,6 +4,7 @@ import {
   contarNovos,
   expiraLink,
   linkValido,
+  linkDaSessao,
   situacaoPagamento,
   somenteDoPaciente,
   tipoLiberavel,
@@ -36,6 +37,13 @@ describe("isolamento", () => {
 });
 
 describe("link temporário", () => {
+  it("link é preso à mesma sessão, paciente e clínica", () => {
+    const link = { sessao_id: "s1", clinica_id: "c1", paciente_id: "pA" };
+    expect(linkDaSessao(link, { id: "s1", ...A })).toBe(true);
+    expect(linkDaSessao(link, { id: "s2", ...A })).toBe(false);
+    expect(linkDaSessao(link, { id: "s1", clinica_id: "c2", paciente_id: "pA" })).toBe(false);
+    expect(linkDaSessao(link, { id: "s1", clinica_id: "c1", paciente_id: "pB" })).toBe(false);
+  });
   it("vale 5 minutos e depois expira", () => {
     expect(LINK_VALIDADE_MIN).toBe(5);
     const exp = expiraLink(agora);
