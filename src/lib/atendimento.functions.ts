@@ -1023,10 +1023,12 @@ export const fecharConversa = createServerFn({ method: "POST" })
       },
     });
     const atendenteAvaliada = dono.atribuida_user_id ?? dono.last_assigned_user_id ?? null;
-    const { solicitarPesquisaSatisfacao } =
+    // Fila (17/10/2026): só registra a pesquisa; o envio pela Meta sai na
+    // rotina de 1 minuto, sem segurar o botão nem depender da aba aberta.
+    const { registrarPesquisaNaFila } =
       await import("@/lib/atendimento/pesquisa-satisfacao.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const pesquisa = await solicitarPesquisaSatisfacao({
+    const pesquisa = await registrarPesquisaNaFila({
       db: supabaseAdmin,
       clinicaId: data.clinicaId,
       conversaId: data.conversaId,
@@ -1037,8 +1039,8 @@ export const fecharConversa = createServerFn({ method: "POST" })
     return {
       ok: true,
       protocol: r.protocol as string,
-      pesquisaEnviada: pesquisa.enviada,
-      pesquisaMotivo: pesquisa.enviada ? null : pesquisa.motivo,
+      pesquisaNaFila: pesquisa.registrada,
+      pesquisaMotivo: pesquisa.registrada ? null : pesquisa.motivo,
     };
   });
 

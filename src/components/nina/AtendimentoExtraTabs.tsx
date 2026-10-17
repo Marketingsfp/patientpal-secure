@@ -3557,11 +3557,11 @@ function AtendInboxOperacional({
       setConvs((prev: any[]) => prev.map((c) => aplicarEncerramentoLocal(c, origem, meuId)));
       fechandoRef.current = false;
       setFechando(false);
-      if (!resultado.pesquisaEnviada && resultado.pesquisaMotivo)
+      if (!resultado.pesquisaNaFila && resultado.pesquisaMotivo)
         toast.warning(
-          `Conversa encerrada, mas a pesquisa não foi enviada: ${resultado.pesquisaMotivo}`,
+          `Conversa encerrada, mas a pesquisa não será enviada: ${resultado.pesquisaMotivo}`,
         );
-      else toast.success("Conversa encerrada e pesquisa de satisfação enviada.");
+      else toast.success("Conversa encerrada. A pesquisa de satisfação será enviada em instantes.");
       void resumoEncerramentoFn({ data: { clinicaId, conversaId: origem } }).catch((e) =>
         console.error("[encerrar] resumo não atualizado", e),
       );

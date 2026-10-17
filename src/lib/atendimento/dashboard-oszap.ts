@@ -68,6 +68,7 @@ export type EntradaDashboard = {
     nota: number | null;
     atendente_user_id: string | null;
     conversa_id?: string | null;
+    falha_envio?: string | null;
     atend_conversas?: { contato_nome?: string | null } | null;
   }[];
   transferencias: { created_at: string; para_departamento_id: string | null }[];
@@ -391,12 +392,37 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
     paciente: string;
     conversaId: string | null;
   }[] = [];
+  // Falhas no envio da pesquisa (17/10/2026), mostradas na aba Nina: todas as
+  // do período, com o motivo gravado no envio ou pela fila.
+  const falhasPesquisa = { atual: 0, anterior: 0 };
+  const registrosFalhasPesquisa: {
+    id: string;
+    quando: string;
+    paciente: string;
+    atendente: string;
+    motivo: string;
+    conversaId: string | null;
+  }[] = [];
   for (const a of e.avaliacoes) {
     const solicitadaEm = a.solicitada_em ?? a.created_at ?? a.respondida_em;
     const janelaSolicitacao = solicitadaEm ? janela(solicitadaEm) : null;
     if (janelaSolicitacao && solicitadaEm) {
       pesquisas[janelaSolicitacao].solicitadas++;
       somarDia(solicitadaEm, "pesquisasSolicitadas");
+    }
+    if (a.status === "falha_envio" && janelaSolicitacao && solicitadaEm) {
+      falhasPesquisa[janelaSolicitacao]++;
+      if (janelaSolicitacao === "atual")
+        registrosFalhasPesquisa.push({
+          id: `${a.conversa_id ?? "sem-conversa"}:${solicitadaEm}`,
+          quando: solicitadaEm,
+          paciente: a.atend_conversas?.contato_nome?.trim() || "Sem nome",
+          atendente: a.atendente_user_id
+            ? (e.nomes.get(a.atendente_user_id) ?? "Nome não disponível")
+            : "Sem atendente",
+          motivo: a.falha_envio?.trim() || "Motivo não registrado",
+          conversaId: a.conversa_id ?? null,
+        });
     }
     if (a.nota == null || !a.respondida_em) continue;
     const j = janela(a.respondida_em);
@@ -426,6 +452,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
       });
   }
   registrosAvaliacoes.sort((x, y) => y.respondidaEm.localeCompare(x.respondidaEm));
+  registrosFalhasPesquisa.sort((x, y) => y.quando.localeCompare(x.quando));
   ind.notaMedia = { atual: media(somaNotas.atual, 2), anterior: media(somaNotas.anterior, 2) };
 
   // Agora
@@ -701,6 +728,7 @@ export function montarDashboardOsZap(e: EntradaDashboard) {
       aguardandoPaciente24h,
     },
     nina,
+    pesquisaFalhas: { ...falhasPesquisa, registros: registrosFalhasPesquisa },
     francisco,
     whatsapp: {
       avisosDisponiveis: !!e.webhook,

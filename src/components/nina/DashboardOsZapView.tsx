@@ -1293,6 +1293,51 @@ export function DashboardOsZapView({
                   </div>
                 </>
               )}
+              {resumo.pesquisaFalhas && (
+                <Secao
+                  titulo="Falhas no envio da pesquisa de satisfação"
+                  descricao="Pesquisas que não chegaram ao paciente no período: recusadas pela Meta, conversa sem telefone, envio interrompido ou não enviadas em até 2 horas após o encerramento."
+                >
+                  <div className="mb-3 max-w-xs">
+                    <Indicador
+                      nome="Falhas no envio"
+                      valor={resumo.pesquisaFalhas.atual}
+                      anterior={resumo.pesquisaFalhas.anterior}
+                      melhor="baixo"
+                    />
+                  </div>
+                  <Tabela
+                    linhas={resumo.pesquisaFalhas.registros}
+                    chave={(l) => l.id}
+                    busca="Buscar paciente, atendente ou motivo"
+                    vazio="Nenhuma falha no envio da pesquisa no período."
+                    colunas={[
+                      {
+                        campo: "quando",
+                        titulo: "Data",
+                        texto: true,
+                        formato: (v) => dataHoraAvaliacao(String(v)),
+                      },
+                      { campo: "paciente", titulo: "Paciente", texto: true },
+                      // Texto longo: alinhado à esquerda (a tabela centraliza da 3ª coluna em diante).
+                      {
+                        campo: "atendente",
+                        titulo: "Atendente",
+                        texto: true,
+                        formato: (v) => <span className="block text-left">{String(v)}</span>,
+                      },
+                      {
+                        campo: "motivo",
+                        titulo: "Motivo",
+                        texto: true,
+                        formato: (v) => (
+                          <span className="block min-w-[14rem] text-left">{String(v)}</span>
+                        ),
+                      },
+                    ]}
+                  />
+                </Secao>
+              )}
             </TabsContent>
 
             <TabsContent value="francisco" className="space-y-5">

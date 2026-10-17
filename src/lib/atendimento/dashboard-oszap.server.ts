@@ -176,12 +176,13 @@ export async function carregarResumoDashboardOsZap(
       nota: number | null;
       atendente_user_id: string | null;
       conversa_id: string | null;
+      falha_envio: string | null;
       atend_conversas: { contato_nome: string | null } | null;
     }>((de, ate) =>
       db
         .from("atend_avaliacoes")
         .select(
-          "created_at, solicitada_em, respondida_em, status, nota, atendente_user_id, conversa_id, atend_conversas!inner(is_teste, contato_nome)",
+          "created_at, solicitada_em, respondida_em, status, nota, atendente_user_id, conversa_id, falha_envio, atend_conversas!inner(is_teste, contato_nome)",
         )
         .eq("clinica_id", clinicaId)
         .eq("atend_conversas.is_teste", false)

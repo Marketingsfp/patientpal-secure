@@ -16,6 +16,7 @@ import {
   type MensagemDashboard,
 } from "../dashboard-oszap";
 import { carregarResumoDashboardOsZap, lerPaginasDashboard } from "../dashboard-oszap.server";
+import { dadosParaAnaliseDashboard } from "../dashboard-oszap-analise";
 
 const periodo = { de: "2024-10-01", ate: "2024-10-01" };
 const agora = new Date("2024-10-02T12:00:00Z");
@@ -204,6 +205,76 @@ describe("Números do dashboard", () => {
         conversaId: "c1",
       },
     ]);
+  });
+
+  it("lista todas as falhas no envio da pesquisa do período, com motivo (17/10/2026)", () => {
+    const r = montarDashboardOsZap(
+      base({
+        nomes: new Map([["ana", "Ana"]]),
+        avaliacoes: [
+          {
+            solicitada_em: "2024-10-01T10:00:00Z",
+            respondida_em: null,
+            status: "falha_envio",
+            nota: null,
+            atendente_user_id: "ana",
+            conversa_id: "c1",
+            falha_envio: "Meta recusou o envio",
+            atend_conversas: { contato_nome: "Paciente Teste" },
+          },
+          {
+            solicitada_em: "2024-10-01T16:00:00Z",
+            respondida_em: null,
+            status: "falha_envio",
+            nota: null,
+            atendente_user_id: null,
+            conversa_id: "c2",
+            falha_envio: null,
+            atend_conversas: { contato_nome: null },
+          },
+          // Período anterior conta só no comparativo; enviada não é falha.
+          {
+            solicitada_em: "2024-09-30T10:00:00Z",
+            respondida_em: null,
+            status: "falha_envio",
+            nota: null,
+            atendente_user_id: "ana",
+          },
+          {
+            solicitada_em: "2024-10-01T11:00:00Z",
+            respondida_em: null,
+            status: "pendente",
+            nota: null,
+            atendente_user_id: "ana",
+          },
+        ],
+      }),
+    );
+    expect(r.pesquisaFalhas.atual).toBe(2);
+    expect(r.pesquisaFalhas.anterior).toBe(1);
+    expect(r.pesquisaFalhas.registros).toEqual([
+      {
+        id: "c2:2024-10-01T16:00:00Z",
+        quando: "2024-10-01T16:00:00Z",
+        paciente: "Sem nome",
+        atendente: "Sem atendente",
+        motivo: "Motivo não registrado",
+        conversaId: "c2",
+      },
+      {
+        id: "c1:2024-10-01T10:00:00Z",
+        quando: "2024-10-01T10:00:00Z",
+        paciente: "Paciente Teste",
+        atendente: "Ana",
+        motivo: "Meta recusou o envio",
+        conversaId: "c1",
+      },
+    ]);
+    // A análise por IA recebe só as contagens, nunca o nome do paciente.
+    const ia = JSON.stringify(dadosParaAnaliseDashboard(r as never));
+    expect(ia).toContain('"falhasNoEnvioDaPesquisa":{"atual":2,"anterior":1}');
+    expect(ia).not.toContain("Paciente Teste");
+    expect(ia).not.toContain("Meta recusou");
   });
 
   it("separa respostas da equipe e da Nina; só conta envio confirmado", () => {

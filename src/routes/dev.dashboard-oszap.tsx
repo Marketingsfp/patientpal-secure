@@ -184,7 +184,26 @@ function dadosFicticios(periodo: { de: string; ate: string }) {
         respondida_em: c.created_at,
         nota: [5, 5, 4, 4, 3, 2, 1][Math.floor(r() * 7)],
         atendente_user_id: r() > 0.5 ? "ana" : "bia",
-      })),
+      }))
+      // Falhas no envio da pesquisa (aba Nina), sem mexer no sorteio acima.
+      .concat(
+        conversas
+          .filter((_, i) => i % 37 === 5)
+          .map((c, i) => ({
+            solicitada_em: c.created_at,
+            respondida_em: null,
+            status: "falha_envio",
+            nota: null,
+            atendente_user_id: i % 2 ? "ana" : "bia",
+            conversa_id: c.id,
+            falha_envio: [
+              "Meta recusou o envio: número fora da janela de 24 horas.",
+              "Não enviada em até 2 horas após o encerramento.",
+              "Envio interrompido; não reenviada para não duplicar a pesquisa.",
+            ][i % 3],
+            atend_conversas: { contato_nome: `Paciente fictício ${i + 1}` },
+          })) as never[],
+      ),
     transferencias: eventos
       .filter((e) => e.evento === "TRANSFERIDA")
       .map((e) => ({ created_at: e.created_at, para_departamento_id: "dep-orc" })),

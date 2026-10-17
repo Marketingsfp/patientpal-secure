@@ -15,6 +15,18 @@ export async function executarJobWatchdog(request: Request): Promise<Response> {
     b = Buffer.from(esperado);
   if (error || !esperado || a.length !== b.length || !timingSafeEqual(a, b))
     return new Response("Unauthorized", { status: 401 });
+  // Pesquisa de satisfação na fila (17/10/2026): roda ao lado das outras
+  // tarefas, isolada delas; uma falha aqui não afeta a Nina.
+  const pesquisasNaFila = (async () => {
+    try {
+      const { enviarPesquisasNaFila } =
+        await import("@/lib/atendimento/pesquisa-satisfacao.server");
+      return await enviarPesquisasNaFila({ db: supabaseAdmin as never });
+    } catch {
+      console.error("[pesquisa-satisfacao] fila falhou; será retomada no próximo ciclo");
+      return { erros: 1 };
+    }
+  })();
   // O cron já chama esta rota a cada minuto, mesmo sem novas mensagens ou
   // navegador aberto. A espera do paciente independe de haver lotes para recuperar.
   let espera: unknown;
@@ -36,14 +48,14 @@ export async function executarJobWatchdog(request: Request): Promise<Response> {
       continuacao = await continuarCargaPendenteNina(supabaseAdmin, processarMensagemTeste);
     }
     return Response.json(
-      { ...recuperacao, continuacao, espera },
+      { ...recuperacao, continuacao, espera, pesquisas: await pesquisasNaFila },
       {
         headers: { "cache-control": "no-store" },
       },
     );
   } catch {
     return Response.json(
-      { erro: "WATCHDOG_FAILED", espera },
+      { erro: "WATCHDOG_FAILED", espera, pesquisas: await pesquisasNaFila },
       { status: 503, headers: { "cache-control": "no-store" } },
     );
   }

@@ -25,6 +25,7 @@ type ResumoDashboard = {
   equipe: Array<{ id?: string } & Record<string, unknown>>;
   departamentos: Array<{ id?: string } & Record<string, unknown>>;
   registrosAvaliacoes?: unknown;
+  pesquisaFalhas?: { atual: number; anterior: number; registros?: unknown };
   [campo: string]: unknown;
 };
 
@@ -52,6 +53,8 @@ export function dadosParaAnaliseDashboard(resumo: ResumoDashboard) {
     porDia,
     porHora,
     registrosAvaliacoes: _semPacientes,
+    // Só as contagens: a lista tem nome de paciente.
+    pesquisaFalhas,
     // Datas técnicas da consulta não ajudam a análise.
     inicio: _inicio,
     fim: _fim,
@@ -74,6 +77,14 @@ export function dadosParaAnaliseDashboard(resumo: ResumoDashboard) {
     .map((h) => ({ dia: DIAS_SEMANA[h.diaSemana], hora: `${h.hora}h`, recebidas: h.recebidas }));
   return limpar({
     ...resto,
+    ...(pesquisaFalhas
+      ? {
+          falhasNoEnvioDaPesquisa: {
+            atual: pesquisaFalhas.atual,
+            anterior: pesquisaFalhas.anterior,
+          },
+        }
+      : {}),
     avisosDoSistema: avisos ?? [],
     serie: { agrupadaPor: agrupamento, grupos: serie },
     mensagensRecebidasPorDiaDaSemana: porDiaSemana,
