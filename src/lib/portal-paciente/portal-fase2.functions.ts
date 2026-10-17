@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
   contarNovos,
+  caminhoClinicoValido,
   origemLink,
   expiraLink,
   nomeForma,
@@ -87,7 +88,7 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
   const [anexos, pedidos] = await Promise.all([
     db
       .from("paciente_arquivos")
-      .select("id, nome_arquivo, tipo, data, enviado_por_nome, liberado_paciente_em")
+      .select("id, caminho, nome_arquivo, tipo, data, enviado_por_nome, liberado_paciente_em")
       .eq("clinica_id", s.clinica_id)
       .eq("paciente_id", s.paciente_id)
       .eq("finalidade_portal", "clinico")
@@ -96,7 +97,7 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
       .limit(200),
     db
       .from("pedidos_exame")
-      .select("id, data, medico_id, liberado_paciente_em")
+      .select("id, data, medico_id, pdf_caminho, liberado_paciente_em")
       .eq("clinica_id", s.clinica_id)
       .eq("paciente_id", s.paciente_id)
       .eq("status", "emitido")
@@ -116,7 +117,7 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
       .in("id", pedidoMedicos);
     for (const m of ms ?? []) nomes.set(m.id, m.nome);
   }
-  const a = (anexos.data ?? []).map((x) => ({
+  const a = (anexos.data ?? []).filter(x => caminhoClinicoValido(x.caminho, s.clinica_id, s.paciente_id, x.tipo)).map((x) => ({
     id: x.id,
     origem: "anexo" as const,
     tipo: x.tipo === "foto" ? "foto_clinica" : "anexo_clinico",
@@ -125,7 +126,7 @@ async function lerDocumentos(s: { clinica_id: string; paciente_id: string }) {
     profissional: x.enviado_por_nome,
     liberadoEm: x.liberado_paciente_em as string,
   }));
-  const p = (pedidos.data ?? []).map((x) => ({
+  const p = (pedidos.data ?? []).filter(x => x.pdf_caminho && caminhoClinicoValido(x.pdf_caminho, s.clinica_id, s.paciente_id, "pedidos-exame")).map((x) => ({
     id: x.id,
     origem: "pedido_exame" as const,
     tipo: "pedido_exame",

@@ -157,10 +157,17 @@ export const cancelarPedidoExame = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { data: existente } = await context.supabase.from("pedidos_exame")
+      .select("clinica_id,paciente_id").eq("id", data.id).maybeSingle();
+    if (!existente) throw new Error("Pedido não encontrado.");
+    const { data: pode } = await context.supabase.rpc("portal_pode_liberar", { _clinica_id: existente.clinica_id });
+    if (!pode) throw new Error("Sem permissão para cancelar pedidos.");
     const { data: pedido, error } = await context.supabase
       .from("pedidos_exame")
       .update({ status: "cancelado" })
       .eq("id", data.id)
+      .eq("clinica_id", existente.clinica_id)
+      .eq("paciente_id", existente.paciente_id)
       .eq("status", "emitido")
       .select("id")
       .maybeSingle();
@@ -204,10 +211,19 @@ export const classificarAnexoPortal = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), finalidade: z.enum(["clinico", "interno"]) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const { data: existente } = await context.supabase.from("paciente_arquivos")
+      .select("clinica_id,paciente_id,caminho,tipo").eq("id", data.id).maybeSingle();
+    if (!existente) throw new Error("Arquivo não encontrado.");
+    const { data: pode } = await context.supabase.rpc("portal_pode_liberar", { _clinica_id: existente.clinica_id });
+    if (!pode) throw new Error("Sem permissão para classificar arquivos.");
+    const { caminhoClinicoValido } = await import("./regras-fase2");
+    if (data.finalidade === "clinico" && !caminhoClinicoValido(existente.caminho, existente.clinica_id, existente.paciente_id, existente.tipo)) throw new Error("Caminho de arquivo incompatível com liberação ao paciente.");
     const { data: reg, error } = await context.supabase
       .from("paciente_arquivos")
       .update({ finalidade_portal: data.finalidade })
       .eq("id", data.id)
+      .eq("clinica_id", existente.clinica_id)
+      .eq("paciente_id", existente.paciente_id)
       .select("id")
       .maybeSingle();
     if (error || !reg)
