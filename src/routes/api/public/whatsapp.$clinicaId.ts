@@ -179,6 +179,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
 
           trace.marcar("RECV_T3_PAYLOAD_PARSED");
           let processou = false;
+          // Mensagens cuja resposta da Nina foi acionada pelo banco (fora desta requisição).
+          let despachadas = 0;
           const entries: any[] = payload?.entry ?? [];
           for (const entry of entries) {
             const changes: any[] = entry?.changes ?? [];
@@ -429,18 +431,9 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                 {
                   // Sempre usa a entrada protegida, também no primeiro recebimento.
                   // Retry reutiliza o conteúdo persistido, não o payload reenviado.
-                  textoPaciente =
-                    msgInserida.tipo === "audio" || msgInserida.tipo === "image"
-                      ? (msgInserida.transcricao ?? "")
-                      : msgInserida.tipo === "text"
-                        ? (msgInserida.body ?? "")
-                        : msgInserida.tipo === "interactive" &&
-                            msgInserida.body &&
-                            msgInserida.body !== "[interactive]"
-                          ? (
-                              await import("@/lib/atendimento/pesquisa-satisfacao")
-                            ).textoDaRespostaInterativa(msgInserida.body)
-                          : "";
+                  // A resposta acionada pelo banco monta o texto pela mesma regra.
+                  const { textoDaEntradaGravada } = await import("@/lib/nina/entrada-whatsapp");
+                  textoPaciente = textoDaEntradaGravada(msgInserida);
                 }
 
                 // FASE 4 — Stale Response Guard: cada mensagem recebida avança
@@ -761,7 +754,24 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
                   }
                 }
 
+                // 17/10/2026: com a chave da clínica ligada, a Meta recebe o "ok" na
+                // hora e a Nina responde numa chamada separada, acionada pelo banco.
+                // Chave desligada ou despacho recusado: tudo segue nesta requisição.
+                let despachada = false;
                 if (deveResponder) {
+                  const { respostaAssincronaLigada, despacharRespostaNina } =
+                    await import("@/lib/nina/whatsapp-assincrono.server");
+                  despachada =
+                    (await respostaAssincronaLigada(supabaseAdmin, params.clinicaId)) &&
+                    (await despacharRespostaNina(supabaseAdmin, {
+                      clinicaId: params.clinicaId,
+                      mensagemId: msgInserida.id,
+                      audioFalhou,
+                      phoneNumberId: webhookPhoneNumberId,
+                    }));
+                  if (despachada) despachadas++;
+                }
+                if (deveResponder && !despachada) {
                   const { processarRespostaWhatsappNina } =
                     await import("@/lib/nina/whatsapp-processamento.server");
                   const processamento = await processarRespostaWhatsappNina({
@@ -831,7 +841,8 @@ export const Route = createFileRoute("/api/public/whatsapp/$clinicaId")({
             }
           }
 
-          if (processou) resultado = "processado_ok";
+          if (processou)
+            resultado = despachadas ? "processado_ok:nina_despachada" : "processado_ok";
           return new Response("ok", { status: 200 });
         } catch (e) {
           resultado = `erro:${String((e as Error)?.message ?? e)}`;

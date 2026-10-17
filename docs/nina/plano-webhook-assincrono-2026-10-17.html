@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirmação imediata à Meta</title>
+<style>
+  :root { --tinta:#1f2937; --suave:#6b7280; --linha:#e5e7eb; --destaque:#0f766e; --erro:#b91c1c; --ok:#047857; --aviso:#b45309; --fundo:#f9fafb; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; color: var(--tinta); background:#fff; max-width: 920px; margin: 28px auto; padding: 0 16px; line-height: 1.45; font-size: 13.5px; }
+  h1 { font-size: 21px; margin: 0 0 4px; } .sub { color: var(--suave); margin: 0 0 16px; }
+  h2 { font-size: 15.5px; margin: 22px 0 6px; color: var(--destaque); }
+  h3 { font-size: 14px; margin: 12px 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--suave); }
+  code { font-family: Consolas, monospace; font-size: 12.5px; background: #f3f4f6; padding: 0 3px; border-radius: 3px; }
+  pre { background: var(--fundo); border: 1px solid var(--linha); border-radius: 6px; padding: 8px 12px; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; }
+  .caixa { background: var(--fundo); border-left: 3px solid var(--destaque); padding: 8px 12px; margin: 8px 0; }
+  .alerta { background: #fffbeb; border-left: 3px solid var(--aviso); padding: 8px 12px; margin: 8px 0; }
+  ol, ul { padding-left: 20px; } li { margin: 2px 0; }
+  @media print { tr, pre, .caixa { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<h1>Plano técnico — confirmar à Meta na hora e responder em seguida</h1>
+<p class="sub">Nina / WhatsApp · 17/10/2026 · etapa 2 do plano de testes de carga · para aprovação antes de qualquer código</p>
+
+<div class="caixa"><b>Objetivo:</b> o webhook do WhatsApp passa a responder "ok" à Meta em ~1–3 s (texto), em vez de esperar a Nina (~20 s, até 2 min). A resposta da Nina continua igual, só que gerada numa chamada separada, acionada pelo banco. Liga e desliga por clínica, sem publicar de novo.</div>
+
+<h2>1. Como é hoje</h2>
+<pre>Meta → webhook: assinatura → grava a mensagem → portões* → Nina (agrupamento + IA + envio) → "ok" à Meta
+                                                                             └── 20 s a 2 min ──┘</pre>
+<p><small>* portões: contato bloqueado, Francisco, confirmação de consulta, código do portal, pesquisa de satisfação, reabertura da conversa, regras de quem responde.</small></p>
+<ul>
+  <li>A Meta reenvia a mensagem quando o "ok" demora: 2 de 24 mensagens reais chegaram duas vezes (~23 s depois).</li>
+  <li>O reenvio encontra a conversa travada pela primeira execução → "conversa ocupada" → o webhook devolve 503 → a Meta reenvia de novo. Hoje <b>o reenvio da Meta é o mecanismo de recuperação</b> desses casos.</li>
+  <li>Ponto a favor: a mensagem já é gravada antes da Nina, com chave única por mensagem, e a Nina já tem fila de turnos com vigia que retoma turnos travados.</li>
+</ul>
+
+<h2>2. Como fica</h2>
+<pre>Meta → webhook: assinatura → grava → portões → [Nina deve responder?]
+                                                    └─ sim: registra a TAREFA e pede ao banco para acionar → "ok" à Meta (~1–3 s)
+
+Banco (pg_net) → rota nova /api/public/nina/processar  (sem o limite de 30 s, a chamada fica aberta até 5 min)
+                 token → assume a tarefa → relê mensagem, configuração e estado da conversa
+                 → processarRespostaWhatsappNina(...)   ← a MESMA função de hoje (agrupamento, IA, envio)
+                 → conclui a tarefa  |  "ocupada" → volta para a fila com espera curta
+
+Varredura do banco (a cada 10 s): tarefa não iniciada em 60 s ou parada (reserva vencida) → aciona de novo
+                 até 3 tentativas → depois encaminha para a equipe com o aviso padrão (nenhum paciente sem resposta)</pre>
+<p><b>Por que pelo banco:</b> o Cloudflare corta trabalho feito depois do "ok" em 30 s, e ~1 em cada 10 respostas da Nina passa disso. Uma chamada aberta pelo banco é uma requisição nova, sem esse corte. O projeto já usa o mesmo mecanismo para o vigia (a cada minuto), backup e confirmação de consultas, e o executor de carga foi desenhado igual (<code>docs/nina/carga-servidor.md</code>).</p>
+
+<h2>3. O que muda no código</h2>
+<table>
+  <tr><th>Peça</th><th>O que faz</th></tr>
+  <tr><td><b>Migration</b> <code>nina_whatsapp_assincrono</code> (aditiva, reexecutável, desligada ao aplicar)</td><td>
+    Tabela <code>nina_whatsapp_tarefas</code>: uma linha por mensagem (única por <code>mensagem_id</code>), estado, token, tentativas, reserva (<code>expira_em</code>), último erro — sem texto nem telefone.<br>
+    Configuração <code>nina_whatsapp_assincrono_config</code> (ativo, URL da rota com formato fixo) e token próprio em <code>sistema_job_tokens</code>.<br>
+    Funções internas (SECURITY DEFINER, sem acesso para usuários): despachar, assumir, renovar, finalizar, varrer, diagnóstico.<br>
+    Agendamento <code>nina-whatsapp-varredura</code> a cada 10 s (só consulta SQL; sem tarefa pendente, não faz chamada).</td></tr>
+  <tr><td><b>Rota nova</b> <code>/api/public/nina/processar</code></td><td>Exige o token interno (comparação de tempo constante) e aceita só <code>{tarefa, token}</code>. Todo o resto vem do banco. Renova a reserva a cada 20 s enquanto trabalha.</td></tr>
+  <tr><td><b>Módulo novo</b> <code>whatsapp-assincrono.server.ts</code></td><td>Despachar (usado pelo webhook) e executar a tarefa (usado pela rota). A montagem da entrada da Nina (texto, áudio que falhou, tipo, conversa) fica numa função única, usada pelos dois caminhos, para não divergir.</td></tr>
+  <tr><td><b>Webhook</b></td><td>Só o trecho <code>if (deveResponder)</code> muda: com a chave ligada e o despacho aceito, marca "despachado" e segue; com a chave desligada ou se o despacho falhar, faz exatamente o que faz hoje.</td></tr>
+  <tr><td><b>Chave por clínica</b></td><td><code>nina_whatsapp_assincrono</code> em <code>clinica_feature_flags</code>. Desligar volta ao comportamento atual na hora, sem publicar.</td></tr>
+</table>
+
+<h2>4. O que NÃO muda</h2>
+<ul>
+  <li>Toda a regra da Nina: agrupamento de mensagens seguidas, ordem, revisão (mensagem nova invalida resposta antiga), pedido médico, transferência, "Nina não responde conversa que está com gente", áudio de resposta, pesquisa.</li>
+  <li>Os portões antes da Nina (bloqueio, Francisco, confirmação, portal, pesquisa, reabertura) continuam no webhook, na mesma ordem.</li>
+  <li>Ambiente de testes e console de homologação (não passam pelo webhook).</li>
+</ul>
+<div class="alerta"><b>Fica para uma fase 2 (se a medição pedir):</b> download de mídia, transcrição de áudio e leitura de foto continuam dentro do webhook, antes do "ok". Para texto, o "ok" sai em ~1–3 s; para áudio e foto, em ~5–15 s — ainda bem abaixo dos ~20 s em que a Meta reenviou.</div>
+
+<h2>5. Falhas e recuperação</h2>
+<table>
+  <tr><th>Situação</th><th>O que acontece</th></tr>
+  <tr><td>Meta reenvia a mesma mensagem</td><td>Mensagem já gravada + tarefa única por mensagem → ignorada.</td></tr>
+  <tr><td>Banco não consegue registrar a tarefa</td><td>O webhook processa como hoje (nada se perde).</td></tr>
+  <tr><td>A chamada do banco não chega / servidor cai antes de assumir</td><td>Varredura aciona de novo depois de 60 s.</td></tr>
+  <tr><td>Servidor cai no meio da resposta</td><td>Reserva vence (90 s) → varredura aciona de novo; os pontos de controle do vigia de turno já existentes evitam mandar a resposta duas vezes.</td></tr>
+  <tr><td>"Conversa ocupada" (hoje: 503 para a Meta)</td><td>A tarefa volta para a fila com espera crescente (2 → 30 s).</td></tr>
+  <tr><td>3 tentativas sem sucesso</td><td>Encaminha para a equipe com o aviso padrão, igual à desistência do vigia.</td></tr>
+  <tr><td>Configuração desligada</td><td>Despacho recusado → webhook processa como hoje.</td></tr>
+</table>
+
+<h2>6. Segurança e LGPD</h2>
+<ul>
+  <li>A chamada do banco leva só o id da tarefa e um token aleatório da tarefa; texto, telefone e nome nunca saem do banco nessa chamada.</li>
+  <li>Rota pública protegida por token guardado só no banco; funções internas sem acesso para <code>anon</code>/<code>authenticated</code>; tabela com RLS ligado e sem políticas (só o servidor).</li>
+  <li>Logs só com ids, tempos e estados.</li>
+</ul>
+
+<h2>7. Testes automatizados</h2>
+<ul>
+  <li>Webhook com a chave desligada: todos os testes atuais de simulação do webhook passam sem mudança.</li>
+  <li>Webhook com a chave ligada: responde "ok" sem chamar a Nina e registra uma tarefa; reenvio não cria segunda tarefa; falha no despacho cai no caminho de hoje.</li>
+  <li>Rota: recusa sem token, com token errado ou com campo a mais; tarefa assumida uma vez só; entrada da Nina idêntica à que o webhook montaria (texto, áudio, foto, lista interativa).</li>
+  <li>Recuperação: "ocupada" reagenda; reserva vencida volta; 3 falhas encaminham para a equipe.</li>
+  <li>Migration aplicada duas vezes em PostgreSQL descartável (como no executor de carga), conferindo fila, varredura e permissões.</li>
+</ul>
+
+<h2>8. Implantação</h2>
+<table>
+  <tr><th>#</th><th>Passo</th><th>Quem</th></tr>
+  <tr><td>1</td><td>Branch com código, testes e migration (configuração desligada) → PR</td><td>Claude</td></tr>
+  <tr><td>2</td><td>Merge, publicação no Lovable e aplicação da migration</td><td>Você autoriza / aplica</td></tr>
+  <tr><td>3</td><td><b>Prova da chamada longa:</b> ativar a configuração e rodar o diagnóstico (o banco chama a rota, que espera 90 s e registra o fim). Confirma que chamadas acima de 30 s terminam.</td><td>Você roda 1 comando SQL; Claude confere</td></tr>
+  <tr><td>4</td><td>Ligar a chave na Menino Jesus (única clínica com WhatsApp; volume real ainda baixo) e mandar do celular da equipe: texto, 3 seguidas, áudio, foto do pedido, pedido de atendente</td><td>Você / equipe</td></tr>
+  <tr><td>5</td><td>Conferir: cada mensagem entregue uma vez, "ok" em até 3 s para texto, tempo da Nina igual ao atual, nenhuma tarefa reacionada</td><td>Claude</td></tr>
+  <tr><td>6</td><td>Acompanhar 2–3 dias de tráfego real; depois seguir para a carga longa e o simulado com a equipe</td><td>Claude</td></tr>
+</table>
+<p><b>Volta atrás:</b> desligar a chave da clínica (efeito imediato). Em último caso, desligar a configuração. Nada é apagado.</p>
+
+<h2>9. Decisões para você</h2>
+<ol>
+  <li>Aprovar o desenho (despacho pelo banco + rota nova + varredura).</li>
+  <li>Autorizar a criação da migration (aditiva, desligada ao aplicar).</li>
+  <li>Ligar direto na Menino Jesus, atrás da chave, depois da prova do passo 3.</li>
+  <li>Deixar mídia (áudio e foto) para a fase 2.</li>
+</ol>
+</body>
+</html>
