@@ -4,6 +4,9 @@
 -- resposta. A varredura aciona de novo o que não começou ou parou no meio.
 -- Aditiva e reexecutável. Fica DESLIGADA: publicar a rota, ativar a configuração,
 -- rodar o diagnóstico e só então ligar a chave `nina_whatsapp_assincrono` da clínica.
+-- Ajuste antes da primeira aplicação (17/10/2026): a varredura roda a cada minuto,
+-- só como rede de segurança; a nova tentativa de "conversa ocupada" é acionada na
+-- hora e a própria rota espera o intervalo (menos registros no histórico do cron).
 -- Plano: docs/nina/plano-webhook-assincrono-2026-10-17.html
 
 CREATE TABLE IF NOT EXISTS public.nina_whatsapp_assincrono_config (
@@ -105,9 +108,10 @@ BEGIN
   RETURN _id;
 END $$;
 
+-- `aguardar_ms`: quanto a rota espera antes de tentar (nova tentativa de conversa ocupada).
 CREATE OR REPLACE FUNCTION public.nina_whatsapp_assumir(_tarefa uuid, _token uuid)
 RETURNS TABLE(clinica_id uuid, mensagem_id uuid, audio_falhou boolean, phone_number_id text,
-  modo text, diagnostico_segundos integer, tentativas integer)
+  modo text, diagnostico_segundos integer, tentativas integer, aguardar_ms integer)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 #variable_conflict use_column
 BEGIN
@@ -115,7 +119,8 @@ BEGIN
       expira_em=clock_timestamp()+interval '90 seconds'
     WHERE t.id=_tarefa AND t.token=_token AND t.estado='enviada' AND t.expira_em > clock_timestamp()
     RETURNING t.clinica_id, t.mensagem_id, t.audio_falhou, t.phone_number_id, t.modo,
-      t.diagnostico_segundos, t.tentativas;
+      t.diagnostico_segundos, t.tentativas,
+      least(30000, greatest(0, ceil(extract(epoch FROM (t.disponivel_em - clock_timestamp())) * 1000)))::integer;
 END $$;
 
 CREATE OR REPLACE FUNCTION public.nina_whatsapp_renovar(_tarefa uuid, _token uuid) RETURNS boolean
@@ -126,8 +131,9 @@ BEGIN
   RETURN FOUND;
 END $$;
 
--- concluida | falhou: encerra. repetir ("conversa ocupada"): volta para a fila com espera;
--- depois de 10 acionamentos, a mensagem vai para a equipe com o aviso padrão.
+-- concluida | falhou: encerra. repetir ("conversa ocupada"): aciona de novo na hora, e a
+-- rota espera o intervalo antes de tentar (sem depender da varredura); depois de 10
+-- acionamentos, a mensagem vai para a equipe com o aviso padrão.
 CREATE OR REPLACE FUNCTION public.nina_whatsapp_finalizar(
   _tarefa uuid, _token uuid, _resultado text, _aguardar_ms integer DEFAULT 0, _erro text DEFAULT NULL)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
@@ -143,7 +149,8 @@ BEGIN
         ELSE make_interval(secs=>greatest(0,least(60000,COALESCE(_aguardar_ms,0)))/1000.0) END,
       ultimo_erro=CASE WHEN _t.tentativas >= 10 THEN 'LIMITE_TENTATIVAS' ELSE left(_erro,300) END
       WHERE id=_tarefa;
-    IF _t.tentativas >= 10 OR COALESCE(_aguardar_ms,0) <= 0 THEN PERFORM nina_whatsapp_enviar(_tarefa); END IF;
+    -- Se a configuração estiver desligada, a tarefa fica pendente para a varredura.
+    PERFORM nina_whatsapp_enviar(_tarefa);
     RETURN true;
   END IF;
   UPDATE nina_whatsapp_tarefas SET
@@ -154,8 +161,9 @@ BEGIN
   RETURN true;
 END $$;
 
--- Cron: aciona o que está disponível ou parou (reserva vencida). Três chamadas
--- perdidas viram encaminhamento para a equipe; cinco encerram a tarefa.
+-- Cron (a cada minuto, rede de segurança): aciona o que ficou pendente ou parou
+-- (reserva vencida). Três chamadas perdidas viram encaminhamento para a equipe;
+-- cinco encerram a tarefa.
 CREATE OR REPLACE FUNCTION public.nina_whatsapp_varrer() RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE _t record; _n integer := 0; _falhas integer;
@@ -210,6 +218,6 @@ GRANT EXECUTE ON FUNCTION public.nina_whatsapp_assincrono_disponivel(),
   public.nina_whatsapp_renovar(uuid,uuid), public.nina_whatsapp_finalizar(uuid,uuid,text,integer,text)
   TO service_role;
 
--- Só consulta SQL; sem tarefa disponível, não faz chamada nenhuma.
-SELECT cron.schedule('nina-whatsapp-varredura', '5 seconds', 'SELECT public.nina_whatsapp_varrer()');
+-- Só consulta SQL; sem tarefa disponível, não faz chamada nenhuma. Mesmo ritmo do vigia.
+SELECT cron.schedule('nina-whatsapp-varredura', '* * * * *', 'SELECT public.nina_whatsapp_varrer()');
 NOTIFY pgrst, 'reload schema';

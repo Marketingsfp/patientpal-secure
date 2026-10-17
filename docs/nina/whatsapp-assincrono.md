@@ -14,7 +14,7 @@ webhook responde como sempre, na própria requisição.
 - Migration `20261017120000_nina_whatsapp_assincrono.sql` (aditiva, reexecutável,
   **desligada** ao aplicar): configuração, tarefas, token `nina-processar` em
   `sistema_job_tokens`, funções internas e o agendamento `nina-whatsapp-varredura`
-  (5 s, só SQL).
+  (a cada minuto, só SQL; rede de segurança).
 - `src/lib/nina/whatsapp-assincrono.server.ts`: chave, despacho e a execução da tarefa.
 - `src/routes/api/public/nina.processar.ts`: rota com token interno; o corpo traz só
   `{tarefa, token}`.
@@ -26,8 +26,8 @@ webhook responde como sempre, na própria requisição.
 | Situação | O que acontece |
 |---|---|
 | Reentrega da Meta | Tarefa única por mensagem; nada novo é acionado |
-| Chamada não chegou / servidor caiu | Reserva vence (60 s sem início, 90 s sem renovar) → varredura aciona de novo |
-| Conversa ocupada | Volta para a fila com espera (2 → 30 s); após 10 acionamentos, encaminha |
+| Chamada não chegou / servidor caiu | Reserva vence (60 s sem início, 90 s sem renovar) → a varredura (a cada minuto) aciona de novo, em até ~2 min |
+| Conversa ocupada | O banco aciona de novo na hora e a rota espera 2 → 30 s antes de tentar; após 10 acionamentos, encaminha |
 | 3 chamadas perdidas | Modo `encaminhar`: aviso padrão e fila da equipe |
 | 5 chamadas perdidas | Tarefa encerrada como `falhou` (`SEM_CONFIRMACAO`) |
 | Entrada já tratada | Conclui sem chamar a Nina (mesmo critério da reentrega) |
@@ -59,7 +59,7 @@ webhook responde como sempre, na própria requisição.
 ## Validação local (17/10/2026)
 
 - `bun scripts/test-nina-whatsapp-assincrono.mjs node_modules/@electric-sql/pglite/dist/index.js`:
-  migration aplicada duas vezes em PostgreSQL descartável, 59 verificações (fila,
+  migration aplicada duas vezes em PostgreSQL descartável, 63 verificações (fila,
   reentrega, reserva, repetição, varredura, encaminhamento, diagnóstico, retenção,
   permissões).
 - `src/lib/nina/__tests__/whatsapp-assincrono.test.ts`: rota (token, pedido estrito,
