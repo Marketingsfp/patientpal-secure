@@ -20,6 +20,36 @@ function executar(cenario: string) {
   return r;
 }
 describe("POST WhatsApp real com serviços simulados", () => {
+  it("chave ligada: grava, despacha e responde sem chamar a Nina na requisição da Meta", () => {
+    const r = executar("assincrono-ligado");
+    expect([r.primeira, r.segunda]).toEqual([200, 200]);
+    expect(r.modelo).toBe(0);
+    expect(r.transporte).toBe(0);
+    expect(r.entradas).toHaveLength(1);
+    // A reentrega chega ao banco, que devolve a mesma tarefa (único por mensagem).
+    expect(r.despachos).toHaveLength(2);
+    expect(r.despachos[0]).toEqual({
+      _clinica_id: "clinica",
+      _mensagem_id: r.entradas[0].id,
+      _audio_falhou: false,
+      _phone_number_id: "telefone-clinica",
+    });
+    expect(r.logs).toEqual(["processado_ok:nina_despachada", "processado_ok:nina_despachada"]);
+  });
+  it("chave ligada e despacho recusado: responde como antes, na própria requisição", () => {
+    const r = executar("assincrono-despacho-falha");
+    expect([r.primeira, r.segunda]).toEqual([200, 200]);
+    expect(r.despachos).toHaveLength(1);
+    expect(r.modelo).toBe(1);
+    expect(r.transporte).toBe(1);
+    expect(r.logs[0]).toBe("processado_ok");
+  });
+  it("chave desligada: nenhum despacho, Nina na própria requisição", () => {
+    const r = executar("chave-desligada");
+    expect(r.despachos).toHaveLength(0);
+    expect(r.modelo).toBe(1);
+    expect(r.transporte).toBe(1);
+  });
   for (const [cenario, status] of [
     ["francisco-recusa", "completed"],
     ["francisco-humano", "handoff"],
