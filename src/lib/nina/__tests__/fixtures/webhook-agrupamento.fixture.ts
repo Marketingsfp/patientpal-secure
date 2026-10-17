@@ -29,7 +29,12 @@ const db: Record<string, Linha[]> = {
   whatsapp_mensagens: [],
   whatsapp_webhook_logs: [],
   whatsapp_configs: [],
+  // Resposta acionada pelo banco (17/10/2026): só os cenários "assincrono-*" ligam a chave.
+  clinica_feature_flags: cenario.startsWith("assincrono-")
+    ? [{ clinica_id: "clinica", flag_key: "nina_whatsapp_assincrono", ativo: true }]
+    : [],
 };
+const despachos: Linha[] = [];
 let falhaInsert = cenario === "persistencia",
   falhaAgrupar = ["agrupamento", "grupo-encerramento-posterior"].includes(cenario);
 let falhaRevisao = [
@@ -139,6 +144,12 @@ mock.module("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: consulta,
     rpc: async (nome: string, args: any) => {
+      if (nome === "nina_whatsapp_despachar") {
+        despachos.push(args);
+        return cenario === "assincrono-despacho-falha"
+          ? { data: null, error: { message: "Despacho indisponível" } }
+          : { data: "tarefa-assincrona", error: null };
+      }
       if (nome !== "nina_revisao_registrar_entrada") throw new Error(`RPC não esperada ${nome}`);
       const mensagem = db.whatsapp_mensagens!.find((m) => m.id === args._mensagem_id)!;
       if (falhaRevisao && cenario !== "revisao-resposta-perdida")
@@ -463,6 +474,7 @@ console.log(
       entradasGerador,
       esperas,
       leiturasFoto,
+      despachos,
       entradas: db.whatsapp_mensagens!.filter((m) => m.direction === "in"),
       saidas: db.whatsapp_mensagens!.filter((m) => m.direction === "out"),
       logs: db.whatsapp_webhook_logs!.map((l) => l.resultado),
