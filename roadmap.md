@@ -1,5 +1,12 @@
 # Roadmap — Instruções da Nina
 
+## Área do Paciente — decisões de 17/10/2026 (não publicar)
+- [x] Registrar papéis confirmados para liberação de documentos.
+- [ ] Conferir/restabelecer pré-requisitos ausentes da fase 2, mediante aprovação do plano.
+- [ ] Anexos clínicos: categorias seguras, liberação manual/automática, download de 5 minutos por sessão e auditoria.
+- [ ] Pedidos de exame: tabela própria, emissão/PDF/listagem/cancelamento e migração somente de pedidos identificados com segurança.
+- [ ] Testes de isolamento e liberação; validação na prévia sem dados reais.
+
 - [x] FASE 1 — Backend: tabela versionada de Instruções da Nina (global, escopos whatsapp + painel interno) + importação da v1 com o conteúdo atual; fallback do código mantido.
 - [x] FASE 2 — Interface: seção "Instruções da Nina" abaixo do canvas em Nina → Arquitetura, editor grande carregado da fonte persistente, botão "Salvar rascunho", sem alterar comportamento da Nina.
 - [x] FASE 3 — Publicação versionada das Instruções da Nina: publicar cria nova versão (anterior arquivada, nunca apagada), histórico com responsável/status/comentário, leitura de versão antiga, comparação e restauração como nova versão. Runtime ainda usa o texto do código.
